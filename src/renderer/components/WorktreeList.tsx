@@ -60,25 +60,27 @@ export function WorktreeList({ worktrees }: Props) {
             </div>
             <div className="mt-0.5 text-xs text-ink-3 truncate font-mono">{wt.path}</div>
           </div>
-          <div className="shrink-0 flex items-center gap-3">
+          <div className="shrink-0 flex items-center gap-2">
             {ghosttyInstalled && (
               <button
                 type="button"
                 onClick={() => void window.gbl.openInGhostty(wt.path)}
-                className="text-ink-3 hover:text-ink"
+                className="inline-flex h-7 items-center gap-1.5 rounded-md border border-line-2 bg-surface px-2.5 text-xs text-ink-2 hover:text-ink hover:bg-bg shadow-sm"
                 title={t('worktrees.openInGhosttyTitle')}
                 aria-label={t('worktrees.openInGhosttyTitle')}
               >
                 <Terminal size={14} />
+                <span>Ghostty</span>
               </button>
             )}
             <button
               type="button"
               onClick={() => void window.gbl.openInFinder(wt.path)}
-              className="text-xs text-ink-3 hover:text-ink underline-offset-2 hover:underline"
+              className="inline-flex h-7 items-center gap-1.5 rounded-md border border-line-2 bg-surface px-2.5 text-xs text-ink-2 hover:text-ink hover:bg-bg shadow-sm"
               title={t('worktrees.revealTitle')}
             >
-              {t('worktrees.reveal')}
+              <FolderOpen size={14} />
+              <span>{t('worktrees.reveal')}</span>
             </button>
           </div>
         </li>
