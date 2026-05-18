@@ -5,7 +5,6 @@
 
 import { useEffect } from 'react'
 import { ArrowLeft, FileText, FileWarning } from 'lucide-react'
-import { cn } from '#/renderer/lib/cn.ts'
 import { useReposStore } from '#/renderer/stores/repos.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import type { CommitDetail as CommitDetailType } from '#/renderer/types-bridge.ts'
@@ -92,13 +91,9 @@ export function CommitDetail({ repoId, detail }: Props) {
                   <span className="text-muted-foreground/60">{t('commit.binary')}</span>
                 ) : (
                   <>
-                    <span className="text-success">+{f.added}</span>{' '}
-                    <span className="text-danger">−{f.deleted}</span>
+                    <span className="text-success">+{f.added}</span> <span className="text-danger">−{f.deleted}</span>
                     <span
-                      className={cn(
-                        'ml-2 inline-block align-middle h-1.5 rounded-sm',
-                        // Bar widths capped at 60px, scaled against largest change in commit.
-                      )}
+                      className="ml-2 inline-block align-middle h-1.5 rounded-sm"
                       style={{
                         width: `${Math.min(60, Math.max(2, ((f.added + f.deleted) / Math.max(1, ...files.map((x) => x.added + x.deleted))) * 60))}px`,
                         background: `linear-gradient(to right, var(--color-success) ${

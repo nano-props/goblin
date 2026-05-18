@@ -28,7 +28,6 @@ contextBridge.exposeInMainWorld('gbl', {
   // ---- Mutating ----------------------------------------------------------
   checkout: (cwd, branch) => safeInvoke('repo:checkout', cwd, branch),
   deleteBranch: (cwd, branch) => safeInvoke('repo:delete-branch', cwd, branch),
-  removeWorktree: (cwd, branch, worktreePath) => safeInvoke('repo:remove-worktree', cwd, branch, worktreePath),
   pull: (cwd, branch, worktreePath) => safeInvoke('repo:pull', cwd, branch, worktreePath),
   push: (cwd, branch) => safeInvoke('repo:push', cwd, branch),
   fetch: (cwd) => safeInvoke('repo:fetch', cwd),
@@ -77,7 +76,7 @@ contextBridge.exposeInMainWorld('gbl', {
   i18n: {
     /** One-shot pull of { lang, pref, dict } at boot. */
     get: () => safeInvoke('i18n:get'),
-    /** Set the user preference: 'auto' | 'en' | 'zh' | 'ko'. */
+    /** Set the user preference: 'auto' | 'en' | 'zh' | 'ko' | 'ja'. */
     setPref: (pref) => safeInvoke('i18n:set-pref', pref),
     /** Subscribe to language changes — receives { lang, pref, dict }. */
     onChange: (cb) => {

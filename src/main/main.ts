@@ -9,6 +9,7 @@ import { wireThemeIpc } from '#/main/ipc/theme.ts'
 import { wireSettingsIpc } from '#/main/ipc/settings.ts'
 import { wireMenuIpc } from '#/main/ipc/menu.ts'
 import { wireI18nIpc } from '#/main/ipc/i18n.ts'
+import { wireOpenersIpc } from '#/main/ipc/openers.ts'
 
 async function main(): Promise<void> {
   if (!app.requestSingleInstanceLock()) {
@@ -71,6 +72,7 @@ async function main(): Promise<void> {
   wireSettingsIpc()
   wireMenuIpc()
   wireI18nIpc()
+  wireOpenersIpc()
 
   buildAppMenu()
   globalShortcut.register('Alt+G', () => {

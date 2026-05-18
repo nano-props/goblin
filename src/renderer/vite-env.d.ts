@@ -33,7 +33,6 @@ interface GblBridge {
   commit: (cwd: string, hash: string) => Promise<CommitDetail | null>
   checkout: (cwd: string, branch: string) => Promise<ExecResult>
   deleteBranch: (cwd: string, branch: string) => Promise<ExecResult>
-  removeWorktree: (cwd: string, branch: string, worktreePath: string) => Promise<ExecResult>
   pull: (cwd: string, branch: string, worktreePath?: string) => Promise<ExecResult>
   push: (cwd: string, branch: string) => Promise<ExecResult>
   fetch: (cwd: string) => Promise<ExecResult>

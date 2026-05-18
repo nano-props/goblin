@@ -1,5 +1,5 @@
 // Active-repo body. Header (name + path + actions) sits above a
-// row of sub-tabs (Branches / Log / Status / Worktrees); transient
+// row of sub-tabs (Branches / Log / Status); transient
 // success/error feedback surfaces as toasts (sonner) instead of
 // inline banners so the layout doesn't shift. Each sub-tab body
 // fills the remaining vertical space.

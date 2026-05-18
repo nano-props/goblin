@@ -1,6 +1,6 @@
-import { git, gitResultWithOptions } from '#/main/git/helper.ts'
+import { git } from '#/main/git/helper.ts'
 import { parseStatus, parseWorktrees } from '#/main/git/parsers.ts'
-import type { ExecResult, WorktreeInfo } from '#/main/git/types.ts'
+import type { WorktreeInfo } from '#/main/git/types.ts'
 
 export async function getWorktrees(cwd: string): Promise<WorktreeInfo[]> {
   try {
@@ -29,8 +29,4 @@ export async function getWorktrees(cwd: string): Promise<WorktreeInfo[]> {
   } catch {
     return []
   }
-}
-
-export async function removeWorktree(cwd: string, worktreePath: string): Promise<ExecResult> {
-  return gitResultWithOptions(cwd, { timeoutMs: 60_000 }, 'worktree', 'remove', '--', worktreePath)
 }

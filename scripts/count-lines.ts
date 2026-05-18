@@ -6,7 +6,6 @@ import path from 'node:path'
 const repoRoot = path.resolve(import.meta.dirname, '..')
 
 function countLines(text: string): number {
-  // Count non-empty lines (lines with at least one non-whitespace character)
   return text.split(/\r?\n/).filter((line) => line.trim().length > 0).length
 }
 

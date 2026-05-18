@@ -72,8 +72,7 @@ export const ja: Record<DictKey, string> = {
   'empty.title': 'リポジトリが開かれていません',
   'empty.body.before': '上部ツールバーの ',
   'empty.body.openLabel': '開く',
-  'empty.body.middle':
-    ' から git リポジトリを追加できます。複数のリポジトリを開いて、サイドバーで切り替えられます。 ',
+  'empty.body.middle': ' から git リポジトリを追加できます。複数のリポジトリを開いて、サイドバーで切り替えられます。 ',
   'empty.body.after': ' でショートカットを表示します。',
 
   // ---- Right-side tabs ---------------------------------------------------
@@ -125,6 +124,8 @@ export const ja: Record<DictKey, string> = {
   'worktrees.revealTitle': 'Finder で表示',
   'worktrees.openInGhosttyTitle': 'Ghostty で開く',
   'worktrees.openInGhosttyLabel': 'Ghostty',
+  'worktrees.copyInfo': 'ワークツリー情報をコピー',
+  'worktrees.copyInfoOk': 'ワークツリー情報をクリップボードにコピーしました',
 
   // ---- Repo actions ------------------------------------------------------
   'action.checkout': 'チェックアウト',
@@ -133,7 +134,6 @@ export const ja: Record<DictKey, string> = {
   'action.fetch': 'フェッチ',
   'action.github': 'GitHub',
   'action.deleteBranch': 'ブランチを削除',
-  'action.removeWorktree': 'ワークツリーを削除',
   'action.checkoutCurrent': 'すでにこのブランチです',
   'action.checkoutInWorktree': '{path} のワークツリーですでにチェックアウト済み',
   'action.checkoutTitle': '{branch} をチェックアウト',
@@ -153,10 +153,6 @@ export const ja: Record<DictKey, string> = {
   'action.confirmDeleteBranchBody.before': 'ローカルブランチ ',
   'action.confirmDeleteBranchBody.after': ' を削除します。完全にマージされていない場合、Git が拒否します。',
   'action.confirmDeleteBranchConfirm': 'ブランチを削除',
-  'action.confirmRemoveWorktreeTitle': '{branch} のワークツリーを削除しますか？',
-  'action.confirmRemoveWorktreeBody.before': 'ワークツリー ',
-  'action.confirmRemoveWorktreeBody.after': ' を削除します。ローカル変更がある場合、Git が拒否します。',
-  'action.confirmRemoveWorktreeConfirm': 'ワークツリーを削除',
   'action.cancel': 'キャンセル',
   'action.menu': '操作',
   'action.refresh': '更新',
@@ -174,7 +170,6 @@ export const ja: Record<DictKey, string> = {
   'error.cannotDeleteCurrentBranch': '現在のブランチは削除できません',
   'error.cannotDeleteProtectedBranch': '保護されたブランチは削除できません',
   'error.cannotDeleteCheckedOutBranch': 'ワークツリーでチェックアウト済みのブランチは削除できません',
-  'error.cannotRemoveMainWorktree': 'メインワークツリーは削除できません',
   'error.worktreeNotFoundForBranch': 'このブランチのワークツリーが見つかりません',
   'error.ghosttyNotInstalled': 'Ghostty がインストールされていません',
   'error.renderCrashTitle': 'このビューの描画中にエラーが発生しました',

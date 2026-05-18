@@ -3,6 +3,4 @@
 // invoke main from menu actions. Kept as a separate file so future
 // menu-driven IPC (e.g. "About" dialog) has a clear home.
 
-export function wireMenuIpc(): void {
-  // Reserved for future menu-driven IPC handlers.
-}
+export function wireMenuIpc(): void {}

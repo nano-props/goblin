@@ -1,4 +1,4 @@
-// English dictionary. Keep keys in sync with zh.ts and ko.ts.
+// English dictionary. Keep keys in sync with zh.ts, ko.ts, and ja.ts.
 //
 // Style: terse, sentence case for buttons/menu items, period-terminated
 // sentences for hints. Brand names (Goblin / GitHub / Finder) are not
@@ -127,6 +127,8 @@ export const en = {
   'worktrees.revealTitle': 'Reveal in Finder',
   'worktrees.openInGhosttyTitle': 'Open in Ghostty',
   'worktrees.openInGhosttyLabel': 'Ghostty',
+  'worktrees.copyInfo': 'Copy worktree info',
+  'worktrees.copyInfoOk': 'Worktree info copied to clipboard',
 
   // ---- Repo actions -------------------------------------------------------
   'action.checkout': 'Checkout',
@@ -135,7 +137,6 @@ export const en = {
   'action.fetch': 'Fetch',
   'action.github': 'GitHub',
   'action.deleteBranch': 'Delete branch',
-  'action.removeWorktree': 'Remove worktree',
   'action.checkoutCurrent': 'Already on this branch',
   'action.checkoutInWorktree': 'Already checked out in worktree at {path}',
   'action.checkoutTitle': 'Checkout {branch}',
@@ -154,10 +155,6 @@ export const en = {
   'action.confirmDeleteBranchBody.before': 'This will delete local branch ',
   'action.confirmDeleteBranchBody.after': '. Git will refuse if it is not fully merged.',
   'action.confirmDeleteBranchConfirm': 'Delete branch',
-  'action.confirmRemoveWorktreeTitle': 'Remove worktree for {branch}?',
-  'action.confirmRemoveWorktreeBody.before': 'This will remove the worktree at ',
-  'action.confirmRemoveWorktreeBody.after': '. Git will refuse if it has local changes.',
-  'action.confirmRemoveWorktreeConfirm': 'Remove worktree',
   'action.cancel': 'Cancel',
   'action.menu': 'Actions',
   'action.refresh': 'Refresh',
@@ -175,7 +172,6 @@ export const en = {
   'error.cannotDeleteCurrentBranch': 'Cannot delete the current branch',
   'error.cannotDeleteProtectedBranch': 'Cannot delete a protected branch',
   'error.cannotDeleteCheckedOutBranch': 'Cannot delete a branch checked out in a worktree',
-  'error.cannotRemoveMainWorktree': 'Cannot remove the main worktree',
   'error.worktreeNotFoundForBranch': 'Worktree not found for branch',
   'error.ghosttyNotInstalled': 'Ghostty not installed',
   'error.renderCrashTitle': 'Something broke while rendering this view',
@@ -197,8 +193,7 @@ export const en = {
   'settings.lang.ko': '한국어',
   'settings.lang.ja': '日本語',
   'settings.fetch': 'Auto-fetch',
-  'settings.fetchHint':
-    'Background `git fetch` for the active repository. Disable on slow networks.',
+  'settings.fetchHint': 'Background `git fetch` for the active repository. Disable on slow networks.',
   'settings.fetch.off': 'Off',
   'settings.fetch.30s': '30 sec',
   'settings.fetch.1m': '1 min',

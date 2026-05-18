@@ -12,7 +12,18 @@
 // network timeout (90s).
 
 import { useState } from 'react'
-import { ArrowDown, ArrowUp, ChevronDown, ExternalLink, GitBranch, Loader2, Terminal, Trash2, X } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  Copy,
+  ExternalLink,
+  GitBranch,
+  Loader2,
+  Terminal,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { useReposStore, type RepoState } from '#/renderer/stores/repos.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { ConfirmDialog } from '#/renderer/components/ConfirmDialog.tsx'
@@ -24,12 +35,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '#/renderer/components/ui/dropdown-menu.tsx'
+import { formatWorktreeInfo } from '#/renderer/lib/worktree-info.ts'
 import type { BranchInfo } from '#/renderer/types.ts'
 
 const PROTECTED_BRANCHES = new Set(['main', 'master', 'develop', 'trunk'])
 
-type Op = 'checkout' | 'pull' | 'push' | 'github' | 'ghostty' | 'deleteBranch' | 'removeWorktree'
+type Op = 'checkout' | 'pull' | 'push' | 'github' | 'ghostty' | 'deleteBranch' | 'copyWorktreeInfo'
 const CANCELLABLE_OPS = new Set<Op>(['pull', 'push'])
+const SILENT_SUCCESS_OPS = new Set<Op>(['github', 'ghostty'])
+const REFRESH_AFTER_OPS = new Set<Op>(['checkout', 'pull', 'push', 'deleteBranch'])
 
 interface Props {
   repo: RepoState
@@ -45,7 +59,6 @@ export function BranchActionsMenu({ repo, branch, ghosttyInstalled }: Props) {
   const [busy, setBusy] = useState<Op | null>(null)
   const [pushConfirm, setPushConfirm] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
-  const [removeWorktreeConfirm, setRemoveWorktreeConfirm] = useState<{ branch: string; path: string } | null>(null)
   const [open, setOpen] = useState(false)
 
   async function run(op: Op, fn: () => Promise<{ ok: boolean; message: string }>) {
@@ -59,13 +72,13 @@ export function BranchActionsMenu({ repo, branch, ghosttyInstalled }: Props) {
       // A "GitHub: OK" toast on top of that is noise. Failures still
       // surface (no origin remote, ghostty crashed) because the user
       // might miss the lack of a tab/window.
-      const skipSuccessToast = (op === 'github' || op === 'ghostty') && result.ok
+      const skipSuccessToast = result.ok && SILENT_SUCCESS_OPS.has(op)
       if (!skipSuccessToast) setLastResult(repo.id, result)
       // Mutating ops change branch state — refresh both snapshot and
       // status. Status drives the always-visible header badge, so we
       // refresh it regardless of which tab is active (otherwise a
       // checkout from the Branches tab leaves the badge count stale).
-      if (op !== 'github' && op !== 'ghostty') {
+      if (REFRESH_AFTER_OPS.has(op)) {
         await refreshSnapshot(repo.id)
         await refreshStatus(repo.id)
       }
@@ -96,16 +109,22 @@ export function BranchActionsMenu({ repo, branch, ghosttyInstalled }: Props) {
     setOpen(false)
   }
 
-  function handleRemoveWorktree() {
-    if (branch.worktreePath) {
-      setRemoveWorktreeConfirm({ branch: branch.name, path: branch.worktreePath })
-      setOpen(false)
-    }
+  function handleCopyWorktreeInfo() {
+    if (!branch.worktreePath) return
+    setOpen(false)
+    void run('copyWorktreeInfo', async () => {
+      try {
+        await navigator.clipboard.writeText(formatWorktreeInfo(repo, branch))
+        return { ok: true, message: 'worktrees.copyInfoOk' }
+      } catch (err) {
+        return { ok: false, message: err instanceof Error ? err.message : String(err) }
+      }
+    })
   }
 
   const isCurrent = branch.name === repo.currentBranch
   const checkedOutInAnotherWorktree = !!branch.worktreePath && !isCurrent
-  const removableWorktree = checkedOutInAnotherWorktree && !branch.worktreeIsPrimary
+  const canCopyWorktreeInfo = checkedOutInAnotherWorktree && !branch.worktreeIsPrimary
   const isProtected = PROTECTED_BRANCHES.has(branch.name)
   const isRegularBranch = !isCurrent && !branch.worktreePath && !isProtected
   const cancellable = busy && CANCELLABLE_OPS.has(busy)
@@ -190,13 +209,13 @@ export function BranchActionsMenu({ repo, branch, ghosttyInstalled }: Props) {
             <ExternalLink />
             {t('action.github')}
           </DropdownMenuItem>
-          {(removableWorktree || isRegularBranch) && (
+          {(canCopyWorktreeInfo || isRegularBranch) && (
             <>
               <DropdownMenuSeparator />
-              {removableWorktree ? (
-                <DropdownMenuItem disabled={!!busy} onClick={handleRemoveWorktree} variant="destructive">
-                  <Trash2 />
-                  {t('action.removeWorktree')}
+              {canCopyWorktreeInfo ? (
+                <DropdownMenuItem disabled={!!busy} onClick={handleCopyWorktreeInfo}>
+                  <Copy />
+                  {t('worktrees.copyInfo')}
                 </DropdownMenuItem>
               ) : (
                 <DropdownMenuItem disabled={!!busy} onClick={handleDeleteBranch} variant="destructive">
@@ -253,33 +272,6 @@ export function BranchActionsMenu({ repo, branch, ghosttyInstalled }: Props) {
           const target = deleteConfirm
           setDeleteConfirm(null)
           if (target) void run('deleteBranch', () => window.gbl.deleteBranch(repo.id, target))
-        }}
-      />
-      <ConfirmDialog
-        open={removeWorktreeConfirm !== null}
-        title={
-          removeWorktreeConfirm ? t('action.confirmRemoveWorktreeTitle', { branch: removeWorktreeConfirm.branch }) : ''
-        }
-        message={
-          removeWorktreeConfirm ? (
-            <span>
-              {t('action.confirmRemoveWorktreeBody.before')}
-              <b className="text-foreground">{removeWorktreeConfirm.path}</b>
-              {t('action.confirmRemoveWorktreeBody.after')}
-            </span>
-          ) : (
-            ''
-          )
-        }
-        confirmLabel={t('action.confirmRemoveWorktreeConfirm')}
-        destructive
-        onCancel={() => setRemoveWorktreeConfirm(null)}
-        onConfirm={() => {
-          const target = removeWorktreeConfirm
-          setRemoveWorktreeConfirm(null)
-          if (target) {
-            void run('removeWorktree', () => window.gbl.removeWorktree(repo.id, target.branch, target.path))
-          }
         }}
       />
     </>

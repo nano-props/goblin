@@ -65,7 +65,8 @@ export const ko: Record<DictKey, string> = {
   'empty.title': '열린 리포지토리가 없습니다',
   'empty.body.before': '툴바의 ',
   'empty.body.openLabel': '열기',
-  'empty.body.middle': ' 를 눌러 git 리포지토리를 추가하세요. 여러 리포지토리를 동시에 열고 사이드바에서 전환할 수 있습니다. ',
+  'empty.body.middle':
+    ' 를 눌러 git 리포지토리를 추가하세요. 여러 리포지토리를 동시에 열고 사이드바에서 전환할 수 있습니다. ',
   'empty.body.after': ' 로 단축키 보기.',
 
   // ---- Right-side tabs ---------------------------------------------------
@@ -117,6 +118,8 @@ export const ko: Record<DictKey, string> = {
   'worktrees.revealTitle': 'Finder 에서 보기',
   'worktrees.openInGhosttyTitle': 'Ghostty에서 열기',
   'worktrees.openInGhosttyLabel': 'Ghostty',
+  'worktrees.copyInfo': '워크트리 정보 복사',
+  'worktrees.copyInfoOk': '워크트리 정보를 클립보드에 복사했습니다',
 
   // ---- Repo actions ------------------------------------------------------
   'action.checkout': '체크아웃',
@@ -125,7 +128,6 @@ export const ko: Record<DictKey, string> = {
   'action.fetch': '페치',
   'action.github': 'GitHub',
   'action.deleteBranch': '브랜치 삭제',
-  'action.removeWorktree': '워크트리 제거',
   'action.checkoutCurrent': '이미 이 브랜치에 있습니다',
   'action.checkoutInWorktree': '{path} 워크트리에서 이미 체크아웃됨',
   'action.checkoutTitle': '{branch} 체크아웃',
@@ -144,10 +146,6 @@ export const ko: Record<DictKey, string> = {
   'action.confirmDeleteBranchBody.before': '로컬 브랜치 ',
   'action.confirmDeleteBranchBody.after': ' 을(를) 삭제합니다. 완전히 병합되지 않았다면 Git 이 거부합니다.',
   'action.confirmDeleteBranchConfirm': '브랜치 삭제',
-  'action.confirmRemoveWorktreeTitle': '{branch} 의 워크트리를 정리할까요?',
-  'action.confirmRemoveWorktreeBody.before': '워크트리 경로 ',
-  'action.confirmRemoveWorktreeBody.after': ' 을(를) 제거합니다. 로컬 변경이 있으면 Git 이 거부합니다.',
-  'action.confirmRemoveWorktreeConfirm': '워크트리 제거',
   'action.cancel': '취소',
   'action.menu': '작업',
   'action.refresh': '새로 고침',
@@ -165,7 +163,6 @@ export const ko: Record<DictKey, string> = {
   'error.cannotDeleteCurrentBranch': '현재 브랜치는 삭제할 수 없습니다',
   'error.cannotDeleteProtectedBranch': '보호된 브랜치는 삭제할 수 없습니다',
   'error.cannotDeleteCheckedOutBranch': '워크트리에서 체크아웃된 브랜치는 삭제할 수 없습니다',
-  'error.cannotRemoveMainWorktree': '메인 워크트리는 제거할 수 없습니다',
   'error.worktreeNotFoundForBranch': '브랜치에 해당하는 워크트리를 찾을 수 없습니다',
   'error.ghosttyNotInstalled': 'Ghostty가 설치되어 있지 않습니다',
   'error.renderCrashTitle': '이 화면을 렌더링하는 중에 오류가 발생했습니다',
@@ -187,8 +184,7 @@ export const ko: Record<DictKey, string> = {
   'settings.lang.ko': '한국어',
   'settings.lang.ja': '日本語',
   'settings.fetch': '자동 동기화',
-  'settings.fetchHint':
-    '활성 리포지토리에 대해 백그라운드에서 `git fetch` 를 실행합니다. 네트워크가 느릴 때는 끄세요.',
+  'settings.fetchHint': '활성 리포지토리에 대해 백그라운드에서 `git fetch` 를 실행합니다. 네트워크가 느릴 때는 끄세요.',
   'settings.fetch.off': '끄기',
   'settings.fetch.30s': '30 초',
   'settings.fetch.1m': '1 분',
