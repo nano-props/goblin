@@ -17,7 +17,7 @@ import { useT } from '#/renderer/stores/i18n.ts'
 import { Badge } from '#/renderer/components/ui/badge.tsx'
 import { BranchActionsMenu } from '#/renderer/components/BranchActionsMenu.tsx'
 import { cn } from '#/renderer/lib/cn.ts'
-import { lastPathSegment } from '#/renderer/lib/paths.ts'
+import { lastPathSegment, tildify } from '#/renderer/lib/paths.ts'
 
 interface Props {
   repo: RepoState
@@ -128,8 +128,17 @@ export function BranchList({ repo }: Props) {
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="truncate font-medium text-foreground">{b.name}</span>
+                {b.isDefault && (
+                  <Badge variant="brand" className="font-mono leading-4">
+                    {t('branches.default')}
+                  </Badge>
+                )}
                 {isWorktree && b.worktreePath && (
-                  <Badge variant={b.worktreeDirty ? 'warning' : 'brand'} className="gap-1" title={b.worktreePath}>
+                  <Badge
+                    variant={b.worktreeDirty ? 'warning' : 'brand'}
+                    className="gap-1"
+                    title={tildify(b.worktreePath)}
+                  >
                     <FolderTree size={10} />
                     {lastPathSegment(b.worktreePath)}
                     {b.worktreeDirty && <span className="ml-0.5 uppercase tracking-wide">· {t('branches.dirty')}</span>}

@@ -25,7 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#
 import { Button } from '#/renderer/components/ui/button.tsx'
 import { useReposStore, type RepoState } from '#/renderer/stores/repos.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
-import { lastPathSegment, parentDir, tildify } from '#/renderer/lib/paths.ts'
+import { lastPathSegment, parentDir, tildify, untildify } from '#/renderer/lib/paths.ts'
 
 interface Props {
   open: boolean
@@ -67,12 +67,14 @@ export function CreateWorktreeDialog({ open, repo, onClose }: Props) {
   }, [open])
 
   const branchTrimmed = branch.trim()
-  const pathTrimmed = worktreePath.trim()
+  const pathTrimmed = untildify(worktreePath.trim())
   const defaultPath = computeDefaultPath(repo.id, branchTrimmed)
   // Effective path that will be sent on submit: user's typed value if
   // provided, else the auto-derived sibling default. Shown as a
   // greyed-out preview so users know what they'll get without typing.
   const effectivePath = pathTrimmed || defaultPath
+  const displayDefaultPath = tildify(defaultPath)
+  const displayEffectivePath = tildify(effectivePath)
   const canSubmit = !busy && branchTrimmed.length > 0 && effectivePath.length > 0 && base.length > 0
 
   async function handleSubmit() {
@@ -157,15 +159,11 @@ export function CreateWorktreeDialog({ open, repo, onClose }: Props) {
               value={worktreePath}
               disabled={!branchTrimmed}
               onChange={(e) => setWorktreePath(e.target.value)}
-              placeholder={defaultPath}
+              placeholder={displayDefaultPath}
               className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
             />
-            <div className="mt-1 text-xs text-muted-foreground truncate" title={effectivePath || undefined}>
-              {!branchTrimmed
-                ? t('action.createWorktreePathDisabledHint')
-                : effectivePath
-                  ? tildify(effectivePath)
-                  : ''}
+            <div className="mt-1 text-xs text-muted-foreground truncate" title={displayEffectivePath || undefined}>
+              {!branchTrimmed ? t('action.createWorktreePathDisabledHint') : effectivePath ? displayEffectivePath : ''}
             </div>
           </div>
         </div>

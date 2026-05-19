@@ -95,6 +95,7 @@ export const ja: Record<DictKey, string> = {
   'branches.gone': '消失',
   'branches.dirty': '変更あり',
   'branches.worktree': 'wt',
+  'branches.default': 'デフォルト',
   'branches.noUpstream': '上流なし',
 
   // ---- Log list ----------------------------------------------------------

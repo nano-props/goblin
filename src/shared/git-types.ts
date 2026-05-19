@@ -6,6 +6,7 @@
 export interface BranchInfo {
   name: string
   isCurrent: boolean
+  isDefault?: boolean
   tracking?: string
   trackingGone?: boolean
   ahead: number

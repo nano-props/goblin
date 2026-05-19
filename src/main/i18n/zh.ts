@@ -86,6 +86,7 @@ export const zh: Record<DictKey, string> = {
   'branches.gone': '已失联',
   'branches.dirty': '有改动',
   'branches.worktree': 'wt',
+  'branches.default': '默认',
   'branches.noUpstream': '未设置上游',
 
   // ---- Log list ----------------------------------------------------------

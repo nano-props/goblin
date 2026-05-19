@@ -39,6 +39,32 @@ export async function getCurrentBranch(cwd: string): Promise<string> {
   }
 }
 
+export async function getDefaultBranch(cwd: string): Promise<string> {
+  try {
+    const ref = await git(cwd, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])
+    return ref.startsWith('origin/') ? ref.slice('origin/'.length) : ref
+  } catch {
+    return ''
+  }
+}
+
+export function prioritizeDefaultBranch(branches: BranchInfo[], defaultBranch: string): BranchInfo[] {
+  if (!defaultBranch) return branches
+  const idx = branches.findIndex((branch) => branch.name === defaultBranch)
+  if (idx <= 0) return branches
+  return [branches[idx]!, ...branches.slice(0, idx), ...branches.slice(idx + 1)]
+}
+
+export function markDefaultBranch(branches: BranchInfo[], defaultBranch: string): BranchInfo[] {
+  if (!defaultBranch && !branches.some((branch) => branch.isDefault)) return branches
+  return branches.map((branch) => {
+    if (branch.name === defaultBranch) return branch.isDefault ? branch : { ...branch, isDefault: true }
+    if (!branch.isDefault) return branch
+    const { isDefault: _isDefault, ...rest } = branch
+    return rest
+  })
+}
+
 export async function getBranches(cwd: string, worktrees?: WorktreeInfo[]): Promise<BranchInfo[]> {
   try {
     const format = [
@@ -51,9 +77,15 @@ export async function getBranches(cwd: string, worktrees?: WorktreeInfo[]): Prom
       '%(upstream:track)',
     ].join(FIELD_SEP)
 
-    const output = await git(cwd, ['for-each-ref', `--format=${format}`, 'refs/heads/'])
-    const currentBranch = await getCurrentBranch(cwd)
-    return parseBranches(output, currentBranch, worktrees)
+    const [output, currentBranch, defaultBranch] = await Promise.all([
+      git(cwd, ['for-each-ref', `--format=${format}`, 'refs/heads/']),
+      getCurrentBranch(cwd),
+      getDefaultBranch(cwd),
+    ])
+    return prioritizeDefaultBranch(
+      markDefaultBranch(parseBranches(output, currentBranch, worktrees), defaultBranch),
+      defaultBranch,
+    )
   } catch {
     return []
   }

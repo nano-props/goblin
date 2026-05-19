@@ -97,6 +97,7 @@ export const en = {
   'branches.gone': 'gone',
   'branches.dirty': 'dirty',
   'branches.worktree': 'wt',
+  'branches.default': 'default',
   'branches.noUpstream': 'No upstream',
 
   // ---- Log list -----------------------------------------------------------

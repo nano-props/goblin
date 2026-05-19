@@ -11,7 +11,7 @@ import { useT } from '#/renderer/stores/i18n.ts'
 import { useReposStore } from '#/renderer/stores/repos.ts'
 import { Button } from '#/renderer/components/ui/button.tsx'
 import { Badge, type BadgeVariant } from '#/renderer/components/ui/badge.tsx'
-import { lastPathSegment } from '#/renderer/lib/paths.ts'
+import { lastPathSegment, tildify } from '#/renderer/lib/paths.ts'
 import type { StatusEntry, WorktreeStatus } from '#/renderer/types.ts'
 
 interface Props {
@@ -125,6 +125,7 @@ export function StatusList({ repoId, status }: Props) {
         const groups = groupStatus(wt.entries)
         const isClean = groups.length === 0
         const isCopyingThis = copyingPath === wt.path
+        const displayPath = tildify(wt.path)
         // Disable every copy button while any patch is in flight —
         // generating a binary patch can take seconds, and clipboard is
         // a shared resource so a second click would just race.
@@ -148,8 +149,8 @@ export function StatusList({ repoId, status }: Props) {
                     {t('status.mainWorktree')}
                   </Badge>
                 )}
-                <span className="font-mono text-[11px] text-muted-foreground truncate min-w-0" title={wt.path}>
-                  {wt.path}
+                <span className="font-mono text-[11px] text-muted-foreground truncate min-w-0" title={displayPath}>
+                  {displayPath}
                 </span>
               </div>
               <div className="flex items-center gap-2 shrink-0">

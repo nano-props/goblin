@@ -25,3 +25,14 @@ export function tildifyPath(path: string, home: string): string {
 export function tildify(path: string): string {
   return tildifyPath(path, window.gbl.homeDir)
 }
+
+export function untildifyPath(path: string, home: string): string {
+  if (!home) return path
+  if (path === '~') return home
+  if (path.startsWith('~/') || path.startsWith('~\\')) return home + path.slice(1)
+  return path
+}
+
+export function untildify(path: string): string {
+  return untildifyPath(path, window.gbl.homeDir)
+}

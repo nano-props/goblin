@@ -88,6 +88,7 @@ export const ko: Record<DictKey, string> = {
   'branches.gone': '원격 사라짐',
   'branches.dirty': '변경',
   'branches.worktree': 'wt',
+  'branches.default': '기본',
   'branches.noUpstream': '업스트림 없음',
 
   // ---- Log list ----------------------------------------------------------

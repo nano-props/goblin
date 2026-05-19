@@ -7,6 +7,7 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from '#/renderer/components/ui/popover.tsx'
+import { tildify } from '#/renderer/lib/paths.ts'
 
 interface MissingReposPopoverProps {
   missing: string[]
@@ -34,15 +35,18 @@ export function MissingReposPopover({ missing, title, dismissLabel, onDismiss }:
           </PopoverTitle>
         </PopoverHeader>
         <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto scroll-thin">
-          {missing.map((p) => (
-            <li
-              key={p}
-              className="truncate rounded-sm bg-muted px-1.5 py-1 font-mono text-[11px] text-muted-foreground"
-              title={p}
-            >
-              {p}
-            </li>
-          ))}
+          {missing.map((p) => {
+            const displayPath = tildify(p)
+            return (
+              <li
+                key={p}
+                className="truncate rounded-sm bg-muted px-1.5 py-1 font-mono text-[11px] text-muted-foreground"
+                title={displayPath}
+              >
+                {displayPath}
+              </li>
+            )
+          })}
         </ul>
         <Button type="button" variant="ghost" size="sm" className="mt-2 h-6 px-1.5" onClick={onDismiss}>
           {dismissLabel}
