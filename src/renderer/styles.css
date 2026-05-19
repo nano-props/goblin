@@ -261,12 +261,14 @@ button,
   background: transparent;
 }
 
-/* Sonner — move the close button from the default top-left to top-right.
- * The library exposes no prop for this; it is controlled by CSS vars. */
-[data-sonner-toaster] {
-  --toast-close-button-start: unset;
-  --toast-close-button-end: 0;
-  --toast-close-button-transform: translate(35%, -35%);
+/* Sonner — move the close button from top-left to top-right.
+ * Sonner injects its styles at runtime, so CSS-var overrides are brittle.
+ * Targeting the button directly with !important is the simplest reliable
+ * way to override the library's injected rules. */
+[data-sonner-toast][data-styled='true'] [data-close-button] {
+  left: unset !important;
+  right: 0 !important;
+  transform: translate(35%, -35%) !important;
 }
 
 .scroll-hidden {
