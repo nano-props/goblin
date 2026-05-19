@@ -42,30 +42,48 @@ const SECTIONS: { titleKey: string; rows: { keys: string[]; labelKey: string }[]
   },
 ]
 
-export function HelpOverlay({ open, onClose }: Props) {
+function KeyChips({ keys }: { keys: string[] }) {
+  return (
+    <span className="flex gap-1 shrink-0">
+      {keys.map((k, i) => (
+        <span key={i} className="kbd">
+          {k}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+function ShortcutSection({ section }: { section: (typeof SECTIONS)[number] }) {
   const t = useT()
   return (
-    <Modal open={open} title={t('help.title')} onClose={onClose} widthClass="max-w-md">
-      <div className="space-y-4">
-        {SECTIONS.map((section) => (
-          <div key={section.titleKey}>
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t(section.titleKey)}</div>
-            <ul className="space-y-1.5">
-              {section.rows.map((row) => (
-                <li key={row.labelKey} className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-foreground">{t(row.labelKey)}</span>
-                  <span className="flex gap-1 shrink-0">
-                    {row.keys.map((k, i) => (
-                      <span key={i} className="kbd">
-                        {k}
-                      </span>
-                    ))}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
+    <section className="rounded-lg border border-border bg-card/60 p-3">
+      <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {t(section.titleKey)}
+      </div>
+      <ul className="space-y-1">
+        {section.rows.map((row) => (
+          <li key={row.labelKey} className="flex min-h-6 items-center justify-between gap-3 text-sm">
+            <span className="min-w-0 truncate text-foreground">{t(row.labelKey)}</span>
+            <KeyChips keys={row.keys} />
+          </li>
         ))}
+      </ul>
+    </section>
+  )
+}
+
+export function HelpOverlay({ open, onClose }: Props) {
+  const t = useT()
+  const [nav, views, actions] = SECTIONS
+  return (
+    <Modal open={open} title={t('help.title')} onClose={onClose} widthClass="max-w-2xl">
+      <div className="grid gap-3 sm:grid-cols-[0.85fr_1.15fr]">
+        <div className="space-y-3">
+          <ShortcutSection section={nav} />
+          <ShortcutSection section={views} />
+        </div>
+        <ShortcutSection section={actions} />
       </div>
     </Modal>
   )

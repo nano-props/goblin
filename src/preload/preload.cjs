@@ -1,5 +1,9 @@
 // Preload bridge. Exposes IPC under `window.gbl` to the renderer.
-const { contextBridge, ipcRenderer } = require('electron')
+// IMPORTANT: This preload runs with sandbox: true (see window.ts). Only
+// the `electron` module is available here — do NOT require Node built-ins
+// like `os`, `fs`, or `path`. Anything that needs Node lives
+// in the main process and is reached via IPC.
+const { contextBridge, ipcRenderer, webUtils } = require('electron')
 
 // All `ipcRenderer.invoke` returns a promise that rejects when the main
 // handler throws. Renderer code often `void`s these results (openInFinder,
@@ -13,10 +17,21 @@ function safeInvoke(channel, ...args) {
   })
 }
 
+// `--gbl-home-dir=...` is injected by main via webPreferences.additionalArguments
+// (see window.ts). `process.argv` is one of the few things sandbox-safe
+// preloads can still read, which is why we use it here instead of
+// `os.homedir()` or a sync IPC.
+const HOME_PREFIX = '--gbl-home-dir='
+const homeDir = process.argv.find((a) => a.startsWith(HOME_PREFIX))?.slice(HOME_PREFIX.length) ?? ''
+
 contextBridge.exposeInMainWorld('gbl', {
+  // ---- Environment -------------------------------------------------------
+  homeDir,
+
   // ---- Repo lifecycle / dialog -------------------------------------------
   openDialog: () => safeInvoke('repo:open-dialog'),
   probe: (cwd) => safeInvoke('repo:probe', cwd),
+  pathForFile: (file) => webUtils.getPathForFile(file),
 
   // ---- Repo data ---------------------------------------------------------
   snapshot: (cwd) => safeInvoke('repo:snapshot', cwd),

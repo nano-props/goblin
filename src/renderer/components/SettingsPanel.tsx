@@ -43,7 +43,8 @@ export function SettingsPanel({ open, onClose }: Props) {
     { value: 900, labelKey: 'settings.fetch.15m' },
   ]
 
-  const buildInfo = `Goblin · v${__APP_VERSION__}`
+  const commit = __BUILD_INFO__.commit
+  const buildInfo = commit ? `Goblin · v${__APP_VERSION__} · ${commit}` : `Goblin · v${__APP_VERSION__}`
 
   return (
     <Modal open={open} title={t('settings.title')} onClose={onClose} widthClass="max-w-lg">

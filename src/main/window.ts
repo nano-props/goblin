@@ -8,6 +8,7 @@
 // before exit (without it the very last drag is truncated).
 
 import { BrowserWindow, app, screen } from 'electron'
+import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { getTheme } from '#/main/theme.ts'
@@ -83,13 +84,18 @@ export async function createMainWindow(): Promise<BrowserWindow> {
       contextIsolation: true,
       nodeIntegration: false,
       // Sandbox the renderer. The preload bridge uses only `electron`
-      // (`contextBridge`, `ipcRenderer`, `shell`, `webUtils`) which is
-      // sandbox-compatible — no `fs`/`path`/`process` required.
+      // (`contextBridge`, `ipcRenderer`, `webUtils`) which is
+      // sandbox-compatible — no `fs`/`path` required.
       // Enabling sandbox cuts off Node primitives if `contextIsolation`
       // ever leaks, turning a renderer XSS into something less than
       // arbitrary code execution.
       sandbox: true,
       webSecurity: true,
+      // Inject startup-time constants the preload would otherwise need
+      // Node modules to resolve. Sandbox forbids `require('os')` in the
+      // preload, but `process.argv` is still readable — this is the
+      // Electron-recommended way to thread main-process values down.
+      additionalArguments: [`--gbl-home-dir=${os.homedir()}`],
     },
   })
 

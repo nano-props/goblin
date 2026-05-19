@@ -17,6 +17,7 @@ import { ListSkeleton } from '#/renderer/components/Skeleton.tsx'
 import { Badge } from '#/renderer/components/ui/badge.tsx'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { cn } from '#/renderer/lib/cn.ts'
+import { tildify } from '#/renderer/lib/paths.ts'
 
 const TAB_KEYS: { id: RightTab; key: string; hotkey: string }[] = [
   { id: 'branches', key: 'tab.branches', hotkey: '⌘1' },
@@ -108,7 +109,7 @@ export function RepoView({ repoId }: Props) {
         <div className="min-w-0 flex-1 flex items-center gap-2">
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-semibold text-foreground">{repo.name}</div>
-            <div className="truncate text-xs text-muted-foreground">{repo.id}</div>
+            <div className="truncate text-xs text-muted-foreground">{tildify(repo.id)}</div>
           </div>
           {repo.fetching && (
             <span className="flex items-center gap-1 text-xs text-muted-foreground" title={t('tab.fetchingTitle')}>

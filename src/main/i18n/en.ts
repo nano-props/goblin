@@ -78,6 +78,11 @@ export const en = {
     ' in the toolbar above to add a git repository. You can keep multiple repositories open and switch between them in the sidebar. Press ',
   'empty.body.after': ' for shortcuts.',
 
+  // ---- Drag and drop ------------------------------------------------------
+  'drop.title': 'Drop to open repository',
+  'drop.body': 'Drop a Git repository folder anywhere in Goblin.',
+  'drop.openFailed': 'Could not open repository',
+
   // ---- Right-side tabs ----------------------------------------------------
   'tab.branches': 'Branches',
   'tab.status': 'Status',
@@ -95,6 +100,7 @@ export const en = {
   'branches.noUpstream': 'No upstream',
 
   // ---- Log list -----------------------------------------------------------
+  'log.showingBranch': 'Commits',
   'log.empty': 'No commits to show.',
   'log.emptyForBranch': 'No commits to show for {branch}.',
 
@@ -158,7 +164,7 @@ export const en = {
   'action.cancel': 'Cancel',
   'action.menu': 'Actions',
   'action.refresh': 'Refresh',
-  'action.refreshTitle': 'Re-read branches, status and log from disk',
+  'action.refreshTitle': 'git branch · git status · git log',
   'action.cancelTitle': 'Cancel {op}',
 
   // ---- Errors / banners ---------------------------------------------------

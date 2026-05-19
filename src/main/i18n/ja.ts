@@ -75,6 +75,11 @@ export const ja: Record<DictKey, string> = {
   'empty.body.middle': ' から git リポジトリを追加できます。複数のリポジトリを開いて、サイドバーで切り替えられます。 ',
   'empty.body.after': ' でショートカットを表示します。',
 
+  // ---- Drag and drop -----------------------------------------------------
+  'drop.title': 'ドロップしてリポジトリを開く',
+  'drop.body': 'Git リポジトリフォルダを Goblin のどこにでもドロップできます。',
+  'drop.openFailed': 'リポジトリを開けませんでした',
+
   // ---- Right-side tabs ---------------------------------------------------
   'tab.branches': 'ブランチ',
   'tab.status': 'ステータス',
@@ -92,6 +97,7 @@ export const ja: Record<DictKey, string> = {
   'branches.noUpstream': '上流なし',
 
   // ---- Log list ----------------------------------------------------------
+  'log.showingBranch': 'コミット',
   'log.empty': '表示できるコミットがありません。',
   'log.emptyForBranch': '{branch} に表示できるコミットがありません。',
 
@@ -156,7 +162,7 @@ export const ja: Record<DictKey, string> = {
   'action.cancel': 'キャンセル',
   'action.menu': '操作',
   'action.refresh': '更新',
-  'action.refreshTitle': 'ブランチ・状態・ログをディスクから再読込',
+  'action.refreshTitle': 'git branch · git status · git log',
   'action.cancelTitle': '{op} をキャンセル',
 
   // ---- Errors / banners --------------------------------------------------

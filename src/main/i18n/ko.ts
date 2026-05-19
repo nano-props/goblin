@@ -69,6 +69,11 @@ export const ko: Record<DictKey, string> = {
     ' 를 눌러 git 리포지토리를 추가하세요. 여러 리포지토리를 동시에 열고 사이드바에서 전환할 수 있습니다. ',
   'empty.body.after': ' 로 단축키 보기.',
 
+  // ---- Drag and drop -----------------------------------------------------
+  'drop.title': '놓아서 리포지토리 열기',
+  'drop.body': 'Git 리포지토리 폴더를 Goblin 어디에나 놓으세요.',
+  'drop.openFailed': '리포지토리를 열 수 없음',
+
   // ---- Right-side tabs ---------------------------------------------------
   'tab.branches': '브랜치',
   'tab.status': '상태',
@@ -86,6 +91,7 @@ export const ko: Record<DictKey, string> = {
   'branches.noUpstream': '업스트림 없음',
 
   // ---- Log list ----------------------------------------------------------
+  'log.showingBranch': '커밋',
   'log.empty': '표시할 커밋이 없습니다.',
   'log.emptyForBranch': '{branch} 에 표시할 커밋이 없습니다.',
 
@@ -149,7 +155,7 @@ export const ko: Record<DictKey, string> = {
   'action.cancel': '취소',
   'action.menu': '작업',
   'action.refresh': '새로 고침',
-  'action.refreshTitle': '브랜치·상태·로그를 디스크에서 다시 읽기',
+  'action.refreshTitle': 'git branch · git status · git log',
   'action.cancelTitle': '{op} 취소',
 
   // ---- Errors / banners --------------------------------------------------

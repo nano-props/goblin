@@ -24,7 +24,9 @@ interface ProbeResult {
 }
 
 interface GblBridge {
+  homeDir: string
   openDialog: () => Promise<string | null>
+  pathForFile: (file: File) => string
   probe: (cwd: string) => Promise<ProbeResult>
   snapshot: (cwd: string) => Promise<RepoSnapshot | null>
   log: (cwd: string, branch: string, count?: number) => Promise<LogEntry[]>
@@ -67,6 +69,11 @@ declare global {
   }
   /** Injected by vite.config.ts `define`. */
   const __APP_VERSION__: string
+  /** Injected by vite.config.ts `define`. `commit` may be empty if the
+   *  build host has no git available; SettingsPanel hides it then. */
+  const __BUILD_INFO__: {
+    commit: string
+  }
 }
 
 export {}

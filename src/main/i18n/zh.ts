@@ -67,6 +67,11 @@ export const zh: Record<DictKey, string> = {
   'empty.body.middle': ' 添加一个 git 仓库。可以同时打开多个仓库，在侧栏切换。按 ',
   'empty.body.after': ' 查看快捷键。',
 
+  // ---- Drag and drop -----------------------------------------------------
+  'drop.title': '松手打开仓库',
+  'drop.body': '把 Git 仓库文件夹拖到 Goblin 任意位置。',
+  'drop.openFailed': '无法打开仓库',
+
   // ---- Right-side tabs ---------------------------------------------------
   'tab.branches': '分支',
   'tab.status': '状态',
@@ -84,6 +89,7 @@ export const zh: Record<DictKey, string> = {
   'branches.noUpstream': '未设置上游',
 
   // ---- Log list ----------------------------------------------------------
+  'log.showingBranch': '提交',
   'log.empty': '暂无提交可显示。',
   'log.emptyForBranch': '{branch} 暂无提交可显示。',
 
@@ -147,7 +153,7 @@ export const zh: Record<DictKey, string> = {
   'action.cancel': '取消',
   'action.menu': '操作',
   'action.refresh': '刷新',
-  'action.refreshTitle': '重新读取本地分支、状态和提交记录',
+  'action.refreshTitle': 'git branch · git status · git log',
   'action.cancelTitle': '取消 {op}',
 
   // ---- Errors / banners --------------------------------------------------

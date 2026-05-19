@@ -31,6 +31,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { useReposStore } from '#/renderer/stores/repos.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { cn } from '#/renderer/lib/cn.ts'
+import { tildify } from '#/renderer/lib/paths.ts'
 
 /** Sidebar row data. Projecting RepoState down to these three string
  *  fields means subscribing to `s.repos` doesn't make us re-render
@@ -117,7 +118,7 @@ function SortableRow({ repo, isActive, onActivate, onClose, closeLabel, dragLabe
       </button>
       <div className="flex-1 min-w-0">
         <div className="truncate font-medium">{repo.name}</div>
-        <div className="truncate text-xs text-muted-foreground">{repo.currentBranch || repo.id}</div>
+        <div className="truncate text-xs text-muted-foreground">{repo.currentBranch || tildify(repo.id)}</div>
       </div>
       <button
         type="button"
@@ -125,7 +126,7 @@ function SortableRow({ repo, isActive, onActivate, onClose, closeLabel, dragLabe
           e.stopPropagation()
           onClose(repo.id)
         }}
-        className="opacity-0 group-hover:opacity-100 cursor-pointer text-muted-foreground hover:text-foreground p-0.5 rounded transition-colors duration-100"
+        className="opacity-0 group-hover:opacity-100 cursor-pointer text-muted-foreground hover:bg-accent hover:text-accent-foreground p-0.5 rounded transition-colors duration-100"
         title={closeLabel}
         aria-label={closeLabel}
       >
