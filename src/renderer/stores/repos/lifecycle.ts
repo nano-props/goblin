@@ -74,7 +74,7 @@ export function createLifecycleActions(set: ReposSet, get: ReposGet) {
       // Probe in parallel; entries that are no longer git repos (folder
       // moved/deleted, external drive not mounted) get reported via
       // `missingFromSession` so the user sees a "couldn't reopen N repos"
-      // notice in the sidebar instead of wondering where their tabs went.
+      // notice in the tab strip instead of wondering where their tabs went.
       interface ProbeResult {
         input: string
         ok: { id: string; name: string } | null

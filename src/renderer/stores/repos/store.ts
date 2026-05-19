@@ -2,7 +2,7 @@
 // absolute path (the toplevel returned by `git rev-parse --show-toplevel`,
 // so opening a subdirectory dedupes against an already-open root).
 //
-// `order` controls left sidebar tab order; `activeId` is the visible
+// `order` controls top tab strip order; `activeId` is the visible
 // repo on the right. Per-repo data (branches, log, status, worktrees,
 // commit detail) lives inside `repos[id]` so each tab keeps its own
 // scroll/selection state when the user flips between them.

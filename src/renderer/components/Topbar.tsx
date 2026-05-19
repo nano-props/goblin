@@ -1,10 +1,9 @@
-// Top app bar. Holds the Open button + ambient utilities (help / settings).
+// Top app bar. Holds ambient utilities (help / settings).
 // The .topbar CSS rule turns this into the OS drag region; child buttons
 // opt out via -webkit-app-region: no-drag (set globally on `button` and
 // any element with `data-interactive`).
 
-import { FolderOpen, HelpCircle, Settings } from 'lucide-react'
-import { useReposStore } from '#/renderer/stores/repos.ts'
+import { HelpCircle, Settings } from 'lucide-react'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { Tip } from '#/renderer/components/Tip.tsx'
 import { Logo } from '#/renderer/components/Logo.tsx'
@@ -17,13 +16,6 @@ interface Props {
 
 export function Topbar({ onOpenSettings, onShowHelp }: Props) {
   const t = useT()
-  const openRepo = useReposStore((s) => s.openRepo)
-
-  async function handleOpen() {
-    const path = await window.gbl.openDialog()
-    if (!path) return
-    await openRepo(path)
-  }
 
   return (
     <div className="topbar relative flex h-10 items-center gap-2 border-b border-border bg-background text-sm">
@@ -31,11 +23,10 @@ export function Topbar({ onOpenSettings, onShowHelp }: Props) {
        * window chrome (cf. Apple's HIG title-bar layout). Absolute so
        * its position is independent of how many action buttons sit on
        * the right; pointer-events-none keeps the OS drag region
-       * unblocked beneath it. Hidden below md (≥768px) so the wordmark
-       * doesn't overlap the right-side action cluster on a narrow
-       * window — the project's minWidth is 800px, so this only kicks
-       * in if the user resizes mid-session. */}
-      <div className="pointer-events-none absolute inset-0 hidden md:flex items-center justify-center">
+       * unblocked beneath it. Open now lives in the repo tab strip, so
+       * the remaining title-bar actions fit at the window's minimum
+       * width without hiding the wordmark. */}
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
         <Logo />
       </div>
 
@@ -43,17 +34,7 @@ export function Topbar({ onOpenSettings, onShowHelp }: Props) {
 
       {/* Topbar actions are ghost-icon-only — same idiom as macOS title
        * bars and the deck-app reference: hover surfaces the button,
-       * tooltips name the action. Keeping all three to one visual class
-       * (no mixed text+icon buttons) reads as a single chrome cluster
-       * rather than a "primary action + utilities" split, which fits
-       * a tool whose primary action lives in the repo body, not the
-       * top bar. */}
-      <Tip label={t('topbar.open')}>
-        <Button variant="ghost" size="icon" onClick={handleOpen} aria-label={t('topbar.open')}>
-          <FolderOpen />
-        </Button>
-      </Tip>
-
+       * tooltips name the action. */}
       <Tip label={t('topbar.help')}>
         <Button variant="ghost" size="icon" onClick={onShowHelp} aria-label={t('topbar.help')}>
           <HelpCircle />

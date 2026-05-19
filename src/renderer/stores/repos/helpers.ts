@@ -1,4 +1,4 @@
-import type { RepoState, ReposSet, ReposStore } from '#/renderer/stores/repos/types.ts'
+import type { RepoState, ReposSet } from '#/renderer/stores/repos/types.ts'
 
 let nextInstanceToken = 1
 
@@ -27,17 +27,15 @@ export function emptyRepo(id: string, name: string): RepoState {
 }
 
 /** Apply `mutator` to the repo at `id` only if its instanceToken still
- *  matches the captured one. Returns true on success, false when the
- *  repo was closed/recreated since the caller captured the token. */
-export function updateIfFresh(
-  state: ReposStore,
-  set: ReposSet,
-  id: string,
-  token: number,
-  mutator: (repo: RepoState) => RepoState,
-): boolean {
-  const repo = state.repos[id]
-  if (!repo || repo.instanceToken !== token) return false
-  set({ repos: { ...state.repos, [id]: mutator(repo) } })
-  return true
+ *  matches the captured one. The check runs inside the functional
+ *  setter so it reads the freshest store state, not the caller's
+ *  pre-await snapshot. */
+export function updateIfFresh(set: ReposSet, id: string, token: number, mutator: (repo: RepoState) => RepoState): void {
+  set((s) => {
+    const repo = s.repos[id]
+    if (!repo || repo.instanceToken !== token) return s
+    const nextRepo = mutator(repo)
+    if (nextRepo === repo) return s
+    return { repos: { ...s.repos, [id]: nextRepo } }
+  })
 }

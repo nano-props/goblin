@@ -75,7 +75,7 @@ export async function createMainWindow(): Promise<BrowserWindow> {
     y: bounds.y,
     width: bounds.width,
     height: bounds.height,
-    minWidth: 800,
+    minWidth: 640,
     minHeight: 480,
     backgroundColor,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',

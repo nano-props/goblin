@@ -8,18 +8,17 @@
 //             switch outside the app) and doesn't want to wait for the
 //             background fetch / file watcher.
 //
-//   Fetch   — `git fetch --all --prune` on origin. Network-bound, so
-//             cancellable; while in flight the button swaps to a red
-//             X that aborts the underlying git child. Without that a
-//             stuck SSH connection would lock the UI for the full
-//             network timeout (~90s).
+//   Fetch   — `git fetch --all --prune` on origin. Network-bound; while
+//             in flight the button shows a spinner and disables itself.
+//             Stuck SSH/network calls fail via the git helper timeout
+//             and surface through the normal error toast.
 //
 // Branch-scoped operations (Checkout / Pull / Push / Open in Ghostty
 // / Open in GitHub) live in `BranchActionsMenu` on each branch row,
 // not here — those need a branch context to be meaningful.
 
 import { useEffect, useState } from 'react'
-import { CloudDownload, FolderPlus, RotateCw, X } from 'lucide-react'
+import { CloudDownload, FolderPlus, Loader2, RotateCw } from 'lucide-react'
 import { useReposStore, type RepoState } from '#/renderer/stores/repos.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { Tip } from '#/renderer/components/Tip.tsx'
@@ -80,13 +79,6 @@ export function RepoActionsHeader({ repo }: Props) {
     }
   }
 
-  function handleCancel() {
-    void window.gbl.abort(repo.id).catch(() => {
-      /* preload already logs; the in-flight git fetch will resolve as
-       * cancelled even if the abort signal didn't reach the child. */
-    })
-  }
-
   // Both buttons carry their label inline — earlier revisions used
   // size="icon" with two refresh-like glyphs (RefreshCcw / RefreshCw)
   // that read as the same icon at 14px and made the user guess which
@@ -100,21 +92,12 @@ export function RepoActionsHeader({ repo }: Props) {
           {t('action.refresh')}
         </Button>
       </Tip>
-      {fetchBusy ? (
-        <Tip label={t('action.cancelTitle', { op: t('action.fetch') })}>
-          <Button variant="destructive-soft" onClick={handleCancel}>
-            <X />
-            {t('action.cancel')}
-          </Button>
-        </Tip>
-      ) : (
-        <Tip label={t('action.fetchTitle')}>
-          <Button variant="ghost" onClick={handleFetch}>
-            <CloudDownload />
-            {t('action.fetch')}
-          </Button>
-        </Tip>
-      )}
+      <Tip label={t('action.fetchTitle')}>
+        <Button variant="ghost" onClick={handleFetch} disabled={fetchBusy}>
+          {fetchBusy ? <Loader2 className="animate-spin" /> : <CloudDownload />}
+          {t('action.fetch')}
+        </Button>
+      </Tip>
       <Tip label={t('action.createWorktreeTitle')}>
         <Button variant="ghost" onClick={() => setCreateOpen(true)}>
           <FolderPlus />

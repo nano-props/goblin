@@ -9,10 +9,10 @@ export function createCommitActions(set: ReposSet, get: ReposGet) {
       const token = repoBefore.instanceToken
       try {
         const detail = await window.gbl.commit(id, hash)
-        updateIfFresh(get(), set, id, token, (r) => ({ ...r, openCommit: detail }))
+        updateIfFresh(set, id, token, (r) => ({ ...r, openCommit: detail }))
       } catch (err) {
         console.warn('[openCommit] failed', err)
-        updateIfFresh(get(), set, id, token, (r) => ({
+        updateIfFresh(set, id, token, (r) => ({
           ...r,
           error: err instanceof Error ? err.message : String(err),
         }))

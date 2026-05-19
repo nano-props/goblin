@@ -6,13 +6,11 @@
 //
 // `busy` is local to each menu instance: clicking Pull on branch A
 // only dims A's menu, leaving B's responsive. Network ops (pull/push)
-// are still cancellable — while one is running the menu shows a
-// Cancel item that aborts the underlying git child process. Without
-// this a stuck SSH connection would lock the menu for the full
-// network timeout (90s).
+// rely on the git helper timeout for stuck remotes; failures surface via
+// the same result toast as normal git errors.
 
 import { useState } from 'react'
-import { ArrowDown, ArrowUp, ChevronDown, ExternalLink, GitBranch, Loader2, Terminal, Trash2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronDown, ExternalLink, GitBranch, Loader2, Terminal, Trash2 } from 'lucide-react'
 import { useReposStore, type RepoState } from '#/renderer/stores/repos.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { ConfirmDialog } from '#/renderer/components/ConfirmDialog.tsx'
@@ -29,7 +27,7 @@ import type { BranchInfo } from '#/renderer/types.ts'
 import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
 
 type Op = 'checkout' | 'pull' | 'push' | 'github' | 'ghostty' | 'deleteBranch' | 'removeWorktree'
-const CANCELLABLE_OPS = new Set<Op>(['pull', 'push'])
+const NETWORK_OPS = new Set<Op>(['pull', 'push'])
 const SILENT_SUCCESS_OPS = new Set<Op>(['github', 'ghostty'])
 const REFRESH_AFTER_OPS = new Set<Op>(['checkout', 'pull', 'push', 'deleteBranch', 'removeWorktree'])
 
@@ -78,17 +76,10 @@ export function BranchActionsMenu({ repo, branch, ghosttyInstalled }: Props) {
         await refreshSnapshot(repo.id)
         await refreshStatus(repo.id)
       }
-      if (result.ok && CANCELLABLE_OPS.has(op)) clearFetchFailed(repo.id)
+      if (result.ok && NETWORK_OPS.has(op)) clearFetchFailed(repo.id)
     } finally {
       setBusy(null)
     }
-  }
-
-  function handleCancel() {
-    void window.gbl.abort(repo.id).catch(() => {
-      /* preload already logs; the in-flight git op will eventually
-       * resolve as cancelled even if the abort signal didn't reach it */
-    })
   }
 
   function handlePush() {
@@ -121,7 +112,6 @@ export function BranchActionsMenu({ repo, branch, ghosttyInstalled }: Props) {
   const canRemoveWorktree = checkedOutInAnotherWorktree && !branch.worktreeIsPrimary
   const isProtected = PROTECTED_BRANCHES.has(branch.name)
   const isRegularBranch = !isCurrent && !branch.worktreePath && !isProtected
-  const cancellable = busy && CANCELLABLE_OPS.has(busy)
 
   return (
     <>
@@ -148,15 +138,6 @@ export function BranchActionsMenu({ repo, branch, ghosttyInstalled }: Props) {
           // doesn't fire when the user clicks an item inside the menu.
           onClick={(e) => e.stopPropagation()}
         >
-          {cancellable && (
-            <>
-              <DropdownMenuItem onClick={handleCancel} variant="destructive">
-                <X />
-                {t('action.cancel')}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-            </>
-          )}
           <DropdownMenuItem
             disabled={isCurrent || checkedOutInAnotherWorktree || !!busy}
             onClick={() => {
@@ -168,7 +149,7 @@ export function BranchActionsMenu({ repo, branch, ghosttyInstalled }: Props) {
             {t('action.checkout')}
           </DropdownMenuItem>
           <DropdownMenuItem
-            disabled={!branch.tracking || (!!busy && busy !== 'pull')}
+            disabled={!branch.tracking || !!busy}
             onClick={() => {
               setOpen(false)
               void run('pull', () => window.gbl.pull(repo.id, branch.name, branch.worktreePath))
@@ -177,7 +158,7 @@ export function BranchActionsMenu({ repo, branch, ghosttyInstalled }: Props) {
             <ArrowDown />
             {t('action.pull')}
           </DropdownMenuItem>
-          <DropdownMenuItem disabled={!!busy && busy !== 'push'} onClick={handlePush}>
+          <DropdownMenuItem disabled={!!busy} onClick={handlePush}>
             <ArrowUp />
             {t('action.push')}
           </DropdownMenuItem>

@@ -10,15 +10,15 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (repoBefore.instanceToken !== token) return
       const silent = options?.silent === true
       if (!silent) {
-        updateIfFresh(get(), set, id, token, (r) => ({ ...r, loading: true, error: null }))
+        updateIfFresh(set, id, token, (r) => ({ ...r, loading: true, error: null }))
       }
       try {
         const snap = await window.gbl.snapshot(id)
         if (!snap) {
-          updateIfFresh(get(), set, id, token, (r) => ({ ...r, loading: false, error: 'error.failedReadRepo' }))
+          updateIfFresh(set, id, token, (r) => ({ ...r, loading: false, error: 'error.failedReadRepo' }))
           return
         }
-        updateIfFresh(get(), set, id, token, (r) => {
+        updateIfFresh(set, id, token, (r) => {
           // Default selection: current branch on first load. Keep the
           // user's pick if it still exists, otherwise fall back so the
           // right pane never points at a stale name.
@@ -48,7 +48,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
           void get().refreshLog(id)
         }
       } catch (err) {
-        updateIfFresh(get(), set, id, token, (r) => ({
+        updateIfFresh(set, id, token, (r) => ({
           ...r,
           loading: false,
           error: err instanceof Error ? err.message : String(err),
@@ -64,7 +64,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (!branch) return
       try {
         const log = await window.gbl.log(id, branch, 100)
-        updateIfFresh(get(), set, id, token, (r) => {
+        updateIfFresh(set, id, token, (r) => {
           // Discard if the user moved to a different branch while we
           // were waiting — otherwise the previous branch's log would
           // overwrite the current one.
@@ -79,7 +79,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         })
       } catch (err) {
         console.warn('[refreshLog] failed', err)
-        updateIfFresh(get(), set, id, token, (r) => ({
+        updateIfFresh(set, id, token, (r) => ({
           ...r,
           error: err instanceof Error ? err.message : String(err),
         }))
@@ -93,10 +93,10 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (repoBefore.instanceToken !== token) return
       try {
         const status = await window.gbl.status(id)
-        updateIfFresh(get(), set, id, token, (r) => ({ ...r, status }))
+        updateIfFresh(set, id, token, (r) => ({ ...r, status }))
       } catch (err) {
         console.warn('[refreshStatus] failed', err)
-        updateIfFresh(get(), set, id, token, (r) => ({
+        updateIfFresh(set, id, token, (r) => ({
           ...r,
           error: err instanceof Error ? err.message : String(err),
         }))
@@ -127,7 +127,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       const repoBefore = get().repos[id]
       if (!repoBefore) return
       const token = repoBefore.instanceToken
-      updateIfFresh(get(), set, id, token, (r) => ({ ...r, fetching: true }))
+      updateIfFresh(set, id, token, (r) => ({ ...r, fetching: true }))
 
       let work!: Promise<void>
       work = (async () => {
@@ -136,7 +136,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
           if (!result.ok) {
             if (result.message === 'cancelled' || result.message === 'error.networkOpInProgress') return
             console.warn('[backgroundFetch] git fetch failed:', result.message)
-            updateIfFresh(get(), set, id, token, (r) => ({
+            updateIfFresh(set, id, token, (r) => ({
               ...r,
               fetchFailed: true,
               fetchError: result.message,
@@ -145,19 +145,19 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
             return
           }
           // Success — clear the fail flag and refresh the snapshot/status.
-          updateIfFresh(get(), set, id, token, (r) => ({ ...r, fetchFailed: false, fetchError: null }))
+          updateIfFresh(set, id, token, (r) => ({ ...r, fetchFailed: false, fetchError: null }))
           await get().refreshSnapshot(id, { silent: true, token })
           await get().refreshStatus(id, { token })
         } catch (err) {
           console.warn('[backgroundFetch] threw:', err)
           const message = err instanceof Error ? err.message : String(err)
-          updateIfFresh(get(), set, id, token, (r) => ({
+          updateIfFresh(set, id, token, (r) => ({
             ...r,
             fetchFailed: true,
             fetchError: message,
           }))
         } finally {
-          updateIfFresh(get(), set, id, token, (r) => ({ ...r, fetching: false }))
+          updateIfFresh(set, id, token, (r) => ({ ...r, fetching: false }))
           // Only clear the slot if it still refers to this run. Without
           // the identity check, a close + reopen + new fetch can land
           // before this finally runs, and we'd wipe the new run's entry.

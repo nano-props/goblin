@@ -1,6 +1,7 @@
 // Root layout — three-region shell:
 //   row 1 (40px): Topbar (always)
-//   row 2 (1fr):  RepoTabs sidebar + active RepoView body
+//   row 2 (40px): RepoTabs strip
+//   row 3 (1fr):  active RepoView body
 //
 // Boots in this order:
 //   1. theme.hydrate()       — pulls main's resolved theme + subscribes
@@ -75,14 +76,12 @@ export function App() {
         onDrop={repoDrop.onDrop}
       >
         <Topbar onOpenSettings={openSettings} onShowHelp={showHelp} />
-        <div className="flex flex-1 min-h-0">
-          <RepoTabs />
-          <main className="flex flex-1 min-w-0">
-            <ErrorBoundary resetKey={activeId}>
-              {activeId ? <RepoView repoId={activeId} /> : <EmptyState />}
-            </ErrorBoundary>
-          </main>
-        </div>
+        <RepoTabs />
+        <main className="flex flex-1 min-h-0 min-w-0">
+          <ErrorBoundary resetKey={activeId}>
+            {activeId ? <RepoView repoId={activeId} /> : <EmptyState />}
+          </ErrorBoundary>
+        </main>
         <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
         <HelpOverlay open={helpOpen} onClose={() => setHelpOpen(false)} />
         {repoDrop.active && <RepoDropOverlay />}

@@ -58,21 +58,22 @@ export const ja: Record<DictKey, string> = {
   'topbar.help': 'キーボードショートカット (?)',
   'topbar.settings': '設定 (⌘,)',
 
-  // ---- Sidebar -----------------------------------------------------------
-  'sidebar.repos': 'リポジトリ',
-  'sidebar.empty.before': 'ツールバーの ',
-  'sidebar.empty.openLabel': '開く',
-  'sidebar.empty.after': ' から git リポジトリを追加してください。',
-  'sidebar.close': '閉じる',
-  'sidebar.dragToReorder': 'ドラッグで並べ替え',
-  'sidebar.missingTitle': '{n} 件のリポジトリを再オープンできませんでした',
-  'sidebar.missingDismiss': '閉じる',
+  // ---- Repository tabs ---------------------------------------------------
+  'repoTabs.repos': 'リポジトリ',
+  'repoTabs.empty.before': '上部タブバーの ',
+  'repoTabs.empty.openLabel': '開く',
+  'repoTabs.empty.after': ' から git リポジトリを追加してください。',
+  'repoTabs.close': '閉じる',
+  'repoTabs.dragToReorder': 'ドラッグで並べ替え',
+  'repoTabs.missingTitle': '{n} 件のリポジトリを再オープンできませんでした',
+  'repoTabs.missingDismiss': '閉じる',
 
   // ---- Empty state -------------------------------------------------------
   'empty.title': 'リポジトリが開かれていません',
-  'empty.body.before': '上部ツールバーの ',
+  'empty.body.before': '上部タブバーの ',
   'empty.body.openLabel': '開く',
-  'empty.body.middle': ' から git リポジトリを追加できます。複数のリポジトリを開いて、サイドバーで切り替えられます。 ',
+  'empty.body.middle':
+    ' から git リポジトリを追加できます。複数のリポジトリを開いて、上部タブバーで切り替えられます。 ',
   'empty.body.after': ' でショートカットを表示します。',
 
   // ---- Drag and drop -----------------------------------------------------
@@ -175,11 +176,9 @@ export const ja: Record<DictKey, string> = {
   'action.createWorktreePathDisabledHint': 'ブランチ名を入力するとパスが自動入力されます。',
   'action.createWorktreeBaseCurrent': '現在',
   'action.createWorktreeConfirm': 'ワークツリーを作成',
-  'action.cancel': 'キャンセル',
   'action.menu': '操作',
   'action.refresh': '更新',
   'action.refreshTitle': 'git branch · git status · git log',
-  'action.cancelTitle': '{op} をキャンセル',
 
   // ---- Errors / banners --------------------------------------------------
   'error.notGitRepo': 'git リポジトリではありません',

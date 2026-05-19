@@ -58,15 +58,15 @@ export const en = {
   'topbar.help': 'Keyboard shortcuts (?)',
   'topbar.settings': 'Settings (⌘,)',
 
-  // ---- Sidebar ------------------------------------------------------------
-  'sidebar.repos': 'Repositories',
-  'sidebar.empty.before': 'Click ',
-  'sidebar.empty.openLabel': 'Open',
-  'sidebar.empty.after': ' in the toolbar to add a git repository.',
-  'sidebar.close': 'Close',
-  'sidebar.dragToReorder': 'Drag to reorder',
-  'sidebar.missingTitle': "Couldn't reopen {n} repository",
-  'sidebar.missingDismiss': 'Dismiss',
+  // ---- Repository tabs ----------------------------------------------------
+  'repoTabs.repos': 'Repositories',
+  'repoTabs.empty.before': 'Click the ',
+  'repoTabs.empty.openLabel': 'Open',
+  'repoTabs.empty.after': ' button in the tab strip to add a git repository.',
+  'repoTabs.close': 'Close',
+  'repoTabs.dragToReorder': 'Drag to reorder',
+  'repoTabs.missingTitle': "Couldn't reopen {n} repository",
+  'repoTabs.missingDismiss': 'Dismiss',
 
   // ---- Empty state --------------------------------------------------------
   'empty.title': 'No repository open',
@@ -75,7 +75,7 @@ export const en = {
   'empty.body.before': 'Click ',
   'empty.body.openLabel': 'Open',
   'empty.body.middle':
-    ' in the toolbar above to add a git repository. You can keep multiple repositories open and switch between them in the sidebar. Press ',
+    ' in the tab strip above to add a git repository. You can keep multiple repositories open and switch between them there. Press ',
   'empty.body.after': ' for shortcuts.',
 
   // ---- Drag and drop ------------------------------------------------------
@@ -177,11 +177,9 @@ export const en = {
   'action.createWorktreePathDisabledHint': 'Enter a branch name to auto-fill the path.',
   'action.createWorktreeBaseCurrent': 'current',
   'action.createWorktreeConfirm': 'Create worktree',
-  'action.cancel': 'Cancel',
   'action.menu': 'Actions',
   'action.refresh': 'Refresh',
   'action.refreshTitle': 'git branch · git status · git log',
-  'action.cancelTitle': 'Cancel {op}',
 
   // ---- Errors / banners ---------------------------------------------------
   'error.notGitRepo': 'Not a git repository',

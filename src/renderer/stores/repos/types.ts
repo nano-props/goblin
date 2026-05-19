@@ -56,7 +56,7 @@ export interface ReposStore {
   sessionReady: boolean
   /** Paths from the previous session that didn't probe successfully on
    *  hydrate (folder moved/deleted, external drive not mounted). The
-   *  sidebar surfaces them so the user knows why their tabs didn't all
+   *  tab strip surfaces them so the user knows why their tabs didn't all
    *  come back, and offers a "forget" action to remove them from the
    *  saved session. */
   missingFromSession: string[]
@@ -70,7 +70,7 @@ export interface ReposStore {
   openRepo: (path: string, options?: { activate?: boolean }) => Promise<OpenRepoResult>
   closeRepo: (id: string) => void
   setActive: (id: string) => void
-  /** Reorder the sidebar so `fromId` lands at `toId`'s position, using
+  /** Reorder the tab strip so `fromId` lands at `toId`'s position, using
    *  the same shift semantics as dnd-kit's `arrayMove` (the rest of the
    *  list closes the gap; later items shift up if `from < to`, down if
    *  `from > to`). No-op if either id is unknown or they're identical. */

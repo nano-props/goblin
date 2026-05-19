@@ -50,21 +50,21 @@ export const zh: Record<DictKey, string> = {
   'topbar.help': '键盘快捷键 (?)',
   'topbar.settings': '设置 (⌘,)',
 
-  // ---- Sidebar -----------------------------------------------------------
-  'sidebar.repos': '仓库',
-  'sidebar.empty.before': '点击工具栏的 ',
-  'sidebar.empty.openLabel': '打开',
-  'sidebar.empty.after': ' 添加一个 git 仓库。',
-  'sidebar.close': '关闭',
-  'sidebar.dragToReorder': '拖动以重新排序',
-  'sidebar.missingTitle': '{n} 个仓库未能恢复',
-  'sidebar.missingDismiss': '忽略',
+  // ---- Repository tabs ---------------------------------------------------
+  'repoTabs.repos': '仓库',
+  'repoTabs.empty.before': '点击顶部标签栏的 ',
+  'repoTabs.empty.openLabel': '打开',
+  'repoTabs.empty.after': ' 添加一个 git 仓库。',
+  'repoTabs.close': '关闭',
+  'repoTabs.dragToReorder': '拖动以重新排序',
+  'repoTabs.missingTitle': '{n} 个仓库未能恢复',
+  'repoTabs.missingDismiss': '忽略',
 
   // ---- Empty state -------------------------------------------------------
   'empty.title': '没有打开的仓库',
-  'empty.body.before': '点击工具栏的 ',
+  'empty.body.before': '点击顶部标签栏的 ',
   'empty.body.openLabel': '打开',
-  'empty.body.middle': ' 添加一个 git 仓库。可以同时打开多个仓库，在侧栏切换。按 ',
+  'empty.body.middle': ' 添加一个 git 仓库。可以同时打开多个仓库，在顶部标签栏切换。按 ',
   'empty.body.after': ' 查看快捷键。',
 
   // ---- Drag and drop -----------------------------------------------------
@@ -166,11 +166,9 @@ export const zh: Record<DictKey, string> = {
   'action.createWorktreePathDisabledHint': '输入分支名后自动填充路径。',
   'action.createWorktreeBaseCurrent': '当前',
   'action.createWorktreeConfirm': '创建工作树',
-  'action.cancel': '取消',
   'action.menu': '操作',
   'action.refresh': '刷新',
   'action.refreshTitle': 'git branch · git status · git log',
-  'action.cancelTitle': '取消 {op}',
 
   // ---- Errors / banners --------------------------------------------------
   'error.notGitRepo': '不是 git 仓库',

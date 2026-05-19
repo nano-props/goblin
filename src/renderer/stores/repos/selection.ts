@@ -20,8 +20,8 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
     cycleActive(direction: 1 | -1) {
       const { order, activeId } = get()
       if (order.length === 0) return
-      const idx = activeId ? order.indexOf(activeId) : 0
-      const nextIdx = (idx + direction + order.length) % order.length
+      const idx = activeId ? order.indexOf(activeId) : -1
+      const nextIdx = idx === -1 ? 0 : (idx + direction + order.length) % order.length
       const next = order[nextIdx]
       if (next) set({ activeId: next })
     },

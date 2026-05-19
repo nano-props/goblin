@@ -51,22 +51,22 @@ export const ko: Record<DictKey, string> = {
   'topbar.help': '키보드 단축키 (?)',
   'topbar.settings': '설정 (⌘,)',
 
-  // ---- Sidebar -----------------------------------------------------------
-  'sidebar.repos': '리포지토리',
-  'sidebar.empty.before': '툴바의 ',
-  'sidebar.empty.openLabel': '열기',
-  'sidebar.empty.after': ' 를 눌러 git 리포지토리를 추가하세요.',
-  'sidebar.close': '닫기',
-  'sidebar.dragToReorder': '드래그하여 순서 변경',
-  'sidebar.missingTitle': '{n} 개 리포지토리를 복원하지 못했습니다',
-  'sidebar.missingDismiss': '무시',
+  // ---- Repository tabs ---------------------------------------------------
+  'repoTabs.repos': '리포지토리',
+  'repoTabs.empty.before': '상단 탭 막대의 ',
+  'repoTabs.empty.openLabel': '열기',
+  'repoTabs.empty.after': ' 를 눌러 git 리포지토리를 추가하세요.',
+  'repoTabs.close': '닫기',
+  'repoTabs.dragToReorder': '드래그하여 순서 변경',
+  'repoTabs.missingTitle': '{n} 개 리포지토리를 복원하지 못했습니다',
+  'repoTabs.missingDismiss': '무시',
 
   // ---- Empty state -------------------------------------------------------
   'empty.title': '열린 리포지토리가 없습니다',
-  'empty.body.before': '툴바의 ',
+  'empty.body.before': '상단 탭 막대의 ',
   'empty.body.openLabel': '열기',
   'empty.body.middle':
-    ' 를 눌러 git 리포지토리를 추가하세요. 여러 리포지토리를 동시에 열고 사이드바에서 전환할 수 있습니다. ',
+    ' 를 눌러 git 리포지토리를 추가하세요. 여러 리포지토리를 동시에 열고 상단 탭 막대에서 전환할 수 있습니다. ',
   'empty.body.after': ' 로 단축키 보기.',
 
   // ---- Drag and drop -----------------------------------------------------
@@ -168,11 +168,9 @@ export const ko: Record<DictKey, string> = {
   'action.createWorktreePathDisabledHint': '브랜치 이름을 입력하면 경로가 자동 채워집니다.',
   'action.createWorktreeBaseCurrent': '현재',
   'action.createWorktreeConfirm': '워크트리 만들기',
-  'action.cancel': '취소',
   'action.menu': '작업',
   'action.refresh': '새로 고침',
   'action.refreshTitle': 'git branch · git status · git log',
-  'action.cancelTitle': '{op} 취소',
 
   // ---- Errors / banners --------------------------------------------------
   'error.notGitRepo': 'git 리포지토리가 아닙니다',
