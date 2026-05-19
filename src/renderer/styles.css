@@ -261,16 +261,6 @@ button,
   background: transparent;
 }
 
-/* Sonner — move the close button from top-left to top-right.
- * Sonner injects its styles at runtime, so CSS-var overrides are brittle.
- * Targeting the button directly with !important is the simplest reliable
- * way to override the library's injected rules. */
-[data-sonner-toast][data-styled='true'] [data-close-button] {
-  left: unset !important;
-  right: 0 !important;
-  transform: translate(35%, -35%) !important;
-}
-
 .scroll-hidden {
   scrollbar-width: none;
 }
