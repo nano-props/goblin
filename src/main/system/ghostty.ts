@@ -42,15 +42,16 @@ function isGhosttyRunning(): Promise<boolean> {
  *  Ghostty is running. */
 function openInRunningGhostty(dir: string): Promise<void> {
   // The path is passed as argv (item 1 of argv), not interpolated,
-  // so AppleScript string-escaping isn't a concern. `activate` is
-  // last so a scripting failure doesn't pull Ghostty to the front
-  // without actually opening anything.
+  // so AppleScript string-escaping isn't a concern. We deliberately
+  // don't call `activate` here — Ghostty's `new window` handler
+  // already runs NSApp.activate internally (TerminalController.swift),
+  // and an extra activate makes macOS pull the user to whichever
+  // Space already has a Ghostty window. See ghostty-org/ghostty#11457.
   const script = `
     on run argv
       set dir to item 1 of argv
       tell application id "${GHOSTTY_BUNDLE_ID}"
         new window with configuration {initial working directory:dir}
-        activate
       end tell
     end run
   `
@@ -66,9 +67,9 @@ function openInRunningGhostty(dir: string): Promise<void> {
 //
 // If Ghostty is already running, we drive its AppleScript dictionary
 // (com.mitchellh.ghostty) to open a new window in the existing
-// instance with `initial working directory` set via a `new surface
-// configuration` record. This avoids spawning a second Ghostty.app
-// process every time.
+// instance, passing an inline `surface configuration` record with
+// `initial working directory` set (see Ghostty.sdef). This avoids
+// spawning a second Ghostty.app process every time.
 //
 // If Ghostty isn't running, fall back to `open -na Ghostty.app
 // --args --working-directory=<path>`. The cold-start path can't
