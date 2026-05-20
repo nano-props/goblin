@@ -33,7 +33,6 @@ export const zh: Record<DictKey, string> = {
   'menu.edit.paste': '粘贴',
   'menu.edit.selectAll': '全选',
 
-  'menu.view.branches': '分支',
   'menu.view.status': '工作区状态',
   'menu.view.log': '提交历史',
   'menu.view.refresh': '刷新',
@@ -72,8 +71,9 @@ export const zh: Record<DictKey, string> = {
   'drop.body': '把 Git 仓库文件夹拖到 Goblin 任意位置。',
   'drop.openFailed': '无法打开仓库',
 
-  // ---- Right-side tabs ---------------------------------------------------
+  // ---- Detail tabs -------------------------------------------------------
   'tab.branches': '分支',
+  'tab.branchDetail': '分支详情',
   'tab.status': '状态',
   'tab.log': '提交',
   'tab.fetching': '同步',
@@ -97,6 +97,8 @@ export const zh: Record<DictKey, string> = {
   // ---- Status ------------------------------------------------------------
   'status.cleanTitle': '工作区已清空',
   'status.cleanBody': '没有待提交的改动。',
+  'status.noWorktreeTitle': '这个分支没有工作树',
+  'status.noWorktreeBody': '切换到该分支，或创建工作树后，就能在这里查看工作区改动。',
   'status.mainWorktree': '主',
   'status.worktreeClean': '干净',
   'status.staged': '已暂存',
@@ -158,6 +160,7 @@ export const zh: Record<DictKey, string> = {
   'action.confirmRemoveWorktreeProtectedHint': '此分支受保护 — 不能在这里删除。',
   'action.createWorktree': '新工作树',
   'action.createWorktreeTitle': '创建新工作树',
+  'action.createWorktreeCreatingTitle': '正在创建 {branch} 的工作树…',
   'action.createWorktreeHint': '将基于所选分支创建一个新分支。',
   'action.createWorktreeBaseLabel': '基础分支',
   'action.createWorktreeBasePlaceholder': '选择分支',
@@ -224,7 +227,6 @@ export const zh: Record<DictKey, string> = {
   'help.row.prevBranch': '上一个分支 / 提交',
   'help.row.nextRepo': '下一个仓库',
   'help.row.prevRepo': '上一个仓库',
-  'help.row.viewBranches': '分支',
   'help.row.viewStatus': '工作区状态',
   'help.row.viewLog': '提交历史',
   'help.row.checkout': '切换分支 / 打开提交',

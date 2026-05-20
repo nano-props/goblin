@@ -26,56 +26,65 @@
  * 1. shadcn/ui semantic tokens (`--color-background`, `--color-foreground`,
  *    `--color-muted-foreground`, …) — these drive every utility class
  *    used by the app and by `components/ui/*` (Button, Dialog, Tooltip…).
- *    We name them with shadcn's vocabulary so the upstream component
- *    code works unchanged after `npx shadcn add`.
+ *    The values below follow modern macOS semantic colours: label /
+ *    secondary label, system grouped fills, separator, and accent blue.
+ *    We keep shadcn's token names so upstream component code works
+ *    unchanged after `npx shadcn add`.
  *
  * 2. Project-specific extras that shadcn doesn't have:
- *      `--color-brand`   — saturated blue, dock-icon outer ring. Used
- *                          for worktree markers, commit-hash mono text,
- *                          the active-row left border. Distinct from
- *                          `--color-accent` (a *hover surface* in
- *                          shadcn) and `--color-ring` (focus ring).
- *      `--color-warning` — salmon, the wordmark's companion dot.
- *                          shadcn has no warning slot; mapped here so
- *                          status-modified / behind / dirty markers
- *                          read consistently.
- *      `--color-success` — green, used in `<Badge variant="success">`
- *                          and ahead/added counts. Like warning, no
- *                          shadcn equivalent. */
+ *      `--color-brand`   — macOS system blue. Used for worktree markers
+ *                          and accent fills. Distinct from
+ *                          `--color-accent` (hover surface) and
+ *                          `--color-ring` (focus ring).
+ *      `--color-brand-text` — contrast-adjusted blue for small text.
+ *      `--color-selected` — branch/list selection surface. Kept
+ *                          separate from brand so selection strength
+ *                          can be tuned per theme without changing
+ *                          icons, focus, or semantic chips.
+ *      `--color-warning` — accessible system-orange text. shadcn has no
+ *                          warning slot; mapped here so status-modified /
+ *                          behind / dirty markers read consistently.
+ *      `--color-success` — accessible system-green text, used in
+ *                          `<Badge variant="success">` and ahead/added
+ *                          counts. Like warning, no shadcn equivalent. */
 @theme {
   /* shadcn/ui core */
   --color-background: #ffffff;
-  --color-foreground: #0a0a0a;
+  --color-foreground: #1d1d1f;
   --color-card: #ffffff;
-  --color-card-foreground: #0a0a0a;
+  --color-card-foreground: #1d1d1f;
   --color-popover: #ffffff;
-  --color-popover-foreground: #0a0a0a;
-  --color-primary: #0a0a0a;
-  --color-primary-foreground: #fafafa;
-  --color-secondary: #f5f5f5;
-  --color-secondary-foreground: #404040;
-  --color-muted: #f5f5f5;
-  --color-muted-foreground: #737373;
-  /* accent is shadcn's hover/active surface — intentionally a touch
-   * deeper than muted so a Button's hover:bg-accent reads even when it
-   * sits inside a `bg-muted` row (selected branch row, status header
-   * etc.). The default neutral palette ships them at the same value
-   * which makes hover-on-hover invisible. */
-  --color-accent: #ececec;
-  --color-accent-foreground: #0a0a0a;
-  --color-border: rgb(10 10 10 / 0.12);
-  --color-input: rgb(10 10 10 / 0.12);
-  --color-ring: #1268ee;
-  --color-destructive: #c43a3a;
+  --color-popover-foreground: #1d1d1f;
+  --color-primary: #006ee6;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #f2f2f7;
+  --color-secondary-foreground: #3c3c43;
+  --color-muted: #f2f2f7;
+  --color-muted-foreground: rgb(60 60 67 / 0.6);
+  /* accent is shadcn's hover/active surface. It maps to a macOS
+   * system-fill step that's darker than muted but still neutral. */
+  --color-accent: #e5e5ea;
+  --color-accent-foreground: #1d1d1f;
+  --color-border: rgb(60 60 67 / 0.18);
+  --color-input: rgb(60 60 67 / 0.22);
+  --color-ring: #007aff;
+  --color-destructive: #d70015;
   --color-destructive-foreground: #ffffff;
 
   /* Project extras */
-  --color-brand: #1268ee;
-  --color-brand-rgb: 18 104 238;
-  --color-warning: #ff8a65;
-  --color-warning-rgb: 255 138 101;
-  --color-success: #2f855a;
-  --color-success-rgb: 47 133 90;
+  --color-brand: #007aff;
+  --color-brand-text: #0066cc;
+  --color-brand-rgb: 0 122 255;
+  --color-selected: rgb(var(--color-brand-rgb) / 0.1);
+  --color-selected-foreground: var(--color-foreground);
+  --color-brand-surface: rgb(var(--color-brand-rgb) / 0.12);
+  --color-warning: #a45a00;
+  --color-warning-rgb: 255 149 0;
+  --color-warning-surface: rgb(var(--color-warning-rgb) / 0.14);
+  --color-warning-border: rgb(var(--color-warning-rgb) / 0.4);
+  --color-success: #1f7f37;
+  --color-success-rgb: 52 199 89;
+  --color-success-surface: rgb(var(--color-success-rgb) / 0.12);
   /* `--color-danger` is an alias of `--color-destructive` for sites
    * that already render destructive content with a translucent fill
    * (they reach for the rgb-channel form `--color-danger-rgb` to
@@ -83,7 +92,9 @@
    * stays a single source of truth — both names point at the same
    * value. */
   --color-danger: var(--color-destructive);
-  --color-danger-rgb: 196 58 58;
+  --color-danger-rgb: 255 59 48;
+  --color-danger-surface: rgb(var(--color-danger-rgb) / 0.12);
+  --color-danger-border: rgb(var(--color-danger-rgb) / 0.4);
 
   /* Type / shadows / radius — shadcn radius scale, project shadow
    * and font stacks. */
@@ -103,39 +114,47 @@
 }
 
 html[data-theme='dark'] {
-  --color-background: #0c0d0f;
-  --color-foreground: #f2f3f5;
-  --color-card: #121417;
-  --color-card-foreground: #f2f3f5;
-  --color-popover: #121417;
-  --color-popover-foreground: #f2f3f5;
-  --color-primary: #1474ff;
-  --color-primary-foreground: #ffffff;
-  --color-secondary: #16181c;
-  --color-secondary-foreground: #c9cbce;
-  --color-muted: #16181c;
-  --color-muted-foreground: #8a8e95;
+  --color-background: #1c1c1e;
+  --color-foreground: #f5f5f7;
+  --color-card: #2c2c2e;
+  --color-card-foreground: #f5f5f7;
+  --color-popover: #2c2c2e;
+  --color-popover-foreground: #f5f5f7;
+  --color-primary: #0a84ff;
+  --color-primary-foreground: #001a33;
+  --color-secondary: #2c2c2e;
+  --color-secondary-foreground: rgb(235 235 245 / 0.86);
+  --color-muted: #2c2c2e;
+  --color-muted-foreground: rgb(235 235 245 / 0.6);
   /* In dark mode hover surfaces go *up* in lightness — accent sits one
    * step above muted so the same hover-on-hover composition reads. */
-  --color-accent: #1d2025;
-  --color-accent-foreground: #f2f3f5;
-  --color-border: rgb(255 255 255 / 0.16);
-  --color-input: rgb(255 255 255 / 0.16);
-  --color-ring: #7fb3ff;
-  --color-destructive: #ff7a7a;
+  --color-accent: #3a3a3c;
+  --color-accent-foreground: #f5f5f7;
+  --color-border: rgb(84 84 88 / 0.55);
+  --color-input: rgb(84 84 88 / 0.65);
+  --color-ring: #0a84ff;
+  --color-destructive: #ff453a;
   /* On the dark surface a bright salmon-on-red is hard to read; pick
    * the deepest near-black that still passes contrast against the
    * solid destructive button. */
   --color-destructive-foreground: #1a0606;
 
-  --color-brand: #7fb3ff;
-  --color-brand-rgb: 127 179 255;
-  /* Warm salmon stays warm in dark mode — slight bump for clarity. */
-  --color-warning: #ff9c7a;
-  --color-warning-rgb: 255 156 122;
-  --color-success: #6ddb9a;
-  --color-success-rgb: 109 219 154;
-  --color-danger-rgb: 255 122 122;
+  --color-brand: #0a84ff;
+  --color-brand-text: #409cff;
+  --color-brand-rgb: 10 132 255;
+  --color-selected: rgb(var(--color-brand-rgb) / 0.2);
+  --color-selected-foreground: var(--color-foreground);
+  --color-brand-surface: rgb(var(--color-brand-rgb) / 0.18);
+  --color-warning: #ff9f0a;
+  --color-warning-rgb: 255 159 10;
+  --color-warning-surface: rgb(var(--color-warning-rgb) / 0.16);
+  --color-warning-border: rgb(var(--color-warning-rgb) / 0.45);
+  --color-success: #30d158;
+  --color-success-rgb: 48 209 88;
+  --color-success-surface: rgb(var(--color-success-rgb) / 0.16);
+  --color-danger-rgb: 255 69 58;
+  --color-danger-surface: rgb(var(--color-danger-rgb) / 0.16);
+  --color-danger-border: rgb(var(--color-danger-rgb) / 0.45);
 }
 
 :root {
@@ -208,7 +227,7 @@ button,
   }
 
   :focus-visible:not([data-slot]) {
-    outline: 2px solid var(--color-brand);
+    outline: 2px solid var(--color-ring);
     outline-offset: 2px;
     border-radius: 4px;
   }

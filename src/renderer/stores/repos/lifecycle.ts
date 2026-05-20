@@ -35,11 +35,12 @@ export function createLifecycleActions(set: ReposSet, get: ReposGet) {
         return activate ? { repos, order, activeId: id } : { repos, order }
       })
 
-      void get().refreshSnapshot(id)
-      // Status drives the per-tab badge in the repo header, which is
-      // visible from every tab — load it eagerly so the count appears
-      // before the user clicks into the Status tab.
-      void get().refreshStatus(id)
+      const token = get().repos[id]?.instanceToken
+      if (token === undefined) return { ok: true, id }
+      void get().refreshSnapshot(id, { token })
+      // Status drives the selected-branch detail badge, so load it
+      // eagerly before the user opens the Status detail tab.
+      void get().refreshStatus(id, { token })
       return { ok: true, id }
     },
 
@@ -123,11 +124,13 @@ export function createLifecycleActions(set: ReposSet, get: ReposGet) {
       })
 
       for (const { id } of valid) {
-        void get().refreshSnapshot(id)
-        // See `openRepo`: status backs the always-visible header badge,
+        const token = get().repos[id]?.instanceToken
+        if (token === undefined) continue
+        void get().refreshSnapshot(id, { token })
+        // See `openRepo`: status backs the selected-branch detail badge,
         // so we hydrate it for every restored repo, not just the active
-        // one — switching tabs after boot shouldn't reveal a stale 0.
-        void get().refreshStatus(id)
+        // one — switching after boot shouldn't reveal a stale 0.
+        void get().refreshStatus(id, { token })
       }
     },
 

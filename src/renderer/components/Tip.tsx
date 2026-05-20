@@ -5,7 +5,7 @@
 // native `title=` attribute for any tooltip we want to style or
 // compose with kbd chips.
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#/renderer/components/ui/tooltip.tsx'
 
 interface Props {
@@ -14,13 +14,16 @@ interface Props {
   side?: 'top' | 'right' | 'bottom' | 'left'
   /** ms before tooltip opens. Default 200. */
   delayMs?: number
+  forceOpen?: boolean
   children: ReactNode
 }
 
-export function Tip({ label, side = 'bottom', delayMs = 200, children }: Props) {
+export function Tip({ label, side = 'bottom', delayMs = 200, forceOpen = false, children }: Props) {
+  const [hoverOpen, setHoverOpen] = useState(false)
+
   return (
     <TooltipProvider delayDuration={delayMs}>
-      <Tooltip>
+      <Tooltip open={forceOpen || hoverOpen} onOpenChange={setHoverOpen}>
         <TooltipTrigger asChild>{children}</TooltipTrigger>
         <TooltipContent side={side} sideOffset={6}>
           {label}

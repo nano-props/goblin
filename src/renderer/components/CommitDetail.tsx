@@ -50,14 +50,14 @@ export function CommitDetail({ repoId, detail }: Props) {
         </button>
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="font-mono text-xs text-brand shrink-0">{meta.shortHash}</span>
+            <span className="font-mono text-xs text-brand-text shrink-0">{meta.shortHash}</span>
             <span className="text-sm font-semibold text-foreground">{meta.subject}</span>
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
             {meta.author} &lt;{meta.email}&gt; · {meta.date}
           </div>
           {meta.parents.length > 0 && (
-            <div className="mt-0.5 text-xs text-muted-foreground/60 font-mono">
+            <div className="mt-0.5 text-xs text-muted-foreground font-mono">
               {meta.parents.length > 1 ? t('commit.parents') : t('commit.parent')}:{' '}
               {meta.parents.map((p) => p.slice(0, 7)).join(', ')}
             </div>
@@ -88,7 +88,7 @@ export function CommitDetail({ repoId, detail }: Props) {
               <span className="truncate text-sm text-foreground font-mono flex-1 min-w-0">{f.path}</span>
               <span className="shrink-0 font-mono text-xs">
                 {f.binary ? (
-                  <span className="text-muted-foreground/60">{t('commit.binary')}</span>
+                  <span className="text-muted-foreground">{t('commit.binary')}</span>
                 ) : (
                   <>
                     <span className="text-success">+{f.added}</span> <span className="text-danger">−{f.deleted}</span>

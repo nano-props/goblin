@@ -1,8 +1,8 @@
-import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
-import { Slot } from "radix-ui"
+import * as React from 'react'
+import { cva, type VariantProps } from 'class-variance-authority'
+import { Slot } from 'radix-ui'
 
-import { cn } from "#/renderer/lib/cn.ts"
+import { cn } from '#/renderer/lib/cn.ts'
 
 // Calibrated for the desktop tool's chip density: small caps on
 // inline list rows, not pill-shaped contact-list avatars. Square
@@ -10,57 +10,45 @@ import { cn } from "#/renderer/lib/cn.ts"
 // the rest of the inline UI furniture (status codes, two-letter
 // X/Y codes from `git status`, commit shortHash).
 const badgeVariants = cva(
-  "inline-flex w-fit shrink-0 items-center justify-center overflow-hidden rounded-sm border border-transparent px-1.5 py-0 text-[10px] font-medium leading-tight whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3",
+  'inline-flex w-fit shrink-0 items-center justify-center overflow-hidden rounded-sm border border-transparent px-1.5 py-0 text-[10px] font-medium leading-tight whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3',
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground [a&]:hover:bg-primary/90",
-        secondary:
-          "bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90",
+        default: 'bg-primary text-primary-foreground [a&]:hover:bg-primary/90',
+        secondary: 'bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90',
         // We override upstream shadcn's `destructive` (solid red fill)
         // with a translucent tint that matches success/warning/brand
         // below. Status chips ("conflict", "deleted") read in dense
         // lists, where a saturated fill reads as a screaming pill —
         // the tint conveys the same semantic at the right intensity.
-        destructive:
-          "border-transparent bg-[rgb(var(--color-danger-rgb)/0.12)] text-destructive",
-        outline:
-          "border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
-        ghost: "[a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 [a&]:hover:underline",
+        destructive: 'border-transparent bg-danger-surface text-destructive',
+        outline: 'border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
+        ghost: '[a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
+        link: 'text-primary underline-offset-4 [a&]:hover:underline',
         // Project extensions — shadcn has no warning/success/brand
         // slot. Same translucent-tint treatment as destructive above
         // so the four semantic chips read as one family.
-        success:
-          "border-transparent bg-[rgb(var(--color-success-rgb)/0.12)] text-success",
-        warning:
-          "border-transparent bg-[rgb(var(--color-warning-rgb)/0.14)] text-warning",
-        brand:
-          "border-transparent bg-[rgb(var(--color-brand-rgb)/0.12)] text-brand",
+        success: 'border-transparent bg-success-surface text-success',
+        warning: 'border-transparent bg-warning-surface text-warning',
+        brand: 'border-transparent bg-brand-surface text-brand-text',
       },
     },
     defaultVariants: {
-      variant: "default",
+      variant: 'default',
     },
-  }
+  },
 )
 
 function Badge({
   className,
-  variant = "default",
+  variant = 'default',
   asChild = false,
   ...props
-}: React.ComponentProps<"span"> &
-  VariantProps<typeof badgeVariants> & { asChild?: boolean }) {
-  const Comp = asChild ? Slot.Root : "span"
+}: React.ComponentProps<'span'> & VariantProps<typeof badgeVariants> & { asChild?: boolean }) {
+  const Comp = asChild ? Slot.Root : 'span'
 
   return (
-    <Comp
-      data-slot="badge"
-      data-variant={variant}
-      className={cn(badgeVariants({ variant }), className)}
-      {...props}
-    />
+    <Comp data-slot="badge" data-variant={variant} className={cn(badgeVariants({ variant }), className)} {...props} />
   )
 }
 

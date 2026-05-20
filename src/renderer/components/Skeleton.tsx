@@ -5,6 +5,7 @@
 // area without committing to an exact count.
 
 import { cn } from '#/renderer/lib/cn.ts'
+import { Toolbar } from '#/renderer/components/Layout.tsx'
 
 interface Props {
   rows?: number
@@ -13,6 +14,10 @@ interface Props {
    *  - "log": single-line + tiny meta (matches LogList)
    *  - "status": label chip + path (matches StatusList) */
   variant?: 'branch' | 'log' | 'status'
+}
+
+interface WorkspaceSkeletonProps {
+  showRepoToolbar?: boolean
 }
 
 export function ListSkeleton({ rows = 6, variant = 'branch' }: Props) {
@@ -45,20 +50,82 @@ export function ListSkeleton({ rows = 6, variant = 'branch' }: Props) {
   )
 }
 
+export function RepoWorkspaceSkeleton({ showRepoToolbar = false }: WorkspaceSkeletonProps) {
+  return (
+    <section className="flex min-w-0 flex-1 flex-col">
+      {showRepoToolbar && (
+        <Toolbar variant="repo">
+          <div className="min-w-0 flex-1 flex items-center gap-2">
+            <Bar w="120px" h="14px" tone="strong" />
+            <Bar w="35%" h="11px" />
+          </div>
+          <div className="flex items-center gap-1">
+            <Bar w="64px" h="24px" />
+            <Bar w="56px" h="24px" />
+            <Bar w="116px" h="24px" />
+          </div>
+        </Toolbar>
+      )}
+      <div className="grid min-h-0 flex-1 grid-rows-2">
+        <div className="flex min-h-0 flex-col overflow-hidden border-b border-border">
+          <ListSkeleton variant="branch" />
+        </div>
+        <div className="flex min-h-0 flex-col overflow-hidden">
+          <BranchDetailSkeleton />
+        </div>
+      </div>
+    </section>
+  )
+}
+
+export function BranchDetailSkeleton() {
+  return (
+    <section className="flex min-h-0 flex-1 flex-col bg-background">
+      <Toolbar className="justify-between gap-2 bg-muted px-2">
+        <div className="flex">
+          <div className="h-9 px-3 flex items-center">
+            <Bar w="42px" h="14px" tone="strong" />
+          </div>
+          <div className="h-9 px-3 flex items-center">
+            <Bar w="42px" h="14px" tone="strong" />
+          </div>
+        </div>
+        <div className="flex min-w-0 items-center justify-end gap-1 overflow-hidden py-1">
+          <Bar w="66px" h="24px" tone="strong" />
+          <Bar w="56px" h="24px" tone="strong" />
+          <Bar w="58px" h="24px" tone="strong" />
+          <Bar w="72px" h="24px" tone="strong" />
+        </div>
+      </Toolbar>
+
+      <div className="flex min-h-0 flex-1 flex-col">
+        <ListSkeleton rows={8} variant="status" />
+      </div>
+    </section>
+  )
+}
+
 function Bar({
   w,
   h,
   round,
   className,
+  tone = 'default',
 }: {
   w: string
   h: string
   round?: boolean
   className?: string
+  tone?: 'default' | 'strong'
 }) {
   return (
     <span
-      className={cn('block bg-muted animate-pulse', round ? 'rounded-full' : 'rounded', className)}
+      className={cn(
+        'block animate-pulse',
+        tone === 'strong' ? 'bg-accent' : 'bg-muted',
+        round ? 'rounded-full' : 'rounded',
+        className,
+      )}
       style={{ width: w, height: h }}
     />
   )

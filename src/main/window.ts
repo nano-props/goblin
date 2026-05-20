@@ -63,8 +63,9 @@ function clampToDisplay(bounds: WindowBounds): WindowBounds {
 export async function createMainWindow(): Promise<BrowserWindow> {
   const { resolved } = getTheme()
   // Match the renderer's body background so there's no white flash
-  // before the bundle loads. Hex values mirror styles.css `--color-bg`.
-  const backgroundColor = resolved === 'dark' ? '#0c0d0f' : '#ffffff'
+  // before the bundle loads. Hex values mirror styles.css
+  // `--color-background`.
+  const backgroundColor = resolved === 'dark' ? '#1c1c1e' : '#ffffff'
 
   const settings = await loadSettings()
   const saved = settings.windowBounds

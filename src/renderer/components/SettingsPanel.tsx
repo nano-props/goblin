@@ -73,7 +73,7 @@ export function SettingsPanel({ open, onClose }: Props) {
           />
         </Section>
 
-        <div className="border-t border-border pt-3 text-xs text-muted-foreground/60">{buildInfo}</div>
+        <div className="border-t border-border pt-3 text-xs text-muted-foreground">{buildInfo}</div>
       </div>
     </Modal>
   )

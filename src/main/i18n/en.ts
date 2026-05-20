@@ -39,7 +39,6 @@ export const en = {
   'menu.edit.selectAll': 'Select All',
 
   // ---- Menu — View --------------------------------------------------------
-  'menu.view.branches': 'Branches',
   'menu.view.status': 'Status',
   'menu.view.log': 'Log',
   'menu.view.refresh': 'Refresh',
@@ -83,8 +82,9 @@ export const en = {
   'drop.body': 'Drop a Git repository folder anywhere in Goblin.',
   'drop.openFailed': 'Could not open repository',
 
-  // ---- Right-side tabs ----------------------------------------------------
+  // ---- Detail tabs --------------------------------------------------------
   'tab.branches': 'Branches',
+  'tab.branchDetail': 'Branch detail',
   'tab.status': 'Status',
   'tab.log': 'Log',
   'tab.fetching': 'fetch',
@@ -108,6 +108,8 @@ export const en = {
   // ---- Status -------------------------------------------------------------
   'status.cleanTitle': 'Working tree is clean',
   'status.cleanBody': 'No changes to commit.',
+  'status.noWorktreeTitle': 'No worktree for this branch',
+  'status.noWorktreeBody': 'Checkout the branch or create a worktree to see working-tree changes here.',
   'status.mainWorktree': 'main',
   'status.worktreeClean': 'clean',
   'status.staged': 'Staged',
@@ -169,6 +171,7 @@ export const en = {
   'action.confirmRemoveWorktreeProtectedHint': "This branch is protected — it can't be deleted from here.",
   'action.createWorktree': 'New worktree',
   'action.createWorktreeTitle': 'Create a new worktree',
+  'action.createWorktreeCreatingTitle': 'Creating worktree for {branch}…',
   'action.createWorktreeHint': 'A new branch will be created from the selected base.',
   'action.createWorktreeBaseLabel': 'Base branch',
   'action.createWorktreeBasePlaceholder': 'Pick a branch',
@@ -235,7 +238,6 @@ export const en = {
   'help.row.prevBranch': 'Previous branch / commit',
   'help.row.nextRepo': 'Next repository',
   'help.row.prevRepo': 'Previous repository',
-  'help.row.viewBranches': 'Branches',
   'help.row.viewStatus': 'Status',
   'help.row.viewLog': 'Log',
   'help.row.checkout': 'Checkout branch / open commit',

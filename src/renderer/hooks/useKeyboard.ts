@@ -2,7 +2,7 @@
 // live here so adding/removing one is a single-file change.
 //
 // Shortcuts that are also wired through the application menu (⌘O,
-// ⌘W, ⌘1..4, ⌘[ , ⌘]) are handled by Electron's accelerator system
+// ⌘W, ⌘2/⌘3, ⌘[ , ⌘]) are handled by Electron's accelerator system
 // and forwarded via `app:menu-invoke`. We only handle the "no
 // modifier" keys here (j/k/?/Enter/Esc) so we don't fight the menu.
 //
@@ -57,50 +57,56 @@ export function useKeyboard({ onShowHelp, isOverlayOpen }: Options) {
       switch (e.key) {
         case 'j':
         case 'ArrowDown': {
-          if (overlayOpen || !repo) break
-          if (repo.rightTab === 'branches' && repo.branches.length > 0) {
+          if (overlayOpen || !repo || repo.branches.length === 0) break
+          if (repo.detailTab === 'commits') {
+            const branch = repo.selectedBranch ?? repo.currentBranch
+            const branchLog = branch ? repo.logsByBranch[branch] : undefined
+            if (branch && branchLog?.entries.length) {
+              e.preventDefault()
+              const idx = branchLog.entries.findIndex((c) => c.hash === branchLog.selectedHash)
+              const nextIdx = Math.min(branchLog.entries.length - 1, idx < 0 ? 0 : idx + 1)
+              const next = branchLog.entries[nextIdx]
+              if (next) state.selectLog(repo.id, branch, next.hash)
+            }
+          } else {
             e.preventDefault()
             const idx = repo.branches.findIndex((b) => b.name === repo.selectedBranch)
             const nextIdx = Math.min(repo.branches.length - 1, idx < 0 ? 0 : idx + 1)
             const next = repo.branches[nextIdx]
             if (next) state.selectBranch(repo.id, next.name)
-          } else if (repo.rightTab === 'log' && repo.log.length > 0) {
-            e.preventDefault()
-            const idx = repo.log.findIndex((c) => c.hash === repo.selectedLogHash)
-            const nextIdx = Math.min(repo.log.length - 1, idx < 0 ? 0 : idx + 1)
-            const next = repo.log[nextIdx]
-            if (next) state.selectLog(repo.id, next.hash)
           }
           break
         }
         case 'k':
         case 'ArrowUp': {
-          if (overlayOpen || !repo) break
-          if (repo.rightTab === 'branches' && repo.branches.length > 0) {
+          if (overlayOpen || !repo || repo.branches.length === 0) break
+          if (repo.detailTab === 'commits') {
+            const branch = repo.selectedBranch ?? repo.currentBranch
+            const branchLog = branch ? repo.logsByBranch[branch] : undefined
+            if (branch && branchLog?.entries.length) {
+              e.preventDefault()
+              const idx = branchLog.entries.findIndex((c) => c.hash === branchLog.selectedHash)
+              const nextIdx = Math.max(0, idx < 0 ? 0 : idx - 1)
+              const next = branchLog.entries[nextIdx]
+              if (next) state.selectLog(repo.id, branch, next.hash)
+            }
+          } else {
             e.preventDefault()
             const idx = repo.branches.findIndex((b) => b.name === repo.selectedBranch)
             const nextIdx = Math.max(0, idx < 0 ? 0 : idx - 1)
             const next = repo.branches[nextIdx]
             if (next) state.selectBranch(repo.id, next.name)
-          } else if (repo.rightTab === 'log' && repo.log.length > 0) {
-            e.preventDefault()
-            const idx = repo.log.findIndex((c) => c.hash === repo.selectedLogHash)
-            const nextIdx = Math.max(0, idx < 0 ? 0 : idx - 1)
-            const next = repo.log[nextIdx]
-            if (next) state.selectLog(repo.id, next.hash)
           }
           break
         }
         case 'Enter': {
           if (overlayOpen || !repo) break
-          if (repo.rightTab === 'branches') {
-            e.preventDefault()
-            // Eligibility (current branch / worktree-occupied) is
-            // checked inside the store action — keep this tight.
-            void state.checkoutSelected()
-          } else if (repo.rightTab === 'log') {
+          if (repo.detailTab === 'commits') {
             e.preventDefault()
             void state.openSelectedCommit()
+          } else {
+            e.preventDefault()
+            void state.checkoutSelected()
           }
           break
         }

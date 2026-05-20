@@ -1,6 +1,7 @@
-import type { RepoState, ReposSet } from '#/renderer/stores/repos/types.ts'
+import type { RepoEvent, RepoState, ReposSet } from '#/renderer/stores/repos/types.ts'
 
 let nextInstanceToken = 1
+let nextEventId = 1
 
 export const inFlightFetchById = new Map<string, Promise<void>>()
 
@@ -12,18 +13,28 @@ export function emptyRepo(id: string, name: string): RepoState {
     branches: [],
     currentBranch: '',
     selectedBranch: null,
-    log: [],
-    selectedLogHash: null,
+    logsByBranch: {},
     status: [],
-    rightTab: 'branches',
+    statusLoading: true,
+    statusLoaded: false,
+    statusError: null,
+    detailTab: 'status',
     openCommit: null,
-    loading: false,
+    openingCommitHash: null,
+    loading: true,
     fetching: false,
     fetchFailed: false,
     fetchError: null,
-    error: null,
-    lastResult: null,
+    events: [],
   }
+}
+
+export function resultEvent(result: { ok: boolean; message: string }): RepoEvent {
+  return { id: nextEventId++, kind: 'result', result }
+}
+
+export function errorEvent(message: string): RepoEvent {
+  return { id: nextEventId++, kind: 'error', message }
 }
 
 /** Apply `mutator` to the repo at `id` only if its instanceToken still

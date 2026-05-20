@@ -22,6 +22,7 @@ import { Topbar } from '#/renderer/components/Topbar.tsx'
 import { ErrorBoundary } from '#/renderer/components/ErrorBoundary.tsx'
 import { RepoTabs } from '#/renderer/components/RepoTabs.tsx'
 import { RepoView } from '#/renderer/components/RepoView.tsx'
+import { RepoWorkspaceSkeleton } from '#/renderer/components/Skeleton.tsx'
 import { SettingsPanel } from '#/renderer/components/SettingsPanel.tsx'
 import { HelpOverlay } from '#/renderer/components/HelpOverlay.tsx'
 import { RepoDropOverlay } from '#/renderer/components/RepoDropOverlay.tsx'
@@ -37,6 +38,7 @@ import { useSettingsWriteErrorToast } from '#/renderer/hooks/useSettingsWriteErr
 
 export function App() {
   const activeId = useReposStore((s) => s.activeId)
+  const sessionReady = useReposStore((s) => s.sessionReady)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const openSettings = useCallback(() => setSettingsOpen(true), [])
@@ -79,7 +81,13 @@ export function App() {
         <RepoTabs />
         <main className="flex flex-1 min-h-0 min-w-0">
           <ErrorBoundary resetKey={activeId}>
-            {activeId ? <RepoView repoId={activeId} /> : <EmptyState />}
+            {!sessionReady ? (
+              <RepoWorkspaceSkeleton showRepoToolbar />
+            ) : activeId ? (
+              <RepoView repoId={activeId} />
+            ) : (
+              <EmptyState />
+            )}
           </ErrorBoundary>
         </main>
         <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />

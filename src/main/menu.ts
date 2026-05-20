@@ -22,7 +22,6 @@ export type MenuAction =
   | 'next-repo'
   | 'prev-repo'
   | 'refresh'
-  | 'tab-branches'
   | 'tab-status'
   | 'tab-log'
   | 'toggle-theme'
@@ -72,14 +71,17 @@ export function buildAppMenu(): void {
   const viewMenu: MenuItemConstructorOptions = {
     label: t('menu.view'),
     submenu: [
-      { label: t('menu.view.branches'), accelerator: 'CmdOrCtrl+1', click: () => send('tab-branches') },
       { label: t('menu.view.status'), accelerator: 'CmdOrCtrl+2', click: () => send('tab-status') },
       { label: t('menu.view.log'), accelerator: 'CmdOrCtrl+3', click: () => send('tab-log') },
       { type: 'separator' },
       { label: t('menu.view.refresh'), accelerator: 'CmdOrCtrl+R', click: () => send('refresh') },
       { label: t('menu.view.toggleTheme'), accelerator: 'CmdOrCtrl+Shift+T', click: () => send('toggle-theme') },
       { type: 'separator' },
-      { role: 'toggleDevTools', label: t('menu.view.toggleDevTools'), accelerator: isMac ? 'Cmd+Alt+I' : 'Ctrl+Shift+I' },
+      {
+        role: 'toggleDevTools',
+        label: t('menu.view.toggleDevTools'),
+        accelerator: isMac ? 'Cmd+Alt+I' : 'Ctrl+Shift+I',
+      },
     ],
   }
 
@@ -91,9 +93,7 @@ export function buildAppMenu(): void {
       { type: 'separator' },
       { role: 'minimize', label: t('menu.window.minimize') },
       { role: 'zoom', label: t('menu.window.zoom') },
-      ...(isMac
-        ? [{ type: 'separator' as const }, { role: 'front' as const, label: t('menu.window.front') }]
-        : []),
+      ...(isMac ? [{ type: 'separator' as const }, { role: 'front' as const, label: t('menu.window.front') }] : []),
     ],
   }
 

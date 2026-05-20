@@ -34,7 +34,6 @@ export const ko: Record<DictKey, string> = {
   'menu.edit.paste': '붙여넣기',
   'menu.edit.selectAll': '전체 선택',
 
-  'menu.view.branches': '브랜치',
   'menu.view.status': '워킹 트리 상태',
   'menu.view.log': '커밋 로그',
   'menu.view.refresh': '새로 고침',
@@ -74,8 +73,9 @@ export const ko: Record<DictKey, string> = {
   'drop.body': 'Git 리포지토리 폴더를 Goblin 어디에나 놓으세요.',
   'drop.openFailed': '리포지토리를 열 수 없음',
 
-  // ---- Right-side tabs ---------------------------------------------------
+  // ---- Detail tabs -------------------------------------------------------
   'tab.branches': '브랜치',
+  'tab.branchDetail': '브랜치 세부 정보',
   'tab.status': '상태',
   'tab.log': '로그',
   'tab.fetching': '동기화',
@@ -99,6 +99,8 @@ export const ko: Record<DictKey, string> = {
   // ---- Status ------------------------------------------------------------
   'status.cleanTitle': '워킹 트리가 깨끗합니다',
   'status.cleanBody': '커밋할 변경 사항이 없습니다.',
+  'status.noWorktreeTitle': '이 브랜치의 워크트리가 없습니다',
+  'status.noWorktreeBody': '브랜치를 체크아웃하거나 워크트리를 만들면 여기서 변경 사항을 볼 수 있습니다.',
   'status.mainWorktree': '메인',
   'status.worktreeClean': '깨끗',
   'status.staged': '스테이지됨',
@@ -160,6 +162,7 @@ export const ko: Record<DictKey, string> = {
   'action.confirmRemoveWorktreeProtectedHint': '이 브랜치는 보호되어 있어 여기서 삭제할 수 없습니다.',
   'action.createWorktree': '새 워크트리',
   'action.createWorktreeTitle': '새 워크트리 만들기',
+  'action.createWorktreeCreatingTitle': '{branch} 의 워크트리를 만드는 중…',
   'action.createWorktreeHint': '선택한 브랜치에서 새 브랜치를 만듭니다.',
   'action.createWorktreeBaseLabel': '기준 브랜치',
   'action.createWorktreeBasePlaceholder': '브랜치 선택',
@@ -227,7 +230,6 @@ export const ko: Record<DictKey, string> = {
   'help.row.prevBranch': '이전 브랜치 / 커밋',
   'help.row.nextRepo': '다음 리포지토리',
   'help.row.prevRepo': '이전 리포지토리',
-  'help.row.viewBranches': '브랜치',
   'help.row.viewStatus': '워킹 트리 상태',
   'help.row.viewLog': '커밋 로그',
   'help.row.checkout': '브랜치 체크아웃 / 커밋 열기',

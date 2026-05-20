@@ -52,7 +52,7 @@ export class ErrorBoundary extends Component<Props, State> {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
         <div className="max-w-md text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[rgb(var(--color-danger-rgb)/0.1)] text-danger">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-danger-surface text-danger">
             <AlertTriangle size={22} />
           </div>
           <div className="text-sm font-semibold text-foreground mb-1">{tx('error.renderCrashTitle')}</div>

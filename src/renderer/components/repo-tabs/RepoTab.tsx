@@ -73,7 +73,7 @@ export function RepoTab({
         <span className="pointer-events-none absolute right-0 top-1/2 h-4 -translate-y-1/2 border-r border-border/70" />
       )}
       <div className="flex h-full min-w-0 flex-1 items-center gap-1.5">
-        <FolderGit2 size={13} className={cn('shrink-0', isActive ? 'text-brand' : 'text-muted-foreground')} />
+        <FolderGit2 size={13} className={cn('shrink-0', isActive ? 'text-foreground' : 'text-muted-foreground')} />
         <span className="truncate font-medium">{repo.name}</span>
       </div>
       <button

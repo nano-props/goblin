@@ -12,7 +12,6 @@
 // responsibility and its errors are precise enough to show as-is.
 
 import { useEffect, useRef, useState } from 'react'
-import { Loader2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -23,14 +22,21 @@ import {
 } from '#/renderer/components/ui/dialog.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/renderer/components/ui/select.tsx'
 import { Button } from '#/renderer/components/ui/button.tsx'
-import { useReposStore, type RepoState } from '#/renderer/stores/repos.ts'
+import type { RepoState } from '#/renderer/stores/repos.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { lastPathSegment, parentDir, tildify, untildify } from '#/renderer/lib/paths.ts'
+
+export interface CreateWorktreeRequest {
+  worktreePath: string
+  newBranch: string
+  baseBranch: string
+}
 
 interface Props {
   open: boolean
   repo: RepoState
   onClose: () => void
+  onCreate: (request: CreateWorktreeRequest) => void
 }
 
 function computeDefaultPath(repoId: string, branch: string): string {
@@ -41,16 +47,12 @@ function computeDefaultPath(repoId: string, branch: string): string {
   return parent ? `${parent}/${name}-${slug}` : `${name}-${slug}`
 }
 
-export function CreateWorktreeDialog({ open, repo, onClose }: Props) {
+export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
   const t = useT()
-  const refreshSnapshot = useReposStore((s) => s.refreshSnapshot)
-  const refreshStatus = useReposStore((s) => s.refreshStatus)
-  const setLastResult = useReposStore((s) => s.setLastResult)
 
   const [base, setBase] = useState<string>('')
   const [branch, setBranch] = useState('')
   const [worktreePath, setWorktreePath] = useState('')
-  const [busy, setBusy] = useState(false)
 
   // Reset on the rising edge of `open` only. Listing repo.branches /
   // repo.currentBranch in the deps would re-fire on every snapshot
@@ -75,30 +77,18 @@ export function CreateWorktreeDialog({ open, repo, onClose }: Props) {
   const effectivePath = pathTrimmed || defaultPath
   const displayDefaultPath = tildify(defaultPath)
   const displayEffectivePath = tildify(effectivePath)
-  const canSubmit = !busy && branchTrimmed.length > 0 && effectivePath.length > 0 && base.length > 0
+  const canSubmit = branchTrimmed.length > 0 && effectivePath.length > 0 && base.length > 0
 
-  async function handleSubmit() {
+  function handleSubmit() {
     if (!canSubmit) return
-    setBusy(true)
-    try {
-      const result = await window.gbl.createWorktree(repo.id, effectivePath, branchTrimmed, base)
-      setLastResult(repo.id, result)
-      if (result.ok) {
-        onClose()
-        void refreshSnapshot(repo.id)
-        void refreshStatus(repo.id)
-      }
-    } finally {
-      setBusy(false)
-    }
+    onClose()
+    onCreate({ worktreePath: effectivePath, newBranch: branchTrimmed, baseBranch: base })
   }
 
   return (
     <Dialog
       open={open}
       onOpenChange={(o) => {
-        // Allow Esc / overlay-click even while a create is in flight.
-        // Git op runs in main; result still surfaces via toast.
         if (!o) onClose()
       }}
     >
@@ -169,11 +159,10 @@ export function CreateWorktreeDialog({ open, repo, onClose }: Props) {
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose} disabled={busy}>
+          <Button variant="ghost" onClick={onClose}>
             {t('dialog.cancel')}
           </Button>
           <Button onClick={handleSubmit} disabled={!canSubmit}>
-            {busy && <Loader2 className="animate-spin" />}
             {t('action.createWorktreeConfirm')}
           </Button>
         </DialogFooter>

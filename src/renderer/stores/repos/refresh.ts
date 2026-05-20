@@ -1,4 +1,4 @@
-import { inFlightFetchById, updateIfFresh } from '#/renderer/stores/repos/helpers.ts'
+import { errorEvent, inFlightFetchById, updateIfFresh } from '#/renderer/stores/repos/helpers.ts'
 import type { ReposGet, ReposSet } from '#/renderer/stores/repos/types.ts'
 
 export function createRefreshActions(set: ReposSet, get: ReposGet) {
@@ -10,12 +10,16 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (repoBefore.instanceToken !== token) return
       const silent = options?.silent === true
       if (!silent) {
-        updateIfFresh(set, id, token, (r) => ({ ...r, loading: true, error: null }))
+        updateIfFresh(set, id, token, (r) => ({ ...r, loading: true }))
       }
       try {
         const snap = await window.gbl.snapshot(id)
         if (!snap) {
-          updateIfFresh(set, id, token, (r) => ({ ...r, loading: false, error: 'error.failedReadRepo' }))
+          updateIfFresh(set, id, token, (r) => ({
+            ...r,
+            loading: false,
+            events: [...r.events, errorEvent('error.failedReadRepo')],
+          }))
           return
         }
         updateIfFresh(set, id, token, (r) => {
@@ -27,61 +31,71 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
           if (!selected || !snap.branches.some((b) => b.name === selected)) {
             selected = snap.branches.find((b) => b.name === snap.current)?.name ?? snap.branches[0]?.name ?? null
           }
-          const branchChanged = selected !== previousSelected
+          const validBranches = new Set(snap.branches.map((b) => b.name))
+          const logsByBranch = Object.fromEntries(
+            Object.entries(r.logsByBranch).filter(([branch]) => validBranches.has(branch)),
+          )
           return {
             ...r,
             branches: snap.branches,
             currentBranch: snap.current,
             selectedBranch: selected,
-            log: branchChanged ? [] : r.log,
-            selectedLogHash: branchChanged ? null : r.selectedLogHash,
+            logsByBranch,
             loading: false,
           }
         })
-        // If the user pressed ⌘2 (Log) while the snapshot was in flight,
-        // their setRightTab fired a refreshLog that bailed out because
+        // If the user opened Commits while the snapshot was in flight,
+        // their setDetailTab fired a refreshBranchLog that bailed out because
         // selectedBranch was still null. Now that we have it, backfill
         // the data they're actually looking at.
         //
         const after = get().repos[id]
-        if (after && after.instanceToken === token && after.rightTab === 'log' && !options?.skipLogBackfill) {
-          void get().refreshLog(id)
+        if (after && after.instanceToken === token && after.detailTab === 'commits' && !options?.skipLogBackfill) {
+          void get().refreshBranchLog(id, undefined, { token })
         }
       } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
         updateIfFresh(set, id, token, (r) => ({
           ...r,
           loading: false,
-          error: err instanceof Error ? err.message : String(err),
+          events: [...r.events, errorEvent(message)],
         }))
       }
     },
 
-    async refreshLog(id: string) {
+    async refreshBranchLog(id: string, branchArg?: string, options?: { token?: number }) {
       const repoBefore = get().repos[id]
       if (!repoBefore) return
-      const token = repoBefore.instanceToken
-      const branch = repoBefore.selectedBranch ?? repoBefore.currentBranch
+      const token = options?.token ?? repoBefore.instanceToken
+      if (repoBefore.instanceToken !== token) return
+      const branch = branchArg ?? repoBefore.selectedBranch ?? repoBefore.currentBranch
       if (!branch) return
+      updateIfFresh(set, id, token, (r) => {
+        if (r.branches.length > 0 && !r.branches.some((b) => b.name === branch)) return r
+        const prev = r.logsByBranch[branch] ?? { entries: [], selectedHash: null, loading: false }
+        return { ...r, logsByBranch: { ...r.logsByBranch, [branch]: { ...prev, loading: true } } }
+      })
       try {
         const log = await window.gbl.log(id, branch, 100)
         updateIfFresh(set, id, token, (r) => {
-          // Discard if the user moved to a different branch while we
-          // were waiting — otherwise the previous branch's log would
-          // overwrite the current one.
-          const stillBranch = r.selectedBranch ?? r.currentBranch
-          if (stillBranch !== branch) return r
-          // Re-anchor the j/k cursor: keep it if the selected hash is
-          // still in the new log, otherwise auto-select the head so j/k
-          // is immediately usable when the user enters the tab.
-          const stillHas = r.selectedLogHash && log.some((e) => e.hash === r.selectedLogHash)
-          const selectedLogHash = stillHas ? r.selectedLogHash : (log[0]?.hash ?? null)
-          return { ...r, log, selectedLogHash }
+          if (!r.branches.some((b) => b.name === branch)) return r
+          const prev = r.logsByBranch[branch] ?? { entries: [], selectedHash: null, loading: false }
+          const stillHas = prev.selectedHash && log.some((e) => e.hash === prev.selectedHash)
+          const selectedHash = stillHas ? prev.selectedHash : (log[0]?.hash ?? null)
+          return { ...r, logsByBranch: { ...r.logsByBranch, [branch]: { entries: log, selectedHash, loading: false } } }
         })
       } catch (err) {
-        console.warn('[refreshLog] failed', err)
+        console.warn('[refreshBranchLog] failed', err)
+        const message = err instanceof Error ? err.message : String(err)
         updateIfFresh(set, id, token, (r) => ({
           ...r,
-          error: err instanceof Error ? err.message : String(err),
+          logsByBranch: r.branches.some((b) => b.name === branch)
+            ? {
+                ...r.logsByBranch,
+                [branch]: { ...(r.logsByBranch[branch] ?? { entries: [], selectedHash: null }), loading: false },
+              }
+            : r.logsByBranch,
+          events: [...r.events, errorEvent(message)],
         }))
       }
     },
@@ -91,30 +105,36 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (!repoBefore) return
       const token = options?.token ?? repoBefore.instanceToken
       if (repoBefore.instanceToken !== token) return
+      updateIfFresh(set, id, token, (r) => ({ ...r, statusLoading: true, statusError: null }))
       try {
         const status = await window.gbl.status(id)
-        updateIfFresh(set, id, token, (r) => ({ ...r, status }))
+        updateIfFresh(set, id, token, (r) => ({ ...r, status, statusLoading: false, statusLoaded: true }))
       } catch (err) {
         console.warn('[refreshStatus] failed', err)
+        const message = err instanceof Error ? err.message : String(err)
         updateIfFresh(set, id, token, (r) => ({
           ...r,
-          error: err instanceof Error ? err.message : String(err),
+          statusLoading: false,
+          statusError: message,
+          events: [...r.events, errorEvent(message)],
         }))
       }
     },
 
-    async refreshAll(id: string) {
-      if (!get().repos[id]) return
-      await get().refreshSnapshot(id, { skipLogBackfill: true })
-      // Status is always refreshed (regardless of which tab is active)
-      // because the tab badge in the repo header surfaces the dirty file
-      // count on every view — without this, the badge would be empty
-      // until the user clicks into the Status tab. Log only matters when
-      // it's visible, so we keep its refresh tab-gated.
+    async refreshAll(id: string, options?: { token?: number }) {
+      const repoBefore = get().repos[id]
+      if (!repoBefore) return
+      const token = options?.token ?? repoBefore.instanceToken
+      if (repoBefore.instanceToken !== token) return
+      await get().refreshSnapshot(id, { skipLogBackfill: true, token })
+      // Status is always refreshed (regardless of which detail tab is
+      // active) because the selected-branch detail toolbar surfaces the
+      // dirty file count on every view. Log only matters when it's
+      // visible, so we keep its refresh tab-gated.
       const after = get().repos[id]
-      if (!after) return
-      await get().refreshStatus(id)
-      if (after.rightTab === 'log') await get().refreshLog(id)
+      if (!after || after.instanceToken !== token) return
+      await get().refreshStatus(id, { token })
+      if (after.detailTab === 'commits') await get().refreshBranchLog(id, undefined, { token })
     },
 
     async backgroundFetch(id: string) {

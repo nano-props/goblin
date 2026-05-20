@@ -39,7 +39,6 @@ export const ja: Record<DictKey, string> = {
   'menu.edit.selectAll': 'すべてを選択',
 
   // ---- Menu — View -------------------------------------------------------
-  'menu.view.branches': 'ブランチ',
   'menu.view.status': 'ステータス',
   'menu.view.log': 'ログ',
   'menu.view.refresh': '更新',
@@ -81,8 +80,9 @@ export const ja: Record<DictKey, string> = {
   'drop.body': 'Git リポジトリフォルダを Goblin のどこにでもドロップできます。',
   'drop.openFailed': 'リポジトリを開けませんでした',
 
-  // ---- Right-side tabs ---------------------------------------------------
+  // ---- Detail tabs -------------------------------------------------------
   'tab.branches': 'ブランチ',
+  'tab.branchDetail': 'ブランチ詳細',
   'tab.status': 'ステータス',
   'tab.log': 'ログ',
   'tab.fetching': 'fetch 中',
@@ -106,6 +106,8 @@ export const ja: Record<DictKey, string> = {
   // ---- Status ------------------------------------------------------------
   'status.cleanTitle': '作業ツリーはクリーンです',
   'status.cleanBody': 'コミットすべき変更はありません。',
+  'status.noWorktreeTitle': 'このブランチのワークツリーはありません',
+  'status.noWorktreeBody': 'ブランチをチェックアウトするかワークツリーを作成すると、ここに変更が表示されます。',
   'status.mainWorktree': 'メイン',
   'status.worktreeClean': 'クリーン',
   'status.staged': 'ステージ済み',
@@ -168,6 +170,7 @@ export const ja: Record<DictKey, string> = {
   'action.confirmRemoveWorktreeProtectedHint': 'このブランチは保護されているため、ここから削除できません。',
   'action.createWorktree': '新しいワークツリー',
   'action.createWorktreeTitle': '新しいワークツリーを作成',
+  'action.createWorktreeCreatingTitle': '{branch} のワークツリーを作成中…',
   'action.createWorktreeHint': '選択したブランチから新しいブランチを作成します。',
   'action.createWorktreeBaseLabel': '元のブランチ',
   'action.createWorktreeBasePlaceholder': 'ブランチを選択',
@@ -236,7 +239,6 @@ export const ja: Record<DictKey, string> = {
   'help.row.prevBranch': '前のブランチ / コミット',
   'help.row.nextRepo': '次のリポジトリ',
   'help.row.prevRepo': '前のリポジトリ',
-  'help.row.viewBranches': 'ブランチ',
   'help.row.viewStatus': 'ステータス',
   'help.row.viewLog': 'ログ',
   'help.row.checkout': 'ブランチを切替 / コミットを開く',

@@ -30,7 +30,7 @@ const buttonVariants = cva(
         // "neutral outline" → "armed" stays small while flagging that
         // the next click commits.
         'destructive-soft':
-          'border bg-destructive/10 text-destructive shadow-xs hover:bg-destructive/20 hover:text-destructive border-destructive/40',
+          'border bg-danger-surface text-destructive shadow-xs hover:bg-danger-surface hover:text-destructive border-danger-border',
       },
       // Sizes calibrated for desktop-tool information density (VS Code
       // / Tower / Sourcetree). Two steps smaller than upstream shadcn,

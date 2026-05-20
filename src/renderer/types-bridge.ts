@@ -35,7 +35,6 @@ export type MenuAction =
   | 'next-repo'
   | 'prev-repo'
   | 'refresh'
-  | 'tab-branches'
   | 'tab-status'
   | 'tab-log'
   | 'toggle-theme'

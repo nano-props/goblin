@@ -11,7 +11,7 @@ export function useMenuActions({ openSettings, showHelp }: MenuActionHandlers) {
   const refreshAll = useReposStore((s) => s.refreshAll)
   const closeRepo = useReposStore((s) => s.closeRepo)
   const cycleActive = useReposStore((s) => s.cycleActive)
-  const setRightTab = useReposStore((s) => s.setRightTab)
+  const setDetailTab = useReposStore((s) => s.setDetailTab)
   const cycleTheme = useThemeStore((s) => s.setPref)
 
   useEffect(() => {
@@ -36,14 +36,11 @@ export function useMenuActions({ openSettings, showHelp }: MenuActionHandlers) {
         case 'refresh':
           if (state.activeId) await refreshAll(state.activeId)
           break
-        case 'tab-branches':
-          if (state.activeId) setRightTab(state.activeId, 'branches')
-          break
         case 'tab-status':
-          if (state.activeId) setRightTab(state.activeId, 'status')
+          if (state.activeId) setDetailTab(state.activeId, 'status')
           break
         case 'tab-log':
-          if (state.activeId) setRightTab(state.activeId, 'log')
+          if (state.activeId) setDetailTab(state.activeId, 'commits')
           break
         case 'toggle-theme': {
           // Read pref from store, not closure: the menu effect runs once
@@ -63,5 +60,5 @@ export function useMenuActions({ openSettings, showHelp }: MenuActionHandlers) {
       }
     })
     return off
-  }, [closeRepo, cycleActive, cycleTheme, openSettings, refreshAll, setRightTab, showHelp])
+  }, [closeRepo, cycleActive, cycleTheme, openSettings, refreshAll, setDetailTab, showHelp])
 }

@@ -2,7 +2,17 @@ import type { StoreApi } from 'zustand'
 import type { BranchInfo, LogEntry, WorktreeStatus } from '#/renderer/types.ts'
 import type { CommitDetail } from '#/renderer/types-bridge.ts'
 
-export type RightTab = 'branches' | 'log' | 'status'
+export type DetailTab = 'status' | 'commits'
+
+export interface BranchLogState {
+  entries: LogEntry[]
+  selectedHash: string | null
+  loading: boolean
+}
+
+export type RepoEvent =
+  | { id: number; kind: 'result'; result: { ok: boolean; message: string } }
+  | { id: number; kind: 'error'; message: string }
 
 /** Discriminated union: a successful open guarantees `id`; a failed
  *  open carries a translation key or raw message. The shape forces
@@ -18,17 +28,16 @@ export interface RepoState {
   branches: BranchInfo[]
   currentBranch: string
   selectedBranch: string | null
-  /** Log/status are tab-specific — only fetched when the user opens that tab. */
-  log: LogEntry[]
-  /** j/k cursor in the Log tab. Null until the user enters the tab or
-   *  log is refreshed; first entry is auto-selected then. Discarded
-   *  whenever a log refresh produces a list that doesn't contain it. */
-  selectedLogHash: string | null
+  logsByBranch: Record<string, BranchLogState>
   /** Working-tree status grouped by worktree (main worktree first). */
   status: WorktreeStatus[]
-  rightTab: RightTab
+  statusLoading: boolean
+  statusLoaded: boolean
+  statusError: string | null
+  detailTab: DetailTab
   /** When set, the log view shows the commit detail overlay. */
   openCommit: CommitDetail | null
+  openingCommitHash: string | null
   loading: boolean
   /** True while a periodic background fetch is running — header indicator. */
   fetching: boolean
@@ -40,11 +49,7 @@ export interface RepoState {
    *  hover and read why fetch is failing instead of just seeing a
    *  red dot. */
   fetchError: string | null
-  /** Last error from a refresh — surfaces as a banner. Translation key
-   *  if known, otherwise raw message. UI passes through `t()`. */
-  error: string | null
-  /** Last operation result — surfaces as a transient toast. */
-  lastResult: { ok: boolean; message: string } | null
+  events: RepoEvent[]
 }
 
 export interface ReposStore {
@@ -75,9 +80,9 @@ export interface ReposStore {
    *  list closes the gap; later items shift up if `from < to`, down if
    *  `from > to`). No-op if either id is unknown or they're identical. */
   reorderRepos: (fromId: string, toId: string) => void
-  setRightTab: (id: string, tab: RightTab) => void
+  setDetailTab: (id: string, tab: DetailTab) => void
   selectBranch: (id: string, branch: string) => void
-  selectLog: (id: string, hash: string) => void
+  selectLog: (id: string, branch: string, hash: string) => void
   cycleActive: (direction: 1 | -1) => void
   /** Keyboard-driven checkout of the active repo's selected branch.
    *  Centralizes the eligibility checks the keyboard hook used to do. */
@@ -88,19 +93,16 @@ export interface ReposStore {
     id: string,
     options?: { silent?: boolean; skipLogBackfill?: boolean; token?: number },
   ) => Promise<void>
-  refreshLog: (id: string) => Promise<void>
+  refreshBranchLog: (id: string, branch?: string, options?: { token?: number }) => Promise<void>
   refreshStatus: (id: string, options?: { token?: number }) => Promise<void>
-  refreshAll: (id: string) => Promise<void>
+  refreshAll: (id: string, options?: { token?: number }) => Promise<void>
   backgroundFetch: (id: string) => Promise<void>
 
   openCommit: (id: string, hash: string) => Promise<void>
   closeCommit: (id: string) => void
 
-  setLastResult: (id: string, result: { ok: boolean; message: string } | null) => void
-  /** Reset the repo-level error string. Used by the toast bridge to
-   *  clear the value once it has been surfaced, so dismissing the
-   *  toast doesn't immediately re-fire on the next render. */
-  setError: (id: string, error: string | null) => void
+  setLastResult: (id: string, result: { ok: boolean; message: string }, token?: number) => void
+  clearEvents: (id: string, eventIds: number[]) => void
   hydrateSession: (openRepos: string[], activeRepo: string | null) => Promise<void>
   /** Drop the "missing" indicator for paths that failed to restore — the
    *  user has acknowledged them. */
@@ -108,7 +110,7 @@ export interface ReposStore {
   /** Clear the fetchFailed flag — called by manual fetch success and
    *  by an explicit refresh, so a stale badge doesn't follow the user
    *  around forever. */
-  clearFetchFailed: (id: string) => void
+  clearFetchFailed: (id: string, token?: number) => void
 }
 
 export type ReposSet = StoreApi<ReposStore>['setState']

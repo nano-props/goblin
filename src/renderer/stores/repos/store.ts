@@ -14,8 +14,8 @@
 //     a stale snapshot from before close-and-reopen overwriting fresh
 //     data, and against late commit-detail / log responses landing in
 //     the wrong repo.
-//   - selection guards: `refreshLog` captures the branch at call time
-//     and discards if the user moved on; same idea for `openCommit`.
+//   - selection guards: branch log state is keyed by branch; same idea
+//     for `openCommit`.
 //   - `inFlightFetchById`: `backgroundFetch` won't double-fire for the
 //     same repo, no matter how often `App.tsx`'s effect re-runs.
 
