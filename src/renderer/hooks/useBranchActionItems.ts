@@ -48,9 +48,9 @@ export function useBranchActionItems(
     ? [
         {
           id: 'copyPatch',
-          label: t('status.copyPatch'),
-          title: t('status.copyPatchTitle'),
-          ariaLabel: t('status.copyPatchTitle'),
+          label: t('status.copy-patch'),
+          title: t('status.copy-patch-title'),
+          ariaLabel: t('status.copy-patch-title'),
           disabled: !!busy,
           visible: true,
           Icon: ClipboardCopy,
@@ -88,7 +88,7 @@ export function useBranchActionItems(
       ? [
           {
             id: 'ghostty' as const,
-            label: t('worktrees.openInGhosttyLabel'),
+            label: t('worktrees.open-in-ghostty-label'),
             disabled: !!busy,
             visible: true,
             Icon: Terminal,
@@ -100,7 +100,7 @@ export function useBranchActionItems(
       ? [
           {
             id: 'vscode' as const,
-            label: t('worktrees.openInVSCodeLabel'),
+            label: t('worktrees.open-in-vs-code-label'),
             disabled: !!busy,
             visible: true,
             Icon: Code2,
@@ -110,7 +110,7 @@ export function useBranchActionItems(
       : []),
     {
       id: 'github',
-      label: branch.pullRequest ? t('action.githubPr', { n: branch.pullRequest.number }) : t('action.github'),
+      label: branch.pullRequest ? t('action.github-pr', { n: branch.pullRequest.number }) : t('action.github'),
       disabled: !!busy,
       visible: true,
       Icon: ExternalLink,
@@ -123,7 +123,7 @@ export function useBranchActionItems(
       ? [
           {
             id: 'removeWorktree' as const,
-            label: t('action.removeWorktree'),
+            label: t('action.remove-worktree'),
             disabled: !!busy,
             visible: true,
             destructive: true,
@@ -136,7 +136,7 @@ export function useBranchActionItems(
       ? [
           {
             id: 'deleteBranch' as const,
-            label: t('action.deleteBranch'),
+            label: t('action.delete-branch'),
             disabled: !!busy,
             visible: true,
             destructive: true,

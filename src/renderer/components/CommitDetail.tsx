@@ -74,7 +74,7 @@ export function CommitDetail({ repoId, detail }: Props) {
       </div>
 
       <div className="flex items-center gap-3 border-b border-border bg-card px-4 py-1.5 text-xs text-muted-foreground">
-        <span>{t(files.length === 1 ? 'commit.filesChanged' : 'commit.filesChangedPlural', { n: files.length })}</span>
+        <span>{t(files.length === 1 ? 'commit.files-changed' : 'commit.files-changed-plural', { n: files.length })}</span>
         {totalAdded > 0 && <span className="text-success">+{totalAdded}</span>}
         {totalDeleted > 0 && <span className="text-danger">−{totalDeleted}</span>}
       </div>

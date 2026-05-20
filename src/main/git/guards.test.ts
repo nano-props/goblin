@@ -18,7 +18,7 @@ describe('resolveKnownWorktree', () => {
       [{ path: '/repo', branch: 'main', isBare: false, isPrimary: true }],
       '/tmp/other',
     )
-    expect(result).toEqual({ ok: false, message: 'error.invalidWorktreePath' })
+    expect(result).toEqual({ ok: false, message: 'error.invalid-worktree-path' })
   })
 
   test('rejects a known path checked out on a different branch', () => {
@@ -27,7 +27,7 @@ describe('resolveKnownWorktree', () => {
       '/repo-linked',
       'other',
     )
-    expect(result).toEqual({ ok: false, message: 'error.worktreeNotFoundForBranch' })
+    expect(result).toEqual({ ok: false, message: 'error.worktree-not-found-for-branch' })
   })
 })
 
@@ -43,7 +43,7 @@ describe('resolveRemovableWorktree', () => {
 
   test('refuses the primary worktree by isPrimary flag', () => {
     const result = resolveRemovableWorktree([main, linked], 'main', '/repo', repoRoot)
-    expect(result).toEqual({ ok: false, message: 'error.cannotRemoveMainWorktree' })
+    expect(result).toEqual({ ok: false, message: 'error.cannot-remove-main-worktree' })
   })
 
   test('refuses when path resolves to the repo root even if isPrimary missed it', () => {
@@ -51,16 +51,16 @@ describe('resolveRemovableWorktree', () => {
     // but if it didn't, the repo-root path check still catches it.
     const odd = { path: '/repo', branch: 'main', isBare: false, isPrimary: false }
     const result = resolveRemovableWorktree([odd], 'main', '/repo', repoRoot)
-    expect(result).toEqual({ ok: false, message: 'error.cannotRemoveMainWorktree' })
+    expect(result).toEqual({ ok: false, message: 'error.cannot-remove-main-worktree' })
   })
 
   test('rejects when no worktree matches both branch and path', () => {
     const result = resolveRemovableWorktree([linked], 'feature', '/somewhere/else', repoRoot)
-    expect(result).toEqual({ ok: false, message: 'error.worktreeNotFoundForBranch' })
+    expect(result).toEqual({ ok: false, message: 'error.worktree-not-found-for-branch' })
   })
 
   test('rejects when path matches but branch does not', () => {
     const result = resolveRemovableWorktree([linked], 'main', '/repo-linked', repoRoot)
-    expect(result).toEqual({ ok: false, message: 'error.worktreeNotFoundForBranch' })
+    expect(result).toEqual({ ok: false, message: 'error.worktree-not-found-for-branch' })
   })
 })

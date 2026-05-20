@@ -56,7 +56,7 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
       if (options?.handleResult?.(result)) return
       const skipSuccessToast = result.ok && SILENT_SUCCESS_OPS.has(op)
       if (!skipSuccessToast) setLastResult(repo.id, result, token)
-      if (!result.ok && result.message === 'error.networkOpInProgress') return
+      if (!result.ok && result.message === 'error.network-op-in-progress') return
       if (REFRESH_AFTER_OPS.has(op)) {
         await Promise.all([refreshSnapshot(repo.id, { token }), refreshStatus(repo.id, { token })])
       }
@@ -73,13 +73,13 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
     void run('copyPatch', async () => {
       const result = await window.gbl.patch(repo.id, worktreePath)
       if (!result.ok) return { ok: false, message: result.message }
-      if (!result.message) return { ok: false, message: 'status.copyPatchEmpty' }
+      if (!result.message) return { ok: false, message: 'status.copy-patch-empty' }
       try {
         await navigator.clipboard.writeText(result.message)
       } catch (err) {
         return { ok: false, message: err instanceof Error ? err.message : String(err) }
       }
-      return { ok: true, message: 'status.copyPatchOk' }
+      return { ok: true, message: 'status.copy-patch-ok' }
     })
   }
 
@@ -130,7 +130,7 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
   function deleteBranch(target: string, force = false) {
     void run('deleteBranch', () => window.gbl.deleteBranch(repo.id, target, force), {
       handleResult: (result) => {
-        if (!force && !result.ok && result.message === 'error.branchNotFullyMerged') {
+        if (!force && !result.ok && result.message === 'error.branch-not-fully-merged') {
           setForceDeleteConfirm(target)
           return true
         }
@@ -147,7 +147,7 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
         handleResult: (result) => {
           if (
             !result.ok &&
-            result.message === 'error.cannotRemoveUnpushedWorktree' &&
+            result.message === 'error.cannot-remove-unpushed-worktree' &&
             alsoDeleteBranch &&
             !forceDeleteBranch
           ) {
@@ -172,19 +172,19 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
     <>
       <ConfirmDialog
         open={pushConfirm !== null}
-        title={pushConfirm ? t('action.confirmPushProtectedTitle', { branch: pushConfirm }) : ''}
+        title={pushConfirm ? t('action.confirm-push-protected-title', { branch: pushConfirm }) : ''}
         message={
           pushConfirm ? (
             <span>
-              {t('action.confirmPushProtectedBody.before')}
+              {t('action.confirm-push-protected-body.before')}
               <b className="text-foreground">{pushConfirm}</b>
-              {t('action.confirmPushProtectedBody.after')}
+              {t('action.confirm-push-protected-body.after')}
             </span>
           ) : (
             ''
           )
         }
-        confirmLabel={t('action.confirmPushConfirm')}
+        confirmLabel={t('action.confirm-push-confirm')}
         destructive
         onCancel={() => setPushConfirm(null)}
         onConfirm={() => {
@@ -195,19 +195,19 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
       />
       <ConfirmDialog
         open={deleteConfirm !== null}
-        title={deleteConfirm ? t('action.confirmDeleteBranchTitle', { branch: deleteConfirm }) : ''}
+        title={deleteConfirm ? t('action.confirm-delete-branch-title', { branch: deleteConfirm }) : ''}
         message={
           deleteConfirm ? (
             <span>
-              {t('action.confirmDeleteBranchBody.before')}
+              {t('action.confirm-delete-branch-body.before')}
               <b className="text-foreground">{deleteConfirm}</b>
-              {t('action.confirmDeleteBranchBody.after')}
+              {t('action.confirm-delete-branch-body.after')}
             </span>
           ) : (
             ''
           )
         }
-        confirmLabel={t('action.confirmDeleteBranchConfirm')}
+        confirmLabel={t('action.confirm-delete-branch-confirm')}
         destructive
         onCancel={() => setDeleteConfirm(null)}
         onConfirm={() => {
@@ -218,19 +218,19 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
       />
       <ConfirmDialog
         open={forceDeleteConfirm !== null}
-        title={forceDeleteConfirm ? t('action.confirmForceDeleteStandaloneTitle', { branch: forceDeleteConfirm }) : ''}
+        title={forceDeleteConfirm ? t('action.confirm-force-delete-standalone-title', { branch: forceDeleteConfirm }) : ''}
         message={
           forceDeleteConfirm ? (
             <span>
-              {t('action.confirmForceDeleteStandaloneBody.before')}
+              {t('action.confirm-force-delete-standalone-body.before')}
               <b className="text-foreground">{forceDeleteConfirm}</b>
-              {t('action.confirmForceDeleteStandaloneBody.after')}
+              {t('action.confirm-force-delete-standalone-body.after')}
             </span>
           ) : (
             ''
           )
         }
-        confirmLabel={t('action.confirmForceDeleteStandaloneConfirm')}
+        confirmLabel={t('action.confirm-force-delete-standalone-confirm')}
         destructive
         onCancel={() => setForceDeleteConfirm(null)}
         onConfirm={() => {
@@ -241,14 +241,14 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
       />
       <ConfirmDialog
         open={removeConfirm !== null}
-        title={removeConfirm ? t('action.confirmRemoveWorktreeTitle', { branch: removeConfirm.branch }) : ''}
+        title={removeConfirm ? t('action.confirm-remove-worktree-title', { branch: removeConfirm.branch }) : ''}
         message={
           removeConfirm ? (
             <div className="space-y-3">
               <span>
-                {t('action.confirmRemoveWorktreeBody.before')}
+                {t('action.confirm-remove-worktree-body.before')}
                 <b className="text-foreground">{tildify(removeConfirm.path)}</b>
-                {t('action.confirmRemoveWorktreeBody.after')}
+                {t('action.confirm-remove-worktree-body.after')}
               </span>
               <label
                 className={
@@ -258,7 +258,7 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
                 }
                 title={
                   PROTECTED_BRANCHES.has(removeConfirm.branch)
-                    ? t('action.confirmRemoveWorktreeProtectedHint')
+                    ? t('action.confirm-remove-worktree-protected-hint')
                     : undefined
                 }
               >
@@ -269,14 +269,14 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
                   onChange={(e) => setRemoveAlsoDeletes(e.target.checked)}
                   className="h-4 w-4 accent-destructive disabled:opacity-50"
                 />
-                <span>{t('action.confirmRemoveWorktreeAlsoDeleteBranch', { branch: removeConfirm.branch })}</span>
+                <span>{t('action.confirm-remove-worktree-also-delete-branch', { branch: removeConfirm.branch })}</span>
               </label>
             </div>
           ) : (
             ''
           )
         }
-        confirmLabel={t('action.confirmRemoveWorktreeConfirm')}
+        confirmLabel={t('action.confirm-remove-worktree-confirm')}
         destructive
         onCancel={() => setRemoveConfirm(null)}
         onConfirm={() => {
@@ -289,16 +289,16 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
       <ConfirmDialog
         open={forceRemoveConfirm !== null}
         title={
-          forceRemoveConfirm ? t('action.confirmForceDeleteBranchTitle', { branch: forceRemoveConfirm.branch }) : ''
+          forceRemoveConfirm ? t('action.confirm-force-delete-branch-title', { branch: forceRemoveConfirm.branch }) : ''
         }
         message={
           forceRemoveConfirm ? (
-            <span>{t('action.confirmForceDeleteBranchBody', { branch: forceRemoveConfirm.branch })}</span>
+            <span>{t('action.confirm-force-delete-branch-body', { branch: forceRemoveConfirm.branch })}</span>
           ) : (
             ''
           )
         }
-        confirmLabel={t('action.confirmForceDeleteBranchConfirm')}
+        confirmLabel={t('action.confirm-force-delete-branch-confirm')}
         destructive
         onCancel={() => setForceRemoveConfirm(null)}
         onConfirm={() => {

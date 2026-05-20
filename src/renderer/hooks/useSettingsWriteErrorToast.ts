@@ -16,7 +16,7 @@ export function useSettingsWriteErrorToast() {
 
   useEffect(() => {
     const off = window.gbl.settings.onWriteError((message) => {
-      toast.error(tRef.current('error.settingsWriteTitle'), { description: message })
+      toast.error(tRef.current('error.settings-write-title'), { description: message })
     })
     return off
   }, [])

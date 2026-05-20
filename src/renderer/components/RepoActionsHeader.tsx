@@ -120,14 +120,14 @@ export function RepoActionsHeader({ repo }: Props) {
   const createBusy = !!creatingBranch
   const syncBusy = !!syncBusyByRepo[repo.id] || repo.syncing
   const createTip = createBusy
-    ? t('action.createWorktreeCreatingTitle', { branch: creatingBranch })
-    : t('action.createWorktreeTitle')
+    ? t('action.create-worktree-creating-title', { branch: creatingBranch })
+    : t('action.create-worktree-title')
 
   // Buttons carry their label inline so the adjacent refresh-like glyphs
   // don't make the user guess which action they are invoking.
   return (
     <div className="flex items-center gap-1">
-      <Tip label={t('action.fetchTitle')}>
+      <Tip label={t('action.fetch-title')}>
         <Button variant="ghost" onClick={handleSync} disabled={syncBusy}>
           <RotateCw className={syncBusy ? 'animate-spin' : ''} />
           {t('action.refresh')}
@@ -143,7 +143,7 @@ export function RepoActionsHeader({ repo }: Props) {
             aria-label={createTip}
           >
             {createBusy ? <Loader2 className="animate-spin" /> : <FolderPlus />}
-            {t('action.createWorktree')}
+            {t('action.create-worktree')}
           </Button>
         </span>
       </Tip>

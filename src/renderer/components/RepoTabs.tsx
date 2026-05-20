@@ -72,15 +72,15 @@ export function RepoTabs() {
       activeId={activeId}
       missing={missing}
       labels={{
-        repositories: t('repoTabs.repos'),
-        emptyBefore: t('repoTabs.empty.before'),
-        emptyOpenLabel: t('repoTabs.empty.openLabel'),
-        emptyAfter: t('repoTabs.empty.after'),
-        close: t('repoTabs.close'),
-        dragToReorder: t('repoTabs.dragToReorder'),
+        repositories: t('repo-tabs.repos'),
+        emptyBefore: t('repo-tabs.empty.before'),
+        emptyOpenLabel: t('repo-tabs.empty.open-label'),
+        emptyAfter: t('repo-tabs.empty.after'),
+        close: t('repo-tabs.close'),
+        dragToReorder: t('repo-tabs.drag-to-reorder'),
         open: t('topbar.open'),
-        missingTitle: t('repoTabs.missingTitle', { n: missing.length }),
-        missingDismiss: t('repoTabs.missingDismiss'),
+        missingTitle: t('repo-tabs.missing-title', { n: missing.length }),
+        missingDismiss: t('repo-tabs.missing-dismiss'),
       }}
       onActivate={setActive}
       onClose={closeRepo}

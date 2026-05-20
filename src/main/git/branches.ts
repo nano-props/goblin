@@ -144,12 +144,12 @@ export async function getLog(cwd: string, branch: string, count = 100): Promise<
 }
 
 export async function checkoutBranch(cwd: string, name: string): Promise<ExecResult> {
-  if (!isSafeBranchName(name)) return { ok: false, message: 'error.invalidArguments' }
+  if (!isSafeBranchName(name)) return { ok: false, message: 'error.invalid-arguments' }
   return gitResult(cwd, 'switch', '--', name)
 }
 
 export async function deleteBranch(cwd: string, name: string, options?: { force?: boolean }): Promise<ExecResult> {
-  if (!isSafeBranchName(name)) return { ok: false, message: 'error.invalidArguments' }
+  if (!isSafeBranchName(name)) return { ok: false, message: 'error.invalid-arguments' }
   return gitResult(cwd, 'branch', options?.force ? '-D' : '-d', '--', name)
 }
 

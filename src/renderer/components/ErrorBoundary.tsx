@@ -55,9 +55,9 @@ export class ErrorBoundary extends Component<Props, State> {
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-danger-surface text-danger">
             <AlertTriangle size={22} />
           </div>
-          <div className="text-sm font-semibold text-foreground mb-1">{tx('error.renderCrashTitle')}</div>
+          <div className="text-sm font-semibold text-foreground mb-1">{tx('error.render-crash-title')}</div>
           <div className="text-xs text-muted-foreground mb-4 leading-relaxed">
-            {this.state.error.message || tx('error.renderCrashUnknown')}
+            {this.state.error.message || tx('error.render-crash-unknown')}
           </div>
           <button
             type="button"
@@ -65,7 +65,7 @@ export class ErrorBoundary extends Component<Props, State> {
             className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-xs text-foreground cursor-pointer hover:text-foreground hover:bg-muted shadow-sm transition-colors duration-100"
           >
             <RefreshCw size={12} />
-            {tx('error.tryAgain')}
+            {tx('error.try-again')}
           </button>
         </div>
       </div>

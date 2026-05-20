@@ -239,20 +239,20 @@ export function BranchStatus({ detail }: Props) {
   const mergeKnown = branch.isDefault || branch.mergedToDefault !== undefined
   const showMerged = !branch.isDefault
   const mergeLabel = !mergeKnown
-    ? t('branchStatus.mergeUnknown')
+    ? t('branch-status.merge-unknown')
     : branch.mergedToDefault || branch.isDefault
-      ? t('branchStatus.merged')
-      : t('branchStatus.notMerged')
+      ? t('branch-status.merged')
+      : t('branch-status.not-merged')
   const mergeTone: Tone = !mergeKnown ? 'neutral' : branch.mergedToDefault ? 'success' : 'warning'
   const prTone: Tone =
     branch.pullRequest?.state === 'merged' ? 'success' : branch.pullRequest?.state === 'open' ? 'brand' : 'warning'
   const prLabel = branch.pullRequest
-    ? t('branchStatus.pr.summary', {
+    ? t('branch-status.pr.summary', {
         n: branch.pullRequest.number,
         state:
           branch.pullRequest.isDraft && branch.pullRequest.state === 'open'
-            ? t('branchStatus.pr.draft')
-            : t(`branchStatus.pr.${branch.pullRequest.state}`),
+            ? t('branch-status.pr.draft')
+            : t(`branch-status.pr.${branch.pullRequest.state}`),
       })
     : ''
   const prTitle = branch.pullRequest?.title
@@ -264,34 +264,34 @@ export function BranchStatus({ detail }: Props) {
     <CopyableValue
       value={worktreePath}
       copyValue={branch.worktreePath}
-      copyLabel={t('branchStatus.copyWorktreePath')}
-      copiedLabel={t('branchStatus.copied')}
+      copyLabel={t('branch-status.copy-worktree-path')}
+      copiedLabel={t('branch-status.copied')}
     />
   ) : (
-    <StatusChip>{t('branchStatus.worktree.none')}</StatusChip>
+    <StatusChip>{t('branch-status.worktree.none')}</StatusChip>
   )
   const worktreeAfter =
     branch.worktreeLocked || hasWorktreeChanges ? (
       <>
-        {branch.worktreeLocked && <StatusChip tone="warning">{t('branchStatus.worktree.locked')}</StatusChip>}
+        {branch.worktreeLocked && <StatusChip tone="warning">{t('branch-status.worktree.locked')}</StatusChip>}
         {hasWorktreeChanges && (
-          <StatusChip tone="warning">{t('branchStatus.worktreeDirty', { n: worktreeChangeCount })}</StatusChip>
+          <StatusChip tone="warning">{t('branch-status.worktree-dirty', { n: worktreeChangeCount })}</StatusChip>
         )}
       </>
     ) : undefined
   const remoteValue = branch.tracking ? (
     <MonoValue tone={branch.trackingGone ? 'warning' : undefined}>{branch.tracking}</MonoValue>
   ) : (
-    <StatusChip tone="warning">{t('branches.noUpstream')}</StatusChip>
+    <StatusChip tone="warning">{t('branches.no-upstream')}</StatusChip>
   )
   const remoteAfter = branch.trackingGone ? <StatusChip tone="warning">{t('branches.gone')}</StatusChip> : undefined
 
   const RoleChips = () =>
     hasRole ? (
       <>
-        {branch.isCurrent && <StatusChip tone="success">{t('branchStatus.current')}</StatusChip>}
+        {branch.isCurrent && <StatusChip tone="success">{t('branch-status.current')}</StatusChip>}
         {branch.isDefault && <StatusChip>{t('branches.default')}</StatusChip>}
-        {protectedBranch && <StatusChip>{t('branchStatus.protected')}</StatusChip>}
+        {protectedBranch && <StatusChip>{t('branch-status.protected')}</StatusChip>}
       </>
     ) : null
   return (
@@ -299,12 +299,12 @@ export function BranchStatus({ detail }: Props) {
       <StatusRows>
         <StatusRow
           icon={<GitBranch size={15} />}
-          label={t('branchStatus.signal.branch')}
+          label={t('branch-status.signal.branch')}
           value={
             <CopyableValue
               value={branch.name}
-              copyLabel={t('branchStatus.copyBranchName')}
-              copiedLabel={t('branchStatus.copied')}
+              copyLabel={t('branch-status.copy-branch-name')}
+              copiedLabel={t('branch-status.copied')}
             />
           }
           after={hasRole ? <RoleChips /> : undefined}
@@ -312,29 +312,29 @@ export function BranchStatus({ detail }: Props) {
         />
         <StatusRow
           icon={<FolderTree size={14} />}
-          label={t('branchStatus.signal.worktree')}
+          label={t('branch-status.signal.worktree')}
           value={worktreeValue}
           after={worktreeAfter}
           tone={worktreeTone}
         />
         <StatusRow
           icon={<RadioTower size={14} />}
-          label={t('branchStatus.signal.remote')}
+          label={t('branch-status.signal.remote')}
           value={remoteValue}
           after={remoteAfter}
           tone={remoteTone}
         />
         <StatusRow
           icon={<RefreshCw size={14} />}
-          label={t('branchStatus.signal.sync')}
+          label={t('branch-status.signal.sync')}
           value={
             <SyncValue
               ahead={branch.ahead}
               behind={branch.behind}
               noUpstream={!branch.tracking}
-              upToDateLabel={!branch.tracking ? t('branches.noUpstream') : t('branchStatus.sync.upToDate')}
-              aheadLabel={t('branchStatus.sync.ahead', { n: branch.ahead })}
-              behindLabel={t('branchStatus.sync.behind', { n: branch.behind })}
+              upToDateLabel={!branch.tracking ? t('branches.no-upstream') : t('branch-status.sync.up-to-date')}
+              aheadLabel={t('branch-status.sync.ahead', { n: branch.ahead })}
+              behindLabel={t('branch-status.sync.behind', { n: branch.behind })}
             />
           }
           tone={syncTone}
@@ -342,7 +342,7 @@ export function BranchStatus({ detail }: Props) {
         {showMerged && (
           <StatusRow
             icon={<GitMerge size={14} />}
-            label={t('branchStatus.signal.merge')}
+            label={t('branch-status.signal.merge')}
             value={
               <span className="inline-flex min-w-0 items-center gap-1.5">
                 <StatusChip tone={mergeTone}>
@@ -361,7 +361,7 @@ export function BranchStatus({ detail }: Props) {
         )}
         <StatusRow
           icon={<GitCommitHorizontal size={14} />}
-          label={t('branchStatus.signal.commit')}
+          label={t('branch-status.signal.commit')}
           value={branch.lastCommitMessage || '—'}
           detail={`${branch.lastCommitAuthor} · ${formatRelativeTime(branch.lastCommitDate, lang)}`}
         />

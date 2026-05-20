@@ -18,7 +18,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
           updateIfFresh(set, id, token, (r) => ({
             ...r,
             loading: false,
-            events: [...r.events, errorEvent('error.failedReadRepo')],
+            events: [...r.events, errorEvent('error.failed-read-repo')],
           }))
           return
         }
@@ -148,7 +148,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         const result = await window.gbl.fetch(id)
         if (!result.ok && result.message === 'cancelled') return
         get().setLastResult(id, result, token)
-        if (!result.ok && result.message === 'error.networkOpInProgress') return
+        if (!result.ok && result.message === 'error.network-op-in-progress') return
         await get().refreshAll(id, { token })
         if (result.ok) get().clearFetchFailed(id, token)
       } finally {
@@ -173,7 +173,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         try {
           const result = await window.gbl.fetch(id, 'background')
           if (!result.ok) {
-            if (result.message === 'cancelled' || result.message === 'error.networkOpInProgress') return
+            if (result.message === 'cancelled' || result.message === 'error.network-op-in-progress') return
             console.warn('[backgroundFetch] git fetch failed:', result.message)
             updateIfFresh(set, id, token, (r) => ({
               ...r,

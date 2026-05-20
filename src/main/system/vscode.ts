@@ -34,7 +34,7 @@ function isUsableDirectory(p: string): boolean {
 }
 
 export function openInVSCode(p: string): Promise<{ ok: boolean; message: string }> {
-  if (!isUsableDirectory(p)) return Promise.resolve({ ok: false, message: 'error.invalidPath' })
+  if (!isUsableDirectory(p)) return Promise.resolve({ ok: false, message: 'error.invalid-path' })
 
   return new Promise((resolve) => {
     execFile('/usr/bin/open', ['-b', VSCODE_BUNDLE_ID, p], (err, _stdout, stderr) => {
@@ -42,7 +42,7 @@ export function openInVSCode(p: string): Promise<{ ok: boolean; message: string 
         const message = stderr.trim() || err.message
         resolve({
           ok: false,
-          message: /Unable to find application/i.test(message) ? 'error.vscodeNotInstalled' : message,
+          message: /Unable to find application/i.test(message) ? 'error.vscode-not-installed' : message,
         })
         return
       }

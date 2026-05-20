@@ -58,7 +58,7 @@ export async function pullBranch(
   worktreePath?: string,
   signal?: AbortSignal,
 ): Promise<ExecResult> {
-  if (!isSafeBranchName(branch)) return { ok: false, message: 'error.invalidArguments' }
+  if (!isSafeBranchName(branch)) return { ok: false, message: 'error.invalid-arguments' }
   if (!(await hasOrigin(worktreePath ?? cwd))) return { ok: false, message: 'No origin remote configured' }
   if (worktreePath) {
     return gitResultWithOptions(
@@ -78,7 +78,7 @@ export async function pullBranch(
 }
 
 export async function pushBranch(cwd: string, branch: string, signal?: AbortSignal): Promise<ExecResult> {
-  if (!isSafeBranchName(branch)) return { ok: false, message: 'error.invalidArguments' }
+  if (!isSafeBranchName(branch)) return { ok: false, message: 'error.invalid-arguments' }
   if (!(await hasOrigin(cwd))) return { ok: false, message: 'No origin remote configured' }
   return gitResultWithOptions(cwd, { timeoutMs: NETWORK_TIMEOUT_MS, signal }, 'push', '-u', 'origin', branch)
 }

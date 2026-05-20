@@ -32,7 +32,7 @@ export function LogList({ repoId, log, branch, selectedHash }: Props) {
   }, [selectedHash])
 
   if (log.length === 0) {
-    return <EmptyState title={branch ? t('log.emptyForBranch', { branch }) : t('log.empty')} />
+    return <EmptyState title={branch ? t('log.empty-for-branch', { branch }) : t('log.empty')} />
   }
   return (
     <div className="flex flex-1 min-h-0 flex-col">

@@ -14,7 +14,7 @@ export function wireOpenersIpc(): void {
   })
 
   ipcMain.handle('repo:open-github', async (_e, cwd: string, branch?: string) => {
-    if (typeof cwd !== 'string' || !cwd) return { ok: false, message: 'error.invalidArguments' }
+    if (typeof cwd !== 'string' || !cwd) return { ok: false, message: 'error.invalid-arguments' }
     if (typeof branch === 'string' && branch) {
       const detectedPr = await getBranchPullRequest(cwd, branch)
       if (detectedPr?.url) {
@@ -38,7 +38,7 @@ export function wireOpenersIpc(): void {
       }
     }
     const url = await getGitHubUrl(cwd)
-    if (!url) return { ok: false, message: 'error.openGithubNoOrigin' }
+    if (!url) return { ok: false, message: 'error.open-github-no-origin' }
     void shell.openExternal(url)
     return { ok: true, message: url }
   })
@@ -51,7 +51,7 @@ export function wireOpenersIpc(): void {
   // cheap and worth it given the IPC bridge surface.
   ipcMain.handle('repo:open-in-finder', async (_e, p: string) => {
     if (typeof p !== 'string' || !p || p.includes('\0') || !path.isAbsolute(p)) {
-      return { ok: false, message: 'error.invalidPath' }
+      return { ok: false, message: 'error.invalid-path' }
     }
     shell.showItemInFolder(p)
     return { ok: true, message: p }
@@ -61,12 +61,12 @@ export function wireOpenersIpc(): void {
   ipcMain.handle('repo:vscode-installed', () => isVSCodeInstalled())
 
   ipcMain.handle('repo:open-in-ghostty', async (_e, p: string) => {
-    if (typeof p !== 'string' || !p) return { ok: false, message: 'error.invalidPath' }
+    if (typeof p !== 'string' || !p) return { ok: false, message: 'error.invalid-path' }
     return openInGhostty(p)
   })
 
   ipcMain.handle('repo:open-in-vscode', async (_e, p: string) => {
-    if (typeof p !== 'string' || !p) return { ok: false, message: 'error.invalidPath' }
+    if (typeof p !== 'string' || !p) return { ok: false, message: 'error.invalid-path' }
     return openInVSCode(p)
   })
 }

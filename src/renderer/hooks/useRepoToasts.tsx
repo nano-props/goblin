@@ -31,12 +31,12 @@ export function useRepoToasts(repoId: string) {
             <ToastDescription>{tRef.current(result.message || 'error.unknown')}</ToastDescription>
           ) : undefined
         if (result.ok) {
-          toast.success(tRef.current('action.resultOk'), {
+          toast.success(tRef.current('action.result-ok'), {
             id: `${repoId}:result:ok:${event.id}`,
             description,
           })
         } else {
-          toast.error(tRef.current('action.resultError'), {
+          toast.error(tRef.current('action.result-error'), {
             id: `${repoId}:result:err:${event.id}`,
             description,
             duration: 10_000,

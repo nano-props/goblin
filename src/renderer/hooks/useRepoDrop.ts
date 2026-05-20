@@ -76,7 +76,7 @@ export function useRepoDrop({ blocked }: Options) {
       for (const path of paths) {
         const result = await openRepo(path, { activate: false })
         if (!result.ok) {
-          toast.error(tRef.current('drop.openFailed'), {
+          toast.error(tRef.current('drop.open-failed'), {
             description: tRef.current(result.message),
           })
           continue

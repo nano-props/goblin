@@ -66,7 +66,7 @@ export function SettingsPanel({ open, onClose }: Props) {
           />
         </Section>
 
-        <Section label={t('settings.fetch')} hint={t('settings.fetchHint')}>
+        <Section label={t('settings.fetch')} hint={t('settings.fetch-hint')}>
           <SettingsSelect
             value={fetchInterval}
             options={intervalOptions.map((o) => ({ value: o.value, label: t(o.labelKey) }))}

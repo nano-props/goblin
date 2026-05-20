@@ -62,15 +62,15 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
         variant="ghost"
         size="icon"
         onClick={toggleDetailCollapsed}
-        aria-label={t(collapsed ? 'branchDetail.expand' : 'branchDetail.collapse')}
-        title={t(collapsed ? 'branchDetail.expandTitle' : 'branchDetail.collapseTitle')}
+        aria-label={t(collapsed ? 'branch-detail.expand' : 'branch-detail.collapse')}
+        title={t(collapsed ? 'branch-detail.expand-title' : 'branch-detail.collapse-title')}
         aria-expanded={!collapsed}
         aria-controls={collapsed ? undefined : contentId}
         className="size-7"
       >
         <ChevronDown className={cn(collapsed && '-rotate-90')} />
       </Button>
-      <div className="flex shrink-0" role="tablist" aria-label={t('tab.branchDetail')}>
+      <div className="flex shrink-0" role="tablist" aria-label={t('tab.branch-detail')}>
         {DETAIL_TABS.map((tab) => {
           const selected = !collapsed && repo.detailTab === tab.id
           return (

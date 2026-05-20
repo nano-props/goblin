@@ -142,10 +142,10 @@ export function BranchList({ repoId }: Props) {
                     </Badge>
                   )}
                   {b.ahead > 0 && (
-                    <Delta direction="ahead" count={b.ahead} label={t('branchStatus.sync.ahead', { n: b.ahead })} />
+                    <Delta direction="ahead" count={b.ahead} label={t('branch-status.sync.ahead', { n: b.ahead })} />
                   )}
                   {b.behind > 0 && (
-                    <Delta direction="behind" count={b.behind} label={t('branchStatus.sync.behind', { n: b.behind })} />
+                    <Delta direction="behind" count={b.behind} label={t('branch-status.sync.behind', { n: b.behind })} />
                   )}
                 </div>
               </div>

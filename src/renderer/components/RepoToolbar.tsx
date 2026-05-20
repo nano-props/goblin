@@ -17,7 +17,7 @@ export function RepoToolbar({ repoId }: Props) {
   const status = (
     <>
       {repo.fetching && (
-        <span className="flex items-center gap-1 text-xs text-muted-foreground" title={t('tab.fetchingTitle')}>
+        <span className="flex items-center gap-1 text-xs text-muted-foreground" title={t('tab.fetching-title')}>
           <Loader2 size={12} className="animate-spin" />
           {t('tab.fetching')}
         </span>
@@ -28,11 +28,11 @@ export function RepoToolbar({ repoId }: Props) {
           // Hover surfaces the actual git error (e.g. "fatal: could
           // not read Username") so the user can act on it; without
           // a real message we fall back to the generic title.
-          title={repo.fetchError ?? t('tab.fetchFailedTitle')}
-          aria-label={repo.fetchError ?? t('tab.fetchFailedTitle')}
+          title={repo.fetchError ?? t('tab.fetch-failed-title')}
+          aria-label={repo.fetchError ?? t('tab.fetch-failed-title')}
         >
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-warning" />
-          {t('tab.fetchFailed')}
+          {t('tab.fetch-failed')}
         </span>
       )}
     </>

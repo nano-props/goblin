@@ -76,9 +76,9 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
   const branchExists = branchTrimmed ? repo.branches.some((b) => b.name === branchTrimmed) : false
   const branchError = branchTrimmed
     ? !branchValidation.ok
-      ? t('action.createWorktreeBranchInvalid')
+      ? t('action.create-worktree-branch-invalid')
       : branchExists
-        ? t('action.createWorktreeBranchExists')
+        ? t('action.create-worktree-branch-exists')
         : ''
     : ''
   // Effective path that will be sent on submit: user's typed value if
@@ -104,8 +104,8 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t('action.createWorktreeTitle')}</DialogTitle>
-          <DialogDescription>{t('action.createWorktreeHint')}</DialogDescription>
+          <DialogTitle>{t('action.create-worktree-title')}</DialogTitle>
+          <DialogDescription>{t('action.create-worktree-hint')}</DialogDescription>
         </DialogHeader>
 
         <form
@@ -117,11 +117,11 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
         >
           <div>
             <label className="block text-sm font-medium text-foreground" htmlFor="cwt-base">
-              {t('action.createWorktreeBaseLabel')}
+              {t('action.create-worktree-base-label')}
             </label>
             <Select value={base} onValueChange={setBase}>
               <SelectTrigger id="cwt-base" className="mt-1 w-full">
-                <SelectValue placeholder={t('action.createWorktreeBasePlaceholder')} />
+                <SelectValue placeholder={t('action.create-worktree-base-placeholder')} />
               </SelectTrigger>
               <SelectContent>
                 {repo.branches.map((b) => (
@@ -133,7 +133,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
                     <span className="truncate">{b.name}</span>
                     {b.name === repo.currentBranch && (
                       <span className="ml-2 text-xs text-muted-foreground">
-                        {t('action.createWorktreeBaseCurrent')}
+                        {t('action.create-worktree-base-current')}
                       </span>
                     )}
                   </SelectItem>
@@ -144,14 +144,14 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
 
           <div>
             <label className="block text-sm font-medium text-foreground" htmlFor="cwt-branch">
-              {t('action.createWorktreeBranchLabel')}
+              {t('action.create-worktree-branch-label')}
             </label>
             <input
               id="cwt-branch"
               autoFocus
               value={branch}
               onChange={(e) => setBranch(e.target.value)}
-              placeholder={t('action.createWorktreeBranchPlaceholder')}
+              placeholder={t('action.create-worktree-branch-placeholder')}
               aria-invalid={!!branchError}
               aria-describedby={branchError ? 'cwt-branch-error' : undefined}
               className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring aria-invalid:border-destructive aria-invalid:ring-destructive/20"
@@ -165,7 +165,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
 
           <div>
             <label className="block text-sm font-medium text-foreground" htmlFor="cwt-path">
-              {t('action.createWorktreePathLabel')}
+              {t('action.create-worktree-path-label')}
             </label>
             <input
               id="cwt-path"
@@ -176,7 +176,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
               className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
             />
             <div className="mt-1 text-xs text-muted-foreground truncate" title={displayEffectivePath || undefined}>
-              {!branchTrimmed ? t('action.createWorktreePathDisabledHint') : effectivePath ? displayEffectivePath : ''}
+              {!branchTrimmed ? t('action.create-worktree-path-disabled-hint') : effectivePath ? displayEffectivePath : ''}
             </div>
           </div>
           <DialogFooter>
@@ -184,7 +184,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
               {t('dialog.cancel')}
             </Button>
             <Button type="submit" disabled={!canSubmit}>
-              {t('action.createWorktreeConfirm')}
+              {t('action.create-worktree-confirm')}
             </Button>
           </DialogFooter>
         </form>

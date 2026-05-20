@@ -44,12 +44,12 @@ export function BranchDetailContent({ repo, detail, detailId, contentId }: Props
           ) : branch.worktreePath && !repo.statusLoaded && repo.statusError ? (
             <EmptyState title={t(repo.statusError)} />
           ) : branch.worktreePath ? (
-            <StatusList status={selectedStatus} emptyTitleKey="status.cleanTitle" emptyBodyKey="status.cleanBody" />
+            <StatusList status={selectedStatus} emptyTitleKey="status.clean-title" emptyBodyKey="status.clean-body" />
           ) : (
             <EmptyState
               icon={<FolderTree size={16} />}
-              title={t('status.noWorktreeTitle')}
-              body={t('status.noWorktreeBody')}
+              title={t('status.no-worktree-title')}
+              body={t('status.no-worktree-body')}
             />
           )}
         </div>

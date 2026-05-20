@@ -64,7 +64,7 @@ async function runCancellable(
       await active.done
       active = activeOpControllers.get(repoId)
     }
-    if (active) return { ok: false, message: 'error.networkOpInProgress' }
+    if (active) return { ok: false, message: 'error.network-op-in-progress' }
   }
 
   const ctrl = new AbortController()
@@ -141,7 +141,7 @@ export function wireRepoIpc(): void {
   // the existing toast machinery without needing a separate code path.
   ipcMain.handle('repo:patch', async (_e, cwd: string, worktreePath: string) => {
     if (typeof cwd !== 'string' || !cwd || typeof worktreePath !== 'string' || !worktreePath) {
-      return { ok: false, message: 'error.invalidWorktreePath' }
+      return { ok: false, message: 'error.invalid-worktree-path' }
     }
     try {
       const target = resolveKnownWorktree(await getWorktrees(cwd), worktreePath)
@@ -167,25 +167,25 @@ export function wireRepoIpc(): void {
   // ---- Mutating operations ------------------------------------------------
   ipcMain.handle('repo:checkout', async (_e, cwd: string, branch: string) => {
     if (typeof cwd !== 'string' || typeof branch !== 'string' || !cwd || !branch) {
-      return { ok: false, message: 'error.invalidArguments' }
+      return { ok: false, message: 'error.invalid-arguments' }
     }
     return checkoutBranch(cwd, branch)
   })
 
   ipcMain.handle('repo:delete-branch', async (_e, cwd: string, branch: string, force?: boolean) => {
     if (typeof cwd !== 'string' || typeof branch !== 'string' || !cwd || !branch) {
-      return { ok: false, message: 'error.invalidArguments' }
+      return { ok: false, message: 'error.invalid-arguments' }
     }
     const current = await getCurrentBranch(cwd)
-    if (branch === current) return { ok: false, message: 'error.cannotDeleteCurrentBranch' }
-    if (PROTECTED_BRANCHES.has(branch)) return { ok: false, message: 'error.cannotDeleteProtectedBranch' }
+    if (branch === current) return { ok: false, message: 'error.cannot-delete-current-branch' }
+    if (PROTECTED_BRANCHES.has(branch)) return { ok: false, message: 'error.cannot-delete-protected-branch' }
     const worktrees = await getWorktrees(cwd)
     if (worktrees.some((wt) => wt.branch === branch)) {
-      return { ok: false, message: 'error.cannotDeleteCheckedOutBranch' }
+      return { ok: false, message: 'error.cannot-delete-checked-out-branch' }
     }
     const shouldForce = force === true
     if (!shouldForce) {
-      if (!(await isSafelyDeletableBranch(cwd, branch))) return { ok: false, message: 'error.branchNotFullyMerged' }
+      if (!(await isSafelyDeletableBranch(cwd, branch))) return { ok: false, message: 'error.branch-not-fully-merged' }
     }
     return deleteBranch(cwd, branch, { force: shouldForce })
   })
@@ -233,7 +233,7 @@ export function wireRepoIpc(): void {
         !branch ||
         !worktreePath
       ) {
-        return { ok: false, message: 'error.invalidArguments' }
+        return { ok: false, message: 'error.invalid-arguments' }
       }
       const root = await getRepoRoot(cwd)
       const worktrees = await getWorktrees(cwd)
@@ -241,13 +241,13 @@ export function wireRepoIpc(): void {
       if (!resolved.ok) return resolved
       const target = resolved.target
 
-      if (target.isLocked === true) return { ok: false, message: 'error.cannotRemoveLockedWorktree' }
+      if (target.isLocked === true) return { ok: false, message: 'error.cannot-remove-locked-worktree' }
 
       // `getWorktrees` (run a few lines up) already filled `isDirty` by
       // running `git status --porcelain -z` in each worktree. Trust it
       // rather than running the same command again. `undefined` means
       // we couldn't read status — refuse rather than blindly deleting.
-      if (target.isDirty !== false) return { ok: false, message: 'error.cannotRemoveDirtyWorktree' }
+      if (target.isDirty !== false) return { ok: false, message: 'error.cannot-remove-dirty-worktree' }
 
       const shouldForceDeleteBranch = forceDeleteBranch === true
 
@@ -255,7 +255,7 @@ export function wireRepoIpc(): void {
         // Mirror the protected-branch guard from `repo:delete-branch`.
         // Catch up front so we don't remove the worktree first and then
         // refuse the delete (leaves the user in a half-applied state).
-        if (PROTECTED_BRANCHES.has(branch)) return { ok: false, message: 'error.cannotDeleteProtectedBranch' }
+        if (PROTECTED_BRANCHES.has(branch)) return { ok: false, message: 'error.cannot-delete-protected-branch' }
 
         // Mirror `git branch -d`: with an upstream, the branch must be an
         // ancestor of that upstream; without one, it must be an ancestor
@@ -265,7 +265,7 @@ export function wireRepoIpc(): void {
         // accepted the stronger warning and we delete with `branch -D`
         // after the worktree is removed.
         if (!shouldForceDeleteBranch && !(await isSafelyDeletableBranch(cwd, branch))) {
-          return { ok: false, message: 'error.cannotRemoveUnpushedWorktree' }
+          return { ok: false, message: 'error.cannot-remove-unpushed-worktree' }
         }
       }
 
@@ -305,10 +305,10 @@ export function wireRepoIpc(): void {
         !newBranch ||
         !baseBranch
       ) {
-        return { ok: false, message: 'error.invalidArguments' }
+        return { ok: false, message: 'error.invalid-arguments' }
       }
       if (!isSafeBranchName(newBranch) || !isSafeBranchName(baseBranch)) {
-        return { ok: false, message: 'error.invalidArguments' }
+        return { ok: false, message: 'error.invalid-arguments' }
       }
       // Reject relative paths and embedded NULs up front: the dialog
       // always supplies an absolute path (derived from the repo's
@@ -317,7 +317,7 @@ export function wireRepoIpc(): void {
       // be surprising — the user's input was the absolute string in
       // the textbox, not "wherever git happens to think the repo is."
       if (!path.isAbsolute(worktreePath) || worktreePath.includes('\0')) {
-        return { ok: false, message: 'error.invalidPath' }
+        return { ok: false, message: 'error.invalid-path' }
       }
       return createWorktree(cwd, worktreePath, newBranch, baseBranch)
     },
@@ -325,7 +325,7 @@ export function wireRepoIpc(): void {
 
   ipcMain.handle('repo:pull', async (_e, cwd: string, branch: string, worktreePath?: string) => {
     if (typeof cwd !== 'string' || typeof branch !== 'string' || !cwd || !branch) {
-      return { ok: false, message: 'error.invalidArguments' }
+      return { ok: false, message: 'error.invalid-arguments' }
     }
     let targetPath: string | undefined
     if (typeof worktreePath === 'string' && worktreePath) {
@@ -338,13 +338,13 @@ export function wireRepoIpc(): void {
 
   ipcMain.handle('repo:push', async (_e, cwd: string, branch: string) => {
     if (typeof cwd !== 'string' || typeof branch !== 'string' || !cwd || !branch) {
-      return { ok: false, message: 'error.invalidArguments' }
+      return { ok: false, message: 'error.invalid-arguments' }
     }
     return runCancellable(cwd, 'user', (signal) => pushBranch(cwd, branch, signal))
   })
 
   ipcMain.handle('repo:fetch', async (_e, cwd: string, kind?: NetworkOpKind) => {
-    if (typeof cwd !== 'string' || !cwd) return { ok: false, message: 'error.invalidArguments' }
+    if (typeof cwd !== 'string' || !cwd) return { ok: false, message: 'error.invalid-arguments' }
     return runCancellable(cwd, kind === 'background' ? 'background' : 'user', (signal) => fetchAll(cwd, signal))
   })
 

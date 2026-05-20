@@ -71,8 +71,8 @@ function openInRunningGhostty(dir: string): Promise<boolean> {
 // Spawned children are detached + unref'd so quitting Goblin doesn't
 // bring the terminal down with it.
 export async function openInGhostty(p: string): Promise<{ ok: boolean; message: string }> {
-  if (!isUsableDirectory(p)) return { ok: false, message: 'error.invalidPath' }
-  if (!isGhosttyInstalled()) return { ok: false, message: 'error.ghosttyNotInstalled' }
+  if (!isUsableDirectory(p)) return { ok: false, message: 'error.invalid-path' }
+  if (!isGhosttyInstalled()) return { ok: false, message: 'error.ghostty-not-installed' }
 
   try {
     if (await openInRunningGhostty(p)) return { ok: true, message: p }

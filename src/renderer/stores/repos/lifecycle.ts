@@ -9,10 +9,10 @@ export function createLifecycleActions(set: ReposSet, get: ReposGet) {
       try {
         probe = await window.gbl.probe(p)
       } catch (err) {
-        return { ok: false, message: err instanceof Error ? err.message : 'error.notGitRepo' }
+        return { ok: false, message: err instanceof Error ? err.message : 'error.not-git-repo' }
       }
       if (!probe?.ok || !probe.root) {
-        return { ok: false, message: 'error.notGitRepo' }
+        return { ok: false, message: 'error.not-git-repo' }
       }
       const id = probe.root
       const name = probe.name ?? lastPathSegment(id)

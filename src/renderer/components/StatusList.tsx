@@ -63,11 +63,11 @@ function groupStatus(entries: StatusEntry[]): Group[] {
   }
   const out: Group[] = []
   if (staged.length)
-    out.push({ kind: 'staged', titleKey: 'status.staged', hintKey: 'status.stagedHint', entries: staged })
+    out.push({ kind: 'staged', titleKey: 'status.staged', hintKey: 'status.staged-hint', entries: staged })
   if (unstaged.length)
-    out.push({ kind: 'unstaged', titleKey: 'status.unstaged', hintKey: 'status.unstagedHint', entries: unstaged })
+    out.push({ kind: 'unstaged', titleKey: 'status.unstaged', hintKey: 'status.unstaged-hint', entries: unstaged })
   if (untracked.length)
-    out.push({ kind: 'untracked', titleKey: 'status.untracked', hintKey: 'status.untrackedHint', entries: untracked })
+    out.push({ kind: 'untracked', titleKey: 'status.untracked', hintKey: 'status.untracked-hint', entries: untracked })
   return out
 }
 
@@ -77,7 +77,7 @@ function groupCode(group: GroupKind, entry: StatusEntry): string {
   return '?'
 }
 
-export function StatusList({ status, emptyTitleKey = 'status.cleanTitle', emptyBodyKey = 'status.cleanBody' }: Props) {
+export function StatusList({ status, emptyTitleKey = 'status.clean-title', emptyBodyKey = 'status.clean-body' }: Props) {
   const t = useT()
   const totalEntries = status.reduce((n, w) => n + w.entries.length, 0)
 

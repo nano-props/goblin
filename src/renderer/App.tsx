@@ -119,7 +119,7 @@ function EmptyState() {
         <div className="text-sm font-medium text-foreground mb-1">{t('empty.title')}</div>
         <div className="text-xs text-muted-foreground leading-relaxed">
           {t('empty.body.before')}
-          <span className="text-foreground">{t('empty.body.openLabel')}</span>
+          <span className="text-foreground">{t('empty.body.open-label')}</span>
           {t('empty.body.middle')}
           <span className="kbd">?</span>
           {t('empty.body.after')}
