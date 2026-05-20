@@ -77,7 +77,11 @@ function groupCode(group: GroupKind, entry: StatusEntry): string {
   return '?'
 }
 
-export function StatusList({ status, emptyTitleKey = 'status.clean-title', emptyBodyKey = 'status.clean-body' }: Props) {
+export function StatusList({
+  status,
+  emptyTitleKey = 'status.clean-title',
+  emptyBodyKey = 'status.clean-body',
+}: Props) {
   const t = useT()
   const totalEntries = status.reduce((n, w) => n + w.entries.length, 0)
 

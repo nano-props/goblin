@@ -227,12 +227,13 @@ export async function setLangPref(pref: LangPref): Promise<void> {
   scheduleWrite()
 }
 
-export async function setFetchInterval(sec: number): Promise<void> {
+export async function setFetchInterval(sec: number): Promise<number> {
   const s = await loadSettings()
-  const clamped = Math.max(0, Math.min(3600, Math.round(sec)))
-  if (s.fetchIntervalSec === clamped) return
+  const clamped = Number.isFinite(sec) ? Math.max(0, Math.min(3600, Math.round(sec))) : s.fetchIntervalSec
+  if (s.fetchIntervalSec === clamped) return clamped
   s.fetchIntervalSec = clamped
   scheduleWrite()
+  return clamped
 }
 
 export async function setWindowBounds(bounds: WindowBounds): Promise<void> {

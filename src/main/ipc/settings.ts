@@ -35,8 +35,8 @@ export function wireSettingsIpc(): void {
 
   ipcMain.handle('settings:set-fetch-interval', async (_e, sec: number) => {
     if (typeof sec !== 'number') return
-    await setFetchInterval(sec)
-    broadcastFetchInterval(sec)
+    const clamped = await setFetchInterval(sec)
+    broadcastFetchInterval(clamped)
   })
 
   ipcMain.handle('settings:save-session', async (_e, session: SessionState) => {

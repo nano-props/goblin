@@ -13,7 +13,8 @@ export function resolveKnownWorktree(
   const target = worktrees.find(
     (wt) => path.resolve(wt.path) === path.resolve(worktreePath) && (!branch || wt.branch === branch),
   )
-  if (!target) return { ok: false, message: branch ? 'error.worktree-not-found-for-branch' : 'error.invalid-worktree-path' }
+  if (!target)
+    return { ok: false, message: branch ? 'error.worktree-not-found-for-branch' : 'error.invalid-worktree-path' }
   return { ok: true, path: target.path }
 }
 

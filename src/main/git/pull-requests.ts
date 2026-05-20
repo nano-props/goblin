@@ -4,6 +4,8 @@ import type { PullRequestInfo } from '#/main/git/types.ts'
 
 const GH_TIMEOUT_MS = 8_000
 const GH_PATH = ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin'].join(':')
+const PR_CACHE_TTL_MS = 30_000
+const prCache = new Map<string, { expiresAt: number; prs: Map<string, PullRequestInfo> | null }>()
 
 interface GhPullRequest {
   number?: number
@@ -89,12 +91,31 @@ async function canUseGh(cwd: string): Promise<boolean> {
   }
 }
 
+function filterPullRequests(
+  prs: Map<string, PullRequestInfo> | null,
+  branchNames?: ReadonlySet<string>,
+): Map<string, PullRequestInfo> | null {
+  if (!prs || !branchNames) return prs
+  const filtered = new Map<string, PullRequestInfo>()
+  for (const branch of branchNames) {
+    const pr = prs.get(branch)
+    if (pr) filtered.set(branch, pr)
+  }
+  return filtered
+}
+
 export async function getBranchPullRequests(
   cwd: string,
   branchNames?: ReadonlySet<string>,
 ): Promise<Map<string, PullRequestInfo> | null> {
+  const cached = prCache.get(cwd)
+  if (cached && cached.expiresAt > Date.now()) return filterPullRequests(cached.prs, branchNames)
+
   try {
-    if (!(await canUseGh(cwd))) return null
+    if (!(await canUseGh(cwd))) {
+      prCache.set(cwd, { expiresAt: Date.now() + PR_CACHE_TTL_MS, prs: null })
+      return null
+    }
     const output = await gh(cwd, [
       'pr',
       'list',
@@ -108,10 +129,11 @@ export async function getBranchPullRequests(
     const byBranch = new Map<string, PullRequestInfo>()
     for (const pr of parsePullRequests(output)) {
       const branch = pr.headRefName
-      if (!branch || (branchNames && !branchNames.has(branch))) continue
+      if (!branch) continue
       byBranch.set(branch, pickPullRequest(byBranch.get(branch), pr))
     }
-    return byBranch
+    prCache.set(cwd, { expiresAt: Date.now() + PR_CACHE_TTL_MS, prs: byBranch })
+    return filterPullRequests(byBranch, branchNames)
   } catch {
     return null
   }

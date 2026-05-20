@@ -11,6 +11,7 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import { forwardRef, useEffect, useRef, useState, type ComponentPropsWithoutRef, type ReactNode } from 'react'
+import { toast } from 'sonner'
 import { useI18nStore, useT } from '#/renderer/stores/i18n.ts'
 import { EmptyState, ScrollPane } from '#/renderer/components/Layout.tsx'
 import { Tip } from '#/renderer/components/Tip.tsx'
@@ -178,6 +179,7 @@ function CopyableValue({
   copiedLabel: string
 }) {
   const [copied, setCopied] = useState(false)
+  const t = useT()
   const copiedTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -202,7 +204,11 @@ function CopyableValue({
         if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current)
         copiedTimerRef.current = window.setTimeout(() => setCopied(false), COPY_FEEDBACK_MS)
       })
-      .catch(() => {})
+      .catch((err: unknown) => {
+        toast.error(t('action.result-error'), {
+          description: err instanceof Error ? err.message : String(err),
+        })
+      })
   }
 
   return (
@@ -350,7 +356,10 @@ export function BranchStatus({ detail }: Props) {
                   {mergeLabel}
                 </StatusChip>
                 {branch.pullRequest && (
-                  <Tip label={<span className="block max-w-80 whitespace-normal break-words">{prTitle}</span>} side="right">
+                  <Tip
+                    label={<span className="block max-w-80 whitespace-normal break-words">{prTitle}</span>}
+                    side="right"
+                  >
                     <StatusChip tone={prTone}>{prLabel}</StatusChip>
                   </Tip>
                 )}

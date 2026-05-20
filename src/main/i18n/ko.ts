@@ -210,7 +210,8 @@ export const ko: Record<DictKey, string> = {
   'action.result-error': '오류',
   'action.confirm-push-protected-title': '{branch} 에 푸시할까요?',
   'action.confirm-push-protected-body.before': '',
-  'action.confirm-push-protected-body.after': ' 로 직접 푸시하려고 합니다. 보통은 PR 을 거치는 게 좋습니다. 계속할까요?',
+  'action.confirm-push-protected-body.after':
+    ' 로 직접 푸시하려고 합니다. 보통은 PR 을 거치는 게 좋습니다. 계속할까요?',
   'action.confirm-push-confirm': '그래도 푸시',
   'action.confirm-delete-branch-title': '{branch} 을(를) 삭제할까요?',
   'action.confirm-delete-branch-body.before': '로컬 브랜치 ',
@@ -289,7 +290,8 @@ export const ko: Record<DictKey, string> = {
   'settings.lang.ko': '한국어',
   'settings.lang.ja': '日本語',
   'settings.fetch': '자동 동기화',
-  'settings.fetch-hint': '활성 리포지토리에 대해 백그라운드에서 `git fetch` 를 실행합니다. 네트워크가 느릴 때는 끄세요.',
+  'settings.fetch-hint':
+    '활성 리포지토리에 대해 백그라운드에서 `git fetch` 를 실행합니다. 네트워크가 느릴 때는 끄세요.',
   'settings.fetch.off': '끄기',
   'settings.fetch.30s': '30 초',
   'settings.fetch.1m': '1 분',

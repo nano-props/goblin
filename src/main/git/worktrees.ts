@@ -2,28 +2,28 @@ import { git, gitResultWithOptions } from '#/main/git/helper.ts'
 import { parseStatus, parseWorktrees } from '#/main/git/parsers.ts'
 import type { ExecResult, WorktreeInfo } from '#/main/git/types.ts'
 
+const WORKTREE_STATUS_CONCURRENCY = 16
+
 export async function getWorktrees(cwd: string): Promise<WorktreeInfo[]> {
   try {
     const output = await git(cwd, ['worktree', 'list', '--porcelain'])
     const worktrees = parseWorktrees(output)
 
-    await Promise.all(
-      worktrees.map(async (wt) => {
-        if (wt.isBare) return
-        try {
-          // -z so a filename containing a literal newline doesn't get
-          // counted as two changes. Reuse parseStatus so rename / copy
-          // pairs (R/C take TWO records under -z) collapse into one
-          // entry — matching what `git status` shows the user.
-          const out = await git(wt.path, ['status', '--porcelain', '-z'])
-          const entries = parseStatus(out)
-          wt.isDirty = entries.length > 0
-          wt.changeCount = entries.length
-        } catch {
-          wt.isDirty = undefined
-        }
-      }),
-    )
+    await mapWithConcurrency(worktrees, WORKTREE_STATUS_CONCURRENCY, async (wt) => {
+      if (wt.isBare) return
+      try {
+        // -z so a filename containing a literal newline doesn't get
+        // counted as two changes. Reuse parseStatus so rename / copy
+        // pairs (R/C take TWO records under -z) collapse into one
+        // entry — matching what `git status` shows the user.
+        const out = await git(wt.path, ['status', '--porcelain', '-z'])
+        const entries = parseStatus(out)
+        wt.isDirty = entries.length > 0
+        wt.changeCount = entries.length
+      } catch {
+        wt.isDirty = undefined
+      }
+    })
 
     return worktrees
   } catch {
@@ -68,4 +68,16 @@ export async function createWorktree(
     worktreePath,
     baseBranch,
   )
+}
+
+async function mapWithConcurrency<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let cursor = 0
+  const worker = async () => {
+    while (true) {
+      const i = cursor++
+      if (i >= items.length) return
+      await fn(items[i]!)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
 }

@@ -218,7 +218,9 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
       />
       <ConfirmDialog
         open={forceDeleteConfirm !== null}
-        title={forceDeleteConfirm ? t('action.confirm-force-delete-standalone-title', { branch: forceDeleteConfirm }) : ''}
+        title={
+          forceDeleteConfirm ? t('action.confirm-force-delete-standalone-title', { branch: forceDeleteConfirm }) : ''
+        }
         message={
           forceDeleteConfirm ? (
             <span>

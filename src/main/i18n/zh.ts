@@ -216,7 +216,8 @@ export const zh: Record<DictKey, string> = {
   'action.confirm-delete-branch-confirm': '删除分支',
   'action.confirm-force-delete-standalone-title': '强制删除 {branch}？',
   'action.confirm-force-delete-standalone-body.before': '本地分支 ',
-  'action.confirm-force-delete-standalone-body.after': ' 有独有提交，尚未完全合并。只有确认不再需要这些提交时才强制删除。',
+  'action.confirm-force-delete-standalone-body.after':
+    ' 有独有提交，尚未完全合并。只有确认不再需要这些提交时才强制删除。',
   'action.confirm-force-delete-standalone-confirm': '强制删除分支',
   'action.confirm-remove-worktree-title': '移除 {branch} 的工作树？',
   'action.confirm-remove-worktree-body.before': '将会删除工作树目录 ',
