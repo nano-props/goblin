@@ -3,7 +3,7 @@
 // opt out via -webkit-app-region: no-drag (set globally on `button` and
 // any element with `data-interactive`).
 
-import { HelpCircle, Info, Settings } from 'lucide-react'
+import { Keyboard, PackageCheck, Settings } from 'lucide-react'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { Tip } from '#/renderer/components/Tip.tsx'
 import { Logo } from '#/renderer/components/Logo.tsx'
@@ -38,12 +38,12 @@ export function Topbar({ onOpenSettings, onShowDependencies, onShowHelp }: Props
        * tooltips name the action. */}
       <Tip label={t('topbar.dependencies')}>
         <Button variant="ghost" size="icon" onClick={onShowDependencies} aria-label={t('topbar.dependencies')}>
-          <Info />
+          <PackageCheck />
         </Button>
       </Tip>
       <Tip label={t('topbar.help')}>
         <Button variant="ghost" size="icon" onClick={onShowHelp} aria-label={t('topbar.help')}>
-          <HelpCircle />
+          <Keyboard />
         </Button>
       </Tip>
       <Tip label={t('topbar.settings')}>

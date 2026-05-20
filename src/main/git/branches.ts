@@ -1,8 +1,7 @@
 import { git, gitResult } from '#/main/git/helper.ts'
 import { FIELD_SEP, parseBranches, parseLog } from '#/main/git/parsers.ts'
-import { getBranchPullRequests } from '#/main/git/pull-requests.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
-import type { BranchInfo, ExecResult, LogEntry, PullRequestInfo, WorktreeInfo } from '#/main/git/types.ts'
+import type { BranchInfo, ExecResult, LogEntry, WorktreeInfo } from '#/main/git/types.ts'
 
 export async function isGitRepo(cwd: string): Promise<boolean> {
   try {
@@ -78,14 +77,6 @@ export function markMergedToDefault(
   }))
 }
 
-export function markPullRequests(branches: BranchInfo[], prs: Map<string, PullRequestInfo> | null): BranchInfo[] {
-  if (!prs || prs.size === 0) return branches
-  return branches.map((branch) => {
-    const pullRequest = prs.get(branch.name)
-    return pullRequest ? { ...branch, pullRequest } : branch
-  })
-}
-
 async function getMergedBranchNames(cwd: string, defaultBranch: string): Promise<Set<string> | null> {
   if (!isSafeBranchName(defaultBranch)) return null
   try {
@@ -120,12 +111,8 @@ export async function getBranches(cwd: string, worktrees?: WorktreeInfo[]): Prom
     ])
     const mergedBranchNames = await getMergedBranchNames(cwd, defaultBranch)
     const branches = markDefaultBranch(parseBranches(output, currentBranch, worktrees), defaultBranch)
-    const pullRequests = await getBranchPullRequests(cwd, new Set(branches.map((branch) => branch.name)))
     return prioritizeDefaultBranch(
-      markPullRequests(
-        mergedBranchNames ? markMergedToDefault(branches, defaultBranch, mergedBranchNames) : branches,
-        pullRequests,
-      ),
+      mergedBranchNames ? markMergedToDefault(branches, defaultBranch, mergedBranchNames) : branches,
       defaultBranch,
     )
   } catch {

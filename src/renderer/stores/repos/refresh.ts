@@ -44,6 +44,12 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
             loading: false,
           }
         })
+        const branchNames = snap.branches.map((branch) => branch.name)
+        void get()
+          .refreshPullRequests(id, branchNames, { token })
+          .catch((err) => {
+            console.warn('[refreshPullRequests] failed', err)
+          })
         // If the user opened Commits while the snapshot was in flight,
         // their setDetailTab fired a refreshBranchLog that bailed out because
         // selectedBranch was still null. Now that we have it, backfill
@@ -60,6 +66,45 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
           loading: false,
           events: [...r.events, errorEvent(message)],
         }))
+      }
+    },
+
+    async refreshPullRequests(id: string, branchesArg?: string[], options?: { token?: number }) {
+      const repoBefore = get().repos[id]
+      if (!repoBefore) return
+      const token = options?.token ?? repoBefore.instanceToken
+      if (repoBefore.instanceToken !== token) return
+      const branchNames = branchesArg ?? repoBefore.branches.map((branch) => branch.name)
+      if (branchNames.length === 0) return
+      const requested = new Set(branchNames)
+      updateIfFresh(set, id, token, (r) => ({ ...r, pullRequestsLoading: true }))
+      try {
+        const entries = await window.gbl.pullRequests(id, branchNames)
+        if (entries === null) {
+          updateIfFresh(set, id, token, (r) => ({ ...r, pullRequestsLoading: false }))
+          return
+        }
+        updateIfFresh(set, id, token, (r) => {
+          const byBranch = new Map(entries.map((entry) => [entry.branch, entry.pullRequest]))
+          let changed = false
+          const branches = r.branches.map((branch) => {
+            const pullRequest = byBranch.get(branch.name)
+            if (pullRequest) {
+              changed = true
+              return { ...branch, pullRequest }
+            }
+            if (requested.has(branch.name) && branch.pullRequest) {
+              const { pullRequest: _pullRequest, ...rest } = branch
+              changed = true
+              return rest
+            }
+            return branch
+          })
+          return changed ? { ...r, branches, pullRequestsLoading: false } : { ...r, pullRequestsLoading: false }
+        })
+      } catch (err) {
+        console.warn('[refreshPullRequests] failed', err)
+        updateIfFresh(set, id, token, (r) => ({ ...r, pullRequestsLoading: false }))
       }
     },
 

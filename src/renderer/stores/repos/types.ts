@@ -50,6 +50,7 @@ export interface RepoState {
    *  hover and read why fetch is failing instead of just seeing a
    *  red dot. */
   fetchError: string | null
+  pullRequestsLoading: boolean
   events: RepoEvent[]
 }
 
@@ -98,6 +99,7 @@ export interface ReposStore {
     options?: { silent?: boolean; skipLogBackfill?: boolean; token?: number },
   ) => Promise<void>
   refreshBranchLog: (id: string, branch?: string, options?: { token?: number }) => Promise<void>
+  refreshPullRequests: (id: string, branches?: string[], options?: { token?: number }) => Promise<void>
   refreshStatus: (id: string, options?: { token?: number }) => Promise<void>
   refreshAll: (id: string, options?: { token?: number }) => Promise<void>
   syncAndRefresh: (id: string, options?: { token?: number }) => Promise<void>

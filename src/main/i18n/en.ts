@@ -158,6 +158,7 @@ export const en = {
   'branch-status.pr.merged': 'merged',
   'branch-status.pr.closed': 'closed',
   'branch-status.pr.summary': 'PR #{n} {state}',
+  'branch-status.pr.loading': 'checking PR',
 
   // ---- Log list -----------------------------------------------------------
   'log.showing-branch': 'Commits',
@@ -262,6 +263,7 @@ export const en = {
   'error.not-git-repo': 'Not a git repository',
   'error.failed-read-repo': 'Failed to read repository',
   'error.open-github-no-origin': 'No origin remote',
+  'error.invalid-url': 'Invalid URL',
   'error.invalid-path': 'Invalid path',
   'error.invalid-worktree-path': 'Invalid worktree path',
   'error.invalid-arguments': 'Invalid arguments',

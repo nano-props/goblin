@@ -1,10 +1,8 @@
-// IPC handlers for git repo operations. Each handler validates that
-// `cwd` is a string before passing to the git layer — the renderer is
-// trusted (single preload bridge) but a malformed message shouldn't
-// crash main.
+// IPC handlers for git repo operations. Each handler validates incoming
+// arguments before passing to the git layer — the renderer is trusted
+// (single preload bridge) but a malformed message shouldn't crash main.
 
 import { ipcMain, dialog, BrowserWindow } from 'electron'
-import path from 'node:path'
 import { getMainWindow } from '#/main/window.ts'
 import {
   checkoutBranch,
@@ -23,9 +21,10 @@ import { getWorkingStatus } from '#/main/git/status.ts'
 import { getWorktreePatch } from '#/main/git/patch.ts'
 import { resolveKnownWorktree, resolveRemovableWorktree } from '#/main/git/guards.ts'
 import { createWorktree, getWorktrees, removeWorktree } from '#/main/git/worktrees.ts'
-import { isSafeBranchName } from '#/shared/refnames.ts'
+import { getBranchPullRequests } from '#/main/git/pull-requests.ts'
 import { getCommitFileStats, getCommitMeta } from '#/main/git/log.ts'
 import { PROTECTED_BRANCHES, type ExecResult } from '#/shared/git-types.ts'
+import { isValidAbsolutePath, isValidBranch, isValidCwd } from '#/main/ipc/validation.ts'
 
 const GIT_HASH_RE = /^[0-9a-fA-F]{7,64}$/
 
@@ -99,7 +98,7 @@ export function wireRepoIpc(): void {
 
   // ---- Repo metadata ------------------------------------------------------
   ipcMain.handle('repo:probe', async (_e, cwd: string) => {
-    if (typeof cwd !== 'string' || !cwd) return { ok: false }
+    if (!isValidCwd(cwd)) return { ok: false }
     const ok = await isGitRepo(cwd)
     if (!ok) return { ok: false }
     const root = await getRepoRoot(cwd)
@@ -113,15 +112,32 @@ export function wireRepoIpc(): void {
   // BranchList rows already carry per-branch worktree info, and the
   // dedicated Worktrees tab was retired.
   ipcMain.handle('repo:snapshot', async (_e, cwd: string) => {
-    if (typeof cwd !== 'string' || !cwd) return null
+    if (!isValidCwd(cwd)) return null
     const worktrees = await getWorktrees(cwd)
     const branches = await getBranches(cwd, worktrees)
     const current = await getCurrentBranch(cwd)
     return { branches, current }
   })
 
+  ipcMain.handle('repo:pull-requests', async (_e, cwd: string, branches?: string[]) => {
+    if (!isValidCwd(cwd)) return []
+    if (branches !== undefined && !Array.isArray(branches)) return []
+    const branchSet =
+      branches === undefined
+        ? undefined
+        : new Set(
+            branches.filter((branch): branch is string => {
+              return isValidBranch(branch)
+            }),
+          )
+    if (branchSet?.size === 0) return []
+    const prs = await getBranchPullRequests(cwd, branchSet)
+    if (!prs) return null
+    return Array.from(prs, ([branch, pullRequest]) => ({ branch, pullRequest }))
+  })
+
   ipcMain.handle('repo:log', async (_e, cwd: string, branch: string, count?: number) => {
-    if (typeof cwd !== 'string' || !cwd || typeof branch !== 'string') return []
+    if (!isValidCwd(cwd) || !isValidBranch(branch)) return []
     // Clamp count: a renderer (or compromised one) shouldn't be able to ask
     // for Number.MAX_SAFE_INTEGER commits and tie up the main process.
     const n = typeof count === 'number' && Number.isFinite(count) ? Math.floor(count) : 100
@@ -130,7 +146,7 @@ export function wireRepoIpc(): void {
   })
 
   ipcMain.handle('repo:status', async (_e, cwd: string) => {
-    if (typeof cwd !== 'string' || !cwd) return []
+    if (!isValidCwd(cwd)) return []
     return getWorkingStatus(cwd)
   })
 
@@ -140,7 +156,7 @@ export function wireRepoIpc(): void {
   // shape mirrors ExecResult so the renderer can surface git errors via
   // the existing toast machinery without needing a separate code path.
   ipcMain.handle('repo:patch', async (_e, cwd: string, worktreePath: string) => {
-    if (typeof cwd !== 'string' || !cwd || typeof worktreePath !== 'string' || !worktreePath) {
+    if (!isValidCwd(cwd) || !isValidAbsolutePath(worktreePath)) {
       return { ok: false, message: 'error.invalid-worktree-path' }
     }
     try {
@@ -157,7 +173,7 @@ export function wireRepoIpc(): void {
 
   // ---- Commit detail ------------------------------------------------------
   ipcMain.handle('repo:commit', async (_e, cwd: string, hash: string) => {
-    if (typeof cwd !== 'string' || !cwd || typeof hash !== 'string' || !hash) return null
+    if (!isValidCwd(cwd) || typeof hash !== 'string' || !hash) return null
     if (!GIT_HASH_RE.test(hash)) return null
     const [meta, files] = await Promise.all([getCommitMeta(cwd, hash), getCommitFileStats(cwd, hash)])
     if (!meta) return null
@@ -166,16 +182,12 @@ export function wireRepoIpc(): void {
 
   // ---- Mutating operations ------------------------------------------------
   ipcMain.handle('repo:checkout', async (_e, cwd: string, branch: string) => {
-    if (typeof cwd !== 'string' || typeof branch !== 'string' || !cwd || !branch) {
-      return { ok: false, message: 'error.invalid-arguments' }
-    }
+    if (!isValidCwd(cwd) || !isValidBranch(branch)) return { ok: false, message: 'error.invalid-arguments' }
     return checkoutBranch(cwd, branch)
   })
 
   ipcMain.handle('repo:delete-branch', async (_e, cwd: string, branch: string, force?: boolean) => {
-    if (typeof cwd !== 'string' || typeof branch !== 'string' || !cwd || !branch) {
-      return { ok: false, message: 'error.invalid-arguments' }
-    }
+    if (!isValidCwd(cwd) || !isValidBranch(branch)) return { ok: false, message: 'error.invalid-arguments' }
     const current = await getCurrentBranch(cwd)
     if (branch === current) return { ok: false, message: 'error.cannot-delete-current-branch' }
     if (PROTECTED_BRANCHES.has(branch)) return { ok: false, message: 'error.cannot-delete-protected-branch' }
@@ -224,14 +236,11 @@ export function wireRepoIpc(): void {
       forceDeleteBranch?: boolean,
     ) => {
       if (
-        typeof cwd !== 'string' ||
-        typeof branch !== 'string' ||
-        typeof worktreePath !== 'string' ||
+        !isValidCwd(cwd) ||
+        !isValidBranch(branch) ||
+        !isValidAbsolutePath(worktreePath) ||
         typeof alsoDeleteBranch !== 'boolean' ||
-        (forceDeleteBranch !== undefined && typeof forceDeleteBranch !== 'boolean') ||
-        !cwd ||
-        !branch ||
-        !worktreePath
+        (forceDeleteBranch !== undefined && typeof forceDeleteBranch !== 'boolean')
       ) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
@@ -295,19 +304,7 @@ export function wireRepoIpc(): void {
   ipcMain.handle(
     'repo:create-worktree',
     async (_e, cwd: string, worktreePath: string, newBranch: string, baseBranch: string) => {
-      if (
-        typeof cwd !== 'string' ||
-        typeof worktreePath !== 'string' ||
-        typeof newBranch !== 'string' ||
-        typeof baseBranch !== 'string' ||
-        !cwd ||
-        !worktreePath ||
-        !newBranch ||
-        !baseBranch
-      ) {
-        return { ok: false, message: 'error.invalid-arguments' }
-      }
-      if (!isSafeBranchName(newBranch) || !isSafeBranchName(baseBranch)) {
+      if (!isValidCwd(cwd) || !isValidBranch(newBranch) || !isValidBranch(baseBranch)) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
       // Reject relative paths and embedded NULs up front: the dialog
@@ -316,7 +313,7 @@ export function wireRepoIpc(): void {
       // bug. Letting git resolve a relative path against `cwd` would
       // be surprising — the user's input was the absolute string in
       // the textbox, not "wherever git happens to think the repo is."
-      if (!path.isAbsolute(worktreePath) || worktreePath.includes('\0')) {
+      if (!isValidAbsolutePath(worktreePath)) {
         return { ok: false, message: 'error.invalid-path' }
       }
       return createWorktree(cwd, worktreePath, newBranch, baseBranch)
@@ -324,11 +321,10 @@ export function wireRepoIpc(): void {
   )
 
   ipcMain.handle('repo:pull', async (_e, cwd: string, branch: string, worktreePath?: string) => {
-    if (typeof cwd !== 'string' || typeof branch !== 'string' || !cwd || !branch) {
-      return { ok: false, message: 'error.invalid-arguments' }
-    }
+    if (!isValidCwd(cwd) || !isValidBranch(branch)) return { ok: false, message: 'error.invalid-arguments' }
     let targetPath: string | undefined
-    if (typeof worktreePath === 'string' && worktreePath) {
+    if (worktreePath !== undefined) {
+      if (!isValidAbsolutePath(worktreePath)) return { ok: false, message: 'error.invalid-worktree-path' }
       const target = resolveKnownWorktree(await getWorktrees(cwd), worktreePath, branch)
       if (!target.ok) return target
       targetPath = target.path
@@ -337,14 +333,12 @@ export function wireRepoIpc(): void {
   })
 
   ipcMain.handle('repo:push', async (_e, cwd: string, branch: string) => {
-    if (typeof cwd !== 'string' || typeof branch !== 'string' || !cwd || !branch) {
-      return { ok: false, message: 'error.invalid-arguments' }
-    }
+    if (!isValidCwd(cwd) || !isValidBranch(branch)) return { ok: false, message: 'error.invalid-arguments' }
     return runCancellable(cwd, 'user', (signal) => pushBranch(cwd, branch, signal))
   })
 
   ipcMain.handle('repo:fetch', async (_e, cwd: string, kind?: NetworkOpKind) => {
-    if (typeof cwd !== 'string' || !cwd) return { ok: false, message: 'error.invalid-arguments' }
+    if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-arguments' }
     return runCancellable(cwd, kind === 'background' ? 'background' : 'user', (signal) => fetchAll(cwd, signal))
   })
 
@@ -352,7 +346,7 @@ export function wireRepoIpc(): void {
   // nothing is running. Returns true when an in-flight op was signalled
   // so the renderer can give immediate visual feedback.
   ipcMain.handle('repo:abort', (_e, cwd: string) => {
-    if (typeof cwd !== 'string' || !cwd) return false
+    if (!isValidCwd(cwd)) return false
     const ctrl = activeOpControllers.get(cwd)
     if (!ctrl) return false
     ctrl.ctrl.abort()

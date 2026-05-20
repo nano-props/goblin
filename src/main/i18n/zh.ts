@@ -147,6 +147,7 @@ export const zh: Record<DictKey, string> = {
   'branch-status.pr.merged': '已合入',
   'branch-status.pr.closed': '已关闭',
   'branch-status.pr.summary': 'PR #{n} {state}',
+  'branch-status.pr.loading': '检查 PR',
 
   // ---- Log list ----------------------------------------------------------
   'log.showing-branch': '提交',
@@ -251,6 +252,7 @@ export const zh: Record<DictKey, string> = {
   'error.not-git-repo': '不是 git 仓库',
   'error.failed-read-repo': '读取仓库失败',
   'error.open-github-no-origin': '没有 origin 远程',
+  'error.invalid-url': 'URL 无效',
   'error.invalid-path': '路径无效',
   'error.invalid-worktree-path': '工作树路径无效',
   'error.invalid-arguments': '参数无效',

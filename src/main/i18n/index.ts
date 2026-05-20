@@ -2,9 +2,8 @@
 //
 // One in-memory `currentLang` mirrors the user's setting (settings.lang
 // resolved against `app.getLocale()` if 'auto'). Reads go through
-// `t(key, params)`; a setter notifies subscribers (menu rebuild + IPC
-// broadcast to renderers). The renderer holds its own copy of the
-// dictionary fetched via IPC; this module is the source of truth.
+// `t(key, params)`. The renderer holds its own copy of the dictionary
+// fetched via IPC; this module is the source of truth.
 
 import { app } from 'electron'
 import { en, type DictKey } from '#/main/i18n/en.ts'
@@ -17,10 +16,7 @@ export type LangPref = Lang | 'auto'
 
 const DICTS: Record<Lang, Record<DictKey, string>> = { en, zh, ko, ja }
 
-export const SUPPORTED_LANGS: readonly Lang[] = ['en', 'zh', 'ko', 'ja'] as const
-
 let currentLang: Lang = 'en'
-const listeners = new Set<(lang: Lang) => void>()
 
 /**
  * Verify every non-en dictionary has the same keys as en. Catches the
@@ -65,22 +61,10 @@ export function resolveLang(pref: LangPref): Lang {
 export function setCurrentLang(lang: Lang): void {
   if (currentLang === lang) return
   currentLang = lang
-  for (const cb of listeners) {
-    try {
-      cb(lang)
-    } catch (err) {
-      console.warn('[i18n] listener threw', err)
-    }
-  }
 }
 
 export function getCurrentLang(): Lang {
   return currentLang
-}
-
-export function subscribeLang(cb: (lang: Lang) => void): () => void {
-  listeners.add(cb)
-  return () => listeners.delete(cb)
 }
 
 export function t(key: DictKey, params?: Record<string, string | number>): string {

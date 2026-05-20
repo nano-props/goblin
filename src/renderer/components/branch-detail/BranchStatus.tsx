@@ -234,7 +234,7 @@ function CopyableValue({
 export function BranchStatus({ detail }: Props) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
-  const { branch, statusCount } = detail
+  const { branch, statusCount, pullRequestsLoading } = detail
   if (!branch) return <EmptyState title={t('branches.empty')} />
 
   const protectedBranch = PROTECTED_BRANCHES.has(branch.name)
@@ -362,6 +362,12 @@ export function BranchStatus({ detail }: Props) {
                   >
                     <StatusChip tone={prTone}>{prLabel}</StatusChip>
                   </Tip>
+                )}
+                {pullRequestsLoading && !branch.pullRequest && (
+                  <StatusChip>
+                    <RefreshCw size={11} className="animate-spin" />
+                    {t('branch-status.pr.loading')}
+                  </StatusChip>
                 )}
               </span>
             }

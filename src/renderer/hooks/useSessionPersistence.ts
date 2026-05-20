@@ -9,6 +9,8 @@ export function useSessionPersistence() {
 
   useEffect(() => {
     if (!sessionReady) return
-    void window.gbl.settings.saveSession({ openRepos: order, activeRepo: activeId, detailCollapsed })
+    void window.gbl.settings.saveSession({ openRepos: order, activeRepo: activeId, detailCollapsed }).catch((err) => {
+      console.warn('[session] save failed', err)
+    })
   }, [sessionReady, order, activeId, detailCollapsed])
 }

@@ -21,10 +21,15 @@ export function useAppBootstrap() {
     if (hydratedRef.current) return
     hydratedRef.current = true
     void (async () => {
-      await Promise.all([hydrateTheme(), hydrateSettings(), hydrateI18n()])
-      const session = useSettingsStore.getState().savedSession
-      setDetailCollapsed(session.detailCollapsed)
-      await hydrateSession(session.openRepos, session.activeRepo)
+      try {
+        await Promise.all([hydrateTheme(), hydrateSettings(), hydrateI18n()])
+        const session = useSettingsStore.getState().savedSession
+        setDetailCollapsed(session.detailCollapsed)
+        await hydrateSession(session.openRepos, session.activeRepo)
+      } catch (err) {
+        console.warn('[bootstrap] failed', err)
+        useReposStore.setState({ sessionReady: true })
+      }
     })()
   }, [hydrateTheme, hydrateSettings, hydrateI18n, hydrateSession, setDetailCollapsed])
 }

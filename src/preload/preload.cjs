@@ -5,11 +5,10 @@
 // in the main process and is reached via IPC.
 const { contextBridge, ipcRenderer, webUtils } = require('electron')
 
-// All `ipcRenderer.invoke` returns a promise that rejects when the main
-// handler throws. Renderer code often `void`s these results (openInFinder,
-// saveSession), which would otherwise turn
-// every transient main-side error into an unhandled rejection. Wrapping
-// once at the bridge keeps the renderer's call sites tidy.
+// `ipcRenderer.invoke` rejects when the main handler throws. We log the
+// channel once at the bridge, then rethrow so renderer call sites can
+// decide whether to surface a toast, fall back, or intentionally ignore
+// the failure with their own `.catch()`.
 function safeInvoke(channel, ...args) {
   return ipcRenderer.invoke(channel, ...args).catch((err) => {
     console.warn(`[ipc] ${channel} failed`, err)
@@ -36,6 +35,7 @@ contextBridge.exposeInMainWorld('gbl', {
 
   // ---- Repo data ---------------------------------------------------------
   snapshot: (cwd) => safeInvoke('repo:snapshot', cwd),
+  pullRequests: (cwd, branches) => safeInvoke('repo:pull-requests', cwd, branches),
   log: (cwd, branch, count) => safeInvoke('repo:log', cwd, branch, count),
   status: (cwd) => safeInvoke('repo:status', cwd),
   patch: (cwd, worktreePath) => safeInvoke('repo:patch', cwd, worktreePath),

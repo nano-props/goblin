@@ -1,7 +1,7 @@
 import type { Configuration } from 'electron-builder'
 
 const config: Configuration = {
-  appId: 'gbl.app',
+  appId: 'goblin.app',
   productName: 'Goblin',
   // Point at the .icns directly so the multi-resolution variants
   // electron-builder embeds match what we authored. Re-generate via

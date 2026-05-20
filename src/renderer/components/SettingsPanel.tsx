@@ -46,6 +46,26 @@ export function SettingsPanel({ open, onClose }: Props) {
 
   const commit = __BUILD_INFO__.commit
   const buildInfo = commit ? `Goblin · v${__APP_VERSION__} · ${commit}` : `Goblin · v${__APP_VERSION__}`
+  const saveThemePref = (pref: ThemePref) => {
+    void setThemePref(pref).catch((err) => {
+      console.warn('[settings] theme update failed', err)
+    })
+  }
+  const saveLangPref = (pref: LangPref) => {
+    void setLangPref(pref).catch((err) => {
+      console.warn('[settings] language update failed', err)
+    })
+  }
+  const saveFetchInterval = (sec: number) => {
+    void setFetchInterval(sec).catch((err) => {
+      console.warn('[settings] fetch interval update failed', err)
+    })
+  }
+  const openProjectGitHub = () => {
+    void window.gbl.openProjectGitHub().catch((err) => {
+      console.warn('[settings] open project GitHub failed', err)
+    })
+  }
 
   return (
     <Modal open={open} title={t('settings.title')} onClose={onClose} widthClass="sm:max-w-sm">
@@ -54,7 +74,7 @@ export function SettingsPanel({ open, onClose }: Props) {
           <SettingsSelect
             value={themePref}
             options={themeOptions.map((o) => ({ value: o.value, label: t(o.labelKey), icon: o.icon }))}
-            onChange={(v) => void setThemePref(v)}
+            onChange={saveThemePref}
           />
         </Section>
 
@@ -62,7 +82,7 @@ export function SettingsPanel({ open, onClose }: Props) {
           <SettingsSelect
             value={langPref}
             options={langOptions.map((o) => ({ value: o.value, label: `${o.emoji} ${t(o.labelKey)}` }))}
-            onChange={(v) => void setLangPref(v)}
+            onChange={saveLangPref}
           />
         </Section>
 
@@ -70,7 +90,7 @@ export function SettingsPanel({ open, onClose }: Props) {
           <SettingsSelect
             value={fetchInterval}
             options={intervalOptions.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
-            onChange={(v) => void setFetchInterval(v)}
+            onChange={saveFetchInterval}
           />
         </Section>
 
@@ -82,7 +102,7 @@ export function SettingsPanel({ open, onClose }: Props) {
             aria-label="Open project on GitHub"
             title="GitHub"
             className="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-foreground"
-            onClick={() => void window.gbl.openProjectGitHub()}
+            onClick={openProjectGitHub}
           >
             <GitHubMark className="size-4" />
           </button>

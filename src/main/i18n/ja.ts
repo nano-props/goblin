@@ -156,6 +156,7 @@ export const ja: Record<DictKey, string> = {
   'branch-status.pr.merged': 'マージ済み',
   'branch-status.pr.closed': 'クローズ',
   'branch-status.pr.summary': 'PR #{n} {state}',
+  'branch-status.pr.loading': 'PR 確認中',
 
   // ---- Log list ----------------------------------------------------------
   'log.showing-branch': 'コミット',
@@ -261,6 +262,7 @@ export const ja: Record<DictKey, string> = {
   'error.not-git-repo': 'git リポジトリではありません',
   'error.failed-read-repo': 'リポジトリの読み込みに失敗しました',
   'error.open-github-no-origin': 'origin リモートがありません',
+  'error.invalid-url': '無効な URL',
   'error.invalid-path': '無効なパス',
   'error.invalid-worktree-path': '無効なワークツリーパス',
   'error.invalid-arguments': '無効な引数',

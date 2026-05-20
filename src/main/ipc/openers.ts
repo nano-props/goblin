@@ -1,25 +1,35 @@
 import { ipcMain, shell } from 'electron'
-import path from 'node:path'
 import { getBranchPullRequest } from '#/main/git/pull-requests.ts'
 import { getGitHubUrl, getPullRequestUrl } from '#/main/git/remote.ts'
 import { isGhosttyInstalled, openInGhostty } from '#/main/system/ghostty.ts'
 import { isVSCodeInstalled, openInVSCode } from '#/main/system/vscode.ts'
+import { isValidAbsolutePath, isValidCwd, isValidOptionalBranch } from '#/main/ipc/validation.ts'
 
-const PROJECT_GITHUB_URL = 'https://github.com/nano-props/gbl-app'
+const PROJECT_GITHUB_URL = 'https://github.com/nano-props/goblin'
+
+async function openHttpsExternal(url: string): Promise<boolean> {
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'https:') return false
+    await shell.openExternal(parsed.toString())
+    return true
+  } catch {
+    return false
+  }
+}
 
 export function wireOpenersIpc(): void {
   ipcMain.handle('app:open-project-github', async () => {
-    void shell.openExternal(PROJECT_GITHUB_URL)
+    if (!(await openHttpsExternal(PROJECT_GITHUB_URL))) return { ok: false, message: 'error.invalid-url' }
     return { ok: true, message: PROJECT_GITHUB_URL }
   })
 
   ipcMain.handle('repo:open-github', async (_e, cwd: string, branch?: string) => {
-    if (typeof cwd !== 'string' || !cwd) return { ok: false, message: 'error.invalid-arguments' }
-    if (typeof branch === 'string' && branch) {
+    if (!isValidCwd(cwd) || !isValidOptionalBranch(branch)) return { ok: false, message: 'error.invalid-arguments' }
+    if (branch) {
       const detectedPr = await getBranchPullRequest(cwd, branch)
       if (detectedPr?.url) {
-        void shell.openExternal(detectedPr.url)
-        return { ok: true, message: detectedPr.url }
+        if (await openHttpsExternal(detectedPr.url)) return { ok: true, message: detectedPr.url }
       }
     }
     // Prefer a PR-shaped URL when we know the branch: GitHub's
@@ -33,13 +43,12 @@ export function wireOpenersIpc(): void {
     if (typeof branch === 'string' && branch && !isDefaultBranch) {
       const prUrl = await getPullRequestUrl(cwd, branch)
       if (prUrl) {
-        void shell.openExternal(prUrl)
-        return { ok: true, message: prUrl }
+        if (await openHttpsExternal(prUrl)) return { ok: true, message: prUrl }
       }
     }
     const url = await getGitHubUrl(cwd)
     if (!url) return { ok: false, message: 'error.open-github-no-origin' }
-    void shell.openExternal(url)
+    if (!(await openHttpsExternal(url))) return { ok: false, message: 'error.invalid-url' }
     return { ok: true, message: url }
   })
 
@@ -50,9 +59,7 @@ export function wireOpenersIpc(): void {
   // but defending against future callers / a malicious renderer is
   // cheap and worth it given the IPC bridge surface.
   ipcMain.handle('repo:open-in-finder', async (_e, p: string) => {
-    if (typeof p !== 'string' || !p || p.includes('\0') || !path.isAbsolute(p)) {
-      return { ok: false, message: 'error.invalid-path' }
-    }
+    if (!isValidAbsolutePath(p)) return { ok: false, message: 'error.invalid-path' }
     shell.showItemInFolder(p)
     return { ok: true, message: p }
   })
@@ -61,12 +68,12 @@ export function wireOpenersIpc(): void {
   ipcMain.handle('repo:vscode-installed', () => isVSCodeInstalled())
 
   ipcMain.handle('repo:open-in-ghostty', async (_e, p: string) => {
-    if (typeof p !== 'string' || !p) return { ok: false, message: 'error.invalid-path' }
+    if (!isValidAbsolutePath(p)) return { ok: false, message: 'error.invalid-path' }
     return openInGhostty(p)
   })
 
   ipcMain.handle('repo:open-in-vscode', async (_e, p: string) => {
-    if (typeof p !== 'string' || !p) return { ok: false, message: 'error.invalid-path' }
+    if (!isValidAbsolutePath(p)) return { ok: false, message: 'error.invalid-path' }
     return openInVSCode(p)
   })
 }

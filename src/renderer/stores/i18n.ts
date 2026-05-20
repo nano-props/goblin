@@ -47,9 +47,13 @@ export const useI18nStore = create<I18nState>((set) => ({
     set({ lang: payload.lang, pref: payload.pref, dict: payload.dict })
     document.documentElement.setAttribute('lang', payload.lang)
     window.gbl.i18n.onChange((next) => {
-      void applyPayload(next)
-      set({ lang: next.lang, pref: next.pref, dict: next.dict })
-      document.documentElement.setAttribute('lang', next.lang)
+      void (async () => {
+        await applyPayload(next)
+        set({ lang: next.lang, pref: next.pref, dict: next.dict })
+        document.documentElement.setAttribute('lang', next.lang)
+      })().catch((err) => {
+        console.warn('[i18n] change failed', err)
+      })
     })
   },
 

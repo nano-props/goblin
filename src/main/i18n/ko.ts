@@ -149,6 +149,7 @@ export const ko: Record<DictKey, string> = {
   'branch-status.pr.merged': '병합됨',
   'branch-status.pr.closed': '닫힘',
   'branch-status.pr.summary': 'PR #{n} {state}',
+  'branch-status.pr.loading': 'PR 확인 중',
 
   // ---- Log list ----------------------------------------------------------
   'log.showing-branch': '커밋',
@@ -254,6 +255,7 @@ export const ko: Record<DictKey, string> = {
   'error.not-git-repo': 'git 리포지토리가 아닙니다',
   'error.failed-read-repo': '리포지토리 읽기 실패',
   'error.open-github-no-origin': 'origin 원격이 없습니다',
+  'error.invalid-url': 'URL이 올바르지 않습니다',
   'error.invalid-path': '경로가 올바르지 않습니다',
   'error.invalid-worktree-path': '워크트리 경로가 올바르지 않습니다',
   'error.invalid-arguments': '인수가 올바르지 않습니다',

@@ -26,6 +26,7 @@ export function emptyRepo(id: string, name: string): RepoState {
     fetching: false,
     fetchFailed: false,
     fetchError: null,
+    pullRequestsLoading: false,
     events: [],
   }
 }
