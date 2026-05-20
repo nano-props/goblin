@@ -54,7 +54,9 @@ contextBridge.exposeInMainWorld('gbl', {
   openGitHub: (cwd, branch) => safeInvoke('repo:open-github', cwd, branch),
   openInFinder: (path) => safeInvoke('repo:open-in-finder', path),
   openInGhostty: (path) => safeInvoke('repo:open-in-ghostty', path),
+  openInVSCode: (path) => safeInvoke('repo:open-in-vscode', path),
   ghosttyInstalled: () => safeInvoke('repo:ghostty-installed'),
+  vscodeInstalled: () => safeInvoke('repo:vscode-installed'),
 
   // ---- Theme -------------------------------------------------------------
   theme: {

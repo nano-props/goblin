@@ -6,6 +6,7 @@ import { Badge } from '#/renderer/components/ui/badge.tsx'
 import { BranchActionBar } from '#/renderer/components/BranchActionBar.tsx'
 import { Toolbar } from '#/renderer/components/Layout.tsx'
 import { useGhosttyInstalled } from '#/renderer/hooks/useGhosttyInstalled.ts'
+import { useVSCodeInstalled } from '#/renderer/hooks/useVSCodeInstalled.ts'
 import { cn } from '#/renderer/lib/cn.ts'
 import type { SelectedBranchDetail } from '#/renderer/components/branch-detail/model.ts'
 
@@ -24,6 +25,7 @@ export function BranchDetailToolbar({ repo, detail, detailId }: Props) {
   const t = useT()
   const setDetailTab = useReposStore((s) => s.setDetailTab)
   const ghosttyInstalled = useGhosttyInstalled()
+  const vscodeInstalled = useVSCodeInstalled()
 
   if (!detail.branch) return null
 
@@ -85,6 +87,7 @@ export function BranchDetailToolbar({ repo, detail, detailId }: Props) {
         repo={repo}
         branch={detail.branch}
         ghosttyInstalled={ghosttyInstalled}
+        vscodeInstalled={vscodeInstalled}
       />
     </Toolbar>
   )

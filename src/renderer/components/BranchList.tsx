@@ -14,7 +14,10 @@ import { ArrowDown, ArrowUp, Check, FolderTree, GitBranch } from 'lucide-react'
 import { useReposStore } from '#/renderer/stores/repos.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { Badge } from '#/renderer/components/ui/badge.tsx'
+import { BranchActionsMenu } from '#/renderer/components/BranchActionsMenu.tsx'
 import { EmptyState } from '#/renderer/components/Layout.tsx'
+import { useGhosttyInstalled } from '#/renderer/hooks/useGhosttyInstalled.ts'
+import { useVSCodeInstalled } from '#/renderer/hooks/useVSCodeInstalled.ts'
 import { cn } from '#/renderer/lib/cn.ts'
 import { lastPathSegment, tildify } from '#/renderer/lib/paths.ts'
 
@@ -26,23 +29,28 @@ export function BranchList({ repoId }: Props) {
   const t = useT()
   const selectBranch = useReposStore((s) => s.selectBranch)
   const selectedRef = useRef<HTMLLIElement | null>(null)
-  const { branches, selected, current } = useStoreWithEqualityFn(
+  const ghosttyInstalled = useGhosttyInstalled()
+  const vscodeInstalled = useVSCodeInstalled()
+  const { repo, branches, selected, current } = useStoreWithEqualityFn(
     useReposStore,
     (s) => {
       const repo = s.repos[repoId]
       return {
+        repo,
         branches: repo?.branches ?? [],
         selected: repo?.selectedBranch ?? null,
         current: repo?.currentBranch ?? '',
       }
     },
-    (a, b) => a.branches === b.branches && a.selected === b.selected && a.current === b.current,
+    (a, b) => a.repo === b.repo,
   )
 
   // Keep the selected row in view as the user navigates with j/k.
   useEffect(() => {
     selectedRef.current?.scrollIntoView({ block: 'nearest' })
   }, [selected])
+
+  if (!repo) return null
 
   if (branches.length === 0) {
     return <EmptyState title={t('branches.empty')} />
@@ -144,6 +152,14 @@ export function BranchList({ repoId }: Props) {
               <div className="mt-0.5 text-xs text-muted-foreground">
                 {b.lastCommitAuthor} · {b.lastCommitDate}
               </div>
+            </div>
+            <div className="shrink-0 flex items-start pt-0.5">
+              <BranchActionsMenu
+                repo={repo}
+                branch={b}
+                ghosttyInstalled={ghosttyInstalled}
+                vscodeInstalled={vscodeInstalled}
+              />
             </div>
           </li>
         )

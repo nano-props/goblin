@@ -136,6 +136,8 @@ export const en = {
   'worktrees.revealTitle': 'Reveal in Finder',
   'worktrees.openInGhosttyTitle': 'Open in Ghostty',
   'worktrees.openInGhosttyLabel': 'Ghostty',
+  'worktrees.openInVSCodeTitle': 'Open in VS Code',
+  'worktrees.openInVSCodeLabel': 'VS Code',
 
   // ---- Repo actions -------------------------------------------------------
   'action.checkout': 'Checkout',
@@ -203,6 +205,7 @@ export const en = {
   'error.cannotRemoveLockedWorktree': 'Worktree is locked — unlock it before removing',
   'error.cannotRemoveUnpushedWorktree': 'Branch has unpushed commits — push first, or untick "Also delete branch"',
   'error.ghosttyNotInstalled': 'Ghostty not installed',
+  'error.vscodeNotInstalled': 'VS Code not installed',
   'error.renderCrashTitle': 'Something broke while rendering this view',
   'error.renderCrashUnknown': 'Unknown render error.',
   'error.tryAgain': 'Try again',

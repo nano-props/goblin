@@ -127,6 +127,8 @@ export const ko: Record<DictKey, string> = {
   'worktrees.revealTitle': 'Finder 에서 보기',
   'worktrees.openInGhosttyTitle': 'Ghostty에서 열기',
   'worktrees.openInGhosttyLabel': 'Ghostty',
+  'worktrees.openInVSCodeTitle': 'VS Code에서 열기',
+  'worktrees.openInVSCodeLabel': 'VS Code',
 
   // ---- Repo actions ------------------------------------------------------
   'action.checkout': '체크아웃',
@@ -195,6 +197,7 @@ export const ko: Record<DictKey, string> = {
   'error.cannotRemoveUnpushedWorktree':
     '브랜치에 푸시되지 않은 커밋이 있습니다 — 먼저 푸시하거나 "브랜치도 함께 삭제" 항목의 체크를 해제하세요',
   'error.ghosttyNotInstalled': 'Ghostty가 설치되어 있지 않습니다',
+  'error.vscodeNotInstalled': 'VS Code가 설치되어 있지 않습니다',
   'error.renderCrashTitle': '이 화면을 렌더링하는 중에 오류가 발생했습니다',
   'error.renderCrashUnknown': '알 수 없는 렌더 오류.',
   'error.tryAgain': '다시 시도',

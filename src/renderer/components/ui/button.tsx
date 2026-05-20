@@ -45,7 +45,7 @@ const buttonVariants = cva(
         // base sets text-xs + svg size-3.5 + gap-2; sizes only override
         // gap / padding / height to keep the variant table readable.
         default: 'h-7 px-2.5 gap-1.5 has-[>svg]:px-2',
-        sm: "h-6 gap-1 px-2 text-[11px] has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
+        sm: "h-6 gap-1 px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
         icon: 'size-7',
       },
     },

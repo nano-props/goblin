@@ -134,6 +134,8 @@ export const ja: Record<DictKey, string> = {
   'worktrees.revealTitle': 'Finder で表示',
   'worktrees.openInGhosttyTitle': 'Ghostty で開く',
   'worktrees.openInGhosttyLabel': 'Ghostty',
+  'worktrees.openInVSCodeTitle': 'VS Code で開く',
+  'worktrees.openInVSCodeLabel': 'VS Code',
 
   // ---- Repo actions ------------------------------------------------------
   'action.checkout': 'チェックアウト',
@@ -203,6 +205,7 @@ export const ja: Record<DictKey, string> = {
   'error.cannotRemoveUnpushedWorktree':
     'ブランチに未プッシュのコミットがあります — 先にプッシュするか、「ブランチも削除する」のチェックを外してください',
   'error.ghosttyNotInstalled': 'Ghostty がインストールされていません',
+  'error.vscodeNotInstalled': 'VS Code がインストールされていません',
   'error.renderCrashTitle': 'このビューの描画中にエラーが発生しました',
   'error.renderCrashUnknown': '不明な描画エラー。',
   'error.tryAgain': '再試行',

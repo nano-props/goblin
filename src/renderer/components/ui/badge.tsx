@@ -10,7 +10,7 @@ import { cn } from '#/renderer/lib/cn.ts'
 // the rest of the inline UI furniture (status codes, two-letter
 // X/Y codes from `git status`, commit shortHash).
 const badgeVariants = cva(
-  'inline-flex w-fit shrink-0 items-center justify-center overflow-hidden rounded-sm border border-transparent px-1.5 py-0 text-[10px] font-medium leading-tight whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3',
+  'inline-flex w-fit shrink-0 items-center justify-center overflow-hidden rounded-sm border border-transparent font-medium leading-tight whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none',
   {
     variants: {
       variant: {
@@ -32,9 +32,14 @@ const badgeVariants = cva(
         warning: 'border-transparent bg-warning-surface text-warning',
         brand: 'border-transparent bg-brand-surface text-brand-text',
       },
+      size: {
+        xs: 'px-1.5 py-0 text-[10px] [&>svg]:size-3',
+        sm: 'px-1.5 py-0.5 text-xs [&>svg]:size-3.5',
+      },
     },
     defaultVariants: {
       variant: 'default',
+      size: 'xs',
     },
   },
 )
@@ -42,13 +47,19 @@ const badgeVariants = cva(
 function Badge({
   className,
   variant = 'default',
+  size = 'xs',
   asChild = false,
   ...props
 }: React.ComponentProps<'span'> & VariantProps<typeof badgeVariants> & { asChild?: boolean }) {
   const Comp = asChild ? Slot.Root : 'span'
 
   return (
-    <Comp data-slot="badge" data-variant={variant} className={cn(badgeVariants({ variant }), className)} {...props} />
+    <Comp
+      data-slot="badge"
+      data-variant={variant}
+      className={cn(badgeVariants({ variant, size }), className)}
+      {...props}
+    />
   )
 }
 

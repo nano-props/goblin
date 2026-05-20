@@ -44,7 +44,9 @@ interface GblBridge {
   openGitHub: (cwd: string, branch?: string) => Promise<ExecResult>
   openInFinder: (path: string) => Promise<ExecResult>
   openInGhostty: (path: string) => Promise<ExecResult>
+  openInVSCode: (path: string) => Promise<ExecResult>
   ghosttyInstalled: () => Promise<boolean>
+  vscodeInstalled: () => Promise<boolean>
   theme: {
     get: () => Promise<ThemeState>
     setPref: (pref: ThemePref) => Promise<ThemeState>

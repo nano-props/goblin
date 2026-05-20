@@ -116,6 +116,7 @@ export function StatusList({ status, emptyTitleKey = 'status.cleanTitle', emptyB
                         </span>
                         <Badge
                           variant={label.variant}
+                          size="sm"
                           className="uppercase tracking-wide shrink-0 min-w-[68px] justify-center"
                         >
                           {label.raw ?? t(label.key)}

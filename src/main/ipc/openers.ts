@@ -2,6 +2,7 @@ import { ipcMain, shell } from 'electron'
 import path from 'node:path'
 import { getGitHubUrl, getPullRequestUrl } from '#/main/git/remote.ts'
 import { isGhosttyInstalled, openInGhostty } from '#/main/system/ghostty.ts'
+import { isVSCodeInstalled, openInVSCode } from '#/main/system/vscode.ts'
 
 export function wireOpenersIpc(): void {
   ipcMain.handle('repo:open-github', async (_e, cwd: string, branch?: string) => {
@@ -42,9 +43,15 @@ export function wireOpenersIpc(): void {
   })
 
   ipcMain.handle('repo:ghostty-installed', () => isGhosttyInstalled())
+  ipcMain.handle('repo:vscode-installed', () => isVSCodeInstalled())
 
   ipcMain.handle('repo:open-in-ghostty', async (_e, p: string) => {
     if (typeof p !== 'string' || !p) return { ok: false, message: 'error.invalidPath' }
     return openInGhostty(p)
+  })
+
+  ipcMain.handle('repo:open-in-vscode', async (_e, p: string) => {
+    if (typeof p !== 'string' || !p) return { ok: false, message: 'error.invalidPath' }
+    return openInVSCode(p)
   })
 }

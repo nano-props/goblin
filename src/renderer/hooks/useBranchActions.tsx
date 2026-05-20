@@ -13,11 +13,12 @@ export type BranchActionOp =
   | 'push'
   | 'github'
   | 'ghostty'
+  | 'vscode'
   | 'deleteBranch'
   | 'removeWorktree'
 
 const NETWORK_OPS = new Set<BranchActionOp>(['pull', 'push'])
-const SILENT_SUCCESS_OPS = new Set<BranchActionOp>(['github', 'ghostty'])
+const SILENT_SUCCESS_OPS = new Set<BranchActionOp>(['github', 'ghostty', 'vscode'])
 const REFRESH_AFTER_OPS = new Set<BranchActionOp>(['checkout', 'pull', 'push', 'deleteBranch', 'removeWorktree'])
 
 interface RemoveConfirm {
@@ -97,6 +98,12 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
     if (!branch.worktreePath) return
     const worktreePath = branch.worktreePath
     void run('ghostty', () => window.gbl.openInGhostty(worktreePath))
+  }
+
+  function openVSCode() {
+    if (!branch.worktreePath) return
+    const worktreePath = branch.worktreePath
+    void run('vscode', () => window.gbl.openInVSCode(worktreePath))
   }
 
   function openGitHub() {
@@ -231,6 +238,7 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
       canCopyPatch,
       canPull: !!branch.tracking,
       canOpenGhostty: !!branch.worktreePath,
+      canOpenVSCode: !!branch.worktreePath,
     },
     actions: {
       copyPatch,
@@ -238,6 +246,7 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
       pull,
       push,
       openGhostty,
+      openVSCode,
       openGitHub,
       requestDeleteBranch,
       requestRemoveWorktree,
