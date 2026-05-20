@@ -2,7 +2,6 @@ import {
   ArrowDown,
   ArrowUp,
   Check,
-  Copy,
   FolderTree,
   GitBranch,
   GitCommitHorizontal,
@@ -10,12 +9,11 @@ import {
   RadioTower,
   RefreshCw,
 } from 'lucide-react'
-import { forwardRef, useEffect, useRef, useState, type ComponentPropsWithoutRef, type ReactNode } from 'react'
-import { toast } from 'sonner'
+import { forwardRef, type ComponentPropsWithoutRef, type ReactNode } from 'react'
 import { useI18nStore, useT } from '#/renderer/stores/i18n.ts'
+import { CopyButton } from '#/renderer/components/CopyButton.tsx'
 import { EmptyState, ScrollPane } from '#/renderer/components/Layout.tsx'
 import { Tip } from '#/renderer/components/Tip.tsx'
-import { Button } from '#/renderer/components/ui/button.tsx'
 import { cn } from '#/renderer/lib/cn.ts'
 import { formatRelativeTime } from '#/renderer/lib/dates.ts'
 import { tildify } from '#/renderer/lib/paths.ts'
@@ -28,12 +26,11 @@ interface Props {
 
 type Tone = 'neutral' | 'success' | 'warning' | 'brand'
 
-const COPY_FEEDBACK_MS = 1200
 const ROW_CLASS = 'grid h-9 grid-cols-[1.25rem_5.75rem_minmax(0,1fr)] items-center gap-3 px-4'
 const ROW_ICON_CLASS = 'flex size-5 items-center justify-center'
 const ROW_LABEL_CLASS = 'truncate text-[11px] font-semibold uppercase tracking-wider text-muted-foreground'
 const ROW_VALUE_CLASS = 'min-w-0 truncate text-sm text-foreground'
-const ROW_DETAIL_CLASS = 'min-w-0 truncate text-xs text-muted-foreground'
+const ROW_DETAIL_CLASS = 'shrink-0 whitespace-nowrap text-xs text-muted-foreground'
 const MONO_VALUE_CLASS = 'font-mono'
 const INLINE_TRUNCATE_CLASS = 'block min-w-0 flex-1 truncate'
 const TONE_TEXT_CLASS: Record<Tone, string> = {
@@ -178,55 +175,12 @@ function CopyableValue({
   copyLabel: string
   copiedLabel: string
 }) {
-  const [copied, setCopied] = useState(false)
-  const t = useT()
-  const copiedTimerRef = useRef<number | null>(null)
-
-  useEffect(() => {
-    setCopied(false)
-    if (copiedTimerRef.current) {
-      window.clearTimeout(copiedTimerRef.current)
-      copiedTimerRef.current = null
-    }
-  }, [copyValue])
-
-  useEffect(() => {
-    return () => {
-      if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current)
-    }
-  }, [])
-
-  function copy() {
-    void navigator.clipboard
-      .writeText(copyValue)
-      .then(() => {
-        setCopied(true)
-        if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current)
-        copiedTimerRef.current = window.setTimeout(() => setCopied(false), COPY_FEEDBACK_MS)
-      })
-      .catch((err: unknown) => {
-        toast.error(t('action.result-error'), {
-          description: err instanceof Error ? err.message : String(err),
-        })
-      })
-  }
-
   return (
     <div className="flex min-w-0 items-center gap-1.5">
       <MonoValue title={value} fill>
         {value}
       </MonoValue>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="size-6 text-muted-foreground hover:text-foreground"
-        aria-label={copyLabel}
-        title={copied ? copiedLabel : copyLabel}
-        onClick={copy}
-      >
-        {copied ? <Check size={12} /> : <Copy size={12} />}
-      </Button>
+      <CopyButton value={copyValue} copyLabel={copyLabel} copiedLabel={copiedLabel} />
     </div>
   )
 }

@@ -1,15 +1,15 @@
 # Goblin
 
-Git Branch List — desktop edition. Open multiple git repositories in tabs and browse branches, log, and status.
+Goblin is a desktop Git branch manager for keeping multiple repositories and worktrees organized.
 
-Electron + React 19 + Vite + Tailwind v4 + Zustand. Light/dark themes, English/中文/한국어/日本語.
+## Core features
 
-## Develop
-
-```sh
-bun install
-bun run dev
-```
+- Open multiple repositories in tabs and restore the previous session.
+- Browse branches, commit logs, and working tree status in one place.
+- Fetch and refresh repository state, with remote sync and PR context.
+- Checkout, pull, push, open GitHub links, and manage branches from the branch list.
+- Create or open linked worktrees, including quick handoff to terminal or VS Code.
+- Navigate quickly with keyboard shortcuts, themes, and multilingual UI.
 
 ## Build & install (macOS)
 
@@ -18,3 +18,10 @@ bun run dev
 ```
 
 Builds a host-architecture `.app` and installs it to `~/Applications`.
+
+## Develop
+
+```sh
+bun install
+bun run dev
+```

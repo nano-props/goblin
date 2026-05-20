@@ -115,6 +115,41 @@ function toSafeSessionPath(p: unknown): string | null {
   return path.normalize(p)
 }
 
+function normalizeThemePref(value: unknown): ThemePref {
+  return value === 'auto' || value === 'light' || value === 'dark' ? value : DEFAULTS.theme
+}
+
+function normalizeLangPref(value: unknown): LangPref {
+  return value === 'auto' || value === 'en' || value === 'zh' || value === 'ko' || value === 'ja'
+    ? value
+    : DEFAULTS.lang
+}
+
+function normalizeFetchInterval(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(0, Math.min(3600, Math.round(value)))
+    : DEFAULTS.fetchIntervalSec
+}
+
+function normalizeWindowBounds(value: unknown): WindowBounds | null {
+  if (!value || typeof value !== 'object') return null
+  const bounds = value as Partial<WindowBounds>
+  if (
+    typeof bounds.width !== 'number' ||
+    typeof bounds.height !== 'number' ||
+    !Number.isFinite(bounds.width) ||
+    !Number.isFinite(bounds.height) ||
+    bounds.width <= 0 ||
+    bounds.height <= 0
+  ) {
+    return null
+  }
+  const normalized: WindowBounds = { width: bounds.width, height: bounds.height }
+  if (typeof bounds.x === 'number' && Number.isFinite(bounds.x)) normalized.x = bounds.x
+  if (typeof bounds.y === 'number' && Number.isFinite(bounds.y)) normalized.y = bounds.y
+  return normalized
+}
+
 export async function loadSettings(): Promise<Settings> {
   if (cache) return cache
   try {
@@ -125,13 +160,10 @@ export async function loadSettings(): Promise<Settings> {
     // fields before the field-by-field merge below.
     cache = {
       version: SETTINGS_SCHEMA_VERSION,
-      theme: parsed.theme ?? DEFAULTS.theme,
-      lang: parsed.lang ?? DEFAULTS.lang,
-      fetchIntervalSec:
-        typeof parsed.fetchIntervalSec === 'number' && parsed.fetchIntervalSec >= 0
-          ? parsed.fetchIntervalSec
-          : DEFAULTS.fetchIntervalSec,
-      windowBounds: parsed.windowBounds ?? null,
+      theme: normalizeThemePref(parsed.theme),
+      lang: normalizeLangPref(parsed.lang),
+      fetchIntervalSec: normalizeFetchInterval(parsed.fetchIntervalSec),
+      windowBounds: normalizeWindowBounds(parsed.windowBounds),
       session: normalizeSession(parsed.session),
       recentRepos: normalizeRecentRepos(parsed.recentRepos),
     }
@@ -199,17 +231,20 @@ async function doFlush(): Promise<void> {
  *  order — without that order a queued write can overwrite a flush
  *  that was meant to be the last word. */
 export async function flushSettings(): Promise<void> {
-  // Cancel the debounced timer and replace it with an immediate flush
-  // chained after any in-flight write.
-  if (writeTimer) {
-    clearTimeout(writeTimer)
-    writeTimer = null
-    const prev = pendingFlush ?? Promise.resolve()
-    pendingFlush = prev.then(doFlush)
-  }
-  if (pendingFlush) {
-    await pendingFlush
-    pendingFlush = null
+  while (writeTimer || pendingFlush) {
+    // Cancel the debounced timer and replace it with an immediate flush
+    // chained after any in-flight write.
+    if (writeTimer) {
+      clearTimeout(writeTimer)
+      writeTimer = null
+      const prev = pendingFlush ?? Promise.resolve()
+      pendingFlush = prev.then(doFlush)
+    }
+    const current = pendingFlush
+    if (current) {
+      await current
+      if (pendingFlush === current) pendingFlush = null
+    }
   }
 }
 

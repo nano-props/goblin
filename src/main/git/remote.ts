@@ -39,11 +39,29 @@ export async function getPullRequestUrl(cwd: string, branch: string): Promise<st
 }
 
 async function hasOrigin(cwd: string): Promise<boolean> {
+  return hasRemote(cwd, 'origin')
+}
+
+async function hasRemote(cwd: string, remote: string): Promise<boolean> {
   try {
-    const url = await git(cwd, ['remote', 'get-url', 'origin'])
+    const url = await git(cwd, ['remote', 'get-url', '--', remote])
     return url.length > 0
   } catch {
     return false
+  }
+}
+
+async function getUpstreamParts(cwd: string, branch: string): Promise<{ remote: string; branch: string } | null> {
+  try {
+    const [remote, mergeRef] = await Promise.all([
+      git(cwd, ['config', '--get', `branch.${branch}.remote`]),
+      git(cwd, ['config', '--get', `branch.${branch}.merge`]),
+    ])
+    const remoteBranch = mergeRef.startsWith('refs/heads/') ? mergeRef.slice('refs/heads/'.length) : ''
+    if (!remote || !remoteBranch || !isSafeBranchName(remoteBranch)) return null
+    return { remote, branch: remoteBranch }
+  } catch {
+    return null
   }
 }
 
@@ -59,22 +77,26 @@ export async function pullBranch(
   signal?: AbortSignal,
 ): Promise<ExecResult> {
   if (!isSafeBranchName(branch)) return { ok: false, message: 'error.invalid-arguments' }
-  if (!(await hasOrigin(worktreePath ?? cwd))) return { ok: false, message: 'No origin remote configured' }
   if (worktreePath) {
-    return gitResultWithOptions(
-      worktreePath,
-      { timeoutMs: NETWORK_TIMEOUT_MS, signal },
-      'pull',
-      '--ff-only',
-      'origin',
-      branch,
-    )
+    return gitResultWithOptions(worktreePath, { timeoutMs: NETWORK_TIMEOUT_MS, signal }, 'pull', '--ff-only')
   }
   const current = await getCurrentBranch(cwd)
   if (branch === current) {
-    return gitResultWithOptions(cwd, { timeoutMs: NETWORK_TIMEOUT_MS, signal }, 'pull', '--ff-only', 'origin', branch)
+    return gitResultWithOptions(cwd, { timeoutMs: NETWORK_TIMEOUT_MS, signal }, 'pull', '--ff-only')
   }
-  return gitResultWithOptions(cwd, { timeoutMs: NETWORK_TIMEOUT_MS, signal }, 'fetch', 'origin', `${branch}:${branch}`)
+  const target = await getUpstreamParts(cwd, branch)
+  if (!target) return { ok: false, message: 'error.invalid-arguments' }
+  if (target.remote !== '.' && !(await hasRemote(cwd, target.remote))) {
+    return { ok: false, message: `No ${target.remote} remote configured` }
+  }
+  return gitResultWithOptions(
+    cwd,
+    { timeoutMs: NETWORK_TIMEOUT_MS, signal },
+    'fetch',
+    '--',
+    target.remote,
+    `${target.branch}:${branch}`,
+  )
 }
 
 export async function pushBranch(cwd: string, branch: string, signal?: AbortSignal): Promise<ExecResult> {

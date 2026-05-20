@@ -24,7 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#
 import { Button } from '#/renderer/components/ui/button.tsx'
 import type { RepoState } from '#/renderer/stores/repos.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
-import { lastPathSegment, parentDir, tildify, untildify } from '#/renderer/lib/paths.ts'
+import { defaultWorktreePath, tildify, untildify } from '#/renderer/lib/paths.ts'
 import { validateBranchName } from '#/shared/refnames.ts'
 
 export interface CreateWorktreeRequest {
@@ -38,14 +38,6 @@ interface Props {
   repo: RepoState
   onClose: () => void
   onCreate: (request: CreateWorktreeRequest) => void
-}
-
-function computeDefaultPath(repoId: string, branch: string): string {
-  const slug = branch.trim().replaceAll('/', '-')
-  if (!slug) return ''
-  const parent = parentDir(repoId)
-  const name = lastPathSegment(repoId)
-  return parent ? `${parent}/${name}-${slug}` : `${name}-${slug}`
 }
 
 export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
@@ -71,7 +63,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
 
   const branchTrimmed = branch.trim()
   const pathTrimmed = untildify(worktreePath.trim())
-  const defaultPath = computeDefaultPath(repo.id, branchTrimmed)
+  const defaultPath = defaultWorktreePath(repo.id, branchTrimmed)
   const branchValidation = branchTrimmed ? validateBranchName(branchTrimmed) : { ok: true }
   const branchExists = branchTrimmed ? repo.branches.some((b) => b.name === branchTrimmed) : false
   const branchError = branchTrimmed

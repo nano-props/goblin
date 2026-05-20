@@ -5,6 +5,9 @@ import { app } from 'electron'
 
 const VSCODE_BUNDLE_ID = 'com.microsoft.VSCode'
 
+/** Main probes on demand; the current renderer UI asks once per mounted
+ *  branch action area, so runtime install/removal may need a remount or
+ *  app restart before buttons update. */
 export function isVSCodeInstalled(): Promise<boolean> {
   const VSCODE_APP_CANDIDATES = [
     path.join(app.getPath('home'), 'Applications/Visual Studio Code.app'),

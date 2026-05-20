@@ -6,9 +6,9 @@ import { spawn, execFile } from 'node:child_process'
 const GHOSTTY_BUNDLE_ID = 'com.mitchellh.ghostty'
 
 /** Whether Ghostty.app exists in either of the two locations macOS users
- *  install GUI apps to. Probed on demand (not cached) so installing or
- *  removing Ghostty while Goblin is running takes effect immediately —
- *  cheap enough that an `existsSync` per call is fine. */
+ *  install GUI apps to. Main probes on demand; the current renderer UI
+ *  asks once per mounted branch action area, so runtime install/removal
+ *  may need a remount or app restart before buttons update. */
 export function isGhosttyInstalled(): boolean {
   const candidates = [path.join(app.getPath('home'), 'Applications/Ghostty.app'), '/Applications/Ghostty.app']
   return candidates.some((p) => existsSync(p))
