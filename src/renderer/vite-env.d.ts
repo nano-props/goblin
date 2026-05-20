@@ -26,6 +26,7 @@ interface ProbeResult {
 interface GblBridge {
   homeDir: string
   openDialog: () => Promise<string | null>
+  openProjectGitHub: () => Promise<ExecResult>
   pathForFile: (file: File) => string
   probe: (cwd: string) => Promise<ProbeResult>
   snapshot: (cwd: string) => Promise<RepoSnapshot | null>

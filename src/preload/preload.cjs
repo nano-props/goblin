@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('gbl', {
 
   // ---- Repo lifecycle / dialog -------------------------------------------
   openDialog: () => safeInvoke('repo:open-dialog'),
+  openProjectGitHub: () => safeInvoke('app:open-project-github'),
   probe: (cwd) => safeInvoke('repo:probe', cwd),
   pathForFile: (file) => webUtils.getPathForFile(file),
 

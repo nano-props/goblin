@@ -4,7 +4,14 @@ import { getGitHubUrl, getPullRequestUrl } from '#/main/git/remote.ts'
 import { isGhosttyInstalled, openInGhostty } from '#/main/system/ghostty.ts'
 import { isVSCodeInstalled, openInVSCode } from '#/main/system/vscode.ts'
 
+const PROJECT_GITHUB_URL = 'https://github.com/nano-props/gbl-app'
+
 export function wireOpenersIpc(): void {
+  ipcMain.handle('app:open-project-github', async () => {
+    void shell.openExternal(PROJECT_GITHUB_URL)
+    return { ok: true, message: PROJECT_GITHUB_URL }
+  })
+
   ipcMain.handle('repo:open-github', async (_e, cwd: string, branch?: string) => {
     if (typeof cwd !== 'string' || !cwd) return { ok: false, message: 'error.invalidArguments' }
     // Prefer a PR-shaped URL when we know the branch: GitHub's
