@@ -104,6 +104,12 @@ function filterPullRequests(
   return filtered
 }
 
+function getCachedBranchPullRequest(cwd: string, branch: string): PullRequestInfo | null {
+  const cached = prCache.get(cwd)
+  if (!cached || cached.expiresAt <= Date.now() || !cached.prs) return null
+  return cached.prs.get(branch) ?? null
+}
+
 export async function getBranchPullRequests(
   cwd: string,
   branchNames?: ReadonlySet<string>,
@@ -141,6 +147,8 @@ export async function getBranchPullRequests(
 
 export async function getBranchPullRequest(cwd: string, branch: string): Promise<PullRequestInfo | null> {
   if (!isSafeBranchName(branch)) return null
+  const pr = getCachedBranchPullRequest(cwd, branch)
+  if (pr) return pr
   try {
     if (!(await canUseGh(cwd))) return null
     const output = await gh(cwd, [

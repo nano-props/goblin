@@ -51,6 +51,7 @@ export interface RepoState {
    *  red dot. */
   fetchError: string | null
   pullRequestsLoading: boolean
+  pullRequestsRequestId: number
   events: RepoEvent[]
 }
 

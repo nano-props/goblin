@@ -1,6 +1,8 @@
 import { errorEvent, inFlightFetchById, updateIfFresh } from '#/renderer/stores/repos/helpers.ts'
 import type { ReposGet, ReposSet } from '#/renderer/stores/repos/types.ts'
 
+let nextPullRequestsRequestId = 1
+
 export function createRefreshActions(set: ReposSet, get: ReposGet) {
   return {
     async refreshSnapshot(id: string, options?: { silent?: boolean; skipLogBackfill?: boolean; token?: number }) {
@@ -35,9 +37,16 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
           const logsByBranch = Object.fromEntries(
             Object.entries(r.logsByBranch).filter(([branch]) => validBranches.has(branch)),
           )
+          const pullRequestsByBranch = new Map(
+            r.branches.flatMap((branch) => (branch.pullRequest ? [[branch.name, branch.pullRequest] as const] : [])),
+          )
+          const branches = snap.branches.map((branch) => {
+            const pullRequest = branch.pullRequest ?? pullRequestsByBranch.get(branch.name)
+            return pullRequest ? { ...branch, pullRequest } : branch
+          })
           return {
             ...r,
-            branches: snap.branches,
+            branches,
             currentBranch: snap.current,
             selectedBranch: selected,
             logsByBranch,
@@ -77,14 +86,18 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       const branchNames = branchesArg ?? repoBefore.branches.map((branch) => branch.name)
       if (branchNames.length === 0) return
       const requested = new Set(branchNames)
-      updateIfFresh(set, id, token, (r) => ({ ...r, pullRequestsLoading: true }))
+      const requestId = nextPullRequestsRequestId++
+      updateIfFresh(set, id, token, (r) => ({ ...r, pullRequestsLoading: true, pullRequestsRequestId: requestId }))
       try {
         const entries = await window.gbl.pullRequests(id, branchNames)
         if (entries === null) {
-          updateIfFresh(set, id, token, (r) => ({ ...r, pullRequestsLoading: false }))
+          updateIfFresh(set, id, token, (r) =>
+            r.pullRequestsRequestId === requestId ? { ...r, pullRequestsLoading: false } : r,
+          )
           return
         }
         updateIfFresh(set, id, token, (r) => {
+          if (r.pullRequestsRequestId !== requestId) return r
           const byBranch = new Map(entries.map((entry) => [entry.branch, entry.pullRequest]))
           let changed = false
           const branches = r.branches.map((branch) => {
@@ -104,7 +117,9 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         })
       } catch (err) {
         console.warn('[refreshPullRequests] failed', err)
-        updateIfFresh(set, id, token, (r) => ({ ...r, pullRequestsLoading: false }))
+        updateIfFresh(set, id, token, (r) =>
+          r.pullRequestsRequestId === requestId ? { ...r, pullRequestsLoading: false } : r,
+        )
       }
     },
 

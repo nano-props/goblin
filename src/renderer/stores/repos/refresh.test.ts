@@ -60,6 +60,7 @@ beforeEach(() => {
     configurable: true,
     value: {
       gbl: {
+        snapshot: async () => ({ branches: [], current: '' }),
         pullRequests: async () => [],
       },
     },
@@ -109,6 +110,56 @@ describe('refreshPullRequests', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.branches[0]?.pullRequest).toEqual(existing)
+    expect(repo?.pullRequestsLoading).toBe(false)
+  })
+
+  test('preserves existing pull request metadata while snapshot refresh rechecks', async () => {
+    const existing = pullRequest(1)
+    const token = seedRepo([branch('feature/a', existing)])
+    let resolvePullRequests!: (value: null) => void
+    window.gbl.snapshot = async () => ({ branches: [branch('feature/a')], current: 'feature/a' })
+    window.gbl.pullRequests = () =>
+      new Promise<null>((resolve) => {
+        resolvePullRequests = resolve
+      })
+
+    await useReposStore.getState().refreshSnapshot(REPO_ID, { token })
+
+    const repo = useReposStore.getState().repos[REPO_ID]
+    expect(repo?.branches[0]?.pullRequest).toEqual(existing)
+    expect(repo?.pullRequestsLoading).toBe(true)
+
+    resolvePullRequests(null)
+    await Promise.resolve()
+  })
+
+  test('ignores stale pull request lookups for the same repo instance', async () => {
+    const token = seedRepo([branch('feature/a')])
+    let resolveFirst!: (value: { branch: string; pullRequest: PullRequestInfo }[]) => void
+    let resolveSecond!: (value: { branch: string; pullRequest: PullRequestInfo }[]) => void
+    let callCount = 0
+    window.gbl.pullRequests = () => {
+      callCount += 1
+      return new Promise<{ branch: string; pullRequest: PullRequestInfo }[]>((resolve) => {
+        if (callCount === 1) resolveFirst = resolve
+        else resolveSecond = resolve
+      })
+    }
+
+    const first = useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { token })
+    const second = useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { token })
+
+    const fresh = pullRequest(2)
+    resolveSecond([{ branch: 'feature/a', pullRequest: fresh }])
+    await second
+
+    expect(useReposStore.getState().repos[REPO_ID]?.branches[0]?.pullRequest).toEqual(fresh)
+
+    resolveFirst([])
+    await first
+
+    const repo = useReposStore.getState().repos[REPO_ID]
+    expect(repo?.branches[0]?.pullRequest).toEqual(fresh)
     expect(repo?.pullRequestsLoading).toBe(false)
   })
 })
