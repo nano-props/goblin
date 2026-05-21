@@ -91,6 +91,7 @@ export const zh: Record<DictKey, string> = {
   'empty.body.open-label': '打开',
   'empty.body.middle': ' 添加一个 git 仓库。可以同时打开多个仓库，在顶部标签栏切换。按 ',
   'empty.body.after': ' 查看快捷键。',
+  'empty.body.after-shortcuts-disabled': ' 添加一个 git 仓库。可以同时打开多个仓库，在顶部标签栏切换。',
 
   // ---- Drag and drop -----------------------------------------------------
   'drop.title': '松手打开仓库',
@@ -251,6 +252,10 @@ export const zh: Record<DictKey, string> = {
   // ---- Errors / banners --------------------------------------------------
   'error.not-git-repo': '不是 git 仓库',
   'error.failed-read-repo': '读取仓库失败',
+  'error.git-not-found': '未找到 Git',
+  'error.path-not-found': '路径不存在',
+  'error.path-not-directory': '路径不是文件夹',
+  'error.path-permission-denied': '没有访问权限',
   'error.open-github-no-origin': '没有 origin 远程',
   'error.invalid-url': 'URL 无效',
   'error.invalid-path': '路径无效',
@@ -288,12 +293,23 @@ export const zh: Record<DictKey, string> = {
   'settings.lang.ko': '한국어',
   'settings.lang.ja': '日本語',
   'settings.fetch': '自动同步',
-  'settings.fetch-hint': '在后台对当前仓库执行 `git fetch`。网络较慢时可关闭。',
+  'settings.fetch-hint': '后台拉取更新。',
   'settings.fetch.off': '关闭',
   'settings.fetch.30s': '30 秒',
   'settings.fetch.1m': '1 分钟',
   'settings.fetch.5m': '5 分钟',
   'settings.fetch.15m': '15 分钟',
+  'settings.shortcuts': '键盘快捷键',
+  'settings.shortcuts-hint': '关闭快捷键，或更换唤起 Goblin 的组合键。',
+  'settings.shortcuts-disable-all': '禁用所有快捷键',
+  'settings.global-shortcut': '全局快捷键',
+  'settings.global-shortcut-hint': '按新组合键，Esc 取消。',
+  'settings.global-shortcut-disabled-hint': '已保存，当前未启用。',
+  'settings.global-shortcut-record': '更换全局快捷键',
+  'settings.global-shortcut-recording': '按下组合键…',
+  'settings.global-shortcut-reset': '重置',
+  'settings.global-shortcut-conflict': '注册失败，可能已被占用。',
+  'settings.global-shortcut-invalid': '请用 Command、Control 或 Option 搭配按键。',
 
   // ---- Help overlay ------------------------------------------------------
   'help.title': '键盘快捷键',

@@ -93,6 +93,8 @@ export const ko: Record<DictKey, string> = {
   'empty.body.middle':
     ' 를 눌러 git 리포지토리를 추가하세요. 여러 리포지토리를 동시에 열고 상단 탭 막대에서 전환할 수 있습니다. ',
   'empty.body.after': ' 로 단축키 보기.',
+  'empty.body.after-shortcuts-disabled':
+    ' 를 눌러 git 리포지토리를 추가하세요. 여러 리포지토리를 동시에 열고 상단 탭 막대에서 전환할 수 있습니다.',
 
   // ---- Drag and drop -----------------------------------------------------
   'drop.title': '놓아서 리포지토리 열기',
@@ -254,6 +256,10 @@ export const ko: Record<DictKey, string> = {
   // ---- Errors / banners --------------------------------------------------
   'error.not-git-repo': 'git 리포지토리가 아닙니다',
   'error.failed-read-repo': '리포지토리 읽기 실패',
+  'error.git-not-found': 'Git을 찾을 수 없습니다',
+  'error.path-not-found': '경로를 찾을 수 없습니다',
+  'error.path-not-directory': '폴더가 아닙니다',
+  'error.path-permission-denied': '권한이 없습니다',
   'error.open-github-no-origin': 'origin 원격이 없습니다',
   'error.invalid-url': 'URL이 올바르지 않습니다',
   'error.invalid-path': '경로가 올바르지 않습니다',
@@ -292,13 +298,23 @@ export const ko: Record<DictKey, string> = {
   'settings.lang.ko': '한국어',
   'settings.lang.ja': '日本語',
   'settings.fetch': '자동 동기화',
-  'settings.fetch-hint':
-    '활성 리포지토리에 대해 백그라운드에서 `git fetch` 를 실행합니다. 네트워크가 느릴 때는 끄세요.',
+  'settings.fetch-hint': '백그라운드 fetch.',
   'settings.fetch.off': '끄기',
   'settings.fetch.30s': '30 초',
   'settings.fetch.1m': '1 분',
   'settings.fetch.5m': '5 분',
   'settings.fetch.15m': '15 분',
+  'settings.shortcuts': '키보드 단축키',
+  'settings.shortcuts-hint': '단축키를 끄거나 Goblin 호출 단축키를 바꿉니다.',
+  'settings.shortcuts-disable-all': '모든 단축키 비활성화',
+  'settings.global-shortcut': '전역 단축키',
+  'settings.global-shortcut-hint': '새 조합을 누르세요. Esc 취소.',
+  'settings.global-shortcut-disabled-hint': '저장됨, 현재 꺼짐.',
+  'settings.global-shortcut-record': '전역 단축키 변경',
+  'settings.global-shortcut-recording': '키 입력…',
+  'settings.global-shortcut-reset': '초기화',
+  'settings.global-shortcut-conflict': '등록 실패. 사용 중일 수 있습니다.',
+  'settings.global-shortcut-invalid': 'Command, Control 또는 Option과 키를 함께 사용하세요.',
 
   // ---- Help overlay ------------------------------------------------------
   'help.title': '키보드 단축키',

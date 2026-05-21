@@ -16,7 +16,7 @@ import { app, Menu, shell, dialog, type MenuItemConstructorOptions, BrowserWindo
 import { promises as fs } from 'node:fs'
 import { getMainWindow } from '#/main/window.ts'
 import { t } from '#/main/i18n/index.ts'
-import { clearRecentRepos, getRecentRepos } from '#/main/settings.ts'
+import { clearRecentRepos, getRecentRepos, getShortcutsDisabled } from '#/main/settings.ts'
 
 export type MenuAction =
   | 'open-repo'
@@ -43,6 +43,8 @@ export function buildAppMenu(): void {
   const isMac = process.platform === 'darwin'
   const name = app.name
   const recentRepos = getRecentRepos()
+  const shortcutsDisabled = getShortcutsDisabled()
+  const accelerator = (value: string) => (shortcutsDisabled ? undefined : value)
   const recentSubmenu: MenuItemConstructorOptions[] =
     recentRepos.length > 0
       ? [
@@ -58,19 +60,25 @@ export function buildAppMenu(): void {
   const fileMenu: MenuItemConstructorOptions = {
     label: t('menu.file'),
     submenu: [
-      { label: t('menu.file.open-repo'), accelerator: 'CmdOrCtrl+O', click: () => send('open-repo') },
+      { label: t('menu.file.open-repo'), accelerator: accelerator('CmdOrCtrl+O'), click: () => send('open-repo') },
       { label: t('menu.file.open-recent'), submenu: recentSubmenu },
       { label: t('menu.file.open-data-folder'), click: () => void openDataFolder() },
       // ⌘W is the standard OS shortcut for closing the window — keep
-      // the `role: 'close'` accelerator there so it still works even if
-      // the renderer hasn't subscribed to menu actions yet (e.g. hung
-      // renderer). Closing a repo tab moves to ⌘⇧W.
-      { role: 'close', label: t('menu.file.close-window'), accelerator: 'CmdOrCtrl+W' },
-      { label: t('menu.file.close-tab'), accelerator: 'CmdOrCtrl+Shift+W', click: () => send('close-repo') },
+      // the `role: 'close'` accelerator there when shortcuts are enabled
+      // so it still works even if the renderer hasn't subscribed to menu
+      // actions yet (e.g. hung renderer). Closing a repo tab moves to ⌘⇧W.
+      shortcutsDisabled
+        ? { label: t('menu.file.close-window'), click: () => BrowserWindow.getFocusedWindow()?.close() }
+        : { role: 'close', label: t('menu.file.close-window'), accelerator: 'CmdOrCtrl+W' },
+      {
+        label: t('menu.file.close-tab'),
+        accelerator: accelerator('CmdOrCtrl+Shift+W'),
+        click: () => send('close-repo'),
+      },
       { type: 'separator' },
       {
         label: t('menu.file.settings'),
-        accelerator: isMac ? 'Cmd+,' : 'Ctrl+,',
+        accelerator: accelerator(isMac ? 'Cmd+,' : 'Ctrl+,'),
         click: () => send('open-settings'),
       },
       ...(isMac ? [] : [{ type: 'separator' as const }, { role: 'quit' as const, label: t('menu.file.quit') }]),
@@ -90,27 +98,40 @@ export function buildAppMenu(): void {
   const viewMenu: MenuItemConstructorOptions = {
     label: t('menu.view'),
     submenu: [
-      { label: t('menu.view.status'), accelerator: 'CmdOrCtrl+1', click: () => send('tab-status') },
-      { label: t('menu.view.changes'), accelerator: 'CmdOrCtrl+2', click: () => send('tab-changes') },
-      { label: t('menu.view.log'), accelerator: 'CmdOrCtrl+3', click: () => send('tab-log') },
-      { label: t('menu.view.toggle-detail'), accelerator: 'CmdOrCtrl+J', click: () => send('toggle-detail') },
-      { type: 'separator' },
-      { label: t('menu.view.refresh'), accelerator: 'CmdOrCtrl+R', click: () => send('refresh') },
-      { label: t('menu.view.toggle-theme'), accelerator: 'CmdOrCtrl+Shift+T', click: () => send('toggle-theme') },
-      { type: 'separator' },
+      { label: t('menu.view.status'), accelerator: accelerator('CmdOrCtrl+1'), click: () => send('tab-status') },
+      { label: t('menu.view.changes'), accelerator: accelerator('CmdOrCtrl+2'), click: () => send('tab-changes') },
+      { label: t('menu.view.log'), accelerator: accelerator('CmdOrCtrl+3'), click: () => send('tab-log') },
       {
-        role: 'toggleDevTools',
-        label: t('menu.view.toggle-dev-tools'),
-        accelerator: isMac ? 'Cmd+Alt+I' : 'Ctrl+Shift+I',
+        label: t('menu.view.toggle-detail'),
+        accelerator: accelerator('CmdOrCtrl+J'),
+        click: () => send('toggle-detail'),
       },
+      { type: 'separator' },
+      { label: t('menu.view.refresh'), accelerator: accelerator('CmdOrCtrl+R'), click: () => send('refresh') },
+      {
+        label: t('menu.view.toggle-theme'),
+        accelerator: accelerator('CmdOrCtrl+Shift+T'),
+        click: () => send('toggle-theme'),
+      },
+      { type: 'separator' },
+      shortcutsDisabled
+        ? {
+            label: t('menu.view.toggle-dev-tools'),
+            click: () => BrowserWindow.getFocusedWindow()?.webContents.toggleDevTools(),
+          }
+        : {
+            role: 'toggleDevTools',
+            label: t('menu.view.toggle-dev-tools'),
+            accelerator: isMac ? 'Cmd+Alt+I' : 'Ctrl+Shift+I',
+          },
     ],
   }
 
   const windowMenu: MenuItemConstructorOptions = {
     label: t('menu.window'),
     submenu: [
-      { label: t('menu.window.next-repo'), accelerator: 'CmdOrCtrl+]', click: () => send('next-repo') },
-      { label: t('menu.window.prev-repo'), accelerator: 'CmdOrCtrl+[', click: () => send('prev-repo') },
+      { label: t('menu.window.next-repo'), accelerator: accelerator('CmdOrCtrl+]'), click: () => send('next-repo') },
+      { label: t('menu.window.prev-repo'), accelerator: accelerator('CmdOrCtrl+['), click: () => send('prev-repo') },
       { type: 'separator' },
       { role: 'minimize', label: t('menu.window.minimize') },
       { role: 'zoom', label: t('menu.window.zoom') },
@@ -123,7 +144,7 @@ export function buildAppMenu(): void {
     // No menu accelerator: Electron requires a modifier on accelerators,
     // and bare `?` is rejected at registration. The renderer's keyboard
     // hook handles `?` directly so the binding still works.
-    submenu: [{ label: t('menu.help.shortcuts'), click: () => send('show-help') }],
+    submenu: [{ label: t('menu.help.shortcuts'), enabled: !shortcutsDisabled, click: () => send('show-help') }],
   }
 
   const template: MenuItemConstructorOptions[] = [
@@ -134,7 +155,7 @@ export function buildAppMenu(): void {
             submenu: [
               { role: 'about' as const, label: t('menu.app.about', { name }) },
               { type: 'separator' as const },
-              { label: t('menu.app.settings'), accelerator: 'Cmd+,', click: () => send('open-settings') },
+              { label: t('menu.app.settings'), accelerator: accelerator('Cmd+,'), click: () => send('open-settings') },
               { type: 'separator' as const },
               { role: 'services' as const, label: t('menu.app.services') },
               { type: 'separator' as const },

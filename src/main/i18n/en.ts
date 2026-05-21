@@ -102,6 +102,8 @@ export const en = {
   'empty.body.middle':
     ' in the tab strip above to add a git repository. You can keep multiple repositories open and switch between them there. Press ',
   'empty.body.after': ' for shortcuts.',
+  'empty.body.after-shortcuts-disabled':
+    ' in the tab strip above to add a git repository. You can keep multiple repositories open and switch between them there.',
 
   // ---- Drag and drop ------------------------------------------------------
   'drop.title': 'Drop to open repository',
@@ -262,6 +264,10 @@ export const en = {
   // ---- Errors / banners ---------------------------------------------------
   'error.not-git-repo': 'Not a git repository',
   'error.failed-read-repo': 'Failed to read repository',
+  'error.git-not-found': 'Git not found',
+  'error.path-not-found': 'Path not found',
+  'error.path-not-directory': 'Path is not a folder',
+  'error.path-permission-denied': 'Permission denied',
   'error.open-github-no-origin': 'No origin remote',
   'error.invalid-url': 'Invalid URL',
   'error.invalid-path': 'Invalid path',
@@ -299,12 +305,23 @@ export const en = {
   'settings.lang.ko': '한국어',
   'settings.lang.ja': '日本語',
   'settings.fetch': 'Auto-fetch',
-  'settings.fetch-hint': 'Background `git fetch` for the active repository. Disable on slow networks.',
+  'settings.fetch-hint': 'Background fetch.',
   'settings.fetch.off': 'Off',
   'settings.fetch.30s': '30 sec',
   'settings.fetch.1m': '1 min',
   'settings.fetch.5m': '5 min',
   'settings.fetch.15m': '15 min',
+  'settings.shortcuts': 'Keyboard shortcuts',
+  'settings.shortcuts-hint': 'Turn off shortcuts or change the wake shortcut.',
+  'settings.shortcuts-disable-all': 'Disable all shortcuts',
+  'settings.global-shortcut': 'Global shortcut',
+  'settings.global-shortcut-hint': 'Press a combo. Esc cancels.',
+  'settings.global-shortcut-disabled-hint': 'Saved, currently off.',
+  'settings.global-shortcut-record': 'Change global shortcut',
+  'settings.global-shortcut-recording': 'Press keys…',
+  'settings.global-shortcut-reset': 'Reset',
+  'settings.global-shortcut-conflict': 'Registration failed. It may be in use.',
+  'settings.global-shortcut-invalid': 'Use Command, Control, or Option with a key.',
 
   // ---- Help overlay -------------------------------------------------------
   'help.title': 'Keyboard shortcuts',

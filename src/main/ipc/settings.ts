@@ -1,5 +1,5 @@
 // Settings IPC. Exposes the subset of `settings.ts` that the renderer
-// needs — theme pref + fetch interval + session state.
+// needs — theme pref + fetch interval + shortcuts + session state.
 // Theme has its own `theme:*` channel pair (set + broadcast) defined in
 // `ipc/theme.ts`; here we expose the simpler one-shot setters.
 //
@@ -16,9 +16,13 @@ import {
   loadSettings,
   onSettingsWriteError,
   setFetchInterval,
+  setGlobalShortcut,
   setSession,
+  setShortcutsDisabled,
   type SessionState,
 } from '#/main/settings.ts'
+import { isGlobalShortcutRegistered, replaceGlobalShortcut, syncGlobalShortcuts } from '#/main/shortcuts.ts'
+import { parseGlobalShortcut } from '#/shared/accelerator.ts'
 
 export function wireSettingsIpc(): void {
   // Hydrate the renderer at boot. The full settings blob is small
@@ -28,6 +32,9 @@ export function wireSettingsIpc(): void {
     return {
       theme: s.theme,
       fetchIntervalSec: s.fetchIntervalSec,
+      shortcutsDisabled: s.shortcutsDisabled,
+      globalShortcut: s.globalShortcut,
+      globalShortcutRegistered: isGlobalShortcutRegistered(),
       session: s.session,
       recentRepos: s.recentRepos,
     }
@@ -37,6 +44,27 @@ export function wireSettingsIpc(): void {
     if (typeof sec !== 'number') return
     const clamped = await setFetchInterval(sec)
     broadcastFetchInterval(clamped)
+  })
+
+  ipcMain.handle('settings:set-shortcuts-disabled', async (_e, disabled: boolean) => {
+    if (typeof disabled !== 'boolean') return
+    const saved = await setShortcutsDisabled(disabled)
+    const s = await loadSettings()
+    syncGlobalShortcuts(saved, s.globalShortcut)
+    await rebuildMenu()
+    broadcastShortcutsDisabled(saved)
+    broadcastGlobalShortcut(s.globalShortcut)
+  })
+
+  ipcMain.handle('settings:set-global-shortcut', async (_e, accelerator: string) => {
+    const parsed = parseGlobalShortcut(accelerator)
+    const s = await loadSettings()
+    if (!parsed) return globalShortcutPayload(s.globalShortcut)
+    const registered = s.shortcutsDisabled || replaceGlobalShortcut(false, s.globalShortcut, parsed)
+    if (!registered && !s.shortcutsDisabled) return globalShortcutPayload(s.globalShortcut)
+    const saved = await setGlobalShortcut(parsed)
+    broadcastGlobalShortcut(saved)
+    return globalShortcutPayload(saved)
   })
 
   ipcMain.handle('settings:save-session', async (_e, session: SessionState) => {
@@ -83,6 +111,23 @@ function broadcastFetchInterval(sec: number): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) win.webContents.send('app:fetch-interval-changed', sec)
   }
+}
+
+function broadcastShortcutsDisabled(disabled: boolean): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send('app:shortcuts-disabled-changed', disabled)
+  }
+}
+
+function broadcastGlobalShortcut(accelerator: string): void {
+  const payload = globalShortcutPayload(accelerator)
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send('app:global-shortcut-changed', payload)
+  }
+}
+
+function globalShortcutPayload(accelerator: string): { accelerator: string; registered: boolean } {
+  return { accelerator, registered: isGlobalShortcutRegistered() }
 }
 
 async function rebuildMenu(): Promise<void> {

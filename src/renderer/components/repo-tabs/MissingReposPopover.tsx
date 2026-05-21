@@ -8,21 +8,29 @@ import {
   PopoverTrigger,
 } from '#/renderer/components/ui/popover.tsx'
 import { tildify } from '#/renderer/lib/paths.ts'
+import { useT } from '#/renderer/stores/i18n.ts'
+import type { MissingRepo } from '#/renderer/stores/repos/types.ts'
 
 interface MissingReposPopoverProps {
-  missing: string[]
+  missing: MissingRepo[]
   title: string
   dismissLabel: string
   onDismiss: () => void
 }
 
 export function MissingReposPopover({ missing, title, dismissLabel, onDismiss }: MissingReposPopoverProps) {
+  const t = useT()
   if (missing.length === 0) return null
 
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 shrink-0 gap-1 text-warning hover:text-warning">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 shrink-0 gap-1 text-warning hover:text-warning"
+          aria-label={title}
+        >
           <AlertCircle size={12} />
           {missing.length}
         </Button>
@@ -34,16 +42,14 @@ export function MissingReposPopover({ missing, title, dismissLabel, onDismiss }:
             {title}
           </PopoverTitle>
         </PopoverHeader>
-        <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto scroll-thin">
-          {missing.map((p) => {
-            const displayPath = tildify(p)
+        <ul className="mt-2 max-h-56 space-y-1.5 overflow-y-auto scroll-thin">
+          {missing.map((entry) => {
+            const displayPath = tildify(entry.path)
+            const reason = formatReason(entry.reason, t)
             return (
-              <li
-                key={p}
-                className="truncate rounded-sm bg-muted px-1.5 py-1 font-mono text-[11px] text-muted-foreground"
-                title={displayPath}
-              >
-                {displayPath}
+              <li key={entry.path} className="rounded-sm bg-muted px-1.5 py-1" title={`${displayPath}\n${reason}`}>
+                <div className="truncate font-mono text-[11px] text-muted-foreground">{displayPath}</div>
+                <div className="mt-0.5 truncate text-[11px] text-warning">{reason}</div>
               </li>
             )
           })}
@@ -54,4 +60,8 @@ export function MissingReposPopover({ missing, title, dismissLabel, onDismiss }:
       </PopoverContent>
     </Popover>
   )
+}
+
+function formatReason(reason: string, t: (key: string) => string): string {
+  return reason.startsWith('error.') ? t(reason) : reason
 }

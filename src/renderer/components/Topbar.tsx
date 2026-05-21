@@ -8,6 +8,7 @@ import { useT } from '#/renderer/stores/i18n.ts'
 import { Tip } from '#/renderer/components/Tip.tsx'
 import { Logo } from '#/renderer/components/Logo.tsx'
 import { Button } from '#/renderer/components/ui/button.tsx'
+import { useSettingsStore } from '#/renderer/stores/settings.ts'
 
 interface Props {
   onOpenSettings: () => void
@@ -17,6 +18,7 @@ interface Props {
 
 export function Topbar({ onOpenSettings, onShowDependencies, onShowHelp }: Props) {
   const t = useT()
+  const shortcutsDisabled = useSettingsStore((s) => s.shortcutsDisabled)
 
   return (
     <div className="topbar relative flex h-10 items-center gap-2 border-b border-border bg-background text-sm">
@@ -41,13 +43,20 @@ export function Topbar({ onOpenSettings, onShowDependencies, onShowHelp }: Props
           <PackageCheck />
         </Button>
       </Tip>
-      <Tip label={t('topbar.help')}>
-        <Button variant="ghost" size="icon" onClick={onShowHelp} aria-label={t('topbar.help')}>
-          <Keyboard />
-        </Button>
-      </Tip>
-      <Tip label={t('topbar.settings')}>
-        <Button variant="ghost" size="icon" onClick={onOpenSettings} aria-label={t('topbar.settings')}>
+      {!shortcutsDisabled && (
+        <Tip label={t('topbar.help')}>
+          <Button variant="ghost" size="icon" onClick={onShowHelp} aria-label={t('topbar.help')}>
+            <Keyboard />
+          </Button>
+        </Tip>
+      )}
+      <Tip label={shortcutsDisabled ? t('settings.title') : t('topbar.settings')}>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onOpenSettings}
+          aria-label={shortcutsDisabled ? t('settings.title') : t('topbar.settings')}
+        >
           <Settings />
         </Button>
       </Tip>

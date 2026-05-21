@@ -3,6 +3,7 @@
 // (single preload bridge) but a malformed message shouldn't crash main.
 
 import { ipcMain, dialog, BrowserWindow } from 'electron'
+import { promises as fs } from 'node:fs'
 import { getMainWindow } from '#/main/window.ts'
 import {
   checkoutBranch,
@@ -25,6 +26,7 @@ import { getBranchPullRequests } from '#/main/git/pull-requests.ts'
 import { getCommitFileStats, getCommitMeta } from '#/main/git/log.ts'
 import { PROTECTED_BRANCHES, type ExecResult } from '#/shared/git-types.ts'
 import { isValidAbsolutePath, isValidBranch, isValidCwd } from '#/main/ipc/validation.ts'
+import { checkGitAvailable } from '#/main/git/helper.ts'
 
 const GIT_HASH_RE = /^[0-9a-fA-F]{7,64}$/
 
@@ -98,10 +100,15 @@ export function wireRepoIpc(): void {
 
   // ---- Repo metadata ------------------------------------------------------
   ipcMain.handle('repo:probe', async (_e, cwd: string) => {
-    if (!isValidCwd(cwd)) return { ok: false }
+    if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-path' }
+    const gitAvailable = await checkGitAvailable()
+    if (!gitAvailable.ok) return gitAvailable
+    const readable = await probeReadableDirectory(cwd)
+    if (!readable.ok) return readable
     const ok = await isGitRepo(cwd)
-    if (!ok) return { ok: false }
+    if (!ok) return { ok: false, message: 'error.not-git-repo' }
     const root = await getRepoRoot(cwd)
+    if (!root) return { ok: false, message: 'error.failed-read-repo' }
     const name = await getRepoName(cwd)
     return { ok: true, root, name }
   })
@@ -352,4 +359,18 @@ export function wireRepoIpc(): void {
     ctrl.ctrl.abort()
     return true
   })
+}
+
+async function probeReadableDirectory(cwd: string): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    const stat = await fs.stat(cwd)
+    if (!stat.isDirectory()) return { ok: false, message: 'error.path-not-directory' }
+    await fs.access(cwd, fs.constants.R_OK)
+    return { ok: true }
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code
+    if (code === 'ENOENT' || code === 'ENOTDIR') return { ok: false, message: 'error.path-not-found' }
+    if (code === 'EACCES' || code === 'EPERM') return { ok: false, message: 'error.path-permission-denied' }
+    return { ok: false, message: err instanceof Error ? err.message : 'error.failed-read-repo' }
+  }
 }

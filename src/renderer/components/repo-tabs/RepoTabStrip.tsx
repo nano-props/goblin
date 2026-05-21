@@ -16,6 +16,7 @@ import { Tip } from '#/renderer/components/Tip.tsx'
 import { RepoTab } from '#/renderer/components/repo-tabs/RepoTab.tsx'
 import { MissingReposPopover } from '#/renderer/components/repo-tabs/MissingReposPopover.tsx'
 import type { RepoTabStripLabels, RepoTabSummary } from '#/renderer/components/repo-tabs/types.ts'
+import type { MissingRepo } from '#/renderer/stores/repos/types.ts'
 
 const restrictToHorizontalTabs: Modifier = ({ transform }) => ({ ...transform, y: 0 })
 
@@ -36,7 +37,7 @@ function shouldShowInactiveSeparator({
 interface RepoTabStripProps {
   repos: RepoTabSummary[]
   activeId: string | null
-  missing: string[]
+  missing: MissingRepo[]
   labels: RepoTabStripLabels
   onActivate: (id: string) => void
   onClose: (id: string) => void

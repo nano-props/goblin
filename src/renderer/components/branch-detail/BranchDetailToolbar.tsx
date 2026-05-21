@@ -1,6 +1,7 @@
 import { ChevronDown, Loader2 } from 'lucide-react'
 import type { KeyboardEvent, MouseEvent } from 'react'
 import { useReposStore, type RepoState, type DetailTab } from '#/renderer/stores/repos.ts'
+import { useSettingsStore } from '#/renderer/stores/settings.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { Badge } from '#/renderer/components/ui/badge.tsx'
 import { Button } from '#/renderer/components/ui/button.tsx'
@@ -33,6 +34,7 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
   const setDetailTab = useReposStore((s) => s.setDetailTab)
   const setDetailCollapsed = useReposStore((s) => s.setDetailCollapsed)
   const toggleDetailCollapsed = useReposStore((s) => s.toggleDetailCollapsed)
+  const shortcutsDisabled = useSettingsStore((s) => s.shortcutsDisabled)
   const ghosttyInstalled = useGhosttyInstalled()
   const vscodeInstalled = useVSCodeInstalled()
 
@@ -72,7 +74,15 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
         size="icon"
         onClick={toggleDetailCollapsed}
         aria-label={t(collapsed ? 'branch-detail.expand' : 'branch-detail.collapse')}
-        title={t(collapsed ? 'branch-detail.expand-title' : 'branch-detail.collapse-title')}
+        title={t(
+          shortcutsDisabled
+            ? collapsed
+              ? 'branch-detail.expand'
+              : 'branch-detail.collapse'
+            : collapsed
+              ? 'branch-detail.expand-title'
+              : 'branch-detail.collapse-title',
+        )}
         aria-expanded={!collapsed}
         aria-controls={collapsed ? undefined : contentId}
         className="size-7"

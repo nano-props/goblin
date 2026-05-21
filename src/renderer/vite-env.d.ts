@@ -3,6 +3,7 @@
 import type { BranchInfo, ExecResult, LogEntry, PullRequestInfo, WorktreeStatus } from '#/renderer/types.ts'
 import type {
   CommitDetail,
+  GlobalShortcutState,
   I18nPayload,
   LangPref,
   MenuAction,
@@ -21,6 +22,7 @@ interface ProbeResult {
   ok: boolean
   root?: string
   name?: string
+  message?: string
 }
 
 interface PullRequestEntry {
@@ -68,9 +70,13 @@ interface GblBridge {
   settings: {
     get: () => Promise<SettingsSnapshot>
     setFetchInterval: (sec: number) => Promise<void>
+    setShortcutsDisabled: (disabled: boolean) => Promise<void>
+    setGlobalShortcut: (accelerator: string) => Promise<GlobalShortcutState>
     addRecentRepo: (repoPath: string) => Promise<string[]>
     clearRecentRepos: () => Promise<void>
     onFetchIntervalChange: (cb: (sec: number) => void) => () => void
+    onShortcutsDisabledChange: (cb: (disabled: boolean) => void) => () => void
+    onGlobalShortcutChange: (cb: (state: GlobalShortcutState) => void) => () => void
     saveSession: (session: SessionState) => Promise<void>
     onWriteError: (cb: (message: string) => void) => () => void
   }

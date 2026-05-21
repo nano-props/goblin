@@ -1,6 +1,6 @@
 import { lastPathSegment } from '#/renderer/lib/paths.ts'
 import { emptyRepo, inFlightFetchById } from '#/renderer/stores/repos/helpers.ts'
-import type { OpenRepoResult, ReposGet, ReposSet } from '#/renderer/stores/repos/types.ts'
+import type { MissingRepo, OpenRepoResult, ReposGet, ReposSet } from '#/renderer/stores/repos/types.ts'
 
 export function createLifecycleActions(set: ReposSet, get: ReposGet) {
   return {
@@ -12,7 +12,7 @@ export function createLifecycleActions(set: ReposSet, get: ReposGet) {
         return { ok: false, message: err instanceof Error ? err.message : 'error.not-git-repo' }
       }
       if (!probe?.ok || !probe.root) {
-        return { ok: false, message: 'error.not-git-repo' }
+        return { ok: false, message: probe?.message ?? 'error.not-git-repo' }
       }
       const id = probe.root
       const name = probe.name ?? lastPathSegment(id)
@@ -81,25 +81,29 @@ export function createLifecycleActions(set: ReposSet, get: ReposGet) {
       // notice in the tab strip instead of wondering where their tabs went.
       interface ProbeResult {
         input: string
+        reason: string | null
         ok: { id: string; name: string } | null
       }
       const probes = await Promise.all(
         openRepos.map(async (p): Promise<ProbeResult> => {
           try {
             const probe = await window.gbl.probe(p)
-            if (!probe?.ok || !probe.root) return { input: p, ok: null }
+            if (!probe?.ok || !probe.root) return { input: p, reason: probe?.message ?? 'error.not-git-repo', ok: null }
             return {
               input: p,
+              reason: null,
               ok: { id: probe.root, name: probe.name ?? lastPathSegment(probe.root) },
             }
           } catch (err) {
             console.warn(`[session] probe failed for ${p}:`, err)
-            return { input: p, ok: null }
+            return { input: p, reason: err instanceof Error ? err.message : 'error.failed-read-repo', ok: null }
           }
         }),
       )
       const valid = probes.filter((x) => x.ok !== null).map((x) => x.ok!)
-      const missing = probes.filter((x) => x.ok === null).map((x) => x.input)
+      const missing: MissingRepo[] = probes
+        .filter((x) => x.ok === null)
+        .map((x) => ({ path: x.input, reason: x.reason ?? 'error.failed-read-repo' }))
 
       set((s) => {
         const repos = { ...s.repos }

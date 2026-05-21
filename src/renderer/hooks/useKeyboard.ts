@@ -12,6 +12,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useReposStore } from '#/renderer/stores/repos.ts'
+import { useSettingsStore } from '#/renderer/stores/settings.ts'
 import { isShortcutBlockingLayerOpen } from '#/renderer/lib/layers.ts'
 
 type BranchShortcutAction = 'pull' | 'push' | 'ghostty' | 'vscode' | 'github'
@@ -47,6 +48,7 @@ export function useKeyboard({ onShowHelp, isOverlayOpen }: Options) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (useSettingsStore.getState().shortcutsDisabled) return
       if (e.metaKey || e.ctrlKey || e.altKey) return
       if (isTypingTarget(e.target)) return
 

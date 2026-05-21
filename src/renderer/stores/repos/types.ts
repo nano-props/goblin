@@ -54,6 +54,11 @@ export interface RepoState {
   events: RepoEvent[]
 }
 
+export interface MissingRepo {
+  path: string
+  reason: string
+}
+
 export interface ReposStore {
   repos: Record<string, RepoState>
   order: string[]
@@ -66,7 +71,7 @@ export interface ReposStore {
    *  tab strip surfaces them so the user knows why their tabs didn't all
    *  come back, and offers a "forget" action to remove them from the
    *  saved session. */
-  missingFromSession: string[]
+  missingFromSession: MissingRepo[]
   detailCollapsed: boolean
 
   /** Add a repo to the store. By default also focuses it — pass

@@ -74,12 +74,24 @@ contextBridge.exposeInMainWorld('gbl', {
   settings: {
     get: () => safeInvoke('settings:get'),
     setFetchInterval: (sec) => safeInvoke('settings:set-fetch-interval', sec),
+    setShortcutsDisabled: (disabled) => safeInvoke('settings:set-shortcuts-disabled', disabled),
+    setGlobalShortcut: (accelerator) => safeInvoke('settings:set-global-shortcut', accelerator),
     addRecentRepo: (repoPath) => safeInvoke('settings:add-recent-repo', repoPath),
     clearRecentRepos: () => safeInvoke('settings:clear-recent-repos'),
     onFetchIntervalChange: (cb) => {
       const listener = (_event, sec) => cb(sec)
       ipcRenderer.on('app:fetch-interval-changed', listener)
       return () => ipcRenderer.off('app:fetch-interval-changed', listener)
+    },
+    onShortcutsDisabledChange: (cb) => {
+      const listener = (_event, disabled) => cb(disabled)
+      ipcRenderer.on('app:shortcuts-disabled-changed', listener)
+      return () => ipcRenderer.off('app:shortcuts-disabled-changed', listener)
+    },
+    onGlobalShortcutChange: (cb) => {
+      const listener = (_event, payload) => cb(payload)
+      ipcRenderer.on('app:global-shortcut-changed', listener)
+      return () => ipcRenderer.off('app:global-shortcut-changed', listener)
     },
     saveSession: (session) => safeInvoke('settings:save-session', session),
     onWriteError: (cb) => {

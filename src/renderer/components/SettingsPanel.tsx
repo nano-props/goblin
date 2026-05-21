@@ -1,10 +1,11 @@
-// Settings overlay — theme pref, language, auto-fetch interval.
+// Settings overlay — theme pref, language, auto-fetch interval, shortcuts.
 // Mounted unconditionally and gated by `open`; the modal itself
 // returns null when closed.
 
 import { Laptop, Moon, Sun } from 'lucide-react'
 import { Modal } from '#/renderer/components/Modal.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/renderer/components/ui/select.tsx'
+import { ShortcutSettings } from '#/renderer/components/settings/ShortcutSettings.tsx'
 import { useThemeStore } from '#/renderer/stores/theme.ts'
 import { useSettingsStore } from '#/renderer/stores/settings.ts'
 import { useI18nStore, useT } from '#/renderer/stores/i18n.ts'
@@ -68,30 +69,36 @@ export function SettingsPanel({ open, onClose }: Props) {
   }
 
   return (
-    <Modal open={open} title={t('settings.title')} onClose={onClose} widthClass="sm:max-w-sm">
-      <div className="space-y-6">
-        <Section label={t('settings.appearance')}>
-          <SettingsSelect
-            value={themePref}
-            options={themeOptions.map((o) => ({ value: o.value, label: t(o.labelKey), icon: o.icon }))}
-            onChange={saveThemePref}
-          />
-        </Section>
+    <Modal open={open} title={t('settings.title')} onClose={onClose}>
+      <div className="space-y-5">
+        <div className="grid grid-cols-3 gap-3">
+          <Section label={t('settings.appearance')}>
+            <SettingsSelect
+              value={themePref}
+              options={themeOptions.map((o) => ({ value: o.value, label: t(o.labelKey), icon: o.icon }))}
+              onChange={saveThemePref}
+            />
+          </Section>
 
-        <Section label={t('settings.lang')}>
-          <SettingsSelect
-            value={langPref}
-            options={langOptions.map((o) => ({ value: o.value, label: `${o.emoji} ${t(o.labelKey)}` }))}
-            onChange={saveLangPref}
-          />
-        </Section>
+          <Section label={t('settings.lang')}>
+            <SettingsSelect
+              value={langPref}
+              options={langOptions.map((o) => ({ value: o.value, label: `${o.emoji} ${t(o.labelKey)}` }))}
+              onChange={saveLangPref}
+            />
+          </Section>
 
-        <Section label={t('settings.fetch')} hint={t('settings.fetch-hint')}>
-          <SettingsSelect
-            value={fetchInterval}
-            options={intervalOptions.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
-            onChange={saveFetchInterval}
-          />
+          <Section label={t('settings.fetch')} hint={t('settings.fetch-hint')} hintPlacement="bottom">
+            <SettingsSelect
+              value={fetchInterval}
+              options={intervalOptions.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
+              onChange={saveFetchInterval}
+            />
+          </Section>
+        </div>
+
+        <Section label={t('settings.shortcuts')} hint={t('settings.shortcuts-hint')}>
+          <ShortcutSettings />
         </Section>
 
         <div className="flex items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted-foreground">
@@ -112,12 +119,23 @@ export function SettingsPanel({ open, onClose }: Props) {
   )
 }
 
-function Section({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Section({
+  label,
+  hint,
+  hintPlacement = 'top',
+  children,
+}: {
+  label: string
+  hint?: string
+  hintPlacement?: 'top' | 'bottom'
+  children: React.ReactNode
+}) {
   return (
     <div>
       <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
-      {hint && <div className="mb-2 text-xs text-muted-foreground">{hint}</div>}
+      {hint && hintPlacement === 'top' && <div className="mb-2 text-xs text-muted-foreground">{hint}</div>}
       {children}
+      {hint && hintPlacement === 'bottom' && <div className="mt-1 text-xs text-muted-foreground">{hint}</div>}
     </div>
   )
 }

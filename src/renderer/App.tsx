@@ -16,7 +16,7 @@
 //   - settings write-error toast (warns the user if prefs aren't
 //     persisting instead of silently dropping their changes)
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Toaster } from '#/renderer/components/ui/sonner.tsx'
 import { Topbar } from '#/renderer/components/Topbar.tsx'
 import { ErrorBoundary } from '#/renderer/components/ErrorBoundary.tsx'
@@ -28,6 +28,7 @@ import { HelpOverlay } from '#/renderer/components/HelpOverlay.tsx'
 import { DependenciesOverlay } from '#/renderer/components/DependenciesOverlay.tsx'
 import { RepoDropOverlay } from '#/renderer/components/RepoDropOverlay.tsx'
 import { useReposStore } from '#/renderer/stores/repos.ts'
+import { useSettingsStore } from '#/renderer/stores/settings.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { useKeyboard } from '#/renderer/hooks/useKeyboard.ts'
 import { useRepoDrop } from '#/renderer/hooks/useRepoDrop.ts'
@@ -41,11 +42,14 @@ export function App() {
   const activeId = useReposStore((s) => s.activeId)
   const sessionReady = useReposStore((s) => s.sessionReady)
   const detailCollapsed = useReposStore((s) => s.detailCollapsed)
+  const shortcutsDisabled = useSettingsStore((s) => s.shortcutsDisabled)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const [dependenciesOpen, setDependenciesOpen] = useState(false)
   const openSettings = useCallback(() => setSettingsOpen(true), [])
-  const showHelp = useCallback(() => setHelpOpen(true), [])
+  const showHelp = useCallback(() => {
+    if (!shortcutsDisabled) setHelpOpen(true)
+  }, [shortcutsDisabled])
   const showDependencies = useCallback(() => setDependenciesOpen(true), [])
   // Shared gate: any modal overlay (Settings, Help) suppresses both
   // keyboard shortcuts and the file-drop dashed border. useKeyboard
@@ -53,6 +57,10 @@ export function App() {
   // from the store inside the hook itself.
   const modalOpen = settingsOpen || helpOpen || dependenciesOpen
   const repoDrop = useRepoDrop({ blocked: modalOpen })
+
+  useEffect(() => {
+    if (shortcutsDisabled) setHelpOpen(false)
+  }, [shortcutsDisabled])
 
   useAppBootstrap()
   useSessionPersistence()
@@ -109,6 +117,7 @@ export function App() {
 
 function EmptyState() {
   const t = useT()
+  const shortcutsDisabled = useSettingsStore((s) => s.shortcutsDisabled)
   // Body is rendered as React fragments rather than dangerouslySet
   // because the dictionary text contains a placeholder for "Open" and
   // a kbd chip — both of which are easier to express as real elements
@@ -120,9 +129,15 @@ function EmptyState() {
         <div className="text-xs text-muted-foreground leading-relaxed">
           {t('empty.body.before')}
           <span className="text-foreground">{t('empty.body.open-label')}</span>
-          {t('empty.body.middle')}
-          <span className="kbd">?</span>
-          {t('empty.body.after')}
+          {shortcutsDisabled ? (
+            t('empty.body.after-shortcuts-disabled')
+          ) : (
+            <>
+              {t('empty.body.middle')}
+              <span className="kbd">?</span>
+              {t('empty.body.after')}
+            </>
+          )}
         </div>
       </div>
     </div>

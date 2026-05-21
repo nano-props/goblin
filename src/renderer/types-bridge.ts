@@ -27,8 +27,16 @@ export interface SessionState {
 export interface SettingsSnapshot {
   theme: ThemePref
   fetchIntervalSec: number
+  shortcutsDisabled: boolean
+  globalShortcut: string
+  globalShortcutRegistered: boolean
   session: SessionState
   recentRepos: string[]
+}
+
+export interface GlobalShortcutState {
+  accelerator: string
+  registered: boolean
 }
 
 export type MenuAction =

@@ -100,6 +100,8 @@ export const ja: Record<DictKey, string> = {
   'empty.body.middle':
     ' から git リポジトリを追加できます。複数のリポジトリを開いて、上部タブバーで切り替えられます。 ',
   'empty.body.after': ' でショートカットを表示します。',
+  'empty.body.after-shortcuts-disabled':
+    ' から git リポジトリを追加できます。複数のリポジトリを開いて、上部タブバーで切り替えられます。',
 
   // ---- Drag and drop -----------------------------------------------------
   'drop.title': 'ドロップしてリポジトリを開く',
@@ -261,6 +263,10 @@ export const ja: Record<DictKey, string> = {
   // ---- Errors / banners --------------------------------------------------
   'error.not-git-repo': 'git リポジトリではありません',
   'error.failed-read-repo': 'リポジトリの読み込みに失敗しました',
+  'error.git-not-found': 'Git が見つかりません',
+  'error.path-not-found': 'パスが見つかりません',
+  'error.path-not-directory': 'フォルダではありません',
+  'error.path-permission-denied': '権限がありません',
   'error.open-github-no-origin': 'origin リモートがありません',
   'error.invalid-url': '無効な URL',
   'error.invalid-path': '無効なパス',
@@ -299,13 +305,23 @@ export const ja: Record<DictKey, string> = {
   'settings.lang.ko': '한국어',
   'settings.lang.ja': '日本語',
   'settings.fetch': '自動 fetch',
-  'settings.fetch-hint':
-    'アクティブなリポジトリのバックグラウンド `git fetch`。低速なネットワークでは無効化してください。',
+  'settings.fetch-hint': 'バックグラウンド fetch。',
   'settings.fetch.off': 'オフ',
   'settings.fetch.30s': '30 秒',
   'settings.fetch.1m': '1 分',
   'settings.fetch.5m': '5 分',
   'settings.fetch.15m': '15 分',
+  'settings.shortcuts': 'キーボードショートカット',
+  'settings.shortcuts-hint': 'ショートカットをオフ、または Goblin の呼び出しキーを変更します。',
+  'settings.shortcuts-disable-all': 'すべてのショートカットを無効にする',
+  'settings.global-shortcut': 'グローバルショートカット',
+  'settings.global-shortcut-hint': '新しい組み合わせを押してください。Esc でキャンセル。',
+  'settings.global-shortcut-disabled-hint': '保存済み、現在はオフ。',
+  'settings.global-shortcut-record': 'グローバルショートカットを変更',
+  'settings.global-shortcut-recording': 'キーを押してください…',
+  'settings.global-shortcut-reset': 'リセット',
+  'settings.global-shortcut-conflict': '登録できません。使用中の可能性があります。',
+  'settings.global-shortcut-invalid': 'Command、Control、Option とキーを組み合わせてください。',
 
   // ---- Help overlay ------------------------------------------------------
   'help.title': 'キーボードショートカット',

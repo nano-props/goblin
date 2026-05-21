@@ -1,5 +1,5 @@
-import { app, globalShortcut } from 'electron'
-import { activateMainWindow, createMainWindow, getMainWindow } from '#/main/window.ts'
+import { app } from 'electron'
+import { createMainWindow, getMainWindow } from '#/main/window.ts'
 import { initTheme } from '#/main/theme.ts'
 import { loadSettings, flushSettings } from '#/main/settings.ts'
 import { buildAppMenu } from '#/main/menu.ts'
@@ -10,6 +10,7 @@ import { wireSettingsIpc } from '#/main/ipc/settings.ts'
 import { wireMenuIpc } from '#/main/ipc/menu.ts'
 import { wireI18nIpc } from '#/main/ipc/i18n.ts'
 import { wireOpenersIpc } from '#/main/ipc/openers.ts'
+import { syncGlobalShortcuts, unregisterAppShortcuts } from '#/main/shortcuts.ts'
 
 async function main(): Promise<void> {
   if (!app.requestSingleInstanceLock()) {
@@ -32,7 +33,7 @@ async function main(): Promise<void> {
   })
 
   app.on('will-quit', () => {
-    globalShortcut.unregister('Alt+G')
+    unregisterAppShortcuts()
   })
 
   app.on('activate', () => {
@@ -75,9 +76,7 @@ async function main(): Promise<void> {
   wireOpenersIpc()
 
   buildAppMenu()
-  globalShortcut.register('Alt+G', () => {
-    void activateMainWindow()
-  })
+  syncGlobalShortcuts(settings.shortcutsDisabled, settings.globalShortcut)
 
   await createMainWindow()
 }

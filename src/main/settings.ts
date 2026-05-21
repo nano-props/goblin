@@ -11,6 +11,7 @@
 import { app } from 'electron'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
+import { DEFAULT_GLOBAL_SHORTCUT, normalizeGlobalShortcut } from '#/shared/accelerator.ts'
 
 export type ThemePref = 'auto' | 'light' | 'dark'
 export type LangPref = 'auto' | 'en' | 'zh' | 'ko' | 'ja'
@@ -44,6 +45,8 @@ export interface Settings {
   lang: LangPref
   /** Auto-fetch interval in seconds for the active repo. 0 = disabled. */
   fetchIntervalSec: number
+  shortcutsDisabled: boolean
+  globalShortcut: string
   windowBounds: WindowBounds | null
   session: SessionState
   recentRepos: string[]
@@ -54,6 +57,8 @@ const DEFAULTS: Settings = {
   theme: 'auto',
   lang: 'auto',
   fetchIntervalSec: 60,
+  shortcutsDisabled: false,
+  globalShortcut: DEFAULT_GLOBAL_SHORTCUT,
   windowBounds: null,
   session: { openRepos: [], activeRepo: null, detailCollapsed: DEFAULT_SESSION_DETAIL_COLLAPSED },
   recentRepos: [],
@@ -163,6 +168,8 @@ export async function loadSettings(): Promise<Settings> {
       theme: normalizeThemePref(parsed.theme),
       lang: normalizeLangPref(parsed.lang),
       fetchIntervalSec: normalizeFetchInterval(parsed.fetchIntervalSec),
+      shortcutsDisabled: parsed.shortcutsDisabled === true,
+      globalShortcut: normalizeGlobalShortcut(parsed.globalShortcut),
       windowBounds: normalizeWindowBounds(parsed.windowBounds),
       session: normalizeSession(parsed.session),
       recentRepos: normalizeRecentRepos(parsed.recentRepos),
@@ -177,6 +184,14 @@ export async function loadSettings(): Promise<Settings> {
 
 export function getRecentRepos(): string[] {
   return cache?.recentRepos ?? []
+}
+
+export function getShortcutsDisabled(): boolean {
+  return cache?.shortcutsDisabled ?? DEFAULTS.shortcutsDisabled
+}
+
+export function getGlobalShortcut(): string {
+  return cache?.globalShortcut ?? DEFAULTS.globalShortcut
 }
 
 function scheduleWrite(): void {
@@ -269,6 +284,23 @@ export async function setFetchInterval(sec: number): Promise<number> {
   s.fetchIntervalSec = clamped
   scheduleWrite()
   return clamped
+}
+
+export async function setShortcutsDisabled(disabled: boolean): Promise<boolean> {
+  const s = await loadSettings()
+  if (s.shortcutsDisabled === disabled) return disabled
+  s.shortcutsDisabled = disabled
+  scheduleWrite()
+  return disabled
+}
+
+export async function setGlobalShortcut(accelerator: string): Promise<string> {
+  const s = await loadSettings()
+  const normalized = normalizeGlobalShortcut(accelerator)
+  if (s.globalShortcut === normalized) return normalized
+  s.globalShortcut = normalized
+  scheduleWrite()
+  return normalized
 }
 
 export async function setWindowBounds(bounds: WindowBounds): Promise<void> {

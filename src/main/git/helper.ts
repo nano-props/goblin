@@ -16,6 +16,26 @@ export interface GitOptions {
   signal?: AbortSignal
 }
 
+export type GitAvailability = { ok: true } | { ok: false; message: string }
+
+let gitAvailabilityCache: Promise<GitAvailability> | null = null
+
+export function checkGitAvailable(): Promise<GitAvailability> {
+  gitAvailabilityCache ??= probeGitAvailable()
+  return gitAvailabilityCache
+}
+
+async function probeGitAvailable(): Promise<GitAvailability> {
+  try {
+    await git(process.cwd(), ['--version'])
+    return { ok: true }
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code
+    if (code === 'ENOENT') return { ok: false, message: 'error.git-not-found' }
+    return { ok: false, message: err instanceof Error ? err.message : 'error.failed-read-repo' }
+  }
+}
+
 /**
  * Run a git command, returning stdout. Throws on non-zero exit, timeout,
  * or abort. Wraps `child_process.execFile` so we can attach an
