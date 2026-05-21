@@ -11,7 +11,7 @@
 
 import { useShallow } from 'zustand/react/shallow'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
-import { useReposStore } from '#/renderer/stores/repos.ts'
+import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { RepoTabStrip } from '#/renderer/components/repo-tabs/RepoTabStrip.tsx'
 import type { RepoTabSummary } from '#/renderer/components/repo-tabs/types.ts'

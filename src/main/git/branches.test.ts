@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { markDefaultBranch, markMergedToDefault, prioritizeDefaultBranch } from '#/main/git/branches.ts'
-import type { BranchInfo } from '#/main/git/types.ts'
+import type { BranchInfo } from '#/shared/git-types.ts'
 
 function branch(name: string): BranchInfo {
   return {

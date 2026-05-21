@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
-import type { RepoState } from '#/renderer/stores/repos.ts'
+import type { RepoState } from '#/renderer/stores/repos/types.ts'
 import { Button } from '#/renderer/components/ui/button.tsx'
 import { useBranchActionItems, type BranchActionItem } from '#/renderer/hooks/useBranchActionItems.ts'
 import type { BranchActionOp } from '#/renderer/hooks/useBranchActions.tsx'

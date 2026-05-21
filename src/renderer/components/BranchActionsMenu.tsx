@@ -1,5 +1,5 @@
 import { ChevronDown, Loader2 } from 'lucide-react'
-import type { RepoState } from '#/renderer/stores/repos.ts'
+import type { RepoState } from '#/renderer/stores/repos/types.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { Button } from '#/renderer/components/ui/button.tsx'
 import {

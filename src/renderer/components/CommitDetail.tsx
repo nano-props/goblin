@@ -5,7 +5,7 @@
 
 import { useEffect } from 'react'
 import { ArrowLeft, FileText, FileWarning } from 'lucide-react'
-import { useReposStore } from '#/renderer/stores/repos.ts'
+import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { useI18nStore, useT } from '#/renderer/stores/i18n.ts'
 import { formatRelativeTime } from '#/renderer/lib/dates.ts'
 import { isShortcutBlockingLayerOpen } from '#/renderer/lib/layers.ts'

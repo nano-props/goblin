@@ -4,7 +4,7 @@
 // (or click) opens the commit detail overlay.
 
 import { useEffect, useRef } from 'react'
-import { useReposStore } from '#/renderer/stores/repos.ts'
+import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { useI18nStore, useT } from '#/renderer/stores/i18n.ts'
 import { EmptyState } from '#/renderer/components/Layout.tsx'
 import { cn } from '#/renderer/lib/cn.ts'

@@ -1,6 +1,6 @@
 import { git, gitResultWithOptions } from '#/main/git/helper.ts'
 import { parseStatus, parseWorktrees } from '#/main/git/parsers.ts'
-import type { ExecResult, WorktreeInfo } from '#/main/git/types.ts'
+import type { ExecResult, WorktreeInfo } from '#/shared/git-types.ts'
 
 const WORKTREE_STATUS_CONCURRENCY = 16
 

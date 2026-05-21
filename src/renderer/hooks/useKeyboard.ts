@@ -11,7 +11,7 @@
 // open would stack the Help modal on top.
 
 import { useEffect, useRef } from 'react'
-import { useReposStore } from '#/renderer/stores/repos.ts'
+import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { useSettingsStore } from '#/renderer/stores/settings.ts'
 import { isShortcutBlockingLayerOpen } from '#/renderer/lib/layers.ts'
 

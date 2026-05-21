@@ -18,6 +18,7 @@ const config: Configuration = {
     'src/shared/**/*.ts',
     'dist/renderer/**/*',
     'package.json',
+    '!src/**/*.test.ts',
     '!**/*.map',
   ],
   mac: {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { execFileSync } from 'node:child_process'
+import { execaSync } from 'execa'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -8,7 +8,7 @@ import { pullBranch } from '#/main/git/remote.ts'
 let tmp: string | null = null
 
 function git(cwd: string, ...args: string[]): string {
-  return execFileSync('git', args, { cwd, encoding: 'utf-8' }).trim()
+  return execaSync('git', args, { cwd }).stdout.trim()
 }
 
 function initRepo(): { repo: string; remote: string } {
@@ -16,15 +16,15 @@ function initRepo(): { repo: string; remote: string } {
   const remote = path.join(tmp, 'remote.git')
   const seed = path.join(tmp, 'seed')
   const repo = path.join(tmp, 'repo')
-  execFileSync('git', ['init', '--bare', remote], { stdio: 'ignore' })
-  execFileSync('git', ['init', seed], { stdio: 'ignore' })
+  execaSync('git', ['init', '--bare', remote], { stdio: 'ignore' })
+  execaSync('git', ['init', seed], { stdio: 'ignore' })
   git(seed, 'config', 'user.email', 'test@example.com')
   git(seed, 'config', 'user.name', 'Test User')
   writeFileSync(path.join(seed, 'README.md'), 'hello\n')
   git(seed, 'add', 'README.md')
   git(seed, 'commit', '-m', 'initial')
   git(seed, 'push', remote, 'HEAD:main')
-  execFileSync('git', ['clone', '-b', 'main', remote, repo], { stdio: 'ignore' })
+  execaSync('git', ['clone', '-b', 'main', remote, repo], { stdio: 'ignore' })
   git(repo, 'config', 'user.email', 'test@example.com')
   git(repo, 'config', 'user.name', 'Test User')
   return { repo, remote }

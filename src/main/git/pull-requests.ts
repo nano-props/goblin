@@ -1,6 +1,6 @@
-import { execFile } from 'node:child_process'
+import { execa } from 'execa'
 import { isSafeBranchName } from '#/shared/refnames.ts'
-import type { PullRequestInfo } from '#/main/git/types.ts'
+import type { PullRequestInfo } from '#/shared/git-types.ts'
 
 const GH_TIMEOUT_MS = 8_000
 const GH_PATH = ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin'].join(':')
@@ -20,30 +20,17 @@ interface GhPullRequest {
 }
 
 function gh(cwd: string, args: string[]): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile(
-      'gh',
-      args,
-      {
-        cwd,
-        encoding: 'utf-8',
-        timeout: GH_TIMEOUT_MS,
-        maxBuffer: 1024 * 1024,
-        env: {
-          ...process.env,
-          GH_PROMPT_DISABLED: '1',
-          PATH: [process.env.PATH, GH_PATH].filter(Boolean).join(':'),
-        },
-      },
-      (error, stdout) => {
-        if (error) {
-          reject(error)
-          return
-        }
-        resolve(typeof stdout === 'string' ? stdout.trimEnd() : String(stdout))
-      },
-    )
-  })
+  return execa('gh', args, {
+    cwd,
+    timeout: GH_TIMEOUT_MS,
+    forceKillAfterDelay: 500,
+    maxBuffer: 1024 * 1024,
+    env: {
+      ...process.env,
+      GH_PROMPT_DISABLED: '1',
+      PATH: [process.env.PATH, GH_PATH].filter(Boolean).join(':'),
+    },
+  }).then(({ stdout }) => stdout.trimEnd())
 }
 
 export function normalizeGhPullRequest(pr: GhPullRequest): PullRequestInfo | null {

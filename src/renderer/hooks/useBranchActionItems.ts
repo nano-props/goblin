@@ -10,7 +10,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
-import type { RepoState } from '#/renderer/stores/repos.ts'
+import type { RepoState } from '#/renderer/stores/repos/types.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { useBranchActions, type BranchActionOp } from '#/renderer/hooks/useBranchActions.tsx'
 import type { BranchInfo } from '#/renderer/types.ts'

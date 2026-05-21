@@ -1,9 +1,11 @@
 import { app } from 'electron'
+import { execa } from 'execa'
 import { existsSync, statSync } from 'node:fs'
 import path from 'node:path'
-import { spawn, execFile } from 'node:child_process'
 
 const GHOSTTY_BUNDLE_ID = 'com.mitchellh.ghostty'
+const APPLE_SCRIPT_TIMEOUT_MS = 5_000
+const OPEN_TIMEOUT_MS = 10_000
 
 /** Whether Ghostty.app exists in either of the two locations macOS users
  *  install GUI apps to. Main probes on demand; the current renderer UI
@@ -46,12 +48,10 @@ function openInRunningGhostty(dir: string): Promise<boolean> {
       return "opened"
     end run
   `
-  return new Promise((resolve, reject) => {
-    execFile('/usr/bin/osascript', ['-e', script, dir], (err, stdout, stderr) => {
-      if (err) return reject(new Error(stderr || err.message))
-      resolve(stdout.trim() === 'opened')
-    })
-  })
+  return execa('/usr/bin/osascript', ['-e', script, dir], {
+    timeout: APPLE_SCRIPT_TIMEOUT_MS,
+    forceKillAfterDelay: 500,
+  }).then(({ stdout }) => stdout.trim() === 'opened')
 }
 
 // Open the given directory in Ghostty.
@@ -81,11 +81,15 @@ export async function openInGhostty(p: string): Promise<{ ok: boolean; message: 
   }
 
   try {
-    const child = spawn('open', ['-na', 'Ghostty.app', '--args', `--working-directory=${p}`], {
+    const child = execa('open', ['-na', 'Ghostty.app', '--args', `--working-directory=${p}`], {
       detached: true,
       stdio: 'ignore',
+      cleanup: false,
+      timeout: OPEN_TIMEOUT_MS,
+      forceKillAfterDelay: 500,
     })
     child.unref()
+    await child
     return { ok: true, message: p }
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : String(err) }

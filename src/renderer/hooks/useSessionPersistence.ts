@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useReposStore } from '#/renderer/stores/repos.ts'
+import { useReposStore } from '#/renderer/stores/repos/store.ts'
 
 export function useSessionPersistence() {
   const activeId = useReposStore((s) => s.activeId)

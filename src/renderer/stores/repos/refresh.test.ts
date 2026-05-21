@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
-import { useReposStore } from '#/renderer/stores/repos.ts'
+import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { emptyRepo } from '#/renderer/stores/repos/helpers.ts'
 import type { BranchInfo, PullRequestInfo } from '#/renderer/types.ts'
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useI18nStore } from '#/renderer/stores/i18n.ts'
-import { useReposStore } from '#/renderer/stores/repos.ts'
+import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { useSettingsStore } from '#/renderer/stores/settings.ts'
 import { useThemeStore } from '#/renderer/stores/theme.ts'
 

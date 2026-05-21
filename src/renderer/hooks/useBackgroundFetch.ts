@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useReposStore } from '#/renderer/stores/repos.ts'
+import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { useSettingsStore } from '#/renderer/stores/settings.ts'
 
 export function useBackgroundFetch() {

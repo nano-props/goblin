@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { toast } from 'sonner'
-import { useReposStore } from '#/renderer/stores/repos.ts'
+import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import type { RepoEvent } from '#/renderer/stores/repos/types.ts'
 

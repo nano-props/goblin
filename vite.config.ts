@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwind from '@tailwindcss/vite'
+import { execaSync } from 'execa'
 import path from 'node:path'
-import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 
 const pkg = JSON.parse(readFileSync(path.resolve(import.meta.dirname, 'package.json'), 'utf8')) as {
@@ -14,9 +14,7 @@ const pkg = JSON.parse(readFileSync(path.resolve(import.meta.dirname, 'package.j
 // hides the field in that case rather than showing a broken build tag.
 function commitHash(): string {
   try {
-    return execSync('git rev-parse --short HEAD', { cwd: import.meta.dirname })
-      .toString()
-      .trim()
+    return execaSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: import.meta.dirname }).stdout.trim()
   } catch {
     return ''
   }

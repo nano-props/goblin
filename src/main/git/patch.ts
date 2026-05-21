@@ -22,7 +22,7 @@
 // slow; we run untracked diffs with bounded concurrency and let the
 // caller's IPC timeout bound the whole thing.
 
-import { execFile } from 'node:child_process'
+import { execa } from 'execa'
 import { git } from '#/main/git/helper.ts'
 import { parseStatus } from '#/main/git/parsers.ts'
 
@@ -79,45 +79,17 @@ export async function getWorktreePatch(worktreePath: string, options?: { signal?
  *  the whole patch rather than silently dropping a file. */
 async function safeDiffNoIndex(cwd: string, relativePath: string, signal?: AbortSignal): Promise<string | null> {
   if (signal?.aborted) throw new Error('cancelled')
-  return new Promise((resolve, reject) => {
-    let grace: NodeJS.Timeout | null = null
-    const child = execFile(
-      'git',
-      ['diff', '--binary', '--no-index', '--', '/dev/null', relativePath],
-      { cwd, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024, timeout: 30_000 },
-      (error, stdout) => {
-        if (signal) signal.removeEventListener('abort', onAbort)
-        if (grace) clearTimeout(grace)
-        const out = typeof stdout === 'string' ? stdout.trimEnd() : String(stdout)
-        if (signal?.aborted) {
-          reject(new Error('cancelled'))
-          return
-        }
-        if (!error || (error as { code?: number }).code === 1) {
-          resolve(out)
-          return
-        }
-        resolve(null)
-      },
-    )
-    const onAbort = () => {
-      try {
-        child.kill('SIGTERM')
-      } catch {
-        /* already gone */
-      }
-      grace = setTimeout(() => {
-        try {
-          child.kill('SIGKILL')
-        } catch {
-          /* gone */
-        }
-      }, 500)
-      if ('unref' in grace && typeof grace.unref === 'function') grace.unref()
-    }
-    if (signal?.aborted) onAbort()
-    else if (signal) signal.addEventListener('abort', onAbort, { once: true })
+  const result = await execa('git', ['diff', '--binary', '--no-index', '--', '/dev/null', relativePath], {
+    cwd,
+    timeout: 30_000,
+    cancelSignal: signal,
+    forceKillAfterDelay: 500,
+    maxBuffer: 10 * 1024 * 1024,
+    reject: false,
   })
+  if (signal?.aborted || result.isCanceled) throw new Error('cancelled')
+  if (result.exitCode === 0 || result.exitCode === 1) return result.stdout.trimEnd()
+  return null
 }
 
 /** Run `fn` over `items` with at most `limit` invocations in flight at

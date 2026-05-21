@@ -1,4 +1,4 @@
-import type { RepoState } from '#/renderer/stores/repos.ts'
+import type { RepoState } from '#/renderer/stores/repos/types.ts'
 
 export type SelectedBranchDetail = ReturnType<typeof getSelectedBranchDetail>
 

@@ -1,6 +1,7 @@
 import { ChevronDown, Loader2 } from 'lucide-react'
 import type { KeyboardEvent, MouseEvent } from 'react'
-import { useReposStore, type RepoState, type DetailTab } from '#/renderer/stores/repos.ts'
+import { useReposStore } from '#/renderer/stores/repos/store.ts'
+import type { RepoState, DetailTab } from '#/renderer/stores/repos/types.ts'
 import { useSettingsStore } from '#/renderer/stores/settings.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { Badge } from '#/renderer/components/ui/badge.tsx'

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
-import { useReposStore, type RepoState } from '#/renderer/stores/repos.ts'
+import { useReposStore } from '#/renderer/stores/repos/store.ts'
+import type { RepoState } from '#/renderer/stores/repos/types.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { ConfirmDialog } from '#/renderer/components/ConfirmDialog.tsx'
 import { tildify } from '#/renderer/lib/paths.ts'

@@ -1,5 +1,5 @@
 import { git, gitResultWithOptions, NETWORK_TIMEOUT_MS } from '#/main/git/helper.ts'
-import type { ExecResult } from '#/main/git/types.ts'
+import type { ExecResult } from '#/shared/git-types.ts'
 import { getCurrentBranch } from '#/main/git/branches.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 
@@ -38,25 +38,29 @@ export async function getPullRequestUrl(cwd: string, branch: string): Promise<st
   return `${repoUrl}/pull/new/${encoded}`
 }
 
-async function hasOrigin(cwd: string): Promise<boolean> {
-  return hasRemote(cwd, 'origin')
+async function hasOrigin(cwd: string, signal?: AbortSignal): Promise<boolean> {
+  return hasRemote(cwd, 'origin', signal)
 }
 
-async function hasRemote(cwd: string, remote: string): Promise<boolean> {
+async function hasRemote(cwd: string, remote: string, signal?: AbortSignal): Promise<boolean> {
   try {
-    const url = await git(cwd, ['remote', 'get-url', '--', remote])
+    const url = await git(cwd, ['remote', 'get-url', '--', remote], { signal })
     return url.length > 0
   } catch {
     return false
   }
 }
 
-async function getUpstreamParts(cwd: string, branch: string): Promise<{ remote: string; branch: string } | null> {
+async function getUpstreamParts(
+  cwd: string,
+  branch: string,
+  signal?: AbortSignal,
+): Promise<{ remote: string; branch: string } | null> {
   if (!isSafeBranchName(branch)) return null
   try {
     const [remote, mergeRef] = await Promise.all([
-      git(cwd, ['config', '--get', `branch.${branch}.remote`]),
-      git(cwd, ['config', '--get', `branch.${branch}.merge`]),
+      git(cwd, ['config', '--get', `branch.${branch}.remote`], { signal }),
+      git(cwd, ['config', '--get', `branch.${branch}.merge`], { signal }),
     ])
     const remoteBranch = mergeRef.startsWith('refs/heads/') ? mergeRef.slice('refs/heads/'.length) : ''
     if (!remote || !remoteBranch || !isSafeBranchName(remoteBranch)) return null
@@ -67,7 +71,9 @@ async function getUpstreamParts(cwd: string, branch: string): Promise<{ remote: 
 }
 
 export async function fetchAll(cwd: string, signal?: AbortSignal): Promise<ExecResult> {
-  if (!(await hasOrigin(cwd))) return { ok: false, message: 'No origin remote configured' }
+  const origin = await hasOrigin(cwd, signal)
+  if (signal?.aborted) return { ok: false, message: 'cancelled' }
+  if (!origin) return { ok: false, message: 'No origin remote configured' }
   return gitResultWithOptions(cwd, { timeoutMs: NETWORK_TIMEOUT_MS, signal }, 'fetch', '--all', '--prune')
 }
 
@@ -81,13 +87,17 @@ export async function pullBranch(
   if (worktreePath) {
     return gitResultWithOptions(worktreePath, { timeoutMs: NETWORK_TIMEOUT_MS, signal }, 'pull', '--ff-only')
   }
-  const current = await getCurrentBranch(cwd)
+  const current = await getCurrentBranch(cwd, { signal })
+  if (signal?.aborted) return { ok: false, message: 'cancelled' }
   if (branch === current) {
     return gitResultWithOptions(cwd, { timeoutMs: NETWORK_TIMEOUT_MS, signal }, 'pull', '--ff-only')
   }
-  const target = await getUpstreamParts(cwd, branch)
+  const target = await getUpstreamParts(cwd, branch, signal)
+  if (signal?.aborted) return { ok: false, message: 'cancelled' }
   if (!target) return { ok: false, message: 'error.invalid-arguments' }
-  if (target.remote !== '.' && !(await hasRemote(cwd, target.remote))) {
+  const remoteExists = target.remote === '.' || (await hasRemote(cwd, target.remote, signal))
+  if (signal?.aborted) return { ok: false, message: 'cancelled' }
+  if (!remoteExists) {
     return { ok: false, message: `No ${target.remote} remote configured` }
   }
   return gitResultWithOptions(
@@ -102,6 +112,8 @@ export async function pullBranch(
 
 export async function pushBranch(cwd: string, branch: string, signal?: AbortSignal): Promise<ExecResult> {
   if (!isSafeBranchName(branch)) return { ok: false, message: 'error.invalid-arguments' }
-  if (!(await hasOrigin(cwd))) return { ok: false, message: 'No origin remote configured' }
+  const origin = await hasOrigin(cwd, signal)
+  if (signal?.aborted) return { ok: false, message: 'cancelled' }
+  if (!origin) return { ok: false, message: 'No origin remote configured' }
   return gitResultWithOptions(cwd, { timeoutMs: NETWORK_TIMEOUT_MS, signal }, 'push', '-u', 'origin', branch)
 }

@@ -22,7 +22,7 @@ import {
 } from '#/renderer/components/ui/dialog.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/renderer/components/ui/select.tsx'
 import { Button } from '#/renderer/components/ui/button.tsx'
-import type { RepoState } from '#/renderer/stores/repos.ts'
+import type { RepoState } from '#/renderer/stores/repos/types.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { defaultWorktreePath, tildify, untildify } from '#/renderer/lib/paths.ts'
 import { validateBranchName } from '#/shared/refnames.ts'

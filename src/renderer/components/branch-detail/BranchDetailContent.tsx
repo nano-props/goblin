@@ -1,6 +1,6 @@
 import { FolderTree } from 'lucide-react'
 import { useT } from '#/renderer/stores/i18n.ts'
-import type { RepoState } from '#/renderer/stores/repos.ts'
+import type { RepoState } from '#/renderer/stores/repos/types.ts'
 import { EmptyState } from '#/renderer/components/Layout.tsx'
 import { LogList } from '#/renderer/components/LogList.tsx'
 import { StatusList } from '#/renderer/components/StatusList.tsx'

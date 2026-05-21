@@ -2,7 +2,7 @@ import { Loader2 } from 'lucide-react'
 import { RepoActionsHeader } from '#/renderer/components/RepoActionsHeader.tsx'
 import { Toolbar, ToolbarTitle } from '#/renderer/components/Layout.tsx'
 import { useT } from '#/renderer/stores/i18n.ts'
-import { useReposStore } from '#/renderer/stores/repos.ts'
+import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { tildify } from '#/renderer/lib/paths.ts'
 
 interface Props {

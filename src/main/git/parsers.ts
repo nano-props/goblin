@@ -6,7 +6,7 @@
 // JSDoc comment; if a callsite changes the command (different format
 // string, removed flag), the parser must be updated in lockstep.
 
-import type { BranchInfo, LogEntry, StatusEntry, WorktreeInfo } from '#/main/git/types.ts'
+import type { BranchInfo, LogEntry, StatusEntry, WorktreeInfo } from '#/shared/git-types.ts'
 
 /** ASCII Unit Separator. Safe against subjects / author names / paths
  *  containing it. Used by both the branch and log format strings. */

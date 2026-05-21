@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { execFileSync } from 'node:child_process'
+import { execaSync } from 'execa'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -8,7 +8,7 @@ import { getWorktreePatch } from '#/main/git/patch.ts'
 let tmp: string | null = null
 
 function git(cwd: string, ...args: string[]) {
-  execFileSync('git', args, { cwd, stdio: 'ignore' })
+  execaSync('git', args, { cwd, stdio: 'ignore' })
 }
 
 function initRepo(): string {

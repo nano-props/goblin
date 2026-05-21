@@ -1,7 +1,7 @@
 import { git, gitResult } from '#/main/git/helper.ts'
 import { FIELD_SEP, parseBranches, parseLog } from '#/main/git/parsers.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
-import type { BranchInfo, ExecResult, LogEntry, WorktreeInfo } from '#/main/git/types.ts'
+import type { BranchInfo, ExecResult, LogEntry, WorktreeInfo } from '#/shared/git-types.ts'
 
 export async function isGitRepo(cwd: string): Promise<boolean> {
   try {
@@ -29,11 +29,11 @@ export async function getRepoName(cwd: string): Promise<string> {
   return idx >= 0 ? root.slice(idx + 1) : root
 }
 
-export async function getCurrentBranch(cwd: string): Promise<string> {
+export async function getCurrentBranch(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
   // `symbolic-ref` fails on detached HEAD — exactly what we want.
   // `rev-parse --abbrev-ref HEAD` would return literal "HEAD" there.
   try {
-    return await git(cwd, ['symbolic-ref', '--short', 'HEAD'])
+    return await git(cwd, ['symbolic-ref', '--short', 'HEAD'], { signal: options?.signal })
   } catch {
     return ''
   }

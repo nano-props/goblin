@@ -10,7 +10,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { FolderPlus, Loader2, RotateCw } from 'lucide-react'
-import { useReposStore, type RepoState } from '#/renderer/stores/repos.ts'
+import { useReposStore } from '#/renderer/stores/repos/store.ts'
+import type { RepoState } from '#/renderer/stores/repos/types.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { Tip } from '#/renderer/components/Tip.tsx'
 import { Button } from '#/renderer/components/ui/button.tsx'

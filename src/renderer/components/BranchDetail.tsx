@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { useReposStore } from '#/renderer/stores/repos.ts'
+import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { getSelectedBranchDetail } from '#/renderer/components/branch-detail/model.ts'
 import { BranchDetailToolbar } from '#/renderer/components/branch-detail/BranchDetailToolbar.tsx'
 import { BranchDetailContent } from '#/renderer/components/branch-detail/BranchDetailContent.tsx'

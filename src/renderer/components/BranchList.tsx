@@ -10,7 +10,7 @@
 import { useEffect, useRef } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { ArrowDown, ArrowUp, Check, FolderTree, GitBranch } from 'lucide-react'
-import { useReposStore } from '#/renderer/stores/repos.ts'
+import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { useI18nStore, useT } from '#/renderer/stores/i18n.ts'
 import { Badge } from '#/renderer/components/ui/badge.tsx'
 import { BranchActionsMenu } from '#/renderer/components/BranchActionsMenu.tsx'

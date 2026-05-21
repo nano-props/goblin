@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useReposStore } from '#/renderer/stores/repos.ts'
+import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { useThemeStore } from '#/renderer/stores/theme.ts'
 
 interface MenuActionHandlers {

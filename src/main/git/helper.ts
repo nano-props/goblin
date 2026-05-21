@@ -1,5 +1,5 @@
-import { execFile, type ChildProcess } from 'node:child_process'
-import type { ExecResult } from '#/main/git/types.ts'
+import { execa, ExecaError } from 'execa'
+import type { ExecResult } from '#/shared/git-types.ts'
 
 /** Default per-call timeout. Network ops (push/pull/fetch) override via opts. */
 const DEFAULT_TIMEOUT_MS = 30_000
@@ -38,71 +38,19 @@ async function probeGitAvailable(): Promise<GitAvailability> {
 
 /**
  * Run a git command, returning stdout. Throws on non-zero exit, timeout,
- * or abort. Wraps `child_process.execFile` so we can attach an
- * AbortController to the child — `promisify(execFile)` doesn't expose
- * the underlying ChildProcess to the caller.
+ * or abort. Wraps execa so all git invocations share timeout, buffering
+ * and cancellation behavior.
  */
 export function git(cwd: string, args: string[], opts?: GitOptions): Promise<string> {
   const timeoutMs = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS
-  return new Promise((resolve, reject) => {
-    let child: ChildProcess | null = null
-    let settled = false
-    const settleReject = (err: NodeJS.ErrnoException) => {
-      if (settled) return
-      settled = true
-      reject(err)
-    }
-    const settleResolve = (out: string) => {
-      if (settled) return
-      settled = true
-      resolve(out)
-    }
-
-    child = execFile(
-      'git',
-      args,
-      {
-        encoding: 'utf-8',
-        cwd,
-        // Some repos can produce large outputs (log, for-each-ref). 10MB headroom.
-        maxBuffer: 10 * 1024 * 1024,
-        timeout: timeoutMs,
-      },
-      (error, stdout) => {
-        if (error) {
-          // Preserve stderr / signal info for stripNoise + timeout detection.
-          const e = error as NodeJS.ErrnoException & { stderr?: string }
-          settleReject(e)
-          return
-        }
-        settleResolve(typeof stdout === 'string' ? stdout.trimEnd() : String(stdout))
-      },
-    )
-
-    if (opts?.signal) {
-      const onAbort = () => {
-        if (!child || settled) return
-        // SIGTERM first — git generally responds promptly. We force-kill
-        // after a short grace if it doesn't.
-        try {
-          child.kill('SIGTERM')
-        } catch {
-          /* already gone */
-        }
-        const grace = setTimeout(() => {
-          try {
-            child?.kill('SIGKILL')
-          } catch {
-            /* gone */
-          }
-        }, 500)
-        // Don't keep the event loop alive just for the grace timer.
-        if ('unref' in grace && typeof grace.unref === 'function') grace.unref()
-      }
-      if (opts.signal.aborted) onAbort()
-      else opts.signal.addEventListener('abort', onAbort, { once: true })
-    }
-  })
+  return execa('git', args, {
+    cwd,
+    timeout: timeoutMs,
+    cancelSignal: opts?.signal,
+    forceKillAfterDelay: 500,
+    // Some repos can produce large outputs (log, for-each-ref). 10MB headroom.
+    maxBuffer: 10 * 1024 * 1024,
+  }).then(({ stdout }) => stdout.trimEnd())
 }
 
 export async function gitResult(cwd: string, ...args: string[]): Promise<ExecResult> {
@@ -118,20 +66,19 @@ export async function gitResultWithOptions(
     const output = await git(cwd, args, opts)
     return { ok: true, message: output }
   } catch (err: unknown) {
-    const e = err as { stderr?: string; message?: string; killed?: boolean; signal?: string; code?: string }
-    const stderr = typeof e.stderr === 'string' ? e.stderr : ''
     // Distinguish three "we ended the process" reasons. The user-visible
     // copy is short on purpose — the renderer surfaces these via toast
     // and the kbps user is rarely interested in the underlying signal.
-    if (opts?.signal?.aborted) {
-      return { ok: false, message: 'cancelled' }
+    if (err instanceof ExecaError) {
+      if (opts?.signal?.aborted || err.isCanceled) return { ok: false, message: 'cancelled' }
+      if (err.timedOut) {
+        return { ok: false, message: `git timed out after ${(opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS) / 1000}s` }
+      }
+      const stderr = typeof err.stderr === 'string' ? err.stderr : ''
+      const cleaned = stripNoise(stderr).trim()
+      return { ok: false, message: cleaned || err.message || 'Unknown error' }
     }
-    if (e.killed && e.signal === 'SIGTERM') {
-      return { ok: false, message: `git timed out after ${(opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS) / 1000}s` }
-    }
-    const cleaned = stripNoise(stderr).trim()
-    const message = cleaned || e.message || 'Unknown error'
-    return { ok: false, message }
+    return { ok: false, message: err instanceof Error ? err.message : 'Unknown error' }
   }
 }
 

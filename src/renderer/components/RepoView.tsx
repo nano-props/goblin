@@ -2,7 +2,7 @@
 // persistent branch list plus selected-branch detail area.
 
 import { useStoreWithEqualityFn } from 'zustand/traditional'
-import { useReposStore } from '#/renderer/stores/repos.ts'
+import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { BranchList } from '#/renderer/components/BranchList.tsx'
 import { BranchDetail } from '#/renderer/components/BranchDetail.tsx'
 import { CommitDetail } from '#/renderer/components/CommitDetail.tsx'
