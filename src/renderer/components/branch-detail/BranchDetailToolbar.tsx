@@ -1,5 +1,5 @@
 import { ChevronDown, Loader2 } from 'lucide-react'
-import type { KeyboardEvent } from 'react'
+import type { KeyboardEvent, MouseEvent } from 'react'
 import { useReposStore, type RepoState, type DetailTab } from '#/renderer/stores/repos.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { Badge } from '#/renderer/components/ui/badge.tsx'
@@ -24,6 +24,9 @@ const DETAIL_TABS: { id: DetailTab; key: string }[] = [
   { id: 'changes', key: 'tab.changes' },
   { id: 'commits', key: 'tab.log' },
 ]
+
+const TOOLBAR_TOGGLE_IGNORE_SELECTOR =
+  'button,a,input,textarea,select,[role="button"],[role="tab"],[role="menuitem"],[data-toolbar-toggle-ignore]'
 
 export function BranchDetailToolbar({ repo, detail, detailId, contentId, collapsed }: Props) {
   const t = useT()
@@ -56,8 +59,14 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
     window.requestAnimationFrame(() => document.getElementById(`${detailId}-${nextTab.id}-tab`)?.focus())
   }
 
+  function handleToolbarClick(e: MouseEvent<HTMLDivElement>) {
+    if (!(e.target instanceof Element)) return
+    if (e.target.closest(TOOLBAR_TOGGLE_IGNORE_SELECTOR)) return
+    toggleDetailCollapsed()
+  }
+
   return (
-    <Toolbar variant="detail">
+    <Toolbar variant="detail" onClick={handleToolbarClick}>
       <Button
         variant="ghost"
         size="icon"

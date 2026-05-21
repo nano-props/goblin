@@ -37,10 +37,12 @@ export function BranchActionBar({ repo, branch, ghosttyInstalled, vscodeInstalle
 
   return (
     <>
-      <div className="flex min-w-0 flex-1 items-center justify-end gap-1 overflow-x-auto py-1 scroll-thin">
-        {visibleItems.map((item) => (
-          <BranchActionButton key={item.id} item={item} busy={busy} />
-        ))}
+      <div className="flex min-w-0 flex-1 items-center justify-end overflow-x-auto py-1 scroll-thin">
+        <div className="flex shrink-0 items-center gap-1" data-toolbar-toggle-ignore>
+          {visibleItems.map((item) => (
+            <BranchActionButton key={item.id} item={item} busy={busy} />
+          ))}
+        </div>
       </div>
 
       {dialogs}

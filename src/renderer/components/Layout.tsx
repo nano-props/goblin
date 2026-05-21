@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { HTMLAttributes, ReactNode } from 'react'
 import { cn } from '#/renderer/lib/cn.ts'
 
 interface ShellProps {
@@ -9,7 +9,7 @@ interface RepoWorkspaceProps extends ShellProps {
   detailCollapsed?: boolean
 }
 
-interface ToolbarProps {
+interface ToolbarProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode
   className?: string
   variant?: 'plain' | 'repo' | 'detail'
@@ -33,7 +33,7 @@ interface EmptyStateProps {
   tone?: 'neutral' | 'success'
 }
 
-export function Toolbar({ children, className, variant = 'plain' }: ToolbarProps) {
+export function Toolbar({ children, className, variant = 'plain', ...props }: ToolbarProps) {
   return (
     <div
       className={cn(
@@ -42,6 +42,7 @@ export function Toolbar({ children, className, variant = 'plain' }: ToolbarProps
         variant === 'detail' && 'min-w-0 justify-between gap-2 bg-muted px-2',
         className,
       )}
+      {...props}
     >
       {children}
     </div>
