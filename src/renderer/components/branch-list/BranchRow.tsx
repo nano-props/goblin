@@ -73,24 +73,15 @@ export function BranchRow({
   return (
     <li
       ref={isSelected ? selectedRef : undefined}
-      data-interactive
+      title={ariaParts.join(', ')}
+      onClick={() => onSelectBranch(branch.name)}
+      onDoubleClick={() => onOpenBranchStatus(branch.name)}
       className={cn(
-        'relative grid grid-cols-[minmax(0,1fr)_auto] items-stretch',
+        'relative grid grid-cols-[minmax(0,1fr)_auto] items-stretch cursor-pointer',
         'transition-colors duration-100',
         isSelected ? 'bg-selected text-selected-foreground hover:bg-selected' : 'hover:bg-muted',
       )}
     >
-      <button
-        type="button"
-        data-shortcut-nav-item
-        data-branch-action-shortcut-target
-        aria-current={isSelected ? 'true' : undefined}
-        aria-label={ariaParts.join(', ')}
-        title={ariaParts.join(', ')}
-        onClick={() => onSelectBranch(branch.name)}
-        onDoubleClick={() => onOpenBranchStatus(branch.name)}
-        className="absolute inset-0 z-0 cursor-pointer appearance-none border-0 bg-transparent p-0 text-left"
-      />
       <div className="pointer-events-none relative z-10 grid min-w-0 grid-cols-[1rem_minmax(0,1fr)] items-start gap-2 px-4 py-2">
         <span className="flex size-4 shrink-0 items-center justify-center pt-0.5">
           {isCurrent ? (

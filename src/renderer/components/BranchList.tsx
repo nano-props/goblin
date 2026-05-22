@@ -1,7 +1,7 @@
 // Persistent branch list. Each row shows branch name, lightweight
 // scan signals, and the head commit subject, author, and relative date. The
 // selected row scrolls into view automatically when the user moves with
-// j/k so a long branch list doesn't strand the cursor offscreen.
+// j/k or arrows so a long branch list doesn't strand the cursor offscreen.
 //
 // Worktree branches use a folder-tree glyph and a compact chip beside the
 // name. We avoid tinting the whole row so selection, hover, and status

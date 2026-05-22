@@ -4,10 +4,9 @@
 // repository body.
 //
 // Drag-to-reorder uses dnd-kit (the de-facto choice in the React/shadcn/
-// tanstack ecosystem — accessible by default, works with pointer/touch/
-// keyboard, ~30 KB). PointerSensor with a small activation distance lets
-// a regular click still focus the repo without triggering a drag, and
-// KeyboardSensor makes Space/Arrows reorder for keyboard users.
+// tanstack ecosystem). PointerSensor with a small activation distance lets
+// a regular click still focus the repo without triggering a drag; keyboard
+// users use Arrow keys for tab activation.
 
 import { useShallow } from 'zustand/react/shallow'
 import { useStoreWithEqualityFn } from 'zustand/traditional'

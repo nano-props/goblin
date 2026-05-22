@@ -3,14 +3,13 @@ import { Plus } from 'lucide-react'
 import {
   DndContext,
   type DragEndEvent,
-  KeyboardSensor,
   type Modifier,
   PointerSensor,
   closestCenter,
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
-import { SortableContext, horizontalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
+import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable'
 import { Button } from '#/renderer/components/ui/button.tsx'
 import { Tip } from '#/renderer/components/Tip.tsx'
 import { RepoTab } from '#/renderer/components/repo-tabs/RepoTab.tsx'
@@ -58,15 +57,42 @@ export function RepoTabStrip({
   onDismissMissing,
 }: RepoTabStripProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  )
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
     if (!over || active.id === over.id) return
     onReorder(String(active.id), String(over.id))
+  }
+
+  const focusRepoTab = (id: string) => {
+    window.requestAnimationFrame(() => {
+      for (const el of document.querySelectorAll<HTMLElement>('[data-repo-tab-id]')) {
+        if (el.dataset.repoTabId === id) {
+          el.focus()
+          break
+        }
+      }
+    })
+  }
+
+  const handleKeyboardNavigate = (id: string, direction: 'prev' | 'next' | 'first' | 'last') => {
+    if (repos.length === 0) return
+    const current = repos.findIndex((repo) => repo.id === id)
+    const index =
+      direction === 'first'
+        ? 0
+        : direction === 'last'
+          ? repos.length - 1
+          : current === -1
+            ? 0
+            : direction === 'next'
+              ? (current + 1) % repos.length
+              : (current - 1 + repos.length) % repos.length
+    const next = repos[index]
+    if (!next) return
+    onActivate(next.id)
+    focusRepoTab(next.id)
   }
 
   const ids = repos.map((repo) => repo.id)
@@ -110,8 +136,8 @@ export function RepoTabStrip({
                     onHoverChange={setHoveredId}
                     onActivate={onActivate}
                     onClose={onClose}
+                    onKeyboardNavigate={handleKeyboardNavigate}
                     closeLabel={labels.close}
-                    dragLabel={labels.dragToReorder}
                   />
                 )
               })}

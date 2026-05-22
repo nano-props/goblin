@@ -320,10 +320,12 @@ export const zh: Record<DictKey, string> = {
 
   // ---- Help overlay ------------------------------------------------------
   'help.title': '键盘快捷键',
+  'help.hint': '未在输入框或聚焦控件中操作时，这些快捷键生效。',
   'help.section.nav': '导航',
   'help.section.views': '视图',
   'help.section.branch-actions': '分支操作',
   'help.section.actions': '操作',
+  'help.section.app': '应用',
   'help.row.next-branch': '下一个分支 / 提交',
   'help.row.prev-branch': '上一个分支 / 提交',
   'help.row.next-repo': '下一个仓库',
@@ -331,15 +333,16 @@ export const zh: Record<DictKey, string> = {
   'help.row.view-status': '分支状态',
   'help.row.view-changes': '变更',
   'help.row.view-log': '提交历史',
+  'help.row.switch-detail-tab': '上一个 / 下一个详情标签',
   'help.row.toggle-detail': '展开/收起详情面板',
-  'help.row.checkout': '切换分支 / 打开提交',
+  'help.row.checkout': '执行当前选择',
   'help.row.open-repo': '打开仓库',
   'help.row.activate-window': '唤出 Goblin 窗口',
   'help.row.close-repo': '关闭当前标签',
   'help.row.refresh': '刷新',
   'help.row.settings': '设置',
   'help.row.this-help': '当前帮助',
-  'help.row.dismiss': '关闭弹层',
+  'help.row.dismiss': '关闭弹层 / 退出当前非文本控件',
 
   // ---- Generic dialog ----------------------------------------------------
   'dialog.cancel': '取消',

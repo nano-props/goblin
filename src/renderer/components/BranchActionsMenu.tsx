@@ -38,10 +38,10 @@ export function BranchActionsMenu({ repo, branch, ghosttyInstalled, vscodeInstal
           <Button
             variant="ghost"
             size="sm"
+            tabIndex={-1}
             className="data-[state=open]:bg-accent data-[state=open]:text-accent-foreground"
             onClick={(e) => e.stopPropagation()}
             onDoubleClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => e.stopPropagation()}
           >
             {busy ? <Loader2 className="animate-spin" /> : <ChevronDown />}
             {t('action.menu')}

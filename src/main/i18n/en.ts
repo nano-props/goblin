@@ -332,10 +332,12 @@ export const en = {
 
   // ---- Help overlay -------------------------------------------------------
   'help.title': 'Keyboard shortcuts',
+  'help.hint': 'Shortcuts work when you are not typing or using a focused control.',
   'help.section.nav': 'Navigation',
   'help.section.views': 'Views',
   'help.section.branch-actions': 'Branch actions',
   'help.section.actions': 'Actions',
+  'help.section.app': 'App',
   'help.row.next-branch': 'Next branch / commit',
   'help.row.prev-branch': 'Previous branch / commit',
   'help.row.next-repo': 'Next repository',
@@ -343,15 +345,16 @@ export const en = {
   'help.row.view-status': 'Branch status',
   'help.row.view-changes': 'Changes',
   'help.row.view-log': 'Log',
+  'help.row.switch-detail-tab': 'Previous / next detail tab',
   'help.row.toggle-detail': 'Collapse / expand detail panel',
-  'help.row.checkout': 'Checkout branch / open commit',
+  'help.row.checkout': 'Activate selection',
   'help.row.open-repo': 'Open repository',
   'help.row.activate-window': 'Show Goblin window',
   'help.row.close-repo': 'Close current tab',
   'help.row.refresh': 'Refresh',
   'help.row.settings': 'Settings',
   'help.row.this-help': 'This help',
-  'help.row.dismiss': 'Dismiss overlay',
+  'help.row.dismiss': 'Dismiss overlay / leave focused non-text control',
 
   // ---- Generic dialog -----------------------------------------------------
   'dialog.cancel': 'Cancel',

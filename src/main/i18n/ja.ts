@@ -332,10 +332,12 @@ export const ja: Record<DictKey, string> = {
 
   // ---- Help overlay ------------------------------------------------------
   'help.title': 'キーボードショートカット',
+  'help.hint': '入力中、またはフォーカス中のコントロールを操作している間はショートカットは実行されません。',
   'help.section.nav': 'ナビゲーション',
   'help.section.views': 'ビュー',
   'help.section.branch-actions': 'ブランチ操作',
   'help.section.actions': 'アクション',
+  'help.section.app': 'アプリ',
   'help.row.next-branch': '次のブランチ / コミット',
   'help.row.prev-branch': '前のブランチ / コミット',
   'help.row.next-repo': '次のリポジトリ',
@@ -343,15 +345,16 @@ export const ja: Record<DictKey, string> = {
   'help.row.view-status': 'ブランチステータス',
   'help.row.view-changes': '変更',
   'help.row.view-log': 'ログ',
+  'help.row.switch-detail-tab': '前 / 次の詳細タブ',
   'help.row.toggle-detail': '詳細パネルを折りたたむ/展開',
-  'help.row.checkout': 'ブランチを切替 / コミットを開く',
+  'help.row.checkout': '選択を実行',
   'help.row.open-repo': 'リポジトリを開く',
   'help.row.activate-window': 'Goblin ウィンドウを表示',
   'help.row.close-repo': '現在のタブを閉じる',
   'help.row.refresh': '更新',
   'help.row.settings': '設定',
   'help.row.this-help': 'このヘルプ',
-  'help.row.dismiss': 'オーバーレイを閉じる',
+  'help.row.dismiss': 'オーバーレイを閉じる / フォーカス中の非テキストコントロールを抜ける',
 
   // ---- Generic dialog ----------------------------------------------------
   'dialog.cancel': 'キャンセル',

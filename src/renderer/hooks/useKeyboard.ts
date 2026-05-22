@@ -4,7 +4,7 @@
 // Shortcuts that are also wired through the application menu (⌘O,
 // ⌘W, ⌘1/⌘2/⌘3, ⌘[ , ⌘]) are handled by Electron's accelerator system
 // and forwarded via `app:menu-invoke`. We only handle the "no
-// modifier" keys here (j/k/p/P/g/v/G/?/Enter/Esc) so we don't fight the menu.
+// modifier" keys here (j/k/arrows/p/P/g/v/G/?/Enter/Esc) so we don't fight the menu.
 //
 // Modal awareness: when an overlay/dialog/menu is open every shortcut
 // is suppressed — including `?`, otherwise pressing it with Settings
@@ -15,12 +15,14 @@ import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { branchForVisibleLog, visibleBranches } from '#/renderer/stores/repos/branch-view-mode.ts'
 import { useSettingsStore } from '#/renderer/stores/settings.ts'
 import { isShortcutBlockingLayerOpen } from '#/renderer/lib/layers.ts'
+import { adjacentDetailTab } from '#/renderer/lib/detail-tabs.ts'
+import { runBranchActionShortcut } from '#/renderer/keyboard/branch-action-shortcuts.ts'
+import type { RepoState, ReposStore } from '#/renderer/stores/repos/types.ts'
 
 type BranchShortcutAction = 'pull' | 'push' | 'ghostty' | 'vscode' | 'github'
+type MoveDirection = 1 | -1
 const INTERACTIVE_SHORTCUT_TARGET_SELECTOR =
   'button,a,input,textarea,select,[role="button"],[role="tab"],[role="menuitem"],[data-interactive]'
-const NAVIGATION_SHORTCUT_TARGET_SELECTOR = '[data-shortcut-nav-item]'
-const BRANCH_ACTION_SHORTCUT_TARGET_SELECTOR = '[data-branch-action-shortcut-target]'
 
 interface Options {
   onShowHelp: () => void
@@ -39,12 +41,8 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest(INTERACTIVE_SHORTCUT_TARGET_SELECTOR) !== null
 }
 
-function allowsListNavigationShortcuts(target: EventTarget | null): boolean {
-  return target instanceof Element && target.closest(NAVIGATION_SHORTCUT_TARGET_SELECTOR) !== null
-}
-
-function allowsBranchActionShortcuts(target: EventTarget | null): boolean {
-  return target instanceof Element && target.closest(BRANCH_ACTION_SHORTCUT_TARGET_SELECTOR) !== null
+function activeElement(): HTMLElement | null {
+  return document.activeElement instanceof HTMLElement ? document.activeElement : null
 }
 
 function branchShortcutAction(e: KeyboardEvent): BranchShortcutAction | null {
@@ -52,6 +50,36 @@ function branchShortcutAction(e: KeyboardEvent): BranchShortcutAction | null {
   if (e.code === 'KeyG') return e.shiftKey ? 'github' : 'ghostty'
   if (e.code === 'KeyV' && !e.shiftKey) return 'vscode'
   return null
+}
+
+function nextIndex(current: number, length: number, direction: MoveDirection): number {
+  if (direction === 1) return Math.min(length - 1, current < 0 ? 0 : current + 1)
+  return Math.max(0, current < 0 ? 0 : current - 1)
+}
+
+function moveCommitSelection(state: ReposStore, repo: RepoState, direction: MoveDirection): boolean {
+  const branch = branchForVisibleLog(repo)
+  const branchLog = branch ? repo.logsByBranch[branch] : undefined
+  if (!branch || !branchLog?.entries.length) return false
+  const index = branchLog.entries.findIndex((commit) => commit.hash === branchLog.selectedHash)
+  const next = branchLog.entries[nextIndex(index, branchLog.entries.length, direction)]
+  if (!next) return false
+  state.selectLog(repo.id, branch, next.hash)
+  return true
+}
+
+function moveBranchSelection(state: ReposStore, repo: RepoState, direction: MoveDirection): boolean {
+  const branches = visibleBranches(repo)
+  if (branches.length === 0) return false
+  const index = branches.findIndex((branch) => branch.name === repo.selectedBranch)
+  const next = branches[nextIndex(index, branches.length, direction)]
+  if (!next) return false
+  state.selectBranch(repo.id, next.name)
+  return true
+}
+
+function moveSelection(state: ReposStore, repo: RepoState, commitListActive: boolean, direction: MoveDirection): boolean {
+  return commitListActive ? moveCommitSelection(state, repo, direction) : moveBranchSelection(state, repo, direction)
 }
 
 export function useKeyboard({ onShowHelp, isOverlayOpen }: Options) {
@@ -76,8 +104,17 @@ export function useKeyboard({ onShowHelp, isOverlayOpen }: Options) {
       const overlayOpen = isOverlayOpenRef.current() || isShortcutBlockingLayerOpen() || !!repo?.openCommit
       const commitListActive = !!repo && repo.detailTab === 'commits' && !state.detailCollapsed
       const interactiveTarget = isInteractiveTarget(e.target)
-      const allowListNavigation = allowsListNavigationShortcuts(e.target)
-      const allowBranchAction = allowsBranchActionShortcuts(e.target)
+
+      if (e.key === 'Escape') {
+        if (overlayOpen) return
+        const active = activeElement()
+        if (!active || active === document.body || active === document.documentElement) return
+        e.preventDefault()
+        active.blur()
+        return
+      }
+
+      if (interactiveTarget) return
 
       // `?` honours the overlay gate so it doesn't stack a second modal
       // on top of Settings/Help/commit-detail. Modal owns Esc.
@@ -90,66 +127,33 @@ export function useKeyboard({ onShowHelp, isOverlayOpen }: Options) {
 
       const action = branchShortcutAction(e)
       if (action) {
-        if (interactiveTarget && !allowBranchAction) return
         if (overlayOpen || !repo || !repo.selectedBranch) return
         e.preventDefault()
-        window.dispatchEvent(new CustomEvent('gbl:branch-action-shortcut', { detail: action }))
+        runBranchActionShortcut(action)
         return
       }
 
       switch (e.key) {
         case 'j':
         case 'ArrowDown': {
-          if (interactiveTarget && !allowListNavigation) break
           if (overlayOpen || !repo) break
-          if (commitListActive) {
-            const branch = branchForVisibleLog(repo)
-            const branchLog = branch ? repo.logsByBranch[branch] : undefined
-            if (branch && branchLog?.entries.length) {
-              e.preventDefault()
-              const idx = branchLog.entries.findIndex((c) => c.hash === branchLog.selectedHash)
-              const nextIdx = Math.min(branchLog.entries.length - 1, idx < 0 ? 0 : idx + 1)
-              const next = branchLog.entries[nextIdx]
-              if (next) state.selectLog(repo.id, branch, next.hash)
-            }
-          } else {
-            const branches = visibleBranches(repo)
-            if (branches.length === 0) break
-            e.preventDefault()
-            const idx = branches.findIndex((b) => b.name === repo.selectedBranch)
-            const nextIdx = Math.min(branches.length - 1, idx < 0 ? 0 : idx + 1)
-            const next = branches[nextIdx]
-            if (next) state.selectBranch(repo.id, next.name)
-          }
+          if (moveSelection(state, repo, commitListActive, 1)) e.preventDefault()
           break
         }
         case 'k':
         case 'ArrowUp': {
-          if (interactiveTarget && !allowListNavigation) break
           if (overlayOpen || !repo) break
-          if (commitListActive) {
-            const branch = branchForVisibleLog(repo)
-            const branchLog = branch ? repo.logsByBranch[branch] : undefined
-            if (branch && branchLog?.entries.length) {
-              e.preventDefault()
-              const idx = branchLog.entries.findIndex((c) => c.hash === branchLog.selectedHash)
-              const nextIdx = Math.max(0, idx < 0 ? 0 : idx - 1)
-              const next = branchLog.entries[nextIdx]
-              if (next) state.selectLog(repo.id, branch, next.hash)
-            }
-          } else {
-            const branches = visibleBranches(repo)
-            if (branches.length === 0) break
-            e.preventDefault()
-            const idx = branches.findIndex((b) => b.name === repo.selectedBranch)
-            const nextIdx = Math.max(0, idx < 0 ? 0 : idx - 1)
-            const next = branches[nextIdx]
-            if (next) state.selectBranch(repo.id, next.name)
-          }
+          if (moveSelection(state, repo, commitListActive, -1)) e.preventDefault()
+          break
+        }
+        case 'ArrowRight':
+        case 'ArrowLeft': {
+          if (overlayOpen || !repo || !repo.selectedBranch || state.detailCollapsed) break
+          e.preventDefault()
+          state.setDetailTab(repo.id, adjacentDetailTab(repo.detailTab, e.key === 'ArrowRight' ? 1 : -1))
           break
         }
         case 'Enter': {
-          if (interactiveTarget) break
           if (overlayOpen || !repo) break
           if (commitListActive) {
             e.preventDefault()

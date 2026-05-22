@@ -3,7 +3,7 @@ import { Loader2 } from 'lucide-react'
 import type { RepoState } from '#/renderer/stores/repos/types.ts'
 import { Button } from '#/renderer/components/ui/button.tsx'
 import { useBranchActionItems, type BranchActionItem } from '#/renderer/hooks/useBranchActionItems.ts'
-import type { BranchActionOp } from '#/renderer/hooks/useBranchActions.tsx'
+import { setBranchActionShortcutHandler } from '#/renderer/keyboard/branch-action-shortcuts.ts'
 import type { BranchInfo } from '#/renderer/types.ts'
 
 interface Props {
@@ -25,14 +25,11 @@ export function BranchActionBar({ repo, branch, ghosttyInstalled, vscodeInstalle
   visibleItemsRef.current = visibleItems
 
   useEffect(() => {
-    const onShortcut = (event: Event) => {
-      const action = (event as CustomEvent<BranchActionOp>).detail
+    return setBranchActionShortcutHandler((action) => {
       const item = visibleItemsRef.current.find((item) => item.id === action)
       if (!item || item.disabled) return
       item.onSelect()
-    }
-    window.addEventListener('gbl:branch-action-shortcut', onShortcut)
-    return () => window.removeEventListener('gbl:branch-action-shortcut', onShortcut)
+    })
   }, [])
 
   return (

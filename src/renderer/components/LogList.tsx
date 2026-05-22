@@ -1,6 +1,6 @@
 // Commit detail tab — `git log` for the selected branch. Refreshed on
 // branch change and on tab switch, capped at 100 entries (any deeper
-// dive belongs in the terminal). j/k moves the selection cursor; Enter
+// dive belongs in the terminal). j/k or arrows move the selection cursor; Enter
 // (or click) opens the commit detail overlay.
 
 import { useEffect, useRef } from 'react'
@@ -25,7 +25,7 @@ export function LogList({ repoId, log, branch, selectedHash }: Props) {
   const selectLog = useReposStore((s) => s.selectLog)
   const selectedRef = useRef<HTMLLIElement | null>(null)
 
-  // Keep the j/k cursor in view as the user navigates — same pattern
+  // Keep the keyboard cursor in view as the user navigates — same pattern
   // BranchList uses.
   useEffect(() => {
     selectedRef.current?.scrollIntoView({ block: 'nearest' })
@@ -43,21 +43,10 @@ export function LogList({ repoId, log, branch, selectedHash }: Props) {
             <li
               key={entry.hash}
               ref={isSelected ? selectedRef : undefined}
-              data-interactive
-              data-shortcut-nav-item
-              role="button"
-              tabIndex={0}
-              aria-pressed={isSelected}
+              aria-current={isSelected ? 'true' : undefined}
               onClick={() => {
                 selectLog(repoId, branch, entry.hash)
                 void openCommit(repoId, entry.hash)
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  selectLog(repoId, branch, entry.hash)
-                  void openCommit(repoId, entry.hash)
-                }
               }}
               className={cn(
                 'px-4 py-2.5 cursor-pointer transition-colors duration-100',

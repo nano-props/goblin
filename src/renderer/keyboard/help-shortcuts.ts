@@ -1,0 +1,58 @@
+import { acceleratorToKeyLabels } from '#/shared/accelerator.ts'
+
+export interface HelpShortcutRow {
+  combos: string[][]
+  labelKey: string
+}
+
+export interface HelpShortcutSection {
+  titleKey: string
+  rows: HelpShortcutRow[]
+}
+
+export function helpShortcutSections(globalShortcut: string): HelpShortcutSection[] {
+  return [
+    {
+      titleKey: 'help.section.nav',
+      rows: [
+        { combos: [['j'], ['↓']], labelKey: 'help.row.next-branch' },
+        { combos: [['k'], ['↑']], labelKey: 'help.row.prev-branch' },
+        { combos: [['←'], ['→']], labelKey: 'help.row.switch-detail-tab' },
+        { combos: [['⌘', ']']], labelKey: 'help.row.next-repo' },
+        { combos: [['⌘', '[']], labelKey: 'help.row.prev-repo' },
+      ],
+    },
+    {
+      titleKey: 'help.section.branch-actions',
+      rows: [
+        { combos: [['Enter']], labelKey: 'help.row.checkout' },
+        { combos: [['p']], labelKey: 'action.pull' },
+        { combos: [['⇧', 'P']], labelKey: 'action.push' },
+        { combos: [['g']], labelKey: 'worktrees.open-in-ghostty-label' },
+        { combos: [['v']], labelKey: 'worktrees.open-in-vs-code-label' },
+        { combos: [['⇧', 'G']], labelKey: 'action.github' },
+      ],
+    },
+    {
+      titleKey: 'help.section.views',
+      rows: [
+        { combos: [['⌘', '1']], labelKey: 'help.row.view-status' },
+        { combos: [['⌘', '2']], labelKey: 'help.row.view-changes' },
+        { combos: [['⌘', '3']], labelKey: 'help.row.view-log' },
+        { combos: [['⌘', 'J']], labelKey: 'help.row.toggle-detail' },
+      ],
+    },
+    {
+      titleKey: 'help.section.app',
+      rows: [
+        { combos: [['⌘', 'O']], labelKey: 'help.row.open-repo' },
+        { combos: [acceleratorToKeyLabels(globalShortcut)], labelKey: 'help.row.activate-window' },
+        { combos: [['⌘', '⇧', 'W']], labelKey: 'help.row.close-repo' },
+        { combos: [['⌘', 'R']], labelKey: 'help.row.refresh' },
+        { combos: [['⌘', ',']], labelKey: 'help.row.settings' },
+        { combos: [['?']], labelKey: 'help.row.this-help' },
+        { combos: [['Esc']], labelKey: 'help.row.dismiss' },
+      ],
+    },
+  ]
+}

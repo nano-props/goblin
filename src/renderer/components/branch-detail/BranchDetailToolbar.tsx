@@ -10,6 +10,7 @@ import { BranchActionBar } from '#/renderer/components/BranchActionBar.tsx'
 import { Toolbar } from '#/renderer/components/Layout.tsx'
 import { useGhosttyInstalled } from '#/renderer/hooks/useGhosttyInstalled.ts'
 import { useVSCodeInstalled } from '#/renderer/hooks/useVSCodeInstalled.ts'
+import { DETAIL_TABS } from '#/renderer/lib/detail-tabs.ts'
 import { cn } from '#/renderer/lib/cn.ts'
 import type { SelectedBranchDetail } from '#/renderer/components/branch-detail/model.ts'
 
@@ -20,12 +21,6 @@ interface Props {
   contentId: string
   collapsed: boolean
 }
-
-const DETAIL_TABS: { id: DetailTab; key: string }[] = [
-  { id: 'status', key: 'tab.status' },
-  { id: 'changes', key: 'tab.changes' },
-  { id: 'commits', key: 'tab.log' },
-]
 
 const TOOLBAR_TOGGLE_IGNORE_SELECTOR =
   'button,a,input,textarea,select,[role="button"],[role="tab"],[role="menuitem"],[data-toolbar-toggle-ignore]'
@@ -92,7 +87,8 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
       </Button>
       <div className="flex shrink-0" role="tablist" aria-label={t('tab.branch-detail')}>
         {DETAIL_TABS.map((tab) => {
-          const selected = !collapsed && repo.detailTab === tab.id
+          const selected = repo.detailTab === tab.id
+          const visuallySelected = !collapsed && selected
           return (
             <button
               key={tab.id}
@@ -101,7 +97,7 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
               role="tab"
               aria-selected={selected}
               aria-controls={collapsed ? undefined : `${detailId}-${tab.id}-panel`}
-              tabIndex={repo.detailTab === tab.id ? 0 : -1}
+              tabIndex={selected ? 0 : -1}
               onClick={() => {
                 setDetailTab(repo.id, tab.id)
                 setDetailCollapsed(false)
@@ -109,12 +105,12 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
               onKeyDown={(e) => handleTabKeyDown(e, tab.id)}
               className={cn(
                 'h-9 px-3 text-sm border-b-2 -mb-px cursor-pointer transition-colors duration-100',
-                selected
+                visuallySelected
                   ? 'border-brand text-foreground'
                   : 'border-transparent text-muted-foreground hover:text-foreground',
               )}
             >
-              {t(tab.key)}
+              {t(tab.labelKey)}
               {tab.id === 'changes' && detail.statusCount > 0 && (
                 <Badge variant="attention" className="ml-1.5 rounded-full">
                   {detail.statusCount}

@@ -325,10 +325,12 @@ export const ko: Record<DictKey, string> = {
 
   // ---- Help overlay ------------------------------------------------------
   'help.title': '키보드 단축키',
+  'help.hint': '입력 중이거나 포커스된 컨트롤을 사용할 때는 단축키가 실행되지 않습니다.',
   'help.section.nav': '내비게이션',
   'help.section.views': '보기',
   'help.section.branch-actions': '브랜치 동작',
   'help.section.actions': '동작',
+  'help.section.app': '앱',
   'help.row.next-branch': '다음 브랜치 / 커밋',
   'help.row.prev-branch': '이전 브랜치 / 커밋',
   'help.row.next-repo': '다음 리포지토리',
@@ -336,15 +338,16 @@ export const ko: Record<DictKey, string> = {
   'help.row.view-status': '브랜치 상태',
   'help.row.view-changes': '변경 사항',
   'help.row.view-log': '커밋 로그',
+  'help.row.switch-detail-tab': '이전 / 다음 상세 탭',
   'help.row.toggle-detail': '세부 패널 접기/펼치기',
-  'help.row.checkout': '브랜치 체크아웃 / 커밋 열기',
+  'help.row.checkout': '선택 실행',
   'help.row.open-repo': '리포지토리 열기',
   'help.row.activate-window': 'Goblin 창 보이기',
   'help.row.close-repo': '현재 탭 닫기',
   'help.row.refresh': '새로 고침',
   'help.row.settings': '설정',
   'help.row.this-help': '이 도움말',
-  'help.row.dismiss': '오버레이 닫기',
+  'help.row.dismiss': '오버레이 닫기 / 포커스된 비텍스트 컨트롤 나가기',
 
   // ---- Generic dialog ----------------------------------------------------
   'dialog.cancel': '취소',

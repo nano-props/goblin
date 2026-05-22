@@ -4,97 +4,59 @@
 import { Modal } from '#/renderer/components/Modal.tsx'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { useSettingsStore } from '#/renderer/stores/settings.ts'
-import { acceleratorToKeyLabels } from '#/shared/accelerator.ts'
+import {
+  helpShortcutSections,
+  type HelpShortcutRow,
+  type HelpShortcutSection,
+} from '#/renderer/keyboard/help-shortcuts.ts'
 
 interface Props {
   open: boolean
   onClose: () => void
 }
 
-interface ShortcutRow {
-  keys: string[]
-  labelKey: string
-}
-
-interface ShortcutSectionModel {
-  titleKey: string
-  rows: ShortcutRow[]
-}
-
-function sections(globalShortcut: string): ShortcutSectionModel[] {
-  return [
-    {
-      titleKey: 'help.section.nav',
-      rows: [
-        { keys: ['j', '↓'], labelKey: 'help.row.next-branch' },
-        { keys: ['k', '↑'], labelKey: 'help.row.prev-branch' },
-        { keys: ['⌘', ']'], labelKey: 'help.row.next-repo' },
-        { keys: ['⌘', '['], labelKey: 'help.row.prev-repo' },
-      ],
-    },
-    {
-      titleKey: 'help.section.views',
-      rows: [
-        { keys: ['⌘', '1'], labelKey: 'help.row.view-status' },
-        { keys: ['⌘', '2'], labelKey: 'help.row.view-changes' },
-        { keys: ['⌘', '3'], labelKey: 'help.row.view-log' },
-        { keys: ['⌘', 'J'], labelKey: 'help.row.toggle-detail' },
-      ],
-    },
-    {
-      titleKey: 'help.section.branch-actions',
-      rows: [
-        { keys: ['Enter'], labelKey: 'help.row.checkout' },
-        { keys: ['p'], labelKey: 'action.pull' },
-        { keys: ['P'], labelKey: 'action.push' },
-        { keys: ['g'], labelKey: 'worktrees.open-in-ghostty-label' },
-        { keys: ['v'], labelKey: 'worktrees.open-in-vs-code-label' },
-        { keys: ['G'], labelKey: 'action.github' },
-      ],
-    },
-    {
-      titleKey: 'help.section.actions',
-      rows: [
-        { keys: ['⌘', 'O'], labelKey: 'help.row.open-repo' },
-        { keys: acceleratorToKeyLabels(globalShortcut), labelKey: 'help.row.activate-window' },
-        { keys: ['⌘', '⇧', 'W'], labelKey: 'help.row.close-repo' },
-        { keys: ['⌘', 'R'], labelKey: 'help.row.refresh' },
-        { keys: ['⌘', ','], labelKey: 'help.row.settings' },
-        { keys: ['?'], labelKey: 'help.row.this-help' },
-        { keys: ['Esc'], labelKey: 'help.row.dismiss' },
-      ],
-    },
-  ]
-}
-
-function KeyChips({ keys }: { keys: string[] }) {
+function KeyCombo({ keys }: { keys: string[] }) {
   return (
-    <span className="flex shrink-0 gap-1">
+    <span className="inline-flex items-center gap-0.5">
       {keys.map((k, i) => (
-        <span key={i} className="kbd">
-          {k}
+        <span key={i} className="inline-flex items-center gap-0.5">
+          {i > 0 && <span className="text-[10px] text-muted-foreground/70">+</span>}
+          <span className="kbd">{k}</span>
         </span>
       ))}
     </span>
   )
 }
 
-function ShortcutSection({ section }: { section: ShortcutSectionModel }) {
+function KeyCombos({ combos }: { combos: string[][] }) {
+  return (
+    <span className="flex shrink-0 flex-wrap justify-end gap-x-1 gap-y-0.5">
+      {combos.map((combo, i) => (
+        <span key={`${combo.join('+')}:${i}`} className="inline-flex items-center gap-1">
+          {i > 0 && <span className="text-[11px] text-muted-foreground/70">/</span>}
+          <KeyCombo keys={combo} />
+        </span>
+      ))}
+    </span>
+  )
+}
+
+function ShortcutSection({ section }: { section: HelpShortcutSection }) {
   const t = useT()
   return (
-    <section className="rounded-xl border border-border bg-card/70 p-3 shadow-sm">
-      <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-        <span className="h-3 w-1 rounded-full bg-brand" />
+    <section className="min-w-0">
+      <div className="mb-1.5 flex items-center gap-2 border-b border-border pb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        <span className="h-1.5 w-1.5 rounded-full bg-brand" />
         <span>{t(section.titleKey)}</span>
       </div>
-      <ul className="space-y-0.5">
-        {section.rows.map((row) => (
+      <ul className="divide-y divide-border/60">
+        {section.rows.map((row: HelpShortcutRow) => (
           <li
-            key={`${row.labelKey}:${row.keys.join('+')}`}
-            className="-mx-1.5 grid min-h-7 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md px-1.5 text-sm"
+            key={`${row.labelKey}:${row.combos.map((combo) => combo.join('+')).join('/')}`}
+            className="grid min-h-6 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 py-1 text-xs"
           >
             <span className="min-w-0 truncate text-foreground">{t(row.labelKey)}</span>
-            <KeyChips keys={row.keys} />
+            <KeyCombos combos={row.combos} />
           </li>
         ))}
       </ul>
@@ -106,11 +68,14 @@ export function HelpOverlay({ open, onClose }: Props) {
   const t = useT()
   const globalShortcut = useSettingsStore((s) => s.globalShortcut)
   return (
-    <Modal open={open} title={t('help.title')} onClose={onClose} widthClass="sm:max-w-3xl">
-      <div className="grid items-start gap-3 sm:grid-cols-2">
-        {sections(globalShortcut).map((section) => (
-          <ShortcutSection key={section.titleKey} section={section} />
-        ))}
+    <Modal open={open} title={t('help.title')} onClose={onClose} widthClass="sm:max-w-2xl">
+      <div className="space-y-3">
+        <div className="grid items-start gap-x-6 gap-y-4 sm:grid-cols-2">
+          {helpShortcutSections(globalShortcut).map((section) => (
+            <ShortcutSection key={section.titleKey} section={section} />
+          ))}
+        </div>
+        <p className="truncate pt-0.5 text-[11px] text-muted-foreground/75">{t('help.hint')}</p>
       </div>
     </Modal>
   )
