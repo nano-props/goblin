@@ -1,11 +1,27 @@
-import { execa } from 'execa'
+import { formatGraphqlError, getGitHubRepoRef, graphqlRequestResult } from '#/main/github/graphql.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
-import type { PullRequestInfo } from '#/shared/git-types.ts'
+import type { GitHubRepoRef, GraphqlRequestError } from '#/main/github/graphql.ts'
+import type { PullRequestFetchMode, PullRequestInfo } from '#/shared/git-types.ts'
 
-const GH_TIMEOUT_MS = 8_000
-const GH_PATH = ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin'].join(':')
 const PR_CACHE_TTL_MS = 30_000
-const prCache = new Map<string, { expiresAt: number; prs: Map<string, PullRequestInfo> | null }>()
+
+interface PrCacheEntry {
+  expiresAt: number
+  mode: PullRequestFetchMode
+  prs: Map<string, PullRequestInfo> | null
+}
+
+interface BranchPrCacheEntry {
+  expiresAt: number
+  mode: PullRequestFetchMode
+  pr: PullRequestInfo | null
+}
+
+const prCache = new Map<string, PrCacheEntry>()
+const branchPrCache = new Map<string, BranchPrCacheEntry>()
+const pendingRepoRequests = new Map<string, Promise<Map<string, PullRequestInfo> | null>>()
+const pendingBranchRequests = new Map<string, Promise<Map<string, PullRequestInfo> | null>>()
+const loggedGraphqlErrors = new Map<string, number>()
 
 interface GhPullRequest {
   number?: number
@@ -13,40 +29,106 @@ interface GhPullRequest {
   url?: string
   state?: string
   isDraft?: boolean
+  createdAt?: string
   mergedAt?: string | null
-  closedAt?: string | null
+  author?: { login?: string } | null
   baseRefName?: string
   headRefName?: string
+  headRepositoryOwner?: { login?: string } | null
+  isCrossRepository?: boolean
+  reviewDecision?: string | null
+  mergeable?: string
+  mergeStateStatus?: string | null
+  statusCheckRollup?: {
+    nodes?: Array<{
+      commit?: {
+        statusCheckRollup?: {
+          contexts?: {
+            checkRunCountsByState?: Array<{ state?: string; count?: number }>
+            statusContextCountsByState?: Array<{ state?: string; count?: number }>
+          }
+        } | null
+      }
+    }>
+  }
 }
 
-function gh(cwd: string, args: string[]): Promise<string> {
-  return execa('gh', args, {
-    cwd,
-    timeout: GH_TIMEOUT_MS,
-    forceKillAfterDelay: 500,
-    maxBuffer: 1024 * 1024,
-    env: {
-      ...process.env,
-      GH_PROMPT_DISABLED: '1',
-      PATH: [process.env.PATH, GH_PATH].filter(Boolean).join(':'),
-    },
-  }).then(({ stdout }) => stdout.trimEnd())
+interface PullRequestsData {
+  repository?: {
+    pullRequests?: {
+      nodes?: GhPullRequest[]
+      pageInfo?: {
+        hasNextPage?: boolean
+        endCursor?: string | null
+      }
+    }
+  } | null
 }
+
+type PullRequestsConnection = NonNullable<NonNullable<PullRequestsData['repository']>['pullRequests']>
+type GhPullRequestState = 'OPEN' | 'CLOSED' | 'MERGED'
 
 export function normalizeGhPullRequest(pr: GhPullRequest): PullRequestInfo | null {
   if (typeof pr.number !== 'number' || !pr.url || !pr.title) return null
   const rawState = pr.state?.toUpperCase()
   const state: PullRequestInfo['state'] =
-    pr.mergedAt || rawState === 'MERGED' ? 'merged' : rawState === 'OPEN' ? 'open' : 'closed'
+    pr.mergedAt != null || rawState === 'MERGED' ? 'merged' : rawState === 'OPEN' ? 'open' : 'closed'
   return {
     number: pr.number,
     title: pr.title,
     url: pr.url,
     state,
     isDraft: pr.isDraft === true,
+    createdAt: pr.createdAt || undefined,
+    author: pr.author?.login || undefined,
     baseRefName: pr.baseRefName || undefined,
     headRefName: pr.headRefName || undefined,
+    headRepositoryOwner: pr.headRepositoryOwner?.login || undefined,
+    isCrossRepository: pr.isCrossRepository === true,
+    checks: summarizeChecks(pr.statusCheckRollup),
+    reviewDecision: normalizeReviewDecision(pr.reviewDecision),
+    mergeable: normalizeMergeable(pr),
   }
+}
+
+function normalizeReviewDecision(value: string | null | undefined): PullRequestInfo['reviewDecision'] {
+  if (value === 'APPROVED' || value === 'CHANGES_REQUESTED' || value === 'REVIEW_REQUIRED') return value
+  return null
+}
+
+function normalizeMergeable(pr: GhPullRequest): PullRequestInfo['mergeable'] | undefined {
+  if (pr.mergeStateStatus === 'DIRTY') return 'CONFLICTING'
+  if (pr.mergeable === 'MERGEABLE' || pr.mergeable === 'CONFLICTING') return pr.mergeable
+  if (pr.mergeable === 'UNKNOWN') return 'UNKNOWN'
+  return undefined
+}
+
+function summarizeChecks(statusCheckRollup: GhPullRequest['statusCheckRollup']): PullRequestInfo['checks'] | undefined {
+  const contexts = statusCheckRollup?.nodes?.[0]?.commit?.statusCheckRollup?.contexts
+  if (!contexts) return undefined
+  let passing = 0
+  let failing = 0
+  let pending = 0
+  for (const item of contexts.checkRunCountsByState ?? []) {
+    const count = typeof item.count === 'number' ? item.count : 0
+    if (item.state === 'NEUTRAL' || item.state === 'SKIPPED' || item.state === 'SUCCESS') passing += count
+    else if (
+      item.state === 'ACTION_REQUIRED' ||
+      item.state === 'CANCELLED' ||
+      item.state === 'FAILURE' ||
+      item.state === 'TIMED_OUT'
+    )
+      failing += count
+    else pending += count
+  }
+  for (const item of contexts.statusContextCountsByState ?? []) {
+    const count = typeof item.count === 'number' ? item.count : 0
+    if (item.state === 'SUCCESS') passing += count
+    else if (item.state === 'ERROR' || item.state === 'FAILURE') failing += count
+    else pending += count
+  }
+  const total = passing + failing + pending
+  return total > 0 ? { total, passing, failing, pending } : undefined
 }
 
 function stateRank(pr: PullRequestInfo): number {
@@ -58,24 +140,6 @@ function stateRank(pr: PullRequestInfo): number {
 export function pickPullRequest(existing: PullRequestInfo | undefined, next: PullRequestInfo): PullRequestInfo {
   if (!existing) return next
   return stateRank(next) < stateRank(existing) ? next : existing
-}
-
-function parsePullRequests(output: string): PullRequestInfo[] {
-  const raw: unknown = JSON.parse(output)
-  if (!Array.isArray(raw)) return []
-  return raw.flatMap((item) => {
-    const pr = normalizeGhPullRequest(item as GhPullRequest)
-    return pr ? [pr] : []
-  })
-}
-
-async function canUseGh(cwd: string): Promise<boolean> {
-  try {
-    await gh(cwd, ['auth', 'status'])
-    return true
-  } catch {
-    return false
-  }
 }
 
 function filterPullRequests(
@@ -91,70 +155,329 @@ function filterPullRequests(
   return filtered
 }
 
-function getCachedBranchPullRequest(cwd: string, branch: string): PullRequestInfo | null {
+function cacheFresh(expiresAt: number): boolean {
+  return expiresAt > Date.now()
+}
+
+function cacheSatisfiesMode(cachedMode: PullRequestFetchMode, requestedMode: PullRequestFetchMode): boolean {
+  return requestedMode === 'summary' || cachedMode === 'full'
+}
+
+function branchCacheKey(cwd: string, branch: string, mode: PullRequestFetchMode): string {
+  return `${cwd}\0${branch}\0${mode}`
+}
+
+function repoRequestKey(cwd: string, mode: PullRequestFetchMode): string {
+  return `${cwd}\0${mode}`
+}
+
+function getCachedBranchPullRequest(
+  cwd: string,
+  branch: string,
+  mode: PullRequestFetchMode,
+): { hit: boolean; pr: PullRequestInfo | null; unavailable?: boolean } {
   const cached = prCache.get(cwd)
-  if (!cached || cached.expiresAt <= Date.now() || !cached.prs) return null
-  return cached.prs.get(branch) ?? null
+  if (cached && cacheFresh(cached.expiresAt) && cacheSatisfiesMode(cached.mode, mode)) {
+    if (cached.prs === null) return { hit: true, pr: null, unavailable: true }
+    const pr = cached.prs.get(branch)
+    if (pr) return { hit: true, pr }
+  }
+
+  const branchCacheKeys =
+    mode === 'summary'
+      ? [branchCacheKey(cwd, branch, 'summary'), branchCacheKey(cwd, branch, 'full')]
+      : [branchCacheKey(cwd, branch, mode)]
+  for (const key of branchCacheKeys) {
+    const branchCached = branchPrCache.get(key)
+    if (branchCached && cacheFresh(branchCached.expiresAt) && cacheSatisfiesMode(branchCached.mode, mode)) {
+      return { hit: true, pr: branchCached.pr }
+    }
+  }
+  return { hit: false, pr: null }
+}
+
+function cacheBranchPullRequest(
+  cwd: string,
+  branch: string,
+  mode: PullRequestFetchMode,
+  pr: PullRequestInfo | null,
+): void {
+  branchPrCache.set(branchCacheKey(cwd, branch, mode), { expiresAt: Date.now() + PR_CACHE_TTL_MS, mode, pr })
+}
+
+const PULL_REQUESTS_QUERY = `
+query GoblinPullRequests(
+  $owner: String!,
+  $repo: String!,
+  $states: [PullRequestState!],
+  $headRefName: String,
+  $limit: Int!,
+  $after: String
+) {
+  repository(owner: $owner, name: $repo) {
+    pullRequests(
+      states: $states,
+      headRefName: $headRefName,
+      first: $limit,
+      after: $after,
+      orderBy: { field: CREATED_AT, direction: DESC }
+    ) {
+      nodes {
+        number
+        title
+        url
+        state
+        isDraft
+        createdAt
+        mergedAt
+        author {
+          login
+        }
+        baseRefName
+        headRefName
+        isCrossRepository
+        reviewDecision
+        mergeable
+        mergeStateStatus
+        statusCheckRollup: commits(last: 1) {
+          nodes {
+            commit {
+              statusCheckRollup {
+                contexts(first: 100) {
+                  checkRunCountsByState {
+                    state
+                    count
+                  }
+                  statusContextCountsByState {
+                    state
+                    count
+                  }
+                }
+              }
+            }
+          }
+        }
+        headRepositoryOwner {
+          login
+        }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+}`
+
+const PULL_REQUESTS_SUMMARY_QUERY = `
+query GoblinPullRequests(
+  $owner: String!,
+  $repo: String!,
+  $states: [PullRequestState!],
+  $headRefName: String,
+  $limit: Int!,
+  $after: String
+) {
+  repository(owner: $owner, name: $repo) {
+    pullRequests(
+      states: $states,
+      headRefName: $headRefName,
+      first: $limit,
+      after: $after,
+      orderBy: { field: CREATED_AT, direction: DESC }
+    ) {
+      nodes {
+        number
+        title
+        url
+        state
+        isDraft
+        createdAt
+        mergedAt
+        author {
+          login
+        }
+        baseRefName
+        headRefName
+        isCrossRepository
+        headRepositoryOwner {
+          login
+        }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+}`
+
+async function queryPullRequests(
+  cwd: string,
+  repo: GitHubRepoRef,
+  options: { headBranch?: string; limit: number; mode: PullRequestFetchMode; states?: GhPullRequestState[] },
+): Promise<PullRequestInfo[] | null> {
+  const results: PullRequestInfo[] = []
+  let after: string | null = null
+  while (results.length < options.limit) {
+    const remaining = options.limit - results.length
+    const response = await graphqlRequestResult<PullRequestsData>(
+      cwd,
+      repo,
+      options.mode === 'summary' ? PULL_REQUESTS_SUMMARY_QUERY : PULL_REQUESTS_QUERY,
+      {
+        owner: repo.owner,
+        repo: repo.name,
+        states: options.states ?? ['OPEN', 'CLOSED', 'MERGED'],
+        headRefName: options.headBranch,
+        limit: Math.min(remaining, 100),
+        after,
+      },
+      'GoblinPullRequests',
+    )
+    if (!response.ok) {
+      logGraphqlError(response.error)
+      return null
+    }
+    if (!response.data.repository?.pullRequests) return null
+    const connection: PullRequestsConnection = response.data.repository.pullRequests
+    for (const node of connection.nodes ?? []) {
+      const pr = normalizeGhPullRequest(node)
+      if (pr) results.push(pr)
+    }
+    if (!connection.pageInfo?.hasNextPage || !connection.pageInfo.endCursor) break
+    after = connection.pageInfo.endCursor
+  }
+  return results
+}
+
+function logGraphqlError(error: GraphqlRequestError): void {
+  const key = `${error.host}:${error.operationName}:${error.code}:${error.status ?? ''}`
+  const lastLoggedAt = loggedGraphqlErrors.get(key) ?? 0
+  if (Date.now() - lastLoggedAt < PR_CACHE_TTL_MS) return
+  loggedGraphqlErrors.set(key, Date.now())
+  console.warn('[pull-requests]', formatGraphqlError(error))
+}
+
+async function queryRepositoryPullRequests(
+  cwd: string,
+  repo: GitHubRepoRef,
+  mode: PullRequestFetchMode,
+): Promise<PullRequestInfo[] | null> {
+  const openPrs = await queryPullRequests(cwd, repo, { states: ['OPEN'], limit: 200, mode })
+  if (!openPrs) return null
+  if (mode === 'summary') return openPrs
+
+  // Closed and merged PRs are only supplemental history. Querying open PRs
+  // separately prevents a busy repository's recent closed PRs from pushing
+  // older-but-still-open PRs past the repo-wide limit.
+  const historicalPrs = await queryPullRequests(cwd, repo, { states: ['CLOSED', 'MERGED'], limit: 200, mode })
+  return historicalPrs ? [...openPrs, ...historicalPrs] : openPrs
+}
+
+function mapPullRequestsByBranch(prs: PullRequestInfo[]): Map<string, PullRequestInfo> {
+  const byBranch = new Map<string, PullRequestInfo>()
+  for (const pr of prs) {
+    // A fork PR can use a head ref name that collides with a local branch.
+    // Until the UI can show the owner/repo context, keep branch rows scoped
+    // to PRs whose head branch belongs to this repository.
+    if (pr.isCrossRepository) continue
+    const branch = pr.headRefName
+    if (!branch) continue
+    byBranch.set(branch, pickPullRequest(byBranch.get(branch), pr))
+  }
+  return byBranch
+}
+
+async function fetchRepositoryPullRequestMap(
+  cwd: string,
+  repo: GitHubRepoRef,
+  mode: PullRequestFetchMode,
+): Promise<Map<string, PullRequestInfo> | null> {
+  const prs = await queryRepositoryPullRequests(cwd, repo, mode)
+  if (!prs) return null
+  const byBranch = mapPullRequestsByBranch(prs)
+  prCache.set(cwd, { expiresAt: Date.now() + PR_CACHE_TTL_MS, mode, prs: byBranch })
+  return byBranch
+}
+
+async function fetchSingleBranchPullRequestMap(
+  cwd: string,
+  repo: GitHubRepoRef,
+  branch: string,
+  mode: PullRequestFetchMode,
+): Promise<Map<string, PullRequestInfo> | null> {
+  const prs = await queryPullRequests(cwd, repo, { headBranch: branch, limit: 20, mode })
+  if (!prs) return null
+  const byBranch = mapPullRequestsByBranch(prs)
+  cacheBranchPullRequest(cwd, branch, mode, byBranch.get(branch) ?? null)
+  return byBranch
 }
 
 export async function getBranchPullRequests(
   cwd: string,
   branchNames?: ReadonlySet<string>,
+  options?: { mode?: PullRequestFetchMode },
 ): Promise<Map<string, PullRequestInfo> | null> {
+  const mode = options?.mode ?? 'full'
+  const singleBranch = branchNames?.size === 1 ? Array.from(branchNames)[0] : undefined
   const cached = prCache.get(cwd)
-  if (cached && cached.expiresAt > Date.now()) return filterPullRequests(cached.prs, branchNames)
+  if (!singleBranch && cached && cacheFresh(cached.expiresAt) && cacheSatisfiesMode(cached.mode, mode)) {
+    return filterPullRequests(cached.prs, branchNames)
+  }
 
   try {
-    if (!(await canUseGh(cwd))) {
-      prCache.set(cwd, { expiresAt: Date.now() + PR_CACHE_TTL_MS, prs: null })
-      return null
+    const repo = await getGitHubRepoRef(cwd)
+    if (!repo) return null
+    if (singleBranch) {
+      const cached = getCachedBranchPullRequest(cwd, singleBranch, mode)
+      if (cached.hit) {
+        if (cached.unavailable) return null
+        return cached.pr ? new Map([[singleBranch, cached.pr]]) : new Map()
+      }
+
+      const key = branchCacheKey(cwd, singleBranch, mode)
+      const existing = pendingBranchRequests.get(key)
+      const byBranch = existing ?? fetchSingleBranchPullRequestMap(cwd, repo, singleBranch, mode)
+      if (!existing) pendingBranchRequests.set(key, byBranch)
+      try {
+        return await byBranch
+      } finally {
+        if (pendingBranchRequests.get(key) === byBranch) pendingBranchRequests.delete(key)
+      }
     }
-    const output = await gh(cwd, [
-      'pr',
-      'list',
-      '--state',
-      'all',
-      '--limit',
-      '200',
-      '--json',
-      'number,title,url,state,isDraft,mergedAt,closedAt,baseRefName,headRefName',
-    ])
-    const byBranch = new Map<string, PullRequestInfo>()
-    for (const pr of parsePullRequests(output)) {
-      const branch = pr.headRefName
-      if (!branch) continue
-      byBranch.set(branch, pickPullRequest(byBranch.get(branch), pr))
+
+    const key = repoRequestKey(cwd, mode)
+    const existing = pendingRepoRequests.get(key)
+    const byBranch = existing ?? fetchRepositoryPullRequestMap(cwd, repo, mode)
+    if (!existing) pendingRepoRequests.set(key, byBranch)
+    try {
+      return filterPullRequests(await byBranch, branchNames)
+    } finally {
+      if (pendingRepoRequests.get(key) === byBranch) pendingRepoRequests.delete(key)
     }
-    prCache.set(cwd, { expiresAt: Date.now() + PR_CACHE_TTL_MS, prs: byBranch })
-    return filterPullRequests(byBranch, branchNames)
   } catch {
+    if (!singleBranch) prCache.set(cwd, { expiresAt: Date.now() + PR_CACHE_TTL_MS, mode, prs: null })
     return null
   }
 }
 
 export async function getBranchPullRequest(cwd: string, branch: string): Promise<PullRequestInfo | null> {
   if (!isSafeBranchName(branch)) return null
-  const pr = getCachedBranchPullRequest(cwd, branch)
-  if (pr) return pr
+  const cached = getCachedBranchPullRequest(cwd, branch, 'full')
+  if (cached.hit) return cached.pr
   try {
-    if (!(await canUseGh(cwd))) return null
-    const output = await gh(cwd, [
-      'pr',
-      'list',
-      '--head',
-      branch,
-      '--state',
-      'all',
-      '--limit',
-      '20',
-      '--json',
-      'number,title,url,state,isDraft,mergedAt,closedAt,baseRefName,headRefName',
-    ])
-    let picked: PullRequestInfo | null = null
-    for (const pr of parsePullRequests(output)) {
-      picked = pickPullRequest(picked ?? undefined, pr)
+    const repo = await getGitHubRepoRef(cwd)
+    if (!repo) return null
+    const key = branchCacheKey(cwd, branch, 'full')
+    const existing = pendingBranchRequests.get(key)
+    const byBranch = existing ?? fetchSingleBranchPullRequestMap(cwd, repo, branch, 'full')
+    if (!existing) pendingBranchRequests.set(key, byBranch)
+    try {
+      return (await byBranch)?.get(branch) ?? null
+    } finally {
+      if (pendingBranchRequests.get(key) === byBranch) pendingBranchRequests.delete(key)
     }
-    return picked
   } catch {
     return null
   }

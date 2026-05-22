@@ -40,7 +40,7 @@ export function CommitDetail({ repoId, detail }: Props) {
   const totalDeleted = files.reduce((n, f) => n + f.deleted, 0)
 
   return (
-    <div className="flex flex-1 flex-col min-h-0">
+    <div className="min-h-0 flex-1 overflow-y-auto scroll-thin">
       <div className="flex items-start gap-3 border-b border-border bg-muted px-4 py-3">
         <button
           type="button"
@@ -84,7 +84,7 @@ export function CommitDetail({ repoId, detail }: Props) {
       {files.length === 0 ? (
         <div className="p-6 text-center text-sm text-muted-foreground">{t('commit.empty')}</div>
       ) : (
-        <ul className="overflow-y-auto scroll-thin flex-1 divide-y divide-border">
+        <ul className="divide-y divide-border">
           {files.map((f) => (
             <li key={f.path} className="px-4 py-2 flex items-center gap-3">
               <span className="shrink-0 text-muted-foreground">

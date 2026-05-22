@@ -24,7 +24,7 @@ import { resolveKnownWorktree, resolveRemovableWorktree } from '#/main/git/guard
 import { createWorktree, getWorktrees, removeWorktree } from '#/main/git/worktrees.ts'
 import { getBranchPullRequests } from '#/main/git/pull-requests.ts'
 import { getCommitFileStats, getCommitMeta } from '#/main/git/log.ts'
-import { PROTECTED_BRANCHES, type ExecResult } from '#/shared/git-types.ts'
+import { PROTECTED_BRANCHES, type ExecResult, type PullRequestFetchMode } from '#/shared/git-types.ts'
 import { isValidAbsolutePath, isValidBranch, isValidCwd } from '#/main/ipc/validation.ts'
 import { checkGitAvailable } from '#/main/git/helper.ts'
 
@@ -127,22 +127,26 @@ export function wireRepoIpc(): void {
     return { branches, current }
   })
 
-  ipcMain.handle('repo:pull-requests', async (_e, cwd: string, branches?: string[]) => {
-    if (!isValidCwd(cwd)) return []
-    if (branches !== undefined && !Array.isArray(branches)) return []
-    const branchSet =
-      branches === undefined
-        ? undefined
-        : new Set(
-            branches.filter((branch): branch is string => {
-              return isValidBranch(branch)
-            }),
-          )
-    if (branchSet?.size === 0) return []
-    const prs = await getBranchPullRequests(cwd, branchSet)
-    if (!prs) return null
-    return Array.from(prs, ([branch, pullRequest]) => ({ branch, pullRequest }))
-  })
+  ipcMain.handle(
+    'repo:pull-requests',
+    async (_e, cwd: string, branches?: string[], options?: { mode?: PullRequestFetchMode }) => {
+      if (!isValidCwd(cwd)) return null
+      if (branches !== undefined && !Array.isArray(branches)) return null
+      const mode = options?.mode === 'summary' ? 'summary' : 'full'
+      const branchSet =
+        branches === undefined
+          ? undefined
+          : new Set(
+              branches.filter((branch): branch is string => {
+                return isValidBranch(branch)
+              }),
+            )
+      if (branchSet?.size === 0) return []
+      const prs = await getBranchPullRequests(cwd, branchSet, { mode })
+      if (!prs) return null
+      return Array.from(prs, ([branch, pullRequest]) => ({ branch, pullRequest }))
+    },
+  )
 
   ipcMain.handle('repo:log', async (_e, cwd: string, branch: string, count?: number) => {
     if (!isValidCwd(cwd) || !isValidBranch(branch)) return []

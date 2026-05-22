@@ -30,9 +30,23 @@ export interface PullRequestInfo {
   url: string
   state: 'open' | 'merged' | 'closed'
   isDraft?: boolean
+  createdAt?: string
+  author?: string
   baseRefName?: string
   headRefName?: string
+  headRepositoryOwner?: string
+  isCrossRepository?: boolean
+  checks?: {
+    total: number
+    passing: number
+    failing: number
+    pending: number
+  }
+  reviewDecision?: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null
+  mergeable?: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN'
 }
+
+export type PullRequestFetchMode = 'summary' | 'full'
 
 export interface WorktreeInfo {
   path: string

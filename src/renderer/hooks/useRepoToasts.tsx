@@ -9,7 +9,6 @@ const EMPTY_EVENTS: RepoEvent[] = []
 export function useRepoToasts(repoId: string) {
   const t = useT()
   const events = useReposStore((s) => s.repos[repoId]?.events ?? EMPTY_EVENTS)
-  const clearEvents = useReposStore((s) => s.clearEvents)
 
   // `t` is read through a ref so a language flip doesn't re-fire these
   // effects (which would already be no-ops after the store clear, but
@@ -49,11 +48,11 @@ export function useRepoToasts(repoId: string) {
         })
       }
     }
-    clearEvents(
+    useReposStore.getState().clearEvents(
       repoId,
       events.map((event) => event.id),
     )
-  }, [events, repoId, clearEvents])
+  }, [events, repoId])
 }
 
 function ToastDescription({ children }: { children: React.ReactNode }) {

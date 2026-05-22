@@ -255,8 +255,7 @@ button,
   justify-content: center;
 }
 
-/* Honor the OS-level "reduce motion" preference. Replacing the keyframe
- * with a no-op duration keeps the layout (no jump) without animating. */
+/* Honor the OS-level "reduce motion" preference. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

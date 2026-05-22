@@ -18,7 +18,7 @@ interface Props {
 export function BranchDetailContent({ repo, detail, detailId, contentId }: Props) {
   const t = useT()
   const { branch, branchLog, selectedStatus } = detail
-  if (!branch) return <EmptyState title={t('branches.empty')} />
+  if (!branch) return <EmptyState title={t(repo.branches.length === 0 ? 'branches.empty' : 'branches.filter-empty')} />
 
   return (
     <div id={contentId} className="flex min-h-0 flex-1 flex-col">

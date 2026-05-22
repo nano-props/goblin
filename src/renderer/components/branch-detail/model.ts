@@ -9,5 +9,5 @@ export function getSelectedBranchDetail(repo: RepoState) {
   const selectedStatus = branch?.worktreePath ? repo.status.filter((wt) => wt.path === branch.worktreePath) : []
   const statusCount = selectedStatus.reduce((n, wt) => n + wt.entries.length, 0)
 
-  return { branch, branchLog, selectedStatus, statusCount, pullRequestsLoading: repo.pullRequestsLoading }
+  return { branch, branchLog, selectedStatus, statusCount }
 }

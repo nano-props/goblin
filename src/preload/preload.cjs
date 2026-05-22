@@ -35,7 +35,7 @@ contextBridge.exposeInMainWorld('gbl', {
 
   // ---- Repo data ---------------------------------------------------------
   snapshot: (cwd) => safeInvoke('repo:snapshot', cwd),
-  pullRequests: (cwd, branches) => safeInvoke('repo:pull-requests', cwd, branches),
+  pullRequests: (cwd, branches, options) => safeInvoke('repo:pull-requests', cwd, branches, options),
   log: (cwd, branch, count) => safeInvoke('repo:log', cwd, branch, count),
   status: (cwd) => safeInvoke('repo:status', cwd),
   patch: (cwd, worktreePath) => safeInvoke('repo:patch', cwd, worktreePath),

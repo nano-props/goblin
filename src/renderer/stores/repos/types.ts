@@ -1,8 +1,9 @@
 import type { StoreApi } from 'zustand'
-import type { BranchInfo, LogEntry, WorktreeStatus } from '#/renderer/types.ts'
+import type { BranchInfo, LogEntry, PullRequestFetchMode, WorktreeStatus } from '#/renderer/types.ts'
 import type { CommitDetail } from '#/renderer/types-bridge.ts'
 
 export type DetailTab = 'status' | 'changes' | 'commits'
+export type BranchViewMode = 'all' | 'worktrees' | 'no-worktree'
 
 export interface BranchLogState {
   entries: LogEntry[]
@@ -28,6 +29,7 @@ export interface RepoState {
   branches: BranchInfo[]
   currentBranch: string
   selectedBranch: string | null
+  branchViewMode: BranchViewMode
   logsByBranch: Record<string, BranchLogState>
   /** Working-tree status grouped by worktree (main worktree first). */
   status: WorktreeStatus[]
@@ -40,6 +42,7 @@ export interface RepoState {
   openingCommitHash: string | null
   loading: boolean
   syncing: boolean
+  lastFetchSettledAt: number | null
   /** True while a periodic background fetch is running — header indicator. */
   fetching: boolean
   /** True if the most recent background fetch failed (network down,
@@ -92,6 +95,7 @@ export interface ReposStore {
   setDetailTab: (id: string, tab: DetailTab) => void
   setDetailCollapsed: (collapsed: boolean) => void
   toggleDetailCollapsed: () => void
+  setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
   selectBranch: (id: string, branch: string) => void
   selectLog: (id: string, branch: string, hash: string) => void
   cycleActive: (direction: 1 | -1) => void
@@ -105,7 +109,11 @@ export interface ReposStore {
     options?: { silent?: boolean; skipLogBackfill?: boolean; token?: number },
   ) => Promise<void>
   refreshBranchLog: (id: string, branch?: string, options?: { token?: number }) => Promise<void>
-  refreshPullRequests: (id: string, branches?: string[], options?: { token?: number }) => Promise<void>
+  refreshPullRequests: (
+    id: string,
+    branches?: string[],
+    options?: { token?: number; mode?: PullRequestFetchMode; silent?: boolean; clearMissing?: boolean },
+  ) => Promise<void>
   refreshStatus: (id: string, options?: { token?: number }) => Promise<void>
   refreshAll: (id: string, options?: { token?: number }) => Promise<void>
   syncAndRefresh: (id: string, options?: { token?: number }) => Promise<void>
@@ -114,7 +122,7 @@ export interface ReposStore {
   openCommit: (id: string, hash: string) => Promise<void>
   closeCommit: (id: string) => void
 
-  setLastResult: (id: string, result: { ok: boolean; message: string }, token?: number) => void
+  setLastResult: (id: string, result: { ok: boolean; message: string }, token: number) => void
   clearEvents: (id: string, eventIds: number[]) => void
   hydrateSession: (openRepos: string[], activeRepo: string | null) => Promise<void>
   /** Drop the "missing" indicator for paths that failed to restore — the
@@ -123,7 +131,7 @@ export interface ReposStore {
   /** Clear the fetchFailed flag — called by manual fetch success and
    *  by an explicit refresh, so a stale badge doesn't follow the user
    *  around forever. */
-  clearFetchFailed: (id: string, token?: number) => void
+  clearFetchFailed: (id: string, token: number) => void
 }
 
 export type ReposSet = StoreApi<ReposStore>['setState']

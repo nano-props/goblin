@@ -9,34 +9,32 @@
 // those need a branch context to be meaningful.
 
 import { useEffect, useRef, useState } from 'react'
-import { FolderPlus, Loader2, RotateCw } from 'lucide-react'
+import { FolderPlus, Loader2 } from 'lucide-react'
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import type { RepoState } from '#/renderer/stores/repos/types.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { Tip } from '#/renderer/components/Tip.tsx'
 import { Button } from '#/renderer/components/ui/button.tsx'
 import { CreateWorktreeDialog, type CreateWorktreeRequest } from '#/renderer/components/CreateWorktreeDialog.tsx'
+import { RepoSyncControl } from '#/renderer/components/repo-sync/RepoSyncControl.tsx'
 
 interface Props {
   repo: RepoState
 }
 
-export function RepoActionsHeader({ repo }: Props) {
+export function RepoToolbarActions({ repo }: Props) {
   const t = useT()
   const setLastResult = useReposStore((s) => s.setLastResult)
-  const syncAndRefresh = useReposStore((s) => s.syncAndRefresh)
   const refreshSnapshot = useReposStore((s) => s.refreshSnapshot)
   const refreshStatus = useReposStore((s) => s.refreshStatus)
-  const [syncBusyByRepo, setSyncBusyByRepo] = useState<Record<string, boolean>>({})
   const [createOpen, setCreateOpen] = useState(false)
   const [creatingByRepo, setCreatingByRepo] = useState<Record<string, string>>({})
   const [createTipByRepo, setCreateTipByRepo] = useState<Record<string, boolean>>({})
   const createTipTimers = useRef<Record<string, number>>({})
-  const syncBusyRef = useRef<Record<string, boolean>>({})
   const creatingRef = useRef<Record<string, boolean>>({})
 
   // RepoView reuses the same React instance across repo switches
-  // (no `key={activeId}` on the parent), so RepoActionsHeader keeps
+  // (no `key={activeId}` on the parent), so RepoToolbarActions keeps
   // its state when the user moves to a different repo. Force-close
   // the create-worktree dialog on repo change so a half-typed branch
   // name from repo A doesn't leak into a submission against repo B.
@@ -50,25 +48,6 @@ export function RepoActionsHeader({ repo }: Props) {
     },
     [],
   )
-
-  async function handleSync() {
-    const targetRepoId = repo.id
-    const token = repo.instanceToken
-    if (syncBusyRef.current[targetRepoId]) return
-    syncBusyRef.current[targetRepoId] = true
-    setSyncBusyByRepo((s) => ({ ...s, [targetRepoId]: true }))
-    try {
-      await syncAndRefresh(targetRepoId, { token })
-    } finally {
-      delete syncBusyRef.current[targetRepoId]
-      setSyncBusyByRepo((s) => {
-        if (!s[targetRepoId]) return s
-        const next = { ...s }
-        delete next[targetRepoId]
-        return next
-      })
-    }
-  }
 
   function showCreateTip(repoId: string) {
     const existing = createTipTimers.current[repoId]
@@ -119,7 +98,6 @@ export function RepoActionsHeader({ repo }: Props) {
 
   const creatingBranch = creatingByRepo[repo.id]
   const createBusy = !!creatingBranch
-  const syncBusy = !!syncBusyByRepo[repo.id] || repo.syncing
   const createTip = createBusy
     ? t('action.create-worktree-creating-title', { branch: creatingBranch })
     : t('action.create-worktree-title')
@@ -128,12 +106,7 @@ export function RepoActionsHeader({ repo }: Props) {
   // don't make the user guess which action they are invoking.
   return (
     <div className="flex items-center gap-1">
-      <Tip label={t('action.fetch-title')}>
-        <Button variant="ghost" onClick={handleSync} disabled={syncBusy}>
-          <RotateCw className={syncBusy ? 'animate-spin' : ''} />
-          {t('action.refresh')}
-        </Button>
-      </Tip>
+      <RepoSyncControl repo={repo} />
       <Tip label={createTip} forceOpen={createBusy && !!createTipByRepo[repo.id]}>
         <span className="inline-flex">
           <Button

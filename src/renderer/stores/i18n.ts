@@ -6,7 +6,7 @@
 
 import i18next from 'i18next'
 import { initReactI18next, useTranslation } from 'react-i18next'
-import { create } from 'zustand'
+import { create, type StoreApi } from 'zustand'
 import type { Lang, LangPref } from '#/renderer/types-bridge.ts'
 
 export type { Lang, LangPref }
@@ -36,36 +36,71 @@ interface I18nState {
   setPref: (pref: LangPref) => Promise<void>
 }
 
+type I18nPayload = { lang: Lang; pref: LangPref; dict: Dict }
+type I18nSet = StoreApi<I18nState>['setState']
+
+let unsubscribe: (() => void) | null = null
+let hydrateVersion = 0
+let payloadQueue = Promise.resolve()
+
+function clearI18nSubscription() {
+  unsubscribe?.()
+  unsubscribe = null
+}
+
 export const useI18nStore = create<I18nState>((set) => ({
   lang: 'en',
   pref: 'auto',
   dict: {},
 
   async hydrate() {
+    const version = ++hydrateVersion
     const payload = await window.gbl.i18n.get()
-    await applyPayload(payload)
-    set({ lang: payload.lang, pref: payload.pref, dict: payload.dict })
-    document.documentElement.setAttribute('lang', payload.lang)
-    window.gbl.i18n.onChange((next) => {
-      void (async () => {
-        await applyPayload(next)
-        set({ lang: next.lang, pref: next.pref, dict: next.dict })
-        document.documentElement.setAttribute('lang', next.lang)
-      })().catch((err) => {
+    if (version !== hydrateVersion) return
+    await commitPayload(set, payload)
+    if (version !== hydrateVersion) return
+    const nextUnsubscribe = window.gbl.i18n.onChange((next) => {
+      void commitPayload(set, next).catch((err) => {
         console.warn('[i18n] change failed', err)
       })
     })
+    if (version !== hydrateVersion) {
+      nextUnsubscribe()
+      return
+    }
+    clearI18nSubscription()
+    unsubscribe = nextUnsubscribe
   },
 
   async setPref(pref) {
     const payload = await window.gbl.i18n.setPref(pref)
     if (payload) {
-      await applyPayload(payload)
-      set({ lang: payload.lang, pref: payload.pref, dict: payload.dict })
-      document.documentElement.setAttribute('lang', payload.lang)
+      await commitPayload(set, payload)
     }
   },
 }))
+
+function commitPayload(set: I18nSet, payload: I18nPayload): Promise<void> {
+  const work = payloadQueue.then(() => commitPayloadNow(set, payload))
+  payloadQueue = work.catch(() => {})
+  return work
+}
+
+async function commitPayloadNow(set: I18nSet, payload: I18nPayload): Promise<void> {
+  const current = useI18nStore.getState()
+  if (samePayload(current, payload)) return
+  await applyPayload(payload)
+  set((s) => (samePayload(s, payload) ? s : { lang: payload.lang, pref: payload.pref, dict: payload.dict }))
+  document.documentElement.setAttribute('lang', payload.lang)
+}
+
+function samePayload(state: Pick<I18nState, 'lang' | 'pref' | 'dict'>, payload: I18nPayload): boolean {
+  if (state.lang !== payload.lang || state.pref !== payload.pref) return false
+  const stateKeys = Object.keys(state.dict)
+  const payloadKeys = Object.keys(payload.dict)
+  if (stateKeys.length !== payloadKeys.length) return false
+  return stateKeys.every((key) => state.dict[key] === payload.dict[key])
+}
 
 async function applyPayload(payload: { lang: Lang; dict: Dict }): Promise<void> {
   i18next.addResourceBundle(payload.lang, 'translation', payload.dict, true, true)

@@ -25,6 +25,18 @@ interface SettingsStore {
   setGlobalShortcut: (accelerator: string) => Promise<GlobalShortcutState>
 }
 
+let unsubscribers: Array<() => void> = []
+let hydrateVersion = 0
+
+function clearSettingsSubscriptions() {
+  for (const unsubscribe of unsubscribers) unsubscribe()
+  unsubscribers = []
+}
+
+function clearSubscriptions(subscriptions: Array<() => void>): void {
+  for (const unsubscribe of subscriptions) unsubscribe()
+}
+
 export const useSettingsStore = create<SettingsStore>((set) => ({
   fetchIntervalSec: 60,
   shortcutsDisabled: false,
@@ -33,7 +45,9 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
   savedSession: { openRepos: [], activeRepo: null, detailCollapsed: true },
 
   async hydrate() {
+    const version = ++hydrateVersion
     const snap = await window.gbl.settings.get()
+    if (version !== hydrateVersion) return snap.session
     set({
       fetchIntervalSec: snap.fetchIntervalSec,
       shortcutsDisabled: snap.shortcutsDisabled,
@@ -41,31 +55,58 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
       globalShortcutRegistered: snap.globalShortcutRegistered,
       savedSession: snap.session,
     })
-    // Subscribe to interval changes pushed from main (e.g. settings
-    // window in the future). Listener is process-lifetime — we don't
-    // unsubscribe.
-    window.gbl.settings.onFetchIntervalChange((sec) => set({ fetchIntervalSec: sec }))
-    window.gbl.settings.onShortcutsDisabledChange((disabled) => set({ shortcutsDisabled: disabled }))
-    window.gbl.settings.onGlobalShortcutChange(({ accelerator, registered }) =>
-      set({ globalShortcut: accelerator, globalShortcutRegistered: registered }),
-    )
+    const nextUnsubscribers: Array<() => void> = []
+    try {
+      nextUnsubscribers.push(
+        window.gbl.settings.onFetchIntervalChange((sec) =>
+          set((s) => (s.fetchIntervalSec === sec ? s : { fetchIntervalSec: sec })),
+        ),
+      )
+      nextUnsubscribers.push(
+        window.gbl.settings.onShortcutsDisabledChange((disabled) =>
+          set((s) => (s.shortcutsDisabled === disabled ? s : { shortcutsDisabled: disabled })),
+        ),
+      )
+      nextUnsubscribers.push(
+        window.gbl.settings.onGlobalShortcutChange(({ accelerator, registered }) =>
+          set((s) =>
+            s.globalShortcut === accelerator && s.globalShortcutRegistered === registered
+              ? s
+              : { globalShortcut: accelerator, globalShortcutRegistered: registered },
+          ),
+        ),
+      )
+    } catch (err) {
+      clearSubscriptions(nextUnsubscribers)
+      throw err
+    }
+    if (version !== hydrateVersion) {
+      clearSubscriptions(nextUnsubscribers)
+      return snap.session
+    }
+    clearSettingsSubscriptions()
+    unsubscribers = nextUnsubscribers
     return snap.session
   },
 
   async setFetchInterval(sec) {
     const clamped = Math.max(0, Math.min(3600, Math.round(sec)))
     await window.gbl.settings.setFetchInterval(clamped)
-    set({ fetchIntervalSec: clamped })
+    set((s) => (s.fetchIntervalSec === clamped ? s : { fetchIntervalSec: clamped }))
   },
 
   async setShortcutsDisabled(disabled) {
     await window.gbl.settings.setShortcutsDisabled(disabled)
-    set({ shortcutsDisabled: disabled })
+    set((s) => (s.shortcutsDisabled === disabled ? s : { shortcutsDisabled: disabled }))
   },
 
   async setGlobalShortcut(accelerator) {
     const state = await window.gbl.settings.setGlobalShortcut(accelerator)
-    set({ globalShortcut: state.accelerator, globalShortcutRegistered: state.registered })
+    set((s) =>
+      s.globalShortcut === state.accelerator && s.globalShortcutRegistered === state.registered
+        ? s
+        : { globalShortcut: state.accelerator, globalShortcutRegistered: state.registered },
+    )
     return state
   },
 }))

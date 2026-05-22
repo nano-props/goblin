@@ -12,6 +12,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
+import { branchForVisibleLog, visibleBranches } from '#/renderer/stores/repos/branch-view-mode.ts'
 import { useSettingsStore } from '#/renderer/stores/settings.ts'
 import { isShortcutBlockingLayerOpen } from '#/renderer/lib/layers.ts'
 
@@ -78,9 +79,9 @@ export function useKeyboard({ onShowHelp, isOverlayOpen }: Options) {
       switch (e.key) {
         case 'j':
         case 'ArrowDown': {
-          if (overlayOpen || !repo || repo.branches.length === 0) break
+          if (overlayOpen || !repo) break
           if (commitListActive) {
-            const branch = repo.selectedBranch ?? repo.currentBranch
+            const branch = branchForVisibleLog(repo)
             const branchLog = branch ? repo.logsByBranch[branch] : undefined
             if (branch && branchLog?.entries.length) {
               e.preventDefault()
@@ -90,19 +91,21 @@ export function useKeyboard({ onShowHelp, isOverlayOpen }: Options) {
               if (next) state.selectLog(repo.id, branch, next.hash)
             }
           } else {
+            const branches = visibleBranches(repo)
+            if (branches.length === 0) break
             e.preventDefault()
-            const idx = repo.branches.findIndex((b) => b.name === repo.selectedBranch)
-            const nextIdx = Math.min(repo.branches.length - 1, idx < 0 ? 0 : idx + 1)
-            const next = repo.branches[nextIdx]
+            const idx = branches.findIndex((b) => b.name === repo.selectedBranch)
+            const nextIdx = Math.min(branches.length - 1, idx < 0 ? 0 : idx + 1)
+            const next = branches[nextIdx]
             if (next) state.selectBranch(repo.id, next.name)
           }
           break
         }
         case 'k':
         case 'ArrowUp': {
-          if (overlayOpen || !repo || repo.branches.length === 0) break
+          if (overlayOpen || !repo) break
           if (commitListActive) {
-            const branch = repo.selectedBranch ?? repo.currentBranch
+            const branch = branchForVisibleLog(repo)
             const branchLog = branch ? repo.logsByBranch[branch] : undefined
             if (branch && branchLog?.entries.length) {
               e.preventDefault()
@@ -112,10 +115,12 @@ export function useKeyboard({ onShowHelp, isOverlayOpen }: Options) {
               if (next) state.selectLog(repo.id, branch, next.hash)
             }
           } else {
+            const branches = visibleBranches(repo)
+            if (branches.length === 0) break
             e.preventDefault()
-            const idx = repo.branches.findIndex((b) => b.name === repo.selectedBranch)
+            const idx = branches.findIndex((b) => b.name === repo.selectedBranch)
             const nextIdx = Math.max(0, idx < 0 ? 0 : idx - 1)
-            const next = repo.branches[nextIdx]
+            const next = branches[nextIdx]
             if (next) state.selectBranch(repo.id, next.name)
           }
           break

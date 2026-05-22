@@ -35,11 +35,11 @@ export function createCommitActions(set: ReposSet, get: ReposGet) {
       })
     },
 
-    setLastResult(id: string, result: { ok: boolean; message: string }, token?: number) {
+    setLastResult(id: string, result: { ok: boolean; message: string }, token: number) {
       set((s) => {
         const repo = s.repos[id]
         if (!repo) return s
-        if (token !== undefined && repo.instanceToken !== token) return s
+        if (repo.instanceToken !== token) return s
         return { repos: { ...s.repos, [id]: { ...repo, events: [...repo.events, resultEvent(result)] } } }
       })
     },
@@ -56,11 +56,11 @@ export function createCommitActions(set: ReposSet, get: ReposGet) {
       })
     },
 
-    clearFetchFailed(id: string, token?: number) {
+    clearFetchFailed(id: string, token: number) {
       set((s) => {
         const repo = s.repos[id]
         if (!repo || !repo.fetchFailed) return s
-        if (token !== undefined && repo.instanceToken !== token) return s
+        if (repo.instanceToken !== token) return s
         return { repos: { ...s.repos, [id]: { ...repo, fetchFailed: false, fetchError: null } } }
       })
     },

@@ -1,22 +1,80 @@
 import { lastPathSegment } from '#/renderer/lib/paths.ts'
 import { emptyRepo, inFlightFetchById } from '#/renderer/stores/repos/helpers.ts'
-import type { MissingRepo, OpenRepoResult, ReposGet, ReposSet } from '#/renderer/stores/repos/types.ts'
+import type { MissingRepo, OpenRepoResult, ReposGet, ReposSet, ReposStore } from '#/renderer/stores/repos/types.ts'
+
+interface ResolvedRepo {
+  id: string
+  name: string
+}
+
+interface ProbeResult {
+  input: string
+  reason: string | null
+  repo: ResolvedRepo | null
+}
+
+interface InitialRepoRefresh {
+  id: string
+  token: number
+}
+
+async function resolveRepoPath(
+  p: string,
+  onError?: (err: unknown) => void,
+  fallbackError = 'error.failed-read-repo',
+): Promise<ProbeResult> {
+  try {
+    const probe = await window.gbl.probe(p)
+    if (!probe?.ok || !probe.root) return { input: p, reason: probe?.message ?? 'error.not-git-repo', repo: null }
+    return {
+      input: p,
+      reason: null,
+      repo: { id: probe.root, name: probe.name ?? lastPathSegment(probe.root) },
+    }
+  } catch (err) {
+    onError?.(err)
+    return { input: p, reason: err instanceof Error ? err.message : fallbackError, repo: null }
+  }
+}
+
+function addResolvedRepos(
+  s: Pick<ReposStore, 'repos' | 'order'>,
+  resolvedRepos: ResolvedRepo[],
+): Pick<ReposStore, 'repos' | 'order'> & { changed: boolean } {
+  let repos = s.repos
+  let order = s.order
+  let changed = false
+  for (const { id, name } of resolvedRepos) {
+    if (repos[id]) continue
+    if (!changed) {
+      repos = { ...repos }
+      order = [...order]
+      changed = true
+    }
+    repos[id] = emptyRepo(id, name)
+    order.push(id)
+  }
+  return { repos, order, changed }
+}
+
+function refreshInitialRepoState(get: ReposGet, refresh: InitialRepoRefresh) {
+  const repo = get().repos[refresh.id]
+  if (!repo || repo.instanceToken !== refresh.token) return
+  void get().refreshSnapshot(refresh.id, { token: refresh.token })
+  // Status drives the selected-branch detail badge, so load it
+  // eagerly before the user opens the Status detail tab.
+  void get().refreshStatus(refresh.id, { token: refresh.token })
+}
 
 export function createLifecycleActions(set: ReposSet, get: ReposGet) {
   return {
     async openRepo(p: string, options?: { activate?: boolean }): Promise<OpenRepoResult> {
-      let probe
-      try {
-        probe = await window.gbl.probe(p)
-      } catch (err) {
-        return { ok: false, message: err instanceof Error ? err.message : 'error.not-git-repo' }
-      }
-      if (!probe?.ok || !probe.root) {
-        return { ok: false, message: probe?.message ?? 'error.not-git-repo' }
-      }
-      const id = probe.root
-      const name = probe.name ?? lastPathSegment(id)
+      const resolved = await resolveRepoPath(p, undefined, 'error.not-git-repo')
+      if (!resolved.repo) return { ok: false, message: resolved.reason ?? 'error.not-git-repo' }
+      const repo = resolved.repo
+      const { id } = repo
       const activate = options?.activate !== false
+      let initialRefresh: InitialRepoRefresh | null = null
       void window.gbl.settings.addRecentRepo(id).catch(() => {
         /* recent menu is best-effort */
       })
@@ -27,23 +85,19 @@ export function createLifecycleActions(set: ReposSet, get: ReposGet) {
       // (`Object.is(next, prev)`), so returning `s` when there's nothing
       // to do skips both the merge and the listener fan-out.
       set((s) => {
-        const existing = s.repos[id] !== undefined
-        if (existing) {
+        const existingRepo = s.repos[id]
+        const { repos, order, changed } = addResolvedRepos(s, [repo])
+        const repoToRefresh = changed ? repos[id] : existingRepo
+        if (repoToRefresh) initialRefresh = { id, token: repoToRefresh.instanceToken }
+        if (!changed) {
           // Already active or caller doesn't want to focus → genuine no-op.
           if (!activate || s.activeId === id) return s
           return { activeId: id }
         }
-        const repos = { ...s.repos, [id]: emptyRepo(id, name) }
-        const order = [...s.order, id]
         return activate ? { repos, order, activeId: id } : { repos, order }
       })
 
-      const token = get().repos[id]?.instanceToken
-      if (token === undefined) return { ok: true, id }
-      void get().refreshSnapshot(id, { token })
-      // Status drives the selected-branch detail badge, so load it
-      // eagerly before the user opens the Status detail tab.
-      void get().refreshStatus(id, { token })
+      if (initialRefresh) refreshInitialRepoState(get, initialRefresh)
       return { ok: true, id }
     },
 
@@ -79,41 +133,25 @@ export function createLifecycleActions(set: ReposSet, get: ReposGet) {
       // moved/deleted, external drive not mounted) get reported via
       // `missingFromSession` so the user sees a "couldn't reopen N repos"
       // notice in the tab strip instead of wondering where their tabs went.
-      interface ProbeResult {
-        input: string
-        reason: string | null
-        ok: { id: string; name: string } | null
-      }
       const probes = await Promise.all(
-        openRepos.map(async (p): Promise<ProbeResult> => {
-          try {
-            const probe = await window.gbl.probe(p)
-            if (!probe?.ok || !probe.root) return { input: p, reason: probe?.message ?? 'error.not-git-repo', ok: null }
-            return {
-              input: p,
-              reason: null,
-              ok: { id: probe.root, name: probe.name ?? lastPathSegment(probe.root) },
-            }
-          } catch (err) {
+        openRepos.map((p) =>
+          resolveRepoPath(p, (err) => {
             console.warn(`[session] probe failed for ${p}:`, err)
-            return { input: p, reason: err instanceof Error ? err.message : 'error.failed-read-repo', ok: null }
-          }
-        }),
+          }),
+        ),
       )
-      const valid = probes.filter((x) => x.ok !== null).map((x) => x.ok!)
+      const valid = probes.filter((x) => x.repo !== null).map((x) => x.repo!)
       const missing: MissingRepo[] = probes
-        .filter((x) => x.ok === null)
+        .filter((x) => x.repo === null)
         .map((x) => ({ path: x.input, reason: x.reason ?? 'error.failed-read-repo' }))
+      let initialRefreshes: InitialRepoRefresh[] = []
 
       set((s) => {
-        const repos = { ...s.repos }
-        const order = [...s.order]
-        for (const { id, name } of valid) {
-          if (!repos[id]) {
-            repos[id] = emptyRepo(id, name)
-            order.push(id)
-          }
-        }
+        const { repos, order } = addResolvedRepos(s, valid)
+        initialRefreshes = valid.flatMap(({ id }) => {
+          const repo = repos[id]
+          return repo ? [{ id, token: repo.instanceToken }] : []
+        })
         const userPickedSomething = s.activeId !== null
         const wantActive =
           userPickedSomething && repos[s.activeId!]
@@ -130,14 +168,11 @@ export function createLifecycleActions(set: ReposSet, get: ReposGet) {
         }
       })
 
-      for (const { id } of valid) {
-        const token = get().repos[id]?.instanceToken
-        if (token === undefined) continue
-        void get().refreshSnapshot(id, { token })
-        // See `openRepo`: status backs the selected-branch detail badge,
-        // so we hydrate it for every restored repo, not just the active
-        // one — switching after boot shouldn't reveal a stale 0.
-        void get().refreshStatus(id, { token })
+      // See `openRepo`: status backs the selected-branch detail badge,
+      // so we hydrate it for every restored repo, not just the active
+      // one — switching after boot shouldn't reveal a stale 0.
+      for (const refresh of initialRefreshes) {
+        refreshInitialRepoState(get, refresh)
       }
     },
 

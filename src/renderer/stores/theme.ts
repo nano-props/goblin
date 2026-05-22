@@ -12,8 +12,16 @@ interface ThemeStore extends ThemeState {
   hydrate: () => Promise<void>
 }
 
+let unsubscribe: (() => void) | null = null
+let hydrateVersion = 0
+
 function applyHtmlAttr(resolved: ResolvedTheme) {
   document.documentElement.setAttribute('data-theme', resolved)
+}
+
+function clearThemeSubscription() {
+  unsubscribe?.()
+  unsubscribe = null
 }
 
 export const useThemeStore = create<ThemeStore>((set, get) => ({
@@ -24,19 +32,28 @@ export const useThemeStore = create<ThemeStore>((set, get) => ({
   resolved: (document.documentElement.getAttribute('data-theme') as ResolvedTheme) ?? 'light',
 
   async hydrate() {
+    const version = ++hydrateVersion
     const state = await window.gbl.theme.get()
+    if (version !== hydrateVersion) return
     applyHtmlAttr(state.resolved)
-    set(state)
-    window.gbl.theme.onChange((next) => {
+    set((s) => (s.pref === state.pref && s.resolved === state.resolved ? s : state))
+    if (version !== hydrateVersion) return
+    const nextUnsubscribe = window.gbl.theme.onChange((next) => {
       applyHtmlAttr(next.resolved)
-      set(next)
+      set((s) => (s.pref === next.pref && s.resolved === next.resolved ? s : next))
     })
+    if (version !== hydrateVersion) {
+      nextUnsubscribe()
+      return
+    }
+    clearThemeSubscription()
+    unsubscribe = nextUnsubscribe
   },
 
   async setPref(pref) {
     if (pref === get().pref) return
     const next = await window.gbl.theme.setPref(pref)
     applyHtmlAttr(next.resolved)
-    set(next)
+    set((s) => (s.pref === next.pref && s.resolved === next.resolved ? s : next))
   },
 }))

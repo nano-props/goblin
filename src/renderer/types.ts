@@ -9,4 +9,5 @@ export type {
   LogEntry,
   ExecResult,
   PullRequestInfo,
+  PullRequestFetchMode,
 } from '#/shared/git-types.ts'

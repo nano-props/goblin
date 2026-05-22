@@ -1,5 +1,6 @@
 import { arrayMove } from '@dnd-kit/sortable'
-import type { DetailTab, ReposGet, ReposSet } from '#/renderer/stores/repos/types.ts'
+import { branchForVisibleLog, selectedBranchForViewMode } from '#/renderer/stores/repos/branch-view-mode.ts'
+import type { BranchViewMode, DetailTab, ReposGet, ReposSet } from '#/renderer/stores/repos/types.ts'
 
 export function createSelectionActions(set: ReposSet, get: ReposGet) {
   return {
@@ -34,6 +35,37 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
       set((s) => ({ detailCollapsed: !s.detailCollapsed }))
     },
 
+    setBranchViewMode(id: string, viewMode: BranchViewMode) {
+      let selectedForLog: string | null = null
+      let selectedForPullRequest: string | null = null
+      let shouldRefreshLog = false
+      set((s) => {
+        const repo = s.repos[id]
+        if (!repo || repo.branchViewMode === viewMode) return s
+        const selectedBranch = selectedBranchForViewMode(repo, viewMode)
+        const selectionChanged = selectedBranch !== repo.selectedBranch
+        selectedForLog = selectedBranch
+        selectedForPullRequest = selectionChanged ? selectedBranch : null
+        shouldRefreshLog = selectionChanged && selectedBranch !== null && repo.detailTab === 'commits'
+        return {
+          repos: {
+            ...s.repos,
+            [id]: {
+              ...repo,
+              branchViewMode: viewMode,
+              selectedBranch,
+              openCommit: selectionChanged ? null : repo.openCommit,
+              openingCommitHash: selectionChanged ? null : repo.openingCommitHash,
+            },
+          },
+        }
+      })
+      if (shouldRefreshLog && selectedForLog) void get().refreshBranchLog(id, selectedForLog)
+      if (selectedForPullRequest) {
+        void get().refreshPullRequests(id, [selectedForPullRequest], { mode: 'full', silent: true })
+      }
+    },
+
     setDetailTab(id: string, tab: DetailTab) {
       let changed = false
       set((s) => {
@@ -45,6 +77,12 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
       })
       if (changed && tab === 'commits') void get().refreshBranchLog(id)
       if (changed && tab === 'changes') void get().refreshStatus(id)
+      if (changed && tab === 'status') {
+        const repo = get().repos[id]
+        if (repo?.selectedBranch) {
+          void get().refreshPullRequests(id, [repo.selectedBranch], { mode: 'full', silent: true })
+        }
+      }
     },
 
     selectBranch(id: string, branch: string) {
@@ -64,6 +102,7 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
       })
       const repo = get().repos[id]
       if (changed && repo?.detailTab === 'commits') void get().refreshBranchLog(id, branch)
+      if (changed) void get().refreshPullRequests(id, [branch], { mode: 'full', silent: true })
     },
 
     selectLog(id: string, branch: string, hash: string) {
@@ -108,7 +147,7 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
       if (!id) return
       const repo = state.repos[id]
       if (!repo || repo.detailTab !== 'commits') return
-      const branch = repo.selectedBranch ?? repo.currentBranch
+      const branch = branchForVisibleLog(repo)
       if (!branch) return
       const branchLog = repo.logsByBranch[branch]
       const hash = branchLog?.selectedHash ?? branchLog?.entries[0]?.hash

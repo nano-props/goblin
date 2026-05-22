@@ -5,11 +5,6 @@ import { useSettingsStore } from '#/renderer/stores/settings.ts'
 import { useThemeStore } from '#/renderer/stores/theme.ts'
 
 export function useAppBootstrap() {
-  const hydrateSession = useReposStore((s) => s.hydrateSession)
-  const setDetailCollapsed = useReposStore((s) => s.setDetailCollapsed)
-  const hydrateSettings = useSettingsStore((s) => s.hydrate)
-  const hydrateTheme = useThemeStore((s) => s.hydrate)
-  const hydrateI18n = useI18nStore((s) => s.hydrate)
   const hydratedRef = useRef(false)
 
   useEffect(() => {
@@ -22,8 +17,13 @@ export function useAppBootstrap() {
     hydratedRef.current = true
     void (async () => {
       try {
-        await Promise.all([hydrateTheme(), hydrateSettings(), hydrateI18n()])
+        await Promise.all([
+          useThemeStore.getState().hydrate(),
+          useSettingsStore.getState().hydrate(),
+          useI18nStore.getState().hydrate(),
+        ])
         const session = useSettingsStore.getState().savedSession
+        const { hydrateSession, setDetailCollapsed } = useReposStore.getState()
         setDetailCollapsed(session.detailCollapsed)
         await hydrateSession(session.openRepos, session.activeRepo)
       } catch (err) {
@@ -31,5 +31,5 @@ export function useAppBootstrap() {
         useReposStore.setState({ sessionReady: true })
       }
     })()
-  }, [hydrateTheme, hydrateSettings, hydrateI18n, hydrateSession, setDetailCollapsed])
+  }, [])
 }
