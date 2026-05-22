@@ -5,7 +5,7 @@
 
 import { useT } from '#/renderer/stores/i18n.ts'
 import { EmptyState, ScrollPane } from '#/renderer/components/Layout.tsx'
-import { compactDisplayDir, splitDisplayPath } from '#/renderer/lib/display-path.ts'
+import { FilePathText } from '#/renderer/components/FilePathText.tsx'
 import type { StatusEntry, WorktreeStatus } from '#/renderer/types.ts'
 
 interface Props {
@@ -55,27 +55,15 @@ export function StatusList({
     <ScrollPane>
       {dirtyWorktrees.map((wt) => (
         <ul key={wt.path} className="divide-y divide-border border-b border-border last:border-b-0">
-          {wt.entries.map((entry) => {
-            const { dir, file } = splitDisplayPath(entry.path)
-            return (
-              <li
-                key={`${wt.path}-${entry.path}`}
-                className="grid grid-cols-[2ch_minmax(0,1fr)] items-start gap-4 px-4 py-2"
-              >
-                <span className="pt-1">
-                  <StatusCode entry={entry} />
-                </span>
-                <span className="min-w-0" title={entry.path} aria-label={entry.path}>
-                  <span className="block truncate font-mono text-sm text-foreground">{file}</span>
-                  {dir && (
-                    <span className="mt-0.5 block truncate font-mono text-xs text-muted-foreground">
-                      {compactDisplayDir(dir)}
-                    </span>
-                  )}
-                </span>
-              </li>
-            )
-          })}
+          {wt.entries.map((entry) => (
+            <li
+              key={`${wt.path}-${entry.path}`}
+              className="grid grid-cols-[2ch_minmax(0,1fr)] items-center gap-4 px-4 py-2"
+            >
+              <StatusCode entry={entry} />
+              <FilePathText path={entry.path} />
+            </li>
+          ))}
         </ul>
       ))}
     </ScrollPane>

@@ -8,7 +8,7 @@ import { ArrowLeft, FileText, FileWarning } from 'lucide-react'
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { useI18nStore, useT } from '#/renderer/stores/i18n.ts'
 import { formatRelativeTime } from '#/renderer/lib/dates.ts'
-import { compactDisplayDir, splitDisplayPath } from '#/renderer/lib/display-path.ts'
+import { FilePathText } from '#/renderer/components/FilePathText.tsx'
 import { isShortcutBlockingLayerOpen } from '#/renderer/lib/layers.ts'
 import type { CommitDetail as CommitDetailType } from '#/renderer/types-bridge.ts'
 
@@ -87,42 +87,32 @@ export function CommitDetail({ repoId, detail }: Props) {
         <div className="p-6 text-center text-sm text-muted-foreground">{t('commit.empty')}</div>
       ) : (
         <ul className="divide-y divide-border">
-          {files.map((f) => {
-            const { dir, file } = splitDisplayPath(f.path)
-            return (
-              <li key={f.path} className="flex items-start gap-3 px-4 py-2">
-                <span className="shrink-0 pt-0.5 text-muted-foreground">
-                  {f.binary ? <FileWarning size={14} /> : <FileText size={14} />}
-                </span>
-                <span className="min-w-0 flex-1" title={f.path} aria-label={f.path}>
-                  <span className="block truncate font-mono text-sm text-foreground">{file}</span>
-                  {dir && (
-                    <span className="mt-0.5 block truncate font-mono text-xs text-muted-foreground">
-                      {compactDisplayDir(dir)}
-                    </span>
-                  )}
-                </span>
-                <span className="shrink-0 pt-0.5 font-mono text-xs">
-                  {f.binary ? (
-                    <span className="text-muted-foreground">{t('commit.binary')}</span>
-                  ) : (
-                    <>
-                      <span className="text-success">+{f.added}</span> <span className="text-danger">−{f.deleted}</span>
-                      <span
-                        className="ml-2 inline-block h-1.5 rounded-sm align-middle"
-                        style={{
-                          width: `${Math.min(60, Math.max(2, ((f.added + f.deleted) / maxFileChanges) * 60))}px`,
-                          background: `linear-gradient(to right, var(--color-success) ${
-                            f.added + f.deleted === 0 ? 50 : (f.added / (f.added + f.deleted)) * 100
-                          }%, var(--color-danger) 0%)`,
-                        }}
-                      />
-                    </>
-                  )}
-                </span>
-              </li>
-            )
-          })}
+          {files.map((f) => (
+            <li key={f.path} className="flex items-center gap-3 px-4 py-2">
+              <span className="shrink-0 text-muted-foreground">
+                {f.binary ? <FileWarning size={14} /> : <FileText size={14} />}
+              </span>
+              <FilePathText path={f.path} />
+              <span className="shrink-0 font-mono text-xs">
+                {f.binary ? (
+                  <span className="text-muted-foreground">{t('commit.binary')}</span>
+                ) : (
+                  <>
+                    <span className="text-success">+{f.added}</span> <span className="text-danger">−{f.deleted}</span>
+                    <span
+                      className="ml-2 inline-block h-1.5 rounded-sm align-middle"
+                      style={{
+                        width: `${Math.min(60, Math.max(2, ((f.added + f.deleted) / maxFileChanges) * 60))}px`,
+                        background: `linear-gradient(to right, var(--color-success) ${
+                          f.added + f.deleted === 0 ? 50 : (f.added / (f.added + f.deleted)) * 100
+                        }%, var(--color-danger) 0%)`,
+                      }}
+                    />
+                  </>
+                )}
+              </span>
+            </li>
+          ))}
         </ul>
       )}
     </div>

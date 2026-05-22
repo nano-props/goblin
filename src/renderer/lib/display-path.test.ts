@@ -1,24 +1,36 @@
 import { describe, expect, test } from 'bun:test'
-import { compactDisplayDir, splitDisplayPath } from '#/renderer/lib/display-path.ts'
+import { ellipsizeMiddlePath } from '#/renderer/lib/display-path.ts'
 
-describe('splitDisplayPath', () => {
-  test('splits a nested path into directory and file', () => {
-    expect(splitDisplayPath('apps/web/src/App.tsx')).toEqual({ dir: 'apps/web/src', file: 'App.tsx' })
+describe('ellipsizeMiddlePath', () => {
+  test('keeps paths that fit unchanged', () => {
+    expect(ellipsizeMiddlePath('apps/web/src/App.tsx', 20)).toBe('apps/web/src/App.tsx')
   })
 
-  test('keeps bare filenames without a directory', () => {
-    expect(splitDisplayPath('README.md')).toEqual({ dir: '', file: 'README.md' })
-  })
-})
-
-describe('compactDisplayDir', () => {
-  test('keeps short directories unchanged', () => {
-    expect(compactDisplayDir('apps/web/src')).toBe('apps/web/src')
+  test('keeps the first segment and longest fitting suffix', () => {
+    expect(ellipsizeMiddlePath('a/b/c/d/file.ts', 14)).toBe('a/…/d/file.ts')
   })
 
-  test('compacts long directories around the most useful segments', () => {
-    expect(compactDisplayDir('seller_promotion_platform/seller-promotion-platform/frontend/src/main')).toBe(
-      'seller_promotion_platform/…/src/main',
-    )
+  test('drops repeated middle prefixes for deeply nested project paths', () => {
+    expect(
+      ellipsizeMiddlePath(
+        'seller_promotion_platform/seller-promotion-platform/seller-promotion-platform-frontend/free-exposure-promotion/src/ui/i18n/m-en.yaml',
+        60,
+      ),
+    ).toBe('seller_promotion_platform/…/src/ui/i18n/m-en.yaml')
+  })
+
+  test('falls back to middle ellipsis for long filenames', () => {
+    expect(ellipsizeMiddlePath('very-long-filename.component.tsx', 12)).toBe('very-l…t.tsx')
+  })
+
+  test('never exceeds the requested character budget for tiny widths', () => {
+    for (let maxChars = 0; maxChars <= 3; maxChars += 1) {
+      expect(ellipsizeMiddlePath('apps/web/src/App.tsx', maxChars).length).toBeLessThanOrEqual(maxChars)
+    }
+  })
+
+  test('normalizes invalid and fractional character budgets', () => {
+    expect(ellipsizeMiddlePath('apps/web/src/App.tsx', Number.NaN)).toBe('')
+    expect(ellipsizeMiddlePath('apps/web/src/App.tsx', 14.9)).toBe('apps/…/App.tsx')
   })
 })

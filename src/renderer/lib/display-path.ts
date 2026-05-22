@@ -1,11 +1,33 @@
-export function splitDisplayPath(path: string): { dir: string; file: string } {
-  const slash = path.lastIndexOf('/')
-  if (slash === -1) return { dir: '', file: path }
-  return { dir: path.slice(0, slash), file: path.slice(slash + 1) }
+function ellipsizeMiddleText(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text
+  if (maxChars <= 0) return ''
+  if (maxChars === 1) return '…'
+  const keep = maxChars - 1
+  const left = Math.ceil(keep / 2)
+  const right = Math.floor(keep / 2)
+  const tail = right === 0 ? '' : text.slice(-right)
+  return `${text.slice(0, left)}…${tail}`
 }
 
-export function compactDisplayDir(dir: string): string {
-  const parts = dir.split('/')
-  if (parts.length <= 3) return dir
-  return `${parts[0]}/…/${parts.slice(-2).join('/')}`
+export function ellipsizeMiddlePath(path: string, maxChars: number): string {
+  const budget = Number.isFinite(maxChars) ? Math.max(0, Math.floor(maxChars)) : 0
+  if (path.length <= budget) return path
+  if (budget <= 0) return ''
+
+  const parts = path.split('/')
+  if (parts.length < 2) return ellipsizeMiddleText(path, budget)
+
+  const head = parts[0]
+  const separator = '/…/'
+  for (let suffixCount = parts.length - 1; suffixCount >= 1; suffixCount -= 1) {
+    const suffix = parts.slice(-suffixCount).join('/')
+    const candidate = `${head}${separator}${suffix}`
+    if (candidate.length <= budget) return candidate
+  }
+
+  const file = parts.at(-1) ?? path
+  const fileCandidate = `…/${file}`
+  if (fileCandidate.length <= budget) return fileCandidate
+
+  return ellipsizeMiddleText(fileCandidate, budget)
 }
