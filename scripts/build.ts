@@ -47,7 +47,15 @@ await $`bun run build:renderer`
 // throw them away.
 const archFlag = process.arch === 'arm64' ? '--arm64' : '--x64'
 const builderArgs = shouldInstall ? ['--mac', 'dir', archFlag] : ['--mac']
-await $`bun run build:electron -- ${builderArgs}`
+if (shouldInstall) {
+  await $`bun run build:electron -- ${builderArgs}`
+} else {
+  // Build each arch serially to avoid proper-lockfile races in dmg-builder
+  // when electron-builder parallelises multiple macOS architectures.
+  for (const arch of ['arm64', 'x64']) {
+    await $`bun run build:electron -- --mac dmg --${arch}`
+  }
+}
 
 const srcApp = await findBuiltApp()
 if (!srcApp) {
