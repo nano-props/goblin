@@ -13,6 +13,11 @@
 - Source imports should use the repo alias with explicit TypeScript extensions, e.g. `#/renderer/stores/i18n.ts` or `#/main/settings.ts`.
 - Do not add re-export shim files. Import from the canonical source module directly instead.
 
+## Verification
+
+- Unit tests run with Vitest via `bun run test`; watch mode is `bun run test:watch`.
+- `bun run typecheck` covers main, renderer, and test-specific TypeScript configs.
+
 ## English UI copy conventions
 
 - Use Title Case for native menu items.

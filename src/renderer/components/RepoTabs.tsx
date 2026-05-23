@@ -14,6 +14,7 @@ import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { RepoTabStrip } from '#/renderer/components/repo-tabs/RepoTabStrip.tsx'
 import type { RepoTabSummary } from '#/renderer/components/repo-tabs/types.ts'
+import { rpc } from '#/renderer/rpc.ts'
 
 /** Equality fn for the summaries array. Zustand's `useShallow` does
  *  Object.is on each element — but we re-create the inner objects
@@ -60,7 +61,7 @@ export function RepoTabs() {
   const dismissMissing = useReposStore((s) => s.dismissMissing)
 
   async function handleOpen() {
-    const path = await window.gbl.openDialog()
+    const path = await rpc.repo.openDialog.query()
     if (!path) return
     await openRepo(path)
   }

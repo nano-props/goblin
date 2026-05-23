@@ -38,23 +38,40 @@ export function RepoSyncControl({ repo }: Props) {
           {buttonLabel}
         </span>
       )}
+      {!activity && <RepoCacheIndicator repo={repo} />}
       {!activity && <RepoFetchFailureIndicator repo={repo} />}
     </div>
+  )
+}
+
+function RepoCacheIndicator({ repo }: { repo: RepoState }) {
+  const t = useT()
+
+  if (repo.cache.source !== 'cache') return null
+
+  const time = repo.cache.savedAt ? new Date(repo.cache.savedAt).toLocaleString() : ''
+  const title = time ? t('tab.cached-title', { time }) : t('tab.cached')
+
+  return (
+    <span className="flex items-center gap-1 text-xs text-muted-foreground" title={title} aria-label={title}>
+      <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/70" />
+      {t('tab.cached')}
+    </span>
   )
 }
 
 function RepoFetchFailureIndicator({ repo }: { repo: RepoState }) {
   const t = useT()
 
-  if (repo.fetchFailed) {
+  if (repo.remote.fetchFailed) {
     return (
       <span
         className="flex items-center gap-1 text-xs text-warning"
         // Hover surfaces the actual git error (e.g. "fatal: could
         // not read Username") so the user can act on it; without
         // a real message we fall back to the generic title.
-        title={repo.fetchError ?? t('tab.fetch-failed-title')}
-        aria-label={repo.fetchError ?? t('tab.fetch-failed-title')}
+        title={repo.remote.fetchError ?? t('tab.fetch-failed-title')}
+        aria-label={repo.remote.fetchError ?? t('tab.fetch-failed-title')}
       >
         <span className="inline-block w-1.5 h-1.5 rounded-full bg-warning" />
         {t('tab.fetch-failed')}

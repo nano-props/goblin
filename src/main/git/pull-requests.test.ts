@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { execaSync } from 'execa'
 import { mkdtempSync, rmSync } from 'node:fs'
 import os from 'node:os'

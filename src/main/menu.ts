@@ -4,7 +4,7 @@
 //      which element has focus — e.g. ⌘O always opens a repo.
 //
 // Renderer-driven actions (Open / Close Tab / Switch Tab / Refresh /
-// Toggle View) are dispatched as `app:menu-invoke` IPC events so the
+// Toggle View) are dispatched as typed RPC events so the
 // renderer can run them in its existing store/state, instead of
 // duplicating that logic in main.
 //
@@ -17,26 +17,12 @@ import { promises as fs } from 'node:fs'
 import { getMainWindow } from '#/main/window.ts'
 import { t } from '#/main/i18n/index.ts'
 import { clearRecentRepos, getRecentRepos, getShortcutsDisabled } from '#/main/settings.ts'
-
-export type MenuAction =
-  | 'open-repo'
-  | 'close-repo'
-  | 'next-repo'
-  | 'prev-repo'
-  | 'refresh'
-  | 'tab-status'
-  | 'tab-changes'
-  | 'tab-log'
-  | 'toggle-detail'
-  | 'toggle-theme'
-  | 'open-settings'
-  | 'show-help'
-  | { type: 'open-recent-repo'; path: string }
+import { sendRpcEvent } from '#/main/events.ts'
+import type { MenuAction } from '#/shared/rpc.ts'
 
 function send(action: MenuAction): void {
   const win = getMainWindow() ?? BrowserWindow.getFocusedWindow()
-  if (!win || win.isDestroyed()) return
-  win.webContents.send('app:menu-invoke', action)
+  sendRpcEvent(win, { type: 'menu-action', action })
 }
 
 export function buildAppMenu(): void {

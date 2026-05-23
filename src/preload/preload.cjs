@@ -1,4 +1,4 @@
-// Preload bridge. Exposes IPC under `window.gbl` to the renderer.
+// Preload bridge. Exposes low-level IPC under `window.goblin` to the renderer.
 // IMPORTANT: This preload runs with sandbox: true (see window.ts). Only
 // the `electron` module is available here — do NOT require Node built-ins
 // like `os`, `fs`, or `path`. Anything that needs Node lives
@@ -16,6 +16,27 @@ function safeInvoke(channel, ...args) {
   })
 }
 
+function isObject(value) {
+  return value !== null && typeof value === 'object'
+}
+
+function rpcCall(path, input) {
+  return safeInvoke('goblin:rpc', { path, input })
+    .then((response) => {
+      if (!isObject(response) || typeof response.ok !== 'boolean') throw new Error('Malformed RPC response')
+      if (response.ok) return response.data
+      const error = isObject(response.error) ? response.error : null
+      throw Object.assign(new Error(typeof error?.message === 'string' ? error.message : 'RPC request failed'), {
+        name: typeof error?.name === 'string' ? error.name : 'RpcError',
+        code: typeof error?.code === 'string' ? error.code : undefined,
+      })
+    })
+    .catch((err) => {
+      console.warn(`[rpc] ${path} failed`, err)
+      throw err
+    })
+}
+
 // `--gbl-home-dir=...` is injected by main via webPreferences.additionalArguments
 // (see window.ts). `process.argv` is one of the few things sandbox-safe
 // preloads can still read, which is why we use it here instead of
@@ -23,102 +44,13 @@ function safeInvoke(channel, ...args) {
 const HOME_PREFIX = '--gbl-home-dir='
 const homeDir = process.argv.find((a) => a.startsWith(HOME_PREFIX))?.slice(HOME_PREFIX.length) ?? ''
 
-contextBridge.exposeInMainWorld('gbl', {
-  // ---- Environment -------------------------------------------------------
+contextBridge.exposeInMainWorld('goblin', {
   homeDir,
-
-  // ---- Repo lifecycle / dialog -------------------------------------------
-  openDialog: () => safeInvoke('repo:open-dialog'),
-  openProjectGitHub: () => safeInvoke('app:open-project-github'),
-  probe: (cwd) => safeInvoke('repo:probe', cwd),
+  invokeRpc: ({ path, input }) => rpcCall(path, input),
   pathForFile: (file) => webUtils.getPathForFile(file),
-
-  // ---- Repo data ---------------------------------------------------------
-  snapshot: (cwd) => safeInvoke('repo:snapshot', cwd),
-  pullRequests: (cwd, branches, options) => safeInvoke('repo:pull-requests', cwd, branches, options),
-  log: (cwd, branch, count) => safeInvoke('repo:log', cwd, branch, count),
-  status: (cwd) => safeInvoke('repo:status', cwd),
-  patch: (cwd, worktreePath) => safeInvoke('repo:patch', cwd, worktreePath),
-  commit: (cwd, hash) => safeInvoke('repo:commit', cwd, hash),
-
-  // ---- Mutating ----------------------------------------------------------
-  checkout: (cwd, branch) => safeInvoke('repo:checkout', cwd, branch),
-  deleteBranch: (cwd, branch, force) => safeInvoke('repo:delete-branch', cwd, branch, force),
-  removeWorktree: (cwd, branch, worktreePath, alsoDeleteBranch, forceDeleteBranch) =>
-    safeInvoke('repo:remove-worktree', cwd, branch, worktreePath, alsoDeleteBranch, forceDeleteBranch),
-  createWorktree: (cwd, worktreePath, newBranch, baseBranch) =>
-    safeInvoke('repo:create-worktree', cwd, worktreePath, newBranch, baseBranch),
-  pull: (cwd, branch, worktreePath) => safeInvoke('repo:pull', cwd, branch, worktreePath),
-  push: (cwd, branch) => safeInvoke('repo:push', cwd, branch),
-  fetch: (cwd, kind) => safeInvoke('repo:fetch', cwd, kind),
-  abort: (cwd) => safeInvoke('repo:abort', cwd),
-  openGitHub: (cwd, branch) => safeInvoke('repo:open-github', cwd, branch),
-  openInFinder: (path) => safeInvoke('repo:open-in-finder', path),
-  openInGhostty: (path) => safeInvoke('repo:open-in-ghostty', path),
-  openInVSCode: (path) => safeInvoke('repo:open-in-vscode', path),
-  ghosttyInstalled: () => safeInvoke('repo:ghostty-installed'),
-  vscodeInstalled: () => safeInvoke('repo:vscode-installed'),
-
-  // ---- Theme -------------------------------------------------------------
-  theme: {
-    get: () => safeInvoke('theme:get'),
-    setPref: (pref) => safeInvoke('theme:set-pref', pref),
-    onChange: (cb) => {
-      const listener = (_event, payload) => cb(payload)
-      ipcRenderer.on('app:theme-changed', listener)
-      return () => ipcRenderer.off('app:theme-changed', listener)
-    },
-  },
-
-  // ---- Settings ----------------------------------------------------------
-  settings: {
-    get: () => safeInvoke('settings:get'),
-    setFetchInterval: (sec) => safeInvoke('settings:set-fetch-interval', sec),
-    setShortcutsDisabled: (disabled) => safeInvoke('settings:set-shortcuts-disabled', disabled),
-    setGlobalShortcut: (accelerator) => safeInvoke('settings:set-global-shortcut', accelerator),
-    addRecentRepo: (repoPath) => safeInvoke('settings:add-recent-repo', repoPath),
-    clearRecentRepos: () => safeInvoke('settings:clear-recent-repos'),
-    onFetchIntervalChange: (cb) => {
-      const listener = (_event, sec) => cb(sec)
-      ipcRenderer.on('app:fetch-interval-changed', listener)
-      return () => ipcRenderer.off('app:fetch-interval-changed', listener)
-    },
-    onShortcutsDisabledChange: (cb) => {
-      const listener = (_event, disabled) => cb(disabled)
-      ipcRenderer.on('app:shortcuts-disabled-changed', listener)
-      return () => ipcRenderer.off('app:shortcuts-disabled-changed', listener)
-    },
-    onGlobalShortcutChange: (cb) => {
-      const listener = (_event, payload) => cb(payload)
-      ipcRenderer.on('app:global-shortcut-changed', listener)
-      return () => ipcRenderer.off('app:global-shortcut-changed', listener)
-    },
-    saveSession: (session) => safeInvoke('settings:save-session', session),
-    onWriteError: (cb) => {
-      const listener = (_event, message) => cb(message)
-      ipcRenderer.on('app:settings-write-error', listener)
-      return () => ipcRenderer.off('app:settings-write-error', listener)
-    },
-  },
-
-  // ---- Menu push (main → renderer) ---------------------------------------
-  onMenuAction: (cb) => {
-    const listener = (_event, action) => cb(action)
-    ipcRenderer.on('app:menu-invoke', listener)
-    return () => ipcRenderer.off('app:menu-invoke', listener)
-  },
-
-  // ---- i18n --------------------------------------------------------------
-  i18n: {
-    /** One-shot pull of { lang, pref, dict } at boot. */
-    get: () => safeInvoke('i18n:get'),
-    /** Set the user preference: 'auto' | 'en' | 'zh' | 'ko' | 'ja'. */
-    setPref: (pref) => safeInvoke('i18n:set-pref', pref),
-    /** Subscribe to language changes — receives { lang, pref, dict }. */
-    onChange: (cb) => {
-      const listener = (_event, payload) => cb(payload)
-      ipcRenderer.on('app:i18n-changed', listener)
-      return () => ipcRenderer.off('app:i18n-changed', listener)
-    },
+  onEvent: (cb) => {
+    const listener = (_event, payload) => cb(payload)
+    ipcRenderer.on('goblin:event', listener)
+    return () => ipcRenderer.off('goblin:event', listener)
   },
 })

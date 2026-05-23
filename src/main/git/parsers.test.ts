@@ -1,14 +1,11 @@
-// Unit tests for the pure git output parsers. Run with `bun test`.
+// Unit tests for the pure git output parsers. Run with `bun run test`.
 //
 // Each test feeds hand-crafted git output (with the actual byte
 // separators git emits) and asserts the resulting domain objects.
 // Tests double as documentation for the exact output shape we expect
 // from each git command.
 
-import { describe, expect, test } from 'bun:test'
-// Relative import: bun's test runner doesn't resolve the package.json
-// `imports` (#/...) field for .ts subpaths the way the Electron/Vite
-// builds do. Same module either way.
+import { describe, expect, test } from 'vitest'
 import { FIELD_SEP, parseBranches, parseLog, parseStatus, parseWorktrees } from '#/main/git/parsers.ts'
 
 const SEP = FIELD_SEP

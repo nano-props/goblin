@@ -20,22 +20,106 @@
 //     same repo, no matter how often `App.tsx`'s effect re-runs.
 
 import { create } from 'zustand'
+import { persist, type PersistStorage, type StorageValue } from 'zustand/middleware'
 import { createCommitActions } from '#/renderer/stores/repos/commit.ts'
 import { createLifecycleActions } from '#/renderer/stores/repos/lifecycle.ts'
 import { createRefreshActions } from '#/renderer/stores/repos/refresh.ts'
 import { createSelectionActions } from '#/renderer/stores/repos/selection.ts'
-import type { ReposStore } from '#/renderer/stores/repos/types.ts'
+import { normalizeRepoCache } from '#/renderer/stores/repos/persistence.ts'
+import type { CachedRepoState, ReposStore } from '#/renderer/stores/repos/types.ts'
 
-export const useReposStore = create<ReposStore>((set, get) => ({
-  repos: {},
-  order: [],
-  activeId: null,
-  sessionReady: false,
-  missingFromSession: [],
-  detailCollapsed: true,
+interface PersistedReposStore {
+  repoCache: Record<string, CachedRepoState>
+}
 
-  ...createLifecycleActions(set, get),
-  ...createSelectionActions(set, get),
-  ...createRefreshActions(set, get),
-  ...createCommitActions(set, get),
-}))
+interface RawPersistedReposStore {
+  repoCache?: unknown
+}
+
+let lastStoredRepoCacheRef: Record<string, CachedRepoState> | undefined
+let lastStoredReposJson: string | undefined
+
+const repoStorage: PersistStorage<PersistedReposStore, void> = {
+  getItem: (name) => {
+    try {
+      const raw = getStorage()?.getItem(name)
+      if (!raw) {
+        lastStoredRepoCacheRef = undefined
+        lastStoredReposJson = undefined
+        return null
+      }
+      const parsed = JSON.parse(raw) as StorageValue<RawPersistedReposStore>
+      const repoCache = normalizeRepoCache(parsed.state?.repoCache)
+      const value = { state: { repoCache }, version: parsed.version }
+      lastStoredRepoCacheRef = repoCache
+      lastStoredReposJson = JSON.stringify(value)
+      return value
+    } catch (err) {
+      lastStoredRepoCacheRef = undefined
+      lastStoredReposJson = undefined
+      console.warn(`[repos] failed to read persisted store ${name}:`, err)
+      return null
+    }
+  },
+  setItem: (name, value) => {
+    const repoCache = value.state.repoCache
+    if (lastStoredReposJson !== undefined && repoCache === lastStoredRepoCacheRef) return
+    const serialized = JSON.stringify(value)
+    if (serialized === lastStoredReposJson) {
+      lastStoredRepoCacheRef = repoCache
+      return
+    }
+    const storage = getStorage()
+    if (!storage) return
+    try {
+      storage.setItem(name, serialized)
+      lastStoredRepoCacheRef = repoCache
+      lastStoredReposJson = serialized
+    } catch (err) {
+      console.warn(`[repos] failed to persist store ${name}:`, err)
+    }
+  },
+  removeItem: (name) => {
+    const storage = getStorage()
+    if (!storage) return
+    try {
+      storage.removeItem(name)
+      lastStoredRepoCacheRef = undefined
+      lastStoredReposJson = undefined
+    } catch (err) {
+      console.warn(`[repos] failed to remove persisted store ${name}:`, err)
+    }
+  },
+}
+
+export const useReposStore = create<ReposStore>()(
+  persist(
+    (set, get) => ({
+      repos: {},
+      repoCache: {},
+      order: [],
+      activeId: null,
+      sessionReady: false,
+      missingFromSession: [],
+      detailCollapsed: true,
+
+      ...createLifecycleActions(set, get),
+      ...createSelectionActions(set, get),
+      ...createRefreshActions(set, get),
+      ...createCommitActions(set, get),
+    }),
+    {
+      name: 'goblin.repo-store.v1',
+      storage: repoStorage,
+      partialize: (state): PersistedReposStore => ({ repoCache: state.repoCache }),
+      merge: (persisted, current) => ({
+        ...current,
+        repoCache: normalizeRepoCache((persisted as RawPersistedReposStore | null)?.repoCache),
+      }),
+    },
+  ),
+)
+
+function getStorage(): Storage | undefined {
+  return typeof globalThis.localStorage === 'undefined' ? undefined : globalThis.localStorage
+}

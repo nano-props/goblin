@@ -1,7 +1,14 @@
 import { execa } from 'execa'
 import { git } from '#/main/git/helper.ts'
+import {
+  enqueueGitHubApiRequest,
+  GITHUB_API_CONCURRENCY,
+  GITHUB_API_INTERVAL_CAP,
+  GITHUB_API_INTERVAL_MS,
+} from '#/main/github/queue.ts'
 
 export const GITHUB_API_TIMEOUT_MS = 17_000
+export { GITHUB_API_CONCURRENCY, GITHUB_API_INTERVAL_CAP, GITHUB_API_INTERVAL_MS }
 
 const GH_PATH = ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin'].join(':')
 const TOKEN_CACHE_TTL_MS = 30_000
@@ -184,76 +191,78 @@ export async function graphqlRequestResult<TData>(
     }
   }
 
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), GITHUB_API_TIMEOUT_MS)
-  try {
-    const response = await fetch(githubGraphqlEndpoint(repo.host), {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        Accept: 'application/vnd.github+json',
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'User-Agent': 'Goblin',
-      },
-      body: JSON.stringify({ query, variables: compactVariables(variables), operationName }),
-    })
-    if (!response.ok) {
-      const { code, retryable } = httpErrorCode(response)
-      return {
-        ok: false,
-        error: graphqlError(repo, operationName, code, response.statusText || `HTTP ${response.status}`, {
-          retryable,
-          status: response.status,
-        }),
-      }
-    }
-
-    let payload: GraphqlEnvelope<TData>
+  return enqueueGitHubApiRequest(async (): Promise<GraphqlRequestResult<TData>> => {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), GITHUB_API_TIMEOUT_MS)
     try {
-      payload = (await response.json()) as GraphqlEnvelope<TData>
+      const response = await fetch(githubGraphqlEndpoint(repo.host), {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'Goblin',
+        },
+        body: JSON.stringify({ query, variables: compactVariables(variables), operationName }),
+      })
+      if (!response.ok) {
+        const { code, retryable } = httpErrorCode(response)
+        return {
+          ok: false,
+          error: graphqlError(repo, operationName, code, response.statusText || `HTTP ${response.status}`, {
+            retryable,
+            status: response.status,
+          }),
+        }
+      }
+
+      let payload: GraphqlEnvelope<TData>
+      try {
+        payload = (await response.json()) as GraphqlEnvelope<TData>
+      } catch (err) {
+        return {
+          ok: false,
+          error: graphqlError(repo, operationName, 'INVALID_JSON', err instanceof Error ? err.message : String(err), {
+            retryable: true,
+          }),
+        }
+      }
+
+      if (payload.errors?.length) {
+        const message = graphqlErrorMessage(payload.errors)
+        return {
+          ok: false,
+          error: graphqlError(repo, operationName, 'GRAPHQL_ERROR', message, {
+            retryable: /rate limit|timeout|temporar|try again/i.test(message),
+            graphqlErrors: payload.errors,
+          }),
+        }
+      }
+
+      if (payload.data === undefined || payload.data === null) {
+        return {
+          ok: false,
+          error: graphqlError(repo, operationName, 'NO_DATA', 'GitHub GraphQL returned no data'),
+        }
+      }
+
+      return { ok: true, data: payload.data }
     } catch (err) {
       return {
         ok: false,
-        error: graphqlError(repo, operationName, 'INVALID_JSON', err instanceof Error ? err.message : String(err), {
-          retryable: true,
-        }),
+        error: graphqlError(
+          repo,
+          operationName,
+          isAbortError(err) ? 'TIMEOUT' : 'NETWORK_ERROR',
+          err instanceof Error ? err.message : String(err),
+          { retryable: true },
+        ),
       }
+    } finally {
+      clearTimeout(timer)
     }
-
-    if (payload.errors?.length) {
-      const message = graphqlErrorMessage(payload.errors)
-      return {
-        ok: false,
-        error: graphqlError(repo, operationName, 'GRAPHQL_ERROR', message, {
-          retryable: /rate limit|timeout|temporar|try again/i.test(message),
-          graphqlErrors: payload.errors,
-        }),
-      }
-    }
-
-    if (payload.data === undefined || payload.data === null) {
-      return {
-        ok: false,
-        error: graphqlError(repo, operationName, 'NO_DATA', 'GitHub GraphQL returned no data'),
-      }
-    }
-
-    return { ok: true, data: payload.data }
-  } catch (err) {
-    return {
-      ok: false,
-      error: graphqlError(
-        repo,
-        operationName,
-        isAbortError(err) ? 'TIMEOUT' : 'NETWORK_ERROR',
-        err instanceof Error ? err.message : String(err),
-        { retryable: true },
-      ),
-    }
-  } finally {
-    clearTimeout(timer)
-  }
+  })
 }
 
 export async function graphqlRequest<TData>(

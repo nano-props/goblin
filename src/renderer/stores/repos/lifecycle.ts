@@ -1,6 +1,9 @@
+import pLimit from 'p-limit'
 import { lastPathSegment } from '#/renderer/lib/paths.ts'
 import { emptyRepo, inFlightFetchById } from '#/renderer/stores/repos/helpers.ts'
+import { hydrateCachedRepo } from '#/renderer/stores/repos/persistence.ts'
 import type { MissingRepo, OpenRepoResult, ReposGet, ReposSet, ReposStore } from '#/renderer/stores/repos/types.ts'
+import { rpc } from '#/renderer/rpc.ts'
 
 interface ResolvedRepo {
   id: string
@@ -18,13 +21,15 @@ interface InitialRepoRefresh {
   token: number
 }
 
+const SESSION_PROBE_CONCURRENCY = 4
+
 async function resolveRepoPath(
   p: string,
   onError?: (err: unknown) => void,
   fallbackError = 'error.failed-read-repo',
 ): Promise<ProbeResult> {
   try {
-    const probe = await window.gbl.probe(p)
+    const probe = await rpc.repo.probe.query({ cwd: p })
     if (!probe?.ok || !probe.root) return { input: p, reason: probe?.message ?? 'error.not-git-repo', repo: null }
     return {
       input: p,
@@ -37,24 +42,43 @@ async function resolveRepoPath(
   }
 }
 
-function addResolvedRepos(
-  s: Pick<ReposStore, 'repos' | 'order'>,
-  resolvedRepos: ResolvedRepo[],
+function orderedInsert(order: string[], id: string, rankById?: ReadonlyMap<string, number>): string[] {
+  if (!rankById) return [...order, id]
+  const rank = rankById.get(id)
+  if (rank === undefined) return [...order, id]
+  const next = [...order]
+  const index = next.findIndex((existing) => {
+    const existingRank = rankById.get(existing)
+    return existingRank !== undefined && existingRank > rank
+  })
+  next.splice(index === -1 ? next.length : index, 0, id)
+  return next
+}
+
+function addResolvedRepo(
+  s: Pick<ReposStore, 'repos' | 'repoCache' | 'order'>,
+  resolvedRepo: ResolvedRepo,
+  rankById?: ReadonlyMap<string, number>,
 ): Pick<ReposStore, 'repos' | 'order'> & { changed: boolean } {
-  let repos = s.repos
-  let order = s.order
-  let changed = false
-  for (const { id, name } of resolvedRepos) {
-    if (repos[id]) continue
-    if (!changed) {
-      repos = { ...repos }
-      order = [...order]
-      changed = true
-    }
-    repos[id] = emptyRepo(id, name)
-    order.push(id)
+  const { id, name } = resolvedRepo
+  if (s.repos[id]) return { repos: s.repos, order: s.order, changed: false }
+  return {
+    repos: { ...s.repos, [id]: hydrateCachedRepo(emptyRepo(id, name), s.repoCache[id]) },
+    order: orderedInsert(s.order, id, rankById),
+    changed: true,
   }
-  return { repos, order, changed }
+}
+
+function activeAfterHydrateStep(
+  s: Pick<ReposStore, 'activeId'>,
+  repos: Record<string, unknown>,
+  order: string[],
+  activeRepo: string | null,
+  managedActiveId: string | null,
+): string | null {
+  if (s.activeId && s.activeId !== managedActiveId && repos[s.activeId]) return s.activeId
+  if (activeRepo && repos[activeRepo]) return activeRepo
+  return order[0] ?? null
 }
 
 function refreshInitialRepoState(get: ReposGet, refresh: InitialRepoRefresh) {
@@ -75,7 +99,7 @@ export function createLifecycleActions(set: ReposSet, get: ReposGet) {
       const { id } = repo
       const activate = options?.activate !== false
       let initialRefresh: InitialRepoRefresh | null = null
-      void window.gbl.settings.addRecentRepo(id).catch(() => {
+      void rpc.settings.addRecentRepo.mutate({ repoPath: id }).catch(() => {
         /* recent menu is best-effort */
       })
 
@@ -86,7 +110,7 @@ export function createLifecycleActions(set: ReposSet, get: ReposGet) {
       // to do skips both the merge and the listener fan-out.
       set((s) => {
         const existingRepo = s.repos[id]
-        const { repos, order, changed } = addResolvedRepos(s, [repo])
+        const { repos, order, changed } = addResolvedRepo(s, repo)
         const repoToRefresh = changed ? repos[id] : existingRepo
         if (repoToRefresh) initialRefresh = { id, token: repoToRefresh.instanceToken }
         if (!changed) {
@@ -109,7 +133,7 @@ export function createLifecycleActions(set: ReposSet, get: ReposGet) {
       // otherwise a `git push` started right before the user closed the
       // tab keeps running for up to the network timeout, charged to a
       // tab that no longer exists. Fire-and-forget; failure is fine.
-      void window.gbl.abort(id).catch(() => {
+      void rpc.repo.abort.mutate({ cwd: id }).catch(() => {
         /* main may have nothing to abort — ignore */
       })
       set((s) => {
@@ -133,47 +157,50 @@ export function createLifecycleActions(set: ReposSet, get: ReposGet) {
       // moved/deleted, external drive not mounted) get reported via
       // `missingFromSession` so the user sees a "couldn't reopen N repos"
       // notice in the tab strip instead of wondering where their tabs went.
-      const probes = await Promise.all(
-        openRepos.map((p) =>
-          resolveRepoPath(p, (err) => {
-            console.warn(`[session] probe failed for ${p}:`, err)
+      const rankById = new Map<string, number>()
+      const missingByIndex: Array<MissingRepo | undefined> = []
+      let managedActiveId: string | null = null
+      const limitProbe = pLimit(SESSION_PROBE_CONCURRENCY)
+      await Promise.all(
+        openRepos.map((p, index) =>
+          limitProbe(async () => {
+            const probe = await resolveRepoPath(p, (err) => {
+              console.warn(`[session] probe failed for ${p}:`, err)
+            })
+            if (!probe.repo) {
+              missingByIndex[index] = { path: probe.input, reason: probe.reason ?? 'error.failed-read-repo' }
+              return
+            }
+
+            const resolvedRepo = probe.repo
+            if (!rankById.has(resolvedRepo.id)) rankById.set(resolvedRepo.id, index)
+            let initialRefresh: InitialRepoRefresh | null = null
+            set((s) => {
+              const { repos, order } = addResolvedRepo(s, resolvedRepo, rankById)
+              const repo = repos[resolvedRepo.id]
+              if (repo) initialRefresh = { id: repo.id, token: repo.instanceToken }
+              const activeId = activeAfterHydrateStep(s, repos, order, activeRepo, managedActiveId)
+              if (s.activeId === null || s.activeId === managedActiveId) managedActiveId = activeId
+              if (repos === s.repos && order === s.order && activeId === s.activeId) return s
+              return { repos, order, activeId }
+            })
+            // See `openRepo`: status backs the selected-branch detail badge,
+            // so we hydrate it for every restored repo, not just the active
+            // one — switching after boot shouldn't reveal a stale 0.
+            if (initialRefresh) refreshInitialRepoState(get, initialRefresh)
           }),
         ),
       )
-      const valid = probes.filter((x) => x.repo !== null).map((x) => x.repo!)
-      const missing: MissingRepo[] = probes
-        .filter((x) => x.repo === null)
-        .map((x) => ({ path: x.input, reason: x.reason ?? 'error.failed-read-repo' }))
-      let initialRefreshes: InitialRepoRefresh[] = []
 
       set((s) => {
-        const { repos, order } = addResolvedRepos(s, valid)
-        initialRefreshes = valid.flatMap(({ id }) => {
-          const repo = repos[id]
-          return repo ? [{ id, token: repo.instanceToken }] : []
-        })
-        const userPickedSomething = s.activeId !== null
-        const wantActive =
-          userPickedSomething && repos[s.activeId!]
-            ? s.activeId
-            : activeRepo && repos[activeRepo]
-              ? activeRepo
-              : (order[0] ?? null)
+        const activeId = activeAfterHydrateStep(s, s.repos, s.order, activeRepo, managedActiveId)
+        if (s.activeId === null || s.activeId === managedActiveId) managedActiveId = activeId
         return {
-          repos,
-          order,
-          activeId: wantActive,
+          activeId,
           sessionReady: true,
-          missingFromSession: missing,
+          missingFromSession: missingByIndex.filter((x): x is MissingRepo => !!x),
         }
       })
-
-      // See `openRepo`: status backs the selected-branch detail badge,
-      // so we hydrate it for every restored repo, not just the active
-      // one — switching after boot shouldn't reveal a stale 0.
-      for (const refresh of initialRefreshes) {
-        refreshInitialRepoState(get, refresh)
-      }
     },
 
     dismissMissing() {

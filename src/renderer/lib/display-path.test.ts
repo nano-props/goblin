@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, test } from 'vitest'
 import { ellipsizeMiddlePath } from '#/renderer/lib/display-path.ts'
 
 describe('ellipsizeMiddlePath', () => {

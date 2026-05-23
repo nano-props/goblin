@@ -4,12 +4,7 @@ import { initTheme } from '#/main/theme.ts'
 import { loadSettings, flushSettings } from '#/main/settings.ts'
 import { buildAppMenu } from '#/main/menu.ts'
 import { assertDictionaryParity, resolveLang, setCurrentLang } from '#/main/i18n/index.ts'
-import { wireRepoIpc } from '#/main/ipc/repo.ts'
-import { wireThemeIpc } from '#/main/ipc/theme.ts'
-import { wireSettingsIpc } from '#/main/ipc/settings.ts'
-import { wireMenuIpc } from '#/main/ipc/menu.ts'
-import { wireI18nIpc } from '#/main/ipc/i18n.ts'
-import { wireOpenersIpc } from '#/main/ipc/openers.ts'
+import { wireRpcIpc } from '#/main/rpc.ts'
 import { syncGlobalShortcuts, unregisterAppShortcuts } from '#/main/shortcuts.ts'
 
 async function main(): Promise<void> {
@@ -69,12 +64,7 @@ async function main(): Promise<void> {
   assertDictionaryParity(!app.isPackaged)
   setCurrentLang(resolveLang(settings.lang))
 
-  wireRepoIpc()
-  wireThemeIpc()
-  wireSettingsIpc()
-  wireMenuIpc()
-  wireI18nIpc()
-  wireOpenersIpc()
+  wireRpcIpc()
 
   buildAppMenu()
   syncGlobalShortcuts(settings.shortcutsDisabled, settings.globalShortcut)

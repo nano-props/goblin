@@ -10,6 +10,7 @@ import { useThemeStore } from '#/renderer/stores/theme.ts'
 import { useSettingsStore } from '#/renderer/stores/settings.ts'
 import { useI18nStore, useT } from '#/renderer/stores/i18n.ts'
 import type { LangPref, ThemePref } from '#/renderer/types-bridge.ts'
+import { rpc } from '#/renderer/rpc.ts'
 
 interface Props {
   open: boolean
@@ -63,7 +64,7 @@ export function SettingsPanel({ open, onClose }: Props) {
     })
   }
   const openProjectGitHub = () => {
-    void window.gbl.openProjectGitHub().catch((err) => {
+    void rpc.app.openProjectGitHub.mutate().catch((err) => {
       console.warn('[settings] open project GitHub failed', err)
     })
   }

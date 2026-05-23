@@ -1,3 +1,5 @@
+import { goblin } from '#/renderer/rpc.ts'
+
 /** Last segment of a path. Tolerant of either separator so worktree
  *  paths and repo roots render correctly on both POSIX and Windows. */
 export function lastPathSegment(p: string): string {
@@ -46,7 +48,7 @@ export function tildifyPath(path: string, home: string): string {
 }
 
 export function tildify(path: string): string {
-  return tildifyPath(path, window.gbl.homeDir)
+  return tildifyPath(path, goblin.homeDir)
 }
 
 export function untildifyPath(path: string, home: string): string {
@@ -57,5 +59,5 @@ export function untildifyPath(path: string, home: string): string {
 }
 
 export function untildify(path: string): string {
-  return untildifyPath(path, window.gbl.homeDir)
+  return untildifyPath(path, goblin.homeDir)
 }

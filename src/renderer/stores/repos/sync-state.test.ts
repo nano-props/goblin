@@ -1,14 +1,30 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, test } from 'vitest'
 import { emptyRepo } from '#/renderer/stores/repos/helpers.ts'
 import { canStartRemoteFetch, isRemoteFetchDue } from '#/renderer/stores/repos/sync-state.ts'
 import type { RepoState } from '#/renderer/stores/repos/types.ts'
 
-function repo(overrides: Partial<RepoState> = {}): RepoState {
+interface RepoOverrides {
+  syncing?: boolean
+  fetching?: boolean
+  loading?: boolean
+  statusLoading?: boolean
+  refreshing?: boolean
+  lastFetchSettledAt?: number | null
+}
+
+function repo(overrides: RepoOverrides = {}): RepoState {
+  const base = emptyRepo('/tmp/goblin-sync-state-test', 'repo')
   return {
-    ...emptyRepo('/tmp/goblin-sync-state-test', 'repo'),
-    loading: false,
-    statusLoading: false,
-    ...overrides,
+    ...base,
+    async: {
+      ...base.async,
+      loading: overrides.loading ?? false,
+      statusLoading: overrides.statusLoading ?? false,
+      syncing: overrides.syncing ?? base.async.syncing,
+      fetching: overrides.fetching ?? base.async.fetching,
+      refreshing: overrides.refreshing ?? base.async.refreshing,
+      lastFetchSettledAt: overrides.lastFetchSettledAt ?? base.async.lastFetchSettledAt,
+    },
   }
 }
 
@@ -20,6 +36,7 @@ describe('canStartRemoteFetch', () => {
     expect(canStartRemoteFetch(repo({ fetching: true }))).toBe(false)
     expect(canStartRemoteFetch(repo({ loading: true }))).toBe(false)
     expect(canStartRemoteFetch(repo({ statusLoading: true }))).toBe(false)
+    expect(canStartRemoteFetch(repo({ refreshing: true }))).toBe(false)
   })
 })
 
@@ -36,5 +53,6 @@ describe('isRemoteFetchDue', () => {
   test('is not due when disabled or core fetch state is busy', () => {
     expect(isRemoteFetchDue(repo(), 0, 100_000)).toBe(false)
     expect(isRemoteFetchDue(repo({ fetching: true, lastFetchSettledAt: null }), 60_000, 100_000)).toBe(false)
+    expect(isRemoteFetchDue(repo({ refreshing: true, lastFetchSettledAt: null }), 60_000, 100_000)).toBe(false)
   })
 })

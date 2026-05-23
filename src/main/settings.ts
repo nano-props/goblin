@@ -11,6 +11,7 @@
 import { app } from 'electron'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
+import writeFileAtomic from 'write-file-atomic'
 import { DEFAULT_GLOBAL_SHORTCUT, normalizeGlobalShortcut } from '#/shared/accelerator.ts'
 
 export type ThemePref = 'auto' | 'light' | 'dark'
@@ -220,24 +221,14 @@ async function chainFlush(prev: Promise<boolean>): Promise<boolean> {
 async function doFlush(): Promise<boolean> {
   if (!cache) return true
   const target = settingsFile()
-  // Write to a sibling tmp file then rename. rename(2) is atomic on the
-  // same filesystem, so a power loss / process kill mid-write leaves
-  // either the old file or the new file intact — never a half-written
-  // settings.json that crashes loadSettings on next boot.
-  const tmp = target + '.tmp'
+  // write-file-atomic writes to a sibling tmp file, fsyncs it, then renames
+  // it over the target so the next boot never reads a half-written JSON file.
   try {
     await fs.mkdir(path.dirname(target), { recursive: true })
-    await fs.writeFile(tmp, JSON.stringify(cache, null, 2), 'utf-8')
-    await fs.rename(tmp, target)
+    await writeFileAtomic(target, JSON.stringify(cache, null, 2), { encoding: 'utf-8' })
     return true
   } catch (err) {
     console.warn('[settings] write failed', err)
-    // Best-effort cleanup of any orphaned tmp file.
-    try {
-      await fs.unlink(tmp)
-    } catch {
-      /* nothing to clean up */
-    }
     for (const cb of writeErrorListeners) {
       try {
         cb(err)

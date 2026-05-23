@@ -18,18 +18,21 @@ function repoToolbarEqual(a: RepoState | undefined, b: RepoState | undefined): b
       a.id === b.id &&
       a.name === b.name &&
       a.instanceToken === b.instanceToken &&
-      a.branches === b.branches &&
-      a.currentBranch === b.currentBranch &&
-      a.selectedBranch === b.selectedBranch &&
-      a.branchViewMode === b.branchViewMode &&
-      a.logsByBranch === b.logsByBranch &&
-      a.loading === b.loading &&
-      a.statusLoading === b.statusLoading &&
-      a.syncing === b.syncing &&
-      a.fetching === b.fetching &&
-      a.fetchFailed === b.fetchFailed &&
-      a.fetchError === b.fetchError &&
-      a.pullRequestsLoading === b.pullRequestsLoading)
+      a.data.branches === b.data.branches &&
+      a.data.currentBranch === b.data.currentBranch &&
+      a.ui.selectedBranch === b.ui.selectedBranch &&
+      a.ui.branchViewMode === b.ui.branchViewMode &&
+      a.data.logsByBranch === b.data.logsByBranch &&
+      a.async.loading === b.async.loading &&
+      a.async.statusLoading === b.async.statusLoading &&
+      a.async.syncing === b.async.syncing &&
+      a.async.fetching === b.async.fetching &&
+      a.cache.source === b.cache.source &&
+      a.async.refreshing === b.async.refreshing &&
+      a.cache.savedAt === b.cache.savedAt &&
+      a.remote.fetchFailed === b.remote.fetchFailed &&
+      a.remote.fetchError === b.remote.fetchError &&
+      a.async.pullRequestsLoading === b.async.pullRequestsLoading)
   )
 }
 
@@ -51,8 +54,8 @@ export function RepoToolbar({ repoId }: Props) {
       <div className="flex shrink-0 items-center gap-2">
         <RepoToolbarActions repo={repo} />
         <BranchViewModeControl
-          value={repo.branchViewMode}
-          disabled={repo.branches.length === 0}
+          value={repo.ui.branchViewMode}
+          disabled={repo.data.branches.length === 0}
           onChange={(viewMode) => setBranchViewMode(repo.id, viewMode)}
         />
       </div>

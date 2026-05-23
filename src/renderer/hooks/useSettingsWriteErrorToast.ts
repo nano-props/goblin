@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { useT } from '#/renderer/stores/i18n.ts'
+import { onRpcEventType } from '#/renderer/rpc.ts'
 
 export function useSettingsWriteErrorToast() {
   const t = useT()
@@ -15,8 +16,8 @@ export function useSettingsWriteErrorToast() {
   tRef.current = t
 
   useEffect(() => {
-    const off = window.gbl.settings.onWriteError((message) => {
-      toast.error(tRef.current('error.settings-write-title'), { description: message })
+    const off = onRpcEventType('settings-write-error', (event) => {
+      toast.error(tRef.current('error.settings-write-title'), { description: event.message })
     })
     return off
   }, [])

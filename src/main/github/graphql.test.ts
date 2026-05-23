@@ -1,6 +1,7 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import {
   formatGraphqlError,
+  GITHUB_API_CONCURRENCY,
   GITHUB_API_TIMEOUT_MS,
   githubGraphqlEndpoint,
   graphqlRequestResult,
@@ -17,6 +18,10 @@ let originalEnv: Partial<Record<(typeof TOKEN_ENV_KEYS)[number], string | undefi
 
 function mockFetch(handler: (...args: Parameters<typeof fetch>) => Promise<Response>): void {
   globalThis.fetch = handler as unknown as typeof fetch
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 beforeEach(() => {
@@ -164,6 +169,33 @@ describe('graphqlRequestResult', () => {
       expect(result.error.message).toBe('Field not found')
       expect(result.error.retryable).toBe(false)
     }
+  })
+
+  test('limits concurrent GraphQL fetches', async () => {
+    let active = 0
+    let maxActive = 0
+    let calls = 0
+    mockFetch(async () => {
+      calls += 1
+      active += 1
+      maxActive = Math.max(maxActive, active)
+      await sleep(10)
+      active -= 1
+      return new Response(JSON.stringify({ data: { ok: true } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    })
+
+    const results = await Promise.all(
+      Array.from({ length: GITHUB_API_CONCURRENCY + 1 }, (_, index) =>
+        graphqlRequestResult<{ ok: boolean }>('/tmp/repo', repo, 'query Test { viewer { login } }', {}, `Test${index}`),
+      ),
+    )
+
+    expect(calls).toBe(GITHUB_API_CONCURRENCY + 1)
+    expect(maxActive).toBe(GITHUB_API_CONCURRENCY)
+    expect(results.every((result) => result.ok)).toBe(true)
   })
 
   test('formats structured errors for logs', () => {

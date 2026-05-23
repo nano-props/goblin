@@ -1,8 +1,10 @@
-import { errorEvent, inFlightFetchById, updateIfFresh } from '#/renderer/stores/repos/helpers.ts'
+import { appendRepoEvent, errorEvent, inFlightFetchById, updateIfFresh } from '#/renderer/stores/repos/helpers.ts'
 import { branchForVisibleLog, selectedBranchForBranchSet } from '#/renderer/stores/repos/branch-view-mode.ts'
+import { persistRepoCache } from '#/renderer/stores/repos/persistence.ts'
 import { canStartRemoteFetch } from '#/renderer/stores/repos/sync-state.ts'
 import type { ReposGet, ReposSet } from '#/renderer/stores/repos/types.ts'
 import type { PullRequestFetchMode, PullRequestInfo } from '#/renderer/types.ts'
+import { rpc } from '#/renderer/rpc.ts'
 
 let nextPullRequestsRequestId = 1
 
@@ -24,8 +26,8 @@ function mergePullRequest(
 export function createRefreshActions(set: ReposSet, get: ReposGet) {
   async function refreshSelectedPullRequest(id: string, token: number): Promise<void> {
     const repo = get().repos[id]
-    if (!repo || repo.instanceToken !== token || !repo.selectedBranch) return
-    await get().refreshPullRequests(id, [repo.selectedBranch], { token, mode: 'full' })
+    if (!repo || repo.instanceToken !== token || !repo.ui.selectedBranch) return
+    await get().refreshPullRequests(id, [repo.ui.selectedBranch], { token, mode: 'full' })
   }
 
   return {
@@ -36,16 +38,20 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (repoBefore.instanceToken !== token) return
       const silent = options?.silent === true
       if (!silent) {
-        updateIfFresh(set, id, token, (r) => ({ ...r, loading: true }))
+        updateIfFresh(set, id, token, (r) => {
+          const hasData = r.data.branches.length > 0
+          r.async.loading = !hasData
+          r.async.refreshing = hasData || r.cache.source === 'cache'
+        })
       }
       try {
-        const snap = await window.gbl.snapshot(id)
+        const snap = await rpc.repo.snapshot.query({ cwd: id })
         if (!snap) {
-          updateIfFresh(set, id, token, (r) => ({
-            ...r,
-            loading: false,
-            events: [...r.events, errorEvent('error.failed-read-repo')],
-          }))
+          updateIfFresh(set, id, token, (r) => {
+            r.async.loading = false
+            r.async.refreshing = false
+            r.events = appendRepoEvent(r.events, errorEvent('error.failed-read-repo'))
+          })
           return
         }
         updateIfFresh(set, id, token, (r) => {
@@ -55,15 +61,17 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
           const selected = selectedBranchForBranchSet({
             branches: snap.branches,
             currentBranch: snap.current,
-            selectedBranch: r.selectedBranch,
-            viewMode: r.branchViewMode,
+            selectedBranch: r.ui.selectedBranch,
+            viewMode: r.ui.branchViewMode,
           })
           const validBranches = new Set(snap.branches.map((b) => b.name))
           const logsByBranch = Object.fromEntries(
-            Object.entries(r.logsByBranch).filter(([branch]) => validBranches.has(branch)),
+            Object.entries(r.data.logsByBranch).filter(([branch]) => validBranches.has(branch)),
           )
           const pullRequestsByBranch = new Map(
-            r.branches.flatMap((branch) => (branch.pullRequest ? [[branch.name, branch.pullRequest] as const] : [])),
+            r.data.branches.flatMap((branch) =>
+              branch.pullRequest ? [[branch.name, branch.pullRequest] as const] : [],
+            ),
           )
           // Preserve the last known PR while the async GitHub refresh below
           // runs. If GitHub is unavailable, refreshPullRequests keeps this
@@ -72,15 +80,16 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
             const pullRequest = branch.pullRequest ?? pullRequestsByBranch.get(branch.name)
             return pullRequest ? { ...branch, pullRequest } : branch
           })
-          return {
-            ...r,
-            branches,
-            currentBranch: snap.current,
-            selectedBranch: selected,
-            logsByBranch,
-            loading: false,
-          }
+          r.data.branches = branches
+          r.data.currentBranch = snap.current
+          r.data.logsByBranch = logsByBranch
+          r.ui.selectedBranch = selected
+          r.async.loading = false
+          r.async.refreshing = false
+          r.cache.source = 'fresh'
+          r.cache.savedAt = null
         })
+        persistRepoCache(set, get().repos[id], token)
         const branchNames = snap.branches.map((branch) => branch.name)
         void (async () => {
           try {
@@ -105,19 +114,19 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         if (
           after &&
           after.instanceToken === token &&
-          after.detailTab === 'commits' &&
-          after.selectedBranch &&
+          after.ui.detailTab === 'commits' &&
+          after.ui.selectedBranch &&
           !options?.skipLogBackfill
         ) {
-          void get().refreshBranchLog(id, after.selectedBranch, { token })
+          void get().refreshBranchLog(id, after.ui.selectedBranch, { token })
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
-        updateIfFresh(set, id, token, (r) => ({
-          ...r,
-          loading: false,
-          events: [...r.events, errorEvent(message)],
-        }))
+        updateIfFresh(set, id, token, (r) => {
+          r.async.loading = false
+          r.async.refreshing = false
+          r.events = appendRepoEvent(r.events, errorEvent(message))
+        })
       }
     },
 
@@ -132,49 +141,45 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (repoBefore.instanceToken !== token) return
       const mode = options?.mode ?? 'full'
       const silent = options?.silent === true
-      if (silent && repoBefore.pullRequestsLoading) return
+      if (silent && repoBefore.async.pullRequestsLoading) return
       const clearMissing = options?.clearMissing ?? mode === 'full'
-      const branchNames = branchesArg ?? repoBefore.branches.map((branch) => branch.name)
+      const branchNames = branchesArg ?? repoBefore.data.branches.map((branch) => branch.name)
       if (branchNames.length === 0) return
       const requested = new Set(branchNames)
       const requestId = nextPullRequestsRequestId++
-      updateIfFresh(set, id, token, (r) => ({
-        ...r,
-        pullRequestsLoading: silent ? r.pullRequestsLoading : true,
-        pullRequestsRequestId: requestId,
-      }))
+      updateIfFresh(set, id, token, (r) => {
+        r.async.pullRequestsLoading = silent ? r.async.pullRequestsLoading : true
+        r.async.pullRequestsRequestId = requestId
+      })
       try {
-        const entries = await window.gbl.pullRequests(id, branchNames, { mode })
+        const entries = await rpc.repo.pullRequests.query({ cwd: id, branches: branchNames, options: { mode } })
         if (entries === null) {
-          updateIfFresh(set, id, token, (r) =>
-            r.pullRequestsRequestId === requestId ? { ...r, pullRequestsLoading: false } : r,
-          )
+          updateIfFresh(set, id, token, (r) => {
+            if (r.async.pullRequestsRequestId === requestId) r.async.pullRequestsLoading = false
+          })
           return
         }
         updateIfFresh(set, id, token, (r) => {
-          if (r.pullRequestsRequestId !== requestId) return r
+          if (r.async.pullRequestsRequestId !== requestId) return
           const byBranch = new Map(entries.map((entry) => [entry.branch, entry.pullRequest]))
-          let changed = false
-          const branches = r.branches.map((branch) => {
+          for (const branch of r.data.branches) {
             const pullRequest = byBranch.get(branch.name)
             if (pullRequest) {
-              changed = true
-              return { ...branch, pullRequest: mergePullRequest(branch, pullRequest, mode) }
+              branch.pullRequest = mergePullRequest(branch, pullRequest, mode)
+              continue
             }
             if (clearMissing && requested.has(branch.name) && branch.pullRequest) {
-              const { pullRequest: _pullRequest, ...rest } = branch
-              changed = true
-              return rest
+              delete branch.pullRequest
             }
-            return branch
-          })
-          return changed ? { ...r, branches, pullRequestsLoading: false } : { ...r, pullRequestsLoading: false }
+          }
+          r.async.pullRequestsLoading = false
         })
+        persistRepoCache(set, get().repos[id], token)
       } catch (err) {
         console.warn('[refreshPullRequests] failed', err)
-        updateIfFresh(set, id, token, (r) =>
-          r.pullRequestsRequestId === requestId ? { ...r, pullRequestsLoading: false } : r,
-        )
+        updateIfFresh(set, id, token, (r) => {
+          if (r.async.pullRequestsRequestId === requestId) r.async.pullRequestsLoading = false
+        })
       }
     },
 
@@ -186,32 +191,31 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       const branch = branchArg ?? branchForVisibleLog(repoBefore)
       if (!branch) return
       updateIfFresh(set, id, token, (r) => {
-        if (r.branches.length > 0 && !r.branches.some((b) => b.name === branch)) return r
-        const prev = r.logsByBranch[branch] ?? { entries: [], selectedHash: null, loading: false }
-        return { ...r, logsByBranch: { ...r.logsByBranch, [branch]: { ...prev, loading: true } } }
+        if (r.data.branches.length > 0 && !r.data.branches.some((b) => b.name === branch)) return
+        const prev = r.data.logsByBranch[branch] ?? { entries: [], selectedHash: null, loading: false }
+        r.data.logsByBranch[branch] = { ...prev, loading: true }
       })
       try {
-        const log = await window.gbl.log(id, branch, 100)
+        const log = await rpc.repo.log.query({ cwd: id, branch, count: 100 })
         updateIfFresh(set, id, token, (r) => {
-          if (!r.branches.some((b) => b.name === branch)) return r
-          const prev = r.logsByBranch[branch] ?? { entries: [], selectedHash: null, loading: false }
+          if (!r.data.branches.some((b) => b.name === branch)) return
+          const prev = r.data.logsByBranch[branch] ?? { entries: [], selectedHash: null, loading: false }
           const stillHas = prev.selectedHash && log.some((e) => e.hash === prev.selectedHash)
           const selectedHash = stillHas ? prev.selectedHash : (log[0]?.hash ?? null)
-          return { ...r, logsByBranch: { ...r.logsByBranch, [branch]: { entries: log, selectedHash, loading: false } } }
+          r.data.logsByBranch[branch] = { entries: log, selectedHash, loading: false }
         })
       } catch (err) {
         console.warn('[refreshBranchLog] failed', err)
         const message = err instanceof Error ? err.message : String(err)
-        updateIfFresh(set, id, token, (r) => ({
-          ...r,
-          logsByBranch: r.branches.some((b) => b.name === branch)
-            ? {
-                ...r.logsByBranch,
-                [branch]: { ...(r.logsByBranch[branch] ?? { entries: [], selectedHash: null }), loading: false },
-              }
-            : r.logsByBranch,
-          events: [...r.events, errorEvent(message)],
-        }))
+        updateIfFresh(set, id, token, (r) => {
+          if (r.data.branches.some((b) => b.name === branch)) {
+            r.data.logsByBranch[branch] = {
+              ...(r.data.logsByBranch[branch] ?? { entries: [], selectedHash: null }),
+              loading: false,
+            }
+          }
+          r.events = appendRepoEvent(r.events, errorEvent(message))
+        })
       }
     },
 
@@ -220,19 +224,26 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (!repoBefore) return
       const token = options?.token ?? repoBefore.instanceToken
       if (repoBefore.instanceToken !== token) return
-      updateIfFresh(set, id, token, (r) => ({ ...r, statusLoading: true, statusError: null }))
+      updateIfFresh(set, id, token, (r) => {
+        r.async.statusLoading = true
+        r.async.statusError = null
+      })
       try {
-        const status = await window.gbl.status(id)
-        updateIfFresh(set, id, token, (r) => ({ ...r, status, statusLoading: false, statusLoaded: true }))
+        const status = await rpc.repo.status.query({ cwd: id })
+        updateIfFresh(set, id, token, (r) => {
+          r.data.status = status
+          r.data.statusLoaded = true
+          r.async.statusLoading = false
+        })
+        persistRepoCache(set, get().repos[id], token)
       } catch (err) {
         console.warn('[refreshStatus] failed', err)
         const message = err instanceof Error ? err.message : String(err)
-        updateIfFresh(set, id, token, (r) => ({
-          ...r,
-          statusLoading: false,
-          statusError: message,
-          events: [...r.events, errorEvent(message)],
-        }))
+        updateIfFresh(set, id, token, (r) => {
+          r.async.statusLoading = false
+          r.async.statusError = message
+          r.events = appendRepoEvent(r.events, errorEvent(message))
+        })
       }
     },
 
@@ -249,7 +260,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       const after = get().repos[id]
       if (!after || after.instanceToken !== token) return
       await get().refreshStatus(id, { token })
-      if (after.detailTab === 'commits') await get().refreshBranchLog(id, undefined, { token })
+      if (after.ui.detailTab === 'commits') await get().refreshBranchLog(id, undefined, { token })
     },
 
     async syncAndRefresh(id: string, options?: { token?: number }) {
@@ -258,9 +269,11 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       const token = options?.token ?? repoBefore.instanceToken
       if (repoBefore.instanceToken !== token) return
       if (!canStartRemoteFetch(repoBefore)) return
-      updateIfFresh(set, id, token, (r) => ({ ...r, syncing: true }))
+      updateIfFresh(set, id, token, (r) => {
+        r.async.syncing = true
+      })
       try {
-        const result = await window.gbl.fetch(id)
+        const result = await rpc.repo.fetch.mutate({ cwd: id })
         const afterFetch = get().repos[id]
         if (!afterFetch || afterFetch.instanceToken !== token) return
         if (!result.ok && result.message === 'cancelled') return
@@ -269,7 +282,10 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         await get().refreshAll(id, { token })
         if (result.ok) get().clearFetchFailed(id, token)
       } finally {
-        updateIfFresh(set, id, token, (r) => ({ ...r, syncing: false, lastFetchSettledAt: Date.now() }))
+        updateIfFresh(set, id, token, (r) => {
+          r.async.syncing = false
+          r.async.lastFetchSettledAt = Date.now()
+        })
       }
     },
 
@@ -284,37 +300,43 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (!repoBefore) return
       if (!canStartRemoteFetch(repoBefore)) return
       const token = repoBefore.instanceToken
-      updateIfFresh(set, id, token, (r) => ({ ...r, fetching: true }))
+      updateIfFresh(set, id, token, (r) => {
+        r.async.fetching = true
+      })
 
       let work!: Promise<void>
       work = (async () => {
         try {
-          const result = await window.gbl.fetch(id, 'background')
+          const result = await rpc.repo.fetch.mutate({ cwd: id, kind: 'background' })
           if (!result.ok) {
             if (result.message === 'cancelled' || result.message === 'error.network-op-in-progress') return
             console.warn('[backgroundFetch] git fetch failed:', result.message)
-            updateIfFresh(set, id, token, (r) => ({
-              ...r,
-              fetchFailed: true,
-              fetchError: result.message,
-            }))
+            updateIfFresh(set, id, token, (r) => {
+              r.remote.fetchFailed = true
+              r.remote.fetchError = result.message
+            })
             await get().refreshStatus(id, { token })
             return
           }
           // Success — clear the fail flag and refresh the snapshot/status.
-          updateIfFresh(set, id, token, (r) => ({ ...r, fetchFailed: false, fetchError: null }))
+          updateIfFresh(set, id, token, (r) => {
+            r.remote.fetchFailed = false
+            r.remote.fetchError = null
+          })
           await get().refreshSnapshot(id, { silent: true, token })
           await get().refreshStatus(id, { token })
         } catch (err) {
           console.warn('[backgroundFetch] threw:', err)
           const message = err instanceof Error ? err.message : String(err)
-          updateIfFresh(set, id, token, (r) => ({
-            ...r,
-            fetchFailed: true,
-            fetchError: message,
-          }))
+          updateIfFresh(set, id, token, (r) => {
+            r.remote.fetchFailed = true
+            r.remote.fetchError = message
+          })
         } finally {
-          updateIfFresh(set, id, token, (r) => ({ ...r, fetching: false, lastFetchSettledAt: Date.now() }))
+          updateIfFresh(set, id, token, (r) => {
+            r.async.fetching = false
+            r.async.lastFetchSettledAt = Date.now()
+          })
           // Only clear the slot if it still refers to this run. Without
           // the identity check, a close + reopen + new fetch can land
           // before this finally runs, and we'd wipe the new run's entry.

@@ -15,8 +15,8 @@ export function branchMatchesViewMode(branch: BranchInfo, viewMode: BranchViewMo
 }
 
 export function visibleBranches(repo: RepoState): BranchInfo[] {
-  if (repo.branchViewMode === 'all') return repo.branches
-  return repo.branches.filter((branch) => branchMatchesViewMode(branch, repo.branchViewMode))
+  if (repo.ui.branchViewMode === 'all') return repo.data.branches
+  return repo.data.branches.filter((branch) => branchMatchesViewMode(branch, repo.ui.branchViewMode))
 }
 
 export function selectedBranchForBranchSet({
@@ -32,13 +32,13 @@ export function selectedBranchForBranchSet({
 
 export function selectedBranchForViewMode(repo: RepoState, viewMode: BranchViewMode): string | null {
   return selectedBranchForBranchSet({
-    branches: repo.branches,
-    currentBranch: repo.currentBranch,
-    selectedBranch: repo.selectedBranch,
+    branches: repo.data.branches,
+    currentBranch: repo.data.currentBranch,
+    selectedBranch: repo.ui.selectedBranch,
     viewMode,
   })
 }
 
 export function branchForVisibleLog(repo: RepoState): string | null {
-  return repo.selectedBranch ?? (repo.branchViewMode === 'all' ? repo.currentBranch : null)
+  return repo.ui.selectedBranch ?? (repo.ui.branchViewMode === 'all' ? repo.data.currentBranch : null)
 }

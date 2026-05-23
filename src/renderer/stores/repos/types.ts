@@ -4,6 +4,7 @@ import type { CommitDetail } from '#/renderer/types-bridge.ts'
 
 export type DetailTab = 'status' | 'changes' | 'commits'
 export type BranchViewMode = 'all' | 'worktrees' | 'no-worktree'
+export type RepoDataSource = 'cache' | 'fresh'
 
 export interface BranchLogState {
   entries: LogEntry[]
@@ -20,31 +21,42 @@ export type RepoEvent =
  *  callers to narrow before reading either field. */
 export type OpenRepoResult = { ok: true; id: string } | { ok: false; message: string }
 
-export interface RepoState {
-  /** Absolute repo root — also the unique id. */
-  id: string
-  name: string
-  /** Bumped on every fresh open so async writers can detect close-and-reopen. */
-  instanceToken: number
+export interface RepoDataState {
   branches: BranchInfo[]
   currentBranch: string
+  logsByBranch: Record<string, BranchLogState>
+  status: WorktreeStatus[]
+  statusLoaded: boolean
+}
+
+export interface RepoUiState {
   selectedBranch: string | null
   branchViewMode: BranchViewMode
-  logsByBranch: Record<string, BranchLogState>
-  /** Working-tree status grouped by worktree (main worktree first). */
-  status: WorktreeStatus[]
-  statusLoading: boolean
-  statusLoaded: boolean
-  statusError: string | null
   detailTab: DetailTab
   /** When set, the log view shows the commit detail overlay. */
   openCommit: CommitDetail | null
   openingCommitHash: string | null
+}
+
+export interface RepoAsyncState {
+  statusLoading: boolean
+  statusError: string | null
   loading: boolean
   syncing: boolean
   lastFetchSettledAt: number | null
   /** True while a periodic background fetch is running — header indicator. */
   fetching: boolean
+  refreshing: boolean
+  pullRequestsLoading: boolean
+  pullRequestsRequestId: number
+}
+
+export interface RepoCacheState {
+  source: RepoDataSource
+  savedAt: number | null
+}
+
+export interface RepoRemoteState {
   /** True if the most recent background fetch failed (network down,
    *  remote refused, etc). Cleared on next success. UI badges this. */
   fetchFailed: boolean
@@ -53,8 +65,26 @@ export interface RepoState {
    *  hover and read why fetch is failing instead of just seeing a
    *  red dot. */
   fetchError: string | null
-  pullRequestsLoading: boolean
-  pullRequestsRequestId: number
+}
+
+export interface CachedRepoState {
+  savedAt: number
+  name: string
+  data: Pick<RepoDataState, 'branches' | 'currentBranch' | 'status' | 'statusLoaded'>
+  ui: Pick<RepoUiState, 'selectedBranch' | 'branchViewMode' | 'detailTab'>
+}
+
+export interface RepoState {
+  /** Absolute repo root — also the unique id. */
+  id: string
+  name: string
+  /** Bumped on every fresh open so async writers can detect close-and-reopen. */
+  instanceToken: number
+  data: RepoDataState
+  ui: RepoUiState
+  async: RepoAsyncState
+  cache: RepoCacheState
+  remote: RepoRemoteState
   events: RepoEvent[]
 }
 
@@ -65,6 +95,7 @@ export interface MissingRepo {
 
 export interface ReposStore {
   repos: Record<string, RepoState>
+  repoCache: Record<string, CachedRepoState>
   order: string[]
   activeId: string | null
   /** Hydration flag — true once boot session is restored, so we don't

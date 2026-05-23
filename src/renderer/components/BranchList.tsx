@@ -51,9 +51,9 @@ export function BranchList({ repoId }: Props) {
       return {
         repo,
         branches: repo ? visibleBranches(repo) : [],
-        branchCount: repo?.branches.length ?? 0,
-        selected: repo?.selectedBranch ?? null,
-        current: repo?.currentBranch ?? '',
+        branchCount: repo?.data.branches.length ?? 0,
+        selected: repo?.ui.selectedBranch ?? null,
+        current: repo?.data.currentBranch ?? '',
       }
     },
     (a, b) =>
@@ -62,9 +62,9 @@ export function BranchList({ repoId }: Props) {
         !!b.repo &&
         a.repo.id === b.repo.id &&
         a.repo.instanceToken === b.repo.instanceToken &&
-        a.repo.branches === b.repo.branches &&
-        a.repo.branchViewMode === b.repo.branchViewMode &&
-        a.repo.status === b.repo.status &&
+        a.repo.data.branches === b.repo.data.branches &&
+        a.repo.ui.branchViewMode === b.repo.ui.branchViewMode &&
+        a.repo.data.status === b.repo.data.status &&
         a.branchCount === b.branchCount &&
         a.selected === b.selected &&
         a.current === b.current),
@@ -78,7 +78,7 @@ export function BranchList({ repoId }: Props) {
   if (!repo) return null
 
   if (branches.length === 0) {
-    return <EmptyState title={t(repo.branches.length === 0 ? 'branches.empty' : 'branches.filter-empty')} />
+    return <EmptyState title={t(repo.data.branches.length === 0 ? 'branches.empty' : 'branches.filter-empty')} />
   }
 
   return (

@@ -47,13 +47,13 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
   const [branch, setBranch] = useState('')
   const [worktreePath, setWorktreePath] = useState('')
 
-  // Reset on the rising edge of `open` only. Listing repo.branches /
-  // repo.currentBranch in the deps would re-fire on every snapshot
+  // Reset on the rising edge of `open` only. Listing repo.data.branches /
+  // repo.data.currentBranch in the deps would re-fire on every snapshot
   // refresh (incl. silent background fetch) and wipe user input.
   // Snapshot the initial base via a ref so the open-edge handler
   // reads the current value without taking a dep on it.
   const initialBaseRef = useRef('')
-  initialBaseRef.current = repo.currentBranch || repo.branches[0]?.name || ''
+  initialBaseRef.current = repo.data.currentBranch || repo.data.branches[0]?.name || ''
   useEffect(() => {
     if (!open) return
     setBase(initialBaseRef.current)
@@ -65,7 +65,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
   const pathTrimmed = untildify(worktreePath.trim())
   const defaultPath = defaultWorktreePath(repo.id, branchTrimmed)
   const branchValidation = branchTrimmed ? validateBranchName(branchTrimmed) : { ok: true }
-  const branchExists = branchTrimmed ? repo.branches.some((b) => b.name === branchTrimmed) : false
+  const branchExists = branchTrimmed ? repo.data.branches.some((b) => b.name === branchTrimmed) : false
   const branchError = branchTrimmed
     ? !branchValidation.ok
       ? t('action.create-worktree-branch-invalid')
@@ -116,14 +116,14 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
                 <SelectValue placeholder={t('action.create-worktree-base-placeholder')} />
               </SelectTrigger>
               <SelectContent>
-                {repo.branches.map((b) => (
+                {repo.data.branches.map((b) => (
                   // textValue is the typeahead string (also what Radix
                   // echoes into the trigger via SelectValue). We pass
                   // just the branch name so the trigger shows "main"
                   // instead of "main current" once selected.
                   <SelectItem key={b.name} value={b.name} textValue={b.name}>
                     <span className="truncate">{b.name}</span>
-                    {b.name === repo.currentBranch && (
+                    {b.name === repo.data.currentBranch && (
                       <span className="ml-2 text-xs text-muted-foreground">
                         {t('action.create-worktree-base-current')}
                       </span>

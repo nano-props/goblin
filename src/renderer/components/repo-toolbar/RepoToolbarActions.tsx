@@ -17,6 +17,7 @@ import { Tip } from '#/renderer/components/Tip.tsx'
 import { Button } from '#/renderer/components/ui/button.tsx'
 import { CreateWorktreeDialog, type CreateWorktreeRequest } from '#/renderer/components/CreateWorktreeDialog.tsx'
 import { RepoSyncControl } from '#/renderer/components/repo-sync/RepoSyncControl.tsx'
+import { rpc } from '#/renderer/rpc.ts'
 
 interface Props {
   repo: RepoState
@@ -72,12 +73,12 @@ export function RepoToolbarActions({ repo }: Props) {
     setCreatingByRepo((s) => ({ ...s, [targetRepoId]: request.newBranch }))
     showCreateTip(targetRepoId)
     try {
-      const result = await window.gbl.createWorktree(
-        targetRepoId,
-        request.worktreePath,
-        request.newBranch,
-        request.baseBranch,
-      )
+      const result = await rpc.repo.createWorktree.mutate({
+        cwd: targetRepoId,
+        worktreePath: request.worktreePath,
+        newBranch: request.newBranch,
+        baseBranch: request.baseBranch,
+      })
       setLastResult(targetRepoId, result, token)
       if (result.ok) {
         await refreshSnapshot(targetRepoId, { token })

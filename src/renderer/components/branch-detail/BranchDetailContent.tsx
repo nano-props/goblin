@@ -18,11 +18,12 @@ interface Props {
 export function BranchDetailContent({ repo, detail, detailId, contentId }: Props) {
   const t = useT()
   const { branch, branchLog, selectedStatus } = detail
-  if (!branch) return <EmptyState title={t(repo.branches.length === 0 ? 'branches.empty' : 'branches.filter-empty')} />
+  if (!branch)
+    return <EmptyState title={t(repo.data.branches.length === 0 ? 'branches.empty' : 'branches.filter-empty')} />
 
   return (
     <div id={contentId} className="flex min-h-0 flex-1 flex-col">
-      {repo.detailTab === 'status' && (
+      {repo.ui.detailTab === 'status' && (
         <div
           id={`${detailId}-status-panel`}
           role="tabpanel"
@@ -32,17 +33,17 @@ export function BranchDetailContent({ repo, detail, detailId, contentId }: Props
           <BranchStatus detail={detail} />
         </div>
       )}
-      {repo.detailTab === 'changes' && (
+      {repo.ui.detailTab === 'changes' && (
         <div
           id={`${detailId}-changes-panel`}
           role="tabpanel"
           aria-labelledby={`${detailId}-changes-tab`}
           className="flex min-h-0 flex-1 flex-col"
         >
-          {branch.worktreePath && repo.statusLoading && !repo.statusLoaded ? (
+          {branch.worktreePath && repo.async.statusLoading && !repo.data.statusLoaded ? (
             <ListSkeleton rows={8} variant="status" />
-          ) : branch.worktreePath && !repo.statusLoaded && repo.statusError ? (
-            <EmptyState title={t(repo.statusError)} />
+          ) : branch.worktreePath && !repo.data.statusLoaded && repo.async.statusError ? (
+            <EmptyState title={t(repo.async.statusError)} />
           ) : branch.worktreePath ? (
             <StatusList status={selectedStatus} emptyTitleKey="status.clean-title" emptyBodyKey="status.clean-body" />
           ) : (
@@ -54,7 +55,7 @@ export function BranchDetailContent({ repo, detail, detailId, contentId }: Props
           )}
         </div>
       )}
-      {repo.detailTab === 'commits' && (
+      {repo.ui.detailTab === 'commits' && (
         <div
           id={`${detailId}-commits-panel`}
           role="tabpanel"

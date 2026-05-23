@@ -1,6 +1,4 @@
-/// <reference types="bun" />
-
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, test } from 'vitest'
 import { defaultWorktreePath, joinPath, parentDir, tildifyPath, untildifyPath } from '#/renderer/lib/paths.ts'
 
 describe('tildifyPath', () => {

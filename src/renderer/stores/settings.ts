@@ -9,6 +9,7 @@
 import { create } from 'zustand'
 import type { GlobalShortcutState, SessionState } from '#/renderer/types-bridge.ts'
 import { DEFAULT_GLOBAL_SHORTCUT } from '#/shared/accelerator.ts'
+import { onRpcEventType, rpc } from '#/renderer/rpc.ts'
 
 interface SettingsStore {
   fetchIntervalSec: number
@@ -46,7 +47,7 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
 
   async hydrate() {
     const version = ++hydrateVersion
-    const snap = await window.gbl.settings.get()
+    const snap = await rpc.settings.get.query()
     if (version !== hydrateVersion) return snap.session
     set({
       fetchIntervalSec: snap.fetchIntervalSec,
@@ -58,23 +59,20 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
     const nextUnsubscribers: Array<() => void> = []
     try {
       nextUnsubscribers.push(
-        window.gbl.settings.onFetchIntervalChange((sec) =>
-          set((s) => (s.fetchIntervalSec === sec ? s : { fetchIntervalSec: sec })),
-        ),
-      )
-      nextUnsubscribers.push(
-        window.gbl.settings.onShortcutsDisabledChange((disabled) =>
-          set((s) => (s.shortcutsDisabled === disabled ? s : { shortcutsDisabled: disabled })),
-        ),
-      )
-      nextUnsubscribers.push(
-        window.gbl.settings.onGlobalShortcutChange(({ accelerator, registered }) =>
+        onRpcEventType('fetch-interval-changed', (event) => {
+          set((s) => (s.fetchIntervalSec === event.sec ? s : { fetchIntervalSec: event.sec }))
+        }),
+        onRpcEventType('shortcuts-disabled-changed', (event) => {
+          set((s) => (s.shortcutsDisabled === event.disabled ? s : { shortcutsDisabled: event.disabled }))
+        }),
+        onRpcEventType('global-shortcut-changed', (event) => {
+          const { accelerator, registered } = event.state
           set((s) =>
             s.globalShortcut === accelerator && s.globalShortcutRegistered === registered
               ? s
               : { globalShortcut: accelerator, globalShortcutRegistered: registered },
-          ),
-        ),
+          )
+        }),
       )
     } catch (err) {
       clearSubscriptions(nextUnsubscribers)
@@ -91,17 +89,17 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
 
   async setFetchInterval(sec) {
     const clamped = Math.max(0, Math.min(3600, Math.round(sec)))
-    await window.gbl.settings.setFetchInterval(clamped)
+    await rpc.settings.setFetchInterval.mutate({ sec: clamped })
     set((s) => (s.fetchIntervalSec === clamped ? s : { fetchIntervalSec: clamped }))
   },
 
   async setShortcutsDisabled(disabled) {
-    await window.gbl.settings.setShortcutsDisabled(disabled)
+    await rpc.settings.setShortcutsDisabled.mutate({ disabled })
     set((s) => (s.shortcutsDisabled === disabled ? s : { shortcutsDisabled: disabled }))
   },
 
   async setGlobalShortcut(accelerator) {
-    const state = await window.gbl.settings.setGlobalShortcut(accelerator)
+    const state = await rpc.settings.setGlobalShortcut.mutate({ accelerator })
     set((s) =>
       s.globalShortcut === state.accelerator && s.globalShortcutRegistered === state.registered
         ? s

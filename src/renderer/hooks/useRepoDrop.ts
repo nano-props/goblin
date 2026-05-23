@@ -2,6 +2,7 @@ import { type DragEvent, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
+import { goblin } from '#/renderer/rpc.ts'
 
 interface Options {
   /** True when an overlay (Settings/Help) is up. While blocked, the
@@ -62,7 +63,7 @@ export function useRepoDrop({ blocked }: Options) {
     setActive(false)
     if (blockedRef.current) return
     const paths = Array.from(event.dataTransfer.files)
-      .map((file) => window.gbl.pathForFile(file))
+      .map((file) => goblin.pathForFile(file))
       .filter((path) => path.length > 0)
     if (paths.length === 0) return
     void (async () => {

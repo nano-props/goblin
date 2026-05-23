@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
+import { rpc } from '#/renderer/rpc.ts'
 
 export function useVSCodeInstalled() {
   const [vscodeInstalled, setVSCodeInstalled] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    void window.gbl
-      .vscodeInstalled()
+    void rpc.repo.vscodeInstalled
+      .query()
       .then((ok) => {
         if (!cancelled) setVSCodeInstalled(ok)
       })

@@ -22,8 +22,8 @@ export function RepoView({ repoId }: Props) {
       const repo = s.repos[repoId]
       return {
         exists: !!repo,
-        initialLoading: !!repo && repo.loading && repo.branches.length === 0,
-        openCommit: repo?.openCommit ?? null,
+        initialLoading: !!repo && repo.async.loading && repo.data.branches.length === 0,
+        openCommit: repo?.ui.openCommit ?? null,
         detailCollapsed: s.detailCollapsed,
       }
     },

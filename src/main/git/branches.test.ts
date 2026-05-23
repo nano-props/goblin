@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, test } from 'vitest'
 import { markDefaultBranch, markMergedToDefault, prioritizeDefaultBranch } from '#/main/git/branches.ts'
 import type { BranchInfo } from '#/shared/git-types.ts'
 

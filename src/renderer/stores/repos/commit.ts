@@ -1,5 +1,6 @@
-import { errorEvent, resultEvent, updateIfFresh } from '#/renderer/stores/repos/helpers.ts'
+import { appendRepoEvent, errorEvent, resultEvent, updateIfFresh } from '#/renderer/stores/repos/helpers.ts'
 import type { ReposGet, ReposSet } from '#/renderer/stores/repos/types.ts'
+import { rpc } from '#/renderer/rpc.ts'
 
 export function createCommitActions(set: ReposSet, get: ReposGet) {
   return {
@@ -7,23 +8,23 @@ export function createCommitActions(set: ReposSet, get: ReposGet) {
       const repoBefore = get().repos[id]
       if (!repoBefore) return
       const token = repoBefore.instanceToken
-      updateIfFresh(set, id, token, (r) => ({ ...r, openingCommitHash: hash }))
+      updateIfFresh(set, id, token, (r) => {
+        r.ui.openingCommitHash = hash
+      })
       try {
-        const detail = await window.gbl.commit(id, hash)
-        updateIfFresh(set, id, token, (r) =>
-          r.openingCommitHash === hash ? { ...r, openCommit: detail, openingCommitHash: null } : r,
-        )
+        const detail = await rpc.repo.commit.query({ cwd: id, hash })
+        updateIfFresh(set, id, token, (r) => {
+          if (r.ui.openingCommitHash !== hash) return
+          r.ui.openCommit = detail
+          r.ui.openingCommitHash = null
+        })
       } catch (err) {
         console.warn('[openCommit] failed', err)
-        updateIfFresh(set, id, token, (r) =>
-          r.openingCommitHash === hash
-            ? {
-                ...r,
-                openingCommitHash: null,
-                events: [...r.events, errorEvent(err instanceof Error ? err.message : String(err))],
-              }
-            : r,
-        )
+        updateIfFresh(set, id, token, (r) => {
+          if (r.ui.openingCommitHash !== hash) return
+          r.ui.openingCommitHash = null
+          r.events = appendRepoEvent(r.events, errorEvent(err instanceof Error ? err.message : String(err)))
+        })
       }
     },
 
@@ -31,7 +32,7 @@ export function createCommitActions(set: ReposSet, get: ReposGet) {
       set((s) => {
         const cur = s.repos[id]
         if (!cur) return s
-        return { repos: { ...s.repos, [id]: { ...cur, openCommit: null, openingCommitHash: null } } }
+        return { repos: { ...s.repos, [id]: { ...cur, ui: { ...cur.ui, openCommit: null, openingCommitHash: null } } } }
       })
     },
 
@@ -40,7 +41,7 @@ export function createCommitActions(set: ReposSet, get: ReposGet) {
         const repo = s.repos[id]
         if (!repo) return s
         if (repo.instanceToken !== token) return s
-        return { repos: { ...s.repos, [id]: { ...repo, events: [...repo.events, resultEvent(result)] } } }
+        return { repos: { ...s.repos, [id]: { ...repo, events: appendRepoEvent(repo.events, resultEvent(result)) } } }
       })
     },
 
@@ -59,9 +60,9 @@ export function createCommitActions(set: ReposSet, get: ReposGet) {
     clearFetchFailed(id: string, token: number) {
       set((s) => {
         const repo = s.repos[id]
-        if (!repo || !repo.fetchFailed) return s
+        if (!repo || !repo.remote.fetchFailed) return s
         if (repo.instanceToken !== token) return s
-        return { repos: { ...s.repos, [id]: { ...repo, fetchFailed: false, fetchError: null } } }
+        return { repos: { ...s.repos, [id]: { ...repo, remote: { fetchFailed: false, fetchError: null } } } }
       })
     },
   }

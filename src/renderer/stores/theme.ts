@@ -6,6 +6,7 @@
 
 import { create } from 'zustand'
 import type { ResolvedTheme, ThemePref, ThemeState } from '#/renderer/types-bridge.ts'
+import { onRpcEventType, rpc } from '#/renderer/rpc.ts'
 
 interface ThemeStore extends ThemeState {
   setPref: (pref: ThemePref) => Promise<void>
@@ -33,12 +34,13 @@ export const useThemeStore = create<ThemeStore>((set, get) => ({
 
   async hydrate() {
     const version = ++hydrateVersion
-    const state = await window.gbl.theme.get()
+    const state = await rpc.theme.get.query()
     if (version !== hydrateVersion) return
     applyHtmlAttr(state.resolved)
     set((s) => (s.pref === state.pref && s.resolved === state.resolved ? s : state))
     if (version !== hydrateVersion) return
-    const nextUnsubscribe = window.gbl.theme.onChange((next) => {
+    const nextUnsubscribe = onRpcEventType('theme-changed', (event) => {
+      const next = event.state
       applyHtmlAttr(next.resolved)
       set((s) => (s.pref === next.pref && s.resolved === next.resolved ? s : next))
     })
@@ -52,7 +54,7 @@ export const useThemeStore = create<ThemeStore>((set, get) => ({
 
   async setPref(pref) {
     if (pref === get().pref) return
-    const next = await window.gbl.theme.setPref(pref)
+    const next = await rpc.theme.setPref.mutate({ pref })
     applyHtmlAttr(next.resolved)
     set((s) => (s.pref === next.pref && s.resolved === next.resolved ? s : next))
   },

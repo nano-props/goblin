@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
+import { rpc } from '#/renderer/rpc.ts'
 
 export function useGhosttyInstalled() {
   const [ghosttyInstalled, setGhosttyInstalled] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    void window.gbl
-      .ghosttyInstalled()
+    void rpc.repo.ghosttyInstalled
+      .query()
       .then((ok) => {
         if (!cancelled) setGhosttyInstalled(ok)
       })

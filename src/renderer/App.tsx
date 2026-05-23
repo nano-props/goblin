@@ -12,7 +12,7 @@
 //   - background fetch loop (active repo only, debounced by interval)
 //   - session persistence (any change to open repos / active id writes
 //     through to main so the next launch can restore)
-//   - menu-action listener (forwards `app:menu-invoke` to store actions)
+//   - menu-action listener (forwards typed RPC events to store actions)
 //   - settings write-error toast (warns the user if prefs aren't
 //     persisting instead of silently dropping their changes)
 
@@ -93,10 +93,10 @@ export function App() {
         <RepoTabs />
         <main className="flex flex-1 min-h-0 min-w-0">
           <ErrorBoundary resetKey={activeId}>
-            {!sessionReady ? (
-              <RepoWorkspaceSkeleton showRepoToolbar detailCollapsed={detailCollapsed} />
-            ) : activeId ? (
+            {activeId ? (
               <RepoView repoId={activeId} />
+            ) : !sessionReady ? (
+              <RepoWorkspaceSkeleton showRepoToolbar detailCollapsed={detailCollapsed} />
             ) : (
               <EmptyState />
             )}

@@ -87,7 +87,7 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
       </Button>
       <div className="flex shrink-0" role="tablist" aria-label={t('tab.branch-detail')}>
         {DETAIL_TABS.map((tab) => {
-          const selected = repo.detailTab === tab.id
+          const selected = repo.ui.detailTab === tab.id
           const visuallySelected = !collapsed && selected
           return (
             <button

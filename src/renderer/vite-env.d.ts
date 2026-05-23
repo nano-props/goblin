@@ -1,113 +1,17 @@
 /// <reference types="vite/client" />
 
-import type {
-  BranchInfo,
-  ExecResult,
-  LogEntry,
-  PullRequestFetchMode,
-  PullRequestInfo,
-  WorktreeStatus,
-} from '#/renderer/types.ts'
-import type {
-  CommitDetail,
-  GlobalShortcutState,
-  I18nPayload,
-  LangPref,
-  MenuAction,
-  SessionState,
-  SettingsSnapshot,
-  ThemePref,
-  ThemeState,
-} from '#/renderer/types-bridge.ts'
+import type { RpcEvent, RpcRequest } from '#/shared/rpc.ts'
 
-interface RepoSnapshot {
-  branches: BranchInfo[]
-  current: string
-}
-
-interface ProbeResult {
-  ok: boolean
-  root?: string
-  name?: string
-  message?: string
-}
-
-interface PullRequestEntry {
-  branch: string
-  pullRequest: PullRequestInfo
-}
-
-interface PullRequestFetchOptions {
-  mode?: PullRequestFetchMode
-  silent?: boolean
-  clearMissing?: boolean
-}
-
-interface GblBridge {
+interface GoblinBridge {
   homeDir: string
-  openDialog: () => Promise<string | null>
-  openProjectGitHub: () => Promise<ExecResult>
+  invokeRpc: (request: RpcRequest) => Promise<unknown>
+  onEvent: (cb: (event: RpcEvent) => void) => () => void
   pathForFile: (file: File) => string
-  probe: (cwd: string) => Promise<ProbeResult>
-  snapshot: (cwd: string) => Promise<RepoSnapshot | null>
-  pullRequests: (
-    cwd: string,
-    branches?: string[],
-    options?: PullRequestFetchOptions,
-  ) => Promise<PullRequestEntry[] | null>
-  log: (cwd: string, branch: string, count?: number) => Promise<LogEntry[]>
-  status: (cwd: string) => Promise<WorktreeStatus[]>
-  patch: (cwd: string, worktreePath: string) => Promise<ExecResult>
-  commit: (cwd: string, hash: string) => Promise<CommitDetail | null>
-  checkout: (cwd: string, branch: string) => Promise<ExecResult>
-  deleteBranch: (cwd: string, branch: string, force?: boolean) => Promise<ExecResult>
-  removeWorktree: (
-    cwd: string,
-    branch: string,
-    worktreePath: string,
-    alsoDeleteBranch: boolean,
-    forceDeleteBranch?: boolean,
-  ) => Promise<ExecResult>
-  createWorktree: (cwd: string, worktreePath: string, newBranch: string, baseBranch: string) => Promise<ExecResult>
-  pull: (cwd: string, branch: string, worktreePath?: string) => Promise<ExecResult>
-  push: (cwd: string, branch: string) => Promise<ExecResult>
-  fetch: (cwd: string, kind?: 'user' | 'background') => Promise<ExecResult>
-  abort: (cwd: string) => Promise<boolean>
-  openGitHub: (cwd: string, branch?: string) => Promise<ExecResult>
-  openInFinder: (path: string) => Promise<ExecResult>
-  openInGhostty: (path: string) => Promise<ExecResult>
-  openInVSCode: (path: string) => Promise<ExecResult>
-  ghosttyInstalled: () => Promise<boolean>
-  vscodeInstalled: () => Promise<boolean>
-  theme: {
-    get: () => Promise<ThemeState>
-    setPref: (pref: ThemePref) => Promise<ThemeState>
-    onChange: (cb: (state: ThemeState) => void) => () => void
-  }
-  settings: {
-    get: () => Promise<SettingsSnapshot>
-    setFetchInterval: (sec: number) => Promise<void>
-    setShortcutsDisabled: (disabled: boolean) => Promise<void>
-    setGlobalShortcut: (accelerator: string) => Promise<GlobalShortcutState>
-    addRecentRepo: (repoPath: string) => Promise<string[]>
-    clearRecentRepos: () => Promise<void>
-    onFetchIntervalChange: (cb: (sec: number) => void) => () => void
-    onShortcutsDisabledChange: (cb: (disabled: boolean) => void) => () => void
-    onGlobalShortcutChange: (cb: (state: GlobalShortcutState) => void) => () => void
-    saveSession: (session: SessionState) => Promise<void>
-    onWriteError: (cb: (message: string) => void) => () => void
-  }
-  onMenuAction: (cb: (action: MenuAction) => void) => () => void
-  i18n: {
-    get: () => Promise<I18nPayload>
-    setPref: (pref: LangPref) => Promise<I18nPayload | null>
-    onChange: (cb: (payload: I18nPayload) => void) => () => void
-  }
 }
 
 declare global {
   interface Window {
-    gbl: GblBridge
+    goblin: GoblinBridge
   }
   /** Injected by vite.config.ts `define`. */
   const __APP_VERSION__: string

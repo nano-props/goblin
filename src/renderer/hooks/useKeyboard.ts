@@ -3,7 +3,7 @@
 //
 // Shortcuts that are also wired through the application menu (⌘O,
 // ⌘W, ⌘1/⌘2/⌘3, ⌘[ , ⌘]) are handled by Electron's accelerator system
-// and forwarded via `app:menu-invoke`. We only handle the "no
+// and forwarded as typed RPC events. We only handle the "no
 // modifier" keys here (j/k/arrows/p/P/g/v/G/?/Enter/Esc) so we don't fight the menu.
 //
 // Modal awareness: when an overlay/dialog/menu is open every shortcut
@@ -59,7 +59,7 @@ function nextIndex(current: number, length: number, direction: MoveDirection): n
 
 function moveCommitSelection(state: ReposStore, repo: RepoState, direction: MoveDirection): boolean {
   const branch = branchForVisibleLog(repo)
-  const branchLog = branch ? repo.logsByBranch[branch] : undefined
+  const branchLog = branch ? repo.data.logsByBranch[branch] : undefined
   if (!branch || !branchLog?.entries.length) return false
   const index = branchLog.entries.findIndex((commit) => commit.hash === branchLog.selectedHash)
   const next = branchLog.entries[nextIndex(index, branchLog.entries.length, direction)]
@@ -71,14 +71,19 @@ function moveCommitSelection(state: ReposStore, repo: RepoState, direction: Move
 function moveBranchSelection(state: ReposStore, repo: RepoState, direction: MoveDirection): boolean {
   const branches = visibleBranches(repo)
   if (branches.length === 0) return false
-  const index = branches.findIndex((branch) => branch.name === repo.selectedBranch)
+  const index = branches.findIndex((branch) => branch.name === repo.ui.selectedBranch)
   const next = branches[nextIndex(index, branches.length, direction)]
   if (!next) return false
   state.selectBranch(repo.id, next.name)
   return true
 }
 
-function moveSelection(state: ReposStore, repo: RepoState, commitListActive: boolean, direction: MoveDirection): boolean {
+function moveSelection(
+  state: ReposStore,
+  repo: RepoState,
+  commitListActive: boolean,
+  direction: MoveDirection,
+): boolean {
   return commitListActive ? moveCommitSelection(state, repo, direction) : moveBranchSelection(state, repo, direction)
 }
 
@@ -101,8 +106,8 @@ export function useKeyboard({ onShowHelp, isOverlayOpen }: Options) {
       const state = useReposStore.getState()
       const repoId = state.activeId
       const repo = repoId ? state.repos[repoId] : null
-      const overlayOpen = isOverlayOpenRef.current() || isShortcutBlockingLayerOpen() || !!repo?.openCommit
-      const commitListActive = !!repo && repo.detailTab === 'commits' && !state.detailCollapsed
+      const overlayOpen = isOverlayOpenRef.current() || isShortcutBlockingLayerOpen() || !!repo?.ui.openCommit
+      const commitListActive = !!repo && repo.ui.detailTab === 'commits' && !state.detailCollapsed
       const interactiveTarget = isInteractiveTarget(e.target)
 
       if (e.key === 'Escape') {
@@ -127,7 +132,7 @@ export function useKeyboard({ onShowHelp, isOverlayOpen }: Options) {
 
       const action = branchShortcutAction(e)
       if (action) {
-        if (overlayOpen || !repo || !repo.selectedBranch) return
+        if (overlayOpen || !repo || !repo.ui.selectedBranch) return
         e.preventDefault()
         runBranchActionShortcut(action)
         return
@@ -148,9 +153,9 @@ export function useKeyboard({ onShowHelp, isOverlayOpen }: Options) {
         }
         case 'ArrowRight':
         case 'ArrowLeft': {
-          if (overlayOpen || !repo || !repo.selectedBranch || state.detailCollapsed) break
+          if (overlayOpen || !repo || !repo.ui.selectedBranch || state.detailCollapsed) break
           e.preventDefault()
-          state.setDetailTab(repo.id, adjacentDetailTab(repo.detailTab, e.key === 'ArrowRight' ? 1 : -1))
+          state.setDetailTab(repo.id, adjacentDetailTab(repo.ui.detailTab, e.key === 'ArrowRight' ? 1 : -1))
           break
         }
         case 'Enter': {

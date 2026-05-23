@@ -6,6 +6,7 @@ import { ConfirmDialog } from '#/renderer/components/ConfirmDialog.tsx'
 import { tildify } from '#/renderer/lib/paths.ts'
 import type { BranchInfo, ExecResult } from '#/renderer/types.ts'
 import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
+import { rpc } from '#/renderer/rpc.ts'
 
 export type BranchActionOp =
   | 'copyPatch'
@@ -72,7 +73,7 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
     if (!branch.worktreePath) return
     const worktreePath = branch.worktreePath
     void run('copyPatch', async () => {
-      const result = await window.gbl.patch(repo.id, worktreePath)
+      const result = await rpc.repo.patch.mutate({ cwd: repo.id, worktreePath })
       if (!result.ok) return { ok: false, message: result.message }
       if (!result.message) return { ok: false, message: 'status.copy-patch-empty' }
       try {
@@ -85,11 +86,13 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
   }
 
   function checkout() {
-    void run('checkout', () => window.gbl.checkout(repo.id, branch.name))
+    void run('checkout', () => rpc.repo.checkout.mutate({ cwd: repo.id, branch: branch.name }))
   }
 
   function pull() {
-    void run('pull', () => window.gbl.pull(repo.id, branch.name, branch.worktreePath))
+    void run('pull', () =>
+      rpc.repo.pull.mutate({ cwd: repo.id, branch: branch.name, worktreePath: branch.worktreePath }),
+    )
   }
 
   function push() {
@@ -98,23 +101,23 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
       setPushConfirm(branch.name)
       return
     }
-    void run('push', () => window.gbl.push(repo.id, branch.name))
+    void run('push', () => rpc.repo.push.mutate({ cwd: repo.id, branch: branch.name }))
   }
 
   function openGhostty() {
     if (!branch.worktreePath) return
     const worktreePath = branch.worktreePath
-    void run('ghostty', () => window.gbl.openInGhostty(worktreePath))
+    void run('ghostty', () => rpc.repo.openInGhostty.mutate({ path: worktreePath }))
   }
 
   function openVSCode() {
     if (!branch.worktreePath) return
     const worktreePath = branch.worktreePath
-    void run('vscode', () => window.gbl.openInVSCode(worktreePath))
+    void run('vscode', () => rpc.repo.openInVSCode.mutate({ path: worktreePath }))
   }
 
   function openGitHub() {
-    void run('github', () => window.gbl.openGitHub(repo.id, branch.name))
+    void run('github', () => rpc.repo.openGitHub.mutate({ cwd: repo.id, branch: branch.name }))
   }
 
   function requestDeleteBranch() {
@@ -129,7 +132,7 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
   }
 
   function deleteBranch(target: string, force = false) {
-    void run('deleteBranch', () => window.gbl.deleteBranch(repo.id, target, force), {
+    void run('deleteBranch', () => rpc.repo.deleteBranch.mutate({ cwd: repo.id, branch: target, force }), {
       handleResult: (result) => {
         if (!force && !result.ok && result.message === 'error.branch-not-fully-merged') {
           setForceDeleteConfirm(target)
@@ -143,7 +146,14 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
   function removeWorktree(target: RemoveConfirm, alsoDeleteBranch: boolean, forceDeleteBranch: boolean) {
     void run(
       'removeWorktree',
-      () => window.gbl.removeWorktree(repo.id, target.branch, target.path, alsoDeleteBranch, forceDeleteBranch),
+      () =>
+        rpc.repo.removeWorktree.mutate({
+          cwd: repo.id,
+          branch: target.branch,
+          worktreePath: target.path,
+          alsoDeleteBranch,
+          forceDeleteBranch,
+        }),
       {
         handleResult: (result) => {
           if (
@@ -161,12 +171,12 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
     )
   }
 
-  const isCurrent = branch.name === repo.currentBranch
+  const isCurrent = branch.name === repo.data.currentBranch
   const checkedOutInAnotherWorktree = !!branch.worktreePath && !isCurrent
   const canRemoveWorktree = checkedOutInAnotherWorktree && !branch.worktreeIsPrimary
   const isProtected = PROTECTED_BRANCHES.has(branch.name)
   const isRegularBranch = !isCurrent && !branch.worktreePath && !isProtected
-  const changedStatus = branch.worktreePath ? repo.status.find((wt) => wt.path === branch.worktreePath) : null
+  const changedStatus = branch.worktreePath ? repo.data.status.find((wt) => wt.path === branch.worktreePath) : null
   const canCopyPatch = !!branch.worktreePath && (changedStatus?.entries.length ?? 0) > 0
 
   const dialogs = (
@@ -191,7 +201,7 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
         onConfirm={() => {
           const target = pushConfirm
           setPushConfirm(null)
-          if (target) void run('push', () => window.gbl.push(repo.id, target))
+          if (target) void run('push', () => rpc.repo.push.mutate({ cwd: repo.id, branch: target }))
         }}
       />
       <ConfirmDialog

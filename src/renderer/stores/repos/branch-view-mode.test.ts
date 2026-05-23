@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, test } from 'vitest'
 import {
   branchForVisibleLog,
   branchMatchesViewMode,
@@ -7,29 +7,32 @@ import {
   visibleBranches,
 } from '#/renderer/stores/repos/branch-view-mode.ts'
 import { emptyRepo } from '#/renderer/stores/repos/helpers.ts'
+import { createBranch as branch } from '#/renderer/stores/repos/test-utils.ts'
 import type { BranchInfo } from '#/renderer/types.ts'
 import type { BranchViewMode, RepoState } from '#/renderer/stores/repos/types.ts'
 
-function branch(name: string, options: Partial<BranchInfo> = {}): BranchInfo {
-  return {
-    name,
-    isCurrent: false,
-    ahead: 0,
-    behind: 0,
-    lastCommitHash: '',
-    lastCommitMessage: '',
-    lastCommitDate: '',
-    lastCommitAuthor: '',
-    ...options,
-  }
+interface RepoOverrides {
+  branches?: BranchInfo[]
+  currentBranch?: string
+  selectedBranch?: string | null
+  branchViewMode?: BranchViewMode
 }
 
-function repo(overrides: Partial<RepoState> = {}): RepoState {
+function repo(overrides: RepoOverrides = {}): RepoState {
+  const base = emptyRepo('/tmp/goblin-branch-view-mode-test', 'repo')
   return {
-    ...emptyRepo('/tmp/goblin-branch-view-mode-test', 'repo'),
-    loading: false,
-    statusLoading: false,
-    ...overrides,
+    ...base,
+    data: {
+      ...base.data,
+      branches: overrides.branches ?? base.data.branches,
+      currentBranch: overrides.currentBranch ?? base.data.currentBranch,
+    },
+    ui: {
+      ...base.ui,
+      selectedBranch: overrides.selectedBranch ?? base.ui.selectedBranch,
+      branchViewMode: overrides.branchViewMode ?? base.ui.branchViewMode,
+    },
+    async: { ...base.async, loading: false, statusLoading: false },
   }
 }
 

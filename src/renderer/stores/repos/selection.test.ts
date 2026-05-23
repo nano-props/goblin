@@ -1,25 +1,16 @@
-import { beforeEach, describe, expect, test } from 'bun:test'
+import { beforeEach, describe, expect, test } from 'vitest'
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
-import { emptyRepo } from '#/renderer/stores/repos/helpers.ts'
-import type { BranchInfo } from '#/renderer/types.ts'
 import type { DetailTab } from '#/renderer/stores/repos/types.ts'
-import type { CommitDetail } from '#/renderer/types-bridge.ts'
+import {
+  createBranch as branch,
+  createCommitDetail,
+  installGoblinTestBridge,
+  resetReposStore,
+  seedRepoState,
+} from '#/renderer/stores/repos/test-utils.ts'
 
 const REPO_ID = '/tmp/gbl-selection-test-repo'
-
-function branch(name: string, options: Partial<BranchInfo> = {}): BranchInfo {
-  return {
-    name,
-    isCurrent: false,
-    ahead: 0,
-    behind: 0,
-    lastCommitHash: '',
-    lastCommitMessage: '',
-    lastCommitDate: '',
-    lastCommitAuthor: '',
-    ...options,
-  }
-}
+const rpcHandlers: Record<string, (input: any) => unknown> = {}
 
 function seedRepo(options: {
   selectedBranch?: string | null
@@ -27,23 +18,8 @@ function seedRepo(options: {
   detailTab?: DetailTab
   openCommit?: boolean
 }) {
-  const openCommit: CommitDetail | null = options.openCommit
-    ? {
-        meta: {
-          hash: 'abc123',
-          shortHash: 'abc123',
-          subject: '',
-          body: '',
-          author: '',
-          email: '',
-          date: '',
-          parents: [],
-        },
-        files: [],
-      }
-    : null
-  const repo = {
-    ...emptyRepo(REPO_ID, 'repo'),
+  seedRepoState({
+    id: REPO_ID,
     branches: [
       branch('main', { worktreePath: '/repo' }),
       branch('feature/worktree', { worktreePath: '/tmp/feature-worktree' }),
@@ -52,39 +28,16 @@ function seedRepo(options: {
     currentBranch: options.currentBranch ?? 'main',
     selectedBranch: options.selectedBranch ?? 'feature/plain',
     detailTab: options.detailTab ?? 'status',
-    openCommit,
-    openingCommitHash: options.openCommit ? 'abc123' : null,
-    loading: false,
-    statusLoading: false,
-  }
-  useReposStore.setState({
-    repos: { [REPO_ID]: repo },
-    order: [REPO_ID],
-    activeId: REPO_ID,
-    sessionReady: true,
-    missingFromSession: [],
-    detailCollapsed: true,
+    openCommit: options.openCommit ? createCommitDetail() : null,
   })
 }
 
 beforeEach(() => {
-  useReposStore.setState({
-    repos: {},
-    order: [],
-    activeId: null,
-    sessionReady: false,
-    missingFromSession: [],
-    detailCollapsed: true,
-  })
-  Object.defineProperty(globalThis, 'window', {
-    configurable: true,
-    value: {
-      gbl: {
-        log: async () => [],
-        pullRequests: async () => [],
-      },
-    },
-  })
+  for (const key of Object.keys(rpcHandlers)) delete rpcHandlers[key]
+  resetReposStore()
+  installGoblinTestBridge(rpcHandlers)
+  rpcHandlers['repo.log'] = async () => []
+  rpcHandlers['repo.pullRequests'] = async () => []
 })
 
 describe('setBranchViewMode', () => {
@@ -94,8 +47,8 @@ describe('setBranchViewMode', () => {
     useReposStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.branchViewMode).toBe('worktrees')
-    expect(repo?.selectedBranch).toBe('main')
+    expect(repo?.ui.branchViewMode).toBe('worktrees')
+    expect(repo?.ui.selectedBranch).toBe('main')
   })
 
   test('keeps the selected branch when it remains visible', () => {
@@ -103,7 +56,7 @@ describe('setBranchViewMode', () => {
 
     useReposStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
-    expect(useReposStore.getState().repos[REPO_ID]?.selectedBranch).toBe('feature/worktree')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBe('feature/worktree')
   })
 
   test('clears commit detail state when selection changes', () => {
@@ -112,25 +65,17 @@ describe('setBranchViewMode', () => {
     useReposStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.selectedBranch).toBe('main')
-    expect(repo?.openCommit).toBeNull()
-    expect(repo?.openingCommitHash).toBeNull()
+    expect(repo?.ui.selectedBranch).toBe('main')
+    expect(repo?.ui.openCommit).toBeNull()
+    expect(repo?.ui.openingCommitHash).toBeNull()
   })
 
   test('refreshes the new branch log when commits are visible', async () => {
     const calls: string[] = []
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: {
-        gbl: {
-          log: async (_repoId: string, branchName: string) => {
-            calls.push(branchName)
-            return []
-          },
-          pullRequests: async () => [],
-        },
-      },
-    })
+    rpcHandlers['repo.log'] = async ({ branch }: { branch: string }) => {
+      calls.push(branch)
+      return []
+    }
     seedRepo({ selectedBranch: 'feature/plain', detailTab: 'commits' })
 
     useReposStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
@@ -144,7 +89,7 @@ describe('selectBranch', () => {
   test('refreshes pull request details silently', async () => {
     let resolve!: () => void
     const calls: Array<{ branches?: string[]; mode?: string }> = []
-    window.gbl.pullRequests = (_repoId, branches, options) =>
+    rpcHandlers['repo.pullRequests'] = ({ branches, options }: { branches?: string[]; options?: { mode?: string } }) =>
       new Promise<[]>((r) => {
         calls.push({ branches, mode: options?.mode })
         resolve = () => r([])
@@ -153,9 +98,67 @@ describe('selectBranch', () => {
 
     useReposStore.getState().selectBranch(REPO_ID, 'main')
 
-    expect(useReposStore.getState().repos[REPO_ID]?.pullRequestsLoading).toBe(false)
+    expect(useReposStore.getState().repos[REPO_ID]?.async.pullRequestsLoading).toBe(false)
     resolve()
     await Promise.resolve()
     expect(calls).toEqual([{ branches: ['main'], mode: 'full' }])
+  })
+})
+
+describe('setDetailTab', () => {
+  test('persists the selected detail tab immediately', () => {
+    seedRepo({ selectedBranch: 'main', detailTab: 'status' })
+
+    useReposStore.getState().setDetailTab(REPO_ID, 'commits')
+
+    expect(useReposStore.getState().repoCache[REPO_ID]?.ui.detailTab).toBe('commits')
+  })
+})
+
+describe('selectLog', () => {
+  test('updates runtime log selection without rewriting durable cache', () => {
+    seedRepo({ selectedBranch: 'main', detailTab: 'commits' })
+    const repo = useReposStore.getState().repos[REPO_ID]!
+    const cached = {
+      savedAt: 123,
+      name: repo.name,
+      data: {
+        branches: repo.data.branches,
+        currentBranch: repo.data.currentBranch,
+        status: repo.data.status,
+        statusLoaded: repo.data.statusLoaded,
+      },
+      ui: {
+        selectedBranch: repo.ui.selectedBranch,
+        branchViewMode: repo.ui.branchViewMode,
+        detailTab: repo.ui.detailTab,
+      },
+    }
+    useReposStore.setState({
+      repos: {
+        [REPO_ID]: {
+          ...repo,
+          data: {
+            ...repo.data,
+            logsByBranch: {
+              main: {
+                entries: [
+                  { hash: 'a', shortHash: 'a', message: 'a', author: 'a', date: '2026-01-01' },
+                  { hash: 'b', shortHash: 'b', message: 'b', author: 'b', date: '2026-01-02' },
+                ],
+                selectedHash: 'a',
+                loading: false,
+              },
+            },
+          },
+        },
+      },
+      repoCache: { [REPO_ID]: cached },
+    })
+
+    useReposStore.getState().selectLog(REPO_ID, 'main', 'b')
+
+    expect(useReposStore.getState().repos[REPO_ID]?.data.logsByBranch.main?.selectedHash).toBe('b')
+    expect(useReposStore.getState().repoCache[REPO_ID]).toBe(cached)
   })
 })

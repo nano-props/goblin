@@ -18,16 +18,16 @@ function branchDetailRepoEqual(a: RepoState | undefined, b: RepoState | undefine
       !!b &&
       a.id === b.id &&
       a.instanceToken === b.instanceToken &&
-      a.branches === b.branches &&
-      a.selectedBranch === b.selectedBranch &&
-      a.branchViewMode === b.branchViewMode &&
-      a.currentBranch === b.currentBranch &&
-      a.logsByBranch === b.logsByBranch &&
-      a.status === b.status &&
-      a.statusLoading === b.statusLoading &&
-      a.statusLoaded === b.statusLoaded &&
-      a.statusError === b.statusError &&
-      a.detailTab === b.detailTab)
+      a.data.branches === b.data.branches &&
+      a.ui.selectedBranch === b.ui.selectedBranch &&
+      a.ui.branchViewMode === b.ui.branchViewMode &&
+      a.data.currentBranch === b.data.currentBranch &&
+      a.data.logsByBranch === b.data.logsByBranch &&
+      a.data.status === b.data.status &&
+      a.async.statusLoading === b.async.statusLoading &&
+      a.data.statusLoaded === b.data.statusLoaded &&
+      a.async.statusError === b.async.statusError &&
+      a.ui.detailTab === b.ui.detailTab)
   )
 }
 

@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
+import { rpc } from '#/renderer/rpc.ts'
 
 export function useSessionPersistence() {
   const activeId = useReposStore((s) => s.activeId)
@@ -9,8 +10,10 @@ export function useSessionPersistence() {
 
   useEffect(() => {
     if (!sessionReady) return
-    void window.gbl.settings.saveSession({ openRepos: order, activeRepo: activeId, detailCollapsed }).catch((err) => {
-      console.warn('[session] save failed', err)
-    })
+    void rpc.settings.saveSession
+      .mutate({ session: { openRepos: order, activeRepo: activeId, detailCollapsed } })
+      .catch((err) => {
+        console.warn('[session] save failed', err)
+      })
   }, [sessionReady, order, activeId, detailCollapsed])
 }

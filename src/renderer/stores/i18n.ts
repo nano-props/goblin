@@ -8,6 +8,7 @@ import i18next from 'i18next'
 import { initReactI18next, useTranslation } from 'react-i18next'
 import { create, type StoreApi } from 'zustand'
 import type { Lang, LangPref } from '#/renderer/types-bridge.ts'
+import { onRpcEventType, rpc } from '#/renderer/rpc.ts'
 
 export type { Lang, LangPref }
 export type Dict = Record<string, string>
@@ -55,12 +56,12 @@ export const useI18nStore = create<I18nState>((set) => ({
 
   async hydrate() {
     const version = ++hydrateVersion
-    const payload = await window.gbl.i18n.get()
+    const payload = await rpc.i18n.get.query()
     if (version !== hydrateVersion) return
     await commitPayload(set, payload)
     if (version !== hydrateVersion) return
-    const nextUnsubscribe = window.gbl.i18n.onChange((next) => {
-      void commitPayload(set, next).catch((err) => {
+    const nextUnsubscribe = onRpcEventType('i18n-changed', (event) => {
+      void commitPayload(set, event.payload).catch((err) => {
         console.warn('[i18n] change failed', err)
       })
     })
@@ -73,7 +74,7 @@ export const useI18nStore = create<I18nState>((set) => ({
   },
 
   async setPref(pref) {
-    const payload = await window.gbl.i18n.setPref(pref)
+    const payload = await rpc.i18n.setPref.mutate({ pref })
     if (payload) {
       await commitPayload(set, payload)
     }
