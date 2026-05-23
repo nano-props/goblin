@@ -28,7 +28,7 @@ export function Modal({ open, title, onClose, children, widthClass = 'sm:max-w-m
        * Settings / Help, where the title is a list-section header
        * rather than a hero. */}
       <DialogContent className={cn('p-0 gap-0', widthClass)}>
-        <DialogHeader className="px-4 py-3 border-b border-border text-left">
+        <DialogHeader className="px-4 py-3 border-b border-separator text-left">
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <div className="p-4 max-h-[70vh] overflow-y-auto scroll-thin">{children}</div>

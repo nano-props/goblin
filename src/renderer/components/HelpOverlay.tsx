@@ -45,11 +45,11 @@ function ShortcutSection({ section }: { section: HelpShortcutSection }) {
   const t = useT()
   return (
     <section className="min-w-0">
-      <div className="mb-1.5 flex items-center gap-2 border-b border-border pb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+      <div className="mb-1.5 flex items-center gap-2 border-b border-separator pb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
         <span className="h-1.5 w-1.5 rounded-full bg-brand" />
         <span>{t(section.titleKey)}</span>
       </div>
-      <ul className="divide-y divide-border/60">
+      <ul className="divide-y divide-separator">
         {section.rows.map((row: HelpShortcutRow) => (
           <li
             key={`${row.labelKey}:${row.combos.map((combo) => combo.join('+')).join('/')}`}

@@ -21,7 +21,7 @@ export function Topbar({ onOpenSettings, onShowDependencies, onShowHelp }: Props
   const shortcutsDisabled = useSettingsStore((s) => s.shortcutsDisabled)
 
   return (
-    <div className="topbar relative flex h-10 items-center gap-2 border-b border-border bg-background text-sm">
+    <div className="topbar relative flex h-10 items-center gap-2 border-b border-separator bg-background text-sm">
       {/* Brand wordmark, centred over the title bar like a native macOS
        * window chrome (cf. Apple's HIG title-bar layout). Absolute so
        * its position is independent of how many action buttons sit on

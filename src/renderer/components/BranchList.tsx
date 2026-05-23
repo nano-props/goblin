@@ -82,7 +82,7 @@ export function BranchList({ repoId }: Props) {
   }
 
   return (
-    <ul className="overflow-y-auto scroll-thin flex-1 divide-y divide-border">
+    <ul className="overflow-y-auto scroll-thin flex-1 divide-y divide-separator">
       {branches.map((branch) => {
         return (
           <BranchRow

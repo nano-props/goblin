@@ -99,7 +99,7 @@ export function RepoTabStrip({
 
   return (
     <nav
-      className="flex h-10 shrink-0 items-center gap-2 border-b border-border bg-muted/60 px-2"
+      className="flex h-10 shrink-0 items-center gap-2 border-b border-separator bg-muted/60 px-2"
       aria-label={labels.repositories}
     >
       <div

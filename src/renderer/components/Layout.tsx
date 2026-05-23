@@ -37,7 +37,7 @@ export function Toolbar({ children, className, variant = 'plain', ...props }: To
   return (
     <div
       className={cn(
-        'flex h-9 shrink-0 items-center border-b border-border',
+        'flex h-9 shrink-0 items-center border-b border-separator',
         variant === 'repo' && 'gap-3 bg-card px-4',
         variant === 'detail' && 'min-w-0 justify-between gap-2 bg-muted px-2',
         className,
@@ -76,7 +76,7 @@ export function RepoWorkspace({ children, detailCollapsed = false }: RepoWorkspa
 
 export function RepoWorkspacePane({ children, border = false }: PaneProps) {
   return (
-    <div className={cn('flex min-h-0 flex-col overflow-hidden', border && 'border-b border-border')}>{children}</div>
+    <div className={cn('flex min-h-0 flex-col overflow-hidden', border && 'border-b border-separator')}>{children}</div>
   )
 }
 

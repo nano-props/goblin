@@ -54,7 +54,7 @@ export function StatusList({
   return (
     <ScrollPane>
       {dirtyWorktrees.map((wt) => (
-        <ul key={wt.path} className="divide-y divide-border border-b border-border last:border-b-0">
+        <ul key={wt.path} className="divide-y divide-separator border-b border-separator last:border-b-0">
           {wt.entries.map((entry) => (
             <li
               key={`${wt.path}-${entry.path}`}

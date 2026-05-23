@@ -36,7 +36,7 @@ export function LogList({ repoId, log, branch, selectedHash }: Props) {
   }
   return (
     <div className="flex flex-1 min-h-0 flex-col">
-      <ul className="overflow-y-auto scroll-thin flex-1 divide-y divide-border">
+      <ul className="overflow-y-auto scroll-thin flex-1 divide-y divide-separator">
         {log.map((entry) => {
           const isSelected = entry.hash === selectedHash
           return (

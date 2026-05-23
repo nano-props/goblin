@@ -102,7 +102,7 @@ export function SettingsPanel({ open, onClose }: Props) {
           <ShortcutSettings />
         </Section>
 
-        <div className="flex items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted-foreground">
+        <div className="flex items-center justify-between gap-3 border-t border-separator pt-3 text-xs text-muted-foreground">
           <span className="truncate">{buildInfo}</span>
           <button
             type="button"

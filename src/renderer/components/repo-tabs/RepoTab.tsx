@@ -46,7 +46,7 @@ export function RepoTab({
       className={cn(
         'group relative flex h-8 min-w-36 max-w-56 shrink-0 touch-none select-none items-center gap-1.5 rounded-md border px-2 text-xs transition-colors duration-100 [&:has(:focus-visible)]:outline-2 [&:has(:focus-visible)]:-outline-offset-2 [&:has(:focus-visible)]:outline-ring',
         isActive
-          ? 'border-border bg-background text-foreground shadow-sm'
+          ? 'border-transparent bg-background text-foreground shadow-sm'
           : 'border-transparent text-muted-foreground hover:bg-accent/70 hover:text-foreground',
         isDragging && 'z-10 cursor-grabbing bg-background shadow-sm ring-1 ring-border',
       )}
@@ -54,7 +54,7 @@ export function RepoTab({
     >
       {isActive && <span className="absolute inset-x-2 -bottom-px h-px rounded-full bg-brand" />}
       {showSeparator && (
-        <span className="pointer-events-none absolute right-0 top-1/2 h-4 -translate-y-1/2 border-r border-border/70" />
+        <span className="pointer-events-none absolute right-0 top-1/2 h-4 -translate-y-1/2 border-r border-separator" />
       )}
       <button
         ref={setActivatorNodeRef}

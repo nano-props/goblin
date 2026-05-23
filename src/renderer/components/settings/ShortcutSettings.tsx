@@ -80,7 +80,7 @@ export function ShortcutSettings() {
         />
       </div>
 
-      <div className="flex items-center justify-between gap-3 border-t border-border pt-2">
+      <div className="flex items-center justify-between gap-3 border-t border-separator pt-2">
         <span className="text-sm text-foreground">{t('settings.global-shortcut')}</span>
         <div className="flex items-center gap-2">
           <button

@@ -41,6 +41,9 @@
  *                          separate from brand so selection strength
  *                          can be tuned per theme without changing
  *                          icons, focus, or semantic chips.
+ *      `--color-separator` — low-emphasis layout/list divider. Lighter
+ *                          than `--color-border`, which remains for
+ *                          controls, cards, popovers, and badges.
  *      `--color-warning` — accessible system-orange text. shadcn has no
  *                          warning slot; mapped here so status-modified /
  *                          behind / dirty markers read consistently.
@@ -55,7 +58,7 @@
  *                          variants in sync. */
 @theme {
   /* shadcn/ui core */
-  --color-background: #ffffff;
+  --color-background: #fbfbfd;
   --color-foreground: #1d1d1f;
   --color-card: #ffffff;
   --color-card-foreground: #1d1d1f;
@@ -65,14 +68,15 @@
   --color-primary-foreground: #ffffff;
   --color-secondary: #f2f2f7;
   --color-secondary-foreground: #3c3c43;
-  --color-muted: #f2f2f7;
-  --color-muted-foreground: rgb(60 60 67 / 0.6);
+  --color-muted: #f1f1f5;
+  --color-muted-foreground: #6e6e73;
   /* accent is shadcn's hover/active surface. It maps to a macOS
    * system-fill step that's darker than muted but still neutral. */
   --color-accent: #e5e5ea;
   --color-accent-foreground: #1d1d1f;
-  --color-border: rgb(60 60 67 / 0.18);
-  --color-input: rgb(60 60 67 / 0.22);
+  --color-separator: rgb(60 60 67 / 0.14);
+  --color-border: rgb(60 60 67 / 0.22);
+  --color-input: rgb(60 60 67 / 0.26);
   --color-ring: #007aff;
   --color-destructive: #d70015;
   --color-destructive-foreground: #ffffff;
@@ -81,7 +85,7 @@
   --color-brand: #007aff;
   --color-brand-text: #0066cc;
   --color-brand-rgb: 0 122 255;
-  --color-selected: rgb(var(--color-brand-rgb) / 0.1);
+  --color-selected: rgb(var(--color-brand-rgb) / 0.12);
   --color-selected-foreground: var(--color-foreground);
   --color-brand-surface: rgb(var(--color-brand-rgb) / 0.12);
   --color-brand-border: rgb(var(--color-brand-rgb) / 0.35);
@@ -95,15 +99,15 @@
   --color-attention-border: var(--color-warning-border);
   --color-success: #1f7f37;
   --color-success-rgb: 52 199 89;
-  --color-success-surface: rgb(var(--color-success-rgb) / 0.12);
+  --color-success-surface: rgb(var(--color-success-rgb) / 0.1);
   --color-success-border: rgb(var(--color-success-rgb) / 0.35);
   /* `--color-danger` is the status-text counterpart to shadcn's
-   * destructive action token. Both currently point at the same red;
-   * the rgb-channel form intentionally matches the text colour so
-   * danger surfaces/borders remain one family. */
-  --color-danger: var(--color-destructive);
-  --color-danger-rgb: 215 0 21;
-  --color-danger-surface: rgb(var(--color-danger-rgb) / 0.12);
+   * destructive action token. Light mode uses a deeper red for dense
+   * status text; the rgb-channel form intentionally matches the text
+   * colour so danger surfaces/borders remain one family. */
+  --color-danger: #b00014;
+  --color-danger-rgb: 176 0 20;
+  --color-danger-surface: rgb(var(--color-danger-rgb) / 0.09);
   --color-danger-border: rgb(var(--color-danger-rgb) / 0.4);
 
   /* Type / shadows / radius — shadcn radius scale, project shadow
@@ -140,6 +144,7 @@ html[data-theme='dark'] {
    * step above muted so the same hover-on-hover composition reads. */
   --color-accent: #3a3a3c;
   --color-accent-foreground: #f5f5f7;
+  --color-separator: rgb(84 84 88 / 0.42);
   --color-border: rgb(84 84 88 / 0.55);
   --color-input: rgb(84 84 88 / 0.65);
   --color-ring: #0a84ff;
@@ -170,7 +175,7 @@ html[data-theme='dark'] {
   --color-success-border: rgb(var(--color-success-rgb) / 0.45);
   --color-danger: var(--color-destructive);
   --color-danger-rgb: 255 69 58;
-  --color-danger-surface: rgb(var(--color-danger-rgb) / 0.16);
+  --color-danger-surface: rgb(var(--color-danger-rgb) / 0.09);
   --color-danger-border: rgb(var(--color-danger-rgb) / 0.45);
 }
 

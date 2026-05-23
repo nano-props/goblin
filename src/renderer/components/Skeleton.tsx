@@ -23,7 +23,7 @@ interface WorkspaceSkeletonProps {
 
 export function ListSkeleton({ rows = 6, variant = 'branch' }: Props) {
   return (
-    <ul className="flex-1 divide-y divide-border">
+    <ul className="flex-1 divide-y divide-separator">
       {Array.from({ length: rows }).map((_, i) => (
         <li key={i} className="px-4 py-2.5 flex items-start gap-2">
           {variant === 'status' ? (
@@ -73,7 +73,7 @@ export function RepoWorkspaceSkeleton({ showRepoToolbar = false, detailCollapsed
           detailCollapsed ? 'grid-rows-[minmax(0,1fr)_2.25rem]' : 'grid-rows-[minmax(0,1fr)_minmax(0,1fr)]',
         )}
       >
-        <div className="flex min-h-0 flex-col overflow-hidden border-b border-border">
+        <div className="flex min-h-0 flex-col overflow-hidden border-b border-separator">
           <ListSkeleton variant="branch" />
         </div>
         <div className="flex min-h-0 flex-col overflow-hidden">

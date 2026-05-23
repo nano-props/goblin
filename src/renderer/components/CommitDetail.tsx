@@ -43,7 +43,7 @@ export function CommitDetail({ repoId, detail }: Props) {
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto scroll-thin">
-      <div className="flex items-start gap-3 border-b border-border bg-muted px-4 py-3">
+      <div className="flex items-start gap-3 border-b border-separator bg-muted px-4 py-3">
         <button
           type="button"
           onClick={() => closeCommit(repoId)}
@@ -75,7 +75,7 @@ export function CommitDetail({ repoId, detail }: Props) {
         </div>
       </div>
 
-      <div className="flex items-center gap-3 border-b border-border bg-card px-4 py-1.5 text-xs text-muted-foreground">
+      <div className="flex items-center gap-3 border-b border-separator bg-card px-4 py-1.5 text-xs text-muted-foreground">
         <span>
           {t(files.length === 1 ? 'commit.files-changed' : 'commit.files-changed-plural', { n: files.length })}
         </span>
@@ -86,7 +86,7 @@ export function CommitDetail({ repoId, detail }: Props) {
       {files.length === 0 ? (
         <div className="p-6 text-center text-sm text-muted-foreground">{t('commit.empty')}</div>
       ) : (
-        <ul className="divide-y divide-border">
+        <ul className="divide-y divide-separator">
           {files.map((f) => (
             <li key={f.path} className="flex items-center gap-3 px-4 py-2">
               <span className="shrink-0 text-muted-foreground">
