@@ -13,6 +13,13 @@ export interface TerminalSnapshot {
   phase: TerminalPhase
   message: string | null
   exitCode?: number
+  search?: TerminalSearchResult | null
+}
+
+export interface TerminalSearchResult {
+  resultIndex: number
+  resultCount: number
+  found: boolean
 }
 
 export interface TerminalSessionContextValue {
@@ -22,6 +29,11 @@ export interface TerminalSessionContextValue {
   restart: (key: string) => void
   snapshot: (key: string) => TerminalSnapshot
   isTerminalFocusTarget: (key: string, target: EventTarget | null) => boolean
+  findNext: (key: string, term: string, incremental?: boolean) => TerminalSearchResult
+  findPrevious: (key: string, term: string) => TerminalSearchResult
+  clearSearch: (key: string) => void
+  /** Serializes xterm framebuffer state as VT sequences; not plain-text output for copy UI. */
+  serialize: (key: string) => string
 }
 
 export interface ManagedTerminalSessionLike {
@@ -33,6 +45,11 @@ export interface ManagedTerminalSessionLike {
   dispose: () => void
   snapshot: () => TerminalSnapshot
   isTerminalFocusTarget: (target: EventTarget | null) => boolean
+  findNext: (term: string, incremental?: boolean) => TerminalSearchResult
+  findPrevious: (term: string) => TerminalSearchResult
+  clearSearch: () => void
+  /** Serializes xterm framebuffer state as VT sequences; not plain-text output for copy UI. */
+  serialize: () => string
   handleOutput: (event: TerminalOutputEvent) => void
   handleExit: (event: TerminalExitEvent) => void
 }

@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type FocusEvent, type KeyboardEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FocusEvent,
+  type KeyboardEvent,
+} from 'react'
 import { Button } from '#/renderer/components/ui/button.tsx'
 import { setTerminalFocused } from '#/renderer/terminal-focus.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
@@ -16,8 +25,21 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
   const t = useT()
   const slotRef = useRef<HTMLDivElement | null>(null)
   const hostRef = useRef<HTMLDivElement | null>(null)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
   const context = useTerminalSessionContext()
-  const { attach, detach, isTerminalFocusTarget, restart: restartSession, snapshot: getSnapshot, version } = context
+  const {
+    attach,
+    detach,
+    isTerminalFocusTarget,
+    restart: restartSession,
+    snapshot: getSnapshot,
+    version,
+    findNext,
+    findPrevious,
+    clearSearch,
+  } = context
   const key = terminalSessionKey(repoRoot, worktreePath)
   const descriptor = useMemo<TerminalDescriptor>(
     () => ({ key, repoRoot, branch, worktreePath }),
@@ -36,7 +58,28 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
     if (snapshot.phase === 'ended') slotRef.current?.focus({ preventScroll: true })
   }, [snapshot.phase])
 
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus({ preventScroll: true })
+  }, [searchOpen])
+
+  useEffect(() => {
+    if (!searchOpen) clearSearch(key)
+  }, [clearSearch, key, searchOpen])
+
   const restart = useCallback(() => restartSession(key), [key, restartSession])
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false)
+    setSearchTerm('')
+  }, [])
+  const searchNext = useCallback(
+    (term = searchTerm, incremental = false) => {
+      findNext(key, term, incremental)
+    },
+    [findNext, key, searchTerm],
+  )
+  const searchPrevious = useCallback(() => {
+    findPrevious(key, searchTerm)
+  }, [findPrevious, key, searchTerm])
   const handleFocus = useCallback(
     (event: FocusEvent<HTMLDivElement>) => {
       setTerminalFocused(snapshot.phase !== 'ended' && isTerminalFocusTarget(key, event.target))
@@ -48,6 +91,18 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
   }, [])
   const handleKeyDownCapture = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
+      if (snapshot.phase !== 'ended' && isTerminalSearchShortcut(event)) {
+        event.preventDefault()
+        event.stopPropagation()
+        setSearchOpen(true)
+        return
+      }
+      if (searchOpen && event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        closeSearch()
+        return
+      }
       if (snapshot.phase === 'ended') {
         if (event.key !== 'Enter') return
         event.preventDefault()
@@ -55,8 +110,33 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
         restart()
       }
     },
-    [restart, snapshot.phase],
+    [closeSearch, restart, searchOpen, snapshot.phase],
   )
+  const handleSearchChange = useCallback(
+    (value: string) => {
+      setSearchTerm(value)
+      searchNext(value, true)
+    },
+    [searchNext],
+  )
+  const handleSearchKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        if (event.shiftKey) searchPrevious()
+        else searchNext()
+      }
+    },
+    [searchNext, searchPrevious],
+  )
+  const resultLabel =
+    snapshot.search && searchTerm
+      ? snapshot.search.resultCount > 0
+        ? snapshot.search.resultIndex >= 0
+          ? `${snapshot.search.resultIndex + 1}/${snapshot.search.resultCount}`
+          : String(snapshot.search.resultCount)
+        : t('terminal.search-no-results')
+      : ''
 
   return (
     <div
@@ -68,6 +148,28 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
       onKeyDownCapture={handleKeyDownCapture}
     >
       <div ref={hostRef} className="goblin-terminal-slot__host" />
+      {searchOpen && (
+        <div className="goblin-terminal-slot__search">
+          <input
+            ref={searchInputRef}
+            className="goblin-terminal-slot__search-input"
+            value={searchTerm}
+            placeholder={t('terminal.search-placeholder')}
+            onChange={(event) => handleSearchChange(event.target.value)}
+            onKeyDown={handleSearchKeyDown}
+          />
+          <span className="goblin-terminal-slot__search-result">{resultLabel}</span>
+          <Button type="button" size="sm" variant="ghost" onClick={searchPrevious} disabled={!searchTerm}>
+            {t('terminal.search-previous')}
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={() => searchNext()} disabled={!searchTerm}>
+            {t('terminal.search-next')}
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={closeSearch}>
+            {t('terminal.search-close')}
+          </Button>
+        </div>
+      )}
       {snapshot.phase === 'ended' && (
         <div className="goblin-terminal-slot__ended-overlay">
           <span>
@@ -99,4 +201,9 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
       )}
     </div>
   )
+}
+
+function isTerminalSearchShortcut(event: KeyboardEvent<HTMLDivElement>): boolean {
+  if (event.altKey || event.key.toLowerCase() !== 'f') return false
+  return event.metaKey || (event.ctrlKey && event.shiftKey)
 }

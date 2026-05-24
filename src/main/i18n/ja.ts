@@ -247,6 +247,11 @@ export const ja: Record<DictKey, string> = {
   'terminal.restart-shortcut': '↩',
   'terminal.session-ended': 'セッションが終了しました',
   'terminal.session-ended-code': 'セッションはコード {code} で終了しました',
+  'terminal.search-placeholder': 'ターミナルを検索',
+  'terminal.search-no-results': '結果なし',
+  'terminal.search-previous': '前へ',
+  'terminal.search-next': '次へ',
+  'terminal.search-close': '閉じる',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': 'Finder で表示',

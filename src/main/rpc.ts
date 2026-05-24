@@ -75,6 +75,7 @@ import { getResolvedTerminalApp, openInPreferredTerminal } from '#/main/system/t
 import { getResolvedEditorApp, openInPreferredEditor } from '#/main/system/editors.ts'
 import { broadcastRpcEvent } from '#/main/events.ts'
 import { closeWorktreeSession } from '#/main/terminal.ts'
+import { openHttpExternal, openHttpsExternal } from '#/main/external-url.ts'
 
 const PROJECT_GITHUB_URL = 'https://github.com/nano-props/goblin'
 const PATCH_TIMEOUT_MS = 90_000
@@ -197,6 +198,10 @@ function createRpcHandlers(): AppRpcHandlers {
       openProjectGitHub: async () => {
         if (!(await openHttpsExternal(PROJECT_GITHUB_URL))) return { ok: false, message: 'error.invalid-url' }
         return { ok: true, message: PROJECT_GITHUB_URL }
+      },
+      openExternalUrl: async ({ url }) => {
+        if (!(await openHttpExternal(url))) return { ok: false, message: 'error.invalid-url' }
+        return { ok: true, message: url }
       },
     },
     repo: {
@@ -710,17 +715,6 @@ function isValidCloneDirectoryName(value: unknown): value is string {
 
 function isValidCloneOperationId(value: unknown): value is string {
   return typeof value === 'string' && CLONE_OPERATION_ID_RE.test(value)
-}
-
-async function openHttpsExternal(url: string): Promise<boolean> {
-  try {
-    const parsed = new URL(url)
-    if (parsed.protocol !== 'https:') return false
-    await shell.openExternal(parsed.toString())
-    return true
-  } catch {
-    return false
-  }
 }
 
 async function saveSession(session: SessionState): Promise<void> {

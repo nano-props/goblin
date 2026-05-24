@@ -166,6 +166,7 @@ export type RpcEvent =
 export interface AppRpcHandlers {
   app: {
     openProjectGitHub: () => Promise<ExecResult>
+    openExternalUrl: (input: { url: string }) => Promise<ExecResult>
   }
   repo: {
     openDialog: () => Promise<string | null>
@@ -246,6 +247,9 @@ export function createAppRouter(handlers: AppRpcHandlers) {
   return t.router({
     app: t.router({
       openProjectGitHub: p.input(EmptyInput).mutation(() => handlers.app.openProjectGitHub()),
+      openExternalUrl: p
+        .input(v.object({ url: v.string() }))
+        .mutation(({ input }) => handlers.app.openExternalUrl(input)),
     }),
     repo: t.router({
       openDialog: p.input(EmptyInput).query(() => handlers.repo.openDialog()),

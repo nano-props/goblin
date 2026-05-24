@@ -237,6 +237,11 @@ export const zh: Record<DictKey, string> = {
   'terminal.restart-shortcut': '↩',
   'terminal.session-ended': '会话已结束',
   'terminal.session-ended-code': '会话已结束，退出码 {code}',
+  'terminal.search-placeholder': '搜索终端',
+  'terminal.search-no-results': '无结果',
+  'terminal.search-previous': '上一个',
+  'terminal.search-next': '下一个',
+  'terminal.search-close': '关闭',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': '在访达中显示',

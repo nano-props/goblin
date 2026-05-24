@@ -240,6 +240,11 @@ export const ko: Record<DictKey, string> = {
   'terminal.restart-shortcut': '↩',
   'terminal.session-ended': '세션이 종료됨',
   'terminal.session-ended-code': '세션이 코드 {code}로 종료됨',
+  'terminal.search-placeholder': '터미널 검색',
+  'terminal.search-no-results': '결과 없음',
+  'terminal.search-previous': '이전',
+  'terminal.search-next': '다음',
+  'terminal.search-close': '닫기',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': 'Finder 에서 보기',

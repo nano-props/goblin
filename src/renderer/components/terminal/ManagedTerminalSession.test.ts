@@ -8,14 +8,26 @@ import type { TerminalOpenResult } from '#/shared/terminal.ts'
 const xtermMocks = vi.hoisted(() => {
   const terminals: any[] = []
   const fitAddons: any[] = []
+  const searchAddons: any[] = []
+  const serializeAddons: any[] = []
+  const unicodeAddons: any[] = []
+  const webLinkAddons: any[] = []
+  const addonFailures = {
+    search: false,
+    serialize: false,
+    unicode: false,
+    webLinks: false,
+  }
 
   class MockTerminal {
     cols: number
     rows: number
+    unicode = { activeVersion: '6' }
     options: {
       cursorBlink?: boolean
       minimumContrastRatio?: number
       theme?: { background?: string; foreground?: string }
+      scrollOnUserInput?: boolean
     }
     element: HTMLDivElement | null = null
     write = vi.fn()
@@ -32,6 +44,7 @@ const xtermMocks = vi.hoisted(() => {
       cursorBlink?: boolean
       minimumContrastRatio?: number
       theme?: { background?: string; foreground?: string }
+      scrollOnUserInput?: boolean
     }) {
       this.cols = options.cols
       this.rows = options.rows
@@ -39,6 +52,7 @@ const xtermMocks = vi.hoisted(() => {
         cursorBlink: options.cursorBlink,
         minimumContrastRatio: options.minimumContrastRatio,
         theme: options.theme,
+        scrollOnUserInput: options.scrollOnUserInput,
       }
       terminals.push(this)
     }
@@ -99,11 +113,105 @@ const xtermMocks = vi.hoisted(() => {
     })
   }
 
-  return { terminals, fitAddons, MockTerminal, MockFitAddon }
+  class MockSearchAddon {
+    term: MockTerminal | null = null
+    private resultHandlers: Array<(event: { resultIndex: number; resultCount: number }) => void> = []
+    clearDecorations = vi.fn()
+    clearActiveDecoration = vi.fn()
+
+    constructor(readonly options?: { highlightLimit?: number }) {
+      if (addonFailures.search) throw new Error('search addon failed')
+      searchAddons.push(this)
+    }
+
+    activate(term: MockTerminal) {
+      this.term = term
+    }
+
+    findNext = vi.fn((term: string) => this.emitSearch(term))
+    findPrevious = vi.fn((term: string) => this.emitSearch(term))
+
+    onDidChangeResults(cb: (event: { resultIndex: number; resultCount: number }) => void) {
+      this.resultHandlers.push(cb)
+      return { dispose: vi.fn(() => (this.resultHandlers = this.resultHandlers.filter((handler) => handler !== cb))) }
+    }
+
+    private emitSearch(term: string) {
+      const found = term !== 'missing'
+      const event = found ? { resultIndex: 0, resultCount: 2 } : { resultIndex: -1, resultCount: 0 }
+      for (const handler of this.resultHandlers) handler(event)
+      return found
+    }
+  }
+
+  class MockSerializeAddon {
+    term: MockTerminal | null = null
+    serialize = vi.fn(() => 'serialized-output')
+    serializeAsHTML = vi.fn(() => '<pre>serialized-output</pre>')
+
+    constructor() {
+      if (addonFailures.serialize) throw new Error('serialize addon failed')
+      serializeAddons.push(this)
+    }
+
+    activate(term: MockTerminal) {
+      this.term = term
+    }
+  }
+
+  class MockUnicode11Addon {
+    term: MockTerminal | null = null
+
+    constructor() {
+      if (addonFailures.unicode) throw new Error('unicode addon failed')
+      unicodeAddons.push(this)
+    }
+
+    activate(term: MockTerminal) {
+      this.term = term
+    }
+  }
+
+  class MockWebLinksAddon {
+    term: MockTerminal | null = null
+
+    constructor(readonly handler?: (event: MouseEvent, uri: string) => void) {
+      if (addonFailures.webLinks) throw new Error('web links addon failed')
+      webLinkAddons.push(this)
+    }
+
+    activate(term: MockTerminal) {
+      this.term = term
+    }
+
+    open(uri: string) {
+      this.handler?.(new MouseEvent('click'), uri)
+    }
+  }
+
+  return {
+    terminals,
+    fitAddons,
+    searchAddons,
+    serializeAddons,
+    unicodeAddons,
+    webLinkAddons,
+    addonFailures,
+    MockTerminal,
+    MockFitAddon,
+    MockSearchAddon,
+    MockSerializeAddon,
+    MockUnicode11Addon,
+    MockWebLinksAddon,
+  }
 })
 
 vi.mock('@xterm/xterm', () => ({ Terminal: xtermMocks.MockTerminal }))
 vi.mock('@xterm/addon-fit', () => ({ FitAddon: xtermMocks.MockFitAddon }))
+vi.mock('@xterm/addon-search', () => ({ SearchAddon: xtermMocks.MockSearchAddon }))
+vi.mock('@xterm/addon-serialize', () => ({ SerializeAddon: xtermMocks.MockSerializeAddon }))
+vi.mock('@xterm/addon-unicode11', () => ({ Unicode11Addon: xtermMocks.MockUnicode11Addon }))
+vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: xtermMocks.MockWebLinksAddon }))
 
 class MockResizeObserver {
   static instances: MockResizeObserver[] = []
@@ -122,6 +230,7 @@ const terminalCalls = {
   resize: vi.fn<Window['goblin']['terminal']['resize']>(),
   close: vi.fn<Window['goblin']['terminal']['close']>(),
 }
+const invokeRpc = vi.fn<Window['goblin']['invokeRpc']>()
 
 const descriptor = {
   key: '/repo\0/worktree',
@@ -133,6 +242,11 @@ const descriptor = {
 beforeEach(() => {
   xtermMocks.terminals.length = 0
   xtermMocks.fitAddons.length = 0
+  xtermMocks.searchAddons.length = 0
+  xtermMocks.serializeAddons.length = 0
+  xtermMocks.unicodeAddons.length = 0
+  xtermMocks.webLinkAddons.length = 0
+  Object.assign(xtermMocks.addonFailures, { search: false, serialize: false, unicode: false, webLinks: false })
   MockResizeObserver.instances.length = 0
   vi.clearAllMocks()
   document.documentElement.setAttribute('data-theme', 'light')
@@ -158,6 +272,10 @@ beforeEach(() => {
   Object.defineProperty(window, 'goblin', {
     configurable: true,
     value: {
+      invokeRpc: invokeRpc.mockResolvedValue({ ok: true }),
+      homeDir: '/home',
+      pathForFile: vi.fn(),
+      onEvent: vi.fn(),
       terminal: {
         open: terminalCalls.open.mockResolvedValue(openResult('session-1')),
         restart: terminalCalls.restart.mockResolvedValue(openResult('session-2')),
@@ -194,6 +312,88 @@ describe('ManagedTerminalSession', () => {
     expect(xtermMocks.terminals[0]!.options.minimumContrastRatio).toBe(4.5)
     expect(terminalCalls.restart).not.toHaveBeenCalled()
     expect(session.snapshot().phase).toBe('open')
+  })
+
+  test('loads terminal addons and exposes search and serialization', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    expect(xtermMocks.unicodeAddons).toHaveLength(1)
+    expect(xtermMocks.terminals[0]!.unicode.activeVersion).toBe('11')
+    expect(xtermMocks.webLinkAddons).toHaveLength(1)
+    expect(xtermMocks.searchAddons).toHaveLength(1)
+    expect(xtermMocks.serializeAddons).toHaveLength(1)
+    expect(session.findNext('needle', true)).toEqual({ resultIndex: 0, resultCount: 2, found: true })
+    expect(xtermMocks.searchAddons[0]!.findNext).toHaveBeenCalledWith(
+      'needle',
+      expect.objectContaining({ incremental: true, caseSensitive: false }),
+    )
+    expect(session.findPrevious('needle')).toEqual({ resultIndex: 0, resultCount: 2, found: true })
+    expect(session.findNext('missing')).toEqual({ resultIndex: -1, resultCount: 0, found: false })
+    expect(session.serialize()).toBe('serialized-output')
+    session.clearSearch()
+    expect(xtermMocks.searchAddons[0]!.clearDecorations).toHaveBeenCalled()
+    expect(session.snapshot().search).toBeUndefined()
+  })
+
+  test('opens web links through the safe app rpc', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+    xtermMocks.webLinkAddons[0]!.open('https://example.com/path')
+    await Promise.resolve()
+
+    expect(invokeRpc).toHaveBeenCalledWith({
+      path: 'app.openExternalUrl',
+      input: { url: 'https://example.com/path' },
+    })
+  })
+
+  test('does not send unsafe web links to the app rpc', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+    xtermMocks.webLinkAddons[0]!.open('javascript:alert(1)')
+    xtermMocks.webLinkAddons[0]!.open('file:///tmp/secret')
+    xtermMocks.webLinkAddons[0]!.open('https://example.com/\u0000bad')
+    await Promise.resolve()
+
+    expect(invokeRpc).not.toHaveBeenCalled()
+  })
+
+  test('opens terminal when optional addon setup fails', async () => {
+    Object.assign(xtermMocks.addonFailures, { search: true, serialize: true, unicode: true, webLinks: true })
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    expect(terminalCalls.open).toHaveBeenCalled()
+    expect(session.snapshot().phase).toBe('open')
+    expect(session.findNext('needle')).toEqual({ resultIndex: -1, resultCount: 0, found: false })
+    expect(session.serialize()).toBe('')
+    expect(warnSpy).toHaveBeenCalledWith('[terminal] failed to load unicode11 addon', expect.any(Error))
+    expect(warnSpy).toHaveBeenCalledWith('[terminal] failed to load web links addon', expect.any(Error))
+    expect(warnSpy).toHaveBeenCalledWith('[terminal] failed to load search addon', expect.any(Error))
+    expect(warnSpy).toHaveBeenCalledWith('[terminal] failed to load serialize addon', expect.any(Error))
+    warnSpy.mockRestore()
   })
 
   test('uses first-class restart IPC instead of open forceNew', async () => {

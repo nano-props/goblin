@@ -92,9 +92,38 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     return sessionsRef.current.get(key)?.isTerminalFocusTarget(target) ?? false
   }, [])
 
+  const findNext = useCallback((key: string, term: string, incremental?: boolean) => {
+    return (
+      sessionsRef.current.get(key)?.findNext(term, incremental) ?? { resultIndex: -1, resultCount: 0, found: false }
+    )
+  }, [])
+
+  const findPrevious = useCallback((key: string, term: string) => {
+    return sessionsRef.current.get(key)?.findPrevious(term) ?? { resultIndex: -1, resultCount: 0, found: false }
+  }, [])
+
+  const clearSearch = useCallback((key: string) => {
+    sessionsRef.current.get(key)?.clearSearch()
+  }, [])
+
+  const serialize = useCallback((key: string) => {
+    return sessionsRef.current.get(key)?.serialize() ?? ''
+  }, [])
+
   const value = useMemo<TerminalSessionContextValue>(
-    () => ({ version, attach, detach, restart, snapshot, isTerminalFocusTarget }),
-    [attach, detach, isTerminalFocusTarget, restart, snapshot, version],
+    () => ({
+      version,
+      attach,
+      detach,
+      restart,
+      snapshot,
+      isTerminalFocusTarget,
+      findNext,
+      findPrevious,
+      clearSearch,
+      serialize,
+    }),
+    [attach, clearSearch, detach, findNext, findPrevious, isTerminalFocusTarget, restart, serialize, snapshot, version],
   )
 
   return (

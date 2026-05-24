@@ -46,6 +46,48 @@
   width: max-content;
 }
 
+.goblin-terminal-slot__search {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  display: flex;
+  max-width: calc(100% - 20px);
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--color-popover) 96%, transparent);
+  padding: 5px;
+  box-shadow: var(--shadow-sm);
+}
+
+.goblin-terminal-slot__search-input {
+  height: 24px;
+  min-width: 80px;
+  width: clamp(80px, 32vw, 190px);
+  border: 1px solid var(--color-input);
+  border-radius: 5px;
+  background: var(--color-background);
+  padding: 0 7px;
+  color: var(--color-foreground);
+  font-size: 12px;
+  outline: none;
+}
+
+.goblin-terminal-slot__search-input:focus {
+  border-color: var(--color-ring);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-ring) 25%, transparent);
+}
+
+.goblin-terminal-slot__search-result {
+  flex: 0 0 auto;
+  min-width: 42px;
+  color: var(--color-muted-foreground);
+  font-size: 11px;
+  text-align: center;
+}
+
 .goblin-terminal-slot__ended-overlay,
 .goblin-terminal-slot__status-overlay {
   position: absolute;

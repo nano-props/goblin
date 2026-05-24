@@ -1,5 +1,11 @@
 import type { FitAddon as XTermFitAddon } from '@xterm/addon-fit'
 import { FitAddon } from '@xterm/addon-fit'
+import type { SearchAddon as XTermSearchAddon, ISearchOptions, ISearchResultChangeEvent } from '@xterm/addon-search'
+import { SearchAddon } from '@xterm/addon-search'
+import type { SerializeAddon as XTermSerializeAddon } from '@xterm/addon-serialize'
+import { SerializeAddon } from '@xterm/addon-serialize'
+import { Unicode11Addon } from '@xterm/addon-unicode11'
+import { WebLinksAddon } from '@xterm/addon-web-links'
 import type { ITheme } from '@xterm/xterm'
 import type { Terminal as XTermTerminal } from '@xterm/xterm'
 import { Terminal } from '@xterm/xterm'
@@ -12,14 +18,31 @@ import type {
 } from '#/shared/terminal.ts'
 import { terminalBridge } from '#/renderer/terminal.ts'
 import { setTerminalFocused } from '#/renderer/terminal-focus.ts'
+import { rpc } from '#/renderer/rpc.ts'
 import { observeTerminalTheme, terminalThemeForCurrentDocument } from '#/renderer/components/terminal/terminal-theme.ts'
-import type { TerminalDescriptor, TerminalPhase, TerminalSnapshot } from '#/renderer/components/terminal/types.ts'
+import type {
+  TerminalDescriptor,
+  TerminalPhase,
+  TerminalSearchResult,
+  TerminalSnapshot,
+} from '#/renderer/components/terminal/types.ts'
 
 const DEFAULT_PARKING_WIDTH = 800
 const DEFAULT_PARKING_HEIGHT = 400
 const DEFAULT_TERMINAL_COLS = 80
 const DEFAULT_TERMINAL_ROWS = 24
 const RESIZE_DEBOUNCE_MS = 80
+const EMPTY_SEARCH_RESULT: TerminalSearchResult = { resultIndex: -1, resultCount: 0, found: false }
+const SEARCH_OPTIONS: ISearchOptions = {
+  caseSensitive: false,
+  decorations: {
+    matchBackground: '#facc15',
+    matchOverviewRuler: '#facc15',
+    activeMatchBackground: '#fb923c',
+    activeMatchBorder: '#ffffff',
+    activeMatchColorOverviewRuler: '#fb923c',
+  },
+}
 
 export class ManagedTerminalSession {
   descriptor: TerminalDescriptor
@@ -29,6 +52,8 @@ export class ManagedTerminalSession {
   private readonly parkingElement: HTMLDivElement
   private term: XTermTerminal | null = null
   private fitAddon: XTermFitAddon | null = null
+  private searchAddon: XTermSearchAddon | null = null
+  private serializeAddon: XTermSerializeAddon | null = null
   private resizeObserver: ResizeObserver | null = null
   private disposables: Array<{ dispose: () => void }> = []
   private ptySessionId: string | null = null
@@ -51,6 +76,7 @@ export class ManagedTerminalSession {
   private lastHeight = DEFAULT_PARKING_HEIGHT
   private lastPtyCols = 0
   private lastPtyRows = 0
+  private searchResult: TerminalSearchResult | null = null
 
   constructor(descriptor: TerminalDescriptor, notify: () => void) {
     this.descriptor = descriptor
@@ -121,7 +147,9 @@ export class ManagedTerminalSession {
   }
 
   snapshot(): TerminalSnapshot {
-    return { phase: this.phase, message: this.message, exitCode: this.exitCode }
+    const snapshot: TerminalSnapshot = { phase: this.phase, message: this.message, exitCode: this.exitCode }
+    if (this.searchResult) snapshot.search = this.searchResult
+    return snapshot
   }
 
   isTerminalFocusTarget(target: EventTarget | null): boolean {
@@ -131,6 +159,23 @@ export class ManagedTerminalSession {
   writeInput(data: string): void {
     if (this.suppressData || this.phase === 'ended' || !this.ptySessionId) return
     void terminalBridge.write({ sessionId: this.ptySessionId, data }).catch(() => {})
+  }
+
+  findNext(term: string, incremental = false): TerminalSearchResult {
+    return this.find(term, 'next', incremental)
+  }
+
+  findPrevious(term: string): TerminalSearchResult {
+    return this.find(term, 'previous', false)
+  }
+
+  clearSearch(): void {
+    this.searchAddon?.clearDecorations()
+    this.setSearchResult(null)
+  }
+
+  serialize(): string {
+    return this.serializeAddon?.serialize({ excludeAltBuffer: true }) ?? ''
   }
 
   handleOutput(event: TerminalOutputEvent): void {
@@ -283,6 +328,9 @@ export class ManagedTerminalSession {
     this.disposeThemeObserver?.()
     this.disposeThemeObserver = null
     this.fitAddon = null
+    this.searchAddon = null
+    this.serializeAddon = null
+    this.searchResult = null
     this.term?.dispose()
     this.term = null
     this.xtermHost.replaceChildren()
@@ -309,8 +357,10 @@ export class ManagedTerminalSession {
       minimumContrastRatio: 4.5,
       scrollback: 10_000,
       macOptionIsMeta: true,
+      scrollOnUserInput: true,
       theme,
     })
+    this.installOptionalAddons(term)
     this.applyTerminalTheme(term, theme)
     this.disposeThemeObserver = observeTerminalTheme((theme) => {
       this.applyTerminalTheme(term, theme)
@@ -319,6 +369,85 @@ export class ManagedTerminalSession {
     this.disposables.push(term.onBinary((data) => this.writeInput(data)))
     this.disposables.push(term.onResize(({ cols, rows }) => this.queueResize(cols, rows)))
     return term
+  }
+
+  private installOptionalAddons(term: XTermTerminal): void {
+    this.installUnicode11Addon(term)
+    this.installWebLinksAddon(term)
+    this.installSearchAddon(term)
+    this.installSerializeAddon(term)
+  }
+
+  private installUnicode11Addon(term: XTermTerminal): void {
+    try {
+      term.loadAddon(new Unicode11Addon())
+      term.unicode.activeVersion = '11'
+    } catch (err) {
+      console.warn('[terminal] failed to load unicode11 addon', err)
+    }
+  }
+
+  private installWebLinksAddon(term: XTermTerminal): void {
+    try {
+      term.loadAddon(new WebLinksAddon((_event, uri) => this.openExternalLink(uri)))
+    } catch (err) {
+      console.warn('[terminal] failed to load web links addon', err)
+    }
+  }
+
+  private installSearchAddon(term: XTermTerminal): void {
+    try {
+      const searchAddon = new SearchAddon({ highlightLimit: 1000 })
+      term.loadAddon(searchAddon)
+      this.disposables.push(searchAddon.onDidChangeResults((event) => this.updateSearchResult(event)))
+      this.searchAddon = searchAddon
+    } catch (err) {
+      console.warn('[terminal] failed to load search addon', err)
+    }
+  }
+
+  private installSerializeAddon(term: XTermTerminal): void {
+    try {
+      const serializeAddon = new SerializeAddon()
+      term.loadAddon(serializeAddon)
+      this.serializeAddon = serializeAddon
+    } catch (err) {
+      console.warn('[terminal] failed to load serialize addon', err)
+    }
+  }
+
+  private find(term: string, direction: 'next' | 'previous', incremental: boolean): TerminalSearchResult {
+    const searchTerm = term
+    if (!searchTerm || !this.searchAddon) {
+      this.clearSearch()
+      return EMPTY_SEARCH_RESULT
+    }
+    const found =
+      direction === 'next'
+        ? this.searchAddon.findNext(searchTerm, { ...SEARCH_OPTIONS, incremental })
+        : this.searchAddon.findPrevious(searchTerm, SEARCH_OPTIONS)
+    if (!found) this.setSearchResult(EMPTY_SEARCH_RESULT)
+    return this.searchResult ?? { ...EMPTY_SEARCH_RESULT, found }
+  }
+
+  private updateSearchResult(event: ISearchResultChangeEvent): void {
+    this.setSearchResult({
+      resultIndex: event.resultIndex,
+      resultCount: event.resultCount,
+      found: event.resultCount > 0,
+    })
+  }
+
+  private setSearchResult(result: TerminalSearchResult | null): void {
+    this.searchResult = result
+    this.notify()
+  }
+
+  private openExternalLink(uri: string): void {
+    if (!isHttpExternalUrl(uri)) return
+    void rpc.app.openExternalUrl.mutate({ url: uri }).catch((err) => {
+      console.warn('[terminal] failed to open link', err)
+    })
   }
 
   private applyTerminalTheme(term: XTermTerminal, theme: ITheme): void {
@@ -417,4 +546,14 @@ function waitForTerminalResponseFlush(): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve())), 0)
   })
+}
+
+function isHttpExternalUrl(value: string): boolean {
+  try {
+    if (value.length > 4096 || /[\0-\x1f\x7f]/.test(value)) return false
+    const parsed = new URL(value)
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:'
+  } catch {
+    return false
+  }
 }

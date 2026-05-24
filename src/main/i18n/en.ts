@@ -249,6 +249,11 @@ export const en = {
   'terminal.restart-shortcut': '↩',
   'terminal.session-ended': 'Session ended',
   'terminal.session-ended-code': 'Session ended with code {code}',
+  'terminal.search-placeholder': 'Search terminal',
+  'terminal.search-no-results': 'No results',
+  'terminal.search-previous': 'Previous',
+  'terminal.search-next': 'Next',
+  'terminal.search-close': 'Close',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) ---
   'worktrees.reveal-title': 'Reveal in Finder',
