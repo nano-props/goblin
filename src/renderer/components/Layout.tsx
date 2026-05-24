@@ -1,16 +1,21 @@
 import type { HTMLAttributes, ReactNode } from 'react'
 import { ScrollArea } from '#/renderer/components/ui/scroll-area.tsx'
+import { SplitPane } from '#/renderer/components/SplitPane.tsx'
 import { cn } from '#/renderer/lib/cn.ts'
-import { DEFAULT_WORKSPACE_LAYOUT, workspaceLayoutAxis } from '#/shared/workspace-layout.ts'
+import { DEFAULT_DETAIL_PANE_SIZES, DEFAULT_WORKSPACE_LAYOUT, workspaceLayoutAxis } from '#/shared/workspace-layout.ts'
 import type { RepoWorkspaceLayout } from '#/renderer/stores/repos/types.ts'
 
 interface ShellProps {
   children: ReactNode
 }
 
-interface RepoWorkspaceProps extends ShellProps {
+interface RepoWorkspaceProps {
+  branchPane: ReactNode
+  detailPane: ReactNode
   layout?: RepoWorkspaceLayout
   detailCollapsed?: boolean
+  detailSize?: number
+  onDetailSizeChange?: (size: number) => void
 }
 
 interface ToolbarProps extends HTMLAttributes<HTMLDivElement> {
@@ -67,24 +72,34 @@ export function ToolbarTitle({ title, description, after }: ToolbarTitleProps) {
 }
 
 export function RepoWorkspace({
-  children,
+  branchPane,
+  detailPane,
   layout = DEFAULT_WORKSPACE_LAYOUT,
   detailCollapsed = false,
+  detailSize = DEFAULT_DETAIL_PANE_SIZES[layout],
+  onDetailSizeChange,
 }: RepoWorkspaceProps) {
   const axis = workspaceLayoutAxis(layout)
+  if (!(axis === 'rows' && detailCollapsed)) {
+    return (
+      <SplitPane
+        orientation={axis === 'columns' ? 'horizontal' : 'vertical'}
+        before={branchPane}
+        after={detailPane}
+        afterSize={detailSize}
+        onAfterSizeChange={onDetailSizeChange}
+        beforeMinSize={axis === 'columns' ? '14rem' : '10rem'}
+        afterMinSize={axis === 'columns' ? '18rem' : '9rem'}
+        afterMaxSize="90%"
+        className="flex-1"
+      />
+    )
+  }
+  // Collapsed top/bottom layout keeps only the detail toolbar visible.
   return (
-    <div
-      className={cn(
-        'grid min-h-0 flex-1',
-        axis === 'columns'
-          ? 'grid-cols-[minmax(0,2fr)_minmax(0,3fr)]'
-          : detailCollapsed
-            // Matches the detail toolbar's `h-9`; border is included by global border-box sizing.
-            ? 'grid-rows-[minmax(0,1fr)_2.25rem]'
-            : 'grid-rows-[minmax(0,1fr)_minmax(0,1fr)]',
-      )}
-    >
-      {children}
+    <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_2.25rem]">
+      {branchPane}
+      {detailPane}
     </div>
   )
 }
@@ -94,7 +109,7 @@ export function RepoWorkspacePane({ children, border = false, layout = DEFAULT_W
   return (
     <div
       className={cn(
-        'flex min-h-0 flex-col overflow-hidden',
+        'flex min-h-0 flex-1 flex-col overflow-hidden',
         border && (axis === 'columns' ? 'border-r border-separator' : 'border-b border-separator'),
       )}
     >

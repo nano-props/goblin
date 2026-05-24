@@ -1,7 +1,7 @@
 import type { StoreApi } from 'zustand'
 import type { BranchInfo, ExecResult, LogEntry, PullRequestFetchMode, WorktreeStatus } from '#/renderer/types.ts'
 import type { CommitDetail } from '#/shared/rpc.ts'
-import type { WorkspaceLayout } from '#/shared/workspace-layout.ts'
+import type { WorkspaceDetailPaneSizes, WorkspaceLayout } from '#/shared/workspace-layout.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/renderer/stores/repos/branch-action-types.ts'
 import type { RepoOperationsState } from '#/renderer/stores/repos/operations.ts'
 
@@ -104,6 +104,7 @@ export interface ReposStore {
   missingFromSession: MissingRepo[]
   detailCollapsed: boolean
   workspaceLayout: RepoWorkspaceLayout
+  detailPaneSizes: WorkspaceDetailPaneSizes
 
   /** Add a repo to the store. By default also focuses it — pass
    *  `activate: false` for batch flows (e.g. multi-folder drop) that
@@ -123,6 +124,8 @@ export interface ReposStore {
   setDetailCollapsed: (collapsed: boolean) => void
   toggleDetailCollapsed: () => void
   setWorkspaceLayout: (layout: RepoWorkspaceLayout) => void
+  setDetailPaneSize: (layout: RepoWorkspaceLayout, size: number) => void
+  setDetailPaneSizes: (sizes: WorkspaceDetailPaneSizes) => void
   resetLayout: () => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
   selectBranch: (id: string, branch: string) => void
@@ -133,10 +136,7 @@ export interface ReposStore {
   checkoutSelected: () => Promise<void>
   /** Keyboard-driven open of the active repo's selected log entry. */
   openSelectedCommit: () => Promise<void>
-  refreshSnapshot: (
-    id: string,
-    options?: { skipLogBackfill?: boolean; token?: number },
-  ) => Promise<void>
+  refreshSnapshot: (id: string, options?: { skipLogBackfill?: boolean; token?: number }) => Promise<void>
   refreshBranchLog: (id: string, branch?: string, options?: { token?: number }) => Promise<void>
   loadMoreBranchLog: (id: string, branch?: string, options?: { token?: number }) => Promise<void>
   refreshPullRequests: (

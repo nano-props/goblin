@@ -26,14 +26,17 @@ export function RepoView({ repoId }: Props) {
         initialLoading: !!repo && operationBusy(repo.ops.snapshot) && repo.data.branches.length === 0,
         detailCollapsed: s.detailCollapsed,
         workspaceLayout: s.workspaceLayout,
+        detailPaneSize: s.detailPaneSizes[s.workspaceLayout],
       }
     },
     (a, b) =>
       a.exists === b.exists &&
       a.initialLoading === b.initialLoading &&
       a.detailCollapsed === b.detailCollapsed &&
-      a.workspaceLayout === b.workspaceLayout,
+      a.workspaceLayout === b.workspaceLayout &&
+      a.detailPaneSize === b.detailPaneSize,
   )
+  const setDetailPaneSize = useReposStore((s) => s.setDetailPaneSize)
   useRepoToasts(repoId)
 
   const behavior = repoWorkspaceBehavior(view.workspaceLayout, view.detailCollapsed)
@@ -41,11 +44,7 @@ export function RepoView({ repoId }: Props) {
   if (!view.exists) return <div />
   if (view.initialLoading) {
     return (
-      <RepoWorkspaceSkeleton
-        showRepoToolbar
-        layout={view.workspaceLayout}
-        detailCollapsed={behavior.detailCollapsed}
-      />
+      <RepoWorkspaceSkeleton showRepoToolbar layout={view.workspaceLayout} detailCollapsed={behavior.detailCollapsed} />
     )
   }
 
@@ -53,14 +52,22 @@ export function RepoView({ repoId }: Props) {
     <section className="flex min-w-0 flex-1 flex-col">
       <RepoToolbar repoId={repoId} />
 
-      <RepoWorkspace layout={view.workspaceLayout} detailCollapsed={behavior.detailCollapsed}>
-        <RepoWorkspacePane layout={view.workspaceLayout} border>
-          <BranchList repoId={repoId} showActions={behavior.branchListActionsVisible} />
-        </RepoWorkspacePane>
-        <RepoWorkspacePane layout={view.workspaceLayout}>
-          <BranchDetail repoId={repoId} layout={view.workspaceLayout} collapsed={behavior.detailCollapsed} />
-        </RepoWorkspacePane>
-      </RepoWorkspace>
+      <RepoWorkspace
+        layout={view.workspaceLayout}
+        detailCollapsed={behavior.detailCollapsed}
+        detailSize={view.detailPaneSize}
+        onDetailSizeChange={(size) => setDetailPaneSize(view.workspaceLayout, size)}
+        branchPane={
+          <RepoWorkspacePane layout={view.workspaceLayout} border={behavior.detailCollapsed}>
+            <BranchList repoId={repoId} showActions={behavior.branchListActionsVisible} />
+          </RepoWorkspacePane>
+        }
+        detailPane={
+          <RepoWorkspacePane layout={view.workspaceLayout}>
+            <BranchDetail repoId={repoId} layout={view.workspaceLayout} collapsed={behavior.detailCollapsed} />
+          </RepoWorkspacePane>
+        }
+      />
     </section>
   )
 }

@@ -63,7 +63,11 @@ import {
   setEditorApp,
   getEditorApp,
 } from '#/main/settings.ts'
-import { effectiveDetailCollapsed, normalizeWorkspaceLayout } from '#/shared/workspace-layout.ts'
+import {
+  effectiveDetailCollapsed,
+  normalizeDetailPaneSizes,
+  normalizeWorkspaceLayout,
+} from '#/shared/workspace-layout.ts'
 import { isGlobalShortcutRegistered, replaceGlobalShortcut, syncGlobalShortcuts } from '#/main/shortcuts.ts'
 import { buildAppMenu, setMenuWorkspaceLayout } from '#/main/menu.ts'
 import { applyLangPref, getCurrentLang, getDictionary } from '#/main/i18n/index.ts'
@@ -729,6 +733,7 @@ async function saveSession(session: SessionState): Promise<void> {
     activeRepo: activeRepo && openRepos.includes(activeRepo) ? activeRepo : null,
     detailCollapsed: effectiveDetailCollapsed(workspaceLayout, detailCollapsed),
     workspaceLayout,
+    detailPaneSizes: normalizeDetailPaneSizes(session.detailPaneSizes),
   })
   // Persist first so a crash still leaves the next boot with the correct
   // layout; the live native menu snapshot is only an optimization for

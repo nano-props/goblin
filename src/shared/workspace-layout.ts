@@ -2,9 +2,14 @@ export const WORKSPACE_LAYOUTS = ['top-bottom', 'left-right'] as const
 
 export type WorkspaceLayout = (typeof WORKSPACE_LAYOUTS)[number]
 export type WorkspaceLayoutAxis = 'rows' | 'columns'
+export type WorkspaceDetailPaneSizes = Record<WorkspaceLayout, number>
 
 export const DEFAULT_WORKSPACE_LAYOUT: WorkspaceLayout = 'top-bottom'
 export const DEFAULT_DETAIL_COLLAPSED = true
+export const DEFAULT_DETAIL_PANE_SIZES: WorkspaceDetailPaneSizes = { 'top-bottom': 50, 'left-right': 60 }
+
+const MIN_DETAIL_PANE_SIZE = 10
+const MAX_DETAIL_PANE_SIZE = 90
 
 const WORKSPACE_LAYOUT_META = {
   'top-bottom': { axis: 'rows', detailCollapseAllowed: true },
@@ -28,4 +33,17 @@ export function workspaceLayoutAllowsDetailCollapse(layout: WorkspaceLayout): bo
 
 export function effectiveDetailCollapsed(layout: WorkspaceLayout, detailCollapsed: boolean): boolean {
   return workspaceLayoutAllowsDetailCollapse(layout) && detailCollapsed
+}
+
+export function normalizeDetailPaneSize(layout: WorkspaceLayout, value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_DETAIL_PANE_SIZES[layout]
+  return Math.max(MIN_DETAIL_PANE_SIZE, Math.min(MAX_DETAIL_PANE_SIZE, Math.round(value * 10) / 10))
+}
+
+export function normalizeDetailPaneSizes(value: unknown): WorkspaceDetailPaneSizes {
+  const sizes = value && typeof value === 'object' ? (value as Partial<Record<WorkspaceLayout, unknown>>) : {}
+  return {
+    'top-bottom': normalizeDetailPaneSize('top-bottom', sizes['top-bottom']),
+    'left-right': normalizeDetailPaneSize('left-right', sizes['left-right']),
+  }
 }

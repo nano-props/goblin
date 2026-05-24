@@ -16,17 +16,14 @@ import { DEFAULT_GLOBAL_SHORTCUT, normalizeGlobalShortcut } from '#/shared/accel
 import {
   DEFAULT_WORKSPACE_LAYOUT,
   DEFAULT_DETAIL_COLLAPSED,
+  DEFAULT_DETAIL_PANE_SIZES,
   effectiveDetailCollapsed,
+  normalizeDetailPaneSizes,
   normalizeWorkspaceLayout,
+  type WorkspaceDetailPaneSizes,
   type WorkspaceLayout,
 } from '#/shared/workspace-layout.ts'
-import type {
-  EditorPref,
-  LangPref,
-  SessionState,
-  TerminalPref,
-  ThemePref,
-} from '#/shared/rpc.ts'
+import type { EditorPref, LangPref, SessionState, TerminalPref, ThemePref } from '#/shared/rpc.ts'
 
 export interface WindowBounds {
   x?: number
@@ -41,6 +38,7 @@ export interface WindowBounds {
 export const SETTINGS_SCHEMA_VERSION = 1
 export const DEFAULT_SESSION_DETAIL_COLLAPSED = DEFAULT_DETAIL_COLLAPSED
 export const DEFAULT_SESSION_WORKSPACE_LAYOUT: WorkspaceLayout = DEFAULT_WORKSPACE_LAYOUT
+export const DEFAULT_SESSION_DETAIL_PANE_SIZES: WorkspaceDetailPaneSizes = DEFAULT_DETAIL_PANE_SIZES
 
 export interface Settings {
   /** Schema version of this file. Older files without it are treated as
@@ -74,6 +72,7 @@ const DEFAULTS: Settings = {
     activeRepo: null,
     detailCollapsed: DEFAULT_SESSION_DETAIL_COLLAPSED,
     workspaceLayout: DEFAULT_SESSION_WORKSPACE_LAYOUT,
+    detailPaneSizes: DEFAULT_SESSION_DETAIL_PANE_SIZES,
   },
   recentRepos: [],
 }
@@ -115,6 +114,7 @@ function normalizeSession(session: unknown): SessionState {
     activeRepo,
     detailCollapsed: effectiveDetailCollapsed(workspaceLayout, detailCollapsed),
     workspaceLayout,
+    detailPaneSizes: normalizeDetailPaneSizes(value.detailPaneSizes),
   }
 }
 

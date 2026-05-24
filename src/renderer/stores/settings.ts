@@ -16,7 +16,7 @@ import type {
   TerminalPref,
 } from '#/shared/rpc.ts'
 import { DEFAULT_GLOBAL_SHORTCUT } from '#/shared/accelerator.ts'
-import { DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
+import { DEFAULT_DETAIL_PANE_SIZES, DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 import { onRpcEventType, rpc } from '#/renderer/rpc.ts'
 
 interface SettingsStore {
@@ -65,7 +65,13 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
   editorApp: 'auto',
   resolvedEditorApp: null,
   editorAvailable: false,
-  savedSession: { openRepos: [], activeRepo: null, detailCollapsed: true, workspaceLayout: DEFAULT_WORKSPACE_LAYOUT },
+  savedSession: {
+    openRepos: [],
+    activeRepo: null,
+    detailCollapsed: true,
+    workspaceLayout: DEFAULT_WORKSPACE_LAYOUT,
+    detailPaneSizes: DEFAULT_DETAIL_PANE_SIZES,
+  },
 
   async hydrate() {
     const version = ++hydrateVersion
@@ -112,7 +118,9 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
         }),
         onRpcEventType('editor-app-changed', (event) => {
           set((s) =>
-            s.editorApp === event.pref && s.resolvedEditorApp === event.resolved && s.editorAvailable === event.available
+            s.editorApp === event.pref &&
+            s.resolvedEditorApp === event.resolved &&
+            s.editorAvailable === event.available
               ? s
               : { editorApp: event.pref, resolvedEditorApp: event.resolved, editorAvailable: event.available },
           )

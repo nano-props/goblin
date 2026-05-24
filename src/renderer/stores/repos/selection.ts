@@ -4,8 +4,11 @@ import { replaceRepo } from '#/renderer/stores/repos/helpers.ts'
 import { persistRepoCache } from '#/renderer/stores/repos/persistence.ts'
 import {
   DEFAULT_DETAIL_COLLAPSED,
+  DEFAULT_DETAIL_PANE_SIZES,
   DEFAULT_WORKSPACE_LAYOUT,
   effectiveDetailCollapsed,
+  normalizeDetailPaneSize,
+  normalizeDetailPaneSizes,
   workspaceLayoutAllowsDetailCollapse,
 } from '#/shared/workspace-layout.ts'
 import type {
@@ -15,6 +18,7 @@ import type {
   ReposGet,
   ReposSet,
 } from '#/renderer/stores/repos/types.ts'
+import type { WorkspaceDetailPaneSizes } from '#/shared/workspace-layout.ts'
 
 export function createSelectionActions(set: ReposSet, get: ReposGet) {
   return {
@@ -63,11 +67,43 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
       })
     },
 
+    setDetailPaneSize(layout: RepoWorkspaceLayout, size: number) {
+      set((s) => {
+        const next = normalizeDetailPaneSize(layout, size)
+        if (s.detailPaneSizes[layout] === next) return s
+        return { detailPaneSizes: { ...s.detailPaneSizes, [layout]: next } }
+      })
+    },
+
+    setDetailPaneSizes(sizes: WorkspaceDetailPaneSizes) {
+      set((s) => {
+        const next = normalizeDetailPaneSizes(sizes)
+        if (
+          s.detailPaneSizes['top-bottom'] === next['top-bottom'] &&
+          s.detailPaneSizes['left-right'] === next['left-right']
+        ) {
+          return s
+        }
+        return { detailPaneSizes: next }
+      })
+    },
+
     resetLayout() {
       set((s) => {
         const detailCollapsed = effectiveDetailCollapsed(DEFAULT_WORKSPACE_LAYOUT, DEFAULT_DETAIL_COLLAPSED)
-        if (s.workspaceLayout === DEFAULT_WORKSPACE_LAYOUT && s.detailCollapsed === detailCollapsed) return s
-        return { workspaceLayout: DEFAULT_WORKSPACE_LAYOUT, detailCollapsed }
+        if (
+          s.workspaceLayout === DEFAULT_WORKSPACE_LAYOUT &&
+          s.detailCollapsed === detailCollapsed &&
+          s.detailPaneSizes['top-bottom'] === DEFAULT_DETAIL_PANE_SIZES['top-bottom'] &&
+          s.detailPaneSizes['left-right'] === DEFAULT_DETAIL_PANE_SIZES['left-right']
+        ) {
+          return s
+        }
+        return {
+          workspaceLayout: DEFAULT_WORKSPACE_LAYOUT,
+          detailCollapsed,
+          detailPaneSizes: DEFAULT_DETAIL_PANE_SIZES,
+        }
       })
     },
 

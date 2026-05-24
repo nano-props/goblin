@@ -10,6 +10,7 @@ import {
   seedRepoState,
 } from '#/renderer/stores/repos/test-utils.ts'
 import type { BranchInfo } from '#/renderer/types.ts'
+import { DEFAULT_DETAIL_PANE_SIZES } from '#/shared/workspace-layout.ts'
 
 const REPO_ID = '/tmp/gbl-selection-test-repo'
 const rpcHandlers: Record<string, (input: any) => unknown> = {}
@@ -383,6 +384,22 @@ describe('setWorkspaceLayout', () => {
   })
 })
 
+describe('setDetailPaneSize', () => {
+  test('stores detail pane sizes per workspace layout', () => {
+    useReposStore.getState().setDetailPaneSize('top-bottom', 37.34)
+    useReposStore.getState().setDetailPaneSize('left-right', 72.28)
+
+    expect(useReposStore.getState().detailPaneSizes).toEqual({ 'top-bottom': 37.3, 'left-right': 72.3 })
+  })
+
+  test('normalizes invalid and out-of-range sizes', () => {
+    useReposStore.getState().setDetailPaneSize('top-bottom', Number.NaN)
+    useReposStore.getState().setDetailPaneSize('left-right', 200)
+
+    expect(useReposStore.getState().detailPaneSizes).toEqual({ 'top-bottom': 50, 'left-right': 90 })
+  })
+})
+
 describe('commit detail collapse behavior', () => {
   test('test fixture represents an opened commit as a stable tab-local state', () => {
     seedRepo({ selectedBranch: 'main', detailTab: 'commits', openCommit: true })
@@ -461,12 +478,17 @@ describe('commit detail collapse behavior', () => {
 
 describe('resetLayout', () => {
   test('restores the initial workspace layout defaults', () => {
-    useReposStore.setState({ workspaceLayout: 'left-right', detailCollapsed: false })
+    useReposStore.setState({
+      workspaceLayout: 'left-right',
+      detailCollapsed: false,
+      detailPaneSizes: { 'top-bottom': 35, 'left-right': 70 },
+    })
 
     useReposStore.getState().resetLayout()
 
     expect(useReposStore.getState().workspaceLayout).toBe('top-bottom')
     expect(useReposStore.getState().detailCollapsed).toBe(true)
+    expect(useReposStore.getState().detailPaneSizes).toBe(DEFAULT_DETAIL_PANE_SIZES)
   })
 
   test('is idempotent when layout is already at defaults', () => {

@@ -27,7 +27,11 @@ import { createLifecycleActions } from '#/renderer/stores/repos/lifecycle.ts'
 import { createRefreshActions } from '#/renderer/stores/repos/refresh.ts'
 import { createSelectionActions } from '#/renderer/stores/repos/selection.ts'
 import { normalizeRepoCache } from '#/renderer/stores/repos/persistence.ts'
-import { DEFAULT_DETAIL_COLLAPSED, DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
+import {
+  DEFAULT_DETAIL_COLLAPSED,
+  DEFAULT_DETAIL_PANE_SIZES,
+  DEFAULT_WORKSPACE_LAYOUT,
+} from '#/shared/workspace-layout.ts'
 import type { CachedRepoState, ReposStore } from '#/renderer/stores/repos/types.ts'
 
 interface PersistedReposStore {
@@ -105,6 +109,7 @@ export const useReposStore = create<ReposStore>()(
       missingFromSession: [],
       detailCollapsed: DEFAULT_DETAIL_COLLAPSED,
       workspaceLayout: DEFAULT_WORKSPACE_LAYOUT,
+      detailPaneSizes: DEFAULT_DETAIL_PANE_SIZES,
 
       ...createLifecycleActions(set, get),
       ...createSelectionActions(set, get),

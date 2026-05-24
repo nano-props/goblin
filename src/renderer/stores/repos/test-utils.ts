@@ -5,7 +5,11 @@ import { disposeAllRepoRuntimes } from '#/renderer/stores/repos/runtime.ts'
 import type { BranchInfo, PullRequestInfo, WorktreeStatus } from '#/renderer/types.ts'
 import type { DetailTab, RepoState } from '#/renderer/stores/repos/types.ts'
 import type { CommitDetail } from '#/shared/rpc.ts'
-import { DEFAULT_DETAIL_COLLAPSED, DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
+import {
+  DEFAULT_DETAIL_COLLAPSED,
+  DEFAULT_DETAIL_PANE_SIZES,
+  DEFAULT_WORKSPACE_LAYOUT,
+} from '#/shared/workspace-layout.ts'
 
 export type RpcTestHandler = (input: any) => unknown
 
@@ -60,6 +64,7 @@ export function resetReposStore(): void {
     missingFromSession: [],
     detailCollapsed: DEFAULT_DETAIL_COLLAPSED,
     workspaceLayout: DEFAULT_WORKSPACE_LAYOUT,
+    detailPaneSizes: DEFAULT_DETAIL_PANE_SIZES,
   })
 }
 
@@ -122,6 +127,7 @@ export function seedRepoState(options: {
     missingFromSession: [],
     detailCollapsed: DEFAULT_DETAIL_COLLAPSED,
     workspaceLayout: DEFAULT_WORKSPACE_LAYOUT,
+    detailPaneSizes: DEFAULT_DETAIL_PANE_SIZES,
   })
   return repo
 }

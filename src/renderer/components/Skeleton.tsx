@@ -77,14 +77,20 @@ export function RepoWorkspaceSkeleton({
           </div>
         </Toolbar>
       )}
-      <RepoWorkspace layout={layout} detailCollapsed={collapsed}>
-        <RepoWorkspacePane layout={layout} border>
-          <ListSkeleton variant="branch" />
-        </RepoWorkspacePane>
-        <RepoWorkspacePane layout={layout}>
-          <BranchDetailSkeleton collapsed={collapsed} />
-        </RepoWorkspacePane>
-      </RepoWorkspace>
+      <RepoWorkspace
+        layout={layout}
+        detailCollapsed={collapsed}
+        branchPane={
+          <RepoWorkspacePane layout={layout} border={collapsed}>
+            <ListSkeleton variant="branch" />
+          </RepoWorkspacePane>
+        }
+        detailPane={
+          <RepoWorkspacePane layout={layout}>
+            <BranchDetailSkeleton collapsed={collapsed} />
+          </RepoWorkspacePane>
+        }
+      />
     </section>
   )
 }

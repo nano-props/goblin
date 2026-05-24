@@ -9,7 +9,7 @@ import type {
   WorktreeStatus,
 } from '#/shared/git-types.ts'
 import { WORKSPACE_LAYOUTS } from '#/shared/workspace-layout.ts'
-import type { WorkspaceLayout } from '#/shared/workspace-layout.ts'
+import type { WorkspaceDetailPaneSizes, WorkspaceLayout } from '#/shared/workspace-layout.ts'
 
 export type { WorkspaceLayout } from '#/shared/workspace-layout.ts'
 
@@ -34,6 +34,7 @@ export interface SessionState {
   activeRepo: string | null
   detailCollapsed: boolean
   workspaceLayout: WorkspaceLayout
+  detailPaneSizes: WorkspaceDetailPaneSizes
 }
 
 export interface SettingsSnapshot {
@@ -353,6 +354,10 @@ export function createAppRouter(handlers: AppRpcHandlers) {
               activeRepo: v.nullable(v.string()),
               detailCollapsed: v.boolean(),
               workspaceLayout: v.picklist(WORKSPACE_LAYOUTS),
+              detailPaneSizes: v.object({
+                'top-bottom': FiniteNumber,
+                'left-right': FiniteNumber,
+              }),
             }),
           }),
         )
