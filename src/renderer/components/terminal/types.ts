@@ -1,6 +1,6 @@
 import type { TerminalExitEvent, TerminalOutputEvent } from '#/shared/terminal.ts'
 
-export type TerminalPhase = 'opening' | 'open' | 'ended' | 'error'
+export type TerminalPhase = 'opening' | 'open' | 'error'
 
 export interface TerminalDescriptor {
   key: string
@@ -12,7 +12,6 @@ export interface TerminalDescriptor {
 export interface TerminalSnapshot {
   phase: TerminalPhase
   message: string | null
-  exitCode?: number
   search?: TerminalSearchResult | null
 }
 
@@ -51,5 +50,5 @@ export interface ManagedTerminalSessionLike {
   /** Serializes xterm framebuffer state as VT sequences; not plain-text output for copy UI. */
   serialize: () => string
   handleOutput: (event: TerminalOutputEvent) => void
-  handleExit: (event: TerminalExitEvent) => void
+  handleExit: (event: TerminalExitEvent) => boolean
 }

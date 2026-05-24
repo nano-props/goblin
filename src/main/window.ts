@@ -14,7 +14,7 @@ import { pathToFileURL } from 'node:url'
 import { getTheme } from '#/main/theme.ts'
 import { loadSettings, setWindowBounds, type WindowBounds } from '#/main/settings.ts'
 import { closeAllTerminalSessions } from '#/main/terminal.ts'
-import { WINDOW_BACKGROUND_BY_THEME } from '#/shared/theme-tokens.ts'
+import { WINDOW_BACKGROUND_BY_COLOR_THEME } from '#/shared/theme-tokens.ts'
 
 const DEFAULT_BOUNDS: WindowBounds = { width: 1200, height: 760 }
 
@@ -63,11 +63,11 @@ function clampToDisplay(bounds: WindowBounds): WindowBounds {
 }
 
 export async function createMainWindow(): Promise<BrowserWindow> {
-  const { resolved } = getTheme()
+  const { resolved, colorTheme } = getTheme()
   // Match the renderer's body background so there's no white flash
-  // before the bundle loads. Hex values mirror styles.css
-  // `--color-background`.
-  const backgroundColor = WINDOW_BACKGROUND_BY_THEME[resolved]
+  // before the bundle loads. Hex values mirror each theme's
+  // `--gbl-surface-canvas`.
+  const backgroundColor = WINDOW_BACKGROUND_BY_COLOR_THEME[colorTheme][resolved]
 
   const settings = await loadSettings()
   const saved = settings.windowBounds
@@ -103,12 +103,13 @@ export async function createMainWindow(): Promise<BrowserWindow> {
   })
 
   // file:// load so the existing CSP (`script-src 'self'`) stays clean.
-  // `?theme=` lets the inline boot script in index.html apply data-theme
+  // `?theme=` and `?colorTheme=` let the boot script apply theme attrs
   // before stylesheets load (no flash). `pathToFileURL` handles Windows
   // path/URL conversion (drive letters, backslashes) — interpolating into
   // a `file://` literal string would produce malformed URLs on Win32.
   const url = pathToFileURL(path.join(app.getAppPath(), 'dist/renderer/index.html'))
   url.searchParams.set('theme', resolved)
+  url.searchParams.set('colorTheme', colorTheme)
   void win.loadURL(url.toString())
 
   // Persist bounds. We listen on both `resize` and `move` because the

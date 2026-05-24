@@ -4,7 +4,6 @@ import {
   closeOwnedTerminalSession,
   closeTerminalKey,
   closeTerminalOwner,
-  closeTerminalScope,
   openTerminalSession,
   resizeTerminalSession,
   writeTerminalSession,
@@ -21,7 +20,7 @@ interface MockPty {
   resize: ReturnType<typeof vi.fn>
   kill: ReturnType<typeof vi.fn>
   emitData: (data: string) => void
-  emitExit: (exitCode: number) => void
+  emitExit: () => void
 }
 
 const mockPtys: MockPty[] = []
@@ -33,13 +32,13 @@ const mockWindows: Array<{
 vi.mock('node-pty', () => ({
   spawn: vi.fn(() => {
     let onData: ((data: string) => void) | null = null
-    let onExit: ((event: { exitCode: number; signal?: number }) => void) | null = null
+    let onExit: (() => void) | null = null
     const pty: MockPty = {
       write: vi.fn(),
       resize: vi.fn(),
       kill: vi.fn(),
       emitData: (data) => onData?.(data),
-      emitExit: (exitCode) => onExit?.({ exitCode }),
+      emitExit: () => onExit?.(),
     }
     mockPtys.push(pty)
     return {
@@ -54,7 +53,7 @@ vi.mock('node-pty', () => ({
           }),
         }
       },
-      onExit: (cb: (event: { exitCode: number; signal?: number }) => void) => {
+      onExit: (cb: () => void) => {
         onExit = cb
         return {
           dispose: vi.fn(() => {
@@ -135,7 +134,6 @@ describe('terminal core sessions', () => {
     expect(replaced.sessionId).not.toBe(first.sessionId)
     expect(replaced.replay).toBe('')
     expect(replaced.replaySeq).toBe(0)
-    expect(replaced.ended).toBe(false)
 
     writeTerminalSession(1, first.sessionId, 'stale input')
     writeTerminalSession(1, replaced.sessionId, 'fresh input')
@@ -214,7 +212,7 @@ describe('terminal core sessions', () => {
     expect(mockPtys).toHaveLength(1)
   })
 
-  test('preserves ended sessions for replay and ignores further writes and resizes', () => {
+  test('removes exited sessions and opens a fresh terminal for the worktree', () => {
     const opened = openTerminalSession({
       ownerWebContentsId: 1,
       scope: '/repo',
@@ -227,11 +225,11 @@ describe('terminal core sessions', () => {
     if (!opened.ok) return
 
     mockPtys[0]!.emitData('before exit')
-    mockPtys[0]!.emitExit(42)
+    mockPtys[0]!.emitExit()
     writeTerminalSession(1, opened.sessionId, 'after exit')
     resizeTerminalSession(1, opened.sessionId, 100, 30)
 
-    const reattached = openTerminalSession({
+    const reopened = openTerminalSession({
       ownerWebContentsId: 1,
       scope: '/repo',
       key: '/repo\0/worktree',
@@ -240,20 +238,18 @@ describe('terminal core sessions', () => {
       rows: 30,
     })
 
-    expect(reattached.ok).toBe(true)
-    if (reattached.ok) {
-      expect(reattached.sessionId).toBe(opened.sessionId)
-      expect(reattached.replay).toBe('before exit')
-      expect(reattached.replaySeq).toBe(1)
-      expect(reattached.ended).toBe(true)
-      expect(reattached.exitCode).toBe(42)
+    expect(reopened.ok).toBe(true)
+    if (reopened.ok) {
+      expect(reopened.sessionId).not.toBe(opened.sessionId)
+      expect(reopened.replay).toBe('')
+      expect(reopened.replaySeq).toBe(0)
     }
     expect(mockPtys[0]!.write).not.toHaveBeenCalled()
     expect(mockPtys[0]!.resize).not.toHaveBeenCalled()
-    expect(spawn).toHaveBeenCalledTimes(1)
+    expect(spawn).toHaveBeenCalledTimes(2)
   })
 
-  test('closes sessions by key and scope', () => {
+  test('closes sessions by key', () => {
     const first = openTerminalSession({
       ownerWebContentsId: 1,
       scope: '/repo',
@@ -270,15 +266,7 @@ describe('terminal core sessions', () => {
       cols: 80,
       rows: 24,
     })
-    const third = openTerminalSession({
-      ownerWebContentsId: 1,
-      scope: '/other',
-      key: '/other\0/three',
-      cwd: '/three',
-      cols: 80,
-      rows: 24,
-    })
-    expect(first.ok && second.ok && third.ok).toBe(true)
+    expect(first.ok && second.ok).toBe(true)
 
     closeTerminalKey('/repo\0/one')
     if (first.ok) writeTerminalSession(1, first.sessionId, 'closed')
@@ -286,14 +274,6 @@ describe('terminal core sessions', () => {
     expect(mockPtys[0]!.kill).toHaveBeenCalledTimes(1)
     expect(mockPtys[0]!.write).not.toHaveBeenCalled()
     expect(mockPtys[1]!.write).toHaveBeenCalledWith('open')
-
-    closeTerminalScope('/repo')
-    if (second.ok) writeTerminalSession(1, second.sessionId, 'closed')
-    if (third.ok) writeTerminalSession(1, third.sessionId, 'still open')
-    expect(mockPtys[1]!.kill).toHaveBeenCalledTimes(1)
-    expect(mockPtys[1]!.write).toHaveBeenCalledTimes(1)
-    expect(mockPtys[2]!.kill).not.toHaveBeenCalled()
-    expect(mockPtys[2]!.write).toHaveBeenCalledWith('still open')
   })
 
   test('scopes reuse and output delivery by owner webContents', () => {
@@ -395,6 +375,37 @@ describe('terminal core sessions', () => {
     expect(mockPtys[0]!.resize).toHaveBeenCalledWith(100, 30)
     expect(mockPtys[0]!.kill).toHaveBeenCalledTimes(1)
     expect(mockPtys[1]!.kill).not.toHaveBeenCalled()
+  })
+
+  test('prunes repo sessions only for the requested owner webContents', async () => {
+    const core = await import('#/main/terminal-core.ts')
+    const first = openTerminalSession({
+      ownerWebContentsId: 1,
+      scope: '/repo',
+      key: '/repo\0/worktree',
+      cwd: '/worktree',
+      cols: 80,
+      rows: 24,
+    })
+    const second = openTerminalSession({
+      ownerWebContentsId: 2,
+      scope: '/repo',
+      key: '/repo\0/worktree',
+      cwd: '/worktree',
+      cols: 80,
+      rows: 24,
+    })
+    expect(first.ok && second.ok).toBe(true)
+    if (!first.ok || !second.ok) return
+
+    core.pruneTerminalScope(1, '/repo', new Set())
+    writeTerminalSession(1, first.sessionId, 'closed')
+    writeTerminalSession(2, second.sessionId, 'open')
+
+    expect(mockPtys[0]!.kill).toHaveBeenCalledTimes(1)
+    expect(mockPtys[0]!.write).not.toHaveBeenCalled()
+    expect(mockPtys[1]!.kill).not.toHaveBeenCalled()
+    expect(mockPtys[1]!.write).toHaveBeenCalledWith('open')
   })
 
   test('continues after PTY resize failures', () => {

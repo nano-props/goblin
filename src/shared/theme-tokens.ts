@@ -1,9 +1,20 @@
 import type { ResolvedTheme } from '#/shared/rpc.ts'
+import type { ColorTheme } from '#/shared/color-theme.ts'
 
 // Main needs a window background before renderer CSS loads. Keep these
-// values in sync with `--gbl-surface-canvas`; when custom themes land,
-// replace this fixed map with the persisted theme canvas token.
-export const WINDOW_BACKGROUND_BY_THEME: Record<ResolvedTheme, string> = {
-  light: '#fbfbfd',
-  dark: '#1c1c1e',
+// values in sync with each theme's `--gbl-surface-canvas` until themes
+// become data-driven and main can read the persisted canvas token.
+export const WINDOW_BACKGROUND_BY_COLOR_THEME: Record<ColorTheme, Record<ResolvedTheme, string>> = {
+  goblin: {
+    light: '#fbfbfd',
+    dark: '#1c1c1e',
+  },
+  shadcn: {
+    light: '#ffffff',
+    dark: '#09090b',
+  },
+  github: {
+    light: '#ffffff',
+    dark: '#0d1117',
+  },
 }

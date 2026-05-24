@@ -9,7 +9,9 @@ import { ShortcutSettings } from '#/renderer/components/settings/ShortcutSetting
 import { useThemeStore } from '#/renderer/stores/theme.ts'
 import { useSettingsStore } from '#/renderer/stores/settings.ts'
 import { useI18nStore, useT } from '#/renderer/stores/i18n.ts'
+import { COLOR_THEMES } from '#/shared/color-theme.ts'
 import type { EditorPref, LangPref, TerminalPref, ThemePref } from '#/shared/rpc.ts'
+import type { ColorTheme } from '#/shared/color-theme.ts'
 import { rpc } from '#/renderer/rpc.ts'
 
 interface Props {
@@ -21,6 +23,8 @@ export function SettingsPanel({ open, onClose }: Props) {
   const t = useT()
   const themePref = useThemeStore((s) => s.pref)
   const setThemePref = useThemeStore((s) => s.setPref)
+  const colorTheme = useThemeStore((s) => s.colorTheme)
+  const setColorTheme = useThemeStore((s) => s.setColorTheme)
   const langPref = useI18nStore((s) => s.pref)
   const setLangPref = useI18nStore((s) => s.setPref)
   const fetchInterval = useSettingsStore((s) => s.fetchIntervalSec)
@@ -35,6 +39,10 @@ export function SettingsPanel({ open, onClose }: Props) {
     { value: 'light', labelKey: 'settings.theme.light', icon: <Sun className="size-4" /> },
     { value: 'dark', labelKey: 'settings.theme.dark', icon: <Moon className="size-4" /> },
   ]
+  const colorThemeOptions: { value: ColorTheme; labelKey: string }[] = COLOR_THEMES.map((value) => ({
+    value,
+    labelKey: `settings.color-theme.${value}`,
+  }))
   const langOptions: { value: LangPref; labelKey: string; emoji: string }[] = [
     { value: 'auto', labelKey: 'settings.lang.auto', emoji: '🌐' },
     { value: 'en', labelKey: 'settings.lang.en', emoji: '🇺🇸' },
@@ -78,6 +86,18 @@ export function SettingsPanel({ open, onClose }: Props) {
         {/* ---- General ---- */}
         <SettingsGroup label={t('settings.group.general')}>
           <SettingsList>
+            <SettingsRow
+              controlId="settings-color-theme"
+              label={t('settings.color-theme')}
+              control={
+                <SettingsSelect
+                  id="settings-color-theme"
+                  value={colorTheme}
+                  options={colorThemeOptions.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
+                  onChange={(v) => save(() => setColorTheme(v), 'color theme')}
+                />
+              }
+            />
             <SettingsRow
               controlId="settings-theme"
               label={t('settings.appearance')}

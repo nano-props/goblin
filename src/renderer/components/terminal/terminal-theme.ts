@@ -49,7 +49,7 @@ export function observeTerminalTheme(onTheme: (theme: ITheme) => void): () => vo
   const observer = new MutationObserver(refresh)
   observer.observe(document.documentElement, {
     attributes: true,
-    attributeFilter: ['data-theme', 'data-theme-id', 'style'],
+    attributeFilter: ['data-theme', 'data-color-theme', 'data-theme-id', 'style'],
   })
   window.addEventListener(TERMINAL_THEME_TOKENS_CHANGED_EVENT, refresh)
   return () => {

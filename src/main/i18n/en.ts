@@ -246,9 +246,6 @@ export const en = {
   // ---- Terminal -----------------------------------------------------------
   'terminal.opening': 'Opening terminal…',
   'terminal.restart': 'Restart terminal',
-  'terminal.restart-shortcut': '↩',
-  'terminal.session-ended': 'Session ended',
-  'terminal.session-ended-code': 'Session ended with code {code}',
   'terminal.search-placeholder': 'Search terminal',
   'terminal.search-no-results': 'No results',
   'terminal.search-previous': 'Previous',
@@ -358,6 +355,10 @@ export const en = {
   // ---- Settings panel -----------------------------------------------------
   'settings.title': 'Settings',
   'settings.appearance': 'Appearance',
+  'settings.color-theme': 'Color theme',
+  'settings.color-theme.goblin': 'Goblin (default)',
+  'settings.color-theme.shadcn': 'shadcn/ui',
+  'settings.color-theme.github': 'GitHub',
   'settings.theme.auto': 'Auto',
   'settings.theme.light': 'Light',
   'settings.theme.dark': 'Dark',

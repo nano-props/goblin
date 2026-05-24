@@ -1,0 +1,72 @@
+/* Theme token contract.
+ *
+ * The app keeps three layers separate:
+ * 1. `--gbl-*` foundations: the small set future custom themes should
+ *    override, similar to Slack theme palettes.
+ * 2. `--color-*` semantic aliases: Tailwind v4 / shadcn utility names
+ *    used by components (`bg-background`, `text-muted-foreground`, …).
+ * 3. integration tokens: CSS hooks for surfaces that are not Tailwind
+ *    utilities, currently Electron startup/window chrome and xterm.
+ */
+
+@theme {
+  /* shadcn/ui core */
+  --color-background: var(--gbl-surface-canvas);
+  --color-foreground: var(--gbl-text-primary);
+  --color-card: var(--gbl-surface-raised);
+  --color-card-foreground: var(--gbl-text-primary);
+  --color-popover: var(--gbl-surface-overlay);
+  --color-popover-foreground: var(--gbl-text-primary);
+  --color-primary: var(--gbl-action-primary);
+  --color-primary-foreground: var(--gbl-action-primary-foreground);
+  --color-secondary: var(--gbl-surface-base);
+  --color-secondary-foreground: var(--gbl-text-secondary-strong);
+  --color-muted: var(--gbl-surface-muted);
+  --color-muted-foreground: var(--gbl-text-secondary);
+  --color-accent: var(--gbl-surface-hover);
+  --color-accent-foreground: var(--gbl-text-primary);
+  --color-separator: var(--gbl-border-subtle);
+  --color-border: var(--gbl-border-default);
+  --color-input: var(--gbl-border-strong);
+  --color-ring: var(--gbl-focus-ring);
+  --color-destructive: var(--gbl-action-danger);
+  --color-destructive-foreground: var(--gbl-action-danger-foreground);
+
+  /* Project semantic extras */
+  --color-brand: var(--gbl-accent);
+  --color-brand-text: var(--gbl-accent-text);
+  --color-brand-rgb: var(--gbl-accent-rgb);
+  --color-selected: var(--gbl-accent-selection);
+  --color-selected-foreground: var(--gbl-text-primary);
+  --color-brand-surface: var(--gbl-accent-surface);
+  --color-brand-border: var(--gbl-accent-border);
+  --color-warning: var(--gbl-status-warning-text);
+  --color-warning-rgb: var(--gbl-status-warning-rgb);
+  --color-warning-surface: var(--gbl-status-warning-surface);
+  --color-warning-border: var(--gbl-status-warning-border);
+  --color-attention: var(--gbl-status-warning-text);
+  --color-attention-rgb: var(--gbl-status-warning-rgb);
+  --color-attention-surface: var(--gbl-status-warning-surface);
+  --color-attention-border: var(--gbl-status-warning-border);
+  --color-success: var(--gbl-status-success-text);
+  --color-success-rgb: var(--gbl-status-success-rgb);
+  --color-success-surface: var(--gbl-status-success-surface);
+  --color-success-border: var(--gbl-status-success-border);
+  --color-danger: var(--gbl-status-danger-text);
+  --color-danger-rgb: var(--gbl-status-danger-rgb);
+  --color-danger-surface: var(--gbl-status-danger-surface);
+  --color-danger-border: var(--gbl-status-danger-border);
+
+  /* Type / shadows / radius — shadcn radius scale, project shadow
+   * and font stacks. */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', 'PingFang SC', 'Noto Sans SC', system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+
+  --shadow-sm: var(--gbl-shadow-sm);
+
+  --radius: 0.5rem;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+}

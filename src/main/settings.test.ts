@@ -73,3 +73,16 @@ test('flushSettings reports earlier failures in a chained flush', async () => {
   expect(saved.theme).toBe('light')
   expect(saved.fetchIntervalSec).toBe(301)
 })
+
+test('persists the selected color theme', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-settings-test-'))
+  vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
+  const settings = await import('#/main/settings.ts')
+
+  await settings.setColorTheme('shadcn')
+  const flushed = await settings.flushSettings()
+  expect(flushed).toBe(true)
+
+  const saved = JSON.parse(readFileSync(path.join(tmp, 'settings.json'), 'utf-8')) as { colorTheme: string }
+  expect(saved.colorTheme).toBe('shadcn')
+})

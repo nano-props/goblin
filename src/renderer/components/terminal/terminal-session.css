@@ -88,7 +88,6 @@
   text-align: center;
 }
 
-.goblin-terminal-slot__ended-overlay,
 .goblin-terminal-slot__status-overlay {
   position: absolute;
   right: 12px;
@@ -103,17 +102,6 @@
   color: var(--color-muted-foreground);
   font-size: 12px;
   box-shadow: var(--shadow-sm);
-}
-
-.goblin-terminal-slot__shortcut {
-  border: 1px solid color-mix(in srgb, var(--color-border) 80%, transparent);
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--color-muted) 70%, transparent);
-  padding: 1px 5px;
-  color: var(--color-muted-foreground);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  line-height: 1.4;
 }
 
 .goblin-terminal-parking {

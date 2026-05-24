@@ -397,6 +397,44 @@ describe('setDetailTab', () => {
 
     expect(useReposStore.getState().repoCache[REPO_ID]?.ui.detailTab).toBe('status')
   })
+
+  test('dismissing the active exited terminal detail falls back to status and collapses the pane', async () => {
+    let refreshedBranches: string[] | undefined
+    rpcHandlers['repo.pullRequests'] = async ({ branches }: { branches: string[] }) => {
+      refreshedBranches = branches
+      return []
+    }
+    seedRepo({ selectedBranch: 'feature/worktree', detailTab: 'terminal' })
+    useReposStore.setState({ detailCollapsed: false })
+
+    useReposStore.getState().dismissExitedTerminalDetail(REPO_ID, '/tmp/feature-worktree')
+
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.detailTab).toBe('status')
+    expect(useReposStore.getState().detailCollapsed).toBe(true)
+    expect(useReposStore.getState().repoCache[REPO_ID]?.ui.detailTab).toBe('status')
+    await flushAsyncWork()
+    expect(refreshedBranches).toEqual(['feature/worktree'])
+  })
+
+  test('dismissing a stale exited terminal session leaves the current detail selection alone', () => {
+    seedRepo({ selectedBranch: 'feature/worktree', detailTab: 'terminal' })
+    useReposStore.setState({ detailCollapsed: false })
+
+    useReposStore.getState().dismissExitedTerminalDetail(REPO_ID, '/tmp/other-worktree')
+
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.detailTab).toBe('terminal')
+    expect(useReposStore.getState().detailCollapsed).toBe(false)
+  })
+
+  test('dismissing terminal detail keeps the pane expanded in left-right layout', () => {
+    seedRepo({ selectedBranch: 'feature/worktree', detailTab: 'terminal' })
+    useReposStore.getState().setWorkspaceLayout('left-right')
+
+    useReposStore.getState().dismissExitedTerminalDetail(REPO_ID, '/tmp/feature-worktree')
+
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.detailTab).toBe('status')
+    expect(useReposStore.getState().detailCollapsed).toBe(false)
+  })
 })
 
 describe('setWorkspaceLayout', () => {

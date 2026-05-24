@@ -63,9 +63,9 @@ export function wireTerminalIpc(): void {
       ? closeOwnedTerminalSession(event.sender.id, input.sessionId)
       : false
   })
-  ipcMain.handle('goblin:terminal-prune-repo', (_event, input: TerminalPruneRepoInput): TerminalMutationResult => {
+  ipcMain.handle('goblin:terminal-prune-repo', (event, input: TerminalPruneRepoInput): TerminalMutationResult => {
     if (!isValidCwd(input?.repoRoot) || !isValidTerminalWorktreePathList(input?.worktreePaths)) return false
-    pruneRepoSessions(input.repoRoot, input.worktreePaths)
+    pruneRepoSessions(event.sender.id, input.repoRoot, input.worktreePaths)
     return true
   })
 
@@ -118,10 +118,10 @@ export function closeWorktreeSession(repoRoot: string, worktreePath: string): vo
   closeTerminalKey(sessionKey(path.resolve(repoRoot), path.resolve(worktreePath)))
 }
 
-export function pruneRepoSessions(repoRoot: string, worktreePaths: string[]): void {
+export function pruneRepoSessions(ownerWebContentsId: number, repoRoot: string, worktreePaths: string[]): void {
   const root = path.resolve(repoRoot)
   const liveKeys = new Set(worktreePaths.filter(isValidAbsolutePath).map((p) => sessionKey(root, path.resolve(p))))
-  pruneTerminalScope(root, liveKeys)
+  pruneTerminalScope(ownerWebContentsId, root, liveKeys)
 }
 
 function isValidTerminalSize(cols: unknown, rows: unknown): boolean {

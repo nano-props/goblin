@@ -244,9 +244,6 @@ export const ja: Record<DictKey, string> = {
   // ---- Terminal ----------------------------------------------------------
   'terminal.opening': 'ターミナルを開いています…',
   'terminal.restart': 'ターミナルを再起動',
-  'terminal.restart-shortcut': '↩',
-  'terminal.session-ended': 'セッションが終了しました',
-  'terminal.session-ended-code': 'セッションはコード {code} で終了しました',
   'terminal.search-placeholder': 'ターミナルを検索',
   'terminal.search-no-results': '結果なし',
   'terminal.search-previous': '前へ',
@@ -358,6 +355,10 @@ export const ja: Record<DictKey, string> = {
   // ---- Settings panel ----------------------------------------------------
   'settings.title': '設定',
   'settings.appearance': '外観',
+  'settings.color-theme': 'カラーテーマ',
+  'settings.color-theme.goblin': 'Goblin（デフォルト）',
+  'settings.color-theme.shadcn': 'shadcn/ui',
+  'settings.color-theme.github': 'GitHub',
   'settings.theme.auto': '自動',
   'settings.theme.light': 'ライト',
   'settings.theme.dark': 'ダーク',

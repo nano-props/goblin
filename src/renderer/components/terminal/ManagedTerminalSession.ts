@@ -54,7 +54,6 @@ export class ManagedTerminalSession {
   private host: HTMLElement | null = null
   private phase: TerminalPhase = 'opening'
   private message: string | null = null
-  private exitCode: number | undefined
   private suppressData = false
   private replayBoundarySeq: number | null = null
   private replayPendingOutput: TerminalOutputEvent[] = []
@@ -63,7 +62,9 @@ export class ManagedTerminalSession {
   private replacingPtySessionId: string | null = null
   private fitFlushTimer: number | null = null
   private resizeFlushTimer: number | null = null
+  private outputFlushFrame: number | null = null
   private pendingResize: { cols: number; rows: number } | null = null
+  private pendingOutput: string[] = []
   private disposeThemeObserver: (() => void) | null = null
   private disposed = false
   private lastWidth = DEFAULT_PARKING_WIDTH
@@ -122,7 +123,7 @@ export class ManagedTerminalSession {
     if (oldPtySessionId) this.replacingPtySessionId = oldPtySessionId
     this.restartOnStart = true
     this.destroyActiveView()
-    this.setSnapshot('opening', null, undefined)
+    this.setSnapshot('opening', null)
     this.start()
   }
 
@@ -141,7 +142,7 @@ export class ManagedTerminalSession {
   }
 
   snapshot(): TerminalSnapshot {
-    const snapshot: TerminalSnapshot = { phase: this.phase, message: this.message, exitCode: this.exitCode }
+    const snapshot: TerminalSnapshot = { phase: this.phase, message: this.message }
     if (this.searchResult) snapshot.search = this.searchResult
     return snapshot
   }
@@ -151,7 +152,7 @@ export class ManagedTerminalSession {
   }
 
   writeInput(data: string): void {
-    if (this.suppressData || this.phase === 'ended' || !this.ptySessionId) return
+    if (this.suppressData || !this.ptySessionId) return
     void terminalBridge.write({ sessionId: this.ptySessionId, data }).catch(() => {})
   }
 
@@ -178,20 +179,22 @@ export class ManagedTerminalSession {
       this.replayPendingOutput.push(event)
       return
     }
-    this.term?.write(event.data)
+    this.queueOutput(event.data)
   }
 
-  handleExit(event: TerminalExitEvent): void {
-    if (event.sessionId !== this.ptySessionId) return
-    this.setSnapshot('ended', null, event.exitCode)
+  handleExit(event: TerminalExitEvent): boolean {
+    if (event.sessionId !== this.ptySessionId) return false
+    this.flushOutput()
+    this.ptySessionId = null
     this.clearTerminalFocusIfOwned()
     this.blurIfFocused()
+    return true
   }
 
   private start(): void {
     if (this.disposed || this.term || !this.frame.isConnected) return
     const token = (this.startToken += 1)
-    this.setSnapshot('opening', null, undefined)
+    this.setSnapshot('opening', null)
     void this.startAsync(token)
   }
 
@@ -224,7 +227,7 @@ export class ManagedTerminalSession {
       if (!result.ok) {
         this.closeReplacingPtySession()
         this.destroyActiveView()
-        this.setSnapshot('error', result.message, undefined)
+        this.setSnapshot('error', result.message)
         return
       }
       this.replacingPtySessionId = null
@@ -233,13 +236,13 @@ export class ManagedTerminalSession {
       this.lastPtyRows = term.rows
       await this.replayActiveView(token, term, result.replay, result.replaySeq)
       if (!this.currentStart(token, term)) return
-      this.setSnapshot(result.ended ? 'ended' : 'open', null, result.exitCode)
-      if (!result.ended && this.host) term.focus()
+      this.setSnapshot('open', null)
+      if (this.host) term.focus()
     } catch (err) {
       this.closeReplacingPtySession()
       if (!this.currentToken(token)) return
       this.destroyActiveView()
-      this.setSnapshot('error', err instanceof Error ? err.message : String(err), undefined)
+      this.setSnapshot('error', err instanceof Error ? err.message : String(err))
     }
   }
 
@@ -275,13 +278,13 @@ export class ManagedTerminalSession {
         const pendingOutput = this.replayPendingOutput.splice(0)
         this.replayBoundarySeq = null
         this.suppressData = false
-        for (const event of outputAfterReplay(pendingOutput, replaySeq)) term.write(event.data)
+        for (const event of outputAfterReplay(pendingOutput, replaySeq)) this.queueOutput(event.data)
       }
     }
   }
 
   private queueResize(cols: number, rows: number): void {
-    if (!this.ptySessionId || this.phase === 'ended') return
+    if (!this.ptySessionId) return
     if (this.lastPtyCols === cols && this.lastPtyRows === rows && !this.pendingResize) return
     this.pendingResize = { cols, rows }
     this.cancelResizeFlush()
@@ -309,11 +312,37 @@ export class ManagedTerminalSession {
     this.resizeFlushTimer = null
   }
 
+  private queueOutput(data: string): void {
+    if (!this.term) return
+    this.pendingOutput.push(data)
+    if (this.outputFlushFrame !== null) return
+    this.outputFlushFrame = requestAnimationFrame(() => {
+      this.outputFlushFrame = null
+      this.flushOutput()
+    })
+  }
+
+  private flushOutput(): void {
+    if (this.outputFlushFrame !== null) {
+      cancelScheduledAnimationFrame(this.outputFlushFrame)
+      this.outputFlushFrame = null
+    }
+    if (!this.pendingOutput.length) return
+    const output = this.pendingOutput.join('')
+    this.pendingOutput = []
+    this.term?.write(output)
+  }
+
   private destroyActiveView(): void {
     this.disconnectResizeObserver()
     this.cancelFitFlush()
     this.cancelResizeFlush()
+    if (this.outputFlushFrame !== null) {
+      cancelScheduledAnimationFrame(this.outputFlushFrame)
+      this.outputFlushFrame = null
+    }
     this.pendingResize = null
+    this.pendingOutput = []
     this.startToken += 1
     this.suppressData = false
     this.replayBoundarySeq = null
@@ -344,7 +373,7 @@ export class ManagedTerminalSession {
     const term = new Terminal({
       cols: DEFAULT_TERMINAL_COLS,
       rows: DEFAULT_TERMINAL_ROWS,
-      cursorBlink: this.phase !== 'ended',
+      cursorBlink: true,
       fontFamily: "'JetBrains Mono', var(--font-mono)",
       fontSize: 14,
       lineHeight: 1.35,
@@ -484,11 +513,9 @@ export class ManagedTerminalSession {
     this.fitAddon.fit()
   }
 
-  private setSnapshot(phase: TerminalPhase, message: string | null, exitCode: number | undefined): void {
+  private setSnapshot(phase: TerminalPhase, message: string | null): void {
     this.phase = phase
     this.message = message
-    this.exitCode = exitCode
-    if (this.term) this.term.options.cursorBlink = phase !== 'ended'
     this.notify()
   }
 
@@ -548,6 +575,11 @@ function waitForTerminalResponseFlush(): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve())), 0)
   })
+}
+
+function cancelScheduledAnimationFrame(frame: number): void {
+  if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame)
+  else clearTimeout(frame)
 }
 
 function isHttpExternalUrl(value: string): boolean {

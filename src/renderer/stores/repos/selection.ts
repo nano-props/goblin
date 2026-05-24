@@ -189,6 +189,34 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
       }
     },
 
+    dismissExitedTerminalDetail(id: string, worktreePath: string) {
+      let changed = false
+      let token: number | undefined
+      set((s) => {
+        const repo = s.repos[id]
+        if (!repo || repo.ui.detailTab !== 'terminal') return s
+        const branch = repo.data.branches.find((branch) => branch.name === repo.ui.selectedBranch)
+        if (branch?.worktreePath !== worktreePath) return s
+        changed = true
+        token = repo.instanceToken
+        return {
+          detailCollapsed: s.activeId === id ? effectiveDetailCollapsed(s.workspaceLayout, true) : s.detailCollapsed,
+          repos: {
+            ...s.repos,
+            [id]: replaceRepo(repo, (r) => {
+              r.ui.detailTab = 'status'
+              r.ui.commitDetail = { phase: 'idle' }
+            }),
+          },
+        }
+      })
+      const repo = get().repos[id]
+      if (changed && token !== undefined) persistRepoCache(set, repo, token)
+      if (changed && token !== undefined && repo?.ui.selectedBranch) {
+        void get().refreshPullRequests(id, [repo.ui.selectedBranch], { token, mode: 'full' })
+      }
+    },
+
     selectBranch(id: string, branch: string) {
       let changed = false
       let token: number | undefined

@@ -9,7 +9,9 @@ import type {
   WorktreeStatus,
 } from '#/shared/git-types.ts'
 import { WORKSPACE_LAYOUTS } from '#/shared/workspace-layout.ts'
+import { COLOR_THEMES } from '#/shared/color-theme.ts'
 import type { WorkspaceDetailPaneSizes, WorkspaceLayout } from '#/shared/workspace-layout.ts'
+import type { ColorTheme } from '#/shared/color-theme.ts'
 
 export type { WorkspaceLayout } from '#/shared/workspace-layout.ts'
 
@@ -25,6 +27,7 @@ export type NetworkOpKind = 'user' | 'background'
 export interface ThemeState {
   pref: ThemePref
   resolved: ResolvedTheme
+  colorTheme: ColorTheme
 }
 
 export interface SessionState {
@@ -39,6 +42,7 @@ export interface SessionState {
 
 export interface SettingsSnapshot {
   theme: ThemePref
+  colorTheme: ColorTheme
   fetchIntervalSec: number
   shortcutsDisabled: boolean
   globalShortcut: string
@@ -216,6 +220,7 @@ export interface AppRpcHandlers {
   theme: {
     get: () => ThemeState
     setPref: (input: { pref: ThemePref }) => Promise<ThemeState>
+    setColorTheme: (input: { colorTheme: ColorTheme }) => Promise<ThemeState>
   }
   settings: {
     get: () => Promise<SettingsSnapshot>
@@ -333,6 +338,9 @@ export function createAppRouter(handlers: AppRpcHandlers) {
       setPref: p
         .input(v.object({ pref: v.picklist(['auto', 'light', 'dark']) }))
         .mutation(({ input }) => handlers.theme.setPref(input)),
+      setColorTheme: p
+        .input(v.object({ colorTheme: v.picklist(COLOR_THEMES) }))
+        .mutation(({ input }) => handlers.theme.setColorTheme(input)),
     }),
     settings: t.router({
       get: p.input(EmptyInput).query(() => handlers.settings.get()),

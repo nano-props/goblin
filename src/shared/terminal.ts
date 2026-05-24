@@ -14,9 +14,6 @@ export type TerminalOpenResult =
       sessionId: string
       replay: string
       replaySeq: number
-      ended: boolean
-      exitCode?: number
-      signal?: number
     }
   | { ok: false; message: string }
 
@@ -50,6 +47,4 @@ export interface TerminalOutputEvent {
 
 export interface TerminalExitEvent {
   sessionId: string
-  exitCode: number
-  signal?: number
 }

@@ -47,7 +47,7 @@ import { isReservedGlobalShortcut, parseGlobalShortcut } from '#/shared/accelera
 import { checkGitAvailable } from '#/main/git/helper.ts'
 import { isValidAbsolutePath, isValidBranch, isValidCwd, isValidOptionalBranch } from '#/main/ipc/validation.ts'
 import { getMainWindow } from '#/main/window.ts'
-import { getTheme, setThemePref, subscribeTheme } from '#/main/theme.ts'
+import { getTheme, setColorTheme, setThemePref, subscribeTheme } from '#/main/theme.ts'
 import {
   addRecentRepo,
   clearRecentRepos,
@@ -76,6 +76,7 @@ import { getResolvedEditorApp, openInPreferredEditor } from '#/main/system/edito
 import { broadcastRpcEvent } from '#/main/events.ts'
 import { closeWorktreeSession } from '#/main/terminal.ts'
 import { openHttpExternal, openHttpsExternal } from '#/main/external-url.ts'
+import { WINDOW_BACKGROUND_BY_COLOR_THEME } from '#/shared/theme-tokens.ts'
 
 const PROJECT_GITHUB_URL = 'https://github.com/nano-props/goblin'
 const PATCH_TIMEOUT_MS = 90_000
@@ -130,6 +131,9 @@ export function wireRpcIpc(): void {
   })
 
   subscribeTheme((state) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.setBackgroundColor(WINDOW_BACKGROUND_BY_COLOR_THEME[state.colorTheme][state.resolved])
+    }
     buildAppMenu()
     broadcastRpcEvent({ type: 'theme-changed', state })
   })
@@ -351,12 +355,14 @@ function createRpcHandlers(): AppRpcHandlers {
         if (pref !== 'auto' && pref !== 'light' && pref !== 'dark') return getTheme()
         return setThemePref(pref)
       },
+      setColorTheme: async ({ colorTheme }) => setColorTheme(colorTheme),
     },
     settings: {
       get: async () => {
         const s = await loadSettings()
         return {
           theme: s.theme,
+          colorTheme: s.colorTheme,
           fetchIntervalSec: s.fetchIntervalSec,
           shortcutsDisabled: s.shortcutsDisabled,
           globalShortcut: s.globalShortcut,

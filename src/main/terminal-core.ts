@@ -4,6 +4,11 @@ import path from 'node:path'
 import * as pty from 'node-pty'
 import type { TerminalExitEvent, TerminalOpenResult, TerminalOutputEvent } from '#/shared/terminal.ts'
 
+// Replay is intentionally capped per live session, not globally. Sessions are
+// owner/worktree scoped, pruned when worktrees disappear, closed with their
+// renderer owner, and removed on PTY exit; adding a global budget would need a
+// user-visible eviction policy for active terminals. If background/persistent
+// terminals are added later, revisit this with an explicit LRU/TTL design.
 const MAX_SESSION_BUFFER_CHARS = 16 * 1024 * 1024
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 const SESSION_ID_RE = /^[A-Za-z0-9_-]{16,64}$/
@@ -22,11 +27,6 @@ export interface TerminalOpenSessionInput {
   forceNew?: boolean
 }
 
-export interface TerminalSessionScope {
-  scope: string
-  key: string
-}
-
 interface TerminalSession {
   id: string
   ownerWebContentsId: number
@@ -39,9 +39,6 @@ interface TerminalSession {
   disposables: Array<{ dispose: () => void }>
   buffer: string
   sequence: number
-  ended: boolean
-  exitCode?: number
-  signal?: number
 }
 
 const sessionsById = new Map<string, TerminalSession>()
@@ -66,9 +63,6 @@ export function openTerminalSession(input: TerminalOpenSessionInput): TerminalOp
       sessionId: existing.id,
       replay: existing.buffer,
       replaySeq: existing.sequence,
-      ended: existing.ended,
-      exitCode: existing.exitCode,
-      signal: existing.signal,
     }
   }
 
@@ -85,7 +79,6 @@ export function openTerminalSession(input: TerminalOpenSessionInput): TerminalOp
     disposables: [],
     buffer: '',
     sequence: 0,
-    ended: false,
   }
   sessionsById.set(id, session)
   sessionIdByOwnerKey.set(ownerKey, id)
@@ -113,17 +106,18 @@ export function openTerminalSession(input: TerminalOpenSessionInput): TerminalOp
     }),
   )
   session.disposables.push(
-    session.pty.onExit(({ exitCode, signal }) => {
-      session.ended = true
-      session.exitCode = exitCode
-      session.signal = signal
+    session.pty.onExit(() => {
       session.pty = null
       disposeSessionListeners(session)
-      broadcastTerminalExit({ sessionId: session.id, exitCode, signal })
+      // Exit IPC is a renderer UI hint for dismissing the terminal pane; main
+      // still tears down the session immediately, so missed delivery only leaves
+      // stale renderer chrome while subsequent writes/resizes no-op.
+      broadcastTerminalExit({ sessionId: session.id })
+      closeTerminalSession(session.id)
     }),
   )
 
-  return { ok: true, sessionId: id, replay: session.buffer, replaySeq: session.sequence, ended: false }
+  return { ok: true, sessionId: id, replay: session.buffer, replaySeq: session.sequence }
 }
 
 export function writeTerminalSession(ownerWebContentsId: number, sessionId: string, data: string): boolean {
@@ -175,12 +169,6 @@ export function closeTerminalSession(sessionId: string): void {
   session.pty = null
 }
 
-export function closeTerminalScope(scope: string): void {
-  for (const session of Array.from(sessionsById.values())) {
-    if (session.scope === scope) closeTerminalSession(session.id)
-  }
-}
-
 export function closeTerminalKey(key: string): void {
   for (const session of Array.from(sessionsById.values())) {
     if (session.key === key) closeTerminalSession(session.id)
@@ -198,9 +186,11 @@ function closeTerminalOwnerKey(ownerWebContentsId: number, key: string): void {
   if (id) closeTerminalSession(id)
 }
 
-export function pruneTerminalScope(scope: string, liveKeys: Set<string>): void {
+export function pruneTerminalScope(ownerWebContentsId: number, scope: string, liveKeys: Set<string>): void {
   for (const session of Array.from(sessionsById.values())) {
-    if (session.scope === scope && !liveKeys.has(session.key)) closeTerminalSession(session.id)
+    if (session.ownerWebContentsId === ownerWebContentsId && session.scope === scope && !liveKeys.has(session.key)) {
+      closeTerminalSession(session.id)
+    }
   }
 }
 
@@ -251,7 +241,7 @@ function disposeSessionListeners(session: TerminalSession): void {
 }
 
 function resizeSessionPty(session: TerminalSession, cols: number, rows: number): boolean {
-  if (session.ended || !session.pty) return false
+  if (!session.pty) return false
   if (session.cols === cols && session.rows === rows) return true
   session.cols = cols
   session.rows = rows

@@ -23,7 +23,9 @@ import {
   type WorkspaceDetailPaneSizes,
   type WorkspaceLayout,
 } from '#/shared/workspace-layout.ts'
+import { DEFAULT_COLOR_THEME, isColorTheme } from '#/shared/color-theme.ts'
 import type { EditorPref, LangPref, SessionState, TerminalPref, ThemePref } from '#/shared/rpc.ts'
+import type { ColorTheme } from '#/shared/color-theme.ts'
 
 export interface WindowBounds {
   x?: number
@@ -45,6 +47,7 @@ export interface Settings {
    *  v0 and quietly upgraded to the current version on next write. */
   version: number
   theme: ThemePref
+  colorTheme: ColorTheme
   lang: LangPref
   /** Auto-fetch interval in seconds for the active repo. 0 = disabled. */
   fetchIntervalSec: number
@@ -60,6 +63,7 @@ export interface Settings {
 const DEFAULTS: Settings = {
   version: SETTINGS_SCHEMA_VERSION,
   theme: 'auto',
+  colorTheme: DEFAULT_COLOR_THEME,
   lang: 'auto',
   fetchIntervalSec: 60,
   shortcutsDisabled: false,
@@ -144,6 +148,10 @@ function normalizeThemePref(value: unknown): ThemePref {
   return value === 'auto' || value === 'light' || value === 'dark' ? value : DEFAULTS.theme
 }
 
+function normalizeColorTheme(value: unknown): ColorTheme {
+  return isColorTheme(value) ? value : DEFAULTS.colorTheme
+}
+
 function normalizeLangPref(value: unknown): LangPref {
   return value === 'auto' || value === 'en' || value === 'zh' || value === 'ko' || value === 'ja'
     ? value
@@ -196,6 +204,7 @@ export async function loadSettings(): Promise<Settings> {
     cache = {
       version: SETTINGS_SCHEMA_VERSION,
       theme: normalizeThemePref(parsed.theme),
+      colorTheme: normalizeColorTheme(parsed.colorTheme),
       lang: normalizeLangPref(parsed.lang),
       fetchIntervalSec: normalizeFetchInterval(parsed.fetchIntervalSec),
       shortcutsDisabled: parsed.shortcutsDisabled === true,
@@ -316,6 +325,15 @@ export async function setThemePref(pref: ThemePref): Promise<void> {
   if (s.theme === pref) return
   s.theme = pref
   scheduleWrite()
+}
+
+export async function setColorTheme(colorTheme: ColorTheme): Promise<ColorTheme> {
+  const s = await loadSettings()
+  const normalized = normalizeColorTheme(colorTheme)
+  if (s.colorTheme === normalized) return normalized
+  s.colorTheme = normalized
+  scheduleWrite()
+  return normalized
 }
 
 export async function setLangPref(pref: LangPref): Promise<void> {

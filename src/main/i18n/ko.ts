@@ -237,9 +237,6 @@ export const ko: Record<DictKey, string> = {
   // ---- Terminal ----------------------------------------------------------
   'terminal.opening': '터미널 여는 중…',
   'terminal.restart': '터미널 다시 시작',
-  'terminal.restart-shortcut': '↩',
-  'terminal.session-ended': '세션이 종료됨',
-  'terminal.session-ended-code': '세션이 코드 {code}로 종료됨',
   'terminal.search-placeholder': '터미널 검색',
   'terminal.search-no-results': '결과 없음',
   'terminal.search-previous': '이전',
@@ -351,6 +348,10 @@ export const ko: Record<DictKey, string> = {
   // ---- Settings panel ----------------------------------------------------
   'settings.title': '설정',
   'settings.appearance': '외관',
+  'settings.color-theme': '색상 테마',
+  'settings.color-theme.goblin': 'Goblin (기본)',
+  'settings.color-theme.shadcn': 'shadcn/ui',
+  'settings.color-theme.github': 'GitHub',
   'settings.theme.auto': '자동',
   'settings.theme.light': '라이트',
   'settings.theme.dark': '다크',

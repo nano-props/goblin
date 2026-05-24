@@ -24,13 +24,21 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       for (const session of sessionsRef.current.values()) session.handleOutput(event)
     })
     const offExit = terminalBridge.onExit((event) => {
-      for (const session of sessionsRef.current.values()) session.handleExit(event)
+      for (const [key, session] of Array.from(sessionsRef.current.entries())) {
+        if (!session.handleExit(event)) continue
+        const { repoRoot, worktreePath } = session.descriptor
+        sessionsRef.current.delete(key)
+        session.dispose()
+        useReposStore.getState().dismissExitedTerminalDetail(repoRoot, worktreePath)
+        notify()
+        break
+      }
     })
     return () => {
       offOutput()
       offExit()
     }
-  }, [])
+  }, [notify])
 
   useEffect(() => {
     const sessions = sessionsRef.current

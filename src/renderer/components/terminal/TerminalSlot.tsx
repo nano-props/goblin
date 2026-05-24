@@ -23,7 +23,6 @@ interface TerminalSlotProps {
 
 export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotProps) {
   const t = useT()
-  const slotRef = useRef<HTMLDivElement | null>(null)
   const hostRef = useRef<HTMLDivElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -55,10 +54,6 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
   }, [attach, descriptor, detach, key])
 
   useEffect(() => {
-    if (snapshot.phase === 'ended') slotRef.current?.focus({ preventScroll: true })
-  }, [snapshot.phase])
-
-  useEffect(() => {
     if (searchOpen) searchInputRef.current?.focus({ preventScroll: true })
   }, [searchOpen])
 
@@ -82,16 +77,16 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
   }, [findPrevious, key, searchTerm])
   const handleFocus = useCallback(
     (event: FocusEvent<HTMLDivElement>) => {
-      setTerminalFocused(snapshot.phase !== 'ended' && isTerminalFocusTarget(key, event.target))
+      setTerminalFocused(isTerminalFocusTarget(key, event.target))
     },
-    [isTerminalFocusTarget, key, snapshot.phase],
+    [isTerminalFocusTarget, key],
   )
   const handleBlur = useCallback((event: FocusEvent<HTMLDivElement>) => {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setTerminalFocused(false)
   }, [])
   const handleKeyDownCapture = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
-      if (snapshot.phase !== 'ended' && isTerminalSearchShortcut(event)) {
+      if (isTerminalSearchShortcut(event)) {
         event.preventDefault()
         event.stopPropagation()
         setSearchOpen(true)
@@ -103,14 +98,8 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
         closeSearch()
         return
       }
-      if (snapshot.phase === 'ended') {
-        if (event.key !== 'Enter') return
-        event.preventDefault()
-        event.stopPropagation()
-        restart()
-      }
     },
-    [closeSearch, restart, searchOpen, snapshot.phase],
+    [closeSearch, searchOpen],
   )
   const handleSearchChange = useCallback(
     (value: string) => {
@@ -140,9 +129,8 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
 
   return (
     <div
-      ref={slotRef}
       className="goblin-terminal-slot"
-      tabIndex={snapshot.phase === 'ended' ? 0 : -1}
+      tabIndex={-1}
       onFocusCapture={handleFocus}
       onBlurCapture={handleBlur}
       onKeyDownCapture={handleKeyDownCapture}
@@ -167,25 +155,6 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
           </Button>
           <Button type="button" size="sm" variant="ghost" onClick={closeSearch}>
             {t('terminal.search-close')}
-          </Button>
-        </div>
-      )}
-      {snapshot.phase === 'ended' && (
-        <div className="goblin-terminal-slot__ended-overlay">
-          <span>
-            {typeof snapshot.exitCode === 'number'
-              ? t('terminal.session-ended-code', { code: String(snapshot.exitCode) })
-              : t('terminal.session-ended')}
-          </span>
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            title={`${t('terminal.restart')} (${t('terminal.restart-shortcut')})`}
-            onClick={restart}
-          >
-            <span>{t('terminal.restart')}</span>
-            <kbd className="goblin-terminal-slot__shortcut">{t('terminal.restart-shortcut')}</kbd>
           </Button>
         </div>
       )}

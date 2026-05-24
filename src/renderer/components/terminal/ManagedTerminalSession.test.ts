@@ -427,7 +427,7 @@ describe('ManagedTerminalSession', () => {
     session.attach(host)
     await flushTerminalStart()
 
-    expect(session.snapshot()).toEqual({ phase: 'error', message: 'error.spawn-failed', exitCode: undefined })
+    expect(session.snapshot()).toEqual({ phase: 'error', message: 'error.spawn-failed' })
   })
 
   test('continues after terminal write failures', async () => {
@@ -460,6 +460,43 @@ describe('ManagedTerminalSession', () => {
 
     expect(terminalCalls.resize).toHaveBeenCalledWith({ sessionId: 'session-1', cols: 101, rows: 31 })
     expect(session.snapshot().phase).toBe('open')
+  })
+
+  test('batches terminal output writes on animation frames', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    session.handleOutput({ sessionId: 'other-session', data: 'ignored', seq: 1 })
+    session.handleOutput({ sessionId: 'session-1', data: 'first', seq: 1 })
+    session.handleOutput({ sessionId: 'session-1', data: 'second', seq: 2 })
+
+    expect(xtermMocks.terminals[0]!.write).not.toHaveBeenCalled()
+    await flushTerminalStart()
+
+    expect(xtermMocks.terminals[0]!.write).toHaveBeenCalledTimes(1)
+    expect(xtermMocks.terminals[0]!.write).toHaveBeenCalledWith('firstsecond')
+  })
+
+  test('flushes matching terminal exits before the provider dismisses the session', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    session.handleOutput({ sessionId: 'session-1', data: 'before exit', seq: 1 })
+    expect(session.handleExit({ sessionId: 'other-session' })).toBe(false)
+    expect(session.handleExit({ sessionId: 'session-1' })).toBe(true)
+    session.dispose()
+
+    expect(xtermMocks.terminals[0]!.write).toHaveBeenCalledWith('before exit')
+    expect(session.snapshot()).toEqual({ phase: 'open', message: null })
+    expect(terminalCalls.close).not.toHaveBeenCalled()
   })
 
   test('closes pending replacement session when disposed before restart reaches main', async () => {
@@ -556,7 +593,7 @@ describe('ManagedTerminalSession', () => {
 })
 
 function openResult(sessionId: string): TerminalOpenResult {
-  return { ok: true, sessionId, replay: '', replaySeq: 0, ended: false }
+  return { ok: true, sessionId, replay: '', replaySeq: 0 }
 }
 
 function deferred<T>() {

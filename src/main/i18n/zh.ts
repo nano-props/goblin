@@ -234,9 +234,6 @@ export const zh: Record<DictKey, string> = {
   // ---- Terminal ----------------------------------------------------------
   'terminal.opening': '正在打开终端…',
   'terminal.restart': '重启终端',
-  'terminal.restart-shortcut': '↩',
-  'terminal.session-ended': '会话已结束',
-  'terminal.session-ended-code': '会话已结束，退出码 {code}',
   'terminal.search-placeholder': '搜索终端',
   'terminal.search-no-results': '无结果',
   'terminal.search-previous': '上一个',
@@ -346,6 +343,10 @@ export const zh: Record<DictKey, string> = {
   // ---- Settings panel ----------------------------------------------------
   'settings.title': '设置',
   'settings.appearance': '外观',
+  'settings.color-theme': '颜色主题',
+  'settings.color-theme.goblin': 'Goblin（默认）',
+  'settings.color-theme.shadcn': 'shadcn/ui',
+  'settings.color-theme.github': 'GitHub',
   'settings.theme.auto': '跟随系统',
   'settings.theme.light': '浅色',
   'settings.theme.dark': '深色',

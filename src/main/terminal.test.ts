@@ -26,7 +26,6 @@ vi.mock('#/main/terminal-core.ts', () => ({
   closeOwnedTerminalSession: vi.fn(),
   closeTerminalKey: vi.fn(),
   closeTerminalOwner: vi.fn(),
-  closeTerminalScope: vi.fn(),
   closeTerminalSession: vi.fn(),
   isValidTerminalSessionId: (value: unknown) => typeof value === 'string' && value.startsWith('term_'),
   isValidTerminalWriteData: (value: unknown) => typeof value === 'string',
@@ -35,7 +34,6 @@ vi.mock('#/main/terminal-core.ts', () => ({
     sessionId: 'term_123456789012',
     replay: '',
     replaySeq: 0,
-    ended: false,
   })),
   pruneTerminalScope: vi.fn(),
   resizeTerminalSession: vi.fn(() => true),
@@ -74,7 +72,7 @@ describe('terminal IPC', () => {
       rows: 24,
     })
 
-    expect(result).toEqual({ ok: true, sessionId: 'term_123456789012', replay: '', replaySeq: 0, ended: false })
+    expect(result).toEqual({ ok: true, sessionId: 'term_123456789012', replay: '', replaySeq: 0 })
     expect(openTerminalSession).toHaveBeenCalledWith({
       ownerWebContentsId: 1,
       scope: '/repo',
@@ -191,10 +189,10 @@ describe('terminal session cleanup helpers', () => {
     const core = await import('#/main/terminal-core.ts')
 
     closeWorktreeSession('/repo/../repo', '/repo-linked/../repo-linked')
-    pruneRepoSessions('/repo/../repo', ['/repo-linked/../repo-linked'])
+    pruneRepoSessions(7, '/repo/../repo', ['/repo-linked/../repo-linked'])
 
     expect(core.closeTerminalKey).toHaveBeenCalledWith('/repo\0/repo-linked')
-    expect(core.pruneTerminalScope).toHaveBeenCalledWith('/repo', new Set(['/repo\0/repo-linked']))
+    expect(core.pruneTerminalScope).toHaveBeenCalledWith(7, '/repo', new Set(['/repo\0/repo-linked']))
   })
 })
 

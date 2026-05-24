@@ -4,7 +4,7 @@
  * slide-in-from-*, animate-out + their -out variants) that shadcn
  * components reference for Radix open/close transitions. */
 @import 'tw-animate-css';
-@import './theme/tokens.css';
+@import './theme/theme.css';
 
 @custom-variant dark (&:where(html[data-theme='dark'] *));
 

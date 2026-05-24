@@ -1,17 +1,20 @@
 // Single source of truth for the user's theme. Mirrors deck-app's design:
 // pref ('auto' | 'light' | 'dark') persists; resolved ('light' | 'dark')
 // is computed against `nativeTheme.shouldUseDarkColors` when pref === 'auto'.
-// Renderers pull `{ pref, resolved }` at boot and subscribe to changes —
+// Renderers pull `{ pref, resolved, colorTheme }` at boot and subscribe to changes —
 // they never read prefers-color-scheme themselves.
 
 import { nativeTheme } from 'electron'
-import { loadSettings, setThemePref as persistThemePref } from '#/main/settings.ts'
+import { loadSettings, setColorTheme as persistColorTheme, setThemePref as persistThemePref } from '#/main/settings.ts'
+import { DEFAULT_COLOR_THEME, isColorTheme } from '#/shared/color-theme.ts'
 import type { ResolvedTheme, ThemePref, ThemeState } from '#/shared/rpc.ts'
+import type { ColorTheme } from '#/shared/color-theme.ts'
 
 type Listener = (state: ThemeState) => void
 
 let currentPref: ThemePref = 'auto'
 let currentResolved: ResolvedTheme = 'light'
+let currentColorTheme: ColorTheme = DEFAULT_COLOR_THEME
 const listeners = new Set<Listener>()
 let inited = false
 let transitionDepth = 0
@@ -27,7 +30,7 @@ function applyToNativeTheme(pref: ThemePref): void {
 }
 
 function emit(): void {
-  const state: ThemeState = { pref: currentPref, resolved: currentResolved }
+  const state: ThemeState = { pref: currentPref, resolved: currentResolved, colorTheme: currentColorTheme }
   for (const l of listeners) {
     try {
       l(state)
@@ -42,6 +45,7 @@ export async function initTheme(): Promise<void> {
   inited = true
   const settings = await loadSettings()
   currentPref = settings.theme
+  currentColorTheme = settings.colorTheme
   applyToNativeTheme(currentPref)
   currentResolved = resolveTheme(currentPref)
 
@@ -58,11 +62,11 @@ export async function initTheme(): Promise<void> {
 }
 
 export function getTheme(): ThemeState {
-  return { pref: currentPref, resolved: currentResolved }
+  return { pref: currentPref, resolved: currentResolved, colorTheme: currentColorTheme }
 }
 
 export async function setThemePref(pref: ThemePref): Promise<ThemeState> {
-  if (pref === currentPref) return { pref: currentPref, resolved: currentResolved }
+  if (pref === currentPref) return getTheme()
   transitionDepth++
   try {
     await persistThemePref(pref)
@@ -70,10 +74,18 @@ export async function setThemePref(pref: ThemePref): Promise<ThemeState> {
     applyToNativeTheme(pref)
     currentResolved = resolveTheme(pref)
     emit()
-    return { pref: currentPref, resolved: currentResolved }
+    return getTheme()
   } finally {
     transitionDepth--
   }
+}
+
+export async function setColorTheme(colorTheme: ColorTheme): Promise<ThemeState> {
+  if (!isColorTheme(colorTheme)) return getTheme()
+  if (colorTheme === currentColorTheme) return getTheme()
+  currentColorTheme = await persistColorTheme(colorTheme)
+  emit()
+  return getTheme()
 }
 
 export function subscribeTheme(listener: Listener): () => void {

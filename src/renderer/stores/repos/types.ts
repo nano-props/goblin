@@ -121,6 +121,7 @@ export interface ReposStore {
    *  `from > to`). No-op if either id is unknown or they're identical. */
   reorderRepos: (fromId: string, toId: string) => void
   setDetailTab: (id: string, tab: DetailTab) => void
+  dismissExitedTerminalDetail: (id: string, worktreePath: string) => void
   setDetailCollapsed: (collapsed: boolean) => void
   toggleDetailCollapsed: () => void
   setWorkspaceLayout: (layout: RepoWorkspaceLayout) => void
