@@ -46,7 +46,7 @@ function ShortcutSection({ section }: { section: HelpShortcutSection }) {
   return (
     <section className="space-y-1.5">
       <div className="px-3 text-[11px] font-medium text-muted-foreground">{t(section.titleKey)}</div>
-      <ul className="overflow-hidden rounded-xl border border-border/60 bg-background/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]">
+      <ul className="overflow-hidden rounded-xl border border-border/60 bg-background/85 shadow-[var(--shadow-inset-highlight)]">
         {section.rows.map((row: HelpShortcutRow) => (
           <li
             key={`${row.labelKey}:${row.combos.map((combo) => combo.join('+')).join('/')}`}

@@ -39,7 +39,7 @@
 }
 
 .goblin-managed-terminal-host .xterm-viewport {
-  background: var(--goblin-terminal-background) !important;
+  background: var(--goblin-terminal-background, var(--color-terminal-background)) !important;
 }
 
 .goblin-managed-terminal-host .xterm-screen {

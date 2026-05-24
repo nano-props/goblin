@@ -1,0 +1,218 @@
+/* Theme token contract.
+ *
+ * The app keeps three layers separate:
+ * 1. `--gbl-*` foundations: the small set future custom themes should
+ *    override, similar to Slack theme palettes.
+ * 2. `--color-*` semantic aliases: Tailwind v4 / shadcn utility names
+ *    used by components (`bg-background`, `text-muted-foreground`, …).
+ * 3. integration tokens: CSS hooks for surfaces that are not Tailwind
+ *    utilities, currently Electron startup/window chrome and xterm.
+ */
+@theme {
+  /* shadcn/ui core */
+  --color-background: var(--gbl-surface-canvas);
+  --color-foreground: var(--gbl-text-primary);
+  --color-card: var(--gbl-surface-raised);
+  --color-card-foreground: var(--gbl-text-primary);
+  --color-popover: var(--gbl-surface-overlay);
+  --color-popover-foreground: var(--gbl-text-primary);
+  --color-primary: var(--gbl-action-primary);
+  --color-primary-foreground: var(--gbl-action-primary-foreground);
+  --color-secondary: var(--gbl-surface-base);
+  --color-secondary-foreground: var(--gbl-text-secondary-strong);
+  --color-muted: var(--gbl-surface-muted);
+  --color-muted-foreground: var(--gbl-text-secondary);
+  --color-accent: var(--gbl-surface-hover);
+  --color-accent-foreground: var(--gbl-text-primary);
+  --color-separator: var(--gbl-border-subtle);
+  --color-border: var(--gbl-border-default);
+  --color-input: var(--gbl-border-strong);
+  --color-ring: var(--gbl-focus-ring);
+  --color-destructive: var(--gbl-action-danger);
+  --color-destructive-foreground: var(--gbl-action-danger-foreground);
+
+  /* Project semantic extras */
+  --color-brand: var(--gbl-accent);
+  --color-brand-text: var(--gbl-accent-text);
+  --color-brand-rgb: var(--gbl-accent-rgb);
+  --color-selected: var(--gbl-accent-selection);
+  --color-selected-foreground: var(--gbl-text-primary);
+  --color-brand-surface: var(--gbl-accent-surface);
+  --color-brand-border: var(--gbl-accent-border);
+  --color-warning: var(--gbl-status-warning-text);
+  --color-warning-rgb: var(--gbl-status-warning-rgb);
+  --color-warning-surface: var(--gbl-status-warning-surface);
+  --color-warning-border: var(--gbl-status-warning-border);
+  --color-attention: var(--gbl-status-warning-text);
+  --color-attention-rgb: var(--gbl-status-warning-rgb);
+  --color-attention-surface: var(--gbl-status-warning-surface);
+  --color-attention-border: var(--gbl-status-warning-border);
+  --color-success: var(--gbl-status-success-text);
+  --color-success-rgb: var(--gbl-status-success-rgb);
+  --color-success-surface: var(--gbl-status-success-surface);
+  --color-success-border: var(--gbl-status-success-border);
+  --color-danger: var(--gbl-status-danger-text);
+  --color-danger-rgb: var(--gbl-status-danger-rgb);
+  --color-danger-surface: var(--gbl-status-danger-surface);
+  --color-danger-border: var(--gbl-status-danger-border);
+
+  /* Type / shadows / radius — shadcn radius scale, project shadow
+   * and font stacks. */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', 'PingFang SC', 'Noto Sans SC', system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+
+  --shadow-sm: var(--gbl-shadow-sm);
+
+  --radius: 0.5rem;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+}
+
+:root,
+html[data-theme='light'] {
+  color-scheme: light;
+
+  --gbl-surface-canvas: #fbfbfd;
+  --gbl-surface-base: #f2f2f7;
+  --gbl-surface-raised: #ffffff;
+  --gbl-surface-overlay: #ffffff;
+  --gbl-surface-muted: #f1f1f5;
+  --gbl-surface-hover: #e5e5ea;
+  --gbl-text-primary: #1d1d1f;
+  --gbl-text-secondary-strong: #3c3c43;
+  --gbl-text-secondary: #6e6e73;
+  --gbl-border-subtle: rgb(60 60 67 / 0.14);
+  --gbl-border-default: rgb(60 60 67 / 0.22);
+  --gbl-border-strong: rgb(60 60 67 / 0.26);
+  --gbl-focus-ring: #007aff;
+  --gbl-action-primary: #006ee6;
+  --gbl-action-primary-foreground: #ffffff;
+  --gbl-action-danger: #d70015;
+  --gbl-action-danger-foreground: #ffffff;
+
+  --gbl-accent: #007aff;
+  --gbl-accent-text: #0066cc;
+  /* `*-rgb` tokens are channel values, not standalone colours. Use
+   * them only inside `rgb(var(...) / alpha)` derived tokens. */
+  --gbl-accent-rgb: 0 122 255;
+  --gbl-accent-selection: rgb(var(--gbl-accent-rgb) / 0.12);
+  --gbl-accent-surface: rgb(var(--gbl-accent-rgb) / 0.12);
+  --gbl-accent-border: rgb(var(--gbl-accent-rgb) / 0.35);
+
+  --gbl-status-warning-text: #a45a00;
+  --gbl-status-warning-rgb: 255 149 0;
+  --gbl-status-warning-surface: rgb(var(--gbl-status-warning-rgb) / 0.14);
+  --gbl-status-warning-border: rgb(var(--gbl-status-warning-rgb) / 0.4);
+  --gbl-status-success-text: #1f7f37;
+  --gbl-status-success-rgb: 52 199 89;
+  --gbl-status-success-surface: rgb(var(--gbl-status-success-rgb) / 0.1);
+  --gbl-status-success-border: rgb(var(--gbl-status-success-rgb) / 0.35);
+  --gbl-status-danger-text: #b00014;
+  --gbl-status-danger-rgb: 176 0 20;
+  --gbl-status-danger-surface: rgb(var(--gbl-status-danger-rgb) / 0.09);
+  --gbl-status-danger-border: rgb(var(--gbl-status-danger-rgb) / 0.4);
+
+  --color-overlay-scrim: rgb(0 0 0 / 0.4);
+  --gbl-shadow-sm: 0 1px 2px rgb(10 10 10 / 0.04);
+  --shadow-inset-highlight: inset 0 1px 0 rgb(255 255 255 / 0.25);
+  --shadow-control-inset-highlight: inset 0 1px 0 rgb(255 255 255 / 0.3);
+
+  --color-terminal-background: #fbfbfd;
+  --color-terminal-foreground: #1d1d1f;
+  --color-terminal-cursor: #1d1d1f;
+  --color-terminal-selection-background: rgba(0, 122, 255, 0.22);
+  --color-terminal-ansi-black: #000000;
+  --color-terminal-ansi-red: #d70015;
+  --color-terminal-ansi-green: #1f7f37;
+  --color-terminal-ansi-yellow: #a45a00;
+  --color-terminal-ansi-blue: #0066cc;
+  --color-terminal-ansi-magenta: #af52de;
+  --color-terminal-ansi-cyan: #007c89;
+  --color-terminal-ansi-white: #6e6e73;
+  --color-terminal-ansi-bright-black: #6e6e73;
+  --color-terminal-ansi-bright-red: #ff3b30;
+  --color-terminal-ansi-bright-green: #34c759;
+  --color-terminal-ansi-bright-yellow: #ff9500;
+  --color-terminal-ansi-bright-blue: #007aff;
+  --color-terminal-ansi-bright-magenta: #bf5af2;
+  --color-terminal-ansi-bright-cyan: #32ade6;
+  --color-terminal-ansi-bright-white: #1d1d1f;
+  --color-terminal-search-match: #facc15;
+  --color-terminal-search-active-match: #fb923c;
+  --color-terminal-search-active-border: #ffffff;
+}
+
+html[data-theme='dark'] {
+  color-scheme: dark;
+
+  --gbl-surface-canvas: #1c1c1e;
+  --gbl-surface-base: #2c2c2e;
+  --gbl-surface-raised: #2c2c2e;
+  --gbl-surface-overlay: #2c2c2e;
+  --gbl-surface-muted: #2c2c2e;
+  --gbl-surface-hover: #3a3a3c;
+  --gbl-text-primary: #f5f5f7;
+  --gbl-text-secondary-strong: rgb(235 235 245 / 0.86);
+  --gbl-text-secondary: rgb(235 235 245 / 0.6);
+  --gbl-border-subtle: rgb(84 84 88 / 0.42);
+  --gbl-border-default: rgb(84 84 88 / 0.55);
+  --gbl-border-strong: rgb(84 84 88 / 0.65);
+  --gbl-focus-ring: #0a84ff;
+  --gbl-action-primary: #0a84ff;
+  --gbl-action-primary-foreground: #001a33;
+  --gbl-action-danger: #ff453a;
+  --gbl-action-danger-foreground: #1a0606;
+
+  --gbl-accent: #0a84ff;
+  --gbl-accent-text: #409cff;
+  /* `*-rgb` tokens are channel values, not standalone colours. Use
+   * them only inside `rgb(var(...) / alpha)` derived tokens. */
+  --gbl-accent-rgb: 10 132 255;
+  --gbl-accent-selection: rgb(var(--gbl-accent-rgb) / 0.2);
+  --gbl-accent-surface: rgb(var(--gbl-accent-rgb) / 0.18);
+  --gbl-accent-border: rgb(var(--gbl-accent-rgb) / 0.45);
+
+  --gbl-status-warning-text: #ff9f0a;
+  --gbl-status-warning-rgb: 255 159 10;
+  --gbl-status-warning-surface: rgb(var(--gbl-status-warning-rgb) / 0.16);
+  --gbl-status-warning-border: rgb(var(--gbl-status-warning-rgb) / 0.45);
+  --gbl-status-success-text: #30d158;
+  --gbl-status-success-rgb: 48 209 88;
+  --gbl-status-success-surface: rgb(var(--gbl-status-success-rgb) / 0.16);
+  --gbl-status-success-border: rgb(var(--gbl-status-success-rgb) / 0.45);
+  --gbl-status-danger-text: var(--gbl-action-danger);
+  --gbl-status-danger-rgb: 255 69 58;
+  --gbl-status-danger-surface: rgb(var(--gbl-status-danger-rgb) / 0.09);
+  --gbl-status-danger-border: rgb(var(--gbl-status-danger-rgb) / 0.45);
+
+  --color-overlay-scrim: rgb(0 0 0 / 0.48);
+  --gbl-shadow-sm: 0 1px 2px rgb(10 10 10 / 0.04);
+  --shadow-inset-highlight: inset 0 1px 0 rgb(255 255 255 / 0.25);
+  --shadow-control-inset-highlight: inset 0 1px 0 rgb(255 255 255 / 0.3);
+
+  --color-terminal-background: #111113;
+  --color-terminal-foreground: #f5f5f7;
+  --color-terminal-cursor: #f5f5f7;
+  --color-terminal-selection-background: rgba(10, 132, 255, 0.32);
+  --color-terminal-ansi-black: #1c1c1e;
+  --color-terminal-ansi-red: #ff453a;
+  --color-terminal-ansi-green: #30d158;
+  --color-terminal-ansi-yellow: #ffd60a;
+  --color-terminal-ansi-blue: #0a84ff;
+  --color-terminal-ansi-magenta: #bf5af2;
+  --color-terminal-ansi-cyan: #64d2ff;
+  --color-terminal-ansi-white: #d1d1d6;
+  --color-terminal-ansi-bright-black: #8e8e93;
+  --color-terminal-ansi-bright-red: #ff6961;
+  --color-terminal-ansi-bright-green: #32d74b;
+  --color-terminal-ansi-bright-yellow: #ffdf5d;
+  --color-terminal-ansi-bright-blue: #409cff;
+  --color-terminal-ansi-bright-magenta: #da8fff;
+  --color-terminal-ansi-bright-cyan: #70d7ff;
+  --color-terminal-ansi-bright-white: #ffffff;
+  --color-terminal-search-match: #facc15;
+  --color-terminal-search-active-match: #fb923c;
+  --color-terminal-search-active-border: #ffffff;
+}

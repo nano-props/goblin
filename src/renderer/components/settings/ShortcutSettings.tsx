@@ -68,7 +68,7 @@ export function ShortcutSettings() {
           : null
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border/60 bg-background/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]">
+    <div className="overflow-hidden rounded-xl border border-border/60 bg-background/85 shadow-[var(--shadow-inset-highlight)]">
       <div className="flex min-h-11 items-center justify-between gap-4 px-3 py-2">
         <label
           htmlFor="shortcuts-disabled-switch"
@@ -103,7 +103,7 @@ export function ShortcutSettings() {
             onBlur={() => setRecordingShortcut(false)}
             title={shortcutStatus?.text ?? t('settings.global-shortcut-record')}
             className={cn(
-              'relative inline-flex h-7 w-20 items-center justify-center rounded-md border px-2 font-mono text-[12px] leading-none shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] transition-colors duration-100',
+              'relative inline-flex h-7 w-20 items-center justify-center rounded-md border px-2 font-mono text-[12px] leading-none shadow-[var(--shadow-control-inset-highlight)] transition-colors duration-100',
               shortcutStatus?.tone === 'error'
                 ? 'border-destructive/55 bg-destructive/10 text-destructive hover:bg-destructive/15'
                 : recordingShortcut

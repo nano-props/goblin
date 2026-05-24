@@ -115,7 +115,7 @@ function DependencySection({ label, hint, children }: { label: string; hint?: st
 
 function DependencyList({ items }: { items: DependencyItem[] }) {
   return (
-    <ul className="overflow-hidden rounded-xl border border-border/60 bg-background/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]">
+    <ul className="overflow-hidden rounded-xl border border-border/60 bg-background/85 shadow-[var(--shadow-inset-highlight)]">
       {items.map((item) => (
         <DependencyRow key={item.titleKey} item={item} />
       ))}

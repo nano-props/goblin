@@ -1,67 +1,73 @@
 import type { ITheme } from '@xterm/xterm'
+import type { ISearchOptions } from '@xterm/addon-search'
 
-type TerminalThemeMode = 'light' | 'dark'
+type TerminalSearchDecorations = NonNullable<ISearchOptions['decorations']>
 
-const LIGHT_TERMINAL_THEME: ITheme = {
-  background: '#fbfbfd',
-  foreground: '#1d1d1f',
-  cursor: '#1d1d1f',
-  selectionBackground: 'rgba(0, 122, 255, 0.22)',
-  black: '#000000',
-  red: '#d70015',
-  green: '#1f7f37',
-  yellow: '#a45a00',
-  blue: '#0066cc',
-  magenta: '#af52de',
-  cyan: '#007c89',
-  white: '#6e6e73',
-  brightBlack: '#6e6e73',
-  brightRed: '#ff3b30',
-  brightGreen: '#34c759',
-  brightYellow: '#ff9500',
-  brightBlue: '#007aff',
-  brightMagenta: '#bf5af2',
-  brightCyan: '#32ade6',
-  brightWhite: '#1d1d1f',
-}
-
-const DARK_TERMINAL_THEME: ITheme = {
-  background: '#111113',
-  foreground: '#f5f5f7',
-  cursor: '#f5f5f7',
-  selectionBackground: 'rgba(10, 132, 255, 0.32)',
-  black: '#1c1c1e',
-  red: '#ff453a',
-  green: '#30d158',
-  yellow: '#ffd60a',
-  blue: '#0a84ff',
-  magenta: '#bf5af2',
-  cyan: '#64d2ff',
-  white: '#d1d1d6',
-  brightBlack: '#8e8e93',
-  brightRed: '#ff6961',
-  brightGreen: '#32d74b',
-  brightYellow: '#ffdf5d',
-  brightBlue: '#409cff',
-  brightMagenta: '#da8fff',
-  brightCyan: '#70d7ff',
-  brightWhite: '#ffffff',
-}
+export const TERMINAL_THEME_TOKENS_CHANGED_EVENT = 'goblin-theme-tokens-changed'
 
 export function terminalThemeForCurrentDocument(): ITheme {
-  return terminalThemeForMode(currentTerminalThemeMode())
+  const styles = getComputedStyle(document.documentElement)
+  return {
+    background: cssToken(styles, '--color-terminal-background'),
+    foreground: cssToken(styles, '--color-terminal-foreground'),
+    cursor: cssToken(styles, '--color-terminal-cursor'),
+    selectionBackground: cssToken(styles, '--color-terminal-selection-background'),
+    black: cssToken(styles, '--color-terminal-ansi-black'),
+    red: cssToken(styles, '--color-terminal-ansi-red'),
+    green: cssToken(styles, '--color-terminal-ansi-green'),
+    yellow: cssToken(styles, '--color-terminal-ansi-yellow'),
+    blue: cssToken(styles, '--color-terminal-ansi-blue'),
+    magenta: cssToken(styles, '--color-terminal-ansi-magenta'),
+    cyan: cssToken(styles, '--color-terminal-ansi-cyan'),
+    white: cssToken(styles, '--color-terminal-ansi-white'),
+    brightBlack: cssToken(styles, '--color-terminal-ansi-bright-black'),
+    brightRed: cssToken(styles, '--color-terminal-ansi-bright-red'),
+    brightGreen: cssToken(styles, '--color-terminal-ansi-bright-green'),
+    brightYellow: cssToken(styles, '--color-terminal-ansi-bright-yellow'),
+    brightBlue: cssToken(styles, '--color-terminal-ansi-bright-blue'),
+    brightMagenta: cssToken(styles, '--color-terminal-ansi-bright-magenta'),
+    brightCyan: cssToken(styles, '--color-terminal-ansi-bright-cyan'),
+    brightWhite: cssToken(styles, '--color-terminal-ansi-bright-white'),
+  }
+}
+
+export function terminalSearchDecorationsForCurrentDocument(): TerminalSearchDecorations {
+  const styles = getComputedStyle(document.documentElement)
+  const match = cssToken(styles, '--color-terminal-search-match')
+  const activeMatch = cssToken(styles, '--color-terminal-search-active-match')
+  return {
+    matchBackground: match,
+    matchOverviewRuler: match,
+    activeMatchBackground: activeMatch,
+    activeMatchBorder: cssToken(styles, '--color-terminal-search-active-border'),
+    activeMatchColorOverviewRuler: activeMatch,
+  }
 }
 
 export function observeTerminalTheme(onTheme: (theme: ITheme) => void): () => void {
-  const observer = new MutationObserver(() => onTheme(terminalThemeForCurrentDocument()))
-  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
-  return () => observer.disconnect()
+  const refresh = () => onTheme(terminalThemeForCurrentDocument())
+  const observer = new MutationObserver(refresh)
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme', 'data-theme-id', 'style'],
+  })
+  window.addEventListener(TERMINAL_THEME_TOKENS_CHANGED_EVENT, refresh)
+  return () => {
+    observer.disconnect()
+    window.removeEventListener(TERMINAL_THEME_TOKENS_CHANGED_EVENT, refresh)
+  }
 }
 
-function terminalThemeForMode(mode: TerminalThemeMode): ITheme {
-  return { ...(mode === 'dark' ? DARK_TERMINAL_THEME : LIGHT_TERMINAL_THEME) }
+function cssToken(styles: CSSStyleDeclaration, name: string): string {
+  return resolveCssValue(styles, styles.getPropertyValue(name).trim(), new Set([name]))
 }
 
-function currentTerminalThemeMode(): TerminalThemeMode {
-  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'
+function resolveCssValue(styles: CSSStyleDeclaration, value: string, seen: Set<string>): string {
+  return value.replace(/var\(\s*(--[\w-]+)\s*(?:,[^)]+)?\)/g, (_match, token: string) => {
+    if (seen.has(token)) return ''
+    seen.add(token)
+    const resolved = resolveCssValue(styles, styles.getPropertyValue(token).trim(), seen)
+    seen.delete(token)
+    return resolved
+  })
 }

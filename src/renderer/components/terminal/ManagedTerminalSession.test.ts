@@ -2,6 +2,7 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { ManagedTerminalSession } from '#/renderer/components/terminal/ManagedTerminalSession.ts'
+import { installTerminalThemeStyles } from '#/renderer/components/terminal/terminal-theme-test-utils.ts'
 import { isTerminalFocused } from '#/renderer/terminal-focus.ts'
 import type { TerminalOpenResult } from '#/shared/terminal.ts'
 
@@ -249,6 +250,7 @@ beforeEach(() => {
   Object.assign(xtermMocks.addonFailures, { search: false, serialize: false, unicode: false, webLinks: false })
   MockResizeObserver.instances.length = 0
   vi.clearAllMocks()
+  installTerminalThemeStyles()
   document.documentElement.setAttribute('data-theme', 'light')
   Object.defineProperty(globalThis, 'ResizeObserver', { configurable: true, value: MockResizeObserver })
   Object.defineProperty(globalThis, 'requestAnimationFrame', {

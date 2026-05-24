@@ -189,7 +189,7 @@ function SettingsGroup({ label, children }: { label: string; children: React.Rea
 
 function SettingsList({ children }: { children: React.ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-border/60 bg-background/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]">
+    <div className="overflow-hidden rounded-xl border border-border/60 bg-background/85 shadow-[var(--shadow-inset-highlight)]">
       {children}
     </div>
   )

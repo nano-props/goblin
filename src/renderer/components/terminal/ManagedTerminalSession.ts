@@ -19,7 +19,11 @@ import type {
 import { terminalBridge } from '#/renderer/terminal.ts'
 import { setTerminalFocused } from '#/renderer/terminal-focus.ts'
 import { rpc } from '#/renderer/rpc.ts'
-import { observeTerminalTheme, terminalThemeForCurrentDocument } from '#/renderer/components/terminal/terminal-theme.ts'
+import {
+  observeTerminalTheme,
+  terminalSearchDecorationsForCurrentDocument,
+  terminalThemeForCurrentDocument,
+} from '#/renderer/components/terminal/terminal-theme.ts'
 import type {
   TerminalDescriptor,
   TerminalPhase,
@@ -33,16 +37,6 @@ const DEFAULT_TERMINAL_COLS = 80
 const DEFAULT_TERMINAL_ROWS = 24
 const RESIZE_DEBOUNCE_MS = 80
 const EMPTY_SEARCH_RESULT: TerminalSearchResult = { resultIndex: -1, resultCount: 0, found: false }
-const SEARCH_OPTIONS: ISearchOptions = {
-  caseSensitive: false,
-  decorations: {
-    matchBackground: '#facc15',
-    matchOverviewRuler: '#facc15',
-    activeMatchBackground: '#fb923c',
-    activeMatchBorder: '#ffffff',
-    activeMatchColorOverviewRuler: '#fb923c',
-  },
-}
 
 export class ManagedTerminalSession {
   descriptor: TerminalDescriptor
@@ -424,8 +418,8 @@ export class ManagedTerminalSession {
     }
     const found =
       direction === 'next'
-        ? this.searchAddon.findNext(searchTerm, { ...SEARCH_OPTIONS, incremental })
-        : this.searchAddon.findPrevious(searchTerm, SEARCH_OPTIONS)
+        ? this.searchAddon.findNext(searchTerm, terminalSearchOptions(incremental))
+        : this.searchAddon.findPrevious(searchTerm, terminalSearchOptions())
     if (!found) this.setSearchResult(EMPTY_SEARCH_RESULT)
     return this.searchResult ?? { ...EMPTY_SEARCH_RESULT, found }
   }
@@ -521,6 +515,14 @@ export class ManagedTerminalSession {
     const sessionId = this.replacingPtySessionId
     this.replacingPtySessionId = null
     if (sessionId) void terminalBridge.close({ sessionId }).catch(() => {})
+  }
+}
+
+function terminalSearchOptions(incremental?: boolean): ISearchOptions {
+  return {
+    caseSensitive: false,
+    decorations: terminalSearchDecorationsForCurrentDocument(),
+    ...(incremental === undefined ? {} : { incremental }),
   }
 }
 

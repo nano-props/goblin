@@ -14,6 +14,7 @@ import { pathToFileURL } from 'node:url'
 import { getTheme } from '#/main/theme.ts'
 import { loadSettings, setWindowBounds, type WindowBounds } from '#/main/settings.ts'
 import { closeAllTerminalSessions } from '#/main/terminal.ts'
+import { WINDOW_BACKGROUND_BY_THEME } from '#/shared/theme-tokens.ts'
 
 const DEFAULT_BOUNDS: WindowBounds = { width: 1200, height: 760 }
 
@@ -66,7 +67,7 @@ export async function createMainWindow(): Promise<BrowserWindow> {
   // Match the renderer's body background so there's no white flash
   // before the bundle loads. Hex values mirror styles.css
   // `--color-background`.
-  const backgroundColor = resolved === 'dark' ? '#1c1c1e' : '#ffffff'
+  const backgroundColor = WINDOW_BACKGROUND_BY_THEME[resolved]
 
   const settings = await loadSettings()
   const saved = settings.windowBounds
