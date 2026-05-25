@@ -255,6 +255,10 @@ export const ja: Record<DictKey, string> = {
   'terminal.search-previous': '前へ',
   'terminal.search-next': '次へ',
   'terminal.search-close': '閉じる',
+  'terminal.sessions': 'ターミナル',
+  'terminal.new': '新しいターミナル',
+  'terminal.close': 'ターミナルを閉じる',
+  'terminal.empty': '開いているターミナルはありません',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': 'Finder で表示',

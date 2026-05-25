@@ -27,5 +27,7 @@ export function isTrustedAppUrl(value: string): boolean {
 }
 
 export function isTrustedIpcEvent(event: IpcMainInvokeEvent): boolean {
-  return trustedWebContentsIds.has(event.sender.id) && event.senderFrame !== null && isTrustedAppUrl(event.senderFrame.url)
+  return (
+    trustedWebContentsIds.has(event.sender.id) && event.senderFrame !== null && isTrustedAppUrl(event.senderFrame.url)
+  )
 }

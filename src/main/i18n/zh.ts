@@ -245,6 +245,10 @@ export const zh: Record<DictKey, string> = {
   'terminal.search-previous': '上一个',
   'terminal.search-next': '下一个',
   'terminal.search-close': '关闭',
+  'terminal.sessions': '终端',
+  'terminal.new': '新建终端',
+  'terminal.close': '关闭终端',
+  'terminal.empty': '没有打开的终端',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': '在访达中显示',

@@ -28,6 +28,7 @@ const mockWindows: Array<{
   webContents: { id: number; isDestroyed: ReturnType<typeof vi.fn>; send: ReturnType<typeof vi.fn> }
   isDestroyed: ReturnType<typeof vi.fn>
 }> = []
+const MAX_SESSION_BUFFER_CHARS = 16 * 1024 * 1024
 
 vi.mock('node-pty', () => ({
   spawn: vi.fn(() => {
@@ -42,6 +43,7 @@ vi.mock('node-pty', () => ({
     }
     mockPtys.push(pty)
     return {
+      process: 'zsh',
       write: pty.write,
       resize: pty.resize,
       kill: pty.kill,
@@ -134,6 +136,8 @@ describe('terminal core sessions', () => {
     expect(replaced.sessionId).not.toBe(first.sessionId)
     expect(replaced.replay).toBe('')
     expect(replaced.replaySeq).toBe(0)
+    expect(replaced.replayTruncated).toBe(false)
+    expect(replaced.processName).toBe('zsh')
 
     writeTerminalSession(1, first.sessionId, 'stale input')
     writeTerminalSession(1, replaced.sessionId, 'fresh input')
@@ -155,6 +159,8 @@ describe('terminal core sessions', () => {
       expect(reused.sessionId).toBe(replaced.sessionId)
       expect(reused.replay).toBe('fresh output')
       expect(reused.replaySeq).toBe(1)
+      expect(reused.replayTruncated).toBe(false)
+      expect(reused.processName).toBe('zsh')
     }
   })
 
@@ -243,10 +249,73 @@ describe('terminal core sessions', () => {
       expect(reopened.sessionId).not.toBe(opened.sessionId)
       expect(reopened.replay).toBe('')
       expect(reopened.replaySeq).toBe(0)
+      expect(reopened.replayTruncated).toBe(false)
+      expect(reopened.processName).toBe('zsh')
     }
     expect(mockPtys[0]!.write).not.toHaveBeenCalled()
     expect(mockPtys[0]!.resize).not.toHaveBeenCalled()
     expect(spawn).toHaveBeenCalledTimes(2)
+  })
+
+  test('keeps replay tail when truncated output has no newline', () => {
+    const opened = openTerminalSession({
+      ownerWebContentsId: 1,
+      scope: '/repo',
+      key: '/repo\0/worktree',
+      cwd: '/worktree',
+      cols: 80,
+      rows: 24,
+    })
+    expect(opened.ok).toBe(true)
+    if (!opened.ok) return
+
+    mockPtys[0]!.emitData(`${'x'.repeat(10)}${'a'.repeat(MAX_SESSION_BUFFER_CHARS)}`)
+    const reused = openTerminalSession({
+      ownerWebContentsId: 1,
+      scope: '/repo',
+      key: '/repo\0/worktree',
+      cwd: '/worktree',
+      cols: 80,
+      rows: 24,
+    })
+
+    expect(reused.ok).toBe(true)
+    if (!reused.ok) return
+    expect(reused.replayTruncated).toBe(true)
+    expect(reused.replay).toHaveLength(MAX_SESSION_BUFFER_CHARS)
+    expect(reused.replay.startsWith('x')).toBe(false)
+    expect(reused.replay.startsWith('a')).toBe(true)
+    expect(reused.replay.endsWith('a')).toBe(true)
+  })
+
+  test('does not replay a split surrogate after truncating history', () => {
+    const opened = openTerminalSession({
+      ownerWebContentsId: 1,
+      scope: '/repo',
+      key: '/repo\0/worktree',
+      cwd: '/worktree',
+      cols: 80,
+      rows: 24,
+    })
+    expect(opened.ok).toBe(true)
+    if (!opened.ok) return
+
+    mockPtys[0]!.emitData(`x🙂${'b'.repeat(MAX_SESSION_BUFFER_CHARS - 1)}`)
+    const reused = openTerminalSession({
+      ownerWebContentsId: 1,
+      scope: '/repo',
+      key: '/repo\0/worktree',
+      cwd: '/worktree',
+      cols: 80,
+      rows: 24,
+    })
+
+    expect(reused.ok).toBe(true)
+    if (!reused.ok) return
+    expect(reused.replayTruncated).toBe(true)
+    expect(reused.replay).toHaveLength(MAX_SESSION_BUFFER_CHARS - 1)
+    expect(reused.replay.charCodeAt(0)).not.toBe(0xde42)
+    expect(reused.replay.startsWith('b')).toBe(true)
   })
 
   test('closes sessions by key', () => {
@@ -272,6 +341,77 @@ describe('terminal core sessions', () => {
     if (first.ok) writeTerminalSession(1, first.sessionId, 'closed')
     if (second.ok) writeTerminalSession(1, second.sessionId, 'open')
     expect(mockPtys[0]!.kill).toHaveBeenCalledTimes(1)
+    expect(mockPtys[0]!.write).not.toHaveBeenCalled()
+    expect(mockPtys[1]!.write).toHaveBeenCalledWith('open')
+  })
+
+  test('closes all terminal ids for a worktree key', () => {
+    const first = openTerminalSession({
+      ownerWebContentsId: 1,
+      scope: '/repo',
+      key: '/repo\0/worktree\0terminal-1',
+      cwd: '/worktree',
+      cols: 80,
+      rows: 24,
+    })
+    const second = openTerminalSession({
+      ownerWebContentsId: 1,
+      scope: '/repo',
+      key: '/repo\0/worktree\0terminal-2',
+      cwd: '/worktree',
+      cols: 80,
+      rows: 24,
+    })
+    const other = openTerminalSession({
+      ownerWebContentsId: 1,
+      scope: '/repo',
+      key: '/repo\0/other\0terminal-1',
+      cwd: '/other',
+      cols: 80,
+      rows: 24,
+    })
+    expect(first.ok && second.ok && other.ok).toBe(true)
+    if (!first.ok || !second.ok || !other.ok) return
+
+    closeTerminalKey('/repo\0/worktree')
+    writeTerminalSession(1, first.sessionId, 'closed first')
+    writeTerminalSession(1, second.sessionId, 'closed second')
+    writeTerminalSession(1, other.sessionId, 'open')
+
+    expect(mockPtys[0]!.kill).toHaveBeenCalledTimes(1)
+    expect(mockPtys[1]!.kill).toHaveBeenCalledTimes(1)
+    expect(mockPtys[2]!.kill).not.toHaveBeenCalled()
+    expect(mockPtys[0]!.write).not.toHaveBeenCalled()
+    expect(mockPtys[1]!.write).not.toHaveBeenCalled()
+    expect(mockPtys[2]!.write).toHaveBeenCalledWith('open')
+  })
+
+  test('does not close sibling worktrees with the same path prefix', () => {
+    const first = openTerminalSession({
+      ownerWebContentsId: 1,
+      scope: '/repo',
+      key: '/repo\0/worktree\0terminal-1',
+      cwd: '/worktree',
+      cols: 80,
+      rows: 24,
+    })
+    const sibling = openTerminalSession({
+      ownerWebContentsId: 1,
+      scope: '/repo',
+      key: '/repo\0/worktree-2\0terminal-1',
+      cwd: '/worktree-2',
+      cols: 80,
+      rows: 24,
+    })
+    expect(first.ok && sibling.ok).toBe(true)
+    if (!first.ok || !sibling.ok) return
+
+    closeTerminalKey('/repo\0/worktree')
+    writeTerminalSession(1, first.sessionId, 'closed')
+    writeTerminalSession(1, sibling.sessionId, 'open')
+
+    expect(mockPtys[0]!.kill).toHaveBeenCalledTimes(1)
+    expect(mockPtys[1]!.kill).not.toHaveBeenCalled()
     expect(mockPtys[0]!.write).not.toHaveBeenCalled()
     expect(mockPtys[1]!.write).toHaveBeenCalledWith('open')
   })
@@ -307,6 +447,7 @@ describe('terminal core sessions', () => {
       sessionId: first.sessionId,
       data: 'owner one',
       seq: 1,
+      processName: 'zsh',
     })
     expect(ownerOne.webContents.send).not.toHaveBeenCalledWith(
       'goblin:terminal-output',
@@ -316,6 +457,7 @@ describe('terminal core sessions', () => {
       sessionId: second.sessionId,
       data: 'owner two',
       seq: 1,
+      processName: 'zsh',
     })
   })
 
@@ -408,6 +550,48 @@ describe('terminal core sessions', () => {
     expect(mockPtys[1]!.write).toHaveBeenCalledWith('open')
   })
 
+  test('prunes all terminal ids for stale worktree keys', async () => {
+    const core = await import('#/main/terminal-core.ts')
+    const first = openTerminalSession({
+      ownerWebContentsId: 1,
+      scope: '/repo',
+      key: '/repo\0/stale\0terminal-1',
+      cwd: '/stale',
+      cols: 80,
+      rows: 24,
+    })
+    const second = openTerminalSession({
+      ownerWebContentsId: 1,
+      scope: '/repo',
+      key: '/repo\0/stale\0terminal-2',
+      cwd: '/stale',
+      cols: 80,
+      rows: 24,
+    })
+    const live = openTerminalSession({
+      ownerWebContentsId: 1,
+      scope: '/repo',
+      key: '/repo\0/live\0terminal-1',
+      cwd: '/live',
+      cols: 80,
+      rows: 24,
+    })
+    expect(first.ok && second.ok && live.ok).toBe(true)
+    if (!first.ok || !second.ok || !live.ok) return
+
+    core.pruneTerminalScope(1, '/repo', new Set(['/repo\0/live']))
+    writeTerminalSession(1, first.sessionId, 'closed first')
+    writeTerminalSession(1, second.sessionId, 'closed second')
+    writeTerminalSession(1, live.sessionId, 'open')
+
+    expect(mockPtys[0]!.kill).toHaveBeenCalledTimes(1)
+    expect(mockPtys[1]!.kill).toHaveBeenCalledTimes(1)
+    expect(mockPtys[2]!.kill).not.toHaveBeenCalled()
+    expect(mockPtys[0]!.write).not.toHaveBeenCalled()
+    expect(mockPtys[1]!.write).not.toHaveBeenCalled()
+    expect(mockPtys[2]!.write).toHaveBeenCalledWith('open')
+  })
+
   test('continues after PTY resize failures', () => {
     const opened = openTerminalSession({
       ownerWebContentsId: 1,
@@ -426,10 +610,13 @@ describe('terminal core sessions', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
     expect(() => resizeTerminalSession(1, opened.sessionId, 100, 30)).not.toThrow()
+    expect(() => resizeTerminalSession(1, opened.sessionId, 100, 30)).not.toThrow()
     writeTerminalSession(1, opened.sessionId, 'still alive')
 
     expect(warnSpy).toHaveBeenCalledWith('[terminal] failed to resize PTY', expect.any(Error))
-    expect(mockPtys[0]!.resize).toHaveBeenCalledWith(100, 30)
+    expect(mockPtys[0]!.resize).toHaveBeenCalledTimes(2)
+    expect(mockPtys[0]!.resize).toHaveBeenNthCalledWith(1, 100, 30)
+    expect(mockPtys[0]!.resize).toHaveBeenNthCalledWith(2, 100, 30)
     expect(mockPtys[0]!.write).toHaveBeenCalledWith('still alive')
   })
 

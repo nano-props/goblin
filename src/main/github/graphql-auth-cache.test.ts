@@ -47,7 +47,13 @@ describe('GitHub auth token cache', () => {
     ctrl.abort()
 
     await graphqlRequestResult('/tmp/repo', repo, 'query Test { viewer { login } }', {}, 'Test', ctrl.signal)
-    const result = await graphqlRequestResult<{ ok: boolean }>('/tmp/repo', repo, 'query Test { viewer { login } }', {}, 'Test')
+    const result = await graphqlRequestResult<{ ok: boolean }>(
+      '/tmp/repo',
+      repo,
+      'query Test { viewer { login } }',
+      {},
+      'Test',
+    )
 
     expect(authCalls).toBe(2)
     expect(result).toEqual({ ok: true, data: { ok: true } })
@@ -56,11 +62,12 @@ describe('GitHub auth token cache', () => {
   test('does not fetch when aborted before a queued GraphQL request starts', async () => {
     vi.resetModules()
     process.env.GH_TOKEN = 'env-token'
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ data: { ok: true } }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ data: { ok: true } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
     )
     globalThis.fetch = fetchMock as unknown as typeof fetch
     const { graphqlRequestResult } = await import('#/main/github/graphql.ts')
@@ -111,7 +118,14 @@ describe('GitHub auth token cache', () => {
     )
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3))
     const ctrl = new AbortController()
-    const queued = graphqlRequestResult<{ ok: boolean }>('/tmp/repo', repo, 'query Test { viewer { login } }', {}, 'Test', ctrl.signal)
+    const queued = graphqlRequestResult<{ ok: boolean }>(
+      '/tmp/repo',
+      repo,
+      'query Test { viewer { login } }',
+      {},
+      'Test',
+      ctrl.signal,
+    )
 
     ctrl.abort()
     const settled = await Promise.race([

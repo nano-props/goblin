@@ -32,6 +32,7 @@ const xtermMocks = vi.hoisted(() => {
     }
     element: HTMLDivElement | null = null
     write = vi.fn()
+    reset = vi.fn()
     dispose = vi.fn()
     focus = vi.fn(() => this.textarea?.focus())
     private textarea: HTMLTextAreaElement | null = null
@@ -235,6 +236,9 @@ const invokeRpc = vi.fn<Window['goblin']['invokeRpc']>()
 
 const descriptor = {
   key: '/repo\0/worktree',
+  groupKey: '/repo\0/worktree',
+  terminalId: 'terminal-1',
+  index: 1,
   repoRoot: '/repo',
   branch: 'feature',
   worktreePath: '/worktree',
@@ -309,6 +313,7 @@ describe('ManagedTerminalSession', () => {
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/worktree',
+      terminalId: 'terminal-1',
       cols: 100,
       rows: 30,
     })
@@ -414,6 +419,7 @@ describe('ManagedTerminalSession', () => {
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/worktree',
+      terminalId: 'terminal-1',
       cols: 100,
       rows: 30,
     })
@@ -429,7 +435,7 @@ describe('ManagedTerminalSession', () => {
     session.attach(host)
     await flushTerminalStart()
 
-    expect(session.snapshot()).toEqual({ phase: 'error', message: 'error.spawn-failed' })
+    expect(session.snapshot()).toEqual({ phase: 'error', message: 'error.spawn-failed', processName: 'terminal' })
   })
 
   test('continues after terminal write failures', async () => {
@@ -459,9 +465,39 @@ describe('ManagedTerminalSession', () => {
 
     xtermMocks.terminals[0]!.resize(101, 31)
     await flushResizeDebounce()
+    xtermMocks.terminals[0]!.resize(101, 31)
+    await flushResizeDebounce()
 
-    expect(terminalCalls.resize).toHaveBeenCalledWith({ sessionId: 'session-1', cols: 101, rows: 31 })
+    expect(terminalCalls.resize).toHaveBeenCalledTimes(2)
+    expect(terminalCalls.resize).toHaveBeenNthCalledWith(1, { sessionId: 'session-1', cols: 101, rows: 31 })
+    expect(terminalCalls.resize).toHaveBeenNthCalledWith(2, { sessionId: 'session-1', cols: 101, rows: 31 })
     expect(session.snapshot().phase).toBe('open')
+  })
+
+  test('forwards user input while replay is being written', async () => {
+    terminalCalls.open.mockResolvedValueOnce(openResult('session-1', { replay: 'history', replaySeq: 1 }))
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    session.attach(host)
+    await flushUntil(() => xtermMocks.terminals[0]?.write.mock.calls.some((call: unknown[]) => call[0] === 'history'))
+
+    xtermMocks.terminals[0]!.emitData('input during replay')
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    expect(terminalCalls.write).toHaveBeenCalledWith({ sessionId: 'session-1', data: 'input during replay' })
+  })
+
+  test('resets the terminal before replaying truncated history', async () => {
+    terminalCalls.open.mockResolvedValueOnce(openResult('session-1', { replay: 'tail', replayTruncated: true }))
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    session.attach(host)
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    expect(xtermMocks.terminals[0]!.reset).toHaveBeenCalledTimes(1)
+    expect(xtermMocks.terminals[0]!.write).toHaveBeenCalledWith('tail')
   })
 
   test('batches terminal output writes on animation frames', async () => {
@@ -472,9 +508,9 @@ describe('ManagedTerminalSession', () => {
     await flushTerminalStart()
     await flushUntil(() => session.snapshot().phase === 'open')
 
-    session.handleOutput({ sessionId: 'other-session', data: 'ignored', seq: 1 })
-    session.handleOutput({ sessionId: 'session-1', data: 'first', seq: 1 })
-    session.handleOutput({ sessionId: 'session-1', data: 'second', seq: 2 })
+    session.handleOutput({ sessionId: 'other-session', data: 'ignored', seq: 1, processName: 'zsh' })
+    session.handleOutput({ sessionId: 'session-1', data: 'first', seq: 1, processName: 'zsh' })
+    session.handleOutput({ sessionId: 'session-1', data: 'second', seq: 2, processName: 'zsh' })
 
     expect(xtermMocks.terminals[0]!.write).not.toHaveBeenCalled()
     await flushTerminalStart()
@@ -491,13 +527,13 @@ describe('ManagedTerminalSession', () => {
     await flushTerminalStart()
     await flushUntil(() => session.snapshot().phase === 'open')
 
-    session.handleOutput({ sessionId: 'session-1', data: 'before exit', seq: 1 })
+    session.handleOutput({ sessionId: 'session-1', data: 'before exit', seq: 1, processName: 'zsh' })
     expect(session.handleExit({ sessionId: 'other-session' })).toBe(false)
     expect(session.handleExit({ sessionId: 'session-1' })).toBe(true)
     session.dispose()
 
     expect(xtermMocks.terminals[0]!.write).toHaveBeenCalledWith('before exit')
-    expect(session.snapshot()).toEqual({ phase: 'open', message: null })
+    expect(session.snapshot()).toEqual({ phase: 'open', message: null, processName: 'zsh' })
     expect(terminalCalls.close).not.toHaveBeenCalled()
   })
 
@@ -594,8 +630,19 @@ describe('ManagedTerminalSession', () => {
   })
 })
 
-function openResult(sessionId: string): TerminalOpenResult {
-  return { ok: true, sessionId, replay: '', replaySeq: 0 }
+function openResult(
+  sessionId: string,
+  overrides: Partial<Extract<TerminalOpenResult, { ok: true }>> = {},
+): TerminalOpenResult {
+  return {
+    ok: true,
+    sessionId,
+    replay: '',
+    replaySeq: 0,
+    replayTruncated: false,
+    processName: 'zsh',
+    ...overrides,
+  }
 }
 
 function deferred<T>() {

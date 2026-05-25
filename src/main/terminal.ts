@@ -18,22 +18,20 @@ import {
   wireTerminalSessionCleanup,
   writeTerminalSession,
 } from '#/main/terminal-core.ts'
-import type {
-  TerminalOpenInput,
-  TerminalOpenResult,
-  TerminalMutationResult,
-  TerminalPruneRepoInput,
-  TerminalResizeInput,
-  TerminalRestartInput,
-  TerminalSessionInput,
-  TerminalWriteInput,
+import {
+  isValidTerminalSize,
+  type TerminalMutationResult,
+  type TerminalOpenInput,
+  type TerminalOpenResult,
+  type TerminalPruneRepoInput,
+  type TerminalResizeInput,
+  type TerminalRestartInput,
+  type TerminalSessionInput,
+  type TerminalWriteInput,
 } from '#/shared/terminal.ts'
 
 const MAX_TERMINAL_PRUNE_WORKTREES = 1000
-const MIN_TERMINAL_COLS = 1
-const MAX_TERMINAL_COLS = 500
-const MIN_TERMINAL_ROWS = 1
-const MAX_TERMINAL_ROWS = 300
+const TERMINAL_ID_RE = /^[A-Za-z0-9_-]{1,64}$/
 
 export { closeAllTerminalSessions } from '#/main/terminal-core.ts'
 
@@ -88,6 +86,7 @@ async function openGoblinWorktreeTerminal(
     !isValidCwd(input?.repoRoot) ||
     !isValidBranch(input?.branch) ||
     !isValidAbsolutePath(input?.worktreePath) ||
+    !isValidTerminalId(input?.terminalId) ||
     !isValidTerminalSize(input?.cols, input?.rows)
   ) {
     return { ok: false, message: 'error.invalid-arguments' }
@@ -102,7 +101,7 @@ async function openGoblinWorktreeTerminal(
   return openTerminalSession({
     ownerWebContentsId,
     scope: repoRoot,
-    key: sessionKey(repoRoot, worktreePath),
+    key: sessionKey(repoRoot, worktreePath, input.terminalId),
     cwd: worktreePath,
     cols: input.cols,
     rows: input.rows,
@@ -131,19 +130,6 @@ export function pruneRepoSessions(ownerWebContentsId: number, repoRoot: string, 
   pruneTerminalScope(ownerWebContentsId, root, liveKeys)
 }
 
-function isValidTerminalSize(cols: unknown, rows: unknown): boolean {
-  return (
-    typeof cols === 'number' &&
-    typeof rows === 'number' &&
-    Number.isFinite(cols) &&
-    Number.isFinite(rows) &&
-    cols >= MIN_TERMINAL_COLS &&
-    cols <= MAX_TERMINAL_COLS &&
-    rows >= MIN_TERMINAL_ROWS &&
-    rows <= MAX_TERMINAL_ROWS
-  )
-}
-
 function isValidTerminalWorktreePathList(value: unknown): boolean {
   return (
     Array.isArray(value) &&
@@ -152,6 +138,10 @@ function isValidTerminalWorktreePathList(value: unknown): boolean {
   )
 }
 
-function sessionKey(repoRoot: string, worktreePath: string): string {
-  return `${repoRoot}\0${worktreePath}`
+function isValidTerminalId(value: unknown): value is string {
+  return typeof value === 'string' && TERMINAL_ID_RE.test(value)
+}
+
+function sessionKey(repoRoot: string, worktreePath: string, terminalId?: string): string {
+  return terminalId ? `${repoRoot}\0${worktreePath}\0${terminalId}` : `${repoRoot}\0${worktreePath}`
 }

@@ -63,9 +63,9 @@ describe('preload goblin bridge', () => {
       invoke: () => Promise.resolve({ ok: false, error: { message: 'boom' } }),
     })
 
-    await expect(goblin.invokeRpc({ path: 'repo.status', input: { cwd: '/repo' }, requestId: 'rpc_test_1' })).rejects.toThrow(
-      'boom',
-    )
+    await expect(
+      goblin.invokeRpc({ path: 'repo.status', input: { cwd: '/repo' }, requestId: 'rpc_test_1' }),
+    ).rejects.toThrow('boom')
 
     expect(warn.mock.calls[0]?.[0]).toBe('[rpc] repo.status failed')
     expect((warn.mock.calls[0]?.[1] as Error | undefined)?.message).toBe('boom')

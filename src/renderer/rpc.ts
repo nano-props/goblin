@@ -36,15 +36,13 @@ function abortableRepoCwd(path: string, input: unknown): string | null {
 function invokeRepoAbort(cwd: string): void {
   try {
     void Promise.resolve(getGoblinBridge().invokeRpc({ path: 'repo.abort', input: { cwd } })).catch(() => {})
-  } catch {
-  }
+  } catch {}
 }
 
 function invokeRpcAbort(requestId: string): void {
   try {
     void Promise.resolve(getGoblinBridge().abortRpc(requestId)).catch(() => {})
-  } catch {
-  }
+  } catch {}
 }
 
 const ipcLink: TRPCLink<AppRouter> = () => {

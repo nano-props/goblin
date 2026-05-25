@@ -2,7 +2,12 @@ import { BrowserWindow, app } from 'electron'
 import crypto from 'node:crypto'
 import path from 'node:path'
 import * as pty from 'node-pty'
-import type { TerminalExitEvent, TerminalOpenResult, TerminalOutputEvent } from '#/shared/terminal.ts'
+import {
+  normalizeTerminalSize,
+  type TerminalExitEvent,
+  type TerminalOpenResult,
+  type TerminalOutputEvent,
+} from '#/shared/terminal.ts'
 
 // Replay is intentionally capped per live session, not globally. Sessions are
 // owner/worktree scoped, pruned when worktrees disappear, closed with their
@@ -12,10 +17,6 @@ import type { TerminalExitEvent, TerminalOpenResult, TerminalOutputEvent } from 
 const MAX_SESSION_BUFFER_CHARS = 16 * 1024 * 1024
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 const SESSION_ID_RE = /^[A-Za-z0-9_-]{16,64}$/
-const MIN_COLS = 1
-const MAX_COLS = 500
-const MIN_ROWS = 1
-const MAX_ROWS = 300
 
 export interface TerminalOpenSessionInput {
   ownerWebContentsId: number
@@ -38,14 +39,16 @@ interface TerminalSession {
   pty: pty.IPty | null
   disposables: Array<{ dispose: () => void }>
   buffer: string
+  bufferTruncated: boolean
   sequence: number
+  processName: string
 }
 
 const sessionsById = new Map<string, TerminalSession>()
 const sessionIdByOwnerKey = new Map<string, string>()
 
 export function openTerminalSession(input: TerminalOpenSessionInput): TerminalOpenResult {
-  const size = normalizeSize(input.cols, input.rows)
+  const size = normalizeTerminalSize(input.cols, input.rows)
   if (!size) return { ok: false, message: 'error.invalid-arguments' }
 
   const cwd = path.resolve(input.cwd)
@@ -63,6 +66,8 @@ export function openTerminalSession(input: TerminalOpenSessionInput): TerminalOp
       sessionId: existing.id,
       replay: existing.buffer,
       replaySeq: existing.sequence,
+      replayTruncated: existing.bufferTruncated,
+      processName: existing.processName,
     }
   }
 
@@ -78,7 +83,9 @@ export function openTerminalSession(input: TerminalOpenSessionInput): TerminalOp
     pty: null,
     disposables: [],
     buffer: '',
+    bufferTruncated: false,
     sequence: 0,
+    processName: '',
   }
   sessionsById.set(id, session)
   sessionIdByOwnerKey.set(ownerKey, id)
@@ -94,6 +101,7 @@ export function openTerminalSession(input: TerminalOpenSessionInput): TerminalOp
       cwd,
       env,
     })
+    session.processName = terminalProcessName(session.pty)
   } catch (err) {
     closeTerminalSession(id)
     return { ok: false, message: err instanceof Error ? err.message : 'error.unknown' }
@@ -102,7 +110,9 @@ export function openTerminalSession(input: TerminalOpenSessionInput): TerminalOp
   session.disposables.push(
     session.pty.onData((data) => {
       const seq = appendSessionData(session, data)
-      broadcastTerminalOutput({ sessionId: session.id, data, seq })
+      const processName = terminalProcessName(session.pty)
+      session.processName = processName
+      broadcastTerminalOutput({ sessionId: session.id, data, seq, processName })
     }),
   )
   session.disposables.push(
@@ -117,7 +127,14 @@ export function openTerminalSession(input: TerminalOpenSessionInput): TerminalOp
     }),
   )
 
-  return { ok: true, sessionId: id, replay: session.buffer, replaySeq: session.sequence }
+  return {
+    ok: true,
+    sessionId: id,
+    replay: session.buffer,
+    replaySeq: session.sequence,
+    replayTruncated: session.bufferTruncated,
+    processName: session.processName,
+  }
 }
 
 export function writeTerminalSession(ownerWebContentsId: number, sessionId: string, data: string): boolean {
@@ -140,7 +157,7 @@ export function resizeTerminalSession(
   rows: number,
 ): boolean {
   if (!isValidTerminalSessionId(sessionId)) return false
-  const size = normalizeSize(cols, rows)
+  const size = normalizeTerminalSize(cols, rows)
   if (!size) return false
   const session = ownedSession(ownerWebContentsId, sessionId)
   return session ? resizeSessionPty(session, size.cols, size.rows) : false
@@ -171,7 +188,7 @@ export function closeTerminalSession(sessionId: string): void {
 
 export function closeTerminalKey(key: string): void {
   for (const session of Array.from(sessionsById.values())) {
-    if (session.key === key) closeTerminalSession(session.id)
+    if (session.key === key || session.key.startsWith(`${key}\0`)) closeTerminalSession(session.id)
   }
 }
 
@@ -188,7 +205,8 @@ function closeTerminalOwnerKey(ownerWebContentsId: number, key: string): void {
 
 export function pruneTerminalScope(ownerWebContentsId: number, scope: string, liveKeys: Set<string>): void {
   for (const session of Array.from(sessionsById.values())) {
-    if (session.ownerWebContentsId === ownerWebContentsId && session.scope === scope && !liveKeys.has(session.key)) {
+    const key = terminalPruneKey(session.key)
+    if (session.ownerWebContentsId === ownerWebContentsId && session.scope === scope && !liveKeys.has(key)) {
       closeTerminalSession(session.id)
     }
   }
@@ -215,7 +233,8 @@ function appendSessionData(session: TerminalSession, data: string): number {
   session.sequence += 1
   session.buffer += data
   if (session.buffer.length > MAX_SESSION_BUFFER_CHARS) {
-    session.buffer = session.buffer.slice(session.buffer.length - MAX_SESSION_BUFFER_CHARS)
+    session.buffer = safeReplayTail(session.buffer, MAX_SESSION_BUFFER_CHARS)
+    session.bufferTruncated = true
   }
   return session.sequence
 }
@@ -243,10 +262,10 @@ function disposeSessionListeners(session: TerminalSession): void {
 function resizeSessionPty(session: TerminalSession, cols: number, rows: number): boolean {
   if (!session.pty) return false
   if (session.cols === cols && session.rows === rows) return true
-  session.cols = cols
-  session.rows = rows
   try {
     session.pty.resize(cols, rows)
+    session.cols = cols
+    session.rows = rows
     return true
   } catch (err) {
     console.warn('[terminal] failed to resize PTY', err)
@@ -254,14 +273,20 @@ function resizeSessionPty(session: TerminalSession, cols: number, rows: number):
   }
 }
 
-function normalizeSize(cols: unknown, rows: unknown): { cols: number; rows: number } | null {
-  if (typeof cols !== 'number' || typeof rows !== 'number' || !Number.isFinite(cols) || !Number.isFinite(rows)) {
-    return null
-  }
-  const c = Math.floor(cols)
-  const r = Math.floor(rows)
-  if (c < MIN_COLS || c > MAX_COLS || r < MIN_ROWS || r > MAX_ROWS) return null
-  return { cols: c, rows: r }
+function safeReplayTail(buffer: string, maxChars: number): string {
+  let tail = buffer.slice(buffer.length - maxChars)
+  if (tail.length === 0) return tail
+  const first = tail.charCodeAt(0)
+  const second = tail.length > 1 ? tail.charCodeAt(1) : 0
+  if (first >= 0xdc00 && first <= 0xdfff) tail = tail.slice(1)
+  else if (first >= 0xd800 && first <= 0xdbff && !(second >= 0xdc00 && second <= 0xdfff)) tail = tail.slice(1)
+  const boundary = tail.search(/[\n\r]/)
+  return boundary >= 0 && boundary < tail.length - 1 ? tail.slice(boundary + 1) : tail
+}
+
+function terminalProcessName(term: pty.IPty | null): string {
+  const processName = typeof term?.process === 'string' ? term.process.trim() : ''
+  return processName || 'terminal'
 }
 
 function createSessionId(): string {
@@ -270,6 +295,11 @@ function createSessionId(): string {
 
 function sessionOwnerKey(ownerWebContentsId: number, key: string): string {
   return `${ownerWebContentsId}\0${key}`
+}
+
+function terminalPruneKey(key: string): string {
+  const parts = key.split('\0')
+  return parts.length >= 2 ? `${parts[0]}\0${parts[1]}` : key
 }
 
 function broadcastTerminalOutput(event: TerminalOutputEvent): void {

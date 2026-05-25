@@ -35,6 +35,8 @@ vi.mock('#/main/terminal-core.ts', () => ({
     sessionId: 'term_123456789012',
     replay: '',
     replaySeq: 0,
+    replayTruncated: false,
+    processName: 'zsh',
   })),
   pruneTerminalScope: vi.fn(),
   resizeTerminalSession: vi.fn(() => true),
@@ -73,15 +75,23 @@ describe('terminal IPC', () => {
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/repo-linked',
+      terminalId: 'terminal-1',
       cols: 80,
       rows: 24,
     })
 
-    expect(result).toEqual({ ok: true, sessionId: 'term_123456789012', replay: '', replaySeq: 0 })
+    expect(result).toEqual({
+      ok: true,
+      sessionId: 'term_123456789012',
+      replay: '',
+      replaySeq: 0,
+      replayTruncated: false,
+      processName: 'zsh',
+    })
     expect(openTerminalSession).toHaveBeenCalledWith({
       ownerWebContentsId: 1,
       scope: '/repo',
-      key: '/repo\0/repo-linked',
+      key: '/repo\0/repo-linked\0terminal-1',
       cwd: '/repo-linked',
       cols: 80,
       rows: 24,
@@ -94,6 +104,7 @@ describe('terminal IPC', () => {
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/repo-linked',
+      terminalId: 'terminal-1',
       cols: 100,
       rows: 30,
     })
@@ -101,7 +112,7 @@ describe('terminal IPC', () => {
     expect(openTerminalSession).toHaveBeenCalledWith({
       ownerWebContentsId: 1,
       scope: '/repo',
-      key: '/repo\0/repo-linked',
+      key: '/repo\0/repo-linked\0terminal-1',
       cwd: '/repo-linked',
       cols: 100,
       rows: 30,
@@ -114,6 +125,7 @@ describe('terminal IPC', () => {
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/repo-linked',
+      terminalId: 'terminal-1',
       cols: 0,
       rows: 24,
     })
@@ -124,22 +136,26 @@ describe('terminal IPC', () => {
   })
 
   test('rejects terminal IPC calls from untrusted senders', async () => {
-    const result = await invokeWithEvent('goblin:terminal-open', {
-      repoRoot: '/repo',
-      branch: 'feature',
-      worktreePath: '/repo-linked',
-      cols: 80,
-      rows: 24,
-    }, {
-      sender: { id: 99, once: vi.fn() },
-      senderFrame: { url: 'https://example.com/' },
-    })
+    const result = await invokeWithEvent(
+      'goblin:terminal-open',
+      {
+        repoRoot: '/repo',
+        branch: 'feature',
+        worktreePath: '/repo-linked',
+        terminalId: 'terminal-1',
+        cols: 80,
+        rows: 24,
+      },
+      {
+        sender: { id: 99, once: vi.fn() },
+        senderFrame: { url: 'https://example.com/' },
+      },
+    )
 
     expect(result).toEqual({ ok: false, message: 'error.invalid-arguments' })
     expect(getWorktrees).not.toHaveBeenCalled()
     expect(openTerminalSession).not.toHaveBeenCalled()
   })
-
 
   test('rejects stale worktree paths and branch mismatches', async () => {
     await expect(
@@ -147,6 +163,7 @@ describe('terminal IPC', () => {
         repoRoot: '/repo',
         branch: 'main',
         worktreePath: '/repo-linked',
+        terminalId: 'terminal-1',
         cols: 80,
         rows: 24,
       }),
@@ -164,6 +181,7 @@ describe('terminal IPC', () => {
         repoRoot: '/repo',
         branch: 'feature',
         worktreePath: '/repo-linked',
+        terminalId: 'terminal-1',
         cols: 80,
         rows: 24,
       },

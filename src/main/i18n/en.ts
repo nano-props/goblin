@@ -257,6 +257,10 @@ export const en = {
   'terminal.search-previous': 'Previous',
   'terminal.search-next': 'Next',
   'terminal.search-close': 'Close',
+  'terminal.sessions': 'Terminals',
+  'terminal.new': 'New terminal',
+  'terminal.close': 'Close terminal',
+  'terminal.empty': 'No terminal open',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) ---
   'worktrees.reveal-title': 'Reveal in Finder',

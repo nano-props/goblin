@@ -11,9 +11,11 @@ import {
 import { Button } from '#/renderer/components/ui/button.tsx'
 import { setTerminalFocused } from '#/renderer/terminal-focus.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
-import { terminalSessionKey } from '#/renderer/components/terminal/terminal-session-utils.ts'
+import { useReposStore } from '#/renderer/stores/repos/store.ts'
+import { terminalSessionGroupKey } from '#/renderer/components/terminal/terminal-session-utils.ts'
 import { useTerminalSessionContext } from '#/renderer/components/terminal/terminal-session-context.ts'
-import type { TerminalDescriptor } from '#/renderer/components/terminal/types.ts'
+import { TerminalSwitcher } from '#/renderer/components/terminal/TerminalSwitcher.tsx'
+import type { TerminalSessionBase } from '#/renderer/components/terminal/types.ts'
 
 interface TerminalSlotProps {
   repoRoot: string
@@ -25,59 +27,92 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
   const t = useT()
   const hostRef = useRef<HTMLDivElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
+  const initializedGroupRef = useRef<string | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const context = useTerminalSessionContext()
   const {
+    ensureDefault,
+    createTerminal,
+    activeDescriptor,
+    sessionSummaries,
+    setActive,
+    closeTerminal,
     attach,
     detach,
     isTerminalFocusTarget,
-    restart: restartSession,
     snapshot: getSnapshot,
     version,
     findNext,
     findPrevious,
     clearSearch,
   } = context
-  const key = terminalSessionKey(repoRoot, worktreePath)
-  const descriptor = useMemo<TerminalDescriptor>(
-    () => ({ key, repoRoot, branch, worktreePath }),
-    [branch, key, repoRoot, worktreePath],
+  const groupKey = terminalSessionGroupKey(repoRoot, worktreePath)
+  const base = useMemo<TerminalSessionBase>(
+    () => ({ repoRoot, branch, worktreePath }),
+    [branch, repoRoot, worktreePath],
   )
-  const snapshot = useMemo(() => getSnapshot(key), [getSnapshot, key, version])
+  const descriptor = useMemo(() => activeDescriptor(groupKey), [activeDescriptor, groupKey, version])
+  const key = descriptor?.key ?? null
+  const summaries = useMemo(() => sessionSummaries(groupKey), [groupKey, sessionSummaries, version])
+  const snapshot = useMemo(
+    () => (key ? getSnapshot(key) : { phase: 'error' as const, message: 'terminal.empty', processName: 'terminal' }),
+    [getSnapshot, key, version],
+  )
+
+  useLayoutEffect(() => {
+    if (initializedGroupRef.current === groupKey) return
+    initializedGroupRef.current = groupKey
+    ensureDefault(base)
+  }, [base, ensureDefault, groupKey])
 
   useLayoutEffect(() => {
     const host = hostRef.current
-    if (!host) return
+    if (!host || !descriptor) return
     attach(descriptor, host)
-    return () => detach(key, host)
-  }, [attach, descriptor, detach, key])
+    return () => detach(descriptor.key, host)
+  }, [attach, descriptor, detach])
 
   useEffect(() => {
     if (searchOpen) searchInputRef.current?.focus({ preventScroll: true })
   }, [searchOpen])
 
   useEffect(() => {
-    if (!searchOpen) clearSearch(key)
+    if (!searchOpen && key) clearSearch(key)
   }, [clearSearch, key, searchOpen])
 
-  const restart = useCallback(() => restartSession(key), [key, restartSession])
+  useEffect(() => {
+    return () => {
+      if (key) clearSearch(key)
+    }
+  }, [clearSearch, key])
+
+  const newTerminal = useCallback(() => createTerminal(base), [base, createTerminal])
+  const closeTerminalKey = useCallback(
+    (terminalKey: string) => {
+      const remaining = closeTerminal(terminalKey)
+      if (remaining.length === 0) useReposStore.getState().dismissExitedTerminalDetail(repoRoot, worktreePath)
+    },
+    [closeTerminal, repoRoot, worktreePath],
+  )
   const closeSearch = useCallback(() => {
     setSearchOpen(false)
     setSearchTerm('')
   }, [])
   const searchNext = useCallback(
     (term = searchTerm, incremental = false) => {
+      if (!key) return
       findNext(key, term, incremental)
     },
     [findNext, key, searchTerm],
   )
   const searchPrevious = useCallback(() => {
+    if (!key) return
     findPrevious(key, searchTerm)
   }, [findPrevious, key, searchTerm])
   const handleFocus = useCallback(
     (event: FocusEvent<HTMLDivElement>) => {
-      setTerminalFocused(isTerminalFocusTarget(key, event.target))
+      setTerminalFocused(!!key && isTerminalFocusTarget(key, event.target))
     },
     [isTerminalFocusTarget, key],
   )
@@ -136,17 +171,28 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
       onKeyDownCapture={handleKeyDownCapture}
     >
       <div ref={hostRef} className="goblin-terminal-slot__host" />
+      <TerminalSwitcher
+        groupKey={groupKey}
+        sessions={summaries}
+        offsetForSearch={searchOpen}
+        onNew={newTerminal}
+        onSelect={setActive}
+        onClose={closeTerminalKey}
+      />
       {searchOpen && (
         <div className="goblin-terminal-slot__search">
           <input
             ref={searchInputRef}
             className="goblin-terminal-slot__search-input"
             value={searchTerm}
+            aria-label={t('terminal.search-placeholder')}
             placeholder={t('terminal.search-placeholder')}
             onChange={(event) => handleSearchChange(event.target.value)}
             onKeyDown={handleSearchKeyDown}
           />
-          <span className="goblin-terminal-slot__search-result">{resultLabel}</span>
+          <span className="goblin-terminal-slot__search-result" role="status" aria-live="polite" aria-atomic="true">
+            {resultLabel}
+          </span>
           <Button type="button" size="sm" variant="ghost" onClick={searchPrevious} disabled={!searchTerm}>
             {t('terminal.search-previous')}
           </Button>
@@ -158,14 +204,14 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
           </Button>
         </div>
       )}
-      {(snapshot.phase === 'opening' || snapshot.phase === 'error') && (
+      {snapshot.phase === 'opening' && (
         <div className="goblin-terminal-slot__status-overlay">
-          <span>{snapshot.phase === 'opening' ? t('terminal.opening') : t(snapshot.message ?? 'error.unknown')}</span>
-          {snapshot.phase === 'error' && (
-            <Button type="button" size="sm" variant="secondary" onClick={restart}>
-              {t('terminal.restart')}
-            </Button>
-          )}
+          <span>{t('terminal.opening')}</span>
+        </div>
+      )}
+      {snapshot.phase === 'error' && snapshot.message !== 'terminal.empty' && (
+        <div className="goblin-terminal-slot__status-overlay">
+          <span>{t(snapshot.message ?? 'error.unknown')}</span>
         </div>
       )}
     </div>

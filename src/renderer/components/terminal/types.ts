@@ -4,6 +4,9 @@ export type TerminalPhase = 'opening' | 'open' | 'error'
 
 export interface TerminalDescriptor {
   key: string
+  groupKey: string
+  terminalId: string
+  index: number
   repoRoot: string
   branch: string
   worktreePath: string
@@ -12,6 +15,7 @@ export interface TerminalDescriptor {
 export interface TerminalSnapshot {
   phase: TerminalPhase
   message: string | null
+  processName: string
   search?: TerminalSearchResult | null
 }
 
@@ -21,8 +25,30 @@ export interface TerminalSearchResult {
   found: boolean
 }
 
+export interface TerminalSessionBase {
+  repoRoot: string
+  branch: string
+  worktreePath: string
+}
+
+export interface TerminalSessionSummary {
+  key: string
+  groupKey: string
+  terminalId: string
+  index: number
+  title: string
+  phase: TerminalPhase
+  active: boolean
+}
+
 export interface TerminalSessionContextValue {
   version: number
+  ensureDefault: (base: TerminalSessionBase) => string
+  createTerminal: (base: TerminalSessionBase) => string
+  activeDescriptor: (groupKey: string) => TerminalDescriptor | null
+  sessionSummaries: (groupKey: string) => TerminalSessionSummary[]
+  setActive: (groupKey: string, key: string) => void
+  closeTerminal: (key: string) => TerminalSessionSummary[]
   attach: (descriptor: TerminalDescriptor, host: HTMLElement) => void
   detach: (key: string, host: HTMLElement) => void
   restart: (key: string) => void

@@ -248,6 +248,10 @@ export const ko: Record<DictKey, string> = {
   'terminal.search-previous': '이전',
   'terminal.search-next': '다음',
   'terminal.search-close': '닫기',
+  'terminal.sessions': '터미널',
+  'terminal.new': '새 터미널',
+  'terminal.close': '터미널 닫기',
+  'terminal.empty': '열린 터미널 없음',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': 'Finder 에서 보기',

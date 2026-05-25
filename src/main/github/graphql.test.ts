@@ -212,5 +212,4 @@ describe('graphqlRequestResult', () => {
       'Test failed on github.com: UNAUTHORIZED HTTP 401 (non-retryable) - Bad credentials',
     )
   })
-
 })

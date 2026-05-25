@@ -54,7 +54,6 @@ export class ManagedTerminalSession {
   private host: HTMLElement | null = null
   private phase: TerminalPhase = 'opening'
   private message: string | null = null
-  private suppressData = false
   private replayBoundarySeq: number | null = null
   private replayPendingOutput: TerminalOutputEvent[] = []
   private startToken = 0
@@ -72,6 +71,7 @@ export class ManagedTerminalSession {
   private lastPtyCols = 0
   private lastPtyRows = 0
   private searchResult: TerminalSearchResult | null = null
+  private processName = 'terminal'
 
   constructor(descriptor: TerminalDescriptor, notify: () => void) {
     this.descriptor = descriptor
@@ -142,7 +142,7 @@ export class ManagedTerminalSession {
   }
 
   snapshot(): TerminalSnapshot {
-    const snapshot: TerminalSnapshot = { phase: this.phase, message: this.message }
+    const snapshot: TerminalSnapshot = { phase: this.phase, message: this.message, processName: this.processName }
     if (this.searchResult) snapshot.search = this.searchResult
     return snapshot
   }
@@ -152,7 +152,7 @@ export class ManagedTerminalSession {
   }
 
   writeInput(data: string): void {
-    if (this.suppressData || !this.ptySessionId) return
+    if (!this.ptySessionId) return
     void terminalBridge.write({ sessionId: this.ptySessionId, data }).catch(() => {})
   }
 
@@ -175,6 +175,7 @@ export class ManagedTerminalSession {
 
   handleOutput(event: TerminalOutputEvent): void {
     if (event.sessionId !== this.ptySessionId) return
+    this.setProcessName(event.processName)
     if (this.replayBoundarySeq !== null) {
       this.replayPendingOutput.push(event)
       return
@@ -232,9 +233,10 @@ export class ManagedTerminalSession {
       }
       this.replacingPtySessionId = null
       this.ptySessionId = result.sessionId
+      this.setProcessName(result.processName)
       this.lastPtyCols = term.cols
       this.lastPtyRows = term.rows
-      await this.replayActiveView(token, term, result.replay, result.replaySeq)
+      await this.replayActiveView(token, term, result.replay, result.replaySeq, result.replayTruncated)
       if (!this.currentStart(token, term)) return
       this.setSnapshot('open', null)
       if (this.host) term.focus()
@@ -251,6 +253,7 @@ export class ManagedTerminalSession {
       repoRoot: this.descriptor.repoRoot,
       branch: this.descriptor.branch,
       worktreePath: this.descriptor.worktreePath,
+      terminalId: this.descriptor.terminalId,
       cols: term.cols,
       rows: term.rows,
     }
@@ -261,23 +264,29 @@ export class ManagedTerminalSession {
       repoRoot: this.descriptor.repoRoot,
       branch: this.descriptor.branch,
       worktreePath: this.descriptor.worktreePath,
+      terminalId: this.descriptor.terminalId,
       cols: term.cols,
       rows: term.rows,
     }
   }
 
-  private async replayActiveView(token: number, term: XTermTerminal, replay: string, replaySeq: number): Promise<void> {
+  private async replayActiveView(
+    token: number,
+    term: XTermTerminal,
+    replay: string,
+    replaySeq: number,
+    replayTruncated: boolean,
+  ): Promise<void> {
     this.replayBoundarySeq = replaySeq
     this.replayPendingOutput = []
-    this.suppressData = true
     try {
+      if (replayTruncated) term.reset()
       if (replay) term.write(replay)
       await waitForTerminalResponseFlush()
     } finally {
       if (this.currentStart(token, term)) {
         const pendingOutput = this.replayPendingOutput.splice(0)
         this.replayBoundarySeq = null
-        this.suppressData = false
         for (const event of outputAfterReplay(pendingOutput, replaySeq)) this.queueOutput(event.data)
       }
     }
@@ -301,9 +310,15 @@ export class ManagedTerminalSession {
     if (!sessionId || !resize) return
     const { cols, rows } = resize
     if (this.lastPtyCols === cols && this.lastPtyRows === rows) return
-    this.lastPtyCols = cols
-    this.lastPtyRows = rows
-    void terminalBridge.resize({ sessionId, cols, rows }).catch(() => {})
+    void terminalBridge
+      .resize({ sessionId, cols, rows })
+      .then((ok) => {
+        if (ok && this.ptySessionId === sessionId) {
+          this.lastPtyCols = cols
+          this.lastPtyRows = rows
+        }
+      })
+      .catch(() => {})
   }
 
   private cancelResizeFlush(): void {
@@ -344,7 +359,6 @@ export class ManagedTerminalSession {
     this.pendingResize = null
     this.pendingOutput = []
     this.startToken += 1
-    this.suppressData = false
     this.replayBoundarySeq = null
     this.replayPendingOutput = []
     for (const disposable of this.disposables.splice(0)) disposable.dispose()
@@ -516,6 +530,13 @@ export class ManagedTerminalSession {
   private setSnapshot(phase: TerminalPhase, message: string | null): void {
     this.phase = phase
     this.message = message
+    this.notify()
+  }
+
+  private setProcessName(processName: string): void {
+    const next = processName.trim() || 'terminal'
+    if (this.processName === next) return
+    this.processName = next
     this.notify()
   }
 

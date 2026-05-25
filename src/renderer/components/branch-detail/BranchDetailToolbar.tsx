@@ -11,6 +11,8 @@ import { Toolbar } from '#/renderer/components/Layout.tsx'
 import { detailTabNavigationKey, navigatedDetailTab, visibleDetailTabs } from '#/renderer/lib/detail-tabs.ts'
 import { cn } from '#/renderer/lib/cn.ts'
 import { repoWorkspaceBehavior } from '#/renderer/lib/workspace-layout.ts'
+import { terminalSessionGroupKey } from '#/renderer/components/terminal/terminal-session-utils.ts'
+import { useTerminalSessionContext } from '#/renderer/components/terminal/terminal-session-context.ts'
 import type { SelectedBranchDetailPresentation } from '#/renderer/components/branch-detail/model.ts'
 
 interface Props {
@@ -30,8 +32,12 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
   const toggleDetailCollapsed = useReposStore((s) => s.toggleDetailCollapsed)
   const toggleDetailFocusMode = useReposStore((s) => s.toggleDetailFocusMode)
   const shortcutsDisabled = useSettingsStore((s) => s.shortcutsDisabled)
+  const terminalContext = useTerminalSessionContext()
   const behavior = repoWorkspaceBehavior(layout, collapsed, focusMode)
   const tabs = visibleDetailTabs(!!detail.branch?.worktreePath)
+  const terminalCount = detail.branch?.worktreePath
+    ? terminalContext.sessionSummaries(terminalSessionGroupKey(repo.id, detail.branch.worktreePath)).length
+    : 0
 
   // No selected branch means there is no tab/action target; BranchDetailContent renders the empty state.
   if (!detail.branch) return null
@@ -118,6 +124,11 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
               {tab.id === 'changes' && detail.statusCount > 0 && (
                 <Badge variant="attention" className="font-mono tabular-nums">
                   {detail.statusCount}
+                </Badge>
+              )}
+              {tab.id === 'terminal' && terminalCount > 0 && (
+                <Badge variant="outline" className="font-mono tabular-nums text-muted-foreground">
+                  {terminalCount}
                 </Badge>
               )}
             </button>

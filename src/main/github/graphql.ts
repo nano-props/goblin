@@ -282,9 +282,15 @@ export async function graphqlRequestResult<TData>(
     if (signal?.aborted || isAbortError(err)) {
       return {
         ok: false,
-        error: graphqlError(repo, operationName, 'TIMEOUT', err instanceof Error ? err.message : 'The operation was aborted.', {
-          retryable: true,
-        }),
+        error: graphqlError(
+          repo,
+          operationName,
+          'TIMEOUT',
+          err instanceof Error ? err.message : 'The operation was aborted.',
+          {
+            retryable: true,
+          },
+        ),
       }
     }
     return {
