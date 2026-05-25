@@ -1,4 +1,4 @@
-import { git, gitResult } from '#/main/git/helper.ts'
+import { git, gitResultWithOptions } from '#/main/git/helper.ts'
 import { FIELD_SEP, parseBranches, parseLog } from '#/main/git/parsers.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 import type { BranchInfo, ExecResult, LogEntry, WorktreeInfo } from '#/shared/git-types.ts'
@@ -12,9 +12,9 @@ export async function isGitRepo(cwd: string): Promise<boolean> {
   }
 }
 
-export async function getRepoRoot(cwd: string): Promise<string> {
+export async function getRepoRoot(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
   try {
-    return await git(cwd, ['rev-parse', '--show-toplevel'])
+    return await git(cwd, ['rev-parse', '--show-toplevel'], { signal: options?.signal })
   } catch {
     return ''
   }
@@ -30,6 +30,7 @@ export async function getRepoName(cwd: string): Promise<string> {
 }
 
 export async function getCurrentBranch(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
+  if (options?.signal?.aborted) return ''
   // `symbolic-ref` fails on detached HEAD — exactly what we want.
   // `rev-parse --abbrev-ref HEAD` would return literal "HEAD" there.
   try {
@@ -132,22 +133,27 @@ export async function getLog(cwd: string, branch: string, count = 100, skip = 0)
   }
 }
 
-export async function checkoutBranch(cwd: string, name: string): Promise<ExecResult> {
+export async function checkoutBranch(cwd: string, name: string, signal?: AbortSignal): Promise<ExecResult> {
   if (!isSafeBranchName(name)) return { ok: false, message: 'error.invalid-arguments' }
-  return gitResult(cwd, 'switch', '--', name)
+  return gitResultWithOptions(cwd, { signal }, 'switch', '--', name)
 }
 
-export async function deleteBranch(cwd: string, name: string, options?: { force?: boolean }): Promise<ExecResult> {
+export async function deleteBranch(
+  cwd: string,
+  name: string,
+  options?: { force?: boolean; signal?: AbortSignal },
+): Promise<ExecResult> {
   if (!isSafeBranchName(name)) return { ok: false, message: 'error.invalid-arguments' }
-  return gitResult(cwd, 'branch', options?.force ? '-D' : '-d', '--', name)
+  return gitResultWithOptions(cwd, { signal: options?.signal }, 'branch', options?.force ? '-D' : '-d', '--', name)
 }
 
 /** Resolve `branch`'s upstream short ref (e.g. "origin/feat") or null
  *  when the branch has no upstream configured. */
-export async function getUpstream(cwd: string, branch: string): Promise<string | null> {
+export async function getUpstream(cwd: string, branch: string, signal?: AbortSignal): Promise<string | null> {
   if (!isSafeBranchName(branch)) return null
+  if (signal?.aborted) return null
   try {
-    const out = await git(cwd, ['rev-parse', '--abbrev-ref', `${branch}@{u}`])
+    const out = await git(cwd, ['rev-parse', '--abbrev-ref', `${branch}@{u}`], { signal })
     return out.trim() || null
   } catch {
     return null
@@ -162,10 +168,16 @@ export async function getUpstream(cwd: string, branch: string): Promise<string |
  *  literal or a value just produced by git itself (getUpstream). The
  *  trailing `--` keeps either argument from being interpreted as a flag
  *  if a future caller passes user input. */
-export async function isAncestor(cwd: string, ancestor: string, descendant: string): Promise<boolean> {
+export async function isAncestor(
+  cwd: string,
+  ancestor: string,
+  descendant: string,
+  signal?: AbortSignal,
+): Promise<boolean> {
   if (!isSafeBranchName(ancestor)) return false
+  if (signal?.aborted) return false
   try {
-    await git(cwd, ['merge-base', '--is-ancestor', '--', ancestor, descendant])
+    await git(cwd, ['merge-base', '--is-ancestor', '--', ancestor, descendant], { signal })
     return true
   } catch {
     return false

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { replaceRepo } from '#/renderer/stores/repos/helpers.ts'
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
-import { runningOperation } from '#/renderer/stores/repos/operations.ts'
+import { markRepoOperationTargets, repoOperation } from '#/renderer/stores/repos/runtime.ts'
 import { INITIAL_LOG_COUNT, LOG_PAGE_SIZE } from '#/renderer/stores/repos/refresh.ts'
 import { branch, REPO_ID, resetRefreshTest, rpcHandlers, seedRepo } from '#/renderer/stores/repos/refresh-test-utils.ts'
 import { canStartRemoteFetch } from '#/renderer/stores/repos/sync-state.ts'
@@ -42,7 +42,7 @@ describe('remote fetch timestamps', () => {
 
     await useReposStore.getState().syncAndRefresh(REPO_ID, { token })
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ops.fetch.settledAt).toBeGreaterThanOrEqual(before)
+    expect(useReposStore.getState().repos[REPO_ID]?.resources.fetch.loadedAt).toBeGreaterThanOrEqual(before)
   })
 
   test('manual sync ignores stale fetch results after repo reopen', async () => {
@@ -65,7 +65,7 @@ describe('remote fetch timestamps', () => {
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.instanceToken).toBe(2)
     expect(repo?.events).toEqual([])
-    expect(repo?.ops.fetch.settledAt).toBeNull()
+    expect(repo?.resources.fetch.loadedAt).toBeNull()
   })
 
   test('background fetch records the remote fetch settled time', async () => {
@@ -76,7 +76,7 @@ describe('remote fetch timestamps', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.instanceToken).toBe(token)
-    expect(repo?.ops.fetch.settledAt).toBeGreaterThanOrEqual(before)
+    expect(repo?.resources.fetch.loadedAt).toBeGreaterThanOrEqual(before)
   })
 
   test('background fetch result from a closed repo does not pollute a reopened repo', async () => {
@@ -98,7 +98,7 @@ describe('remote fetch timestamps', () => {
     expect(repo?.instanceToken).toBe(newToken)
     expect(repo?.data.branches.map((b) => b.name)).toEqual(['feature/reopened'])
     expect(repo?.remote).toEqual({ fetchFailed: false, fetchError: null })
-    expect(repo?.ops.fetch.settledAt).toBeNull()
+    expect(repo?.resources.fetch.loadedAt).toBeNull()
   })
 
   test('background fetch records and clears fetch failures', async () => {
@@ -113,6 +113,11 @@ describe('remote fetch timestamps', () => {
       fetchFailed: true,
       fetchError: 'fatal: offline',
     })
+    expect(useReposStore.getState().repos[REPO_ID]?.resources.fetch).toMatchObject({
+      phase: 'idle',
+      error: 'fatal: offline',
+      stale: false,
+    })
 
     fetchOk = true
     await useReposStore.getState().backgroundFetch(REPO_ID)
@@ -120,6 +125,11 @@ describe('remote fetch timestamps', () => {
     expect(useReposStore.getState().repos[REPO_ID]?.remote).toEqual({
       fetchFailed: false,
       fetchError: null,
+    })
+    expect(useReposStore.getState().repos[REPO_ID]?.resources.fetch).toMatchObject({
+      phase: 'idle',
+      error: null,
+      stale: false,
     })
   })
 
@@ -147,13 +157,13 @@ describe('remote fetch timestamps', () => {
 
     const work = useReposStore.getState().backgroundFetch(REPO_ID)
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ops.fetch.settledAt).toBeNull()
+    expect(useReposStore.getState().repos[REPO_ID]?.resources.fetch.loadedAt).toBeNull()
 
     resolveFetch({ ok: true, message: 'ok' })
     await work
 
     expect(useReposStore.getState().repos[REPO_ID]?.instanceToken).toBe(token)
-    expect(useReposStore.getState().repos[REPO_ID]?.ops.fetch.settledAt).not.toBeNull()
+    expect(useReposStore.getState().repos[REPO_ID]?.resources.fetch.loadedAt).not.toBeNull()
   })
 
   test('coalesces concurrent background fetch requests for the same repo', async () => {
@@ -209,7 +219,7 @@ describe('remote fetch timestamps', () => {
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.instanceToken).toBe(newToken)
     expect(repo?.data.branches.map((b) => b.name)).toEqual(['feature/reopened'])
-    expect(repo?.ops.fetch.settledAt).not.toBeNull()
+    expect(repo?.resources.fetch.loadedAt).not.toBeNull()
   })
 
   test('network operations expose repo-level fetch busy state', async () => {
@@ -223,13 +233,13 @@ describe('remote fetch timestamps', () => {
     const work = useReposStore.getState().syncAndRefresh(REPO_ID, { token })
 
     const runningRepo = useReposStore.getState().repos[REPO_ID]
-    expect(runningRepo?.ops.fetch.phase).toBe('running')
+    expect(runningRepo?.resources.fetch.phase).toBe('loading')
     expect(canStartRemoteFetch(runningRepo)).toBe(false)
 
     resolveNetwork({ ok: true, message: 'ok' })
     await work
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ops.fetch.phase).toBe('idle')
+    expect(useReposStore.getState().repos[REPO_ID]?.resources.fetch.phase).toBe('idle')
   })
 
   test('manual sync records failed fetch results and still refreshes local state', async () => {
@@ -258,7 +268,7 @@ describe('remote fetch timestamps', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.events.at(-1)).toMatchObject({ kind: 'result', result: { ok: false, message: 'network down' } })
-    expect(repo?.ops.fetch.phase).toBe('idle')
+    expect(repo?.resources.fetch.phase).toBe('idle')
   })
 
   test('branch network actions expose branch and fetch operation state', async () => {
@@ -272,16 +282,16 @@ describe('remote fetch timestamps', () => {
     const work = useReposStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' }, { token })
 
     const runningRepo = useReposStore.getState().repos[REPO_ID]
-    expect(runningRepo?.ops.branchAction.phase).toBe('running')
-    expect(runningRepo?.ops.fetch.phase).toBe('running')
+    expect(runningRepo?.resources.branchAction.phase).toBe('loading')
+    expect(runningRepo?.resources.fetch.phase).toBe('loading')
     expect(canStartRemoteFetch(runningRepo)).toBe(false)
 
     resolvePull({ ok: true, message: 'ok' })
     await work
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.ops.branchAction.phase).toBe('idle')
-    expect(repo?.ops.fetch.phase).toBe('idle')
+    expect(repo?.resources.branchAction.phase).toBe('idle')
+    expect(repo?.resources.fetch.phase).toBe('idle')
   })
 
   test('branch write actions run through branch operation state and refresh after completion', async () => {
@@ -300,14 +310,14 @@ describe('remote fetch timestamps', () => {
     const work = useReposStore.getState().runBranchAction(REPO_ID, { kind: 'checkout', branch: 'feature/a' }, { token })
 
     const runningRepo = useReposStore.getState().repos[REPO_ID]
-    expect(runningRepo?.ops.branchAction.phase).toBe('running')
+    expect(runningRepo?.resources.branchAction.phase).toBe('loading')
     expect(canStartRemoteFetch(runningRepo)).toBe(false)
 
     resolveCheckout({ ok: true, message: 'ok' })
     await work
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.ops.branchAction.phase).toBe('idle')
+    expect(repo?.resources.branchAction.phase).toBe('idle')
     expect(repo?.data.currentBranch).toBe('feature/a')
     expect(snapshotCount).toBe(1)
   })
@@ -334,7 +344,7 @@ describe('remote fetch timestamps', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(result).toEqual({ ok: true, message: 'ok' })
-    expect(repo?.ops.branchAction.phase).toBe('idle')
+    expect(repo?.resources.branchAction.phase).toBe('idle')
     expect(repo?.data.branches.map((b) => b.name)).toEqual(['main', 'feature/a'])
     expect(snapshotCount).toBe(1)
   })
@@ -384,7 +394,7 @@ describe('remote fetch timestamps', () => {
     expect(result).toEqual({ ok: false, message: 'error.branch-not-fully-merged' })
     expect(repo?.events).toEqual([])
     expect(snapshotCount).toBe(0)
-    expect(repo?.ops.branchAction.phase).toBe('idle')
+    expect(repo?.resources.branchAction.phase).toBe('idle')
   })
 
   test('branch action failures refresh by default', async () => {
@@ -421,6 +431,16 @@ describe('remote fetch timestamps', () => {
     expect(useReposStore.getState().repos[REPO_ID]?.remote).toEqual({
       fetchFailed: true,
       fetchError: 'previous failure',
+    })
+    expect(useReposStore.getState().repos[REPO_ID]?.resources.branchAction).toMatchObject({
+      phase: 'idle',
+      error: 'fatal: rejected',
+      kind: null,
+      target: null,
+    })
+    expect(useReposStore.getState().repos[REPO_ID]?.resources.fetch).toMatchObject({
+      phase: 'idle',
+      error: 'fatal: rejected',
     })
   })
 
@@ -567,6 +587,49 @@ describe('core refresh request ordering', () => {
     expect(useReposStore.getState().repos[REPO_ID]?.data.status).toEqual(fresh)
   })
 
+  test('refreshStatus records resource loading, success, and stale error state', async () => {
+    const token = seedRepo([branch('feature/a')])
+    let resolveStatus!: (value: WorktreeStatus[]) => void
+    const status: WorktreeStatus[] = [{ path: '/tmp/gbl-test-repo', branch: 'feature/a', isMain: true, entries: [] }]
+    rpcHandlers['repo.status'] = () =>
+      new Promise<WorktreeStatus[]>((resolve) => {
+        resolveStatus = resolve
+      })
+
+    const work = useReposStore.getState().refreshStatus(REPO_ID, { token })
+
+    expect(useReposStore.getState().repos[REPO_ID]?.resources.status).toMatchObject({
+      phase: 'loading',
+      loadedAt: null,
+      error: null,
+      stale: false,
+    })
+
+    resolveStatus(status)
+    await work
+
+    const loadedAt = useReposStore.getState().repos[REPO_ID]?.resources.status.loadedAt
+    expect(loadedAt).toEqual(expect.any(Number))
+    expect(useReposStore.getState().repos[REPO_ID]?.resources.status).toMatchObject({
+      phase: 'idle',
+      error: null,
+      stale: false,
+    })
+
+    rpcHandlers['repo.status'] = async () => {
+      throw new Error('status failed')
+    }
+
+    await useReposStore.getState().refreshStatus(REPO_ID, { token })
+
+    expect(useReposStore.getState().repos[REPO_ID]?.resources.status).toMatchObject({
+      phase: 'idle',
+      loadedAt,
+      error: 'status failed',
+      stale: true,
+    })
+  })
+
   test('marks read operations as queued before scheduler starts them', async () => {
     const token = seedRepo([branch('feature/a')])
     const resolvers: Array<(value: WorktreeStatus[]) => void> = []
@@ -578,20 +641,20 @@ describe('core refresh request ordering', () => {
     const works = Array.from({ length: 4 }, () => useReposStore.getState().refreshStatus(REPO_ID, { token }))
 
     expect(resolvers).toHaveLength(3)
-    expect(useReposStore.getState().repos[REPO_ID]?.ops.status.phase).toBe('queued')
+    expect(repoOperation(REPO_ID, 'status').phase).toBe('queued')
 
     resolvers[0]?.([])
     await works[0]
 
     expect(resolvers).toHaveLength(4)
-    expect(useReposStore.getState().repos[REPO_ID]?.ops.status.phase).toBe('running')
+    expect(repoOperation(REPO_ID, 'status').phase).toBe('running')
 
     resolvers[1]?.([])
     resolvers[2]?.([])
     resolvers[3]?.([])
     await Promise.all(works)
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ops.status.phase).toBe('idle')
+    expect(repoOperation(REPO_ID, 'status').phase).toBe('idle')
   })
 
   test('closing a repo cancels active and queued repo operations', async () => {
@@ -605,7 +668,7 @@ describe('core refresh request ordering', () => {
 
     const works = Array.from({ length: 4 }, () => useReposStore.getState().refreshStatus(REPO_ID, { token }))
     expect(callCount).toBe(3)
-    expect(useReposStore.getState().repos[REPO_ID]?.ops.status.phase).toBe('queued')
+    expect(repoOperation(REPO_ID, 'status').phase).toBe('queued')
 
     useReposStore.getState().closeRepo(REPO_ID)
 
@@ -626,7 +689,7 @@ describe('core refresh request ordering', () => {
 
     try {
       expect(resolvers).toHaveLength(3)
-      expect(useReposStore.getState().repos[REPO_ID]?.ops.status.phase).toBe('queued')
+      expect(repoOperation(REPO_ID, 'status').phase).toBe('queued')
 
       await expect(works[3]).resolves.toBeUndefined()
 
@@ -678,18 +741,29 @@ describe('core refresh request ordering', () => {
         stale: { entries: [], selectedHash: null, hasMore: false },
         fresh: { entries: [], selectedHash: null, hasMore: false },
       }
-      repo.ops.logsByBranch = {
-        stale: runningOperation({ reason: 'log' }),
-        fresh: runningOperation({ reason: 'log' }),
+      repo.resources.logsByBranch = {
+        stale: { phase: 'loading', loadedAt: null, error: null, stale: false },
+        fresh: { phase: 'loading', loadedAt: null, error: null, stale: false },
       }
     })
+    markRepoOperationTargets(
+      REPO_ID,
+      1,
+      [
+        { key: 'log:stale', reason: 'log' },
+        { key: 'log:fresh', reason: 'log' },
+      ],
+      'running',
+    )
     rpcHandlers['repo.snapshot'] = async () => ({ branches: [branch('fresh')], current: 'fresh' })
 
     await useReposStore.getState().refreshSnapshot(REPO_ID, { token })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(Object.keys(repo?.data.logsByBranch ?? {})).toEqual(['fresh'])
-    expect(Object.keys(repo?.ops.logsByBranch ?? {})).toEqual(['fresh'])
+    expect(Object.keys(repo?.resources.logsByBranch ?? {})).toEqual(['fresh'])
+    expect(repoOperation(REPO_ID, 'log:stale').phase).toBe('idle')
+    expect(repoOperation(REPO_ID, 'log:fresh').phase).toBe('running')
   })
 
   test('snapshot refresh falls back from terminal tab when selected branch loses its worktree', async () => {
@@ -783,7 +857,7 @@ describe('core refresh request ordering', () => {
     expect(log?.entries).toHaveLength(INITIAL_LOG_COUNT)
     expect(log?.selectedHash).toBe('hash-0')
     expect(log?.hasMore).toBe(true)
-    expect(useReposStore.getState().repos[REPO_ID]?.ops.logsByBranch.main?.phase).toBe('idle')
+    expect(repoOperation(REPO_ID, 'log:main').phase).toBe('idle')
   })
 
   test('loadMoreBranchLog appends the next page', async () => {
@@ -824,6 +898,6 @@ describe('core refresh request ordering', () => {
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(logCalls).toBe(0)
     expect(repo?.data.logsByBranch.missing).toBeUndefined()
-    expect(repo?.ops.logsByBranch.missing).toBeUndefined()
+    expect(repoOperation(REPO_ID, 'log:missing').phase).toBe('idle')
   })
 })

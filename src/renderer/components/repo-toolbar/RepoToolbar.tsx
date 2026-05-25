@@ -12,8 +12,6 @@ interface Props {
 }
 
 // Keep this equality in sync with fields read by RepoToolbar children.
-// Operation settle updates can change only ops.* references; omitting one
-// can leave busy indicators stale even though the store updated.
 function repoToolbarEqual(a: RepoState | undefined, b: RepoState | undefined): boolean {
   return (
     a === b ||
@@ -27,12 +25,12 @@ function repoToolbarEqual(a: RepoState | undefined, b: RepoState | undefined): b
       a.ui.selectedBranch === b.ui.selectedBranch &&
       a.ui.branchViewMode === b.ui.branchViewMode &&
       a.data.logsByBranch === b.data.logsByBranch &&
-      a.ops.snapshot === b.ops.snapshot &&
-      a.ops.status === b.ops.status &&
-      a.ops.fetch === b.ops.fetch &&
-      a.ops.logsByBranch === b.ops.logsByBranch &&
-      a.ops.pullRequests === b.ops.pullRequests &&
-      a.ops.branchAction === b.ops.branchAction &&
+      a.resources.snapshot === b.resources.snapshot &&
+      a.resources.status === b.resources.status &&
+      a.resources.fetch === b.resources.fetch &&
+      a.resources.logsByBranch === b.resources.logsByBranch &&
+      a.resources.pullRequests === b.resources.pullRequests &&
+      a.resources.branchAction === b.resources.branchAction &&
       a.cache.source === b.cache.source &&
       a.cache.savedAt === b.cache.savedAt &&
       a.remote.fetchFailed === b.remote.fetchFailed &&

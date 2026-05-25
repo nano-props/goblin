@@ -1,4 +1,29 @@
+import {
+  idleOperation,
+  operationBusy,
+  queueOperation,
+  settleOperation,
+  startOperation,
+  type RepoOperationReason,
+  type RepoOperationState,
+} from '#/renderer/stores/repos/operations.ts'
+
 export type RepoTaskLane = 'network' | 'read' | 'write'
+
+export type RepoOperationKey =
+  | 'fetch'
+  | 'snapshot'
+  | 'status'
+  | 'pullRequests'
+  | 'branchAction'
+  | `log:${string}`
+  | `pullRequest:${string}`
+
+export interface RepoRuntimeOperationTarget {
+  key: RepoOperationKey
+  reason: RepoOperationReason
+  target?: string | null
+}
 
 interface QueuedRepoTask<T> {
   task: (signal: AbortSignal) => Promise<T>
@@ -105,6 +130,7 @@ class RepoLane {
 interface RepoRuntime {
   nextOperationId: number
   queues: Record<RepoTaskLane, RepoLane>
+  operations: Partial<Record<RepoOperationKey, RepoOperationState>>
 }
 
 const runtimes = new Map<string, RepoRuntime>()
@@ -117,6 +143,7 @@ function createRuntime(): RepoRuntime {
       read: new RepoLane(3),
       write: new RepoLane(1),
     },
+    operations: {},
   }
 }
 
@@ -132,6 +159,79 @@ function getRuntime(repoId: string): RepoRuntime {
 export function nextRepoOperationId(repoId: string): number {
   const runtime = getRuntime(repoId)
   return runtime.nextOperationId++
+}
+
+function ensureRepoOperation(repoId: string, key: RepoOperationKey): RepoOperationState {
+  const operations = getRuntime(repoId).operations
+  return (operations[key] ??= idleOperation())
+}
+
+export function repoOperation(repoId: string, key: RepoOperationKey): RepoOperationState {
+  return runtimes.get(repoId)?.operations[key] ?? idleOperation()
+}
+
+export function repoOperationBusy(repoId: string, key: RepoOperationKey): boolean {
+  return operationBusy(repoOperation(repoId, key))
+}
+
+export function repoOperationCurrent(repoId: string, key: RepoOperationKey, requestId: number): boolean {
+  return repoOperation(repoId, key).requestId === requestId
+}
+
+export function markRepoOperationTargets(
+  repoId: string,
+  requestId: number,
+  targets: RepoRuntimeOperationTarget[],
+  phase: 'queued' | 'running',
+  wasQueued = false,
+): void {
+  if (phase === 'running' && wasQueued) {
+    const allTargetsQueuedForRequest = targets.every((target) => {
+      const operation = repoOperation(repoId, target.key)
+      return operation.requestId === requestId && operation.phase === 'queued'
+    })
+    if (!allTargetsQueuedForRequest) return
+  }
+  for (const target of targets) {
+    const operation = ensureRepoOperation(repoId, target.key)
+    if (phase === 'running') {
+      startOperation(operation, requestId, { reason: target.reason, target: target.target })
+    } else {
+      queueOperation(operation, requestId, { reason: target.reason, target: target.target })
+    }
+  }
+}
+
+export function settleRepoOperationTargets(
+  repoId: string,
+  requestId: number,
+  targets: RepoRuntimeOperationTarget[],
+  error: string | null,
+): void {
+  const runtime = runtimes.get(repoId)
+  if (!runtime) return
+  for (const target of targets) {
+    const operation = runtime.operations[target.key]
+    if (operation) settleOperation(operation, requestId, { error })
+  }
+}
+
+export function pruneRepoBranchLogOperations(repoId: string, validBranches: Set<string>): void {
+  const operations = runtimes.get(repoId)?.operations
+  if (!operations) return
+  for (const key of Object.keys(operations) as RepoOperationKey[]) {
+    if (!key.startsWith('log:')) continue
+    if (!validBranches.has(key.slice('log:'.length))) delete operations[key]
+  }
+}
+
+export function pruneRepoBranchPullRequestOperations(repoId: string, validBranches: Set<string>): void {
+  const operations = runtimes.get(repoId)?.operations
+  if (!operations) return
+  for (const key of Object.keys(operations) as RepoOperationKey[]) {
+    if (!key.startsWith('pullRequest:')) continue
+    if (!validBranches.has(key.slice('pullRequest:'.length))) delete operations[key]
+  }
 }
 
 export function scheduleRepoTask<T>(

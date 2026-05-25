@@ -1,6 +1,5 @@
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { emptyRepo } from '#/renderer/stores/repos/helpers.ts'
-import { idleRepoOperations } from '#/renderer/stores/repos/operations.ts'
 import { disposeAllRepoRuntimes } from '#/renderer/stores/repos/runtime.ts'
 import type { BranchInfo, PullRequestInfo, WorktreeStatus } from '#/renderer/types.ts'
 import type { DetailTab, RepoState } from '#/renderer/stores/repos/types.ts'
@@ -107,7 +106,6 @@ export function seedRepoState(options: {
   instanceToken?: number
   status?: WorktreeStatus[]
   statusLoaded?: boolean
-  ops?: Partial<RepoState['ops']>
 }): RepoState {
   const base = emptyRepo(options.id, options.name ?? 'repo')
   const repo: RepoState = {
@@ -126,7 +124,6 @@ export function seedRepoState(options: {
       detailTab: options.detailTab ?? base.ui.detailTab,
       commitDetail: options.openCommit ? { phase: 'open', detail: options.openCommit } : base.ui.commitDetail,
     },
-    ops: { ...idleRepoOperations(), ...options.ops },
   }
   useReposStore.setState({
     repos: { [options.id]: repo },

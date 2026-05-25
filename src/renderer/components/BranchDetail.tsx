@@ -15,8 +15,6 @@ interface Props {
 }
 
 // Keep this equality in sync with fields read by BranchDetail children.
-// Log operation settle updates can change only ops.logsByBranch, so it
-// must be compared for the commits-tab spinner to clear.
 function branchDetailRepoEqual(a: RepoState | undefined, b: RepoState | undefined): boolean {
   return (
     a === b ||
@@ -32,16 +30,20 @@ function branchDetailRepoEqual(a: RepoState | undefined, b: RepoState | undefine
       a.data.logsByBranch === b.data.logsByBranch &&
       a.data.status === b.data.status &&
       a.data.statusLoaded === b.data.statusLoaded &&
-      a.ops.status === b.ops.status &&
-      a.ops.logsByBranch === b.ops.logsByBranch &&
-      a.ops.pullRequests === b.ops.pullRequests &&
-      // ops.fetch is intentionally excluded: fetch presentation lives in RepoToolbar/RepoSyncControl.
-      a.ops.branchAction === b.ops.branchAction &&
+      a.resources.status === b.resources.status &&
+      a.resources.logsByBranch === b.resources.logsByBranch &&
+      a.resources.pullRequests === b.resources.pullRequests &&
+      a.resources.branchAction === b.resources.branchAction &&
       a.ui.detailTab === b.ui.detailTab)
   )
 }
 
-export function BranchDetail({ repoId, layout = DEFAULT_WORKSPACE_LAYOUT, collapsed = false, focusMode = false }: Props) {
+export function BranchDetail({
+  repoId,
+  layout = DEFAULT_WORKSPACE_LAYOUT,
+  collapsed = false,
+  focusMode = false,
+}: Props) {
   const detailId = useId()
   const repo = useStoreWithEqualityFn(useReposStore, (s) => s.repos[repoId], branchDetailRepoEqual)
   if (!repo) return null

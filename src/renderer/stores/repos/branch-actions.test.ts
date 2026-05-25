@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
+import { repoOperation } from '#/renderer/stores/repos/runtime.ts'
+import { startResource } from '#/renderer/stores/repos/resources.ts'
+import { replaceRepo } from '#/renderer/stores/repos/helpers.ts'
 import {
   createBranch,
   installGoblinTestBridge,
@@ -19,7 +22,30 @@ beforeEach(() => {
 })
 
 describe('runBranchAction', () => {
-  test('tracks branch action operation state while the action is running', async () => {
+  test('blocks local branch actions while remote fetch resource is busy', async () => {
+    let checkoutCalls = 0
+    installGoblinTestBridge({
+      'repo.checkout': async () => {
+        checkoutCalls += 1
+        return { ok: true, message: 'ok' }
+      },
+    })
+    useReposStore.setState((s) => ({
+      repos: {
+        ...s.repos,
+        [REPO_ID]: replaceRepo(s.repos[REPO_ID]!, (repo) => {
+          startResource(repo.resources.fetch)
+        }),
+      },
+    }))
+
+    const result = await useReposStore.getState().runBranchAction(REPO_ID, { kind: 'checkout', branch: 'feature/a' })
+
+    expect(result).toEqual({ ok: false, message: 'error.network-op-in-progress' })
+    expect(checkoutCalls).toBe(0)
+  })
+
+  test('tracks branch action resource state while the action is running', async () => {
     let release!: () => void
     installGoblinTestBridge({
       'repo.push': () =>
@@ -31,18 +57,28 @@ describe('runBranchAction', () => {
     const work = useReposStore.getState().runBranchAction(REPO_ID, { kind: 'push', branch: 'feature/a' })
     const running = useReposStore.getState().repos[REPO_ID]
 
-    expect(running?.ops.branchAction.phase).toBe('running')
-    expect(running?.ops.branchAction.target).toBe('feature/a')
+    expect(running?.resources.branchAction).toMatchObject({
+      phase: 'loading',
+      kind: 'push',
+      target: 'feature/a',
+    })
+    expect(repoOperation(REPO_ID, 'branchAction').phase).toBe('running')
+    expect(repoOperation(REPO_ID, 'branchAction').target).toBe('feature/a')
 
     release()
     await work
 
     const settled = useReposStore.getState().repos[REPO_ID]
-    expect(settled?.ops.branchAction.phase).toBe('idle')
-    expect(settled?.ops.branchAction.target).toBeNull()
+    expect(settled?.resources.branchAction).toMatchObject({
+      phase: 'idle',
+      kind: null,
+      target: null,
+    })
+    expect(repoOperation(REPO_ID, 'branchAction').phase).toBe('idle')
+    expect(repoOperation(REPO_ID, 'branchAction').target).toBeNull()
   })
 
-  test('tracks create worktree operation state while the action is running', async () => {
+  test('tracks create worktree resource state while the action is running', async () => {
     let release!: () => void
     installGoblinTestBridge({
       'repo.createWorktree': () =>
@@ -59,14 +95,24 @@ describe('runBranchAction', () => {
     })
     const running = useReposStore.getState().repos[REPO_ID]
 
-    expect(running?.ops.branchAction.phase).toBe('running')
-    expect(running?.ops.branchAction.target).toBe('feature/new')
+    expect(running?.resources.branchAction).toMatchObject({
+      phase: 'loading',
+      kind: 'createWorktree',
+      target: 'feature/new',
+    })
+    expect(repoOperation(REPO_ID, 'branchAction').phase).toBe('running')
+    expect(repoOperation(REPO_ID, 'branchAction').target).toBe('feature/new')
 
     release()
     await work
 
     const settled = useReposStore.getState().repos[REPO_ID]
-    expect(settled?.ops.branchAction.phase).toBe('idle')
-    expect(settled?.ops.branchAction.target).toBeNull()
+    expect(settled?.resources.branchAction).toMatchObject({
+      phase: 'idle',
+      kind: null,
+      target: null,
+    })
+    expect(repoOperation(REPO_ID, 'branchAction').phase).toBe('idle')
+    expect(repoOperation(REPO_ID, 'branchAction').target).toBeNull()
   })
 })

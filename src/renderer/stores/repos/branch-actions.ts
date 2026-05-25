@@ -1,6 +1,17 @@
 import { runExclusiveOperation, type RepoOperationTarget } from '#/renderer/stores/repos/operation-runner.ts'
-import { operationBusy } from '#/renderer/stores/repos/operations.ts'
 import type { RepoBranchActionReason, RepoOperationReason } from '#/renderer/stores/repos/operations.ts'
+import { updateIfFresh } from '#/renderer/stores/repos/helpers.ts'
+import { repoOperationBusy } from '#/renderer/stores/repos/runtime.ts'
+import {
+  cancelResource,
+  finishBranchActionResourceError,
+  finishBranchActionResourceSuccess,
+  finishResourceError,
+  finishResourceSuccess,
+  resourceBusy,
+  startBranchActionResource,
+  startResource,
+} from '#/renderer/stores/repos/resources.ts'
 import { canStartRemoteFetch } from '#/renderer/stores/repos/sync-state.ts'
 import type {
   RepoBranchAction,
@@ -61,7 +72,7 @@ function isNetworkBranchAction(action: RepoBranchAction): action is NetworkRepoB
 
 function branchActionTarget(action: RepoBranchAction): RepoOperationTarget {
   return {
-    select: (r) => r.ops.branchAction,
+    key: 'branchAction',
     reason: branchActionReason(action),
     target: branchActionOperationTarget(action),
   }
@@ -118,35 +129,46 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
       if (!repoBefore) return null
       const token = options?.token ?? repoBefore.instanceToken
       if (repoBefore.instanceToken !== token) return null
-      if (operationBusy(repoBefore.ops.branchAction)) {
+      if (resourceBusy(repoBefore.resources.branchAction) || repoOperationBusy(id, 'branchAction')) {
         return { ok: false, message: 'cancelled' }
       }
       const network = isNetworkBranchAction(action)
-      if (network && !canStartBranchNetwork(repoBefore)) {
+      if (!canStartBranchNetwork(repoBefore)) {
         const result = { ok: false, message: 'error.network-op-in-progress' }
         get().setLastResult(id, result, token)
         return result
       }
+      updateIfFresh(set, id, token, (r) => {
+        startBranchActionResource(r.resources.branchAction, action.kind, branchActionOperationTarget(action))
+        if (network) startResource(r.resources.fetch, { hasData: r.resources.fetch.loadedAt !== null })
+      })
       return runExclusiveOperation({
-        set,
         get,
         id,
         token,
         lane: network ? 'network' : 'write',
         priority: 100,
         targets: network
-          ? [
-              branchActionTarget(action),
-              { select: (r) => r.ops.fetch, reason: networkFetchReason(action) },
-            ]
+          ? [branchActionTarget(action), { key: 'fetch', reason: networkFetchReason(action) }]
           : [branchActionTarget(action)],
-        canStart: network ? canStartBranchNetwork : undefined,
         busyResult: network
           ? { ok: false, message: 'error.network-op-in-progress' }
           : { ok: false, message: 'cancelled' },
         task: (signal) => runBranchActionRpc(action, id, signal),
         errorFromResult: (result) => (!result.ok && result.message !== 'cancelled' ? result.message : null),
         onResult: async (result) => {
+          updateIfFresh(set, id, token, (r) => {
+            if (result.message === 'cancelled') {
+              finishBranchActionResourceSuccess(r.resources.branchAction)
+              if (network) cancelResource(r.resources.fetch)
+            } else if (result.ok) {
+              finishBranchActionResourceSuccess(r.resources.branchAction)
+              if (network) finishResourceSuccess(r.resources.fetch)
+            } else {
+              finishBranchActionResourceError(r.resources.branchAction, result.message)
+              if (network) finishResourceError(r.resources.fetch, result.message)
+            }
+          })
           if (result.message === 'cancelled') return
           if (options?.deferResultMessages?.includes(result.message)) return
           get().setLastResult(id, result, token)
@@ -158,6 +180,10 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
           if (result.ok && network) get().clearFetchFailed(id, token)
         },
         onError: (message) => {
+          updateIfFresh(set, id, token, (r) => {
+            finishBranchActionResourceError(r.resources.branchAction, message)
+            if (network) finishResourceError(r.resources.fetch, message)
+          })
           get().setLastResult(id, { ok: false, message }, token)
         },
       })

@@ -4,7 +4,7 @@ import {
   getSelectedBranchDetailPresentation,
 } from '#/renderer/components/branch-detail/model.ts'
 import { emptyRepo } from '#/renderer/stores/repos/helpers.ts'
-import { idleOperation, runningOperation } from '#/renderer/stores/repos/operations.ts'
+import { finishResourceError, startResource } from '#/renderer/stores/repos/resources.ts'
 import { createBranch } from '#/renderer/stores/repos/test-utils.ts'
 
 describe('getSelectedBranchDetailPresentation', () => {
@@ -29,12 +29,12 @@ describe('getSelectedBranchDetailPresentation', () => {
     expect(getSelectedBranchDetailPresentation(repo).branch).toBeNull()
   })
 
-  test('derives log loading from operations instead of log data', () => {
+  test('derives log loading from resource state instead of log data', () => {
     const repo = emptyRepo('/tmp/gbl-detail-presentation-log', 'repo')
     repo.data.branches = [createBranch('main')]
     repo.ui.selectedBranch = 'main'
     repo.data.logsByBranch.main = { entries: [], selectedHash: null, hasMore: false }
-    repo.ops.logsByBranch.main = runningOperation({ reason: 'log' })
+    repo.resources.logsByBranch.main = { phase: 'loading', loadedAt: null, error: null, stale: false }
 
     const detail = getSelectedBranchDetailPresentation(repo)
 
@@ -53,7 +53,7 @@ describe('getSelectedBranchDetailPresentation', () => {
       selectedHash: 'a',
       hasMore: true,
     }
-    repo.ops.logsByBranch.main = runningOperation({ reason: 'log' })
+    repo.resources.logsByBranch.main = { phase: 'refreshing', loadedAt: Date.now(), error: null, stale: false }
 
     const detail = getSelectedBranchDetailPresentation(repo)
 
@@ -61,7 +61,7 @@ describe('getSelectedBranchDetailPresentation', () => {
     expect(detail.loading.logAppend).toBe(true)
   })
 
-  test('surfaces status loading and errors from status operations', () => {
+  test('surfaces status loading and errors from status resource state', () => {
     const repo = emptyRepo('/tmp/gbl-detail-presentation-status', 'repo')
     repo.data.branches = [createBranch('main', { worktreePath: '/tmp/worktree' })]
     repo.data.status = [
@@ -73,14 +73,14 @@ describe('getSelectedBranchDetailPresentation', () => {
       },
     ]
     repo.ui.selectedBranch = 'main'
-    repo.ops.status = { ...idleOperation(), error: 'status failed' }
+    finishResourceError(repo.resources.status, 'status failed')
 
     let detail = getSelectedBranchDetailPresentation(repo)
     expect(detail.statusCount).toBe(1)
     expect(detail.errors.status).toBe('status failed')
     expect(detail.loading.status).toBe(false)
 
-    repo.ops.status = runningOperation({ reason: 'status' })
+    startResource(repo.resources.status, { hasData: true })
     detail = getSelectedBranchDetailPresentation(repo)
     expect(detail.loading.status).toBe(true)
     expect(detail.loading.pullRequests).toBe(false)

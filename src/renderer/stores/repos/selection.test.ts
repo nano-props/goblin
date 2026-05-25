@@ -204,7 +204,7 @@ describe('selectBranch', () => {
 
     useReposStore.getState().selectBranch(REPO_ID, 'main')
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ops.pullRequests.phase).toBe('running')
+    expect(useReposStore.getState().repos[REPO_ID]?.resources.pullRequests.phase).toBe('loading')
     resolve()
     await Promise.resolve()
     expect(calls).toEqual([{ branches: ['main'], mode: 'full' }])

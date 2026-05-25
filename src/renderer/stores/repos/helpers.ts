@@ -1,5 +1,5 @@
 import { produce, type Draft } from 'immer'
-import { emptyRepoOperations } from '#/renderer/stores/repos/operations.ts'
+import { emptyRepoResources } from '#/renderer/stores/repos/resources.ts'
 import type { RepoEvent, RepoState, ReposSet, ReposStore } from '#/renderer/stores/repos/types.ts'
 
 let nextInstanceToken = 1
@@ -24,13 +24,13 @@ export function emptyRepo(id: string, name: string): RepoState {
       status: [],
       statusLoaded: false,
     },
+    resources: emptyRepoResources(),
     ui: {
       selectedBranch: null,
       branchViewMode: 'all',
       detailTab: 'status',
       commitDetail: { phase: 'idle' },
     },
-    ops: emptyRepoOperations(),
     cache: {
       source: 'fresh',
       savedAt: null,
@@ -71,11 +71,7 @@ export function replaceRepo(repo: RepoState, mutator: RepoMutator): RepoState {
   return produce(repo, mutator)
 }
 
-export function replaceRepoState(
-  state: ReposPatch,
-  repo: RepoState,
-  mutator: RepoMutator,
-): ReposPatch {
+export function replaceRepoState(state: ReposPatch, repo: RepoState, mutator: RepoMutator): ReposPatch {
   const nextRepo = replaceRepo(repo, mutator)
   return nextRepo === repo ? state : { repos: { ...state.repos, [repo.id]: nextRepo } }
 }

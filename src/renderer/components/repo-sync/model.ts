@@ -1,6 +1,6 @@
 import type { RepoState } from '#/renderer/stores/repos/types.ts'
 import { canStartRemoteFetch } from '#/renderer/stores/repos/sync-state.ts'
-import { operationBusy } from '#/renderer/stores/repos/operations.ts'
+import { resourceBusy } from '#/renderer/stores/repos/resources.ts'
 
 export type RepoSyncStage = 'cache' | 'branches' | 'status' | 'prs' | 'log' | 'remote'
 
@@ -30,12 +30,12 @@ const STAGE_ACTIVITIES = Object.fromEntries(
 ) as Record<RepoSyncStage, RepoSyncActivity>
 
 export function getRepoSyncActivity(repo: RepoState): RepoSyncActivity | null {
-  const logLoading = Object.values(repo.ops.logsByBranch).some(operationBusy)
-  const snapshotLoading = operationBusy(repo.ops.snapshot)
-  const branchActionLoading = operationBusy(repo.ops.branchAction)
-  const statusLoading = operationBusy(repo.ops.status)
-  const pullRequestsLoading = operationBusy(repo.ops.pullRequests)
-  const remoteLoading = operationBusy(repo.ops.fetch)
+  const logLoading = Object.values(repo.resources.logsByBranch).some(resourceBusy)
+  const snapshotLoading = resourceBusy(repo.resources.snapshot)
+  const branchActionLoading = resourceBusy(repo.resources.branchAction)
+  const statusLoading = resourceBusy(repo.resources.status)
+  const pullRequestsLoading = resourceBusy(repo.resources.pullRequests)
+  const remoteLoading = resourceBusy(repo.resources.fetch)
   const stage =
     repo.cache.source === 'cache' && snapshotLoading
       ? 'cache'

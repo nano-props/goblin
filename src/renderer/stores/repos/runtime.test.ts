@@ -1,5 +1,14 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import { disposeAllRepoRuntimes, disposeRepoRuntime, scheduleRepoTask } from '#/renderer/stores/repos/runtime.ts'
+import {
+  disposeAllRepoRuntimes,
+  disposeRepoRuntime,
+  markRepoOperationTargets,
+  pruneRepoBranchPullRequestOperations,
+  repoOperation,
+  repoOperationBusy,
+  scheduleRepoTask,
+  settleRepoOperationTargets,
+} from '#/renderer/stores/repos/runtime.ts'
 
 const REPO_ID = '/tmp/gbl-runtime-test-repo'
 
@@ -96,5 +105,49 @@ describe('repo runtime task scheduling', () => {
     await expect(active).rejects.toThrow('active cancelled')
     await expect(queued).rejects.toThrow('cancelled')
     expect(activeAborted).toBe(true)
+  })
+
+  test('dispose clears operation busy state without recreating runtime on read or settle', () => {
+    markRepoOperationTargets(REPO_ID, 1, [{ key: 'fetch', reason: 'fetch' }], 'running')
+
+    expect(repoOperationBusy(REPO_ID, 'fetch')).toBe(true)
+
+    disposeRepoRuntime(REPO_ID)
+    settleRepoOperationTargets(REPO_ID, 1, [{ key: 'fetch', reason: 'fetch' }], null)
+
+    expect(repoOperationBusy(REPO_ID, 'fetch')).toBe(false)
+    expect(repoOperation(REPO_ID, 'fetch').phase).toBe('idle')
+  })
+
+  test('prunes pull request operation state for removed branches', () => {
+    markRepoOperationTargets(
+      REPO_ID,
+      1,
+      [
+        { key: 'pullRequests', reason: 'summary' },
+        { key: 'pullRequest:feature/a', reason: 'summary' },
+        { key: 'pullRequest:feature/stale', reason: 'summary' },
+        { key: 'log:feature/stale', reason: 'log' },
+      ],
+      'running',
+    )
+    settleRepoOperationTargets(
+      REPO_ID,
+      1,
+      [
+        { key: 'pullRequests', reason: 'summary' },
+        { key: 'pullRequest:feature/a', reason: 'summary' },
+        { key: 'pullRequest:feature/stale', reason: 'summary' },
+        { key: 'log:feature/stale', reason: 'log' },
+      ],
+      null,
+    )
+
+    pruneRepoBranchPullRequestOperations(REPO_ID, new Set(['feature/a']))
+
+    expect(repoOperation(REPO_ID, 'pullRequests').requestId).toBe(1)
+    expect(repoOperation(REPO_ID, 'pullRequest:feature/a').requestId).toBe(1)
+    expect(repoOperation(REPO_ID, 'pullRequest:feature/stale').requestId).toBe(0)
+    expect(repoOperation(REPO_ID, 'log:feature/stale').requestId).toBe(1)
   })
 })

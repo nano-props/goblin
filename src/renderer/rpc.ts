@@ -4,6 +4,16 @@ import type { AppRouter, RpcEvent } from '#/shared/rpc.ts'
 
 type RpcEventType = RpcEvent['type']
 
+const ABORTABLE_REPO_CWD_PATHS = new Set([
+  'repo.fetch',
+  'repo.pull',
+  'repo.push',
+  'repo.checkout',
+  'repo.createWorktree',
+  'repo.deleteBranch',
+  'repo.removeWorktree',
+])
+
 function getGoblinBridge(): Window['goblin'] {
   const bridge = window.goblin
   if (!bridge) throw new Error('Goblin bridge is unavailable')
@@ -11,7 +21,7 @@ function getGoblinBridge(): Window['goblin'] {
 }
 
 function abortableRepoCwd(path: string, input: unknown): string | null {
-  if (path !== 'repo.fetch' && path !== 'repo.pull' && path !== 'repo.push') return null
+  if (!ABORTABLE_REPO_CWD_PATHS.has(path)) return null
   if (!input || typeof input !== 'object') return null
   const { cwd } = input as { cwd?: unknown }
   return typeof cwd === 'string' ? cwd : null

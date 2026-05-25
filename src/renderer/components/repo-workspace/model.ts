@@ -1,4 +1,4 @@
-import { operationBusy } from '#/renderer/stores/repos/operations.ts'
+import { resourceInitialLoading } from '#/renderer/stores/repos/resources.ts'
 import type { RepoState } from '#/renderer/stores/repos/types.ts'
 
 export interface RepoWorkspacePresentation {
@@ -9,6 +9,6 @@ export interface RepoWorkspacePresentation {
 export function getRepoWorkspacePresentation(repo: RepoState | undefined): RepoWorkspacePresentation {
   return {
     exists: !!repo,
-    initialLoading: !!repo && operationBusy(repo.ops.snapshot) && repo.data.branches.length === 0,
+    initialLoading: !!repo && resourceInitialLoading(repo.resources.snapshot),
   }
 }

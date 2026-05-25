@@ -1,8 +1,12 @@
-import { describe, expect, test } from 'vitest'
+import { afterEach, describe, expect, test } from 'vitest'
 import { emptyRepo } from '#/renderer/stores/repos/helpers.ts'
-import { idleRepoOperations, runningOperation } from '#/renderer/stores/repos/operations.ts'
+import { finishResourceSuccess, startBranchActionResource, startResource } from '#/renderer/stores/repos/resources.ts'
+import { disposeRepoRuntime, markRepoOperationTargets, nextRepoOperationId } from '#/renderer/stores/repos/runtime.ts'
 import { canStartRemoteFetch, isRemoteFetchDue } from '#/renderer/stores/repos/sync-state.ts'
+import type { RepoRuntimeOperationTarget } from '#/renderer/stores/repos/runtime.ts'
 import type { RepoState } from '#/renderer/stores/repos/types.ts'
+
+type CoreRemoteFetchBlockerKey = 'fetch' | 'branchAction' | 'snapshot' | 'status'
 
 interface RepoOverrides {
   fetchBusy?: boolean
@@ -14,17 +18,19 @@ interface RepoOverrides {
 
 function repo(overrides: RepoOverrides = {}): RepoState {
   const base = emptyRepo('/tmp/goblin-sync-state-test', 'repo')
-  const ops = idleRepoOperations()
-  if (overrides.fetchBusy) ops.fetch = runningOperation({ reason: 'fetch' })
-  if (overrides.branchActionBusy) ops.branchAction = runningOperation({ reason: 'branch:checkout' })
-  if (overrides.snapshotBusy) ops.snapshot = runningOperation({ reason: 'snapshot' })
-  if (overrides.statusBusy) ops.status = runningOperation({ reason: 'status' })
-  ops.fetch.settledAt = overrides.lastFetchSettledAt ?? null
-  return {
-    ...base,
-    ops,
+  if (overrides.fetchBusy) startResource(base.resources.fetch)
+  if (overrides.branchActionBusy) startBranchActionResource(base.resources.branchAction, 'checkout', 'feature/a')
+  if (overrides.snapshotBusy) startResource(base.resources.snapshot)
+  if (overrides.statusBusy) startResource(base.resources.status)
+  if (overrides.lastFetchSettledAt !== undefined && overrides.lastFetchSettledAt !== null) {
+    finishResourceSuccess(base.resources.fetch, overrides.lastFetchSettledAt)
   }
+  return base
 }
+
+afterEach(() => {
+  disposeRepoRuntime('/tmp/goblin-sync-state-test')
+})
 
 describe('canStartRemoteFetch', () => {
   test('requires a repo that is not already busy with core refresh work', () => {
@@ -35,6 +41,19 @@ describe('canStartRemoteFetch', () => {
     expect(canStartRemoteFetch(repo({ snapshotBusy: true }))).toBe(false)
     expect(canStartRemoteFetch(repo({ statusBusy: true }))).toBe(false)
   })
+
+  test.each<CoreRemoteFetchBlockerKey>(['fetch', 'branchAction', 'snapshot', 'status'])(
+    'is blocked while runtime %s work is active',
+    (key) => {
+      const r = repo()
+      const requestId = nextRepoOperationId(r.id)
+      const target: RepoRuntimeOperationTarget = { key, reason: key === 'branchAction' ? 'branch:checkout' : key }
+
+      markRepoOperationTargets(r.id, requestId, [target], 'running')
+
+      expect(canStartRemoteFetch(r)).toBe(false)
+    },
+  )
 })
 
 describe('isRemoteFetchDue', () => {

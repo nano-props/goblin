@@ -1,11 +1,16 @@
-import { describe, expect, test } from 'vitest'
+import { afterEach, describe, expect, test } from 'vitest'
 import {
   getRepoSyncActivity,
   getRepoSyncPresentation,
   isRepoSyncBlocked,
 } from '#/renderer/components/repo-sync/model.ts'
 import { emptyRepo } from '#/renderer/stores/repos/helpers.ts'
-import { idleRepoOperations, runningOperation } from '#/renderer/stores/repos/operations.ts'
+import {
+  startBranchActionResource,
+  startPullRequestResource,
+  startResource,
+} from '#/renderer/stores/repos/resources.ts'
+import { disposeRepoRuntime, markRepoOperationTargets, nextRepoOperationId } from '#/renderer/stores/repos/runtime.ts'
 import type { RepoDataSource, RepoState } from '#/renderer/stores/repos/types.ts'
 
 interface RepoOverrides {
@@ -24,6 +29,14 @@ interface RepoOverrides {
 
 function repo(overrides: RepoOverrides = {}): RepoState {
   const base = emptyRepo('/tmp/goblin-sync-test', 'repo')
+  if (overrides.snapshotBusy) startResource(base.resources.snapshot)
+  if (overrides.statusBusy) startResource(base.resources.status)
+  if (overrides.pullRequestsBusy) startPullRequestResource(base.resources.pullRequests, 'full')
+  if (overrides.fetchBusy) startResource(base.resources.fetch)
+  if (overrides.branchActionBusy) startBranchActionResource(base.resources.branchAction, 'checkout', 'feature/a')
+  for (const branch of overrides.logBusyBranches ?? (overrides.logBusyBranch ? [overrides.logBusyBranch] : [])) {
+    base.resources.logsByBranch[branch] = { phase: 'loading', loadedAt: null, error: null, stale: false }
+  }
   return {
     ...base,
     data: {
@@ -35,30 +48,16 @@ function repo(overrides: RepoOverrides = {}): RepoState {
       ...base.ui,
       selectedBranch: overrides.selectedBranch ?? base.ui.selectedBranch,
     },
-    ops: {
-      ...idleRepoOperations(),
-      snapshot: overrides.snapshotBusy ? runningOperation({ reason: 'snapshot' }) : idleRepoOperations().snapshot,
-      branchAction: overrides.branchActionBusy
-        ? runningOperation({ reason: 'branch:checkout' })
-        : idleRepoOperations().branchAction,
-      status: overrides.statusBusy ? runningOperation({ reason: 'status' }) : idleRepoOperations().status,
-      pullRequests: overrides.pullRequestsBusy
-        ? runningOperation({ reason: 'pullRequests' })
-        : idleRepoOperations().pullRequests,
-      fetch: overrides.fetchBusy ? runningOperation({ reason: 'fetch' }) : idleRepoOperations().fetch,
-      logsByBranch: Object.fromEntries(
-        (overrides.logBusyBranches ?? (overrides.logBusyBranch ? [overrides.logBusyBranch] : [])).map((branch) => [
-          branch,
-          runningOperation({ reason: 'log' }),
-        ]),
-      ),
-    },
     cache: {
       ...base.cache,
       source: overrides.dataSource ?? base.cache.source,
     },
   }
 }
+
+afterEach(() => {
+  disposeRepoRuntime('/tmp/goblin-sync-test')
+})
 
 describe('getRepoSyncActivity', () => {
   test('uses the highest-value active refresh stage', () => {
@@ -111,6 +110,13 @@ describe('getRepoSyncActivity', () => {
   test('falls back to remote activity and idle states', () => {
     expect(getRepoSyncActivity(repo({ fetchBusy: true }))?.stage).toBe('remote')
     expect(getRepoSyncActivity(repo())).toBeNull()
+  })
+
+  test('does not surface runtime-only work as visible activity', () => {
+    const r = repo()
+    markRepoOperationTargets(r.id, nextRepoOperationId(r.id), [{ key: 'fetch', reason: 'fetch' }], 'running')
+
+    expect(getRepoSyncActivity(r)).toBeNull()
   })
 })
 
@@ -177,6 +183,18 @@ describe('getRepoSyncPresentation', () => {
 
     expect(getRepoSyncPresentation(r, null)).toEqual({
       rawBlocked: false,
+      visibleActivity: null,
+      visualBusy: false,
+      visualDisabled: false,
+    })
+  })
+
+  test('keeps runtime-only blocking work visually idle until resources show activity', () => {
+    const r = repo()
+    markRepoOperationTargets(r.id, nextRepoOperationId(r.id), [{ key: 'fetch', reason: 'fetch' }], 'running')
+
+    expect(getRepoSyncPresentation(r, null)).toEqual({
+      rawBlocked: true,
       visibleActivity: null,
       visualBusy: false,
       visualDisabled: false,

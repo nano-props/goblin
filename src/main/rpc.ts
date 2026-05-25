@@ -286,16 +286,32 @@ function createRpcHandlers(): AppRpcHandlers {
       },
       checkout: async ({ cwd, branch }) => {
         if (!isValidCwd(cwd) || !isValidBranch(branch)) return { ok: false, message: 'error.invalid-arguments' }
-        return checkoutBranch(cwd, branch)
+        return runCancellable(cwd, 'user', (signal) => checkoutBranch(cwd, branch, signal))
       },
-      deleteBranch: deleteRepoBranch,
-      removeWorktree: removeRepoWorktree,
+      deleteBranch: async (input) => {
+        if (!isValidCwd(input.cwd) || !isValidBranch(input.branch)) {
+          return { ok: false, message: 'error.invalid-arguments' }
+        }
+        return runCancellable(input.cwd, 'user', (signal) => deleteRepoBranch(input, signal))
+      },
+      removeWorktree: async (input) => {
+        if (
+          !isValidCwd(input.cwd) ||
+          !isValidBranch(input.branch) ||
+          !isValidAbsolutePath(input.worktreePath) ||
+          typeof input.alsoDeleteBranch !== 'boolean' ||
+          (input.forceDeleteBranch !== undefined && typeof input.forceDeleteBranch !== 'boolean')
+        ) {
+          return { ok: false, message: 'error.invalid-arguments' }
+        }
+        return runCancellable(input.cwd, 'user', (signal) => removeRepoWorktree(input, signal))
+      },
       createWorktree: async ({ cwd, worktreePath, newBranch, baseBranch }) => {
         if (!isValidCwd(cwd) || !isValidBranch(newBranch) || !isValidBranch(baseBranch)) {
           return { ok: false, message: 'error.invalid-arguments' }
         }
         if (!isValidAbsolutePath(worktreePath)) return { ok: false, message: 'error.invalid-path' }
-        return createWorktree(cwd, worktreePath, newBranch, baseBranch)
+        return runCancellable(cwd, 'user', (signal) => createWorktree(cwd, worktreePath, newBranch, baseBranch, signal))
       },
       pull: async ({ cwd, branch, worktreePath }) => {
         if (!isValidCwd(cwd) || !isValidBranch(branch)) return { ok: false, message: 'error.invalid-arguments' }
@@ -459,43 +475,53 @@ async function openDirectoryDialog(title: string): Promise<string | null> {
   return result.filePaths[0]
 }
 
-async function deleteRepoBranch({
-  cwd,
-  branch,
-  force,
-}: {
-  cwd: string
-  branch: string
-  force?: boolean
-}): Promise<ExecResult> {
+async function deleteRepoBranch(
+  {
+    cwd,
+    branch,
+    force,
+  }: {
+    cwd: string
+    branch: string
+    force?: boolean
+  },
+  signal?: AbortSignal,
+): Promise<ExecResult> {
   if (!isValidCwd(cwd) || !isValidBranch(branch)) return { ok: false, message: 'error.invalid-arguments' }
-  const current = await getCurrentBranch(cwd)
+  const current = await getCurrentBranch(cwd, { signal })
+  if (signal?.aborted) return { ok: false, message: 'cancelled' }
   if (branch === current) return { ok: false, message: 'error.cannot-delete-current-branch' }
   if (PROTECTED_BRANCHES.has(branch)) return { ok: false, message: 'error.cannot-delete-protected-branch' }
-  const worktrees = await getWorktrees(cwd)
+  const worktrees = await getWorktrees(cwd, { signal })
+  if (signal?.aborted) return { ok: false, message: 'cancelled' }
   if (worktrees.some((wt) => wt.branch === branch)) {
     return { ok: false, message: 'error.cannot-delete-checked-out-branch' }
   }
   const shouldForce = force === true
-  if (!shouldForce && !(await isSafelyDeletableBranch(cwd, branch))) {
+  const safelyDeletable = shouldForce || (await isSafelyDeletableBranch(cwd, branch, signal))
+  if (signal?.aborted) return { ok: false, message: 'cancelled' }
+  if (!safelyDeletable) {
     return { ok: false, message: 'error.branch-not-fully-merged' }
   }
-  return deleteBranch(cwd, branch, { force: shouldForce })
+  return deleteBranch(cwd, branch, { force: shouldForce, signal })
 }
 
-async function removeRepoWorktree({
-  cwd,
-  branch,
-  worktreePath,
-  alsoDeleteBranch,
-  forceDeleteBranch,
-}: {
-  cwd: string
-  branch: string
-  worktreePath: string
-  alsoDeleteBranch: boolean
-  forceDeleteBranch?: boolean
-}): Promise<ExecResult> {
+async function removeRepoWorktree(
+  {
+    cwd,
+    branch,
+    worktreePath,
+    alsoDeleteBranch,
+    forceDeleteBranch,
+  }: {
+    cwd: string
+    branch: string
+    worktreePath: string
+    alsoDeleteBranch: boolean
+    forceDeleteBranch?: boolean
+  },
+  signal?: AbortSignal,
+): Promise<ExecResult> {
   if (
     !isValidCwd(cwd) ||
     !isValidBranch(branch) ||
@@ -505,8 +531,10 @@ async function removeRepoWorktree({
   ) {
     return { ok: false, message: 'error.invalid-arguments' }
   }
-  const root = await getRepoRoot(cwd)
-  const worktrees = await getWorktrees(cwd)
+  const root = await getRepoRoot(cwd, { signal })
+  if (signal?.aborted) return { ok: false, message: 'cancelled' }
+  const worktrees = await getWorktrees(cwd, { signal })
+  if (signal?.aborted) return { ok: false, message: 'cancelled' }
   const resolved = resolveRemovableWorktree(worktrees, branch, worktreePath, root)
   if (!resolved.ok) return resolved
   const target = resolved.target
@@ -519,16 +547,20 @@ async function removeRepoWorktree({
   const shouldForceDeleteBranch = forceDeleteBranch === true
   if (alsoDeleteBranch) {
     if (PROTECTED_BRANCHES.has(branch)) return { ok: false, message: 'error.cannot-delete-protected-branch' }
-    if (!shouldForceDeleteBranch && !(await isSafelyDeletableBranch(cwd, branch))) {
+    const safelyDeletable = shouldForceDeleteBranch || (await isSafelyDeletableBranch(cwd, branch, signal))
+    if (signal?.aborted) return { ok: false, message: 'cancelled' }
+    if (!safelyDeletable) {
       return { ok: false, message: 'error.cannot-remove-unpushed-worktree' }
     }
   }
 
-  const removeResult = await removeWorktree(cwd, target.path)
+  if (signal?.aborted) return { ok: false, message: 'cancelled' }
+  const removeResult = await removeWorktree(cwd, target.path, signal)
   if (!removeResult.ok) return removeResult
   closeWorktreeSession(root, target.path)
   if (alsoDeleteBranch) {
-    const delResult = await deleteBranch(cwd, branch, { force: shouldForceDeleteBranch })
+    if (signal?.aborted) return { ok: false, message: 'cancelled' }
+    const delResult = await deleteBranch(cwd, branch, { force: shouldForceDeleteBranch, signal })
     if (!delResult.ok) return delResult
   }
   return removeResult
@@ -593,9 +625,9 @@ async function openRepoGitHub({ cwd, branch }: { cwd: string; branch?: string })
   return { ok: true, message: url }
 }
 
-async function isSafelyDeletableBranch(cwd: string, branch: string): Promise<boolean> {
-  const upstream = await getUpstream(cwd, branch)
-  return isAncestor(cwd, branch, upstream ?? 'HEAD')
+async function isSafelyDeletableBranch(cwd: string, branch: string, signal?: AbortSignal): Promise<boolean> {
+  const upstream = await getUpstream(cwd, branch, signal)
+  return isAncestor(cwd, branch, upstream ?? 'HEAD', signal)
 }
 
 async function runCancellable(

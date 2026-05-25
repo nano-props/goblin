@@ -62,6 +62,7 @@ export async function gitResultWithOptions(
   opts: GitOptions | undefined,
   ...args: string[]
 ): Promise<ExecResult> {
+  if (opts?.signal?.aborted) return { ok: false, message: 'cancelled' }
   try {
     const output = await git(cwd, args, opts)
     return { ok: true, message: output }

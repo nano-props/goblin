@@ -39,9 +39,7 @@ export function RepoSyncControl({ repo }: Props) {
           onClick={handleSync}
           loading={visualBusy}
           disabled={visualDisabled}
-          className={cn(
-            visualBusy && 'bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground',
-          )}
+          className={cn(visualBusy && 'bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground')}
         >
           {({ busy }) => {
             const BusyIcon = busy ? Loader2 : Icon

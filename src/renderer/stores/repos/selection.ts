@@ -230,7 +230,8 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
           r.ui.detailTab = 'status'
           r.ui.commitDetail = { phase: 'idle' }
         })
-        const detailCollapsed = s.activeId === id ? effectiveDetailCollapsed(s.workspaceLayout, true) : s.detailCollapsed
+        const detailCollapsed =
+          s.activeId === id ? effectiveDetailCollapsed(s.workspaceLayout, true) : s.detailCollapsed
         if (nextRepo === repo && detailCollapsed === s.detailCollapsed) return s
         if (nextRepo === repo) return { detailCollapsed }
         return {

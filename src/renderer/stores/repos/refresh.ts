@@ -1,19 +1,39 @@
 import { appendRepoEvent, errorEvent, inFlightFetchById, updateIfFresh } from '#/renderer/stores/repos/helpers.ts'
 import { branchForVisibleLog, selectedBranchForBranchSet } from '#/renderer/stores/repos/branch-view-mode.ts'
-import {
-  runExclusiveOperation,
-  runLatestOperation,
-  type RepoOperationSelector,
-} from '#/renderer/stores/repos/operation-runner.ts'
+import { runExclusiveOperation, runLatestOperation } from '#/renderer/stores/repos/operation-runner.ts'
 import { persistRepoCache } from '#/renderer/stores/repos/persistence.ts'
+import { runLatestResourceOperation } from '#/renderer/stores/repos/resource-runner.ts'
 import { canStartRemoteFetch } from '#/renderer/stores/repos/sync-state.ts'
-import { idleOperation, operationBusy } from '#/renderer/stores/repos/operations.ts'
+import {
+  pruneRepoBranchLogOperations,
+  pruneRepoBranchPullRequestOperations,
+  repoOperationBusy,
+  repoOperationCurrent,
+} from '#/renderer/stores/repos/runtime.ts'
+import {
+  recordBackgroundFetchThrownError,
+  runBackgroundFetchResultWorkflow,
+  runManualSyncResultWorkflow,
+  runRefreshAllWorkflow,
+  runSnapshotSuccessWorkflow,
+} from '#/renderer/stores/repos/refresh-workflows.ts'
+import {
+  cancelResource,
+  finishPullRequestResourceError,
+  finishPullRequestResourceSuccess,
+  finishPullRequestResourceUnavailable,
+  finishResourceError,
+  finishResourceSuccess,
+  idlePullRequestResource,
+  idleResource,
+  startPullRequestResource,
+  startResource,
+} from '#/renderer/stores/repos/resources.ts'
 import { branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import type { RepoOperationReason, RepoPullRequestReason } from '#/renderer/stores/repos/operations.ts'
 import type { BranchLogState, ReposGet, ReposSet } from '#/renderer/stores/repos/types.ts'
 import type { ExecResult, LogEntry, PullRequestFetchMode, PullRequestInfo } from '#/renderer/types.ts'
 import { rpc } from '#/renderer/rpc.ts'
-import { terminalBridge } from '#/renderer/terminal.ts'
 
 export const INITIAL_LOG_COUNT = 30
 export const LOG_PAGE_SIZE = 30
@@ -42,12 +62,34 @@ function mergePullRequest(
   }
 }
 
-export function createRefreshActions(set: ReposSet, get: ReposGet) {
-  function repoFresh(id: string, token: number): boolean {
-    const repo = get().repos[id]
-    return !!repo && repo.instanceToken === token
-  }
+function existingBranchNames(r: { data: { branches: Array<{ name: string }> } }): Set<string> {
+  return new Set(r.data.branches.map((branch) => branch.name))
+}
 
+function finishPullRequestBranchResources(
+  r: {
+    resources: {
+      pullRequestsByBranch: Record<string, ReturnType<typeof idlePullRequestResource>>
+    }
+  },
+  branchNames: string[],
+  existingBranches: Set<string>,
+  finish: (resource: ReturnType<typeof idlePullRequestResource>) => void,
+  options?: { createMissing?: boolean },
+): void {
+  for (const branch of branchNames) {
+    if (!existingBranches.has(branch)) {
+      delete r.resources.pullRequestsByBranch[branch]
+      continue
+    }
+    const resource = options?.createMissing
+      ? (r.resources.pullRequestsByBranch[branch] ??= idlePullRequestResource())
+      : r.resources.pullRequestsByBranch[branch]
+    if (resource) finish(resource)
+  }
+}
+
+export function createRefreshActions(set: ReposSet, get: ReposGet) {
   async function runNetworkTask(
     id: string,
     task: (signal: AbortSignal) => Promise<ExecResult>,
@@ -58,42 +100,35 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
     const token = options?.token ?? repoBefore.instanceToken
     if (repoBefore.instanceToken !== token) return null
     if (!canStartRemoteFetch(repoBefore)) return { ok: false, message: 'error.network-op-in-progress' }
+    updateIfFresh(set, id, token, (r) => {
+      startResource(r.resources.fetch, { hasData: r.resources.fetch.loadedAt !== null })
+    })
     return runExclusiveOperation({
-      set,
       get,
       id,
       token,
       lane: 'network',
       priority: options?.priority ?? 50,
-      targets: [{ select: (r) => r.ops.fetch, reason: options?.reason ?? 'network' }],
-      canStart: canStartRemoteFetch,
+      targets: [{ key: 'fetch', reason: options?.reason ?? 'network' }],
       busyResult: { ok: false, message: 'error.network-op-in-progress' },
       task,
       errorFromResult: (result) => (!result.ok && result.message !== 'cancelled' ? result.message : null),
+      onResult: (result) => {
+        updateIfFresh(set, id, token, (r) => {
+          if (result.ok) finishResourceSuccess(r.resources.fetch)
+          else if (result.message !== 'cancelled' && result.message !== 'error.network-op-in-progress') {
+            finishResourceError(r.resources.fetch, result.message)
+          } else {
+            cancelResource(r.resources.fetch)
+          }
+        })
+      },
+      onError: (message) => {
+        updateIfFresh(set, id, token, (r) => {
+          finishResourceError(r.resources.fetch, message)
+        })
+      },
       rethrow: true,
-    })
-  }
-
-  async function refreshSelectedPullRequest(id: string, token: number): Promise<void> {
-    const repo = get().repos[id]
-    if (!repo || repo.instanceToken !== token || !repo.ui.selectedBranch) return
-    await get().refreshPullRequests(id, [repo.ui.selectedBranch], { token, mode: 'full' })
-  }
-
-  async function refreshPullRequestsAfterSnapshot(
-    id: string,
-    token: number,
-    branchNames: string[],
-    isSnapshotCurrent: () => boolean,
-  ): Promise<void> {
-    if (!isSnapshotCurrent() || !repoFresh(id, token)) return
-    await get().refreshPullRequests(id, branchNames, { token, mode: 'summary' })
-    if (!isSnapshotCurrent() || !repoFresh(id, token)) return
-    await refreshSelectedPullRequest(id, token)
-    if (!isSnapshotCurrent() || !repoFresh(id, token)) return
-    await get().refreshPullRequests(id, branchNames, {
-      token,
-      mode: 'full',
     })
   }
 
@@ -122,21 +157,15 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
     if (repoBefore.data.branches.length > 0 && !repoBefore.data.branches.some((b) => b.name === branch)) return
     const append = options?.append === true
     const existing = repoBefore.data.logsByBranch[branch]
-    const existingOperation = repoBefore.ops.logsByBranch[branch] ?? idleOperation()
     if (append) {
-      if (!existing || operationBusy(existingOperation)) return
+      if (!existing || repoOperationBusy(id, `log:${branch}`)) return
       if (!existing.hasMore || existing.entries.length >= MAX_LOG_COUNT) return
     }
     const loaded = append ? existing.entries.length : 0
     const pageSize = append ? Math.min(LOG_PAGE_SIZE, MAX_LOG_COUNT - loaded) : INITIAL_LOG_COUNT
     if (pageSize <= 0) return
     const requestCount = pageSize + 1
-    updateIfFresh(set, id, token, (r) => {
-      r.data.logsByBranch[branch] ??= emptyBranchLog()
-      r.ops.logsByBranch[branch] ??= idleOperation()
-    })
-    const selectLogOperation: RepoOperationSelector = (r) => r.ops.logsByBranch[branch] ?? idleOperation()
-    await runLatestOperation({
+    await runLatestResourceOperation({
       set,
       get,
       id,
@@ -144,30 +173,31 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       lane: 'read',
       operationKey: `log:${branch}`,
       priority: 20,
-      targets: [{ select: selectLogOperation, reason: 'log' }],
+      target: { key: `log:${branch}`, reason: 'log' },
+      selectResource: (r) => (r.resources.logsByBranch[branch] ??= idleResource()),
+      start: (r) => {
+        r.data.logsByBranch[branch] ??= emptyBranchLog()
+        r.resources.logsByBranch[branch] ??= idleResource()
+        return { hasData: (r.data.logsByBranch[branch]?.entries.length ?? 0) > 0 }
+      },
       task: (signal) => rpc.repo.log.query({ cwd: id, branch, count: requestCount, skip: loaded }, { signal }),
-      onResult: (log) => {
-        updateIfFresh(set, id, token, (r) => {
-          if (!r.data.branches.some((b) => b.name === branch)) return
-          const prev = r.data.logsByBranch[branch] ?? emptyBranchLog()
-          const page = logPage(log, pageSize)
-          const entries = (append ? [...prev.entries, ...page.entries] : page.entries).slice(0, MAX_LOG_COUNT)
-          const stillHas = prev.selectedHash && entries.some((e) => e.hash === prev.selectedHash)
-          const selectedHash = stillHas ? prev.selectedHash : (entries[0]?.hash ?? null)
-          r.data.logsByBranch[branch] = {
-            entries,
-            selectedHash,
-            hasMore: entries.length < MAX_LOG_COUNT && page.hasMore,
-          }
-        })
+      applyResult: (r, log) => {
+        if (!r.data.branches.some((b) => b.name === branch)) return false
+        const prev = r.data.logsByBranch[branch] ?? emptyBranchLog()
+        const page = logPage(log, pageSize)
+        const entries = (append ? [...prev.entries, ...page.entries] : page.entries).slice(0, MAX_LOG_COUNT)
+        const stillHas = prev.selectedHash && entries.some((e) => e.hash === prev.selectedHash)
+        const selectedHash = stillHas ? prev.selectedHash : (entries[0]?.hash ?? null)
+        r.data.logsByBranch[branch] = {
+          entries,
+          selectedHash,
+          hasMore: entries.length < MAX_LOG_COUNT && page.hasMore,
+        }
       },
-      onError: (message) => {
-        console.warn('[refreshBranchLog] failed', message)
-        updateIfFresh(set, id, token, (r) => {
-          if (r.data.branches.some((b) => b.name === branch)) r.data.logsByBranch[branch] ??= emptyBranchLog()
-          r.events = appendRepoEvent(r.events, errorEvent(message))
-        })
+      onError: (_message, r) => {
+        if (r.data.branches.some((b) => b.name === branch)) r.data.logsByBranch[branch] ??= emptyBranchLog()
       },
+      errorLog: '[refreshBranchLog] failed',
     })
   }
 
@@ -177,24 +207,28 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (!repoBefore) return
       const token = options?.token ?? repoBefore.instanceToken
       if (repoBefore.instanceToken !== token) return
+      updateIfFresh(set, id, token, (r) => {
+        startResource(r.resources.snapshot, { hasData: r.data.branches.length > 0 })
+      })
       await runLatestOperation({
-        set,
         get,
         id,
         token,
         lane: 'read',
         operationKey: 'snapshot',
         priority: 50,
-        targets: [{ select: (r) => r.ops.snapshot, reason: 'snapshot' }],
+        targets: [{ key: 'snapshot', reason: 'snapshot' }],
         task: (signal) => rpc.repo.snapshot.query({ cwd: id }, { signal }),
         errorFromResult: (snap) => (snap ? null : 'error.failed-read-repo'),
         onResult: (snap, ctx) => {
           if (!snap) {
             updateIfFresh(set, id, token, (r) => {
+              finishResourceError(r.resources.snapshot, 'error.failed-read-repo')
               r.events = appendRepoEvent(r.events, errorEvent('error.failed-read-repo'))
             })
             return
           }
+          const validBranches = new Set(snap.branches.map((b) => b.name))
           updateIfFresh(set, id, token, (r) => {
             // Default selection: current branch on first load. Keep the
             // user's pick if it still exists, otherwise fall back so the
@@ -205,7 +239,6 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
               selectedBranch: r.ui.selectedBranch,
               viewMode: r.ui.branchViewMode,
             })
-            const validBranches = new Set(snap.branches.map((b) => b.name))
             const logsByBranch = Object.fromEntries(
               Object.entries(r.data.logsByBranch).filter(([branch]) => validBranches.has(branch)),
             )
@@ -226,8 +259,11 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
             r.data.branches = branches
             r.data.currentBranch = snap.current
             r.data.logsByBranch = logsByBranch
-            r.ops.logsByBranch = Object.fromEntries(
-              Object.entries(r.ops.logsByBranch).filter(([branch]) => validBranches.has(branch)),
+            r.resources.logsByBranch = Object.fromEntries(
+              Object.entries(r.resources.logsByBranch).filter(([branch]) => validBranches.has(branch)),
+            )
+            r.resources.pullRequestsByBranch = Object.fromEntries(
+              Object.entries(r.resources.pullRequestsByBranch).filter(([branch]) => validBranches.has(branch)),
             )
             r.ui.selectedBranch = selected
             if (
@@ -238,48 +274,26 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
             }
             r.cache.source = 'fresh'
             r.cache.savedAt = null
+            finishResourceSuccess(r.resources.snapshot)
           })
-          const repoAfterSnapshot = get().repos[id]
-          if (!ctx.isCurrent()) return
-          persistRepoCache(set, repoAfterSnapshot, token)
+          pruneRepoBranchLogOperations(id, validBranches)
+          pruneRepoBranchPullRequestOperations(id, validBranches)
           const branchNames = snap.branches.map((branch) => branch.name)
           const worktreePaths = snap.branches
             .map((branch) => branch.worktreePath)
             .filter((p): p is string => typeof p === 'string' && p.length > 0)
-          void terminalBridge.pruneRepo({ repoRoot: id, worktreePaths }).catch((err) => {
-            console.warn('[terminal] failed to prune repo sessions', err)
+          runSnapshotSuccessWorkflow(set, get, {
+            id,
+            token,
+            branchNames,
+            worktreePaths,
+            isSnapshotCurrent: ctx.isCurrent,
+            skipLogBackfill: options?.skipLogBackfill,
           })
-          const isSnapshotCurrent = ctx.isCurrent
-          void (async () => {
-            try {
-              if (isSnapshotCurrent()) await refreshPullRequestsAfterSnapshot(id, token, branchNames, isSnapshotCurrent)
-            } catch (err) {
-              console.warn('[refreshPullRequests] failed', err)
-              const message = err instanceof Error ? err.message : String(err)
-              updateIfFresh(set, id, token, (r) => {
-                r.events = appendRepoEvent(r.events, errorEvent(message))
-              })
-            }
-          })()
-          // If the user opened Commits while the snapshot was in flight,
-          // their setDetailTab fired a refreshBranchLog that bailed out because
-          // selectedBranch was still null. Now that we have it, backfill
-          // the data they're actually looking at.
-          //
-          const after = get().repos[id]
-          if (
-            after &&
-            after.instanceToken === token &&
-            ctx.isCurrent() &&
-            after.ui.detailTab === 'commits' &&
-            after.ui.selectedBranch &&
-            !options?.skipLogBackfill
-          ) {
-            void get().refreshBranchLog(id, after.ui.selectedBranch, { token })
-          }
         },
         onError: (message) => {
           updateIfFresh(set, id, token, (r) => {
+            finishResourceError(r.resources.snapshot, message)
             r.events = appendRepoEvent(r.events, errorEvent(message))
           })
         },
@@ -304,20 +318,49 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       const branchNames = branchesArg ?? repoBefore.data.branches.map((branch) => branch.name)
       if (branchNames.length === 0) return
       const requested = new Set(branchNames)
+      updateIfFresh(set, id, token, (r) => {
+        startPullRequestResource(r.resources.pullRequests, mode, {
+          hasData: r.data.branches.some((branch) => requested.has(branch.name) && !!branch.pullRequest),
+        })
+        for (const branch of branchNames) {
+          r.resources.pullRequestsByBranch[branch] ??= idlePullRequestResource()
+          const branchState = r.data.branches.find((item) => item.name === branch)
+          startPullRequestResource(r.resources.pullRequestsByBranch[branch], mode, {
+            hasData: !!branchState?.pullRequest,
+          })
+        }
+      })
       await runLatestOperation({
-        set,
         get,
         id,
         token,
         lane: 'read',
         operationKey: 'pullRequests',
         priority: 10,
-        targets: [{ select: (r) => r.ops.pullRequests, reason: pullRequestReason(mode) }],
+        targets: [
+          { key: 'pullRequests', reason: pullRequestReason(mode) },
+          ...branchNames.map((branch) => ({ key: `pullRequest:${branch}` as const, reason: pullRequestReason(mode) })),
+        ],
         task: (signal) =>
           rpc.repo.pullRequests.query({ cwd: id, branches: branchNames, options: { mode } }, { signal }),
         onResult: (entries, ctx) => {
-          if (entries === null) return
           updateIfFresh(set, id, token, (r) => {
+            const existingBranches = existingBranchNames(r)
+            if (entries === null) {
+              finishPullRequestResourceUnavailable(r.resources.pullRequests, mode)
+              finishPullRequestBranchResources(r, branchNames, existingBranches, (resource) =>
+                finishPullRequestResourceUnavailable(resource, mode),
+              )
+              return
+            }
+            finishPullRequestResourceSuccess(r.resources.pullRequests, mode)
+            finishPullRequestBranchResources(
+              r,
+              branchNames,
+              existingBranches,
+              (resource) => finishPullRequestResourceSuccess(resource, mode),
+              { createMissing: true },
+            )
             const byBranch = new Map(entries.map((entry) => [entry.branch, entry.pullRequest]))
             for (const branch of r.data.branches) {
               const pullRequest = byBranch.get(branch.name)
@@ -334,9 +377,24 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
           })
           if (ctx.isCurrent()) persistRepoCache(set, get().repos[id], token)
         },
+        onStale: (ctx) => {
+          updateIfFresh(set, id, token, (r) => {
+            const existingBranches = existingBranchNames(r)
+            const currentBranches = branchNames.filter((branch) =>
+              repoOperationCurrent(id, `pullRequest:${branch}`, ctx.requestId),
+            )
+            finishPullRequestBranchResources(r, currentBranches, existingBranches, (resource) =>
+              finishPullRequestResourceUnavailable(resource, mode),
+            )
+          })
+        },
         onError: (message) => {
           console.warn('[refreshPullRequests] failed', message)
           updateIfFresh(set, id, token, (r) => {
+            finishPullRequestResourceError(r.resources.pullRequests, message)
+            finishPullRequestBranchResources(r, branchNames, existingBranchNames(r), (resource) =>
+              finishPullRequestResourceError(resource, message),
+            )
             r.events = appendRepoEvent(r.events, errorEvent(message))
           })
         },
@@ -356,7 +414,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (!repoBefore) return
       const token = options?.token ?? repoBefore.instanceToken
       if (repoBefore.instanceToken !== token) return
-      await runLatestOperation({
+      await runLatestResourceOperation({
         set,
         get,
         id,
@@ -364,22 +422,19 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         lane: 'read',
         operationKey: 'status',
         priority: 40,
-        targets: [{ select: (r) => r.ops.status, reason: 'status' }],
+        target: { key: 'status', reason: 'status' },
+        selectResource: (r) => r.resources.status,
+        start: (r) => ({ hasData: r.data.statusLoaded || r.data.status.length > 0 }),
         task: (signal) => rpc.repo.status.query({ cwd: id }, { signal }),
-        onResult: (status, ctx) => {
-          updateIfFresh(set, id, token, (r) => {
-            r.data.status = status
-            r.data.statusLoaded = true
-          })
+        applyResult: (r, status) => {
+          r.data.status = status
+          r.data.statusLoaded = true
+        },
+        onSuccess: (_status, ctx) => {
           const repoAfterStatus = get().repos[id]
           if (ctx.isCurrent()) persistRepoCache(set, repoAfterStatus, token)
         },
-        onError: (message) => {
-          console.warn('[refreshStatus] failed', message)
-          updateIfFresh(set, id, token, (r) => {
-            r.events = appendRepoEvent(r.events, errorEvent(message))
-          })
-        },
+        errorLog: '[refreshStatus] failed',
       })
     },
 
@@ -388,17 +443,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (!repoBefore) return
       const token = options?.token ?? repoBefore.instanceToken
       if (repoBefore.instanceToken !== token) return
-      await get().refreshSnapshot(id, { skipLogBackfill: true, token })
-      // Status is always refreshed (regardless of which detail tab is
-      // active) because the selected-branch detail toolbar surfaces the
-      // dirty file count on every view. Log only matters when it's
-      // visible, so we keep its refresh tab-gated.
-      const after = get().repos[id]
-      if (!after || after.instanceToken !== token) return
-      await get().refreshStatus(id, { token })
-      const afterStatus = get().repos[id]
-      if (!afterStatus || afterStatus.instanceToken !== token) return
-      if (afterStatus.ui.detailTab === 'commits') await get().refreshBranchLog(id, undefined, { token })
+      await runRefreshAllWorkflow(get, { id, token })
     },
 
     async syncAndRefresh(id: string, options?: { token?: number }) {
@@ -420,11 +465,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         return
       }
       if (!result) return
-      if (!result.ok && result.message === 'cancelled') return
-      get().setLastResult(id, result, token)
-      if (!result.ok && result.message === 'error.network-op-in-progress') return
-      await get().refreshAll(id, { token })
-      if (result.ok) get().clearFetchFailed(id, token)
+      await runManualSyncResultWorkflow(get, { id, token, result })
     },
 
     async backgroundFetch(id: string) {
@@ -455,31 +496,11 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
             { token, reason: 'background-fetch' },
           )
           if (!result) return
-          if (!result.ok) {
-            if (result.message === 'cancelled' || result.message === 'error.network-op-in-progress') return
-            console.warn('[backgroundFetch] git fetch failed:', result.message)
-            updateIfFresh(set, id, token, (r) => {
-              r.remote.fetchFailed = true
-              r.remote.fetchError = result.message
-            })
-            await get().refreshStatus(id, { token })
-            return
-          }
-          // Success — clear the fail flag and refresh the snapshot/status.
-          updateIfFresh(set, id, token, (r) => {
-            r.remote.fetchFailed = false
-            r.remote.fetchError = null
-          })
-          await get().refreshSnapshot(id, { token })
-          await get().refreshStatus(id, { token })
+          await runBackgroundFetchResultWorkflow(set, get, { id, token, result })
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err)
           if (message === 'Request aborted' || message === 'cancelled') return
-          console.warn('[backgroundFetch] threw:', err)
-          updateIfFresh(set, id, token, (r) => {
-            r.remote.fetchFailed = true
-            r.remote.fetchError = message
-          })
+          recordBackgroundFetchThrownError(set, { id, token, message, error: err })
         } finally {
           // Only clear the slot if it still refers to this run. Without
           // the identity check, a close + reopen + new fetch can land

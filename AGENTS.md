@@ -18,6 +18,15 @@
 - Unit tests run with Vitest via `bun run test`; watch mode is `bun run test:watch`.
 - `bun run typecheck` covers main, renderer, and test-specific TypeScript configs.
 
+## Repo loading and refresh architecture
+
+- UI loading, busy, disabled, error, stale, and loaded timestamps should be derived from `repo.resources`.
+- Do not reintroduce `repo.ops` or expose operation execution state on `RepoState`.
+- Execution-only state such as queue lane, request id, latest-wins replacement, and exclusive busy checks belongs in `runtime.ts` / `operation-runner.ts`.
+- Multi-resource sequencing belongs in `refresh-workflows.ts`; keep `refresh.ts` focused on single-resource RPC/data-write primitives.
+- Prefer `resource-runner.ts` for simple read-resource lifecycle code. Keep specialized resources such as PR fan-out or branch actions explicit when a generic abstraction would obscure behavior.
+- UI visual presentation should not surface runtime-only operation state. Runtime busy checks are for execution/concurrency safety and click gating.
+
 ## English UI copy conventions
 
 - Use Title Case for native menu items.

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { branchActionItemIdFromOperation, isBranchActionBlocked } from '#/renderer/hooks/branch-action-state.ts'
-import { idleOperation, queueOperation, runningOperation } from '#/renderer/stores/repos/operations.ts'
 import { emptyRepo } from '#/renderer/stores/repos/helpers.ts'
+import { startBranchActionResource } from '#/renderer/stores/repos/resources.ts'
 
 describe('isBranchActionBlocked', () => {
   test('returns false while branch actions are idle', () => {
@@ -10,46 +10,44 @@ describe('isBranchActionBlocked', () => {
     expect(isBranchActionBlocked(repo)).toBe(false)
   })
 
-  test('uses repo branch action state for cross-button blocking', () => {
+  test('uses repo branch action resource state for cross-button blocking', () => {
     const repo = emptyRepo('/tmp/gbl-branch-action-blocked', 'repo')
-    repo.ops.branchAction = runningOperation({ requestId: 7, reason: 'branch:push' })
+    startBranchActionResource(repo.resources.branchAction, 'push', 'feature/a')
 
     expect(isBranchActionBlocked(repo)).toBe(true)
   })
 
-  test('treats queued branch actions as blocked', () => {
+  test('treats non-running branch action resources as unblocked', () => {
     const repo = emptyRepo('/tmp/gbl-branch-action-queued', 'repo')
-    repo.ops.branchAction = idleOperation()
-    queueOperation(repo.ops.branchAction, 8, { reason: 'branch:checkout' })
 
-    expect(isBranchActionBlocked(repo)).toBe(true)
+    expect(isBranchActionBlocked(repo)).toBe(false)
   })
 })
 
 describe('branchActionItemIdFromOperation', () => {
-  test('maps store-backed branch operation reasons to UI actions', () => {
+  test('maps store-backed branch action resource kinds to UI actions', () => {
     const repo = emptyRepo('/tmp/gbl-branch-action-operation', 'repo')
 
-    repo.ops.branchAction = runningOperation({ reason: 'branch:checkout', target: 'feature/a' })
+    startBranchActionResource(repo.resources.branchAction, 'checkout', 'feature/a')
     expect(branchActionItemIdFromOperation(repo, 'feature/a')).toBe('checkout')
 
-    repo.ops.branchAction = runningOperation({ reason: 'branch:pull', target: 'feature/a' })
+    startBranchActionResource(repo.resources.branchAction, 'pull', 'feature/a')
     expect(branchActionItemIdFromOperation(repo, 'feature/a')).toBe('pull')
 
-    repo.ops.branchAction = runningOperation({ reason: 'branch:push', target: 'feature/a' })
+    startBranchActionResource(repo.resources.branchAction, 'push', 'feature/a')
     expect(branchActionItemIdFromOperation(repo, 'feature/a')).toBe('push')
 
-    repo.ops.branchAction = runningOperation({ reason: 'branch:deleteBranch', target: 'feature/a' })
+    startBranchActionResource(repo.resources.branchAction, 'deleteBranch', 'feature/a')
     expect(branchActionItemIdFromOperation(repo, 'feature/a')).toBe('deleteBranch')
 
-    repo.ops.branchAction = runningOperation({ reason: 'branch:removeWorktree', target: 'feature/a' })
+    startBranchActionResource(repo.resources.branchAction, 'removeWorktree', 'feature/a')
     expect(branchActionItemIdFromOperation(repo, 'feature/a')).toBe('removeWorktree')
   })
 
   test('only marks the target branch action item as busy', () => {
     const repo = emptyRepo('/tmp/gbl-branch-action-operation-target', 'repo')
 
-    repo.ops.branchAction = runningOperation({ reason: 'branch:pull', target: 'feature/a' })
+    startBranchActionResource(repo.resources.branchAction, 'pull', 'feature/a')
 
     expect(branchActionItemIdFromOperation(repo, 'feature/a')).toBe('pull')
     expect(branchActionItemIdFromOperation(repo, 'feature/b')).toBeNull()
@@ -60,7 +58,7 @@ describe('branchActionItemIdFromOperation', () => {
 
     expect(branchActionItemIdFromOperation(repo, 'feature/a')).toBeNull()
 
-    repo.ops.branchAction = runningOperation({ reason: 'branch:createWorktree', target: 'feature/a' })
+    startBranchActionResource(repo.resources.branchAction, 'createWorktree', 'feature/a')
     expect(branchActionItemIdFromOperation(repo, 'feature/a')).toBeNull()
   })
 })

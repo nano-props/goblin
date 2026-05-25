@@ -17,7 +17,7 @@ import { Tip } from '#/renderer/components/Tip.tsx'
 import { Button } from '#/renderer/components/ui/button.tsx'
 import { CreateWorktreeDialog, type CreateWorktreeRequest } from '#/renderer/components/CreateWorktreeDialog.tsx'
 import { RepoSyncControl } from '#/renderer/components/repo-sync/RepoSyncControl.tsx'
-import { operationBusy } from '#/renderer/stores/repos/operations.ts'
+import { resourceBusy } from '#/renderer/stores/repos/resources.ts'
 
 interface Props {
   repo: RepoState
@@ -27,7 +27,7 @@ export function RepoToolbarActions({ repo }: Props) {
   const t = useT()
   const runBranchAction = useReposStore((s) => s.runBranchAction)
   const [createOpen, setCreateOpen] = useState(false)
-  const branchActionBusy = operationBusy(repo.ops.branchAction)
+  const branchActionBusy = resourceBusy(repo.resources.branchAction)
 
   // RepoView reuses the same React instance across repo switches
   // (no `key={activeId}` on the parent), so RepoToolbarActions keeps

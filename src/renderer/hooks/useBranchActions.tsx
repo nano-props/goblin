@@ -308,7 +308,7 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
           const target = removeConfirm
           const alsoDelete = removeAlsoDeletes
           // Match create-worktree: the confirm dialog only starts the repo action;
-          // repo.ops.branchAction owns progress, and a later unpushed-worktree result reopens force confirm.
+          // branchAction resource owns progress, and a later unpushed-worktree result reopens force confirm.
           setRemoveConfirm(null)
           if (target) void removeWorktree(target, alsoDelete, false)
         }}

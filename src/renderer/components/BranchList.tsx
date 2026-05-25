@@ -64,7 +64,7 @@ export function BranchList({ repoId, showActions = true, variant = 'list' }: Pro
         a.repo.data.branches === b.repo.data.branches &&
         a.repo.ui.branchViewMode === b.repo.ui.branchViewMode &&
         a.repo.data.status === b.repo.data.status &&
-        a.repo.ops.branchAction === b.repo.ops.branchAction &&
+        a.repo.resources.branchAction === b.repo.resources.branchAction &&
         a.branchCount === b.branchCount &&
         a.selected === b.selected &&
         a.current === b.current),
@@ -79,7 +79,8 @@ export function BranchList({ repoId, showActions = true, variant = 'list' }: Pro
   if (!repo) return null
 
   const selectedBranch = selected
-    ? (branches.find((branch) => branch.name === selected) ?? repo.data.branches.find((branch) => branch.name === selected))
+    ? (branches.find((branch) => branch.name === selected) ??
+      repo.data.branches.find((branch) => branch.name === selected))
     : null
   const renderedBranches = variant === 'selected-strip' ? (selectedBranch ? [selectedBranch] : []) : branches
 
@@ -115,9 +116,5 @@ export function BranchList({ repoId, showActions = true, variant = 'list' }: Pro
       </div>
     )
 
-  return (
-    <ScrollArea className="min-h-0 flex-1">
-      {list}
-    </ScrollArea>
-  )
+  return <ScrollArea className="min-h-0 flex-1">{list}</ScrollArea>
 }

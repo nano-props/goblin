@@ -29,11 +29,7 @@ const REPO_WORKSPACE_BEHAVIOR = {
   WorkspaceLayout,
   Omit<
     RepoWorkspaceBehavior,
-    | 'detailCollapsed'
-    | 'detailCollapseAllowed'
-    | 'detailFocusAllowed'
-    | 'detailFocusMode'
-    | 'mode'
+    'detailCollapsed' | 'detailCollapseAllowed' | 'detailFocusAllowed' | 'detailFocusMode' | 'mode'
   >
 >
 

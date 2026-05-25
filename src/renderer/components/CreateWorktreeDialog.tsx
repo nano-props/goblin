@@ -23,7 +23,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/renderer/components/ui/select.tsx'
 import { Button } from '#/renderer/components/ui/button.tsx'
 import type { RepoState } from '#/renderer/stores/repos/types.ts'
-import { operationBusy } from '#/renderer/stores/repos/operations.ts'
+import { resourceBusy } from '#/renderer/stores/repos/resources.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { defaultWorktreePath, tildify, untildify } from '#/renderer/lib/paths.ts'
 import { validateBranchName } from '#/shared/refnames.ts'
@@ -80,7 +80,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
   const effectivePath = pathTrimmed || defaultPath
   const displayDefaultPath = tildify(defaultPath)
   const displayEffectivePath = tildify(effectivePath)
-  const branchActionBusy = operationBusy(repo.ops.branchAction)
+  const branchActionBusy = resourceBusy(repo.resources.branchAction)
   const canSubmit = branchTrimmed.length > 0 && !branchError && effectivePath.length > 0 && base.length > 0
 
   function handleSubmit() {

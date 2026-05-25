@@ -1,6 +1,3 @@
-import type { RepoState } from '#/renderer/stores/repos/types.ts'
-
-export type RepoOperationKind = 'fetch' | 'snapshot' | 'status' | 'pullRequests' | 'branchAction'
 export type RepoOperationPhase = 'idle' | 'queued' | 'running'
 export type RepoBranchActionReason =
   | 'branch:checkout'
@@ -34,15 +31,6 @@ export interface RepoOperationState {
   error: string | null
 }
 
-export interface RepoOperationsState {
-  fetch: RepoOperationState
-  snapshot: RepoOperationState
-  status: RepoOperationState
-  pullRequests: RepoOperationState
-  branchAction: RepoOperationState
-  logsByBranch: Record<string, RepoOperationState>
-}
-
 export function idleOperation(): RepoOperationState {
   return {
     requestId: 0,
@@ -52,38 +40,6 @@ export function idleOperation(): RepoOperationState {
     startedAt: null,
     settledAt: null,
     error: null,
-  }
-}
-
-export function runningOperation(options?: {
-  requestId?: number
-  reason?: RepoOperationReason
-  target?: string | null
-}): RepoOperationState {
-  const operation = idleOperation()
-  startOperation(operation, options?.requestId ?? 0, { reason: options?.reason, target: options?.target })
-  return operation
-}
-
-export function emptyRepoOperations(): RepoOperationsState {
-  return {
-    fetch: idleOperation(),
-    snapshot: idleOperation(),
-    status: idleOperation(),
-    pullRequests: idleOperation(),
-    branchAction: idleOperation(),
-    logsByBranch: {},
-  }
-}
-
-export function idleRepoOperations(): RepoOperationsState {
-  return {
-    fetch: idleOperation(),
-    snapshot: idleOperation(),
-    status: idleOperation(),
-    pullRequests: idleOperation(),
-    branchAction: idleOperation(),
-    logsByBranch: {},
   }
 }
 
@@ -130,16 +86,4 @@ export function settleOperation(
 
 export function operationBusy(operation: RepoOperationState): boolean {
   return operation.phase !== 'idle'
-}
-
-export function repoOperation(repo: RepoState, kind: RepoOperationKind): RepoOperationState {
-  return repo.ops[kind]
-}
-
-export function isRepoOperationCurrent(
-  repo: RepoState | undefined,
-  kind: RepoOperationKind,
-  requestId: number,
-): boolean {
-  return !!repo && repoOperation(repo, kind).requestId === requestId
 }

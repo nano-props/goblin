@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
+import { replaceRepo } from '#/renderer/stores/repos/helpers.ts'
 import type { PullRequestInfo } from '#/renderer/types.ts'
 import {
   branch,
@@ -42,7 +43,7 @@ describe('refreshPullRequests', () => {
     const branches = useReposStore.getState().repos[REPO_ID]?.data.branches
     expect(branches?.find((b) => b.name === 'feature/a')?.pullRequest).toEqual(fresh)
     expect(branches?.find((b) => b.name === 'feature/b')?.pullRequest).toBeUndefined()
-    expect(useReposStore.getState().repos[REPO_ID]?.ops.pullRequests.phase).toBe('idle')
+    expect(useReposStore.getState().repos[REPO_ID]?.resources.pullRequests.phase).toBe('idle')
     expect(mode).toBe('full')
   })
 
@@ -78,7 +79,7 @@ describe('refreshPullRequests', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.data.branches[0]?.pullRequest).toEqual(existing)
-    expect(repo?.ops.pullRequests.phase).toBe('idle')
+    expect(repo?.resources.pullRequests.phase).toBe('idle')
   })
 
   test('summary lookup can explicitly clear missing requested pull requests', async () => {
@@ -91,7 +92,7 @@ describe('refreshPullRequests', () => {
       .refreshPullRequests(REPO_ID, ['feature/a'], { token, mode: 'summary', clearMissing: true })
 
     expect(useReposStore.getState().repos[REPO_ID]?.data.branches[0]?.pullRequest).toBeUndefined()
-    expect(useReposStore.getState().repos[REPO_ID]?.ops.pullRequests.phase).toBe('idle')
+    expect(useReposStore.getState().repos[REPO_ID]?.resources.pullRequests.phase).toBe('idle')
   })
 
   test('summary lookup preserves existing full pull request health fields', async () => {
@@ -138,7 +139,7 @@ describe('refreshPullRequests', () => {
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.instanceToken).toBe(2)
     expect(repo?.data.branches[0]?.pullRequest).toBeUndefined()
-    expect(repo?.ops.pullRequests.phase).toBe('idle')
+    expect(repo?.resources.pullRequests.phase).toBe('idle')
   })
 
   test('preserves existing pull requests when lookup is unavailable', async () => {
@@ -150,7 +151,9 @@ describe('refreshPullRequests', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.data.branches[0]?.pullRequest).toEqual(existing)
-    expect(repo?.ops.pullRequests.phase).toBe('idle')
+    expect(repo?.resources.pullRequests.phase).toBe('idle')
+    expect(repo?.resources.pullRequests.loadedAt).toBeNull()
+    expect(repo?.resources.pullRequests.stale).toBe(true)
   })
 
   test('preserves existing pull request metadata while snapshot refresh rechecks', async () => {
@@ -167,7 +170,7 @@ describe('refreshPullRequests', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.data.branches[0]?.pullRequest).toEqual(existing)
-    expect(repo?.ops.pullRequests.phase).not.toBe('idle')
+    expect(repo?.resources.pullRequests.phase).not.toBe('idle')
 
     resolvePullRequests(null)
     await new Promise((resolve) => setTimeout(resolve, 0))
@@ -192,7 +195,7 @@ describe('refreshPullRequests', () => {
   })
 
   test('records pull request refresh failures as repo events', async () => {
-    const token = seedRepo([branch('feature/a')])
+    const token = seedRepo([branch('feature/a', pullRequest(1))])
     rpcHandlers['repo.pullRequests'] = async () => {
       throw new Error('github unavailable')
     }
@@ -202,6 +205,18 @@ describe('refreshPullRequests', () => {
     expect(useReposStore.getState().repos[REPO_ID]?.events).toEqual([
       expect.objectContaining({ kind: 'error', message: 'github unavailable' }),
     ])
+    expect(useReposStore.getState().repos[REPO_ID]?.resources.pullRequests).toMatchObject({
+      phase: 'idle',
+      error: 'github unavailable',
+      mode: null,
+      stale: true,
+    })
+    expect(useReposStore.getState().repos[REPO_ID]?.resources.pullRequestsByBranch['feature/a']).toMatchObject({
+      phase: 'idle',
+      error: 'github unavailable',
+      mode: null,
+      stale: true,
+    })
   })
 
   test('snapshot refresh performs summary lookup, selected full lookup, then full backfill', async () => {
@@ -221,7 +236,7 @@ describe('refreshPullRequests', () => {
       calls.push({
         branches,
         mode: options?.mode,
-        loadingAtStart: useReposStore.getState().repos[REPO_ID]?.ops.pullRequests.phase !== 'idle',
+        loadingAtStart: useReposStore.getState().repos[REPO_ID]?.resources.pullRequests.phase !== 'idle',
       })
       return []
     }
@@ -263,7 +278,61 @@ describe('refreshPullRequests', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.data.branches[0]?.pullRequest).toEqual(fresh)
-    expect(repo?.ops.pullRequests.phase).toBe('idle')
+    expect(repo?.resources.pullRequests.phase).toBe('idle')
+  })
+
+  test('settles branch resources that are only owned by a stale lookup', async () => {
+    const token = seedRepo([branch('feature/a'), branch('feature/b')])
+    let resolveFirst!: (value: { branch: string; pullRequest: PullRequestInfo }[]) => void
+    let resolveSecond!: (value: { branch: string; pullRequest: PullRequestInfo }[]) => void
+    let callCount = 0
+    rpcHandlers['repo.pullRequests'] = () => {
+      callCount += 1
+      return new Promise<{ branch: string; pullRequest: PullRequestInfo }[]>((resolve) => {
+        if (callCount === 1) resolveFirst = resolve
+        else resolveSecond = resolve
+      })
+    }
+
+    const first = useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a', 'feature/b'], { token })
+    const second = useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { token })
+
+    resolveSecond([])
+    await second
+    resolveFirst([])
+    await first
+
+    const repo = useReposStore.getState().repos[REPO_ID]
+    expect(repo?.resources.pullRequests.phase).toBe('idle')
+    expect(repo?.resources.pullRequestsByBranch['feature/a']?.phase).toBe('idle')
+    expect(repo?.resources.pullRequestsByBranch['feature/b']?.phase).toBe('idle')
+  })
+
+  test('does not recreate branch resources for branches removed before lookup completion', async () => {
+    const token = seedRepo([branch('feature/a'), branch('feature/b')])
+    let resolve!: (value: { branch: string; pullRequest: PullRequestInfo }[]) => void
+    rpcHandlers['repo.pullRequests'] = () =>
+      new Promise<{ branch: string; pullRequest: PullRequestInfo }[]>((r) => {
+        resolve = r
+      })
+
+    const work = useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/b'], { token })
+    useReposStore.setState((s) => ({
+      repos: {
+        ...s.repos,
+        [REPO_ID]: replaceRepo(s.repos[REPO_ID]!, (repo) => {
+          repo.data.branches = repo.data.branches.filter((branch) => branch.name !== 'feature/b')
+          delete repo.resources.pullRequestsByBranch['feature/b']
+        }),
+      },
+    }))
+
+    resolve([{ branch: 'feature/b', pullRequest: pullRequest(2) }])
+    await work
+
+    const repo = useReposStore.getState().repos[REPO_ID]
+    expect(repo?.data.branches.map((item) => item.name)).toEqual(['feature/a'])
+    expect(repo?.resources.pullRequestsByBranch['feature/b']).toBeUndefined()
   })
 
   test('does not persist cache from a stale pull request lookup while a newer lookup is running', async () => {

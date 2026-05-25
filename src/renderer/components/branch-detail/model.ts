@@ -1,5 +1,5 @@
 import type { RepoState } from '#/renderer/stores/repos/types.ts'
-import { idleOperation, operationBusy } from '#/renderer/stores/repos/operations.ts'
+import { resourceBusy } from '#/renderer/stores/repos/resources.ts'
 
 export type SelectedBranchDetail = ReturnType<typeof getSelectedBranchDetail>
 export type SelectedBranchDetailPresentation = ReturnType<typeof getSelectedBranchDetailPresentation>
@@ -16,24 +16,24 @@ export function getSelectedBranchDetail(repo: RepoState) {
 
 export function getSelectedBranchDetailPresentation(repo: RepoState) {
   const detail = getSelectedBranchDetail(repo)
-  const branchLogOperation = detail.branch ? (repo.ops.logsByBranch[detail.branch.name] ?? idleOperation()) : null
-  const logLoading = branchLogOperation ? operationBusy(branchLogOperation) : false
+  const branchLogResource = detail.branch ? repo.resources.logsByBranch[detail.branch.name] : null
+  const logLoading = branchLogResource ? resourceBusy(branchLogResource) : false
   const logInitialLoading = logLoading && !detail.branchLog?.entries.length
   const logAppendLoading = logLoading && !!detail.branchLog?.entries.length
-  const statusLoading = operationBusy(repo.ops.status)
+  const statusLoading = resourceBusy(repo.resources.status)
 
   return {
     ...detail,
     loading: {
       status: statusLoading,
-      pullRequests: operationBusy(repo.ops.pullRequests),
+      pullRequests: resourceBusy(repo.resources.pullRequests),
       commits: repo.ui.commitDetail.phase === 'opening' || logLoading,
       log: logLoading,
       logInitial: logInitialLoading,
       logAppend: logAppendLoading,
     },
     errors: {
-      status: repo.ops.status.error,
+      status: repo.resources.status.error,
     },
   }
 }

@@ -1,4 +1,5 @@
-import { operationBusy } from '#/renderer/stores/repos/operations.ts'
+import type { RepoBranchActionKind } from '#/renderer/stores/repos/branch-action-types.ts'
+import { resourceBusy } from '#/renderer/stores/repos/resources.ts'
 import type { RepoState } from '#/renderer/stores/repos/types.ts'
 
 export type BranchActionItemId =
@@ -13,24 +14,34 @@ export type BranchActionItemId =
   | 'removeWorktree'
 
 export function isBranchActionBlocked(repo: RepoState): boolean {
-  return operationBusy(repo.ops.branchAction)
+  return resourceBusy(repo.resources.branchAction)
+}
+
+export function branchActionItemIdFromKind(kind: RepoBranchActionKind | null): BranchActionItemId | null {
+  switch (kind) {
+    case 'checkout':
+      return 'checkout'
+    case 'pull':
+      return 'pull'
+    case 'push':
+      return 'push'
+    case 'deleteBranch':
+      return 'deleteBranch'
+    case 'removeWorktree':
+      return 'removeWorktree'
+    case 'createWorktree':
+    case null:
+      return null
+  }
+}
+
+export function branchActionItemIdFromResource(repo: RepoState, branchName: string): BranchActionItemId | null {
+  const action = repo.resources.branchAction
+  if (!resourceBusy(action)) return null
+  if (action.target !== branchName) return null
+  return branchActionItemIdFromKind(action.kind)
 }
 
 export function branchActionItemIdFromOperation(repo: RepoState, branchName: string): BranchActionItemId | null {
-  if (!operationBusy(repo.ops.branchAction)) return null
-  if (repo.ops.branchAction.target !== branchName) return null
-  switch (repo.ops.branchAction.reason) {
-    case 'branch:checkout':
-      return 'checkout'
-    case 'branch:pull':
-      return 'pull'
-    case 'branch:push':
-      return 'push'
-    case 'branch:deleteBranch':
-      return 'deleteBranch'
-    case 'branch:removeWorktree':
-      return 'removeWorktree'
-    default:
-      return null
-  }
+  return branchActionItemIdFromResource(repo, branchName)
 }

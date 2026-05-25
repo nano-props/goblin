@@ -55,8 +55,15 @@ const WORKTREE_OP_TIMEOUT_MS = 180_000
  *  safety net we want; the IPC handler has already pre-checked the
  *  expected cases and surfaced friendlier errors, so anything that
  *  reaches here is a corner case worth showing git's own message for. */
-export async function removeWorktree(cwd: string, worktreePath: string): Promise<ExecResult> {
-  return gitResultWithOptions(cwd, { timeoutMs: WORKTREE_OP_TIMEOUT_MS }, 'worktree', 'remove', '--', worktreePath)
+export async function removeWorktree(cwd: string, worktreePath: string, signal?: AbortSignal): Promise<ExecResult> {
+  return gitResultWithOptions(
+    cwd,
+    { timeoutMs: WORKTREE_OP_TIMEOUT_MS, signal },
+    'worktree',
+    'remove',
+    '--',
+    worktreePath,
+  )
 }
 
 /** `git worktree add -b <newBranch> <path> <baseBranch>`. Always creates
@@ -69,10 +76,11 @@ export async function createWorktree(
   worktreePath: string,
   newBranch: string,
   baseBranch: string,
+  signal?: AbortSignal,
 ): Promise<ExecResult> {
   return gitResultWithOptions(
     cwd,
-    { timeoutMs: WORKTREE_OP_TIMEOUT_MS },
+    { timeoutMs: WORKTREE_OP_TIMEOUT_MS, signal },
     'worktree',
     'add',
     '-b',

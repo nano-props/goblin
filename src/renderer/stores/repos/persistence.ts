@@ -2,6 +2,7 @@ import { LRUCache } from 'lru-cache'
 import * as v from 'valibot'
 import type { ReposSet } from '#/renderer/stores/repos/types.ts'
 import { selectedBranchForBranchSet } from '#/renderer/stores/repos/branch-view-mode.ts'
+import { finishResourceSuccess } from '#/renderer/stores/repos/resources.ts'
 import type { CachedRepoState, RepoState } from '#/renderer/stores/repos/types.ts'
 
 const MAX_CACHE_AGE_MS = 14 * 24 * 60 * 60 * 1000
@@ -90,6 +91,13 @@ export function hydrateCachedRepo(repo: RepoState, cached: CachedRepoState | und
     selectedBranch: cached.ui.selectedBranch,
     viewMode: cached.ui.branchViewMode,
   })
+  const resources = {
+    ...repo.resources,
+    snapshot: { ...repo.resources.snapshot },
+    status: { ...repo.resources.status },
+  }
+  if (cached.data.branches.length > 0) finishResourceSuccess(resources.snapshot, cached.savedAt)
+  if (cached.data.statusLoaded) finishResourceSuccess(resources.status, cached.savedAt)
   return {
     ...repo,
     name: cached.name || repo.name,
@@ -100,6 +108,7 @@ export function hydrateCachedRepo(repo: RepoState, cached: CachedRepoState | und
       status: cached.data.status,
       statusLoaded: cached.data.statusLoaded,
     },
+    resources,
     ui: {
       ...repo.ui,
       selectedBranch,

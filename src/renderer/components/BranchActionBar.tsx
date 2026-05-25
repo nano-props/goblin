@@ -79,9 +79,7 @@ function BranchActionAuto({
   const containerRef = useRef<HTMLDivElement | null>(null)
   const measureRef = useRef<HTMLDivElement | null>(null)
   const [collapsed, setCollapsed] = useState(false)
-  const layoutKey = visibleItems
-    .map((item) => `${item.id}:${item.label}:${item.disabled}`)
-    .join('|')
+  const layoutKey = visibleItems.map((item) => `${item.id}:${item.label}:${item.disabled}`).join('|')
 
   useLayoutEffect(() => {
     const update = () => {
@@ -119,11 +117,7 @@ function BranchActionAuto({
   )
 }
 
-function BranchActionButtonScroller({
-  visibleItems,
-}: {
-  visibleItems: BranchActionItem[]
-}) {
+function BranchActionButtonScroller({ visibleItems }: { visibleItems: BranchActionItem[] }) {
   return (
     <ScrollArea orientation="horizontal" className="min-w-0 flex-1">
       <BranchActionButtonRow visibleItems={visibleItems} className="min-w-full" />
@@ -149,13 +143,7 @@ function BranchActionButtonRow({
   )
 }
 
-function BranchActionButton({
-  item,
-  measure = false,
-}: {
-  item: BranchActionItem
-  measure?: boolean
-}) {
+function BranchActionButton({ item, measure = false }: { item: BranchActionItem; measure?: boolean }) {
   return (
     <AsyncButton
       variant="ghost"

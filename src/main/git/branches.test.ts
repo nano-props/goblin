@@ -3,7 +3,16 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { getLog, markDefaultBranch, markMergedToDefault, prioritizeDefaultBranch } from '#/main/git/branches.ts'
+import {
+  checkoutBranch,
+  deleteBranch,
+  getLog,
+  getUpstream,
+  isAncestor,
+  markDefaultBranch,
+  markMergedToDefault,
+  prioritizeDefaultBranch,
+} from '#/main/git/branches.ts'
 import type { BranchInfo } from '#/shared/git-types.ts'
 
 let tmp: string | null = null
@@ -34,6 +43,21 @@ function commitFile(cwd: string, file: string, value: string, message: string, s
   writeFileSync(path.join(cwd, file), value)
   runGit(cwd, ['add', file], seconds)
   runGit(cwd, ['commit', '-q', '-m', message], seconds)
+}
+
+function createRepo(): string {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-branches-test-'))
+  runGit(tmp, ['init', '-b', 'main'])
+  runGit(tmp, ['config', 'user.email', 'test@example.com'])
+  runGit(tmp, ['config', 'user.name', 'Test User'])
+  commitFile(tmp, 'README.md', 'initial\n', 'initial', 0)
+  return tmp
+}
+
+function abortedSignal(): AbortSignal {
+  const ctrl = new AbortController()
+  ctrl.abort()
+  return ctrl.signal
 }
 
 afterEach(() => {
@@ -97,6 +121,46 @@ describe('markMergedToDefault', () => {
   test('preserves branches when no default branch is known', () => {
     const branches = [branch('feature/a')]
     expect(markMergedToDefault(branches, '', new Set(['feature/a']))).toBe(branches)
+  })
+})
+
+describe('branch write operations', () => {
+  test('does not checkout a branch when already aborted', async () => {
+    const repo = createRepo()
+    runGit(repo, ['branch', 'feature/aborted'])
+
+    const result = await checkoutBranch(repo, 'feature/aborted', abortedSignal())
+
+    expect(result).toEqual({ ok: false, message: 'cancelled' })
+    expect(execFileSync('git', ['branch', '--show-current'], { cwd: repo, encoding: 'utf8' }).trim()).toBe('main')
+  })
+
+  test('does not delete a branch when already aborted', async () => {
+    const repo = createRepo()
+    runGit(repo, ['branch', 'feature/delete'])
+
+    const result = await deleteBranch(repo, 'feature/delete', { force: true, signal: abortedSignal() })
+
+    expect(result).toEqual({ ok: false, message: 'cancelled' })
+    expect(execFileSync('git', ['branch', '--list', 'feature/delete'], { cwd: repo, encoding: 'utf8' }).trim()).toBe(
+      'feature/delete',
+    )
+  })
+
+  test('does not resolve an upstream when already aborted', async () => {
+    const repo = createRepo()
+
+    const result = await getUpstream(repo, 'main', abortedSignal())
+
+    expect(result).toBeNull()
+  })
+
+  test('does not check ancestry when already aborted', async () => {
+    const repo = createRepo()
+
+    const result = await isAncestor(repo, 'main', 'HEAD', abortedSignal())
+
+    expect(result).toBe(false)
   })
 })
 

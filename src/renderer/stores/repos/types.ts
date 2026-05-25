@@ -3,7 +3,7 @@ import type { BranchInfo, ExecResult, LogEntry, PullRequestFetchMode, WorktreeSt
 import type { CommitDetail } from '#/shared/rpc.ts'
 import type { WorkspaceDetailPaneSizes, WorkspaceLayout } from '#/shared/workspace-layout.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/renderer/stores/repos/branch-action-types.ts'
-import type { RepoOperationsState } from '#/renderer/stores/repos/operations.ts'
+import type { RepoResourcesState } from '#/renderer/stores/repos/resources.ts'
 
 export type DetailTab = 'status' | 'changes' | 'commits' | 'terminal'
 export type BranchViewMode = 'all' | 'worktrees' | 'no-worktree'
@@ -51,7 +51,7 @@ export interface RepoCacheState {
 
 export interface RepoRemoteState {
   /** Sticky connectivity badge for background fetch failures. Unlike
-   *  `ops.fetch.error`, this persists after the operation settles and
+   *  `resources.fetch.error`, this persists after the operation settles and
    *  is cleared by the next successful network operation. */
   fetchFailed: boolean
   /** Last fetch failure message — populated when fetchFailed flips
@@ -75,8 +75,8 @@ export interface RepoState {
   /** Bumped on every fresh open so async writers can detect close-and-reopen. */
   instanceToken: number
   data: RepoDataState
+  resources: RepoResourcesState
   ui: RepoUiState
-  ops: RepoOperationsState
   cache: RepoCacheState
   remote: RepoRemoteState
   events: RepoEvent[]
