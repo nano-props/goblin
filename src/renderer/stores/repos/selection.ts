@@ -20,13 +20,14 @@ import type {
 } from '#/renderer/stores/repos/types.ts'
 import type { WorkspaceDetailPaneSizes } from '#/shared/workspace-layout.ts'
 import type { RepoState } from '#/renderer/stores/repos/types.ts'
+import { detailTabForWorktree } from '#/renderer/lib/detail-tabs.ts'
 
 function branchHasWorktree(repo: RepoState, branchName: string | null): boolean {
   return !!branchName && repo.data.branches.some((branch) => branch.name === branchName && !!branch.worktreePath)
 }
 
 function detailTabForSelection(repo: RepoState, tab: DetailTab, selectedBranch = repo.ui.selectedBranch): DetailTab {
-  return tab === 'terminal' && !branchHasWorktree(repo, selectedBranch) ? 'status' : tab
+  return detailTabForWorktree(tab, branchHasWorktree(repo, selectedBranch))
 }
 
 export function createSelectionActions(set: ReposSet, get: ReposGet) {
@@ -68,11 +69,37 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
       })
     },
 
+    setDetailFocusMode(focused: boolean) {
+      set((s) => {
+        const detailFocusMode = s.workspaceLayout === 'top-bottom' && focused
+        const detailCollapsed = detailFocusMode ? false : s.detailCollapsed
+        return s.detailFocusMode === detailFocusMode && s.detailCollapsed === detailCollapsed
+          ? s
+          : { detailFocusMode, detailCollapsed }
+      })
+    },
+
+    toggleDetailFocusMode() {
+      set((s) => {
+        if (s.workspaceLayout !== 'top-bottom') return s
+        const detailFocusMode = !s.detailFocusMode
+        const detailCollapsed = detailFocusMode ? false : s.detailCollapsed
+        return { detailFocusMode, detailCollapsed }
+      })
+    },
+
     setWorkspaceLayout(layout: RepoWorkspaceLayout) {
       set((s) => {
+        const detailFocusMode = layout === 'top-bottom' ? s.detailFocusMode : false
         const detailCollapsed = effectiveDetailCollapsed(layout, s.detailCollapsed)
-        if (s.workspaceLayout === layout && s.detailCollapsed === detailCollapsed) return s
-        return { workspaceLayout: layout, detailCollapsed }
+        if (
+          s.workspaceLayout === layout &&
+          s.detailCollapsed === detailCollapsed &&
+          s.detailFocusMode === detailFocusMode
+        ) {
+          return s
+        }
+        return { workspaceLayout: layout, detailCollapsed, detailFocusMode }
       })
     },
 
@@ -103,6 +130,7 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
         if (
           s.workspaceLayout === DEFAULT_WORKSPACE_LAYOUT &&
           s.detailCollapsed === detailCollapsed &&
+          !s.detailFocusMode &&
           s.detailPaneSizes['top-bottom'] === DEFAULT_DETAIL_PANE_SIZES['top-bottom'] &&
           s.detailPaneSizes['left-right'] === DEFAULT_DETAIL_PANE_SIZES['left-right']
         ) {
@@ -111,6 +139,7 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
         return {
           workspaceLayout: DEFAULT_WORKSPACE_LAYOUT,
           detailCollapsed,
+          detailFocusMode: false,
           detailPaneSizes: DEFAULT_DETAIL_PANE_SIZES,
         }
       })
@@ -200,6 +229,7 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
         changed = true
         token = repo.instanceToken
         return {
+          // Terminal exits in background repos should not surprise the active workspace layout.
           detailCollapsed: s.activeId === id ? effectiveDetailCollapsed(s.workspaceLayout, true) : s.detailCollapsed,
           repos: {
             ...s.repos,

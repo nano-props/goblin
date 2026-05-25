@@ -36,6 +36,7 @@ export interface SessionState {
   /** The active tab — null when no repos were open. */
   activeRepo: string | null
   detailCollapsed: boolean
+  detailFocusMode: boolean
   workspaceLayout: WorkspaceLayout
   detailPaneSizes: WorkspaceDetailPaneSizes
 }
@@ -366,6 +367,7 @@ export function createAppRouter(handlers: AppRpcHandlers) {
               openRepos: v.array(v.string()),
               activeRepo: v.nullable(v.string()),
               detailCollapsed: v.boolean(),
+              detailFocusMode: v.boolean(),
               workspaceLayout: v.picklist(WORKSPACE_LAYOUTS),
               detailPaneSizes: v.object({
                 'top-bottom': FiniteNumber,

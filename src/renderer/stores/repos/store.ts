@@ -108,6 +108,7 @@ export const useReposStore = create<ReposStore>()(
       sessionReady: false,
       missingFromSession: [],
       detailCollapsed: DEFAULT_DETAIL_COLLAPSED,
+      detailFocusMode: false,
       workspaceLayout: DEFAULT_WORKSPACE_LAYOUT,
       detailPaneSizes: DEFAULT_DETAIL_PANE_SIZES,
 

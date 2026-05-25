@@ -4,6 +4,7 @@ import { SplitPane } from '#/renderer/components/SplitPane.tsx'
 import { cn } from '#/renderer/lib/cn.ts'
 import { DEFAULT_DETAIL_PANE_SIZES, DEFAULT_WORKSPACE_LAYOUT, workspaceLayoutAxis } from '#/shared/workspace-layout.ts'
 import type { RepoWorkspaceLayout } from '#/renderer/stores/repos/types.ts'
+import type { RepoWorkspaceMode } from '#/renderer/lib/workspace-layout.ts'
 
 const LEFT_RIGHT_BRANCH_MIN_SIZE = '14rem'
 const LEFT_RIGHT_DETAIL_MIN_SIZE = '22rem'
@@ -18,7 +19,7 @@ interface RepoWorkspaceProps {
   branchPane: ReactNode
   detailPane: ReactNode
   layout?: RepoWorkspaceLayout
-  detailCollapsed?: boolean
+  mode?: RepoWorkspaceMode
   detailSize?: number
   onDetailSizeChange?: (size: number) => void
 }
@@ -31,8 +32,6 @@ interface ToolbarProps extends HTMLAttributes<HTMLDivElement> {
 
 interface PaneProps {
   children: ReactNode
-  border?: boolean
-  layout?: RepoWorkspaceLayout
 }
 
 interface ToolbarTitleProps {
@@ -80,12 +79,22 @@ export function RepoWorkspace({
   branchPane,
   detailPane,
   layout = DEFAULT_WORKSPACE_LAYOUT,
-  detailCollapsed = false,
+  mode = 'split',
   detailSize = DEFAULT_DETAIL_PANE_SIZES[layout],
   onDetailSizeChange,
 }: RepoWorkspaceProps) {
   const axis = workspaceLayoutAxis(layout)
-  if (!(axis === 'rows' && detailCollapsed)) {
+  const workspaceMode = axis === 'rows' ? mode : 'split'
+  if (workspaceMode === 'focus') {
+    return (
+      <div className="grid min-h-0 flex-1 grid-rows-[auto_1px_minmax(0,1fr)]">
+        {branchPane}
+        <WorkspaceSeparator />
+        {detailPane}
+      </div>
+    )
+  }
+  if (workspaceMode === 'split') {
     return (
       <SplitPane
         orientation={axis === 'columns' ? 'horizontal' : 'vertical'}
@@ -102,22 +111,21 @@ export function RepoWorkspace({
   }
   // Collapsed top/bottom layout keeps only the detail toolbar visible.
   return (
-    <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_2.25rem]">
+    <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_1px_2.25rem]">
       {branchPane}
+      <WorkspaceSeparator />
       {detailPane}
     </div>
   )
 }
 
-export function RepoWorkspacePane({ children, border = false, layout = DEFAULT_WORKSPACE_LAYOUT }: PaneProps) {
-  const axis = workspaceLayoutAxis(layout)
+function WorkspaceSeparator() {
+  return <div className="bg-separator" aria-hidden />
+}
+
+export function RepoWorkspacePane({ children }: PaneProps) {
   return (
-    <div
-      className={cn(
-        'flex min-h-0 flex-1 flex-col overflow-hidden',
-        border && (axis === 'columns' ? 'border-r border-separator' : 'border-b border-separator'),
-      )}
-    >
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {children}
     </div>
   )

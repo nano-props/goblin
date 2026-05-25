@@ -103,6 +103,7 @@ export interface ReposStore {
    *  saved session. */
   missingFromSession: MissingRepo[]
   detailCollapsed: boolean
+  detailFocusMode: boolean
   workspaceLayout: RepoWorkspaceLayout
   detailPaneSizes: WorkspaceDetailPaneSizes
 
@@ -124,6 +125,8 @@ export interface ReposStore {
   dismissExitedTerminalDetail: (id: string, worktreePath: string) => void
   setDetailCollapsed: (collapsed: boolean) => void
   toggleDetailCollapsed: () => void
+  setDetailFocusMode: (focused: boolean) => void
+  toggleDetailFocusMode: () => void
   setWorkspaceLayout: (layout: RepoWorkspaceLayout) => void
   setDetailPaneSize: (layout: RepoWorkspaceLayout, size: number) => void
   setDetailPaneSizes: (sizes: WorkspaceDetailPaneSizes) => void

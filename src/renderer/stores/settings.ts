@@ -69,6 +69,7 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
     openRepos: [],
     activeRepo: null,
     detailCollapsed: true,
+    detailFocusMode: false,
     workspaceLayout: DEFAULT_WORKSPACE_LAYOUT,
     detailPaneSizes: DEFAULT_DETAIL_PANE_SIZES,
   },

@@ -472,6 +472,75 @@ describe('setWorkspaceLayout', () => {
   })
 })
 
+describe('setDetailFocusMode', () => {
+  test('enables focus mode and expands detail in top-bottom layout', () => {
+    useReposStore.getState().setDetailCollapsed(true)
+
+    useReposStore.getState().setDetailFocusMode(true)
+
+    expect(useReposStore.getState().detailFocusMode).toBe(true)
+    expect(useReposStore.getState().detailCollapsed).toBe(false)
+  })
+
+  test('keeps focus mode when detail is collapsed', () => {
+    useReposStore.getState().setDetailFocusMode(true)
+
+    useReposStore.getState().setDetailCollapsed(true)
+
+    expect(useReposStore.getState().detailFocusMode).toBe(true)
+    expect(useReposStore.getState().detailCollapsed).toBe(true)
+  })
+
+  test('exits focus mode without expanding a collapsed detail panel', () => {
+    useReposStore.getState().setDetailFocusMode(true)
+    useReposStore.getState().setDetailCollapsed(true)
+
+    useReposStore.getState().setDetailFocusMode(false)
+
+    expect(useReposStore.getState().detailFocusMode).toBe(false)
+    expect(useReposStore.getState().detailCollapsed).toBe(true)
+  })
+
+  test('re-expands into focus mode when focus is enabled while collapsed', () => {
+    useReposStore.getState().setDetailFocusMode(true)
+    useReposStore.getState().setDetailCollapsed(true)
+
+    useReposStore.getState().toggleDetailCollapsed()
+
+    expect(useReposStore.getState().detailFocusMode).toBe(true)
+    expect(useReposStore.getState().detailCollapsed).toBe(false)
+  })
+
+  test('exits focus mode when switching to left-right layout', () => {
+    useReposStore.getState().setDetailFocusMode(true)
+
+    useReposStore.getState().setWorkspaceLayout('left-right')
+
+    expect(useReposStore.getState().workspaceLayout).toBe('left-right')
+    expect(useReposStore.getState().detailFocusMode).toBe(false)
+    expect(useReposStore.getState().detailCollapsed).toBe(false)
+  })
+
+  test('does not enable focus mode in left-right layout', () => {
+    useReposStore.getState().setWorkspaceLayout('left-right')
+
+    useReposStore.getState().setDetailFocusMode(true)
+
+    expect(useReposStore.getState().detailFocusMode).toBe(false)
+  })
+
+  test('preserves focus preference when filtering leaves no selected branch', () => {
+    seedRepo({ selectedBranch: 'main', branches: [branch('main')] })
+    useReposStore.getState().setDetailFocusMode(true)
+
+    useReposStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
+
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBeNull()
+    expect(useReposStore.getState().detailFocusMode).toBe(true)
+    expect(useReposStore.getState().detailCollapsed).toBe(false)
+  })
+})
+
 describe('setDetailPaneSize', () => {
   test('stores detail pane sizes per workspace layout', () => {
     useReposStore.getState().setDetailPaneSize('top-bottom', 37.34)
@@ -569,6 +638,7 @@ describe('resetLayout', () => {
     useReposStore.setState({
       workspaceLayout: 'left-right',
       detailCollapsed: false,
+      detailFocusMode: true,
       detailPaneSizes: { 'top-bottom': 35, 'left-right': 70 },
     })
 
@@ -576,6 +646,7 @@ describe('resetLayout', () => {
 
     expect(useReposStore.getState().workspaceLayout).toBe('top-bottom')
     expect(useReposStore.getState().detailCollapsed).toBe(true)
+    expect(useReposStore.getState().detailFocusMode).toBe(false)
     expect(useReposStore.getState().detailPaneSizes).toBe(DEFAULT_DETAIL_PANE_SIZES)
   })
 

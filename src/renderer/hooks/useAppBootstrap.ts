@@ -23,12 +23,14 @@ export function useAppBootstrap() {
           useI18nStore.getState().hydrate(),
         ])
         const session = useSettingsStore.getState().savedSession
-        const { hydrateSession, setDetailCollapsed, setWorkspaceLayout, setDetailPaneSizes } = useReposStore.getState()
+        const { hydrateSession, setDetailCollapsed, setDetailFocusMode, setWorkspaceLayout, setDetailPaneSizes } =
+          useReposStore.getState()
         // Apply layout prefs before repo probing finishes so the first
         // restored paint uses the saved geometry. useSessionPersistence
         // still waits for sessionReady, so this cannot overwrite the
         // persisted session with a partially hydrated one.
         setWorkspaceLayout(session.workspaceLayout)
+        setDetailFocusMode(session.detailFocusMode)
         setDetailCollapsed(session.detailCollapsed)
         setDetailPaneSizes(session.detailPaneSizes)
         await hydrateSession(session.openRepos, session.activeRepo)

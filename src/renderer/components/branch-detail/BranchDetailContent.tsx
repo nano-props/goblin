@@ -13,6 +13,7 @@ import { TerminalSlot } from '#/renderer/components/terminal/TerminalSlot.tsx'
 import type { SelectedBranchDetail } from '#/renderer/components/branch-detail/model.ts'
 import { operationBusy } from '#/renderer/stores/repos/operations.ts'
 import { isShortcutBlockingLayerOpen } from '#/renderer/lib/layers.ts'
+import { detailTabForWorktree } from '#/renderer/lib/detail-tabs.ts'
 
 interface Props {
   repo: RepoState
@@ -36,7 +37,9 @@ export function BranchDetailContent({ repo, detail, detailId, contentId, layout 
   const setDetailTab = useReposStore((s) => s.setDetailTab)
   const { branch } = detail
   useEffect(() => {
-    if (repo.ui.detailTab === 'terminal' && branch && !branch.worktreePath) setDetailTab(repo.id, 'status')
+    if (!branch) return
+    const nextTab = detailTabForWorktree(repo.ui.detailTab, !!branch.worktreePath)
+    if (nextTab !== repo.ui.detailTab) setDetailTab(repo.id, nextTab)
   }, [branch, repo.id, repo.ui.detailTab, setDetailTab])
   if (!branch)
     return <EmptyState title={t(repo.data.branches.length === 0 ? 'branches.empty' : 'branches.filter-empty')} />

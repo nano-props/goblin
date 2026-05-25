@@ -1,4 +1,4 @@
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Maximize2, Minimize2 } from 'lucide-react'
 import type { KeyboardEvent } from 'react'
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import type { RepoState, DetailTab, RepoWorkspaceLayout } from '#/renderer/stores/repos/types.ts'
@@ -8,7 +8,7 @@ import { Badge } from '#/renderer/components/ui/badge.tsx'
 import { Button } from '#/renderer/components/ui/button.tsx'
 import { BranchActionBar } from '#/renderer/components/BranchActionBar.tsx'
 import { Toolbar } from '#/renderer/components/Layout.tsx'
-import { visibleDetailTabs } from '#/renderer/lib/detail-tabs.ts'
+import { detailTabNavigationKey, navigatedDetailTab, visibleDetailTabs } from '#/renderer/lib/detail-tabs.ts'
 import { cn } from '#/renderer/lib/cn.ts'
 import { repoWorkspaceBehavior } from '#/renderer/lib/workspace-layout.ts'
 import type { SelectedBranchDetail } from '#/renderer/components/branch-detail/model.ts'
@@ -19,40 +19,32 @@ interface Props {
   detailId: string
   contentId: string
   collapsed: boolean
+  focusMode: boolean
   layout: RepoWorkspaceLayout
 }
 
-export function BranchDetailToolbar({ repo, detail, detailId, contentId, collapsed, layout }: Props) {
+export function BranchDetailToolbar({ repo, detail, detailId, contentId, collapsed, focusMode, layout }: Props) {
   const t = useT()
   const setDetailTab = useReposStore((s) => s.setDetailTab)
   const setDetailCollapsed = useReposStore((s) => s.setDetailCollapsed)
   const toggleDetailCollapsed = useReposStore((s) => s.toggleDetailCollapsed)
+  const toggleDetailFocusMode = useReposStore((s) => s.toggleDetailFocusMode)
   const shortcutsDisabled = useSettingsStore((s) => s.shortcutsDisabled)
-  const behavior = repoWorkspaceBehavior(layout, collapsed)
+  const behavior = repoWorkspaceBehavior(layout, collapsed, focusMode)
   const tabs = visibleDetailTabs(!!detail.branch?.worktreePath)
 
+  // No selected branch means there is no tab/action target; BranchDetailContent renders the empty state.
   if (!detail.branch) return null
 
   function handleTabKeyDown(e: KeyboardEvent<HTMLButtonElement>, tabId: DetailTab) {
-    const current = tabs.findIndex((tab) => tab.id === tabId)
-    const last = tabs.length - 1
-    const next =
-      e.key === 'ArrowRight'
-        ? (current + 1) % tabs.length
-        : e.key === 'ArrowLeft'
-          ? (current - 1 + tabs.length) % tabs.length
-          : e.key === 'Home'
-            ? 0
-            : e.key === 'End'
-              ? last
-              : -1
-    if (next === -1) return
+    const key = detailTabNavigationKey(e.key)
+    if (!key) return
     e.preventDefault()
-    const nextTab = tabs[next]
-    setDetailTab(repo.id, nextTab.id)
+    const nextTab = navigatedDetailTab(tabId, key, !!detail.branch?.worktreePath)
+    setDetailTab(repo.id, nextTab)
     setDetailCollapsed(false)
     // The tablist stays mounted even when the panel is collapsed; optional chaining guards transient unmounts.
-    window.requestAnimationFrame(() => document.getElementById(`${detailId}-${nextTab.id}-tab`)?.focus())
+    window.requestAnimationFrame(() => document.getElementById(`${detailId}-${nextTab}-tab`)?.focus())
   }
 
   return (
@@ -77,6 +69,24 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
           className="size-7"
         >
           <ChevronDown className={cn(collapsed && '-rotate-90')} />
+        </Button>
+      )}
+      {behavior.detailFocusAllowed && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleDetailFocusMode}
+          aria-label={t(behavior.detailFocusMode ? 'branch-detail.exit-focus' : 'branch-detail.focus')}
+          // No accelerator is registered for focus mode, so the title intentionally omits shortcut text.
+          title={t(behavior.detailFocusMode ? 'branch-detail.exit-focus-title' : 'branch-detail.focus-title')}
+          aria-pressed={behavior.detailFocusMode}
+          className={cn(
+            'size-7',
+            behavior.detailFocusMode &&
+              'bg-accent text-accent-foreground shadow-xs hover:bg-accent hover:text-accent-foreground',
+          )}
+        >
+          {behavior.detailFocusMode ? <Minimize2 /> : <Maximize2 />}
         </Button>
       )}
       <div className="flex shrink-0" role="tablist" aria-label={t('tab.branch-detail')}>

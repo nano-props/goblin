@@ -157,11 +157,16 @@ export const ko: Record<DictKey, string> = {
   'branch-detail.collapse-title': '세부 패널 접기 (⌘J)',
   'branch-detail.expand': '세부 패널 펼치기',
   'branch-detail.expand-title': '세부 패널 펼치기 (⌘J)',
+  'branch-detail.focus': '브랜치 세부 정보 집중',
+  'branch-detail.focus-title': '브랜치 세부 정보 집중',
+  'branch-detail.exit-focus': '브랜치 세부 정보 집중 종료',
+  'branch-detail.exit-focus-title': '브랜치 세부 정보 집중 종료',
 
   // ---- Branches list -----------------------------------------------------
   'branches.empty': '이 리포지토리에 브랜치가 없습니다.',
   'branches.filter-empty': '이 필터와 일치하는 브랜치가 없습니다.',
   'branches.filter-label': '브랜치 필터',
+  'branches.selected': '선택한 브랜치',
   'branches.filter.all': '전체',
   'branches.filter.worktrees': '워크트리',
   'branches.filter.no-worktree': '워크트리 없음',

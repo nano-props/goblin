@@ -147,6 +147,7 @@ function repoCacheEntry(repo: RepoState): CachedRepoState | null {
     ui: {
       selectedBranch: repo.ui.selectedBranch,
       branchViewMode: repo.ui.branchViewMode,
+      // Terminal tabs are tied to live worktree sessions, so cache restores fall back to status.
       detailTab: repo.ui.detailTab === 'terminal' ? 'status' : repo.ui.detailTab,
     },
   }

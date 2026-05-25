@@ -730,10 +730,12 @@ async function saveSession(session: SessionState): Promise<void> {
   const workspaceLayout = normalizeWorkspaceLayout(session.workspaceLayout)
   const detailCollapsed =
     typeof session.detailCollapsed === 'boolean' ? session.detailCollapsed : DEFAULT_SESSION_DETAIL_COLLAPSED
+  const detailFocusMode = workspaceLayout === 'top-bottom' && session.detailFocusMode === true
   await setSession({
     openRepos,
     activeRepo: activeRepo && openRepos.includes(activeRepo) ? activeRepo : null,
     detailCollapsed: effectiveDetailCollapsed(workspaceLayout, detailCollapsed),
+    detailFocusMode,
     workspaceLayout,
     detailPaneSizes: normalizeDetailPaneSizes(session.detailPaneSizes),
   })

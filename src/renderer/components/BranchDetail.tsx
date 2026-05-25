@@ -11,6 +11,7 @@ interface Props {
   repoId: string
   layout?: RepoWorkspaceLayout
   collapsed?: boolean
+  focusMode?: boolean
 }
 
 // Keep this equality in sync with fields read by BranchDetail children.
@@ -40,7 +41,7 @@ function branchDetailRepoEqual(a: RepoState | undefined, b: RepoState | undefine
   )
 }
 
-export function BranchDetail({ repoId, layout = DEFAULT_WORKSPACE_LAYOUT, collapsed = false }: Props) {
+export function BranchDetail({ repoId, layout = DEFAULT_WORKSPACE_LAYOUT, collapsed = false, focusMode = false }: Props) {
   const detailId = useId()
   const repo = useStoreWithEqualityFn(useReposStore, (s) => s.repos[repoId], branchDetailRepoEqual)
   if (!repo) return null
@@ -56,6 +57,7 @@ export function BranchDetail({ repoId, layout = DEFAULT_WORKSPACE_LAYOUT, collap
         detailId={detailId}
         contentId={contentId}
         collapsed={collapsed}
+        focusMode={focusMode}
         layout={layout}
       />
       {!collapsed && (

@@ -166,11 +166,16 @@ export const en = {
   'branch-detail.collapse-title': 'Collapse detail panel (⌘J)',
   'branch-detail.expand': 'Expand detail panel',
   'branch-detail.expand-title': 'Expand detail panel (⌘J)',
+  'branch-detail.focus': 'Focus branch detail',
+  'branch-detail.focus-title': 'Focus branch detail',
+  'branch-detail.exit-focus': 'Exit branch detail focus',
+  'branch-detail.exit-focus-title': 'Exit branch detail focus',
 
   // ---- Branches list ------------------------------------------------------
   'branches.empty': 'No branches found in this repository.',
   'branches.filter-empty': 'No branches match this filter.',
   'branches.filter-label': 'Filter branches',
+  'branches.selected': 'Selected branch',
   'branches.filter.all': 'All',
   'branches.filter.worktrees': 'Worktrees',
   'branches.filter.no-worktree': 'No worktree',

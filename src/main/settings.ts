@@ -39,6 +39,7 @@ export interface WindowBounds {
  *  can rewrite the file before the app reads it. */
 export const SETTINGS_SCHEMA_VERSION = 1
 export const DEFAULT_SESSION_DETAIL_COLLAPSED = DEFAULT_DETAIL_COLLAPSED
+export const DEFAULT_SESSION_DETAIL_FOCUS_MODE = false
 export const DEFAULT_SESSION_WORKSPACE_LAYOUT: WorkspaceLayout = DEFAULT_WORKSPACE_LAYOUT
 export const DEFAULT_SESSION_DETAIL_PANE_SIZES: WorkspaceDetailPaneSizes = DEFAULT_DETAIL_PANE_SIZES
 
@@ -75,6 +76,7 @@ const DEFAULTS: Settings = {
     openRepos: [],
     activeRepo: null,
     detailCollapsed: DEFAULT_SESSION_DETAIL_COLLAPSED,
+    detailFocusMode: DEFAULT_SESSION_DETAIL_FOCUS_MODE,
     workspaceLayout: DEFAULT_SESSION_WORKSPACE_LAYOUT,
     detailPaneSizes: DEFAULT_SESSION_DETAIL_PANE_SIZES,
   },
@@ -113,10 +115,15 @@ function normalizeSession(session: unknown): SessionState {
   const workspaceLayout = normalizeWorkspaceLayout(value.workspaceLayout)
   const detailCollapsed =
     typeof value.detailCollapsed === 'boolean' ? value.detailCollapsed : DEFAULTS.session.detailCollapsed
+  const detailFocusMode =
+    workspaceLayout === 'top-bottom' && typeof value.detailFocusMode === 'boolean'
+      ? value.detailFocusMode
+      : DEFAULTS.session.detailFocusMode
   return {
     openRepos,
     activeRepo,
     detailCollapsed: effectiveDetailCollapsed(workspaceLayout, detailCollapsed),
+    detailFocusMode,
     workspaceLayout,
     detailPaneSizes: normalizeDetailPaneSizes(value.detailPaneSizes),
   }

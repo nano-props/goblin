@@ -164,11 +164,16 @@ export const ja: Record<DictKey, string> = {
   'branch-detail.collapse-title': '詳細パネルを折りたたむ (⌘J)',
   'branch-detail.expand': '詳細パネルを展開',
   'branch-detail.expand-title': '詳細パネルを展開 (⌘J)',
+  'branch-detail.focus': 'ブランチ詳細に集中',
+  'branch-detail.focus-title': 'ブランチ詳細に集中',
+  'branch-detail.exit-focus': 'ブランチ詳細の集中を終了',
+  'branch-detail.exit-focus-title': 'ブランチ詳細の集中を終了',
 
   // ---- Branches list -----------------------------------------------------
   'branches.empty': 'このリポジトリにブランチがありません。',
   'branches.filter-empty': 'このフィルターに一致するブランチはありません。',
   'branches.filter-label': 'ブランチをフィルター',
+  'branches.selected': '選択中のブランチ',
   'branches.filter.all': 'すべて',
   'branches.filter.worktrees': 'ワークツリー',
   'branches.filter.no-worktree': 'ワークツリーなし',

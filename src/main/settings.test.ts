@@ -86,3 +86,25 @@ test('persists the selected color theme', async () => {
   const saved = JSON.parse(readFileSync(path.join(tmp, 'settings.json'), 'utf-8')) as { colorTheme: string }
   expect(saved.colorTheme).toBe('shadcn')
 })
+
+test('persists session detail focus mode', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-settings-test-'))
+  vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
+  const settings = await import('#/main/settings.ts')
+
+  await settings.setSession({
+    openRepos: [],
+    activeRepo: null,
+    detailCollapsed: true,
+    detailFocusMode: true,
+    workspaceLayout: 'top-bottom',
+    detailPaneSizes: { 'top-bottom': 50, 'left-right': 60 },
+  })
+  const flushed = await settings.flushSettings()
+  expect(flushed).toBe(true)
+
+  const saved = JSON.parse(readFileSync(path.join(tmp, 'settings.json'), 'utf-8')) as {
+    session: { detailFocusMode: boolean }
+  }
+  expect(saved.session.detailFocusMode).toBe(true)
+})

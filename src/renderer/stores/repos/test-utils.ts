@@ -63,6 +63,7 @@ export function resetReposStore(): void {
     sessionReady: false,
     missingFromSession: [],
     detailCollapsed: DEFAULT_DETAIL_COLLAPSED,
+    detailFocusMode: false,
     workspaceLayout: DEFAULT_WORKSPACE_LAYOUT,
     detailPaneSizes: DEFAULT_DETAIL_PANE_SIZES,
   })
@@ -135,6 +136,7 @@ export function seedRepoState(options: {
     sessionReady: true,
     missingFromSession: [],
     detailCollapsed: DEFAULT_DETAIL_COLLAPSED,
+    detailFocusMode: false,
     workspaceLayout: DEFAULT_WORKSPACE_LAYOUT,
     detailPaneSizes: DEFAULT_DETAIL_PANE_SIZES,
   })

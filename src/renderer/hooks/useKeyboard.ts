@@ -159,6 +159,7 @@ export function useKeyboard({ onShowHelp, isOverlayOpen }: Options) {
           if (overlayOpen || !repo || !repo.ui.selectedBranch || state.detailCollapsed) break
           e.preventDefault()
           const selected = repo.data.branches.find((branch) => branch.name === repo.ui.selectedBranch)
+          // Global shortcuts do not own tab focus; a missing branch is treated as "no worktree".
           state.setDetailTab(
             repo.id,
             adjacentDetailTab(repo.ui.detailTab, e.key === 'ArrowRight' ? 1 : -1, !!selected?.worktreePath),

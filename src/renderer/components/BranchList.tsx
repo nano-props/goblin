@@ -19,9 +19,10 @@ import { ScrollArea } from '#/renderer/components/ui/scroll-area.tsx'
 interface Props {
   repoId: string
   showActions?: boolean
+  variant?: 'list' | 'selected-strip'
 }
 
-export function BranchList({ repoId, showActions = true }: Props) {
+export function BranchList({ repoId, showActions = true, variant = 'list' }: Props) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
   const selectBranch = useReposStore((s) => s.selectBranch)
@@ -70,35 +71,52 @@ export function BranchList({ repoId, showActions = true }: Props) {
 
   // Keep the selected row in view as the user navigates with j/k.
   useEffect(() => {
-    selectedRef.current?.scrollIntoView({ block: 'nearest' })
-  }, [selected])
+    const selectedEl = selectedRef.current
+    if (selectedEl && variant === 'list') selectedEl.scrollIntoView({ block: 'nearest' })
+  }, [selected, variant])
 
   if (!repo) return null
 
-  if (branches.length === 0) {
+  const selectedBranch = selected
+    ? (branches.find((branch) => branch.name === selected) ?? repo.data.branches.find((branch) => branch.name === selected))
+    : null
+  const renderedBranches = variant === 'selected-strip' ? (selectedBranch ? [selectedBranch] : []) : branches
+
+  if (renderedBranches.length === 0) {
     return <EmptyState title={t(repo.data.branches.length === 0 ? 'branches.empty' : 'branches.filter-empty')} />
   }
 
+  const list = (
+    <ul className="divide-y divide-separator">
+      {renderedBranches.map((branch) => {
+        return (
+          <BranchRow
+            key={branch.name}
+            repo={repo}
+            branch={branch}
+            selected={selected}
+            current={current}
+            lang={lang}
+            onSelectBranch={handleSelectBranch}
+            onOpenBranchStatus={handleOpenBranchStatus}
+            selectedRef={selectedRef}
+            showActions={showActions}
+          />
+        )
+      })}
+    </ul>
+  )
+
+  if (variant === 'selected-strip')
+    return (
+      <div className="shrink-0 overflow-hidden" role="region" aria-label={t('branches.selected')} aria-live="polite">
+        {list}
+      </div>
+    )
+
   return (
     <ScrollArea className="min-h-0 flex-1">
-      <ul className="divide-y divide-separator">
-        {branches.map((branch) => {
-          return (
-            <BranchRow
-              key={branch.name}
-              repo={repo}
-              branch={branch}
-              selected={selected}
-              current={current}
-              lang={lang}
-              onSelectBranch={handleSelectBranch}
-              onOpenBranchStatus={handleOpenBranchStatus}
-              selectedRef={selectedRef}
-              showActions={showActions}
-            />
-          )
-        })}
-      </ul>
+      {list}
     </ScrollArea>
   )
 }

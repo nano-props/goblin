@@ -154,11 +154,16 @@ export const zh: Record<DictKey, string> = {
   'branch-detail.collapse-title': '收起详情面板 (⌘J)',
   'branch-detail.expand': '展开详情面板',
   'branch-detail.expand-title': '展开详情面板 (⌘J)',
+  'branch-detail.focus': '专注分支详情',
+  'branch-detail.focus-title': '专注分支详情',
+  'branch-detail.exit-focus': '退出分支详情专注',
+  'branch-detail.exit-focus-title': '退出分支详情专注',
 
   // ---- Branches list -----------------------------------------------------
   'branches.empty': '该仓库暂无分支。',
   'branches.filter-empty': '没有匹配当前筛选的分支。',
   'branches.filter-label': '筛选分支',
+  'branches.selected': '选中的分支',
   'branches.filter.all': '全部',
   'branches.filter.worktrees': '工作树',
   'branches.filter.no-worktree': '无工作树',

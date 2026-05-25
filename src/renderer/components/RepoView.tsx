@@ -25,6 +25,7 @@ export function RepoView({ repoId }: Props) {
         exists: !!repo,
         initialLoading: !!repo && operationBusy(repo.ops.snapshot) && repo.data.branches.length === 0,
         detailCollapsed: s.detailCollapsed,
+        detailFocusMode: s.detailFocusMode,
         workspaceLayout: s.workspaceLayout,
         detailPaneSize: s.detailPaneSizes[s.workspaceLayout],
       }
@@ -33,13 +34,14 @@ export function RepoView({ repoId }: Props) {
       a.exists === b.exists &&
       a.initialLoading === b.initialLoading &&
       a.detailCollapsed === b.detailCollapsed &&
+      a.detailFocusMode === b.detailFocusMode &&
       a.workspaceLayout === b.workspaceLayout &&
       a.detailPaneSize === b.detailPaneSize,
   )
   const setDetailPaneSize = useReposStore((s) => s.setDetailPaneSize)
   useRepoToasts(repoId)
 
-  const behavior = repoWorkspaceBehavior(view.workspaceLayout, view.detailCollapsed)
+  const behavior = repoWorkspaceBehavior(view.workspaceLayout, view.detailCollapsed, view.detailFocusMode)
 
   if (!view.exists) return <div />
   if (view.initialLoading) {
@@ -54,17 +56,27 @@ export function RepoView({ repoId }: Props) {
 
       <RepoWorkspace
         layout={view.workspaceLayout}
-        detailCollapsed={behavior.detailCollapsed}
+        mode={behavior.mode}
         detailSize={view.detailPaneSize}
         onDetailSizeChange={(size) => setDetailPaneSize(view.workspaceLayout, size)}
         branchPane={
-          <RepoWorkspacePane layout={view.workspaceLayout} border={behavior.detailCollapsed}>
-            <BranchList repoId={repoId} showActions={behavior.branchListActionsVisible} />
+          <RepoWorkspacePane>
+            <BranchList
+              repoId={repoId}
+              showActions={behavior.branchListActionsVisible}
+              // Focus mode pins the selected branch as a strip so the detail pane can use the remaining space.
+              variant={behavior.mode === 'focus' ? 'selected-strip' : 'list'}
+            />
           </RepoWorkspacePane>
         }
         detailPane={
-          <RepoWorkspacePane layout={view.workspaceLayout}>
-            <BranchDetail repoId={repoId} layout={view.workspaceLayout} collapsed={behavior.detailCollapsed} />
+          <RepoWorkspacePane>
+            <BranchDetail
+              repoId={repoId}
+              layout={view.workspaceLayout}
+              collapsed={behavior.detailCollapsed}
+              focusMode={behavior.detailFocusMode}
+            />
           </RepoWorkspacePane>
         }
       />
