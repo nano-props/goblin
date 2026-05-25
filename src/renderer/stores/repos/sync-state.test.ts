@@ -46,10 +46,10 @@ describe('canStartRemoteFetch', () => {
     'is blocked while runtime %s work is active',
     (key) => {
       const r = repo()
-      const requestId = nextRepoOperationId(r.id)
+      const operationId = nextRepoOperationId(r.id)
       const target: RepoRuntimeOperationTarget = { key, reason: key === 'branchAction' ? 'branch:checkout' : key }
 
-      markRepoOperationTargets(r.id, requestId, [target], 'running')
+      markRepoOperationTargets(r.id, operationId, [target], 'running')
 
       expect(canStartRemoteFetch(r)).toBe(false)
     },

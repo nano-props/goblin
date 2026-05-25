@@ -55,7 +55,7 @@ function clearSubscriptions(subscriptions: Array<() => void>): void {
 }
 
 export const useSettingsStore = create<SettingsStore>((set) => ({
-  fetchIntervalSec: 60,
+  fetchIntervalSec: 120,
   shortcutsDisabled: false,
   globalShortcut: DEFAULT_GLOBAL_SHORTCUT,
   globalShortcutRegistered: false,

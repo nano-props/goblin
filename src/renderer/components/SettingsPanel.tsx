@@ -65,6 +65,8 @@ export function SettingsPanel({ open, onClose }: Props) {
     { value: 0, labelKey: 'settings.fetch.off' },
     { value: 30, labelKey: 'settings.fetch.30s' },
     { value: 60, labelKey: 'settings.fetch.1m' },
+    { value: 120, labelKey: 'settings.fetch.2m' },
+    { value: 180, labelKey: 'settings.fetch.3m' },
     { value: 300, labelKey: 'settings.fetch.5m' },
     { value: 900, labelKey: 'settings.fetch.15m' },
   ]
@@ -161,7 +163,6 @@ export function SettingsPanel({ open, onClose }: Props) {
             <SettingsRow
               controlId="settings-fetch"
               label={t('settings.fetch')}
-              hint={t('settings.fetch-hint')}
               control={
                 <SettingsSelect
                   id="settings-fetch"

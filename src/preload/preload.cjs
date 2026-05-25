@@ -20,8 +20,8 @@ function isObject(value) {
   return value !== null && typeof value === 'object'
 }
 
-function rpcCall(path, input) {
-  return safeInvoke('goblin:rpc', { path, input })
+function rpcCall(request) {
+  return safeInvoke('goblin:rpc', request)
     .then((response) => {
       if (!isObject(response) || typeof response.ok !== 'boolean') throw new Error('Malformed RPC response')
       if (response.ok) return response.data
@@ -32,7 +32,7 @@ function rpcCall(path, input) {
       })
     })
     .catch((err) => {
-      console.warn(`[rpc] ${path} failed`, err)
+      console.warn(`[rpc] ${request.path} failed`, err)
       throw err
     })
 }
@@ -46,7 +46,8 @@ const homeDir = process.argv.find((a) => a.startsWith(HOME_PREFIX))?.slice(HOME_
 
 contextBridge.exposeInMainWorld('goblin', {
   homeDir,
-  invokeRpc: ({ path, input }) => rpcCall(path, input),
+  invokeRpc: ({ path, input, requestId }) => rpcCall({ path, input, requestId }),
+  abortRpc: (requestId) => safeInvoke('goblin:rpc-abort', { requestId }),
   pathForFile: (file) => webUtils.getPathForFile(file),
   terminal: {
     open: (input) => safeInvoke('goblin:terminal-open', input),

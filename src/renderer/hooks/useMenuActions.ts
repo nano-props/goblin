@@ -53,7 +53,7 @@ export function useMenuActions({ openSettings, openCloneRepo, showHelp, isOverla
         const state = useReposStore.getState()
         switch (action) {
           case 'open-repo': {
-            const path = await rpc.repo.openDialog.query()
+            const path = await rpc.repo.openDialog.mutate()
             if (path) await state.openRepo(path)
             break
           }

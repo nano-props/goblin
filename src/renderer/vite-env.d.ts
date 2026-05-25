@@ -17,6 +17,7 @@ import type {
 interface GoblinBridge {
   homeDir: string
   invokeRpc: (request: RpcRequest) => Promise<unknown>
+  abortRpc: (requestId: string) => Promise<boolean>
   onEvent: (cb: (event: RpcEvent) => void) => () => void
   pathForFile: (file: File) => string
   terminal: {

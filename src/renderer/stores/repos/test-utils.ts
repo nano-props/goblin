@@ -79,6 +79,7 @@ export function installGoblinTestBridge(handlers: Record<string, RpcTestHandler>
           if (!handler) throw new Error(`Unhandled RPC path: ${path}`)
           return handler(input)
         },
+        abortRpc: () => Promise.resolve(false),
         onEvent: () => () => {},
         pathForFile: () => '',
         terminal: {

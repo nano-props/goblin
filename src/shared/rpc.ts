@@ -133,6 +133,7 @@ export interface PullRequestFetchOptions {
 export interface RpcRequest {
   path: string
   input?: unknown
+  requestId?: string
 }
 
 export type RpcResponse =
@@ -258,8 +259,8 @@ export function createAppRouter(handlers: AppRpcHandlers) {
         .mutation(({ input }) => handlers.app.openExternalUrl(input)),
     }),
     repo: t.router({
-      openDialog: p.input(EmptyInput).query(() => handlers.repo.openDialog()),
-      cloneParentDialog: p.input(EmptyInput).query(() => handlers.repo.cloneParentDialog()),
+      openDialog: p.input(EmptyInput).mutation(() => handlers.repo.openDialog()),
+      cloneParentDialog: p.input(EmptyInput).mutation(() => handlers.repo.cloneParentDialog()),
       probe: p.input(CwdInput).query(({ input }) => handlers.repo.probe(input)),
       clone: p
         .input(

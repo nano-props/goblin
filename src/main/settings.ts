@@ -66,7 +66,7 @@ const DEFAULTS: Settings = {
   theme: 'auto',
   colorTheme: DEFAULT_COLOR_THEME,
   lang: 'auto',
-  fetchIntervalSec: 60,
+  fetchIntervalSec: 120,
   shortcutsDisabled: false,
   globalShortcut: DEFAULT_GLOBAL_SHORTCUT,
   terminalApp: 'auto',

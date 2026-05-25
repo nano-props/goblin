@@ -3,6 +3,7 @@ import { ipcMain } from 'electron'
 import { closeWorktreeSession, pruneRepoSessions, wireTerminalIpc } from '#/main/terminal.ts'
 import { openTerminalSession } from '#/main/terminal-core.ts'
 import { getWorktrees } from '#/main/git/worktrees.ts'
+import { registerTrustedAppPath, registerTrustedWebContents } from '#/main/ipc/trusted-webcontents.ts'
 import type { TerminalOpenInput, TerminalRestartInput } from '#/shared/terminal.ts'
 
 const ipcHandlers = new Map<string, (_event: unknown, input: any) => unknown>()
@@ -43,6 +44,10 @@ vi.mock('#/main/terminal-core.ts', () => ({
 
 describe('terminal IPC', () => {
   beforeAll(() => {
+    registerTrustedAppPath('/app/dist/renderer/index.html')
+    registerTrustedWebContents({ id: 1, once: vi.fn() } as any)
+    registerTrustedWebContents({ id: 7, once: vi.fn() } as any)
+    registerTrustedWebContents({ id: 9, once: vi.fn() } as any)
     wireTerminalIpc()
   })
 
@@ -117,6 +122,24 @@ describe('terminal IPC', () => {
     expect(getWorktrees).not.toHaveBeenCalled()
     expect(openTerminalSession).not.toHaveBeenCalled()
   })
+
+  test('rejects terminal IPC calls from untrusted senders', async () => {
+    const result = await invokeWithEvent('goblin:terminal-open', {
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      cols: 80,
+      rows: 24,
+    }, {
+      sender: { id: 99, once: vi.fn() },
+      senderFrame: { url: 'https://example.com/' },
+    })
+
+    expect(result).toEqual({ ok: false, message: 'error.invalid-arguments' })
+    expect(getWorktrees).not.toHaveBeenCalled()
+    expect(openTerminalSession).not.toHaveBeenCalled()
+  })
+
 
   test('rejects stale worktree paths and branch mismatches', async () => {
     await expect(
@@ -205,7 +228,14 @@ function invokeWithSender<TInput>(
   input: TInput,
   sender: { id: number; once: ReturnType<typeof vi.fn> },
 ): unknown {
+  return invokeWithEvent(channel, input, {
+    sender,
+    senderFrame: { url: 'file:///app/dist/renderer/index.html?theme=light' },
+  })
+}
+
+function invokeWithEvent<TInput>(channel: string, input: TInput, event: unknown): unknown {
   const handler = ipcHandlers.get(channel)
   if (!handler) throw new Error(`missing handler: ${channel}`)
-  return handler({ sender }, input)
+  return handler(event, input)
 }

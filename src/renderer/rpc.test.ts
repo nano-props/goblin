@@ -23,6 +23,10 @@ function installBridge(calls: Array<{ path: string; input?: unknown }>, result =
           calls.push({ path, input })
           return path === 'repo.abort' ? Promise.resolve(false) : result
         },
+        abortRpc: (requestId: string) => {
+          calls.push({ path: 'goblin:rpc-abort', input: { requestId } })
+          return Promise.resolve(false)
+        },
         onEvent: () => () => {},
         pathForFile: () => '',
       },
@@ -61,5 +65,6 @@ describe('renderer rpc abort forwarding', () => {
     await expect(promise).rejects.toThrow('Request aborted')
 
     expect(calls).toContainEqual({ path: 'repo.abort', input: { cwd: '/tmp/repo' } })
+    expect(calls).toContainEqual({ path: 'goblin:rpc-abort', input: { requestId: expect.any(String) } })
   })
 })

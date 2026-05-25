@@ -14,6 +14,12 @@ const ABORTABLE_REPO_CWD_PATHS = new Set([
   'repo.removeWorktree',
 ])
 
+let nextRpcRequestId = 1
+
+function createRpcRequestId(): string {
+  return `rpc_${Date.now().toString(36)}_${nextRpcRequestId++}`
+}
+
 function getGoblinBridge(): Window['goblin'] {
   const bridge = window.goblin
   if (!bridge) throw new Error('Goblin bridge is unavailable')
@@ -25,6 +31,20 @@ function abortableRepoCwd(path: string, input: unknown): string | null {
   if (!input || typeof input !== 'object') return null
   const { cwd } = input as { cwd?: unknown }
   return typeof cwd === 'string' ? cwd : null
+}
+
+function invokeRepoAbort(cwd: string): void {
+  try {
+    void Promise.resolve(getGoblinBridge().invokeRpc({ path: 'repo.abort', input: { cwd } })).catch(() => {})
+  } catch {
+  }
+}
+
+function invokeRpcAbort(requestId: string): void {
+  try {
+    void Promise.resolve(getGoblinBridge().abortRpc(requestId)).catch(() => {})
+  } catch {
+  }
 }
 
 const ipcLink: TRPCLink<AppRouter> = () => {
@@ -46,13 +66,11 @@ const ipcLink: TRPCLink<AppRouter> = () => {
         finish()
         observer.error(TRPCClientError.from(cause instanceof Error ? cause : new Error(String(cause))))
       }
+      const requestId = createRpcRequestId()
       const abort = () => {
         const cwd = abortableRepoCwd(op.path, op.input)
-        if (cwd) {
-          void getGoblinBridge()
-            .invokeRpc({ path: 'repo.abort', input: { cwd } })
-            .catch(() => {})
-        }
+        if (cwd) invokeRepoAbort(cwd)
+        invokeRpcAbort(requestId)
         fail(new Error('Request aborted'))
       }
 
@@ -66,7 +84,7 @@ const ipcLink: TRPCLink<AppRouter> = () => {
 
       let request: Promise<unknown>
       try {
-        request = Promise.resolve(getGoblinBridge().invokeRpc({ path: op.path, input: op.input }))
+        request = Promise.resolve(getGoblinBridge().invokeRpc({ path: op.path, input: op.input, requestId }))
       } catch (cause) {
         fail(cause)
         return () => {}

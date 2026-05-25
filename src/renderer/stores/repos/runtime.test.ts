@@ -145,9 +145,9 @@ describe('repo runtime task scheduling', () => {
 
     pruneRepoBranchPullRequestOperations(REPO_ID, new Set(['feature/a']))
 
-    expect(repoOperation(REPO_ID, 'pullRequests').requestId).toBe(1)
-    expect(repoOperation(REPO_ID, 'pullRequest:feature/a').requestId).toBe(1)
-    expect(repoOperation(REPO_ID, 'pullRequest:feature/stale').requestId).toBe(0)
-    expect(repoOperation(REPO_ID, 'log:feature/stale').requestId).toBe(1)
+    expect(repoOperation(REPO_ID, 'pullRequests').operationId).toBe(1)
+    expect(repoOperation(REPO_ID, 'pullRequest:feature/a').operationId).toBe(1)
+    expect(repoOperation(REPO_ID, 'pullRequest:feature/stale').operationId).toBe(0)
+    expect(repoOperation(REPO_ID, 'log:feature/stale').operationId).toBe(1)
   })
 })

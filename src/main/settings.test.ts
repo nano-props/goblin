@@ -14,6 +14,16 @@ afterEach(() => {
   vi.doUnmock('write-file-atomic')
 })
 
+test('defaults auto-fetch to two minutes', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-settings-test-'))
+  vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
+  const settings = await import('#/main/settings.ts')
+
+  const loaded = await settings.loadSettings()
+
+  expect(loaded.fetchIntervalSec).toBe(120)
+})
+
 test('flushSettings drains writes queued during an in-flight flush', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-settings-test-'))
   vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))

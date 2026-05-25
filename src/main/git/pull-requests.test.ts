@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { execaSync } from 'execa'
 import { mkdtempSync, rmSync } from 'node:fs'
 import os from 'node:os'
@@ -60,6 +60,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.restoreAllMocks()
   globalThis.fetch = originalFetch
   for (const key of TOKEN_ENV_KEYS) {
     const value = originalEnv[key]
@@ -214,5 +215,63 @@ describe('getBranchPullRequest', () => {
     expect(repoWide?.get('cached')?.number).toBe(1)
     expect(hidden?.number).toBe(99)
     expect(queriedHeads).toContain('hidden')
+  })
+})
+
+describe('getBranchPullRequests cancellation', () => {
+  test('does not let one caller abort another caller sharing a pending request key', async () => {
+    const repo = initGitHubRepo()
+    const ctrl = new AbortController()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    let releaseFirstFetch!: () => void
+    let fetchCalls = 0
+    const firstFetchStarted = new Promise<void>((resolve) => {
+      globalThis.fetch = (async (...args: Parameters<typeof fetch>) => {
+        const init = args[1]
+        fetchCalls += 1
+        if (fetchCalls === 1) {
+          resolve()
+          const release = new Promise<void>((resolveFirstFetch) => {
+            releaseFirstFetch = resolveFirstFetch
+          })
+          const aborted = new Promise<never>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), {
+              once: true,
+            })
+          })
+          await Promise.race([release, aborted])
+        }
+        return graphqlPullRequests([pullRequestNode(7, 'feature/a')])
+      }) as typeof fetch
+    })
+
+    const first = getBranchPullRequests(repo, undefined, { mode: 'summary', signal: ctrl.signal })
+    await firstFetchStarted
+    const second = getBranchPullRequests(repo, undefined, { mode: 'summary' })
+    ctrl.abort()
+    releaseFirstFetch()
+
+    const [, secondResult] = await Promise.all([first, second])
+    expect(secondResult?.get('feature/a')?.number).toBe(7)
+    expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('[pull-requests]'), expect.anything())
+  })
+
+  test('does not overwrite a successful repo cache when an unexpected refresh error occurs', async () => {
+    const repo = initGitHubRepo()
+    globalThis.fetch = (async () => graphqlPullRequests([pullRequestNode(3, 'cached')])) as unknown as typeof fetch
+    const summary = await getBranchPullRequests(repo, undefined, { mode: 'summary' })
+    expect(summary?.get('cached')?.number).toBe(3)
+
+    vi.spyOn(console, 'warn').mockImplementation(() => {
+      throw new Error('logger unavailable')
+    })
+    globalThis.fetch = (async () =>
+      new Response('', { status: 500, statusText: 'server down' })) as unknown as typeof fetch
+    const failed = await getBranchPullRequests(repo, undefined, { mode: 'full' })
+    vi.mocked(console.warn).mockRestore()
+    const cached = await getBranchPullRequests(repo, undefined, { mode: 'summary' })
+
+    expect(failed).toBeNull()
+    expect(cached?.get('cached')?.number).toBe(3)
   })
 })

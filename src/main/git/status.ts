@@ -11,12 +11,14 @@ const WORKTREE_STATUS_CONCURRENCY = 16
  *  We list worktrees with `git worktree list` and run `git status` in
  *  each in parallel. Bare worktrees and worktrees that fail to status
  *  (drive unmounted, permissions) are skipped silently. */
-export async function getWorkingStatus(cwd: string): Promise<WorktreeStatus[]> {
+export async function getWorkingStatus(cwd: string, options?: { signal?: AbortSignal }): Promise<WorktreeStatus[]> {
   let worktrees
   try {
-    const out = await git(cwd, ['worktree', 'list', '--porcelain'])
+    const out = await git(cwd, ['worktree', 'list', '--porcelain'], { signal: options?.signal })
+    if (options?.signal?.aborted) return []
     worktrees = parseWorktrees(out)
   } catch {
+    if (options?.signal?.aborted) return []
     return []
   }
 
@@ -31,7 +33,8 @@ export async function getWorkingStatus(cwd: string): Promise<WorktreeStatus[]> {
         // escaped and double-quoted (e.g. `"file name.txt"`), which the LF
         // parser leaves as literal quotes in the output. -z gives us the
         // raw bytes and uses NUL between entries.
-        const output = await git(wt.path, ['status', '--porcelain', '-z'])
+        const output = await git(wt.path, ['status', '--porcelain', '-z'], { signal: options?.signal })
+        if (options?.signal?.aborted) return null
         const entries = parseStatus(output)
         return {
           path: wt.path,
@@ -43,8 +46,10 @@ export async function getWorkingStatus(cwd: string): Promise<WorktreeStatus[]> {
         return null
       }
     },
+    options?.signal,
   )
 
+  if (options?.signal?.aborted) return []
   const filtered = results.filter((x): x is WorktreeStatus => x !== null)
   // Main worktree first; the rest keep `git worktree list`'s order
   // (creation order — stable and matches what `git worktree list` shows
@@ -53,11 +58,17 @@ export async function getWorkingStatus(cwd: string): Promise<WorktreeStatus[]> {
   return filtered
 }
 
-async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+  signal?: AbortSignal,
+): Promise<R[]> {
   const results = new Array<R>(items.length)
   let cursor = 0
   const worker = async () => {
     while (true) {
+      if (signal?.aborted) return
       const i = cursor++
       if (i >= items.length) return
       results[i] = await fn(items[i]!)

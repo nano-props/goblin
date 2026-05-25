@@ -85,4 +85,18 @@ describe('getSelectedBranchDetailPresentation', () => {
     expect(detail.loading.status).toBe(true)
     expect(detail.loading.pullRequests).toBe(false)
   })
+
+  test('surfaces stale status when refresh fails after data was loaded', () => {
+    const repo = emptyRepo('/tmp/gbl-detail-presentation-status-stale', 'repo')
+    repo.data.branches = [createBranch('main', { worktreePath: '/tmp/worktree' })]
+    repo.data.statusLoaded = true
+    repo.ui.selectedBranch = 'main'
+    repo.resources.status.loadedAt = Date.now()
+
+    finishResourceError(repo.resources.status, 'status failed')
+
+    const detail = getSelectedBranchDetailPresentation(repo)
+    expect(detail.stale.status).toBe(true)
+    expect(detail.errors.status).toBe('status failed')
+  })
 })

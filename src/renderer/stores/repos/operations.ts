@@ -22,7 +22,7 @@ export type RepoOperationReason =
   | RepoBranchActionReason
 
 export interface RepoOperationState {
-  requestId: number
+  operationId: number
   phase: RepoOperationPhase
   reason: RepoOperationReason | null
   target: string | null
@@ -33,7 +33,7 @@ export interface RepoOperationState {
 
 export function idleOperation(): RepoOperationState {
   return {
-    requestId: 0,
+    operationId: 0,
     phase: 'idle',
     reason: null,
     target: null,
@@ -45,10 +45,10 @@ export function idleOperation(): RepoOperationState {
 
 export function startOperation(
   operation: RepoOperationState,
-  requestId: number,
+  operationId: number,
   options?: { reason?: RepoOperationReason; target?: string | null },
 ): void {
-  operation.requestId = requestId
+  operation.operationId = operationId
   operation.phase = 'running'
   operation.reason = options?.reason ?? null
   operation.target = options?.target ?? null
@@ -59,10 +59,10 @@ export function startOperation(
 
 export function queueOperation(
   operation: RepoOperationState,
-  requestId: number,
+  operationId: number,
   options?: { reason?: RepoOperationReason; target?: string | null },
 ): void {
-  operation.requestId = requestId
+  operation.operationId = operationId
   operation.phase = 'queued'
   operation.reason = options?.reason ?? null
   operation.target = options?.target ?? null
@@ -73,10 +73,10 @@ export function queueOperation(
 
 export function settleOperation(
   operation: RepoOperationState,
-  requestId: number,
+  operationId: number,
   options?: { error?: string | null },
 ): boolean {
-  if (operation.requestId !== requestId) return false
+  if (operation.operationId !== operationId) return false
   operation.phase = 'idle'
   operation.target = null
   operation.settledAt = Date.now()

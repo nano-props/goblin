@@ -71,7 +71,7 @@ export function RepoTabs({ cloneOpen, onCloneOpenChange }: RepoTabsProps) {
   const dismissMissing = useReposStore((s) => s.dismissMissing)
 
   async function handleOpenLocal() {
-    const path = await rpc.repo.openDialog.query()
+    const path = await rpc.repo.openDialog.mutate()
     if (!path) return
     const result = await openRepo(path)
     if (!result.ok) {

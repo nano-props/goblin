@@ -381,7 +381,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
           updateIfFresh(set, id, token, (r) => {
             const existingBranches = existingBranchNames(r)
             const currentBranches = branchNames.filter((branch) =>
-              repoOperationCurrent(id, `pullRequest:${branch}`, ctx.requestId),
+              repoOperationCurrent(id, `pullRequest:${branch}`, ctx.operationId),
             )
             finishPullRequestBranchResources(r, currentBranches, existingBranches, (resource) =>
               finishPullRequestResourceUnavailable(resource, mode),

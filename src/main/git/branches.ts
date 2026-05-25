@@ -40,9 +40,9 @@ export async function getCurrentBranch(cwd: string, options?: { signal?: AbortSi
   }
 }
 
-export async function getDefaultBranch(cwd: string): Promise<string> {
+export async function getDefaultBranch(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
   try {
-    const ref = await git(cwd, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])
+    const ref = await git(cwd, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], { signal: options?.signal })
     return ref.startsWith('origin/') ? ref.slice('origin/'.length) : ref
   } catch {
     return ''
@@ -78,10 +78,14 @@ export function markMergedToDefault(
   }))
 }
 
-async function getMergedBranchNames(cwd: string, defaultBranch: string): Promise<Set<string> | null> {
+async function getMergedBranchNames(
+  cwd: string,
+  defaultBranch: string,
+  signal?: AbortSignal,
+): Promise<Set<string> | null> {
   if (!isSafeBranchName(defaultBranch)) return null
   try {
-    const output = await git(cwd, ['branch', '--format=%(refname:short)', '--merged', defaultBranch])
+    const output = await git(cwd, ['branch', '--format=%(refname:short)', '--merged', defaultBranch], { signal })
     return new Set(
       output
         .split('\n')
@@ -93,7 +97,11 @@ async function getMergedBranchNames(cwd: string, defaultBranch: string): Promise
   }
 }
 
-export async function getBranches(cwd: string, worktrees?: WorktreeInfo[]): Promise<BranchInfo[]> {
+export async function getBranches(
+  cwd: string,
+  worktrees?: WorktreeInfo[],
+  options?: { signal?: AbortSignal },
+): Promise<BranchInfo[]> {
   try {
     const format = [
       '%(refname:short)',
@@ -106,11 +114,13 @@ export async function getBranches(cwd: string, worktrees?: WorktreeInfo[]): Prom
     ].join(FIELD_SEP)
 
     const [output, currentBranch, defaultBranch] = await Promise.all([
-      git(cwd, ['for-each-ref', `--format=${format}`, 'refs/heads/']),
-      getCurrentBranch(cwd),
-      getDefaultBranch(cwd),
+      git(cwd, ['for-each-ref', `--format=${format}`, 'refs/heads/'], { signal: options?.signal }),
+      getCurrentBranch(cwd, { signal: options?.signal }),
+      getDefaultBranch(cwd, { signal: options?.signal }),
     ])
-    const mergedBranchNames = await getMergedBranchNames(cwd, defaultBranch)
+    if (options?.signal?.aborted) return []
+    const mergedBranchNames = await getMergedBranchNames(cwd, defaultBranch, options?.signal)
+    if (options?.signal?.aborted) return []
     const branches = markDefaultBranch(parseBranches(output, currentBranch, worktrees), defaultBranch)
     return prioritizeDefaultBranch(
       mergedBranchNames ? markMergedToDefault(branches, defaultBranch, mergedBranchNames) : branches,
@@ -121,12 +131,18 @@ export async function getBranches(cwd: string, worktrees?: WorktreeInfo[]): Prom
   }
 }
 
-export async function getLog(cwd: string, branch: string, count = 100, skip = 0): Promise<LogEntry[]> {
+export async function getLog(
+  cwd: string,
+  branch: string,
+  count = 100,
+  skip = 0,
+  options?: { signal?: AbortSignal },
+): Promise<LogEntry[]> {
   if (!isSafeBranchName(branch)) return []
   try {
     const format = ['%H', '%h', '%s', '%an', '%aI'].join(FIELD_SEP)
     const args = ['log', `--format=${format}`, '-n', String(count), '--skip', String(skip), branch]
-    const output = await git(cwd, args)
+    const output = await git(cwd, args, { signal: options?.signal })
     return parseLog(output)
   } catch {
     return []

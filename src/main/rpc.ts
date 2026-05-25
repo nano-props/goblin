@@ -1,4 +1,5 @@
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { TRPCError } from '@trpc/server'
@@ -76,6 +77,7 @@ import { getResolvedEditorApp, openInPreferredEditor } from '#/main/system/edito
 import { broadcastRpcEvent } from '#/main/events.ts'
 import { closeWorktreeSession } from '#/main/terminal.ts'
 import { openHttpExternal, openHttpsExternal } from '#/main/external-url.ts'
+import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 import { WINDOW_BACKGROUND_BY_COLOR_THEME } from '#/shared/theme-tokens.ts'
 
 const PROJECT_GITHUB_URL = 'https://github.com/nano-props/goblin'
@@ -86,7 +88,9 @@ const CLONE_URL_SCHEME_RE = /^(?:https?|ssh|git|file):\/\/\S+$/i
 const SCP_LIKE_CLONE_URL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+:[^\s]+$/
 const CLONE_OPERATION_ID_RE = /^[A-Za-z0-9_-]{1,128}$/
 const MAX_RPC_PROCEDURE_PATH_LENGTH = 128
+const MAX_RPC_REQUEST_ID_LENGTH = 128
 const RPC_PATH_SEGMENT_RE = /^[A-Za-z0-9_-]+$/
+const RPC_REQUEST_ID_RE = /^[A-Za-z0-9_-]+$/
 const FORBIDDEN_RPC_PATH_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype'])
 
 interface ActiveNetworkOp {
@@ -102,6 +106,8 @@ interface ActiveCloneOp {
 
 const activeOpControllers = new Map<string, ActiveNetworkOp>()
 const activeCloneControllers = new Map<string, ActiveCloneOp>()
+const activeRpcControllers = new Map<string, AbortController>()
+const rpcSignalStorage = new AsyncLocalStorage<AbortSignal>()
 
 let wired = false
 
@@ -114,8 +120,19 @@ export function wireRpcIpc(): void {
 
   const router = createAppRouter(createRpcHandlers())
 
-  ipcMain.handle('goblin:rpc', async (_event, request: RpcRequest): Promise<RpcResponse> => {
+  ipcMain.handle('goblin:rpc-abort', async (event, input: unknown): Promise<boolean> => {
     try {
+      return isTrustedIpcEvent(event) ? abortRpcRequest(input) : false
+    } catch {
+      return false
+    }
+  })
+
+  ipcMain.handle('goblin:rpc', async (event, request: RpcRequest): Promise<RpcResponse> => {
+    try {
+      if (!isTrustedIpcEvent(event)) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Untrusted IPC sender' })
+      }
       if (!isValidRpcRequest(request)) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid RPC request' })
       }
@@ -124,7 +141,16 @@ export function wireRpcIpc(): void {
       if (typeof procedure !== 'function') {
         throw new TRPCError({ code: 'NOT_FOUND', message: `Unknown RPC procedure: ${request.path}` })
       }
-      return { ok: true, data: await procedure(request.input) }
+      const requestId = request.requestId
+      if (!isValidRpcRequestId(requestId)) return { ok: true, data: await procedure(request.input) }
+      const ctrl = new AbortController()
+      activeRpcControllers.set(requestId, ctrl)
+      try {
+        const data = await rpcSignalStorage.run(ctrl.signal, () => procedure(request.input))
+        return { ok: true, data }
+      } finally {
+        if (activeRpcControllers.get(requestId) === ctrl) activeRpcControllers.delete(requestId)
+      }
     } catch (err) {
       return { ok: false, error: toRpcError(err) }
     }
@@ -154,6 +180,29 @@ function isValidRpcRequest(request: unknown): request is RpcRequest {
     return false
   }
   return true
+}
+
+function isValidRpcRequestId(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= MAX_RPC_REQUEST_ID_LENGTH &&
+    RPC_REQUEST_ID_RE.test(value)
+  )
+}
+
+function abortRpcRequest(input: unknown): boolean {
+  if (!input || typeof input !== 'object') return false
+  const { requestId } = input as { requestId?: unknown }
+  if (!isValidRpcRequestId(requestId)) return false
+  const ctrl = activeRpcControllers.get(requestId)
+  if (!ctrl) return false
+  ctrl.abort()
+  return true
+}
+
+function currentRpcSignal(): AbortSignal | undefined {
+  return rpcSignalStorage.getStore()
 }
 
 function resolveRpcPathSegment(target: unknown, segment: string): unknown {
@@ -242,10 +291,19 @@ function createRpcHandlers(): AppRpcHandlers {
       abortClone: async ({ operationId }) => abortCloneOperation(operationId),
       snapshot: async ({ cwd }) => {
         if (!isValidCwd(cwd)) return null
-        const worktrees = await getWorktrees(cwd)
-        const branches = await getBranches(cwd, worktrees)
-        const current = await getCurrentBranch(cwd)
-        return { branches, current }
+        const signal = currentRpcSignal()
+        try {
+          const worktrees = await getWorktrees(cwd, { signal })
+          if (signal?.aborted) return null
+          const branches = await getBranches(cwd, worktrees, { signal })
+          if (signal?.aborted) return null
+          const current = await getCurrentBranch(cwd, { signal })
+          if (signal?.aborted) return null
+          return { branches, current }
+        } catch (err) {
+          if (signal?.aborted) return null
+          throw err
+        }
       },
       pullRequests: async ({ cwd, branches, options }) => {
         if (!isValidCwd(cwd)) return null
@@ -260,7 +318,8 @@ function createRpcHandlers(): AppRpcHandlers {
                 }),
               )
         if (branchSet?.size === 0) return []
-        const prs = await getBranchPullRequests(cwd, branchSet, { mode })
+        const signal = currentRpcSignal()
+        const prs = await getBranchPullRequests(cwd, branchSet, { mode, signal })
         if (!prs) return null
         return Array.from(prs, ([branch, pullRequest]) => ({ branch, pullRequest }))
       },
@@ -270,11 +329,15 @@ function createRpcHandlers(): AppRpcHandlers {
         const safeCount = Math.max(1, Math.min(1000, n))
         const offset = typeof skip === 'number' && Number.isFinite(skip) ? Math.floor(skip) : 0
         const safeSkip = Math.max(0, offset)
-        return getLog(cwd, branch, safeCount, safeSkip)
+        const signal = currentRpcSignal()
+        const log = await getLog(cwd, branch, safeCount, safeSkip, { signal })
+        return signal?.aborted ? [] : log
       },
       status: async ({ cwd }) => {
         if (!isValidCwd(cwd)) return []
-        return getWorkingStatus(cwd)
+        const signal = currentRpcSignal()
+        const status = await getWorkingStatus(cwd, { signal })
+        return signal?.aborted ? [] : status
       },
       patch: createPatch,
       commit: async ({ cwd, hash }) => {

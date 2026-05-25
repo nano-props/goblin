@@ -275,6 +275,7 @@ beforeEach(() => {
     configurable: true,
     value: {
       invokeRpc: invokeRpc.mockResolvedValue({ ok: true }),
+      abortRpc: vi.fn(),
       homeDir: '/home',
       pathForFile: vi.fn(),
       onEvent: vi.fn(),
@@ -357,6 +358,7 @@ describe('ManagedTerminalSession', () => {
     expect(invokeRpc).toHaveBeenCalledWith({
       path: 'app.openExternalUrl',
       input: { url: 'https://example.com/path' },
+      requestId: expect.any(String),
     })
   })
 

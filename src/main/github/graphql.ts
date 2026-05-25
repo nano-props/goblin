@@ -57,7 +57,7 @@ export type GraphqlRequestResult<TData> =
 
 const TOKEN_ENV_KEYS = ['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN'] as const
 
-function gh(cwd: string, args: string[]): Promise<string> {
+function gh(cwd: string, args: string[], signal?: AbortSignal): Promise<string> {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     GH_PROMPT_DISABLED: '1',
@@ -68,6 +68,7 @@ function gh(cwd: string, args: string[]): Promise<string> {
     cwd,
     timeout: GITHUB_API_TIMEOUT_MS,
     forceKillAfterDelay: 500,
+    cancelSignal: signal,
     maxBuffer: 1024 * 1024,
     env,
   }).then(({ stdout }) => stdout.trimEnd())
@@ -97,15 +98,16 @@ export function tokenFromEnv(host: string): string | null {
   return candidates.find((token): token is string => typeof token === 'string' && token.length > 0) ?? null
 }
 
-export async function getGitHubRepoRef(cwd: string): Promise<GitHubRepoRef | null> {
+export async function getGitHubRepoRef(cwd: string, signal?: AbortSignal): Promise<GitHubRepoRef | null> {
   try {
-    return parseGitHubRemoteUrl(await git(cwd, ['remote', 'get-url', 'origin']))
-  } catch {
+    return parseGitHubRemoteUrl(await git(cwd, ['remote', 'get-url', 'origin'], { signal }))
+  } catch (err) {
+    if (signal?.aborted || isAbortError(err)) return null
     return null
   }
 }
 
-async function getAuthToken(cwd: string, host: string): Promise<string | null> {
+async function getAuthToken(cwd: string, host: string, signal?: AbortSignal): Promise<string | null> {
   const envToken = tokenFromEnv(host)
   if (envToken) return envToken
 
@@ -113,11 +115,12 @@ async function getAuthToken(cwd: string, host: string): Promise<string | null> {
   if (cached && cached.expiresAt > Date.now()) return cached.token
 
   try {
-    const token = await gh(cwd, ['auth', 'token', '--hostname', host])
+    const token = await gh(cwd, ['auth', 'token', '--hostname', host], signal)
     const value = token.trim() || null
     tokenCache.set(host, { expiresAt: Date.now() + TOKEN_CACHE_TTL_MS, token: value })
     return value
-  } catch {
+  } catch (err) {
+    if (signal?.aborted || isAbortError(err)) return null
     tokenCache.set(host, { expiresAt: Date.now() + TOKEN_MISS_CACHE_TTL_MS, token: null })
     return null
   }
@@ -182,8 +185,9 @@ export async function graphqlRequestResult<TData>(
   query: string,
   variables: Record<string, unknown>,
   operationName: string,
+  signal?: AbortSignal,
 ): Promise<GraphqlRequestResult<TData>> {
-  const token = await getAuthToken(cwd, repo.host)
+  const token = await getAuthToken(cwd, repo.host, signal)
   if (!token) {
     return {
       ok: false,
@@ -191,76 +195,103 @@ export async function graphqlRequestResult<TData>(
     }
   }
 
-  return enqueueGitHubApiRequest(async (): Promise<GraphqlRequestResult<TData>> => {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), GITHUB_API_TIMEOUT_MS)
-    try {
-      const response = await fetch(githubGraphqlEndpoint(repo.host), {
-        method: 'POST',
-        signal: controller.signal,
-        headers: {
-          Accept: 'application/vnd.github+json',
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'User-Agent': 'Goblin',
-        },
-        body: JSON.stringify({ query, variables: compactVariables(variables), operationName }),
-      })
-      if (!response.ok) {
-        const { code, retryable } = httpErrorCode(response)
+  return enqueueGitHubApiRequest(
+    async (): Promise<GraphqlRequestResult<TData>> => {
+      if (signal?.aborted) {
         return {
           ok: false,
-          error: graphqlError(repo, operationName, code, response.statusText || `HTTP ${response.status}`, {
-            retryable,
-            status: response.status,
-          }),
+          error: graphqlError(repo, operationName, 'TIMEOUT', 'The operation was aborted.', { retryable: true }),
         }
       }
-
-      let payload: GraphqlEnvelope<TData>
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), GITHUB_API_TIMEOUT_MS)
+      const abort = () => controller.abort()
+      signal?.addEventListener('abort', abort, { once: true })
       try {
-        payload = (await response.json()) as GraphqlEnvelope<TData>
+        const response = await fetch(githubGraphqlEndpoint(repo.host), {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            Accept: 'application/vnd.github+json',
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'User-Agent': 'Goblin',
+          },
+          body: JSON.stringify({ query, variables: compactVariables(variables), operationName }),
+        })
+        if (!response.ok) {
+          const { code, retryable } = httpErrorCode(response)
+          return {
+            ok: false,
+            error: graphqlError(repo, operationName, code, response.statusText || `HTTP ${response.status}`, {
+              retryable,
+              status: response.status,
+            }),
+          }
+        }
+
+        let payload: GraphqlEnvelope<TData>
+        try {
+          payload = (await response.json()) as GraphqlEnvelope<TData>
+        } catch (err) {
+          return {
+            ok: false,
+            error: graphqlError(repo, operationName, 'INVALID_JSON', err instanceof Error ? err.message : String(err), {
+              retryable: true,
+            }),
+          }
+        }
+
+        if (payload.errors?.length) {
+          const message = graphqlErrorMessage(payload.errors)
+          return {
+            ok: false,
+            error: graphqlError(repo, operationName, 'GRAPHQL_ERROR', message, {
+              retryable: /rate limit|timeout|temporar|try again/i.test(message),
+              graphqlErrors: payload.errors,
+            }),
+          }
+        }
+
+        if (payload.data === undefined || payload.data === null) {
+          return {
+            ok: false,
+            error: graphqlError(repo, operationName, 'NO_DATA', 'GitHub GraphQL returned no data'),
+          }
+        }
+
+        return { ok: true, data: payload.data }
       } catch (err) {
         return {
           ok: false,
-          error: graphqlError(repo, operationName, 'INVALID_JSON', err instanceof Error ? err.message : String(err), {
-            retryable: true,
-          }),
+          error: graphqlError(
+            repo,
+            operationName,
+            isAbortError(err) ? 'TIMEOUT' : 'NETWORK_ERROR',
+            err instanceof Error ? err.message : String(err),
+            { retryable: true },
+          ),
         }
+      } finally {
+        signal?.removeEventListener('abort', abort)
+        clearTimeout(timer)
       }
-
-      if (payload.errors?.length) {
-        const message = graphqlErrorMessage(payload.errors)
-        return {
-          ok: false,
-          error: graphqlError(repo, operationName, 'GRAPHQL_ERROR', message, {
-            retryable: /rate limit|timeout|temporar|try again/i.test(message),
-            graphqlErrors: payload.errors,
-          }),
-        }
-      }
-
-      if (payload.data === undefined || payload.data === null) {
-        return {
-          ok: false,
-          error: graphqlError(repo, operationName, 'NO_DATA', 'GitHub GraphQL returned no data'),
-        }
-      }
-
-      return { ok: true, data: payload.data }
-    } catch (err) {
+    },
+    { signal },
+  ).catch((err): GraphqlRequestResult<TData> => {
+    if (signal?.aborted || isAbortError(err)) {
       return {
         ok: false,
-        error: graphqlError(
-          repo,
-          operationName,
-          isAbortError(err) ? 'TIMEOUT' : 'NETWORK_ERROR',
-          err instanceof Error ? err.message : String(err),
-          { retryable: true },
-        ),
+        error: graphqlError(repo, operationName, 'TIMEOUT', err instanceof Error ? err.message : 'The operation was aborted.', {
+          retryable: true,
+        }),
       }
-    } finally {
-      clearTimeout(timer)
+    }
+    return {
+      ok: false,
+      error: graphqlError(repo, operationName, 'NETWORK_ERROR', err instanceof Error ? err.message : String(err), {
+        retryable: true,
+      }),
     }
   })
 }
@@ -271,7 +302,8 @@ export async function graphqlRequest<TData>(
   query: string,
   variables: Record<string, unknown>,
   operationName: string,
+  signal?: AbortSignal,
 ): Promise<TData | null> {
-  const result = await graphqlRequestResult<TData>(cwd, repo, query, variables, operationName)
+  const result = await graphqlRequestResult<TData>(cwd, repo, query, variables, operationName, signal)
   return result.ok ? result.data : null
 }

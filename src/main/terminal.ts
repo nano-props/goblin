@@ -4,6 +4,7 @@ import path from 'node:path'
 import { getWorktrees } from '#/main/git/worktrees.ts'
 import { resolveKnownWorktree } from '#/main/git/guards.ts'
 import { isValidAbsolutePath, isValidBranch, isValidCwd } from '#/main/ipc/validation.ts'
+import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 import {
   closeAllTerminalSessions,
   closeOwnedTerminalSession,
@@ -43,27 +44,33 @@ export function wireTerminalIpc(): void {
   wired = true
 
   ipcMain.handle('goblin:terminal-open', async (event, input: TerminalOpenInput): Promise<TerminalOpenResult> => {
+    if (!isTrustedIpcEvent(event)) return { ok: false, message: 'error.invalid-arguments' }
     registerTerminalOwnerCleanup(event.sender)
     return openGoblinWorktreeTerminal(event.sender.id, input)
   })
   ipcMain.handle('goblin:terminal-restart', async (event, input: TerminalRestartInput): Promise<TerminalOpenResult> => {
+    if (!isTrustedIpcEvent(event)) return { ok: false, message: 'error.invalid-arguments' }
     registerTerminalOwnerCleanup(event.sender)
     return openGoblinWorktreeTerminal(event.sender.id, input, { restart: true })
   })
   ipcMain.handle('goblin:terminal-write', (event, input: TerminalWriteInput): TerminalMutationResult => {
+    if (!isTrustedIpcEvent(event)) return false
     if (!isValidTerminalSessionId(input?.sessionId) || !isValidTerminalWriteData(input?.data)) return false
     return writeTerminalSession(event.sender.id, input.sessionId, input.data)
   })
   ipcMain.handle('goblin:terminal-resize', (event, input: TerminalResizeInput): TerminalMutationResult => {
+    if (!isTrustedIpcEvent(event)) return false
     if (!isValidTerminalSessionId(input?.sessionId) || !isValidTerminalSize(input?.cols, input?.rows)) return false
     return resizeTerminalSession(event.sender.id, input.sessionId, input.cols, input.rows)
   })
   ipcMain.handle('goblin:terminal-close', (event, input: TerminalSessionInput): TerminalMutationResult => {
+    if (!isTrustedIpcEvent(event)) return false
     return isValidTerminalSessionId(input?.sessionId)
       ? closeOwnedTerminalSession(event.sender.id, input.sessionId)
       : false
   })
   ipcMain.handle('goblin:terminal-prune-repo', (event, input: TerminalPruneRepoInput): TerminalMutationResult => {
+    if (!isTrustedIpcEvent(event)) return false
     if (!isValidCwd(input?.repoRoot) || !isValidTerminalWorktreePathList(input?.worktreePaths)) return false
     pruneRepoSessions(event.sender.id, input.repoRoot, input.worktreePaths)
     return true

@@ -171,6 +171,19 @@ function repoRequestKey(cwd: string, mode: PullRequestFetchMode): string {
   return `${cwd}\0${mode}`
 }
 
+const signalIds = new WeakMap<AbortSignal, number>()
+let nextSignalId = 1
+
+function pendingRequestKey(key: string, signal?: AbortSignal): string {
+  if (!signal) return key
+  let id = signalIds.get(signal)
+  if (id === undefined) {
+    id = nextSignalId++
+    signalIds.set(signal, id)
+  }
+  return `${key}\0signal:${id}`
+}
+
 function getCachedBranchPullRequest(
   cwd: string,
   branch: string,
@@ -314,7 +327,13 @@ query GoblinPullRequests(
 async function queryPullRequests(
   cwd: string,
   repo: GitHubRepoRef,
-  options: { headBranch?: string; limit: number; mode: PullRequestFetchMode; states?: GhPullRequestState[] },
+  options: {
+    headBranch?: string
+    limit: number
+    mode: PullRequestFetchMode
+    signal?: AbortSignal
+    states?: GhPullRequestState[]
+  },
 ): Promise<PullRequestInfo[] | null> {
   const results: PullRequestInfo[] = []
   let after: string | null = null
@@ -333,9 +352,10 @@ async function queryPullRequests(
         after,
       },
       'GoblinPullRequests',
+      options.signal,
     )
     if (!response.ok) {
-      logGraphqlError(response.error)
+      if (!options.signal?.aborted) logGraphqlError(response.error)
       return null
     }
     if (!response.data.repository?.pullRequests) return null
@@ -362,15 +382,21 @@ async function queryRepositoryPullRequests(
   cwd: string,
   repo: GitHubRepoRef,
   mode: PullRequestFetchMode,
+  signal?: AbortSignal,
 ): Promise<PullRequestInfo[] | null> {
-  const openPrs = await queryPullRequests(cwd, repo, { states: ['OPEN'], limit: 200, mode })
+  const openPrs = await queryPullRequests(cwd, repo, { states: ['OPEN'], limit: 200, mode, signal })
   if (!openPrs) return null
   if (mode === 'summary') return openPrs
 
   // Closed and merged PRs are only supplemental history. Querying open PRs
   // separately prevents a busy repository's recent closed PRs from pushing
   // older-but-still-open PRs past the repo-wide limit.
-  const historicalPrs = await queryPullRequests(cwd, repo, { states: ['CLOSED', 'MERGED'], limit: 200, mode })
+  const historicalPrs = await queryPullRequests(cwd, repo, {
+    states: ['CLOSED', 'MERGED'],
+    limit: 200,
+    mode,
+    signal,
+  })
   return historicalPrs ? [...openPrs, ...historicalPrs] : openPrs
 }
 
@@ -392,8 +418,10 @@ async function fetchRepositoryPullRequestMap(
   cwd: string,
   repo: GitHubRepoRef,
   mode: PullRequestFetchMode,
+  signal?: AbortSignal,
 ): Promise<Map<string, PullRequestInfo> | null> {
-  const prs = await queryRepositoryPullRequests(cwd, repo, mode)
+  if (signal?.aborted) return null
+  const prs = await queryRepositoryPullRequests(cwd, repo, mode, signal)
   if (!prs) return null
   const byBranch = mapPullRequestsByBranch(prs)
   prCache.set(cwd, { expiresAt: Date.now() + PR_CACHE_TTL_MS, mode, prs: byBranch })
@@ -405,8 +433,9 @@ async function fetchSingleBranchPullRequestMap(
   repo: GitHubRepoRef,
   branch: string,
   mode: PullRequestFetchMode,
+  signal?: AbortSignal,
 ): Promise<Map<string, PullRequestInfo> | null> {
-  const prs = await queryPullRequests(cwd, repo, { headBranch: branch, limit: 20, mode })
+  const prs = await queryPullRequests(cwd, repo, { headBranch: branch, limit: 20, mode, signal })
   if (!prs) return null
   const byBranch = mapPullRequestsByBranch(prs)
   cacheBranchPullRequest(cwd, branch, mode, byBranch.get(branch) ?? null)
@@ -416,7 +445,7 @@ async function fetchSingleBranchPullRequestMap(
 export async function getBranchPullRequests(
   cwd: string,
   branchNames?: ReadonlySet<string>,
-  options?: { mode?: PullRequestFetchMode },
+  options?: { mode?: PullRequestFetchMode; signal?: AbortSignal },
 ): Promise<Map<string, PullRequestInfo> | null> {
   const mode = options?.mode ?? 'full'
   const singleBranch = branchNames?.size === 1 ? Array.from(branchNames)[0] : undefined
@@ -426,7 +455,7 @@ export async function getBranchPullRequests(
   }
 
   try {
-    const repo = await getGitHubRepoRef(cwd)
+    const repo = await getGitHubRepoRef(cwd, options?.signal)
     if (!repo) return null
     if (singleBranch) {
       const cached = getCachedBranchPullRequest(cwd, singleBranch, mode)
@@ -434,9 +463,9 @@ export async function getBranchPullRequests(
         return cached.pr ? new Map([[singleBranch, cached.pr]]) : new Map()
       }
 
-      const key = branchCacheKey(cwd, singleBranch, mode)
+      const key = pendingRequestKey(branchCacheKey(cwd, singleBranch, mode), options?.signal)
       const existing = pendingBranchRequests.get(key)
-      const byBranch = existing ?? fetchSingleBranchPullRequestMap(cwd, repo, singleBranch, mode)
+      const byBranch = existing ?? fetchSingleBranchPullRequestMap(cwd, repo, singleBranch, mode, options?.signal)
       if (!existing) pendingBranchRequests.set(key, byBranch)
       try {
         return await byBranch
@@ -445,9 +474,9 @@ export async function getBranchPullRequests(
       }
     }
 
-    const key = repoRequestKey(cwd, mode)
+    const key = pendingRequestKey(repoRequestKey(cwd, mode), options?.signal)
     const existing = pendingRepoRequests.get(key)
-    const byBranch = existing ?? fetchRepositoryPullRequestMap(cwd, repo, mode)
+    const byBranch = existing ?? fetchRepositoryPullRequestMap(cwd, repo, mode, options?.signal)
     if (!existing) pendingRepoRequests.set(key, byBranch)
     try {
       return filterPullRequests(await byBranch, branchNames)
@@ -455,21 +484,29 @@ export async function getBranchPullRequests(
       if (pendingRepoRequests.get(key) === byBranch) pendingRepoRequests.delete(key)
     }
   } catch {
-    if (!singleBranch) prCache.set(cwd, { expiresAt: Date.now() + PR_CACHE_TTL_MS, mode, prs: null })
+    const current = prCache.get(cwd)
+    if (!singleBranch && (!current || !cacheFresh(current.expiresAt) || current.prs === null)) {
+      prCache.set(cwd, { expiresAt: Date.now() + PR_CACHE_TTL_MS, mode, prs: null })
+    }
     return null
   }
 }
 
-export async function getBranchPullRequest(cwd: string, branch: string): Promise<PullRequestInfo | null> {
+export async function getBranchPullRequest(
+  cwd: string,
+  branch: string,
+  options?: { signal?: AbortSignal },
+): Promise<PullRequestInfo | null> {
+  if (options?.signal?.aborted) return null
   if (!isSafeBranchName(branch)) return null
   const cached = getCachedBranchPullRequest(cwd, branch, 'full')
   if (cached.hit) return cached.pr
   try {
-    const repo = await getGitHubRepoRef(cwd)
+    const repo = await getGitHubRepoRef(cwd, options?.signal)
     if (!repo) return null
-    const key = branchCacheKey(cwd, branch, 'full')
+    const key = pendingRequestKey(branchCacheKey(cwd, branch, 'full'), options?.signal)
     const existing = pendingBranchRequests.get(key)
-    const byBranch = existing ?? fetchSingleBranchPullRequestMap(cwd, repo, branch, 'full')
+    const byBranch = existing ?? fetchSingleBranchPullRequestMap(cwd, repo, branch, 'full', options?.signal)
     if (!existing) pendingBranchRequests.set(key, byBranch)
     try {
       return (await byBranch)?.get(branch) ?? null

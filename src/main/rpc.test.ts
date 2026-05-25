@@ -2,11 +2,13 @@ import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
 import { ipcMain } from 'electron'
 import { isAncestor, getCurrentBranch, getUpstream } from '#/main/git/branches.ts'
 import { getWorktrees } from '#/main/git/worktrees.ts'
+import { getWorkingStatus } from '#/main/git/status.ts'
 import { resolveRemovableWorktree } from '#/main/git/guards.ts'
+import { registerTrustedAppPath, registerTrustedWebContents } from '#/main/ipc/trusted-webcontents.ts'
 import { wireRpcIpc } from '#/main/rpc.ts'
 import type { RpcResponse } from '#/shared/rpc.ts'
 
-const ipcHandlers = new Map<string, (_event: unknown, input: any) => Promise<RpcResponse>>()
+const ipcHandlers = new Map<string, (_event: unknown, input: any) => Promise<unknown>>()
 
 vi.mock('electron', () => ({
   BrowserWindow: {
@@ -17,7 +19,7 @@ vi.mock('electron', () => ({
     showOpenDialog: vi.fn(),
   },
   ipcMain: {
-    handle: vi.fn((channel: string, handler: (_event: unknown, input: any) => Promise<RpcResponse>) => {
+    handle: vi.fn((channel: string, handler: (_event: unknown, input: any) => Promise<unknown>) => {
       ipcHandlers.set(channel, handler)
     }),
   },
@@ -105,7 +107,7 @@ vi.mock('#/main/settings.ts', () => ({
   loadSettings: vi.fn(() => ({
     theme: 'auto',
     colorTheme: 'default',
-    fetchIntervalSec: 60,
+    fetchIntervalSec: 120,
     shortcutsDisabled: false,
     globalShortcut: '',
     terminalApp: 'auto',
@@ -170,14 +172,33 @@ vi.mock('#/main/external-url.ts', () => ({
   openHttpsExternal: vi.fn(),
 }))
 
-async function invokeRpc(path: string, input?: unknown): Promise<RpcResponse> {
+const trustedSender = { id: 1 }
+const trustedEvent = {
+  sender: trustedSender,
+  senderFrame: { url: 'file:///app/dist/renderer/index.html?theme=light' },
+}
+
+async function invokeRpc(
+  path: string,
+  input?: unknown,
+  event: unknown = trustedEvent,
+  requestId?: string,
+): Promise<RpcResponse> {
   const handler = ipcHandlers.get('goblin:rpc')
   if (!handler) throw new Error('RPC handler not wired')
-  return handler({}, { path, input })
+  return handler(event, { path, input, requestId }) as Promise<RpcResponse>
+}
+
+async function invokeAbortRpc(input: unknown, event: unknown = trustedEvent): Promise<unknown> {
+  const handler = ipcHandlers.get('goblin:rpc-abort')
+  if (!handler) throw new Error('RPC abort handler not wired')
+  return handler(event, input)
 }
 
 describe('main repo rpc cancellation', () => {
   beforeAll(() => {
+    registerTrustedAppPath('/app/dist/renderer/index.html')
+    registerTrustedWebContents({ id: 1, once: vi.fn() } as any)
     wireRpcIpc()
   })
 
@@ -211,5 +232,70 @@ describe('main repo rpc cancellation', () => {
     })
 
     expect(result).toEqual({ ok: true, data: { ok: false, message: 'cancelled' } })
+  })
+
+  test('rejects RPC calls from untrusted senders', async () => {
+    const result = await invokeRpc('settings.get', undefined, {
+      sender: { id: 99 },
+      senderFrame: { url: 'https://example.com/' },
+    })
+
+    expect(result).toEqual({
+      ok: false,
+      error: { name: 'TRPCError', code: 'FORBIDDEN', message: 'Untrusted IPC sender' },
+    })
+  })
+
+  test('rejects RPC calls without a sender frame', async () => {
+    const result = await invokeRpc('settings.get', undefined, {
+      sender: trustedSender,
+      senderFrame: null,
+    })
+
+    expect(result).toEqual({
+      ok: false,
+      error: { name: 'TRPCError', code: 'FORBIDDEN', message: 'Untrusted IPC sender' },
+    })
+  })
+
+  test('aborts a cancellable read RPC by request id', async () => {
+    let observedSignal: AbortSignal | undefined
+    vi.mocked(getWorkingStatus).mockImplementation(
+      (_cwd, options) =>
+        new Promise((resolve) => {
+          observedSignal = options?.signal
+          options?.signal?.addEventListener('abort', () => resolve([{ path: '/repo', isMain: true, entries: [] }]), {
+            once: true,
+          })
+        }),
+    )
+
+    const status = invokeRpc('repo.status', { cwd: '/repo' }, trustedEvent, 'rpc-read-status')
+    await vi.waitFor(() => expect(getWorkingStatus).toHaveBeenCalled())
+    expect(observedSignal).toBeInstanceOf(AbortSignal)
+    const aborted = await invokeAbortRpc({ requestId: 'rpc-read-status' }, trustedEvent)
+
+    expect(aborted).toBe(true)
+    await expect(status).resolves.toEqual({ ok: true, data: [] })
+    expect(getWorkingStatus).toHaveBeenCalledWith('/repo', { signal: expect.any(AbortSignal) })
+  })
+
+  test('returns null when snapshot is aborted during worktree loading', async () => {
+    let observedSignal: AbortSignal | undefined
+    vi.mocked(getWorktrees).mockImplementation(
+      (_cwd, options) =>
+        new Promise((_resolve, reject) => {
+          observedSignal = options?.signal
+          options?.signal?.addEventListener('abort', () => reject(new Error('cancelled')), { once: true })
+        }),
+    )
+
+    const snapshot = invokeRpc('repo.snapshot', { cwd: '/repo' }, trustedEvent, 'rpc-read-snapshot')
+    await vi.waitFor(() => expect(getWorktrees).toHaveBeenCalled())
+    expect(observedSignal).toBeInstanceOf(AbortSignal)
+    const aborted = await invokeAbortRpc({ requestId: 'rpc-read-snapshot' }, trustedEvent)
+
+    expect(aborted).toBe(true)
+    await expect(snapshot).resolves.toEqual({ ok: true, data: null })
   })
 })

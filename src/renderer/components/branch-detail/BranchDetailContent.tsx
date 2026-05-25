@@ -56,6 +56,7 @@ export function BranchDetailContent({ repo, detail, detailId, contentId, layout 
           selectedStatus={detail.selectedStatus}
           statusLoading={detail.loading.status}
           statusError={detail.errors.status}
+          statusStale={detail.stale.status}
         />
       )}
       {repo.ui.detailTab === 'commits' && (
@@ -118,6 +119,7 @@ function BranchChangesTab({
   selectedStatus,
   statusLoading,
   statusError,
+  statusStale,
 }: {
   detailId: string
   repo: RepoState
@@ -125,6 +127,7 @@ function BranchChangesTab({
   selectedStatus: SelectedBranchDetailPresentation['selectedStatus']
   statusLoading: boolean
   statusError: string | null
+  statusStale: boolean
 }) {
   const t = useT()
   // Keep this tab-level count separate from StatusList's empty-state check: the tab decides the scroll boundary.
@@ -138,11 +141,17 @@ function BranchChangesTab({
         <EmptyState title={t(statusError)} />
       ) : branch.worktreePath ? (
         totalEntries > 0 ? (
-          <ScrollPane>
-            <StatusList status={selectedStatus} emptyTitleKey="status.clean-title" emptyBodyKey="status.clean-body" />
-          </ScrollPane>
+          <div className="flex min-h-0 flex-1 flex-col">
+            {statusStale && statusError && <StaleStatusNotice message={statusError} />}
+            <ScrollPane>
+              <StatusList status={selectedStatus} emptyTitleKey="status.clean-title" emptyBodyKey="status.clean-body" />
+            </ScrollPane>
+          </div>
         ) : (
-          <StatusList status={selectedStatus} emptyTitleKey="status.clean-title" emptyBodyKey="status.clean-body" />
+          <div className="flex min-h-0 flex-1 flex-col">
+            {statusStale && statusError && <StaleStatusNotice message={statusError} />}
+            <StatusList status={selectedStatus} emptyTitleKey="status.clean-title" emptyBodyKey="status.clean-body" />
+          </div>
         )
       ) : (
         <EmptyState
@@ -152,6 +161,16 @@ function BranchChangesTab({
         />
       )}
     </BranchTabPanel>
+  )
+}
+
+function StaleStatusNotice({ message }: { message: string }) {
+  const t = useT()
+  return (
+    <div className="border-b border-warning-border bg-warning-surface px-4 py-2 text-xs text-warning">
+      <span className="font-medium">{t('status.stale-title')}</span>
+      <span className="text-muted-foreground"> — {t(message)}</span>
+    </div>
   )
 }
 

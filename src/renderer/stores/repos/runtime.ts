@@ -174,37 +174,37 @@ export function repoOperationBusy(repoId: string, key: RepoOperationKey): boolea
   return operationBusy(repoOperation(repoId, key))
 }
 
-export function repoOperationCurrent(repoId: string, key: RepoOperationKey, requestId: number): boolean {
-  return repoOperation(repoId, key).requestId === requestId
+export function repoOperationCurrent(repoId: string, key: RepoOperationKey, operationId: number): boolean {
+  return repoOperation(repoId, key).operationId === operationId
 }
 
 export function markRepoOperationTargets(
   repoId: string,
-  requestId: number,
+  operationId: number,
   targets: RepoRuntimeOperationTarget[],
   phase: 'queued' | 'running',
   wasQueued = false,
 ): void {
   if (phase === 'running' && wasQueued) {
-    const allTargetsQueuedForRequest = targets.every((target) => {
+    const allTargetsQueuedForOperation = targets.every((target) => {
       const operation = repoOperation(repoId, target.key)
-      return operation.requestId === requestId && operation.phase === 'queued'
+      return operation.operationId === operationId && operation.phase === 'queued'
     })
-    if (!allTargetsQueuedForRequest) return
+    if (!allTargetsQueuedForOperation) return
   }
   for (const target of targets) {
     const operation = ensureRepoOperation(repoId, target.key)
     if (phase === 'running') {
-      startOperation(operation, requestId, { reason: target.reason, target: target.target })
+      startOperation(operation, operationId, { reason: target.reason, target: target.target })
     } else {
-      queueOperation(operation, requestId, { reason: target.reason, target: target.target })
+      queueOperation(operation, operationId, { reason: target.reason, target: target.target })
     }
   }
 }
 
 export function settleRepoOperationTargets(
   repoId: string,
-  requestId: number,
+  operationId: number,
   targets: RepoRuntimeOperationTarget[],
   error: string | null,
 ): void {
@@ -212,7 +212,7 @@ export function settleRepoOperationTargets(
   if (!runtime) return
   for (const target of targets) {
     const operation = runtime.operations[target.key]
-    if (operation) settleOperation(operation, requestId, { error })
+    if (operation) settleOperation(operation, operationId, { error })
   }
 }
 

@@ -15,7 +15,7 @@ export type RepoOperationTarget = RepoRuntimeOperationTarget
 interface RepoOperationContext {
   id: string
   token: number
-  requestId: number
+  operationId: number
   isCurrent: () => boolean
 }
 
@@ -46,9 +46,9 @@ type InternalRepoOperationOptions<T> =
   | (RunLatestOperationOptions<T> & { policy: 'latest-wins' })
   | (RunExclusiveOperationOptions<T> & { policy: 'exclusive' })
 
-function operationCurrent(get: ReposGet, id: string, token: number, requestId: number, target: RepoOperationTarget) {
+function operationCurrent(get: ReposGet, id: string, token: number, operationId: number, target: RepoOperationTarget) {
   const repo = get().repos[id]
-  return !!repo && repo.instanceToken === token && repoOperationCurrent(id, target.key, requestId)
+  return !!repo && repo.instanceToken === token && repoOperationCurrent(id, target.key, operationId)
 }
 
 function anyTargetBusy(id: string, targets: RepoOperationTarget[]) {
@@ -66,12 +66,12 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
     if (busy || (options.canStart && !options.canStart(repoBefore))) return options.busyResult ?? null
   }
 
-  const requestId = nextRepoOperationId(options.id)
+  const operationId = nextRepoOperationId(options.id)
   const ctx: RepoOperationContext = {
     id: options.id,
     token,
-    requestId,
-    isCurrent: () => operationCurrent(options.get, options.id, token, requestId, primary),
+    operationId,
+    isCurrent: () => operationCurrent(options.get, options.id, token, operationId, primary),
   }
   let error: string | null = null
   let staleHandled = false
@@ -85,8 +85,8 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
       priority: options.priority,
       replaceQueuedKey:
         options.policy === 'latest-wins' ? `${options.lane}:${options.operationKey ?? primary.key}` : undefined,
-      onQueued: () => markRepoOperationTargets(options.id, requestId, options.targets, 'queued'),
-      onStart: (wasQueued) => markRepoOperationTargets(options.id, requestId, options.targets, 'running', wasQueued),
+      onQueued: () => markRepoOperationTargets(options.id, operationId, options.targets, 'queued'),
+      onStart: (wasQueued) => markRepoOperationTargets(options.id, operationId, options.targets, 'running', wasQueued),
     })
     if (!ctx.isCurrent()) {
       await handleStale()
@@ -102,7 +102,7 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
     if (options.rethrow) throw err
     return null
   } finally {
-    settleRepoOperationTargets(options.id, requestId, options.targets, error)
+    settleRepoOperationTargets(options.id, operationId, options.targets, error)
   }
 }
 

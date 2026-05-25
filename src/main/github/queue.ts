@@ -21,6 +21,6 @@ export function createGitHubApiQueue(options: GitHubApiQueueOptions = {}): PQueu
 
 const githubApiQueue = createGitHubApiQueue()
 
-export function enqueueGitHubApiRequest<T>(task: () => Promise<T>): Promise<T> {
-  return githubApiQueue.add(task)
+export function enqueueGitHubApiRequest<T>(task: () => Promise<T>, options?: { signal?: AbortSignal }): Promise<T> {
+  return githubApiQueue.add(task, { signal: options?.signal })
 }

@@ -67,7 +67,7 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
   async function chooseParentPath() {
     if (pending) return
     try {
-      const selected = await rpc.repo.cloneParentDialog.query()
+      const selected = await rpc.repo.cloneParentDialog.mutate()
       if (selected) setParentPath(tildify(selected))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('error.unknown'))

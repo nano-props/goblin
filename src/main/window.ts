@@ -14,6 +14,8 @@ import { pathToFileURL } from 'node:url'
 import { getTheme } from '#/main/theme.ts'
 import { loadSettings, setWindowBounds, type WindowBounds } from '#/main/settings.ts'
 import { closeAllTerminalSessions } from '#/main/terminal.ts'
+import { openHttpExternal } from '#/main/external-url.ts'
+import { isTrustedAppUrl, registerTrustedAppPath, registerTrustedWebContents } from '#/main/ipc/trusted-webcontents.ts'
 import { WINDOW_BACKGROUND_BY_COLOR_THEME } from '#/shared/theme-tokens.ts'
 
 const DEFAULT_BOUNDS: WindowBounds = { width: 1200, height: 760 }
@@ -101,15 +103,27 @@ export async function createMainWindow(): Promise<BrowserWindow> {
       additionalArguments: [`--gbl-home-dir=${os.homedir()}`],
     },
   })
+  registerTrustedWebContents(win.webContents)
 
   // file:// load so the existing CSP (`script-src 'self'`) stays clean.
   // `?theme=` and `?colorTheme=` let the boot script apply theme attrs
   // before stylesheets load (no flash). `pathToFileURL` handles Windows
   // path/URL conversion (drive letters, backslashes) — interpolating into
   // a `file://` literal string would produce malformed URLs on Win32.
-  const url = pathToFileURL(path.join(app.getAppPath(), 'dist/renderer/index.html'))
+  const appHtmlPath = path.join(app.getAppPath(), 'dist/renderer/index.html')
+  registerTrustedAppPath(appHtmlPath)
+  const url = pathToFileURL(appHtmlPath)
   url.searchParams.set('theme', resolved)
   url.searchParams.set('colorTheme', colorTheme)
+  win.webContents.on('will-navigate', (event, nextUrl) => {
+    if (!isTrustedAppUrl(nextUrl)) event.preventDefault()
+  })
+  win.webContents.setWindowOpenHandler(({ url: nextUrl }) => {
+    void openHttpExternal(nextUrl).catch((err) => {
+      console.warn('[window] failed to open external window URL', err)
+    })
+    return { action: 'deny' }
+  })
   void win.loadURL(url.toString())
 
   // Persist bounds. We listen on both `resize` and `move` because the
