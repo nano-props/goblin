@@ -167,8 +167,11 @@ export const en = {
 
   // ---- Branches list ------------------------------------------------------
   'branches.empty': 'No branches found in this repository.',
-  'branches.filter-empty': 'No branches match this filter.',
+  'branches.filter-empty': 'No branches match the current filters.',
   'branches.filter-label': 'Filter branches',
+  'branches.search-label': 'Search branches',
+  'branches.search-placeholder': 'Search branches',
+  'branches.search-clear': 'Clear branch search',
   'branches.selected': 'Selected branch',
   'branches.filter.all': 'All',
   'branches.filter.worktrees': 'Worktrees',

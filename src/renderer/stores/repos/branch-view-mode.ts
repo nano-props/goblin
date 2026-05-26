@@ -8,15 +8,28 @@ interface BranchSelectionInput {
   viewMode: BranchViewMode
 }
 
+interface VisibleBranchesInput {
+  branches: BranchInfo[]
+  viewMode: BranchViewMode
+  searchQuery?: string
+}
+
 export function branchMatchesViewMode(branch: BranchInfo, viewMode: BranchViewMode): boolean {
   if (viewMode === 'worktrees') return !!branch.worktreePath
   if (viewMode === 'no-worktree') return !branch.worktreePath
   return true
 }
 
-export function visibleBranches(repo: RepoState): BranchInfo[] {
-  if (repo.ui.branchViewMode === 'all') return repo.data.branches
-  return repo.data.branches.filter((branch) => branchMatchesViewMode(branch, repo.ui.branchViewMode))
+export function branchMatchesSearchQuery(branch: BranchInfo, query: string): boolean {
+  const needle = query.trim().toLowerCase()
+  return needle.length === 0 || branch.name.toLowerCase().includes(needle)
+}
+
+export function visibleBranches({ branches, viewMode, searchQuery = '' }: VisibleBranchesInput): BranchInfo[] {
+  return branches.filter(
+    (branch) =>
+      branchMatchesViewMode(branch, viewMode) && branchMatchesSearchQuery(branch, searchQuery),
+  )
 }
 
 export function selectedBranchForBranchSet({

@@ -47,27 +47,37 @@ export function BranchList({ repoId, showActions = true, variant = 'list' }: Pro
     useReposStore,
     (s) => {
       const repo = s.repos[repoId]
+      const branchSearchQuery = s.branchSearchQueries[repoId] ?? ''
       return {
         repo,
-        branches: repo ? visibleBranches(repo) : [],
+        branches: repo
+          ? visibleBranches({
+              branches: repo.data.branches,
+              viewMode: repo.ui.branchViewMode,
+              searchQuery: branchSearchQuery,
+            })
+          : [],
         branchCount: repo?.data.branches.length ?? 0,
+        branchSearchQuery,
         selected: repo?.ui.selectedBranch ?? null,
         current: repo?.data.currentBranch ?? '',
       }
     },
     (a, b) =>
-      a.repo === b.repo ||
-      (!!a.repo &&
-        !!b.repo &&
-        a.repo.id === b.repo.id &&
-        a.repo.instanceToken === b.repo.instanceToken &&
-        a.repo.data.branches === b.repo.data.branches &&
-        a.repo.ui.branchViewMode === b.repo.ui.branchViewMode &&
-        a.repo.data.status === b.repo.data.status &&
-        a.repo.resources.branchAction === b.repo.resources.branchAction &&
-        a.branchCount === b.branchCount &&
-        a.selected === b.selected &&
-        a.current === b.current),
+      a.repo === b.repo
+        ? a.branchSearchQuery === b.branchSearchQuery
+        : !!a.repo &&
+            !!b.repo &&
+            a.repo.id === b.repo.id &&
+            a.repo.instanceToken === b.repo.instanceToken &&
+            a.repo.data.branches === b.repo.data.branches &&
+            a.repo.ui.branchViewMode === b.repo.ui.branchViewMode &&
+            a.branchSearchQuery === b.branchSearchQuery &&
+            a.repo.data.status === b.repo.data.status &&
+            a.repo.resources.branchAction === b.repo.resources.branchAction &&
+            a.branchCount === b.branchCount &&
+            a.selected === b.selected &&
+            a.current === b.current,
   )
 
   // Keep the selected row in view as the user navigates with j/k.

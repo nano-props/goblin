@@ -189,6 +189,19 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
       }
     },
 
+    setBranchSearchQuery(id: string, query: string) {
+      set((s) => {
+        if (!s.repos[id]) return s
+        const hasQuery = query.trim().length > 0
+        const currentQuery = s.branchSearchQueries[id]
+        if (hasQuery ? currentQuery === query : currentQuery === undefined) return s
+        const branchSearchQueries = { ...s.branchSearchQueries }
+        if (hasQuery) branchSearchQueries[id] = query
+        else delete branchSearchQueries[id]
+        return { branchSearchQueries }
+      })
+    },
+
     setDetailTab(id: string, tab: DetailTab) {
       let changed = false
       let token: number | undefined

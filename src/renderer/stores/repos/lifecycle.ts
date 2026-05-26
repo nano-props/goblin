@@ -139,7 +139,9 @@ export function createLifecycleActions(set: ReposSet, get: ReposGet) {
       set((s) => {
         if (!s.repos[id]) return s
         const repos = { ...s.repos }
+        const branchSearchQueries = { ...s.branchSearchQueries }
         delete repos[id]
+        delete branchSearchQueries[id]
         const order = s.order.filter((x) => x !== id)
         let activeId = s.activeId
         // Slide focus to the right neighbour; fall back to the left if
@@ -148,7 +150,7 @@ export function createLifecycleActions(set: ReposSet, get: ReposGet) {
           const idx = s.order.indexOf(id)
           activeId = order[idx] ?? order[idx - 1] ?? null
         }
-        return { repos, order, activeId }
+        return { repos, branchSearchQueries, order, activeId }
       })
     },
 

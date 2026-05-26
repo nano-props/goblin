@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import {
   branchForVisibleLog,
+  branchMatchesSearchQuery,
   branchMatchesViewMode,
   selectedBranchForBranchSet,
   selectedBranchForViewMode,
@@ -53,14 +54,32 @@ describe('visibleBranches', () => {
   test('returns branches visible in the active repo view mode', () => {
     const branches = [branch('main', { worktreePath: '/repo' }), branch('feature/plain')]
 
-    expect(visibleBranches(repo({ branches, branchViewMode: 'all' })).map((b) => b.name)).toEqual([
+    expect(visibleBranches({ branches, viewMode: 'all' }).map((b) => b.name)).toEqual([
       'main',
       'feature/plain',
     ])
-    expect(visibleBranches(repo({ branches, branchViewMode: 'worktrees' })).map((b) => b.name)).toEqual(['main'])
-    expect(visibleBranches(repo({ branches, branchViewMode: 'no-worktree' })).map((b) => b.name)).toEqual([
+    expect(visibleBranches({ branches, viewMode: 'worktrees' }).map((b) => b.name)).toEqual(['main'])
+    expect(visibleBranches({ branches, viewMode: 'no-worktree' }).map((b) => b.name)).toEqual(['feature/plain'])
+  })
+
+  test('filters branches by the active search query', () => {
+    const branches = [branch('main', { worktreePath: '/repo' }), branch('feature/plain'), branch('fix/plain')]
+
+    expect(visibleBranches({ branches, viewMode: 'all', searchQuery: 'plain' }).map((b) => b.name)).toEqual([
       'feature/plain',
+      'fix/plain',
     ])
+    expect(
+      visibleBranches({ branches, viewMode: 'no-worktree', searchQuery: 'feature' }).map((b) => b.name),
+    ).toEqual(['feature/plain'])
+  })
+})
+
+describe('branchMatchesSearchQuery', () => {
+  test('matches branch names case-insensitively and ignores surrounding whitespace', () => {
+    expect(branchMatchesSearchQuery(branch('feature/SearchBox'), ' search ')).toBe(true)
+    expect(branchMatchesSearchQuery(branch('feature/SearchBox'), 'missing')).toBe(false)
+    expect(branchMatchesSearchQuery(branch('feature/SearchBox'), '')).toBe(true)
   })
 })
 

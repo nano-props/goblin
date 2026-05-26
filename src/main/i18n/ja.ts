@@ -165,8 +165,11 @@ export const ja: Record<DictKey, string> = {
 
   // ---- Branches list -----------------------------------------------------
   'branches.empty': 'このリポジトリにブランチがありません。',
-  'branches.filter-empty': 'このフィルターに一致するブランチはありません。',
+  'branches.filter-empty': '現在のフィルターに一致するブランチはありません。',
   'branches.filter-label': 'ブランチをフィルター',
+  'branches.search-label': 'ブランチを検索',
+  'branches.search-placeholder': 'ブランチを検索',
+  'branches.search-clear': 'ブランチ検索をクリア',
   'branches.selected': '選択中のブランチ',
   'branches.filter.all': 'すべて',
   'branches.filter.worktrees': 'ワークツリー',

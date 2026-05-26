@@ -11,7 +11,6 @@ import {
 import { Button } from '#/renderer/components/ui/button.tsx'
 import { setTerminalFocused } from '#/renderer/terminal-focus.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
-import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { terminalSessionGroupKey } from '#/renderer/components/terminal/terminal-session-utils.ts'
 import { useTerminalSessionContext } from '#/renderer/components/terminal/terminal-session-context.ts'
 import { TerminalSwitcher } from '#/renderer/components/terminal/TerminalSwitcher.tsx'
@@ -37,7 +36,7 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
     activeDescriptor,
     sessionSummaries,
     setActive,
-    closeTerminal,
+    closeTerminalAndDismissDetailIfLast,
     attach,
     detach,
     isTerminalFocusTarget,
@@ -90,10 +89,9 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
   const newTerminal = useCallback(() => createTerminal(base), [base, createTerminal])
   const closeTerminalKey = useCallback(
     (terminalKey: string) => {
-      const remaining = closeTerminal(terminalKey)
-      if (remaining.length === 0) useReposStore.getState().dismissExitedTerminalDetail(repoRoot, worktreePath)
+      closeTerminalAndDismissDetailIfLast(terminalKey, base)
     },
-    [closeTerminal, repoRoot, worktreePath],
+    [base, closeTerminalAndDismissDetailIfLast],
   )
   const closeSearch = useCallback(() => {
     setSearchOpen(false)

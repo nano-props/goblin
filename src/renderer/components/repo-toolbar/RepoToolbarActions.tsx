@@ -9,9 +9,9 @@
 // those need a branch context to be meaningful.
 
 import { useEffect, useState } from 'react'
+import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { FolderPlus } from 'lucide-react'
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
-import type { RepoState } from '#/renderer/stores/repos/types.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { Tip } from '#/renderer/components/Tip.tsx'
 import { Button } from '#/renderer/components/ui/button.tsx'
@@ -20,14 +20,43 @@ import { RepoActivityControl } from '#/renderer/components/repo-activity/RepoAct
 import { resourceBusy } from '#/renderer/stores/repos/resources.ts'
 
 interface Props {
-  repo: RepoState
+  repoId: string
 }
 
-export function RepoToolbarActions({ repo }: Props) {
+export function RepoToolbarActions({ repoId }: Props) {
+  return (
+    <div className="flex items-center gap-1">
+      <RepoActivityControl repoId={repoId} />
+      <CreateWorktreeAction repoId={repoId} />
+    </div>
+  )
+}
+
+function CreateWorktreeAction({ repoId }: Props) {
   const t = useT()
   const runBranchAction = useReposStore((s) => s.runBranchAction)
+  const repo = useStoreWithEqualityFn(
+    useReposStore,
+    (s) => {
+      const repo = s.repos[repoId]
+      return repo
+        ? {
+            id: repo.id,
+            instanceToken: repo.instanceToken,
+            branchAction: repo.resources.branchAction,
+          }
+        : null
+    },
+    (a, b) =>
+      a === b ||
+      (!!a &&
+        !!b &&
+        a.id === b.id &&
+        a.instanceToken === b.instanceToken &&
+        a.branchAction === b.branchAction),
+  )
   const [createOpen, setCreateOpen] = useState(false)
-  const branchActionBusy = resourceBusy(repo.resources.branchAction)
+  const branchActionBusy = repo ? resourceBusy(repo.branchAction) : true
 
   // RepoView reuses the same React instance across repo switches
   // (no `key={activeId}` on the parent), so RepoToolbarActions keeps
@@ -36,9 +65,10 @@ export function RepoToolbarActions({ repo }: Props) {
   // name from repo A doesn't leak into a submission against repo B.
   useEffect(() => {
     setCreateOpen(false)
-  }, [repo.id])
+  }, [repoId])
 
   async function handleCreateWorktree(request: CreateWorktreeRequest) {
+    if (!repo) return
     const targetRepoId = repo.id
     const token = repo.instanceToken
     if (branchActionBusy) return
@@ -55,12 +85,12 @@ export function RepoToolbarActions({ repo }: Props) {
   }
 
   const createTip = t('action.create-worktree-title')
+  if (!repo) return null
 
   // Buttons carry their label inline so the adjacent refresh-like glyphs
   // don't make the user guess which action they are invoking.
   return (
-    <div className="flex items-center gap-1">
-      <RepoActivityControl repo={repo} />
+    <>
       <Tip label={createTip}>
         <span className="inline-flex">
           <Button
@@ -76,12 +106,29 @@ export function RepoToolbarActions({ repo }: Props) {
           </Button>
         </span>
       </Tip>
-      <CreateWorktreeDialog
-        open={createOpen}
-        repo={repo}
-        onClose={() => setCreateOpen(false)}
-        onCreate={handleCreateWorktree}
-      />
-    </div>
+      {createOpen && (
+        <CreateWorktreeDialogConnected
+          repoId={repoId}
+          open={createOpen}
+          onClose={() => setCreateOpen(false)}
+          onCreate={handleCreateWorktree}
+        />
+      )}
+    </>
   )
+}
+
+function CreateWorktreeDialogConnected({
+  repoId,
+  open,
+  onClose,
+  onCreate,
+}: Props & {
+  open: boolean
+  onClose: () => void
+  onCreate: (request: CreateWorktreeRequest) => void | Promise<void>
+}) {
+  const repo = useReposStore((s) => s.repos[repoId])
+  if (!repo) return null
+  return <CreateWorktreeDialog open={open} repo={repo} onClose={onClose} onCreate={onCreate} />
 }

@@ -659,6 +659,53 @@ describe('resetLayout', () => {
   })
 })
 
+describe('setBranchSearchQuery', () => {
+  test('updates runtime search without rewriting durable cache or changing selection', () => {
+    seedRepo({ selectedBranch: 'feature/plain' })
+    const repo = useReposStore.getState().repos[REPO_ID]!
+    const cached = {
+      savedAt: 123,
+      name: repo.name,
+      data: {
+        branches: repo.data.branches,
+        currentBranch: repo.data.currentBranch,
+        status: repo.data.status,
+        statusLoaded: repo.data.statusLoaded,
+      },
+      ui: {
+        selectedBranch: repo.ui.selectedBranch,
+        branchViewMode: repo.ui.branchViewMode,
+        detailTab: repo.ui.detailTab,
+      },
+    }
+    useReposStore.setState({ repoCache: { [REPO_ID]: cached } })
+
+    useReposStore.getState().setBranchSearchQuery(REPO_ID, 'worktree')
+
+    expect(useReposStore.getState().branchSearchQueries[REPO_ID]).toBe('worktree')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBe('feature/plain')
+    expect(useReposStore.getState().repoCache[REPO_ID]).toBe(cached)
+  })
+
+  test('removes runtime search when the query is cleared or the repo is closed', () => {
+    seedRepo({ selectedBranch: 'feature/plain' })
+
+    useReposStore.getState().setBranchSearchQuery(REPO_ID, 'worktree')
+    useReposStore.getState().setBranchSearchQuery(REPO_ID, '')
+
+    expect(useReposStore.getState().branchSearchQueries[REPO_ID]).toBeUndefined()
+
+    useReposStore.getState().setBranchSearchQuery(REPO_ID, '   ')
+
+    expect(useReposStore.getState().branchSearchQueries[REPO_ID]).toBeUndefined()
+
+    useReposStore.getState().setBranchSearchQuery(REPO_ID, 'feature')
+    useReposStore.getState().closeRepo(REPO_ID)
+
+    expect(useReposStore.getState().branchSearchQueries[REPO_ID]).toBeUndefined()
+  })
+})
+
 describe('selectLog', () => {
   test('updates runtime log selection without rewriting durable cache', () => {
     seedRepo({ selectedBranch: 'main', detailTab: 'commits' })

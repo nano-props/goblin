@@ -157,8 +157,11 @@ export const zh: Record<DictKey, string> = {
 
   // ---- Branches list -----------------------------------------------------
   'branches.empty': '该仓库暂无分支。',
-  'branches.filter-empty': '没有匹配当前筛选的分支。',
+  'branches.filter-empty': '没有匹配当前筛选或搜索的分支。',
   'branches.filter-label': '筛选分支',
+  'branches.search-label': '搜索分支',
+  'branches.search-placeholder': '搜索分支',
+  'branches.search-clear': '清除分支搜索',
   'branches.selected': '选中的分支',
   'branches.filter.all': '全部',
   'branches.filter.worktrees': '工作树',
@@ -222,7 +225,7 @@ export const zh: Record<DictKey, string> = {
   'log.loading-more': '正在加载…',
 
   // ---- Status ------------------------------------------------------------
-  'status.clean-title': '工作区已清空',
+  'status.clean-title': '工作区干净',
   'status.clean-body': '没有待提交的改动。',
   'status.no-worktree-title': '这个分支没有工作树',
   'status.no-worktree-body': '切换到该分支，或创建工作树后，就能在这里查看工作区改动。',

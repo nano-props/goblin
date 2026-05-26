@@ -4,7 +4,7 @@ import { isSafeBranchName } from '#/shared/refnames.ts'
 describe('isSafeBranchName', () => {
   test('accepts ordinary branch names', () => {
     expect(isSafeBranchName('feature/worktree-actions')).toBe(true)
-    expect(isSafeBranchName('jizhao_fix-123')).toBe(true)
+    expect(isSafeBranchName('user_fix-123')).toBe(true)
     expect(isSafeBranchName('foo#bar')).toBe(true)
     expect(isSafeBranchName('中文/分支')).toBe(true)
   })

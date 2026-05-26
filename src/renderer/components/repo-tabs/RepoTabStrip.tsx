@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from '#/renderer/components/ui/dropdown-menu.tsx'
 import { RepoTab } from '#/renderer/components/repo-tabs/RepoTab.tsx'
+import { TabTooltipLayer } from '#/renderer/components/repo-tabs/TabTooltipLayer.tsx'
 import { MissingReposPopover } from '#/renderer/components/repo-tabs/MissingReposPopover.tsx'
 import type { RepoTabStripLabels, RepoTabSummary } from '#/renderer/components/repo-tabs/types.ts'
 import type { MissingRepo } from '#/renderer/stores/repos/types.ts'
@@ -110,7 +111,7 @@ export function RepoTabStrip({
     <nav className="relative h-10 shrink-0 bg-muted/60" aria-label={labels.repositories}>
       <div className="absolute inset-x-0 top-0 bottom-px flex items-center gap-2 px-2">
         <ScrollArea orientation="horizontal" className="h-full min-w-0 flex-1" viewportClassName="[&>div]:h-full">
-          <div className="flex h-full w-max min-w-full items-center gap-1" role="tablist">
+          <TabTooltipLayer repos={repos} className="flex h-full w-max min-w-full items-center gap-1" role="tablist">
             {repos.length === 0 ? (
               <div className="flex h-8 items-center px-2 text-xs text-muted-foreground">
                 {labels.emptyBefore}
@@ -149,7 +150,7 @@ export function RepoTabStrip({
                 </SortableContext>
               </DndContext>
             )}
-          </div>
+          </TabTooltipLayer>
         </ScrollArea>
         <MissingReposPopover
           missing={missing}

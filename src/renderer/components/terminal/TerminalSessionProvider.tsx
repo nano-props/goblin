@@ -46,6 +46,47 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     return true
   }
 
+  const sessionSummaries = useCallback((groupKey: string): TerminalSessionSummary[] => {
+    const activeKey = activeKeyByGroupRef.current.get(groupKey) ?? null
+    return Array.from(sessionsRef.current.values())
+      .filter((session) => session.descriptor.groupKey === groupKey)
+      .sort((a, b) => a.descriptor.index - b.descriptor.index)
+      .map((session) => {
+        const snapshot = session.snapshot()
+        return {
+          key: session.descriptor.key,
+          groupKey,
+          terminalId: session.descriptor.terminalId,
+          index: session.descriptor.index,
+          title: snapshot.processName || `terminal ${session.descriptor.index}`,
+          phase: snapshot.phase,
+          active: session.descriptor.key === activeKey,
+        }
+      })
+  }, [])
+
+  const closeTerminal = useCallback(
+    (key: string): TerminalSessionSummary[] => {
+      const groupKey = sessionsRef.current.get(key)?.descriptor.groupKey
+      if (!removeSession(key, { dispose: true })) return groupKey ? sessionSummaries(groupKey) : []
+      notify()
+      return groupKey ? sessionSummaries(groupKey) : []
+    },
+    [notify, sessionSummaries],
+  )
+
+  const closeTerminalAndDismissDetailIfLast = useCallback(
+    (key: string, base: TerminalSessionBase): TerminalSessionSummary[] => {
+      const session = sessionsRef.current.get(key)
+      if (!session || session.descriptor.groupKey !== terminalSessionGroupKey(base.repoRoot, base.worktreePath))
+        return []
+      const remaining = closeTerminal(key)
+      if (remaining.length === 0) useReposStore.getState().dismissExitedTerminalDetail(base.repoRoot, base.worktreePath)
+      return remaining
+    },
+    [closeTerminal],
+  )
+
   useEffect(() => {
     const offOutput = terminalBridge.onOutput((event) => {
       for (const session of sessionsRef.current.values()) session.handleOutput(event)
@@ -53,10 +94,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     const offExit = terminalBridge.onExit((event) => {
       for (const [key, session] of Array.from(sessionsRef.current.entries())) {
         if (!session.handleExit(event)) continue
-        const { repoRoot, worktreePath } = session.descriptor
-        removeSession(key, { dispose: true })
-        useReposStore.getState().dismissExitedTerminalDetail(repoRoot, worktreePath)
-        notify()
+        closeTerminalAndDismissDetailIfLast(key, session.descriptor)
         break
       }
     })
@@ -64,7 +102,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       offOutput()
       offExit()
     }
-  }, [notify])
+  }, [closeTerminalAndDismissDetailIfLast])
 
   useEffect(() => {
     const sessions = sessionsRef.current
@@ -162,25 +200,6 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     return activeKey ? (sessionsRef.current.get(activeKey)?.descriptor ?? null) : null
   }, [])
 
-  const sessionSummaries = useCallback((groupKey: string): TerminalSessionSummary[] => {
-    const activeKey = activeKeyByGroupRef.current.get(groupKey) ?? null
-    return Array.from(sessionsRef.current.values())
-      .filter((session) => session.descriptor.groupKey === groupKey)
-      .sort((a, b) => a.descriptor.index - b.descriptor.index)
-      .map((session) => {
-        const snapshot = session.snapshot()
-        return {
-          key: session.descriptor.key,
-          groupKey,
-          terminalId: session.descriptor.terminalId,
-          index: session.descriptor.index,
-          title: snapshot.processName || `terminal ${session.descriptor.index}`,
-          phase: snapshot.phase,
-          active: session.descriptor.key === activeKey,
-        }
-      })
-  }, [])
-
   const setActive = useCallback(
     (groupKey: string, key: string) => {
       const session = sessionsRef.current.get(key)
@@ -189,16 +208,6 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       notify()
     },
     [notify],
-  )
-
-  const closeTerminal = useCallback(
-    (key: string): TerminalSessionSummary[] => {
-      const groupKey = sessionsRef.current.get(key)?.descriptor.groupKey
-      if (!removeSession(key, { dispose: true })) return groupKey ? sessionSummaries(groupKey) : []
-      notify()
-      return groupKey ? sessionSummaries(groupKey) : []
-    },
-    [notify, sessionSummaries],
   )
 
   const restart = useCallback((key: string) => {
@@ -241,7 +250,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       activeDescriptor,
       sessionSummaries,
       setActive,
-      closeTerminal,
+      closeTerminalAndDismissDetailIfLast,
       attach,
       detach,
       restart,
@@ -256,7 +265,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       activeDescriptor,
       attach,
       clearSearch,
-      closeTerminal,
+      closeTerminalAndDismissDetailIfLast,
       createTerminal,
       detach,
       ensureDefault,

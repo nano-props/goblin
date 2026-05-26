@@ -34,3 +34,11 @@
 - Use lowercase for status chips and badges, e.g. `open`, `dirty`, `no upstream`, `no worktree`, `modified`.
 - Preserve official casing for proper nouns and acronyms, e.g. `GitHub`, `VS Code`, `PR`.
 - Preserve raw git/status data as-is, e.g. branch names, paths, `M`, `A`, and `??`.
+
+## Path display conventions
+
+- User-visible paths under the home directory should be displayed with `~`, e.g. `$HOME/Developer/project` as `~/Developer/project`. Use the existing `tildify` helpers instead of hand-rolled replacements.
+
+## Privacy-safe examples
+
+- Do not use real user names, machine names, personal paths, emails, tokens, or company-internal identifiers in code examples, tests, docs, or snapshots. Use generic placeholders such as `user`, `alice`, `example`, `$HOME`, or `example.com` instead.

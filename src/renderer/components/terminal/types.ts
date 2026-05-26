@@ -48,7 +48,7 @@ export interface TerminalSessionContextValue {
   activeDescriptor: (groupKey: string) => TerminalDescriptor | null
   sessionSummaries: (groupKey: string) => TerminalSessionSummary[]
   setActive: (groupKey: string, key: string) => void
-  closeTerminal: (key: string) => TerminalSessionSummary[]
+  closeTerminalAndDismissDetailIfLast: (key: string, base: TerminalSessionBase) => TerminalSessionSummary[]
   attach: (descriptor: TerminalDescriptor, host: HTMLElement) => void
   detach: (key: string, host: HTMLElement) => void
   restart: (key: string) => void

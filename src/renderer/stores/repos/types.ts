@@ -113,6 +113,7 @@ export interface ReposStore {
    *  come back, and offers a "forget" action to remove them from the
    *  saved session. */
   missingFromSession: MissingRepo[]
+  branchSearchQueries: Record<string, string>
   detailCollapsed: boolean
   detailFocusMode: boolean
   workspaceLayout: RepoWorkspaceLayout
@@ -143,6 +144,7 @@ export interface ReposStore {
   setDetailPaneSizes: (sizes: WorkspaceDetailPaneSizes) => void
   resetLayout: () => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
+  setBranchSearchQuery: (id: string, query: string) => void
   selectBranch: (id: string, branch: string) => void
   selectLog: (id: string, branch: string, hash: string) => void
   cycleActive: (direction: 1 | -1) => void

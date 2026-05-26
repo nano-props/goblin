@@ -107,6 +107,7 @@ export const useReposStore = create<ReposStore>()(
       activeId: null,
       sessionReady: false,
       missingFromSession: [],
+      branchSearchQueries: {},
       detailCollapsed: DEFAULT_DETAIL_COLLAPSED,
       detailFocusMode: false,
       workspaceLayout: DEFAULT_WORKSPACE_LAYOUT,

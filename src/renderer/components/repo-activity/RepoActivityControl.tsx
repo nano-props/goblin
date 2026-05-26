@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { Check, Loader2, RotateCw } from 'lucide-react'
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import type { RepoEvent, RepoState } from '#/renderer/stores/repos/types.ts'
@@ -17,7 +18,7 @@ import { Button } from '#/renderer/components/ui/button.tsx'
 import { repoEventActionSuccessLabel } from '#/renderer/stores/repos/action-labels.ts'
 
 interface Props {
-  repo: RepoState
+  repoId: string
 }
 
 const COMPLETION_VISIBLE_MS = 1500
@@ -33,7 +34,25 @@ function useRepoActivityControlPresentation(repo: RepoState) {
   return getRepoActivityControlPresentation(repo, visibleActivity)
 }
 
-export function RepoActivityControl({ repo }: Props) {
+export function RepoActivityControl({ repoId }: Props) {
+  const repo = useStoreWithEqualityFn(
+    useReposStore,
+    (s) => s.repos[repoId],
+    (a, b) =>
+      a === b ||
+      (!!a &&
+        !!b &&
+        a.id === b.id &&
+        a.instanceToken === b.instanceToken &&
+        a.resources === b.resources &&
+        a.cache === b.cache &&
+        a.remote === b.remote),
+  )
+  if (!repo) return null
+  return <RepoActivityControlView repo={repo} />
+}
+
+function RepoActivityControlView({ repo }: { repo: RepoState }) {
   const { syncBlocked, visibleActivity, showingActivity } = useRepoActivityControlPresentation(repo)
   const completion = useRepoCompletion(repo.id)
   const view = getRepoActivityControlView({

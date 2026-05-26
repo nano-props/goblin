@@ -69,7 +69,11 @@ function moveCommitSelection(state: ReposStore, repo: RepoState, direction: Move
 }
 
 function moveBranchSelection(state: ReposStore, repo: RepoState, direction: MoveDirection): boolean {
-  const branches = visibleBranches(repo)
+  const branches = visibleBranches({
+    branches: repo.data.branches,
+    viewMode: repo.ui.branchViewMode,
+    searchQuery: state.branchSearchQueries[repo.id] ?? '',
+  })
   if (branches.length === 0) return false
   const index = branches.findIndex((branch) => branch.name === repo.ui.selectedBranch)
   const next = branches[nextIndex(index, branches.length, direction)]

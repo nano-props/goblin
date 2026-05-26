@@ -158,8 +158,11 @@ export const ko: Record<DictKey, string> = {
 
   // ---- Branches list -----------------------------------------------------
   'branches.empty': '이 리포지토리에 브랜치가 없습니다.',
-  'branches.filter-empty': '이 필터와 일치하는 브랜치가 없습니다.',
+  'branches.filter-empty': '현재 필터와 일치하는 브랜치가 없습니다.',
   'branches.filter-label': '브랜치 필터',
+  'branches.search-label': '브랜치 검색',
+  'branches.search-placeholder': '브랜치 검색',
+  'branches.search-clear': '브랜치 검색 지우기',
   'branches.selected': '선택한 브랜치',
   'branches.filter.all': '전체',
   'branches.filter.worktrees': '워크트리',
