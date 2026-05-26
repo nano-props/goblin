@@ -3,57 +3,92 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Goblin — Git Branches & Worktrees, at a Glance</title>
+    <title>Goblin — Git Branches, Worktrees, Terminals</title>
     <meta
       name="description"
-      content="A desktop app for managing Git branches and worktrees across multiple repositories. Browse status, PRs, commit logs, and take action — all in one window."
+      content="Goblin is a macOS desktop app for managing Git branches, worktrees, pull requests, commit history, and terminal sessions across multiple repositories."
     />
     <link rel="icon" type="image/png" href="goblin.png" />
     <style>
       *,
       *::before,
       *::after {
-        margin: 0;
-        padding: 0;
         box-sizing: border-box;
       }
 
       :root {
-        --bg: #faf9f7;
-        --bg-card: #ffffff;
-        --text: #1a1a1a;
-        --text-secondary: #6b6b6b;
-        --accent: #2d7ff9;
-        --accent-light: #eaf1fe;
-        --border: #e8e5e0;
-        --blue: #2d7ff9;
-        --indigo: #6366f1;
-        --sky: #38bdf8;
-        --gradient: linear-gradient(135deg, #eef2ff 0%, #ecfeff 50%, #eaf1fe 100%);
+        color-scheme: light;
+        --canvas: #fbfbfd;
+        --base: #f2f2f7;
+        --raised: #ffffff;
+        --overlay: #ffffff;
+        --hover: #e5e5ea;
+        --text: #1d1d1f;
+        --text-strong: #3c3c43;
+        --muted: #6e6e73;
+        --separator: rgb(60 60 67 / 0.14);
+        --border: rgb(60 60 67 / 0.22);
+        --border-strong: rgb(60 60 67 / 0.28);
+        --accent: #007aff;
+        --accent-text: #0066cc;
+        --accent-soft: rgb(0 122 255 / 0.12);
+        --accent-border: rgb(0 122 255 / 0.35);
+        --success: #1f7f37;
+        --warning: #a45a00;
+        --danger: #b00014;
+        --shadow: 0 24px 70px rgb(10 10 10 / 0.16);
+        --shadow-sm: 0 1px 2px rgb(10 10 10 / 0.05);
+        --radius: 10px;
       }
 
       @media (prefers-color-scheme: dark) {
         html:not([data-theme='light']) {
-          --bg: #111111;
-          --bg-card: #1a1a1a;
-          --text: #e8e5e0;
-          --text-secondary: #999;
-          --accent: #5b9bf8;
-          --accent-light: #1a2440;
-          --border: #2a2a2a;
-          --gradient: linear-gradient(135deg, #151525 0%, #121e22 50%, #141e30 100%);
+          color-scheme: dark;
+          --canvas: #1c1c1e;
+          --base: #2c2c2e;
+          --raised: #2c2c2e;
+          --overlay: #2c2c2e;
+          --hover: #3a3a3c;
+          --text: #f5f5f7;
+          --text-strong: rgb(235 235 245 / 0.86);
+          --muted: rgb(235 235 245 / 0.6);
+          --separator: rgb(84 84 88 / 0.42);
+          --border: rgb(84 84 88 / 0.55);
+          --border-strong: rgb(84 84 88 / 0.65);
+          --accent: #0a84ff;
+          --accent-text: #409cff;
+          --accent-soft: rgb(10 132 255 / 0.18);
+          --accent-border: rgb(10 132 255 / 0.45);
+          --success: #30d158;
+          --warning: #ff9f0a;
+          --danger: #ff453a;
+          --shadow: 0 24px 70px rgb(0 0 0 / 0.42);
+          --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.2);
         }
       }
 
       html[data-theme='dark'] {
-        --bg: #111111;
-        --bg-card: #1a1a1a;
-        --text: #e8e5e0;
-        --text-secondary: #999;
-        --accent: #5b9bf8;
-        --accent-light: #1a2440;
-        --border: #2a2a2a;
-        --gradient: linear-gradient(135deg, #151525 0%, #121e22 50%, #141e30 100%);
+        color-scheme: dark;
+        --canvas: #1c1c1e;
+        --base: #2c2c2e;
+        --raised: #2c2c2e;
+        --overlay: #2c2c2e;
+        --hover: #3a3a3c;
+        --text: #f5f5f7;
+        --text-strong: rgb(235 235 245 / 0.86);
+        --muted: rgb(235 235 245 / 0.6);
+        --separator: rgb(84 84 88 / 0.42);
+        --border: rgb(84 84 88 / 0.55);
+        --border-strong: rgb(84 84 88 / 0.65);
+        --accent: #0a84ff;
+        --accent-text: #409cff;
+        --accent-soft: rgb(10 132 255 / 0.18);
+        --accent-border: rgb(10 132 255 / 0.45);
+        --success: #30d158;
+        --warning: #ff9f0a;
+        --danger: #ff453a;
+        --shadow: 0 24px 70px rgb(0 0 0 / 0.42);
+        --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.2);
       }
 
       html {
@@ -61,59 +96,51 @@
       }
 
       body {
-        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
-        background: var(--bg);
+        margin: 0;
+        background: var(--canvas);
         color: var(--text);
-        line-height: 1.6;
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', 'PingFang SC', 'Noto Sans SC', system-ui,
+          sans-serif;
         -webkit-font-smoothing: antialiased;
+        line-height: 1.6;
       }
 
-      /* NAV */
-      nav {
+      a {
+        color: inherit;
+      }
+
+      .topnav {
         position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        z-index: 100;
-        padding: 16px 24px;
+        inset: 0 0 auto;
+        z-index: 10;
         display: flex;
-        justify-content: space-between;
         align-items: center;
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        background: rgba(250, 249, 247, 0.8);
-        box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+        justify-content: space-between;
+        gap: 16px;
+        padding: 14px 22px;
+        border-bottom: 1px solid var(--separator);
+        background: color-mix(in srgb, var(--canvas) 82%, transparent);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
       }
 
-      @media (prefers-color-scheme: dark) {
-        html:not([data-theme='light']) nav {
-          background: rgba(17, 17, 17, 0.8);
-          box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
-        }
-      }
-
-      html[data-theme='dark'] nav {
-        background: rgba(17, 17, 17, 0.8);
-        box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
-      }
-
-      .nav-brand {
-        display: flex;
+      .brand {
+        display: inline-flex;
         align-items: center;
         gap: 10px;
-        font-weight: 700;
-        font-size: 18px;
-        text-decoration: none;
         color: var(--text);
+        text-decoration: none;
+        font-weight: 700;
       }
 
-      .nav-brand img {
-        width: 32px;
-        height: 32px;
+      .brand img {
+        width: 30px;
+        height: 30px;
         border-radius: 8px;
       }
 
-      .nav-right {
+      .nav-actions {
         display: flex;
         align-items: center;
         gap: 8px;
@@ -121,1099 +148,1276 @@
 
       .nav-links {
         display: flex;
-        gap: 28px;
-      }
-
-      .sep {
-        width: 1px;
-        height: 16px;
-        background: var(--border);
-        margin: 0 4px;
+        align-items: center;
+        gap: 22px;
+        margin-right: 4px;
       }
 
       .nav-links a {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 600;
         text-decoration: none;
-        color: var(--text-secondary);
-        font-size: 14px;
-        font-weight: 500;
-        transition: color 0.2s;
       }
 
       .nav-links a:hover {
         color: var(--text);
       }
 
-      .lang-toggle {
+      .segmented,
+      .icon-button {
         display: inline-flex;
+        overflow: hidden;
         border: 1px solid var(--border);
         border-radius: 8px;
-        overflow: hidden;
-        background: var(--bg-card);
+        background: var(--raised);
+        box-shadow: var(--shadow-sm);
       }
 
-      .lang-toggle button {
+      .segmented button,
+      .icon-button {
+        height: 32px;
         border: 0;
         background: transparent;
-        color: var(--text-secondary);
-        padding: 0 12px;
-        height: 34px;
+        color: var(--muted);
         cursor: pointer;
+      }
+
+      .segmented button {
+        padding: 0 10px;
         font:
-          600 12px/1 ui-monospace,
-          'SF Mono',
+          700 11px/1 ui-monospace,
+          SFMono-Regular,
           Menlo,
           monospace;
         letter-spacing: 0.06em;
-        transition: all 0.2s;
       }
 
-      .lang-toggle button + button {
-        border-left: 1px solid var(--border);
+      .segmented button + button {
+        border-left: 1px solid var(--separator);
       }
 
-      .lang-toggle button.active {
+      .segmented button.active {
         background: var(--text);
-        color: var(--bg);
+        color: var(--canvas);
       }
 
-      /* HERO */
-      .hero {
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 120px 24px 80px;
-        background: var(--gradient);
-      }
-
-      .hero-inner {
-        display: flex;
-        align-items: center;
-        gap: 64px;
-        max-width: 1060px;
-        width: 100%;
-      }
-
-      .hero-text {
-        flex: 1;
-        min-width: 0;
-      }
-
-      .hero-visual {
-        flex-shrink: 0;
-        display: flex;
+      .icon-button {
+        width: 32px;
         align-items: center;
         justify-content: center;
       }
 
-      .hero-icon {
-        width: 220px;
-        height: 220px;
-        border-radius: 48px;
-        animation: float 6s ease-in-out infinite;
-        filter: drop-shadow(0 24px 48px rgba(0, 0, 0, 0.12));
-      }
-
-      @keyframes float {
-        0%,
-        100% {
-          transform: translateY(0);
-        }
-        50% {
-          transform: translateY(-12px);
-        }
-      }
-
-      .hero h1 {
-        font-size: clamp(36px, 5.5vw, 64px);
-        font-weight: 800;
-        letter-spacing: -0.03em;
-        line-height: 1.1;
-        margin-bottom: 20px;
-      }
-
-      .hero h1 span {
-        background: linear-gradient(135deg, var(--indigo), var(--blue), var(--sky));
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-      }
-
-      .hero-sub {
-        font-size: clamp(16px, 2vw, 19px);
-        color: var(--text-secondary);
-        max-width: 520px;
-        margin-bottom: 36px;
-      }
-
-      .hero-actions {
-        display: flex;
-        gap: 12px;
-        flex-wrap: wrap;
-      }
-
-      .btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 14px 28px;
-        border-radius: 12px;
-        font-size: 15px;
-        font-weight: 600;
-        text-decoration: none;
-        transition: all 0.2s;
-        cursor: pointer;
-        border: none;
-      }
-
-      .btn-primary {
-        background: var(--text);
-        color: var(--bg);
-      }
-
-      .btn-primary:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-      }
-
-      .btn-secondary {
-        background: var(--bg-card);
-        color: var(--text);
-        border: 1px solid var(--border);
-      }
-
-      .btn-secondary:hover {
-        border-color: var(--text-secondary);
-      }
-
-      .btn svg {
-        width: 18px;
-        height: 18px;
-      }
-
-      .hero-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 6px 14px;
-        border-radius: 100px;
-        background: var(--accent-light);
-        color: var(--accent);
-        font-size: 13px;
-        font-weight: 600;
-        margin-bottom: 24px;
-      }
-
-      /* SECTIONS */
-      section {
-        padding: 100px 24px;
-      }
-
-      .container {
-        max-width: 960px;
-        margin: 0 auto;
-      }
-
-      .section-label {
-        font-size: 13px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--accent);
-        margin-bottom: 12px;
-      }
-
-      .section-title {
-        font-size: clamp(28px, 4vw, 40px);
-        font-weight: 800;
-        letter-spacing: -0.02em;
-        margin-bottom: 16px;
-      }
-
-      .section-desc {
-        font-size: 17px;
-        color: var(--text-secondary);
-        max-width: 560px;
-        margin-bottom: 56px;
-      }
-
-      /* FEATURES */
-      .features-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-        gap: 20px;
-      }
-
-      .feature-card {
-        padding: 28px;
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        transition: all 0.25s;
-      }
-
-      .feature-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.06);
-      }
-
-      .feature-icon {
-        width: 44px;
-        height: 44px;
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-bottom: 16px;
-        font-size: 20px;
-      }
-
-      .fi-blue {
-        background: #e6eefa;
-        color: #2d7ff9;
-      }
-      .fi-indigo {
-        background: #eef2ff;
-        color: #6366f1;
-      }
-      .fi-sky {
-        background: #e0f7ff;
-        color: #0891b2;
-      }
-      .fi-amber {
-        background: #fef3e2;
-        color: #c47d1d;
-      }
-      .fi-green {
-        background: #e4f5e8;
-        color: #3a8a4d;
-      }
-      .fi-purple {
-        background: #f0ecf8;
-        color: #7c5cbf;
-      }
-
-      @media (prefers-color-scheme: dark) {
-        html:not([data-theme='light']) .fi-blue {
-          background: #1a2440;
-        }
-        html:not([data-theme='light']) .fi-indigo {
-          background: #1e1b3a;
-        }
-        html:not([data-theme='light']) .fi-sky {
-          background: #122030;
-        }
-        html:not([data-theme='light']) .fi-amber {
-          background: #2e2418;
-        }
-        html:not([data-theme='light']) .fi-green {
-          background: #1a2e1e;
-        }
-        html:not([data-theme='light']) .fi-purple {
-          background: #2a2040;
-        }
-      }
-
-      html[data-theme='dark'] .fi-blue {
-        background: #1a2440;
-      }
-      html[data-theme='dark'] .fi-indigo {
-        background: #1e1b3a;
-      }
-      html[data-theme='dark'] .fi-sky {
-        background: #122030;
-      }
-      html[data-theme='dark'] .fi-amber {
-        background: #2e2418;
-      }
-      html[data-theme='dark'] .fi-green {
-        background: #1a2e1e;
-      }
-      html[data-theme='dark'] .fi-purple {
-        background: #2a2040;
-      }
-
-      .feature-card h3 {
-        font-size: 17px;
-        font-weight: 700;
-        margin-bottom: 8px;
-      }
-
-      .feature-card p {
-        font-size: 14px;
-        color: var(--text-secondary);
-        line-height: 1.6;
-      }
-
-      /* HOW IT WORKS */
-      .steps {
-        display: flex;
-        flex-direction: column;
-        gap: 0;
-        position: relative;
-      }
-
-      .step {
-        display: flex;
-        gap: 24px;
-        align-items: flex-start;
-        padding-bottom: 48px;
-        position: relative;
-      }
-
-      .step:last-child {
-        padding-bottom: 0;
-      }
-
-      .step-num {
-        flex-shrink: 0;
-        width: 44px;
-        height: 44px;
-        border-radius: 50%;
-        background: var(--text);
-        color: var(--bg);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 800;
-        font-size: 16px;
-        position: relative;
-        z-index: 1;
-      }
-
-      .step:not(:last-child) .step-num::after {
-        content: '';
-        position: absolute;
-        top: 44px;
-        left: 50%;
-        width: 2px;
-        height: calc(100% + 4px);
-        background: var(--border);
-        transform: translateX(-50%);
-      }
-
-      .step-content h3 {
-        font-size: 18px;
-        font-weight: 700;
-        margin-bottom: 4px;
-      }
-
-      .step-content p {
-        font-size: 15px;
-        color: var(--text-secondary);
-      }
-
-      /* CTA */
-      .cta-section {
-        text-align: center;
-        background: var(--gradient);
-        border-radius: 24px;
-        padding: 80px 24px;
-        margin: 100px auto;
-        max-width: 960px;
-      }
-
-      .cta-section h2 {
-        font-size: clamp(28px, 4vw, 40px);
-        font-weight: 800;
-        margin-bottom: 12px;
-        letter-spacing: -0.02em;
-      }
-
-      .cta-section p {
-        color: var(--text-secondary);
-        margin-bottom: 32px;
-        font-size: 17px;
-      }
-
-      .cta-section .hero-actions {
-        justify-content: center;
-      }
-
-      /* FOOTER */
-      footer {
-        text-align: center;
-        padding: 40px 24px;
-        border-top: 1px solid var(--border);
-        color: var(--text-secondary);
-        font-size: 13px;
-      }
-
-      footer a {
-        color: var(--text-secondary);
-        text-decoration: none;
-      }
-      footer a:hover {
-        color: var(--text);
-      }
-
-      /* RESPONSIVE */
-      @media (max-width: 640px) {
-        .nav-links {
-          display: none;
-        }
-
-        .hero {
-          padding: 100px 20px 60px;
-        }
-
-        .hero-inner {
-          flex-direction: column-reverse;
-          gap: 32px;
-          text-align: center;
-        }
-
-        .hero-actions {
-          justify-content: center;
-        }
-
-        .hero-icon {
-          width: 100px;
-          height: 100px;
-          border-radius: 24px;
-        }
-
-        section {
-          padding: 64px 20px;
-        }
-
-        .features-grid {
-          grid-template-columns: 1fr;
-        }
-
-        .cta-section {
-          margin: 64px 16px;
-          padding: 56px 20px;
-        }
-
-        .step {
-          gap: 16px;
-        }
-      }
-
-      /* THEME TOGGLE */
-      .theme-toggle {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 34px;
-        height: 34px;
-        border-radius: 8px;
-        border: 1px solid var(--border);
-        background: var(--bg-card);
-        color: var(--text-secondary);
-        cursor: pointer;
-        transition:
-          border-color 0.2s,
-          color 0.2s;
-        flex-shrink: 0;
-      }
-
-      .theme-toggle:hover {
-        border-color: var(--text-secondary);
-        color: var(--text);
-      }
-
-      .theme-toggle svg {
+      .icon-button svg {
         width: 15px;
         height: 15px;
       }
 
-      .theme-toggle .icon-sun {
+      .icon-button .sun {
         display: none;
       }
-      .theme-toggle .icon-moon {
+
+      html[data-theme='dark'] .icon-button .sun,
+      html:not([data-theme='light']) .icon-button .sun {
         display: block;
       }
 
-      @media (prefers-color-scheme: dark) {
-        html:not([data-theme='light']) .theme-toggle .icon-sun {
-          display: block;
-        }
-        html:not([data-theme='light']) .theme-toggle .icon-moon {
-          display: none;
-        }
-      }
-
-      html[data-theme='dark'] .theme-toggle .icon-sun {
-        display: block;
-      }
-      html[data-theme='dark'] .theme-toggle .icon-moon {
+      html[data-theme='dark'] .icon-button .moon,
+      html:not([data-theme='light']) .icon-button .moon {
         display: none;
       }
-      html[data-theme='light'] .theme-toggle .icon-sun {
-        display: none;
-      }
-      html[data-theme='light'] .theme-toggle .icon-moon {
-        display: block;
+
+      .hero {
+        padding: 128px 24px 84px;
       }
 
-      /* ANIMATE ON SCROLL */
+      .hero-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 0.9fr) minmax(520px, 1.1fr);
+        align-items: center;
+        gap: 56px;
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 10px;
+        border: 1px solid var(--accent-border);
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent-text);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--accent);
+      }
+
+      h1 {
+        margin: 18px 0 18px;
+        font-size: clamp(42px, 6vw, 76px);
+        line-height: 0.98;
+        letter-spacing: -0.055em;
+      }
+
+      .hero-copy {
+        max-width: 580px;
+        color: var(--muted);
+        font-size: 18px;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 28px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 40px;
+        padding: 0 16px;
+        border-radius: 9px;
+        border: 1px solid var(--border);
+        background: var(--raised);
+        color: var(--text);
+        font-size: 14px;
+        font-weight: 700;
+        text-decoration: none;
+        box-shadow: var(--shadow-sm);
+      }
+
+      .button.primary {
+        border-color: var(--text);
+        background: var(--text);
+        color: var(--canvas);
+      }
+
+      .app-window {
+        overflow: hidden;
+        border: 1px solid var(--border-strong);
+        border-radius: 16px;
+        background: var(--raised);
+        box-shadow: var(--shadow);
+      }
+
+      .window-titlebar {
+        display: flex;
+        align-items: center;
+        height: 42px;
+        padding: 0 14px;
+        border-bottom: 1px solid var(--separator);
+        background: var(--base);
+      }
+
+      .traffic {
+        display: flex;
+        gap: 8px;
+      }
+
+      .traffic span {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        border: 1px solid rgb(0 0 0 / 0.12);
+      }
+
+      .traffic span:nth-child(1) {
+        background: #ff5f57;
+      }
+      .traffic span:nth-child(2) {
+        background: #ffbd2e;
+      }
+      .traffic span:nth-child(3) {
+        background: #28c840;
+      }
+
+      .window-title {
+        flex: 1;
+        text-align: center;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .gear {
+        color: var(--muted);
+      }
+
+      .repo-strip {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 40px;
+        padding: 0 12px;
+        border-bottom: 1px solid var(--separator);
+        background: var(--canvas);
+      }
+
+      .repo-tab {
+        display: inline-flex;
+        align-items: center;
+        max-width: 160px;
+        height: 28px;
+        padding: 0 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--raised);
+        color: var(--text);
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      .repo-tab.muted {
+        color: var(--muted);
+        background: var(--base);
+      }
+
+      .app-body {
+        display: grid;
+        grid-template-columns: 290px minmax(0, 1fr);
+        min-height: 390px;
+      }
+
+      .branch-list {
+        border-right: 1px solid var(--separator);
+        background: var(--canvas);
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 42px;
+        padding: 0 12px;
+        border-bottom: 1px solid var(--separator);
+      }
+
+      .toolbar strong {
+        font-size: 13px;
+      }
+
+      .filter {
+        display: inline-flex;
+        gap: 2px;
+        padding: 2px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--base);
+      }
+
+      .filter span {
+        padding: 2px 7px;
+        border-radius: 6px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .filter span.active {
+        background: var(--raised);
+        color: var(--text);
+      }
+
+      .branch-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--separator);
+      }
+
+      .branch-row.active {
+        background: var(--accent-soft);
+      }
+
+      .branch-name {
+        overflow: hidden;
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 700;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .branch-meta {
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .chip {
+        align-self: start;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+        padding: 1px 6px;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 700;
+      }
+
+      .chip.success {
+        border-color: color-mix(in srgb, var(--success) 45%, transparent);
+        color: var(--success);
+        background: color-mix(in srgb, var(--success) 12%, transparent);
+      }
+
+      .chip.warning {
+        border-color: color-mix(in srgb, var(--warning) 45%, transparent);
+        color: var(--warning);
+        background: color-mix(in srgb, var(--warning) 12%, transparent);
+      }
+
+      .detail {
+        display: grid;
+        grid-template-rows: auto 1fr 140px;
+        min-width: 0;
+        background: var(--raised);
+      }
+
+      .detail-tabs {
+        display: flex;
+        gap: 4px;
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--separator);
+      }
+
+      .detail-tabs span {
+        padding: 5px 10px;
+        border-radius: 7px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .detail-tabs span.active {
+        background: var(--accent-soft);
+        color: var(--accent-text);
+      }
+
+      .detail-content {
+        padding: 16px;
+      }
+
+      .signals {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+
+      .signal-card {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px;
+        background: var(--canvas);
+      }
+
+      .signal-label {
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .signal-value {
+        margin-top: 6px;
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .commit-list {
+        margin-top: 14px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+      }
+
+      .commit {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 10px;
+        border-top: 1px solid var(--separator);
+        color: var(--text-strong);
+        font-size: 12px;
+      }
+
+      .commit:first-child {
+        border-top: 0;
+      }
+
+      .terminal {
+        border-top: 1px solid var(--separator);
+        background: #111113;
+        color: #f5f5f7;
+        font:
+          12px/1.5 ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+        padding: 12px;
+      }
+
+      .terminal span {
+        color: #30d158;
+      }
+
+      section {
+        padding: 88px 24px;
+      }
+
+      .container {
+        max-width: 1040px;
+        margin: 0 auto;
+      }
+
+      .section-label {
+        color: var(--accent-text);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .section-title {
+        margin: 10px 0 12px;
+        font-size: clamp(28px, 4vw, 42px);
+        line-height: 1.05;
+        letter-spacing: -0.035em;
+      }
+
+      .section-desc {
+        max-width: 680px;
+        color: var(--muted);
+        font-size: 17px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+        margin-top: 34px;
+      }
+
+      .card {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--raised);
+        padding: 20px;
+        box-shadow: var(--shadow-sm);
+      }
+
+      .card-icon {
+        display: inline-flex;
+        width: 34px;
+        height: 34px;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 14px;
+        border: 1px solid var(--accent-border);
+        border-radius: 9px;
+        background: var(--accent-soft);
+        color: var(--accent-text);
+      }
+
+      .card h3 {
+        margin: 0 0 7px;
+        font-size: 16px;
+      }
+
+      .card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .settings-preview {
+        display: grid;
+        grid-template-columns: 210px 1fr;
+        overflow: hidden;
+        margin-top: 34px;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        background: var(--raised);
+        box-shadow: var(--shadow-sm);
+      }
+
+      .settings-sidebar {
+        padding: 14px;
+        border-right: 1px solid var(--separator);
+        background: var(--base);
+      }
+
+      .settings-nav-item {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        height: 36px;
+        padding: 0 9px;
+        border-radius: 8px;
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .settings-nav-item.active {
+        background: var(--accent-soft);
+        color: var(--accent-text);
+      }
+
+      .settings-main {
+        padding: 18px;
+      }
+
+      .setting-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 12px 14px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--canvas);
+      }
+
+      .setting-row + .setting-row {
+        margin-top: 10px;
+      }
+
+      .setting-row p {
+        margin: 2px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .kbd {
+        display: inline-flex;
+        min-width: 24px;
+        height: 22px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--border-strong);
+        border-radius: 6px;
+        background: var(--base);
+        color: var(--text);
+        font:
+          12px/1 ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+      }
+
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+        margin-top: 34px;
+      }
+
+      .step {
+        padding: 20px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--raised);
+      }
+
+      .step-num {
+        display: inline-flex;
+        width: 28px;
+        height: 28px;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 14px;
+        border-radius: 8px;
+        background: var(--text);
+        color: var(--canvas);
+        font-weight: 800;
+      }
+
+      .step h3 {
+        margin: 0 0 6px;
+      }
+
+      .step p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .cta {
+        margin: 54px auto 0;
+        padding: 34px;
+        border: 1px solid var(--accent-border);
+        border-radius: 18px;
+        background: var(--accent-soft);
+        text-align: center;
+      }
+
+      .cta h2 {
+        margin: 0 0 8px;
+        font-size: clamp(26px, 4vw, 42px);
+        letter-spacing: -0.035em;
+      }
+
+      .cta p {
+        margin: 0 auto 20px;
+        color: var(--muted);
+      }
+
+      footer {
+        padding: 34px 24px;
+        border-top: 1px solid var(--separator);
+        color: var(--muted);
+        text-align: center;
+        font-size: 13px;
+      }
+
+      footer a {
+        color: var(--muted);
+        text-decoration: none;
+      }
+
+      footer a:hover {
+        color: var(--text);
+      }
+
       .fade-in {
         opacity: 0;
-        transform: translateY(20px);
+        transform: translateY(16px);
         transition:
-          opacity 0.6s ease,
-          transform 0.6s ease;
+          opacity 0.55s ease,
+          transform 0.55s ease;
       }
 
       .fade-in.visible {
         opacity: 1;
         transform: translateY(0);
       }
+
+      @media (max-width: 980px) {
+        .hero-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .app-window {
+          max-width: 760px;
+          margin: 0 auto;
+        }
+
+        .grid,
+        .steps {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+
+      @media (max-width: 680px) {
+        .nav-links {
+          display: none;
+        }
+
+        .hero {
+          padding-top: 104px;
+        }
+
+        .hero-grid {
+          gap: 28px;
+        }
+
+        .app-body,
+        .settings-preview {
+          grid-template-columns: 1fr;
+        }
+
+        .branch-list,
+        .settings-sidebar {
+          display: none;
+        }
+
+        .grid,
+        .steps {
+          grid-template-columns: 1fr;
+        }
+      }
     </style>
   </head>
   <body>
-    <!-- NAV -->
-    <nav>
-      <a href="#" class="nav-brand">
+    <nav class="topnav">
+      <a href="#" class="brand">
         <img src="goblin.png" alt="Goblin" />
-        Goblin
+        <span>Goblin</span>
       </a>
-      <div class="nav-right">
+      <div class="nav-actions">
         <div class="nav-links">
           <a href="#features" data-i18n="nav_features">Features</a>
-          <a href="#how-it-works" data-i18n="nav_how">How It Works</a>
+          <a href="#settings" data-i18n="nav_settings">Settings</a>
+          <a href="#workflow" data-i18n="nav_workflow">Workflow</a>
           <a href="https://github.com/nano-props/goblin" target="_blank" rel="noopener noreferrer">GitHub</a>
         </div>
-        <span class="sep"></span>
-        <div class="lang-toggle">
+        <div class="segmented" aria-label="Language">
           <button id="lang-en" lang="en" class="active" onclick="setLang('en')">EN</button>
           <button id="lang-zh" lang="zh" onclick="setLang('zh')">中</button>
           <button id="lang-ko" lang="ko" onclick="setLang('ko')">한</button>
           <button id="lang-ja" lang="ja" onclick="setLang('ja')">日</button>
         </div>
-        <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
-          <svg
-            class="icon-sun"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
+        <button class="icon-button" onclick="toggleTheme()" aria-label="Toggle theme">
+          <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="4" />
             <path
               d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"
             />
           </svg>
-          <svg
-            class="icon-moon"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
+          <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
           </svg>
         </button>
       </div>
     </nav>
 
-    <!-- HERO -->
-    <section class="hero">
-      <div class="hero-inner">
-        <div class="hero-text">
-          <div class="hero-badge">
-            <svg
-              viewBox="0 0 24 24"
-              width="14"
-              height="14"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M12 2L2 7l10 5 10-5-10-5z" />
-              <path d="M2 17l10 5 10-5" />
-              <path d="M2 12l10 5 10-5" />
-            </svg>
-            <span data-i18n="hero_badge">macOS Desktop App</span>
+    <main>
+      <section class="hero">
+        <div class="hero-grid">
+          <div>
+            <div class="eyebrow">
+              <span class="dot"></span><span data-i18n="hero_badge">macOS desktop Git workspace</span>
+            </div>
+            <h1 data-i18n-html="hero_title">Branch work,<br />without the context switch.</h1>
+            <p class="hero-copy" data-i18n="hero_sub">
+              Goblin keeps repositories, branches, worktrees, pull requests, logs, and terminals in one focused desktop
+              window.
+            </p>
+            <div class="actions">
+              <a
+                class="button primary"
+                href="https://github.com/nano-props/goblin/releases"
+                target="_blank"
+                rel="noopener noreferrer"
+                data-i18n="btn_download"
+                >Download</a
+              >
+              <a
+                class="button"
+                href="https://github.com/nano-props/goblin"
+                target="_blank"
+                rel="noopener noreferrer"
+                data-i18n="btn_source"
+                >Source code</a
+              >
+            </div>
           </div>
-          <h1 data-i18n-html="hero_title">Branches and worktrees,<br /><span>at a glance</span></h1>
-          <p class="hero-sub" data-i18n="hero_sub">
-            A desktop app for managing Git branches and worktrees across multiple repositories. See status, PRs, and
-            commit logs — checkout, sync, or open any worktree in one window.
+
+          <div class="app-window fade-in" aria-label="Goblin app preview">
+            <div class="window-titlebar">
+              <div class="traffic"><span></span><span></span><span></span></div>
+              <div class="window-title">Goblin</div>
+              <div class="gear">⚙</div>
+            </div>
+            <div class="repo-strip">
+              <span class="repo-tab">goblin</span>
+              <span class="repo-tab muted">marketplace</span>
+              <span class="repo-tab muted">+ clone</span>
+            </div>
+            <div class="app-body">
+              <div class="branch-list">
+                <div class="toolbar">
+                  <strong data-i18n="preview_branches">Branches</strong>
+                  <div class="filter"><span class="active">all</span><span>worktree</span></div>
+                </div>
+                <div class="branch-row active">
+                  <div>
+                    <div class="branch-name">feature/settings-panel</div>
+                    <div class="branch-meta">2 ahead · worktree</div>
+                  </div>
+                  <span class="chip success">PR</span>
+                </div>
+                <div class="branch-row">
+                  <div>
+                    <div class="branch-name">main</div>
+                    <div class="branch-meta">up to date · default</div>
+                  </div>
+                  <span class="chip">main</span>
+                </div>
+                <div class="branch-row">
+                  <div>
+                    <div class="branch-name">fix/terminal-replay</div>
+                    <div class="branch-meta">dirty · terminal</div>
+                  </div>
+                  <span class="chip warning">dirty</span>
+                </div>
+                <div class="branch-row">
+                  <div>
+                    <div class="branch-name">docs/landing-page</div>
+                    <div class="branch-meta">no worktree</div>
+                  </div>
+                  <span class="chip">docs</span>
+                </div>
+              </div>
+              <div class="detail">
+                <div class="detail-tabs">
+                  <span class="active">Status</span><span>Changes</span><span>Log</span><span>Terminal</span>
+                </div>
+                <div class="detail-content">
+                  <div class="signals">
+                    <div class="signal-card">
+                      <div class="signal-label">Sync</div>
+                      <div class="signal-value">2 ahead</div>
+                    </div>
+                    <div class="signal-card">
+                      <div class="signal-label">PR</div>
+                      <div class="signal-value">open · checks passing</div>
+                    </div>
+                    <div class="signal-card">
+                      <div class="signal-label">Worktree</div>
+                      <div class="signal-value">clean</div>
+                    </div>
+                  </div>
+                  <div class="commit-list">
+                    <div class="commit"><span>Polish unified settings panel</span><code>3287d86</code></div>
+                    <div class="commit"><span>Add terminal session switching</span><code>dbf7c04</code></div>
+                    <div class="commit"><span>Refactor resource refresh state</span><code>f15ba12</code></div>
+                  </div>
+                </div>
+                <div class="terminal">
+                  <span>~/Developer/goblin</span> bun run typecheck<br />✓ main, renderer, and tests passed
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="features">
+        <div class="container">
+          <div class="section-label" data-i18n="features_label">Features</div>
+          <h2 class="section-title" data-i18n-html="features_title">A desktop control room for active Git work.</h2>
+          <p class="section-desc" data-i18n="features_desc">
+            Goblin is built for juggling branches across multiple repos without losing terminal, editor, PR, or worktree
+            context.
           </p>
-          <div class="hero-actions">
-            <a
-              href="https://github.com/nano-props/goblin/releases"
-              class="btn btn-primary"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              <span data-i18n="btn_download">Download</span>
-            </a>
-            <a
-              href="https://github.com/nano-props/goblin"
-              class="btn btn-secondary"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                <path
-                  d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"
-                />
-              </svg>
-              <span data-i18n="btn_source">Source Code</span>
-            </a>
+          <div class="grid">
+            <article class="card fade-in">
+              <div class="card-icon">▣</div>
+              <h3 data-i18n="f1_title">Multi-repo tabs</h3>
+              <p data-i18n="f1_desc">
+                Open local repositories or clone new ones, keep them in tabs, and restore the last workspace on launch.
+              </p>
+            </article>
+            <article class="card fade-in">
+              <div class="card-icon">⑂</div>
+              <h3 data-i18n="f2_title">Branch and worktree actions</h3>
+              <p data-i18n="f2_desc">
+                Checkout, pull, push, create worktrees, open folders in editors, and reveal paths from one branch list.
+              </p>
+            </article>
+            <article class="card fade-in">
+              <div class="card-icon">⌁</div>
+              <h3 data-i18n="f3_title">PR and status signals</h3>
+              <p data-i18n="f3_desc">
+                See sync state, dirty worktrees, PR review status, CI checks, and mergeability inline with each branch.
+              </p>
+            </article>
+            <article class="card fade-in">
+              <div class="card-icon">⌘</div>
+              <h3 data-i18n="f4_title">Keyboard-first navigation</h3>
+              <p data-i18n="f4_desc">
+                Use j/k, arrows, repository shortcuts, and branch action keys. Customize the global shortcut or disable
+                shortcuts entirely.
+              </p>
+            </article>
+            <article class="card fade-in">
+              <div class="card-icon">▤</div>
+              <h3 data-i18n="f5_title">Managed terminals</h3>
+              <p data-i18n="f5_desc">
+                Run terminals inside the app, switch sessions, search output, replay terminal state, and keep context
+                per repository.
+              </p>
+            </article>
+            <article class="card fade-in">
+              <div class="card-icon">◐</div>
+              <h3 data-i18n="f6_title">Themes and languages</h3>
+              <p data-i18n="f6_desc">
+                Choose Goblin, shadcn/ui, or GitHub color themes, light/dark/system appearance, and English, Chinese,
+                Korean, or Japanese.
+              </p>
+            </article>
           </div>
         </div>
-        <div class="hero-visual">
-          <img src="goblin.png" alt="Goblin Icon" class="hero-icon" />
-        </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- FEATURES -->
-    <section id="features">
-      <div class="container">
-        <div class="section-label" data-i18n="features_label">Features</div>
-        <h2 class="section-title" data-i18n-html="features_title">
-          Everything about your branches,<br />nothing in the way
-        </h2>
-        <p class="section-desc" data-i18n="features_desc">
-          Goblin gives you a bird's-eye view of every branch, worktree, and pull request across all your repositories.
-        </p>
-        <div class="features-grid">
-          <!-- f1: Multi-Repo Tabs -->
-          <div class="feature-card fade-in">
-            <div class="feature-icon fi-blue">
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                <line x1="3" y1="9" x2="21" y2="9" />
-                <line x1="9" y1="3" x2="9" y2="9" />
-              </svg>
+      <section id="settings" style="background: var(--base)">
+        <div class="container">
+          <div class="section-label" data-i18n="settings_label">Settings</div>
+          <h2 class="section-title" data-i18n="settings_title">One settings panel, every preference.</h2>
+          <p class="section-desc" data-i18n="settings_desc">
+            Dependency notes, keyboard shortcuts, app integrations, sync behavior, themes, language, and About now live
+            in a single Goblin-styled settings window.
+          </p>
+          <div class="settings-preview fade-in">
+            <div class="settings-sidebar">
+              <div class="settings-nav-item active">⚙ <span data-i18n="settings_nav_general">General</span></div>
+              <div class="settings-nav-item">▣ <span data-i18n="settings_nav_apps">External apps</span></div>
+              <div class="settings-nav-item">≡ <span data-i18n="settings_nav_sync">Sync</span></div>
+              <div class="settings-nav-item">□ <span data-i18n="settings_nav_deps">Dependencies</span></div>
+              <div class="settings-nav-item">⌨ <span data-i18n="settings_nav_shortcuts">Shortcuts</span></div>
+              <div class="settings-nav-item">ⓘ <span data-i18n="settings_nav_about">About</span></div>
             </div>
-            <h3 data-i18n="f1_title">Multi-Repo Tabs</h3>
-            <p data-i18n="f1_desc">
-              Open multiple Git repositories in tabs, drag to reorder, and restore your previous session on next launch.
-              Drop a folder anywhere to add it.
-            </p>
-          </div>
-          <!-- f2: Branch & Worktree Management -->
-          <div class="feature-card fade-in">
-            <div class="feature-icon fi-indigo">
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <line x1="6" y1="3" x2="6" y2="15" />
-                <circle cx="18" cy="6" r="3" />
-                <circle cx="6" cy="18" r="3" />
-                <path d="M18 9a9 9 0 0 1-9 9" />
-              </svg>
+            <div class="settings-main">
+              <div class="setting-row">
+                <div>
+                  <strong data-i18n="setting_color">Color theme</strong>
+                  <p data-i18n="setting_color_desc">Goblin, shadcn/ui, and GitHub themes share the same UI contract.</p>
+                </div>
+                <span class="chip success">Goblin</span>
+              </div>
+              <div class="setting-row">
+                <div>
+                  <strong data-i18n="setting_sync">Auto-fetch</strong>
+                  <p data-i18n="setting_sync_desc">Fetches the active repository in the background.</p>
+                </div>
+                <span class="chip">2 min</span>
+              </div>
+              <div class="setting-row">
+                <div>
+                  <strong data-i18n="setting_shortcut">Keyboard shortcuts</strong>
+                  <p data-i18n="setting_shortcut_desc">Press <span class="kbd">?</span> to see all shortcuts.</p>
+                </div>
+                <span class="chip">⌥G</span>
+              </div>
+              <div class="setting-row">
+                <div>
+                  <strong data-i18n="setting_about">About</strong>
+                  <p>Goblin · v0.1.0 · 3287d86</p>
+                </div>
+                <span class="chip">GitHub</span>
+              </div>
             </div>
-            <h3 data-i18n="f2_title">Branch & Worktree Management</h3>
-            <p data-i18n="f2_desc">
-              Browse all branches with status signals. Create or remove worktrees, checkout, pull, push, and open
-              branches directly in Ghostty or VS Code.
-            </p>
-          </div>
-          <!-- f3: PR Context -->
-          <div class="feature-card fade-in">
-            <div class="feature-icon fi-green">
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <circle cx="18" cy="18" r="3" />
-                <circle cx="6" cy="6" r="3" />
-                <path d="M13 6h3a2 2 0 0 1 2 2v7" />
-                <line x1="6" y1="9" x2="6" y2="21" />
-              </svg>
-            </div>
-            <h3 data-i18n="f3_title">Pull Request Context</h3>
-            <p data-i18n="f3_desc">
-              See PR status, review state, CI check results, and merge readiness inline with each branch — powered by
-              the GitHub CLI.
-            </p>
-          </div>
-          <!-- f4: Commit Log & Status -->
-          <div class="feature-card fade-in">
-            <div class="feature-icon fi-amber">
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-              </svg>
-            </div>
-            <h3 data-i18n="f4_title">Commit Log & Status</h3>
-            <p data-i18n="f4_desc">
-              View commit history with diffs, inspect working tree changes per branch, and copy patches to the
-              clipboard. Auto-fetch keeps everything up to date.
-            </p>
-          </div>
-          <!-- f5: Keyboard-First -->
-          <div class="feature-card fade-in">
-            <div class="feature-icon fi-sky">
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <polyline points="7 15 12 20 17 15" />
-                <polyline points="7 9 12 4 17 9" />
-              </svg>
-            </div>
-            <h3 data-i18n="f5_title">Keyboard-First</h3>
-            <p data-i18n="f5_desc">
-              Navigate branches with j/k, switch repos with brackets, toggle views, and trigger actions — all without
-              leaving the keyboard. A configurable global shortcut wakes the window.
-            </p>
-          </div>
-          <!-- f6: Multilingual & Themed -->
-          <div class="feature-card fade-in">
-            <div class="feature-icon fi-purple">
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <line x1="2" y1="12" x2="22" y2="12" />
-                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-              </svg>
-            </div>
-            <h3 data-i18n="f6_title">Multilingual & Themed</h3>
-            <p data-i18n="f6_desc">
-              Supports English, Chinese, Korean, and Japanese with auto-detection. Switch between light, dark, and
-              system themes — all preferences persist across sessions.
-            </p>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- HOW IT WORKS -->
-    <section id="how-it-works" style="background: var(--gradient)">
-      <div class="container">
-        <div class="section-label" data-i18n="how_label">How It Works</div>
-        <h2 class="section-title" data-i18n="how_title">Three steps. Full picture.</h2>
-        <p class="section-desc" data-i18n="how_desc">
-          Point Goblin at your repositories and get a live overview of branches, status, and PRs.
-        </p>
-        <div class="steps">
-          <div class="step fade-in">
-            <div class="step-num">1</div>
-            <div class="step-content">
+      <section id="workflow">
+        <div class="container">
+          <div class="section-label" data-i18n="workflow_label">Workflow</div>
+          <h2 class="section-title" data-i18n="workflow_title">Open. Inspect. Act.</h2>
+          <p class="section-desc" data-i18n="workflow_desc">
+            Goblin keeps read-only context visible and puts high-frequency branch actions one keystroke away.
+          </p>
+          <div class="steps">
+            <div class="step fade-in">
+              <div class="step-num">1</div>
               <h3 data-i18n="s1_title">Open repositories</h3>
               <p data-i18n="s1_desc">
-                Add Git repositories via the file picker or drag-and-drop. Goblin opens each in a tab and restores your
-                session on next launch.
+                Open a local repo, clone a new one, or drop folders into the window. Goblin restores your workspace next
+                time.
               </p>
             </div>
-          </div>
-          <div class="step fade-in">
-            <div class="step-num">2</div>
-            <div class="step-content">
-              <h3 data-i18n="s2_title">Browse branches</h3>
+            <div class="step fade-in">
+              <div class="step-num">2</div>
+              <h3 data-i18n="s2_title">Inspect branch context</h3>
               <p data-i18n="s2_desc">
-                See every branch with its sync status, worktree info, latest commit, and linked pull request. Filter by
-                worktree state or search by name.
+                Review sync state, worktree status, commits, changes, PRs, checks, and terminal sessions without
+                switching tools.
+              </p>
+            </div>
+            <div class="step fade-in">
+              <div class="step-num">3</div>
+              <h3 data-i18n="s3_title">Act safely</h3>
+              <p data-i18n="s3_desc">
+                Run common branch actions, open editors or terminals, copy patches, refresh resources, and keep
+                destructive git work outside the app.
               </p>
             </div>
           </div>
-          <div class="step fade-in">
-            <div class="step-num">3</div>
-            <div class="step-content">
-              <h3 data-i18n="s3_title">Take action</h3>
-              <p data-i18n="s3_desc">
-                Checkout, pull, push, create worktrees, open in VS Code or Ghostty, and jump to GitHub — all from one
-                keyboard-driven interface.
-              </p>
+          <div class="cta fade-in">
+            <h2 data-i18n-html="cta_title">Ready to make branch work quieter?</h2>
+            <p data-i18n="cta_desc">Goblin is free, open-source, and MIT-licensed.</p>
+            <div class="actions" style="justify-content: center">
+              <a
+                class="button primary"
+                href="https://github.com/nano-props/goblin/releases"
+                target="_blank"
+                rel="noopener noreferrer"
+                data-i18n="btn_download"
+                >Download</a
+              >
+              <a
+                class="button"
+                href="https://github.com/nano-props/goblin"
+                target="_blank"
+                rel="noopener noreferrer"
+                data-i18n="btn_github"
+                >View on GitHub</a
+              >
             </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </main>
 
-    <!-- CTA -->
-    <div class="cta-section fade-in">
-      <h2 data-i18n-html="cta_title">Ready to tame<br />your branches?</h2>
-      <p data-i18n="cta_desc">Goblin is free, open-source, and MIT-licensed.</p>
-      <div class="hero-actions">
-        <a
-          href="https://github.com/nano-props/goblin/releases"
-          class="btn btn-primary"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            width="18"
-            height="18"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          <span data-i18n="btn_download">Download</span>
-        </a>
-        <a
-          href="https://github.com/nano-props/goblin"
-          class="btn btn-secondary"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <span data-i18n="btn_github">View on GitHub</span>
-        </a>
-      </div>
-    </div>
-
-    <!-- FOOTER -->
     <footer>
-      <p>
-        <span data-i18n="footer_made">Made by</span>
-        <a href="https://github.com/nano-props" target="_blank" rel="noopener noreferrer">nano</a> &middot; MIT License
-        &middot; Goblin
-      </p>
+      <span data-i18n="footer_text">Made by nano · MIT License · Goblin</span>
     </footer>
 
     <script>
       const i18n = {
         en: {
           nav_features: 'Features',
-          nav_how: 'How It Works',
-          hero_badge: 'macOS Desktop App',
-          hero_title: 'Branches and worktrees,<br/><span>at a glance</span>',
+          nav_settings: 'Settings',
+          nav_workflow: 'Workflow',
+          hero_badge: 'macOS desktop Git workspace',
+          hero_title: 'Branch work,<br />without the context switch.',
           hero_sub:
-            'A desktop app for managing Git branches and worktrees across multiple repositories. See status, PRs, and commit logs — checkout, sync, or open any worktree in one window.',
+            'Goblin keeps repositories, branches, worktrees, pull requests, logs, and terminals in one focused desktop window.',
           btn_download: 'Download',
-          btn_source: 'Source Code',
+          btn_source: 'Source code',
           btn_github: 'View on GitHub',
+          preview_branches: 'Branches',
           features_label: 'Features',
-          features_title: 'Everything about your branches,<br/>nothing in the way',
+          features_title: 'A desktop control room for active Git work.',
           features_desc:
-            "Goblin gives you a bird's-eye view of every branch, worktree, and pull request across all your repositories.",
-          f1_title: 'Multi-Repo Tabs',
+            'Goblin is built for juggling branches across multiple repos without losing terminal, editor, PR, or worktree context.',
+          f1_title: 'Multi-repo tabs',
           f1_desc:
-            'Open multiple Git repositories in tabs, drag to reorder, and restore your previous session on next launch. Drop a folder anywhere to add it.',
-          f2_title: 'Branch & Worktree Management',
+            'Open local repositories or clone new ones, keep them in tabs, and restore the last workspace on launch.',
+          f2_title: 'Branch and worktree actions',
           f2_desc:
-            'Browse all branches with status signals. Create or remove worktrees, checkout, pull, push, and open branches directly in Ghostty or VS Code.',
-          f3_title: 'Pull Request Context',
+            'Checkout, pull, push, create worktrees, open folders in editors, and reveal paths from one branch list.',
+          f3_title: 'PR and status signals',
           f3_desc:
-            'See PR status, review state, CI check results, and merge readiness inline with each branch — powered by the GitHub CLI.',
-          f4_title: 'Commit Log & Status',
+            'See sync state, dirty worktrees, PR review status, CI checks, and mergeability inline with each branch.',
+          f4_title: 'Keyboard-first navigation',
           f4_desc:
-            'View commit history with diffs, inspect working tree changes per branch, and copy patches to the clipboard. Auto-fetch keeps everything up to date.',
-          f5_title: 'Keyboard-First',
+            'Use j/k, arrows, repository shortcuts, and branch action keys. Customize the global shortcut or disable shortcuts entirely.',
+          f5_title: 'Managed terminals',
           f5_desc:
-            'Navigate branches with j/k, switch repos with brackets, toggle views, and trigger actions — all without leaving the keyboard. A configurable global shortcut wakes the window.',
-          f6_title: 'Multilingual & Themed',
+            'Run terminals inside the app, switch sessions, search output, replay terminal state, and keep context per repository.',
+          f6_title: 'Themes and languages',
           f6_desc:
-            'Supports English, Chinese, Korean, and Japanese with auto-detection. Switch between light, dark, and system themes — all preferences persist across sessions.',
-          how_label: 'How It Works',
-          how_title: 'Three steps. Full picture.',
-          how_desc: 'Point Goblin at your repositories and get a live overview of branches, status, and PRs.',
+            'Choose Goblin, shadcn/ui, or GitHub color themes, light/dark/system appearance, and English, Chinese, Korean, or Japanese.',
+          settings_label: 'Settings',
+          settings_title: 'One settings panel, every preference.',
+          settings_desc:
+            'Dependency notes, keyboard shortcuts, app integrations, sync behavior, themes, language, and About now live in a single Goblin-styled settings window.',
+          settings_nav_general: 'General',
+          settings_nav_apps: 'External apps',
+          settings_nav_sync: 'Sync',
+          settings_nav_deps: 'Dependencies',
+          settings_nav_shortcuts: 'Shortcuts',
+          settings_nav_about: 'About',
+          setting_color: 'Color theme',
+          setting_color_desc: 'Goblin, shadcn/ui, and GitHub themes share the same UI contract.',
+          setting_sync: 'Auto-fetch',
+          setting_sync_desc: 'Fetches the active repository in the background.',
+          setting_shortcut: 'Keyboard shortcuts',
+          setting_shortcut_desc: 'Press ? to see all shortcuts.',
+          setting_about: 'About',
+          workflow_label: 'Workflow',
+          workflow_title: 'Open. Inspect. Act.',
+          workflow_desc:
+            'Goblin keeps read-only context visible and puts high-frequency branch actions one keystroke away.',
           s1_title: 'Open repositories',
           s1_desc:
-            'Add Git repositories via the file picker or drag-and-drop. Goblin opens each in a tab and restores your session on next launch.',
-          s2_title: 'Browse branches',
+            'Open a local repo, clone a new one, or drop folders into the window. Goblin restores your workspace next time.',
+          s2_title: 'Inspect branch context',
           s2_desc:
-            'See every branch with its sync status, worktree info, latest commit, and linked pull request. Filter by worktree state or search by name.',
-          s3_title: 'Take action',
+            'Review sync state, worktree status, commits, changes, PRs, checks, and terminal sessions without switching tools.',
+          s3_title: 'Act safely',
           s3_desc:
-            'Checkout, pull, push, create worktrees, open in VS Code or Ghostty, and jump to GitHub — all from one keyboard-driven interface.',
-          cta_title: 'Ready to tame<br/>your branches?',
+            'Run common branch actions, open editors or terminals, copy patches, refresh resources, and keep destructive git work outside the app.',
+          cta_title: 'Ready to make branch work quieter?',
           cta_desc: 'Goblin is free, open-source, and MIT-licensed.',
-          footer_made: 'Made by',
+          footer_text: 'Made by nano · MIT License · Goblin',
         },
         zh: {
           nav_features: '功能',
-          nav_how: '使用方式',
-          hero_badge: 'macOS 桌面应用',
-          hero_title: '分支与工作树，<br/><span>一眼纵览</span>',
-          hero_sub:
-            '一个管理 Git 分支与工作树的桌面应用，支持同时打开多个仓库。查看状态、PR、提交记录——checkout、同步或打开任意工作树，一个窗口搞定。',
+          nav_settings: '设置',
+          nav_workflow: '工作流',
+          hero_badge: 'macOS 桌面 Git 工作区',
+          hero_title: '处理分支，<br />不再切换上下文。',
+          hero_sub: 'Goblin 把仓库、分支、工作树、Pull Request、日志和终端放进一个专注的桌面窗口。',
           btn_download: '下载',
           btn_source: '源代码',
-          btn_github: '在 GitHub 上查看',
-          features_label: '功能特性',
-          features_title: '关于分支的一切，<br/>毫无多余',
-          features_desc: 'Goblin 让你一眼纵览所有仓库中的分支、worktree 和 Pull Request。',
+          btn_github: '在 GitHub 查看',
+          preview_branches: '分支',
+          features_label: '功能',
+          features_title: '活跃 Git 工作的桌面控制台。',
+          features_desc: 'Goblin 面向多仓库分支协作，不丢失终端、编辑器、PR 或工作树上下文。',
           f1_title: '多仓库标签页',
-          f1_desc: '以标签页形式打开多个 Git 仓库，拖拽排序，下次启动自动恢复上次会话。把文件夹拖进窗口即可添加。',
-          f2_title: '分支与 Worktree 管理',
-          f2_desc:
-            '浏览所有分支及其状态信号。创建或删除 worktree，checkout、pull、push，直接在 Ghostty 或 VS Code 中打开分支。',
-          f3_title: 'Pull Request 上下文',
-          f3_desc: '在每个分支旁直接查看 PR 状态、Review 进度、CI 检查结果和合并就绪状态——由 GitHub CLI 驱动。',
-          f4_title: '提交日志与状态',
-          f4_desc: '查看带 diff 的提交历史，按分支检查工作区变更，并将补丁复制到剪贴板。自动 fetch 保持一切最新。',
-          f5_title: '键盘优先',
-          f5_desc: '用 j/k 浏览分支，用方括号切换仓库，切换视图，触发操作——全程键盘完成。可配置的全局快捷键唤醒窗口。',
-          f6_title: '多语言与主题',
-          f6_desc:
-            '支持英语、中文、韩语、日语并自动检测系统语言。在浅色、深色和跟随系统主题间切换——所有偏好跨会话保持。',
-          how_label: '使用方式',
-          how_title: '三步上手，全局纵览。',
-          how_desc: '把仓库交给 Goblin，即刻获得分支、状态和 PR 的实时概览。',
+          f1_desc: '打开本地仓库或克隆新仓库，以标签页管理，并在下次启动恢复上次工作区。',
+          f2_title: '分支与工作树操作',
+          f2_desc: '在同一个分支列表中切换、拉取、推送、创建工作树、用编辑器打开文件夹、在访达中显示路径。',
+          f3_title: 'PR 与状态信号',
+          f3_desc: '在分支旁直接查看同步状态、脏工作树、PR 评审、CI 检查和可合并状态。',
+          f4_title: '键盘优先导航',
+          f4_desc: '使用 j/k、方向键、仓库切换快捷键和分支操作键；也可以自定义全局快捷键或完全禁用快捷键。',
+          f5_title: '托管终端',
+          f5_desc: '在应用内运行终端、切换会话、搜索输出、回放终端状态，并按仓库保留上下文。',
+          f6_title: '主题与语言',
+          f6_desc: '支持 Goblin、shadcn/ui、GitHub 三套颜色主题，浅色/深色/跟随系统外观，以及英中韩日四种语言。',
+          settings_label: '设置',
+          settings_title: '一个设置面板，管理所有偏好。',
+          settings_desc: '依赖说明、键盘快捷键、外部应用、同步、主题、语言和关于信息都整合进 Goblin 风格的设置窗口。',
+          settings_nav_general: '通用',
+          settings_nav_apps: '外部应用',
+          settings_nav_sync: '同步',
+          settings_nav_deps: '依赖说明',
+          settings_nav_shortcuts: '快捷键',
+          settings_nav_about: '关于',
+          setting_color: '颜色主题',
+          setting_color_desc: 'Goblin、shadcn/ui 和 GitHub 主题共享同一套 UI 约定。',
+          setting_sync: '自动同步',
+          setting_sync_desc: '后台同步当前仓库的远端更新。',
+          setting_shortcut: '键盘快捷键',
+          setting_shortcut_desc: '按 ? 查看所有快捷键。',
+          setting_about: '关于',
+          workflow_label: '工作流',
+          workflow_title: '打开，检查，行动。',
+          workflow_desc: 'Goblin 让只读上下文始终可见，并把高频分支操作放到一个快捷键以内。',
           s1_title: '打开仓库',
-          s1_desc: '通过文件选择器或拖放添加 Git 仓库。Goblin 将每个仓库打开为标签页，并在下次启动时恢复会话。',
-          s2_title: '浏览分支',
-          s2_desc:
-            '查看每个分支的同步状态、worktree 信息、最新提交和关联的 Pull Request。按 worktree 状态过滤或按名称搜索。',
-          s3_title: '采取行动',
-          s3_desc:
-            'Checkout、pull、push、创建 worktree、在 VS Code 或 Ghostty 中打开、跳转到 GitHub——一切都在一个键盘驱动的界面中完成。',
-          cta_title: '让每一条分支<br/>都清晰可控',
+          s1_desc: '打开本地仓库、克隆新仓库，或把文件夹拖进窗口。Goblin 会在下次启动恢复工作区。',
+          s2_title: '检查分支上下文',
+          s2_desc: '无需切换工具即可查看同步状态、工作树状态、提交、变更、PR、检查和终端会话。',
+          s3_title: '安全行动',
+          s3_desc: '执行常用分支操作、打开编辑器或终端、复制补丁、刷新资源，同时把破坏性 git 操作留在应用之外。',
+          cta_title: '准备让分支工作安静下来？',
           cta_desc: 'Goblin 免费、开源，基于 MIT 许可证。',
-          footer_made: '由',
+          footer_text: '由 nano 制作 · MIT License · Goblin',
         },
         ko: {
           nav_features: '기능',
-          nav_how: '사용 방법',
-          hero_badge: 'macOS 데스크톱 앱',
-          hero_title: '브랜치와 워크트리,<br/><span>한눈에 파악</span>',
+          nav_settings: '설정',
+          nav_workflow: '워크플로',
+          hero_badge: 'macOS 데스크톱 Git 작업 영역',
+          hero_title: '브랜치 작업,<br />컨텍스트 전환 없이.',
           hero_sub:
-            '여러 리포지토리의 Git 브랜치와 워크트리를 관리하는 데스크톱 앱. 상태, PR, 커밋 로그를 확인하고 — 체크아웃, 동기화, 워크트리 열기를 한 창에서 수행하세요.',
+            'Goblin은 리포지토리, 브랜치, 워크트리, Pull Request, 로그, 터미널을 하나의 집중된 데스크톱 창에 모읍니다.',
           btn_download: '다운로드',
           btn_source: '소스 코드',
           btn_github: 'GitHub에서 보기',
+          preview_branches: '브랜치',
           features_label: '기능',
-          features_title: '브랜치에 대한 모든 것,<br/>방해는 제로',
-          features_desc: 'Goblin은 모든 리포지토리의 브랜치, 워크트리, Pull Request를 한눈에 보여줍니다.',
+          features_title: '활성 Git 작업을 위한 데스크톱 컨트롤 룸.',
+          features_desc:
+            'Goblin은 여러 리포의 브랜치를 다루면서 터미널, 에디터, PR, 워크트리 컨텍스트를 잃지 않도록 설계되었습니다.',
           f1_title: '멀티 리포 탭',
-          f1_desc:
-            '여러 Git 리포지토리를 탭으로 열고, 드래그로 순서를 바꾸고, 다음 실행 시 이전 세션을 복원합니다. 폴더를 드롭해서 추가할 수 있습니다.',
-          f2_title: '브랜치 & 워크트리 관리',
-          f2_desc:
-            '상태 신호와 함께 모든 브랜치를 탐색합니다. 워크트리를 생성/제거하고, 체크아웃, 풀, 푸시하고, Ghostty나 VS Code에서 바로 열 수 있습니다.',
-          f3_title: 'Pull Request 컨텍스트',
-          f3_desc:
-            '각 브랜치 옆에 PR 상태, 리뷰 상태, CI 체크 결과, 병합 준비 상태를 인라인으로 확인 — GitHub CLI로 구동됩니다.',
-          f4_title: '커밋 로그 & 상태',
+          f1_desc: '로컬 리포를 열거나 새로 클론하고 탭으로 유지하며 다음 실행 시 마지막 작업 영역을 복원합니다.',
+          f2_title: '브랜치와 워크트리 동작',
+          f2_desc: '한 브랜치 목록에서 체크아웃, 풀, 푸시, 워크트리 생성, 에디터 열기, 경로 표시를 수행합니다.',
+          f3_title: 'PR 및 상태 신호',
+          f3_desc: '각 브랜치 옆에서 동기화 상태, dirty 워크트리, PR 리뷰, CI 체크, 병합 가능 여부를 확인합니다.',
+          f4_title: '키보드 우선 내비게이션',
           f4_desc:
-            'diff가 포함된 커밋 히스토리를 보고, 브랜치별 워킹 트리 변경 사항을 검사하고, 패치를 클립보드에 복사합니다. 자동 fetch가 모든 것을 최신 상태로 유지합니다.',
-          f5_title: '키보드 우선',
+            'j/k, 화살표, 리포 전환 단축키, 브랜치 액션 키를 사용하고 전역 단축키를 사용자화하거나 끌 수 있습니다.',
+          f5_title: '관리형 터미널',
           f5_desc:
-            'j/k로 브랜치 탐색, 대괄호로 리포 전환, 뷰 토글, 액션 트리거 — 키보드에서 손을 떼지 않고 모든 작업을 수행합니다. 설정 가능한 글로벌 단축키로 창을 깨웁니다.',
-          f6_title: '다국어 & 테마',
+            '앱 안에서 터미널을 실행하고, 세션을 전환하고, 출력을 검색하고, 터미널 상태를 재생하며 리포별 컨텍스트를 유지합니다.',
+          f6_title: '테마와 언어',
           f6_desc:
-            '영어, 중국어, 한국어, 일본어를 자동 감지로 지원합니다. 라이트, 다크, 시스템 테마 간 전환 — 모든 설정이 세션 간 유지됩니다.',
-          how_label: '사용 방법',
-          how_title: '세 단계. 전체 그림.',
-          how_desc: 'Goblin에 리포지토리를 연결하면 브랜치, 상태, PR의 실시간 개요를 얻을 수 있습니다.',
+            'Goblin, shadcn/ui, GitHub 색상 테마와 라이트/다크/시스템 외관, 영어/중국어/한국어/일본어를 지원합니다.',
+          settings_label: '설정',
+          settings_title: '하나의 설정 패널, 모든 선호 설정.',
+          settings_desc:
+            '의존성 안내, 키보드 단축키, 앱 통합, 동기화, 테마, 언어, 정보를 하나의 Goblin 스타일 설정 창에 모았습니다.',
+          settings_nav_general: '일반',
+          settings_nav_apps: '외부 앱',
+          settings_nav_sync: '동기화',
+          settings_nav_deps: '의존성',
+          settings_nav_shortcuts: '단축키',
+          settings_nav_about: '정보',
+          setting_color: '색상 테마',
+          setting_color_desc: 'Goblin, shadcn/ui, GitHub 테마가 같은 UI 계약을 공유합니다.',
+          setting_sync: '자동 fetch',
+          setting_sync_desc: '활성 리포지토리를 백그라운드에서 가져옵니다.',
+          setting_shortcut: '키보드 단축키',
+          setting_shortcut_desc: '? 키로 모든 단축키를 봅니다.',
+          setting_about: '정보',
+          workflow_label: '워크플로',
+          workflow_title: '열고, 확인하고, 실행하세요.',
+          workflow_desc: 'Goblin은 읽기 전용 컨텍스트를 항상 보이게 하고 자주 쓰는 브랜치 작업을 한 키 거리로 둡니다.',
           s1_title: '리포지토리 열기',
           s1_desc:
-            '파일 피커나 드래그 앤 드롭으로 Git 리포지토리를 추가합니다. Goblin은 각 리포를 탭으로 열고 다음 실행 시 세션을 복원합니다.',
-          s2_title: '브랜치 탐색',
+            '로컬 리포를 열고 새 리포를 클론하거나 폴더를 창에 드롭합니다. Goblin은 다음 실행 시 작업 영역을 복원합니다.',
+          s2_title: '브랜치 컨텍스트 확인',
           s2_desc:
-            '모든 브랜치의 동기화 상태, 워크트리 정보, 최신 커밋, 연결된 Pull Request를 확인합니다. 워크트리 상태로 필터링하거나 이름으로 검색하세요.',
-          s3_title: '액션 실행',
+            '도구를 바꾸지 않고 동기화 상태, 워크트리 상태, 커밋, 변경 사항, PR, 체크, 터미널 세션을 검토합니다.',
+          s3_title: '안전하게 실행',
           s3_desc:
-            '체크아웃, 풀, 푸시, 워크트리 생성, VS Code나 Ghostty에서 열기, GitHub으로 이동 — 모든 것을 키보드 중심 인터페이스에서 수행합니다.',
-          cta_title: '브랜치를 길들일<br/>준비가 되셨나요?',
+            '일반적인 브랜치 작업, 에디터/터미널 열기, 패치 복사, 리소스 새로 고침을 실행하고 파괴적인 git 작업은 앱 밖에 둡니다.',
+          cta_title: '브랜치 작업을 더 조용하게 만들 준비가 되셨나요?',
           cta_desc: 'Goblin은 무료 오픈소스이며 MIT 라이선스입니다.',
-          footer_made: '만든이',
+          footer_text: 'nano 제작 · MIT License · Goblin',
         },
         ja: {
           nav_features: '機能',
-          nav_how: '使い方',
-          hero_badge: 'macOS デスクトップアプリ',
-          hero_title: 'ブランチとワークツリーを<br/><span>一目で把握</span>',
+          nav_settings: '設定',
+          nav_workflow: 'ワークフロー',
+          hero_badge: 'macOS デスクトップ Git ワークスペース',
+          hero_title: 'ブランチ作業を、<br />コンテキスト切替なしで。',
           hero_sub:
-            '複数リポジトリの Git ブランチとワークツリーを管理するデスクトップアプリ。ステータス、PR、コミットログを確認し — チェックアウト、同期、ワークツリーを開く操作を一画面で。',
+            'Goblin はリポジトリ、ブランチ、ワークツリー、Pull Request、ログ、ターミナルをひとつの集中したデスクトップウィンドウにまとめます。',
           btn_download: 'ダウンロード',
           btn_source: 'ソースコード',
           btn_github: 'GitHub で見る',
+          preview_branches: 'ブランチ',
           features_label: '機能',
-          features_title: 'ブランチのすべてを、<br/>邪魔なく',
-          features_desc: 'Goblin はすべてのリポジトリのブランチ、ワークツリー、Pull Request を俯瞰できます。',
+          features_title: 'アクティブな Git 作業のためのデスクトップ管制室。',
+          features_desc:
+            'Goblin は複数リポジトリのブランチを扱いながら、ターミナル、エディタ、PR、ワークツリーの文脈を失わないようにします。',
           f1_title: 'マルチリポタブ',
           f1_desc:
-            '複数の Git リポジトリをタブで開き、ドラッグで並べ替え、次回起動時に前回のセッションを復元します。フォルダをドロップして追加できます。',
-          f2_title: 'ブランチ & ワークツリー管理',
+            'ローカルリポジトリを開く、または新規クローンし、タブで保持して次回起動時に最後のワークスペースを復元します。',
+          f2_title: 'ブランチとワークツリー操作',
           f2_desc:
-            'ステータスシグナル付きですべてのブランチを閲覧。ワークツリーの作成・削除、チェックアウト、プル、プッシュ、Ghostty や VS Code で直接オープン。',
-          f3_title: 'Pull Request コンテキスト',
+            'ひとつのブランチリストからチェックアウト、pull、push、ワークツリー作成、エディタで開く、パス表示を実行できます。',
+          f3_title: 'PR と状態シグナル',
           f3_desc:
-            '各ブランチの横に PR ステータス、レビュー状態、CI チェック結果、マージ準備状況をインラインで表示 — GitHub CLI で駆動。',
-          f4_title: 'コミットログ & ステータス',
+            '各ブランチの横で同期状態、dirty ワークツリー、PR レビュー、CI チェック、マージ可能性を確認できます。',
+          f4_title: 'キーボードファースト操作',
           f4_desc:
-            'diff 付きコミット履歴の表示、ブランチごとのワーキングツリー変更の確認、パッチのクリップボードコピー。自動 fetch で常に最新。',
-          f5_title: 'キーボードファースト',
+            'j/k、矢印、リポジトリ切替、ブランチアクションキーを使い、グローバルショートカットの変更や無効化もできます。',
+          f5_title: '管理されたターミナル',
           f5_desc:
-            'j/k でブランチ移動、ブラケットでリポ切替、ビュー切替、アクション実行 — すべてキーボードから。設定可能なグローバルショートカットでウィンドウを呼び出し。',
-          f6_title: '多言語 & テーマ',
+            'アプリ内でターミナルを実行し、セッション切替、出力検索、状態リプレイ、リポジトリごとの文脈保持ができます。',
+          f6_title: 'テーマと言語',
           f6_desc:
-            '英語、中国語、韓国語、日本語を自動検出でサポート。ライト、ダーク、システムテーマを切り替え — すべての設定がセッション間で保持されます。',
-          how_label: '使い方',
-          how_title: '3ステップ。全体像を把握。',
-          how_desc: 'Goblin にリポジトリを指定するだけで、ブランチ、ステータス、PR のライブ概要を取得できます。',
+            'Goblin、shadcn/ui、GitHub のカラーテーマ、ライト/ダーク/システム外観、英中韓日の言語をサポートします。',
+          settings_label: '設定',
+          settings_title: 'ひとつの設定パネルですべての環境設定を。',
+          settings_desc:
+            '依存関係の説明、キーボードショートカット、アプリ連携、同期、テーマ、言語、情報を Goblin スタイルの設定ウィンドウに統合しました。',
+          settings_nav_general: '一般',
+          settings_nav_apps: '外部アプリ',
+          settings_nav_sync: '同期',
+          settings_nav_deps: '依存関係',
+          settings_nav_shortcuts: 'ショートカット',
+          settings_nav_about: '情報',
+          setting_color: 'カラーテーマ',
+          setting_color_desc: 'Goblin、shadcn/ui、GitHub テーマは同じ UI 契約を共有します。',
+          setting_sync: '自動 fetch',
+          setting_sync_desc: 'アクティブなリポジトリをバックグラウンドで fetch します。',
+          setting_shortcut: 'キーボードショートカット',
+          setting_shortcut_desc: '? ですべてのショートカットを表示します。',
+          setting_about: '情報',
+          workflow_label: 'ワークフロー',
+          workflow_title: '開く。確認する。実行する。',
+          workflow_desc: 'Goblin は読み取り専用の文脈を表示し続け、頻繁なブランチ操作をワンキー以内に置きます。',
           s1_title: 'リポジトリを開く',
           s1_desc:
-            'ファイルピッカーまたはドラッグ＆ドロップで Git リポジトリを追加。Goblin は各リポをタブで開き、次回起動時にセッションを復元します。',
-          s2_title: 'ブランチを閲覧',
+            'ローカルリポジトリを開く、新規クローンする、またはフォルダをウィンドウへドロップします。Goblin は次回起動時にワークスペースを復元します。',
+          s2_title: 'ブランチ文脈を確認',
           s2_desc:
-            'すべてのブランチの同期状態、ワークツリー情報、最新コミット、リンクされた Pull Request を確認。ワークツリー状態でフィルタリングまたは名前で検索。',
-          s3_title: 'アクションを実行',
+            'ツールを切り替えずに同期状態、ワークツリー状態、コミット、変更、PR、チェック、ターミナルセッションを確認します。',
+          s3_title: '安全に実行',
           s3_desc:
-            'チェックアウト、プル、プッシュ、ワークツリー作成、VS Code や Ghostty で開く、GitHub へジャンプ — すべてをキーボード駆動のインターフェースから。',
-          cta_title: 'ブランチを手懐ける<br/>準備はできましたか？',
+            '一般的なブランチ操作、エディタやターミナルを開く、パッチコピー、リソース更新を実行し、破壊的な git 操作はアプリ外に置きます。',
+          cta_title: 'ブランチ作業をもっと静かにしませんか？',
           cta_desc: 'Goblin は無料・オープンソース、MIT ライセンスです。',
-          footer_made: '作者',
+          footer_text: 'nano 制作 · MIT License · Goblin',
         },
       }
 
@@ -1261,7 +1465,6 @@
 
       setLang(currentLang)
 
-      /* Theme toggle */
       function getEffectiveTheme() {
         return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
       }

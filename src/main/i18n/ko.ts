@@ -59,8 +59,6 @@ export const ko: Record<DictKey, string> = {
 
   // ---- Topbar ------------------------------------------------------------
   'topbar.open': '열기',
-  'topbar.dependencies': '의존성 안내',
-  'topbar.help': '키보드 단축키 (?)',
   'topbar.settings': '설정 (⌘,)',
 
   // ---- Dependencies ------------------------------------------------------
@@ -123,11 +121,7 @@ export const ko: Record<DictKey, string> = {
   'empty.title': '열린 리포지토리가 없습니다',
   'empty.body.before': '상단 탭 막대의 ',
   'empty.body.open-label': '열기',
-  'empty.body.middle':
-    ' 를 눌러 git 리포지토리를 추가하세요. 여러 리포지토리를 동시에 열고 상단 탭 막대에서 전환할 수 있습니다. ',
-  'empty.body.after': ' 로 단축키 보기.',
-  'empty.body.after-shortcuts-disabled':
-    ' 를 눌러 git 리포지토리를 추가하세요. 여러 리포지토리를 동시에 열고 상단 탭 막대에서 전환할 수 있습니다.',
+  'empty.body.after': '를 눌러 Git 리포지토리를 추가하거나, 리포지토리 폴더를 이 창으로 드롭하세요.',
 
   // ---- Drag and drop -----------------------------------------------------
   'drop.title': '놓아서 리포지토리 열기',
@@ -193,12 +187,13 @@ export const ko: Record<DictKey, string> = {
   'branch-status.copy-worktree-path': '워크트리 경로 복사',
   'branch-status.copied': '복사됨',
   'branch-status.signal.branch': '브랜치',
-  'branch-status.signal.remote': '원격',
+  'branch-status.signal.remote': '업스트림',
   'branch-status.signal.sync': '동기화',
   'branch-status.signal.merge': '기준선',
   'branch-status.signal.pr': 'PR',
   'branch-status.signal.worktree': '워크트리',
   'branch-status.sync.up-to-date': '최신',
+  'branch-status.upstream.pr-only': 'PR만',
   'branch-status.worktree.none': '워크트리 없음',
   'branch-status.worktree.locked': '잠김',
   'branch-status.sync.ahead': '{n} 앞섬',
@@ -359,7 +354,7 @@ export const ko: Record<DictKey, string> = {
   'settings.title': '설정',
   'settings.appearance': '외관',
   'settings.color-theme': '색상 테마',
-  'settings.color-theme.goblin': 'Goblin (기본)',
+  'settings.color-theme.goblin': 'Goblin',
   'settings.color-theme.shadcn': 'shadcn/ui',
   'settings.color-theme.github': 'GitHub',
   'settings.theme.auto': '자동',
@@ -374,6 +369,9 @@ export const ko: Record<DictKey, string> = {
   'settings.group.general': '일반',
   'settings.group.apps': '외부 앱',
   'settings.group.sync': '동기화',
+  'settings.nav.dependencies': '의존성',
+  'settings.nav.shortcuts': '단축키',
+  'settings.about': '정보',
   'settings.terminal': '터미널',
   'settings.terminal.auto': '자동',
   'settings.terminal.ghostty': 'Ghostty',
@@ -384,6 +382,7 @@ export const ko: Record<DictKey, string> = {
   'settings.editor.cursor': 'Cursor',
   'settings.editor.windsurf': 'Windsurf',
   'settings.fetch': '자동 동기화',
+  'settings.fetch-hint': '활성 리포지토리를 백그라운드에서 가져옵니다.',
   'settings.fetch.off': '끄기',
   'settings.fetch.30s': '30 초',
   'settings.fetch.1m': '1 분',

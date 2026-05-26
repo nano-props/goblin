@@ -66,8 +66,6 @@ export const ja: Record<DictKey, string> = {
 
   // ---- Topbar ------------------------------------------------------------
   'topbar.open': '開く',
-  'topbar.dependencies': '依存関係の説明',
-  'topbar.help': 'キーボードショートカット (?)',
   'topbar.settings': '設定 (⌘,)',
 
   // ---- Dependencies ------------------------------------------------------
@@ -130,11 +128,7 @@ export const ja: Record<DictKey, string> = {
   'empty.title': 'リポジトリが開かれていません',
   'empty.body.before': '上部タブバーの ',
   'empty.body.open-label': '開く',
-  'empty.body.middle':
-    ' から git リポジトリを追加できます。複数のリポジトリを開いて、上部タブバーで切り替えられます。 ',
-  'empty.body.after': ' でショートカットを表示します。',
-  'empty.body.after-shortcuts-disabled':
-    ' から git リポジトリを追加できます。複数のリポジトリを開いて、上部タブバーで切り替えられます。',
+  'empty.body.after': ' から Git リポジトリを追加するか、リポジトリフォルダをこのウィンドウにドロップします。',
 
   // ---- Drag and drop -----------------------------------------------------
   'drop.title': 'ドロップしてリポジトリを開く',
@@ -200,12 +194,13 @@ export const ja: Record<DictKey, string> = {
   'branch-status.copy-worktree-path': 'ワークツリーパスをコピー',
   'branch-status.copied': 'コピー済み',
   'branch-status.signal.branch': 'ブランチ',
-  'branch-status.signal.remote': 'リモート',
+  'branch-status.signal.remote': '上流',
   'branch-status.signal.sync': '同期',
   'branch-status.signal.merge': 'ベースライン',
   'branch-status.signal.pr': 'PR',
   'branch-status.signal.worktree': 'ワークツリー',
   'branch-status.sync.up-to-date': '最新',
+  'branch-status.upstream.pr-only': 'PR のみ',
   'branch-status.worktree.none': 'ワークツリーなし',
   'branch-status.worktree.locked': 'ロック中',
   'branch-status.sync.ahead': '{n} 件 ahead',
@@ -366,7 +361,7 @@ export const ja: Record<DictKey, string> = {
   'settings.title': '設定',
   'settings.appearance': '外観',
   'settings.color-theme': 'カラーテーマ',
-  'settings.color-theme.goblin': 'Goblin（デフォルト）',
+  'settings.color-theme.goblin': 'Goblin',
   'settings.color-theme.shadcn': 'shadcn/ui',
   'settings.color-theme.github': 'GitHub',
   'settings.theme.auto': '自動',
@@ -381,6 +376,9 @@ export const ja: Record<DictKey, string> = {
   'settings.group.general': '一般',
   'settings.group.apps': '外部アプリ',
   'settings.group.sync': '同期',
+  'settings.nav.dependencies': '依存関係',
+  'settings.nav.shortcuts': 'ショートカット',
+  'settings.about': '情報',
   'settings.terminal': 'ターミナル',
   'settings.terminal.auto': '自動',
   'settings.terminal.ghostty': 'Ghostty',
@@ -391,6 +389,7 @@ export const ja: Record<DictKey, string> = {
   'settings.editor.cursor': 'Cursor',
   'settings.editor.windsurf': 'Windsurf',
   'settings.fetch': '自動 fetch',
+  'settings.fetch-hint': 'アクティブなリポジトリをバックグラウンドで fetch します。',
   'settings.fetch.off': 'オフ',
   'settings.fetch.30s': '30 秒',
   'settings.fetch.1m': '1 分',

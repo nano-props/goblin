@@ -1,24 +1,20 @@
-// Top app bar. Holds ambient utilities (help / settings).
+// Top app bar. Holds the ambient settings entry.
 // The .topbar CSS rule turns this into the OS drag region; child buttons
 // opt out via -webkit-app-region: no-drag (set globally on `button` and
 // any element with `data-interactive`).
 
-import { Keyboard, PackageCheck, Settings } from 'lucide-react'
+import { Settings } from 'lucide-react'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { Tip } from '#/renderer/components/Tip.tsx'
 import { Logo } from '#/renderer/components/Logo.tsx'
 import { Button } from '#/renderer/components/ui/button.tsx'
-import { useSettingsStore } from '#/renderer/stores/settings.ts'
 
 interface Props {
   onOpenSettings: () => void
-  onShowDependencies: () => void
-  onShowHelp: () => void
 }
 
-export function Topbar({ onOpenSettings, onShowDependencies, onShowHelp }: Props) {
+export function Topbar({ onOpenSettings }: Props) {
   const t = useT()
-  const shortcutsDisabled = useSettingsStore((s) => s.shortcutsDisabled)
 
   return (
     <div className="topbar relative flex h-10 items-center gap-2 border-b border-separator bg-background text-sm">
@@ -38,25 +34,8 @@ export function Topbar({ onOpenSettings, onShowDependencies, onShowHelp }: Props
       {/* Topbar actions are ghost-icon-only — same idiom as macOS title
        * bars and the deck-app reference: hover surfaces the button,
        * tooltips name the action. */}
-      <Tip label={t('topbar.dependencies')}>
-        <Button variant="ghost" size="icon" onClick={onShowDependencies} aria-label={t('topbar.dependencies')}>
-          <PackageCheck />
-        </Button>
-      </Tip>
-      {!shortcutsDisabled && (
-        <Tip label={t('topbar.help')}>
-          <Button variant="ghost" size="icon" onClick={onShowHelp} aria-label={t('topbar.help')}>
-            <Keyboard />
-          </Button>
-        </Tip>
-      )}
-      <Tip label={shortcutsDisabled ? t('settings.title') : t('topbar.settings')}>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onOpenSettings}
-          aria-label={shortcutsDisabled ? t('settings.title') : t('topbar.settings')}
-        >
+      <Tip label={t('topbar.settings')}>
+        <Button variant="ghost" size="icon" onClick={() => onOpenSettings()} aria-label={t('topbar.settings')}>
           <Settings />
         </Button>
       </Tip>

@@ -58,8 +58,6 @@ export const zh: Record<DictKey, string> = {
 
   // ---- Topbar ------------------------------------------------------------
   'topbar.open': '打开',
-  'topbar.dependencies': '依赖说明',
-  'topbar.help': '键盘快捷键 (?)',
   'topbar.settings': '设置 (⌘,)',
 
   // ---- Dependencies ------------------------------------------------------
@@ -122,9 +120,7 @@ export const zh: Record<DictKey, string> = {
   'empty.title': '没有打开的仓库',
   'empty.body.before': '点击顶部标签栏的 ',
   'empty.body.open-label': '打开',
-  'empty.body.middle': ' 添加一个 git 仓库。可以同时打开多个仓库，在顶部标签栏切换。按 ',
-  'empty.body.after': ' 查看快捷键。',
-  'empty.body.after-shortcuts-disabled': ' 添加一个 git 仓库。可以同时打开多个仓库，在顶部标签栏切换。',
+  'empty.body.after': ' 添加一个 Git 仓库，或把仓库文件夹拖到窗口中。',
 
   // ---- Drag and drop -----------------------------------------------------
   'drop.title': '松手打开仓库',
@@ -190,12 +186,13 @@ export const zh: Record<DictKey, string> = {
   'branch-status.copy-worktree-path': '复制工作树路径',
   'branch-status.copied': '已复制',
   'branch-status.signal.branch': '分支',
-  'branch-status.signal.remote': '远端',
+  'branch-status.signal.remote': '上游',
   'branch-status.signal.sync': '同步',
   'branch-status.signal.merge': '基线',
   'branch-status.signal.pr': 'PR',
   'branch-status.signal.worktree': '工作树',
   'branch-status.sync.up-to-date': '已同步',
+  'branch-status.upstream.pr-only': '仅 PR',
   'branch-status.worktree.none': '没有工作树',
   'branch-status.worktree.locked': '已锁定',
   'branch-status.sync.ahead': '领先 {n}',
@@ -354,7 +351,7 @@ export const zh: Record<DictKey, string> = {
   'settings.title': '设置',
   'settings.appearance': '外观',
   'settings.color-theme': '颜色主题',
-  'settings.color-theme.goblin': 'Goblin（默认）',
+  'settings.color-theme.goblin': 'Goblin',
   'settings.color-theme.shadcn': 'shadcn/ui',
   'settings.color-theme.github': 'GitHub',
   'settings.theme.auto': '跟随系统',
@@ -369,6 +366,9 @@ export const zh: Record<DictKey, string> = {
   'settings.group.general': '通用',
   'settings.group.apps': '外部应用',
   'settings.group.sync': '同步',
+  'settings.nav.dependencies': '依赖说明',
+  'settings.nav.shortcuts': '快捷键',
+  'settings.about': '关于',
   'settings.terminal': '终端',
   'settings.terminal.auto': '自动',
   'settings.terminal.ghostty': 'Ghostty',
@@ -379,6 +379,7 @@ export const zh: Record<DictKey, string> = {
   'settings.editor.cursor': 'Cursor',
   'settings.editor.windsurf': 'Windsurf',
   'settings.fetch': '自动同步',
+  'settings.fetch-hint': '后台同步当前仓库的远端更新；关闭后仅手动刷新。',
   'settings.fetch.off': '关闭',
   'settings.fetch.30s': '30 秒',
   'settings.fetch.1m': '1 分钟',

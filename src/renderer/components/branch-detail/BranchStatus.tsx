@@ -115,7 +115,11 @@ export function BranchStatus({ detail, layout }: Props) {
   ) : (
     <StatusChip tone="attention">{t('branches.no-upstream')}</StatusChip>
   )
-  const remoteAfter = branch.trackingGone ? <StatusChip tone="attention">{t('branches.gone')}</StatusChip> : undefined
+  const remoteAfter = branch.trackingGone ? (
+    <StatusChip tone="attention">{t('branches.gone')}</StatusChip>
+  ) : !branch.tracking && pullRequest ? (
+    <StatusChip>{t('branch-status.upstream.pr-only')}</StatusChip>
+  ) : undefined
 
   const roleChips = hasRole ? (
     <>

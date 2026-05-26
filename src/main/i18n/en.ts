@@ -66,8 +66,6 @@ export const en = {
 
   // ---- Topbar -------------------------------------------------------------
   'topbar.open': 'Open',
-  'topbar.dependencies': 'Dependency notes',
-  'topbar.help': 'Keyboard shortcuts (?)',
   'topbar.settings': 'Settings (⌘,)',
 
   // ---- Dependencies -------------------------------------------------------
@@ -128,15 +126,11 @@ export const en = {
 
   // ---- Empty state --------------------------------------------------------
   'empty.title': 'No repository open',
-  // Body split into segments so React renders the bold/kbd parts as real
-  // elements (no dangerouslySetInnerHTML).
+  // Body split into segments so React renders the highlighted label as a real
+  // element (no dangerouslySetInnerHTML).
   'empty.body.before': 'Click ',
   'empty.body.open-label': 'Open',
-  'empty.body.middle':
-    ' in the tab strip above to add a git repository. You can keep multiple repositories open and switch between them there. Press ',
-  'empty.body.after': ' for shortcuts.',
-  'empty.body.after-shortcuts-disabled':
-    ' in the tab strip above to add a git repository. You can keep multiple repositories open and switch between them there.',
+  'empty.body.after': ' in the tab strip to add a Git repository, or drop a repository folder into this window.',
 
   // ---- Drag and drop ------------------------------------------------------
   'drop.title': 'Drop to open repository',
@@ -202,12 +196,13 @@ export const en = {
   'branch-status.copy-worktree-path': 'Copy worktree path',
   'branch-status.copied': 'Copied',
   'branch-status.signal.branch': 'Branch',
-  'branch-status.signal.remote': 'Remote',
+  'branch-status.signal.remote': 'Upstream',
   'branch-status.signal.sync': 'Sync',
   'branch-status.signal.merge': 'Baseline',
   'branch-status.signal.pr': 'PR',
   'branch-status.signal.worktree': 'Worktree',
   'branch-status.sync.up-to-date': 'up to date',
+  'branch-status.upstream.pr-only': 'PR only',
   'branch-status.worktree.none': 'no worktree',
   'branch-status.worktree.locked': 'locked',
   'branch-status.sync.ahead': '{n} ahead',
@@ -366,7 +361,7 @@ export const en = {
   'settings.title': 'Settings',
   'settings.appearance': 'Appearance',
   'settings.color-theme': 'Color theme',
-  'settings.color-theme.goblin': 'Goblin (default)',
+  'settings.color-theme.goblin': 'Goblin',
   'settings.color-theme.shadcn': 'shadcn/ui',
   'settings.color-theme.github': 'GitHub',
   'settings.theme.auto': 'Auto',
@@ -381,6 +376,9 @@ export const en = {
   'settings.group.general': 'General',
   'settings.group.apps': 'External apps',
   'settings.group.sync': 'Sync',
+  'settings.nav.dependencies': 'Dependencies',
+  'settings.nav.shortcuts': 'Shortcuts',
+  'settings.about': 'About',
   'settings.terminal': 'Terminal',
   'settings.terminal.auto': 'Auto',
   'settings.terminal.ghostty': 'Ghostty',
@@ -391,6 +389,7 @@ export const en = {
   'settings.editor.cursor': 'Cursor',
   'settings.editor.windsurf': 'Windsurf',
   'settings.fetch': 'Auto-fetch',
+  'settings.fetch-hint': 'Fetches the active repository in the background.',
   'settings.fetch.off': 'Off',
   'settings.fetch.30s': '30 sec',
   'settings.fetch.1m': '1 min',
