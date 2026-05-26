@@ -3,6 +3,7 @@ import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { repoOperation } from '#/renderer/stores/repos/runtime.ts'
 import { startResource } from '#/renderer/stores/repos/resources.ts'
 import { replaceRepo } from '#/renderer/stores/repos/helpers.ts'
+import { getBranchActionCapabilities } from '#/renderer/hooks/useBranchActions.tsx'
 import {
   createBranch,
   installGoblinTestBridge,
@@ -57,6 +58,43 @@ function installSuccessfulCreateWorktreeBridge(options?: { onSnapshot?: () => vo
     'repo.pullRequests': async () => [],
   })
 }
+
+describe('branch action capabilities', () => {
+  test('gates remote-only actions when a repo transitions to local-only', () => {
+    const branch = createBranch('feature/local', { worktreePath: '/tmp/gbl-branch-actions-test-worktree' })
+    seedRepoState({
+      id: REPO_ID,
+      branches: [branch],
+      remote: {
+        remotes: ['origin'],
+        hasRemotes: true,
+        hasGitHubRemote: true,
+      },
+    })
+    let repo = useReposStore.getState().repos[REPO_ID]!
+
+    expect(getBranchActionCapabilities(repo, branch)).toMatchObject({
+      canPush: true,
+      canOpenGitHub: true,
+      canOpenTerminal: true,
+      canOpenEditor: true,
+    })
+
+    updateRepoForTest((repo) => {
+      repo.remote.remotes = []
+      repo.remote.hasRemotes = false
+      repo.remote.hasGitHubRemote = false
+    })
+    repo = useReposStore.getState().repos[REPO_ID]!
+
+    expect(getBranchActionCapabilities(repo, branch)).toMatchObject({
+      canPush: false,
+      canOpenGitHub: false,
+      canOpenTerminal: true,
+      canOpenEditor: true,
+    })
+  })
+})
 
 describe('runBranchAction', () => {
   test('blocks local branch actions while remote fetch resource is busy', async () => {

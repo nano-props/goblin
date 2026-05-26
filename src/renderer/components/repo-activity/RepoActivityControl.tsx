@@ -59,6 +59,7 @@ function RepoActivityControlView({ repo }: { repo: RepoState }) {
     visibleActivity: showingActivity ? visibleActivity : null,
     completion,
     syncBlocked,
+    localOnly: repo.remote.hasRemotes === false,
   })
 
   switch (view.kind) {
@@ -66,6 +67,14 @@ function RepoActivityControlView({ repo }: { repo: RepoState }) {
       return <RepoActivityIndicator activity={view.activity} />
     case 'completion':
       return <RepoCompletionIndicator completion={view.completion} />
+    case 'local-only':
+      return (
+        <div className="flex items-center gap-2">
+          <RepoLocalOnlyIndicator repo={repo} />
+          <RepoCacheIndicator repo={repo} />
+          <RepoFetchFailureIndicator repo={repo} />
+        </div>
+      )
     case 'refresh-button':
       return (
         <div className="flex items-center gap-2">
@@ -124,7 +133,7 @@ function RepoRefreshButton({ repo, syncBlocked }: { repo: RepoState; syncBlocked
   }
 
   return (
-    <Tip label={t('action.fetch-title')}>
+    <Tip label={t(repo.remote.hasRemotes === false ? 'action.fetch-local-title' : 'action.fetch-title')}>
       <AsyncButton variant="ghost" onClick={handleSync}>
         {({ busy }) => (
           <>
@@ -134,6 +143,23 @@ function RepoRefreshButton({ repo, syncBlocked }: { repo: RepoState; syncBlocked
         )}
       </AsyncButton>
     </Tip>
+  )
+}
+
+function RepoLocalOnlyIndicator({ repo }: { repo: RepoState }) {
+  const t = useT()
+
+  if (repo.remote.hasRemotes !== false) return null
+
+  return (
+    <span
+      className="flex items-center gap-1 text-xs text-muted-foreground"
+      title={t('tab.local-only-title')}
+      aria-label={t('tab.local-only-title')}
+    >
+      <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/70" />
+      {t('tab.local-only')}
+    </span>
   )
 }
 

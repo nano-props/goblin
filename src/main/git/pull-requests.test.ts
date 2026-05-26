@@ -23,6 +23,10 @@ function initGitHubRepo(): string {
   return tmp
 }
 
+function git(cwd: string, ...args: string[]): string {
+  return execaSync('git', args, { cwd }).stdout.trim()
+}
+
 function pullRequestNode(number: number, headRefName: string) {
   return {
     number,
@@ -196,6 +200,58 @@ describe('pickPullRequest', () => {
 })
 
 describe('getBranchPullRequest', () => {
+  test('uses the branch upstream GitHub remote for single-branch queries', async () => {
+    const repo = initGitHubRepo()
+    git(repo, 'remote', 'set-url', 'origin', 'https://github.com/me/fork.git')
+    git(repo, 'remote', 'add', 'upstream', 'https://github.com/acme/repo.git')
+    git(repo, 'config', 'branch.feature.remote', 'upstream')
+    git(repo, 'config', 'branch.feature.merge', 'refs/heads/main')
+    const queriedRepos: Array<{ owner?: string; repo?: string; headRefName?: string }> = []
+    globalThis.fetch = (async (...args: Parameters<typeof fetch>) => {
+      const init = args[1]
+      const body = JSON.parse(String(init?.body)) as {
+        variables?: { owner?: string; repo?: string; headRefName?: string }
+      }
+      queriedRepos.push(body.variables ?? {})
+      return graphqlPullRequests([pullRequestNode(42, 'feature')])
+    }) as typeof fetch
+
+    const result = await getBranchPullRequests(repo, new Set(['feature']), { mode: 'summary' })
+
+    expect(result?.get('feature')?.number).toBe(42)
+    expect(queriedRepos[0]).toMatchObject({ owner: 'acme', repo: 'repo', headRefName: 'feature' })
+  })
+
+  test('keeps single-branch PR cache entries isolated by selected GitHub repo', async () => {
+    const repo = initGitHubRepo()
+    git(repo, 'remote', 'set-url', 'origin', 'https://github.com/me/fork.git')
+    git(repo, 'remote', 'add', 'upstream', 'https://github.com/acme/repo.git')
+    git(repo, 'config', 'branch.feature.remote', 'upstream')
+    git(repo, 'config', 'branch.feature.merge', 'refs/heads/main')
+    const queriedRepos: Array<{ owner?: string; repo?: string; headRefName?: string }> = []
+    globalThis.fetch = (async (...args: Parameters<typeof fetch>) => {
+      const init = args[1]
+      const body = JSON.parse(String(init?.body)) as {
+        variables?: { owner?: string; repo?: string; headRefName?: string }
+      }
+      const variables = body.variables ?? {}
+      queriedRepos.push(variables)
+      return graphqlPullRequests([
+        pullRequestNode(variables.headRefName === 'feature' ? 42 : 7, variables.headRefName ?? ''),
+      ])
+    }) as typeof fetch
+
+    const upstreamBranch = await getBranchPullRequests(repo, new Set(['feature']), { mode: 'summary' })
+    const originBranch = await getBranchPullRequests(repo, new Set(['other']), { mode: 'summary' })
+
+    expect(upstreamBranch?.get('feature')?.number).toBe(42)
+    expect(originBranch?.get('other')?.number).toBe(7)
+    expect(queriedRepos).toEqual([
+      expect.objectContaining({ owner: 'acme', repo: 'repo', headRefName: 'feature' }),
+      expect.objectContaining({ owner: 'me', repo: 'fork', headRefName: 'other' }),
+    ])
+  })
+
   test('does not treat a repo-wide cache miss as a definitive single-branch miss', async () => {
     const repo = initGitHubRepo()
     const queriedHeads: Array<string | undefined> = []
@@ -219,7 +275,7 @@ describe('getBranchPullRequest', () => {
 })
 
 describe('getBranchPullRequests cancellation', () => {
-  test('does not let one caller abort another caller sharing a pending request key', async () => {
+  test('does not let a signaled caller abort an unsignaled caller', async () => {
     const repo = initGitHubRepo()
     const ctrl = new AbortController()
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -254,6 +310,49 @@ describe('getBranchPullRequests cancellation', () => {
     const [, secondResult] = await Promise.all([first, second])
     expect(secondResult?.get('feature/a')?.number).toBe(7)
     expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('[pull-requests]'), expect.anything())
+  })
+
+  test('shares pending requests for callers using the same signal', async () => {
+    const repo = initGitHubRepo()
+    const ctrl = new AbortController()
+    let releaseFetch!: () => void
+    let fetchCalls = 0
+    const firstFetchStarted = new Promise<void>((resolve) => {
+      globalThis.fetch = (async (..._args: Parameters<typeof fetch>) => {
+        fetchCalls += 1
+        resolve()
+        await new Promise<void>((release) => {
+          releaseFetch = release
+        })
+        return graphqlPullRequests([pullRequestNode(8, 'feature/shared')])
+      }) as typeof fetch
+    })
+
+    const first = getBranchPullRequests(repo, undefined, { mode: 'summary', signal: ctrl.signal })
+    await firstFetchStarted
+    const second = getBranchPullRequests(repo, undefined, { mode: 'summary', signal: ctrl.signal })
+    releaseFetch()
+
+    const [firstResult, secondResult] = await Promise.all([first, second])
+    expect(fetchCalls).toBe(1)
+    expect(firstResult?.get('feature/shared')?.number).toBe(8)
+    expect(secondResult?.get('feature/shared')?.number).toBe(8)
+  })
+
+  test('stops full repo queries when aborted after open pull requests load', async () => {
+    const repo = initGitHubRepo()
+    const ctrl = new AbortController()
+    let fetchCalls = 0
+    globalThis.fetch = (async (..._args: Parameters<typeof fetch>) => {
+      fetchCalls += 1
+      ctrl.abort()
+      return graphqlPullRequests([pullRequestNode(9, 'feature/open')])
+    }) as typeof fetch
+
+    const result = await getBranchPullRequests(repo, undefined, { mode: 'full', signal: ctrl.signal })
+
+    expect(result).toBeNull()
+    expect(fetchCalls).toBe(1)
   })
 
   test('does not overwrite a successful repo cache when an unexpected refresh error occurs', async () => {

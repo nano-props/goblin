@@ -1,10 +1,12 @@
 import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
 import { ipcMain } from 'electron'
-import { isAncestor, getCurrentBranch, getUpstream } from '#/main/git/branches.ts'
+import { getDefaultBranch, isAncestor, getCurrentBranch, getUpstream } from '#/main/git/branches.ts'
 import { getWorktrees } from '#/main/git/worktrees.ts'
 import { getWorkingStatus } from '#/main/git/status.ts'
 import { resolveKnownWorktree, resolveRemovableWorktree } from '#/main/git/guards.ts'
-import { pullBranch } from '#/main/git/remote.ts'
+import { getGitHubUrl, getPullRequestUrl, pullBranch } from '#/main/git/remote.ts'
+import { getBranchPullRequest } from '#/main/git/pull-requests.ts'
+import { openHttpsExternal } from '#/main/external-url.ts'
 import { registerTrustedAppPath, registerTrustedWebContents } from '#/main/ipc/trusted-webcontents.ts'
 import { wireRpcIpc } from '#/main/rpc.ts'
 import type { RpcResponse } from '#/shared/rpc.ts'
@@ -62,6 +64,7 @@ vi.mock('#/main/git/remote.ts', () => ({
   fetchAll: vi.fn(),
   getGitHubUrl: vi.fn(),
   getPullRequestUrl: vi.fn(),
+  getRemoteInfo: vi.fn(),
   pullBranch: vi.fn(),
   pushBranch: vi.fn(),
 }))
@@ -301,6 +304,19 @@ describe('main repo rpc cancellation', () => {
     expect(aborted).toBe(true)
     await expect(status).resolves.toEqual({ ok: true, data: [] })
     expect(getWorkingStatus).toHaveBeenCalledWith('/repo', { signal: expect.any(AbortSignal) })
+  })
+
+  test('passes branch context when opening a default branch GitHub URL', async () => {
+    vi.mocked(getDefaultBranch).mockResolvedValue('main')
+    vi.mocked(getBranchPullRequest).mockResolvedValue(null)
+    vi.mocked(getGitHubUrl).mockResolvedValue('https://github.com/acme/repo')
+    vi.mocked(openHttpsExternal).mockResolvedValue(true)
+
+    const result = await invokeRpc('repo.openGitHub', { cwd: '/repo', branch: 'main' })
+
+    expect(result).toEqual({ ok: true, data: { ok: true, message: 'https://github.com/acme/repo' } })
+    expect(getPullRequestUrl).not.toHaveBeenCalled()
+    expect(getGitHubUrl).toHaveBeenCalledWith('/repo', { branch: 'main' })
   })
 
   test('returns null when snapshot is aborted during worktree loading', async () => {

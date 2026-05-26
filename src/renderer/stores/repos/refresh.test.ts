@@ -97,7 +97,7 @@ describe('remote fetch timestamps', () => {
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.instanceToken).toBe(newToken)
     expect(repo?.data.branches.map((b) => b.name)).toEqual(['feature/reopened'])
-    expect(repo?.remote).toEqual({ fetchFailed: false, fetchError: null })
+    expect(repo?.remote).toMatchObject({ fetchFailed: false, fetchError: null })
     expect(repo?.resources.fetch.loadedAt).toBeNull()
   })
 
@@ -109,7 +109,7 @@ describe('remote fetch timestamps', () => {
 
     await useReposStore.getState().backgroundFetch(REPO_ID)
 
-    expect(useReposStore.getState().repos[REPO_ID]?.remote).toEqual({
+    expect(useReposStore.getState().repos[REPO_ID]?.remote).toMatchObject({
       fetchFailed: true,
       fetchError: 'fatal: offline',
     })
@@ -122,7 +122,7 @@ describe('remote fetch timestamps', () => {
     fetchOk = true
     await useReposStore.getState().backgroundFetch(REPO_ID)
 
-    expect(useReposStore.getState().repos[REPO_ID]?.remote).toEqual({
+    expect(useReposStore.getState().repos[REPO_ID]?.remote).toMatchObject({
       fetchFailed: false,
       fetchError: null,
     })
@@ -141,7 +141,7 @@ describe('remote fetch timestamps', () => {
 
     await useReposStore.getState().backgroundFetch(REPO_ID)
 
-    expect(useReposStore.getState().repos[REPO_ID]?.remote).toEqual({
+    expect(useReposStore.getState().repos[REPO_ID]?.remote).toMatchObject({
       fetchFailed: true,
       fetchError: 'network down',
     })
@@ -422,13 +422,14 @@ describe('remote fetch timestamps', () => {
   test('failed network branch actions do not clear the sticky fetch failure badge', async () => {
     const token = seedRepo([branch('feature/a')])
     updateRepoForTest((repo) => {
-      repo.remote = { fetchFailed: true, fetchError: 'previous failure' }
+      repo.remote.fetchFailed = true
+      repo.remote.fetchError = 'previous failure'
     })
     rpcHandlers['repo.pull'] = async () => ({ ok: false, message: 'fatal: rejected' })
 
     await useReposStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' }, { token })
 
-    expect(useReposStore.getState().repos[REPO_ID]?.remote).toEqual({
+    expect(useReposStore.getState().repos[REPO_ID]?.remote).toMatchObject({
       fetchFailed: true,
       fetchError: 'previous failure',
     })

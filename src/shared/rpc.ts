@@ -6,6 +6,7 @@ import type {
   LogEntry,
   PullRequestFetchMode,
   PullRequestInfo,
+  RepoRemoteInfo,
   WorktreeStatus,
 } from '#/shared/git-types.ts'
 import { WORKSPACE_LAYOUTS } from '#/shared/workspace-layout.ts'
@@ -107,6 +108,7 @@ export interface CommitDetail {
 export interface RepoSnapshot {
   branches: BranchInfo[]
   current: string
+  remote?: RepoRemoteInfo
 }
 
 export interface ProbeResult {

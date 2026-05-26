@@ -15,6 +15,60 @@ import {
 beforeEach(resetRefreshTest)
 
 describe('refreshPullRequests', () => {
+  test('snapshot records local-only remote capability and clears stale pull requests', async () => {
+    const stale = pullRequest(1)
+    const token = seedRepo([branch('feature/a', stale)])
+    useReposStore.setState((s) => ({
+      repos: {
+        ...s.repos,
+        [REPO_ID]: replaceRepo(s.repos[REPO_ID]!, (repo) => {
+          repo.remote.fetchFailed = true
+          repo.remote.fetchError = 'previous failure'
+        }),
+      },
+    }))
+    rpcHandlers['repo.snapshot'] = async () => ({
+      branches: [branch('feature/a')],
+      current: 'feature/a',
+      remote: { remotes: [], hasRemotes: false, hasGitHubRemote: false },
+    })
+
+    await useReposStore.getState().refreshSnapshot(REPO_ID, { token })
+
+    const repo = useReposStore.getState().repos[REPO_ID]
+    expect(repo?.remote).toMatchObject({
+      remotes: [],
+      hasRemotes: false,
+      hasGitHubRemote: false,
+      fetchFailed: false,
+      fetchError: null,
+    })
+    expect(repo?.data.branches[0]?.pullRequest).toBeUndefined()
+  })
+
+  test('skips pull request refresh for local-only repositories', async () => {
+    const token = seedRepo([branch('feature/a')])
+    let callCount = 0
+    useReposStore.setState((s) => ({
+      repos: {
+        ...s.repos,
+        [REPO_ID]: replaceRepo(s.repos[REPO_ID]!, (repo) => {
+          repo.remote.hasRemotes = false
+          repo.remote.hasGitHubRemote = false
+        }),
+      },
+    }))
+    rpcHandlers['repo.pullRequests'] = async () => {
+      callCount += 1
+      return []
+    }
+
+    await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { token })
+
+    expect(callCount).toBe(0)
+    expect(useReposStore.getState().repos[REPO_ID]?.resources.pullRequests.phase).toBe('idle')
+  })
+
   test('snapshot refresh writes a durable repo cache entry', async () => {
     const token = seedRepo([])
     rpcHandlers['repo.snapshot'] = async () => ({ branches: [branch('feature/a')], current: 'feature/a' })

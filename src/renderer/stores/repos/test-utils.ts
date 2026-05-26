@@ -109,6 +109,7 @@ export function seedRepoState(options: {
   instanceToken?: number
   status?: WorktreeStatus[]
   statusLoaded?: boolean
+  remote?: Partial<RepoState['remote']>
 }): RepoState {
   const base = emptyRepo(options.id, options.name ?? 'repo')
   const repo: RepoState = {
@@ -126,6 +127,10 @@ export function seedRepoState(options: {
       selectedBranch: options.selectedBranch ?? base.ui.selectedBranch,
       detailTab: options.detailTab ?? base.ui.detailTab,
       commitDetail: options.openCommit ? { phase: 'open', detail: options.openCommit } : base.ui.commitDetail,
+    },
+    remote: {
+      ...base.remote,
+      ...options.remote,
     },
   }
   useReposStore.setState({

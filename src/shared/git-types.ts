@@ -96,6 +96,17 @@ export interface LogEntry {
   date: string
 }
 
+export interface GitRemoteInfo {
+  name: string
+  url: string
+}
+
+export interface RepoRemoteInfo {
+  remotes: GitRemoteInfo[]
+  hasRemotes: boolean
+  hasGitHubRemote: boolean
+}
+
 export const GIT_HASH_RE = /^[0-9a-fA-F]{7,64}$/
 
 export interface ExecResult {

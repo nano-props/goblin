@@ -33,6 +33,7 @@ function seedRepo(options: {
     selectedBranch: options.selectedBranch ?? 'feature/plain',
     detailTab: options.detailTab ?? 'status',
     openCommit: options.openCommit ? createCommitDetail() : null,
+    remote: { remotes: ['origin'], hasRemotes: true, hasGitHubRemote: true },
   })
 }
 

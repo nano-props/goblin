@@ -29,7 +29,7 @@ import {
   isAncestor,
   isGitRepo,
 } from '#/main/git/branches.ts'
-import { fetchAll, getGitHubUrl, getPullRequestUrl, pullBranch, pushBranch } from '#/main/git/remote.ts'
+import { fetchAll, getGitHubUrl, getPullRequestUrl, getRemoteInfo, pullBranch, pushBranch } from '#/main/git/remote.ts'
 import { getWorkingStatus } from '#/main/git/status.ts'
 import { getWorktreePatch } from '#/main/git/patch.ts'
 import { resolveKnownWorktree, resolveRemovableWorktree } from '#/main/git/guards.ts'
@@ -299,7 +299,9 @@ function createRpcHandlers(): AppRpcHandlers {
           if (signal?.aborted) return null
           const current = await getCurrentBranch(cwd, { signal })
           if (signal?.aborted) return null
-          return { branches, current }
+          const remote = await getRemoteInfo(cwd, signal)
+          if (signal?.aborted) return null
+          return { branches, current, remote }
         } catch (err) {
           if (signal?.aborted) return null
           throw err
@@ -684,7 +686,7 @@ async function openRepoGitHub({ cwd, branch }: { cwd: string; branch?: string })
     const prUrl = await getPullRequestUrl(cwd, branch)
     if (prUrl && (await openHttpsExternal(prUrl))) return { ok: true, message: prUrl }
   }
-  const url = await getGitHubUrl(cwd)
+  const url = await getGitHubUrl(cwd, { branch })
   if (!url) return { ok: false, message: 'error.open-github-no-origin' }
   if (!(await openHttpsExternal(url))) return { ok: false, message: 'error.invalid-url' }
   return { ok: true, message: url }

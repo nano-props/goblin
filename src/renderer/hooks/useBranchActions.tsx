@@ -19,9 +19,44 @@ export type { BranchActionItemId } from '#/renderer/hooks/branch-action-state.ts
 const SILENT_SUCCESS_OPS = new Set<BranchActionItemId>(['github', 'terminal', 'editor'])
 type LocalBranchActionItemId = 'copyPatch' | 'github' | 'terminal' | 'editor'
 
+export interface BranchActionCapabilities {
+  isCurrent: boolean
+  checkedOutInAnotherWorktree: boolean
+  canRemoveWorktree: boolean
+  isRegularBranch: boolean
+  canCopyPatch: boolean
+  canPull: boolean
+  canPush: boolean
+  canOpenGitHub: boolean
+  canOpenTerminal: boolean
+  canOpenEditor: boolean
+}
+
 interface RemoveConfirm {
   branch: string
   path: string
+}
+
+export function getBranchActionCapabilities(repo: RepoState, branch: BranchInfo): BranchActionCapabilities {
+  const isCurrent = branch.name === repo.data.currentBranch
+  const checkedOutInAnotherWorktree = !!branch.worktreePath && !isCurrent
+  const canRemoveWorktree = checkedOutInAnotherWorktree && !branch.worktreeIsPrimary
+  const isProtected = PROTECTED_BRANCHES.has(branch.name)
+  const isRegularBranch = !isCurrent && !branch.worktreePath && !isProtected
+  const changedStatus = branch.worktreePath ? repo.data.status.find((wt) => wt.path === branch.worktreePath) : null
+  const canCopyPatch = !!branch.worktreePath && (changedStatus?.entries.length ?? 0) > 0
+  return {
+    isCurrent,
+    checkedOutInAnotherWorktree,
+    canRemoveWorktree,
+    isRegularBranch,
+    canCopyPatch,
+    canPull: !!branch.tracking,
+    canPush: repo.remote.hasRemotes === true,
+    canOpenGitHub: repo.remote.hasGitHubRemote === true,
+    canOpenTerminal: !!branch.worktreePath,
+    canOpenEditor: !!branch.worktreePath,
+  }
 }
 
 export function useBranchActions(repo: RepoState, branch: BranchInfo) {
@@ -180,13 +215,7 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
     )
   }
 
-  const isCurrent = branch.name === repo.data.currentBranch
-  const checkedOutInAnotherWorktree = !!branch.worktreePath && !isCurrent
-  const canRemoveWorktree = checkedOutInAnotherWorktree && !branch.worktreeIsPrimary
-  const isProtected = PROTECTED_BRANCHES.has(branch.name)
-  const isRegularBranch = !isCurrent && !branch.worktreePath && !isProtected
-  const changedStatus = branch.worktreePath ? repo.data.status.find((wt) => wt.path === branch.worktreePath) : null
-  const canCopyPatch = !!branch.worktreePath && (changedStatus?.entries.length ?? 0) > 0
+  const capabilities = getBranchActionCapabilities(repo, branch)
   const removeConfirmProtected = removeConfirm ? PROTECTED_BRANCHES.has(removeConfirm.branch) : false
 
   const dialogs = (
@@ -340,16 +369,7 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
   return {
     blocked: branchActionBusy || pendingLocalAction !== null,
     busyAction: pendingLocalAction ?? branchOperationAction,
-    capabilities: {
-      isCurrent,
-      checkedOutInAnotherWorktree,
-      canRemoveWorktree,
-      isRegularBranch,
-      canCopyPatch,
-      canPull: !!branch.tracking,
-      canOpenTerminal: !!branch.worktreePath,
-      canOpenEditor: !!branch.worktreePath,
-    },
+    capabilities,
     actions: {
       copyPatch,
       checkout,

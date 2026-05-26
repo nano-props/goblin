@@ -8,4 +8,14 @@ describe('emptyRepo', () => {
     expect(repo.resources).toBeDefined()
     expect(Object.prototype.hasOwnProperty.call(repo, 'ops')).toBe(false)
   })
+
+  test('starts without remote capabilities until snapshot detects them', () => {
+    const repo = emptyRepo('/tmp/goblin-helper-test', 'repo')
+
+    expect(repo.remote).toMatchObject({
+      remotes: [],
+      hasRemotes: false,
+      hasGitHubRemote: false,
+    })
+  })
 })

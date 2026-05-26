@@ -25,7 +25,12 @@ export function pullRequestWithHealth(number: number): PullRequestInfo {
 }
 
 export function seedRepo(branches: BranchInfo[], instanceToken = 1): number {
-  return seedRepoState({ id: REPO_ID, branches, instanceToken }).instanceToken
+  return seedRepoState({
+    id: REPO_ID,
+    branches,
+    instanceToken,
+    remote: { remotes: ['origin'], hasRemotes: true, hasGitHubRemote: true },
+  }).instanceToken
 }
 
 export function resetRefreshTest(): void {

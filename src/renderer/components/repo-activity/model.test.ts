@@ -251,6 +251,7 @@ describe('getRepoActivityControlView', () => {
         visibleActivity: branchActivity,
         completion,
         syncBlocked: true,
+        localOnly: false,
       }),
     ).toEqual({ kind: 'activity', activity: branchActivity })
   })
@@ -261,6 +262,7 @@ describe('getRepoActivityControlView', () => {
         visibleActivity: statusActivity,
         completion,
         syncBlocked: true,
+        localOnly: false,
       }),
     ).toEqual({ kind: 'completion', completion })
   })
@@ -271,6 +273,7 @@ describe('getRepoActivityControlView', () => {
         visibleActivity: statusActivity,
         completion: null,
         syncBlocked: true,
+        localOnly: true,
       }),
     ).toEqual({ kind: 'activity', activity: statusActivity })
   })
@@ -281,6 +284,7 @@ describe('getRepoActivityControlView', () => {
         visibleActivity: null,
         completion,
         syncBlocked: false,
+        localOnly: true,
       }),
     ).toEqual({ kind: 'completion', completion })
   })
@@ -291,6 +295,7 @@ describe('getRepoActivityControlView', () => {
         visibleActivity: null,
         completion: null,
         syncBlocked: true,
+        localOnly: false,
       }),
     ).toEqual({ kind: 'refresh-button', syncBlocked: true })
     expect(
@@ -298,7 +303,19 @@ describe('getRepoActivityControlView', () => {
         visibleActivity: null,
         completion: null,
         syncBlocked: false,
+        localOnly: false,
       }),
     ).toEqual({ kind: 'refresh-button', syncBlocked: false })
+  })
+
+  test('shows local-only idle state without a refresh button', () => {
+    expect(
+      getRepoActivityControlView({
+        visibleActivity: null,
+        completion: null,
+        syncBlocked: false,
+        localOnly: true,
+      }),
+    ).toEqual({ kind: 'local-only' })
   })
 })

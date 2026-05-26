@@ -1,5 +1,5 @@
 import { execa } from 'execa'
-import { git } from '#/main/git/helper.ts'
+import { getRemotes, getUpstreamParts, pickPreferredRemote } from '#/main/git/remote.ts'
 import {
   enqueueGitHubApiRequest,
   GITHUB_API_CONCURRENCY,
@@ -19,6 +19,11 @@ export interface GitHubRepoRef {
   host: string
   owner: string
   name: string
+}
+
+export interface GitHubRepoRefOptions {
+  branch?: string
+  signal?: AbortSignal
 }
 
 interface GraphqlEnvelope<TData> {
@@ -86,6 +91,28 @@ export function parseGitHubRemoteUrl(url: string): GitHubRepoRef | null {
   return { host: match[1].toLowerCase(), owner: parts[0]!, name: parts[1]! }
 }
 
+function isAbortSignal(value: unknown): value is AbortSignal {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    'aborted' in value &&
+    'addEventListener' in value &&
+    typeof (value as { addEventListener?: unknown }).addEventListener === 'function'
+  )
+}
+
+function normalizeRepoRefOptions(options?: AbortSignal | GitHubRepoRefOptions): GitHubRepoRefOptions {
+  if (!options) return {}
+  return isAbortSignal(options) ? { signal: options } : options
+}
+
+function pickGitHubRepoRef(
+  remotes: Array<{ name: string; repo: GitHubRepoRef }>,
+  upstream?: { remote: string; branch: string } | null,
+): GitHubRepoRef | null {
+  return pickPreferredRemote(remotes, upstream)?.repo ?? null
+}
+
 export function githubGraphqlEndpoint(host: string): string {
   return host === 'github.com' ? 'https://api.github.com/graphql' : `https://${host}/api/graphql`
 }
@@ -98,9 +125,20 @@ export function tokenFromEnv(host: string): string | null {
   return candidates.find((token): token is string => typeof token === 'string' && token.length > 0) ?? null
 }
 
-export async function getGitHubRepoRef(cwd: string, signal?: AbortSignal): Promise<GitHubRepoRef | null> {
+export async function getGitHubRepoRef(
+  cwd: string,
+  options?: AbortSignal | GitHubRepoRefOptions,
+): Promise<GitHubRepoRef | null> {
+  const { branch, signal } = normalizeRepoRefOptions(options)
   try {
-    return parseGitHubRemoteUrl(await git(cwd, ['remote', 'get-url', 'origin'], { signal }))
+    const [allRemotes, upstream] = await Promise.all([
+      getRemotes(cwd, signal),
+      branch ? getUpstreamParts(cwd, branch, signal) : Promise.resolve(null),
+    ])
+    const remotes = allRemotes
+      .map((remote) => ({ name: remote.name, repo: parseGitHubRemoteUrl(remote.url) }))
+      .filter((remote): remote is { name: string; repo: GitHubRepoRef } => remote.repo !== null)
+    return pickGitHubRepoRef(remotes, upstream)
   } catch (err) {
     if (signal?.aborted || isAbortError(err)) return null
     return null

@@ -137,16 +137,16 @@ function createFileMenu(state: AppMenuState): MenuItemConstructorOptions {
       },
       { label: t('menu.file.open-recent'), submenu: createRecentReposMenu(state.recentRepos) },
       { label: t('menu.file.open-data-folder'), click: () => void openDataFolder() },
-      // ⌘W is the standard OS shortcut for closing the window — keep
+      // ⌘⇧W is the standard OS shortcut for closing the window — keep
       // the `role: 'close'` accelerator there when shortcuts are enabled
       // so it still works even if the renderer hasn't subscribed to menu
-      // actions yet (e.g. hung renderer). Closing a repo tab moves to ⌘⇧W.
+      // actions yet (e.g. hung renderer). Closing a repo tab uses ⌘W.
       state.shortcutsDisabled
         ? { label: t('menu.file.close-window'), click: () => BrowserWindow.getFocusedWindow()?.close() }
-        : { role: 'close', label: t('menu.file.close-window'), accelerator: 'CmdOrCtrl+W' },
+        : { role: 'close', label: t('menu.file.close-window'), accelerator: 'CmdOrCtrl+Shift+W' },
       {
         label: t('menu.file.close-tab'),
-        accelerator: accelerator(state, 'CmdOrCtrl+Shift+W'),
+        accelerator: accelerator(state, 'CmdOrCtrl+W'),
         click: () => send('close-repo'),
       },
       ...(state.isMac

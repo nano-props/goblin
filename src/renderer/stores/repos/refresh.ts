@@ -242,14 +242,20 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
             const logsByBranch = Object.fromEntries(
               Object.entries(r.data.logsByBranch).filter(([branch]) => validBranches.has(branch)),
             )
-            const pullRequestsByBranch = new Map(
-              r.data.branches.flatMap((branch) =>
-                branch.pullRequest ? [[branch.name, branch.pullRequest] as const] : [],
-              ),
-            )
+            const preservePullRequests = snap.remote
+              ? snap.remote.hasGitHubRemote === true
+              : r.remote.hasGitHubRemote === true
+            const pullRequestsByBranch = preservePullRequests
+              ? new Map(
+                  r.data.branches.flatMap((branch) =>
+                    branch.pullRequest ? [[branch.name, branch.pullRequest] as const] : [],
+                  ),
+                )
+              : new Map()
             // Preserve the last known PR while the async GitHub refresh below
             // runs. If GitHub is unavailable, refreshPullRequests keeps this
-            // metadata instead of making the row flicker to "no PR".
+            // metadata instead of making the row flicker to "no PR"; local-only
+            // repos clear it because there is no PR source to refresh.
             const branches = snap.branches.map((branch) => {
               const pullRequest = branch.pullRequest ?? pullRequestsByBranch.get(branch.name)
               return pullRequest && branchPullRequestBelongsToBranch(branch, pullRequest)
@@ -266,6 +272,15 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
               Object.entries(r.resources.pullRequestsByBranch).filter(([branch]) => validBranches.has(branch)),
             )
             r.ui.selectedBranch = selected
+            if (snap.remote) {
+              r.remote.remotes = snap.remote.remotes.map((remote) => remote.name)
+              r.remote.hasRemotes = snap.remote.hasRemotes
+              r.remote.hasGitHubRemote = snap.remote.hasGitHubRemote
+              if (!snap.remote.hasRemotes) {
+                r.remote.fetchFailed = false
+                r.remote.fetchError = null
+              }
+            }
             if (
               r.ui.detailTab === 'terminal' &&
               !branches.some((branch) => branch.name === selected && branch.worktreePath)
@@ -317,6 +332,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       const clearMissing = options?.clearMissing ?? mode === 'full'
       const branchNames = branchesArg ?? repoBefore.data.branches.map((branch) => branch.name)
       if (branchNames.length === 0) return
+      if (repoBefore.remote.hasGitHubRemote !== true) return
       const requested = new Set(branchNames)
       updateIfFresh(set, id, token, (r) => {
         startPullRequestResource(r.resources.pullRequests, mode, {

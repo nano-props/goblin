@@ -62,6 +62,9 @@ export interface RepoCacheState {
 }
 
 export interface RepoRemoteState {
+  remotes?: string[]
+  hasRemotes?: boolean
+  hasGitHubRemote?: boolean
   /** Sticky connectivity badge for background fetch failures. Unlike
    *  `resources.fetch.error`, this persists after the operation settles and
    *  is cleared by the next successful network operation. */

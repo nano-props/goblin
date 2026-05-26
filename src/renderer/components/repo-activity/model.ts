@@ -32,6 +32,7 @@ export interface RepoCompletion extends RepoActionLabel {
 export type RepoActivityControlView =
   | { kind: 'activity'; activity: RepoActivity }
   | { kind: 'completion'; completion: RepoCompletion }
+  | { kind: 'local-only' }
   | { kind: 'refresh-button'; syncBlocked: boolean }
 
 const REFRESH_ACTIVITY_LABEL_KEYS: Record<Exclude<RepoActivityKind, 'branch-action'>, string> = {
@@ -97,9 +98,11 @@ export function getRepoActivityControlView(input: {
   visibleActivity: RepoActivity | null
   completion: RepoCompletion | null
   syncBlocked: boolean
+  localOnly: boolean
 }): RepoActivityControlView {
   if (input.visibleActivity?.kind === 'branch-action') return { kind: 'activity', activity: input.visibleActivity }
   if (input.completion) return { kind: 'completion', completion: input.completion }
   if (input.visibleActivity) return { kind: 'activity', activity: input.visibleActivity }
+  if (input.localOnly) return { kind: 'local-only' }
   return { kind: 'refresh-button', syncBlocked: input.syncBlocked }
 }
