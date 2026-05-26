@@ -30,7 +30,13 @@ describe('refreshPullRequests', () => {
     rpcHandlers['repo.snapshot'] = async () => ({
       branches: [branch('feature/a')],
       current: 'feature/a',
-      remote: { remotes: [], hasRemotes: false, hasGitHubRemote: false },
+      remote: {
+        remotes: [],
+        hasRemotes: false,
+        hasBrowserRemote: false,
+        remoteProviders: {},
+        hasGitHubRemote: false,
+      },
     })
 
     await useReposStore.getState().refreshSnapshot(REPO_ID, { token })
@@ -39,6 +45,8 @@ describe('refreshPullRequests', () => {
     expect(repo?.remote).toMatchObject({
       remotes: [],
       hasRemotes: false,
+      hasBrowserRemote: false,
+      remoteProviders: {},
       hasGitHubRemote: false,
       fetchFailed: false,
       fetchError: null,
@@ -54,6 +62,7 @@ describe('refreshPullRequests', () => {
         ...s.repos,
         [REPO_ID]: replaceRepo(s.repos[REPO_ID]!, (repo) => {
           repo.remote.hasRemotes = false
+          repo.remote.hasBrowserRemote = false
           repo.remote.hasGitHubRemote = false
         }),
       },
@@ -64,6 +73,29 @@ describe('refreshPullRequests', () => {
     }
 
     await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { token })
+
+    expect(callCount).toBe(0)
+    expect(useReposStore.getState().repos[REPO_ID]?.resources.pullRequests.phase).toBe('idle')
+  })
+
+  test('skips pull request refresh for browser-only remotes', async () => {
+    const token = seedRepo([branch('feature/gitlab')])
+    let callCount = 0
+    useReposStore.setState((s) => ({
+      repos: {
+        ...s.repos,
+        [REPO_ID]: replaceRepo(s.repos[REPO_ID]!, (repo) => {
+          repo.remote.hasBrowserRemote = true
+          repo.remote.hasGitHubRemote = false
+        }),
+      },
+    }))
+    rpcHandlers['repo.pullRequests'] = async () => {
+      callCount += 1
+      return []
+    }
+
+    await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/gitlab'], { token })
 
     expect(callCount).toBe(0)
     expect(useReposStore.getState().repos[REPO_ID]?.resources.pullRequests.phase).toBe('idle')

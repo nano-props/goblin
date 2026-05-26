@@ -1,4 +1,5 @@
 import { appendRepoEvent, errorEvent, inFlightFetchById, updateIfFresh } from '#/renderer/stores/repos/helpers.ts'
+import { isRepoUnavailableReason, markRepoAvailable, markRepoUnavailable } from '#/renderer/stores/repos/availability.ts'
 import { branchForVisibleLog, selectedBranchForBranchSet } from '#/renderer/stores/repos/branch-view-mode.ts'
 import { runExclusiveOperation, runLatestOperation } from '#/renderer/stores/repos/operation-runner.ts'
 import { persistRepoCache } from '#/renderer/stores/repos/persistence.ts'
@@ -275,12 +276,16 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
             if (snap.remote) {
               r.remote.remotes = snap.remote.remotes.map((remote) => remote.name)
               r.remote.hasRemotes = snap.remote.hasRemotes
+              r.remote.hasBrowserRemote = snap.remote.hasBrowserRemote
+              r.remote.browserRemoteProvider = snap.remote.browserRemoteProvider
+              r.remote.remoteProviders = snap.remote.remoteProviders
               r.remote.hasGitHubRemote = snap.remote.hasGitHubRemote
               if (!snap.remote.hasRemotes) {
                 r.remote.fetchFailed = false
                 r.remote.fetchError = null
               }
             }
+            markRepoAvailable(r)
             if (
               r.ui.detailTab === 'terminal' &&
               !branches.some((branch) => branch.name === selected && branch.worktreePath)
@@ -308,6 +313,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         },
         onError: (message) => {
           updateIfFresh(set, id, token, (r) => {
+            if (isRepoUnavailableReason(message)) markRepoUnavailable(r, message)
             finishResourceError(r.resources.snapshot, message)
             r.events = appendRepoEvent(r.events, errorEvent(message))
           })
@@ -328,6 +334,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (!repoBefore) return
       const token = options?.token ?? repoBefore.instanceToken
       if (repoBefore.instanceToken !== token) return
+      if (repoBefore.availability.phase === 'unavailable') return
       const mode = options?.mode ?? 'full'
       const clearMissing = options?.clearMissing ?? mode === 'full'
       const branchNames = branchesArg ?? repoBefore.data.branches.map((branch) => branch.name)
@@ -450,6 +457,9 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
           const repoAfterStatus = get().repos[id]
           if (ctx.isCurrent()) persistRepoCache(set, repoAfterStatus, token)
         },
+        onError: (message, r) => {
+          if (isRepoUnavailableReason(message)) markRepoUnavailable(r, message)
+        },
         errorLog: '[refreshStatus] failed',
       })
     },
@@ -467,6 +477,10 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (!repoBefore) return
       const token = options?.token ?? repoBefore.instanceToken
       if (repoBefore.instanceToken !== token) return
+      if (repoBefore.availability.phase === 'unavailable') {
+        await get().refreshAll(id, { token })
+        return
+      }
       if (!canStartRemoteFetch(repoBefore)) return
       let result: ExecResult | null
       try {

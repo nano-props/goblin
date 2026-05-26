@@ -59,6 +59,36 @@ describe('GitHub auth token cache', () => {
     expect(result).toEqual({ ok: true, data: { ok: true } })
   })
 
+  test('returns a token miss when gh auth token is unavailable', async () => {
+    vi.resetModules()
+    for (const key of TOKEN_ENV_KEYS) delete process.env[key]
+    execaMock.mockRejectedValue(Object.assign(new Error('spawn gh ENOENT'), { code: 'ENOENT' }))
+    const fetchMock = vi.fn()
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+    const { graphqlRequestResult } = await import('#/main/github/graphql.ts')
+
+    const result = await graphqlRequestResult('/tmp/repo', repo, 'query Test { viewer { login } }', {}, 'Test')
+
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error.code).toBe('NO_AUTH_TOKEN')
+  })
+
+  test('returns a token miss when gh is not logged in', async () => {
+    vi.resetModules()
+    for (const key of TOKEN_ENV_KEYS) delete process.env[key]
+    execaMock.mockRejectedValue(new Error('not logged in'))
+    const fetchMock = vi.fn()
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+    const { graphqlRequestResult } = await import('#/main/github/graphql.ts')
+
+    const result = await graphqlRequestResult('/tmp/repo', repo, 'query Test { viewer { login } }', {}, 'Test')
+
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error.code).toBe('NO_AUTH_TOKEN')
+  })
+
   test('does not fetch when aborted before a queued GraphQL request starts', async () => {
     vi.resetModules()
     process.env.GH_TOKEN = 'env-token'

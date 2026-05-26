@@ -29,7 +29,7 @@ import {
   isAncestor,
   isGitRepo,
 } from '#/main/git/branches.ts'
-import { fetchAll, getGitHubUrl, getPullRequestUrl, getRemoteInfo, pullBranch, pushBranch } from '#/main/git/remote.ts'
+import { fetchAll, getBrowserRemoteUrl, getNewPullRequestUrl, getRemoteInfo, pullBranch, pushBranch } from '#/main/git/remote.ts'
 import { getWorkingStatus } from '#/main/git/status.ts'
 import { getWorktreePatch } from '#/main/git/patch.ts'
 import { resolveKnownWorktree, resolveRemovableWorktree } from '#/main/git/guards.ts'
@@ -293,6 +293,8 @@ function createRpcHandlers(): AppRpcHandlers {
         if (!isValidCwd(cwd)) return null
         const signal = currentRpcSignal()
         try {
+          const available = await probeGitRepository(cwd)
+          if (!available.ok) throw new Error(available.message)
           const worktrees = await getWorktrees(cwd, { signal })
           if (signal?.aborted) return null
           const branches = await getBranches(cwd, worktrees, { signal })
@@ -337,6 +339,8 @@ function createRpcHandlers(): AppRpcHandlers {
       },
       status: async ({ cwd }) => {
         if (!isValidCwd(cwd)) return []
+        const available = await probeGitRepository(cwd)
+        if (!available.ok) throw new Error(available.message)
         const signal = currentRpcSignal()
         const status = await getWorkingStatus(cwd, { signal })
         return signal?.aborted ? [] : status
@@ -408,6 +412,8 @@ function createRpcHandlers(): AppRpcHandlers {
       },
       fetch: async ({ cwd, kind }) => {
         if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-arguments' }
+        const available = await probeGitRepository(cwd)
+        if (!available.ok) return available
         return runCancellable(cwd, kind === 'background' ? 'background' : 'user', (signal) => fetchAll(cwd, signal))
       },
       abort: async ({ cwd }) => {
@@ -417,7 +423,7 @@ function createRpcHandlers(): AppRpcHandlers {
         ctrl.ctrl.abort()
         return true
       },
-      openGitHub: openRepoGitHub,
+      openRemote: openRepoRemote,
       openInFinder: async ({ path: p }) => {
         if (!isValidAbsolutePath(p)) return { ok: false, message: 'error.invalid-path' }
         shell.showItemInFolder(p)
@@ -666,7 +672,7 @@ async function createPatch({ cwd, worktreePath }: { cwd: string; worktreePath: s
   }
 }
 
-async function openRepoGitHub({ cwd, branch }: { cwd: string; branch?: string }): Promise<ExecResult> {
+async function openRepoRemote({ cwd, branch }: { cwd: string; branch?: string }): Promise<ExecResult> {
   if (!isValidCwd(cwd) || !isValidOptionalBranch(branch)) return { ok: false, message: 'error.invalid-arguments' }
   // Only branch opens need the default branch: it tells us whether a PR is a
   // reverse/default-branch PR that should not be opened from the default row.
@@ -683,11 +689,11 @@ async function openRepoGitHub({ cwd, branch }: { cwd: string; branch?: string })
     }
   }
   if (typeof branch === 'string' && branch && !isDefaultBranch) {
-    const prUrl = await getPullRequestUrl(cwd, branch)
+    const prUrl = await getNewPullRequestUrl(cwd, branch)
     if (prUrl && (await openHttpsExternal(prUrl))) return { ok: true, message: prUrl }
   }
-  const url = await getGitHubUrl(cwd, { branch })
-  if (!url) return { ok: false, message: 'error.open-github-no-origin' }
+  const url = await getBrowserRemoteUrl(cwd, { branch })
+  if (!url) return { ok: false, message: 'error.open-remote-unavailable' }
   if (!(await openHttpsExternal(url))) return { ok: false, message: 'error.invalid-url' }
   return { ok: true, message: url }
 }
@@ -767,6 +773,14 @@ async function probeReadableDirectory(cwd: string): Promise<{ ok: true } | { ok:
     if (code === 'EACCES' || code === 'EPERM') return { ok: false, message: 'error.path-permission-denied' }
     return { ok: false, message: err instanceof Error ? err.message : 'error.failed-read-repo' }
   }
+}
+
+async function probeGitRepository(cwd: string): Promise<{ ok: true } | { ok: false; message: string }> {
+  const ok = await isGitRepo(cwd)
+  if (ok) return { ok: true }
+  const readable = await probeReadableDirectory(cwd)
+  if (!readable.ok) return readable
+  return { ok: false, message: 'error.not-git-repo' }
 }
 
 async function probeWritableDirectory(cwd: string): Promise<{ ok: true } | { ok: false; message: string }> {

@@ -1,5 +1,6 @@
 import { execa } from 'execa'
 import { getRemotes, getUpstreamParts, pickPreferredRemote } from '#/main/git/remote.ts'
+import { isGitHubHost, parseGitRemoteUrl } from '#/main/git/remote-url.ts'
 import {
   enqueueGitHubApiRequest,
   GITHUB_API_CONCURRENCY,
@@ -80,15 +81,11 @@ function gh(cwd: string, args: string[], signal?: AbortSignal): Promise<string> 
 }
 
 export function parseGitHubRemoteUrl(url: string): GitHubRepoRef | null {
-  const sshUrl = url.match(/^ssh:\/\/(?:[^@]+@)?([^:/]+)(?::\d+)?\/(.+?)(?:\.git)?\/?$/)
-  const httpsUrl = url.match(/^https?:\/\/(?:[^@/]+@)?([^/]+)\/(.+?)(?:\.git)?\/?$/)
-  const scpUrl = url.match(/^(?:[^@]+@)?([^:/\s]+):([^/].*?)(?:\.git)?\/?$/)
-  const match = sshUrl ?? httpsUrl ?? scpUrl
-  if (!match) return null
-  const path = match[2]?.replace(/\.git$/, '').replace(/\/$/, '') ?? ''
-  const parts = path.split('/').filter(Boolean)
-  if (parts.length !== 2 || !match[1]) return null
-  return { host: match[1].toLowerCase(), owner: parts[0]!, name: parts[1]! }
+  const parsed = parseGitRemoteUrl(url)
+  if (!parsed || !isGitHubHost(parsed.host)) return null
+  const parts = parsed.path.split('/').filter(Boolean)
+  if (parts.length !== 2) return null
+  return { host: parsed.host, owner: parts[0]!, name: parts[1]! }
 }
 
 function isAbortSignal(value: unknown): value is AbortSignal {

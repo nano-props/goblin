@@ -1,4 +1,5 @@
 import { appendRepoEvent, errorEvent, updateIfFresh } from '#/renderer/stores/repos/helpers.ts'
+import { isRepoUnavailableReason } from '#/renderer/stores/repos/availability.ts'
 import { persistRepoCache } from '#/renderer/stores/repos/persistence.ts'
 import { terminalBridge } from '#/renderer/terminal.ts'
 import type { DetailTab, ReposGet, ReposSet } from '#/renderer/stores/repos/types.ts'
@@ -158,6 +159,7 @@ export async function runRefreshAllWorkflow(get: ReposGet, options: { id: string
   // visible, so we keep its refresh tab-gated.
   const after = get().repos[options.id]
   if (!after || after.instanceToken !== options.token) return
+  if (after.availability.phase === 'unavailable') return
   await get().refreshStatus(options.id, { token: options.token })
   const afterStatus = get().repos[options.id]
   if (!afterStatus || afterStatus.instanceToken !== options.token) return
@@ -183,6 +185,10 @@ export async function runBackgroundFetchResultWorkflow(
 ): Promise<void> {
   if (!options.result.ok) {
     if (options.result.message === 'cancelled' || options.result.message === 'error.network-op-in-progress') return
+    if (isRepoUnavailableReason(options.result.message)) {
+      await get().refreshSnapshot(options.id, { token: options.token })
+      return
+    }
     console.warn('[backgroundFetch] git fetch failed:', options.result.message)
     updateIfFresh(set, options.id, options.token, (r) => {
       r.remote.fetchFailed = true

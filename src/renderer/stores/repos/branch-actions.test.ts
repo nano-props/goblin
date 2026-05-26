@@ -4,6 +4,7 @@ import { repoOperation } from '#/renderer/stores/repos/runtime.ts'
 import { startResource } from '#/renderer/stores/repos/resources.ts'
 import { replaceRepo } from '#/renderer/stores/repos/helpers.ts'
 import { getBranchActionCapabilities } from '#/renderer/hooks/useBranchActions.tsx'
+import { branchBrowserRemoteProvider } from '#/renderer/hooks/useBranchActionItems.ts'
 import {
   createBranch,
   installGoblinTestBridge,
@@ -68,6 +69,9 @@ describe('branch action capabilities', () => {
       remote: {
         remotes: ['origin'],
         hasRemotes: true,
+        hasBrowserRemote: true,
+        browserRemoteProvider: 'github',
+        remoteProviders: { origin: 'github' },
         hasGitHubRemote: true,
       },
     })
@@ -75,7 +79,7 @@ describe('branch action capabilities', () => {
 
     expect(getBranchActionCapabilities(repo, branch)).toMatchObject({
       canPush: true,
-      canOpenGitHub: true,
+      canOpenRemote: true,
       canOpenTerminal: true,
       canOpenEditor: true,
     })
@@ -83,16 +87,94 @@ describe('branch action capabilities', () => {
     updateRepoForTest((repo) => {
       repo.remote.remotes = []
       repo.remote.hasRemotes = false
+      repo.remote.hasBrowserRemote = false
+      repo.remote.browserRemoteProvider = undefined
+      repo.remote.remoteProviders = {}
       repo.remote.hasGitHubRemote = false
     })
     repo = useReposStore.getState().repos[REPO_ID]!
 
     expect(getBranchActionCapabilities(repo, branch)).toMatchObject({
       canPush: false,
-      canOpenGitHub: false,
+      canOpenRemote: false,
       canOpenTerminal: true,
       canOpenEditor: true,
     })
+  })
+
+  test('allows browser actions for non-GitHub web remotes', () => {
+    const branch = createBranch('feature/gitlab')
+    seedRepoState({
+      id: REPO_ID,
+      branches: [branch],
+      remote: {
+        remotes: ['origin'],
+        hasRemotes: true,
+        hasBrowserRemote: true,
+        browserRemoteProvider: 'gitlab',
+        remoteProviders: { origin: 'gitlab' },
+        hasGitHubRemote: false,
+      },
+    })
+
+    expect(getBranchActionCapabilities(useReposStore.getState().repos[REPO_ID]!, branch)).toMatchObject({
+      canPush: true,
+      canOpenRemote: true,
+    })
+  })
+
+  test('resolves browser remote providers from tracking remotes', () => {
+    const branch = createBranch('feature/provider', { tracking: 'gitlab-upstream/feature/provider' })
+    seedRepoState({
+      id: REPO_ID,
+      branches: [branch],
+      remote: {
+        remotes: ['origin', 'gitlab-upstream'],
+        hasRemotes: true,
+        hasBrowserRemote: true,
+        browserRemoteProvider: 'github',
+        remoteProviders: { origin: 'github', 'gitlab-upstream': 'gitlab' },
+        hasGitHubRemote: true,
+      },
+    })
+
+    expect(branchBrowserRemoteProvider(useReposStore.getState().repos[REPO_ID]!, branch)).toBe('gitlab')
+  })
+
+  test('falls back to the repo browser provider when tracking remote is missing', () => {
+    const branch = createBranch('feature/missing-provider', { tracking: 'deleted/feature/missing-provider' })
+    seedRepoState({
+      id: REPO_ID,
+      branches: [branch],
+      remote: {
+        remotes: ['origin'],
+        hasRemotes: true,
+        hasBrowserRemote: true,
+        browserRemoteProvider: 'github',
+        remoteProviders: { origin: 'github' },
+        hasGitHubRemote: true,
+      },
+    })
+
+    expect(branchBrowserRemoteProvider(useReposStore.getState().repos[REPO_ID]!, branch)).toBe('github')
+  })
+
+  test('uses the longest provider remote match for slash-containing tracking names', () => {
+    const branch = createBranch('feature/longest-provider', { tracking: 'origin/gitlab/feature/longest-provider' })
+    seedRepoState({
+      id: REPO_ID,
+      branches: [branch],
+      remote: {
+        remotes: ['origin', 'origin/gitlab'],
+        hasRemotes: true,
+        hasBrowserRemote: true,
+        browserRemoteProvider: 'github',
+        remoteProviders: { origin: 'github', 'origin/gitlab': 'gitlab' },
+        hasGitHubRemote: true,
+      },
+    })
+
+    expect(branchBrowserRemoteProvider(useReposStore.getState().repos[REPO_ID]!, branch)).toBe('gitlab')
   })
 })
 

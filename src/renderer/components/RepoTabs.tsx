@@ -9,7 +9,6 @@
 // users use Arrow keys for tab activation.
 
 import { toast } from 'sonner'
-import { useShallow } from 'zustand/react/shallow'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
@@ -31,7 +30,7 @@ function summariesEqual(a: RepoTabSummary[], b: RepoTabSummary[]): boolean {
   for (let i = 0; i < a.length; i++) {
     const x = a[i]!
     const y = b[i]!
-    if (x.id !== y.id || x.name !== y.name) return false
+    if (x.id !== y.id || x.name !== y.name || x.unavailable !== y.unavailable) return false
   }
   return true
 }
@@ -57,7 +56,7 @@ export function RepoTabs({ cloneOpen, onCloneOpenChange }: RepoTabsProps) {
       s.order
         .map<RepoTabSummary | null>((id) => {
           const r = s.repos[id]
-          return r ? { id: r.id, name: r.name } : null
+          return r ? { id: r.id, name: r.name, unavailable: r.availability.phase === 'unavailable' } : null
         })
         .filter((x): x is RepoTabSummary => x !== null),
     summariesEqual,
@@ -67,8 +66,6 @@ export function RepoTabs({ cloneOpen, onCloneOpenChange }: RepoTabsProps) {
   const closeRepo = useReposStore((s) => s.closeRepo)
   const openRepo = useReposStore((s) => s.openRepo)
   const reorderRepos = useReposStore((s) => s.reorderRepos)
-  const missing = useReposStore(useShallow((s) => s.missingFromSession))
-  const dismissMissing = useReposStore((s) => s.dismissMissing)
 
   async function handleOpenLocal() {
     const path = await rpc.repo.openDialog.mutate()
@@ -100,12 +97,8 @@ export function RepoTabs({ cloneOpen, onCloneOpenChange }: RepoTabsProps) {
       <RepoTabStrip
         repos={summaries}
         activeId={activeId}
-        missing={missing}
         labels={{
           repositories: t('repo-tabs.repos'),
-          emptyBefore: t('repo-tabs.empty.before'),
-          emptyOpenLabel: t('repo-tabs.empty.open-label'),
-          emptyAfter: t('repo-tabs.empty.after'),
           close: t('repo-tabs.close'),
           dragToReorder: t('repo-tabs.drag-to-reorder'),
           open: t('topbar.open'),
@@ -113,15 +106,13 @@ export function RepoTabs({ cloneOpen, onCloneOpenChange }: RepoTabsProps) {
           openLocalShortcut: shortcutsDisabled ? null : '⌘O',
           clone: t('repo-tabs.clone'),
           cloneShortcut: shortcutsDisabled ? null : '⌘⇧O',
-          missingTitle: t('repo-tabs.missing-title', { n: missing.length }),
-          missingDismiss: t('repo-tabs.missing-dismiss'),
+          unavailable: t('repo-unavailable.title'),
         }}
         onActivate={setActive}
         onClose={closeRepo}
         onReorder={reorderRepos}
         onOpenLocal={handleOpenLocal}
         onClone={() => onCloneOpenChange(true)}
-        onDismissMissing={dismissMissing}
       />
       <CloneRepositoryDialog open={cloneOpen} onClose={() => onCloneOpenChange(false)} onClone={handleClone} />
     </>

@@ -101,9 +101,7 @@ export const ja: Record<DictKey, string> = {
 
   // ---- Repository tabs ---------------------------------------------------
   'repo-tabs.repos': 'リポジトリ',
-  'repo-tabs.empty.before': '上部タブバーの ',
-  'repo-tabs.empty.open-label': '開く',
-  'repo-tabs.empty.after': ' から git リポジトリを追加してください。',
+  'repo-tabs.empty': '上部タブバーの <open>開く</open> から git リポジトリを追加してください。',
   'repo-tabs.close': '閉じる',
   'repo-tabs.drag-to-reorder': 'ドラッグで並べ替え',
   'repo-tabs.open-local': 'ローカルリポジトリを開く…',
@@ -121,14 +119,17 @@ export const ja: Record<DictKey, string> = {
   'repo-tabs.clone-confirm': 'クローンして開く',
   'repo-tabs.clone-cloning': 'クローン中…',
   'repo-tabs.clone-opened': 'リポジトリをクローンしました',
-  'repo-tabs.missing-title': '{n} 件のリポジトリを再オープンできませんでした',
-  'repo-tabs.missing-dismiss': '閉じる',
+  'repo-unavailable.title': 'リポジトリパスを利用できません',
+  'repo-unavailable.body': 'Goblin はこのパスを Git リポジトリとして読み取れません。フォルダを復元するか .git を作り直してから再試行してください。',
+  'repo-unavailable.path': 'パス',
+  'repo-unavailable.reason': '理由',
+  'repo-unavailable.retry': '再確認',
+  'repo-unavailable.close': 'タブを閉じる',
 
   // ---- Empty state -------------------------------------------------------
   'empty.title': 'リポジトリが開かれていません',
-  'empty.body.before': '上部タブバーの ',
-  'empty.body.open-label': '開く',
-  'empty.body.after': ' から Git リポジトリを追加するか、リポジトリフォルダをこのウィンドウにドロップします。',
+  'empty.body':
+    '上部タブバーの <open>開く</open> から Git リポジトリを追加するか、リポジトリフォルダをこのウィンドウにドロップします。',
 
   // ---- Drag and drop -----------------------------------------------------
   'drop.title': 'ドロップしてリポジトリを開く',
@@ -272,8 +273,8 @@ export const ja: Record<DictKey, string> = {
   'action.pull': 'プル',
   'action.push': 'プッシュ',
   'action.fetch': 'フェッチ',
-  'action.github': 'GitHub',
-  'action.github-pr': 'PR #{n}',
+  'action.remote': 'リモート',
+  'action.remote-pr': 'PR #{n}',
   'action.delete-branch': 'ブランチを削除',
   'action.remove-worktree': 'ワークツリーを削除',
   'action.checkout-loading': 'チェックアウト中…',
@@ -293,26 +294,23 @@ export const ja: Record<DictKey, string> = {
   'action.push-title': '{branch} をプッシュ',
   'action.fetch-title': 'リモートを同期してステータスを更新',
   'action.fetch-local-title': 'ローカルブランチとステータスを更新',
-  'action.github-title': 'リポジトリをブラウザで開く',
+  'action.remote-title': 'リポジトリをブラウザで開く',
   'action.result-ok': 'OK',
   'action.result-error': 'エラー',
   'action.confirm-push-protected-title': '{branch} にプッシュしますか？',
-  'action.confirm-push-protected-body.before': 'このまま ',
-  'action.confirm-push-protected-body.after':
-    ' に直接プッシュしようとしています。通常はプルリクエスト経由が望ましいですが、続行しますか？',
+  'action.confirm-push-protected-body':
+    'このまま <branch>{branch}</branch> に直接プッシュしようとしています。通常はプルリクエスト経由が望ましいですが、続行しますか？',
   'action.confirm-push-confirm': 'プッシュを続行',
   'action.confirm-delete-branch-title': '{branch} を削除しますか？',
-  'action.confirm-delete-branch-body.before': 'ローカルブランチ ',
-  'action.confirm-delete-branch-body.after': ' を削除します。完全にマージされていない場合、Git が拒否します。',
+  'action.confirm-delete-branch-body':
+    'ローカルブランチ <branch>{branch}</branch> を削除します。完全にマージされていない場合、Git が拒否します。',
   'action.confirm-delete-branch-confirm': 'ブランチを削除',
   'action.confirm-force-delete-standalone-title': '{branch} を強制削除しますか？',
-  'action.confirm-force-delete-standalone-body.before': 'ローカルブランチ ',
-  'action.confirm-force-delete-standalone-body.after':
-    ' には完全にマージされていない固有コミットがあります。そのコミットが不要な場合のみ強制削除してください。',
+  'action.confirm-force-delete-standalone-body':
+    'ローカルブランチ <branch>{branch}</branch> には完全にマージされていない固有コミットがあります。そのコミットが不要な場合のみ強制削除してください。',
   'action.confirm-force-delete-standalone-confirm': 'ブランチを強制削除',
   'action.confirm-remove-worktree-title': '{branch} のワークツリーを削除しますか？',
-  'action.confirm-remove-worktree-body.before': 'ワークツリーのディレクトリ ',
-  'action.confirm-remove-worktree-body.after': ' を削除します。',
+  'action.confirm-remove-worktree-body': 'ワークツリーのディレクトリ <path>{path}</path> を削除します。',
   'action.confirm-remove-worktree-confirm': 'ワークツリーを削除',
   'action.confirm-remove-worktree-also-delete-branch': 'ブランチ {branch} も削除する',
   'action.confirm-remove-worktree-protected-hint': 'このブランチは保護されているため、ここから削除できません。',
@@ -345,7 +343,7 @@ export const ja: Record<DictKey, string> = {
   'error.path-not-found': 'パスが見つかりません',
   'error.path-not-directory': 'フォルダではありません',
   'error.path-permission-denied': '権限がありません',
-  'error.open-github-no-origin': 'GitHub リモートがありません',
+  'error.open-remote-unavailable': 'ブラウザで開けるリモートがありません',
   'error.pull-no-remote': '上流リモートが設定されていません',
   'error.push-no-remote': 'プッシュ先のリモートが設定されていません',
   'error.push-ambiguous-remote': '複数のリモートが設定されています。プッシュする前に上流を設定するか origin リモートを追加してください。',

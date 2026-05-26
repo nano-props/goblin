@@ -29,7 +29,14 @@ export function seedRepo(branches: BranchInfo[], instanceToken = 1): number {
     id: REPO_ID,
     branches,
     instanceToken,
-    remote: { remotes: ['origin'], hasRemotes: true, hasGitHubRemote: true },
+    remote: {
+      remotes: ['origin'],
+      hasRemotes: true,
+      hasBrowserRemote: true,
+      browserRemoteProvider: 'github',
+      remoteProviders: { origin: 'github' },
+      hasGitHubRemote: true,
+    },
   }).instanceToken
 }
 

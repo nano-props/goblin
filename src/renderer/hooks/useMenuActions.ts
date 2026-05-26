@@ -62,6 +62,7 @@ export function useMenuActions({ openSettings, openCloneRepo, showHelp, isOverla
             break
           case 'close-repo': {
             if (state.activeId) closeRepo(state.activeId)
+            else window.close()
             break
           }
           case 'next-repo':

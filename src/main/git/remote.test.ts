@@ -3,7 +3,7 @@ import { execaSync } from 'execa'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { fetchAll, getGitHubUrl, getPullRequestUrl, getRemoteInfo, pullBranch, pushBranch } from '#/main/git/remote.ts'
+import { fetchAll, getBrowserRemoteUrl, getNewPullRequestUrl, getRemoteInfo, pullBranch, pushBranch } from '#/main/git/remote.ts'
 import { getGitHubRepoRef } from '#/main/github/graphql.ts'
 
 let tmp: string | null = null
@@ -55,6 +55,9 @@ describe('fetchAll', () => {
     await expect(getRemoteInfo(repo)).resolves.toEqual({
       remotes: [],
       hasRemotes: false,
+      hasBrowserRemote: false,
+      browserRemoteProvider: undefined,
+      remoteProviders: {},
       hasGitHubRemote: false,
     })
   })
@@ -85,6 +88,9 @@ describe('fetchAll', () => {
     await expect(getRemoteInfo(repo)).resolves.toEqual({
       remotes: [{ name: 'origin', url: remote }],
       hasRemotes: true,
+      hasBrowserRemote: false,
+      browserRemoteProvider: undefined,
+      remoteProviders: {},
       hasGitHubRemote: false,
     })
     const result = await fetchAll(repo)
@@ -98,11 +104,52 @@ describe('fetchAll', () => {
     execaSync('git', ['init', repo], { stdio: 'ignore' })
     git(repo, 'remote', 'add', 'upstream', 'git@github.com:acme/repo.git')
 
-    await expect(getGitHubUrl(repo)).resolves.toBe('https://github.com/acme/repo')
+    await expect(getBrowserRemoteUrl(repo)).resolves.toBe('https://github.com/acme/repo')
     await expect(getRemoteInfo(repo)).resolves.toMatchObject({
       hasRemotes: true,
+      hasBrowserRemote: true,
+      browserRemoteProvider: 'github',
+      remoteProviders: { upstream: 'github' },
       hasGitHubRemote: true,
     })
+  })
+
+  test('resolves browser and new MR URLs from GitLab remotes', async () => {
+    tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-remote-test-'))
+    const repo = path.join(tmp, 'repo')
+    execaSync('git', ['init', repo], { stdio: 'ignore' })
+    git(repo, 'remote', 'add', 'origin', 'git@gitlab.com:acme/platform/repo.git')
+
+    await expect(getBrowserRemoteUrl(repo)).resolves.toBe('https://gitlab.com/acme/platform/repo')
+    await expect(getNewPullRequestUrl(repo, 'feature/gitlab')).resolves.toBe(
+      'https://gitlab.com/acme/platform/repo/-/merge_requests/new?merge_request%5Bsource_branch%5D=feature%2Fgitlab',
+    )
+    await expect(getRemoteInfo(repo)).resolves.toMatchObject({
+      hasRemotes: true,
+      hasBrowserRemote: true,
+      browserRemoteProvider: 'gitlab',
+      remoteProviders: { origin: 'gitlab' },
+      hasGitHubRemote: false,
+    })
+    await expect(getGitHubRepoRef(repo)).resolves.toBeNull()
+  })
+
+  test('treats unknown web remotes as external browser remotes', async () => {
+    tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-remote-test-'))
+    const repo = path.join(tmp, 'repo')
+    execaSync('git', ['init', repo], { stdio: 'ignore' })
+    git(repo, 'remote', 'add', 'origin', 'https://code.example.com/acme/repo.git')
+
+    await expect(getBrowserRemoteUrl(repo)).resolves.toBe('https://code.example.com/acme/repo')
+    await expect(getNewPullRequestUrl(repo, 'feature/external')).resolves.toBeNull()
+    await expect(getRemoteInfo(repo)).resolves.toMatchObject({
+      hasRemotes: true,
+      hasBrowserRemote: true,
+      browserRemoteProvider: 'external',
+      remoteProviders: { origin: 'external' },
+      hasGitHubRemote: false,
+    })
+    await expect(getGitHubRepoRef(repo)).resolves.toBeNull()
   })
 
   test('prefers the branch upstream GitHub remote over origin for browser URLs', async () => {
@@ -114,8 +161,8 @@ describe('fetchAll', () => {
     git(repo, 'config', 'branch.feature.remote', 'upstream')
     git(repo, 'config', 'branch.feature.merge', 'refs/heads/main')
 
-    await expect(getGitHubUrl(repo, { branch: 'feature' })).resolves.toBe('https://github.com/acme/repo')
-    await expect(getPullRequestUrl(repo, 'feature')).resolves.toBe('https://github.com/acme/repo/pull/new/feature')
+    await expect(getBrowserRemoteUrl(repo, { branch: 'feature' })).resolves.toBe('https://github.com/acme/repo')
+    await expect(getNewPullRequestUrl(repo, 'feature')).resolves.toBe('https://github.com/acme/repo/pull/new/feature')
     await expect(getGitHubRepoRef(repo, { branch: 'feature' })).resolves.toEqual({
       host: 'github.com',
       owner: 'acme',
@@ -134,7 +181,7 @@ describe('fetchAll', () => {
     git(repo, 'config', 'branch.feature.remote', 'local')
     git(repo, 'config', 'branch.feature.merge', 'refs/heads/main')
 
-    await expect(getGitHubUrl(repo, { branch: 'feature' })).resolves.toBe('https://github.com/me/fork')
+    await expect(getBrowserRemoteUrl(repo, { branch: 'feature' })).resolves.toBe('https://github.com/me/fork')
   })
 })
 

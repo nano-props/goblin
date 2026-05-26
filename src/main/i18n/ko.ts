@@ -94,9 +94,7 @@ export const ko: Record<DictKey, string> = {
 
   // ---- Repository tabs ---------------------------------------------------
   'repo-tabs.repos': '리포지토리',
-  'repo-tabs.empty.before': '상단 탭 막대의 ',
-  'repo-tabs.empty.open-label': '열기',
-  'repo-tabs.empty.after': ' 를 눌러 git 리포지토리를 추가하세요.',
+  'repo-tabs.empty': '상단 탭 막대의 <open>열기</open> 를 눌러 git 리포지토리를 추가하세요.',
   'repo-tabs.close': '닫기',
   'repo-tabs.drag-to-reorder': '드래그하여 순서 변경',
   'repo-tabs.open-local': '로컬 리포지토리 열기…',
@@ -114,14 +112,17 @@ export const ko: Record<DictKey, string> = {
   'repo-tabs.clone-confirm': '클론 후 열기',
   'repo-tabs.clone-cloning': '클론 중…',
   'repo-tabs.clone-opened': '리포지토리를 클론했습니다',
-  'repo-tabs.missing-title': '{n} 개 리포지토리를 복원하지 못했습니다',
-  'repo-tabs.missing-dismiss': '무시',
+  'repo-unavailable.title': '리포지토리 경로를 사용할 수 없음',
+  'repo-unavailable.body': 'Goblin 이 이 경로를 Git 리포지토리로 읽을 수 없습니다. 폴더를 복원하거나 .git 을 다시 만든 뒤 재시도하세요.',
+  'repo-unavailable.path': '경로',
+  'repo-unavailable.reason': '이유',
+  'repo-unavailable.retry': '다시 확인',
+  'repo-unavailable.close': '탭 닫기',
 
   // ---- Empty state -------------------------------------------------------
   'empty.title': '열린 리포지토리가 없습니다',
-  'empty.body.before': '상단 탭 막대의 ',
-  'empty.body.open-label': '열기',
-  'empty.body.after': '를 눌러 Git 리포지토리를 추가하거나, 리포지토리 폴더를 이 창으로 드롭하세요.',
+  'empty.body':
+    '상단 탭 막대의 <open>열기</open> 를 눌러 Git 리포지토리를 추가하거나, 리포지토리 폴더를 이 창으로 드롭하세요.',
 
   // ---- Drag and drop -----------------------------------------------------
   'drop.title': '놓아서 리포지토리 열기',
@@ -265,8 +266,8 @@ export const ko: Record<DictKey, string> = {
   'action.pull': '풀',
   'action.push': '푸시',
   'action.fetch': '페치',
-  'action.github': 'GitHub',
-  'action.github-pr': 'PR #{n}',
+  'action.remote': '원격',
+  'action.remote-pr': 'PR #{n}',
   'action.delete-branch': '브랜치 삭제',
   'action.remove-worktree': '워크트리 제거',
   'action.checkout-loading': '체크아웃 중…',
@@ -286,26 +287,23 @@ export const ko: Record<DictKey, string> = {
   'action.push-title': '{branch} 푸시',
   'action.fetch-title': '원격을 동기화하고 상태 새로 고침',
   'action.fetch-local-title': '로컬 브랜치와 상태 새로 고침',
-  'action.github-title': '브라우저에서 리포지토리 열기',
+  'action.remote-title': '브라우저에서 리포지토리 열기',
   'action.result-ok': '성공',
   'action.result-error': '오류',
   'action.confirm-push-protected-title': '{branch} 에 푸시할까요?',
-  'action.confirm-push-protected-body.before': '',
-  'action.confirm-push-protected-body.after':
-    ' 로 직접 푸시하려고 합니다. 보통은 PR 을 거치는 게 좋습니다. 계속할까요?',
+  'action.confirm-push-protected-body':
+    '<branch>{branch}</branch> 브랜치로 직접 푸시하려고 합니다. 보통은 PR 을 거치는 게 좋습니다. 계속할까요?',
   'action.confirm-push-confirm': '그래도 푸시',
   'action.confirm-delete-branch-title': '{branch} 을(를) 삭제할까요?',
-  'action.confirm-delete-branch-body.before': '로컬 브랜치 ',
-  'action.confirm-delete-branch-body.after': ' 을(를) 삭제합니다. 완전히 병합되지 않았다면 Git 이 거부합니다.',
+  'action.confirm-delete-branch-body':
+    '로컬 브랜치 <branch>{branch}</branch> 을(를) 삭제합니다. 완전히 병합되지 않았다면 Git 이 거부합니다.',
   'action.confirm-delete-branch-confirm': '브랜치 삭제',
   'action.confirm-force-delete-standalone-title': '{branch} 을(를) 강제 삭제할까요?',
-  'action.confirm-force-delete-standalone-body.before': '로컬 브랜치 ',
-  'action.confirm-force-delete-standalone-body.after':
-    ' 에는 완전히 병합되지 않은 고유 커밋이 있습니다. 해당 커밋이 더 이상 필요 없을 때만 강제 삭제하세요.',
+  'action.confirm-force-delete-standalone-body':
+    '로컬 브랜치 <branch>{branch}</branch> 에는 완전히 병합되지 않은 고유 커밋이 있습니다. 해당 커밋이 더 이상 필요 없을 때만 강제 삭제하세요.',
   'action.confirm-force-delete-standalone-confirm': '브랜치 강제 삭제',
   'action.confirm-remove-worktree-title': '{branch} 의 워크트리를 제거할까요?',
-  'action.confirm-remove-worktree-body.before': '워크트리 디렉터리 ',
-  'action.confirm-remove-worktree-body.after': ' 를 삭제합니다.',
+  'action.confirm-remove-worktree-body': '워크트리 디렉터리 <path>{path}</path> 를 삭제합니다.',
   'action.confirm-remove-worktree-confirm': '워크트리 제거',
   'action.confirm-remove-worktree-also-delete-branch': '브랜치 {branch} 도 함께 삭제',
   'action.confirm-remove-worktree-protected-hint': '이 브랜치는 보호되어 있어 여기서 삭제할 수 없습니다.',
@@ -338,7 +336,7 @@ export const ko: Record<DictKey, string> = {
   'error.path-not-found': '경로를 찾을 수 없습니다',
   'error.path-not-directory': '폴더가 아닙니다',
   'error.path-permission-denied': '권한이 없습니다',
-  'error.open-github-no-origin': 'GitHub 원격이 없습니다',
+  'error.open-remote-unavailable': '브라우저에서 열 수 있는 원격이 없습니다',
   'error.pull-no-remote': '업스트림 원격이 설정되어 있지 않습니다',
   'error.push-no-remote': '푸시할 원격이 설정되어 있지 않습니다',
   'error.push-ambiguous-remote': '여러 원격이 설정되어 있습니다. 푸시하기 전에 업스트림을 설정하거나 origin 원격을 추가하세요.',

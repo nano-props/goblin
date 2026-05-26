@@ -10,4 +10,5 @@ export type {
   ExecResult,
   PullRequestInfo,
   PullRequestFetchMode,
+  BrowserRemoteProvider,
 } from '#/shared/git-types.ts'

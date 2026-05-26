@@ -538,6 +538,40 @@ describe('core refresh request ordering', () => {
     expect(logCalls).toBe(0)
   })
 
+  test('refreshAll marks deleted or non-git paths unavailable and skips follow-up reads', async () => {
+    const token = seedRepo([branch('main')])
+    let statusCalls = 0
+    rpcHandlers['repo.snapshot'] = async () => {
+      throw new Error('error.not-git-repo')
+    }
+    rpcHandlers['repo.status'] = async () => {
+      statusCalls += 1
+      return []
+    }
+
+    await useReposStore.getState().refreshAll(REPO_ID, { token })
+
+    const repo = useReposStore.getState().repos[REPO_ID]
+    expect(repo?.availability).toMatchObject({ phase: 'unavailable', reason: 'error.not-git-repo' })
+    expect(repo?.resources.snapshot.error).toBe('error.not-git-repo')
+    expect(statusCalls).toBe(0)
+  })
+
+  test('refreshSnapshot restores an unavailable repo when the path is a git repo again', async () => {
+    const token = seedRepo([branch('old')])
+    updateRepoForTest((repo) => {
+      repo.availability = { phase: 'unavailable', reason: 'error.path-not-found', checkedAt: Date.now() }
+    })
+    rpcHandlers['repo.snapshot'] = async () => ({ branches: [branch('main')], current: 'main' })
+
+    await useReposStore.getState().refreshSnapshot(REPO_ID, { token })
+
+    const repo = useReposStore.getState().repos[REPO_ID]
+    expect(repo?.availability).toEqual({ phase: 'available' })
+    expect(repo?.data.branches.map((b) => b.name)).toEqual(['main'])
+    expect(repo?.resources.snapshot.error).toBeNull()
+  })
+
   test('refreshAll stops before log when the repo is reopened after status', async () => {
     const token = seedRepo([branch('main')], 1)
     let logCalls = 0

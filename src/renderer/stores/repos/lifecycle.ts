@@ -4,7 +4,7 @@ import { emptyRepo, inFlightFetchById } from '#/renderer/stores/repos/helpers.ts
 import { hydrateCachedRepo } from '#/renderer/stores/repos/persistence.ts'
 import { disposeRepoRuntime } from '#/renderer/stores/repos/runtime.ts'
 import { runInitialRepoLoad } from '#/renderer/stores/repos/refresh-workflows.ts'
-import type { MissingRepo, OpenRepoResult, ReposGet, ReposSet, ReposStore } from '#/renderer/stores/repos/types.ts'
+import type { OpenRepoResult, ReposGet, ReposSet, ReposStore } from '#/renderer/stores/repos/types.ts'
 import { rpc } from '#/renderer/rpc.ts'
 
 interface ResolvedRepo {
@@ -67,6 +67,23 @@ function addResolvedRepo(
   return {
     repos: { ...s.repos, [id]: hydrateCachedRepo(emptyRepo(id, name), s.repoCache[id]) },
     order: orderedInsert(s.order, id, rankById),
+    changed: true,
+  }
+}
+
+function addUnavailableRepo(
+  s: Pick<ReposStore, 'repos' | 'repoCache' | 'order'>,
+  id: string,
+  reason: string,
+  rankById?: ReadonlyMap<string, number>,
+): Pick<ReposStore, 'repos' | 'order'> & { changed: boolean } {
+  if (s.repos[id]) return { repos: s.repos, order: s.order, changed: false }
+  const cached = s.repoCache[id]
+  const repo = hydrateCachedRepo(emptyRepo(id, cached?.name || lastPathSegment(id)), cached)
+  repo.availability = { phase: 'unavailable', reason, checkedAt: Date.now() }
+  return {
+    repos: { ...s.repos, [id]: repo },
+    order: s.order.includes(id) ? s.order : orderedInsert(s.order, id, rankById),
     changed: true,
   }
 }
@@ -156,11 +173,9 @@ export function createLifecycleActions(set: ReposSet, get: ReposGet) {
 
     async hydrateSession(openRepos: string[], activeRepo: string | null) {
       // Probe in parallel; entries that are no longer git repos (folder
-      // moved/deleted, external drive not mounted) get reported via
-      // `missingFromSession` so the user sees a "couldn't reopen N repos"
-      // notice in the tab strip instead of wondering where their tabs went.
+      // moved/deleted, external drive not mounted) are restored as unavailable
+      // tabs so the user's workspace shape stays intact.
       const rankById = new Map<string, number>()
-      const missingByIndex: Array<MissingRepo | undefined> = []
       let managedActiveId: string | null = null
       const limitProbe = pLimit(SESSION_PROBE_CONCURRENCY)
       await Promise.all(
@@ -170,7 +185,19 @@ export function createLifecycleActions(set: ReposSet, get: ReposGet) {
               console.warn(`[session] probe failed for ${p}:`, err)
             })
             if (!probe.repo) {
-              missingByIndex[index] = { path: probe.input, reason: probe.reason ?? 'error.failed-read-repo' }
+              if (!rankById.has(probe.input)) rankById.set(probe.input, index)
+              set((s) => {
+                const { repos, order } = addUnavailableRepo(
+                  s,
+                  probe.input,
+                  probe.reason ?? 'error.failed-read-repo',
+                  rankById,
+                )
+                const activeId = activeAfterHydrateStep(s, repos, order, activeRepo, managedActiveId)
+                if (s.activeId === null || s.activeId === managedActiveId) managedActiveId = activeId
+                if (repos === s.repos && order === s.order && activeId === s.activeId) return s
+                return { repos, order, activeId }
+              })
               return
             }
 
@@ -200,13 +227,8 @@ export function createLifecycleActions(set: ReposSet, get: ReposGet) {
         return {
           activeId,
           sessionReady: true,
-          missingFromSession: missingByIndex.filter((x): x is MissingRepo => !!x),
         }
       })
-    },
-
-    dismissMissing() {
-      set({ missingFromSession: [] })
     },
   }
 }

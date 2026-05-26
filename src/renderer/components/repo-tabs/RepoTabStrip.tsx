@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Trans } from 'react-i18next'
 import { Download, FolderOpen, Plus } from 'lucide-react'
 import {
   DndContext,
@@ -21,9 +22,7 @@ import {
 } from '#/renderer/components/ui/dropdown-menu.tsx'
 import { RepoTab } from '#/renderer/components/repo-tabs/RepoTab.tsx'
 import { TabTooltipLayer } from '#/renderer/components/repo-tabs/TabTooltipLayer.tsx'
-import { MissingReposPopover } from '#/renderer/components/repo-tabs/MissingReposPopover.tsx'
 import type { RepoTabStripLabels, RepoTabSummary } from '#/renderer/components/repo-tabs/types.ts'
-import type { MissingRepo } from '#/renderer/stores/repos/types.ts'
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
@@ -63,27 +62,23 @@ function shouldShowInactiveSeparator({
 interface RepoTabStripProps {
   repos: RepoTabSummary[]
   activeId: string | null
-  missing: MissingRepo[]
   labels: RepoTabStripLabels
   onActivate: (id: string) => void
   onClose: (id: string) => void
   onReorder: (activeId: string, overId: string) => void
   onOpenLocal: () => void
   onClone: () => void
-  onDismissMissing: () => void
 }
 
 export function RepoTabStrip({
   repos,
   activeId,
-  missing,
   labels,
   onActivate,
   onClose,
   onReorder,
   onOpenLocal,
   onClone,
-  onDismissMissing,
 }: RepoTabStripProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
@@ -133,9 +128,7 @@ export function RepoTabStrip({
           <TabTooltipLayer repos={repos} className="flex h-full w-max min-w-full items-center gap-1" role="tablist">
             {repos.length === 0 ? (
               <div className="flex h-8 items-center px-2 text-xs text-muted-foreground">
-                {labels.emptyBefore}
-                <span className="text-foreground">{labels.emptyOpenLabel}</span>
-                {labels.emptyAfter}
+                <Trans i18nKey="repo-tabs.empty" components={{ open: <span className="text-foreground" /> }} />
               </div>
             ) : (
               <DndContext
@@ -163,6 +156,7 @@ export function RepoTabStrip({
                         onClose={onClose}
                         onKeyboardNavigate={handleKeyboardNavigate}
                         closeLabel={labels.close}
+                        unavailableLabel={labels.unavailable}
                       />
                     )
                   })}
@@ -171,12 +165,6 @@ export function RepoTabStrip({
             )}
           </TabTooltipLayer>
         </ScrollArea>
-        <MissingReposPopover
-          missing={missing}
-          title={labels.missingTitle}
-          dismissLabel={labels.missingDismiss}
-          onDismiss={onDismissMissing}
-        />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button

@@ -4,6 +4,7 @@ import type { RepoState } from '#/renderer/stores/repos/types.ts'
 
 export function canStartRemoteFetch(repo: RepoState | undefined): repo is RepoState {
   if (!repo) return false
+  if (repo.availability.phase === 'unavailable') return false
   // Network writes must not overlap with core repo reads/writes that mutate
   // branch/status truth. Log and PR refreshes are metadata reads, so they can
   // remain visible without blocking manual sync/pull/push.

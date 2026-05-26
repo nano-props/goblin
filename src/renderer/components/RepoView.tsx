@@ -11,6 +11,7 @@ import { RepoWorkspace, RepoWorkspacePane } from '#/renderer/components/Layout.t
 import { useRepoToasts } from '#/renderer/hooks/useRepoToasts.tsx'
 import { repoWorkspaceBehavior } from '#/renderer/lib/workspace-layout.ts'
 import { getRepoWorkspacePresentation } from '#/renderer/components/repo-workspace/model.ts'
+import { UnavailableRepoView } from '#/renderer/components/UnavailableRepoView.tsx'
 
 interface Props {
   repoId: string
@@ -40,11 +41,13 @@ export function RepoView({ repoId }: Props) {
       a.detailPaneSize === b.detailPaneSize,
   )
   const setDetailPaneSize = useReposStore((s) => s.setDetailPaneSize)
+  const repo = useReposStore((s) => s.repos[repoId])
   useRepoToasts(repoId)
 
   const behavior = repoWorkspaceBehavior(view.workspaceLayout, view.detailCollapsed, view.detailFocusMode)
 
-  if (!view.exists) return <div />
+  if (!view.exists || !repo) return <div />
+  if (repo.availability.phase === 'unavailable') return <UnavailableRepoView repo={repo} />
   if (view.initialLoading) {
     return (
       <RepoWorkspaceSkeleton showRepoToolbar layout={view.workspaceLayout} detailCollapsed={behavior.detailCollapsed} />

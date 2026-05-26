@@ -38,10 +38,14 @@ export function emptyRepo(id: string, name: string): RepoState {
     remote: {
       remotes: [],
       hasRemotes: false,
+      hasBrowserRemote: false,
+      browserRemoteProvider: undefined,
+      remoteProviders: {},
       hasGitHubRemote: false,
       fetchFailed: false,
       fetchError: null,
     },
+    availability: { phase: 'available' },
     events: [],
   }
 }

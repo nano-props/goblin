@@ -30,7 +30,7 @@ export function helpShortcutSections(globalShortcut: string): HelpShortcutSectio
         { combos: [['⇧', 'P']], labelKey: 'action.push' },
         { combos: [['g']], labelKey: 'worktrees.open-in-terminal-label' },
         { combos: [['v']], labelKey: 'worktrees.open-in-editor-label' },
-        { combos: [['⇧', 'G']], labelKey: 'action.github' },
+        { combos: [['⇧', 'G']], labelKey: 'action.remote' },
       ],
     },
     {

@@ -1,13 +1,14 @@
-import { ArrowDown, ArrowUp, ClipboardCopy, GitBranch, GitPullRequest, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, ClipboardCopy, ExternalLink, GitBranch, GitPullRequest, Trash2 } from 'lucide-react'
 import { createElement, type ReactNode } from 'react'
 import { GitHubOutlineIcon } from '#/renderer/components/GitHubOutlineIcon.tsx'
+import { GitLabLogoIcon } from '#/renderer/components/GitLabLogoIcon.tsx'
 import type { RepoState } from '#/renderer/stores/repos/types.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { useSettingsStore } from '#/renderer/stores/settings.ts'
 import { EditorAppIcon, TerminalAppIcon } from '#/renderer/components/ExternalAppIcon/index.tsx'
 import { useBranchActions, type BranchActionItemId } from '#/renderer/hooks/useBranchActions.tsx'
 import { branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
-import type { BranchInfo } from '#/renderer/types.ts'
+import type { BranchInfo, BrowserRemoteProvider } from '#/renderer/types.ts'
 
 export interface BranchActionItem {
   id: BranchActionItemId
@@ -30,6 +31,23 @@ export interface BranchActionItemGroups {
   dialogs: ReactNode
 }
 
+export function branchBrowserRemoteProvider(repo: RepoState, branch: BranchInfo): BrowserRemoteProvider | undefined {
+  const providers = repo.remote.remoteProviders
+  if (branch.tracking && providers) {
+    const remoteName = Object.keys(providers)
+      .filter((remote) => branch.tracking === remote || branch.tracking!.startsWith(`${remote}/`))
+      .sort((a, b) => b.length - a.length)[0]
+    if (remoteName) return providers[remoteName]
+  }
+  return repo.remote.browserRemoteProvider
+}
+
+function browserRemoteIcon(provider: BrowserRemoteProvider | undefined) {
+  if (provider === 'github') return GitHubOutlineIcon
+  if (provider === 'gitlab') return GitLabLogoIcon
+  return ExternalLink
+}
+
 export function useBranchActionItems(repo: RepoState, branch: BranchInfo): BranchActionItemGroups {
   const t = useT()
   const terminalApp = useSettingsStore((s) => s.terminalApp)
@@ -43,7 +61,7 @@ export function useBranchActionItems(repo: RepoState, branch: BranchInfo): Branc
   const busy = (id: BranchActionItemId) => busyAction === id
   const pullRequest =
     branch.pullRequest && branchPullRequestBelongsToBranch(branch, branch.pullRequest) ? branch.pullRequest : undefined
-  const githubIcon = pullRequest ? GitPullRequest : GitHubOutlineIcon
+  const remoteIcon = pullRequest ? GitPullRequest : browserRemoteIcon(branchBrowserRemoteProvider(repo, branch))
 
   const patchItems: BranchActionItem[] = capabilities.canCopyPatch
     ? [
@@ -121,14 +139,14 @@ export function useBranchActionItems(repo: RepoState, branch: BranchInfo): Branc
         ]
       : []),
     {
-      id: 'github',
-      label: pullRequest ? t('action.github-pr', { n: pullRequest.number }) : t('action.github'),
+      id: 'remote',
+      label: pullRequest ? t('action.remote-pr', { n: pullRequest.number }) : t('action.remote'),
       disabled,
-      busy: busy('github'),
-      visible: capabilities.canOpenGitHub,
+      busy: busy('remote'),
+      visible: capabilities.canOpenRemote,
       shortcut: '⇧G',
-      icon: createElement(githubIcon),
-      onSelect: actions.openGitHub,
+      icon: createElement(remoteIcon),
+      onSelect: actions.openRemote,
     },
   ]
 

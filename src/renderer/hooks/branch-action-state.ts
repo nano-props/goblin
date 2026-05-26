@@ -7,7 +7,7 @@ export type BranchActionItemId =
   | 'checkout'
   | 'pull'
   | 'push'
-  | 'github'
+  | 'remote'
   | 'terminal'
   | 'editor'
   | 'deleteBranch'

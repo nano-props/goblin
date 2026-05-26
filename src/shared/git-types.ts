@@ -101,9 +101,14 @@ export interface GitRemoteInfo {
   url: string
 }
 
+export type BrowserRemoteProvider = 'github' | 'gitlab' | 'external'
+
 export interface RepoRemoteInfo {
   remotes: GitRemoteInfo[]
   hasRemotes: boolean
+  hasBrowserRemote: boolean
+  browserRemoteProvider?: BrowserRemoteProvider
+  remoteProviders: Record<string, BrowserRemoteProvider>
   hasGitHubRemote: boolean
 }
 

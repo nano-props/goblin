@@ -101,9 +101,7 @@ export const en = {
 
   // ---- Repository tabs ----------------------------------------------------
   'repo-tabs.repos': 'Repositories',
-  'repo-tabs.empty.before': 'Click the ',
-  'repo-tabs.empty.open-label': 'Open',
-  'repo-tabs.empty.after': ' button in the tab strip to add a git repository.',
+  'repo-tabs.empty': 'Click the <open>Open</open> button in the tab strip to add a git repository.',
   'repo-tabs.close': 'Close',
   'repo-tabs.drag-to-reorder': 'Drag to reorder',
   'repo-tabs.open-local': 'Open local repository…',
@@ -121,16 +119,19 @@ export const en = {
   'repo-tabs.clone-confirm': 'Clone and open',
   'repo-tabs.clone-cloning': 'Cloning…',
   'repo-tabs.clone-opened': 'Repository cloned',
-  'repo-tabs.missing-title': "Couldn't reopen {n} repository",
-  'repo-tabs.missing-dismiss': 'Dismiss',
+  'repo-unavailable.title': 'Repository path unavailable',
+  'repo-unavailable.body': 'Goblin cannot read this path as a Git repository. Restore the folder or recreate .git, then retry.',
+  'repo-unavailable.path': 'Path',
+  'repo-unavailable.reason': 'Reason',
+  'repo-unavailable.retry': 'Check again',
+  'repo-unavailable.close': 'Close tab',
 
   // ---- Empty state --------------------------------------------------------
   'empty.title': 'No repository open',
-  // Body split into segments so React renders the highlighted label as a real
+  // Body uses <Trans> so React renders the highlighted label as a real
   // element (no dangerouslySetInnerHTML).
-  'empty.body.before': 'Click ',
-  'empty.body.open-label': 'Open',
-  'empty.body.after': ' in the tab strip to add a Git repository, or drop a repository folder into this window.',
+  'empty.body':
+    'Click <open>Open</open> in the tab strip to add a Git repository, or drop a repository folder into this window.',
 
   // ---- Drag and drop ------------------------------------------------------
   'drop.title': 'Drop to open repository',
@@ -274,8 +275,8 @@ export const en = {
   'action.pull': 'Pull',
   'action.push': 'Push',
   'action.fetch': 'Fetch',
-  'action.github': 'GitHub',
-  'action.github-pr': 'PR #{n}',
+  'action.remote': 'Remote',
+  'action.remote-pr': 'PR #{n}',
   'action.delete-branch': 'Delete branch',
   'action.remove-worktree': 'Remove worktree',
   'action.checkout-loading': 'Checking out…',
@@ -295,25 +296,23 @@ export const en = {
   'action.push-title': 'Push {branch}',
   'action.fetch-title': 'Sync remote and refresh status',
   'action.fetch-local-title': 'Refresh local branches and status',
-  'action.github-title': 'Open repo in browser',
+  'action.remote-title': 'Open repo in browser',
   'action.result-ok': 'OK',
   'action.result-error': 'Error',
   'action.confirm-push-protected-title': 'Push to {branch}?',
-  'action.confirm-push-protected-body.before': 'You are about to push directly to ',
-  'action.confirm-push-protected-body.after': ', which usually deserves a pull request. Continue?',
+  'action.confirm-push-protected-body':
+    'You are about to push directly to <branch>{branch}</branch>, which usually deserves a pull request. Continue?',
   'action.confirm-push-confirm': 'Push anyway',
   'action.confirm-delete-branch-title': 'Delete {branch}?',
-  'action.confirm-delete-branch-body.before': 'This will delete local branch ',
-  'action.confirm-delete-branch-body.after': '. Git will refuse if it is not fully merged.',
+  'action.confirm-delete-branch-body':
+    'This will delete local branch <branch>{branch}</branch>. Git will refuse if it is not fully merged.',
   'action.confirm-delete-branch-confirm': 'Delete branch',
   'action.confirm-force-delete-standalone-title': 'Force-delete {branch}?',
-  'action.confirm-force-delete-standalone-body.before': 'Local branch ',
-  'action.confirm-force-delete-standalone-body.after':
-    ' has unique commits that are not fully merged. Force-delete only if you no longer need those commits.',
+  'action.confirm-force-delete-standalone-body':
+    'Local branch <branch>{branch}</branch> has unique commits that are not fully merged. Force-delete only if you no longer need those commits.',
   'action.confirm-force-delete-standalone-confirm': 'Force-delete branch',
   'action.confirm-remove-worktree-title': 'Remove worktree for {branch}?',
-  'action.confirm-remove-worktree-body.before': 'This will delete the worktree directory at ',
-  'action.confirm-remove-worktree-body.after': '.',
+  'action.confirm-remove-worktree-body': 'This will delete the worktree directory at <path>{path}</path>.',
   'action.confirm-remove-worktree-confirm': 'Remove worktree',
   'action.confirm-remove-worktree-also-delete-branch': 'Also delete branch {branch}',
   'action.confirm-remove-worktree-protected-hint': "This branch is protected — it can't be deleted from here.",
@@ -346,7 +345,7 @@ export const en = {
   'error.path-not-found': 'Path not found',
   'error.path-not-directory': 'Path is not a folder',
   'error.path-permission-denied': 'Permission denied',
-  'error.open-github-no-origin': 'No GitHub remote',
+  'error.open-remote-unavailable': 'No browser remote',
   'error.pull-no-remote': 'Upstream remote is not configured',
   'error.push-no-remote': 'No remote configured for push',
   'error.push-ambiguous-remote': 'Multiple remotes are configured. Set an upstream or add an origin remote before pushing.',

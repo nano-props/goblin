@@ -15,6 +15,9 @@ describe('emptyRepo', () => {
     expect(repo.remote).toMatchObject({
       remotes: [],
       hasRemotes: false,
+      hasBrowserRemote: false,
+      browserRemoteProvider: undefined,
+      remoteProviders: {},
       hasGitHubRemote: false,
     })
   })

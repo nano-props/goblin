@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Trans } from 'react-i18next'
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import type { RepoState } from '#/renderer/stores/repos/types.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
@@ -16,8 +17,8 @@ import { useAsyncPending } from '#/renderer/hooks/useAsyncPending.ts'
 
 export type { BranchActionItemId } from '#/renderer/hooks/branch-action-state.ts'
 
-const SILENT_SUCCESS_OPS = new Set<BranchActionItemId>(['github', 'terminal', 'editor'])
-type LocalBranchActionItemId = 'copyPatch' | 'github' | 'terminal' | 'editor'
+const SILENT_SUCCESS_OPS = new Set<BranchActionItemId>(['remote', 'terminal', 'editor'])
+type LocalBranchActionItemId = 'copyPatch' | 'remote' | 'terminal' | 'editor'
 
 export interface BranchActionCapabilities {
   isCurrent: boolean
@@ -27,7 +28,7 @@ export interface BranchActionCapabilities {
   canCopyPatch: boolean
   canPull: boolean
   canPush: boolean
-  canOpenGitHub: boolean
+  canOpenRemote: boolean
   canOpenTerminal: boolean
   canOpenEditor: boolean
 }
@@ -53,7 +54,7 @@ export function getBranchActionCapabilities(repo: RepoState, branch: BranchInfo)
     canCopyPatch,
     canPull: !!branch.tracking,
     canPush: repo.remote.hasRemotes === true,
-    canOpenGitHub: repo.remote.hasGitHubRemote === true,
+    canOpenRemote: repo.remote.hasBrowserRemote === true || repo.remote.hasGitHubRemote === true,
     canOpenTerminal: !!branch.worktreePath,
     canOpenEditor: !!branch.worktreePath,
   }
@@ -157,8 +158,8 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
     return runUiAction('editor', () => rpc.repo.openEditor.mutate({ path: worktreePath }))
   }
 
-  function openGitHub() {
-    return runUiAction('github', () => rpc.repo.openGitHub.mutate({ cwd: repo.id, branch: branch.name }))
+  function openRemote() {
+    return runUiAction('remote', () => rpc.repo.openRemote.mutate({ cwd: repo.id, branch: branch.name }))
   }
 
   function requestDeleteBranch() {
@@ -225,11 +226,11 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
         title={pushConfirm ? t('action.confirm-push-protected-title', { branch: pushConfirm }) : ''}
         message={
           pushConfirm ? (
-            <span>
-              {t('action.confirm-push-protected-body.before')}
-              <b className="text-foreground">{pushConfirm}</b>
-              {t('action.confirm-push-protected-body.after')}
-            </span>
+            <Trans
+              i18nKey="action.confirm-push-protected-body"
+              values={{ branch: pushConfirm }}
+              components={{ branch: <b className="text-foreground" /> }}
+            />
           ) : (
             ''
           )
@@ -248,11 +249,11 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
         title={deleteConfirm ? t('action.confirm-delete-branch-title', { branch: deleteConfirm }) : ''}
         message={
           deleteConfirm ? (
-            <span>
-              {t('action.confirm-delete-branch-body.before')}
-              <b className="text-foreground">{deleteConfirm}</b>
-              {t('action.confirm-delete-branch-body.after')}
-            </span>
+            <Trans
+              i18nKey="action.confirm-delete-branch-body"
+              values={{ branch: deleteConfirm }}
+              components={{ branch: <b className="text-foreground" /> }}
+            />
           ) : (
             ''
           )
@@ -273,11 +274,11 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
         }
         message={
           forceDeleteConfirm ? (
-            <span>
-              {t('action.confirm-force-delete-standalone-body.before')}
-              <b className="text-foreground">{forceDeleteConfirm}</b>
-              {t('action.confirm-force-delete-standalone-body.after')}
-            </span>
+            <Trans
+              i18nKey="action.confirm-force-delete-standalone-body"
+              values={{ branch: forceDeleteConfirm }}
+              components={{ branch: <b className="text-foreground" /> }}
+            />
           ) : (
             ''
           )
@@ -297,11 +298,11 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
         message={
           removeConfirm ? (
             <div className="space-y-3">
-              <span>
-                {t('action.confirm-remove-worktree-body.before')}
-                <b className="text-foreground">{tildify(removeConfirm.path)}</b>
-                {t('action.confirm-remove-worktree-body.after')}
-              </span>
+              <Trans
+                i18nKey="action.confirm-remove-worktree-body"
+                values={{ path: tildify(removeConfirm.path) }}
+                components={{ path: <b className="text-foreground" /> }}
+              />
               <label
                 className={
                   removeConfirmProtected
@@ -377,7 +378,7 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
       push,
       openTerminal,
       openEditor,
-      openGitHub,
+      openRemote,
       requestDeleteBranch,
       requestRemoveWorktree,
     },

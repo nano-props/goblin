@@ -1,5 +1,12 @@
 import type { StoreApi } from 'zustand'
-import type { BranchInfo, ExecResult, LogEntry, PullRequestFetchMode, WorktreeStatus } from '#/renderer/types.ts'
+import type {
+  BranchInfo,
+  BrowserRemoteProvider,
+  ExecResult,
+  LogEntry,
+  PullRequestFetchMode,
+  WorktreeStatus,
+} from '#/renderer/types.ts'
 import type { CommitDetail } from '#/shared/rpc.ts'
 import type { WorkspaceDetailPaneSizes, WorkspaceLayout } from '#/shared/workspace-layout.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/renderer/stores/repos/branch-action-types.ts'
@@ -64,6 +71,9 @@ export interface RepoCacheState {
 export interface RepoRemoteState {
   remotes?: string[]
   hasRemotes?: boolean
+  hasBrowserRemote?: boolean
+  browserRemoteProvider?: BrowserRemoteProvider
+  remoteProviders?: Record<string, BrowserRemoteProvider>
   hasGitHubRemote?: boolean
   /** Sticky connectivity badge for background fetch failures. Unlike
    *  `resources.fetch.error`, this persists after the operation settles and
@@ -75,6 +85,10 @@ export interface RepoRemoteState {
    *  red dot. */
   fetchError: string | null
 }
+
+export type RepoAvailabilityState =
+  | { phase: 'available' }
+  | { phase: 'unavailable'; reason: string; checkedAt: number }
 
 export interface CachedRepoState {
   savedAt: number
@@ -94,12 +108,8 @@ export interface RepoState {
   ui: RepoUiState
   cache: RepoCacheState
   remote: RepoRemoteState
+  availability: RepoAvailabilityState
   events: RepoEvent[]
-}
-
-export interface MissingRepo {
-  path: string
-  reason: string
 }
 
 export interface ReposStore {
@@ -110,12 +120,6 @@ export interface ReposStore {
   /** Hydration flag — true once boot session is restored, so we don't
    *  overwrite the saved session with an empty one before restore. */
   sessionReady: boolean
-  /** Paths from the previous session that didn't probe successfully on
-   *  hydrate (folder moved/deleted, external drive not mounted). The
-   *  tab strip surfaces them so the user knows why their tabs didn't all
-   *  come back, and offers a "forget" action to remove them from the
-   *  saved session. */
-  missingFromSession: MissingRepo[]
   branchSearchQueries: Record<string, string>
   detailCollapsed: boolean
   detailFocusMode: boolean
@@ -184,9 +188,6 @@ export interface ReposStore {
   setLastResult: (id: string, result: { ok: boolean; message: string }, token: number, options?: RepoResultEventOptions) => void
   clearEvents: (id: string, eventIds: number[]) => void
   hydrateSession: (openRepos: string[], activeRepo: string | null) => Promise<void>
-  /** Drop the "missing" indicator for paths that failed to restore — the
-   *  user has acknowledged them. */
-  dismissMissing: () => void
   /** Clear the fetchFailed flag — called by manual fetch success and
    *  by an explicit refresh, so a stale badge doesn't follow the user
    *  around forever. */

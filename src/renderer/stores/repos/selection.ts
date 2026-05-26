@@ -302,6 +302,7 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
       if (!id) return
       const repo = state.repos[id]
       if (!repo) return
+      if (repo.availability.phase === 'unavailable') return
       const token = repo.instanceToken
       const branch = repo.ui.selectedBranch
       if (!branch || branch === repo.data.currentBranch) return
@@ -316,6 +317,7 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
       if (!id) return
       const repo = state.repos[id]
       if (!repo || repo.ui.detailTab !== 'commits') return
+      if (repo.availability.phase === 'unavailable') return
       const branch = branchForVisibleLog(repo)
       if (!branch) return
       const branchLog = repo.data.logsByBranch[branch]

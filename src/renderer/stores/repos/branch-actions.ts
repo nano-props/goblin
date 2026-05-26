@@ -159,6 +159,9 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
       if (!repoBefore) return null
       const token = options?.token ?? repoBefore.instanceToken
       if (repoBefore.instanceToken !== token) return null
+      if (repoBefore.availability.phase === 'unavailable') {
+        return { ok: false, message: repoBefore.availability.reason }
+      }
       if (resourceBusy(repoBefore.resources.branchAction) || repoOperationBusy(id, 'branchAction')) {
         return { ok: false, message: 'cancelled' }
       }

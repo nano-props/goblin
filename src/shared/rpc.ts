@@ -216,7 +216,7 @@ export interface AppRpcHandlers {
     push: (input: { cwd: string; branch: string }) => Promise<ExecResult>
     fetch: (input: { cwd: string; kind?: NetworkOpKind }) => Promise<ExecResult>
     abort: (input: { cwd: string }) => Promise<boolean>
-    openGitHub: (input: { cwd: string; branch?: string }) => Promise<ExecResult>
+    openRemote: (input: { cwd: string; branch?: string }) => Promise<ExecResult>
     openInFinder: (input: { path: string }) => Promise<ExecResult>
     openTerminal: (input: { path: string }) => Promise<ExecResult>
     openEditor: (input: { path: string }) => Promise<ExecResult>
@@ -330,9 +330,9 @@ export function createAppRouter(handlers: AppRpcHandlers) {
         .input(v.object({ cwd: v.string(), kind: v.optional(v.picklist(['user', 'background'])) }))
         .mutation(({ input }) => handlers.repo.fetch(input)),
       abort: p.input(CwdInput).mutation(({ input }) => handlers.repo.abort(input)),
-      openGitHub: p
+      openRemote: p
         .input(v.object({ cwd: v.string(), branch: v.optional(v.string()) }))
-        .mutation(({ input }) => handlers.repo.openGitHub(input)),
+        .mutation(({ input }) => handlers.repo.openRemote(input)),
       openInFinder: p.input(PathInput).mutation(({ input }) => handlers.repo.openInFinder(input)),
       openTerminal: p.input(PathInput).mutation(({ input }) => handlers.repo.openTerminal(input)),
       openEditor: p.input(PathInput).mutation(({ input }) => handlers.repo.openEditor(input)),

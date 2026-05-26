@@ -65,6 +65,15 @@ describe('parseGitHubRemoteUrl', () => {
       name: 'repo',
     })
   })
+
+  test('ignores GitLab remotes', () => {
+    expect(parseGitHubRemoteUrl('https://gitlab.com/acme/repo.git')).toBeNull()
+    expect(parseGitHubRemoteUrl('git@gitlab.example.com:acme/repo.git')).toBeNull()
+  })
+
+  test('ignores unknown remotes', () => {
+    expect(parseGitHubRemoteUrl('https://code.example.com/acme/repo.git')).toBeNull()
+  })
 })
 
 describe('githubGraphqlEndpoint', () => {

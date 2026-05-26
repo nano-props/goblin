@@ -1,4 +1,4 @@
-import { FolderGit2, X } from 'lucide-react'
+import { AlertCircle, FolderGit2, X } from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { cn } from '#/renderer/lib/cn.ts'
@@ -13,6 +13,7 @@ interface RepoTabProps {
   onClose: (id: string) => void
   onKeyboardNavigate: (id: string, direction: 'prev' | 'next' | 'first' | 'last') => void
   closeLabel: string
+  unavailableLabel: string
 }
 
 export function RepoTab({
@@ -24,6 +25,7 @@ export function RepoTab({
   onClose,
   onKeyboardNavigate,
   closeLabel,
+  unavailableLabel,
 }: RepoTabProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: repo.id,
@@ -34,6 +36,7 @@ export function RepoTab({
     transform: CSS.Transform.toString(chromeLikeTransform),
     transition,
   }
+  const tabLabel = repo.unavailable ? `${repo.name} — ${unavailableLabel}` : repo.name
 
   return (
     <div
@@ -64,7 +67,7 @@ export function RepoTab({
         role="tab"
         tabIndex={isActive ? 0 : -1}
         aria-selected={isActive}
-        aria-label={repo.name}
+        aria-label={tabLabel}
         onClick={() => onActivate(repo.id)}
         onKeyDown={(e) => {
           if (!isDragging && (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Home' || e.key === 'End')) {
@@ -85,6 +88,7 @@ export function RepoTab({
       >
         <FolderGit2 size={13} className={cn('shrink-0', isActive ? 'text-foreground' : 'text-foreground/55')} />
         <span className="truncate font-medium">{repo.name}</span>
+        {repo.unavailable && <AlertCircle size={12} className="shrink-0 text-warning" aria-hidden />}
       </button>
       <button
         type="button"

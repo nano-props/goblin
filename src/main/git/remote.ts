@@ -1,6 +1,7 @@
 import { git, gitResultWithOptions, NETWORK_TIMEOUT_MS } from '#/main/git/helper.ts'
-import type { ExecResult, GitRemoteInfo, RepoRemoteInfo } from '#/shared/git-types.ts'
+import type { BrowserRemoteProvider, ExecResult, GitRemoteInfo, RepoRemoteInfo } from '#/shared/git-types.ts'
 import { getCurrentBranch } from '#/main/git/branches.ts'
+import { isGitHubHost, isGitLabHost, parseGitRemoteUrl, remoteUrlToHttps } from '#/main/git/remote-url.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 
 export interface UpstreamParts {
@@ -8,20 +9,12 @@ export interface UpstreamParts {
   branch: string
 }
 
-function remoteUrlToHttps(url: string): string | null {
-  const sshUrl = url.match(/^ssh:\/\/(?:[^@]+@)?([^:/]+)(?::\d+)?\/(.+?)(?:\.git)?\/?$/)
-  if (sshUrl) return `https://${sshUrl[1]}/${sshUrl[2]}`
-
-  const httpsUrl = url.match(/^https?:\/\/(?:[^@/]+@)?([^/]+)\/(.+?)(?:\.git)?\/?$/)
-  if (httpsUrl) return `https://${httpsUrl[1]}/${httpsUrl[2]}`
-
-  const scpUrl = url.match(/^(?:[^@]+@)?([^:/\s]+):([^/].*?)(?:\.git)?\/?$/)
-  if (scpUrl) return `https://${scpUrl[1]}/${scpUrl[2]}`
-
-  return null
+interface BrowserRemote {
+  url: string
+  provider: BrowserRemoteProvider
 }
 
-export async function getGitHubUrl(
+export async function getBrowserRemoteUrl(
   cwd: string,
   options?: { branch?: string; signal?: AbortSignal },
 ): Promise<string | null> {
@@ -30,23 +23,27 @@ export async function getGitHubUrl(
       getRemotes(cwd, options?.signal),
       options?.branch ? getUpstreamParts(cwd, options.branch, options.signal) : Promise.resolve(null),
     ])
-    const remote = pickGitHubRemote(remotes, upstream)
-    return remote ? remoteUrlToHttps(remote.url) : null
+    return pickBrowserRemote(remotes, upstream)?.url ?? null
   } catch {
     return null
   }
 }
 
-export async function getPullRequestUrl(cwd: string, branch: string): Promise<string | null> {
-  const repoUrl = await getGitHubUrl(cwd, { branch })
-  if (!repoUrl) return null
+export async function getNewPullRequestUrl(cwd: string, branch: string): Promise<string | null> {
+  const remote = await getBrowserRemote(cwd, { branch })
+  if (!remote) return null
+  if (remote.provider === 'gitlab') {
+    const params = new URLSearchParams({ 'merge_request[source_branch]': branch })
+    return `${remote.url}/-/merge_requests/new?${params.toString()}`
+  }
+  if (remote.provider !== 'github') return null
   const encoded = branch.split('/').map(encodeURIComponent).join('/')
   // `/pull/new/{branch}` redirects to the existing open PR if one is
   // associated with the branch; otherwise it lands on GitHub's "create
   // pull request" page pre-populated with that branch as the head. This
-  // single URL covers both intents the user has when clicking "Open in
-  // GitHub" from a branch row — see an existing PR, or start one.
-  return `${repoUrl}/pull/new/${encoded}`
+  // single URL covers both intents the user has when opening the branch's
+  // remote page — see an existing PR, or start one.
+  return `${remote.url}/pull/new/${encoded}`
 }
 
 async function hasRemote(cwd: string, remote: string, signal?: AbortSignal): Promise<boolean> {
@@ -86,16 +83,69 @@ export function pickPreferredRemote<T extends { name: string }>(
 
 function pickGitHubRemote(remotes: GitRemoteInfo[], upstream?: UpstreamParts | null): GitRemoteInfo | null {
   return pickPreferredRemote(
-    remotes.filter((remote) => remoteUrlToHttps(remote.url)),
+    remotes.filter((remote) => {
+      const parsed = parseGitRemoteUrl(remote.url)
+      return !!parsed && isGitHubHost(parsed.host) && parsed.path.split('/').filter(Boolean).length === 2
+    }),
     upstream,
   )
 }
 
+function browserRemoteProvider(host: string): BrowserRemoteProvider {
+  if (isGitHubHost(host)) return 'github'
+  if (isGitLabHost(host)) return 'gitlab'
+  return 'external'
+}
+
+function browserRemote(remote: GitRemoteInfo): BrowserRemote | null {
+  const parsed = parseGitRemoteUrl(remote.url)
+  const url = remoteUrlToHttps(remote.url)
+  if (!parsed || !url) return null
+  return { url, provider: browserRemoteProvider(parsed.host) }
+}
+
+function pickBrowserRemote(remotes: GitRemoteInfo[], upstream?: UpstreamParts | null): BrowserRemote | null {
+  return pickPreferredRemote(
+    remotes
+      .map((remote) => {
+        const browser = browserRemote(remote)
+        return browser ? { name: remote.name, ...browser } : null
+      })
+      .filter((remote): remote is { name: string } & BrowserRemote => remote !== null),
+    upstream,
+  )
+}
+
+async function getBrowserRemote(
+  cwd: string,
+  options?: { branch?: string; signal?: AbortSignal },
+): Promise<BrowserRemote | null> {
+  try {
+    const [remotes, upstream] = await Promise.all([
+      getRemotes(cwd, options?.signal),
+      options?.branch ? getUpstreamParts(cwd, options.branch, options.signal) : Promise.resolve(null),
+    ])
+    return pickBrowserRemote(remotes, upstream)
+  } catch {
+    return null
+  }
+}
+
 export async function getRemoteInfo(cwd: string, signal?: AbortSignal): Promise<RepoRemoteInfo> {
   const remotes = await getRemotes(cwd, signal)
+  const remoteProviders = Object.fromEntries(
+    remotes.flatMap((remote) => {
+      const browser = browserRemote(remote)
+      return browser ? [[remote.name, browser.provider] as const] : []
+    }),
+  )
+  const browser = pickBrowserRemote(remotes)
   return {
     remotes,
     hasRemotes: remotes.length > 0,
+    hasBrowserRemote: browser !== null,
+    browserRemoteProvider: browser?.provider,
+    remoteProviders,
     hasGitHubRemote: pickGitHubRemote(remotes) !== null,
   }
 }

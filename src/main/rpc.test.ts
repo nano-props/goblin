@@ -1,10 +1,10 @@
 import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
 import { ipcMain } from 'electron'
-import { getDefaultBranch, isAncestor, getCurrentBranch, getUpstream } from '#/main/git/branches.ts'
+import { getDefaultBranch, isAncestor, getCurrentBranch, getUpstream, isGitRepo } from '#/main/git/branches.ts'
 import { getWorktrees } from '#/main/git/worktrees.ts'
 import { getWorkingStatus } from '#/main/git/status.ts'
 import { resolveKnownWorktree, resolveRemovableWorktree } from '#/main/git/guards.ts'
-import { getGitHubUrl, getPullRequestUrl, pullBranch } from '#/main/git/remote.ts'
+import { getBrowserRemoteUrl, getNewPullRequestUrl, pullBranch } from '#/main/git/remote.ts'
 import { getBranchPullRequest } from '#/main/git/pull-requests.ts'
 import { openHttpsExternal } from '#/main/external-url.ts'
 import { registerTrustedAppPath, registerTrustedWebContents } from '#/main/ipc/trusted-webcontents.ts'
@@ -62,8 +62,8 @@ vi.mock('#/main/git/helper.ts', () => ({
 
 vi.mock('#/main/git/remote.ts', () => ({
   fetchAll: vi.fn(),
-  getGitHubUrl: vi.fn(),
-  getPullRequestUrl: vi.fn(),
+  getBrowserRemoteUrl: vi.fn(),
+  getNewPullRequestUrl: vi.fn(),
   getRemoteInfo: vi.fn(),
   pullBranch: vi.fn(),
   pushBranch: vi.fn(),
@@ -208,6 +208,7 @@ describe('main repo rpc cancellation', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(isGitRepo).mockResolvedValue(true)
     vi.mocked(getCurrentBranch).mockResolvedValue('main')
     vi.mocked(getWorktrees).mockResolvedValue([{ path: '/repo', branch: 'main', isBare: false, isPrimary: true }])
     vi.mocked(getUpstream).mockResolvedValue(null)
@@ -306,17 +307,17 @@ describe('main repo rpc cancellation', () => {
     expect(getWorkingStatus).toHaveBeenCalledWith('/repo', { signal: expect.any(AbortSignal) })
   })
 
-  test('passes branch context when opening a default branch GitHub URL', async () => {
+  test('passes branch context when opening a default branch remote URL', async () => {
     vi.mocked(getDefaultBranch).mockResolvedValue('main')
     vi.mocked(getBranchPullRequest).mockResolvedValue(null)
-    vi.mocked(getGitHubUrl).mockResolvedValue('https://github.com/acme/repo')
+    vi.mocked(getBrowserRemoteUrl).mockResolvedValue('https://github.com/acme/repo')
     vi.mocked(openHttpsExternal).mockResolvedValue(true)
 
-    const result = await invokeRpc('repo.openGitHub', { cwd: '/repo', branch: 'main' })
+    const result = await invokeRpc('repo.openRemote', { cwd: '/repo', branch: 'main' })
 
     expect(result).toEqual({ ok: true, data: { ok: true, message: 'https://github.com/acme/repo' } })
-    expect(getPullRequestUrl).not.toHaveBeenCalled()
-    expect(getGitHubUrl).toHaveBeenCalledWith('/repo', { branch: 'main' })
+    expect(getNewPullRequestUrl).not.toHaveBeenCalled()
+    expect(getBrowserRemoteUrl).toHaveBeenCalledWith('/repo', { branch: 'main' })
   })
 
   test('returns null when snapshot is aborted during worktree loading', async () => {

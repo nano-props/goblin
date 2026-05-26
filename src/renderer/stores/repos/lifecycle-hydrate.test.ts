@@ -132,14 +132,18 @@ describe('repo session hydration', () => {
     expect(useReposStore.getState().activeId).toBe(REPO_A)
   })
 
-  test('hydrateSession reports missing repos while restoring valid repos', async () => {
+  test('hydrateSession restores unavailable repos as tabs', async () => {
     installGoblin()
 
     await useReposStore.getState().hydrateSession([REPO_A, '/missing'], '/missing')
 
-    expect(useReposStore.getState().order).toEqual([REPO_A])
-    expect(useReposStore.getState().activeId).toBe(REPO_A)
-    expect(useReposStore.getState().missingFromSession).toEqual([{ path: '/missing', reason: 'missing' }])
+    expect(useReposStore.getState().order).toEqual([REPO_A, '/missing'])
+    expect(useReposStore.getState().activeId).toBe('/missing')
+    expect(useReposStore.getState().repos['/missing']).toMatchObject({
+      id: '/missing',
+      name: 'missing',
+      availability: { phase: 'unavailable', reason: 'missing' },
+    })
   })
 
   test('hydrateSession limits concurrent repo probes', async () => {

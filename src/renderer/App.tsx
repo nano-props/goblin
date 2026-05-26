@@ -17,6 +17,7 @@
 //     persisting instead of silently dropping their changes)
 
 import { useCallback, useState } from 'react'
+import { Trans } from 'react-i18next'
 import { Toaster } from '#/renderer/components/ui/sonner.tsx'
 import { Topbar } from '#/renderer/components/Topbar.tsx'
 import { ErrorBoundary } from '#/renderer/components/ErrorBoundary.tsx'
@@ -140,9 +141,7 @@ function EmptyState() {
       <div className="text-center max-w-sm">
         <div className="text-sm font-medium text-foreground mb-1">{t('empty.title')}</div>
         <div className="text-xs text-muted-foreground leading-relaxed">
-          {t('empty.body.before')}
-          <span className="text-foreground">{t('empty.body.open-label')}</span>
-          {t('empty.body.after')}
+          <Trans i18nKey="empty.body" components={{ open: <span className="text-foreground" /> }} />
         </div>
       </div>
     </div>
