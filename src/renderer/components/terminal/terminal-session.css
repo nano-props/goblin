@@ -69,18 +69,10 @@
   z-index: 2;
   width: 176px;
   max-width: calc(100% - 20px);
-  border: 1px solid color-mix(in srgb, var(--color-border) 64%, transparent);
+  border: 1px solid var(--color-border);
   border-radius: 7px;
-  background: color-mix(in srgb, var(--color-popover) 58%, transparent);
-  transition:
-    border-color 120ms ease,
-    background-color 120ms ease;
-}
-
-.goblin-terminal-switcher:hover,
-.goblin-terminal-switcher:focus-within {
-  border-color: var(--color-border);
-  background: color-mix(in srgb, var(--color-popover) 94%, transparent);
+  background: var(--color-popover);
+  box-shadow: var(--shadow-sm);
 }
 
 .goblin-terminal-switcher--below-search {
@@ -92,7 +84,7 @@
   height: 30px;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 62%, transparent);
+  border-bottom: 1px solid var(--color-separator);
   padding: 0 5px 0 8px;
 }
 
