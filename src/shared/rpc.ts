@@ -47,6 +47,8 @@ export interface SettingsSnapshot {
   colorTheme: ColorTheme
   fetchIntervalSec: number
   shortcutsDisabled: boolean
+  globalShortcutDisabled: boolean
+  swapCloseShortcuts: boolean
   globalShortcut: string
   globalShortcutRegistered: boolean
   terminalApp: TerminalPref
@@ -156,6 +158,7 @@ export type MenuAction =
   | 'toggle-detail'
   | 'reset-layout'
   | 'open-settings'
+  | 'open-about'
   | 'show-help'
   | { type: 'open-recent-repo'; path: string }
   | { type: 'set-workspace-layout'; layout: WorkspaceLayout }
@@ -164,6 +167,8 @@ export type RpcEvent =
   | { type: 'theme-changed'; state: ThemeState }
   | { type: 'fetch-interval-changed'; sec: number }
   | { type: 'shortcuts-disabled-changed'; disabled: boolean }
+  | { type: 'global-shortcut-disabled-changed'; disabled: boolean }
+  | { type: 'swap-close-shortcuts-changed'; swapped: boolean }
   | { type: 'global-shortcut-changed'; state: GlobalShortcutState }
   | ({ type: 'terminal-app-changed' } & TerminalAppState)
   | ({ type: 'editor-app-changed' } & EditorAppState)
@@ -198,13 +203,19 @@ export interface AppRpcHandlers {
     patch: (input: { cwd: string; worktreePath: string }) => Promise<ExecResult>
     commit: (input: { cwd: string; hash: string }) => Promise<CommitDetail | null>
     checkout: (input: { cwd: string; branch: string }) => Promise<ExecResult>
-    deleteBranch: (input: { cwd: string; branch: string; force?: boolean }) => Promise<ExecResult>
+    deleteBranch: (input: {
+      cwd: string
+      branch: string
+      force?: boolean
+      alsoDeleteUpstream?: boolean
+    }) => Promise<ExecResult>
     removeWorktree: (input: {
       cwd: string
       branch: string
       worktreePath: string
       alsoDeleteBranch: boolean
       forceDeleteBranch?: boolean
+      alsoDeleteUpstream?: boolean
     }) => Promise<ExecResult>
     createWorktree: (input: {
       cwd: string
@@ -230,6 +241,8 @@ export interface AppRpcHandlers {
     get: () => Promise<SettingsSnapshot>
     setFetchInterval: (input: { sec: number }) => Promise<void>
     setShortcutsDisabled: (input: { disabled: boolean }) => Promise<void>
+    setGlobalShortcutDisabled: (input: { disabled: boolean }) => Promise<void>
+    setSwapCloseShortcuts: (input: { swapped: boolean }) => Promise<void>
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
     setTerminalApp: (input: { pref: TerminalPref }) => Promise<TerminalAppState>
     setEditorApp: (input: { pref: EditorPref }) => Promise<EditorAppState>
@@ -306,7 +319,14 @@ export function createAppRouter(handlers: AppRpcHandlers) {
         .query(({ input }) => handlers.repo.commit(input)),
       checkout: p.input(BranchInput).mutation(({ input }) => handlers.repo.checkout(input)),
       deleteBranch: p
-        .input(v.object({ cwd: v.string(), branch: v.string(), force: v.optional(v.boolean()) }))
+        .input(
+          v.object({
+            cwd: v.string(),
+            branch: v.string(),
+            force: v.optional(v.boolean()),
+            alsoDeleteUpstream: v.optional(v.boolean()),
+          }),
+        )
         .mutation(({ input }) => handlers.repo.deleteBranch(input)),
       removeWorktree: p
         .input(
@@ -316,6 +336,7 @@ export function createAppRouter(handlers: AppRpcHandlers) {
             worktreePath: v.string(),
             alsoDeleteBranch: v.boolean(),
             forceDeleteBranch: v.optional(v.boolean()),
+            alsoDeleteUpstream: v.optional(v.boolean()),
           }),
         )
         .mutation(({ input }) => handlers.repo.removeWorktree(input)),
@@ -354,6 +375,12 @@ export function createAppRouter(handlers: AppRpcHandlers) {
       setShortcutsDisabled: p
         .input(v.object({ disabled: v.boolean() }))
         .mutation(({ input }) => handlers.settings.setShortcutsDisabled(input)),
+      setGlobalShortcutDisabled: p
+        .input(v.object({ disabled: v.boolean() }))
+        .mutation(({ input }) => handlers.settings.setGlobalShortcutDisabled(input)),
+      setSwapCloseShortcuts: p
+        .input(v.object({ swapped: v.boolean() }))
+        .mutation(({ input }) => handlers.settings.setSwapCloseShortcuts(input)),
       setGlobalShortcut: p
         .input(v.object({ accelerator: v.string() }))
         .mutation(({ input }) => handlers.settings.setGlobalShortcut(input)),

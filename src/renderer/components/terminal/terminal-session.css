@@ -16,6 +16,53 @@
   overflow: hidden;
 }
 
+.goblin-terminal-progress {
+  position: relative;
+  flex: 0 0 2px;
+  background: color-mix(in srgb, var(--color-brand) 20%, transparent);
+  overflow: hidden;
+}
+
+.goblin-terminal-progress__bar {
+  height: 100%;
+  background: var(--color-brand);
+  transition: width 200ms ease;
+}
+
+.goblin-terminal-progress--error {
+  background: color-mix(in srgb, var(--color-destructive) 20%, transparent);
+}
+
+.goblin-terminal-progress--error .goblin-terminal-progress__bar {
+  background: var(--color-destructive);
+}
+
+.goblin-terminal-progress--warning {
+  background: color-mix(in srgb, var(--color-attention) 20%, transparent);
+}
+
+.goblin-terminal-progress--warning .goblin-terminal-progress__bar {
+  background: var(--color-attention);
+}
+
+.goblin-terminal-progress--indeterminate {
+  background: color-mix(in srgb, var(--color-brand) 20%, transparent);
+}
+
+.goblin-terminal-progress--indeterminate::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: var(--color-brand);
+  animation: goblin-terminal-progress-indeterminate 1.5s ease-in-out infinite;
+}
+
+@keyframes goblin-terminal-progress-indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
 .goblin-managed-terminal-frame {
   position: relative;
   width: 100%;

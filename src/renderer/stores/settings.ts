@@ -22,6 +22,8 @@ import { onRpcEventType, rpc } from '#/renderer/rpc.ts'
 interface SettingsStore {
   fetchIntervalSec: number
   shortcutsDisabled: boolean
+  globalShortcutDisabled: boolean
+  swapCloseShortcuts: boolean
   globalShortcut: string
   globalShortcutRegistered: boolean
   terminalApp: TerminalPref
@@ -37,6 +39,8 @@ interface SettingsStore {
   hydrate: () => Promise<SessionState>
   setFetchInterval: (sec: number) => Promise<void>
   setShortcutsDisabled: (disabled: boolean) => Promise<void>
+  setGlobalShortcutDisabled: (disabled: boolean) => Promise<void>
+  setSwapCloseShortcuts: (swapped: boolean) => Promise<void>
   setGlobalShortcut: (accelerator: string) => Promise<GlobalShortcutState>
   setTerminalApp: (pref: TerminalPref) => Promise<void>
   setEditorApp: (pref: EditorPref) => Promise<void>
@@ -57,6 +61,8 @@ function clearSubscriptions(subscriptions: Array<() => void>): void {
 export const useSettingsStore = create<SettingsStore>((set) => ({
   fetchIntervalSec: 120,
   shortcutsDisabled: false,
+  globalShortcutDisabled: false,
+  swapCloseShortcuts: false,
   globalShortcut: DEFAULT_GLOBAL_SHORTCUT,
   globalShortcutRegistered: false,
   terminalApp: 'auto',
@@ -81,6 +87,8 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
     set({
       fetchIntervalSec: snap.fetchIntervalSec,
       shortcutsDisabled: snap.shortcutsDisabled,
+      globalShortcutDisabled: snap.globalShortcutDisabled,
+      swapCloseShortcuts: snap.swapCloseShortcuts,
       globalShortcut: snap.globalShortcut,
       globalShortcutRegistered: snap.globalShortcutRegistered,
       terminalApp: snap.terminalApp,
@@ -99,6 +107,12 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
         }),
         onRpcEventType('shortcuts-disabled-changed', (event) => {
           set((s) => (s.shortcutsDisabled === event.disabled ? s : { shortcutsDisabled: event.disabled }))
+        }),
+        onRpcEventType('global-shortcut-disabled-changed', (event) => {
+          set((s) => (s.globalShortcutDisabled === event.disabled ? s : { globalShortcutDisabled: event.disabled }))
+        }),
+        onRpcEventType('swap-close-shortcuts-changed', (event) => {
+          set((s) => (s.swapCloseShortcuts === event.swapped ? s : { swapCloseShortcuts: event.swapped }))
         }),
         onRpcEventType('global-shortcut-changed', (event) => {
           const { accelerator, registered } = event.state
@@ -149,6 +163,16 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
   async setShortcutsDisabled(disabled) {
     await rpc.settings.setShortcutsDisabled.mutate({ disabled })
     set((s) => (s.shortcutsDisabled === disabled ? s : { shortcutsDisabled: disabled }))
+  },
+
+  async setGlobalShortcutDisabled(disabled) {
+    await rpc.settings.setGlobalShortcutDisabled.mutate({ disabled })
+    set((s) => (s.globalShortcutDisabled === disabled ? s : { globalShortcutDisabled: disabled }))
+  },
+
+  async setSwapCloseShortcuts(swapped) {
+    await rpc.settings.setSwapCloseShortcuts.mutate({ swapped })
+    set((s) => (s.swapCloseShortcuts === swapped ? s : { swapCloseShortcuts: swapped }))
   },
 
   async setGlobalShortcut(accelerator) {

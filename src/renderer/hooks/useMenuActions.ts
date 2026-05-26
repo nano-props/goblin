@@ -3,9 +3,10 @@ import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { isShortcutBlockingLayerOpen } from '#/renderer/lib/layers.ts'
 import { onRpcEventType, rpc } from '#/renderer/rpc.ts'
 import { isTerminalFocused } from '#/renderer/terminal-focus.ts'
+import type { SettingsPage } from '#/renderer/components/SettingsPanel.tsx'
 
 interface MenuActionHandlers {
-  openSettings: () => void
+  openSettings: (page?: SettingsPage) => void
   openCloneRepo: () => void
   showHelp: () => void
   isOverlayOpen: () => boolean
@@ -47,6 +48,17 @@ export function useMenuActions({ openSettings, openCloneRepo, showHelp, isOverla
         if (action === 'reset-layout') {
           // Same app-level view preference as set-workspace-layout above.
           resetLayout()
+          return
+        }
+        // Settings / about navigate inside the settings overlay, so they
+        // must work even when the overlay is already open (e.g. the user
+        // clicks "About Goblin" while on the General tab).
+        if (action === 'open-settings') {
+          openSettings()
+          return
+        }
+        if (action === 'open-about') {
+          openSettings('about')
           return
         }
         if (isOverlayOpenRef.current() || isShortcutBlockingLayerOpen()) return
@@ -105,9 +117,6 @@ export function useMenuActions({ openSettings, openCloneRepo, showHelp, isOverla
           case 'toggle-detail':
             // Match VS Code: Cmd+J toggles the panel even while the integrated terminal owns focus.
             if (state.activeId) toggleDetailCollapsed()
-            break
-          case 'open-settings':
-            openSettings()
             break
           case 'show-help':
             showHelp()

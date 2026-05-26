@@ -4,8 +4,10 @@ import { useRef, type ReactNode } from 'react'
 import {
   AppWindow,
   Code2,
+  ExternalLink,
   GitBranch,
   GitPullRequest,
+  Hash,
   Info,
   Keyboard,
   Laptop,
@@ -14,6 +16,7 @@ import {
   Settings2,
   SlidersHorizontal,
   Sun,
+  Tag,
   Terminal,
   type LucideIcon,
 } from 'lucide-react'
@@ -376,7 +379,6 @@ function SyncSettings() {
 function AboutSettings() {
   const t = useT()
   const commit = __BUILD_INFO__.commit
-  const buildInfo = commit ? `v${__APP_VERSION__} · ${commit}` : `v${__APP_VERSION__}`
   const openProjectGitHub = () => {
     void rpc.app.openProjectGitHub.mutate().catch((err) => {
       console.warn('[settings] open project GitHub failed', err)
@@ -384,20 +386,52 @@ function AboutSettings() {
   }
 
   return (
-    <div className="flex flex-col items-center px-4 py-8 text-center">
-      <img src={appIconUrl} alt="Goblin" className="size-16 rounded-2xl shadow-sm" />
-      <div className="mt-3 text-base font-semibold text-foreground">Goblin</div>
-      <div className="mt-1 text-xs text-muted-foreground">{buildInfo}</div>
-      <button
-        type="button"
-        data-interactive
-        onClick={openProjectGitHub}
-        className="mt-5 inline-flex h-8 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm text-foreground transition-colors duration-100 hover:bg-accent hover:text-accent-foreground"
-      >
-        <GitHubMark className="size-4 shrink-0 text-muted-foreground" />
-        {t('settings.open-github')}
-      </button>
-    </div>
+    <ul className="overflow-hidden rounded-xl border border-border/60 bg-background/85 shadow-[var(--shadow-inset-highlight)]">
+      <li className="flex min-h-14 items-center gap-3 px-4 py-2.5 [&+&]:border-t [&+&]:border-separator">
+        <img src={appIconUrl} alt="Goblin" className="size-8 shrink-0 rounded-lg" />
+        <div className="min-w-0 flex-1">
+          <span className="truncate text-sm font-medium text-foreground">{t('about.app')}</span>
+        </div>
+      </li>
+      <li className="flex min-h-14 items-center gap-3 px-4 py-2.5 [&+&]:border-t [&+&]:border-separator">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+          <Tag size={16} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <span className="truncate text-sm font-medium text-foreground">{t('about.version')}</span>
+        </div>
+        <span className="shrink-0 font-mono text-xs text-muted-foreground">v{__APP_VERSION__}</span>
+      </li>
+      <li className="flex min-h-14 items-center gap-3 px-4 py-2.5 [&+&]:border-t [&+&]:border-separator">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+          <Hash size={16} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <span className="truncate text-sm font-medium text-foreground">{t('about.build')}</span>
+        </div>
+        <span className="shrink-0 font-mono text-xs text-muted-foreground">
+          {commit || t('about.build.unknown')}
+        </span>
+      </li>
+      <li className="flex min-h-14 items-center gap-3 px-4 py-2.5 [&+&]:border-t [&+&]:border-separator">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+          <GitHubMark className="size-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <span className="truncate text-sm font-medium text-foreground">{t('about.github')}</span>
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">{t('about.github.body')}</p>
+        </div>
+        <button
+          type="button"
+          data-interactive
+          onClick={openProjectGitHub}
+          className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-accent-foreground"
+          aria-label={t('settings.open-github')}
+        >
+          <ExternalLink size={14} />
+        </button>
+      </li>
+    </ul>
   )
 }
 
@@ -420,13 +454,14 @@ function DependenciesSettings() {
 function KeyboardShortcutSettings() {
   const t = useT()
   const globalShortcut = useSettingsStore((s) => s.globalShortcut)
+  const swapCloseShortcuts = useSettingsStore((s) => s.swapCloseShortcuts)
   return (
     <>
       <SettingsGroup label={t('settings.shortcuts')}>
         <ShortcutSettings />
       </SettingsGroup>
       <SettingsGroup label={t('help.title')} hint={t('help.hint')}>
-        <ShortcutList sections={helpShortcutSections(globalShortcut)} />
+        <ShortcutList sections={helpShortcutSections(globalShortcut, swapCloseShortcuts)} />
       </SettingsGroup>
     </>
   )

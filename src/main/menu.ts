@@ -16,7 +16,14 @@ import { app, Menu, shell, dialog, type MenuItemConstructorOptions, BrowserWindo
 import { promises as fs } from 'node:fs'
 import { getMainWindow } from '#/main/window.ts'
 import { applyLangPref, t } from '#/main/i18n/index.ts'
-import { clearRecentRepos, getLangPref, getRecentRepos, getSession, getShortcutsDisabled } from '#/main/settings.ts'
+import {
+  clearRecentRepos,
+  getLangPref,
+  getRecentRepos,
+  getSession,
+  getShortcutsDisabled,
+  getSwapCloseShortcuts,
+} from '#/main/settings.ts'
 import { broadcastRpcEvent, sendRpcEvent } from '#/main/events.ts'
 import { getTheme, setThemePref } from '#/main/theme.ts'
 import { normalizeWorkspaceLayout, type WorkspaceLayout } from '#/shared/workspace-layout.ts'
@@ -27,6 +34,7 @@ interface AppMenuState {
   name: string
   recentRepos: string[]
   shortcutsDisabled: boolean
+  swapCloseShortcuts: boolean
   themePref: ThemePref
   langPref: LangPref
   workspaceLayout: WorkspaceLayout
@@ -83,6 +91,7 @@ function readMenuState(): AppMenuState {
     name: app.name,
     recentRepos: getRecentRepos(),
     shortcutsDisabled: getShortcutsDisabled(),
+    swapCloseShortcuts: getSwapCloseShortcuts(),
     themePref: getTheme().pref,
     langPref: getLangPref(),
     workspaceLayout: normalizeWorkspaceLayout(menuWorkspaceLayout ?? getSession().workspaceLayout),
@@ -104,7 +113,7 @@ function createMacAppMenu(state: AppMenuState): MenuItemConstructorOptions {
   return {
     label: state.name,
     submenu: [
-      { role: 'about', label: t('menu.app.about', { name: state.name }) },
+      { label: t('menu.app.about', { name: state.name }), click: () => send('open-about') },
       separator(),
       { label: t('menu.app.settings'), accelerator: accelerator(state, 'Cmd+,'), click: () => send('open-settings') },
       createAppearanceMenu(state.themePref),
@@ -137,16 +146,20 @@ function createFileMenu(state: AppMenuState): MenuItemConstructorOptions {
       },
       { label: t('menu.file.open-recent'), submenu: createRecentReposMenu(state.recentRepos) },
       { label: t('menu.file.open-data-folder'), click: () => void openDataFolder() },
-      // ⌘⇧W is the standard OS shortcut for closing the window — keep
-      // the `role: 'close'` accelerator there when shortcuts are enabled
-      // so it still works even if the renderer hasn't subscribed to menu
-      // actions yet (e.g. hung renderer). Closing a repo tab uses ⌘W.
+      // Close-window uses Electron's `role: 'close'` so it works even
+      // when the renderer is hung. The swap setting flips which shortcut
+      // closes the window vs. the tab. Default: ⌘W = close window,
+      // ⌘⇧W = close tab. Swapped (legacy): ⌘W = close tab, ⌘⇧W = close window.
       state.shortcutsDisabled
         ? { label: t('menu.file.close-window'), click: () => BrowserWindow.getFocusedWindow()?.close() }
-        : { role: 'close', label: t('menu.file.close-window'), accelerator: 'CmdOrCtrl+Shift+W' },
+        : {
+            role: 'close',
+            label: t('menu.file.close-window'),
+            accelerator: state.swapCloseShortcuts ? 'CmdOrCtrl+Shift+W' : 'CmdOrCtrl+W',
+          },
       {
         label: t('menu.file.close-tab'),
-        accelerator: accelerator(state, 'CmdOrCtrl+W'),
+        accelerator: accelerator(state, state.swapCloseShortcuts ? 'CmdOrCtrl+W' : 'CmdOrCtrl+Shift+W'),
         click: () => send('close-repo'),
       },
       ...(state.isMac

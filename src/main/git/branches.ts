@@ -1,4 +1,4 @@
-import { git, gitResultWithOptions } from '#/main/git/helper.ts'
+import { git, gitResultWithOptions, NETWORK_TIMEOUT_MS } from '#/main/git/helper.ts'
 import { FIELD_SEP, parseBranches, parseLog } from '#/main/git/parsers.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 import type { BranchInfo, ExecResult, LogEntry, WorktreeInfo } from '#/shared/git-types.ts'
@@ -161,6 +161,16 @@ export async function deleteBranch(
 ): Promise<ExecResult> {
   if (!isSafeBranchName(name)) return { ok: false, message: 'error.invalid-arguments' }
   return gitResultWithOptions(cwd, { signal: options?.signal }, 'branch', options?.force ? '-D' : '-d', '--', name)
+}
+
+export async function deleteUpstreamBranch(
+  cwd: string,
+  remote: string,
+  branch: string,
+  signal?: AbortSignal,
+): Promise<ExecResult> {
+  if (!isSafeBranchName(branch)) return { ok: false, message: 'error.invalid-arguments' }
+  return gitResultWithOptions(cwd, { timeoutMs: NETWORK_TIMEOUT_MS, signal }, 'push', '--delete', '--', remote, branch)
 }
 
 /** Resolve `branch`'s upstream short ref (e.g. "origin/feat") or null

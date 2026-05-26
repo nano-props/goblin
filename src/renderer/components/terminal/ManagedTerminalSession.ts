@@ -1,5 +1,9 @@
 import type { FitAddon as XTermFitAddon } from '@xterm/addon-fit'
 import { FitAddon } from '@xterm/addon-fit'
+import type { ImageAddon as XTermImageAddon } from '@xterm/addon-image'
+import { ImageAddon } from '@xterm/addon-image'
+import type { ProgressAddon as XTermProgressAddon } from '@xterm/addon-progress'
+import { ProgressAddon } from '@xterm/addon-progress'
 import type { SearchAddon as XTermSearchAddon, ISearchOptions, ISearchResultChangeEvent } from '@xterm/addon-search'
 import { SearchAddon } from '@xterm/addon-search'
 import type { SerializeAddon as XTermSerializeAddon } from '@xterm/addon-serialize'
@@ -27,6 +31,7 @@ import {
 import type {
   TerminalDescriptor,
   TerminalPhase,
+  TerminalProgressState,
   TerminalSearchResult,
   TerminalSnapshot,
 } from '#/renderer/components/terminal/types.ts'
@@ -48,6 +53,8 @@ export class ManagedTerminalSession {
   private fitAddon: XTermFitAddon | null = null
   private searchAddon: XTermSearchAddon | null = null
   private serializeAddon: XTermSerializeAddon | null = null
+  private imageAddon: XTermImageAddon | null = null
+  private progressAddon: XTermProgressAddon | null = null
   private resizeObserver: ResizeObserver | null = null
   private disposables: Array<{ dispose: () => void }> = []
   private ptySessionId: string | null = null
@@ -71,6 +78,7 @@ export class ManagedTerminalSession {
   private lastPtyCols = 0
   private lastPtyRows = 0
   private searchResult: TerminalSearchResult | null = null
+  private progressState: TerminalProgressState | null = null
   private processName = 'terminal'
 
   constructor(descriptor: TerminalDescriptor, notify: () => void) {
@@ -144,6 +152,7 @@ export class ManagedTerminalSession {
   snapshot(): TerminalSnapshot {
     const snapshot: TerminalSnapshot = { phase: this.phase, message: this.message, processName: this.processName }
     if (this.searchResult) snapshot.search = this.searchResult
+    if (this.progressState) snapshot.progress = this.progressState
     return snapshot
   }
 
@@ -209,6 +218,7 @@ export class ManagedTerminalSession {
       this.fitAddon = fitAddon
       term.loadAddon(fitAddon)
       term.open(this.xtermHost)
+
       this.installResizeObserver()
       await waitForTerminalLayout()
       if (!this.currentStart(token, term)) return
@@ -367,7 +377,10 @@ export class ManagedTerminalSession {
     this.fitAddon = null
     this.searchAddon = null
     this.serializeAddon = null
+    this.imageAddon = null
+    this.progressAddon = null
     this.searchResult = null
+    this.progressState = null
     this.term?.dispose()
     this.term = null
     this.xtermHost.replaceChildren()
@@ -413,6 +426,8 @@ export class ManagedTerminalSession {
     this.installWebLinksAddon(term)
     this.installSearchAddon(term)
     this.installSerializeAddon(term)
+    this.installImageAddon(term)
+    this.installProgressAddon(term)
   }
 
   private installUnicode11Addon(term: XTermTerminal): void {
@@ -451,6 +466,37 @@ export class ManagedTerminalSession {
     } catch (err) {
       console.warn('[terminal] failed to load serialize addon', err)
     }
+  }
+
+  private installImageAddon(term: XTermTerminal): void {
+    try {
+      const imageAddon = new ImageAddon()
+      term.loadAddon(imageAddon)
+      this.imageAddon = imageAddon
+    } catch (err) {
+      console.warn('[terminal] failed to load image addon', err)
+    }
+  }
+
+  private installProgressAddon(term: XTermTerminal): void {
+    try {
+      const progressAddon = new ProgressAddon()
+      term.loadAddon(progressAddon)
+      this.disposables.push(progressAddon.onChange(({ state, value }) => this.updateProgress(state, value)))
+      this.progressAddon = progressAddon
+    } catch (err) {
+      console.warn('[terminal] failed to load progress addon', err)
+    }
+  }
+
+  private updateProgress(state: number, value: number): void {
+    if (state === 0) {
+      if (!this.progressState) return
+      this.progressState = null
+    } else {
+      this.progressState = { state: state as TerminalProgressState['state'], value: Math.max(0, Math.min(100, value)) }
+    }
+    this.notify()
   }
 
   private find(term: string, direction: 'next' | 'previous', incremental: boolean): TerminalSearchResult {

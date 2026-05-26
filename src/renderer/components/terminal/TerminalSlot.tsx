@@ -9,6 +9,7 @@ import {
   type KeyboardEvent,
 } from 'react'
 import { Button } from '#/renderer/components/ui/button.tsx'
+import { cn } from '#/renderer/lib/cn.ts'
 import { setTerminalFocused } from '#/renderer/terminal-focus.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { terminalSessionGroupKey } from '#/renderer/components/terminal/terminal-session-utils.ts'
@@ -160,6 +161,10 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
         : t('terminal.search-no-results')
       : ''
 
+  const progress = snapshot.progress
+  const progressVariant =
+    progress?.state === 2 ? 'error' : progress?.state === 4 ? 'warning' : progress?.state === 3 ? 'indeterminate' : ''
+
   return (
     <div
       className="goblin-terminal-slot"
@@ -168,6 +173,21 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
       onBlurCapture={handleBlur}
       onKeyDownCapture={handleKeyDownCapture}
     >
+      {progress && (
+        <div
+          className={cn('goblin-terminal-progress', progressVariant && `goblin-terminal-progress--${progressVariant}`)}
+          role="progressbar"
+          aria-label={t('terminal.progress')}
+          aria-valuenow={progress.state === 3 ? undefined : progress.value}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-busy={progress.state === 3 ? true : undefined}
+        >
+          {progress.state !== 3 && (
+            <div className="goblin-terminal-progress__bar" style={{ width: `${progress.value}%` }} />
+          )}
+        </div>
+      )}
       <div ref={hostRef} className="goblin-terminal-slot__host" />
       <TerminalSwitcher
         groupKey={groupKey}

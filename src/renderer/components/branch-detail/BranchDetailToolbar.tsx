@@ -1,5 +1,5 @@
 import { ChevronDown, Maximize2, Minimize2 } from 'lucide-react'
-import type { KeyboardEvent } from 'react'
+import type { KeyboardEvent, MouseEvent } from 'react'
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import type { RepoState, DetailTab, RepoWorkspaceLayout } from '#/renderer/stores/repos/types.ts'
 import { useSettingsStore } from '#/renderer/stores/settings.ts'
@@ -25,6 +25,9 @@ interface Props {
   layout: RepoWorkspaceLayout
 }
 
+const INTERACTIVE_SELECTOR =
+  'button, a, input, textarea, select, [role="button"], [role="tab"], [role="menuitem"]'
+
 export function BranchDetailToolbar({ repo, detail, detailId, contentId, collapsed, focusMode, layout }: Props) {
   const t = useT()
   const setDetailTab = useReposStore((s) => s.setDetailTab)
@@ -42,6 +45,12 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
   // No selected branch means there is no tab/action target; BranchDetailContent renders the empty state.
   if (!detail.branch) return null
 
+  function handleToolbarClick(e: MouseEvent<HTMLDivElement>) {
+    if (!(e.target instanceof Element)) return
+    if (e.target.closest(INTERACTIVE_SELECTOR)) return
+    toggleDetailCollapsed()
+  }
+
   function handleTabKeyDown(e: KeyboardEvent<HTMLButtonElement>, tabId: DetailTab) {
     const key = detailTabNavigationKey(e.key)
     if (!key) return
@@ -54,7 +63,7 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
   }
 
   return (
-    <Toolbar variant="detail">
+    <Toolbar variant="detail" onClick={behavior.detailCollapseAllowed ? handleToolbarClick : undefined}>
       {behavior.detailCollapseAllowed && (
         <Button
           variant="ghost"

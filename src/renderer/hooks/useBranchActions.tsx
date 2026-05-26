@@ -77,6 +77,9 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
   const [removeConfirm, setRemoveConfirm] = useState<RemoveConfirm | null>(null)
   const [forceRemoveConfirm, setForceRemoveConfirm] = useState<RemoveConfirm | null>(null)
   const [removeAlsoDeletes, setRemoveAlsoDeletes] = useState(true)
+  const [deleteAlsoUpstream, setDeleteAlsoUpstream] = useState(false)
+  const [removeAlsoUpstream, setRemoveAlsoUpstream] = useState(false)
+  const hasUpstream = !!branch.tracking && !branch.trackingGone
 
   function runUiAction(
     op: LocalBranchActionItemId,
@@ -164,18 +167,20 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
 
   function requestDeleteBranch() {
     if (branchActionBusy || hasPendingLocalAction()) return
+    setDeleteAlsoUpstream(false)
     setDeleteConfirm(branch.name)
   }
 
   function requestRemoveWorktree() {
     if (branchActionBusy || hasPendingLocalAction() || !branch.worktreePath) return
     setRemoveAlsoDeletes(!PROTECTED_BRANCHES.has(branch.name))
+    setRemoveAlsoUpstream(false)
     setRemoveConfirm({ branch: branch.name, path: branch.worktreePath })
   }
 
-  function deleteBranch(target: string, force = false) {
+  function deleteBranch(target: string, force = false, alsoDeleteUpstream = false) {
     return runRepoAction(
-      { kind: 'deleteBranch', branch: target, force },
+      { kind: 'deleteBranch', branch: target, force, alsoDeleteUpstream },
       {
         deferResultMessages: force ? [] : ['error.branch-not-fully-merged'],
         handleResult: (result) => {
@@ -189,7 +194,12 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
     )
   }
 
-  function removeWorktree(target: RemoveConfirm, alsoDeleteBranch: boolean, forceDeleteBranch: boolean) {
+  function removeWorktree(
+    target: RemoveConfirm,
+    alsoDeleteBranch: boolean,
+    forceDeleteBranch: boolean,
+    alsoDeleteUpstream = false,
+  ) {
     return runRepoAction(
       {
         kind: 'removeWorktree',
@@ -197,6 +207,7 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
         worktreePath: target.path,
         alsoDeleteBranch,
         forceDeleteBranch,
+        alsoDeleteUpstream,
       },
       {
         deferResultMessages: alsoDeleteBranch && !forceDeleteBranch ? ['error.cannot-remove-unpushed-worktree'] : [],
@@ -238,10 +249,10 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
         confirmLabel={t('action.confirm-push-confirm')}
         destructive
         onCancel={() => setPushConfirm(null)}
-        onConfirm={async () => {
+        onConfirm={() => {
           const target = pushConfirm
-          if (target) await runRepoAction({ kind: 'push', branch: target })
           setPushConfirm(null)
+          if (target) void runRepoAction({ kind: 'push', branch: target })
         }}
       />
       <ConfirmDialog
@@ -249,11 +260,24 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
         title={deleteConfirm ? t('action.confirm-delete-branch-title', { branch: deleteConfirm }) : ''}
         message={
           deleteConfirm ? (
-            <Trans
-              i18nKey="action.confirm-delete-branch-body"
-              values={{ branch: deleteConfirm }}
-              components={{ branch: <b className="text-foreground" /> }}
-            />
+            <div className="space-y-3">
+              <Trans
+                i18nKey="action.confirm-delete-branch-body"
+                values={{ branch: deleteConfirm }}
+                components={{ branch: <b className="text-foreground" /> }}
+              />
+              {hasUpstream && (
+                <label className="flex items-center gap-2 text-foreground cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={deleteAlsoUpstream}
+                    onChange={(e) => setDeleteAlsoUpstream(e.target.checked)}
+                    className="h-4 w-4 accent-destructive"
+                  />
+                  <span>{t('action.confirm-delete-branch-also-delete-upstream', { tracking: branch.tracking! })}</span>
+                </label>
+              )}
+            </div>
           ) : (
             ''
           )
@@ -261,10 +285,11 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
         confirmLabel={t('action.confirm-delete-branch-confirm')}
         destructive
         onCancel={() => setDeleteConfirm(null)}
-        onConfirm={async () => {
+        onConfirm={() => {
           const target = deleteConfirm
-          if (target) await deleteBranch(target)
+          const upstream = deleteAlsoUpstream
           setDeleteConfirm(null)
+          if (target) void deleteBranch(target, false, upstream)
         }}
       />
       <ConfirmDialog
@@ -274,11 +299,26 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
         }
         message={
           forceDeleteConfirm ? (
-            <Trans
-              i18nKey="action.confirm-force-delete-standalone-body"
-              values={{ branch: forceDeleteConfirm }}
-              components={{ branch: <b className="text-foreground" /> }}
-            />
+            <div className="space-y-3">
+              <Trans
+                i18nKey="action.confirm-force-delete-standalone-body"
+                values={{ branch: forceDeleteConfirm }}
+                components={{ branch: <b className="text-foreground" /> }}
+              />
+              {hasUpstream && (
+                <label className="flex items-center gap-2 text-foreground cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={deleteAlsoUpstream}
+                    onChange={(e) => setDeleteAlsoUpstream(e.target.checked)}
+                    className="h-4 w-4 accent-destructive"
+                  />
+                  <span>
+                    {t('action.confirm-delete-branch-also-delete-upstream', { tracking: branch.tracking! })}
+                  </span>
+                </label>
+              )}
+            </div>
           ) : (
             ''
           )
@@ -286,10 +326,11 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
         confirmLabel={t('action.confirm-force-delete-standalone-confirm')}
         destructive
         onCancel={() => setForceDeleteConfirm(null)}
-        onConfirm={async () => {
+        onConfirm={() => {
           const target = forceDeleteConfirm
-          if (target) await deleteBranch(target, true)
+          const upstream = deleteAlsoUpstream
           setForceDeleteConfirm(null)
+          if (target) void deleteBranch(target, true, upstream)
         }}
       />
       <ConfirmDialog
@@ -326,6 +367,17 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
                   {t('action.confirm-remove-worktree-protected-hint')}
                 </div>
               )}
+              {removeAlsoDeletes && hasUpstream && !removeConfirmProtected && (
+                <label className="flex items-center gap-2 text-foreground cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={removeAlsoUpstream}
+                    onChange={(e) => setRemoveAlsoUpstream(e.target.checked)}
+                    className="h-4 w-4 accent-destructive"
+                  />
+                  <span>{t('action.confirm-delete-branch-also-delete-upstream', { tracking: branch.tracking! })}</span>
+                </label>
+              )}
             </div>
           ) : (
             ''
@@ -337,10 +389,9 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
         onConfirm={() => {
           const target = removeConfirm
           const alsoDelete = removeAlsoDeletes
-          // Match create-worktree: the confirm dialog only starts the repo action;
-          // branchAction resource owns progress, and a later unpushed-worktree result reopens force confirm.
+          const upstream = removeAlsoUpstream
           setRemoveConfirm(null)
-          if (target) void removeWorktree(target, alsoDelete, false)
+          if (target) void removeWorktree(target, alsoDelete, false, upstream)
         }}
       />
       <ConfirmDialog
@@ -350,7 +401,22 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
         }
         message={
           forceRemoveConfirm ? (
-            <span>{t('action.confirm-force-delete-branch-body', { branch: forceRemoveConfirm.branch })}</span>
+            <div className="space-y-3">
+              <span>{t('action.confirm-force-delete-branch-body', { branch: forceRemoveConfirm.branch })}</span>
+              {hasUpstream && (
+                <label className="flex items-center gap-2 text-foreground cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={removeAlsoUpstream}
+                    onChange={(e) => setRemoveAlsoUpstream(e.target.checked)}
+                    className="h-4 w-4 accent-destructive"
+                  />
+                  <span>
+                    {t('action.confirm-delete-branch-also-delete-upstream', { tracking: branch.tracking! })}
+                  </span>
+                </label>
+              )}
+            </div>
           ) : (
             ''
           )
@@ -360,8 +426,9 @@ export function useBranchActions(repo: RepoState, branch: BranchInfo) {
         onCancel={() => setForceRemoveConfirm(null)}
         onConfirm={() => {
           const target = forceRemoveConfirm
+          const upstream = removeAlsoUpstream
           setForceRemoveConfirm(null)
-          if (target) void removeWorktree(target, true, true)
+          if (target) void removeWorktree(target, true, true, upstream)
         }}
       />
     </>

@@ -11,6 +11,10 @@ export function ShortcutSettings() {
   const shortcutStatusId = 'global-shortcut-status'
   const shortcutsDisabled = useSettingsStore((s) => s.shortcutsDisabled)
   const setShortcutsDisabled = useSettingsStore((s) => s.setShortcutsDisabled)
+  const globalShortcutDisabled = useSettingsStore((s) => s.globalShortcutDisabled)
+  const setGlobalShortcutDisabled = useSettingsStore((s) => s.setGlobalShortcutDisabled)
+  const swapCloseShortcuts = useSettingsStore((s) => s.swapCloseShortcuts)
+  const setSwapCloseShortcuts = useSettingsStore((s) => s.setSwapCloseShortcuts)
   const globalShortcut = useSettingsStore((s) => s.globalShortcut)
   const globalShortcutRegistered = useSettingsStore((s) => s.globalShortcutRegistered)
   const setGlobalShortcut = useSettingsStore((s) => s.setGlobalShortcut)
@@ -23,10 +27,22 @@ export function ShortcutSettings() {
     })
   }
 
+  const saveGlobalShortcutDisabled = (disabled: boolean) => {
+    void setGlobalShortcutDisabled(disabled).catch((err) => {
+      console.warn('[settings] global shortcut disabled update failed', err)
+    })
+  }
+
+  const saveSwapCloseShortcuts = (swapped: boolean) => {
+    void setSwapCloseShortcuts(swapped).catch((err) => {
+      console.warn('[settings] swap close shortcuts update failed', err)
+    })
+  }
+
   const saveGlobalShortcut = (accelerator: string) => {
     void setGlobalShortcut(accelerator)
       .then((state) => {
-        const failedToUseRequested = state.accelerator !== accelerator || (!shortcutsDisabled && !state.registered)
+        const failedToUseRequested = state.accelerator !== accelerator || (!globalShortcutDisabled && !state.registered)
         setShortcutError(failedToUseRequested ? t('settings.global-shortcut-conflict') : null)
       })
       .catch((err) => {
@@ -59,11 +75,11 @@ export function ShortcutSettings() {
 
   const shortcutStatus = shortcutError
     ? { text: shortcutError, tone: 'error' as const }
-    : !shortcutsDisabled && !globalShortcutRegistered
+    : !globalShortcutDisabled && !globalShortcutRegistered
       ? { text: t('settings.global-shortcut-conflict'), tone: 'error' as const }
       : recordingShortcut
         ? { text: t('settings.global-shortcut-hint'), tone: 'muted' as const }
-        : shortcutsDisabled
+        : globalShortcutDisabled
           ? { text: t('settings.global-shortcut-disabled-hint'), tone: 'muted' as const }
           : null
 
@@ -74,13 +90,43 @@ export function ShortcutSettings() {
           htmlFor="shortcuts-disabled-switch"
           className="min-w-0 cursor-pointer select-none text-sm text-foreground"
         >
-          {t('settings.shortcuts-disable-all')}
+          {t('settings.shortcuts-disable-app')}
         </label>
         <Switch
           id="shortcuts-disabled-switch"
           checked={shortcutsDisabled}
           onCheckedChange={saveShortcutsDisabled}
-          aria-label={t('settings.shortcuts-disable-all')}
+          aria-label={t('settings.shortcuts-disable-app')}
+        />
+      </div>
+
+      <div className="flex min-h-11 items-center justify-between gap-4 border-t border-separator px-3 py-2">
+        <label
+          htmlFor="global-shortcut-disabled-switch"
+          className="min-w-0 cursor-pointer select-none text-sm text-foreground"
+        >
+          {t('settings.shortcuts-disable-global')}
+        </label>
+        <Switch
+          id="global-shortcut-disabled-switch"
+          checked={globalShortcutDisabled}
+          onCheckedChange={saveGlobalShortcutDisabled}
+          aria-label={t('settings.shortcuts-disable-global')}
+        />
+      </div>
+
+      <div className="flex min-h-11 items-center justify-between gap-4 border-t border-separator px-3 py-2">
+        <label
+          htmlFor="swap-close-shortcuts-switch"
+          className="min-w-0 cursor-pointer select-none text-sm text-foreground"
+        >
+          {t('settings.swap-close-shortcuts')}
+        </label>
+        <Switch
+          id="swap-close-shortcuts-switch"
+          checked={swapCloseShortcuts}
+          onCheckedChange={saveSwapCloseShortcuts}
+          aria-label={t('settings.swap-close-shortcuts')}
         />
       </div>
 

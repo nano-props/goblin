@@ -253,6 +253,7 @@ export const ko: Record<DictKey, string> = {
   'terminal.sessions': '터미널',
   'terminal.new': '새 터미널',
   'terminal.close': '터미널 닫기',
+  'terminal.progress': '터미널 진행률',
   'terminal.empty': '열린 터미널 없음',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
@@ -299,6 +300,7 @@ export const ko: Record<DictKey, string> = {
   'action.confirm-delete-branch-body':
     '로컬 브랜치 <branch>{branch}</branch> 을(를) 삭제합니다. 완전히 병합되지 않았다면 Git 이 거부합니다.',
   'action.confirm-delete-branch-confirm': '브랜치 삭제',
+  'action.confirm-delete-branch-also-delete-upstream': '업스트림 브랜치 {tracking}도 삭제',
   'action.confirm-force-delete-standalone-title': '{branch} 을(를) 강제 삭제할까요?',
   'action.confirm-force-delete-standalone-body':
     '로컬 브랜치 <branch>{branch}</branch> 에는 완전히 병합되지 않은 고유 커밋이 있습니다. 해당 커밋이 더 이상 필요 없을 때만 강제 삭제하세요.',
@@ -367,6 +369,7 @@ export const ko: Record<DictKey, string> = {
   'error.try-again': '다시 시도',
   'error.back': '뒤로 (Esc)',
   'error.settings-write-title': '설정 저장 실패',
+  'error.upstream-delete-failed': '로컬 브랜치가 삭제되었지만 업스트림 브랜치 삭제에 실패했습니다.',
 
   // ---- Settings panel ----------------------------------------------------
   'settings.title': '설정',
@@ -410,7 +413,9 @@ export const ko: Record<DictKey, string> = {
   'settings.fetch.15m': '15 분',
   'settings.shortcuts': '키보드 단축키',
   'settings.shortcuts-hint': '단축키를 끄거나 Goblin 호출 단축키를 바꿉니다.',
-  'settings.shortcuts-disable-all': '앱 단축키 비활성화',
+  'settings.shortcuts-disable-app': '앱 단축키 비활성화',
+  'settings.shortcuts-disable-global': '전역 단축키 비활성화',
+  'settings.swap-close-shortcuts': '닫기 단축키 교체 (⌘W ↔ ⌘⇧W)',
   'settings.global-shortcut': '전역 단축키',
   'settings.global-shortcut-hint': '새 조합을 누르세요. Esc 취소.',
   'settings.global-shortcut-disabled-hint': '저장됨, 현재 꺼짐.',
@@ -420,6 +425,12 @@ export const ko: Record<DictKey, string> = {
   'settings.global-shortcut-conflict': '등록 실패. 사용 중일 수 있습니다.',
   'settings.global-shortcut-invalid': 'Command, Control 또는 Option과 키를 함께 사용하세요.',
   'settings.open-github': 'GitHub에서 프로젝트 열기',
+  'about.app': 'Goblin',
+  'about.version': '버전',
+  'about.build': '빌드',
+  'about.build.unknown': 'dev',
+  'about.github': '소스 코드',
+  'about.github.body': 'GitHub에서 보기',
 
   // ---- Help overlay ------------------------------------------------------
   'help.title': '키보드 단축키',

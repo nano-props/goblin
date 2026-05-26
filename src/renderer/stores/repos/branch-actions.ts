@@ -131,7 +131,10 @@ function runBranchActionRpc(action: RepoBranchAction, repoId: string, signal?: A
         { signal },
       )
     case 'deleteBranch':
-      return rpc.repo.deleteBranch.mutate({ cwd: repoId, branch: action.branch, force: action.force }, { signal })
+      return rpc.repo.deleteBranch.mutate(
+        { cwd: repoId, branch: action.branch, force: action.force, alsoDeleteUpstream: action.alsoDeleteUpstream },
+        { signal },
+      )
     case 'removeWorktree':
       return rpc.repo.removeWorktree.mutate(
         {
@@ -140,6 +143,7 @@ function runBranchActionRpc(action: RepoBranchAction, repoId: string, signal?: A
           worktreePath: action.worktreePath,
           alsoDeleteBranch: action.alsoDeleteBranch,
           forceDeleteBranch: action.forceDeleteBranch,
+          alsoDeleteUpstream: action.alsoDeleteUpstream,
         },
         { signal },
       )

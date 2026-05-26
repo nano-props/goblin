@@ -18,6 +18,7 @@ import {
 import {
   checkoutBranch,
   deleteBranch,
+  deleteUpstreamBranch,
   getBranches,
   getCurrentBranch,
   getDefaultBranch,
@@ -33,6 +34,7 @@ import {
   getBrowserRemoteUrl,
   getNewPullRequestUrl,
   getRemoteInfo,
+  getUpstreamParts,
   pullBranch,
   pushBranch,
 } from '#/main/git/remote.ts'
@@ -69,6 +71,8 @@ import {
   onSettingsWriteError,
   setFetchInterval,
   setGlobalShortcut,
+  setGlobalShortcutDisabled,
+  setSwapCloseShortcuts,
   setSession,
   setShortcutsDisabled,
   setTerminalApp,
@@ -466,6 +470,8 @@ function createRpcHandlers(): AppRpcHandlers {
           colorTheme: s.colorTheme,
           fetchIntervalSec: s.fetchIntervalSec,
           shortcutsDisabled: s.shortcutsDisabled,
+          globalShortcutDisabled: s.globalShortcutDisabled,
+          swapCloseShortcuts: s.swapCloseShortcuts,
           globalShortcut: s.globalShortcut,
           globalShortcutRegistered: isGlobalShortcutRegistered(),
           ...terminalAppSnapshot(s.terminalApp),
@@ -482,19 +488,30 @@ function createRpcHandlers(): AppRpcHandlers {
       setShortcutsDisabled: async ({ disabled }) => {
         if (typeof disabled !== 'boolean') return
         const saved = await setShortcutsDisabled(disabled)
-        const s = await loadSettings()
-        syncGlobalShortcuts(saved, s.globalShortcut)
         buildAppMenu()
         broadcastRpcEvent({ type: 'shortcuts-disabled-changed', disabled: saved })
+      },
+      setGlobalShortcutDisabled: async ({ disabled }) => {
+        if (typeof disabled !== 'boolean') return
+        const saved = await setGlobalShortcutDisabled(disabled)
+        const s = await loadSettings()
+        syncGlobalShortcuts(saved, s.globalShortcut)
+        broadcastRpcEvent({ type: 'global-shortcut-disabled-changed', disabled: saved })
         broadcastRpcEvent({ type: 'global-shortcut-changed', state: globalShortcutPayload(s.globalShortcut) })
+      },
+      setSwapCloseShortcuts: async ({ swapped }) => {
+        if (typeof swapped !== 'boolean') return
+        const saved = await setSwapCloseShortcuts(swapped)
+        buildAppMenu()
+        broadcastRpcEvent({ type: 'swap-close-shortcuts-changed', swapped: saved })
       },
       setGlobalShortcut: async ({ accelerator }) => {
         const parsed = parseGlobalShortcut(accelerator)
         const s = await loadSettings()
         if (!parsed) return globalShortcutPayload(s.globalShortcut)
         if (isReservedGlobalShortcut(parsed)) return globalShortcutPayload(s.globalShortcut)
-        const registered = s.shortcutsDisabled || replaceGlobalShortcut(false, s.globalShortcut, parsed)
-        if (!registered && !s.shortcutsDisabled) return globalShortcutPayload(s.globalShortcut)
+        const registered = s.globalShortcutDisabled || replaceGlobalShortcut(false, s.globalShortcut, parsed)
+        if (!registered && !s.globalShortcutDisabled) return globalShortcutPayload(s.globalShortcut)
         const saved = await setGlobalShortcut(parsed)
         const payload = globalShortcutPayload(saved)
         broadcastRpcEvent({ type: 'global-shortcut-changed', state: payload })
@@ -566,10 +583,12 @@ async function deleteRepoBranch(
     cwd,
     branch,
     force,
+    alsoDeleteUpstream,
   }: {
     cwd: string
     branch: string
     force?: boolean
+    alsoDeleteUpstream?: boolean
   },
   signal?: AbortSignal,
 ): Promise<ExecResult> {
@@ -589,7 +608,21 @@ async function deleteRepoBranch(
   if (!safelyDeletable) {
     return { ok: false, message: 'error.branch-not-fully-merged' }
   }
-  return deleteBranch(cwd, branch, { force: shouldForce, signal })
+  // Read upstream config BEFORE deleting the local branch — git branch -d
+  // removes the [branch "…"] section from .git/config, so the info would
+  // be gone after deletion.
+  const upstream = alsoDeleteUpstream ? await getUpstreamParts(cwd, branch, signal) : null
+  if (signal?.aborted) return { ok: false, message: 'cancelled' }
+  const delResult = await deleteBranch(cwd, branch, { force: shouldForce, signal })
+  if (!delResult.ok) return delResult
+  if (upstream && upstream.remote !== '.') {
+    if (signal?.aborted) return { ok: false, message: 'cancelled' }
+    const upstreamResult = await deleteUpstreamBranch(cwd, upstream.remote, upstream.branch, signal)
+    if (!upstreamResult.ok) {
+      return { ok: false, message: 'error.upstream-delete-failed' }
+    }
+  }
+  return delResult
 }
 
 async function removeRepoWorktree(
@@ -599,12 +632,14 @@ async function removeRepoWorktree(
     worktreePath,
     alsoDeleteBranch,
     forceDeleteBranch,
+    alsoDeleteUpstream,
   }: {
     cwd: string
     branch: string
     worktreePath: string
     alsoDeleteBranch: boolean
     forceDeleteBranch?: boolean
+    alsoDeleteUpstream?: boolean
   },
   signal?: AbortSignal,
 ): Promise<ExecResult> {
@@ -640,7 +675,11 @@ async function removeRepoWorktree(
     }
   }
 
+  // Read upstream config BEFORE deleting the local branch — git branch -d
+  // removes the [branch "…"] section from .git/config.
+  const upstream = alsoDeleteBranch && alsoDeleteUpstream ? await getUpstreamParts(cwd, branch, signal) : null
   if (signal?.aborted) return { ok: false, message: 'cancelled' }
+
   const removeResult = await removeWorktree(cwd, target.path, signal)
   if (!removeResult.ok) return removeResult
   closeWorktreeSession(root, target.path)
@@ -648,6 +687,13 @@ async function removeRepoWorktree(
     if (signal?.aborted) return { ok: false, message: 'cancelled' }
     const delResult = await deleteBranch(cwd, branch, { force: shouldForceDeleteBranch, signal })
     if (!delResult.ok) return delResult
+    if (upstream && upstream.remote !== '.') {
+      if (signal?.aborted) return { ok: false, message: 'cancelled' }
+      const upstreamResult = await deleteUpstreamBranch(cwd, upstream.remote, upstream.branch, signal)
+      if (!upstreamResult.ok) {
+        return { ok: false, message: 'error.upstream-delete-failed' }
+      }
+    }
   }
   return removeResult
 }

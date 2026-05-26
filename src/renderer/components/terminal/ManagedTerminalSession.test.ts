@@ -13,11 +13,15 @@ const xtermMocks = vi.hoisted(() => {
   const serializeAddons: any[] = []
   const unicodeAddons: any[] = []
   const webLinkAddons: any[] = []
+  const imageAddons: any[] = []
+  const progressAddons: any[] = []
   const addonFailures = {
     search: false,
     serialize: false,
     unicode: false,
     webLinks: false,
+    image: false,
+    progress: false,
   }
 
   class MockTerminal {
@@ -191,6 +195,42 @@ const xtermMocks = vi.hoisted(() => {
     }
   }
 
+  class MockImageAddon {
+    term: MockTerminal | null = null
+
+    constructor() {
+      if (addonFailures.image) throw new Error('image addon failed')
+      imageAddons.push(this)
+    }
+
+    activate(term: MockTerminal) {
+      this.term = term
+    }
+  }
+
+  class MockProgressAddon {
+    term: MockTerminal | null = null
+    private changeHandlers: Array<(state: { state: number; value: number }) => void> = []
+
+    constructor() {
+      if (addonFailures.progress) throw new Error('progress addon failed')
+      progressAddons.push(this)
+    }
+
+    activate(term: MockTerminal) {
+      this.term = term
+    }
+
+    onChange(cb: (state: { state: number; value: number }) => void) {
+      this.changeHandlers.push(cb)
+      return { dispose: vi.fn(() => (this.changeHandlers = this.changeHandlers.filter((h) => h !== cb))) }
+    }
+
+    emitProgress(state: number, value: number) {
+      for (const handler of this.changeHandlers) handler({ state, value })
+    }
+  }
+
   return {
     terminals,
     fitAddons,
@@ -198,6 +238,8 @@ const xtermMocks = vi.hoisted(() => {
     serializeAddons,
     unicodeAddons,
     webLinkAddons,
+    imageAddons,
+    progressAddons,
     addonFailures,
     MockTerminal,
     MockFitAddon,
@@ -205,11 +247,15 @@ const xtermMocks = vi.hoisted(() => {
     MockSerializeAddon,
     MockUnicode11Addon,
     MockWebLinksAddon,
+    MockImageAddon,
+    MockProgressAddon,
   }
 })
 
 vi.mock('@xterm/xterm', () => ({ Terminal: xtermMocks.MockTerminal }))
 vi.mock('@xterm/addon-fit', () => ({ FitAddon: xtermMocks.MockFitAddon }))
+vi.mock('@xterm/addon-image', () => ({ ImageAddon: xtermMocks.MockImageAddon }))
+vi.mock('@xterm/addon-progress', () => ({ ProgressAddon: xtermMocks.MockProgressAddon }))
 vi.mock('@xterm/addon-search', () => ({ SearchAddon: xtermMocks.MockSearchAddon }))
 vi.mock('@xterm/addon-serialize', () => ({ SerializeAddon: xtermMocks.MockSerializeAddon }))
 vi.mock('@xterm/addon-unicode11', () => ({ Unicode11Addon: xtermMocks.MockUnicode11Addon }))
@@ -251,7 +297,12 @@ beforeEach(() => {
   xtermMocks.serializeAddons.length = 0
   xtermMocks.unicodeAddons.length = 0
   xtermMocks.webLinkAddons.length = 0
-  Object.assign(xtermMocks.addonFailures, { search: false, serialize: false, unicode: false, webLinks: false })
+  xtermMocks.imageAddons.length = 0
+  xtermMocks.progressAddons.length = 0
+  Object.assign(xtermMocks.addonFailures, {
+    search: false, serialize: false, unicode: false, webLinks: false,
+    image: false, progress: false,
+  })
   MockResizeObserver.instances.length = 0
   vi.clearAllMocks()
   installTerminalThemeStyles()
@@ -384,7 +435,10 @@ describe('ManagedTerminalSession', () => {
   })
 
   test('opens terminal when optional addon setup fails', async () => {
-    Object.assign(xtermMocks.addonFailures, { search: true, serialize: true, unicode: true, webLinks: true })
+    Object.assign(xtermMocks.addonFailures, {
+      search: true, serialize: true, unicode: true, webLinks: true,
+      image: true, progress: true,
+    })
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const host = document.createElement('div')
     document.body.appendChild(host)
@@ -402,6 +456,9 @@ describe('ManagedTerminalSession', () => {
     expect(warnSpy).toHaveBeenCalledWith('[terminal] failed to load web links addon', expect.any(Error))
     expect(warnSpy).toHaveBeenCalledWith('[terminal] failed to load search addon', expect.any(Error))
     expect(warnSpy).toHaveBeenCalledWith('[terminal] failed to load serialize addon', expect.any(Error))
+    expect(warnSpy).toHaveBeenCalledWith('[terminal] failed to load image addon', expect.any(Error))
+    expect(warnSpy).toHaveBeenCalledWith('[terminal] failed to load progress addon', expect.any(Error))
+    expect(session.snapshot().progress).toBeUndefined()
     warnSpy.mockRestore()
   })
 
@@ -627,6 +684,92 @@ describe('ManagedTerminalSession', () => {
         .querySelector<HTMLElement>('.goblin-managed-terminal-frame')
         ?.style.getPropertyValue('--goblin-terminal-background'),
     ).toBe('#111113')
+  })
+
+  test('loads image and progress addons', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    expect(xtermMocks.imageAddons).toHaveLength(1)
+    expect(xtermMocks.progressAddons).toHaveLength(1)
+  })
+
+  test('progress state appears in snapshot and clears on state 0', async () => {
+    const notify = vi.fn()
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, notify)
+
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+    notify.mockClear()
+
+    xtermMocks.progressAddons[0]!.emitProgress(1, 75)
+    expect(session.snapshot().progress).toEqual({ state: 1, value: 75 })
+    expect(notify).toHaveBeenCalledTimes(1)
+
+    xtermMocks.progressAddons[0]!.emitProgress(1, 100)
+    expect(session.snapshot().progress).toEqual({ state: 1, value: 100 })
+
+    xtermMocks.progressAddons[0]!.emitProgress(0, 0)
+    expect(session.snapshot().progress).toBeUndefined()
+  })
+
+  test('progress error and indeterminate states', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    xtermMocks.progressAddons[0]!.emitProgress(2, 80)
+    expect(session.snapshot().progress).toEqual({ state: 2, value: 80 })
+
+    xtermMocks.progressAddons[0]!.emitProgress(3, 0)
+    expect(session.snapshot().progress).toEqual({ state: 3, value: 0 })
+  })
+
+  test('progress state is cleared on restart', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    xtermMocks.progressAddons[0]!.emitProgress(1, 75)
+    expect(session.snapshot().progress).toEqual({ state: 1, value: 75 })
+
+    session.restart()
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    expect(session.snapshot().progress).toBeUndefined()
+  })
+
+  test('progress value is clamped to 0-100', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    xtermMocks.progressAddons[0]!.emitProgress(1, 150)
+    expect(session.snapshot().progress).toEqual({ state: 1, value: 100 })
+
+    xtermMocks.progressAddons[0]!.emitProgress(1, -10)
+    expect(session.snapshot().progress).toEqual({ state: 1, value: 0 })
   })
 })
 

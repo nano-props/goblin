@@ -262,6 +262,7 @@ export const en = {
   'terminal.sessions': 'Terminals',
   'terminal.new': 'New terminal',
   'terminal.close': 'Close terminal',
+  'terminal.progress': 'Terminal progress',
   'terminal.empty': 'No terminal open',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) ---
@@ -308,6 +309,7 @@ export const en = {
   'action.confirm-delete-branch-body':
     'This will delete local branch <branch>{branch}</branch>. Git will refuse if it is not fully merged.',
   'action.confirm-delete-branch-confirm': 'Delete branch',
+  'action.confirm-delete-branch-also-delete-upstream': 'Also delete upstream branch {tracking}',
   'action.confirm-force-delete-standalone-title': 'Force-delete {branch}?',
   'action.confirm-force-delete-standalone-body':
     'Local branch <branch>{branch}</branch> has unique commits that are not fully merged. Force-delete only if you no longer need those commits.',
@@ -375,6 +377,7 @@ export const en = {
   'error.try-again': 'Try again',
   'error.back': 'Back (Esc)',
   'error.settings-write-title': 'Failed to save settings',
+  'error.upstream-delete-failed': 'Local branch deleted, but failed to delete the upstream branch.',
 
   // ---- Settings panel -----------------------------------------------------
   'settings.title': 'Settings',
@@ -418,7 +421,9 @@ export const en = {
   'settings.fetch.15m': '15 min',
   'settings.shortcuts': 'Keyboard shortcuts',
   'settings.shortcuts-hint': 'Turn off shortcuts or change the wake shortcut.',
-  'settings.shortcuts-disable-all': 'Disable app shortcuts',
+  'settings.shortcuts-disable-app': 'Disable app shortcuts',
+  'settings.shortcuts-disable-global': 'Disable global shortcut',
+  'settings.swap-close-shortcuts': 'Swap close shortcuts (⌘W ↔ ⌘⇧W)',
   'settings.global-shortcut': 'Global shortcut',
   'settings.global-shortcut-hint': 'Press a combo. Esc cancels.',
   'settings.global-shortcut-disabled-hint': 'Saved, currently off.',
@@ -428,6 +433,12 @@ export const en = {
   'settings.global-shortcut-conflict': 'Registration failed. It may be in use.',
   'settings.global-shortcut-invalid': 'Use Command, Control, or Option with a key.',
   'settings.open-github': 'Open project on GitHub',
+  'about.app': 'Goblin',
+  'about.version': 'Version',
+  'about.build': 'Build',
+  'about.build.unknown': 'dev',
+  'about.github': 'Source code',
+  'about.github.body': 'View on GitHub',
 
   // ---- Help overlay -------------------------------------------------------
   'help.title': 'Keyboard shortcuts',

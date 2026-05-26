@@ -54,6 +54,8 @@ export interface Settings {
   /** Auto-fetch interval in seconds for the active repo. 0 = disabled. */
   fetchIntervalSec: number
   shortcutsDisabled: boolean
+  globalShortcutDisabled: boolean
+  swapCloseShortcuts: boolean
   globalShortcut: string
   terminalApp: TerminalPref
   editorApp: EditorPref
@@ -69,6 +71,8 @@ const DEFAULTS: Settings = {
   lang: 'auto',
   fetchIntervalSec: 120,
   shortcutsDisabled: false,
+  globalShortcutDisabled: false,
+  swapCloseShortcuts: false,
   globalShortcut: DEFAULT_GLOBAL_SHORTCUT,
   terminalApp: 'auto',
   editorApp: 'auto',
@@ -208,6 +212,8 @@ export async function loadSettings(): Promise<Settings> {
       lang: normalizeLangPref(parsed.lang),
       fetchIntervalSec: normalizeFetchInterval(parsed.fetchIntervalSec),
       shortcutsDisabled: parsed.shortcutsDisabled === true,
+      globalShortcutDisabled: parsed.globalShortcutDisabled === true,
+      swapCloseShortcuts: parsed.swapCloseShortcuts === true,
       globalShortcut: normalizeGlobalShortcut(parsed.globalShortcut),
       terminalApp: normalizeTerminalPref(parsed.terminalApp),
       editorApp: normalizeEditorPref(parsed.editorApp),
@@ -229,6 +235,14 @@ export function getRecentRepos(): string[] {
 
 export function getShortcutsDisabled(): boolean {
   return cache?.shortcutsDisabled ?? DEFAULTS.shortcutsDisabled
+}
+
+export function getGlobalShortcutDisabled(): boolean {
+  return cache?.globalShortcutDisabled ?? DEFAULTS.globalShortcutDisabled
+}
+
+export function getSwapCloseShortcuts(): boolean {
+  return cache?.swapCloseShortcuts ?? DEFAULTS.swapCloseShortcuts
 }
 
 export function getGlobalShortcut(): string {
@@ -358,6 +372,22 @@ export async function setShortcutsDisabled(disabled: boolean): Promise<boolean> 
   s.shortcutsDisabled = disabled
   scheduleWrite()
   return disabled
+}
+
+export async function setGlobalShortcutDisabled(disabled: boolean): Promise<boolean> {
+  const s = await loadSettings()
+  if (s.globalShortcutDisabled === disabled) return disabled
+  s.globalShortcutDisabled = disabled
+  scheduleWrite()
+  return disabled
+}
+
+export async function setSwapCloseShortcuts(swapped: boolean): Promise<boolean> {
+  const s = await loadSettings()
+  if (s.swapCloseShortcuts === swapped) return swapped
+  s.swapCloseShortcuts = swapped
+  scheduleWrite()
+  return swapped
 }
 
 export async function setGlobalShortcut(accelerator: string): Promise<string> {

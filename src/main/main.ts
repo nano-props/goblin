@@ -69,7 +69,7 @@ async function main(): Promise<void> {
   wireTerminalIpc()
 
   buildAppMenu()
-  syncGlobalShortcuts(settings.shortcutsDisabled, settings.globalShortcut)
+  syncGlobalShortcuts(settings.globalShortcutDisabled, settings.globalShortcut)
 
   await createMainWindow()
 }

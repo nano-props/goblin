@@ -260,6 +260,7 @@ export const ja: Record<DictKey, string> = {
   'terminal.sessions': 'ターミナル',
   'terminal.new': '新しいターミナル',
   'terminal.close': 'ターミナルを閉じる',
+  'terminal.progress': 'ターミナル進行状況',
   'terminal.empty': '開いているターミナルはありません',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
@@ -306,6 +307,7 @@ export const ja: Record<DictKey, string> = {
   'action.confirm-delete-branch-body':
     'ローカルブランチ <branch>{branch}</branch> を削除します。完全にマージされていない場合、Git が拒否します。',
   'action.confirm-delete-branch-confirm': 'ブランチを削除',
+  'action.confirm-delete-branch-also-delete-upstream': '上流ブランチ {tracking} も削除',
   'action.confirm-force-delete-standalone-title': '{branch} を強制削除しますか？',
   'action.confirm-force-delete-standalone-body':
     'ローカルブランチ <branch>{branch}</branch> には完全にマージされていない固有コミットがあります。そのコミットが不要な場合のみ強制削除してください。',
@@ -374,6 +376,7 @@ export const ja: Record<DictKey, string> = {
   'error.try-again': '再試行',
   'error.back': '戻る (Esc)',
   'error.settings-write-title': '設定の保存に失敗しました',
+  'error.upstream-delete-failed': 'ローカルブランチは削除されましたが、上流ブランチの削除に失敗しました。',
 
   // ---- Settings panel ----------------------------------------------------
   'settings.title': '設定',
@@ -417,7 +420,9 @@ export const ja: Record<DictKey, string> = {
   'settings.fetch.15m': '15 分',
   'settings.shortcuts': 'キーボードショートカット',
   'settings.shortcuts-hint': 'ショートカットをオフ、または Goblin の呼び出しキーを変更します。',
-  'settings.shortcuts-disable-all': 'アプリのショートカットを無効化',
+  'settings.shortcuts-disable-app': 'アプリのショートカットを無効化',
+  'settings.shortcuts-disable-global': 'グローバルショートカットを無効化',
+  'settings.swap-close-shortcuts': '閉じるショートカットを入れ替え（⌘W ↔ ⌘⇧W）',
   'settings.global-shortcut': 'グローバルショートカット',
   'settings.global-shortcut-hint': '新しい組み合わせを押してください。Esc でキャンセル。',
   'settings.global-shortcut-disabled-hint': '保存済み、現在はオフ。',
@@ -427,6 +432,12 @@ export const ja: Record<DictKey, string> = {
   'settings.global-shortcut-conflict': '登録できません。使用中の可能性があります。',
   'settings.global-shortcut-invalid': 'Command、Control、Option とキーを組み合わせてください。',
   'settings.open-github': 'GitHub でプロジェクトを開く',
+  'about.app': 'Goblin',
+  'about.version': 'バージョン',
+  'about.build': 'ビルド',
+  'about.build.unknown': 'dev',
+  'about.github': 'ソースコード',
+  'about.github.body': 'GitHub で表示',
 
   // ---- Help overlay ------------------------------------------------------
   'help.title': 'キーボードショートカット',

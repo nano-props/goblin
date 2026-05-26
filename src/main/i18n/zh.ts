@@ -250,6 +250,7 @@ export const zh: Record<DictKey, string> = {
   'terminal.sessions': '终端',
   'terminal.new': '新建终端',
   'terminal.close': '关闭终端',
+  'terminal.progress': '终端进度',
   'terminal.empty': '没有打开的终端',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
@@ -295,6 +296,7 @@ export const zh: Record<DictKey, string> = {
   'action.confirm-delete-branch-body':
     '这会删除本地分支 <branch>{branch}</branch>。如果分支尚未完全合并，Git 会拒绝删除。',
   'action.confirm-delete-branch-confirm': '删除分支',
+  'action.confirm-delete-branch-also-delete-upstream': '同时删除上游分支 {tracking}',
   'action.confirm-force-delete-standalone-title': '强制删除 {branch}？',
   'action.confirm-force-delete-standalone-body':
     '本地分支 <branch>{branch}</branch> 有独有提交，尚未完全合并。只有确认不再需要这些提交时才强制删除。',
@@ -361,6 +363,7 @@ export const zh: Record<DictKey, string> = {
   'error.try-again': '重试',
   'error.back': '返回 (Esc)',
   'error.settings-write-title': '设置保存失败',
+  'error.upstream-delete-failed': '本地分支已删除，但上游分支删除失败。',
 
   // ---- Settings panel ----------------------------------------------------
   'settings.title': '设置',
@@ -404,7 +407,9 @@ export const zh: Record<DictKey, string> = {
   'settings.fetch.15m': '15 分钟',
   'settings.shortcuts': '键盘快捷键',
   'settings.shortcuts-hint': '关闭快捷键，或更换唤起 Goblin 的组合键。',
-  'settings.shortcuts-disable-all': '禁用应用快捷键',
+  'settings.shortcuts-disable-app': '禁用应用快捷键',
+  'settings.shortcuts-disable-global': '禁用全局快捷键',
+  'settings.swap-close-shortcuts': '交换关闭快捷键（⌘W ↔ ⌘⇧W）',
   'settings.global-shortcut': '全局快捷键',
   'settings.global-shortcut-hint': '按新组合键，Esc 取消。',
   'settings.global-shortcut-disabled-hint': '已保存，当前未启用。',
@@ -414,6 +419,12 @@ export const zh: Record<DictKey, string> = {
   'settings.global-shortcut-conflict': '注册失败，可能已被占用。',
   'settings.global-shortcut-invalid': '请用 Command、Control 或 Option 搭配按键。',
   'settings.open-github': '在 GitHub 打开项目',
+  'about.app': 'Goblin',
+  'about.version': '版本',
+  'about.build': '构建',
+  'about.build.unknown': 'dev',
+  'about.github': '源代码',
+  'about.github.body': '在 GitHub 查看',
 
   // ---- Help overlay ------------------------------------------------------
   'help.title': '键盘快捷键',

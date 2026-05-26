@@ -12,11 +12,19 @@ export interface TerminalDescriptor {
   worktreePath: string
 }
 
+export interface TerminalProgressState {
+  /** 1 = normal, 2 = error, 3 = indeterminate, 4 = paused/warning. State 0 clears the progress (not stored). */
+  state: 1 | 2 | 3 | 4
+  /** 0-100 percent */
+  value: number
+}
+
 export interface TerminalSnapshot {
   phase: TerminalPhase
   message: string | null
   processName: string
   search?: TerminalSearchResult | null
+  progress?: TerminalProgressState | null
 }
 
 export interface TerminalSearchResult {
