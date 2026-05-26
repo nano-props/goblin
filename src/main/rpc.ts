@@ -391,8 +391,10 @@ function createRpcHandlers(): AppRpcHandlers {
               if (signal.aborted) return { ok: false, message: 'cancelled' }
               throw err
             }
+            if (signal.aborted) return { ok: false, message: 'cancelled' }
             const target = resolveKnownWorktree(worktrees, worktreePath, branch)
             if (!target.ok) return target
+            if (signal.aborted) return { ok: false, message: 'cancelled' }
             targetPath = target.path
           }
           return pullBranch(cwd, branch, targetPath, signal)

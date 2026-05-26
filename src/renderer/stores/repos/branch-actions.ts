@@ -18,7 +18,7 @@ import type {
   RepoBranchActionKind,
   RunBranchActionOptions,
 } from '#/renderer/stores/repos/branch-action-types.ts'
-import type { RepoState, ReposGet, ReposSet } from '#/renderer/stores/repos/types.ts'
+import type { RepoEventAction, RepoState, ReposGet, ReposSet } from '#/renderer/stores/repos/types.ts'
 import type { ExecResult } from '#/renderer/types.ts'
 import { runBranchActionRefreshWorkflow } from '#/renderer/stores/repos/refresh-workflows.ts'
 import { rpc } from '#/renderer/rpc.ts'
@@ -62,6 +62,27 @@ function branchActionOperationTarget(action: RepoBranchAction): string | null {
   return exhaustive
 }
 
+function branchActionEventAction(action: RepoBranchAction): RepoEventAction {
+  switch (action.kind) {
+    case 'checkout':
+    case 'pull':
+    case 'push':
+    case 'deleteBranch':
+      return { kind: action.kind, branch: action.branch }
+    case 'createWorktree':
+      return { kind: action.kind, branch: action.newBranch, worktreePath: action.worktreePath }
+    case 'removeWorktree':
+      return {
+        kind: action.kind,
+        branch: action.branch,
+        worktreePath: action.worktreePath,
+        alsoDeleteBranch: action.alsoDeleteBranch,
+      }
+  }
+  const exhaustive: never = action
+  return exhaustive
+}
+
 function networkFetchReason(action: NetworkRepoBranchAction): NetworkFetchReason {
   return NETWORK_FETCH_REASON_BY_KIND[action.kind]
 }
@@ -80,6 +101,15 @@ function branchActionTarget(action: RepoBranchAction): RepoOperationTarget {
 
 function canStartBranchNetwork(repo: RepoState): boolean {
   return canStartRemoteFetch(repo)
+}
+
+function focusCreatedWorktreeBranch(get: ReposGet, id: string, token: number, action: RepoBranchAction): void {
+  if (action.kind !== 'createWorktree') return
+  const repo = get().repos[id]
+  if (!repo || repo.instanceToken !== token) return
+  if (!repo.data.branches.some((branch) => branch.name === action.newBranch)) return
+  if (repo.ui.branchViewMode === 'no-worktree') get().setBranchViewMode(id, 'all')
+  get().selectBranch(id, action.newBranch)
 }
 
 function runBranchActionRpc(action: RepoBranchAction, repoId: string, signal?: AbortSignal): Promise<ExecResult> {
@@ -171,11 +201,12 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
           })
           if (result.message === 'cancelled') return
           if (options?.deferResultMessages?.includes(result.message)) return
-          get().setLastResult(id, result, token)
+          get().setLastResult(id, result, token, { action: branchActionEventAction(action) })
           if (!result.ok && result.message === 'error.network-op-in-progress') return
           if (result.ok || options?.refreshOnError !== false) {
             const repo = get().repos[id]
             if (repo?.instanceToken === token) await runBranchActionRefreshWorkflow(get, { id, token })
+            if (result.ok) focusCreatedWorktreeBranch(get, id, token, action)
           }
           if (result.ok && network) get().clearFetchFailed(id, token)
         },
@@ -184,7 +215,7 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
             finishBranchActionResourceError(r.resources.branchAction, message)
             if (network) finishResourceError(r.resources.fetch, message)
           })
-          get().setLastResult(id, { ok: false, message }, token)
+          get().setLastResult(id, { ok: false, message }, token, { action: branchActionEventAction(action) })
         },
       })
     },

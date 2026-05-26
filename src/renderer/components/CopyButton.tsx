@@ -17,8 +17,9 @@ type CopyButtonProps = Omit<
   copiedLabel: string
 }
 
-export function CopyButton({ value, copyLabel, copiedLabel, className, ...props }: CopyButtonProps) {
+export function CopyButton({ value, copyLabel, copiedLabel, className, disabled, ...props }: CopyButtonProps) {
   const [copied, setCopied] = useState(false)
+  const [copying, setCopying] = useState(false)
   const t = useT()
   const copiedTimerRef = useRef<number | null>(null)
 
@@ -31,6 +32,7 @@ export function CopyButton({ value, copyLabel, copiedLabel, className, ...props 
 
   useEffect(() => {
     setCopied(false)
+    setCopying(false)
     clearCopiedTimer()
   }, [value])
 
@@ -39,6 +41,8 @@ export function CopyButton({ value, copyLabel, copiedLabel, className, ...props 
   }, [])
 
   function copy() {
+    if (copying) return
+    setCopying(true)
     void navigator.clipboard
       .writeText(value)
       .then(() => {
@@ -56,6 +60,9 @@ export function CopyButton({ value, copyLabel, copiedLabel, className, ...props 
           description: err instanceof Error ? err.message : String(err),
         })
       })
+      .finally(() => {
+        setCopying(false)
+      })
   }
 
   return (
@@ -67,6 +74,8 @@ export function CopyButton({ value, copyLabel, copiedLabel, className, ...props 
         size="icon"
         className={cn('size-6 text-muted-foreground hover:text-foreground', className)}
         aria-label={copied ? copiedLabel : copyLabel}
+        aria-busy={copying ? true : undefined}
+        disabled={disabled || copying}
         onClick={copy}
       >
         {copied ? <Check size={12} /> : <Copy size={12} />}

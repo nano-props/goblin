@@ -16,7 +16,7 @@ import { useT } from '#/renderer/stores/i18n.ts'
 import { Tip } from '#/renderer/components/Tip.tsx'
 import { Button } from '#/renderer/components/ui/button.tsx'
 import { CreateWorktreeDialog, type CreateWorktreeRequest } from '#/renderer/components/CreateWorktreeDialog.tsx'
-import { RepoSyncControl } from '#/renderer/components/repo-sync/RepoSyncControl.tsx'
+import { RepoActivityControl } from '#/renderer/components/repo-activity/RepoActivityControl.tsx'
 import { resourceBusy } from '#/renderer/stores/repos/resources.ts'
 
 interface Props {
@@ -60,7 +60,7 @@ export function RepoToolbarActions({ repo }: Props) {
   // don't make the user guess which action they are invoking.
   return (
     <div className="flex items-center gap-1">
-      <RepoSyncControl repo={repo} />
+      <RepoActivityControl repo={repo} />
       <Tip label={createTip}>
         <span className="inline-flex">
           <Button

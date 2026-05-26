@@ -3,7 +3,8 @@ import { ipcMain } from 'electron'
 import { isAncestor, getCurrentBranch, getUpstream } from '#/main/git/branches.ts'
 import { getWorktrees } from '#/main/git/worktrees.ts'
 import { getWorkingStatus } from '#/main/git/status.ts'
-import { resolveRemovableWorktree } from '#/main/git/guards.ts'
+import { resolveKnownWorktree, resolveRemovableWorktree } from '#/main/git/guards.ts'
+import { pullBranch } from '#/main/git/remote.ts'
 import { registerTrustedAppPath, registerTrustedWebContents } from '#/main/ipc/trusted-webcontents.ts'
 import { wireRpcIpc } from '#/main/rpc.ts'
 import type { RpcResponse } from '#/shared/rpc.ts'
@@ -215,6 +216,11 @@ describe('main repo rpc cancellation', () => {
       ok: true,
       target: { path: '/repo-feature', branch: 'feature/cancel', isBare: false, isPrimary: false, isDirty: false },
     })
+    vi.mocked(resolveKnownWorktree).mockReturnValue({
+      ok: true,
+      path: '/repo-feature',
+    })
+    vi.mocked(pullBranch).mockResolvedValue({ ok: true, message: 'ok' })
   })
 
   test('returns cancelled when deleteBranch is aborted during safety checks', async () => {
@@ -232,6 +238,23 @@ describe('main repo rpc cancellation', () => {
     })
 
     expect(result).toEqual({ ok: true, data: { ok: false, message: 'cancelled' } })
+  })
+
+  test('returns cancelled when pull is aborted while resolving a worktree target', async () => {
+    vi.mocked(getWorktrees).mockImplementationOnce(async () => {
+      await invokeRpc('repo.abort', { cwd: '/repo' })
+      return [{ path: '/repo-feature', branch: 'feature/cancel', isBare: false, isPrimary: false, isDirty: false }]
+    })
+
+    const result = await invokeRpc('repo.pull', {
+      cwd: '/repo',
+      branch: 'feature/cancel',
+      worktreePath: '/repo-feature',
+    })
+
+    expect(result).toEqual({ ok: true, data: { ok: false, message: 'cancelled' } })
+    expect(resolveKnownWorktree).not.toHaveBeenCalled()
+    expect(pullBranch).not.toHaveBeenCalled()
   })
 
   test('rejects RPC calls from untrusted senders', async () => {

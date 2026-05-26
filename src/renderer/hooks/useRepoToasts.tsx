@@ -4,6 +4,7 @@ import { ScrollArea } from '#/renderer/components/ui/scroll-area.tsx'
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import type { RepoEvent } from '#/renderer/stores/repos/types.ts'
+import { repoEventActionSuccessLabel } from '#/renderer/stores/repos/action-labels.ts'
 
 const EMPTY_EVENTS: RepoEvent[] = []
 
@@ -26,15 +27,21 @@ export function useRepoToasts(repoId: string) {
       if (event.kind === 'result') {
         const result = event.result
         const hasMessage = !!result.message
+        const actionLabel = repoEventActionSuccessLabel(event.action)
         const description =
-          hasMessage || !result.ok ? (
+          (hasMessage && !actionLabel) || !result.ok ? (
             <ToastDescription>{tRef.current(result.message || 'error.unknown')}</ToastDescription>
           ) : undefined
         if (result.ok) {
-          toast.success(tRef.current('action.result-ok'), {
-            id: `${repoId}:result:ok:${event.id}`,
-            description,
-          })
+          toast.success(
+            actionLabel
+              ? tRef.current(actionLabel.labelKey, actionLabel.labelParams)
+              : tRef.current('action.result-ok'),
+            {
+              id: `${repoId}:result:ok:${event.id}`,
+              description,
+            },
+          )
         } else {
           toast.error(tRef.current('action.result-error'), {
             id: `${repoId}:result:err:${event.id}`,

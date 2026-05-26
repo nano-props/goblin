@@ -20,8 +20,20 @@ export interface BranchLogState {
   hasMore: boolean
 }
 
+export type RepoEventAction =
+  | { kind: 'checkout'; branch: string }
+  | { kind: 'pull'; branch: string }
+  | { kind: 'push'; branch: string }
+  | { kind: 'createWorktree'; branch: string; worktreePath: string }
+  | { kind: 'deleteBranch'; branch: string }
+  | { kind: 'removeWorktree'; branch: string; worktreePath: string; alsoDeleteBranch: boolean }
+
+export interface RepoResultEventOptions {
+  action?: RepoEventAction
+}
+
 export type RepoEvent =
-  | { id: number; kind: 'result'; result: { ok: boolean; message: string } }
+  | { id: number; kind: 'result'; result: { ok: boolean; message: string }; action?: RepoEventAction }
   | { id: number; kind: 'error'; message: string }
 
 /** Discriminated union: a successful open guarantees `id`; a failed
@@ -164,7 +176,7 @@ export interface ReposStore {
   openCommit: (id: string, hash: string) => Promise<void>
   closeCommit: (id: string) => void
 
-  setLastResult: (id: string, result: { ok: boolean; message: string }, token: number) => void
+  setLastResult: (id: string, result: { ok: boolean; message: string }, token: number, options?: RepoResultEventOptions) => void
   clearEvents: (id: string, eventIds: number[]) => void
   hydrateSession: (openRepos: string[], activeRepo: string | null) => Promise<void>
   /** Drop the "missing" indicator for paths that failed to restore — the

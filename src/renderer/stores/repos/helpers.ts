@@ -1,6 +1,6 @@
 import { produce, type Draft } from 'immer'
 import { emptyRepoResources } from '#/renderer/stores/repos/resources.ts'
-import type { RepoEvent, RepoState, ReposSet, ReposStore } from '#/renderer/stores/repos/types.ts'
+import type { RepoEvent, RepoResultEventOptions, RepoState, ReposSet, ReposStore } from '#/renderer/stores/repos/types.ts'
 
 let nextInstanceToken = 1
 let nextEventId = 1
@@ -43,8 +43,8 @@ export function emptyRepo(id: string, name: string): RepoState {
   }
 }
 
-export function resultEvent(result: { ok: boolean; message: string }): RepoEvent {
-  return { id: nextEventId++, kind: 'result', result }
+export function resultEvent(result: { ok: boolean; message: string }, options?: RepoResultEventOptions): RepoEvent {
+  return { id: nextEventId++, kind: 'result', result, action: options?.action }
 }
 
 export function errorEvent(message: string): RepoEvent {
