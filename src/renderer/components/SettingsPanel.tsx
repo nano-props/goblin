@@ -23,6 +23,7 @@ import {
 import { Dialog, DialogContent, DialogTitle } from '#/renderer/components/ui/dialog.tsx'
 import { ScrollArea } from '#/renderer/components/ui/scroll-area.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/renderer/components/ui/select.tsx'
+import { Switch } from '#/renderer/components/ui/switch.tsx'
 import { Badge } from '#/renderer/components/ui/badge.tsx'
 import { GitHubMark } from '#/renderer/components/GitHubMark.tsx'
 import { ShortcutSettings } from '#/renderer/components/settings/ShortcutSettings.tsx'
@@ -219,6 +220,8 @@ function GeneralSettings() {
   const setThemePref = useThemeStore((s) => s.setPref)
   const colorTheme = useThemeStore((s) => s.colorTheme)
   const setColorTheme = useThemeStore((s) => s.setColorTheme)
+  const toggleDetailOnActionBarBlankClick = useSettingsStore((s) => s.toggleDetailOnActionBarBlankClick)
+  const setToggleDetailOnActionBarBlankClick = useSettingsStore((s) => s.setToggleDetailOnActionBarBlankClick)
   const langPref = useI18nStore((s) => s.pref)
   const setLangPref = useI18nStore((s) => s.setPref)
   const themeOptions: { value: ThemePref; labelKey: string; icon: ReactNode }[] = [
@@ -277,6 +280,21 @@ function GeneralSettings() {
               value={langPref}
               options={langOptions.map((o) => ({ value: o.value, label: `${o.emoji} ${t(o.labelKey)}` }))}
               onChange={(v) => save(() => setLangPref(v), 'language')}
+            />
+          }
+        />
+        <SettingsRow
+          controlId="settings-action-bar-blank-toggle"
+          label={t('settings.action-bar-blank-toggle')}
+          hint={t('settings.action-bar-blank-toggle-hint')}
+          control={
+            <Switch
+              id="settings-action-bar-blank-toggle"
+              checked={toggleDetailOnActionBarBlankClick}
+              onCheckedChange={(enabled) =>
+                save(() => setToggleDetailOnActionBarBlankClick(enabled), 'action bar blank toggle')
+              }
+              aria-label={t('settings.action-bar-blank-toggle')}
             />
           }
         />

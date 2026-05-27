@@ -391,6 +391,9 @@ export const ko: Record<DictKey, string> = {
   'settings.lang.zh': '中文',
   'settings.lang.ko': '한국어',
   'settings.lang.ja': '日本語',
+  'settings.action-bar-blank-toggle': '작업 막대 빈 영역으로 세부 패널 접기/펼치기',
+  'settings.action-bar-blank-toggle-hint':
+    '켜면 브랜치 작업 버튼 앞의 빈 공간을 클릭해 세부 패널을 접거나 펼칩니다.',
   'settings.group.general': '일반',
   'settings.group.apps': '외부 앱',
   'settings.group.sync': '동기화',

@@ -56,6 +56,7 @@ export interface Settings {
   shortcutsDisabled: boolean
   globalShortcutDisabled: boolean
   swapCloseShortcuts: boolean
+  toggleDetailOnActionBarBlankClick: boolean
   globalShortcut: string
   terminalApp: TerminalPref
   editorApp: EditorPref
@@ -73,6 +74,7 @@ const DEFAULTS: Settings = {
   shortcutsDisabled: false,
   globalShortcutDisabled: false,
   swapCloseShortcuts: false,
+  toggleDetailOnActionBarBlankClick: false,
   globalShortcut: DEFAULT_GLOBAL_SHORTCUT,
   terminalApp: 'auto',
   editorApp: 'auto',
@@ -214,6 +216,7 @@ export async function loadSettings(): Promise<Settings> {
       shortcutsDisabled: parsed.shortcutsDisabled === true,
       globalShortcutDisabled: parsed.globalShortcutDisabled === true,
       swapCloseShortcuts: parsed.swapCloseShortcuts === true,
+      toggleDetailOnActionBarBlankClick: parsed.toggleDetailOnActionBarBlankClick === true,
       globalShortcut: normalizeGlobalShortcut(parsed.globalShortcut),
       terminalApp: normalizeTerminalPref(parsed.terminalApp),
       editorApp: normalizeEditorPref(parsed.editorApp),
@@ -388,6 +391,14 @@ export async function setSwapCloseShortcuts(swapped: boolean): Promise<boolean> 
   s.swapCloseShortcuts = swapped
   scheduleWrite()
   return swapped
+}
+
+export async function setToggleDetailOnActionBarBlankClick(enabled: boolean): Promise<boolean> {
+  const s = await loadSettings()
+  if (s.toggleDetailOnActionBarBlankClick === enabled) return enabled
+  s.toggleDetailOnActionBarBlankClick = enabled
+  scheduleWrite()
+  return enabled
 }
 
 export async function setGlobalShortcut(accelerator: string): Promise<string> {

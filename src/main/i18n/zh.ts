@@ -385,6 +385,8 @@ export const zh: Record<DictKey, string> = {
   'settings.lang.zh': '中文',
   'settings.lang.ko': '한국어',
   'settings.lang.ja': '日本語',
+  'settings.action-bar-blank-toggle': '点击操作栏空白处展开/收起详情',
+  'settings.action-bar-blank-toggle-hint': '开启后，点击分支操作按钮前的空白区域会展开或收起详情面板。',
   'settings.group.general': '通用',
   'settings.group.apps': '外部应用',
   'settings.group.sync': '同步',

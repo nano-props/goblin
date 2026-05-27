@@ -43,6 +43,7 @@ export function BranchDetailToolbar({
   const toggleDetailCollapsed = useReposStore((s) => s.toggleDetailCollapsed)
   const toggleDetailFocusMode = useReposStore((s) => s.toggleDetailFocusMode)
   const shortcutsDisabled = useSettingsStore((s) => s.shortcutsDisabled)
+  const toggleDetailOnActionBarBlankClick = useSettingsStore((s) => s.toggleDetailOnActionBarBlankClick)
   const terminalContext = useTerminalSessionContext()
   const behavior = repoWorkspaceBehavior(layout, collapsed, focusMode)
   const tabs = visibleDetailTabs(!!detail.branch?.worktreePath)
@@ -154,7 +155,7 @@ export function BranchDetailToolbar({
       <div
         aria-hidden="true"
         className="min-w-2 flex-1 self-stretch"
-        onClick={behavior.detailCollapseAllowed ? toggleDetailCollapsed : undefined}
+        onClick={toggleDetailOnActionBarBlankClick && behavior.detailCollapseAllowed ? toggleDetailCollapsed : undefined}
       />
       {branchActions && (
         <BranchActionControls actions={branchActions} variant={behavior.detailActionVariant} />

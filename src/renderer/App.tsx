@@ -119,7 +119,7 @@ export function App() {
             onPageChange={setSettingsPage}
             onClose={closeSettings}
           />
-          {repoDrop.active && <RepoDropOverlay />}
+          <RepoDropOverlay active={repoDrop.active} />
           {/* shadcn/ui Toaster wrapper — owns its own theme + style hooks.
            * App-level only sets position + closeButton; the rest of the
            * visual contract is in components/ui/sonner.tsx. */}

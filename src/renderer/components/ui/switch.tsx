@@ -8,7 +8,7 @@ function Switch({ className, ...props }: React.ComponentProps<typeof SwitchPrimi
     <SwitchPrimitive.Root
       data-slot="switch"
       className={cn(
-        'peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border border-transparent bg-control-hover p-0.5 shadow-xs transition-colors duration-100 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary',
+        'peer inline-flex h-[22px] w-10 shrink-0 cursor-pointer items-center rounded-full border border-border/70 bg-accent p-0.5 shadow-xs transition-colors duration-100 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-primary data-[state=checked]:bg-primary',
         className,
       )}
       {...props}
@@ -16,7 +16,7 @@ function Switch({ className, ...props }: React.ComponentProps<typeof SwitchPrimi
       <SwitchPrimitive.Thumb
         data-slot="switch-thumb"
         className={cn(
-          'pointer-events-none block size-4 rounded-full bg-background shadow-sm ring-0 transition-transform duration-100 data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0',
+          'pointer-events-none block size-[18px] rounded-full bg-background shadow-sm ring-0 transition-transform duration-100 data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0',
         )}
       />
     </SwitchPrimitive.Root>

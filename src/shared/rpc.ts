@@ -49,6 +49,7 @@ export interface SettingsSnapshot {
   shortcutsDisabled: boolean
   globalShortcutDisabled: boolean
   swapCloseShortcuts: boolean
+  toggleDetailOnActionBarBlankClick: boolean
   globalShortcut: string
   globalShortcutRegistered: boolean
   terminalApp: TerminalPref
@@ -169,6 +170,7 @@ export type RpcEvent =
   | { type: 'shortcuts-disabled-changed'; disabled: boolean }
   | { type: 'global-shortcut-disabled-changed'; disabled: boolean }
   | { type: 'swap-close-shortcuts-changed'; swapped: boolean }
+  | { type: 'toggle-detail-on-action-bar-blank-click-changed'; enabled: boolean }
   | { type: 'global-shortcut-changed'; state: GlobalShortcutState }
   | ({ type: 'terminal-app-changed' } & TerminalAppState)
   | ({ type: 'editor-app-changed' } & EditorAppState)
@@ -243,6 +245,7 @@ export interface AppRpcHandlers {
     setShortcutsDisabled: (input: { disabled: boolean }) => Promise<void>
     setGlobalShortcutDisabled: (input: { disabled: boolean }) => Promise<void>
     setSwapCloseShortcuts: (input: { swapped: boolean }) => Promise<void>
+    setToggleDetailOnActionBarBlankClick: (input: { enabled: boolean }) => Promise<void>
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
     setTerminalApp: (input: { pref: TerminalPref }) => Promise<TerminalAppState>
     setEditorApp: (input: { pref: EditorPref }) => Promise<EditorAppState>
@@ -381,6 +384,9 @@ export function createAppRouter(handlers: AppRpcHandlers) {
       setSwapCloseShortcuts: p
         .input(v.object({ swapped: v.boolean() }))
         .mutation(({ input }) => handlers.settings.setSwapCloseShortcuts(input)),
+      setToggleDetailOnActionBarBlankClick: p
+        .input(v.object({ enabled: v.boolean() }))
+        .mutation(({ input }) => handlers.settings.setToggleDetailOnActionBarBlankClick(input)),
       setGlobalShortcut: p
         .input(v.object({ accelerator: v.string() }))
         .mutation(({ input }) => handlers.settings.setGlobalShortcut(input)),

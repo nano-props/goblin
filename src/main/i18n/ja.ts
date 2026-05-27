@@ -398,6 +398,9 @@ export const ja: Record<DictKey, string> = {
   'settings.lang.zh': '中文',
   'settings.lang.ko': '한국어',
   'settings.lang.ja': '日本語',
+  'settings.action-bar-blank-toggle': 'アクションバーの空白で詳細を折りたたむ/展開',
+  'settings.action-bar-blank-toggle-hint':
+    'オンにすると、ブランチ操作ボタン手前の空白をクリックして詳細パネルを折りたたみ/展開できます。',
   'settings.group.general': '一般',
   'settings.group.apps': '外部アプリ',
   'settings.group.sync': '同期',

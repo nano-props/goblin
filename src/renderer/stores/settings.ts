@@ -24,6 +24,7 @@ interface SettingsStore {
   shortcutsDisabled: boolean
   globalShortcutDisabled: boolean
   swapCloseShortcuts: boolean
+  toggleDetailOnActionBarBlankClick: boolean
   globalShortcut: string
   globalShortcutRegistered: boolean
   terminalApp: TerminalPref
@@ -41,6 +42,7 @@ interface SettingsStore {
   setShortcutsDisabled: (disabled: boolean) => Promise<void>
   setGlobalShortcutDisabled: (disabled: boolean) => Promise<void>
   setSwapCloseShortcuts: (swapped: boolean) => Promise<void>
+  setToggleDetailOnActionBarBlankClick: (enabled: boolean) => Promise<void>
   setGlobalShortcut: (accelerator: string) => Promise<GlobalShortcutState>
   setTerminalApp: (pref: TerminalPref) => Promise<void>
   setEditorApp: (pref: EditorPref) => Promise<void>
@@ -63,6 +65,7 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
   shortcutsDisabled: false,
   globalShortcutDisabled: false,
   swapCloseShortcuts: false,
+  toggleDetailOnActionBarBlankClick: false,
   globalShortcut: DEFAULT_GLOBAL_SHORTCUT,
   globalShortcutRegistered: false,
   terminalApp: 'auto',
@@ -89,6 +92,7 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
       shortcutsDisabled: snap.shortcutsDisabled,
       globalShortcutDisabled: snap.globalShortcutDisabled,
       swapCloseShortcuts: snap.swapCloseShortcuts,
+      toggleDetailOnActionBarBlankClick: snap.toggleDetailOnActionBarBlankClick,
       globalShortcut: snap.globalShortcut,
       globalShortcutRegistered: snap.globalShortcutRegistered,
       terminalApp: snap.terminalApp,
@@ -113,6 +117,13 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
         }),
         onRpcEventType('swap-close-shortcuts-changed', (event) => {
           set((s) => (s.swapCloseShortcuts === event.swapped ? s : { swapCloseShortcuts: event.swapped }))
+        }),
+        onRpcEventType('toggle-detail-on-action-bar-blank-click-changed', (event) => {
+          set((s) =>
+            s.toggleDetailOnActionBarBlankClick === event.enabled
+              ? s
+              : { toggleDetailOnActionBarBlankClick: event.enabled },
+          )
         }),
         onRpcEventType('global-shortcut-changed', (event) => {
           const { accelerator, registered } = event.state
@@ -173,6 +184,13 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
   async setSwapCloseShortcuts(swapped) {
     await rpc.settings.setSwapCloseShortcuts.mutate({ swapped })
     set((s) => (s.swapCloseShortcuts === swapped ? s : { swapCloseShortcuts: swapped }))
+  },
+
+  async setToggleDetailOnActionBarBlankClick(enabled) {
+    await rpc.settings.setToggleDetailOnActionBarBlankClick.mutate({ enabled })
+    set((s) =>
+      s.toggleDetailOnActionBarBlankClick === enabled ? s : { toggleDetailOnActionBarBlankClick: enabled },
+    )
   },
 
   async setGlobalShortcut(accelerator) {

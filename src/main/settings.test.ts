@@ -24,6 +24,16 @@ test('defaults auto-fetch to two minutes', async () => {
   expect(loaded.fetchIntervalSec).toBe(120)
 })
 
+test('defaults action bar blank click detail toggle to disabled', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-settings-test-'))
+  vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
+  const settings = await import('#/main/settings.ts')
+
+  const loaded = await settings.loadSettings()
+
+  expect(loaded.toggleDetailOnActionBarBlankClick).toBe(false)
+})
+
 test('flushSettings drains writes queued during an in-flight flush', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-settings-test-'))
   vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
@@ -95,6 +105,21 @@ test('persists the selected color theme', async () => {
 
   const saved = JSON.parse(readFileSync(path.join(tmp, 'settings.json'), 'utf-8')) as { colorTheme: string }
   expect(saved.colorTheme).toBe('shadcn')
+})
+
+test('persists action bar blank click detail toggle', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-settings-test-'))
+  vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
+  const settings = await import('#/main/settings.ts')
+
+  await settings.setToggleDetailOnActionBarBlankClick(true)
+  const flushed = await settings.flushSettings()
+  expect(flushed).toBe(true)
+
+  const saved = JSON.parse(readFileSync(path.join(tmp, 'settings.json'), 'utf-8')) as {
+    toggleDetailOnActionBarBlankClick: boolean
+  }
+  expect(saved.toggleDetailOnActionBarBlankClick).toBe(true)
 })
 
 test('persists session detail focus mode', async () => {

@@ -73,6 +73,7 @@ import {
   setGlobalShortcut,
   setGlobalShortcutDisabled,
   setSwapCloseShortcuts,
+  setToggleDetailOnActionBarBlankClick,
   setSession,
   setShortcutsDisabled,
   setTerminalApp,
@@ -472,6 +473,7 @@ function createRpcHandlers(): AppRpcHandlers {
           shortcutsDisabled: s.shortcutsDisabled,
           globalShortcutDisabled: s.globalShortcutDisabled,
           swapCloseShortcuts: s.swapCloseShortcuts,
+          toggleDetailOnActionBarBlankClick: s.toggleDetailOnActionBarBlankClick,
           globalShortcut: s.globalShortcut,
           globalShortcutRegistered: isGlobalShortcutRegistered(),
           ...terminalAppSnapshot(s.terminalApp),
@@ -504,6 +506,11 @@ function createRpcHandlers(): AppRpcHandlers {
         const saved = await setSwapCloseShortcuts(swapped)
         buildAppMenu()
         broadcastRpcEvent({ type: 'swap-close-shortcuts-changed', swapped: saved })
+      },
+      setToggleDetailOnActionBarBlankClick: async ({ enabled }) => {
+        if (typeof enabled !== 'boolean') return
+        const saved = await setToggleDetailOnActionBarBlankClick(enabled)
+        broadcastRpcEvent({ type: 'toggle-detail-on-action-bar-blank-click-changed', enabled: saved })
       },
       setGlobalShortcut: async ({ accelerator }) => {
         const parsed = parseGlobalShortcut(accelerator)

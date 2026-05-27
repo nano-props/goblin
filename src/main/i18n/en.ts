@@ -399,6 +399,9 @@ export const en = {
   'settings.lang.zh': '中文',
   'settings.lang.ko': '한국어',
   'settings.lang.ja': '日本語',
+  'settings.action-bar-blank-toggle': 'Toggle detail from empty action bar area',
+  'settings.action-bar-blank-toggle-hint':
+    'When enabled, clicking the empty space before branch actions collapses or expands the detail panel.',
   'settings.group.general': 'General',
   'settings.group.apps': 'External apps',
   'settings.group.sync': 'Sync',
