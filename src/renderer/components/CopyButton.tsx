@@ -71,8 +71,8 @@ export function CopyButton({ value, copyLabel, copiedLabel, className, disabled,
         {...props}
         type="button"
         variant="ghost"
-        size="icon"
-        className={cn('size-6 text-muted-foreground hover:text-foreground', className)}
+        size="icon-sm"
+        className={cn('text-muted-foreground hover:text-foreground', className)}
         aria-label={copied ? copiedLabel : copyLabel}
         aria-busy={copying ? true : undefined}
         disabled={disabled || copying}

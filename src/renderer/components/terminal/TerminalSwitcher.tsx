@@ -33,9 +33,8 @@ export function TerminalSwitcher({
         <span className="goblin-terminal-switcher__title">{t('terminal.sessions')}</span>
         <Button
           type="button"
-          size="icon"
+          size="icon-sm"
           variant="ghost"
-          className="size-6"
           onClick={onNew}
           title={t('terminal.new')}
           aria-label={t('terminal.new')}
@@ -75,9 +74,9 @@ export function TerminalSwitcher({
                 </button>
                 <Button
                   type="button"
-                  size="icon"
+                  size="icon-sm"
                   variant="ghost"
-                  className="goblin-terminal-switcher__close size-6"
+                  className="goblin-terminal-switcher__close"
                   onClick={() => onClose(session.key)}
                   title={t('terminal.close')}
                   aria-label={t('terminal.close')}

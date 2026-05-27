@@ -167,13 +167,7 @@ export function RepoTabStrip({
         </ScrollArea>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7 shrink-0"
-              aria-label={labels.open}
-              title={labels.open}
-            >
+            <Button variant="ghost" size="icon" className="shrink-0" aria-label={labels.open} title={labels.open}>
               <Plus />
             </Button>
           </DropdownMenuTrigger>

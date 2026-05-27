@@ -42,6 +42,22 @@ interface RemoveConfirm {
   path: string
 }
 
+function ConfirmValue({ value }: { value: string }) {
+  return (
+    <span className="block break-all font-mono text-foreground" title={value}>
+      {value}
+    </span>
+  )
+}
+
+function IndentedValue({ value }: { value: string }) {
+  return (
+    <span className="block break-all pl-6 font-mono text-foreground" title={value}>
+      {value}
+    </span>
+  )
+}
+
 export function getBranchActionCapabilities(repo: RepoState, branch: RepoBranchState): BranchActionCapabilities {
   const isCurrent = branch.name === repo.data.currentBranch
   const checkedOutInAnotherWorktree = !!branch.worktree?.path && !isCurrent
@@ -272,19 +288,22 @@ export function useBranchActions(repo: RepoState, branch: RepoBranchState) {
       />
       <ConfirmDialog
         open={deleteConfirm !== null}
-        title={deleteConfirm ? t('action.confirm-delete-branch-title', { branch: deleteConfirm }) : ''}
+        title={deleteConfirm ? t('action.confirm-delete-branch-title') : ''}
         message={
           deleteConfirm ? (
             <div className="space-y-3">
-              <Trans
-                i18nKey="action.confirm-delete-branch-body"
-                values={{ branch: deleteConfirm }}
-                components={{ branch: <b className="text-foreground" /> }}
-              />
+              <div className="space-y-1">
+                <span>{t('action.confirm-delete-branch-body')}</span>
+                <ConfirmValue value={deleteConfirm} />
+                <span className="block text-muted-foreground">{t('action.confirm-delete-branch-note')}</span>
+              </div>
               {hasUpstream && (
-                <ConfirmCheckbox checked={deleteAlsoUpstream} onCheckedChange={setDeleteAlsoUpstream} destructive>
-                  {t('action.confirm-delete-branch-also-delete-upstream', { tracking: branch.tracking! })}
-                </ConfirmCheckbox>
+                <div className="space-y-1">
+                  <ConfirmCheckbox checked={deleteAlsoUpstream} onCheckedChange={setDeleteAlsoUpstream} destructive>
+                    {t('action.confirm-delete-branch-also-delete-upstream')}
+                  </ConfirmCheckbox>
+                  <IndentedValue value={branch.tracking!} />
+                </div>
               )}
             </div>
           ) : (
@@ -303,21 +322,22 @@ export function useBranchActions(repo: RepoState, branch: RepoBranchState) {
       />
       <ConfirmDialog
         open={forceDeleteConfirm !== null}
-        title={
-          forceDeleteConfirm ? t('action.confirm-force-delete-standalone-title', { branch: forceDeleteConfirm }) : ''
-        }
+        title={forceDeleteConfirm ? t('action.confirm-force-delete-standalone-title') : ''}
         message={
           forceDeleteConfirm ? (
             <div className="space-y-3">
-              <Trans
-                i18nKey="action.confirm-force-delete-standalone-body"
-                values={{ branch: forceDeleteConfirm }}
-                components={{ branch: <b className="text-foreground" /> }}
-              />
+              <div className="space-y-1">
+                <span>{t('action.confirm-force-delete-standalone-body')}</span>
+                <ConfirmValue value={forceDeleteConfirm} />
+                <span className="block text-muted-foreground">{t('action.confirm-force-delete-standalone-note')}</span>
+              </div>
               {hasUpstream && (
-                <ConfirmCheckbox checked={deleteAlsoUpstream} onCheckedChange={setDeleteAlsoUpstream} destructive>
-                  {t('action.confirm-delete-branch-also-delete-upstream', { tracking: branch.tracking! })}
-                </ConfirmCheckbox>
+                <div className="space-y-1">
+                  <ConfirmCheckbox checked={deleteAlsoUpstream} onCheckedChange={setDeleteAlsoUpstream} destructive>
+                    {t('action.confirm-delete-branch-also-delete-upstream')}
+                  </ConfirmCheckbox>
+                  <IndentedValue value={branch.tracking!} />
+                </div>
               )}
             </div>
           ) : (
@@ -336,35 +356,42 @@ export function useBranchActions(repo: RepoState, branch: RepoBranchState) {
       />
       <ConfirmDialog
         open={removeConfirm !== null}
-        title={removeConfirm ? t('action.confirm-remove-worktree-title', { branch: removeConfirm.branch }) : ''}
+        title={removeConfirm ? t('action.confirm-remove-worktree-title') : ''}
         message={
           removeConfirm ? (
             <div className="space-y-3">
-              <Trans
-                i18nKey="action.confirm-remove-worktree-body"
-                values={{ path: tildify(removeConfirm.path) }}
-                components={{ path: <b className="text-foreground" /> }}
-              />
-              <ConfirmCheckbox
-                checked={removeAlsoDeletes}
-                disabled={removeConfirmProtected}
-                describedBy={removeConfirmProtected ? 'remove-worktree-protected-hint' : undefined}
-                onCheckedChange={setRemoveAlsoDeletes}
-                destructive
-                title={removeConfirmProtected ? t('action.confirm-remove-worktree-protected-hint') : undefined}
-              >
-                {t('action.confirm-remove-worktree-also-delete-branch', { branch: removeConfirm.branch })}
-              </ConfirmCheckbox>
-              {removeConfirmProtected && (
-                <div id="remove-worktree-protected-hint" className="text-xs text-muted-foreground">
-                  {t('action.confirm-remove-worktree-protected-hint')}
+              <div className="space-y-1">
+                <span>{t('action.confirm-remove-worktree-body')}</span>
+                <ConfirmValue value={tildify(removeConfirm.path)} />
+              </div>
+              <div className="space-y-2">
+                <div className="space-y-1">
+                  <ConfirmCheckbox
+                    checked={removeAlsoDeletes}
+                    disabled={removeConfirmProtected}
+                    describedBy={removeConfirmProtected ? 'remove-worktree-protected-hint' : undefined}
+                    onCheckedChange={setRemoveAlsoDeletes}
+                    destructive
+                    title={removeConfirmProtected ? t('action.confirm-remove-worktree-protected-hint') : undefined}
+                  >
+                    {t('action.confirm-remove-worktree-also-delete-branch')}
+                  </ConfirmCheckbox>
+                  <IndentedValue value={removeConfirm.branch} />
                 </div>
-              )}
-              {removeAlsoDeletes && hasUpstream && !removeConfirmProtected && (
-                <ConfirmCheckbox checked={removeAlsoUpstream} onCheckedChange={setRemoveAlsoUpstream} destructive>
-                  {t('action.confirm-delete-branch-also-delete-upstream', { tracking: branch.tracking! })}
-                </ConfirmCheckbox>
-              )}
+                {removeConfirmProtected && (
+                  <div id="remove-worktree-protected-hint" className="pl-6 text-xs text-muted-foreground">
+                    {t('action.confirm-remove-worktree-protected-hint')}
+                  </div>
+                )}
+                {removeAlsoDeletes && hasUpstream && !removeConfirmProtected && (
+                  <div className="space-y-1">
+                    <ConfirmCheckbox checked={removeAlsoUpstream} onCheckedChange={setRemoveAlsoUpstream} destructive>
+                      {t('action.confirm-delete-branch-also-delete-upstream')}
+                    </ConfirmCheckbox>
+                    <IndentedValue value={branch.tracking!} />
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             ''
@@ -383,17 +410,26 @@ export function useBranchActions(repo: RepoState, branch: RepoBranchState) {
       />
       <ConfirmDialog
         open={forceRemoveConfirm !== null}
-        title={
-          forceRemoveConfirm ? t('action.confirm-force-delete-branch-title', { branch: forceRemoveConfirm.branch }) : ''
-        }
+        title={forceRemoveConfirm ? t('action.confirm-force-delete-branch-title') : ''}
         message={
           forceRemoveConfirm ? (
             <div className="space-y-3">
-              <span>{t('action.confirm-force-delete-branch-body', { branch: forceRemoveConfirm.branch })}</span>
+              <div className="space-y-1">
+                <span>{t('action.confirm-remove-worktree-body')}</span>
+                <ConfirmValue value={tildify(forceRemoveConfirm.path)} />
+              </div>
+              <div className="space-y-1">
+                <span>{t('action.confirm-force-delete-branch-body')}</span>
+                <ConfirmValue value={forceRemoveConfirm.branch} />
+                <span className="block text-muted-foreground">{t('action.confirm-force-delete-branch-note')}</span>
+              </div>
               {hasUpstream && (
-                <ConfirmCheckbox checked={removeAlsoUpstream} onCheckedChange={setRemoveAlsoUpstream} destructive>
-                  {t('action.confirm-delete-branch-also-delete-upstream', { tracking: branch.tracking! })}
-                </ConfirmCheckbox>
+                <div className="space-y-1">
+                  <ConfirmCheckbox checked={removeAlsoUpstream} onCheckedChange={setRemoveAlsoUpstream} destructive>
+                    {t('action.confirm-delete-branch-also-delete-upstream')}
+                  </ConfirmCheckbox>
+                  <IndentedValue value={branch.tracking!} />
+                </div>
               )}
             </div>
           ) : (

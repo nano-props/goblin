@@ -22,6 +22,8 @@ import {
 } from '#/renderer/components/ui/dialog.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/renderer/components/ui/select.tsx'
 import { Button } from '#/renderer/components/ui/button.tsx'
+import { Field, FieldDescription, FieldError, FieldLabel } from '#/renderer/components/ui/field.tsx'
+import { Input } from '#/renderer/components/ui/input.tsx'
 import type { RepoState } from '#/renderer/stores/repos/types.ts'
 import { resourceBusy } from '#/renderer/stores/repos/resources.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
@@ -103,18 +105,16 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
         </DialogHeader>
 
         <form
-          className="space-y-4"
+          className="space-y-0"
           onSubmit={(e) => {
             e.preventDefault()
             handleSubmit()
           }}
         >
-          <div>
-            <label className="block text-sm font-medium text-foreground" htmlFor="cwt-base">
-              {t('action.create-worktree-base-label')}
-            </label>
+          <Field>
+            <FieldLabel htmlFor="cwt-base">{t('action.create-worktree-base-label')}</FieldLabel>
             <Select value={base} onValueChange={setBase}>
-              <SelectTrigger id="cwt-base" className="mt-1 w-full">
+              <SelectTrigger id="cwt-base" className="w-full">
                 <SelectValue placeholder={t('action.create-worktree-base-placeholder')} />
               </SelectTrigger>
               <SelectContent>
@@ -134,13 +134,12 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
                 ))}
               </SelectContent>
             </Select>
-          </div>
+            <FieldDescription reserveHeight aria-hidden />
+          </Field>
 
-          <div>
-            <label className="block text-sm font-medium text-foreground" htmlFor="cwt-branch">
-              {t('action.create-worktree-branch-label')}
-            </label>
-            <input
+          <Field data-invalid={branchError ? true : undefined}>
+            <FieldLabel htmlFor="cwt-branch">{t('action.create-worktree-branch-label')}</FieldLabel>
+            <Input
               id="cwt-branch"
               autoFocus
               value={branch}
@@ -148,31 +147,27 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
               placeholder={t('action.create-worktree-branch-placeholder')}
               aria-invalid={!!branchError}
               aria-describedby={branchError ? 'cwt-branch-error' : undefined}
-              className="mt-1 w-full rounded-md border border-input bg-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring aria-invalid:border-danger-border aria-invalid:ring-danger/20 dark:aria-invalid:ring-danger/40"
             />
-            {branchError && (
-              <div id="cwt-branch-error" className="mt-1 text-xs text-danger">
-                {branchError}
-              </div>
-            )}
-          </div>
+            <FieldError id="cwt-branch-error" reserveHeight aria-live="polite" aria-atomic="true">
+              {branchError}
+            </FieldError>
+          </Field>
 
-          <div>
-            <label className="block text-sm font-medium text-foreground" htmlFor="cwt-path">
-              {t('action.create-worktree-path-label')}
-            </label>
-            <input
+          <Field>
+            <FieldLabel htmlFor="cwt-path">{t('action.create-worktree-path-label')}</FieldLabel>
+            <Input
               id="cwt-path"
               value={worktreePath}
               disabled={!branchTrimmed}
               onChange={(e) => setWorktreePath(e.target.value)}
               placeholder={displayDefaultPath}
               aria-describedby="cwt-path-hint"
-              className="mt-1 w-full rounded-md border border-input bg-control px-3 py-2 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+              className="font-mono text-xs"
             />
-            <div
+            <FieldDescription
               id="cwt-path-hint"
-              className="mt-1 text-xs text-muted-foreground truncate"
+              reserveHeight
+              className="truncate"
               title={displayEffectivePath || undefined}
             >
               {!branchTrimmed
@@ -180,9 +175,9 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
                 : effectivePath
                   ? displayEffectivePath
                   : ''}
-            </div>
-          </div>
-          <DialogFooter>
+            </FieldDescription>
+          </Field>
+          <DialogFooter className="pt-4">
             <Button type="button" variant="ghost" onClick={onClose}>
               {t('dialog.cancel')}
             </Button>

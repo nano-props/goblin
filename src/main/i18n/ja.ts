@@ -307,23 +307,25 @@ export const ja: Record<DictKey, string> = {
   'action.confirm-push-protected-body':
     'このまま <branch>{branch}</branch> に直接プッシュしようとしています。通常はプルリクエスト経由が望ましいですが、続行しますか？',
   'action.confirm-push-confirm': 'プッシュを続行',
-  'action.confirm-delete-branch-title': '{branch} を削除しますか？',
-  'action.confirm-delete-branch-body':
-    'ローカルブランチ <branch>{branch}</branch> を削除します。完全にマージされていない場合、Git が拒否します。',
+  'action.confirm-delete-branch-title': 'ブランチを削除しますか？',
+  'action.confirm-delete-branch-body': 'ローカルブランチを削除します：',
+  'action.confirm-delete-branch-note': 'このローカルブランチが完全にマージされていない場合、Git が拒否します。',
   'action.confirm-delete-branch-confirm': 'ブランチを削除',
-  'action.confirm-delete-branch-also-delete-upstream': '上流ブランチ {tracking} も削除',
-  'action.confirm-force-delete-standalone-title': '{branch} を強制削除しますか？',
-  'action.confirm-force-delete-standalone-body':
-    'ローカルブランチ <branch>{branch}</branch> には完全にマージされていない固有コミットがあります。そのコミットが不要な場合のみ強制削除してください。',
+  'action.confirm-delete-branch-also-delete-upstream': '上流ブランチも削除',
+  'action.confirm-force-delete-standalone-title': 'ブランチを強制削除しますか？',
+  'action.confirm-force-delete-standalone-body': 'ローカルブランチを強制削除します：',
+  'action.confirm-force-delete-standalone-note':
+    'このローカルブランチには未マージの固有コミットがあります。不要な場合のみ続行してください。',
   'action.confirm-force-delete-standalone-confirm': 'ブランチを強制削除',
-  'action.confirm-remove-worktree-title': '{branch} のワークツリーを削除しますか？',
-  'action.confirm-remove-worktree-body': 'ワークツリーのディレクトリ <path>{path}</path> を削除します。',
+  'action.confirm-remove-worktree-title': 'ワークツリーを削除しますか？',
+  'action.confirm-remove-worktree-body': 'ワークツリーのディレクトリを削除します：',
   'action.confirm-remove-worktree-confirm': 'ワークツリーを削除',
-  'action.confirm-remove-worktree-also-delete-branch': 'ブランチ {branch} も削除する',
+  'action.confirm-remove-worktree-also-delete-branch': 'このブランチも削除する',
   'action.confirm-remove-worktree-protected-hint': 'このブランチは保護されているため、ここから削除できません。',
-  'action.confirm-force-delete-branch-title': 'ローカルブランチ {branch} を削除しますか？',
-  'action.confirm-force-delete-branch-body':
-    'このブランチが安全にマージ済みか確認できず、上流が消失している可能性があります。ワークツリーを削除し、ローカルブランチを強制削除しますか？',
+  'action.confirm-force-delete-branch-title': 'ローカルブランチを削除しますか？',
+  'action.confirm-force-delete-branch-body': 'ローカルブランチを強制削除します：',
+  'action.confirm-force-delete-branch-note':
+    'このローカルブランチが安全にマージ済みか確認できず、上流が消失している可能性があります。',
   'action.confirm-force-delete-branch-confirm': 'ワークツリーを削除してブランチを強制削除',
   'action.create-worktree': '新しいワークツリー',
   'action.create-worktree-title': '新しいワークツリーを作成',

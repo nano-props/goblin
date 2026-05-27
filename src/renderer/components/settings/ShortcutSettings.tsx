@@ -1,5 +1,6 @@
 import { useState, type KeyboardEvent } from 'react'
 import { RefreshCw } from 'lucide-react'
+import { Button } from '#/renderer/components/ui/button.tsx'
 import { Switch } from '#/renderer/components/ui/switch.tsx'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { useSettingsStore } from '#/renderer/stores/settings.ts'
@@ -138,9 +139,10 @@ export function ShortcutSettings() {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          <button
+          <Button
             type="button"
             data-interactive
+            variant="ghost"
             onClick={() => {
               setRecordingShortcut(true)
               setShortcutError(null)
@@ -149,7 +151,7 @@ export function ShortcutSettings() {
             onBlur={() => setRecordingShortcut(false)}
             title={shortcutStatus?.text ?? t('settings.global-shortcut-record')}
             className={cn(
-              'relative inline-flex h-7 w-20 items-center justify-center rounded-md border px-2 font-mono text-[12px] leading-none shadow-[var(--shadow-control-inset-highlight)] transition-colors duration-100',
+              'relative h-7 w-20 border px-2 font-mono text-[12px] font-normal leading-none shadow-[var(--shadow-control-inset-highlight)]',
               shortcutStatus?.tone === 'error'
                 ? 'border-danger-border bg-danger-surface text-danger hover:bg-danger-surface'
                 : recordingShortcut
@@ -167,17 +169,19 @@ export function ShortcutSettings() {
                 shortcutStatus?.tone === 'error' ? 'bg-danger' : recordingShortcut ? 'bg-primary' : 'hidden',
               )}
             />
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             data-interactive
+            variant="ghost"
+            size="icon"
             onClick={() => saveGlobalShortcut(DEFAULT_GLOBAL_SHORTCUT)}
-            className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground"
             aria-label={t('settings.global-shortcut-reset')}
             title={t('settings.global-shortcut-reset')}
           >
             <RefreshCw className="size-3.5" aria-hidden="true" />
-          </button>
+          </Button>
         </div>
       </div>
     </div>

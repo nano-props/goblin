@@ -79,12 +79,13 @@ export function BranchSearchInput({ value, disabled = false, onChange }: Props) 
       />
       {!expanded && (
         <Tip label={label}>
-          <button
+          <Button
             type="button"
+            variant="ghost"
             disabled={disabled}
             onClick={() => setOpen(true)}
             aria-label={label}
-            className="absolute inset-0 cursor-pointer rounded-md border-0 bg-transparent outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed"
+            className="absolute inset-0 h-auto w-auto rounded-md border-0 bg-transparent p-0 hover:bg-transparent focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed"
           />
         </Tip>
       )}
@@ -92,10 +93,10 @@ export function BranchSearchInput({ value, disabled = false, onChange }: Props) 
         <Button
           type="button"
           variant="ghost"
-          size="icon"
+          size="icon-sm"
           onClick={handleClear}
           aria-label={t('branches.search-clear')}
-          className="mr-0.5 size-6 text-muted-foreground hover:text-foreground [&_svg:not([class*='size-'])]:size-3"
+          className="mr-0.5 text-muted-foreground hover:text-foreground [&_svg:not([class*='size-'])]:size-3"
         >
           <X />
         </Button>

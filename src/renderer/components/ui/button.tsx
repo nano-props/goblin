@@ -20,8 +20,7 @@ const buttonVariants = cva(
         default: 'bg-primary text-primary-foreground hover:bg-primary/90',
         destructive:
           'bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40',
-        outline:
-          'border border-input bg-control shadow-xs hover:bg-control-hover hover:text-accent-foreground',
+        outline: 'border border-input bg-control shadow-xs hover:bg-control-hover hover:text-accent-foreground',
         secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
         ghost: 'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
         link: 'text-primary underline-offset-4 hover:underline',
@@ -38,15 +37,18 @@ const buttonVariants = cva(
       // workhorse default; h-6 covers tighter inline rows.
       //
       // Only the sizes the app actually uses are kept. If `shadcn add`
-      // pulls in a new component that wants xs/lg/icon-xs/icon-sm/
-      // icon-lg, add it back at that point — declaring sizes nobody
-      // calls hides the small range we actually care about.
+      // pulls in a new component that wants xs/lg or other icon sizes,
+      // add it back at that point — declaring sizes nobody calls hides
+      // the small range we actually care about.
       size: {
         // base sets text-xs + svg size-3.5 + gap-2; sizes only override
         // gap / padding / height to keep the variant table readable.
         default: 'h-7 px-2.5 gap-1.5 has-[>svg]:px-2',
         sm: "h-6 gap-1 px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
+        'icon-xs': "size-5 [&_svg:not([class*='size-'])]:size-3",
+        'icon-sm': 'size-6',
         icon: 'size-7',
+        'icon-lg': 'size-8',
       },
     },
     defaultVariants: {

@@ -9,6 +9,7 @@
 import type { ErrorInfo, ReactNode } from 'react'
 import { ErrorBoundary as ReactErrorBoundary, getErrorMessage, type FallbackProps } from 'react-error-boundary'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { Button } from '#/renderer/components/ui/button.tsx'
 import { useT } from '#/renderer/stores/i18n.ts'
 
 interface Props {
@@ -29,14 +30,15 @@ function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
         </div>
         <div className="text-sm font-semibold text-foreground mb-1">{t('error.render-crash-title')}</div>
         <div className="text-xs text-muted-foreground mb-4 leading-relaxed">{message}</div>
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={resetErrorBoundary}
-          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-xs text-foreground cursor-pointer hover:text-foreground hover:bg-muted shadow-sm transition-colors duration-100"
+          className="h-8 border-border bg-card px-3 shadow-sm hover:bg-muted hover:text-foreground"
         >
-          <RefreshCw size={12} />
+          <RefreshCw className="size-3" />
           {t('error.try-again')}
-        </button>
+        </Button>
       </div>
     </div>
   )

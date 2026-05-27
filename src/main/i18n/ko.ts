@@ -300,23 +300,25 @@ export const ko: Record<DictKey, string> = {
   'action.confirm-push-protected-body':
     '<branch>{branch}</branch> 브랜치로 직접 푸시하려고 합니다. 보통은 PR 을 거치는 게 좋습니다. 계속할까요?',
   'action.confirm-push-confirm': '그래도 푸시',
-  'action.confirm-delete-branch-title': '{branch} 을(를) 삭제할까요?',
-  'action.confirm-delete-branch-body':
-    '로컬 브랜치 <branch>{branch}</branch> 을(를) 삭제합니다. 완전히 병합되지 않았다면 Git 이 거부합니다.',
+  'action.confirm-delete-branch-title': '브랜치를 삭제할까요?',
+  'action.confirm-delete-branch-body': '로컬 브랜치를 삭제합니다:',
+  'action.confirm-delete-branch-note': '이 로컬 브랜치가 완전히 병합되지 않았다면 Git 이 거부합니다.',
   'action.confirm-delete-branch-confirm': '브랜치 삭제',
-  'action.confirm-delete-branch-also-delete-upstream': '업스트림 브랜치 {tracking}도 삭제',
-  'action.confirm-force-delete-standalone-title': '{branch} 을(를) 강제 삭제할까요?',
-  'action.confirm-force-delete-standalone-body':
-    '로컬 브랜치 <branch>{branch}</branch> 에는 완전히 병합되지 않은 고유 커밋이 있습니다. 해당 커밋이 더 이상 필요 없을 때만 강제 삭제하세요.',
+  'action.confirm-delete-branch-also-delete-upstream': '업스트림 브랜치도 삭제',
+  'action.confirm-force-delete-standalone-title': '브랜치를 강제 삭제할까요?',
+  'action.confirm-force-delete-standalone-body': '로컬 브랜치를 강제로 삭제합니다:',
+  'action.confirm-force-delete-standalone-note':
+    '이 로컬 브랜치에는 병합되지 않은 고유 커밋이 있습니다. 더 이상 필요 없을 때만 계속하세요.',
   'action.confirm-force-delete-standalone-confirm': '브랜치 강제 삭제',
-  'action.confirm-remove-worktree-title': '{branch} 의 워크트리를 제거할까요?',
-  'action.confirm-remove-worktree-body': '워크트리 디렉터리 <path>{path}</path> 를 삭제합니다.',
+  'action.confirm-remove-worktree-title': '워크트리를 제거할까요?',
+  'action.confirm-remove-worktree-body': '워크트리 디렉터리를 삭제합니다:',
   'action.confirm-remove-worktree-confirm': '워크트리 제거',
-  'action.confirm-remove-worktree-also-delete-branch': '브랜치 {branch} 도 함께 삭제',
+  'action.confirm-remove-worktree-also-delete-branch': '이 브랜치도 함께 삭제',
   'action.confirm-remove-worktree-protected-hint': '이 브랜치는 보호되어 있어 여기서 삭제할 수 없습니다.',
-  'action.confirm-force-delete-branch-title': '로컬 브랜치 {branch} 을(를) 삭제할까요?',
-  'action.confirm-force-delete-branch-body':
-    '이 브랜치가 안전하게 병합되었는지 확인할 수 없고 업스트림이 사라졌을 수 있습니다. 워크트리를 제거하고 로컬 브랜치를 강제로 삭제할까요?',
+  'action.confirm-force-delete-branch-title': '로컬 브랜치를 삭제할까요?',
+  'action.confirm-force-delete-branch-body': '로컬 브랜치를 강제로 삭제합니다:',
+  'action.confirm-force-delete-branch-note':
+    '이 로컬 브랜치가 안전하게 병합되었는지 확인할 수 없고 업스트림이 사라졌을 수 있습니다.',
   'action.confirm-force-delete-branch-confirm': '워크트리 제거 및 브랜치 강제 삭제',
   'action.create-worktree': '새 워크트리',
   'action.create-worktree-title': '새 워크트리 만들기',

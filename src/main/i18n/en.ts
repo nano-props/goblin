@@ -309,23 +309,25 @@ export const en = {
   'action.confirm-push-protected-body':
     'You are about to push directly to <branch>{branch}</branch>, which usually deserves a pull request. Continue?',
   'action.confirm-push-confirm': 'Push anyway',
-  'action.confirm-delete-branch-title': 'Delete {branch}?',
-  'action.confirm-delete-branch-body':
-    'This will delete local branch <branch>{branch}</branch>. Git will refuse if it is not fully merged.',
+  'action.confirm-delete-branch-title': 'Delete branch?',
+  'action.confirm-delete-branch-body': 'This will delete the local branch:',
+  'action.confirm-delete-branch-note': 'Git will refuse if this local branch is not fully merged.',
   'action.confirm-delete-branch-confirm': 'Delete branch',
-  'action.confirm-delete-branch-also-delete-upstream': 'Also delete upstream branch {tracking}',
-  'action.confirm-force-delete-standalone-title': 'Force-delete {branch}?',
-  'action.confirm-force-delete-standalone-body':
-    'Local branch <branch>{branch}</branch> has unique commits that are not fully merged. Force-delete only if you no longer need those commits.',
+  'action.confirm-delete-branch-also-delete-upstream': 'Also delete upstream branch',
+  'action.confirm-force-delete-standalone-title': 'Force-delete branch?',
+  'action.confirm-force-delete-standalone-body': 'This will force-delete the local branch:',
+  'action.confirm-force-delete-standalone-note':
+    'This local branch has unmerged unique commits; continue only if they are no longer needed.',
   'action.confirm-force-delete-standalone-confirm': 'Force-delete branch',
-  'action.confirm-remove-worktree-title': 'Remove worktree for {branch}?',
-  'action.confirm-remove-worktree-body': 'This will delete the worktree directory at <path>{path}</path>.',
+  'action.confirm-remove-worktree-title': 'Remove worktree?',
+  'action.confirm-remove-worktree-body': 'This will delete the worktree directory:',
   'action.confirm-remove-worktree-confirm': 'Remove worktree',
-  'action.confirm-remove-worktree-also-delete-branch': 'Also delete branch {branch}',
+  'action.confirm-remove-worktree-also-delete-branch': 'Also delete this branch',
   'action.confirm-remove-worktree-protected-hint': "This branch is protected — it can't be deleted from here.",
-  'action.confirm-force-delete-branch-title': 'Delete local branch {branch}?',
-  'action.confirm-force-delete-branch-body':
-    'This branch is not known to be safely merged, and its upstream may be gone. Remove the worktree and force-delete the local branch?',
+  'action.confirm-force-delete-branch-title': 'Delete local branch?',
+  'action.confirm-force-delete-branch-body': 'This will force-delete the local branch:',
+  'action.confirm-force-delete-branch-note':
+    'This local branch is not known to be safely merged, and its upstream may be gone.',
   'action.confirm-force-delete-branch-confirm': 'Remove worktree and force-delete branch',
   'action.create-worktree': 'New worktree',
   'action.create-worktree-title': 'Create a new worktree',

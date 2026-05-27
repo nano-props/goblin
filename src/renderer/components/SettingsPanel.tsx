@@ -25,6 +25,7 @@ import { ScrollArea } from '#/renderer/components/ui/scroll-area.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/renderer/components/ui/select.tsx'
 import { Switch } from '#/renderer/components/ui/switch.tsx'
 import { Badge } from '#/renderer/components/ui/badge.tsx'
+import { Button } from '#/renderer/components/ui/button.tsx'
 import { GitHubMark } from '#/renderer/components/GitHubMark.tsx'
 import { ShortcutSettings } from '#/renderer/components/settings/ShortcutSettings.tsx'
 import { useThemeStore } from '#/renderer/stores/theme.ts'
@@ -159,14 +160,15 @@ export function SettingsPanel({ open, page, onPageChange, onClose }: Props) {
           <aside className="flex w-48 shrink-0 flex-col border-r border-separator bg-muted/30 px-3 py-3">
             <nav className="space-y-1" aria-label={t('settings.title')}>
               {pages.map((item) => (
-                <button
+                <Button
                   key={item.page}
                   ref={page === item.page ? selectedPageButtonRef : undefined}
                   type="button"
                   data-interactive
+                  variant="ghost"
                   onClick={() => onPageChange(item.page)}
                   className={cn(
-                    'flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm transition-colors duration-100',
+                    'h-9 w-full justify-start gap-2.5 px-2.5 text-left text-sm font-normal',
                     page === item.page
                       ? 'bg-selected text-selected-foreground'
                       : 'text-foreground hover:bg-accent hover:text-accent-foreground',
@@ -184,7 +186,7 @@ export function SettingsPanel({ open, page, onPageChange, onClose }: Props) {
                     <item.Icon className="size-3.5" />
                   </span>
                   <span className="truncate font-medium">{item.label}</span>
-                </button>
+                </Button>
               ))}
             </nav>
 
@@ -427,9 +429,7 @@ function AboutSettings() {
         <div className="min-w-0 flex-1">
           <span className="truncate text-sm font-medium text-foreground">{t('about.build')}</span>
         </div>
-        <span className="shrink-0 font-mono text-xs text-muted-foreground">
-          {commit || t('about.build.unknown')}
-        </span>
+        <span className="shrink-0 font-mono text-xs text-muted-foreground">{commit || t('about.build.unknown')}</span>
       </li>
       <li className="flex min-h-14 items-center gap-3 px-4 py-2.5 [&+&]:border-t [&+&]:border-separator">
         <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
@@ -439,15 +439,17 @@ function AboutSettings() {
           <span className="truncate text-sm font-medium text-foreground">{t('about.github')}</span>
           <p className="mt-0.5 truncate text-xs text-muted-foreground">{t('about.github.body')}</p>
         </div>
-        <button
+        <Button
           type="button"
           data-interactive
+          variant="ghost"
+          size="icon-lg"
           onClick={openProjectGitHub}
-          className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-accent-foreground"
+          className="shrink-0 text-muted-foreground hover:text-accent-foreground"
           aria-label={t('settings.open-github')}
         >
-          <ExternalLink size={14} />
-        </button>
+          <ExternalLink className="size-3.5" />
+        </Button>
       </li>
     </ul>
   )

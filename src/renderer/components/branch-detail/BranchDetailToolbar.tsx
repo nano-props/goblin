@@ -87,7 +87,6 @@ export function BranchDetailToolbar({
             title={detailToggleTitle}
             aria-expanded={!collapsed}
             aria-controls={collapsed ? undefined : contentId}
-            className="size-7"
           >
             <ChevronDown className={cn(collapsed && '-rotate-90')} />
           </Button>
@@ -102,7 +101,6 @@ export function BranchDetailToolbar({
             title={t(behavior.detailFocusMode ? 'branch-detail.exit-focus-title' : 'branch-detail.focus-title')}
             aria-pressed={behavior.detailFocusMode}
             className={cn(
-              'size-7',
               behavior.detailFocusMode &&
                 'bg-accent text-accent-foreground shadow-xs hover:bg-accent hover:text-accent-foreground',
             )}
@@ -115,10 +113,11 @@ export function BranchDetailToolbar({
             const selected = repo.ui.detailTab === tab.id
             const visuallySelected = !collapsed && selected
             return (
-              <button
+              <Button
                 key={tab.id}
                 id={`${detailId}-${tab.id}-tab`}
                 type="button"
+                variant="ghost"
                 role="tab"
                 aria-selected={selected}
                 aria-expanded={selected ? !collapsed : undefined}
@@ -130,7 +129,7 @@ export function BranchDetailToolbar({
                 }}
                 onKeyDown={(e) => handleTabKeyDown(e, tab.id)}
                 className={cn(
-                  'inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-sm cursor-pointer transition-colors duration-100',
+                  'h-7 gap-1.5 px-2.5 text-sm font-normal',
                   visuallySelected
                     ? 'bg-selected text-selected-foreground'
                     : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
@@ -147,7 +146,7 @@ export function BranchDetailToolbar({
                     {terminalCount}
                   </Badge>
                 )}
-              </button>
+              </Button>
             )
           })}
         </div>
@@ -155,11 +154,11 @@ export function BranchDetailToolbar({
       <div
         aria-hidden="true"
         className="min-w-2 flex-1 self-stretch"
-        onClick={toggleDetailOnActionBarBlankClick && behavior.detailCollapseAllowed ? toggleDetailCollapsed : undefined}
+        onClick={
+          toggleDetailOnActionBarBlankClick && behavior.detailCollapseAllowed ? toggleDetailCollapsed : undefined
+        }
       />
-      {branchActions && (
-        <BranchActionControls actions={branchActions} variant={behavior.detailActionVariant} />
-      )}
+      {branchActions && <BranchActionControls actions={branchActions} variant={behavior.detailActionVariant} />}
     </Toolbar>
   )
 }
