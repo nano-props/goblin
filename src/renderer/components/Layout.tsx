@@ -53,7 +53,7 @@ export function Toolbar({ children, className, variant = 'plain', ...props }: To
       className={cn(
         'flex h-9 shrink-0 items-center border-b border-separator',
         variant === 'repo' && 'gap-3 bg-card px-4',
-        variant === 'detail' && 'min-w-0 justify-between gap-2 bg-muted px-2',
+        variant === 'detail' && 'min-w-0 justify-between gap-2 bg-card px-2',
         className,
       )}
       {...props}
@@ -120,7 +120,7 @@ export function RepoWorkspace({
 }
 
 function WorkspaceSeparator() {
-  return <div className="bg-separator" aria-hidden />
+  return <div className="bg-border" aria-hidden />
 }
 
 export function RepoWorkspacePane({ children }: PaneProps) {

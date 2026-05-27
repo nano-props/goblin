@@ -238,6 +238,10 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     sessionsRef.current.get(key)?.clearSearch()
   }, [])
 
+  const writeInput = useCallback((key: string, data: string) => {
+    sessionsRef.current.get(key)?.writeInput(data)
+  }, [])
+
   const serialize = useCallback((key: string) => {
     return sessionsRef.current.get(key)?.serialize() ?? ''
   }, [])
@@ -259,6 +263,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       findNext,
       findPrevious,
       clearSearch,
+      writeInput,
       serialize,
     }),
     [
@@ -278,6 +283,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       setActive,
       snapshot,
       version,
+      writeInput,
     ],
   )
 

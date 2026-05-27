@@ -4,7 +4,11 @@ import type { RepoState } from '#/renderer/stores/repos/types.ts'
 import { AsyncButton } from '#/renderer/components/AsyncButton.tsx'
 import { BranchActionsDropdown } from '#/renderer/components/BranchActionsMenu.tsx'
 import { ScrollArea } from '#/renderer/components/ui/scroll-area.tsx'
-import { useBranchActionItems, type BranchActionItem } from '#/renderer/hooks/useBranchActionItems.ts'
+import {
+  useBranchActionItems,
+  type BranchActionItem,
+  type BranchActionItemGroups,
+} from '#/renderer/hooks/useBranchActionItems.ts'
 import { setBranchActionShortcutHandler } from '#/renderer/keyboard/branch-action-shortcuts.ts'
 import { cn } from '#/renderer/lib/cn.ts'
 import type { BranchInfo } from '#/renderer/types.ts'
@@ -12,11 +16,30 @@ import type { BranchInfo } from '#/renderer/types.ts'
 interface Props {
   repo: RepoState
   branch: BranchInfo
-  variant?: 'bar' | 'menu' | 'auto'
+  variant?: BranchActionBarVariant
+}
+
+export type BranchActionBarVariant = 'bar' | 'menu' | 'auto'
+
+interface BranchActionControlsProps {
+  actions: BranchActionItemGroups
+  variant?: BranchActionBarVariant
 }
 
 export function BranchActionBar({ repo, branch, variant = 'bar' }: Props) {
-  const { patchItems, mainItems, destructiveItems, dialogs } = useBranchActionItems(repo, branch)
+  const actions = useBranchActionItems(repo, branch)
+
+  return (
+    <>
+      <BranchActionControls actions={actions} variant={variant} />
+
+      <BranchActionDialogs actions={actions} />
+    </>
+  )
+}
+
+export function BranchActionControls({ actions, variant = 'bar' }: BranchActionControlsProps) {
+  const { patchItems, mainItems, destructiveItems } = actions
   const visibleItems = [...patchItems, ...mainItems, ...destructiveItems].filter((item) => item.visible)
   // Register the global shortcut once. The ref is reassigned on every render,
   // including the latest item callbacks, so repo/branch changes don't stale the handler.
@@ -32,37 +55,25 @@ export function BranchActionBar({ repo, branch, variant = 'bar' }: Props) {
   }, [])
 
   if (variant === 'menu') {
-    return (
-      <>
-        <BranchActionsDropdown patchItems={patchItems} mainItems={mainItems} destructiveItems={destructiveItems} />
-
-        {dialogs}
-      </>
-    )
+    return <BranchActionsDropdown patchItems={patchItems} mainItems={mainItems} destructiveItems={destructiveItems} />
   }
 
   if (variant === 'auto') {
     return (
-      <>
-        <BranchActionAuto
-          visibleItems={visibleItems}
-          patchItems={patchItems}
-          mainItems={mainItems}
-          destructiveItems={destructiveItems}
-        />
-
-        {dialogs}
-      </>
+      <BranchActionAuto
+        visibleItems={visibleItems}
+        patchItems={patchItems}
+        mainItems={mainItems}
+        destructiveItems={destructiveItems}
+      />
     )
   }
 
-  return (
-    <>
-      <BranchActionButtonScroller visibleItems={visibleItems} />
+  return <BranchActionButtonScroller visibleItems={visibleItems} />
+}
 
-      {dialogs}
-    </>
-  )
+export function BranchActionDialogs({ actions }: { actions: BranchActionItemGroups }) {
+  return actions.dialogs
 }
 
 function BranchActionAuto({
@@ -119,7 +130,7 @@ function BranchActionAuto({
 
 function BranchActionButtonScroller({ visibleItems }: { visibleItems: BranchActionItem[] }) {
   return (
-    <ScrollArea orientation="horizontal" className="min-w-0 flex-1">
+    <ScrollArea orientation="horizontal" className="min-w-0">
       <BranchActionButtonRow visibleItems={visibleItems} className="min-w-full" />
     </ScrollArea>
   )

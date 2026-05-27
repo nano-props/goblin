@@ -54,6 +54,8 @@ vi.mock('#/renderer/components/terminal/ManagedTerminalSession.ts', () => {
 
     clearSearch() {}
 
+    writeInput() {}
+
     serialize(): string {
       return ''
     }

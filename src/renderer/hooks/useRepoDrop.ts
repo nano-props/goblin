@@ -41,15 +41,18 @@ export function useRepoDrop({ blocked }: Options) {
 
   const onDragEnter = (event: DragEvent<HTMLDivElement>) => {
     if (!hasFiles(event)) return
+    const handledByChild = event.isDefaultPrevented()
     event.preventDefault()
     if (isDropBlocked(blockedRef.current)) return
-    setActive(true)
+    setActive(!handledByChild)
   }
 
   const onDragOver = (event: DragEvent<HTMLDivElement>) => {
     if (!hasFiles(event)) return
+    const handledByChild = event.isDefaultPrevented()
     event.preventDefault()
     if (isDropBlocked(blockedRef.current)) return
+    setActive(!handledByChild)
     event.dataTransfer.dropEffect = 'copy'
   }
 
@@ -64,8 +67,10 @@ export function useRepoDrop({ blocked }: Options) {
 
   const onDrop = (event: DragEvent<HTMLDivElement>) => {
     if (!hasFiles(event)) return
+    const handledByChild = event.isDefaultPrevented()
     event.preventDefault()
     setActive(false)
+    if (handledByChild) return
     if (isDropBlocked(blockedRef.current)) return
     const paths = Array.from(event.dataTransfer.files)
       .map((file) => goblin.pathForFile(file))

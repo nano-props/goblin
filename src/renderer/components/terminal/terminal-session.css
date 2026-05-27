@@ -255,6 +255,22 @@
   box-shadow: var(--shadow-sm);
 }
 
+.goblin-terminal-slot__drop-overlay {
+  position: absolute;
+  inset: 4px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--color-brand);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-background) 85%, transparent);
+  pointer-events: none;
+  color: var(--color-muted-foreground);
+  font-size: 12px;
+  font-weight: 500;
+}
+
 .goblin-terminal-parking {
   position: fixed;
   left: -10000px;

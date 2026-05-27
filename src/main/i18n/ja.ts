@@ -262,6 +262,7 @@ export const ja: Record<DictKey, string> = {
   'terminal.close': 'ターミナルを閉じる',
   'terminal.progress': 'ターミナル進行状況',
   'terminal.empty': '開いているターミナルはありません',
+  'terminal.drop-hint': 'ドロップしてパスを貼り付け',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': 'Finder で表示',

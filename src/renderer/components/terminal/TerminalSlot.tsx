@@ -5,12 +5,14 @@ import {
   useMemo,
   useRef,
   useState,
+  type DragEvent,
   type FocusEvent,
   type KeyboardEvent,
 } from 'react'
 import { Button } from '#/renderer/components/ui/button.tsx'
 import { cn } from '#/renderer/lib/cn.ts'
 import { setTerminalFocused } from '#/renderer/terminal-focus.ts'
+import { goblin } from '#/renderer/rpc.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { terminalSessionGroupKey } from '#/renderer/components/terminal/terminal-session-utils.ts'
 import { useTerminalSessionContext } from '#/renderer/components/terminal/terminal-session-context.ts'
@@ -46,6 +48,7 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
     findNext,
     findPrevious,
     clearSearch,
+    writeInput,
   } = context
   const groupKey = terminalSessionGroupKey(repoRoot, worktreePath)
   const base = useMemo<TerminalSessionBase>(
@@ -161,6 +164,38 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
         : t('terminal.search-no-results')
       : ''
 
+  const [dragOver, setDragOver] = useState(false)
+  const handleDragEnter = useCallback((event: DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes('Files')) return
+    event.preventDefault()
+    setDragOver(true)
+  }, [])
+  const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes('Files')) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+  }, [])
+  const handleDragLeave = useCallback((event: DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes('Files')) return
+    const relatedTarget = event.relatedTarget
+    if (!(relatedTarget instanceof Node) || !event.currentTarget.contains(relatedTarget)) setDragOver(false)
+  }, [])
+  const handleDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if (!event.dataTransfer.types.includes('Files')) return
+      event.preventDefault()
+      setDragOver(false)
+      if (!key) return
+      const paths = Array.from(event.dataTransfer.files)
+        .map((file) => goblin.pathForFile(file))
+        .filter((path) => path.length > 0)
+      if (paths.length === 0) return
+      const escaped = paths.map(shellEscapePath).join(' ')
+      writeInput(key, escaped)
+    },
+    [key, writeInput],
+  )
+
   const progress = snapshot.progress
   const progressVariant =
     progress?.state === 2 ? 'error' : progress?.state === 4 ? 'warning' : progress?.state === 3 ? 'indeterminate' : ''
@@ -172,6 +207,10 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
       onFocusCapture={handleFocus}
       onBlurCapture={handleBlur}
       onKeyDownCapture={handleKeyDownCapture}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
       {progress && (
         <div
@@ -232,6 +271,11 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
           <span>{t(snapshot.message ?? 'error.unknown')}</span>
         </div>
       )}
+      {dragOver && (
+        <div className="goblin-terminal-slot__drop-overlay">
+          <span>{t('terminal.drop-hint')}</span>
+        </div>
+      )}
     </div>
   )
 }
@@ -239,4 +283,10 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
 function isTerminalSearchShortcut(event: KeyboardEvent<HTMLDivElement>): boolean {
   if (event.altKey || event.key.toLowerCase() !== 'f') return false
   return event.metaKey || (event.ctrlKey && event.shiftKey)
+}
+
+function shellEscapePath(path: string): string {
+  if (path.length === 0) return "''"
+  if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(path)) return path
+  return "'" + path.replace(/'/g, "'\\''") + "'"
 }

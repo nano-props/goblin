@@ -65,6 +65,7 @@ export interface TerminalSessionContextValue {
   findNext: (key: string, term: string, incremental?: boolean) => TerminalSearchResult
   findPrevious: (key: string, term: string) => TerminalSearchResult
   clearSearch: (key: string) => void
+  writeInput: (key: string, data: string) => void
   /** Serializes xterm framebuffer state as VT sequences; not plain-text output for copy UI. */
   serialize: (key: string) => string
 }
@@ -81,6 +82,7 @@ export interface ManagedTerminalSessionLike {
   findNext: (term: string, incremental?: boolean) => TerminalSearchResult
   findPrevious: (term: string) => TerminalSearchResult
   clearSearch: () => void
+  writeInput: (data: string) => void
   /** Serializes xterm framebuffer state as VT sequences; not plain-text output for copy UI. */
   serialize: () => string
   handleOutput: (event: TerminalOutputEvent) => void

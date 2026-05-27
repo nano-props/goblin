@@ -98,12 +98,12 @@ export function RepoWorkspaceSkeleton({
 export function BranchDetailSkeleton({ collapsed = false }: { collapsed?: boolean }) {
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
-      <Toolbar className="justify-between gap-2 bg-muted px-2">
-        <div className="flex">
-          <div className="h-9 px-3 flex items-center">
+      <Toolbar className="justify-between gap-2 bg-card px-2">
+        <div className="flex gap-0.5">
+          <div className="h-7 px-2.5 flex items-center">
             <Bar w="42px" h="14px" tone="strong" />
           </div>
-          <div className="h-9 px-3 flex items-center">
+          <div className="h-7 px-2.5 flex items-center">
             <Bar w="42px" h="14px" tone="strong" />
           </div>
         </div>

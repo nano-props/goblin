@@ -255,6 +255,7 @@ export const ko: Record<DictKey, string> = {
   'terminal.close': '터미널 닫기',
   'terminal.progress': '터미널 진행률',
   'terminal.empty': '열린 터미널 없음',
+  'terminal.drop-hint': '놓아서 경로 붙여넣기',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': 'Finder 에서 보기',

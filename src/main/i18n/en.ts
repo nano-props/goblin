@@ -264,6 +264,7 @@ export const en = {
   'terminal.close': 'Close terminal',
   'terminal.progress': 'Terminal progress',
   'terminal.empty': 'No terminal open',
+  'terminal.drop-hint': 'Drop to paste path',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) ---
   'worktrees.reveal-title': 'Reveal in Finder',
