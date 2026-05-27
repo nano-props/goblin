@@ -583,7 +583,7 @@ describe('runBranchAction', () => {
     })
   })
 
-  test('selects the created worktree branch after a successful refresh', async () => {
+  test('keeps the current branch selection after creating a worktree', async () => {
     setSelectionForTest('feature/a', 'all')
     installSuccessfulCreateWorktreeBridge()
 
@@ -600,10 +600,10 @@ describe('runBranchAction', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.branchViewMode).toBe('all')
-    expect(repo?.ui.selectedBranch).toBe('feature/new')
+    expect(repo?.ui.selectedBranch).toBe('feature/a')
   })
 
-  test('switches no-worktree filtering to all before selecting the created worktree branch', async () => {
+  test('keeps no-worktree filtering after creating a worktree', async () => {
     setSelectionForTest('feature/a', 'no-worktree')
     installSuccessfulCreateWorktreeBridge()
 
@@ -619,14 +619,14 @@ describe('runBranchAction', () => {
     )
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.ui.branchViewMode).toBe('all')
-    expect(repo?.ui.selectedBranch).toBe('feature/new')
+    expect(repo?.ui.branchViewMode).toBe('no-worktree')
+    expect(repo?.ui.selectedBranch).toBe('feature/a')
   })
 
   test.each([
     ['failed', { ok: false, message: 'error.invalid-path' }],
     ['cancelled', { ok: false, message: 'cancelled' }],
-  ])('does not focus a created worktree branch when the action is %s', async (_label, result) => {
+  ])('keeps the current branch selection when create worktree is %s', async (_label, result) => {
     setSelectionForTest('feature/a', 'no-worktree')
     installGoblinTestBridge({
       'repo.createWorktree': async () => result,
@@ -648,7 +648,7 @@ describe('runBranchAction', () => {
     expect(repo?.ui.selectedBranch).toBe('feature/a')
   })
 
-  test('does not focus the created branch when the repo token goes stale during refresh', async () => {
+  test('does not let stale create worktree refresh results change selection', async () => {
     setSelectionForTest('feature/a', 'no-worktree')
     installSuccessfulCreateWorktreeBridge({
       onSnapshot: () => {
@@ -709,7 +709,7 @@ describe('runBranchAction', () => {
     expect(repo?.data.branches.map((branch) => branch.name)).toEqual(['feature/new-instance'])
   })
 
-  test('does not focus a branch after non-create branch actions refresh', async () => {
+  test('keeps selection after non-create branch actions refresh', async () => {
     setSelectionForTest('feature/a', 'no-worktree')
     installGoblinTestBridge({
       'repo.deleteBranch': async () => ({ ok: true, message: 'ok' }),

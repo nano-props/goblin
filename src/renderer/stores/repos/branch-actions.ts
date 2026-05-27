@@ -130,15 +130,6 @@ async function waitForCoreRefresh(id: string, signal: AbortSignal): Promise<void
   await waitForRepoOperationsIdle(id, ['snapshot', 'status'], signal)
 }
 
-function focusCreatedWorktreeBranch(get: ReposGet, id: string, token: number, action: RepoBranchAction): void {
-  if (action.kind !== 'createWorktree') return
-  const repo = get().repos[id]
-  if (!repo || repo.instanceToken !== token) return
-  if (!repo.data.branches.some((branch) => branch.name === action.newBranch)) return
-  if (repo.ui.branchViewMode === 'no-worktree') get().setBranchViewMode(id, 'all')
-  get().selectBranch(id, action.newBranch)
-}
-
 function runBranchActionRpc(action: RepoBranchAction, repoId: string, signal?: AbortSignal): Promise<ExecResult> {
   switch (action.kind) {
     case 'checkout':
@@ -264,7 +255,6 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
         if (result.ok || options?.refreshOnError !== false) {
           const repo = get().repos[id]
           if (repo?.instanceToken === token) await runBranchActionRefreshWorkflow(get, { id, token })
-          if (result.ok) focusCreatedWorktreeBranch(get, id, token, action)
         }
         if (result.ok && network) get().clearFetchFailed(id, token)
       }

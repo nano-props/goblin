@@ -40,10 +40,10 @@ interface AppMenuState {
   workspaceLayout: WorkspaceLayout
 }
 
-const THEME_MENU_OPTIONS = [
-  { pref: 'auto', labelKey: 'settings.theme.auto' },
-  { pref: 'light', labelKey: 'settings.theme.light' },
-  { pref: 'dark', labelKey: 'settings.theme.dark' },
+const APPEARANCE_MENU_OPTIONS = [
+  { pref: 'auto', labelKey: 'settings.appearance.auto' },
+  { pref: 'light', labelKey: 'settings.appearance.light' },
+  { pref: 'dark', labelKey: 'settings.appearance.dark' },
 ] as const
 
 const LANGUAGE_MENU_OPTIONS = [
@@ -293,7 +293,7 @@ function createWorkspaceLayoutMenu(workspaceLayout: WorkspaceLayout): MenuItemCo
 function createAppearanceMenu(themePref: ThemePref): MenuItemConstructorOptions {
   return {
     label: t('settings.appearance'),
-    submenu: THEME_MENU_OPTIONS.map(({ pref, labelKey }) => ({
+    submenu: APPEARANCE_MENU_OPTIONS.map(({ pref, labelKey }) => ({
       type: 'radio' as const,
       label: t(labelKey),
       checked: themePref === pref,

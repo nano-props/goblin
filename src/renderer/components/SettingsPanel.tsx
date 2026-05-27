@@ -224,14 +224,14 @@ function GeneralSettings() {
   const setToggleDetailOnActionBarBlankClick = useSettingsStore((s) => s.setToggleDetailOnActionBarBlankClick)
   const langPref = useI18nStore((s) => s.pref)
   const setLangPref = useI18nStore((s) => s.setPref)
-  const themeOptions: { value: ThemePref; labelKey: string; icon: ReactNode }[] = [
-    { value: 'auto', labelKey: 'settings.theme.auto', icon: <Laptop className="size-4" /> },
-    { value: 'light', labelKey: 'settings.theme.light', icon: <Sun className="size-4" /> },
-    { value: 'dark', labelKey: 'settings.theme.dark', icon: <Moon className="size-4" /> },
+  const appearanceOptions: { value: ThemePref; labelKey: string; icon: ReactNode }[] = [
+    { value: 'auto', labelKey: 'settings.appearance.auto', icon: <Laptop className="size-4" /> },
+    { value: 'light', labelKey: 'settings.appearance.light', icon: <Sun className="size-4" /> },
+    { value: 'dark', labelKey: 'settings.appearance.dark', icon: <Moon className="size-4" /> },
   ]
-  const colorThemeOptions: { value: ColorTheme; labelKey: string }[] = COLOR_THEMES.map((value) => ({
+  const themePresetOptions: { value: ColorTheme; labelKey: string }[] = COLOR_THEMES.map((value) => ({
     value,
-    labelKey: `settings.color-theme.${value}`,
+    labelKey: `settings.theme-preset.${value}`,
   }))
   const langOptions: { value: LangPref; labelKey: string; emoji: string }[] = [
     { value: 'auto', labelKey: 'settings.lang.auto', emoji: '🌐' },
@@ -248,26 +248,26 @@ function GeneralSettings() {
     <SettingsGroup label={t('settings.group.general')}>
       <SettingsList>
         <SettingsRow
-          controlId="settings-color-theme"
-          label={t('settings.color-theme')}
+          controlId="settings-theme-preset"
+          label={t('settings.theme-preset')}
           control={
             <SettingsSelect
-              id="settings-color-theme"
+              id="settings-theme-preset"
               value={colorTheme}
-              options={colorThemeOptions.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
-              onChange={(v) => save(() => setColorTheme(v), 'color theme')}
+              options={themePresetOptions.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
+              onChange={(v) => save(() => setColorTheme(v), 'theme preset')}
             />
           }
         />
         <SettingsRow
-          controlId="settings-theme"
+          controlId="settings-appearance"
           label={t('settings.appearance')}
           control={
             <SettingsSelect
-              id="settings-theme"
+              id="settings-appearance"
               value={themePref}
-              options={themeOptions.map((o) => ({ value: o.value, label: t(o.labelKey), icon: o.icon }))}
-              onChange={(v) => save(() => setThemePref(v), 'theme')}
+              options={appearanceOptions.map((o) => ({ value: o.value, label: t(o.labelKey), icon: o.icon }))}
+              onChange={(v) => save(() => setThemePref(v), 'appearance')}
             />
           }
         />
