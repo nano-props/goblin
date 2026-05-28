@@ -30,15 +30,18 @@ const xtermMocks = vi.hoisted(() => {
     unicode = { activeVersion: '6' }
     options: {
       cursorBlink?: boolean
+      macOptionIsMeta?: boolean
       minimumContrastRatio?: number
       theme?: { background?: string; foreground?: string }
       scrollOnUserInput?: boolean
     }
     element: HTMLDivElement | null = null
+    modes = { applicationCursorKeysMode: false }
     write = vi.fn()
     reset = vi.fn()
     dispose = vi.fn()
     focus = vi.fn(() => this.textarea?.focus())
+    customKeyEventHandler: ((event: KeyboardEvent) => boolean) | null = null
     private textarea: HTMLTextAreaElement | null = null
     private resizeHandlers: Array<(size: { cols: number; rows: number }) => void> = []
     private dataHandlers: Array<(data: string) => void> = []
@@ -48,6 +51,7 @@ const xtermMocks = vi.hoisted(() => {
       cols: number
       rows: number
       cursorBlink?: boolean
+      macOptionIsMeta?: boolean
       minimumContrastRatio?: number
       theme?: { background?: string; foreground?: string }
       scrollOnUserInput?: boolean
@@ -56,6 +60,7 @@ const xtermMocks = vi.hoisted(() => {
       this.rows = options.rows
       this.options = {
         cursorBlink: options.cursorBlink,
+        macOptionIsMeta: options.macOptionIsMeta,
         minimumContrastRatio: options.minimumContrastRatio,
         theme: options.theme,
         scrollOnUserInput: options.scrollOnUserInput,
@@ -88,6 +93,10 @@ const xtermMocks = vi.hoisted(() => {
     onResize(cb: (size: { cols: number; rows: number }) => void) {
       this.resizeHandlers.push(cb)
       return { dispose: vi.fn(() => (this.resizeHandlers = this.resizeHandlers.filter((handler) => handler !== cb))) }
+    }
+
+    attachCustomKeyEventHandler(cb: (event: KeyboardEvent) => boolean) {
+      this.customKeyEventHandler = cb
     }
 
     resize(cols: number, rows: number) {
@@ -398,6 +407,41 @@ describe('ManagedTerminalSession', () => {
     session.clearSearch()
     expect(xtermMocks.searchAddons[0]!.clearDecorations).toHaveBeenCalled()
     expect(session.snapshot().search).toBeUndefined()
+  })
+
+  test('handles mac option arrows with VS Code-like terminal input', async () => {
+    const savedPlatform = navigator.platform
+    Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'MacIntel' })
+    try {
+      const host = document.createElement('div')
+      document.body.appendChild(host)
+      const session = new ManagedTerminalSession(descriptor, vi.fn())
+
+      session.attach(host)
+      await flushTerminalStart()
+      await flushUntil(() => session.snapshot().phase === 'open')
+
+      const term = xtermMocks.terminals[0]!
+      expect(term.options.macOptionIsMeta).toBe(true)
+      expect(term.customKeyEventHandler).toBeTypeOf('function')
+
+      expect(term.customKeyEventHandler?.(optionArrow('ArrowLeft'))).toBe(false)
+      expect(term.customKeyEventHandler?.(optionArrow('ArrowRight'))).toBe(false)
+      expect(term.customKeyEventHandler?.(optionArrow('ArrowUp'))).toBe(false)
+      expect(term.customKeyEventHandler?.(optionArrow('ArrowDown'))).toBe(false)
+      await Promise.resolve()
+
+      expect(terminalCalls.write).toHaveBeenNthCalledWith(1, { sessionId: 'session-1', data: '\x1bb' })
+      expect(terminalCalls.write).toHaveBeenNthCalledWith(2, { sessionId: 'session-1', data: '\x1bf' })
+      expect(terminalCalls.write).toHaveBeenNthCalledWith(3, { sessionId: 'session-1', data: '\x1b[A' })
+      expect(terminalCalls.write).toHaveBeenNthCalledWith(4, { sessionId: 'session-1', data: '\x1b[B' })
+
+      term.modes.applicationCursorKeysMode = true
+      expect(term.customKeyEventHandler?.(optionArrow('ArrowLeft'))).toBe(true)
+      expect(terminalCalls.write).toHaveBeenCalledTimes(4)
+    } finally {
+      Object.defineProperty(window.navigator, 'platform', { configurable: true, value: savedPlatform })
+    }
   })
 
   test('opens web links through the safe app rpc', async () => {
@@ -796,6 +840,10 @@ function deferred<T>() {
     reject = rej
   })
   return { promise, resolve, reject }
+}
+
+function optionArrow(key: string): KeyboardEvent {
+  return new KeyboardEvent('keydown', { key, altKey: true, cancelable: true })
 }
 
 async function flushTerminalStart(): Promise<void> {

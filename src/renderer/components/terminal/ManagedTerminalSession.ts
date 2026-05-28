@@ -28,6 +28,10 @@ import {
   terminalSearchDecorationsForCurrentDocument,
   terminalThemeForCurrentDocument,
 } from '#/renderer/components/terminal/terminal-theme.ts'
+import {
+  isMacNavigatorPlatform,
+  terminalInputForMacOptionArrow,
+} from '#/renderer/components/terminal/terminal-keyboard.ts'
 import type {
   TerminalDescriptor,
   TerminalPhase,
@@ -411,6 +415,7 @@ export class ManagedTerminalSession {
       theme,
     })
     this.installOptionalAddons(term)
+    this.installKeyboardHandlers(term)
     this.applyTerminalTheme(term, theme)
     this.disposeThemeObserver = observeTerminalTheme((theme) => {
       this.applyTerminalTheme(term, theme)
@@ -419,6 +424,24 @@ export class ManagedTerminalSession {
     this.disposables.push(term.onBinary((data) => this.writeInput(data)))
     this.disposables.push(term.onResize(({ cols, rows }) => this.queueResize(cols, rows)))
     return term
+  }
+
+  private installKeyboardHandlers(term: XTermTerminal): void {
+    // attachCustomKeyEventHandler returns void (no disposable); the handler is
+    // implicitly cleaned up when the Terminal instance is disposed in
+    // destroyActiveView.
+    const isMac = isMacNavigatorPlatform(globalThis.navigator?.platform ?? '')
+    term.attachCustomKeyEventHandler((event) => {
+      const input = terminalInputForMacOptionArrow(event, {
+        isMac,
+        applicationCursorKeysMode: term.modes.applicationCursorKeysMode,
+      })
+      if (!input) return true
+      event.preventDefault()
+      event.stopPropagation()
+      this.writeInput(input)
+      return false
+    })
   }
 
   private installOptionalAddons(term: XTermTerminal): void {
