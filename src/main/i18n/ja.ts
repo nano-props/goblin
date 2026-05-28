@@ -101,7 +101,6 @@ export const ja: Record<DictKey, string> = {
 
   // ---- Repository tabs ---------------------------------------------------
   'repo-tabs.repos': 'リポジトリ',
-  'repo-tabs.empty': '上部タブバーの <open>開く</open> から git リポジトリを追加してください。',
   'repo-tabs.close': '閉じる',
   'repo-tabs.drag-to-reorder': 'ドラッグで並べ替え',
   'repo-tabs.open-local': 'ローカルリポジトリを開く…',

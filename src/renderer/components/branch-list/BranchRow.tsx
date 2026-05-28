@@ -87,8 +87,8 @@ export function BranchRow({
         isSelected ? 'bg-selected text-selected-foreground hover:bg-selected' : 'hover:bg-muted',
       )}
     >
-      <div className="pointer-events-none relative z-10 grid min-w-0 grid-cols-[1rem_minmax(0,1fr)] items-start gap-2 px-4 py-2">
-        <span className="flex size-4 shrink-0 items-center justify-center pt-0.5">
+      <div className="pointer-events-none relative z-10 grid min-w-0 grid-cols-[1rem_minmax(0,1fr)] gap-x-2 gap-y-0.5 px-4 py-2">
+        <span className="flex w-4 shrink-0 items-center justify-center">
           {isCurrent ? (
             <Check size={14} className="text-success" />
           ) : isWorktree ? (
@@ -97,66 +97,64 @@ export function BranchRow({
             <GitBranch size={14} className={isSelected ? 'text-selected-muted-foreground' : 'text-muted-foreground'} />
           )}
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="flex min-w-0 items-center gap-2">
-            <span
-              className={cn(
-                'min-w-0 truncate text-sm font-medium',
-                isSelected ? 'text-selected-foreground' : 'text-foreground',
-              )}
-            >
-              {branch.name}
-            </span>
-            <span className="flex shrink-0 items-center gap-1.5">
-              {branch.isDefault && (
-                <Badge variant="outline" className="font-mono text-muted-foreground">
-                  {t('branches.default')}
-                </Badge>
-              )}
-              {hasWorktree && worktreeDirty ? (
-                <Badge variant="attention" className="gap-1 font-mono">
-                  <FolderTree size={10} />
-                  {t('branches.dirty')}
-                </Badge>
-              ) : isWorktree ? (
-                <Badge variant="outline" className="gap-1 font-mono text-muted-foreground">
-                  <FolderTree size={10} />
-                  {t('branches.worktree')}
-                </Badge>
-              ) : null}
-              {branch.trackingGone && (
-                <Badge variant="attention" className="font-mono">
-                  {t('branches.gone')}
-                </Badge>
-              )}
-              {branch.ahead > 0 && (
-                <Delta
-                  direction="ahead"
-                  count={branch.ahead}
-                  label={t('branch-status.sync.ahead', { n: branch.ahead })}
-                />
-              )}
-              {branch.behind > 0 && (
-                <Delta
-                  direction="behind"
-                  count={branch.behind}
-                  label={t('branch-status.sync.behind', { n: branch.behind })}
-                />
-              )}
-            </span>
-          </span>
+        <span className="flex min-w-0 items-center gap-2">
           <span
             className={cn(
-              'mt-0.5 flex min-w-0 items-center gap-2 text-xs',
-              isSelected ? 'text-selected-muted-foreground' : 'text-muted-foreground',
+              'min-w-0 truncate text-sm font-medium',
+              isSelected ? 'text-selected-foreground' : 'text-foreground',
             )}
           >
-            <span className="min-w-0 truncate" title={branch.lastCommitMessage || undefined}>
-              {branch.lastCommitMessage || '—'}
-            </span>
-            <span className="shrink-0 whitespace-nowrap" title={commitMeta}>
-              {commitMeta}
-            </span>
+            {branch.name}
+          </span>
+          <span className="flex shrink-0 items-center gap-1.5">
+            {branch.isDefault && (
+              <Badge variant="outline" className="font-mono text-muted-foreground">
+                {t('branches.default')}
+              </Badge>
+            )}
+            {hasWorktree && worktreeDirty ? (
+              <Badge variant="attention" className="gap-1 font-mono">
+                <FolderTree size={10} />
+                {t('branches.dirty')}
+              </Badge>
+            ) : isWorktree ? (
+              <Badge variant="outline" className="gap-1 font-mono text-muted-foreground">
+                <FolderTree size={10} />
+                {t('branches.worktree')}
+              </Badge>
+            ) : null}
+            {branch.trackingGone && (
+              <Badge variant="attention" className="font-mono">
+                {t('branches.gone')}
+              </Badge>
+            )}
+            {branch.ahead > 0 && (
+              <Delta
+                direction="ahead"
+                count={branch.ahead}
+                label={t('branch-status.sync.ahead', { n: branch.ahead })}
+              />
+            )}
+            {branch.behind > 0 && (
+              <Delta
+                direction="behind"
+                count={branch.behind}
+                label={t('branch-status.sync.behind', { n: branch.behind })}
+              />
+            )}
+          </span>
+        </span>
+        <span
+          className={cn(
+            'col-start-2 flex min-w-0 items-center gap-2 text-xs',
+            isSelected ? 'text-selected-muted-foreground' : 'text-muted-foreground',
+          )}
+        >
+          <span className="min-w-0 truncate" title={branch.lastCommitMessage || undefined}>
+            {branch.lastCommitMessage || '—'}
+          </span>
+          <span className="shrink-0 whitespace-nowrap" title={commitMeta}>
+            {commitMeta}
           </span>
         </span>
       </div>

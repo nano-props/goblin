@@ -2,6 +2,7 @@ import { AlertCircle, FolderGit2, X } from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { cn } from '#/renderer/lib/cn.ts'
+import { compositeFocusRing } from '#/renderer/components/ui/focus.ts'
 import type { RepoTabSummary } from '#/renderer/components/repo-tabs/types.ts'
 
 interface RepoTabProps {
@@ -48,7 +49,8 @@ export function RepoTab({
       onPointerEnter={() => onHoverChange(repo.id)}
       onPointerLeave={() => onHoverChange(null)}
       className={cn(
-        'group relative flex h-8 min-w-36 max-w-56 shrink-0 touch-none select-none items-center gap-1.5 rounded-md border px-2 text-xs transition-colors duration-100 [&:has(:focus-visible)]:outline-2 [&:has(:focus-visible)]:-outline-offset-2 [&:has(:focus-visible)]:outline-ring',
+        'group relative flex h-8 min-w-36 max-w-56 shrink-0 touch-none select-none items-center gap-1.5 rounded-md border px-2 text-xs transition-colors duration-100',
+        compositeFocusRing,
         isActive
           ? 'border-input bg-card text-foreground'
           : 'border-transparent text-muted-foreground hover:bg-accent/70 hover:text-foreground',

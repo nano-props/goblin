@@ -93,7 +93,6 @@ export const zh: Record<DictKey, string> = {
 
   // ---- Repository tabs ---------------------------------------------------
   'repo-tabs.repos': '仓库',
-  'repo-tabs.empty': '点击顶部标签栏的 <open>打开</open> 添加一个 git 仓库。',
   'repo-tabs.close': '关闭',
   'repo-tabs.drag-to-reorder': '拖动以重新排序',
   'repo-tabs.open-local': '打开本地仓库…',

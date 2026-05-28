@@ -42,6 +42,7 @@ import type { BadgeVariant } from '#/renderer/components/ui/badge.tsx'
 import type { EditorPref, LangPref, TerminalPref, ThemePref } from '#/shared/rpc.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import { rpc } from '#/renderer/rpc.ts'
+import { SETTINGS_PANEL_CONTENT_ID } from '#/renderer/components/ui/ids.ts'
 
 export type SettingsPage = 'general' | 'apps' | 'sync' | 'dependencies' | 'shortcuts' | 'about'
 
@@ -149,6 +150,7 @@ export function SettingsPanel({ open, page, onPageChange, onClose }: Props) {
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
       <DialogContent
+        id={SETTINGS_PANEL_CONTENT_ID}
         showCloseButton
         className="h-[560px] max-h-[calc(100vh-2rem)] gap-0 overflow-hidden rounded-xl border bg-card p-0 shadow-lg sm:max-w-[760px]"
         onOpenAutoFocus={(event) => {

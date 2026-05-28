@@ -101,7 +101,6 @@ export const en = {
 
   // ---- Repository tabs ----------------------------------------------------
   'repo-tabs.repos': 'Repositories',
-  'repo-tabs.empty': 'Click the <open>Open</open> button in the tab strip to add a git repository.',
   'repo-tabs.close': 'Close',
   'repo-tabs.drag-to-reorder': 'Drag to reorder',
   'repo-tabs.open-local': 'Open local repository…',

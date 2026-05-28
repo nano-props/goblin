@@ -94,7 +94,6 @@ export const ko: Record<DictKey, string> = {
 
   // ---- Repository tabs ---------------------------------------------------
   'repo-tabs.repos': '리포지토리',
-  'repo-tabs.empty': '상단 탭 막대의 <open>열기</open> 를 눌러 git 리포지토리를 추가하세요.',
   'repo-tabs.close': '닫기',
   'repo-tabs.drag-to-reorder': '드래그하여 순서 변경',
   'repo-tabs.open-local': '로컬 리포지토리 열기…',

@@ -4,6 +4,7 @@ import { Button } from '#/renderer/components/ui/button.tsx'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { cn } from '#/renderer/lib/cn.ts'
 import { Tip } from '#/renderer/components/Tip.tsx'
+import { compositeFocusRing } from '#/renderer/components/ui/focus.ts'
 
 interface Props {
   value: string
@@ -38,7 +39,8 @@ export function BranchSearchInput({ value, disabled = false, onChange }: Props) 
     <div
       onBlur={handleBlur}
       className={cn(
-        'group/search relative flex h-7 shrink-0 items-center overflow-hidden rounded-md border border-input bg-control shadow-xs transition-[width,border-color,background-color,opacity] duration-150 ease-out focus-within:border-ring',
+        'group/search relative flex h-7 shrink-0 items-center overflow-hidden rounded-md border border-input bg-control shadow-xs transition-[width,background-color,opacity] duration-150 ease-out',
+        compositeFocusRing,
         expanded ? 'w-52' : 'w-7',
         !expanded && !disabled && 'hover:bg-control-hover',
         disabled && 'cursor-not-allowed opacity-50',
@@ -85,7 +87,7 @@ export function BranchSearchInput({ value, disabled = false, onChange }: Props) 
             disabled={disabled}
             onClick={() => setOpen(true)}
             aria-label={label}
-            className="absolute inset-0 h-auto w-auto rounded-md border-0 bg-transparent p-0 hover:bg-transparent focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed"
+            className="absolute inset-0 h-auto w-auto rounded-md border-0 bg-transparent p-0 hover:bg-transparent focus-visible:outline-none disabled:cursor-not-allowed"
           />
         </Tip>
       )}
@@ -96,7 +98,7 @@ export function BranchSearchInput({ value, disabled = false, onChange }: Props) 
           size="icon-sm"
           onClick={handleClear}
           aria-label={t('branches.search-clear')}
-          className="mr-0.5 text-muted-foreground hover:text-foreground [&_svg:not([class*='size-'])]:size-3"
+          className="mr-0.5 text-muted-foreground hover:text-foreground focus-visible:outline-none [&_svg:not([class*='size-'])]:size-3"
         >
           <X />
         </Button>

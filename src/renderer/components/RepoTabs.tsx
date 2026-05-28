@@ -14,9 +14,7 @@ import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { useSettingsStore } from '#/renderer/stores/settings.ts'
 import { RepoTabStrip } from '#/renderer/components/repo-tabs/RepoTabStrip.tsx'
-import { CloneRepositoryDialog, type CloneRepositoryRequest } from '#/renderer/components/CloneRepositoryDialog.tsx'
 import type { RepoTabSummary } from '#/renderer/components/repo-tabs/types.ts'
-import type { CloneRepoResult } from '#/shared/rpc.ts'
 import { rpc } from '#/renderer/rpc.ts'
 
 /** Equality fn for the summaries array. Zustand's `useShallow` does
@@ -36,11 +34,10 @@ function summariesEqual(a: RepoTabSummary[], b: RepoTabSummary[]): boolean {
 }
 
 interface RepoTabsProps {
-  cloneOpen: boolean
-  onCloneOpenChange: (open: boolean) => void
+  onClone: () => void
 }
 
-export function RepoTabs({ cloneOpen, onCloneOpenChange }: RepoTabsProps) {
+export function RepoTabs({ onClone }: RepoTabsProps) {
   const t = useT()
   const shortcutsDisabled = useSettingsStore((s) => s.shortcutsDisabled)
   // Build the summary array inside the selector but compare with our
@@ -78,43 +75,26 @@ export function RepoTabs({ cloneOpen, onCloneOpenChange }: RepoTabsProps) {
     }
   }
 
-  async function handleClone(request: CloneRepositoryRequest): Promise<CloneRepoResult> {
-    const result = await rpc.repo.clone.mutate(request)
-    if (!result.ok || !result.path) return result
-    const openResult = await openRepo(result.path)
-    if (!openResult.ok) {
-      toast.error(t('drop.open-failed'), {
-        description: `${result.path}\n${t(openResult.message)}`,
-      })
-      return { ok: false, message: openResult.message, path: result.path }
-    }
-    toast.success(t('repo-tabs.clone-opened'), { description: result.path })
-    return result
-  }
-
   return (
-    <>
-      <RepoTabStrip
-        repos={summaries}
-        activeId={activeId}
-        labels={{
-          repositories: t('repo-tabs.repos'),
-          close: t('repo-tabs.close'),
-          dragToReorder: t('repo-tabs.drag-to-reorder'),
-          open: t('topbar.open'),
-          openLocal: t('repo-tabs.open-local'),
-          openLocalShortcut: shortcutsDisabled ? null : '⌘O',
-          clone: t('repo-tabs.clone'),
-          cloneShortcut: shortcutsDisabled ? null : '⌘⇧O',
-          unavailable: t('repo-unavailable.title'),
-        }}
-        onActivate={setActive}
-        onClose={closeRepo}
-        onReorder={reorderRepos}
-        onOpenLocal={handleOpenLocal}
-        onClone={() => onCloneOpenChange(true)}
-      />
-      <CloneRepositoryDialog open={cloneOpen} onClose={() => onCloneOpenChange(false)} onClone={handleClone} />
-    </>
+    <RepoTabStrip
+      repos={summaries}
+      activeId={activeId}
+      labels={{
+        repositories: t('repo-tabs.repos'),
+        close: t('repo-tabs.close'),
+        dragToReorder: t('repo-tabs.drag-to-reorder'),
+        open: t('topbar.open'),
+        openLocal: t('repo-tabs.open-local'),
+        openLocalShortcut: shortcutsDisabled ? null : '⌘O',
+        clone: t('repo-tabs.clone'),
+        cloneShortcut: shortcutsDisabled ? null : '⌘⇧O',
+        unavailable: t('repo-unavailable.title'),
+      }}
+      onActivate={setActive}
+      onClose={closeRepo}
+      onReorder={reorderRepos}
+      onOpenLocal={handleOpenLocal}
+      onClone={onClone}
+    />
   )
 }

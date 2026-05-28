@@ -1,7 +1,6 @@
-// Root layout — three-region shell:
-//   row 1 (40px): Topbar (always)
-//   row 2 (40px): RepoTabs strip
-//   row 3 (1fr):  active RepoView body
+// Root layout — two-region shell:
+//   row 1 (40px): Topbar with embedded RepoTabs strip
+//   row 2 (1fr):  active RepoView body
 //
 // Boots in this order:
 //   1. theme.hydrate()       — pulls main's resolved theme + subscribes
@@ -22,6 +21,7 @@ import { Toaster } from '#/renderer/components/ui/sonner.tsx'
 import { Topbar } from '#/renderer/components/Topbar.tsx'
 import { ErrorBoundary } from '#/renderer/components/ErrorBoundary.tsx'
 import { RepoTabs } from '#/renderer/components/RepoTabs.tsx'
+import { RepoCloneDialog } from '#/renderer/components/RepoCloneDialog.tsx'
 import { RepoView } from '#/renderer/components/RepoView.tsx'
 import { RepoWorkspaceSkeleton } from '#/renderer/components/Skeleton.tsx'
 import { SettingsPanel, type SettingsPage } from '#/renderer/components/SettingsPanel.tsx'
@@ -96,8 +96,9 @@ export function App() {
           onDragLeave={repoDrop.onDragLeave}
           onDrop={repoDrop.onDrop}
         >
-          <Topbar onOpenSettings={openSettings} />
-          <RepoTabs cloneOpen={cloneOpen} onCloneOpenChange={setCloneOpen} />
+          <Topbar onOpenSettings={openSettings} settingsActive={settingsOpen}>
+            <RepoTabs onClone={openCloneRepo} />
+          </Topbar>
           <main className="flex flex-1 min-h-0 min-w-0">
             <ErrorBoundary resetKey={activeId}>
               {activeId ? (
@@ -119,6 +120,7 @@ export function App() {
             onPageChange={setSettingsPage}
             onClose={closeSettings}
           />
+          <RepoCloneDialog open={cloneOpen} onOpenChange={setCloneOpen} />
           <RepoDropOverlay active={repoDrop.active} />
           {/* shadcn/ui Toaster wrapper — owns its own theme + style hooks.
            * App-level only sets position + closeButton; the rest of the
