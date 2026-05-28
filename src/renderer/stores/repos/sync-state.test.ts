@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from 'vitest'
 import { emptyRepo } from '#/renderer/stores/repos/helpers.ts'
-import { finishResourceSuccess, startBranchActionResource, startResource } from '#/renderer/stores/repos/resources.ts'
+import { markRepoOperationViews } from '#/renderer/stores/repos/operations.ts'
+import { finishResourceSuccess, startResource } from '#/renderer/stores/repos/resources.ts'
 import { disposeRepoRuntime, markRepoOperationTargets, nextRepoOperationId } from '#/renderer/stores/repos/runtime.ts'
 import { canStartRemoteFetch, isRemoteFetchDue } from '#/renderer/stores/repos/sync-state.ts'
 import type { RepoRuntimeOperationTarget } from '#/renderer/stores/repos/runtime.ts'
@@ -19,7 +20,14 @@ interface RepoOverrides {
 function repo(overrides: RepoOverrides = {}): RepoState {
   const base = emptyRepo('/tmp/goblin-sync-state-test', 'repo')
   if (overrides.fetchBusy) startResource(base.resources.fetch)
-  if (overrides.branchActionBusy) startBranchActionResource(base.resources.branchAction, 'checkout', 'feature/a')
+  if (overrides.branchActionBusy) {
+    markRepoOperationViews(
+      base.operations,
+      1,
+      [{ key: 'branchAction', reason: 'branch:checkout', target: 'feature/a' }],
+      'running',
+    )
+  }
   if (overrides.snapshotBusy) startResource(base.resources.snapshot)
   if (overrides.statusBusy) startResource(base.resources.status)
   if (overrides.lastFetchSettledAt !== undefined && overrides.lastFetchSettledAt !== null) {

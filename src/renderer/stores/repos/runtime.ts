@@ -4,26 +4,14 @@ import {
   queueOperation,
   settleOperation,
   startOperation,
+  type RepoOperationKey,
   type RepoOperationReason,
   type RepoOperationState,
+  type RepoOperationTarget,
 } from '#/renderer/stores/repos/operations.ts'
 
 export type RepoTaskLane = 'network' | 'read' | 'write'
-
-export type RepoOperationKey =
-  | 'fetch'
-  | 'snapshot'
-  | 'status'
-  | 'pullRequests'
-  | 'branchAction'
-  | `log:${string}`
-  | `pullRequest:${string}`
-
-export interface RepoRuntimeOperationTarget {
-  key: RepoOperationKey
-  reason: RepoOperationReason
-  target?: string | null
-}
+export type { RepoOperationKey, RepoOperationTarget as RepoRuntimeOperationTarget }
 
 interface QueuedRepoTask<T> {
   task: (signal: AbortSignal) => Promise<T>
@@ -208,7 +196,7 @@ export function repoOperationCurrent(repoId: string, key: RepoOperationKey, oper
 export function markRepoOperationTargets(
   repoId: string,
   operationId: number,
-  targets: RepoRuntimeOperationTarget[],
+  targets: RepoOperationTarget[],
   phase: 'queued' | 'running',
   wasQueued = false,
 ): void {
@@ -232,16 +220,17 @@ export function markRepoOperationTargets(
 export function settleRepoOperationTargets(
   repoId: string,
   operationId: number,
-  targets: RepoRuntimeOperationTarget[],
+  targets: RepoOperationTarget[],
   error: string | null,
 ): void {
   const runtime = runtimes.get(repoId)
   if (!runtime) return
+  let settled = false
   for (const target of targets) {
     const operation = runtime.operations[target.key]
-    if (operation) settleOperation(operation, operationId, { error })
+    if (operation && settleOperation(operation, operationId, { error })) settled = true
   }
-  notifyOperationIdleWaiters(repoId)
+  if (settled) notifyOperationIdleWaiters(repoId)
 }
 
 function notifyOperationIdleWaiters(repoId: string): void {

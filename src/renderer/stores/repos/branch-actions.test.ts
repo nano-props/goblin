@@ -258,7 +258,7 @@ describe('runBranchAction', () => {
     await syncWork
   })
 
-  test('tracks branch action resource state while the action is running', async () => {
+  test('tracks branch action operation state while the action is running', async () => {
     let release!: () => void
     installGoblinTestBridge({
       'repo.push': () =>
@@ -270,11 +270,10 @@ describe('runBranchAction', () => {
     const work = useReposStore.getState().runBranchAction(REPO_ID, { kind: 'push', branch: 'feature/a' })
     const running = useReposStore.getState().repos[REPO_ID]
 
-    expect(running?.resources.branchAction).toMatchObject({
-      phase: 'loading',
-      kind: 'push',
+    expect(running?.operations.branchAction).toMatchObject({
+      phase: 'running',
+      reason: 'branch:push',
       target: 'feature/a',
-      actionPhase: 'running',
     })
     expect(repoOperation(REPO_ID, 'branchAction').phase).toBe('running')
     expect(repoOperation(REPO_ID, 'branchAction').target).toBe('feature/a')
@@ -283,11 +282,9 @@ describe('runBranchAction', () => {
     await work
 
     const settled = useReposStore.getState().repos[REPO_ID]
-    expect(settled?.resources.branchAction).toMatchObject({
+    expect(settled?.operations.branchAction).toMatchObject({
       phase: 'idle',
-      kind: null,
       target: null,
-      actionPhase: null,
     })
     expect(repoOperation(REPO_ID, 'branchAction').phase).toBe('idle')
     expect(repoOperation(REPO_ID, 'branchAction').target).toBeNull()
@@ -325,18 +322,17 @@ describe('runBranchAction', () => {
     expect(abortCalls).toBe(1)
     expect(pullCalls).toBe(0)
     expect(repoOperation(REPO_ID, 'branchAction').phase).toBe('queued')
-    expect(useReposStore.getState().repos[REPO_ID]?.resources.branchAction).toMatchObject({
-      phase: 'loading',
-      kind: 'pull',
+    expect(useReposStore.getState().repos[REPO_ID]?.operations.branchAction).toMatchObject({
+      phase: 'queued',
+      reason: 'branch:pull',
       target: 'feature/a',
-      actionPhase: 'queued',
     })
 
     resolveFetch({ ok: false, message: 'cancelled' })
     await flushAsyncWork()
 
     expect(pullCalls).toBe(1)
-    expect(useReposStore.getState().repos[REPO_ID]?.resources.branchAction.actionPhase).toBe('running')
+    expect(useReposStore.getState().repos[REPO_ID]?.operations.branchAction.phase).toBe('running')
     resolvePull({ ok: true, message: 'ok' })
     await Promise.all([fetchWork, pullWork])
   })
@@ -376,18 +372,17 @@ describe('runBranchAction', () => {
 
     expect(abortCalls).toBe(1)
     expect(checkoutCalls).toBe(0)
-    expect(useReposStore.getState().repos[REPO_ID]?.resources.branchAction).toMatchObject({
-      phase: 'loading',
-      kind: 'checkout',
+    expect(useReposStore.getState().repos[REPO_ID]?.operations.branchAction).toMatchObject({
+      phase: 'queued',
+      reason: 'branch:checkout',
       target: 'feature/a',
-      actionPhase: 'queued',
     })
 
     resolveFetch({ ok: false, message: 'cancelled' })
     await flushAsyncWork()
 
     expect(checkoutCalls).toBe(1)
-    expect(useReposStore.getState().repos[REPO_ID]?.resources.branchAction.actionPhase).toBe('running')
+    expect(useReposStore.getState().repos[REPO_ID]?.operations.branchAction.phase).toBe('running')
     resolveCheckout({ ok: true, message: 'ok' })
     await Promise.all([fetchWork, checkoutWork])
   })
@@ -416,11 +411,10 @@ describe('runBranchAction', () => {
     })
     await flushAsyncWork()
 
-    expect(useReposStore.getState().repos[REPO_ID]?.resources.branchAction).toMatchObject({
-      phase: 'loading',
-      kind: 'checkout',
+    expect(useReposStore.getState().repos[REPO_ID]?.operations.branchAction).toMatchObject({
+      phase: 'queued',
+      reason: 'branch:checkout',
       target: 'feature/a',
-      actionPhase: 'queued',
     })
 
     seedRepoState({
@@ -436,11 +430,9 @@ describe('runBranchAction', () => {
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(checkoutCalls).toBe(0)
     expect(repo?.instanceToken).toBe(2)
-    expect(repo?.resources.branchAction).toMatchObject({
+    expect(repo?.operations.branchAction).toMatchObject({
       phase: 'idle',
-      kind: null,
       target: null,
-      actionPhase: null,
     })
     expect(repo?.data.currentBranch).toBe('feature/reopened')
   })
@@ -470,11 +462,9 @@ describe('runBranchAction', () => {
 
     expect(result).toEqual({ ok: false, message: 'error.branch-action-wait-timeout' })
     expect(checkoutCalls).toBe(0)
-    expect(useReposStore.getState().repos[REPO_ID]?.resources.branchAction).toMatchObject({
+    expect(useReposStore.getState().repos[REPO_ID]?.operations.branchAction).toMatchObject({
       phase: 'idle',
-      kind: null,
       target: null,
-      actionPhase: null,
     })
   })
 
@@ -504,11 +494,9 @@ describe('runBranchAction', () => {
 
     expect(result).toEqual({ ok: false, message: 'error.branch-action-wait-timeout' })
     expect(pullCalls).toBe(0)
-    expect(useReposStore.getState().repos[REPO_ID]?.resources.branchAction).toMatchObject({
+    expect(useReposStore.getState().repos[REPO_ID]?.operations.branchAction).toMatchObject({
       phase: 'idle',
-      kind: null,
       target: null,
-      actionPhase: null,
     })
 
     resolveFetch({ ok: false, message: 'cancelled' })
@@ -554,11 +542,10 @@ describe('runBranchAction', () => {
       reason: 'branch:push',
       target: 'feature/b',
     })
-    expect(useReposStore.getState().repos[REPO_ID]?.resources.branchAction).toMatchObject({
-      phase: 'loading',
-      kind: 'push',
+    expect(useReposStore.getState().repos[REPO_ID]?.operations.branchAction).toMatchObject({
+      phase: 'queued',
+      reason: 'branch:push',
       target: 'feature/b',
-      actionPhase: 'queued',
     })
 
     resolveFetch({ ok: false, message: 'cancelled' })
@@ -570,7 +557,7 @@ describe('runBranchAction', () => {
     await Promise.all([fetchWork, pullWork, pushWork])
   })
 
-  test('clears actionPhase after failed branch network actions', async () => {
+  test('clears operation phase after failed branch network actions', async () => {
     installGoblinTestBridge({
       'repo.pull': async () => ({ ok: false, message: 'boom' }),
       'repo.snapshot': async () => ({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
@@ -583,15 +570,13 @@ describe('runBranchAction', () => {
       .runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' }, { refreshOnError: false })
 
     expect(result).toEqual({ ok: false, message: 'boom' })
-    expect(useReposStore.getState().repos[REPO_ID]?.resources.branchAction).toMatchObject({
+    expect(useReposStore.getState().repos[REPO_ID]?.operations.branchAction).toMatchObject({
       phase: 'idle',
-      kind: null,
       target: null,
-      actionPhase: null,
     })
   })
 
-  test('clears stale branch network action resources when a queued action is replaced', async () => {
+  test('clears stale branch network operations when a queued action is replaced', async () => {
     let resolveFetch!: (value: { ok: false; message: string }) => void
     let resolvePush!: (value: { ok: true; message: string }) => void
     installGoblinTestBridge({
@@ -623,11 +608,9 @@ describe('runBranchAction', () => {
     resolvePush({ ok: true, message: 'ok' })
     await Promise.all([fetchWork, pullWork, pushWork])
 
-    expect(useReposStore.getState().repos[REPO_ID]?.resources.branchAction).toMatchObject({
+    expect(useReposStore.getState().repos[REPO_ID]?.operations.branchAction).toMatchObject({
       phase: 'idle',
-      kind: null,
       target: null,
-      actionPhase: null,
     })
   })
 
@@ -660,14 +643,14 @@ describe('runBranchAction', () => {
     await flushAsyncWork()
 
     expect(pullCalls).toBe(0)
-    expect(repoOperation(REPO_ID, 'branchAction').phase).toBe('running')
-    expect(useReposStore.getState().repos[REPO_ID]?.resources.branchAction.actionPhase).toBe('queued')
+    expect(repoOperation(REPO_ID, 'branchAction').phase).toBe('queued')
+    expect(useReposStore.getState().repos[REPO_ID]?.operations.branchAction.phase).toBe('queued')
 
     resolveStatus([])
     await flushAsyncWork()
 
     expect(pullCalls).toBe(1)
-    expect(useReposStore.getState().repos[REPO_ID]?.resources.branchAction.actionPhase).toBe('running')
+    expect(useReposStore.getState().repos[REPO_ID]?.operations.branchAction.phase).toBe('running')
     resolvePull({ ok: true, message: 'ok' })
     await Promise.all([statusWork, pullWork])
   })
@@ -726,19 +709,19 @@ describe('runBranchAction', () => {
       await flushAsyncWork()
 
       expect(actionCalls).toBe(0)
-      expect(useReposStore.getState().repos[REPO_ID]?.resources.branchAction.actionPhase).toBe('queued')
+      expect(useReposStore.getState().repos[REPO_ID]?.operations.branchAction.phase).toBe('queued')
 
       resolveStatus([])
       await flushAsyncWork()
 
       expect(actionCalls).toBe(1)
-      expect(useReposStore.getState().repos[REPO_ID]?.resources.branchAction.actionPhase).toBe('running')
+      expect(useReposStore.getState().repos[REPO_ID]?.operations.branchAction.phase).toBe('running')
       resolveAction({ ok: true, message: 'ok' })
       await Promise.all([statusWork, actionWork])
     },
   )
 
-  test('tracks create worktree resource state while the action is running', async () => {
+  test('tracks create worktree operation state while the action is running', async () => {
     let release!: () => void
     installGoblinTestBridge({
       'repo.createWorktree': () =>
@@ -755,9 +738,9 @@ describe('runBranchAction', () => {
     })
     const running = useReposStore.getState().repos[REPO_ID]
 
-    expect(running?.resources.branchAction).toMatchObject({
-      phase: 'loading',
-      kind: 'createWorktree',
+    expect(running?.operations.branchAction).toMatchObject({
+      phase: 'running',
+      reason: 'branch:createWorktree',
       target: 'feature/new',
     })
     expect(repoOperation(REPO_ID, 'branchAction').phase).toBe('running')
@@ -767,9 +750,8 @@ describe('runBranchAction', () => {
     await work
 
     const settled = useReposStore.getState().repos[REPO_ID]
-    expect(settled?.resources.branchAction).toMatchObject({
+    expect(settled?.operations.branchAction).toMatchObject({
       phase: 'idle',
-      kind: null,
       target: null,
     })
     expect(repoOperation(REPO_ID, 'branchAction').phase).toBe('idle')

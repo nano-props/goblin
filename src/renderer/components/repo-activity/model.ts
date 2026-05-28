@@ -2,6 +2,7 @@ import type { RepoState } from '#/renderer/stores/repos/types.ts'
 import { canStartRemoteFetch } from '#/renderer/stores/repos/sync-state.ts'
 import { resourceBusy } from '#/renderer/stores/repos/resources.ts'
 import { repoBranchActionLoadingLabel, type RepoActionLabel } from '#/renderer/stores/repos/action-labels.ts'
+import { branchActionKindFromReason, isBranchActionReason } from '#/renderer/stores/repos/operations.ts'
 
 export type RepoActivityKind =
   | 'cache-refresh'
@@ -53,9 +54,9 @@ function refreshActivity(kind: Exclude<RepoActivityKind, 'branch-action'>, block
 }
 
 function branchActionActivity(repo: RepoState): RepoActivity | null {
-  const action = repo.resources.branchAction
-  if (!resourceBusy(action) || !action.kind) return null
-  const label = repoBranchActionLoadingLabel(action.kind, action.actionPhase ?? 'running')
+  const action = repo.operations.branchAction
+  if (action.phase === 'idle' || !isBranchActionReason(action.reason)) return null
+  const label = repoBranchActionLoadingLabel(branchActionKindFromReason(action.reason), action.phase)
   return {
     kind: 'branch-action',
     labelKey: label.labelKey,

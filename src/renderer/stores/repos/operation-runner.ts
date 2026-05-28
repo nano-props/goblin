@@ -5,28 +5,35 @@ import {
   repoOperationCurrent,
   scheduleRepoTask,
   settleRepoOperationTargets,
-  type RepoRuntimeOperationTarget,
   type RepoTaskLane,
 } from '#/renderer/stores/repos/runtime.ts'
-import type { RepoState, ReposGet } from '#/renderer/stores/repos/types.ts'
+import { updateIfFresh } from '#/renderer/stores/repos/helpers.ts'
+import {
+  markRepoOperationViews,
+  settleRepoOperationViews,
+  type RepoOperationTarget,
+} from '#/renderer/stores/repos/operations.ts'
+import type { RepoState, ReposGet, ReposSet } from '#/renderer/stores/repos/types.ts'
 
-export type RepoOperationTarget = RepoRuntimeOperationTarget
+export type { RepoOperationTarget }
 
 interface RepoOperationContext {
   id: string
   token: number
   operationId: number
   isCurrent: () => boolean
+  setPhase: (phase: 'queued' | 'running') => void
 }
 
 interface RepoOperationBaseOptions<T> {
+  set: ReposSet
   get: ReposGet
   id: string
   token?: number
   lane: RepoTaskLane
   priority: number
   targets: [RepoOperationTarget, ...RepoOperationTarget[]]
-  task: (signal: AbortSignal) => Promise<T>
+  task: (signal: AbortSignal, ctx: RepoOperationContext) => Promise<T>
   operationKey?: string
   queuedTimeoutMs?: number
   queuedTimeoutMessage?: string
@@ -58,6 +65,26 @@ function anyTargetBusy(id: string, targets: RepoOperationTarget[]) {
   return targets.some((target) => repoOperationBusy(id, target.key))
 }
 
+function markOperationState<T>(
+  options: InternalRepoOperationOptions<T>,
+  token: number,
+  operationId: number,
+  phase: 'queued' | 'running',
+  wasQueued = false,
+) {
+  markRepoOperationTargets(options.id, operationId, options.targets, phase, wasQueued)
+  updateIfFresh(options.set, options.id, token, (repo) => {
+    markRepoOperationViews(repo.operations, operationId, options.targets, phase, wasQueued)
+  })
+}
+
+function settleOperationState<T>(options: InternalRepoOperationOptions<T>, token: number, operationId: number, error: string | null) {
+  settleRepoOperationTargets(options.id, operationId, options.targets, error)
+  updateIfFresh(options.set, options.id, token, (repo) => {
+    settleRepoOperationViews(repo.operations, operationId, options.targets, error)
+  })
+}
+
 async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Promise<T | null> {
   const repoBefore = options.get().repos[options.id]
   if (!repoBefore) return null
@@ -75,6 +102,9 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
     token,
     operationId,
     isCurrent: () => operationCurrent(options.get, options.id, token, operationId, primary),
+    setPhase: (phase) => {
+      if (ctx.isCurrent()) markOperationState(options, token, operationId, phase)
+    },
   }
   let error: string | null = null
   let staleHandled = false
@@ -84,14 +114,14 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
     await options.onStale?.(ctx)
   }
   try {
-    const result = await scheduleRepoTask(options.id, options.lane, options.task, {
+    const result = await scheduleRepoTask(options.id, options.lane, (signal) => options.task(signal, ctx), {
       priority: options.priority,
       replaceQueuedKey:
         options.policy === 'latest-wins' ? `${options.lane}:${options.operationKey ?? primary.key}` : undefined,
       queuedTimeoutMs: options.queuedTimeoutMs,
       queuedTimeoutMessage: options.queuedTimeoutMessage,
-      onQueued: () => markRepoOperationTargets(options.id, operationId, options.targets, 'queued'),
-      onStart: (wasQueued) => markRepoOperationTargets(options.id, operationId, options.targets, 'running', wasQueued),
+      onQueued: () => markOperationState(options, token, operationId, 'queued'),
+      onStart: (wasQueued) => markOperationState(options, token, operationId, 'running', wasQueued),
     })
     if (!ctx.isCurrent()) {
       await handleStale()
@@ -111,7 +141,7 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
     if (options.rethrow) throw err
     return null
   } finally {
-    settleRepoOperationTargets(options.id, operationId, options.targets, error)
+    settleOperationState(options, token, operationId, error)
   }
 }
 

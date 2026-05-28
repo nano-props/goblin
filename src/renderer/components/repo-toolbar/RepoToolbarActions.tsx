@@ -17,7 +17,6 @@ import { Tip } from '#/renderer/components/Tip.tsx'
 import { Button } from '#/renderer/components/ui/button.tsx'
 import { CreateWorktreeDialog, type CreateWorktreeRequest } from '#/renderer/components/CreateWorktreeDialog.tsx'
 import { RepoActivityControl } from '#/renderer/components/repo-activity/RepoActivityControl.tsx'
-import { resourceBusy } from '#/renderer/stores/repos/resources.ts'
 
 interface Props {
   repoId: string
@@ -43,7 +42,7 @@ function CreateWorktreeAction({ repoId }: Props) {
         ? {
             id: repo.id,
             instanceToken: repo.instanceToken,
-            branchAction: repo.resources.branchAction,
+            branchAction: repo.operations.branchAction,
           }
         : null
     },
@@ -52,7 +51,7 @@ function CreateWorktreeAction({ repoId }: Props) {
       (!!a && !!b && a.id === b.id && a.instanceToken === b.instanceToken && a.branchAction === b.branchAction),
   )
   const [createOpen, setCreateOpen] = useState(false)
-  const branchActionBusy = repo ? resourceBusy(repo.branchAction) : true
+  const branchActionBusy = repo ? repo.branchAction.phase !== 'idle' : true
 
   // RepoView reuses the same React instance across repo switches
   // (no `key={activeId}` on the parent), so RepoToolbarActions keeps

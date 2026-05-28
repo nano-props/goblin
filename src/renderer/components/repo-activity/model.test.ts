@@ -8,11 +8,8 @@ import {
   type RepoCompletion,
 } from '#/renderer/components/repo-activity/model.ts'
 import { emptyRepo } from '#/renderer/stores/repos/helpers.ts'
-import {
-  startBranchActionResource,
-  startPullRequestResource,
-  startResource,
-} from '#/renderer/stores/repos/resources.ts'
+import { startPullRequestResource, startResource } from '#/renderer/stores/repos/resources.ts'
+import { markRepoOperationViews, type RepoBranchActionReason } from '#/renderer/stores/repos/operations.ts'
 import { disposeRepoRuntime, markRepoOperationTargets, nextRepoOperationId } from '#/renderer/stores/repos/runtime.ts'
 import type { RepoBranchActionKind } from '#/renderer/stores/repos/branch-action-types.ts'
 import type { RepoDataSource, RepoState } from '#/renderer/stores/repos/types.ts'
@@ -32,6 +29,7 @@ interface RepoOverrides {
   branchActionTarget?: string
   branchActionPhase?: 'queued' | 'running'
   selectedBranch?: string | null
+  unavailable?: boolean
 }
 
 function repo(overrides: RepoOverrides = {}): RepoState {
@@ -41,11 +39,18 @@ function repo(overrides: RepoOverrides = {}): RepoState {
   if (overrides.pullRequestsBusy) startPullRequestResource(base.resources.pullRequests, 'full')
   if (overrides.fetchBusy) startResource(base.resources.fetch)
   if (overrides.branchActionBusy) {
-    startBranchActionResource(
-      base.resources.branchAction,
-      overrides.branchActionKind ?? 'checkout',
-      overrides.branchActionTarget ?? 'feature/a',
-      overrides.branchActionPhase ? { actionPhase: overrides.branchActionPhase } : undefined,
+    const kind = overrides.branchActionKind ?? 'checkout'
+    markRepoOperationViews(
+      base.operations,
+      1,
+      [
+        {
+          key: 'branchAction',
+          reason: branchActionReason(kind),
+          target: overrides.branchActionTarget ?? 'feature/a',
+        },
+      ],
+      overrides.branchActionPhase ?? 'running',
     )
   }
   for (const branch of overrides.logBusyBranches ?? (overrides.logBusyBranch ? [overrides.logBusyBranch] : [])) {
@@ -66,7 +71,14 @@ function repo(overrides: RepoOverrides = {}): RepoState {
       ...base.cache,
       source: overrides.dataSource ?? base.cache.source,
     },
+    availability: overrides.unavailable
+      ? { phase: 'unavailable', reason: 'error.failed-read-repo', checkedAt: 1 }
+      : base.availability,
   }
+}
+
+function branchActionReason(kind: RepoBranchActionKind): RepoBranchActionReason {
+  return `branch:${kind}` as RepoBranchActionReason
 }
 
 afterEach(() => {
@@ -172,7 +184,7 @@ describe('getRepoActivity', () => {
     })
   })
 
-  test('uses running labels when actionPhase is running or unset', () => {
+  test('uses running labels when the operation phase is running', () => {
     const running = repo({
       branchActionBusy: true,
       branchActionKind: 'pull',
@@ -180,7 +192,6 @@ describe('getRepoActivity', () => {
       branchActionPhase: 'running',
     })
     const unset = repo({ branchActionBusy: true, branchActionKind: 'push', branchActionTarget: 'feature/a' })
-    unset.resources.branchAction.actionPhase = null
 
     expect(getRepoActivity(running)).toMatchObject({
       kind: 'branch-action',
@@ -273,6 +284,16 @@ describe('getRepoActivityControlPresentation', () => {
   test('keeps runtime-only blocking work visually idle until resources show activity', () => {
     const r = repo()
     markRepoOperationTargets(r.id, nextRepoOperationId(r.id), [{ key: 'fetch', reason: 'fetch' }], 'running')
+
+    expect(getRepoActivityControlPresentation(r, null)).toEqual({
+      syncBlocked: true,
+      visibleActivity: null,
+      showingActivity: false,
+    })
+  })
+
+  test('blocks sync when the repo is unavailable', () => {
+    const r = repo({ unavailable: true })
 
     expect(getRepoActivityControlPresentation(r, null)).toEqual({
       syncBlocked: true,

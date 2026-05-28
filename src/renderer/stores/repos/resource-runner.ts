@@ -37,6 +37,7 @@ export async function runLatestResourceOperation<T>(options: RunLatestResourceOp
     startResource(options.selectResource(repo), startOptions ?? undefined)
   })
   await runLatestOperation({
+    set: options.set,
     get: options.get,
     id: options.id,
     token: options.token,

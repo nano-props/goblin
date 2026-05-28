@@ -10,7 +10,7 @@ export function canStartRemoteFetch(repo: RepoState | undefined): repo is RepoSt
   // remain visible without blocking manual sync/pull/push.
   return (
     !resourceBusy(repo.resources.fetch) &&
-    !resourceBusy(repo.resources.branchAction) &&
+    repo.operations.branchAction.phase === 'idle' &&
     !resourceBusy(repo.resources.snapshot) &&
     !resourceBusy(repo.resources.status) &&
     !repoOperationBusy(repo.id, 'fetch') &&

@@ -10,6 +10,7 @@ import type {
 import type { CommitDetail } from '#/shared/rpc.ts'
 import type { WorkspaceDetailPaneSizes, WorkspaceLayout } from '#/shared/workspace-layout.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/renderer/stores/repos/branch-action-types.ts'
+import type { RepoOperationsState } from '#/renderer/stores/repos/operations.ts'
 import type { RepoResourcesState } from '#/renderer/stores/repos/resources.ts'
 
 export type DetailTab = 'status' | 'changes' | 'commits' | 'terminal'
@@ -117,6 +118,7 @@ export interface RepoState {
   instanceToken: number
   data: RepoDataState
   resources: RepoResourcesState
+  operations: RepoOperationsState
   ui: RepoUiState
   cache: RepoCacheState
   remote: RepoRemoteState

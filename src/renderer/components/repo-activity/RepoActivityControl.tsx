@@ -34,20 +34,23 @@ function useRepoActivityControlPresentation(repo: RepoState) {
   return getRepoActivityControlPresentation(repo, visibleActivity)
 }
 
-export function RepoActivityControl({ repoId }: Props) {
-  const repo = useStoreWithEqualityFn(
-    useReposStore,
-    (s) => s.repos[repoId],
-    (a, b) =>
-      a === b ||
-      (!!a &&
-        !!b &&
-        a.id === b.id &&
-        a.instanceToken === b.instanceToken &&
-        a.resources === b.resources &&
-        a.cache === b.cache &&
-        a.remote === b.remote),
+function repoActivityControlRepoEqual(a: RepoState | undefined, b: RepoState | undefined): boolean {
+  return (
+    a === b ||
+    (!!a &&
+      !!b &&
+      a.id === b.id &&
+      a.instanceToken === b.instanceToken &&
+      a.resources === b.resources &&
+      a.operations.branchAction === b.operations.branchAction &&
+      a.availability === b.availability &&
+      a.cache === b.cache &&
+      a.remote === b.remote)
   )
+}
+
+export function RepoActivityControl({ repoId }: Props) {
+  const repo = useStoreWithEqualityFn(useReposStore, (s) => s.repos[repoId], repoActivityControlRepoEqual)
   if (!repo) return null
   return <RepoActivityControlView repo={repo} />
 }

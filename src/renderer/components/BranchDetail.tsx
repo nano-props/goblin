@@ -39,7 +39,7 @@ function branchDetailRepoEqual(a: RepoState | undefined, b: RepoState | undefine
       a.resources.status === b.resources.status &&
       a.resources.logsByBranch === b.resources.logsByBranch &&
       a.resources.pullRequests === b.resources.pullRequests &&
-      a.resources.branchAction === b.resources.branchAction &&
+      a.operations.branchAction === b.operations.branchAction &&
       a.remote === b.remote &&
       a.ui.detailTab === b.ui.detailTab)
   )

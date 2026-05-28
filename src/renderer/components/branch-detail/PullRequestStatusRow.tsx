@@ -1,4 +1,4 @@
-import { GitPullRequest } from 'lucide-react'
+import { Check, Circle, GitPullRequest, X } from 'lucide-react'
 import { useI18nStore, useT } from '#/renderer/stores/i18n.ts'
 import { CopyButton } from '#/renderer/components/CopyButton.tsx'
 import { Tip } from '#/renderer/components/Tip.tsx'
@@ -63,15 +63,26 @@ function prSummary(pr: PullRequestInfo, t: TFn): string {
   })
 }
 
-function prSignalLabel(signal: PrHealthSignal): string {
-  if (signal.tone === 'danger') return `× ${signal.label}`
-  if (signal.tone === 'neutral' || signal.tone === 'attention' || signal.tone === 'warning') return `○ ${signal.label}`
-  return `✓ ${signal.label}`
+function prSummaryTone(pr: PullRequestInfo): Tone {
+  if (pr.state === 'merged') return 'success'
+  if (pr.state === 'closed') return 'danger'
+  if (pr.isDraft && pr.state === 'open') return 'neutral'
+  return 'brand'
 }
 
-function prChipLabel(pr: PullRequestInfo | undefined, signals: PrHealthSignal[], t: TFn): string {
-  if (!pr) return ''
-  return [prSummary(pr, t), ...signals.map(prSignalLabel)].join(' · ')
+function PrSignalIcon({ tone }: { tone: PrHealthSignal['tone'] }) {
+  if (tone === 'danger') return <X size={11} />
+  if (tone === 'success') return <Check size={11} />
+  return <Circle size={9} />
+}
+
+function PrSignalChip({ signal }: { signal: PrHealthSignal }) {
+  return (
+    <StatusChip tone={signal.tone} className="min-w-0 shrink">
+      <PrSignalIcon tone={signal.tone} />
+      <span className="truncate">{signal.label}</span>
+    </StatusChip>
+  )
 }
 
 function prTooltip(pr: PullRequestInfo, lang: Lang, t: TFn): { title: string; meta: string[] } {
@@ -89,16 +100,18 @@ function prTooltip(pr: PullRequestInfo, lang: Lang, t: TFn): { title: string; me
 }
 
 function PullRequestValue({
-  tone,
-  label,
+  summary,
+  summaryTone,
+  signals,
   tooltip,
   url,
   copyLabel,
   copiedLabel,
   tooltipSide,
 }: {
-  tone: Tone
-  label: string
+  summary: string
+  summaryTone: Tone
+  signals: PrHealthSignal[]
   tooltip: { title: string; meta: string[] }
   url: string
   copyLabel: string
@@ -129,9 +142,14 @@ function PullRequestValue({
         align={tooltipAlign}
         collisionPadding={16}
       >
-        <StatusChip tone={tone} className="min-w-0 shrink">
-          <span className="truncate">{label}</span>
-        </StatusChip>
+        <div className="flex min-w-0 max-w-full items-center gap-1.5">
+          <StatusChip tone={summaryTone} className="min-w-0 shrink">
+            <span className="truncate">{summary}</span>
+          </StatusChip>
+          {signals.map((signal) => (
+            <PrSignalChip key={`${signal.tone}:${signal.label}`} signal={signal} />
+          ))}
+        </div>
       </Tip>
       <CopyButton value={url} copyLabel={copyLabel} copiedLabel={copiedLabel} className="shrink-0" />
     </div>
@@ -151,7 +169,8 @@ export function PullRequestStatusRow({
 
   const signals = prHealthSignals(pullRequest, t)
   const tone = prChipTone(pullRequest, signals)
-  const label = prChipLabel(pullRequest, signals, t)
+  const summary = prSummary(pullRequest, t)
+  const summaryTone = prSummaryTone(pullRequest)
   const tooltip = prTooltip(pullRequest, lang, t)
 
   return (
@@ -160,8 +179,9 @@ export function PullRequestStatusRow({
       label={t('branch-status.signal.pr')}
       value={
         <PullRequestValue
-          tone={tone}
-          label={label}
+          summary={summary}
+          summaryTone={summaryTone}
+          signals={signals}
           tooltip={tooltip}
           url={pullRequest.url}
           copyLabel={t('branch-status.pr.copy-link')}
@@ -169,7 +189,7 @@ export function PullRequestStatusRow({
           tooltipSide={tooltipSide}
         />
       }
-      valueLayout="inline"
+      valueLayout="fill"
       tone={tone}
     />
   )

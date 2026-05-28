@@ -282,7 +282,7 @@ describe('remote fetch timestamps', () => {
     const work = useReposStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' }, { token })
 
     const runningRepo = useReposStore.getState().repos[REPO_ID]
-    expect(runningRepo?.resources.branchAction.phase).toBe('loading')
+    expect(runningRepo?.operations.branchAction.phase).toBe('running')
     expect(runningRepo?.resources.fetch.phase).toBe('loading')
     expect(canStartRemoteFetch(runningRepo)).toBe(false)
 
@@ -290,7 +290,7 @@ describe('remote fetch timestamps', () => {
     await work
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.resources.branchAction.phase).toBe('idle')
+    expect(repo?.operations.branchAction.phase).toBe('idle')
     expect(repo?.resources.fetch.phase).toBe('idle')
   })
 
@@ -310,14 +310,14 @@ describe('remote fetch timestamps', () => {
     const work = useReposStore.getState().runBranchAction(REPO_ID, { kind: 'checkout', branch: 'feature/a' }, { token })
 
     const runningRepo = useReposStore.getState().repos[REPO_ID]
-    expect(runningRepo?.resources.branchAction.phase).toBe('loading')
+    expect(runningRepo?.operations.branchAction.phase).toBe('running')
     expect(canStartRemoteFetch(runningRepo)).toBe(false)
 
     resolveCheckout({ ok: true, message: 'ok' })
     await work
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.resources.branchAction.phase).toBe('idle')
+    expect(repo?.operations.branchAction.phase).toBe('idle')
     expect(repo?.data.currentBranch).toBe('feature/a')
     expect(snapshotCount).toBe(1)
   })
@@ -344,7 +344,7 @@ describe('remote fetch timestamps', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(result).toEqual({ ok: true, message: 'ok' })
-    expect(repo?.resources.branchAction.phase).toBe('idle')
+    expect(repo?.operations.branchAction.phase).toBe('idle')
     expect(repo?.data.branches.map((b) => b.name)).toEqual(['main', 'feature/a'])
     expect(snapshotCount).toBe(1)
   })
@@ -394,7 +394,7 @@ describe('remote fetch timestamps', () => {
     expect(result).toEqual({ ok: false, message: 'error.branch-not-fully-merged' })
     expect(repo?.events).toEqual([])
     expect(snapshotCount).toBe(0)
-    expect(repo?.resources.branchAction.phase).toBe('idle')
+    expect(repo?.operations.branchAction.phase).toBe('idle')
   })
 
   test('branch action failures refresh by default', async () => {
@@ -433,10 +433,9 @@ describe('remote fetch timestamps', () => {
       fetchFailed: true,
       fetchError: 'previous failure',
     })
-    expect(useReposStore.getState().repos[REPO_ID]?.resources.branchAction).toMatchObject({
+    expect(useReposStore.getState().repos[REPO_ID]?.operations.branchAction).toMatchObject({
       phase: 'idle',
       error: 'fatal: rejected',
-      kind: null,
       target: null,
     })
     expect(useReposStore.getState().repos[REPO_ID]?.resources.fetch).toMatchObject({

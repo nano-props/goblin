@@ -1,4 +1,5 @@
 import { produce, type Draft } from 'immer'
+import { emptyRepoOperations } from '#/renderer/stores/repos/operations.ts'
 import { emptyRepoResources } from '#/renderer/stores/repos/resources.ts'
 import type {
   RepoEvent,
@@ -32,6 +33,7 @@ export function emptyRepo(id: string, name: string): RepoState {
       worktreesByPath: {},
     },
     resources: emptyRepoResources(),
+    operations: emptyRepoOperations(),
     ui: {
       selectedBranch: null,
       branchViewMode: 'all',

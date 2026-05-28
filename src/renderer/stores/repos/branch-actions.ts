@@ -8,13 +8,9 @@ import { updateIfFresh } from '#/renderer/stores/repos/helpers.ts'
 import { repoOperation, repoOperationBusy, waitForRepoOperationsIdle } from '#/renderer/stores/repos/runtime.ts'
 import {
   cancelResource,
-  finishBranchActionResourceError,
-  finishBranchActionResourceSuccess,
   finishResourceError,
   finishResourceSuccess,
   resourceBusy,
-  setBranchActionResourcePhase,
-  startBranchActionResource,
   startResource,
 } from '#/renderer/stores/repos/resources.ts'
 import type {
@@ -216,7 +212,6 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
         return { ok: false, message: repoBefore.availability.reason }
       }
       if (
-        resourceBusy(repoBefore.resources.branchAction) ||
         branchOperation.phase === 'running' ||
         branchOperation.phase === 'queued'
       ) {
@@ -231,21 +226,15 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
       }
       if (schedule.shouldAbortBackgroundFetch) abortBackgroundFetchIfActive(id)
       updateIfFresh(set, id, token, (r) => {
-        startBranchActionResource(r.resources.branchAction, action.kind, branchActionOperationTarget(action), {
-          actionPhase: schedule.initialPhase,
-        })
         if (network) startResource(r.resources.fetch, { hasData: r.resources.fetch.loadedAt !== null })
       })
       const handleResult = async (result: ExecResult) => {
         updateIfFresh(set, id, token, (r) => {
           if (result.message === 'cancelled') {
-            finishBranchActionResourceSuccess(r.resources.branchAction)
             if (network) cancelResource(r.resources.fetch)
           } else if (result.ok) {
-            finishBranchActionResourceSuccess(r.resources.branchAction)
             if (network) finishResourceSuccess(r.resources.fetch)
           } else {
-            finishBranchActionResourceError(r.resources.branchAction, result.message)
             if (network) finishResourceError(r.resources.fetch, result.message)
           }
         })
@@ -263,13 +252,11 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
       const handleError = (message: string) => {
         if (message === 'cancelled') {
           updateIfFresh(set, id, token, (r) => {
-            finishBranchActionResourceSuccess(r.resources.branchAction)
             if (network) cancelResource(r.resources.fetch)
           })
           return
         }
         updateIfFresh(set, id, token, (r) => {
-          finishBranchActionResourceError(r.resources.branchAction, message)
           if (network) finishResourceError(r.resources.fetch, message)
         })
         get().setLastResult(id, { ok: false, message }, token, { action: branchActionEventAction(action) })
@@ -277,14 +264,16 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
       const errorFromResult = (result: ExecResult) =>
         !result.ok && result.message !== 'cancelled' ? result.message : null
       const errorResult = (message: string): ExecResult => ({ ok: false, message })
-      const runActionTask = async (signal: AbortSignal) => {
+      const runActionTask = async (signal: AbortSignal, ctx: { setPhase: (phase: 'queued' | 'running') => void }) => {
         try {
           if (schedule.waitForBackgroundFetch) {
-            updateIfFresh(set, id, token, (r) => setBranchActionResourcePhase(r.resources.branchAction, 'queued'))
+            ctx.setPhase('queued')
+            signal.throwIfAborted()
             await waitForBranchActionIdle(id, ['fetch'], signal, options?.waitTimeoutMs)
           }
           if (coreRefreshBusy(id)) {
-            updateIfFresh(set, id, token, (r) => setBranchActionResourcePhase(r.resources.branchAction, 'queued'))
+            ctx.setPhase('queued')
+            signal.throwIfAborted()
             await waitForBranchActionIdle(id, ['snapshot', 'status'], signal, options?.waitTimeoutMs)
           }
         } catch (err) {
@@ -293,12 +282,13 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
           throw err
         }
         throwIfStale(get, id, token)
-        updateIfFresh(set, id, token, (r) => setBranchActionResourcePhase(r.resources.branchAction, 'running'))
+        ctx.setPhase('running')
         return runBranchActionRpc(action, id, signal)
       }
 
       if (network) {
         return runLatestOperation({
+          set,
           get,
           id,
           token,
@@ -317,6 +307,7 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
       }
 
       return runExclusiveOperation({
+        set,
         get,
         id,
         token,

@@ -12,7 +12,6 @@ export interface BranchActionScheduleInput {
 
 export interface BranchActionScheduleDecision {
   blockedMessage?: string
-  initialPhase: 'queued' | 'running'
   shouldAbortBackgroundFetch: boolean
   waitForBackgroundFetch: boolean
 }
@@ -33,15 +32,12 @@ export function evaluateBranchActionSchedule(input: BranchActionScheduleInput): 
   if (fetchBlocked) {
     return {
       blockedMessage: 'error.network-op-in-progress',
-      initialPhase: 'running',
       shouldAbortBackgroundFetch: false,
       waitForBackgroundFetch: false,
     }
   }
 
   return {
-    initialPhase:
-      backgroundFetchBlocked || replacingQueuedNetworkAction || input.coreRefreshBusy ? 'queued' : 'running',
     shouldAbortBackgroundFetch: backgroundFetchBlocked,
     waitForBackgroundFetch: backgroundFetchBlocked && !network,
   }

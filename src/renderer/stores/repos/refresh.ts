@@ -6,6 +6,7 @@ import {
 } from '#/renderer/stores/repos/availability.ts'
 import { branchForVisibleLog, selectedBranchForBranchSet } from '#/renderer/stores/repos/branch-view-mode.ts'
 import { runExclusiveOperation, runLatestOperation } from '#/renderer/stores/repos/operation-runner.ts'
+import { pruneRepoOperationViewsForBranches } from '#/renderer/stores/repos/operations.ts'
 import { persistRepoCache } from '#/renderer/stores/repos/persistence.ts'
 import { runLatestResourceOperation } from '#/renderer/stores/repos/resource-runner.ts'
 import { canStartRemoteFetch } from '#/renderer/stores/repos/sync-state.ts'
@@ -114,6 +115,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       startResource(r.resources.fetch, { hasData: r.resources.fetch.loadedAt !== null })
     })
     return runExclusiveOperation({
+      set,
       get,
       id,
       token,
@@ -220,6 +222,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         startResource(r.resources.snapshot, { hasData: r.data.branches.length > 0 })
       })
       await runLatestOperation({
+        set,
         get,
         id,
         token,
@@ -286,6 +289,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
             r.resources.pullRequestsByBranch = Object.fromEntries(
               Object.entries(r.resources.pullRequestsByBranch).filter(([branch]) => validBranches.has(branch)),
             )
+            pruneRepoOperationViewsForBranches(r.operations, validBranches)
             r.ui.selectedBranch = selected
             if (snap.remote) {
               r.remote.remotes = snap.remote.remotes.map((remote) => remote.name)
@@ -368,6 +372,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         }
       })
       await runLatestOperation({
+        set,
         get,
         id,
         token,

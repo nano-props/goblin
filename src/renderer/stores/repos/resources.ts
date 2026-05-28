@@ -1,5 +1,4 @@
 import type { PullRequestFetchMode } from '#/renderer/types.ts'
-import type { RepoBranchActionKind } from '#/renderer/stores/repos/branch-action-types.ts'
 
 export type RepoResourcePhase = 'idle' | 'loading' | 'refreshing'
 
@@ -14,18 +13,10 @@ export interface RepoPullRequestResourceState extends RepoResourceState {
   mode: PullRequestFetchMode | null
 }
 
-export interface RepoBranchActionResourceState extends RepoResourceState {
-  kind: RepoBranchActionKind | null
-  target: string | null
-  /** UI-facing phase for an active branch action; null when the resource is idle. */
-  actionPhase: 'queued' | 'running' | null
-}
-
 export interface RepoResourcesState {
   snapshot: RepoResourceState
   status: RepoResourceState
   fetch: RepoResourceState
-  branchAction: RepoBranchActionResourceState
   pullRequests: RepoPullRequestResourceState
   pullRequestsByBranch: Record<string, RepoPullRequestResourceState>
   logsByBranch: Record<string, RepoResourceState>
@@ -50,21 +41,11 @@ export function idlePullRequestResource(
   }
 }
 
-export function idleBranchActionResource(loadedAt: number | null = null): RepoBranchActionResourceState {
-  return {
-    ...idleResource(loadedAt),
-    kind: null,
-    target: null,
-    actionPhase: null,
-  }
-}
-
 export function emptyRepoResources(): RepoResourcesState {
   return {
     snapshot: idleResource(),
     status: idleResource(),
     fetch: idleResource(),
-    branchAction: idleBranchActionResource(),
     pullRequests: idlePullRequestResource(),
     pullRequestsByBranch: {},
     logsByBranch: {},
@@ -138,41 +119,4 @@ export function finishPullRequestResourceUnavailable(
 export function finishPullRequestResourceError(resource: RepoPullRequestResourceState, error: string): void {
   finishResourceError(resource, error)
   resource.mode = null
-}
-
-export function startBranchActionResource(
-  resource: RepoBranchActionResourceState,
-  kind: RepoBranchActionKind,
-  target: string | null,
-  options?: { actionPhase?: 'queued' | 'running' },
-): void {
-  startResource(resource)
-  resource.kind = kind
-  resource.target = target
-  resource.actionPhase = options?.actionPhase ?? 'running'
-}
-
-export function setBranchActionResourcePhase(
-  resource: RepoBranchActionResourceState,
-  actionPhase: 'queued' | 'running',
-): void {
-  if (!resourceBusy(resource)) return
-  resource.actionPhase = actionPhase
-}
-
-export function finishBranchActionResourceSuccess(
-  resource: RepoBranchActionResourceState,
-  loadedAt: number = Date.now(),
-): void {
-  finishResourceSuccess(resource, loadedAt)
-  resource.kind = null
-  resource.target = null
-  resource.actionPhase = null
-}
-
-export function finishBranchActionResourceError(resource: RepoBranchActionResourceState, error: string): void {
-  finishResourceError(resource, error)
-  resource.kind = null
-  resource.target = null
-  resource.actionPhase = null
 }

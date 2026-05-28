@@ -25,7 +25,6 @@ import { Button } from '#/renderer/components/ui/button.tsx'
 import { Field, FieldDescription, FieldError, FieldLabel } from '#/renderer/components/ui/field.tsx'
 import { Input } from '#/renderer/components/ui/input.tsx'
 import type { RepoState } from '#/renderer/stores/repos/types.ts'
-import { resourceBusy } from '#/renderer/stores/repos/resources.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { defaultWorktreePath, tildify, untildify } from '#/renderer/lib/paths.ts'
 import { validateBranchName } from '#/shared/refnames.ts'
@@ -68,6 +67,8 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
   const pathTrimmed = untildify(worktreePath.trim())
   const defaultPath = defaultWorktreePath(repo.id, branchTrimmed)
   const branchValidation = branchTrimmed ? validateBranchName(branchTrimmed) : { ok: true }
+  const baseExists = base ? repo.data.branches.some((b) => b.name === base) : false
+  const baseError = base && !baseExists ? t('action.create-worktree-base-missing') : ''
   const branchExists = branchTrimmed ? repo.data.branches.some((b) => b.name === branchTrimmed) : false
   const branchError = branchTrimmed
     ? !branchValidation.ok
@@ -82,8 +83,8 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
   const effectivePath = pathTrimmed || defaultPath
   const displayDefaultPath = tildify(defaultPath)
   const displayEffectivePath = tildify(effectivePath)
-  const branchActionBusy = resourceBusy(repo.resources.branchAction)
-  const canSubmit = branchTrimmed.length > 0 && !branchError && effectivePath.length > 0 && base.length > 0
+  const branchActionBusy = repo.operations.branchAction.phase !== 'idle'
+  const canSubmit = branchTrimmed.length > 0 && !branchError && effectivePath.length > 0 && baseExists
 
   function handleSubmit() {
     if (!canSubmit || branchActionBusy) return
@@ -111,10 +112,15 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
             handleSubmit()
           }}
         >
-          <Field>
+          <Field data-invalid={baseError ? true : undefined}>
             <FieldLabel htmlFor="cwt-base">{t('action.create-worktree-base-label')}</FieldLabel>
             <Select value={base} onValueChange={setBase}>
-              <SelectTrigger id="cwt-base" className="w-full">
+              <SelectTrigger
+                id="cwt-base"
+                className="w-full"
+                aria-invalid={!!baseError}
+                aria-describedby={baseError ? 'cwt-base-error' : undefined}
+              >
                 <SelectValue placeholder={t('action.create-worktree-base-placeholder')} />
               </SelectTrigger>
               <SelectContent>
@@ -134,7 +140,9 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
                 ))}
               </SelectContent>
             </Select>
-            <FieldDescription reserveHeight aria-hidden />
+            <FieldError id="cwt-base-error" reserveHeight aria-live="polite" aria-atomic="true">
+              {baseError}
+            </FieldError>
           </Field>
 
           <Field data-invalid={branchError ? true : undefined}>

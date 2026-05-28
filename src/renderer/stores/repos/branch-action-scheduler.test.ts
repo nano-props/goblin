@@ -35,7 +35,6 @@ describe('isNetworkBranchActionKind', () => {
 describe('evaluateBranchActionSchedule', () => {
   test.each(ACTIONS)('runs %s immediately when no blocking work exists', (actionKind) => {
     expect(decision({ actionKind })).toEqual({
-      initialPhase: 'running',
       shouldAbortBackgroundFetch: false,
       waitForBackgroundFetch: false,
     })
@@ -58,7 +57,6 @@ describe('evaluateBranchActionSchedule', () => {
 
   test.each(ACTIONS)('queues %s behind core refresh work', (actionKind) => {
     expect(decision({ actionKind, coreRefreshBusy: true })).toMatchObject({
-      initialPhase: 'queued',
       shouldAbortBackgroundFetch: false,
       waitForBackgroundFetch: false,
     })
@@ -73,7 +71,6 @@ describe('evaluateBranchActionSchedule', () => {
         fetchOperationReason: 'background-fetch',
       }),
     ).toMatchObject({
-      initialPhase: 'queued',
       shouldAbortBackgroundFetch: true,
       waitForBackgroundFetch: !isNetworkBranchActionKind(actionKind),
     })
@@ -91,7 +88,6 @@ describe('evaluateBranchActionSchedule', () => {
           branchOperationPhase: 'queued',
         }),
       ).toMatchObject({
-        initialPhase: 'queued',
         shouldAbortBackgroundFetch: false,
         waitForBackgroundFetch: false,
       })
