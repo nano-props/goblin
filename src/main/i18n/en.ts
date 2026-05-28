@@ -246,7 +246,7 @@ export const en = {
   'status.main-worktree': 'main',
   'status.worktree-clean': 'clean',
   'status.stale-title': 'Showing stale changes',
-  'status.copy-patch': 'Copy patch',
+  'status.copy-patch': 'Patch',
   'status.copy-patch-title': 'Copy a git apply --binary patch of this worktree to the clipboard',
   'status.copy-patch-ok': 'Patch copied to clipboard',
   'status.copy-patch-empty': 'Nothing to copy — worktree is clean',
@@ -271,7 +271,7 @@ export const en = {
   'worktrees.open-in-terminal-title': 'Open in terminal',
   'worktrees.open-in-terminal-label': 'Terminal',
   'worktrees.open-in-editor-title': 'Open in editor',
-  'worktrees.open-in-editor-label': 'Editor',
+  'worktrees.open-in-editor-label': 'Edit',
 
   // ---- Repo actions -------------------------------------------------------
   'action.checkout': 'Checkout',
@@ -280,8 +280,8 @@ export const en = {
   'action.fetch': 'Fetch',
   'action.remote': 'Remote',
   'action.remote-pr': 'PR #{n}',
-  'action.delete-branch': 'Delete branch',
-  'action.remove-worktree': 'Remove worktree',
+  'action.delete-branch': 'Delete',
+  'action.remove-worktree': 'Delete',
   'action.checkout-loading': 'Checking out…',
   'action.checkout-queued': 'Waiting to check out…',
   'action.pull-loading': 'Pulling…',

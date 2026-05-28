@@ -41,7 +41,7 @@ export function LogList({ repoId, log, branch, selectedHash, hasMore = false, lo
   }
   return (
     <div className="min-w-0 w-full">
-      <ul className="min-w-0 w-full divide-y divide-separator">
+      <ul className="min-w-0 w-full">
         {log.map((entry) => {
           const isSelected = entry.hash === selectedHash
           const commitMeta = `${entry.author} · ${formatRelativeTime(entry.date, lang)}`

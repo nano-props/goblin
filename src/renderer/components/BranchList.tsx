@@ -120,7 +120,7 @@ export function BranchList({ repoId, showActions = true, variant = 'list' }: Pro
   }
 
   const list = (
-    <ul className="divide-y divide-separator">
+    <ul>
       {renderedBranches.map((branch) => {
         return (
           <BranchRow

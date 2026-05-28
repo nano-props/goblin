@@ -234,7 +234,7 @@ export const zh: Record<DictKey, string> = {
   'status.main-worktree': '主',
   'status.worktree-clean': '干净',
   'status.stale-title': '正在显示旧的改动数据',
-  'status.copy-patch': '复制补丁',
+  'status.copy-patch': '补丁',
   'status.copy-patch-title': '将该工作树的 git apply --binary 补丁复制到剪贴板',
   'status.copy-patch-ok': '补丁已复制到剪贴板',
   'status.copy-patch-empty': '无需复制 — 工作树是干净的',
@@ -259,7 +259,7 @@ export const zh: Record<DictKey, string> = {
   'worktrees.open-in-terminal-title': '在终端中打开',
   'worktrees.open-in-terminal-label': '终端',
   'worktrees.open-in-editor-title': '在编辑器中打开',
-  'worktrees.open-in-editor-label': '编辑器',
+  'worktrees.open-in-editor-label': '编辑',
 
   // ---- Repo actions ------------------------------------------------------
   'action.checkout': '切换',
@@ -268,8 +268,8 @@ export const zh: Record<DictKey, string> = {
   'action.fetch': '同步',
   'action.remote': '远端',
   'action.remote-pr': 'PR #{n}',
-  'action.delete-branch': '删除分支',
-  'action.remove-worktree': '删除工作树',
+  'action.delete-branch': '删除',
+  'action.remove-worktree': '删除',
   'action.checkout-loading': '正在切换分支…',
   'action.checkout-queued': '等待切换分支…',
   'action.pull-loading': '正在拉取…',

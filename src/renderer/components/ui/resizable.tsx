@@ -18,7 +18,7 @@ const resizeHandle = {
   horizontal: 'h-full w-px cursor-col-resize before:inset-y-0 before:left-1/2 before:w-2 before:-translate-x-1/2',
   vertical: 'h-px w-full cursor-row-resize before:inset-x-0 before:top-1/2 before:h-2 before:-translate-y-1/2',
   visibleLine: [
-    'pointer-events-none absolute z-20 rounded-full bg-separator',
+    'pointer-events-none absolute z-20 rounded-full bg-separator/70',
     'transition-[background-color,opacity,width,height] duration-100',
     'opacity-100 group-data-[separator=hover]:bg-brand group-data-[separator=hover]:opacity-60',
     'group-focus-visible:bg-brand group-focus-visible:opacity-100 group-data-[separator=active]:bg-brand group-data-[separator=active]:opacity-100',

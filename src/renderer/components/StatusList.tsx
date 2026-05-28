@@ -52,11 +52,11 @@ export function StatusList({
   }
 
   return dirtyWorktrees.map((wt) => (
-    <ul key={wt.path} className="divide-y divide-separator border-b border-separator last:border-b-0">
+    <ul key={wt.path}>
       {wt.entries.map((entry) => (
         <li
           key={`${wt.path}-${entry.path}`}
-          className="grid grid-cols-[2ch_minmax(0,1fr)] items-center gap-4 px-4 py-2"
+          className="grid grid-cols-[2ch_minmax(0,1fr)] items-center gap-3 px-4 py-1.5"
         >
           <StatusCode entry={entry} />
           <FilePathText path={entry.path} />

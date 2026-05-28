@@ -237,7 +237,7 @@ export const ko: Record<DictKey, string> = {
   'status.main-worktree': '메인',
   'status.worktree-clean': '깨끗',
   'status.stale-title': '오래된 변경 내용을 표시 중',
-  'status.copy-patch': '패치 복사',
+  'status.copy-patch': '패치',
   'status.copy-patch-title': '이 워크트리의 git apply --binary 패치를 클립보드에 복사',
   'status.copy-patch-ok': '패치를 클립보드에 복사했습니다',
   'status.copy-patch-empty': '복사할 내용 없음 — 워크트리가 깨끗합니다',
@@ -262,7 +262,7 @@ export const ko: Record<DictKey, string> = {
   'worktrees.open-in-terminal-title': '터미널에서 열기',
   'worktrees.open-in-terminal-label': '터미널',
   'worktrees.open-in-editor-title': '에디터에서 열기',
-  'worktrees.open-in-editor-label': '에디터',
+  'worktrees.open-in-editor-label': '편집',
 
   // ---- Repo actions ------------------------------------------------------
   'action.checkout': '체크아웃',
@@ -271,8 +271,8 @@ export const ko: Record<DictKey, string> = {
   'action.fetch': '페치',
   'action.remote': '원격',
   'action.remote-pr': 'PR #{n}',
-  'action.delete-branch': '브랜치 삭제',
-  'action.remove-worktree': '워크트리 제거',
+  'action.delete-branch': '삭제',
+  'action.remove-worktree': '삭제',
   'action.checkout-loading': '체크아웃 중…',
   'action.checkout-queued': '체크아웃 대기 중…',
   'action.pull-loading': '풀 중…',

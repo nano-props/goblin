@@ -244,7 +244,7 @@ export const ja: Record<DictKey, string> = {
   'status.main-worktree': 'メイン',
   'status.worktree-clean': 'クリーン',
   'status.stale-title': '古い変更データを表示しています',
-  'status.copy-patch': 'パッチをコピー',
+  'status.copy-patch': 'パッチ',
   'status.copy-patch-title': 'このワークツリーの git apply --binary 用パッチをクリップボードにコピー',
   'status.copy-patch-ok': 'パッチをクリップボードにコピーしました',
   'status.copy-patch-empty': 'コピー対象なし — ワークツリーはクリーンです',
@@ -269,7 +269,7 @@ export const ja: Record<DictKey, string> = {
   'worktrees.open-in-terminal-title': 'ターミナルで開く',
   'worktrees.open-in-terminal-label': 'ターミナル',
   'worktrees.open-in-editor-title': 'エディタで開く',
-  'worktrees.open-in-editor-label': 'エディタ',
+  'worktrees.open-in-editor-label': '編集',
 
   // ---- Repo actions ------------------------------------------------------
   'action.checkout': 'チェックアウト',
@@ -278,8 +278,8 @@ export const ja: Record<DictKey, string> = {
   'action.fetch': 'フェッチ',
   'action.remote': 'リモート',
   'action.remote-pr': 'PR #{n}',
-  'action.delete-branch': 'ブランチを削除',
-  'action.remove-worktree': 'ワークツリーを削除',
+  'action.delete-branch': '削除',
+  'action.remove-worktree': '削除',
   'action.checkout-loading': 'チェックアウト中…',
   'action.checkout-queued': 'チェックアウト待機中…',
   'action.pull-loading': 'プル中…',
