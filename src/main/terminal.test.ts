@@ -14,8 +14,14 @@ vi.mock('electron', () => ({
       ipcHandlers.set(channel, handler)
     }),
   },
-  BrowserWindow: { getAllWindows: () => [] },
-  app: { on: vi.fn() },
+  BrowserWindow: { getAllWindows: () => [], fromWebContents: vi.fn(() => ({ isDestroyed: () => false, isFocused: () => false, flashFrame: vi.fn() })) },
+  Notification: Object.assign(
+    vi.fn(function MockNotification(this: { show: ReturnType<typeof vi.fn> }) {
+      this.show = vi.fn()
+    }),
+    { isSupported: vi.fn(() => true) },
+  ),
+  app: { on: vi.fn(), dock: { bounce: vi.fn() } },
 }))
 
 vi.mock('#/main/git/worktrees.ts', () => ({
@@ -66,6 +72,7 @@ describe('terminal IPC', () => {
     expect(ipcHandlers.has('goblin:terminal-restart')).toBe(true)
     expect(ipcHandlers.has('goblin:terminal-close')).toBe(true)
     expect(ipcHandlers.has('goblin:terminal-prune-repo')).toBe(true)
+    expect(ipcHandlers.has('goblin:terminal-notify-bell')).toBe(true)
     expect(ipcHandlers.has('goblin:terminal-close-repo')).toBe(false)
     expect(ipcHandlers.has('goblin:terminal-close-worktree')).toBe(false)
   })
@@ -223,6 +230,27 @@ describe('terminal IPC', () => {
   test('returns true after pruning a valid repo terminal scope', () => {
     expect(invoke('goblin:terminal-prune-repo', { repoRoot: '/repo', worktreePaths: ['/repo-linked'] })).toBe(true)
   })
+
+  test('shows a system notification for trusted bell requests', async () => {
+    const { BrowserWindow, Notification, app } = await import('electron')
+    const flashFrame = vi.fn()
+    vi.mocked(BrowserWindow.fromWebContents).mockReturnValueOnce({
+      isDestroyed: () => false,
+      isFocused: () => false,
+      flashFrame,
+    } as any)
+
+    expect(
+      invoke('goblin:terminal-notify-bell', { title: 'Terminal bell', body: 'zsh needs attention in feature' }),
+    ).toBe(true)
+    expect(flashFrame).toHaveBeenCalledWith(true)
+    expect(app.dock?.bounce).toHaveBeenCalledWith('informational')
+    expect(Notification).toHaveBeenCalledWith({
+      title: 'Terminal bell',
+      body: 'zsh needs attention in feature',
+      silent: true,
+    })
+  })
 })
 
 describe('terminal session cleanup helpers', () => {
@@ -238,13 +266,13 @@ describe('terminal session cleanup helpers', () => {
 })
 
 function invoke<TInput>(channel: string, input: TInput): unknown {
-  return invokeWithSender(channel, input, { id: 1, once: vi.fn() })
+  return invokeWithSender(channel, input, { id: 1, once: vi.fn(), isDestroyed: () => false })
 }
 
 function invokeWithSender<TInput>(
   channel: string,
   input: TInput,
-  sender: { id: number; once: ReturnType<typeof vi.fn> },
+  sender: { id: number; once: ReturnType<typeof vi.fn>; isDestroyed?: () => boolean },
 ): unknown {
   return invokeWithEvent(channel, input, {
     sender,

@@ -7,6 +7,7 @@ import { assertDictionaryParity, resolveLang, setCurrentLang } from '#/main/i18n
 import { wireRpcIpc } from '#/main/rpc.ts'
 import { wireTerminalIpc } from '#/main/terminal.ts'
 import { syncGlobalShortcuts, unregisterAppShortcuts } from '#/main/shortcuts.ts'
+import { enqueueExternalOpenPath } from '#/main/external-open.ts'
 
 function activateMainWindowFromEvent(): void {
   void activationBarrier
@@ -21,6 +22,12 @@ function activateMainWindowFromEvent(): void {
 
 let activationBarrier: Promise<void> = Promise.resolve()
 let isQuitting = false
+
+app.on('open-file', (event, path) => {
+  event.preventDefault()
+  if (!enqueueExternalOpenPath(path)) return
+  activateMainWindowFromEvent()
+})
 
 async function main(): Promise<void> {
   if (!app.requestSingleInstanceLock()) {

@@ -11,7 +11,7 @@ import { openHttpsExternal } from '#/main/external-url.ts'
 import { registerTrustedAppPath, registerTrustedWebContents } from '#/main/ipc/trusted-webcontents.ts'
 import { wireRpcIpc } from '#/main/rpc.ts'
 import { broadcastRpcEvent } from '#/main/events.ts'
-import { setTerminalApp, setEditorApp } from '#/main/settings.ts'
+import { setTerminalApp, setEditorApp, setTerminalNotificationsEnabled } from '#/main/settings.ts'
 import { getTerminalActionAvailability, getTerminalAppAvailability, resolveTerminalApp } from '#/main/system/terminals.ts'
 import { getEditorAppAvailability, resolveEditorApp } from '#/main/system/editors.ts'
 import { probeGitHubCli } from '#/main/system/github-cli.ts'
@@ -118,6 +118,7 @@ vi.mock('#/main/settings.ts', () => ({
     theme: 'auto',
     colorTheme: 'default',
     fetchIntervalSec: 120,
+    terminalNotificationsEnabled: false,
     shortcutsDisabled: false,
     globalShortcutDisabled: false,
     swapCloseShortcuts: false,
@@ -144,6 +145,7 @@ vi.mock('#/main/settings.ts', () => ({
   setGlobalShortcutDisabled: vi.fn(),
   setShortcutsDisabled: vi.fn(),
   setSwapCloseShortcuts: vi.fn(),
+  setTerminalNotificationsEnabled: vi.fn(),
   setToggleDetailOnActionBarBlankClick: vi.fn(),
   setTerminalApp: vi.fn(),
 }))
@@ -410,6 +412,7 @@ describe('main repo rpc cancellation', () => {
     expect(result).toEqual({
       ok: true,
       data: expect.objectContaining({
+        terminalNotificationsEnabled: false,
         terminalApp: 'auto',
         editorApp: 'auto',
       }),
@@ -549,6 +552,18 @@ describe('main repo rpc cancellation', () => {
       detectedAt: expect.any(Number),
     })
     expect(probeGitHubCli).not.toHaveBeenCalled()
+  })
+
+  test('broadcasts terminal notification setting changes', async () => {
+    vi.mocked(setTerminalNotificationsEnabled).mockResolvedValue(true)
+
+    const result = await invokeRpc('settings.setTerminalNotificationsEnabled', { enabled: true })
+
+    expect(result).toEqual({ ok: true, data: undefined })
+    expect(broadcastRpcEvent).toHaveBeenCalledWith({
+      type: 'terminal-notifications-changed',
+      enabled: true,
+    })
   })
 
   test('keeps Terminal.app available for actions even when detection reports unavailable', async () => {

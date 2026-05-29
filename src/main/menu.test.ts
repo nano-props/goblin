@@ -88,7 +88,7 @@ describe('app menu actions', () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
     buildAppMenu()
 
-    clickMenuItem('menu.file', 'menu.file.open-repo')
+    clickMenuItem('menu.file', 'menu.file.open-local-repo')
     await Promise.resolve()
 
     expect(mocks.activateMainWindow).toHaveBeenCalledTimes(1)
@@ -100,11 +100,22 @@ describe('app menu actions', () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
     buildAppMenu()
 
-    clickMenuItem('menu.file', 'menu.file.open-repo')
+    clickMenuItem('menu.file', 'menu.file.open-local-repo')
     await Promise.resolve()
 
     expect(mocks.activateMainWindow).not.toHaveBeenCalled()
     expect(mocks.sendRpcEvent).toHaveBeenCalledWith(mocks.win, { type: 'menu-action', action: 'open-repo' })
+  })
+
+  test('sends the path dialog action from the file menu', async () => {
+    mocks.getMainWindow.mockReturnValue(mocks.win)
+    const { buildAppMenu } = await import('#/main/menu.ts')
+    buildAppMenu()
+
+    clickMenuItem('menu.file', 'menu.file.open-local-repo-path')
+    await Promise.resolve()
+
+    expect(mocks.sendRpcEvent).toHaveBeenCalledWith(mocks.win, { type: 'menu-action', action: 'open-repo-path' })
   })
 })
 

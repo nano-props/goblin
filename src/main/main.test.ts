@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => {
     resolveLang: vi.fn(() => 'en'),
     setCurrentLang: vi.fn(),
     syncGlobalShortcuts: vi.fn(),
+    enqueueExternalOpenPath: vi.fn(() => true),
     unregisterAppShortcuts: vi.fn(),
     wireRpcIpc: vi.fn(),
     wireTerminalIpc: vi.fn(),
@@ -93,6 +94,10 @@ vi.mock('#/main/shortcuts.ts', () => ({
   unregisterAppShortcuts: mocks.unregisterAppShortcuts,
 }))
 
+vi.mock('#/main/external-open.ts', () => ({
+  enqueueExternalOpenPath: mocks.enqueueExternalOpenPath,
+}))
+
 describe('main process startup lifecycle', () => {
   beforeEach(() => {
     vi.resetModules()
@@ -145,6 +150,23 @@ describe('main process startup lifecycle', () => {
 
     expect(mocks.activateMainWindow).not.toHaveBeenCalled()
     expect(mocks.handlers.get('activate')).toBeUndefined()
+  })
+
+  test('queues open-file paths and defers activation until startup initialization finishes', async () => {
+    await import('#/main/main.ts')
+
+    const event = { preventDefault: vi.fn() }
+    await emit('open-file', event, '/tmp/repo')
+    await Promise.resolve()
+
+    expect(event.preventDefault).toHaveBeenCalledTimes(1)
+    expect(mocks.enqueueExternalOpenPath).toHaveBeenCalledWith('/tmp/repo')
+    expect(mocks.activateMainWindow).not.toHaveBeenCalled()
+
+    mocks.resolveReady()
+    await vi.waitFor(() => {
+      expect(mocks.activateMainWindow).toHaveBeenCalled()
+    })
   })
 })
 

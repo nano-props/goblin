@@ -40,6 +40,11 @@ export interface TerminalPruneRepoInput {
   worktreePaths: string[]
 }
 
+export interface TerminalNotifyBellInput {
+  title: string
+  body: string
+}
+
 export type TerminalMutationResult = boolean
 
 export interface TerminalOutputEvent {
@@ -72,4 +77,10 @@ export function normalizeTerminalSize(cols: unknown, rows: unknown): { cols: num
 
 export function isValidTerminalSize(cols: unknown, rows: unknown): boolean {
   return normalizeTerminalSize(cols, rows) !== null
+}
+
+export function isValidTerminalNotifyBellInput(value: unknown): value is TerminalNotifyBellInput {
+  if (!value || typeof value !== 'object') return false
+  const { title, body } = value as { title?: unknown; body?: unknown }
+  return typeof title === 'string' && title.length > 0 && title.length <= 200 && typeof body === 'string' && body.length > 0 && body.length <= 500
 }

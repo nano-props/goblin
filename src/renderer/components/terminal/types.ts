@@ -19,6 +19,11 @@ export interface TerminalProgressState {
   value: number
 }
 
+export interface TerminalBellEvent {
+  processName: string
+  visible: boolean
+}
+
 export interface TerminalSnapshot {
   phase: TerminalPhase
   message: string | null
@@ -47,6 +52,7 @@ export interface TerminalSessionSummary {
   title: string
   phase: TerminalPhase
   active: boolean
+  hasBell: boolean
 }
 
 export interface TerminalSessionContextValue {
@@ -56,6 +62,7 @@ export interface TerminalSessionContextValue {
   activeDescriptor: (groupKey: string) => TerminalDescriptor | null
   sessionSummaries: (groupKey: string) => TerminalSessionSummary[]
   setActive: (groupKey: string, key: string) => void
+  clearBell: (key: string) => boolean
   closeTerminalAndDismissDetailIfLast: (key: string, base: TerminalSessionBase) => TerminalSessionSummary[]
   attach: (descriptor: TerminalDescriptor, host: HTMLElement) => void
   detach: (key: string, host: HTMLElement) => void

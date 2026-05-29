@@ -27,7 +27,8 @@ export const ja: Record<DictKey, string> = {
   'menu.window.front': 'すべてを手前に移動',
 
   // ---- Menu — File -------------------------------------------------------
-  'menu.file.open-repo': 'リポジトリを開く…',
+  'menu.file.open-local-repo': 'ローカルリポジトリを開く…',
+  'menu.file.open-local-repo-path': 'パスでローカルリポジトリを開く…',
   'menu.file.clone-repo': 'リポジトリをクローン…',
   'menu.file.open-recent': '最近使った項目を開く',
   'menu.file.no-recent': '最近使ったリポジトリはありません',
@@ -75,6 +76,13 @@ export const ja: Record<DictKey, string> = {
   'repo-tabs.close': '閉じる',
   'repo-tabs.drag-to-reorder': 'ドラッグで並べ替え',
   'repo-tabs.open-local': 'ローカルリポジトリを開く…',
+  'repo-tabs.open-title': 'ローカルリポジトリを開く',
+  'repo-tabs.open-description': 'ローカルパスを入力するかフォルダを選択して、Git リポジトリを新しいタブで開きます。',
+  'repo-tabs.open-path-label': 'リポジトリのパス',
+  'repo-tabs.open-path-placeholder': '~/Developer/repo',
+  'repo-tabs.open-path-choose': '選択…',
+  'repo-tabs.open-local-confirm': 'ローカルリポジトリを開く',
+  'repo-tabs.open-opening': '開いています…',
   'repo-tabs.clone': 'リポジトリをクローン…',
   'repo-tabs.clone-title': 'リポジトリをクローン',
   'repo-tabs.clone-description': 'リモート Git リポジトリをクローンし、新しいタブで開きます。',
@@ -103,9 +111,9 @@ export const ja: Record<DictKey, string> = {
     '上部タブバーの <open>開く</open> から Git リポジトリを追加するか、リポジトリフォルダをこのウィンドウにドロップします。',
 
   // ---- Drag and drop -----------------------------------------------------
-  'drop.title': 'ドロップしてリポジトリを開く',
+  'drop.title': 'ドロップしてローカルリポジトリを開く',
   'drop.body': 'Git リポジトリフォルダを Goblin のどこにでもドロップできます。',
-  'drop.open-failed': 'リポジトリを開けませんでした',
+  'drop.open-failed': 'ローカルリポジトリを開けませんでした',
 
   // ---- Detail tabs -------------------------------------------------------
   'tab.branches': 'ブランチ',
@@ -232,6 +240,11 @@ export const ja: Record<DictKey, string> = {
   'terminal.progress': 'ターミナル進行状況',
   'terminal.empty': '開いているターミナルはありません',
   'terminal.drop-hint': 'ドロップしてパスを貼り付け',
+  'terminal.index-title': 'ターミナル {index}',
+  'terminal.bell-unread': '未読のターミナルベル',
+  'terminal.bell-unread-count': '未読ベル {count} 件',
+  'terminal.bell-notification-title': 'バックグラウンドのターミナル通知',
+  'terminal.bell-notification-body': '{terminalTitle} · {processName} · {branch}',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': 'Finder で表示',
@@ -377,6 +390,19 @@ export const ja: Record<DictKey, string> = {
   'settings.action-bar-blank-toggle': 'アクションバーの空白で詳細を折りたたむ/展開',
   'settings.action-bar-blank-toggle-hint':
     '上下レイアウトでのみ有効です。アクションバーの空白をクリックして詳細を表示/非表示にします。',
+  'settings.terminal-notifications': 'ターミナルベル通知',
+  'settings.terminal-notifications-hint': 'バックグラウンドのターミナルベルでシステム通知を表示します。',
+  'settings.terminal-notifications-test': 'システム通知をテスト',
+  'settings.terminal-notifications-test-hint':
+    '同じ通知経路でテスト通知を送ります。Dock のバウンスしか出ない場合は macOS の通知設定を確認してください。',
+  'settings.terminal-notifications-test-button': 'テスト通知を表示',
+  'settings.terminal-notifications-test-title': 'Goblin テスト通知',
+  'settings.terminal-notifications-test-body': '右上の通知が表示されない場合は macOS の通知設定を確認してください。',
+  'settings.terminal-notifications-test-sent': 'テスト通知を送信しました',
+  'settings.terminal-notifications-test-sent-hint':
+    'Dock のバウンスだけで右上の通知が出ない場合は、macOS の Goblin 通知設定を確認してください。',
+  'settings.terminal-notifications-test-failed': 'テスト通知を表示できません',
+  'settings.terminal-notifications-test-failed-hint': '通知リクエストが正常に完了しませんでした。もう一度お試しください。',
   'settings.group.general': '一般',
   'settings.group.apps': '外部アプリ',
   'settings.group.sync': '同期',
@@ -413,6 +439,10 @@ export const ja: Record<DictKey, string> = {
   'settings.apps.status.not-detected': '未検出',
   'settings.fetch': '自動 fetch',
   'settings.fetch-hint': 'アクティブなリポジトリをバックグラウンドで fetch します。',
+  'settings.general.open-from-terminal-title': 'Terminal から開く',
+  'settings.general.open-from-terminal-body':
+    'macOS では、Terminal やスクリプトからローカルリポジトリのパスを Goblin に直接渡して開けます。',
+  'settings.general.open-from-terminal-command': 'open -b goblin.app /path/to/repo',
   'settings.fetch.off': 'オフ',
   'settings.fetch.30s': '30 秒',
   'settings.fetch.1m': '1 分',
@@ -476,7 +506,7 @@ export const ja: Record<DictKey, string> = {
   'help.row.switch-detail-tab': '前 / 次の詳細タブ',
   'help.row.toggle-detail': '詳細パネルを折りたたむ/展開',
   'help.row.checkout': '選択を実行',
-  'help.row.open-repo': 'リポジトリを開く',
+  'help.row.open-local-repo': 'ローカルリポジトリを開く',
   'help.row.clone-repo': 'リポジトリをクローン',
   'help.row.activate-window': 'Goblin ウィンドウを表示',
   'help.row.close-repo': '現在のタブを閉じる',

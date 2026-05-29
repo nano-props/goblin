@@ -143,9 +143,13 @@ function createFileMenu(state: AppMenuState): MenuItemConstructorOptions {
     label: t('menu.file'),
     submenu: [
       {
-        label: t('menu.file.open-repo'),
+        label: t('menu.file.open-local-repo'),
         accelerator: accelerator(state, 'CmdOrCtrl+O'),
         click: () => send('open-repo'),
+      },
+      {
+        label: t('menu.file.open-local-repo-path'),
+        click: () => send('open-repo-path'),
       },
       {
         label: t('menu.file.clone-repo'),

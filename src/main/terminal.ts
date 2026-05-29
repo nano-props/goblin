@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { BrowserWindow, Notification, app, ipcMain } from 'electron'
 import type { WebContents } from 'electron'
 import path from 'node:path'
 import { getWorktrees } from '#/main/git/worktrees.ts'
@@ -19,8 +19,10 @@ import {
   writeTerminalSession,
 } from '#/main/terminal-core.ts'
 import {
+  isValidTerminalNotifyBellInput,
   isValidTerminalSize,
   type TerminalMutationResult,
+  type TerminalNotifyBellInput,
   type TerminalOpenInput,
   type TerminalOpenResult,
   type TerminalPruneRepoInput,
@@ -72,6 +74,10 @@ export function wireTerminalIpc(): void {
     if (!isValidCwd(input?.repoRoot) || !isValidTerminalWorktreePathList(input?.worktreePaths)) return false
     pruneRepoSessions(event.sender.id, input.repoRoot, input.worktreePaths)
     return true
+  })
+  ipcMain.handle('goblin:terminal-notify-bell', (event, input: TerminalNotifyBellInput): TerminalMutationResult => {
+    if (!isTrustedIpcEvent(event) || !isValidTerminalNotifyBellInput(input)) return false
+    return notifyTerminalBell(event.sender, input)
   })
 
   wireTerminalSessionCleanup()
@@ -144,4 +150,25 @@ function isValidTerminalId(value: unknown): value is string {
 
 function sessionKey(repoRoot: string, worktreePath: string, terminalId?: string): string {
   return terminalId ? `${repoRoot}\0${worktreePath}\0${terminalId}` : `${repoRoot}\0${worktreePath}`
+}
+
+function notifyTerminalBell(webContents: WebContents, input: TerminalNotifyBellInput): boolean {
+  const win = BrowserWindow.fromWebContents(webContents)
+  if (!win || win.isDestroyed() || webContents.isDestroyed()) return false
+  try {
+    if (!win.isFocused()) {
+      win.flashFrame(true)
+      setTimeout(() => {
+        try {
+          if (!win.isDestroyed()) win.flashFrame(false)
+        } catch {}
+      }, 1500)
+    }
+    if (process.platform === 'darwin') app.dock?.bounce('informational')
+    if (Notification.isSupported()) new Notification({ title: input.title, body: input.body, silent: true }).show()
+    return true
+  } catch (err) {
+    console.warn('[terminal] failed to show bell notification', err)
+    return false
+  }
 }

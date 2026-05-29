@@ -1,18 +1,21 @@
 import { useEffect, useRef } from 'react'
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { isShortcutBlockingLayerOpen } from '#/renderer/lib/layers.ts'
-import { onRpcEventType, rpc } from '#/renderer/rpc.ts'
+import { onRpcEventType } from '#/renderer/rpc.ts'
 import { isTerminalFocused } from '#/renderer/terminal-focus.ts'
 import type { SettingsPage } from '#/renderer/components/SettingsPanel.tsx'
+import { useT } from '#/renderer/stores/i18n.ts'
+import { openRepoFromDialog } from '#/renderer/lib/open-repo-dialog.ts'
 
 interface MenuActionHandlers {
   openSettings: (page?: SettingsPage) => void
+  openRepoPathDialog: () => void
   openCloneRepo: () => void
   showHelp: () => void
   isOverlayOpen: () => boolean
 }
 
-export function useMenuActions({ openSettings, openCloneRepo, showHelp, isOverlayOpen }: MenuActionHandlers) {
+export function useMenuActions({ openSettings, openRepoPathDialog, openCloneRepo, showHelp, isOverlayOpen }: MenuActionHandlers) {
   const syncAndRefresh = useReposStore((s) => s.syncAndRefresh)
   const closeRepo = useReposStore((s) => s.closeRepo)
   const cycleActive = useReposStore((s) => s.cycleActive)
@@ -21,6 +24,7 @@ export function useMenuActions({ openSettings, openCloneRepo, showHelp, isOverla
   const setWorkspaceLayout = useReposStore((s) => s.setWorkspaceLayout)
   const toggleDetailCollapsed = useReposStore((s) => s.toggleDetailCollapsed)
   const resetLayout = useReposStore((s) => s.resetLayout)
+  const t = useT()
   const isOverlayOpenRef = useRef(isOverlayOpen)
   isOverlayOpenRef.current = isOverlayOpen
 
@@ -64,11 +68,12 @@ export function useMenuActions({ openSettings, openCloneRepo, showHelp, isOverla
         if (isOverlayOpenRef.current() || isShortcutBlockingLayerOpen()) return
         const state = useReposStore.getState()
         switch (action) {
-          case 'open-repo': {
-            const path = await rpc.repo.openDialog.mutate()
-            if (path) await state.openRepo(path)
+          case 'open-repo':
+            await openRepoFromDialog({ openRepo: state.openRepo, t })
             break
-          }
+          case 'open-repo-path':
+            openRepoPathDialog()
+            break
           case 'clone-repo':
             openCloneRepo()
             break
@@ -130,6 +135,7 @@ export function useMenuActions({ openSettings, openCloneRepo, showHelp, isOverla
   }, [
     closeRepo,
     cycleActive,
+    openRepoPathDialog,
     openCloneRepo,
     openSettings,
     resetLayout,
@@ -138,6 +144,7 @@ export function useMenuActions({ openSettings, openCloneRepo, showHelp, isOverla
     setWorkspaceLayout,
     showHelp,
     syncAndRefresh,
+    t,
     toggleDetailCollapsed,
   ])
 }

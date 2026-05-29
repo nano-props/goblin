@@ -75,6 +75,7 @@ import {
   setSession,
   setShortcutsDisabled,
   setTerminalApp,
+  setTerminalNotificationsEnabled,
   getTerminalApp,
   setEditorApp,
   getEditorApp,
@@ -95,6 +96,7 @@ import { closeWorktreeSession } from '#/main/terminal.ts'
 import { openHttpExternal, openHttpsExternal } from '#/main/external-url.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 import { WINDOW_BACKGROUND_BY_COLOR_THEME } from '#/shared/theme-tokens.ts'
+import { consumeExternalOpenPaths } from '#/main/external-open.ts'
 
 const PROJECT_GITHUB_URL = 'https://github.com/nano-props/goblin'
 const PATCH_TIMEOUT_MS = 90_000
@@ -255,6 +257,7 @@ function createRpcHandlers(): AppRpcHandlers {
     },
     repo: {
       openDialog: openRepoDialog,
+      consumeExternalOpenPaths: async () => consumeExternalOpenPaths(),
       cloneParentDialog: () => openDirectoryDialog('Choose Clone Destination'),
       probe: async ({ cwd }) => {
         if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-path' }
@@ -449,6 +452,7 @@ function createRpcHandlers(): AppRpcHandlers {
           theme: s.theme,
           colorTheme: s.colorTheme,
           fetchIntervalSec: s.fetchIntervalSec,
+          terminalNotificationsEnabled: s.terminalNotificationsEnabled,
           shortcutsDisabled: s.shortcutsDisabled,
           globalShortcutDisabled: s.globalShortcutDisabled,
           swapCloseShortcuts: s.swapCloseShortcuts,
@@ -465,6 +469,11 @@ function createRpcHandlers(): AppRpcHandlers {
         if (!Number.isFinite(sec)) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid fetch interval' })
         const clamped = await setFetchInterval(sec)
         broadcastRpcEvent({ type: 'fetch-interval-changed', sec: clamped })
+      },
+      setTerminalNotificationsEnabled: async ({ enabled }) => {
+        if (typeof enabled !== 'boolean') return
+        const saved = await setTerminalNotificationsEnabled(enabled)
+        broadcastRpcEvent({ type: 'terminal-notifications-changed', enabled: saved })
       },
       setShortcutsDisabled: async ({ disabled }) => {
         if (typeof disabled !== 'boolean') return
@@ -526,6 +535,7 @@ function createRpcHandlers(): AppRpcHandlers {
       clearRecentRepos: async () => {
         await clearRecentRepos()
         buildAppMenu()
+        return
       },
     },
     externalApps: {

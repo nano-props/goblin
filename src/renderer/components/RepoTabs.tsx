@@ -7,7 +7,6 @@
 // tanstack ecosystem). PointerSensor with a small activation distance lets
 // a regular click still focus the repo without triggering a drag; keyboard
 // users use Arrow keys for tab activation.
-
 import { toast } from 'sonner'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
@@ -15,7 +14,7 @@ import { useT } from '#/renderer/stores/i18n.ts'
 import { useSettingsStore } from '#/renderer/stores/settings.ts'
 import { RepoTabStrip } from '#/renderer/components/repo-tabs/RepoTabStrip.tsx'
 import type { RepoTabSummary } from '#/renderer/components/repo-tabs/types.ts'
-import { rpc } from '#/renderer/rpc.ts'
+import { openRepoFromDialog } from '#/renderer/lib/open-repo-dialog.ts'
 
 /** Equality fn for the summaries array. Zustand's `useShallow` does
  *  Object.is on each element — but we re-create the inner objects
@@ -65,14 +64,7 @@ export function RepoTabs({ onClone }: RepoTabsProps) {
   const reorderRepos = useReposStore((s) => s.reorderRepos)
 
   async function handleOpenLocal() {
-    const path = await rpc.repo.openDialog.mutate()
-    if (!path) return
-    const result = await openRepo(path)
-    if (!result.ok) {
-      toast.error(t('drop.open-failed'), {
-        description: t(result.message),
-      })
-    }
+    await openRepoFromDialog({ openRepo, t })
   }
 
   return (

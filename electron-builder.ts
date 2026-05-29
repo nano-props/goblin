@@ -24,6 +24,16 @@ const config: Configuration = {
   asarUnpack: ['node_modules/node-pty/prebuilds/**/*'],
   mac: {
     category: 'public.app-category.developer-tools',
+    extendInfo: {
+      CFBundleDocumentTypes: [
+        {
+          CFBundleTypeName: 'Folder',
+          CFBundleTypeRole: 'Viewer',
+          LSHandlerRank: 'Alternate',
+          LSItemContentTypes: ['public.folder'],
+        },
+      ],
+    },
     // electron-builder organizes builds by arch, so any `dir` here would be
     // emitted for every arch declared on dmg. `build.ts install` picks the
     // host-arch directory out of `release/mac*/` itself.

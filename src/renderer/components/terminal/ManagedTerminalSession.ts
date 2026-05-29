@@ -33,6 +33,7 @@ import {
   terminalInputForMacOptionArrow,
 } from '#/renderer/components/terminal/terminal-keyboard.ts'
 import type {
+  TerminalBellEvent,
   TerminalDescriptor,
   TerminalPhase,
   TerminalProgressState,
@@ -50,6 +51,7 @@ const EMPTY_SEARCH_RESULT: TerminalSearchResult = { resultIndex: -1, resultCount
 export class ManagedTerminalSession {
   descriptor: TerminalDescriptor
   private readonly notify: () => void
+  private readonly onBell: ((descriptor: TerminalDescriptor, event: TerminalBellEvent) => void) | null
   private readonly frame: HTMLDivElement
   private readonly xtermHost: HTMLDivElement
   private readonly parkingElement: HTMLDivElement
@@ -85,9 +87,14 @@ export class ManagedTerminalSession {
   private progressState: TerminalProgressState | null = null
   private processName = 'terminal'
 
-  constructor(descriptor: TerminalDescriptor, notify: () => void) {
+  constructor(
+    descriptor: TerminalDescriptor,
+    notify: () => void,
+    onBell: ((descriptor: TerminalDescriptor, event: TerminalBellEvent) => void) | null = null,
+  ) {
     this.descriptor = descriptor
     this.notify = notify
+    this.onBell = onBell
     this.frame = document.createElement('div')
     this.frame.className = 'goblin-managed-terminal-frame'
     this.xtermHost = document.createElement('div')
@@ -422,6 +429,7 @@ export class ManagedTerminalSession {
     })
     this.disposables.push(term.onData((data) => this.writeInput(data)))
     this.disposables.push(term.onBinary((data) => this.writeInput(data)))
+    this.disposables.push(term.onBell(() => this.handleBell()))
     this.disposables.push(term.onResize(({ cols, rows }) => this.queueResize(cols, rows)))
     return term
   }
@@ -520,6 +528,13 @@ export class ManagedTerminalSession {
       this.progressState = { state: state as TerminalProgressState['state'], value: Math.max(0, Math.min(100, value)) }
     }
     this.notify()
+  }
+
+  private handleBell(): void {
+    this.onBell?.(this.descriptor, {
+      processName: this.processName,
+      visible: !!this.host?.isConnected,
+    })
   }
 
   private find(term: string, direction: 'next' | 'previous', incremental: boolean): TerminalSearchResult {

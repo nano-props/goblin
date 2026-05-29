@@ -40,6 +40,7 @@ function installBridge(handlers: Record<string, () => unknown>) {
 function resetSettingsStore(): void {
   useSettingsStore.setState({
     fetchIntervalSec: 120,
+    terminalNotificationsEnabled: false,
     shortcutsDisabled: false,
     globalShortcutDisabled: false,
     swapCloseShortcuts: false,
@@ -152,6 +153,7 @@ describe('settings store external app hydration', () => {
         theme: 'auto',
         colorTheme: 'default',
         fetchIntervalSec: 120,
+        terminalNotificationsEnabled: false,
         shortcutsDisabled: false,
         globalShortcutDisabled: false,
         swapCloseShortcuts: false,
@@ -205,5 +207,39 @@ describe('settings store external app hydration', () => {
       terminalAppAvailability: { ghostty: true, terminal: true },
       externalAppsDetectedAt: 200,
     })
+  })
+
+  test('hydrates and updates terminal notification preference from settings events', async () => {
+    const bridge = installBridge({
+      'settings.get': () => ({
+        theme: 'auto',
+        colorTheme: 'default',
+        fetchIntervalSec: 120,
+        terminalNotificationsEnabled: false,
+        shortcutsDisabled: false,
+        globalShortcutDisabled: false,
+        swapCloseShortcuts: false,
+        toggleDetailOnActionBarBlankClick: false,
+        globalShortcut: 'CommandOrControl+Shift+G',
+        globalShortcutRegistered: false,
+        terminalApp: 'auto',
+        editorApp: 'auto',
+        session: {
+          openRepos: [],
+          activeRepo: null,
+          detailCollapsed: true,
+          detailFocusMode: false,
+          workspaceLayout: 'top-bottom',
+          detailPaneSizes: { 'top-bottom': 0.5, 'left-right': 0.5 },
+        },
+        recentRepos: [],
+      }),
+    })
+
+    await useSettingsStore.getState().hydrate()
+    expect(useSettingsStore.getState().terminalNotificationsEnabled).toBe(false)
+
+    bridge.emit({ type: 'terminal-notifications-changed', enabled: true })
+    expect(useSettingsStore.getState().terminalNotificationsEnabled).toBe(true)
   })
 })

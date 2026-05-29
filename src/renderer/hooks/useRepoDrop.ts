@@ -4,6 +4,7 @@ import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { goblin } from '#/renderer/rpc.ts'
 import { isShortcutBlockingLayerOpen } from '#/renderer/lib/layers.ts'
+import { openRepoPaths } from '#/renderer/lib/open-repo-paths.ts'
 
 interface Options {
   /** True when an overlay (Settings/Help) is up. While blocked, the
@@ -77,24 +78,15 @@ export function useRepoDrop({ blocked }: Options) {
       .filter((path) => path.length > 0)
     if (paths.length === 0) return
     void (async () => {
-      // `activate: false` keeps openRepo from flipping activeId per
-      // entry — without it, dropping five folders flashes through five
-      // tabs before settling. Pin the first successful id at the end
-      // so focus lands somewhere predictable. dataTransfer.files isn't
-      // ordered by what the user clicked, so "first" just means
-      // first-completed, not visually-first.
-      let firstId: string | null = null
-      for (const path of paths) {
-        const result = await openRepo(path, { activate: false })
-        if (!result.ok) {
+      await openRepoPaths(paths, {
+        openRepo,
+        setActive: useReposStore.getState().setActive,
+        onOpenFailed: (_path, message) => {
           toast.error(tRef.current('drop.open-failed'), {
-            description: tRef.current(result.message),
+            description: tRef.current(message),
           })
-          continue
-        }
-        firstId ??= result.id
-      }
-      if (firstId !== null) useReposStore.getState().setActive(firstId)
+        },
+      })
     })()
   }
 

@@ -24,7 +24,8 @@ export const ko: Record<DictKey, string> = {
   'menu.window.zoom': '확대/축소',
   'menu.window.front': '모두 앞으로 가져오기',
 
-  'menu.file.open-repo': '리포지토리 열기…',
+  'menu.file.open-local-repo': '로컬 리포지토리 열기…',
+  'menu.file.open-local-repo-path': '경로로 로컬 리포지토리 열기…',
   'menu.file.clone-repo': '리포지토리 클론…',
   'menu.file.open-recent': '최근 항목 열기',
   'menu.file.no-recent': '최근 리포지토리 없음',
@@ -68,6 +69,13 @@ export const ko: Record<DictKey, string> = {
   'repo-tabs.close': '닫기',
   'repo-tabs.drag-to-reorder': '드래그하여 순서 변경',
   'repo-tabs.open-local': '로컬 리포지토리 열기…',
+  'repo-tabs.open-title': '로컬 리포지토리 열기',
+  'repo-tabs.open-description': '로컬 경로를 입력하거나 폴더를 선택해 Git 리포지토리를 새 탭으로 엽니다.',
+  'repo-tabs.open-path-label': '리포지토리 경로',
+  'repo-tabs.open-path-placeholder': '~/Developer/repo',
+  'repo-tabs.open-path-choose': '선택…',
+  'repo-tabs.open-local-confirm': '로컬 리포지토리 열기',
+  'repo-tabs.open-opening': '여는 중…',
   'repo-tabs.clone': '리포지토리 클론…',
   'repo-tabs.clone-title': '리포지토리 클론',
   'repo-tabs.clone-description': '원격 Git 리포지토리를 클론하고 새 탭으로 엽니다.',
@@ -96,9 +104,9 @@ export const ko: Record<DictKey, string> = {
     '상단 탭 막대의 <open>열기</open> 를 눌러 Git 리포지토리를 추가하거나, 리포지토리 폴더를 이 창으로 드롭하세요.',
 
   // ---- Drag and drop -----------------------------------------------------
-  'drop.title': '놓아서 리포지토리 열기',
+  'drop.title': '놓아서 로컬 리포지토리 열기',
   'drop.body': 'Git 리포지토리 폴더를 Goblin 어디에나 놓으세요.',
-  'drop.open-failed': '리포지토리를 열 수 없음',
+  'drop.open-failed': '로컬 리포지토리를 열 수 없음',
 
   // ---- Detail tabs -------------------------------------------------------
   'tab.branches': '브랜치',
@@ -225,6 +233,11 @@ export const ko: Record<DictKey, string> = {
   'terminal.progress': '터미널 진행률',
   'terminal.empty': '열린 터미널 없음',
   'terminal.drop-hint': '놓아서 경로 붙여넣기',
+  'terminal.index-title': '터미널 {index}',
+  'terminal.bell-unread': '읽지 않은 터미널 벨',
+  'terminal.bell-unread-count': '읽지 않은 벨 {count}개',
+  'terminal.bell-notification-title': '백그라운드 터미널 알림',
+  'terminal.bell-notification-body': '{terminalTitle} · {processName} · {branch}',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': 'Finder 에서 보기',
@@ -370,6 +383,19 @@ export const ko: Record<DictKey, string> = {
   'settings.action-bar-blank-toggle': '작업 막대 빈 영역으로 세부 패널 접기/펼치기',
   'settings.action-bar-blank-toggle-hint':
     '상하 레이아웃에서만 작동합니다. 작업 막대 빈 공간을 클릭해 세부 정보를 표시하거나 숨깁니다.',
+  'settings.terminal-notifications': '터미널 벨 알림',
+  'settings.terminal-notifications-hint': '백그라운드 터미널 벨에 대해 시스템 알림을 표시합니다.',
+  'settings.terminal-notifications-test': '시스템 알림 테스트',
+  'settings.terminal-notifications-test-hint':
+    '같은 알림 경로로 테스트 알림을 보냅니다. Dock 튐만 보인다면 macOS 알림 설정을 확인하세요.',
+  'settings.terminal-notifications-test-button': '테스트 알림 표시',
+  'settings.terminal-notifications-test-title': 'Goblin 테스트 알림',
+  'settings.terminal-notifications-test-body': '오른쪽 상단 알림이 보이지 않으면 macOS 알림 설정을 확인하세요.',
+  'settings.terminal-notifications-test-sent': '테스트 알림을 보냈습니다',
+  'settings.terminal-notifications-test-sent-hint':
+    'Dock 튐만 있고 오른쪽 상단 알림이 없다면 macOS의 Goblin 알림 설정을 확인하세요.',
+  'settings.terminal-notifications-test-failed': '테스트 알림을 표시할 수 없습니다',
+  'settings.terminal-notifications-test-failed-hint': '알림 요청이 성공적으로 완료되지 않았습니다. 다시 시도해 주세요.',
   'settings.group.general': '일반',
   'settings.group.apps': '외부 앱',
   'settings.group.sync': '동기화',
@@ -406,6 +432,10 @@ export const ko: Record<DictKey, string> = {
   'settings.apps.status.not-detected': '감지되지 않음',
   'settings.fetch': '자동 동기화',
   'settings.fetch-hint': '활성 리포지토리를 백그라운드에서 가져옵니다.',
+  'settings.general.open-from-terminal-title': '터미널에서 열기',
+  'settings.general.open-from-terminal-body':
+    'macOS에서는 터미널이나 스크립트에서 로컬 리포지토리 경로를 Goblin으로 바로 열 수 있습니다.',
+  'settings.general.open-from-terminal-command': 'open -b goblin.app /path/to/repo',
   'settings.fetch.off': '끄기',
   'settings.fetch.30s': '30 초',
   'settings.fetch.1m': '1 분',
@@ -469,7 +499,7 @@ export const ko: Record<DictKey, string> = {
   'help.row.switch-detail-tab': '이전 / 다음 상세 탭',
   'help.row.toggle-detail': '세부 패널 접기/펼치기',
   'help.row.checkout': '선택 실행',
-  'help.row.open-repo': '리포지토리 열기',
+  'help.row.open-local-repo': '로컬 리포지토리 열기',
   'help.row.clone-repo': '리포지토리 클론',
   'help.row.activate-window': 'Goblin 창 보이기',
   'help.row.close-repo': '현재 탭 닫기',

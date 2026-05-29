@@ -40,7 +40,16 @@ describe('TerminalSwitcher', () => {
           groupKey="repo::worktree"
           offsetForSearch={false}
           sessions={[
-            { key: 'terminal-1', groupKey: 'repo::worktree', terminalId: 'terminal-1', index: 1, title: 'zsh', phase: 'open', active: true },
+            {
+              key: 'terminal-1',
+              groupKey: 'repo::worktree',
+              terminalId: 'terminal-1',
+              index: 1,
+              title: 'zsh',
+              phase: 'open',
+              active: true,
+              hasBell: false,
+            },
             {
               key: 'terminal-2',
               groupKey: 'repo::worktree',
@@ -49,6 +58,7 @@ describe('TerminalSwitcher', () => {
               title: 'node',
               phase: 'open',
               active: false,
+              hasBell: true,
             },
           ]}
           onNew={onNew}
@@ -70,6 +80,8 @@ describe('TerminalSwitcher', () => {
       expect(onClose).toHaveBeenCalledWith('terminal-1')
       expect(onSelect).not.toHaveBeenCalled()
       expect(onNew).not.toHaveBeenCalled()
+      expect(container.querySelector('.goblin-terminal-switcher__badge')?.textContent).toBe('1')
+      expect(container.querySelectorAll('.goblin-terminal-switcher__bell-dot')).toHaveLength(1)
     } finally {
       await act(async () => root.unmount())
       container.remove()

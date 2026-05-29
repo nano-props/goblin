@@ -56,6 +56,7 @@ contextBridge.exposeInMainWorld('goblin', {
     resize: (input) => safeInvoke('goblin:terminal-resize', input),
     close: (input) => safeInvoke('goblin:terminal-close', input),
     pruneRepo: (input) => safeInvoke('goblin:terminal-prune-repo', input),
+    notifyBell: (input) => safeInvoke('goblin:terminal-notify-bell', input),
     onOutput: (cb) => {
       const listener = (_event, payload) => cb(payload)
       ipcRenderer.on('goblin:terminal-output', listener)

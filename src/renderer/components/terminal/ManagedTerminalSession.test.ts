@@ -46,6 +46,7 @@ const xtermMocks = vi.hoisted(() => {
     private resizeHandlers: Array<(size: { cols: number; rows: number }) => void> = []
     private dataHandlers: Array<(data: string) => void> = []
     private binaryHandlers: Array<(data: string) => void> = []
+    private bellHandlers: Array<() => void> = []
 
     constructor(options: {
       cols: number
@@ -95,6 +96,11 @@ const xtermMocks = vi.hoisted(() => {
       return { dispose: vi.fn(() => (this.resizeHandlers = this.resizeHandlers.filter((handler) => handler !== cb))) }
     }
 
+    onBell(cb: () => void) {
+      this.bellHandlers.push(cb)
+      return { dispose: vi.fn(() => (this.bellHandlers = this.bellHandlers.filter((handler) => handler !== cb))) }
+    }
+
     attachCustomKeyEventHandler(cb: (event: KeyboardEvent) => boolean) {
       this.customKeyEventHandler = cb
     }
@@ -107,6 +113,10 @@ const xtermMocks = vi.hoisted(() => {
 
     emitData(data: string) {
       for (const handler of this.dataHandlers) handler(data)
+    }
+
+    emitBell() {
+      for (const handler of this.bellHandlers) handler()
     }
   }
 
@@ -286,6 +296,7 @@ const terminalCalls = {
   write: vi.fn<Window['goblin']['terminal']['write']>(),
   resize: vi.fn<Window['goblin']['terminal']['resize']>(),
   close: vi.fn<Window['goblin']['terminal']['close']>(),
+  notifyBell: vi.fn<Window['goblin']['terminal']['notifyBell']>(),
 }
 const invokeRpc = vi.fn<Window['goblin']['invokeRpc']>()
 
@@ -349,6 +360,7 @@ beforeEach(() => {
         write: terminalCalls.write.mockResolvedValue(true),
         resize: terminalCalls.resize.mockResolvedValue(true),
         close: terminalCalls.close.mockResolvedValue(true),
+        notifyBell: terminalCalls.notifyBell.mockResolvedValue(true),
         pruneRepo: vi.fn(),
         onOutput: vi.fn(),
         onExit: vi.fn(),
@@ -741,6 +753,21 @@ describe('ManagedTerminalSession', () => {
 
     expect(xtermMocks.imageAddons).toHaveLength(1)
     expect(xtermMocks.progressAddons).toHaveLength(1)
+  })
+
+  test('emits bell events for provider-level policy handling', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const notify = vi.fn()
+    const onBell = vi.fn()
+    const session = new ManagedTerminalSession(descriptor, notify, onBell)
+
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    xtermMocks.terminals[0]!.emitBell()
+    expect(onBell).toHaveBeenCalledWith(descriptor, { processName: 'zsh', visible: true })
   })
 
   test('progress state appears in snapshot and clears on state 0', async () => {

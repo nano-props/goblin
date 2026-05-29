@@ -1,6 +1,7 @@
 import type {
   TerminalExitEvent,
   TerminalMutationResult,
+  TerminalNotifyBellInput,
   TerminalOpenInput,
   TerminalOpenResult,
   TerminalOutputEvent,
@@ -35,6 +36,9 @@ export const terminalBridge = {
   },
   pruneRepo(input: TerminalPruneRepoInput): Promise<TerminalMutationResult> {
     return getTerminalBridge().pruneRepo(input)
+  },
+  notifyBell(input: TerminalNotifyBellInput): Promise<TerminalMutationResult> {
+    return getTerminalBridge().notifyBell(input)
   },
   onOutput(cb: (event: TerminalOutputEvent) => void): () => void {
     return getTerminalBridge().onOutput(cb)

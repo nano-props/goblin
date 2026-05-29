@@ -144,10 +144,21 @@
   padding: 0 5px 0 8px;
 }
 
+.goblin-terminal-switcher__title-wrap {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
 .goblin-terminal-switcher__title {
   color: var(--color-muted-foreground);
   font-size: 11px;
   font-weight: 500;
+}
+
+.goblin-terminal-switcher__badge {
+  min-width: 16px;
 }
 
 .goblin-terminal-switcher__list {
@@ -214,6 +225,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.goblin-terminal-switcher__bell-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--color-attention);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-popover) 80%, transparent);
 }
 
 .goblin-terminal-switcher__close {

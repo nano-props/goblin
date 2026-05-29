@@ -23,6 +23,7 @@ import { Topbar } from '#/renderer/components/Topbar.tsx'
 import { ErrorBoundary } from '#/renderer/components/ErrorBoundary.tsx'
 import { RepoTabs } from '#/renderer/components/RepoTabs.tsx'
 import { RepoCloneDialog } from '#/renderer/components/RepoCloneDialog.tsx'
+import { RepoOpenDialog } from '#/renderer/components/RepoOpenDialog.tsx'
 import { RepoView } from '#/renderer/components/RepoView.tsx'
 import { RepoWorkspaceSkeleton } from '#/renderer/components/Skeleton.tsx'
 import { SettingsPanel, type SettingsPage } from '#/renderer/components/SettingsPanel.tsx'
@@ -35,6 +36,7 @@ import { useKeyboard } from '#/renderer/hooks/useKeyboard.ts'
 import { useRepoDrop } from '#/renderer/hooks/useRepoDrop.ts'
 import { useAppBootstrap } from '#/renderer/hooks/useAppBootstrap.ts'
 import { useBackgroundFetch } from '#/renderer/hooks/useBackgroundFetch.ts'
+import { useExternalOpenPaths } from '#/renderer/hooks/useExternalOpenPaths.ts'
 import { useMenuActions } from '#/renderer/hooks/useMenuActions.ts'
 import { useSessionPersistence } from '#/renderer/hooks/useSessionPersistence.ts'
 import { useSettingsWriteErrorToast } from '#/renderer/hooks/useSettingsWriteErrorToast.ts'
@@ -49,11 +51,13 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsPage, setSettingsPage] = useState<SettingsPage>('general')
   const [cloneOpen, setCloneOpen] = useState(false)
+  const [openRepoOpen, setOpenRepoOpen] = useState(false)
   const workspaceBehavior = repoWorkspaceBehavior(workspaceLayout, detailCollapsed)
   const openSettings = useCallback((page: SettingsPage = 'general') => {
     setSettingsPage(page)
     setSettingsOpen(true)
   }, [])
+  const openRepoPathDialog = useCallback(() => setOpenRepoOpen(true), [])
   const closeSettings = useCallback(() => {
     setSettingsOpen(false)
     setSettingsPage('general')
@@ -66,14 +70,15 @@ export function App() {
   // keyboard shortcuts and the file-drop dashed border. useKeyboard
   // additionally OR's in commit-detail, which is per-repo state read
   // from the store inside the hook itself.
-  const modalOpen = settingsOpen || cloneOpen
+  const modalOpen = settingsOpen || cloneOpen || openRepoOpen
   const repoDrop = useRepoDrop({ blocked: modalOpen })
 
   useAppBootstrap()
   useSessionPersistence()
   useSettingsWriteErrorToast()
   useBackgroundFetch()
-  useMenuActions({ openSettings, openCloneRepo, showHelp, isOverlayOpen: () => modalOpen })
+  useExternalOpenPaths()
+  useMenuActions({ openSettings, openRepoPathDialog, openCloneRepo, showHelp, isOverlayOpen: () => modalOpen })
 
   useKeyboard({
     onShowHelp: showHelp,
@@ -121,6 +126,7 @@ export function App() {
             onPageChange={setSettingsPage}
             onClose={closeSettings}
           />
+          <RepoOpenDialog open={openRepoOpen} onOpenChange={setOpenRepoOpen} />
           <RepoCloneDialog open={cloneOpen} onOpenChange={setCloneOpen} />
           <RepoDropOverlay active={repoDrop.active} />
           {/* shadcn/ui Toaster wrapper — owns its own theme + style hooks.

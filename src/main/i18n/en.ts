@@ -27,7 +27,8 @@ export const en = {
   'menu.window.front': 'Bring All to Front',
 
   // ---- Menu — File --------------------------------------------------------
-  'menu.file.open-repo': 'Open Repository…',
+  'menu.file.open-local-repo': 'Open Local Repository…',
+  'menu.file.open-local-repo-path': 'Open Local Repository by Path…',
   'menu.file.clone-repo': 'Clone Repository…',
   'menu.file.open-recent': 'Open Recent',
   'menu.file.no-recent': 'No Recent Repositories',
@@ -75,6 +76,13 @@ export const en = {
   'repo-tabs.close': 'Close',
   'repo-tabs.drag-to-reorder': 'Drag to reorder',
   'repo-tabs.open-local': 'Open local repository…',
+  'repo-tabs.open-title': 'Open local repository',
+  'repo-tabs.open-description': 'Enter a local path or choose a folder to open a Git repository as a new tab.',
+  'repo-tabs.open-path-label': 'Repository path',
+  'repo-tabs.open-path-placeholder': '~/Developer/repo',
+  'repo-tabs.open-path-choose': 'Choose…',
+  'repo-tabs.open-local-confirm': 'Open local repository',
+  'repo-tabs.open-opening': 'Opening…',
   'repo-tabs.clone': 'Clone repository…',
   'repo-tabs.clone-title': 'Clone repository',
   'repo-tabs.clone-description': 'Clone a remote Git repository and open it as a new tab.',
@@ -105,9 +113,9 @@ export const en = {
     'Click <open>Open</open> in the tab strip to add a Git repository, or drop a repository folder into this window.',
 
   // ---- Drag and drop ------------------------------------------------------
-  'drop.title': 'Drop to open repository',
+  'drop.title': 'Drop to open local repository',
   'drop.body': 'Drop a Git repository folder anywhere in Goblin.',
-  'drop.open-failed': 'Could not open repository',
+  'drop.open-failed': 'Could not open local repository',
 
   // ---- Detail tabs --------------------------------------------------------
   'tab.branches': 'Branches',
@@ -234,6 +242,11 @@ export const en = {
   'terminal.progress': 'Terminal progress',
   'terminal.empty': 'No terminal open',
   'terminal.drop-hint': 'Drop to paste path',
+  'terminal.index-title': 'Terminal {index}',
+  'terminal.bell-unread': 'Unread terminal bell',
+  'terminal.bell-unread-count': '{count} unread bell',
+  'terminal.bell-notification-title': 'Background terminal alert',
+  'terminal.bell-notification-body': '{terminalTitle} · {processName} · {branch}',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) ---
   'worktrees.reveal-title': 'Reveal in Finder',
@@ -378,6 +391,20 @@ export const en = {
   'settings.action-bar-blank-toggle': 'Toggle details from action bar',
   'settings.action-bar-blank-toggle-hint':
     'Top/bottom layout only. Click empty action bar space to show or hide details.',
+  'settings.terminal-notifications': 'Terminal bell notifications',
+  'settings.terminal-notifications-hint': 'Show system notifications for background terminal bells.',
+  'settings.terminal-notifications-test': 'Test system notifications',
+  'settings.terminal-notifications-test-hint':
+    'Trigger a test notification through the same notification path. If you only see the Dock bounce, check macOS notification settings.',
+  'settings.terminal-notifications-test-button': 'Show test notification',
+  'settings.terminal-notifications-test-title': 'Goblin test notification',
+  'settings.terminal-notifications-test-body':
+    'If you do not see a top-right notification, check your macOS notification settings.',
+  'settings.terminal-notifications-test-sent': 'Test notification sent',
+  'settings.terminal-notifications-test-sent-hint':
+    'If you only see the Dock bounce and no top-right notification, check Goblin in macOS notification settings.',
+  'settings.terminal-notifications-test-failed': 'Unable to show test notification',
+  'settings.terminal-notifications-test-failed-hint': 'The notification request did not complete successfully. Please try again.',
   'settings.group.general': 'General',
   'settings.group.apps': 'External apps',
   'settings.group.sync': 'Sync',
@@ -414,6 +441,10 @@ export const en = {
   'settings.apps.status.not-detected': 'not detected',
   'settings.fetch': 'Auto-fetch',
   'settings.fetch-hint': 'Fetches the active repository in the background.',
+  'settings.general.open-from-terminal-title': 'Open from Terminal',
+  'settings.general.open-from-terminal-body':
+    'On macOS, you can open a local repository directly in Goblin from Terminal or scripts.',
+  'settings.general.open-from-terminal-command': 'open -b goblin.app /path/to/repo',
   'settings.fetch.off': 'Off',
   'settings.fetch.30s': '30 sec',
   'settings.fetch.1m': '1 min',
@@ -477,7 +508,7 @@ export const en = {
   'help.row.switch-detail-tab': 'Previous / next detail tab',
   'help.row.toggle-detail': 'Collapse / expand detail panel',
   'help.row.checkout': 'Activate selection',
-  'help.row.open-repo': 'Open repository',
+  'help.row.open-local-repo': 'Open local repository',
   'help.row.clone-repo': 'Clone repository',
   'help.row.activate-window': 'Show Goblin window',
   'help.row.close-repo': 'Close current tab',

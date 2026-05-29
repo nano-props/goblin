@@ -26,6 +26,7 @@ import { onRpcEventType, rpc } from '#/renderer/rpc.ts'
 
 interface SettingsStore {
   fetchIntervalSec: number
+  terminalNotificationsEnabled: boolean
   shortcutsDisabled: boolean
   globalShortcutDisabled: boolean
   swapCloseShortcuts: boolean
@@ -50,6 +51,7 @@ interface SettingsStore {
   hydrate: () => Promise<SessionState>
   hydrateExternalApps: () => Promise<void>
   setFetchInterval: (sec: number) => Promise<void>
+  setTerminalNotificationsEnabled: (enabled: boolean) => Promise<void>
   setShortcutsDisabled: (disabled: boolean) => Promise<void>
   setGlobalShortcutDisabled: (disabled: boolean) => Promise<void>
   setSwapCloseShortcuts: (swapped: boolean) => Promise<void>
@@ -183,6 +185,7 @@ function mergeDetectedExternalAppsState<T extends object>(
 
 export const useSettingsStore = create<SettingsStore>((set) => ({
   fetchIntervalSec: 120,
+  terminalNotificationsEnabled: false,
   shortcutsDisabled: false,
   globalShortcutDisabled: false,
   swapCloseShortcuts: false,
@@ -215,6 +218,7 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
     if (version !== hydrateVersion) return snap.session
     set({
       fetchIntervalSec: snap.fetchIntervalSec,
+      terminalNotificationsEnabled: snap.terminalNotificationsEnabled,
       shortcutsDisabled: snap.shortcutsDisabled,
       globalShortcutDisabled: snap.globalShortcutDisabled,
       swapCloseShortcuts: snap.swapCloseShortcuts,
@@ -230,6 +234,11 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
       nextUnsubscribers.push(
         onRpcEventType('fetch-interval-changed', (event) => {
           set((s) => (s.fetchIntervalSec === event.sec ? s : { fetchIntervalSec: event.sec }))
+        }),
+        onRpcEventType('terminal-notifications-changed', (event) => {
+          set((s) =>
+            s.terminalNotificationsEnabled === event.enabled ? s : { terminalNotificationsEnabled: event.enabled },
+          )
         }),
         onRpcEventType('shortcuts-disabled-changed', (event) => {
           set((s) => (s.shortcutsDisabled === event.disabled ? s : { shortcutsDisabled: event.disabled }))
@@ -297,6 +306,11 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
     const clamped = Math.max(0, Math.min(3600, Math.round(sec)))
     await rpc.settings.setFetchInterval.mutate({ sec: clamped })
     set((s) => (s.fetchIntervalSec === clamped ? s : { fetchIntervalSec: clamped }))
+  },
+
+  async setTerminalNotificationsEnabled(enabled) {
+    await rpc.settings.setTerminalNotificationsEnabled.mutate({ enabled })
+    set((s) => (s.terminalNotificationsEnabled === enabled ? s : { terminalNotificationsEnabled: enabled }))
   },
 
   async setShortcutsDisabled(disabled) {

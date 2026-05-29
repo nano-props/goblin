@@ -39,6 +39,7 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
     activeDescriptor,
     sessionSummaries,
     setActive,
+    clearBell,
     closeTerminalAndDismissDetailIfLast,
     attach,
     detach,
@@ -75,6 +76,18 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
     attach(descriptor, host)
     return () => detach(descriptor.key, host)
   }, [attach, descriptor, detach])
+
+  useEffect(() => {
+    if (!key || typeof document === 'undefined' || !document.hasFocus()) return
+    clearBell(key)
+  }, [clearBell, key, version])
+
+  useEffect(() => {
+    if (!key) return
+    const handleFocus = () => clearBell(key)
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [clearBell, key])
 
   useEffect(() => {
     if (searchOpen) searchInputRef.current?.focus({ preventScroll: true })

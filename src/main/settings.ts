@@ -53,6 +53,7 @@ export interface Settings {
   lang: LangPref
   /** Auto-fetch interval in seconds for the active repo. 0 = disabled. */
   fetchIntervalSec: number
+  terminalNotificationsEnabled: boolean
   shortcutsDisabled: boolean
   globalShortcutDisabled: boolean
   swapCloseShortcuts: boolean
@@ -71,6 +72,7 @@ const DEFAULTS: Settings = {
   colorTheme: DEFAULT_COLOR_THEME,
   lang: 'auto',
   fetchIntervalSec: 120,
+  terminalNotificationsEnabled: false,
   shortcutsDisabled: false,
   globalShortcutDisabled: false,
   swapCloseShortcuts: false,
@@ -180,6 +182,10 @@ function normalizeFetchInterval(value: unknown): number {
     : DEFAULTS.fetchIntervalSec
 }
 
+function normalizeTerminalNotificationsEnabled(value: unknown): boolean {
+  return value === true
+}
+
 function normalizeWindowBounds(value: unknown): WindowBounds | null {
   if (!value || typeof value !== 'object') return null
   const bounds = value as Partial<WindowBounds>
@@ -213,6 +219,7 @@ export async function loadSettings(): Promise<Settings> {
       colorTheme: normalizeColorTheme(parsed.colorTheme),
       lang: normalizeLangPref(parsed.lang),
       fetchIntervalSec: normalizeFetchInterval(parsed.fetchIntervalSec),
+      terminalNotificationsEnabled: normalizeTerminalNotificationsEnabled(parsed.terminalNotificationsEnabled),
       shortcutsDisabled: parsed.shortcutsDisabled === true,
       globalShortcutDisabled: parsed.globalShortcutDisabled === true,
       swapCloseShortcuts: parsed.swapCloseShortcuts === true,
@@ -238,6 +245,10 @@ export function getRecentRepos(): string[] {
 
 export function getShortcutsDisabled(): boolean {
   return cache?.shortcutsDisabled ?? DEFAULTS.shortcutsDisabled
+}
+
+export function getTerminalNotificationsEnabled(): boolean {
+  return cache?.terminalNotificationsEnabled ?? DEFAULTS.terminalNotificationsEnabled
 }
 
 export function getGlobalShortcutDisabled(): boolean {
@@ -369,6 +380,14 @@ export async function setFetchInterval(sec: number): Promise<number> {
   return clamped
 }
 
+export async function setTerminalNotificationsEnabled(enabled: boolean): Promise<boolean> {
+  const s = await loadSettings()
+  if (s.terminalNotificationsEnabled === enabled) return enabled
+  s.terminalNotificationsEnabled = enabled
+  scheduleWrite()
+  return enabled
+}
+
 export async function setShortcutsDisabled(disabled: boolean): Promise<boolean> {
   const s = await loadSettings()
   if (s.shortcutsDisabled === disabled) return disabled
@@ -445,6 +464,7 @@ export async function addRecentRepo(repoPath: string): Promise<string[]> {
   if (!safePath) return getRecentRepos()
   const s = await loadSettings()
   s.recentRepos = [safePath, ...s.recentRepos.filter((p) => p !== safePath)].slice(0, MAX_RECENT_REPOS)
+  app.addRecentDocument(safePath)
   scheduleWrite()
   return s.recentRepos
 }
@@ -453,5 +473,6 @@ export async function clearRecentRepos(): Promise<void> {
   const s = await loadSettings()
   if (s.recentRepos.length === 0) return
   s.recentRepos = []
+  app.clearRecentDocuments()
   scheduleWrite()
 }

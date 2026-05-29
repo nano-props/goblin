@@ -4,6 +4,7 @@ import { setTerminalFocused } from '#/renderer/terminal-focus.ts'
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { terminalBridge } from '#/renderer/terminal.ts'
 import { ManagedTerminalSession } from '#/renderer/components/terminal/ManagedTerminalSession.ts'
+import { createTerminalBellController } from '#/renderer/components/terminal/terminal-bell-controller.ts'
 import {
   isTerminalDescriptorLive,
   terminalDescriptor,
@@ -29,12 +30,16 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   const nextIndexByGroupRef = useRef(new Map<string, number>())
   const [version, setVersion] = useState(0)
   const notify = useCallback(() => setVersion((current) => current + 1), [])
+  const bellControllerRef = useRef<ReturnType<typeof createTerminalBellController> | null>(null)
+  if (!bellControllerRef.current) bellControllerRef.current = createTerminalBellController(notify)
+  const bellController = bellControllerRef.current
 
   function removeSession(key: string, options: { dispose: boolean }): boolean {
     const session = sessionsRef.current.get(key)
     if (!session) return false
     const groupKey = session.descriptor.groupKey
     sessionsRef.current.delete(key)
+    bellController.remove(key)
     if (options.dispose) session.dispose()
     if (activeKeyByGroupRef.current.get(groupKey) === key) {
       const next = Array.from(sessionsRef.current.values())
@@ -61,6 +66,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
           title: snapshot.processName || `terminal ${session.descriptor.index}`,
           phase: snapshot.phase,
           active: session.descriptor.key === activeKey,
+          hasBell: bellController.hasBell(session.descriptor.key),
         }
       })
   }, [])
@@ -112,6 +118,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       sessions.clear()
       activeKeyByGroupRef.current.clear()
       nextIndexByGroupRef.current.clear()
+      bellController.reset()
     }
   }, [])
 
@@ -140,7 +147,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
         current.updateDescriptor(descriptor)
         return current
       }
-      const session = new ManagedTerminalSession(descriptor, notify)
+      const session = new ManagedTerminalSession(descriptor, notify, bellController.handleBell)
       sessionsRef.current.set(descriptor.key, session)
       if (!activeKeyByGroupRef.current.has(descriptor.groupKey)) {
         activeKeyByGroupRef.current.set(descriptor.groupKey, descriptor.key)
@@ -204,11 +211,19 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     (groupKey: string, key: string) => {
       const session = sessionsRef.current.get(key)
       if (!session || session.descriptor.groupKey !== groupKey) return
+      const wasActive = activeKeyByGroupRef.current.get(groupKey) === key
+      const hadBell = bellController.hasBell(key)
+      if (wasActive && !hadBell) return
       activeKeyByGroupRef.current.set(groupKey, key)
-      notify()
+      bellController.clear(key)
+      if (!hadBell) notify()
     },
-    [notify],
+    [bellController, notify],
   )
+
+  const clearBell = useCallback((key: string) => {
+    return bellController.clear(key)
+  }, [bellController])
 
   const restart = useCallback((key: string) => {
     sessionsRef.current.get(key)?.restart()
@@ -254,6 +269,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       activeDescriptor,
       sessionSummaries,
       setActive,
+      clearBell,
       closeTerminalAndDismissDetailIfLast,
       attach,
       detach,
@@ -281,6 +297,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       serialize,
       sessionSummaries,
       setActive,
+      clearBell,
       snapshot,
       version,
       writeInput,

@@ -54,6 +54,7 @@ export interface SettingsSnapshot {
   theme: ThemePref
   colorTheme: ColorTheme
   fetchIntervalSec: number
+  terminalNotificationsEnabled: boolean
   shortcutsDisabled: boolean
   globalShortcutDisabled: boolean
   swapCloseShortcuts: boolean
@@ -161,6 +162,7 @@ export type RpcResponse =
 
 export type MenuAction =
   | 'open-repo'
+  | 'open-repo-path'
   | 'clone-repo'
   | 'close-repo'
   | 'next-repo'
@@ -181,6 +183,7 @@ export type MenuAction =
 export type RpcEvent =
   | { type: 'theme-changed'; state: ThemeState }
   | { type: 'fetch-interval-changed'; sec: number }
+  | { type: 'terminal-notifications-changed'; enabled: boolean }
   | { type: 'shortcuts-disabled-changed'; disabled: boolean }
   | { type: 'global-shortcut-disabled-changed'; disabled: boolean }
   | { type: 'swap-close-shortcuts-changed'; swapped: boolean }
@@ -190,6 +193,7 @@ export type RpcEvent =
   | ({ type: 'terminal-app-changed' } & TerminalAppState)
   | ({ type: 'editor-app-changed' } & EditorAppState)
   | { type: 'settings-write-error'; message: string }
+  | { type: 'external-open-enqueued' }
   | { type: 'menu-action'; action: MenuAction }
   | { type: 'i18n-changed'; payload: I18nPayload }
 
@@ -200,6 +204,7 @@ export interface AppRpcHandlers {
   }
   repo: {
     openDialog: () => Promise<string | null>
+    consumeExternalOpenPaths: () => Promise<string[]>
     cloneParentDialog: () => Promise<string | null>
     probe: (input: { cwd: string }) => Promise<ProbeResult>
     clone: (input: {
@@ -257,6 +262,7 @@ export interface AppRpcHandlers {
   settings: {
     get: () => Promise<SettingsSnapshot>
     setFetchInterval: (input: { sec: number }) => Promise<void>
+    setTerminalNotificationsEnabled: (input: { enabled: boolean }) => Promise<void>
     setShortcutsDisabled: (input: { disabled: boolean }) => Promise<void>
     setGlobalShortcutDisabled: (input: { disabled: boolean }) => Promise<void>
     setSwapCloseShortcuts: (input: { swapped: boolean }) => Promise<void>
@@ -297,6 +303,7 @@ export function createAppRouter(handlers: AppRpcHandlers) {
     }),
     repo: t.router({
       openDialog: p.input(EmptyInput).mutation(() => handlers.repo.openDialog()),
+      consumeExternalOpenPaths: p.input(EmptyInput).mutation(() => handlers.repo.consumeExternalOpenPaths()),
       cloneParentDialog: p.input(EmptyInput).mutation(() => handlers.repo.cloneParentDialog()),
       probe: p.input(CwdInput).query(({ input }) => handlers.repo.probe(input)),
       clone: p
@@ -394,6 +401,9 @@ export function createAppRouter(handlers: AppRpcHandlers) {
       setFetchInterval: p
         .input(v.object({ sec: FiniteNumber }))
         .mutation(({ input }) => handlers.settings.setFetchInterval(input)),
+      setTerminalNotificationsEnabled: p
+        .input(v.object({ enabled: v.boolean() }))
+        .mutation(({ input }) => handlers.settings.setTerminalNotificationsEnabled(input)),
       setShortcutsDisabled: p
         .input(v.object({ disabled: v.boolean() }))
         .mutation(({ input }) => handlers.settings.setShortcutsDisabled(input)),

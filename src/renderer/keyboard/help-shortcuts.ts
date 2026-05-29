@@ -48,7 +48,7 @@ export function helpShortcutSections(globalShortcut: string, swapCloseShortcuts 
     {
       titleKey: 'help.section.app',
       rows: [
-        { combos: [['⌘', 'O']], labelKey: 'help.row.open-repo' },
+        { combos: [['⌘', 'O']], labelKey: 'help.row.open-local-repo' },
         { combos: [['⌘', '⇧', 'O']], labelKey: 'help.row.clone-repo' },
         { combos: [acceleratorToKeyLabels(globalShortcut)], labelKey: 'help.row.activate-window' },
         { combos: [closeTabCombo], labelKey: 'help.row.close-repo' },

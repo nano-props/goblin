@@ -4,6 +4,7 @@ import type { RpcEvent, RpcRequest } from '#/shared/rpc.ts'
 import type {
   TerminalExitEvent,
   TerminalMutationResult,
+  TerminalNotifyBellInput,
   TerminalOpenInput,
   TerminalOpenResult,
   TerminalOutputEvent,
@@ -27,6 +28,7 @@ interface GoblinBridge {
     resize: (input: TerminalResizeInput) => Promise<TerminalMutationResult>
     close: (input: TerminalSessionInput) => Promise<TerminalMutationResult>
     pruneRepo: (input: TerminalPruneRepoInput) => Promise<TerminalMutationResult>
+    notifyBell: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>
     onOutput: (cb: (event: TerminalOutputEvent) => void) => () => void
     onExit: (cb: (event: TerminalExitEvent) => void) => () => void
   }

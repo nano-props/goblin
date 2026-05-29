@@ -1,4 +1,5 @@
 import { Plus, Terminal as TerminalIcon, Trash2 } from 'lucide-react'
+import { Badge } from '#/renderer/components/ui/badge.tsx'
 import { Button } from '#/renderer/components/ui/button.tsx'
 import { ScrollArea } from '#/renderer/components/ui/scroll-area.tsx'
 import { useT } from '#/renderer/stores/i18n.ts'
@@ -23,6 +24,7 @@ export function TerminalSwitcher({
   onClose,
 }: TerminalSwitcherProps) {
   const t = useT()
+  const unreadCount = sessions.filter((session) => session.hasBell).length
   return (
     <div
       className={cn('goblin-terminal-switcher', offsetForSearch && 'goblin-terminal-switcher--below-search')}
@@ -30,7 +32,20 @@ export function TerminalSwitcher({
       aria-label={t('terminal.sessions')}
     >
       <div className="goblin-terminal-switcher__header">
-        <span className="goblin-terminal-switcher__title">{t('terminal.sessions')}</span>
+        <div className="goblin-terminal-switcher__title-wrap">
+          <span className="goblin-terminal-switcher__title">{t('terminal.sessions')}</span>
+          {unreadCount > 0 && (
+            <Badge
+              variant="attention"
+              size="xs"
+              className="goblin-terminal-switcher__badge"
+              title={t('terminal.bell-unread-count', { count: unreadCount })}
+              aria-label={t('terminal.bell-unread-count', { count: unreadCount })}
+            >
+              {unreadCount}
+            </Badge>
+          )}
+        </div>
         <Button
           type="button"
           size="icon-sm"
@@ -72,6 +87,12 @@ export function TerminalSwitcher({
                 >
                   <TerminalIcon size={16} />
                   <span>{session.title}</span>
+                  {session.hasBell && (
+                    <>
+                      <span className="goblin-terminal-switcher__bell-dot" aria-hidden="true" />
+                      <span className="sr-only">{t('terminal.bell-unread')}</span>
+                    </>
+                  )}
                 </button>
                 <Button
                   type="button"

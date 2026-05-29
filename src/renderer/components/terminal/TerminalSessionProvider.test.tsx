@@ -1,14 +1,17 @@
 // @vitest-environment jsdom
 
+import i18next from 'i18next'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { TerminalSessionProvider } from '#/renderer/components/terminal/TerminalSessionProvider.tsx'
 import { useTerminalSessionContext } from '#/renderer/components/terminal/terminal-session-context.ts'
 import { terminalSessionGroupKey } from '#/renderer/components/terminal/terminal-session-utils.ts'
+import { useSettingsStore } from '#/renderer/stores/settings.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/renderer/stores/repos/test-utils.ts'
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import type {
+  TerminalBellEvent,
   TerminalDescriptor,
   TerminalSearchResult,
   TerminalSessionContextValue,
@@ -16,12 +19,24 @@ import type {
 } from '#/renderer/components/terminal/types.ts'
 import type { TerminalExitEvent, TerminalOutputEvent } from '#/shared/terminal.ts'
 
+const mockSessions = vi.hoisted(() => [] as Array<{ descriptor: TerminalDescriptor; emitBell: (event: TerminalBellEvent) => void }>)
+
 vi.mock('#/renderer/components/terminal/ManagedTerminalSession.ts', () => {
   class ManagedTerminalSession {
     descriptor: TerminalDescriptor
+    private readonly onBell: (descriptor: TerminalDescriptor, event: TerminalBellEvent) => void
 
-    constructor(descriptor: TerminalDescriptor) {
+    constructor(
+      descriptor: TerminalDescriptor,
+      _notify: () => void,
+      onBell: (descriptor: TerminalDescriptor, event: TerminalBellEvent) => void,
+    ) {
       this.descriptor = descriptor
+      this.onBell = onBell
+      mockSessions.push({
+        descriptor,
+        emitBell: (event) => this.onBell(this.descriptor, event),
+      })
     }
 
     updateDescriptor(descriptor: TerminalDescriptor) {
@@ -78,7 +93,20 @@ let exitHandler: ((event: TerminalExitEvent) => void) | null = null
 beforeEach(() => {
   ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   exitHandler = null
+  mockSessions.length = 0
   resetReposStore()
+  useSettingsStore.setState({ terminalNotificationsEnabled: false })
+  i18next.addResourceBundle(
+    'en',
+    'translation',
+    {
+      'terminal.index-title': 'Terminal {index}',
+      'terminal.bell-notification-title': 'Background terminal alert',
+      'terminal.bell-notification-body': '{terminalTitle} · {processName} · {branch}',
+    },
+    true,
+    true,
+  )
   document.body.innerHTML = ''
   Object.defineProperty(window, 'goblin', {
     configurable: true,
@@ -108,6 +136,7 @@ beforeEach(() => {
         write: vi.fn(async () => true),
         resize: vi.fn(async () => true),
         close: vi.fn(async () => true),
+        notifyBell: vi.fn(async () => true),
         pruneRepo: vi.fn(async () => true),
         onOutput: vi.fn(() => () => {}),
         onExit: vi.fn((cb: (event: TerminalExitEvent) => void) => {
@@ -141,10 +170,10 @@ describe('TerminalSessionProvider', () => {
       expect(
         getContext()
           .sessionSummaries(groupKey)
-          .map((session) => [session.terminalId, session.active]),
+          .map((session) => [session.terminalId, session.active, session.hasBell]),
       ).toEqual([
-        ['terminal-1', false],
-        ['terminal-2', true],
+        ['terminal-1', false, false],
+        ['terminal-2', true, false],
       ])
 
       await act(async () => {
@@ -156,8 +185,8 @@ describe('TerminalSessionProvider', () => {
       expect(
         getContext()
           .sessionSummaries(groupKey)
-          .map((session) => [session.terminalId, session.active]),
-      ).toEqual([['terminal-1', true]])
+          .map((session) => [session.terminalId, session.active, session.hasBell]),
+      ).toEqual([['terminal-1', true, false]])
 
       await act(async () => {
         exitHandler?.({ sessionId: 'terminal-1' })
@@ -166,6 +195,67 @@ describe('TerminalSessionProvider', () => {
       expect(useReposStore.getState().repos[REPO_ID]?.ui.detailTab).toBe('status')
       expect(useReposStore.getState().detailCollapsed).toBe(true)
     } finally {
+      await unmount()
+    }
+  })
+
+  test('tracks unread bells in provider state and clears them when activating the session', async () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      detailTab: 'terminal',
+    })
+    useSettingsStore.setState({ terminalNotificationsEnabled: true })
+    const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
+    const notifyBell = vi.fn(async () => true)
+    Object.assign(window.goblin.terminal, { notifyBell })
+    const { getContext, unmount } = await renderProvider()
+
+    try {
+      const base = { repoRoot: REPO_ID, branch: 'feature/worktree', worktreePath: WORKTREE_PATH }
+      await act(async () => {
+        getContext().ensureDefault(base)
+        getContext().createTerminal(base)
+      })
+
+      const groupKey = terminalSessionGroupKey(REPO_ID, WORKTREE_PATH)
+      const firstSession = mockSessions.find((session) => session.descriptor.terminalId === 'terminal-1')
+      if (!firstSession) throw new Error('missing terminal-1 mock session')
+
+      await act(async () => {
+        firstSession.emitBell({ processName: 'zsh', visible: false })
+      })
+
+      expect(
+        getContext()
+          .sessionSummaries(groupKey)
+          .map((session) => [session.terminalId, session.active, session.hasBell]),
+      ).toEqual([
+        ['terminal-1', false, true],
+        ['terminal-2', true, false],
+      ])
+      expect(notifyBell).toHaveBeenCalledWith({
+        title: 'Background terminal alert',
+        body: 'Terminal 1 · zsh · feature/worktree',
+      })
+
+      await act(async () => {
+        const firstKey = getContext().sessionSummaries(groupKey)[0]?.key
+        if (!firstKey) throw new Error('missing terminal-1 key')
+        getContext().setActive(groupKey, firstKey)
+      })
+
+      expect(
+        getContext()
+          .sessionSummaries(groupKey)
+          .map((session) => [session.terminalId, session.active, session.hasBell]),
+      ).toEqual([
+        ['terminal-1', true, false],
+        ['terminal-2', false, false],
+      ])
+    } finally {
+      hasFocus.mockRestore()
       await unmount()
     }
   })
