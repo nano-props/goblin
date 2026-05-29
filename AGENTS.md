@@ -38,3 +38,4 @@
 ## Privacy-safe examples
 
 - Use generic placeholders in examples, tests, docs, and snapshots. Do not include real user names, machine names, personal paths, emails, tokens, secrets, or company-internal identifiers.
+- Test fixtures and inline sample code should stay generic as well; avoid realistic business snippets, internal module names, or production-like file paths when a neutral placeholder communicates the same intent.
