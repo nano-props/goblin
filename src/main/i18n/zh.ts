@@ -358,8 +358,8 @@ export const zh: Record<DictKey, string> = {
   // ---- Settings panel ----------------------------------------------------
   'settings.title': '设置',
   'settings.theme-preset': '主题',
-  'settings.theme-preset.goblin': 'Goblin',
-  'settings.theme-preset.shadcn': 'shadcn/ui',
+  'settings.theme-preset.macos': 'macOS',
+  'settings.theme-preset.mono': 'Mono',
   'settings.theme-preset.github': 'GitHub',
   'settings.appearance': '外观',
   'settings.appearance.auto': '跟随系统',

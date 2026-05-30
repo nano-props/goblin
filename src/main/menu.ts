@@ -162,7 +162,7 @@ function createFileMenu(state: AppMenuState): MenuItemConstructorOptions {
       // Close-window uses Electron's `role: 'close'` so it works even
       // when the renderer is hung. The swap setting flips which shortcut
       // closes the window vs. the tab. Default: ⌘W = close window,
-      // ⌘⇧W = close tab. Swapped (legacy): ⌘W = close tab, ⌘⇧W = close window.
+      // ⌘⇧W = close tab. Swapped: ⌘W = close tab, ⌘⇧W = close window.
       state.shortcutsDisabled
         ? { label: t('menu.file.close-window'), click: () => BrowserWindow.getFocusedWindow()?.close() }
         : {

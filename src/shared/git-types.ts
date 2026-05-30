@@ -61,8 +61,9 @@ export function branchPullRequestBelongsToBranch(
   if (branch.isDefault === true) {
     return pullRequest.headRefName === branch.name && pullRequest.baseRefName === branch.name
   }
-  // PR rows are keyed by head branch. Tolerate missing headRefName for
-  // legacy cached PRs, but never attach an explicit head mismatch.
+  // Refresh results are already keyed by the branch they were requested for.
+  // If a PR omits headRefName, keep it attached for regular branches, but
+  // never allow an explicit head mismatch.
   if (pullRequest.headRefName && pullRequest.headRefName !== branch.name) return false
   return true
 }

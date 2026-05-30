@@ -5,11 +5,11 @@ import type { ColorTheme } from '#/shared/color-theme.ts'
 // values in sync with each theme's `--gbl-surface-canvas` until themes
 // become data-driven and main can read the persisted canvas token.
 export const WINDOW_BACKGROUND_BY_COLOR_THEME: Record<ColorTheme, Record<ResolvedTheme, string>> = {
-  goblin: {
+  macos: {
     light: '#fbfbfd',
     dark: '#1c1c1e',
   },
-  shadcn: {
+  mono: {
     light: '#ffffff',
     dark: '#09090b',
   },

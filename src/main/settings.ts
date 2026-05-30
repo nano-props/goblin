@@ -35,19 +35,12 @@ export interface WindowBounds {
   height: number
 }
 
-/** Bump when a breaking schema change lands (renamed fields, removed
- *  enum values, etc.). loadSettings checks this so a future migration
- *  can rewrite the file before the app reads it. */
-export const SETTINGS_SCHEMA_VERSION = 1
 export const DEFAULT_SESSION_DETAIL_COLLAPSED = DEFAULT_DETAIL_COLLAPSED
 export const DEFAULT_SESSION_DETAIL_FOCUS_MODE = false
 export const DEFAULT_SESSION_WORKSPACE_LAYOUT: WorkspaceLayout = DEFAULT_WORKSPACE_LAYOUT
 export const DEFAULT_SESSION_DETAIL_PANE_SIZES: WorkspaceDetailPaneSizes = DEFAULT_DETAIL_PANE_SIZES
 
 export interface Settings {
-  /** Schema version of this file. Older files without it are treated as
-   *  v0 and quietly upgraded to the current version on next write. */
-  version: number
   theme: ThemePref
   colorTheme: ColorTheme
   lang: LangPref
@@ -67,7 +60,6 @@ export interface Settings {
 }
 
 const DEFAULTS: Settings = {
-  version: SETTINGS_SCHEMA_VERSION,
   theme: 'auto',
   colorTheme: DEFAULT_COLOR_THEME,
   lang: 'auto',
@@ -210,11 +202,7 @@ export async function loadSettings(): Promise<Settings> {
   try {
     const raw = await fs.readFile(settingsFile(), 'utf-8')
     const parsed = JSON.parse(raw) as Partial<Settings>
-    // version is read but not yet used — no migrations exist for v1.
-    // When v2 ships, add a migrate(parsed) step here that rewrites
-    // fields before the field-by-field merge below.
     cache = {
-      version: SETTINGS_SCHEMA_VERSION,
       theme: normalizeThemePref(parsed.theme),
       colorTheme: normalizeColorTheme(parsed.colorTheme),
       lang: normalizeLangPref(parsed.lang),

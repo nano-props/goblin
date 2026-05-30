@@ -109,12 +109,27 @@ test('persists the selected color theme', async () => {
   vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
   const settings = await import('#/main/settings.ts')
 
-  await settings.setColorTheme('shadcn')
+  await settings.setColorTheme('mono')
   const flushed = await settings.flushSettings()
   expect(flushed).toBe(true)
 
   const saved = JSON.parse(readFileSync(path.join(tmp, 'settings.json'), 'utf-8')) as { colorTheme: string }
-  expect(saved.colorTheme).toBe('shadcn')
+  expect(saved.colorTheme).toBe('mono')
+})
+
+test('falls back to the default color theme for unknown values', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-settings-test-'))
+  await fs.writeFile(
+    path.join(tmp, 'settings.json'),
+    JSON.stringify({ theme: 'auto', colorTheme: 'unknown-theme' }),
+    'utf-8',
+  )
+  vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
+  const settings = await import('#/main/settings.ts')
+
+  const loaded = await settings.loadSettings()
+
+  expect(loaded.colorTheme).toBe('macos')
 })
 
 test('persists action bar blank click detail toggle', async () => {

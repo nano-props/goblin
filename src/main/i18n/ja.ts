@@ -373,8 +373,8 @@ export const ja: Record<DictKey, string> = {
   // ---- Settings panel ----------------------------------------------------
   'settings.title': '設定',
   'settings.theme-preset': 'テーマ',
-  'settings.theme-preset.goblin': 'Goblin',
-  'settings.theme-preset.shadcn': 'shadcn/ui',
+  'settings.theme-preset.macos': 'macOS',
+  'settings.theme-preset.mono': 'Mono',
   'settings.theme-preset.github': 'GitHub',
   'settings.appearance': '外観',
   'settings.appearance.auto': '自動',

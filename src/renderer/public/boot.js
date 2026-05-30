@@ -9,8 +9,8 @@
   var theme = qs.get('theme')
   if (theme !== 'light' && theme !== 'dark') theme = 'light'
   var colorTheme = qs.get('colorTheme')
-  var colorThemes = ['goblin', 'shadcn', 'github']
-  if (colorThemes.indexOf(colorTheme) === -1) colorTheme = 'goblin'
+  var colorThemes = ['macos', 'mono', 'github']
+  if (colorThemes.indexOf(colorTheme) === -1) colorTheme = 'macos'
   document.documentElement.setAttribute('data-theme', theme)
   document.documentElement.setAttribute('data-color-theme', colorTheme)
 })()

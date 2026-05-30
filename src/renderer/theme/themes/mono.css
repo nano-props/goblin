@@ -1,4 +1,4 @@
-html[data-color-theme='shadcn'][data-theme='light'] {
+html[data-color-theme='mono'][data-theme='light'] {
   color-scheme: light;
 
   --gbl-surface-canvas: #ffffff;
@@ -76,7 +76,7 @@ html[data-color-theme='shadcn'][data-theme='light'] {
   --color-terminal-search-active-border: #09090b;
 }
 
-html[data-color-theme='shadcn'][data-theme='dark'] {
+html[data-color-theme='mono'][data-theme='dark'] {
   color-scheme: dark;
 
   --gbl-surface-canvas: #09090b;

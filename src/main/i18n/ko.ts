@@ -366,8 +366,8 @@ export const ko: Record<DictKey, string> = {
   // ---- Settings panel ----------------------------------------------------
   'settings.title': '설정',
   'settings.theme-preset': '테마',
-  'settings.theme-preset.goblin': 'Goblin',
-  'settings.theme-preset.shadcn': 'shadcn/ui',
+  'settings.theme-preset.macos': 'macOS',
+  'settings.theme-preset.mono': 'Mono',
   'settings.theme-preset.github': 'GitHub',
   'settings.appearance': '외관',
   'settings.appearance.auto': '자동',

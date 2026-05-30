@@ -62,7 +62,7 @@ vi.mock('#/main/settings.ts', () => ({
 }))
 
 vi.mock('#/main/theme.ts', () => ({
-  getTheme: () => ({ resolved: 'light', colorTheme: 'goblin' }),
+  getTheme: () => ({ resolved: 'light', colorTheme: 'macos' }),
 }))
 
 vi.mock('#/main/terminal.ts', () => ({
@@ -146,6 +146,6 @@ describe('main window navigation boundaries', () => {
 
     await getOrCreateMainWindow()
 
-    expect(mocks.loadURL).toHaveBeenCalledWith('http://127.0.0.1:5173/?theme=light&colorTheme=goblin')
+    expect(mocks.loadURL).toHaveBeenCalledWith('http://127.0.0.1:5173/?theme=light&colorTheme=macos')
   })
 })

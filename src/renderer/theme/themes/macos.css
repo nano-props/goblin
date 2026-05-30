@@ -1,6 +1,6 @@
 :root,
 html[data-theme='light']:not([data-color-theme]),
-html[data-color-theme='goblin'][data-theme='light'] {
+html[data-color-theme='macos'][data-theme='light'] {
   color-scheme: light;
 
   --gbl-surface-canvas: #fbfbfd;
@@ -80,7 +80,7 @@ html[data-color-theme='goblin'][data-theme='light'] {
 }
 
 html[data-theme='dark']:not([data-color-theme]),
-html[data-color-theme='goblin'][data-theme='dark'] {
+html[data-color-theme='macos'][data-theme='dark'] {
   color-scheme: dark;
 
   --gbl-surface-canvas: #1c1c1e;

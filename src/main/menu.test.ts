@@ -73,7 +73,7 @@ vi.mock('#/main/events.ts', () => ({
 }))
 
 vi.mock('#/main/theme.ts', () => ({
-  getTheme: vi.fn(() => ({ pref: 'auto', resolved: 'light', colorTheme: 'goblin' })),
+  getTheme: vi.fn(() => ({ pref: 'auto', resolved: 'light', colorTheme: 'macos' })),
   setThemePref: vi.fn(),
 }))
 

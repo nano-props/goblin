@@ -119,7 +119,7 @@ export const useReposStore = create<ReposStore>()(
       ...createCommitActions(set, get),
     }),
     {
-      name: 'goblin.repo-store.v1',
+      name: 'goblin.repo-store',
       storage: repoStorage,
       partialize: (state): PersistedReposStore => ({ repoCache: state.repoCache }),
       merge: (persisted, current) => ({

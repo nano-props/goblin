@@ -374,8 +374,8 @@ export const en = {
   // ---- Settings panel -----------------------------------------------------
   'settings.title': 'Settings',
   'settings.theme-preset': 'Theme',
-  'settings.theme-preset.goblin': 'Goblin',
-  'settings.theme-preset.shadcn': 'shadcn/ui',
+  'settings.theme-preset.macos': 'macOS',
+  'settings.theme-preset.mono': 'Mono',
   'settings.theme-preset.github': 'GitHub',
   'settings.appearance': 'Appearance',
   'settings.appearance.auto': 'Auto',

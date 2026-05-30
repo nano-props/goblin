@@ -28,11 +28,11 @@ describe('branchPullRequestBelongsToBranch', () => {
     ).toBe(false)
   })
 
-  test('keeps legacy cached pull requests without headRefName on regular branches', () => {
+  test('accepts pull requests without a head branch on regular branches', () => {
     expect(branchPullRequestBelongsToBranch(branch('feature/a'), pr({ baseRefName: 'main' }))).toBe(true)
   })
 
-  test('rejects legacy cached pull requests without headRefName on default branches', () => {
+  test('rejects default-branch pull requests without a head branch', () => {
     expect(branchPullRequestBelongsToBranch(branch('main', { isDefault: true }), pr({ baseRefName: 'main' }))).toBe(
       false,
     )

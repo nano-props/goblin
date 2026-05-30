@@ -51,7 +51,7 @@ describe('trusted app web contents', () => {
     expect(
       isTrustedIpcEvent({
         sender: { id: 8 },
-        senderFrame: { url: 'http://127.0.0.1:5173/?theme=light&colorTheme=goblin' },
+        senderFrame: { url: 'http://127.0.0.1:5173/?theme=light&colorTheme=macos' },
       } as any),
     ).toBe(true)
     expect(
