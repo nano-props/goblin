@@ -77,6 +77,8 @@ vi.mock('electron', () => ({
 
 vi.mock('#/main/i18n/index.ts', () => ({
   t: vi.fn((key: string) => key),
+  getCurrentLang: vi.fn(() => 'en'),
+  getDictionary: vi.fn(() => ({ 'settings.title': 'Settings' })),
 }))
 
 vi.mock('#/main/theme.ts', () => ({

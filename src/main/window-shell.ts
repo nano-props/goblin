@@ -18,6 +18,7 @@ import {
   registerTrustedAppPath,
   registerTrustedAppUrl,
 } from '#/main/ipc/trusted-webcontents.ts'
+import { getCurrentLang, getDictionary } from '#/main/i18n/index.ts'
 import { getTheme } from '#/main/theme.ts'
 import { WINDOW_BACKGROUND_BY_COLOR_THEME } from '#/shared/theme-tokens.ts'
 
@@ -30,6 +31,13 @@ export function windowCanvasBackground(): string {
   return WINDOW_BACKGROUND_BY_COLOR_THEME[colorTheme][resolved]
 }
 
+function initialI18nArgument(): string {
+  const lang = getCurrentLang()
+  const dict = getDictionary()
+  const payload = Buffer.from(JSON.stringify({ lang, dict })).toString('base64')
+  return `--gbl-initial-i18n=${payload}`
+}
+
 export function createRendererWindowWebPreferences(): BrowserWindowConstructorOptions['webPreferences'] {
   return {
     preload: PRELOAD_PATH,
@@ -37,7 +45,7 @@ export function createRendererWindowWebPreferences(): BrowserWindowConstructorOp
     nodeIntegration: false,
     sandbox: true,
     webSecurity: true,
-    additionalArguments: [`--gbl-home-dir=${os.homedir()}`],
+    additionalArguments: [`--gbl-home-dir=${os.homedir()}`, initialI18nArgument()],
   }
 }
 

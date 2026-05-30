@@ -53,6 +53,12 @@ function rpcCall(request) {
 // `os.homedir()` or a sync IPC.
 const HOME_PREFIX = '--gbl-home-dir='
 const homeDir = process.argv.find((a) => a.startsWith(HOME_PREFIX))?.slice(HOME_PREFIX.length) ?? ''
+
+const I18N_PREFIX = '--gbl-initial-i18n='
+const i18nRaw = process.argv.find((a) => a.startsWith(I18N_PREFIX))?.slice(I18N_PREFIX.length) ?? ''
+const initialI18n = i18nRaw
+  ? JSON.parse(Buffer.from(i18nRaw, 'base64').toString('utf8'))
+  : null
 const rpcEventSubscribers = new Set()
 let rpcEventListener = null
 const windowPageSubscribersByKey = new Map()
@@ -147,6 +153,7 @@ function maybeDisposeWindowFlushListener(windowKey) {
 
 contextBridge.exposeInMainWorld('goblin', {
   homeDir,
+  initialI18n,
   invokeRpc: ({ path, input, requestId }) => rpcCall({ path, input, requestId }),
   abortRpc: (requestId) => safeInvoke('goblin:rpc-abort', { requestId }),
   pathForFile: (file) => webUtils.getPathForFile(file),

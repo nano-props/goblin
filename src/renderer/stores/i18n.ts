@@ -13,10 +13,31 @@ import { onRpcEventType, rpc } from '#/renderer/rpc.ts'
 export type { Lang, LangPref }
 export type Dict = Record<string, string>
 
+interface InitialI18n {
+  lang: Lang
+  dict: Dict
+}
+
+function getInitialI18n(): InitialI18n | null {
+  try {
+    const raw = window.goblin?.initialI18n
+    if (raw && typeof raw === 'object' && 'lang' in raw && 'dict' in raw) {
+      return raw as InitialI18n
+    }
+  } catch {
+    // ignore
+  }
+  return null
+}
+
+const initial = getInitialI18n()
+
 void i18next.use(initReactI18next).init({
-  lng: 'en',
+  lng: initial?.lang ?? 'en',
   fallbackLng: 'en',
-  resources: { en: { translation: {} } },
+  resources: initial
+    ? { [initial.lang]: { translation: initial.dict } }
+    : { en: { translation: {} } },
   defaultNS: 'translation',
   keySeparator: false,
   interpolation: {
@@ -28,6 +49,10 @@ void i18next.use(initReactI18next).init({
     useSuspense: false,
   },
 })
+
+if (initial && typeof document !== 'undefined') {
+  document.documentElement.setAttribute('lang', initial.lang)
+}
 
 interface I18nState {
   lang: Lang
@@ -49,9 +74,9 @@ function clearI18nSubscription() {
 }
 
 export const useI18nStore = create<I18nState>((set) => ({
-  lang: 'en',
+  lang: initial?.lang ?? 'en',
   pref: 'auto',
-  dict: {},
+  dict: initial?.dict ?? {},
 
   async hydrate() {
     const version = ++hydrateVersion

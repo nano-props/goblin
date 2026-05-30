@@ -18,6 +18,7 @@ import type {
 
 interface GoblinBridge {
   homeDir: string
+  initialI18n: { lang: string; dict: Record<string, string> } | null
   invokeRpc: (request: RpcRequest) => Promise<unknown>
   abortRpc: (requestId: string) => Promise<boolean>
   onEvent: (cb: (event: RpcEvent) => void) => () => void
