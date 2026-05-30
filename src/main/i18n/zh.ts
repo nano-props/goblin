@@ -411,6 +411,7 @@ export const zh: Record<DictKey, string> = {
   'settings.group.proxy': '代理',
   'settings.nav.github': 'GitHub',
   'settings.nav.integrations': '集成',
+  'settings.nav.notifications': '通知',
   'settings.nav.refresh': '刷新',
   'settings.nav.shortcuts': '快捷键',
   'settings.about': '关于',

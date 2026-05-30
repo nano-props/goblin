@@ -1,4 +1,4 @@
-import { AppWindow, Info, Keyboard, Settings2, Shield, SlidersHorizontal, type LucideIcon } from 'lucide-react'
+import { AppWindow, Bell, Info, Keyboard, Settings2, Shield, SlidersHorizontal, type LucideIcon } from 'lucide-react'
 import { GitHubMark } from '#/renderer/components/GitHubMark.tsx'
 import { SettingsContentFrame } from '#/renderer/components/settings/SettingsContentFrame.tsx'
 import { SettingsSidebar } from '#/renderer/components/settings/SettingsSidebar.tsx'
@@ -7,6 +7,7 @@ import { ExternalAppSettings } from '#/renderer/components/settings/pages/Extern
 import { GeneralSettings } from '#/renderer/components/settings/pages/GeneralSettings.tsx'
 import { GitHubSettings } from '#/renderer/components/settings/pages/GitHubSettings.tsx'
 import { KeyboardShortcutSettings } from '#/renderer/components/settings/pages/KeyboardShortcutSettings.tsx'
+import { NotificationSettings } from '#/renderer/components/settings/pages/NotificationSettings.tsx'
 import { ProxySettings } from '#/renderer/components/settings/pages/ProxySettings.tsx'
 import { SyncSettings } from '#/renderer/components/settings/pages/SyncSettings.tsx'
 import { useT } from '#/renderer/stores/i18n.ts'
@@ -21,11 +22,12 @@ interface SettingsSurfaceProps {
 
 const SETTINGS_SURFACE_PAGES = [
   { page: 'general', labelKey: 'settings.group.general', titleKey: 'settings.group.general', Icon: Settings2 },
-  { page: 'github', labelKey: 'settings.nav.github', titleKey: 'settings.github.title', Icon: GitHubMark },
-  { page: 'apps', labelKey: 'settings.group.apps', titleKey: 'settings.group.apps', Icon: AppWindow },
   { page: 'shortcuts', labelKey: 'settings.nav.shortcuts', titleKey: 'settings.shortcuts', Icon: Keyboard },
-  { page: 'sync', labelKey: 'settings.nav.refresh', titleKey: 'settings.nav.refresh', Icon: SlidersHorizontal },
+  { page: 'notifications', labelKey: 'settings.nav.notifications', titleKey: 'settings.nav.notifications', Icon: Bell },
   { page: 'proxy', labelKey: 'settings.group.proxy', titleKey: 'settings.group.proxy', Icon: Shield },
+  { page: 'sync', labelKey: 'settings.nav.refresh', titleKey: 'settings.nav.refresh', Icon: SlidersHorizontal },
+  { page: 'apps', labelKey: 'settings.group.apps', titleKey: 'settings.group.apps', Icon: AppWindow },
+  { page: 'github', labelKey: 'settings.nav.github', titleKey: 'settings.github.title', Icon: GitHubMark },
   { page: 'about', labelKey: 'settings.about', titleKey: 'settings.about', Icon: Info },
 ] as const satisfies ReadonlyArray<{
   page: SettingsPage
@@ -68,6 +70,7 @@ export function SettingsSurface({ page, onPageChange, topInset = 0, autoFocusSel
         {page === 'sync' && <SyncSettings />}
         {page === 'proxy' && <ProxySettings />}
         {page === 'shortcuts' && <KeyboardShortcutSettings />}
+        {page === 'notifications' && <NotificationSettings />}
         {page === 'about' && <AboutSettings />}
       </SettingsContentFrame>
     </div>

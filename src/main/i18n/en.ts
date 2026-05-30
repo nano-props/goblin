@@ -429,6 +429,7 @@ export const en = {
   'settings.group.proxy': 'Proxy',
   'settings.nav.github': 'GitHub',
   'settings.nav.integrations': 'Integrations',
+  'settings.nav.notifications': 'Notifications',
   'settings.nav.refresh': 'Refresh',
   'settings.nav.shortcuts': 'Shortcuts',
   'settings.about': 'About',

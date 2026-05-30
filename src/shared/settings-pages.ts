@@ -1,4 +1,4 @@
-export const SETTINGS_PAGES = ['general', 'github', 'apps', 'sync', 'proxy', 'shortcuts', 'about'] as const
+export const SETTINGS_PAGES = ['general', 'shortcuts', 'notifications', 'proxy', 'sync', 'apps', 'github', 'about'] as const
 
 export type SettingsPage = (typeof SETTINGS_PAGES)[number]
 

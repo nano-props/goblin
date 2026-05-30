@@ -136,7 +136,7 @@ afterEach(() => {
 
 describe('SettingsSurface', () => {
   test('can trigger a test terminal notification from settings', async () => {
-    await render(<SettingsSurface page="general" onPageChange={() => {}} />)
+    await render(<SettingsSurface page="notifications" onPageChange={() => {}} />)
 
     await act(async () => {
       buttonByText('settings.terminal-notifications-test-button').click()
@@ -149,7 +149,7 @@ describe('SettingsSurface', () => {
 
   test('shows an error toast when the test notification is blocked', async () => {
     sendTestNotification.mockResolvedValueOnce(false)
-    await render(<SettingsSurface page="general" onPageChange={() => {}} />)
+    await render(<SettingsSurface page="notifications" onPageChange={() => {}} />)
 
     await act(async () => {
       buttonByText('settings.terminal-notifications-test-button').click()

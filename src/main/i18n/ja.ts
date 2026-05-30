@@ -427,6 +427,7 @@ export const ja: Record<DictKey, string> = {
   'settings.group.proxy': 'プロキシ',
   'settings.nav.github': 'GitHub',
   'settings.nav.integrations': '連携',
+  'settings.nav.notifications': '通知',
   'settings.nav.refresh': '更新',
   'settings.nav.shortcuts': 'ショートカット',
   'settings.about': '情報',
