@@ -33,15 +33,16 @@ import dev.goblin.android.ui.theme.GoblinSpacing
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddHostScreen(
+    initialHost: SshHostProfile? = null,
     onBack: () -> Unit,
     onImportPrivateKey: (displayName: String, bytes: ByteArray) -> SshIdentityRef,
     onSaveHost: (SshHostProfile) -> Unit,
 ) {
     val context = LocalContext.current
-    var alias by remember { mutableStateOf("") }
-    var host by remember { mutableStateOf("") }
-    var user by remember { mutableStateOf("") }
-    var port by remember { mutableStateOf("22") }
+    var alias by remember(initialHost) { mutableStateOf(initialHost?.alias.orEmpty()) }
+    var host by remember(initialHost) { mutableStateOf(initialHost?.host.orEmpty()) }
+    var user by remember(initialHost) { mutableStateOf(initialHost?.user.orEmpty()) }
+    var port by remember(initialHost) { mutableStateOf(initialHost?.port?.toString() ?: "22") }
     var error by remember { mutableStateOf<String?>(null) }
     var selectedIdentity by remember { mutableStateOf<SshIdentityRef?>(null) }
     val importPrivateKey = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -62,7 +63,7 @@ fun AddHostScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Add host") },
+                title = { Text(if (initialHost == null) "Add host" else "Edit host") },
                 navigationIcon = {
                     TextButton(onClick = onBack) {
                         Text("Back")
@@ -115,6 +116,9 @@ fun AddHostScreen(
             selectedIdentity?.let {
                 Text("Identity selected: ${it.displayName}", style = MaterialTheme.typography.labelMedium)
             }
+            if (selectedIdentity == null && initialHost?.identityRefId != null) {
+                Text("Existing identity selected", style = MaterialTheme.typography.labelMedium)
+            }
             if (error != null) {
                 Text(error.orEmpty(), color = MaterialTheme.colorScheme.error)
             }
@@ -128,13 +132,26 @@ fun AddHostScreen(
                 Button(
                     onClick = {
                         runCatching {
-                            SshHostProfile.create(
-                                alias = alias,
-                                host = host,
-                                user = user,
-                                port = SshHostProfile.parsePort(port),
-                                identityRefId = selectedIdentity?.id,
-                            )
+                            val parsedPort = SshHostProfile.parsePort(port)
+                            val identityRefId = selectedIdentity?.id ?: initialHost?.identityRefId
+                            if (initialHost == null) {
+                                SshHostProfile.create(
+                                    alias = alias,
+                                    host = host,
+                                    user = user,
+                                    port = parsedPort,
+                                    identityRefId = identityRefId,
+                                )
+                            } else {
+                                SshHostProfile.update(
+                                    existing = initialHost,
+                                    alias = alias,
+                                    host = host,
+                                    user = user,
+                                    port = parsedPort,
+                                    identityRefId = identityRefId,
+                                )
+                            }
                         }.onSuccess {
                             error = null
                             onSaveHost(it)
@@ -143,7 +160,7 @@ fun AddHostScreen(
                         }
                     },
                 ) {
-                    Text("Save host")
+                    Text(if (initialHost == null) "Save host" else "Save changes")
                 }
             }
         }

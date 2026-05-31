@@ -11,6 +11,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -23,14 +24,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import dev.goblin.android.domain.ResourceState
 import dev.goblin.android.domain.ssh.DiagnosticCategory
 import dev.goblin.android.domain.ssh.DiagnosticStage
 import dev.goblin.android.domain.ssh.DiagnosticStageResult
 import dev.goblin.android.domain.ssh.DiagnosticStatus
 import dev.goblin.android.domain.ssh.DiagnosticsResult
+import dev.goblin.android.domain.ssh.RemoteRepositoryProfile
 import dev.goblin.android.domain.ssh.RemoteTarget
 import dev.goblin.android.domain.ssh.SshHostProfile
+import dev.goblin.android.ssh.SshInitializationCheck
 import dev.goblin.android.ui.theme.GoblinSpacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -40,23 +44,71 @@ import kotlinx.coroutines.withContext
 @Composable
 fun DiagnosticsScreen(
     host: SshHostProfile,
+    repositories: List<RemoteRepositoryProfile> = emptyList(),
     onBack: () -> Unit,
     onOpenTerminal: () -> Unit,
+    onCheckSshInitialization: () -> SshInitializationCheck = { SshInitializationCheck.Ready },
+    onInitializeSshAccess: (CharArray) -> Unit = {},
     onRunDiagnostics: () -> DiagnosticsResult,
     onTrustHostKey: (String) -> Unit,
+    onSaveRepository: (RemoteRepositoryProfile) -> Unit = {},
+    onDeleteRepository: (String) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     var diagnosticsState: ResourceState<DiagnosticsResult> by remember { mutableStateOf(ResourceState.Idle) }
+    var initializationCheck: SshInitializationCheck? by remember { mutableStateOf(null) }
+    var initializationPassword by remember { mutableStateOf("") }
+    var initializationError by remember { mutableStateOf<String?>(null) }
 
     fun runDiagnostics() {
         diagnosticsState = ResourceState.Loading
         scope.launch {
+            val ready = runCatching {
+                withContext(Dispatchers.IO) { onCheckSshInitialization() }
+            }.getOrElse {
+                diagnosticsState = ResourceState.Error(it.message ?: "SSH initialization check failed", it)
+                return@launch
+            }
+            if (ready != SshInitializationCheck.Ready) {
+                initializationCheck = ready
+                diagnosticsState = ResourceState.Idle
+                return@launch
+            }
+            initializationCheck = null
             diagnosticsState = runCatching {
                 withContext(Dispatchers.IO) { onRunDiagnostics() }
             }.fold(
                 onSuccess = { ResourceState.Loaded(it) },
                 onFailure = { ResourceState.Error(it.message ?: "Diagnostics failed", it) },
             )
+        }
+    }
+
+    fun refreshInitializationCheck() {
+        scope.launch {
+            initializationCheck = runCatching {
+                withContext(Dispatchers.IO) { onCheckSshInitialization() }
+            }.getOrElse {
+                initializationError = it.message ?: "SSH initialization check failed"
+                null
+            }
+        }
+    }
+
+    fun initializeSshAccess() {
+        val password = initializationPassword.toCharArray()
+        initializationError = null
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { onInitializeSshAccess(password) }
+            }.onSuccess {
+                initializationPassword = ""
+                initializationCheck = null
+                runDiagnostics()
+            }.onFailure {
+                initializationPassword = ""
+                initializationError = it.message ?: "SSH initialization failed"
+            }
         }
     }
 
@@ -81,9 +133,28 @@ fun DiagnosticsScreen(
         ) {
             Text(host.title, style = MaterialTheme.typography.titleLarge)
             Text(host.subtitle, style = MaterialTheme.typography.bodyMedium)
+            initializationCheck?.let { check ->
+                SshInitializationCard(
+                    check = check,
+                    password = initializationPassword,
+                    error = initializationError,
+                    onPasswordChange = { initializationPassword = it },
+                    onTrustHostKey = {
+                        onTrustHostKey(it)
+                        refreshInitializationCheck()
+                    },
+                    onInitialize = { initializeSshAccess() },
+                )
+            }
             Button(onClick = { runDiagnostics() }) {
                 Text("Run diagnostics")
             }
+            RemoteRepositoriesSection(
+                host = host,
+                repositories = repositories,
+                onSaveRepository = onSaveRepository,
+                onDeleteRepository = onDeleteRepository,
+            )
             when (val state = diagnosticsState) {
                 ResourceState.Idle -> DiagnosticStageList(stages = pendingStages())
                 ResourceState.Loading -> DiagnosticStageList(stages = pendingStages(running = DiagnosticStage.SSH))
@@ -106,6 +177,139 @@ fun DiagnosticsScreen(
                     onRunDiagnostics = { runDiagnostics() },
                     onOpenTerminal = onOpenTerminal,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SshInitializationCard(
+    check: SshInitializationCheck,
+    password: String,
+    error: String?,
+    onPasswordChange: (String) -> Unit,
+    onTrustHostKey: (String) -> Unit,
+    onInitialize: () -> Unit,
+) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(GoblinSpacing.Md),
+            verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
+        ) {
+            when (check) {
+                SshInitializationCheck.Ready -> Text("SSH access is initialized.")
+                is SshInitializationCheck.NeedsHostKeyTrust -> {
+                    Text("Trust this host key before initializing SSH access.")
+                    Text(check.fingerprint, style = MaterialTheme.typography.bodySmall)
+                    Button(onClick = { onTrustHostKey(check.fingerprint) }) {
+                        Text("Trust host key")
+                    }
+                }
+                SshInitializationCheck.NeedsServerPassword -> {
+                    Text("Enter the temporary server password to install Goblin Android's public key.")
+                    OutlinedTextField(
+                        modifier = Modifier.fillMaxWidth(),
+                        value = password,
+                        onValueChange = onPasswordChange,
+                        label = { Text("Temporary password") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                    )
+                    Button(
+                        enabled = password.isNotEmpty(),
+                        onClick = onInitialize,
+                    ) {
+                        Text("Initialize SSH access")
+                    }
+                }
+                is SshInitializationCheck.HostKeyChanged -> {
+                    Text(
+                        "Host key changed. Review this server before trusting it again.",
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    Text("Previous: ${check.previousFingerprint}", style = MaterialTheme.typography.bodySmall)
+                    Text("Current: ${check.currentFingerprint}", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            if (error != null) {
+                Text(error, color = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RemoteRepositoriesSection(
+    host: SshHostProfile,
+    repositories: List<RemoteRepositoryProfile>,
+    onSaveRepository: (RemoteRepositoryProfile) -> Unit,
+    onDeleteRepository: (String) -> Unit,
+) {
+    var alias by remember(host.id) { mutableStateOf("") }
+    var remotePath by remember(host.id) { mutableStateOf("") }
+    var error by remember(host.id) { mutableStateOf<String?>(null) }
+
+    Card(Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(GoblinSpacing.Md),
+            verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
+        ) {
+            Text("Saved repositories", style = MaterialTheme.typography.titleMedium)
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = alias,
+                onValueChange = { alias = it },
+                label = { Text("Alias") },
+                singleLine = true,
+            )
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = remotePath,
+                onValueChange = { remotePath = it },
+                label = { Text("Remote path") },
+                singleLine = true,
+                isError = error != null,
+            )
+            Button(
+                onClick = {
+                    runCatching {
+                        RemoteRepositoryProfile.create(
+                            hostProfileId = host.id,
+                            alias = alias,
+                            remotePath = remotePath,
+                        )
+                    }.onSuccess {
+                        onSaveRepository(it)
+                        alias = ""
+                        remotePath = ""
+                        error = null
+                    }.onFailure {
+                        error = it.message ?: "Repository validation failed"
+                    }
+                },
+            ) {
+                Text("Save repository")
+            }
+            if (error != null) {
+                Text(error.orEmpty(), color = MaterialTheme.colorScheme.error)
+            }
+            if (repositories.isEmpty()) {
+                Text("No saved repositories.")
+            } else {
+                repositories.forEach { repository ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(repository.title, style = MaterialTheme.typography.bodyMedium)
+                            Text(repository.remotePath, style = MaterialTheme.typography.bodySmall)
+                        }
+                        TextButton(onClick = { onDeleteRepository(repository.id) }) {
+                            Text("Delete record")
+                        }
+                    }
+                }
             }
         }
     }
@@ -206,4 +410,3 @@ private fun targetPreview(): RemoteTarget = RemoteTarget(
     remotePath = "/",
     identityRefId = null,
 )
-

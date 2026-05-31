@@ -13,10 +13,15 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
+interface SshIdentityMaterialStore {
+    fun importPrivateKey(displayName: String, keyBytes: ByteArray): SshIdentityRef
+    fun loadProtectedBytesById(identityId: String): ByteArray
+}
+
 class SecureIdentityStore private constructor(
     private val filesDir: File,
-) {
-    fun importPrivateKey(displayName: String, keyBytes: ByteArray): SshIdentityRef {
+) : SshIdentityMaterialStore {
+    override fun importPrivateKey(displayName: String, keyBytes: ByteArray): SshIdentityRef {
         require(keyBytes.isNotEmpty()) { "Identity data is required" }
         val id = UUID.randomUUID().toString()
         val encrypted = encrypt(keyBytes)
@@ -35,7 +40,7 @@ class SecureIdentityStore private constructor(
         return decrypt(record)
     }
 
-    fun loadProtectedBytesById(identityId: String): ByteArray {
+    override fun loadProtectedBytesById(identityId: String): ByteArray {
         val record = EncryptedIdentityRecord.deserialize(File(filesDir, "$identityId.identity").readText())
         return decrypt(record)
     }

@@ -13,10 +13,14 @@ class HostProfileStore private constructor(
     fun loadHosts(): List<SshHostProfile> = HostProfileCodec.decode(preferences.getString(KeyHosts, "").orEmpty())
 
     fun saveHost(hostProfile: SshHostProfile): SshHostProfile {
-        val current = loadHosts()
-        val next = current.filterNot { it.id == hostProfile.id } + hostProfile
+        val next = HostProfileStorePolicy.upsertHost(loadHosts(), hostProfile)
         preferences.edit { putString(KeyHosts, HostProfileCodec.encode(next)) }
         return hostProfile
+    }
+
+    fun deleteHost(hostProfileId: String) {
+        val next = HostProfileStorePolicy.deleteHost(loadHosts(), hostProfileId)
+        preferences.edit { putString(KeyHosts, HostProfileCodec.encode(next)) }
     }
 
     companion object {
@@ -26,6 +30,14 @@ class HostProfileStore private constructor(
         fun create(context: Context): HostProfileStore =
             HostProfileStore(context.getSharedPreferences(PreferencesName, Context.MODE_PRIVATE))
     }
+}
+
+object HostProfileStorePolicy {
+    fun upsertHost(hosts: List<SshHostProfile>, hostProfile: SshHostProfile): List<SshHostProfile> =
+        hosts.filterNot { it.id == hostProfile.id } + hostProfile
+
+    fun deleteHost(hosts: List<SshHostProfile>, hostProfileId: String): List<SshHostProfile> =
+        hosts.filterNot { it.id == hostProfileId }
 }
 
 object HostProfileCodec {

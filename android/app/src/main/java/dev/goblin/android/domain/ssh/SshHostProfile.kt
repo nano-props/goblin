@@ -48,6 +48,29 @@ data class SshHostProfile(
             )
         }
 
+        fun update(
+            existing: SshHostProfile,
+            alias: String?,
+            host: String,
+            user: String,
+            port: Int,
+            identityRefId: String? = existing.identityRefId,
+        ): SshHostProfile {
+            val normalizedHost = host.trim()
+            val normalizedUser = user.trim()
+            val normalizedAlias = alias?.trim()?.takeIf { it.isNotEmpty() }
+            require(normalizedHost.isNotEmpty()) { "Host is required" }
+            require(normalizedUser.isNotEmpty()) { "User is required" }
+            require(port in ValidPortRange) { "Port must be in 1..65535" }
+            return existing.copy(
+                alias = normalizedAlias,
+                host = normalizedHost,
+                user = normalizedUser,
+                port = port,
+                identityRefId = identityRefId?.trim()?.takeIf { it.isNotEmpty() },
+            )
+        }
+
         fun parsePort(value: String): Int {
             val trimmed = value.trim()
             if (trimmed.isEmpty()) return 22
@@ -57,4 +80,3 @@ data class SshHostProfile(
         }
     }
 }
-
