@@ -30,7 +30,7 @@ const settingsWindowController = createStandalonePageWindow<SettingsPage>({
   },
   logLabel: 'settings-window',
   defaultPage: 'general',
-  createWindow: () => {
+  createWindow: async () => {
     const { resolved, colorTheme } = getTheme()
     const win = new BrowserWindow({
       width: 760,
@@ -44,7 +44,7 @@ const settingsWindowController = createStandalonePageWindow<SettingsPage>({
       titleBarOverlay: titleBarOverlayForTheme(resolved, colorTheme, SETTINGS_WINDOW_TOP_INSET_PX),
       trafficLightPosition: macTrafficLightPosition(SETTINGS_WINDOW_TOP_INSET_PX),
       autoHideMenuBar: process.platform !== 'darwin',
-      webPreferences: createRendererWindowWebPreferences(),
+      webPreferences: await createRendererWindowWebPreferences(),
     })
     win.once('ready-to-show', () => {
       if (!win.isDestroyed()) win.show()

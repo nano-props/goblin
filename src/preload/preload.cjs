@@ -47,17 +47,24 @@ function rpcCall(request) {
     })
 }
 
-// `--gbl-home-dir=...` is injected by main via webPreferences.additionalArguments
-// (see window.ts). `process.argv` is one of the few things sandbox-safe
-// preloads can still read, which is why we use it here instead of
-// `os.homedir()` or a sync IPC.
-const HOME_PREFIX = '--gbl-home-dir='
+// `--goblin-home-dir=...`, `--goblin-initial-i18n=...` and
+// `--goblin-initial-settings=...` are injected by main via
+// webPreferences.additionalArguments (see window-shell.ts).
+// `process.argv` is one of the few things sandbox-safe preloads can still
+// read, which is why we use it here instead of sync IPC.
+const HOME_PREFIX = '--goblin-home-dir='
 const homeDir = process.argv.find((a) => a.startsWith(HOME_PREFIX))?.slice(HOME_PREFIX.length) ?? ''
 
-const I18N_PREFIX = '--gbl-initial-i18n='
+const I18N_PREFIX = '--goblin-initial-i18n='
 const i18nRaw = process.argv.find((a) => a.startsWith(I18N_PREFIX))?.slice(I18N_PREFIX.length) ?? ''
 const initialI18n = i18nRaw
   ? JSON.parse(Buffer.from(i18nRaw, 'base64').toString('utf8'))
+  : null
+
+const SETTINGS_PREFIX = '--goblin-initial-settings='
+const settingsRaw = process.argv.find((a) => a.startsWith(SETTINGS_PREFIX))?.slice(SETTINGS_PREFIX.length) ?? ''
+const initialSettings = settingsRaw
+  ? JSON.parse(Buffer.from(settingsRaw, 'base64').toString('utf8'))
   : null
 const rpcEventSubscribers = new Set()
 let rpcEventListener = null
@@ -154,6 +161,7 @@ function maybeDisposeWindowFlushListener(windowKey) {
 contextBridge.exposeInMainWorld('goblin', {
   homeDir,
   initialI18n,
+  initialSettings,
   invokeRpc: ({ path, input, requestId }) => rpcCall({ path, input, requestId }),
   abortRpc: (requestId) => safeInvoke('goblin:rpc-abort', { requestId }),
   pathForFile: (file) => webUtils.getPathForFile(file),

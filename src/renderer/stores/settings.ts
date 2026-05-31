@@ -185,16 +185,19 @@ function mergeDetectedExternalAppsState<T extends object>(
   return same(s, next) && s.externalAppsDetectedAt === detectedAt ? s : { ...next, externalAppsDetectedAt: detectedAt }
 }
 
+const initialSettings =
+  typeof window !== 'undefined' && window.goblin?.initialSettings ? window.goblin.initialSettings : null
+
 export const useSettingsStore = create<SettingsStore>((set) => ({
-  fetchIntervalSec: 120,
-  terminalNotificationsEnabled: false,
-  shortcutsDisabled: false,
-  globalShortcutDisabled: false,
-  swapCloseShortcuts: false,
-  toggleDetailOnActionBarBlankClick: false,
-  globalShortcut: DEFAULT_GLOBAL_SHORTCUT,
-  globalShortcutRegistered: false,
-  terminalApp: 'auto',
+  fetchIntervalSec: initialSettings?.fetchIntervalSec ?? 120,
+  terminalNotificationsEnabled: initialSettings?.terminalNotificationsEnabled ?? false,
+  shortcutsDisabled: initialSettings?.shortcutsDisabled ?? false,
+  globalShortcutDisabled: initialSettings?.globalShortcutDisabled ?? false,
+  swapCloseShortcuts: initialSettings?.swapCloseShortcuts ?? false,
+  toggleDetailOnActionBarBlankClick: initialSettings?.toggleDetailOnActionBarBlankClick ?? false,
+  globalShortcut: initialSettings?.globalShortcut ?? DEFAULT_GLOBAL_SHORTCUT,
+  globalShortcutRegistered: initialSettings?.globalShortcutRegistered ?? false,
+  terminalApp: initialSettings?.terminalApp ?? 'auto',
   resolvedTerminalApp: null,
   terminalAvailable: false,
   terminalAppAvailability: { ghostty: false, terminal: false },

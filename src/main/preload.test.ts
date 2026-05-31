@@ -21,7 +21,14 @@ function loadPreload(options: { invoke?: (channel: string, ...args: unknown[]) =
   const code = readFileSync(path.join(import.meta.dirname, '../preload/preload.cjs'), 'utf8')
   const sandbox = {
     console,
-    process: { argv: [] },
+    Buffer,
+    process: {
+      argv: [
+        '--goblin-home-dir=/home/test',
+        '--goblin-initial-i18n=' + Buffer.from(JSON.stringify({ lang: 'en', dict: {} })).toString('base64'),
+        '--goblin-initial-settings=' + Buffer.from(JSON.stringify({ fetchIntervalSec: 120, terminalNotificationsEnabled: false })).toString('base64'),
+      ],
+    },
     require: (name: string) => {
       if (name !== 'electron') throw new Error(`unexpected require: ${name}`)
       return {

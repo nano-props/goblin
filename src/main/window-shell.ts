@@ -20,6 +20,8 @@ import {
 } from '#/main/ipc/trusted-webcontents.ts'
 import { getCurrentLang, getDictionary } from '#/main/i18n/index.ts'
 import { getTheme } from '#/main/theme.ts'
+import { loadSettings } from '#/main/settings.ts'
+import { isGlobalShortcutRegistered } from '#/main/shortcuts.ts'
 import { WINDOW_BACKGROUND_BY_COLOR_THEME } from '#/shared/theme-tokens.ts'
 
 const rendererDevUrl = process.env.GOBLIN_RENDERER_DEV_URL?.trim()
@@ -35,17 +37,36 @@ function initialI18nArgument(): string {
   const lang = getCurrentLang()
   const dict = getDictionary()
   const payload = Buffer.from(JSON.stringify({ lang, dict })).toString('base64')
-  return `--gbl-initial-i18n=${payload}`
+  return `--goblin-initial-i18n=${payload}`
 }
 
-export function createRendererWindowWebPreferences(): BrowserWindowConstructorOptions['webPreferences'] {
+export async function createRendererWindowWebPreferences(): Promise<BrowserWindowConstructorOptions['webPreferences']> {
+  const settings = await loadSettings()
+  const settingsPayload = Buffer.from(
+    JSON.stringify({
+      fetchIntervalSec: settings.fetchIntervalSec,
+      terminalNotificationsEnabled: settings.terminalNotificationsEnabled,
+      shortcutsDisabled: settings.shortcutsDisabled,
+      globalShortcutDisabled: settings.globalShortcutDisabled,
+      swapCloseShortcuts: settings.swapCloseShortcuts,
+      toggleDetailOnActionBarBlankClick: settings.toggleDetailOnActionBarBlankClick,
+      globalShortcut: settings.globalShortcut,
+      globalShortcutRegistered: isGlobalShortcutRegistered(),
+      terminalApp: settings.terminalApp,
+      editorApp: settings.editorApp,
+    }),
+  ).toString('base64')
   return {
     preload: PRELOAD_PATH,
     contextIsolation: true,
     nodeIntegration: false,
     sandbox: true,
     webSecurity: true,
-    additionalArguments: [`--gbl-home-dir=${os.homedir()}`, initialI18nArgument()],
+    additionalArguments: [
+      `--goblin-home-dir=${os.homedir()}`,
+      initialI18nArgument(),
+      `--goblin-initial-settings=${settingsPayload}`,
+    ],
   }
 }
 

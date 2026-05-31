@@ -106,7 +106,7 @@ async function createMainWindow(): Promise<BrowserWindow> {
     titleBarOverlay: titleBarOverlayForTheme(resolved, colorTheme, WINDOW_TOPBAR_HEIGHT_PX),
     trafficLightPosition: macTrafficLightPosition(WINDOW_TOPBAR_HEIGHT_PX),
     autoHideMenuBar: process.platform !== 'darwin',
-    webPreferences: createRendererWindowWebPreferences(),
+    webPreferences: await createRendererWindowWebPreferences(),
   })
   attachRendererSurfaceWindow(win, { logLabel: 'window', surface: MAIN_WINDOW_SURFACE })
   const { url } = createRendererEntryUrl({ entryHtml: 'index.html' })

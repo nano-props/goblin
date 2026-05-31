@@ -26,7 +26,7 @@ interface StandalonePageWindowOptions<TPage extends string> {
   surface: RendererSurfaceSpec
   logLabel: string
   defaultPage: TPage
-  createWindow: () => BrowserWindow
+  createWindow: () => BrowserWindow | Promise<BrowserWindow>
   loadWindow: (win: BrowserWindow, page: TPage) => Promise<void>
   lifecycle?: {
     // Opt-in close-time flush for renderer state that lives outside the
@@ -138,7 +138,7 @@ export function createStandalonePageWindow<TPage extends string>({
       })
     }
     creation = (async () => {
-      const win = createWindow()
+      const win = await createWindow()
       const wcId = win.webContents.id
       currentWindow = win
       attachRendererSurfaceWindow(win, { logLabel, surface })
