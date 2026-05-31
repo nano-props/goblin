@@ -12,6 +12,9 @@ import dev.goblin.android.ssh.SshInitializationService
 import dev.goblin.android.ssh.SshjInitializationClient
 import dev.goblin.android.ssh.SshjClientFacade
 import dev.goblin.android.ssh.RemoteRepositoryGitService
+import dev.goblin.android.ssh.RemoteWorktreeService
+import dev.goblin.android.ssh.PortForwardManager
+import dev.goblin.android.ssh.SshjPortForwardBackend
 import dev.goblin.android.terminal.SshTerminalService
 import dev.goblin.android.ui.theme.GoblinTheme
 
@@ -30,6 +33,16 @@ class MainActivity : ComponentActivity() {
             client = SshjClientFacade(identityStore = secureIdentityStore),
             hostKeyStore = hostKeyStore,
         )
+        val remoteWorktreeService = RemoteWorktreeService(
+            client = SshjClientFacade(identityStore = secureIdentityStore),
+            hostKeyStore = hostKeyStore,
+        )
+        val portForwardManager = PortForwardManager(
+            backend = SshjPortForwardBackend(
+                identityStore = secureIdentityStore,
+                hostKeyTrustStore = hostKeyStore,
+            ),
+        )
         val initializationService = SshInitializationService(
             identityStore = secureIdentityStore,
             hostKeyStore = hostKeyStore,
@@ -47,6 +60,8 @@ class MainActivity : ComponentActivity() {
                     secureIdentityStore = secureIdentityStore,
                     diagnosticsService = diagnosticsService,
                     remoteRepositoryGitService = remoteRepositoryGitService,
+                    remoteWorktreeService = remoteWorktreeService,
+                    portForwardManager = portForwardManager,
                     initializationService = initializationService,
                     terminalService = terminalService,
                 )

@@ -68,6 +68,23 @@ class SshDiagnosticsServiceTest {
         assertStage(result, DiagnosticStage.Shell, DiagnosticStatus.Skipped)
     }
 
+    @Test
+    fun `unknown host key blocks diagnostics before shell probes`() {
+        val client = FakeSshClient(fingerprint = "SHA256:new", failures = emptyMap())
+        val result = SshDiagnosticsService(
+            client = client,
+            hostKeyStore = FakeHostKeyTrustStore(null),
+        ).runDiagnostics(target())
+
+        assertFalse(result.ok)
+        assertEquals(DiagnosticCategory.HostKey, result.category)
+        assertEquals("Trust this host key?", result.message)
+        assertEquals("SHA256:new", result.hostKeyFingerprint)
+        assertTrue(client.probes.isEmpty())
+        assertStage(result, DiagnosticStage.SSH, DiagnosticStatus.Failed)
+        assertStage(result, DiagnosticStage.Shell, DiagnosticStatus.Skipped)
+    }
+
     private fun service(
         trustedFingerprint: String = "SHA256:test",
         fingerprint: String = "SHA256:test",
@@ -97,17 +114,22 @@ class SshDiagnosticsServiceTest {
         private val fingerprint: String,
         private val failures: Map<SshDiagnosticProbe, SshCommandResult>,
     ) : SshClientFacade {
+        val probes = mutableListOf<SshDiagnosticProbe>()
+
         override fun fetchHostFingerprint(target: RemoteTarget): String = fingerprint
 
         override fun runDiagnosticProbe(
             target: RemoteTarget,
             probe: SshDiagnosticProbe,
             secrets: SshConnectionSecrets,
-        ): SshCommandResult = failures[probe] ?: when (probe) {
-            SshDiagnosticProbe.CheckShell -> SshCommandResult(ok = true, stdout = "ok")
-            SshDiagnosticProbe.CheckGit -> SshCommandResult(ok = true, stdout = "/usr/bin/git")
-            SshDiagnosticProbe.TestPath -> SshCommandResult(ok = true)
-            SshDiagnosticProbe.RevParseTopLevel -> SshCommandResult(ok = true, stdout = target.remotePath)
+        ): SshCommandResult {
+            probes += probe
+            return failures[probe] ?: when (probe) {
+                SshDiagnosticProbe.CheckShell -> SshCommandResult(ok = true, stdout = "ok")
+                SshDiagnosticProbe.CheckGit -> SshCommandResult(ok = true, stdout = "/usr/bin/git")
+                SshDiagnosticProbe.TestPath -> SshCommandResult(ok = true)
+                SshDiagnosticProbe.RevParseTopLevel -> SshCommandResult(ok = true, stdout = target.remotePath)
+            }
         }
     }
 
@@ -123,4 +145,3 @@ class SshDiagnosticsServiceTest {
         }
     }
 }
-

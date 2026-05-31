@@ -134,6 +134,38 @@ class RemoteRepositoryGitServiceTest {
         assertTrue(snapshot.worktrees.first { it.path == "/srv/app-missing" }.isMissing)
     }
 
+    @Test
+    fun `snapshot parser keeps detached and bare worktree states`() {
+        val output = """
+            __GOBLIN_ANDROID_CURRENT__
+            abc123
+            __GOBLIN_ANDROID_DEFAULT__
+            main
+            __GOBLIN_ANDROID_STATUS__
+            __GOBLIN_ANDROID_COMMITS__
+            __GOBLIN_ANDROID_BRANCHES__
+            main${'\u0000'}${' '}
+            __GOBLIN_ANDROID_WORKTREES__
+            worktree /srv/app
+            HEAD abc123
+            bare
+
+            worktree /srv/app-detached
+            HEAD def456
+            __GOBLIN_ANDROID_WORKTREE_STATUS__
+            /srv/app${'\u0000'}0
+            /srv/app-detached${'\u0000'}0
+        """.trimIndent()
+
+        val snapshot = parseRemoteRepositorySnapshot(output)
+
+        assertEquals("abc123", snapshot.currentRef)
+        assertTrue(snapshot.worktrees.first { it.path == "/srv/app" }.isBare)
+        assertEquals(null, snapshot.worktrees.first { it.path == "/srv/app" }.branch)
+        assertEquals(null, snapshot.worktrees.first { it.path == "/srv/app-detached" }.branch)
+        assertFalse(snapshot.branches.single().isCurrent)
+    }
+
     private fun target(remotePath: String): RemoteTarget = RemoteTarget(
         id = "lee@example.com:22$remotePath",
         alias = "Dev",

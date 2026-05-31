@@ -75,6 +75,11 @@ class HostProfileStoreTest {
         assertFalse(payload.contains("password", ignoreCase = true))
         assertFalse(payload.contains("privateKey", ignoreCase = true))
         assertFalse(payload.contains("rawKey", ignoreCase = true))
+        assertFalse(payload.contains("identityBytes", ignoreCase = true))
+        assertFalse(payload.contains("terminal", ignoreCase = true))
+        assertFalse(payload.contains("session", ignoreCase = true))
+        assertFalse(payload.contains("socket", ignoreCase = true))
+        assertFalse(payload.contains("portForward", ignoreCase = true))
         assertTrue(payload.isNotBlank())
     }
 }

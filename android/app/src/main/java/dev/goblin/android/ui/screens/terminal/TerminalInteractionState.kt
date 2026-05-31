@@ -29,3 +29,9 @@ internal fun terminalInputUnavailableMessage(state: TerminalSessionState): Strin
 }
 
 internal fun terminalLineInput(value: String): String = "$value\r"
+
+internal fun terminalTargetLabel(repositoryTitle: String?, remotePath: String): String {
+    val path = remotePath.ifBlank { "/" }
+    val title = repositoryTitle?.takeIf { it.isNotBlank() }
+    return if (title == null) path else "$title - $path"
+}

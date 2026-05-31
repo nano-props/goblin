@@ -14,6 +14,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import dev.goblin.android.ui.theme.GoblinSpacing
 
+fun localTerminalPlaceholderText(): String =
+    "Android-local terminal and local Git are deferred from v1; use SSH terminals for emergency work."
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiagnosticsPlaceholderScreen(
@@ -106,7 +109,8 @@ fun SettingsPlaceholderScreen(onBack: () -> Unit) {
         ) {
             Text("Goblin Android")
             Text("SSH remote-first emergency operations.")
+            Text("Local terminal")
+            Text(localTerminalPlaceholderText())
         }
     }
 }
-

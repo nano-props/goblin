@@ -1,6 +1,6 @@
 # Goblin Android Product Model Contract
 
-**Status:** Phase 1 baseline
+**Status:** Phase 4 baseline
 **Scope:** Android-native model names and behavior that preserve desktop Goblin semantics.
 
 ## Remote Target Identity
@@ -41,6 +41,7 @@ Runtime-only state:
 - Diagnostic execution progress.
 - Terminal shell streams.
 - Terminal output, scrollback, resize state, and connection state.
+- SSH local port-forward sessions and socket handles.
 
 Android resource states are `idle`, `loading`, `loaded`, `stale`, and `error`. SSH and terminal runtime states are modeled separately so live session details are not written into host profile storage.
 
@@ -79,3 +80,29 @@ Input and paste flow through the terminal controller into a shell stream. The co
 Terminal output is capped for phone rendering. Phase 1 keeps only the latest rendered scrollback in runtime memory and uses a remaining-height viewport so keyboard and resize changes do not push the input controls off-screen.
 
 All terminal SSH operations that can touch the network, including open, send, paste, helper keys, resize, and close, must run off the Compose main thread. Controller write failures transition terminal state to `Failed` instead of propagating through input-event dispatch.
+
+## Remote Worktrees
+
+Remote worktree creation and removal are explicit remote SSH operations. They are not local Android filesystem operations.
+
+Remote repository snapshots can show primary, linked, locked, missing, dirty, and bare worktree states. Worktree terminal entry uses the selected remote worktree path and keeps the terminal session runtime-only.
+
+Worktree removal is blocked for primary, dirty, locked, missing, and protected-branch worktrees. Protected branches are `main`, `master`, `develop`, and `release/*`. Allowed removals require confirmation text that states the remote worktree is removed from the SSH server and that the branch is not deleted.
+
+## Port Forwarding
+
+Port forwarding is SSH local forwarding for remote development services. Android binds forwarded services to `127.0.0.1` only. The remote service host defaults to `127.0.0.1`, and users supply the remote port plus an optional local port.
+
+Port-forward sessions are runtime-only. Saved repository records store no tunnel ids, socket handles, assigned local ports, or SSH connection state. Deleting a saved repository record stops that repository's runtime tunnels before removing the app-local record.
+
+Valid port-forward input:
+
+- Remote port: `1..65535`.
+- Local port: blank for automatic allocation, or `1..65535`.
+- Explicit local port `0` from UI input is invalid; only blank input maps to automatic allocation.
+
+Repository workspace exposes a `Ports` tab. Active tunnels show the remote service, local forwarded URL, lifecycle text, and actions to open, copy, or stop the URL.
+
+## Local Terminal Scope
+
+Android v1 is SSH remote-first. Android-local terminal and local Git parity are deferred from v1 and are represented as a placeholder so users do not mistake the app for the macOS client's local workflow.

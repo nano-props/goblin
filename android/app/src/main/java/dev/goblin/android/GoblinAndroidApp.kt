@@ -9,11 +9,14 @@ import dev.goblin.android.data.HostProfileStore
 import dev.goblin.android.data.RemoteRepositoryStore
 import dev.goblin.android.data.ssh.SecureIdentityStore
 import dev.goblin.android.domain.ResourceState
+import dev.goblin.android.domain.ssh.PortForwardOwner
 import dev.goblin.android.domain.ssh.RemoteRepositoryProfile
 import dev.goblin.android.domain.ssh.RemoteTarget
 import dev.goblin.android.domain.ssh.SshHostProfile
 import dev.goblin.android.navigation.AppRoute
 import dev.goblin.android.ssh.RemoteRepositoryGitService
+import dev.goblin.android.ssh.RemoteWorktreeService
+import dev.goblin.android.ssh.PortForwardManager
 import dev.goblin.android.ssh.SshDiagnosticsService
 import dev.goblin.android.ssh.SshInitializationService
 import dev.goblin.android.terminal.TerminalSessionFactory
@@ -32,6 +35,8 @@ fun GoblinAndroidApp(
     secureIdentityStore: SecureIdentityStore,
     diagnosticsService: SshDiagnosticsService,
     remoteRepositoryGitService: RemoteRepositoryGitService,
+    remoteWorktreeService: RemoteWorktreeService,
+    portForwardManager: PortForwardManager,
     initializationService: SshInitializationService,
     terminalService: TerminalSessionFactory,
 ) {
@@ -71,11 +76,15 @@ fun GoblinAndroidApp(
             onAddRepository = { route = AppRoute.AddRepository },
             onOpenRepository = { repositoryId -> route = AppRoute.Repository(repositoryId) },
             onDeleteRepository = { repositoryId ->
+                portForwardManager.stopOwner(repositoryId)
                 remoteRepositoryStore.deleteRepository(repositoryId)
                 reloadRepositories()
             },
             onEditHost = { hostId -> route = AppRoute.EditHost(hostId) },
             onDeleteHost = { hostId ->
+                currentRepositories()
+                    .filter { it.hostProfileId == hostId }
+                    .forEach { portForwardManager.stopOwner(it.id) }
                 hostProfileStore.deleteHost(hostId)
                 remoteRepositoryStore.deleteByHostId(hostId)
                 reloadHosts()
@@ -162,6 +171,7 @@ fun GoblinAndroidApp(
                         remoteRepositoryGitService.inspectRepository(RemoteTarget.fromHostProfile(routeHost(), remotePath))
                     },
                     onDeleteRepository = { repositoryId ->
+                        portForwardManager.stopOwner(repositoryId)
                         remoteRepositoryStore.deleteRepository(repositoryId)
                         reloadRepositories()
                     },
@@ -178,6 +188,7 @@ fun GoblinAndroidApp(
                 reloadRepositories()
             },
             onDeleteRepository = { repositoryId ->
+                portForwardManager.stopOwner(repositoryId)
                 remoteRepositoryStore.deleteRepository(repositoryId)
                 reloadRepositories()
             },
@@ -209,10 +220,36 @@ fun GoblinAndroidApp(
                         route = AppRoute.Terminal(host.id, remotePath, repository.id)
                     },
                     onDeleteRepository = {
+                        portForwardManager.stopOwner(repository.id)
                         remoteRepositoryStore.deleteRepository(repository.id)
                         reloadRepositories()
                         route = AppRoute.Hosts
                     },
+                    onCreateWorktree = { branch, worktreePath ->
+                        remoteWorktreeService.createWorktree(
+                            target = RemoteTarget.fromHostProfile(host, repository.remotePath),
+                            branch = branch,
+                            worktreePath = worktreePath,
+                        )
+                    },
+                    onRemoveWorktree = { worktree ->
+                        remoteWorktreeService.removeWorktree(
+                            target = RemoteTarget.fromHostProfile(host, repository.remotePath),
+                            worktree = worktree,
+                        )
+                    },
+                    portForwardSessions = portForwardManager.sessions(repository.id),
+                    onStartPortForward = { request ->
+                        portForwardManager.start(
+                            owner = PortForwardOwner(
+                                id = repository.id,
+                                label = repository.title,
+                            ),
+                            target = RemoteTarget.fromHostProfile(host, repository.remotePath),
+                            request = request,
+                        )
+                    },
+                    onStopPortForward = { sessionId -> portForwardManager.stop(sessionId) },
                 )
             }
         }

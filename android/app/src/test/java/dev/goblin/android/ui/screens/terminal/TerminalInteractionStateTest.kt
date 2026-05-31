@@ -38,4 +38,12 @@ class TerminalInteractionStateTest {
     fun `line input uses carriage return for PTY enter`() {
         assertEquals("pwd\r", terminalLineInput("pwd"))
     }
+
+    @Test
+    fun `terminal target label includes repository and worktree path`() {
+        assertEquals(
+            "App - /srv/app-feature",
+            terminalTargetLabel(repositoryTitle = "App", remotePath = "/srv/app-feature"),
+        )
+    }
 }
