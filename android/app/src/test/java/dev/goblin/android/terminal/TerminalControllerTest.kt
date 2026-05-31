@@ -43,11 +43,24 @@ class TerminalControllerTest {
     }
 
     @Test
+    fun `resize before open uses requested size for shell startup`() {
+        val service = FakeTerminalSessionFactory()
+        val controller = TerminalController(service)
+
+        assertFalse(controller.resize(120, 40))
+        controller.open(target())
+
+        assertEquals(120, service.openCols)
+        assertEquals(40, service.openRows)
+    }
+
+    @Test
     fun `close cleans up active shell session`() {
         val service = FakeTerminalSessionFactory()
         val controller = TerminalController(service)
 
         controller.open(target())
+        controller.close()
         controller.close()
 
         assertTrue(service.session.closed)
@@ -55,10 +68,47 @@ class TerminalControllerTest {
     }
 
     @Test
+    fun `opening a new shell closes the previous session`() {
+        val service = FakeTerminalSessionFactory()
+        val controller = TerminalController(service)
+
+        controller.open(target())
+        val firstSession = service.session
+        controller.open(target())
+
+        assertTrue(firstSession.closed)
+        assertFalse(service.session.closed)
+    }
+
+    @Test
     fun `sendInput returns false without active session`() {
         val controller = TerminalController(FakeTerminalSessionFactory())
 
         assertFalse(controller.sendInput("ls\n"))
+    }
+
+    @Test
+    fun `sendInput failure moves terminal to failed instead of throwing`() {
+        val service = FakeTerminalSessionFactory()
+        val controller = TerminalController(service)
+        service.sessionInputError = IllegalStateException("network on main")
+
+        controller.open(target())
+
+        assertFalse(controller.sendInput("ls\n"))
+        assertTrue(controller.state is TerminalSessionState.Failed)
+    }
+
+    @Test
+    fun `high volume output is capped for phone rendering`() {
+        val service = FakeTerminalSessionFactory()
+        val controller = TerminalController(service)
+
+        controller.open(target())
+        service.emitOutput("x".repeat(100_000))
+
+        val state = controller.state as TerminalSessionState.Connected
+        assertEquals(32_000, state.output.length)
     }
 
     private fun target(): RemoteTarget = RemoteTarget(
@@ -73,6 +123,10 @@ class TerminalControllerTest {
 
     private class FakeTerminalSessionFactory : TerminalSessionFactory {
         lateinit var session: FakeTerminalSession
+        var openCols: Int = 0
+        var openRows: Int = 0
+        var sessionInputError: RuntimeException? = null
+        private lateinit var onOutput: (String) -> Unit
 
         override fun openShell(
             target: RemoteTarget,
@@ -83,19 +137,29 @@ class TerminalControllerTest {
             onExit: () -> Unit,
             onFailure: (Throwable) -> Unit,
         ): TerminalSession {
-            session = FakeTerminalSession()
+            openCols = cols
+            openRows = rows
+            this.onOutput = onOutput
+            session = FakeTerminalSession(sessionInputError)
             onOutput("ready\n")
             return session
         }
+
+        fun emitOutput(value: String) {
+            onOutput(value)
+        }
     }
 
-    private class FakeTerminalSession : TerminalSession {
+    private class FakeTerminalSession(
+        private val inputError: RuntimeException? = null,
+    ) : TerminalSession {
         override val id: String = "session-1"
         val sentInput = mutableListOf<String>()
         val resizes = mutableListOf<Pair<Int, Int>>()
         var closed = false
 
         override fun sendInput(value: String) {
+            inputError?.let { throw it }
             sentInput.add(value)
         }
 
@@ -108,4 +172,3 @@ class TerminalControllerTest {
         }
     }
 }
-

@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
@@ -42,33 +42,98 @@ import dev.goblin.android.terminal.TerminalSessionState
 import dev.goblin.android.ui.theme.GoblinColors
 import dev.goblin.android.ui.theme.GoblinSpacing
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TerminalScreen(
     host: SshHostProfile,
+    remotePath: String = "/",
     terminalService: TerminalSessionFactory,
     onBack: () -> Unit,
 ) {
     var terminalState: TerminalSessionState by remember { mutableStateOf(TerminalSessionState.Idle) }
     var input by remember { mutableStateOf("") }
-    val controller = remember(terminalService) {
-        TerminalController(terminalService = terminalService) { terminalState = it }
-    }
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val target = remember(host) { RemoteTarget.fromHostProfile(host) }
+    val controller = remember(terminalService, scope) {
+        TerminalController(terminalService = terminalService) { next ->
+            scope.launch { terminalState = next }
+        }
+    }
+    val target = remember(host, remotePath) { RemoteTarget.fromHostProfile(host, remotePath) }
+    var inputNotice by remember { mutableStateOf<String?>(null) }
+    val inputAvailable = terminalInputAvailable(terminalState)
+
+    fun connect() {
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                controller.open(target)
+            }
+        }
+    }
+
+    fun sendTerminalInput(value: String, onResult: (Boolean) -> Unit = {}) {
+        scope.launch {
+            val sent = withContext(Dispatchers.IO) {
+                controller.sendInput(value)
+            }
+            onResult(sent)
+        }
+    }
+
+    fun closeTerminal() {
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                controller.close()
+            }
+        }
+    }
+
+    fun submitInput() {
+        val unavailable = terminalInputUnavailableMessage(terminalState)
+        if (unavailable != null) {
+            inputNotice = unavailable
+            return
+        }
+        val value = input
+        if (value.isEmpty()) return
+        sendTerminalInput(terminalLineInput(value)) { sent ->
+            inputNotice = if (sent) {
+                input = ""
+                null
+            } else {
+                "Terminal is not connected."
+            }
+        }
+    }
 
     DisposableEffect(controller) {
-        onDispose { controller.close() }
+        onDispose {
+            CoroutineScope(Dispatchers.IO).launch {
+                controller.close()
+            }
+        }
+    }
+
+    LaunchedEffect(target) {
+        withContext(Dispatchers.IO) {
+            controller.open(target)
+        }
+    }
+
+    LaunchedEffect(terminalState) {
+        inputNotice = terminalInputUnavailableMessage(terminalState)
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Terminal spike") },
+                title = { Text("Terminal") },
                 navigationIcon = {
                     TextButton(onClick = onBack) {
                         Text("Back")
@@ -85,24 +150,36 @@ fun TerminalScreen(
             val cols = (maxWidth.value / 8f).roundToInt().coerceIn(20, 180)
             val rows = (maxHeight.value / 18f).roundToInt().coerceIn(6, 80)
             LaunchedEffect(cols, rows) {
-                controller.resize(cols, rows)
+                withContext(Dispatchers.IO) {
+                    controller.resize(cols, rows)
+                }
             }
 
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(GoblinColors.TerminalBackground)
+                    .imePadding()
                     .padding(GoblinSpacing.Md),
                 verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
             ) {
-                TerminalStatusStrip(host = host, state = terminalState)
-                TerminalViewport(state = terminalState)
+                TerminalStatusStrip(host = host, remotePath = remotePath, state = terminalState)
+                TerminalViewport(
+                    modifier = Modifier.weight(1f),
+                    state = terminalState,
+                )
                 HelperKeyRow(
-                    onEsc = { controller.sendInput("\u001b") },
-                    onCtrl = { controller.sendInput("\u0003") },
-                    onTab = { controller.sendInput("\t") },
-                    onArrow = { code -> controller.sendInput(code) },
+                    enabled = inputAvailable,
+                    onEsc = { sendTerminalInput("\u001b") },
+                    onCtrl = { sendTerminalInput("\u0003") },
+                    onTab = { sendTerminalInput("\t") },
+                    onArrow = { code -> sendTerminalInput(code) },
                     onPaste = {
+                        val unavailable = terminalInputUnavailableMessage(terminalState)
+                        if (unavailable != null) {
+                            inputNotice = unavailable
+                            return@HelperKeyRow
+                        }
                         scope.launch {
                             val text = clipboard.getClipEntry()
                                 ?.clipData
@@ -110,37 +187,55 @@ fun TerminalScreen(
                                 ?.coerceToText(context)
                                 ?.toString()
                                 .orEmpty()
-                            controller.paste(text)
+                            val pasted = withContext(Dispatchers.IO) {
+                                controller.paste(text)
+                            }
+                            inputNotice = if (pasted) null else "Terminal is not connected."
                         }
                     },
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
+                ) {
                     BasicTextField(
                         modifier = Modifier
                             .weight(1f)
                             .background(MaterialTheme.colorScheme.surface)
                             .padding(GoblinSpacing.Sm),
+                        enabled = inputAvailable,
                         value = input,
-                        onValueChange = { input = it },
+                        onValueChange = {
+                            input = it
+                            inputNotice = null
+                        },
                         textStyle = TextStyle(
                             color = MaterialTheme.colorScheme.onSurface,
                             fontFamily = FontFamily.Monospace,
                         ),
                     )
                     Button(
-                        onClick = {
-                            controller.sendInput(input + "\n")
-                            input = ""
-                        },
+                        enabled = inputAvailable && input.isNotEmpty(),
+                        onClick = { submitInput() },
                     ) {
                         Text("Send")
                     }
                 }
+                inputNotice?.let {
+                    Text(
+                        text = it,
+                        color = GoblinColors.TerminalForeground,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm)) {
-                    Button(onClick = { controller.open(target) }) {
-                        Text("Connect")
+                    Button(
+                        enabled = terminalReconnectAvailable(terminalState),
+                        onClick = { connect() },
+                    ) {
+                        Text("Reconnect")
                     }
-                    TextButton(onClick = { controller.close() }) {
+                    TextButton(onClick = { closeTerminal() }) {
                         Text("Close")
                     }
                 }
@@ -150,7 +245,7 @@ fun TerminalScreen(
 }
 
 @Composable
-private fun TerminalStatusStrip(host: SshHostProfile, state: TerminalSessionState) {
+private fun TerminalStatusStrip(host: SshHostProfile, remotePath: String, state: TerminalSessionState) {
     val status = when (state) {
         TerminalSessionState.Idle -> "idle"
         TerminalSessionState.Connecting -> "connecting"
@@ -160,29 +255,33 @@ private fun TerminalStatusStrip(host: SshHostProfile, state: TerminalSessionStat
         is TerminalSessionState.Failed -> "failed"
     }
     Text(
-        text = "${host.title} - $status",
+        text = "${host.title} - ${remotePath.ifBlank { "/" }} - $status",
         color = GoblinColors.TerminalForeground,
         style = MaterialTheme.typography.labelMedium,
     )
 }
 
 @Composable
-private fun TerminalViewport(state: TerminalSessionState) {
+private fun TerminalViewport(modifier: Modifier = Modifier, state: TerminalSessionState) {
     val output = when (state) {
         is TerminalSessionState.Connected -> state.output
-        is TerminalSessionState.Failed -> "Terminal disconnected. Reconnect or return to diagnostics.\n${state.message}"
-        is TerminalSessionState.Exited -> "Terminal disconnected. Reconnect or return to diagnostics."
+        is TerminalSessionState.Failed -> "$TerminalDisconnectedMessage\n${state.message}"
+        is TerminalSessionState.Exited -> TerminalDisconnectedMessage
         TerminalSessionState.Connecting -> "Connecting..."
         is TerminalSessionState.Resizing -> "Resizing..."
         TerminalSessionState.Idle -> ""
     }
+    val verticalScrollState = rememberScrollState()
+    val horizontalScrollState = rememberScrollState()
+    LaunchedEffect(output) {
+        verticalScrollState.scrollTo(verticalScrollState.maxValue)
+    }
     Text(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 240.dp)
             .background(GoblinColors.TerminalBackground)
-            .verticalScroll(rememberScrollState())
-            .horizontalScroll(rememberScrollState()),
+            .verticalScroll(verticalScrollState)
+            .horizontalScroll(horizontalScrollState),
         text = output,
         color = GoblinColors.TerminalForeground,
         fontFamily = FontFamily.Monospace,
@@ -192,6 +291,7 @@ private fun TerminalViewport(state: TerminalSessionState) {
 
 @Composable
 private fun HelperKeyRow(
+    enabled: Boolean,
     onEsc: () -> Unit,
     onCtrl: () -> Unit,
     onTab: () -> Unit,
@@ -202,13 +302,13 @@ private fun HelperKeyRow(
         modifier = Modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
     ) {
-        TextButton(onClick = onEsc) { Text("Esc") }
-        TextButton(onClick = onCtrl) { Text("Ctrl") }
-        TextButton(onClick = onTab) { Text("Tab") }
-        TextButton(onClick = { onArrow("\u001b[A") }) { Text("Up") }
-        TextButton(onClick = { onArrow("\u001b[B") }) { Text("Down") }
-        TextButton(onClick = { onArrow("\u001b[D") }) { Text("Left") }
-        TextButton(onClick = { onArrow("\u001b[C") }) { Text("Right") }
-        TextButton(onClick = onPaste) { Text("Paste") }
+        TextButton(enabled = enabled, onClick = onEsc) { Text("Esc") }
+        TextButton(enabled = enabled, onClick = onCtrl) { Text("Ctrl") }
+        TextButton(enabled = enabled, onClick = onTab) { Text("Tab") }
+        TextButton(enabled = enabled, onClick = { onArrow("\u001b[A") }) { Text("Up") }
+        TextButton(enabled = enabled, onClick = { onArrow("\u001b[B") }) { Text("Down") }
+        TextButton(enabled = enabled, onClick = { onArrow("\u001b[D") }) { Text("Left") }
+        TextButton(enabled = enabled, onClick = { onArrow("\u001b[C") }) { Text("Right") }
+        TextButton(enabled = enabled, onClick = onPaste) { Text("Paste") }
     }
 }

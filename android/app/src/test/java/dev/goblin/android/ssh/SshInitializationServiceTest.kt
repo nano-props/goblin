@@ -32,11 +32,29 @@ class SshInitializationServiceTest {
 
     @Test
     fun `check is ready when host key is trusted and identity exists`() {
-        val service = service(trustedFingerprint = "SHA256:new", fingerprint = "SHA256:new")
+        val service = service(
+            identityStore = FakeIdentityStore(existingBytesById = mapOf("identity-1" to "existing-private-key".toByteArray())),
+            trustedFingerprint = "SHA256:new",
+            fingerprint = "SHA256:new",
+        )
 
         val check = service.check(profile(identityRefId = "identity-1"))
 
         assertEquals(SshInitializationCheck.Ready, check)
+    }
+
+    @Test
+    fun `check asks for temporary server password when stored identity cannot be read`() {
+        val service = service(
+            identityStore = FakeIdentityStore(existingBytesById = mapOf("identity-1" to "bad-private-key".toByteArray())),
+            publicKeyReader = FailingPublicKeyReader(),
+            trustedFingerprint = "SHA256:new",
+            fingerprint = "SHA256:new",
+        )
+
+        val check = service.check(profile(identityRefId = "identity-1"))
+
+        assertEquals(SshInitializationCheck.NeedsServerPassword, check)
     }
 
     @Test
@@ -96,14 +114,42 @@ class SshInitializationServiceTest {
     }
 
     @Test
+    fun `initialize replaces unreadable existing identity with a generated identity`() {
+        val identityStore = FakeIdentityStore(existingBytesById = mapOf("identity-1" to "bad-private-key".toByteArray()))
+        val client = FakeInitializationClient(fingerprint = "SHA256:new")
+        val password = "secret".toCharArray()
+        val service = service(
+            identityStore = identityStore,
+            client = client,
+            keyGenerator = FakeSshKeyGenerator(),
+            publicKeyReader = FailingPublicKeyReader(),
+            trustedFingerprint = "SHA256:new",
+            fingerprint = "SHA256:new",
+        )
+
+        val result = service.initialize(profile(identityRefId = "identity-1"), password)
+
+        assertEquals("generated-identity", result.profile.identityRefId)
+        assertEquals(listOf("generated-private-key"), identityStore.importedPayloads)
+        assertEquals(listOf("ssh-ed25519 generated-public-key goblin-android"), client.installedPublicKeys)
+    }
+
+
+    @Test
     fun `default generator produces an SSH public key line and private key payload`() {
         val generated = DefaultSshKeyGenerator().generate(profile())
 
-        assertTrue(
-            generated.publicKeyLine.startsWith("ssh-ed25519 ") ||
-                generated.publicKeyLine.startsWith("ecdsa-sha2-nistp256 "),
-        )
+        assertTrue(generated.publicKeyLine.startsWith("ssh-rsa "))
         assertTrue(generated.privateKeyBytes.decodeToString().startsWith("-----BEGIN PRIVATE KEY-----"))
+    }
+
+    @Test
+    fun `default generator private key can be read back for public key authentication`() {
+        val generated = DefaultSshKeyGenerator().generate(profile())
+
+        val publicKeyLine = SshjPublicKeyReader().publicKeyLine(generated.privateKeyBytes)
+
+        assertTrue(publicKeyLine.startsWith("ssh-rsa "))
     }
 
     private fun service(
@@ -193,6 +239,12 @@ class SshInitializationServiceTest {
         override fun publicKeyLine(privateKeyBytes: ByteArray): String {
             seenPrivateKeys.add(privateKeyBytes.decodeToString())
             return publicKeyLine
+        }
+    }
+
+    private class FailingPublicKeyReader : SshPublicKeyReader {
+        override fun publicKeyLine(privateKeyBytes: ByteArray): String {
+            throw IllegalArgumentException("Unsupported private key")
         }
     }
 }

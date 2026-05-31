@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import dev.goblin.android.domain.ResourceState
+import dev.goblin.android.domain.ssh.RemoteRepositoryProfile
 import dev.goblin.android.domain.ssh.SshHostProfile
 import dev.goblin.android.ui.theme.GoblinSpacing
 
@@ -37,7 +38,11 @@ import dev.goblin.android.ui.theme.GoblinSpacing
 @Composable
 fun HostsScreen(
     hostsState: ResourceState<List<SshHostProfile>>,
+    repositories: List<RemoteRepositoryProfile> = emptyList(),
     onAddHost: () -> Unit,
+    onAddRepository: () -> Unit = {},
+    onOpenRepository: (String) -> Unit = {},
+    onDeleteRepository: (String) -> Unit = {},
     onEditHost: (String) -> Unit,
     onDeleteHost: (String) -> Unit,
     onOpenDiagnostics: (String) -> Unit,
@@ -69,14 +74,22 @@ fun HostsScreen(
                 is ResourceState.Error -> ErrorHosts(message = hostsState.message, onAddHost = onAddHost)
                 is ResourceState.Stale -> HostList(
                     hosts = hostsState.value,
+                    repositories = repositories,
                     onAddHost = onAddHost,
+                    onAddRepository = onAddRepository,
+                    onOpenRepository = onOpenRepository,
+                    onDeleteRepository = onDeleteRepository,
                     onEditHost = onEditHost,
                     onDeleteHost = onDeleteHost,
                     onOpenDiagnostics = onOpenDiagnostics,
                 )
                 is ResourceState.Loaded -> HostList(
                     hosts = hostsState.value,
+                    repositories = repositories,
                     onAddHost = onAddHost,
+                    onAddRepository = onAddRepository,
+                    onOpenRepository = onOpenRepository,
+                    onDeleteRepository = onDeleteRepository,
                     onEditHost = onEditHost,
                     onDeleteHost = onDeleteHost,
                     onOpenDiagnostics = onOpenDiagnostics,
@@ -108,12 +121,17 @@ private fun ErrorHosts(message: String, onAddHost: () -> Unit) {
 @Composable
 private fun HostList(
     hosts: List<SshHostProfile>,
+    repositories: List<RemoteRepositoryProfile>,
     onAddHost: () -> Unit,
+    onAddRepository: () -> Unit,
+    onOpenRepository: (String) -> Unit,
+    onDeleteRepository: (String) -> Unit,
     onEditHost: (String) -> Unit,
     onDeleteHost: (String) -> Unit,
     onOpenDiagnostics: (String) -> Unit,
 ) {
     var deleteTarget by remember { mutableStateOf<SshHostProfile?>(null) }
+    var repositoryDeleteTarget by remember { mutableStateOf<RemoteRepositoryProfile?>(null) }
 
     if (hosts.isEmpty()) {
         Column(
@@ -141,8 +159,13 @@ private fun HostList(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text("Saved hosts", style = MaterialTheme.typography.titleMedium)
-        Button(onClick = onAddHost) {
-            Text("Add host")
+        Row(horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm)) {
+            TextButton(onClick = onAddRepository) {
+                Text("Add project")
+            }
+            Button(onClick = onAddHost) {
+                Text("Add host")
+            }
         }
     }
     Spacer(Modifier.height(GoblinSpacing.Md))
@@ -154,6 +177,19 @@ private fun HostList(
                 onEditHost = { onEditHost(host.id) },
                 onDeleteHost = { deleteTarget = host },
             )
+        }
+        if (repositories.isNotEmpty()) {
+            item {
+                Spacer(Modifier.height(GoblinSpacing.Sm))
+                Text("Saved projects", style = MaterialTheme.typography.titleMedium)
+            }
+            items(repositories, key = { it.id }) { repository ->
+                RepositoryRow(
+                    repository = repository,
+                    onOpenRepository = { onOpenRepository(repository.id) },
+                    onDeleteRepository = { repositoryDeleteTarget = repository },
+                )
+            }
         }
     }
 
@@ -178,6 +214,63 @@ private fun HostList(
                 }
             },
         )
+    }
+
+    repositoryDeleteTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { repositoryDeleteTarget = null },
+            title = { Text("Delete project record?") },
+            text = { Text("This removes ${target.title} from Goblin Android. It does not delete anything on the SSH server.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDeleteRepository(target.id)
+                        repositoryDeleteTarget = null
+                    },
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { repositoryDeleteTarget = null }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun RepositoryRow(
+    repository: RemoteRepositoryProfile,
+    onOpenRepository: () -> Unit,
+    onDeleteRepository: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onOpenRepository,
+    ) {
+        Row(
+            modifier = Modifier.padding(GoblinSpacing.Md),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
+            ) {
+                Text(repository.title, style = MaterialTheme.typography.titleMedium)
+                Text(repository.remotePath, style = MaterialTheme.typography.bodySmall)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs)) {
+                TextButton(onClick = onOpenRepository) {
+                    Text("Open")
+                }
+                TextButton(onClick = onDeleteRepository) {
+                    Text("Delete")
+                }
+            }
+        }
     }
 }
 

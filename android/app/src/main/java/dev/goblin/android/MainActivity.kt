@@ -11,6 +11,7 @@ import dev.goblin.android.ssh.SshDiagnosticsService
 import dev.goblin.android.ssh.SshInitializationService
 import dev.goblin.android.ssh.SshjInitializationClient
 import dev.goblin.android.ssh.SshjClientFacade
+import dev.goblin.android.ssh.RemoteRepositoryGitService
 import dev.goblin.android.terminal.SshTerminalService
 import dev.goblin.android.ui.theme.GoblinTheme
 
@@ -22,6 +23,10 @@ class MainActivity : ComponentActivity() {
         val secureIdentityStore = SecureIdentityStore.create(this)
         val hostKeyStore = HostKeyStore.create(this)
         val diagnosticsService = SshDiagnosticsService(
+            client = SshjClientFacade(identityStore = secureIdentityStore),
+            hostKeyStore = hostKeyStore,
+        )
+        val remoteRepositoryGitService = RemoteRepositoryGitService(
             client = SshjClientFacade(identityStore = secureIdentityStore),
             hostKeyStore = hostKeyStore,
         )
@@ -41,6 +46,7 @@ class MainActivity : ComponentActivity() {
                     remoteRepositoryStore = remoteRepositoryStore,
                     secureIdentityStore = secureIdentityStore,
                     diagnosticsService = diagnosticsService,
+                    remoteRepositoryGitService = remoteRepositoryGitService,
                     initializationService = initializationService,
                     terminalService = terminalService,
                 )

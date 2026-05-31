@@ -16,6 +16,9 @@ class TerminalController(
     private var rows: Int = DefaultRows
 
     fun open(target: RemoteTarget, secrets: SshConnectionSecrets = SshConnectionSecrets()) {
+        session?.close()
+        session = null
+        output = ""
         update(TerminalSessionState.Connecting)
         runCatching {
             terminalService.openShell(
@@ -38,28 +41,44 @@ class TerminalController(
     fun sendInput(value: String): Boolean {
         val current = session ?: return false
         if (value.isEmpty()) return false
-        current.sendInput(value)
-        return true
+        return runCatching {
+            current.sendInput(value)
+        }.fold(
+            onSuccess = { true },
+            onFailure = {
+                fail(it)
+                false
+            },
+        )
     }
 
     fun paste(value: String): Boolean = sendInput(value)
 
     fun resize(nextCols: Int, nextRows: Int): Boolean {
-        val current = session ?: return false
         val safeCols = nextCols.coerceIn(MinCols, MaxCols)
         val safeRows = nextRows.coerceIn(MinRows, MaxRows)
         cols = safeCols
         rows = safeRows
+        val current = session ?: return false
         update(TerminalSessionState.Resizing(current.id, safeCols, safeRows))
-        current.resize(safeCols, safeRows)
-        update(TerminalSessionState.Connected(current.id, output, safeCols, safeRows))
-        return true
+        return runCatching {
+            current.resize(safeCols, safeRows)
+        }.fold(
+            onSuccess = {
+                update(TerminalSessionState.Connected(current.id, output, safeCols, safeRows))
+                true
+            },
+            onFailure = {
+                fail(it)
+                false
+            },
+        )
     }
 
     fun close() {
         val current = session ?: return
         session = null
-        current.close()
+        runCatching { current.close() }
         update(TerminalSessionState.Exited(current.id))
     }
 
@@ -92,7 +111,7 @@ class TerminalController(
         private const val MaxCols = 240
         private const val MinRows = 6
         private const val MaxRows = 100
-        private const val MaxOutputChars = 128_000
+        private const val MaxOutputChars = 32_000
     }
 }
 
@@ -114,4 +133,3 @@ interface TerminalSession {
     fun resize(cols: Int, rows: Int)
     fun close()
 }
-

@@ -5,22 +5,15 @@ import dev.goblin.android.data.ssh.SshIdentityMaterialStore
 import dev.goblin.android.domain.ssh.HostKeyTrust
 import dev.goblin.android.domain.ssh.RemoteTarget
 import dev.goblin.android.domain.ssh.SshHostProfile
-import java.io.Reader
-import java.io.StringReader
 import java.nio.charset.StandardCharsets
 import java.security.KeyPairGenerator
 import java.security.PublicKey
-import java.security.spec.ECGenParameterSpec
 import java.util.Base64
 import java.util.concurrent.TimeUnit
-import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.common.Buffer
 import net.schmizz.sshj.common.KeyType
 import net.schmizz.sshj.common.SecurityUtils
 import net.schmizz.sshj.transport.verification.HostKeyVerifier
-import net.schmizz.sshj.userauth.keyprovider.OpenSSHKeyFile
-import net.schmizz.sshj.userauth.password.PasswordFinder
-import net.schmizz.sshj.userauth.password.Resource
 
 sealed interface SshInitializationCheck {
     data object Ready : SshInitializationCheck
@@ -75,7 +68,7 @@ class SshInitializationService(
             )
             is HostKeyTrust.Rejected -> SshInitializationCheck.NeedsHostKeyTrust(trust.fingerprint)
             is HostKeyTrust.Trusted -> {
-                if (profile.identityRefId == null) SshInitializationCheck.NeedsServerPassword else SshInitializationCheck.Ready
+                if (hasUsableIdentity(profile)) SshInitializationCheck.Ready else SshInitializationCheck.NeedsServerPassword
             }
         }
     }
@@ -107,11 +100,12 @@ class SshInitializationService(
     private fun prepareIdentity(profile: SshHostProfile): PreparedIdentity {
         val existingIdentityId = profile.identityRefId
         if (existingIdentityId != null) {
-            val privateKeyBytes = identityStore.loadProtectedBytesById(existingIdentityId)
-            return PreparedIdentity(
-                profile = profile,
-                publicKeyLine = publicKeyReader.publicKeyLine(privateKeyBytes),
-            )
+            readExistingPublicKey(existingIdentityId)?.let { publicKeyLine ->
+                return PreparedIdentity(
+                    profile = profile,
+                    publicKeyLine = publicKeyLine,
+                )
+            }
         }
 
         val generated = keyGenerator.generate(profile)
@@ -129,34 +123,22 @@ class SshInitializationService(
         val profile: SshHostProfile,
         val publicKeyLine: String,
     )
+
+    private fun hasUsableIdentity(profile: SshHostProfile): Boolean {
+        val identityRefId = profile.identityRefId ?: return false
+        return readExistingPublicKey(identityRefId) != null
+    }
+
+    private fun readExistingPublicKey(identityRefId: String): String? =
+        runCatching {
+            publicKeyReader.publicKeyLine(identityStore.loadProtectedBytesById(identityRefId))
+        }.getOrNull()
 }
 
 class DefaultSshKeyGenerator : SshKeyGenerator {
     override fun generate(profile: SshHostProfile): GeneratedSshKey {
-        val keyPair = runCatching {
-            KeyPairGenerator.getInstance("Ed25519").generateKeyPair()
-        }.getOrElse {
-            val generator = KeyPairGenerator.getInstance("EC")
-            generator.initialize(ECGenParameterSpec("secp256r1"))
-            generator.generateKeyPair()
-        }
-        val privateKey = encodePkcs8Pem(keyPair.private.encoded)
-        return GeneratedSshKey(
-            privateKeyBytes = privateKey.toByteArray(StandardCharsets.UTF_8),
-            publicKeyLine = SshPublicKeyEncoding.publicKeyLine(keyPair.public, "goblin-android"),
-        )
-    }
-
-    private fun encodePkcs8Pem(encoded: ByteArray): String {
-        val body = Base64.getMimeEncoder(64, "\n".toByteArray()).encodeToString(encoded)
-        return "-----BEGIN PRIVATE KEY-----\n$body\n-----END PRIVATE KEY-----\n"
-    }
-}
-
-class EcdsaSshKeyGenerator : SshKeyGenerator {
-    override fun generate(profile: SshHostProfile): GeneratedSshKey {
-        val generator = KeyPairGenerator.getInstance("EC")
-        generator.initialize(ECGenParameterSpec("secp256r1"))
+        val generator = KeyPairGenerator.getInstance("RSA")
+        generator.initialize(GeneratedKeyBits)
         val keyPair = generator.generateKeyPair()
         val privateKey = encodePkcs8Pem(keyPair.private.encoded)
         return GeneratedSshKey(
@@ -169,18 +151,15 @@ class EcdsaSshKeyGenerator : SshKeyGenerator {
         val body = Base64.getMimeEncoder(64, "\n".toByteArray()).encodeToString(encoded)
         return "-----BEGIN PRIVATE KEY-----\n$body\n-----END PRIVATE KEY-----\n"
     }
+
+    private companion object {
+        const val GeneratedKeyBits = 3072
+    }
 }
 
 class SshjPublicKeyReader : SshPublicKeyReader {
-    override fun publicKeyLine(privateKeyBytes: ByteArray): String {
-        val keyFile = OpenSSHKeyFile()
-        keyFile.init(
-            StringReader(privateKeyBytes.toString(StandardCharsets.UTF_8)),
-            null as Reader?,
-            EmptyPasswordFinder,
-        )
-        return SshPublicKeyEncoding.publicKeyLine(keyFile.public, "imported")
-    }
+    override fun publicKeyLine(privateKeyBytes: ByteArray): String =
+        SshPrivateKeys.publicKeyLine(privateKeyBytes, "imported")
 }
 
 object SshPublicKeyEncoding {
@@ -198,7 +177,7 @@ object SshPublicKeyEncoding {
 class SshjInitializationClient : SshInitializationClient {
     override fun fetchHostFingerprint(target: RemoteTarget): String {
         var fingerprint: String? = null
-        SSHClient().use { client ->
+        SshjClients.create().use { client ->
             client.addHostKeyVerifier(capturingVerifier { fingerprint = it })
             client.connect(target.host, target.port)
         }
@@ -214,7 +193,7 @@ class SshjInitializationClient : SshInitializationClient {
         expectedFingerprint: String,
         publicKeyLine: String,
     ) {
-        SSHClient().use { client ->
+        SshjClients.create().use { client ->
             client.addHostKeyVerifier(expectedFingerprintVerifier(expectedFingerprint))
             client.connect(target.host, target.port)
             client.authPassword(target.user, password)
@@ -273,8 +252,3 @@ class SshjInitializationClient : SshInitializationClient {
 }
 
 class SshInitializationException(message: String) : RuntimeException(message)
-
-private object EmptyPasswordFinder : PasswordFinder {
-    override fun reqPassword(resource: Resource<*>?): CharArray = CharArray(0)
-    override fun shouldRetry(resource: Resource<*>?): Boolean = false
-}

@@ -13,6 +13,7 @@ import dev.goblin.android.domain.ssh.RemoteRepositoryProfile
 import dev.goblin.android.domain.ssh.RemoteTarget
 import dev.goblin.android.domain.ssh.SshHostProfile
 import dev.goblin.android.navigation.AppRoute
+import dev.goblin.android.ssh.RemoteRepositoryGitService
 import dev.goblin.android.ssh.SshDiagnosticsService
 import dev.goblin.android.ssh.SshInitializationService
 import dev.goblin.android.terminal.TerminalSessionFactory
@@ -20,6 +21,8 @@ import dev.goblin.android.ui.screens.addhost.AddHostScreen
 import dev.goblin.android.ui.screens.diagnostics.DiagnosticsScreen
 import dev.goblin.android.ui.screens.hosts.HostsScreen
 import dev.goblin.android.ui.screens.placeholders.SettingsPlaceholderScreen
+import dev.goblin.android.ui.screens.repositories.RepositorySetupScreen
+import dev.goblin.android.ui.screens.repositories.RepositoryWorkspaceScreen
 import dev.goblin.android.ui.screens.terminal.TerminalScreen
 
 @Composable
@@ -28,6 +31,7 @@ fun GoblinAndroidApp(
     remoteRepositoryStore: RemoteRepositoryStore,
     secureIdentityStore: SecureIdentityStore,
     diagnosticsService: SshDiagnosticsService,
+    remoteRepositoryGitService: RemoteRepositoryGitService,
     initializationService: SshInitializationService,
     terminalService: TerminalSessionFactory,
 ) {
@@ -62,7 +66,14 @@ fun GoblinAndroidApp(
     when (val currentRoute = route) {
         AppRoute.Hosts -> HostsScreen(
             hostsState = hostsState,
+            repositories = currentRepositories(),
             onAddHost = { route = AppRoute.AddHost },
+            onAddRepository = { route = AppRoute.AddRepository },
+            onOpenRepository = { repositoryId -> route = AppRoute.Repository(repositoryId) },
+            onDeleteRepository = { repositoryId ->
+                remoteRepositoryStore.deleteRepository(repositoryId)
+                reloadRepositories()
+            },
             onEditHost = { hostId -> route = AppRoute.EditHost(hostId) },
             onDeleteHost = { hostId ->
                 hostProfileStore.deleteHost(hostId)
@@ -78,6 +89,12 @@ fun GoblinAndroidApp(
             initialHost = null,
             onBack = { route = AppRoute.Hosts },
             onImportPrivateKey = { displayName, bytes -> secureIdentityStore.importPrivateKey(displayName, bytes) },
+            onCheckSshInitialization = { input -> initializationService.check(input) },
+            onTrustHostKey = { input, fingerprint -> initializationService.trustHostKey(input, fingerprint) },
+            onInitializeSshAccess = { input, password ->
+                val result = initializationService.initialize(input, password)
+                result.profile
+            },
             onSaveHost = { input ->
                 hostProfileStore.saveHost(input)
                 reloadHosts()
@@ -94,6 +111,12 @@ fun GoblinAndroidApp(
                     initialHost = host,
                     onBack = { route = AppRoute.Hosts },
                     onImportPrivateKey = { displayName, bytes -> secureIdentityStore.importPrivateKey(displayName, bytes) },
+                    onCheckSshInitialization = { input -> initializationService.check(input) },
+                    onTrustHostKey = { input, fingerprint -> initializationService.trustHostKey(input, fingerprint) },
+                    onInitializeSshAccess = { input, password ->
+                        val result = initializationService.initialize(input, password)
+                        result.profile
+                    },
                     onSaveHost = { input ->
                         hostProfileStore.saveHost(input)
                         reloadHosts()
@@ -117,6 +140,10 @@ fun GoblinAndroidApp(
                     repositories = repositories,
                     onBack = { route = AppRoute.Hosts },
                     onOpenTerminal = { route = AppRoute.Terminal(currentRoute.hostId) },
+                    onOpenRepository = { repositoryId -> route = AppRoute.Repository(repositoryId) },
+                    onOpenRepositoryTerminal = { repository ->
+                        route = AppRoute.Terminal(currentRoute.hostId, repository.remotePath, repository.id)
+                    },
                     onCheckSshInitialization = { initializationService.check(routeHost()) },
                     onInitializeSshAccess = { password ->
                         val result = initializationService.initialize(routeHost(), password)
@@ -131,9 +158,60 @@ fun GoblinAndroidApp(
                         remoteRepositoryStore.saveRepository(repository)
                         reloadRepositories()
                     },
+                    onInspectRepository = { remotePath ->
+                        remoteRepositoryGitService.inspectRepository(RemoteTarget.fromHostProfile(routeHost(), remotePath))
+                    },
                     onDeleteRepository = { repositoryId ->
                         remoteRepositoryStore.deleteRepository(repositoryId)
                         reloadRepositories()
+                    },
+                )
+            }
+        }
+
+        AppRoute.AddRepository -> RepositorySetupScreen(
+            hosts = currentHosts(),
+            repositories = currentRepositories(),
+            onBack = { route = AppRoute.Hosts },
+            onSaveRepository = { repository ->
+                remoteRepositoryStore.saveRepository(repository)
+                reloadRepositories()
+            },
+            onDeleteRepository = { repositoryId ->
+                remoteRepositoryStore.deleteRepository(repositoryId)
+                reloadRepositories()
+            },
+            onOpenRepository = { repositoryId -> route = AppRoute.Repository(repositoryId) },
+            onBrowseDirectories = { host, remotePath ->
+                remoteRepositoryGitService.browseDirectories(RemoteTarget.fromHostProfile(host, remotePath))
+            },
+            onInspectRepository = { host, remotePath ->
+                remoteRepositoryGitService.inspectRepository(RemoteTarget.fromHostProfile(host, remotePath))
+            },
+        )
+
+        is AppRoute.Repository -> {
+            val repository = currentRepositories().firstOrNull { it.id == currentRoute.repositoryId }
+            val host = repository?.let { repo -> currentHosts().firstOrNull { it.id == repo.hostProfileId } }
+            if (repository == null || host == null) {
+                route = AppRoute.Hosts
+            } else {
+                RepositoryWorkspaceScreen(
+                    host = host,
+                    repository = repository,
+                    onBack = { route = AppRoute.Hosts },
+                    onLoadSnapshot = {
+                        remoteRepositoryGitService.loadSnapshot(
+                            RemoteTarget.fromHostProfile(host, repository.remotePath),
+                        )
+                    },
+                    onOpenTerminalAtPath = { remotePath ->
+                        route = AppRoute.Terminal(host.id, remotePath, repository.id)
+                    },
+                    onDeleteRepository = {
+                        remoteRepositoryStore.deleteRepository(repository.id)
+                        reloadRepositories()
+                        route = AppRoute.Hosts
                     },
                 )
             }
@@ -146,8 +224,13 @@ fun GoblinAndroidApp(
             } else {
                 TerminalScreen(
                     host = host,
+                    remotePath = currentRoute.remotePath,
                     terminalService = terminalService,
-                    onBack = { route = AppRoute.Diagnostics(currentRoute.hostId) },
+                    onBack = {
+                        route = currentRoute.repositoryId
+                            ?.let { AppRoute.Repository(it) }
+                            ?: AppRoute.Diagnostics(currentRoute.hostId)
+                    },
                 )
             }
         }

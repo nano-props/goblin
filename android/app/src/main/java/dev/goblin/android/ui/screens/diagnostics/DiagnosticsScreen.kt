@@ -31,10 +31,12 @@ import dev.goblin.android.domain.ssh.DiagnosticStage
 import dev.goblin.android.domain.ssh.DiagnosticStageResult
 import dev.goblin.android.domain.ssh.DiagnosticStatus
 import dev.goblin.android.domain.ssh.DiagnosticsResult
+import dev.goblin.android.domain.ssh.RemoteRepositoryInspection
 import dev.goblin.android.domain.ssh.RemoteRepositoryProfile
 import dev.goblin.android.domain.ssh.RemoteTarget
 import dev.goblin.android.domain.ssh.SshHostProfile
 import dev.goblin.android.ssh.SshInitializationCheck
+import dev.goblin.android.ui.screens.repositories.createRepositoryFromInspection
 import dev.goblin.android.ui.theme.GoblinSpacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -47,12 +49,17 @@ fun DiagnosticsScreen(
     repositories: List<RemoteRepositoryProfile> = emptyList(),
     onBack: () -> Unit,
     onOpenTerminal: () -> Unit,
+    onOpenRepository: (String) -> Unit = {},
+    onOpenRepositoryTerminal: (RemoteRepositoryProfile) -> Unit = {},
     onCheckSshInitialization: () -> SshInitializationCheck = { SshInitializationCheck.Ready },
     onInitializeSshAccess: (CharArray) -> Unit = {},
     onRunDiagnostics: () -> DiagnosticsResult,
     onTrustHostKey: (String) -> Unit,
     onSaveRepository: (RemoteRepositoryProfile) -> Unit = {},
     onDeleteRepository: (String) -> Unit = {},
+    onInspectRepository: (String) -> RemoteRepositoryInspection = { path ->
+        RemoteRepositoryInspection(path, path, null, null)
+    },
 ) {
     val scope = rememberCoroutineScope()
     var diagnosticsState: ResourceState<DiagnosticsResult> by remember { mutableStateOf(ResourceState.Idle) }
@@ -154,6 +161,9 @@ fun DiagnosticsScreen(
                 repositories = repositories,
                 onSaveRepository = onSaveRepository,
                 onDeleteRepository = onDeleteRepository,
+                onOpenRepository = onOpenRepository,
+                onOpenRepositoryTerminal = onOpenRepositoryTerminal,
+                onInspectRepository = onInspectRepository,
             )
             when (val state = diagnosticsState) {
                 ResourceState.Idle -> DiagnosticStageList(stages = pendingStages())
@@ -244,10 +254,15 @@ private fun RemoteRepositoriesSection(
     repositories: List<RemoteRepositoryProfile>,
     onSaveRepository: (RemoteRepositoryProfile) -> Unit,
     onDeleteRepository: (String) -> Unit,
+    onOpenRepository: (String) -> Unit,
+    onOpenRepositoryTerminal: (RemoteRepositoryProfile) -> Unit,
+    onInspectRepository: (String) -> RemoteRepositoryInspection,
 ) {
+    val scope = rememberCoroutineScope()
     var alias by remember(host.id) { mutableStateOf("") }
     var remotePath by remember(host.id) { mutableStateOf("") }
     var error by remember(host.id) { mutableStateOf<String?>(null) }
+    var saving by remember(host.id) { mutableStateOf(false) }
 
     Card(Modifier.fillMaxWidth()) {
         Column(
@@ -271,24 +286,28 @@ private fun RemoteRepositoriesSection(
                 isError = error != null,
             )
             Button(
+                enabled = remotePath.trim().startsWith("/") && !saving,
                 onClick = {
-                    runCatching {
-                        RemoteRepositoryProfile.create(
-                            hostProfileId = host.id,
-                            alias = alias,
-                            remotePath = remotePath,
-                        )
-                    }.onSuccess {
-                        onSaveRepository(it)
-                        alias = ""
-                        remotePath = ""
-                        error = null
-                    }.onFailure {
-                        error = it.message ?: "Repository validation failed"
+                    saving = true
+                    error = null
+                    scope.launch {
+                        runCatching {
+                            withContext(Dispatchers.IO) {
+                                createRepositoryFromInspection(host, alias, onInspectRepository(remotePath))
+                            }
+                        }.onSuccess {
+                            onSaveRepository(it)
+                            alias = ""
+                            remotePath = ""
+                            error = null
+                        }.onFailure {
+                            error = it.message ?: "Repository validation failed"
+                        }
+                        saving = false
                     }
                 },
             ) {
-                Text("Save repository")
+                Text(if (saving) "Validating..." else "Save repository")
             }
             if (error != null) {
                 Text(error.orEmpty(), color = MaterialTheme.colorScheme.error)
@@ -297,16 +316,22 @@ private fun RemoteRepositoriesSection(
                 Text("No saved repositories.")
             } else {
                 repositories.forEach { repository ->
-                    Row(
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
                     ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(repository.title, style = MaterialTheme.typography.bodyMedium)
-                            Text(repository.remotePath, style = MaterialTheme.typography.bodySmall)
-                        }
-                        TextButton(onClick = { onDeleteRepository(repository.id) }) {
-                            Text("Delete record")
+                        Text(repository.title, style = MaterialTheme.typography.bodyMedium)
+                        Text(repository.remotePath, style = MaterialTheme.typography.bodySmall)
+                        Row(horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs)) {
+                            TextButton(onClick = { onOpenRepository(repository.id) }) {
+                                Text("Open")
+                            }
+                            TextButton(onClick = { onOpenRepositoryTerminal(repository) }) {
+                                Text("Terminal")
+                            }
+                            TextButton(onClick = { onDeleteRepository(repository.id) }) {
+                                Text("Delete")
+                            }
                         }
                     }
                 }

@@ -5,8 +5,8 @@ import dev.goblin.android.data.ssh.SecureIdentityStore
 import dev.goblin.android.domain.ssh.HostKeyTrust
 import dev.goblin.android.domain.ssh.RemoteTarget
 import dev.goblin.android.ssh.SshConnectionSecrets
-import java.io.Reader
-import java.io.StringReader
+import dev.goblin.android.ssh.SshjClients
+import dev.goblin.android.ssh.SshPrivateKeys
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
@@ -16,9 +16,6 @@ import net.schmizz.sshj.common.SecurityUtils
 import net.schmizz.sshj.connection.channel.direct.PTYMode
 import net.schmizz.sshj.connection.channel.direct.Session
 import net.schmizz.sshj.transport.verification.HostKeyVerifier
-import net.schmizz.sshj.userauth.keyprovider.OpenSSHKeyFile
-import net.schmizz.sshj.userauth.password.PasswordFinder
-import net.schmizz.sshj.userauth.password.Resource
 
 class SshTerminalService(
     private val identityStore: SecureIdentityStore? = null,
@@ -34,12 +31,12 @@ class SshTerminalService(
         onExit: () -> Unit,
         onFailure: (Throwable) -> Unit,
     ): TerminalSession {
-        val client = SSHClient()
+        val client = SshjClients.create()
         client.addHostKeyVerifier(capturingVerifier(target, secrets.acceptedHostFingerprint))
         client.connect(target.host, target.port)
         val identityBytes = secrets.identityBytes ?: target.identityRefId?.let { identityStore?.loadProtectedBytesById(it) }
         if (identityBytes != null) {
-            client.authPublickey(target.user, keyProvider(identityBytes, secrets.passphrase))
+            client.authPublickey(target.user, SshPrivateKeys.keyProvider(client, identityBytes, secrets.passphrase))
         } else {
             client.authPublickey(target.user)
         }
@@ -47,6 +44,7 @@ class SshTerminalService(
         val sshSession = client.startSession()
         sshSession.allocatePTY("xterm-256color", cols, rows, 0, 0, emptyMap<PTYMode, Int>())
         val shell = sshSession.startShell()
+        writeInitialDirectory(shell, target.remotePath)
         val terminalSession = SshTerminalSession(
             id = UUID.randomUUID().toString(),
             client = client,
@@ -57,16 +55,6 @@ class SshTerminalService(
         )
         terminalSession.startReader(onOutput)
         return terminalSession
-    }
-
-    private fun keyProvider(identityBytes: ByteArray, passphrase: CharArray?): OpenSSHKeyFile {
-        val keyFile = OpenSSHKeyFile()
-        keyFile.init(
-            StringReader(identityBytes.toString(StandardCharsets.UTF_8)),
-            null as Reader?,
-            StaticPasswordFinder(passphrase),
-        )
-        return keyFile
     }
 
     private fun capturingVerifier(target: RemoteTarget, expectedFingerprint: String?): HostKeyVerifier =
@@ -84,10 +72,14 @@ class SshTerminalService(
             override fun findExistingAlgorithms(hostname: String, port: Int): MutableList<String> = mutableListOf()
         }
 
-    private class StaticPasswordFinder(private val value: CharArray?) : PasswordFinder {
-        override fun reqPassword(resource: Resource<*>?): CharArray = value ?: CharArray(0)
-        override fun shouldRetry(resource: Resource<*>?): Boolean = false
+    private fun writeInitialDirectory(shell: Session.Shell, remotePath: String) {
+        val normalizedPath = remotePath.trim().ifEmpty { "/" }
+        if (normalizedPath == "/") return
+        shell.outputStream.write("cd ${shellQuote(normalizedPath)}\n".toByteArray(StandardCharsets.UTF_8))
+        shell.outputStream.flush()
     }
+
+    private fun shellQuote(value: String): String = "'${value.replace("'", "'\"'\"'")}'"
 }
 
 internal object TerminalHostKeyPolicy {

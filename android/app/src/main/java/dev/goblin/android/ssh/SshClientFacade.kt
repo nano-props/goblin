@@ -3,16 +3,11 @@ package dev.goblin.android.ssh
 import dev.goblin.android.data.ssh.SecureIdentityStore
 import dev.goblin.android.domain.ssh.DiagnosticCategory
 import dev.goblin.android.domain.ssh.RemoteTarget
-import java.io.Reader
-import java.io.StringReader
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.common.SecurityUtils
 import net.schmizz.sshj.transport.verification.HostKeyVerifier
-import net.schmizz.sshj.userauth.keyprovider.OpenSSHKeyFile
-import net.schmizz.sshj.userauth.password.PasswordFinder
-import net.schmizz.sshj.userauth.password.Resource
 
 enum class SshDiagnosticProbe {
     CheckShell,
@@ -43,6 +38,12 @@ class SshClientException(
 interface SshClientFacade {
     fun fetchHostFingerprint(target: RemoteTarget): String
 
+    fun runCommand(
+        target: RemoteTarget,
+        script: String,
+        secrets: SshConnectionSecrets = SshConnectionSecrets(),
+    ): SshCommandResult = throw UnsupportedOperationException("Raw SSH commands are not supported")
+
     fun runDiagnosticProbe(
         target: RemoteTarget,
         probe: SshDiagnosticProbe,
@@ -55,7 +56,7 @@ class SshjClientFacade(
 ) : SshClientFacade {
     override fun fetchHostFingerprint(target: RemoteTarget): String {
         var fingerprint: String? = null
-        SSHClient().use { client ->
+        SshjClients.create().use { client ->
             client.addHostKeyVerifier(capturingVerifier { fingerprint = it })
             client.connect(target.host, target.port)
         }
@@ -66,9 +67,15 @@ class SshjClientFacade(
         target: RemoteTarget,
         probe: SshDiagnosticProbe,
         secrets: SshConnectionSecrets,
+    ): SshCommandResult = runCommand(target, scriptFor(target, probe), secrets)
+
+    override fun runCommand(
+        target: RemoteTarget,
+        script: String,
+        secrets: SshConnectionSecrets,
     ): SshCommandResult = withAuthenticatedClient(target, secrets) { client ->
         client.startSession().use { session ->
-            val command = session.exec(scriptFor(target, probe))
+            val command = session.exec(script)
             command.join(CommandTimeoutSeconds, TimeUnit.SECONDS)
             val stdout = command.inputStream.readBytes().toString(StandardCharsets.UTF_8).trimEnd()
             val stderr = command.errorStream.readBytes().toString(StandardCharsets.UTF_8).trimEnd()
@@ -88,12 +95,12 @@ class SshjClientFacade(
         block: (SSHClient) -> T,
     ): T {
         try {
-            SSHClient().use { client ->
+            SshjClients.create().use { client ->
                 client.addHostKeyVerifier(capturingVerifier(expectedFingerprint = secrets.acceptedHostFingerprint))
                 client.connect(target.host, target.port)
                 val identityBytes = secrets.identityBytes ?: target.identityRefId?.let { identityStore?.loadProtectedBytesById(it) }
                 if (identityBytes != null) {
-                    client.authPublickey(target.user, keyProvider(identityBytes, secrets.passphrase))
+                    client.authPublickey(target.user, SshPrivateKeys.keyProvider(client, identityBytes, secrets.passphrase))
                 } else {
                     client.authPublickey(target.user)
                 }
@@ -104,13 +111,6 @@ class SshjClientFacade(
         } catch (err: Throwable) {
             throw SshClientException(classifyThrowable(err), err.message ?: "SSH command failed", err)
         }
-    }
-
-    private fun keyProvider(identityBytes: ByteArray, passphrase: CharArray?): OpenSSHKeyFile {
-        val keyFile = OpenSSHKeyFile()
-        val reader = StringReader(identityBytes.toString(StandardCharsets.UTF_8))
-        keyFile.init(reader, null as Reader?, StaticPasswordFinder(passphrase))
-        return keyFile
     }
 
     private fun capturingVerifier(
@@ -145,11 +145,6 @@ class SshjClientFacade(
             "refused" in text || "unreachable" in text || "unknownhost" in text -> DiagnosticCategory.Unreachable
             else -> DiagnosticCategory.Unknown
         }
-    }
-
-    private class StaticPasswordFinder(private val value: CharArray?) : PasswordFinder {
-        override fun reqPassword(resource: Resource<*>?): CharArray = value ?: CharArray(0)
-        override fun shouldRetry(resource: Resource<*>?): Boolean = false
     }
 
     companion object {

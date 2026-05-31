@@ -6,7 +6,7 @@ Phase 1 evaluates a native Compose renderer before any WebView/xterm fallback. T
 
 ## Selected renderer
 
-Selected renderer: Compose native text viewport.
+Selected renderer for the revised Phase 1 spike: Compose native text viewport.
 
 The renderer is enough for Phase 1 because it:
 
@@ -15,6 +15,15 @@ The renderer is enough for Phase 1 because it:
 - Supports paste through the Android clipboard.
 - Observes layout changes and calls the terminal resize path.
 - Keeps all output runtime-only.
+- Caps phone-rendered scrollback to avoid large-output Compose redraw stalls.
+- Uses remaining-height layout and immediate auto-scroll so the input row is not pushed out by keyboard or resize changes.
+- Runs terminal socket writes, resize, and close operations off the Compose main thread to avoid Android `NetworkOnMainThreadException`.
+
+## Manual UAT result
+
+Passed on 2026-05-31. The terminal path was verified on Android after opening a trusted host terminal and confirming connection, typed command input, output streaming, scroll behavior, paste/helper key interaction, resize or keyboard layout behavior, close cleanup, and reopen behavior.
+
+The accepted Phase 1 renderer remains the native Compose text viewport. Phase 3 can still replace it with a stronger terminal renderer if worktree-scoped terminal requirements need richer ANSI, alternate screen, modifier, or performance behavior.
 
 ## Fallback criteria
 
@@ -34,6 +43,7 @@ Replay buffer design is deferred to Phase 3 implementation but constrained now:
 
 - Buffers are runtime-only and associated with host/session owner identity.
 - The buffer has a strict character cap and drops oldest output when capped.
+- Phase 1 caps rendered output at 32,000 characters; Phase 3 can tune this when a full terminal renderer exists.
 - Terminal output is not persisted in `HostProfileStore`, identity storage, or host-key storage.
 - Reconnect/replay behavior should be visible to the user and must not silently resurrect closed sessions.
 - A future worktree terminal should scope replay by host id, remote repository id, worktree path, and terminal session id.
@@ -45,4 +55,3 @@ Replay buffer design is deferred to Phase 3 implementation but constrained now:
 - Worktree-scoped terminal ownership.
 - Replay buffer implementation and restore UI.
 - Full helper-key behavior for complex modifier combinations.
-

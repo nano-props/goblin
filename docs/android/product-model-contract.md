@@ -72,4 +72,10 @@ Required Phase 1 lifecycle states:
 - Exited
 - Failed
 
-Input and paste flow through the terminal controller into a shell stream. The controller must not build ad hoc shell commands from UI text.
+Opening the Terminal route should start the SSH shell automatically for the selected host and path. After exit or failure, reconnect is an explicit user action.
+
+Input and paste flow through the terminal controller into a shell stream. The controller must not build ad hoc shell commands from UI text. Send, paste, and helper-key actions must be disabled or visibly explained until the terminal is connected so disconnected input is not silently dropped.
+
+Terminal output is capped for phone rendering. Phase 1 keeps only the latest rendered scrollback in runtime memory and uses a remaining-height viewport so keyboard and resize changes do not push the input controls off-screen.
+
+All terminal SSH operations that can touch the network, including open, send, paste, helper keys, resize, and close, must run off the Compose main thread. Controller write failures transition terminal state to `Failed` instead of propagating through input-event dispatch.
