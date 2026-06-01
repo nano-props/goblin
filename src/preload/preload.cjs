@@ -47,25 +47,26 @@ function rpcCall(request) {
     })
 }
 
-// `--goblin-home-dir=...`, `--goblin-initial-i18n=...` and
-// `--goblin-initial-settings=...` are injected by main via
+// `--goblin-bootstrap=...` is injected by main via
 // webPreferences.additionalArguments (see window-shell.ts).
 // `process.argv` is one of the few things sandbox-safe preloads can still
 // read, which is why we use it here instead of sync IPC.
-const HOME_PREFIX = '--goblin-home-dir='
-const homeDir = process.argv.find((a) => a.startsWith(HOME_PREFIX))?.slice(HOME_PREFIX.length) ?? ''
+function safeParseBase64JsonArgument(prefix, label) {
+  const raw = process.argv.find((a) => a.startsWith(prefix))?.slice(prefix.length) ?? ''
+  if (!raw) return null
+  try {
+    return JSON.parse(Buffer.from(raw, 'base64').toString('utf8'))
+  } catch (err) {
+    console.warn(`[preload] failed to parse ${label}`, err)
+    return null
+  }
+}
 
-const I18N_PREFIX = '--goblin-initial-i18n='
-const i18nRaw = process.argv.find((a) => a.startsWith(I18N_PREFIX))?.slice(I18N_PREFIX.length) ?? ''
-const initialI18n = i18nRaw
-  ? JSON.parse(Buffer.from(i18nRaw, 'base64').toString('utf8'))
-  : null
-
-const SETTINGS_PREFIX = '--goblin-initial-settings='
-const settingsRaw = process.argv.find((a) => a.startsWith(SETTINGS_PREFIX))?.slice(SETTINGS_PREFIX.length) ?? ''
-const initialSettings = settingsRaw
-  ? JSON.parse(Buffer.from(settingsRaw, 'base64').toString('utf8'))
-  : null
+const BOOTSTRAP_PREFIX = '--goblin-bootstrap='
+const bootstrap = safeParseBase64JsonArgument(BOOTSTRAP_PREFIX, 'bootstrap payload')
+const homeDir = typeof bootstrap?.homeDir === 'string' ? bootstrap.homeDir : ''
+const initialI18n = isObject(bootstrap?.i18n) ? bootstrap.i18n : null
+const initialSettings = isObject(bootstrap?.settings) ? bootstrap.settings : null
 const rpcEventSubscribers = new Set()
 let rpcEventListener = null
 const windowPageSubscribersByKey = new Map()

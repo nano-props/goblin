@@ -22,6 +22,7 @@ import { getCurrentLang, getDictionary } from '#/main/i18n/index.ts'
 import { getTheme } from '#/main/theme.ts'
 import { loadSettings } from '#/main/settings.ts'
 import { isGlobalShortcutRegistered } from '#/main/shortcuts.ts'
+import type { RendererBootstrapPayload } from '#/shared/bootstrap.ts'
 import { WINDOW_BACKGROUND_BY_COLOR_THEME } from '#/shared/theme-tokens.ts'
 
 const rendererDevUrl = process.env.GOBLIN_RENDERER_DEV_URL?.trim()
@@ -33,17 +34,17 @@ export function windowCanvasBackground(): string {
   return WINDOW_BACKGROUND_BY_COLOR_THEME[colorTheme][resolved]
 }
 
-function initialI18nArgument(): string {
-  const lang = getCurrentLang()
-  const dict = getDictionary()
-  const payload = Buffer.from(JSON.stringify({ lang, dict })).toString('base64')
-  return `--goblin-initial-i18n=${payload}`
-}
-
-export async function createRendererWindowWebPreferences(): Promise<BrowserWindowConstructorOptions['webPreferences']> {
-  const settings = await loadSettings()
-  const settingsPayload = Buffer.from(
-    JSON.stringify({
+function buildRendererBootstrapPayload(
+  settings: Awaited<ReturnType<typeof loadSettings>>,
+): RendererBootstrapPayload {
+  return {
+    homeDir: os.homedir(),
+    i18n: {
+      lang: getCurrentLang(),
+      pref: settings.lang,
+      dict: getDictionary(),
+    },
+    settings: {
       fetchIntervalSec: settings.fetchIntervalSec,
       terminalNotificationsEnabled: settings.terminalNotificationsEnabled,
       shortcutsDisabled: settings.shortcutsDisabled,
@@ -54,19 +55,20 @@ export async function createRendererWindowWebPreferences(): Promise<BrowserWindo
       globalShortcutRegistered: isGlobalShortcutRegistered(),
       terminalApp: settings.terminalApp,
       editorApp: settings.editorApp,
-    }),
-  ).toString('base64')
+    },
+  }
+}
+
+export async function createRendererWindowWebPreferences(): Promise<BrowserWindowConstructorOptions['webPreferences']> {
+  const settings = await loadSettings()
+  const bootstrapPayload = Buffer.from(JSON.stringify(buildRendererBootstrapPayload(settings))).toString('base64')
   return {
     preload: PRELOAD_PATH,
     contextIsolation: true,
     nodeIntegration: false,
     sandbox: true,
     webSecurity: true,
-    additionalArguments: [
-      `--goblin-home-dir=${os.homedir()}`,
-      initialI18nArgument(),
-      `--goblin-initial-settings=${settingsPayload}`,
-    ],
+    additionalArguments: [`--goblin-bootstrap=${bootstrapPayload}`],
   }
 }
 

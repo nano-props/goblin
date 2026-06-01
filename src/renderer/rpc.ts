@@ -1,6 +1,7 @@
 import { createTRPCClient, TRPCClientError, type TRPCLink } from '@trpc/client'
 import { observable } from '@trpc/server/observable'
 import type { AppRouter, RpcEvent } from '#/shared/rpc.ts'
+import { getInitialBootstrap } from '#/renderer/bootstrap.ts'
 
 type RpcEventType = RpcEvent['type']
 
@@ -110,7 +111,7 @@ export const rpc = createTRPCClient<AppRouter>({
 
 export const goblin = {
   get homeDir() {
-    return getGoblinBridge().homeDir
+    return getInitialBootstrap().homeDir
   },
   pathForFile(file: File) {
     return getGoblinBridge().pathForFile(file)

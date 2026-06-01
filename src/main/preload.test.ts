@@ -2,8 +2,29 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 import { describe, expect, test, vi } from 'vitest'
+import type { RendererBootstrapPayload } from '#/shared/bootstrap.ts'
 
-function loadPreload(options: { invoke?: (channel: string, ...args: unknown[]) => Promise<unknown> } = {}) {
+function defaultArgv() {
+  const bootstrap: RendererBootstrapPayload = {
+    homeDir: '/home/test',
+    i18n: { lang: 'en', pref: 'ja', dict: { hello: 'world' } },
+    settings: {
+      fetchIntervalSec: 120,
+      terminalNotificationsEnabled: false,
+      shortcutsDisabled: false,
+      globalShortcutDisabled: false,
+      swapCloseShortcuts: false,
+      toggleDetailOnActionBarBlankClick: false,
+      globalShortcut: 'CommandOrControl+Shift+G',
+      globalShortcutRegistered: false,
+      terminalApp: 'auto',
+      editorApp: 'cursor',
+    },
+  }
+  return ['--goblin-bootstrap=' + Buffer.from(JSON.stringify(bootstrap)).toString('base64')]
+}
+
+function loadPreload(options: { invoke?: (channel: string, ...args: unknown[]) => Promise<unknown>; argv?: string[] } = {}) {
   const exposed: Record<string, any> = {}
   const invocations: Array<{ channel: string; args: unknown[] }> = []
   const sends: Array<{ channel: string; args: unknown[] }> = []
@@ -23,11 +44,7 @@ function loadPreload(options: { invoke?: (channel: string, ...args: unknown[]) =
     console,
     Buffer,
     process: {
-      argv: [
-        '--goblin-home-dir=/home/test',
-        '--goblin-initial-i18n=' + Buffer.from(JSON.stringify({ lang: 'en', dict: {} })).toString('base64'),
-        '--goblin-initial-settings=' + Buffer.from(JSON.stringify({ fetchIntervalSec: 120, terminalNotificationsEnabled: false })).toString('base64'),
-      ],
+      argv: options.argv ?? defaultArgv(),
     },
     require: (name: string) => {
       if (name !== 'electron') throw new Error(`unexpected require: ${name}`)
@@ -47,6 +64,30 @@ function loadPreload(options: { invoke?: (channel: string, ...args: unknown[]) =
 }
 
 describe('preload goblin bridge', () => {
+  test('exposes bootstrap snapshots parsed from the single preload payload', () => {
+    const { goblin } = loadPreload()
+
+    expect(goblin.homeDir).toBe('/home/test')
+    expect(goblin.initialI18n).toEqual({ lang: 'en', pref: 'ja', dict: { hello: 'world' } })
+    expect(goblin.initialSettings).toMatchObject({
+      fetchIntervalSec: 120,
+      terminalNotificationsEnabled: false,
+      editorApp: 'cursor',
+    })
+  })
+
+  test('falls back cleanly when the bootstrap payload is malformed', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { goblin } = loadPreload({ argv: ['--goblin-bootstrap=***not-base64***'] })
+
+    expect(goblin.homeDir).toBe('')
+    expect(goblin.initialI18n).toBeNull()
+    expect(goblin.initialSettings).toBeNull()
+    expect(warn.mock.calls[0]?.[0]).toBe('[preload] failed to parse bootstrap payload')
+    expect((warn.mock.calls[0]?.[1] as { name?: string } | undefined)?.name).toBe('SyntaxError')
+    warn.mockRestore()
+  })
+
   test('forwards RPC request ids to the main process', async () => {
     const { goblin, invocations } = loadPreload()
 

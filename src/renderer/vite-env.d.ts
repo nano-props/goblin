@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
-import type { RpcEvent, RpcRequest, SettingsPage, TerminalPref, EditorPref } from '#/shared/rpc.ts'
+import type { InitialI18nSnapshot, InitialSettingsSnapshot } from '#/shared/bootstrap.ts'
+import type { RpcEvent, RpcRequest, SettingsPage } from '#/shared/rpc.ts'
 import type { WindowFlushResult } from '#/shared/window-lifecycle.ts'
 import type {
   TerminalExitEvent,
@@ -16,22 +17,9 @@ import type {
   TerminalWriteInput,
 } from '#/shared/terminal.ts'
 
-interface InitialSettingsSnapshot {
-  fetchIntervalSec: number
-  terminalNotificationsEnabled: boolean
-  shortcutsDisabled: boolean
-  globalShortcutDisabled: boolean
-  swapCloseShortcuts: boolean
-  toggleDetailOnActionBarBlankClick: boolean
-  globalShortcut: string
-  globalShortcutRegistered: boolean
-  terminalApp: TerminalPref
-  editorApp: EditorPref
-}
-
 interface GoblinBridge {
   homeDir: string
-  initialI18n: { lang: string; dict: Record<string, string> } | null
+  initialI18n: InitialI18nSnapshot | null
   initialSettings: InitialSettingsSnapshot | null
   invokeRpc: (request: RpcRequest) => Promise<unknown>
   abortRpc: (requestId: string) => Promise<boolean>

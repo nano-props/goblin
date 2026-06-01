@@ -21,6 +21,7 @@ import type {
   TerminalAppAvailability,
   TerminalPref,
 } from '#/shared/rpc.ts'
+import { getInitialBootstrap } from '#/renderer/bootstrap.ts'
 import { DEFAULT_GLOBAL_SHORTCUT } from '#/shared/accelerator.ts'
 import { DEFAULT_DETAIL_PANE_SIZES, DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 import { onRpcEventType, rpc } from '#/renderer/rpc.ts'
@@ -185,8 +186,7 @@ function mergeDetectedExternalAppsState<T extends object>(
   return same(s, next) && s.externalAppsDetectedAt === detectedAt ? s : { ...next, externalAppsDetectedAt: detectedAt }
 }
 
-const initialSettings =
-  typeof window !== 'undefined' && window.goblin?.initialSettings ? window.goblin.initialSettings : null
+const initialSettings = getInitialBootstrap().initialSettings
 
 export const useSettingsStore = create<SettingsStore>((set) => ({
   fetchIntervalSec: initialSettings?.fetchIntervalSec ?? 120,
@@ -198,10 +198,10 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
   globalShortcut: initialSettings?.globalShortcut ?? DEFAULT_GLOBAL_SHORTCUT,
   globalShortcutRegistered: initialSettings?.globalShortcutRegistered ?? false,
   terminalApp: initialSettings?.terminalApp ?? 'auto',
+  editorApp: initialSettings?.editorApp ?? 'auto',
   resolvedTerminalApp: null,
   terminalAvailable: false,
   terminalAppAvailability: { ghostty: false, terminal: false },
-  editorApp: 'auto',
   resolvedEditorApp: null,
   editorAvailable: false,
   editorAppAvailability: { vscode: false, cursor: false, windsurf: false },

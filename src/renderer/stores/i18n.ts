@@ -8,6 +8,7 @@ import i18next from 'i18next'
 import { initReactI18next, useTranslation } from 'react-i18next'
 import { create, type StoreApi } from 'zustand'
 import type { I18nPayload, Lang, LangPref } from '#/shared/rpc.ts'
+import { getInitialBootstrap } from '#/renderer/bootstrap.ts'
 import { onRpcEventType, rpc } from '#/renderer/rpc.ts'
 
 export type { Lang, LangPref }
@@ -15,13 +16,14 @@ export type Dict = Record<string, string>
 
 interface InitialI18n {
   lang: Lang
+  pref: LangPref
   dict: Dict
 }
 
 function getInitialI18n(): InitialI18n | null {
   try {
-    const raw = window.goblin?.initialI18n
-    if (raw && typeof raw === 'object' && 'lang' in raw && 'dict' in raw) {
+    const raw = getInitialBootstrap().initialI18n
+    if (raw && typeof raw === 'object' && 'lang' in raw && 'pref' in raw && 'dict' in raw) {
       return raw as InitialI18n
     }
   } catch {
@@ -75,7 +77,7 @@ function clearI18nSubscription() {
 
 export const useI18nStore = create<I18nState>((set) => ({
   lang: initial?.lang ?? 'en',
-  pref: 'auto',
+  pref: initial?.pref ?? 'auto',
   dict: initial?.dict ?? {},
 
   async hydrate() {
