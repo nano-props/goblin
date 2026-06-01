@@ -9,6 +9,7 @@ import type {
   WorktreeStatus,
 } from '#/renderer/types.ts'
 import type { CommitDetail } from '#/shared/rpc.ts'
+import type { RemoteRepoTarget, RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspaceDetailPaneSizes, WorkspaceLayout } from '#/shared/workspace-layout.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/renderer/stores/repos/branch-action-types.ts'
 import type { RepoOperationsState } from '#/renderer/stores/repos/operations.ts'
@@ -85,6 +86,7 @@ export interface RepoCacheState {
 }
 
 export interface RepoRemoteState {
+  target?: RemoteRepoTarget
   remotes?: string[]
   remoteDetails?: GitRemoteInfo[]
   hasRemotes?: boolean
@@ -148,7 +150,7 @@ export interface ReposStore {
    *  tab flashing through every entry. Returns the resolved repo id
    *  (the toplevel git root) on success so callers can drive a final
    *  `setActive` without re-reading the store. */
-  openRepo: (path: string, options?: { activate?: boolean }) => Promise<OpenRepoResult>
+  openRepo: (path: string | RepoSessionEntry, options?: { activate?: boolean }) => Promise<OpenRepoResult>
   closeRepo: (id: string) => void
   setActive: (id: string) => void
   /** Reorder the tab strip so `fromId` lands at `toId`'s position, using
@@ -208,7 +210,7 @@ export interface ReposStore {
     options?: RepoResultEventOptions,
   ) => void
   clearEvents: (id: string, eventIds: number[]) => void
-  hydrateSession: (openRepos: string[], activeRepo: string | null) => Promise<void>
+  hydrateSession: (openRepos: RepoSessionEntry[], activeRepo: string | null) => Promise<void>
   /** Clear the fetchFailed flag — called by manual fetch success and
    *  by an explicit refresh, so a stale badge doesn't follow the user
    *  around forever. */

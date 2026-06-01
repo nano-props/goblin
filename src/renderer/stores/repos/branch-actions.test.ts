@@ -14,6 +14,7 @@ import {
 } from '#/renderer/stores/repos/test-utils.ts'
 import type { RepoBranchAction } from '#/renderer/stores/repos/branch-action-types.ts'
 import type { BranchViewMode } from '#/renderer/stores/repos/types.ts'
+import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 
 const REPO_ID = '/tmp/gbl-branch-actions-test-repo'
 
@@ -148,6 +149,30 @@ describe('branch action capabilities', () => {
     expect(getBranchActionCapabilities(useReposStore.getState().repos[REPO_ID]!, branch)).toMatchObject({
       canPush: true,
       canOpenRemote: true,
+    })
+  })
+
+  test('disables external editor actions for remote worktrees while keeping terminal access', () => {
+    const branch = createRepoBranch('feature/remote', { worktree: { path: '/srv/repo-feature' } })
+    const target = normalizeRemoteTarget({ alias: 'example', host: 'example.com', user: 'alice', port: 22, remotePath: '/srv/repo' })
+    expect(target).not.toBeNull()
+    seedRepoState({
+      id: target!.id,
+      branches: [branch],
+      remote: {
+        target: target!,
+        remotes: ['origin'],
+        hasRemotes: true,
+        hasBrowserRemote: true,
+        browserRemoteProvider: 'github',
+        remoteProviders: { origin: 'github' },
+        hasGitHubRemote: true,
+      },
+    })
+
+    expect(getBranchActionCapabilities(useReposStore.getState().repos[target!.id]!, branch)).toMatchObject({
+      canOpenTerminal: true,
+      canOpenEditor: false,
     })
   })
 

@@ -30,12 +30,13 @@ import { openSettingsWindow } from '#/main/settings-window.ts'
 import { normalizeWorkspaceLayout, type WorkspaceLayout } from '#/shared/workspace-layout.ts'
 import { tildifyPath } from '#/shared/paths.ts'
 import type { LangPref, MenuAction, ThemePref } from '#/shared/rpc.ts'
+import { remoteTargetSubtitle, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 import { focusedRegisteredSurface } from '#/main/window-registry.ts'
 
 interface AppMenuState {
   isMac: boolean
   name: string
-  recentRepos: string[]
+  recentRepos: RepoSessionEntry[]
   shortcutsDisabled: boolean
   swapCloseShortcuts: boolean
   themePref: ThemePref
@@ -161,6 +162,7 @@ function createFileMenu(state: AppMenuState): MenuItemConstructorOptions {
       },
       {
         label: t('menu.file.open-remote-repo'),
+        accelerator: accelerator(state, 'CmdOrCtrl+Shift+R'),
         click: () => send('open-remote-repo'),
       },
       { label: t('menu.file.open-recent'), submenu: createRecentReposMenu(state.recentRepos) },
@@ -197,13 +199,16 @@ function createFileMenu(state: AppMenuState): MenuItemConstructorOptions {
   }
 }
 
-function createRecentReposMenu(recentRepos: string[]): MenuItemConstructorOptions[] {
+function createRecentReposMenu(recentRepos: RepoSessionEntry[]): MenuItemConstructorOptions[] {
   const home = app.getPath('home')
   return recentRepos.length > 0
     ? [
-        ...recentRepos.map((repoPath) => ({
-          label: tildifyPath(repoPath, home),
-          click: () => send({ type: 'open-recent-repo', path: repoPath }),
+        ...recentRepos.map((entry) => ({
+          label:
+            entry.kind === 'local'
+              ? tildifyPath(entry.id, home)
+              : `${entry.ref.displayName} — ${entry.ref.alias}:${entry.ref.remotePath}`,
+          click: () => send({ type: 'open-recent-repo', entry }),
         })),
         separator(),
         { label: t('menu.file.clear-recent'), click: () => void clearRecentReposFromMenu() },

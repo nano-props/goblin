@@ -59,7 +59,7 @@ export function useMenuActions({ closeAllOverlays, openRepoPathDialog, openClone
           const state = useReposStore.getState()
           switch (action.type) {
             case 'open-recent-repo':
-              await state.openRepo(action.path)
+              await state.openRepo(action.entry)
               break
           }
           return

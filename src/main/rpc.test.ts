@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
 import { ipcMain } from 'electron'
 import { getDefaultBranch, isAncestor, getCurrentBranch, getUpstream, isGitRepo } from '#/main/git/branches.ts'
-import { getWorktrees } from '#/main/git/worktrees.ts'
+import { createWorktree, getWorktrees } from '#/main/git/worktrees.ts'
 import { getWorkingStatus } from '#/main/git/status.ts'
 import { getWorktreePatch } from '#/main/git/patch.ts'
 import { resolveKnownWorktree, resolveRemovableWorktree } from '#/main/git/guards.ts'
@@ -18,6 +18,10 @@ import type { EditorAppState, ExternalAppsSnapshot, RpcResponse } from '#/shared
 
 const ipcHandlers = new Map<string, (_event: unknown, input: any) => Promise<unknown>>()
 const browserWindowFromWebContents = vi.hoisted(() => vi.fn(() => null))
+const listSshConfigHostsMock = vi.hoisted(() => vi.fn())
+const resolveRemoteTargetMock = vi.hoisted(() => vi.fn())
+const resolveTrackedRemoteTargetMock = vi.hoisted(() => vi.fn())
+const runRemoteCommandMock = vi.hoisted(() => vi.fn())
 
 vi.mock('electron', () => ({
   BrowserWindow: {
@@ -224,6 +228,16 @@ vi.mock('#/main/external-url.ts', () => ({
   openHttpsExternal: vi.fn(),
 }))
 
+vi.mock('#/main/ssh/config.ts', () => ({
+  listSshConfigHosts: listSshConfigHostsMock,
+  resolveRemoteTarget: resolveRemoteTargetMock,
+  resolveTrackedRemoteTarget: resolveTrackedRemoteTargetMock,
+}))
+
+vi.mock('#/main/ssh/commands.ts', () => ({
+  runRemoteCommand: runRemoteCommandMock,
+}))
+
 const trustedSender = { id: 1 }
 const trustedEvent = {
   sender: trustedSender,
@@ -257,6 +271,20 @@ describe('main repo rpc cancellation', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     browserWindowFromWebContents.mockReturnValue(null)
+    listSshConfigHostsMock.mockResolvedValue([])
+    resolveRemoteTargetMock.mockImplementation(async ({ alias, remotePath }: { alias: string; remotePath: string }) => ({
+      target: {
+        id: `ssh-config://${alias}${remotePath}`,
+        alias,
+        host: 'example.com',
+        user: 'alice',
+        port: 22,
+        remotePath,
+        displayName: `${alias}:repo`,
+      },
+    }))
+    resolveTrackedRemoteTargetMock.mockImplementation(async (target: any) => ({ target }))
+    runRemoteCommandMock.mockResolvedValue({ ok: true, stdout: '/home/alice', stderr: '' })
     vi.mocked(isGitRepo).mockResolvedValue(true)
     vi.mocked(getCurrentBranch).mockResolvedValue('main')
     vi.mocked(getWorktrees).mockResolvedValue([{ path: '/repo', branch: 'main', isBare: false, isPrimary: true }])
@@ -350,6 +378,125 @@ describe('main repo rpc cancellation', () => {
       properties: ['openDirectory'],
       title: 'Open Git Repository',
     })
+  })
+
+  test('expands home-relative remote paths before returning resolved targets', async () => {
+    resolveRemoteTargetMock.mockImplementationOnce(async ({ alias, remotePath }: { alias: string; remotePath: string }) => ({
+      target: {
+        id: `ssh-config://${alias}${remotePath}`,
+        alias,
+        host: 'example.com',
+        user: 'alice',
+        port: 22,
+        remotePath,
+        displayName: `${alias}:repo`,
+      },
+    }))
+
+    const result = await invokeRpc('remote.resolveTarget', { alias: 'prod', remotePath: '~/repo' })
+
+    expect(resolveRemoteTargetMock).toHaveBeenCalledWith({ alias: 'prod', remotePath: '/' }, undefined)
+    expect(runRemoteCommandMock).toHaveBeenCalledWith(
+      expect.objectContaining({ alias: 'prod' }),
+      { type: 'printHome' },
+      { signal: undefined },
+    )
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        target: expect.objectContaining({
+          alias: 'prod',
+          remotePath: '/home/alice/repo',
+        }),
+      },
+    })
+  })
+
+  test('expands home-relative remote worktree paths before creating remote worktrees', async () => {
+    resolveRemoteTargetMock.mockImplementationOnce(async ({ alias, remotePath }: { alias: string; remotePath: string }) => ({
+      target: {
+        id: `ssh-config://${alias}${remotePath}`,
+        alias,
+        host: 'example.com',
+        user: 'alice',
+        port: 22,
+        remotePath,
+        displayName: `${alias}:repo`,
+      },
+    }))
+    runRemoteCommandMock
+      .mockResolvedValueOnce({ ok: true, stdout: '/home/alice', stderr: '' })
+      .mockResolvedValueOnce({ ok: true, stdout: '', stderr: '' })
+
+    const result = await invokeRpc('repo.createWorktree', {
+      cwd: 'ssh-config://prod/srv/repo',
+      worktreePath: '~/trees/repo-feature',
+      newBranch: 'feature/new',
+      baseBranch: 'main',
+    })
+
+    expect(result).toEqual({ ok: true, data: { ok: true, message: 'ok' } })
+    expect(runRemoteCommandMock).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ alias: 'prod' }),
+      { type: 'printHome' },
+      { signal: undefined },
+    )
+    expect(runRemoteCommandMock).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ alias: 'prod', remotePath: '/srv/repo' }),
+      {
+        type: 'gitWorktreeAdd',
+        path: '/srv/repo',
+        worktreePath: '/home/alice/trees/repo-feature',
+        newBranch: 'feature/new',
+        baseBranch: 'main',
+      },
+      { signal: expect.any(AbortSignal), timeoutMs: 180000 },
+    )
+    expect(vi.mocked(createWorktree)).not.toHaveBeenCalled()
+  })
+
+  test('lists lightweight remote path suggestions and maps home-relative prefixes back to ~/', async () => {
+    resolveRemoteTargetMock.mockImplementationOnce(async ({ alias, remotePath }: { alias: string; remotePath: string }) => ({
+      target: {
+        id: `ssh-config://${alias}${remotePath}`,
+        alias,
+        host: 'example.com',
+        user: 'alice',
+        port: 22,
+        remotePath,
+        displayName: `${alias}:repo`,
+      },
+    }))
+    runRemoteCommandMock
+      .mockResolvedValueOnce({ ok: true, stdout: '/home/alice', stderr: '' })
+      .mockResolvedValueOnce({
+        ok: true,
+        stdout: ['/home/alice/repos', '/home/alice/Desktop', '/opt/shared'].join('\n'),
+        stderr: '',
+      })
+      .mockResolvedValueOnce({ ok: true, stdout: '/home/alice', stderr: '' })
+
+    const result = await invokeRpc('remote.listPathSuggestions', {
+      alias: 'prod',
+      remotePath: '~/repo',
+      prefix: '~/D',
+    })
+
+    expect(result).toEqual({ ok: true, data: ['~/Desktop'] })
+    expect(runRemoteCommandMock).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ alias: 'prod' }),
+      { type: 'printHome' },
+      { signal: undefined },
+    )
+    expect(runRemoteCommandMock).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ alias: 'prod' }),
+      { type: 'listDirectories', path: '/home/alice', limit: 20 },
+      { signal: undefined },
+    )
   })
 
   test('aborts a cancellable read RPC by request id', async () => {

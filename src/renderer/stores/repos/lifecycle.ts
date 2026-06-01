@@ -6,16 +6,28 @@ import { disposeRepoRuntime } from '#/renderer/stores/repos/runtime.ts'
 import { runInitialRepoLoad } from '#/renderer/stores/repos/refresh-workflows.ts'
 import type { OpenRepoResult, ReposGet, ReposSet, ReposStore } from '#/renderer/stores/repos/types.ts'
 import { rpc } from '#/renderer/rpc.ts'
+import {
+  isRemoteRepoId,
+  localRepoSessionEntry,
+  normalizeRemoteRepoRef,
+  parseRemoteRepoId,
+  remoteRepoSessionEntry,
+  repoSessionEntryId,
+  type RemoteRepoTarget,
+  type RepoSessionEntry,
+} from '#/shared/remote-repo.ts'
 
 interface ResolvedRepo {
   id: string
   name: string
+  target?: RemoteRepoTarget
 }
 
 interface ProbeResult {
   input: string
   reason: string | null
   repo: ResolvedRepo | null
+  target?: RemoteRepoTarget
 }
 
 interface InitialRepoRefresh {
@@ -25,22 +37,49 @@ interface InitialRepoRefresh {
 
 const SESSION_PROBE_CONCURRENCY = 4
 
+function sessionEntryFromInput(input: string | RepoSessionEntry): RepoSessionEntry {
+  if (typeof input !== 'string') return input
+  if (!isRemoteRepoId(input)) return localRepoSessionEntry(input)
+  const parsed = parseRemoteRepoId(input)
+  const ref = parsed ? normalizeRemoteRepoRef(parsed) : null
+  return ref ? { kind: 'remote', id: ref.id, ref } : localRepoSessionEntry(input)
+}
+
 async function resolveRepoPath(
-  p: string,
+  input: string | RepoSessionEntry,
   onError?: (err: unknown) => void,
   fallbackError = 'error.failed-read-repo',
 ): Promise<ProbeResult> {
+  const entry = sessionEntryFromInput(input)
   try {
-    const probe = await rpc.repo.probe.query({ cwd: p })
-    if (!probe?.ok || !probe.root) return { input: p, reason: probe?.message ?? 'error.not-git-repo', repo: null }
+    let target: RemoteRepoTarget | undefined
+    if (entry.kind === 'remote') target = (await rpc.remote.resolveTarget.query(entry.ref)).target
+    const probe = await rpc.repo.probe.query({ cwd: entry.id })
+    if (!probe?.ok || !probe.root) {
+      return {
+        input: entry.id,
+        reason: probe?.message ?? 'error.not-git-repo',
+        repo: null,
+        target,
+      }
+    }
     return {
-      input: p,
+      input: entry.id,
       reason: null,
-      repo: { id: probe.root, name: probe.name ?? lastPathSegment(probe.root) },
+      repo: {
+        id: probe.root,
+        name: probe.name ?? (entry.kind === 'remote' ? entry.ref.displayName : lastPathSegment(probe.root)),
+        ...(target ? { target } : {}),
+      },
+      target,
     }
   } catch (err) {
     onError?.(err)
-    return { input: p, reason: err instanceof Error ? err.message : fallbackError, repo: null }
+    return {
+      input: entry.id,
+      reason: err instanceof Error ? err.message : fallbackError,
+      repo: null,
+    }
   }
 }
 
@@ -63,9 +102,38 @@ function addResolvedRepo(
   rankById?: ReadonlyMap<string, number>,
 ): Pick<ReposStore, 'repos' | 'order'> & { changed: boolean } {
   const { id, name } = resolvedRepo
-  if (s.repos[id]) return { repos: s.repos, order: s.order, changed: false }
+  const existing = s.repos[id]
+  if (existing) {
+    if (
+      !resolvedRepo.target ||
+      (existing.remote.target &&
+        existing.remote.target.alias === resolvedRepo.target.alias &&
+        existing.remote.target.host === resolvedRepo.target.host &&
+        existing.remote.target.user === resolvedRepo.target.user &&
+        existing.remote.target.port === resolvedRepo.target.port &&
+        existing.remote.target.remotePath === resolvedRepo.target.remotePath)
+    ) {
+      return { repos: s.repos, order: s.order, changed: false }
+    }
+    return {
+      repos: {
+        ...s.repos,
+        [id]: {
+          ...existing,
+          remote: {
+            ...existing.remote,
+            target: resolvedRepo.target,
+          },
+        },
+      },
+      order: s.order,
+      changed: false,
+    }
+  }
+  const repo = hydrateCachedRepo(emptyRepo(id, name), s.repoCache[id])
+  if (resolvedRepo.target) repo.remote.target = resolvedRepo.target
   return {
-    repos: { ...s.repos, [id]: hydrateCachedRepo(emptyRepo(id, name), s.repoCache[id]) },
+    repos: { ...s.repos, [id]: repo },
     order: orderedInsert(s.order, id, rankById),
     changed: true,
   }
@@ -75,11 +143,13 @@ function addUnavailableRepo(
   s: Pick<ReposStore, 'repos' | 'repoCache' | 'order'>,
   id: string,
   reason: string,
+  target?: RemoteRepoTarget,
   rankById?: ReadonlyMap<string, number>,
 ): Pick<ReposStore, 'repos' | 'order'> & { changed: boolean } {
   if (s.repos[id]) return { repos: s.repos, order: s.order, changed: false }
   const cached = s.repoCache[id]
-  const repo = hydrateCachedRepo(emptyRepo(id, cached?.name || lastPathSegment(id)), cached)
+  const repo = hydrateCachedRepo(emptyRepo(id, cached?.name || target?.displayName || lastPathSegment(id)), cached)
+  if (target) repo.remote.target = target
   repo.availability = { phase: 'unavailable', reason, checkedAt: Date.now() }
   return {
     repos: { ...s.repos, [id]: repo },
@@ -108,14 +178,16 @@ function refreshInitialRepoState(get: ReposGet, refresh: InitialRepoRefresh) {
 
 export function createLifecycleActions(set: ReposSet, get: ReposGet) {
   return {
-    async openRepo(p: string, options?: { activate?: boolean }): Promise<OpenRepoResult> {
-      const resolved = await resolveRepoPath(p, undefined, 'error.not-git-repo')
+    async openRepo(pathOrEntry: string | RepoSessionEntry, options?: { activate?: boolean }): Promise<OpenRepoResult> {
+      const entry = sessionEntryFromInput(pathOrEntry)
+      const resolved = await resolveRepoPath(entry, undefined, 'error.not-git-repo')
       if (!resolved.repo) return { ok: false, message: resolved.reason ?? 'error.not-git-repo' }
       const repo = resolved.repo
       const { id } = repo
       const activate = options?.activate !== false
       let initialRefresh: InitialRepoRefresh | null = null
-      void rpc.settings.addRecentRepo.mutate({ repoPath: id }).catch(() => {
+      const recentEntry = repo.target ? remoteRepoSessionEntry(repo.target) : { kind: 'local' as const, id }
+      void rpc.settings.addRecentRepo.mutate({ repo: recentEntry }).catch(() => {
         /* recent menu is best-effort */
       })
 
@@ -171,7 +243,7 @@ export function createLifecycleActions(set: ReposSet, get: ReposGet) {
       })
     },
 
-    async hydrateSession(openRepos: string[], activeRepo: string | null) {
+    async hydrateSession(openRepos: RepoSessionEntry[], activeRepo: string | null) {
       // Probe in parallel; entries that are no longer git repos (folder
       // moved/deleted, external drive not mounted) are restored as unavailable
       // tabs so the user's workspace shape stays intact.
@@ -179,10 +251,10 @@ export function createLifecycleActions(set: ReposSet, get: ReposGet) {
       let managedActiveId: string | null = null
       const limitProbe = pLimit(SESSION_PROBE_CONCURRENCY)
       await Promise.all(
-        openRepos.map((p, index) =>
+        openRepos.map((entry, index) =>
           limitProbe(async () => {
-            const probe = await resolveRepoPath(p, (err) => {
-              console.warn(`[session] probe failed for ${p}:`, err)
+            const probe = await resolveRepoPath(entry, (err) => {
+              console.warn(`[session] probe failed for ${repoSessionEntryId(entry)}:`, err)
             })
             if (!probe.repo) {
               if (!rankById.has(probe.input)) rankById.set(probe.input, index)
@@ -191,6 +263,7 @@ export function createLifecycleActions(set: ReposSet, get: ReposGet) {
                   s,
                   probe.input,
                   probe.reason ?? 'error.failed-read-repo',
+                  probe.target,
                   rankById,
                 )
                 const activeId = activeAfterHydrateStep(s, repos, order, activeRepo, managedActiveId)

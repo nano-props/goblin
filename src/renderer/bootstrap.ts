@@ -19,8 +19,16 @@ function readInitialBootstrap(): RendererBootstrapSnapshot {
   }
 }
 
-const initialBootstrap = readInitialBootstrap()
+let initialBootstrap = readInitialBootstrap()
 
 export function getInitialBootstrap(): RendererBootstrapSnapshot {
+  if (
+    initialBootstrap.homeDir.length === 0 &&
+    initialBootstrap.initialI18n === null &&
+    initialBootstrap.initialSettings === null
+  ) {
+    const next = readInitialBootstrap()
+    if (next.homeDir.length > 0 || next.initialI18n !== null || next.initialSettings !== null) initialBootstrap = next
+  }
   return initialBootstrap
 }

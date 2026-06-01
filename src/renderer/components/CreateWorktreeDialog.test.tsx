@@ -8,6 +8,7 @@ import { CreateWorktreeDialog } from '#/renderer/components/CreateWorktreeDialog
 import { emptyRepo } from '#/renderer/stores/repos/helpers.ts'
 import type { RepoState } from '#/renderer/stores/repos/types.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
+import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
@@ -81,6 +82,27 @@ describe('CreateWorktreeDialog', () => {
     expect(document.body.textContent).toContain('error.invalid-path')
     expect(buttonByText('dialog.cancel').disabled).toBe(false)
   })
+
+  test('allows home-relative remote worktree paths', async () => {
+    const onClose = vi.fn()
+    const onCreate = vi.fn(async () => ({ ok: true, message: 'ok' }))
+
+    render(
+      <CreateWorktreeDialog open repo={createRemoteRepo()} onClose={onClose} onCreate={onCreate} />,
+    )
+
+    setInputValue('#cwt-branch', 'feature/new')
+    setInputValue('#cwt-path', '~/trees/repo-feature-new')
+    click('button[type="submit"]')
+    await flush()
+
+    expect(onCreate).toHaveBeenCalledWith({
+      worktreePath: '~/trees/repo-feature-new',
+      newBranch: 'feature/new',
+      baseBranch: 'main',
+    })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
 })
 
 function createRepo(): RepoState {
@@ -108,6 +130,21 @@ function createRepo(): RepoState {
       lastCommitAuthor: 'Test',
     },
   ]
+  return repo
+}
+
+function createRemoteRepo(): RepoState {
+  const target = normalizeRemoteTarget({
+    alias: 'prod',
+    host: 'example.com',
+    user: 'alice',
+    port: 22,
+    remotePath: '/srv/repo',
+  })
+  if (!target) throw new Error('Failed to create remote target for test')
+  const repo = createRepo()
+  repo.id = target.id
+  repo.remote.target = target
   return repo
 }
 

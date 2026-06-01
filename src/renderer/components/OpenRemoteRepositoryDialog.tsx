@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FileKey } from 'lucide-react'
 import { DialogFooter } from '#/renderer/components/ui/dialog.tsx'
 import { Button } from '#/renderer/components/ui/button.tsx'
 import { DialogError } from '#/renderer/components/ui/dialog-error.tsx'
@@ -13,12 +12,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/renderer/components/ui/select.tsx'
-import { ToggleGroup, ToggleGroupItem } from '#/renderer/components/ui/toggle-group.tsx'
 import { rpc } from '#/renderer/rpc.ts'
+import { useRemotePathSuggestions } from '#/renderer/hooks/useRemotePathSuggestions.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { RemoteDiagnosticsPanel } from '#/renderer/components/RemoteDiagnosticsPanel.tsx'
-import { isAbsoluteRemotePath } from '#/shared/remote-repo.ts'
+import { isResolvableRemotePathInput, isHomeRelativeRemotePath, remoteRepoSessionEntry } from '#/shared/remote-repo.ts'
 import type {
   RemoteDiagnosticsResult,
   RemoteRepoTarget,
@@ -30,36 +29,26 @@ interface Props {
   onOpenChange: (open: boolean) => void
 }
 
-export type AddRemoteMode = 'config' | 'manual'
-
-const DEFAULT_MANUAL_USER = 'root'
-const DEFAULT_MANUAL_PORT = '22'
-
 export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
   const t = useT()
   const [hosts, setHosts] = useState<SshConfigHost[]>([])
-  const [mode, setMode] = useState<AddRemoteMode>('manual')
+  const [hasInclude, setHasInclude] = useState(false)
   const [alias, setAlias] = useState('')
-  const [host, setHost] = useState('')
-  const [user, setUser] = useState(DEFAULT_MANUAL_USER)
-  const [port, setPort] = useState(DEFAULT_MANUAL_PORT)
-  const [identityFile, setIdentityFile] = useState('')
   const [remotePath, setRemotePath] = useState('')
   const [target, setTarget] = useState<RemoteRepoTarget | null>(null)
   const [diagnostics, setDiagnostics] = useState<RemoteDiagnosticsResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const portResult = useMemo(() => parseRemotePort(port), [port])
+  const selectedHost = useMemo(() => hosts.find((item) => item.alias === alias) ?? null, [alias, hosts])
   const pending = loading
   const pathError = remotePathError(remotePath)
-  const canSubmit = canSubmitRemoteRepository({
-    mode,
+  const canSubmit = canSubmitRemoteRepository({ alias, remotePath, pending })
+  const pathPreview = formatRemotePathPreview(t, { alias, remotePath, target })
+  const pathSuggestions = useRemotePathSuggestions({
+    enabled: open && !pending,
     alias,
-    host,
-    user,
-    remotePath,
-    portError: portResult.errorKey,
-    pending,
+    remotePath: remotePath.trim() || '/',
+    prefix: remotePath,
   })
 
   function clearResolvedRemoteState() {
@@ -70,12 +59,8 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
   useEffect(() => {
     if (!open) return
     setHosts([])
-    setMode('manual')
+    setHasInclude(false)
     setAlias('')
-    setHost('')
-    setUser(DEFAULT_MANUAL_USER)
-    setPort(DEFAULT_MANUAL_PORT)
-    setIdentityFile('')
     setRemotePath('')
     setTarget(null)
     setDiagnostics(null)
@@ -84,16 +69,14 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
     let cancelled = false
     void rpc.remote.listSshHosts
       .query()
-      .then((items) => {
+      .then((result) => {
         if (cancelled) return
-        setHosts(items)
-        if (items.length > 0) {
-          setMode('config')
-          setAlias(items[0]?.alias ?? '')
-        }
+        setHosts(result.hosts)
+        setHasInclude(result.hasInclude)
+        setAlias(result.hasInclude ? '' : (result.hosts[0]?.alias ?? ''))
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err))
+        if (!cancelled) setError(formatRemoteDialogError(t, err))
       })
     return () => {
       cancelled = true
@@ -101,15 +84,7 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
   }, [open])
 
   async function resolveCurrentTarget(pathOverride?: string): Promise<RemoteRepoTarget | null> {
-    const input = buildRemoteConnectionInput(
-      mode,
-      alias,
-      host,
-      user,
-      portResult.port,
-      pathOverride ?? remotePath,
-      identityFile,
-    )
+    const input = buildRemoteConnectionInput(alias, pathOverride ?? remotePath)
     if (!input) return null
     const resolved = await rpc.remote.resolveTarget.query(input)
     setTarget(resolved.target)
@@ -126,7 +101,7 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
       const result = await rpc.remote.testRepository.query({ target: nextTarget })
       setDiagnostics(result)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(formatRemoteDialogError(t, err))
     } finally {
       setLoading(false)
     }
@@ -134,18 +109,6 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
 
   async function handleTest() {
     await runConnectionTest()
-  }
-
-  async function handleIdentityFileBrowse() {
-    setError(null)
-    try {
-      const selectedPath = await rpc.remote.identityFileDialog.mutate()
-      if (!selectedPath) return
-      setIdentityFile(selectedPath)
-      clearResolvedRemoteState()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    }
   }
 
   async function handleSubmit() {
@@ -164,15 +127,15 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
           return
         }
       }
-      const openResult = await useReposStore.getState().openRepo(nextTarget.id)
+      const openResult = await useReposStore.getState().openRepo(remoteRepoSessionEntry(nextTarget))
       if (!openResult.ok) {
-        setError(t(openResult.message))
+        setError(formatRemoteDialogError(t, openResult.message))
         setLoading(false)
         return
       }
       onOpenChange(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(formatRemoteDialogError(t, err))
     } finally {
       setLoading(false)
     }
@@ -189,158 +152,92 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
         if (!nextOpen && !pending) handleCancel()
       }}
       showCloseButton={!pending}
+      className="sm:max-w-xl"
       title={t('repo-tabs.open-remote-title')}
       description={t('repo-tabs.open-remote-description')}
     >
       <form
-        className="space-y-0"
+        className="space-y-4"
         onSubmit={(event) => {
           event.preventDefault()
           void handleSubmit()
         }}
       >
-        <Field>
-          <FieldDescription>{t('repo-tabs.open-remote-connect-via-ssh')}</FieldDescription>
-        </Field>
-
-        <ToggleGroup
-          type="single"
-          value={mode}
-          onValueChange={(next) => {
-            if (!next) return
-            const nextMode = next as AddRemoteMode
-            setMode(nextMode)
-            if (nextMode === 'config') {
-              setAlias((currentAlias) =>
-                hosts.some((item) => item.alias === currentAlias) ? currentAlias : (hosts[0]?.alias ?? ''),
-              )
-            }
-            clearResolvedRemoteState()
-          }}
-          variant="outline"
-          size="sm"
-          className="w-full"
-        >
-          <ToggleGroupItem value="config" disabled={pending || hosts.length === 0} className="flex-1 text-xs">
-            {t('repo-tabs.open-remote-ssh-config')}
-          </ToggleGroupItem>
-          <ToggleGroupItem value="manual" disabled={pending} className="flex-1 text-xs">
-            {t('repo-tabs.open-remote-manual')}
-          </ToggleGroupItem>
-        </ToggleGroup>
-
-        {mode === 'config' ? (
-          <Field>
-            <FieldLabel htmlFor="remote-ssh-host">{t('repo-tabs.open-remote-ssh-config')}</FieldLabel>
-            {hosts.length > 0 ? (
-              <Select
+        <Field className="gap-2">
+          <FieldLabel htmlFor="remote-ssh-host">{t('repo-tabs.open-remote-host-alias-label')}</FieldLabel>
+          {hasInclude ? (
+            <>
+              <Input
+                id="remote-ssh-host"
+                disabled={pending}
                 value={alias}
-                disabled={pending}
-                onValueChange={(value) => {
-                  setAlias(value)
+                onChange={(event) => {
+                  setAlias(event.target.value)
                   clearResolvedRemoteState()
                 }}
-              >
-                <SelectTrigger id="remote-ssh-host" className="w-full text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
+                placeholder={hosts[0]?.alias ?? 'my-server'}
+                className="h-10 text-sm"
+                list={hosts.length > 0 ? 'remote-ssh-host-options' : undefined}
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+              {hosts.length > 0 && (
+                <datalist id="remote-ssh-host-options">
                   {hosts.map((item) => (
-                    <SelectItem key={item.alias} value={item.alias}>
-                      {item.alias}
-                    </SelectItem>
+                    <option key={item.alias} value={item.alias} />
                   ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <div className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">
-                {t('repo-tabs.open-remote-no-ssh-hosts')}
-              </div>
-            )}
-            <FieldDescription reserveHeight aria-hidden />
-          </Field>
-        ) : (
-          <>
-            <Field>
-              <FieldLabel htmlFor="remote-host">{t('repo-tabs.open-remote-host-label')}</FieldLabel>
-              <Input
-                id="remote-host"
-                autoFocus
-                disabled={pending}
-                value={host}
-                onChange={(event) => {
-                  setHost(event.target.value)
-                  clearResolvedRemoteState()
-                }}
-                placeholder={t('repo-tabs.open-remote-host-placeholder')}
-                className="font-mono text-xs"
-              />
-              <FieldDescription reserveHeight aria-hidden />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="remote-user">{t('repo-tabs.open-remote-username-label')}</FieldLabel>
-              <Input
-                id="remote-user"
-                disabled={pending}
-                value={user}
-                onChange={(event) => {
-                  setUser(event.target.value)
-                  clearResolvedRemoteState()
-                }}
-                className="font-mono text-xs"
-              />
-              <FieldDescription reserveHeight aria-hidden />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="remote-port">{t('repo-tabs.open-remote-port-label')}</FieldLabel>
-              <Input
-                id="remote-port"
-                disabled={pending}
-                value={port}
-                onChange={(event) => {
-                  setPort(event.target.value)
-                  clearResolvedRemoteState()
-                }}
-                className="font-mono text-xs"
-              />
-              <FieldDescription reserveHeight aria-hidden />
-            </Field>
-          </>
-        )}
-
-        <Field>
-          <FieldLabel htmlFor="remote-private-key">{t('repo-tabs.open-remote-private-key-label')}</FieldLabel>
-          <div className="flex gap-2">
-            <Input
-              id="remote-private-key"
-              value={identityFile}
+                </datalist>
+              )}
+              <FieldDescription>{t('repo-tabs.open-remote-include-manual-hint')}</FieldDescription>
+            </>
+          ) : hosts.length > 0 ? (
+            <Select
+              value={alias}
               disabled={pending}
-              placeholder="~/.ssh/id_ed25519"
-              onChange={(event) => {
-                setIdentityFile(event.target.value)
+              onValueChange={(value) => {
+                setAlias(value)
                 clearResolvedRemoteState()
               }}
-              className="min-w-0 flex-1 font-mono text-xs"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              disabled={pending}
-              aria-label={t('repo-tabs.open-remote-private-key-choose')}
-              title={t('repo-tabs.open-remote-private-key-choose')}
-              onClick={() => void handleIdentityFileBrowse()}
             >
-              <FileKey className="h-4 w-4" />
-            </Button>
-          </div>
-          <FieldDescription reserveHeight>{t('repo-tabs.open-remote-private-key-hint')}</FieldDescription>
+              <SelectTrigger id="remote-ssh-host" className="h-10 w-full text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {hosts.map((item) => (
+                  <SelectItem key={item.alias} value={item.alias}>
+                    {item.alias}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="rounded-md border border-dashed border-border px-3 py-3 text-xs text-muted-foreground">
+              <div>{t('repo-tabs.open-remote-no-ssh-hosts')}</div>
+              <div className="mt-1">{t('repo-tabs.open-remote-no-ssh-hosts-help')}</div>
+            </div>
+          )}
         </Field>
 
-        <Field data-invalid={pathError.errorKey ? true : undefined}>
+        {selectedHost ? (
+          <div className="rounded-md border border-border/60 bg-muted/15 px-3 py-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+              <span className="truncate font-medium text-foreground">{selectedHost.alias}</span>
+              <span className="truncate text-muted-foreground">{selectedHost.hostName ?? selectedHost.alias}</span>
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {formatSshConfigMeta(t, selectedHost)}
+            </div>
+          </div>
+        ) : !hasInclude && hosts.length === 0 ? (
+          <FieldDescription>{t('repo-tabs.open-remote-config-required')}</FieldDescription>
+        ) : null}
+
+        <Field className="gap-2" data-invalid={pathError.errorKey || (!hasInclude && hosts.length === 0) ? true : undefined}>
           <FieldLabel htmlFor="remote-path">{t('repo-tabs.open-remote-path-label')}</FieldLabel>
           <Input
             id="remote-path"
+            autoFocus={hasInclude || hosts.length > 0}
             disabled={pending}
             value={remotePath}
             onChange={(event) => {
@@ -348,16 +245,22 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
               clearResolvedRemoteState()
             }}
             placeholder={t('repo-tabs.open-remote-path-placeholder')}
-            className="font-mono text-xs"
+            className="h-10 font-mono text-sm"
+            list={pathSuggestions.length > 0 ? 'open-remote-path-suggestions' : undefined}
           />
-          <FieldDescription reserveHeight>
-            {portResult.errorKey
-              ? t(portResult.errorKey)
+          {pathSuggestions.length > 0 && (
+            <datalist id="open-remote-path-suggestions">
+              {pathSuggestions.map((item) => (
+                <option key={item} value={item} />
+              ))}
+            </datalist>
+          )}
+          <FieldDescription reserveHeight className="whitespace-pre-wrap break-words" title={pathPreview || undefined}>
+            {!hasInclude && hosts.length === 0
+              ? t('repo-tabs.open-remote-config-required')
               : pathError.errorKey
                 ? t(pathError.errorKey)
-                : target
-                  ? target.id
-                  : ''}
+                : pathPreview}
           </FieldDescription>
         </Field>
 
@@ -365,14 +268,14 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
 
         {error && <DialogError>{error}</DialogError>}
 
-        <DialogFooter className="pt-4">
+        <DialogFooter className="gap-2 pt-2">
           <Button type="button" variant="ghost" disabled={pending} onClick={handleCancel}>
             {t('dialog.cancel')}
           </Button>
-          <Button type="button" variant="outline" disabled={!canSubmit || pending} onClick={() => void handleTest()}>
+          <Button type="button" variant="outline" className="min-w-24" disabled={!canSubmit || pending} onClick={() => void handleTest()}>
             {t('repo-tabs.open-remote-test-connection')}
           </Button>
-          <Button type="submit" disabled={!canSubmit || pending}>
+          <Button type="submit" className="min-w-28" disabled={!canSubmit || pending}>
             {t('repo-tabs.open-remote-confirm')}
           </Button>
         </DialogFooter>
@@ -381,56 +284,60 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
   )
 }
 
-export function parseRemotePort(value: string): { port?: number; errorKey: string | null } {
-  const trimmed = value.trim()
-  if (!trimmed) return { errorKey: null }
-  const port = Number(trimmed)
-  if (!Number.isInteger(port) || port < 1 || port > 65535) return { errorKey: 'repo-tabs.open-remote-port-error' }
-  return { port, errorKey: null }
-}
-
 export function remotePathError(value: string): { errorKey: string | null } {
   const trimmed = value.trim()
   if (!trimmed) return { errorKey: 'repo-tabs.open-remote-path-required' }
-  if (!isAbsoluteRemotePath(trimmed)) return { errorKey: 'repo-tabs.open-remote-path-absolute' }
+  if (!isValidRemotePathInput(trimmed)) return { errorKey: 'repo-tabs.open-remote-path-absolute' }
   return { errorKey: null }
 }
 
 export function canSubmitRemoteRepository(input: {
-  mode: AddRemoteMode
   alias: string
-  host: string
-  user: string
   remotePath: string
-  portError: string | null
   pending: boolean
 }): boolean {
-  if (input.pending || input.portError || remotePathError(input.remotePath).errorKey) return false
-  if (input.mode === 'config') return input.alias.trim().length > 0
-  return input.host.trim().length > 0 && input.user.trim().length > 0
+  if (input.pending || remotePathError(input.remotePath).errorKey) return false
+  return input.alias.trim().length > 0
 }
 
-export function buildRemoteConnectionInput(
-  mode: AddRemoteMode,
-  alias: string,
-  host: string,
-  user: string,
-  port: number | undefined,
-  remotePath: string,
-  identityFile: string = '',
-) {
+export function buildRemoteConnectionInput(alias: string, remotePath: string) {
   const cleanPath = remotePath.trim()
   if (remotePathError(cleanPath).errorKey) return null
-  const cleanIdentityFile = identityFile.trim()
-  const auth = cleanIdentityFile ? { identityFile: cleanIdentityFile } : {}
-  if (mode === 'config') {
-    const cleanAlias = alias.trim()
-    return cleanAlias ? { mode: 'config' as const, alias: cleanAlias, remotePath: cleanPath, ...auth } : null
+  const cleanAlias = alias.trim()
+  return cleanAlias ? { alias: cleanAlias, remotePath: cleanPath } : null
+}
+
+export function formatRemotePathPreview(
+  t: (key: string, params?: Record<string, string>) => string,
+  input: { alias: string; remotePath: string; target: RemoteRepoTarget | null },
+): string {
+  const alias = input.target?.alias ?? input.alias.trim()
+  const typedPath = input.remotePath.trim()
+  if (!alias || !typedPath) return ''
+  if (input.target && isHomeRelativeRemotePath(typedPath) && input.target.remotePath !== typedPath) {
+    return t('repo-tabs.open-remote-path-preview-expanded', {
+      input: `${alias}:${typedPath}`,
+      expanded: `${input.target.alias}:${input.target.remotePath}`,
+    })
   }
-  const cleanHost = host.trim()
-  const cleanUser = user.trim()
-  if (!cleanHost || !cleanUser) return null
-  return port
-    ? { mode: 'manual' as const, host: cleanHost, user: cleanUser, port, remotePath: cleanPath, ...auth }
-    : { mode: 'manual' as const, host: cleanHost, user: cleanUser, remotePath: cleanPath, ...auth }
+  const path = input.target ? `${input.target.alias}:${input.target.remotePath}` : `${alias}:${typedPath}`
+  return t('repo-tabs.open-remote-path-preview', { path })
+}
+
+function formatSshConfigMeta(t: (key: string) => string, host: SshConfigHost): string {
+  const parts = [
+    host.user ? `${t('repo-tabs.open-remote-username-label')}: ${host.user}` : null,
+    `${t('repo-tabs.open-remote-port-label')}: ${host.port ?? 22}`,
+  ].filter(Boolean)
+  return parts.join(' · ')
+}
+
+export function formatRemoteDialogError(t: (key: string, params?: Record<string, string>) => string, err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err)
+  if (message.startsWith('error.') || message.startsWith('repo-tabs.')) return t(message)
+  return message
+}
+
+function isValidRemotePathInput(value: string): boolean {
+  return isResolvableRemotePathInput(value)
 }

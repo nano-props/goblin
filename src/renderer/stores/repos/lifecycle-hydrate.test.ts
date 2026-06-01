@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
+import { localRepoSessionEntry, normalizeRemoteTarget, remoteRepoSessionEntry } from '#/shared/remote-repo.ts'
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import type { BranchSnapshotInfo } from '#/renderer/types.ts'
 import {
@@ -16,7 +17,7 @@ describe('repo session hydration', () => {
   test('hydrateSession restores tabs through the same initial local refresh path without recent-repo side effects', async () => {
     const calls = installGoblin()
 
-    await useReposStore.getState().hydrateSession([REPO_A, REPO_B], REPO_B)
+    await useReposStore.getState().hydrateSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry(REPO_B)], REPO_B)
 
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().activeId).toBe(REPO_B)
@@ -56,7 +57,7 @@ describe('repo session hydration', () => {
         }),
     })
 
-    await useReposStore.getState().hydrateSession([REPO_A], REPO_A)
+    await useReposStore.getState().hydrateSession([localRepoSessionEntry(REPO_A)], REPO_A)
 
     const cachedRepo = useReposStore.getState().repos[REPO_A]
     expect(cachedRepo?.name).toBe('cached-a')
@@ -107,7 +108,7 @@ describe('repo session hydration', () => {
       snapshot: () => new Promise<{ branches: BranchSnapshotInfo[]; current: string }>(() => {}),
     })
 
-    const work = useReposStore.getState().hydrateSession([REPO_A, REPO_B], REPO_A)
+    const work = useReposStore.getState().hydrateSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry(REPO_B)], REPO_A)
     for (let i = 0; i < 5 && probes.size < 2; i += 1) await Promise.resolve()
     probes.get(REPO_A)?.({ ok: true, root: REPO_A, name: 'repo-a' })
     await flushRpc()
@@ -128,7 +129,7 @@ describe('repo session hydration', () => {
     installGoblin()
     await useReposStore.getState().openRepo(REPO_A)
 
-    await useReposStore.getState().hydrateSession([REPO_B], REPO_B)
+    await useReposStore.getState().hydrateSession([localRepoSessionEntry(REPO_B)], REPO_B)
 
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().activeId).toBe(REPO_A)
@@ -137,7 +138,7 @@ describe('repo session hydration', () => {
   test('hydrateSession restores unavailable repos as tabs', async () => {
     installGoblin()
 
-    await useReposStore.getState().hydrateSession([REPO_A, '/missing'], '/missing')
+    await useReposStore.getState().hydrateSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry('/missing')], '/missing')
 
     expect(useReposStore.getState().order).toEqual([REPO_A, '/missing'])
     expect(useReposStore.getState().activeId).toBe('/missing')
@@ -165,7 +166,7 @@ describe('repo session hydration', () => {
       },
     })
 
-    const work = useReposStore.getState().hydrateSession(repos, null)
+    const work = useReposStore.getState().hydrateSession(repos.map(localRepoSessionEntry), null)
     for (let i = 0; i < 5 && resolvers.length < 4; i += 1) await Promise.resolve()
 
     expect(maxActive).toBe(4)
@@ -177,5 +178,64 @@ describe('repo session hydration', () => {
     await work
 
     expect(useReposStore.getState().order).toEqual(repos)
+  })
+
+  test('hydrateSession restores remote target metadata for remote repos', async () => {
+    const target = normalizeRemoteTarget({
+      alias: 'example',
+      host: 'example.com',
+      user: 'alice',
+      port: 22,
+      remotePath: '/srv/repo',
+    })
+    expect(target).not.toBeNull()
+    installGoblin({
+      probe: (path: string) => ({ ok: true, root: path, name: 'repo' }),
+    })
+
+    await useReposStore.getState().hydrateSession([remoteRepoSessionEntry(target!)], target!.id)
+
+    expect(useReposStore.getState().repos[target!.id]?.remote.target).toEqual(target)
+    expect(useReposStore.getState().activeId).toBe(target!.id)
+  })
+
+  test('hydrateSession keeps resolved remote target metadata when remote probe reports a missing path', async () => {
+    const target = normalizeRemoteTarget({
+      alias: 'example',
+      host: 'example.com',
+      user: 'alice',
+      port: 22,
+      remotePath: '/srv/repo',
+    })
+    expect(target).not.toBeNull()
+    installGoblin({
+      probe: () => ({ ok: false, message: 'path-missing' }),
+    })
+
+    await useReposStore.getState().hydrateSession([remoteRepoSessionEntry(target!)], target!.id)
+
+    expect(useReposStore.getState().repos[target!.id]).toMatchObject({
+      id: target!.id,
+      remote: { target },
+      availability: { phase: 'unavailable', reason: 'path-missing' },
+    })
+  })
+
+  test('hydrateSession does not resolve a failed remote target twice', async () => {
+    const target = normalizeRemoteTarget({
+      alias: 'example',
+      host: 'example.com',
+      user: 'alice',
+      port: 22,
+      remotePath: '/srv/repo',
+    })
+    expect(target).not.toBeNull()
+    const calls = installGoblin({
+      probe: () => ({ ok: false, message: 'unreachable' }),
+    })
+
+    await useReposStore.getState().hydrateSession([remoteRepoSessionEntry(target!)], target!.id)
+
+    expect(calls.resolveTarget).toEqual([{ alias: 'example', remotePath: '/srv/repo' }])
   })
 })

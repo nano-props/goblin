@@ -1,6 +1,13 @@
 import { parseBranches, parseLog, parseStatus, parseWorktrees } from '#/main/git/parsers.ts'
 import { markDefaultBranch, prioritizeDefaultBranch } from '#/main/git/branches.ts'
 import {
+  getBrowserRemoteUrlForRemotes,
+  getNewPullRequestUrlForRemotes,
+  parseRemoteVerbose,
+  repoRemoteInfoForRemotes,
+  type UpstreamParts,
+} from '#/main/git/remote.ts'
+import {
   REMOTE_SNAPSHOT_BRANCHES_MARKER,
   REMOTE_SNAPSHOT_CURRENT_MARKER,
   REMOTE_SNAPSHOT_DEFAULT_MARKER,
@@ -8,7 +15,15 @@ import {
   type RemoteCommandKind,
   type RemoteCommandResult,
 } from '#/main/ssh/commands.ts'
-import { PROTECTED_BRANCHES, type BranchSnapshotInfo, type ExecResult, type LogEntry, type WorktreeInfo, type WorktreeStatus } from '#/shared/git-types.ts'
+import {
+  PROTECTED_BRANCHES,
+  type BranchSnapshotInfo,
+  type ExecResult,
+  type LogEntry,
+  type RepoRemoteInfo,
+  type WorktreeInfo,
+  type WorktreeStatus,
+} from '#/shared/git-types.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 
 type RemoteGitRunner = (
@@ -25,6 +40,7 @@ const REMOTE_PATCH_TIMEOUT_MS = 90_000
 export interface RemoteRepoSnapshot {
   branches: BranchSnapshotInfo[]
   current: string
+  remote: RepoRemoteInfo
 }
 
 interface SnapshotSections {
@@ -43,7 +59,10 @@ export async function getRemoteSnapshot(
     getRemoteWorktrees(target, { signal: options.signal, run }),
   ])
   if (!result.ok) return null
-  return parseRemoteSnapshot(result.stdout, worktrees)
+  const snapshot = parseRemoteSnapshot(result.stdout, worktrees)
+  if (!snapshot) return null
+  const remote = await getRemoteRepoInfo(target, { signal: options.signal, run })
+  return { ...snapshot, remote }
 }
 
 export async function getRemoteStatus(
@@ -314,19 +333,20 @@ export async function deleteRemoteBranch(
   return remoteExecResult(result)
 }
 
-export async function getRemoteGitHubUrl(
+export async function getRemoteBrowserUrl(
   target: RemoteRepoTarget,
   branch?: string,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<string | null> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
-  const result = await run({ type: 'gitRemoteGetUrl', path: target.remotePath }, target, { signal: options.signal })
-  if (!result.ok || options.signal?.aborted) return null
-  const repoUrl = remoteUrlToHttps(result.stdout.trim())
-  if (!repoUrl) return null
-  if (!branch) return repoUrl
-  const encoded = branch.split('/').map(encodeURIComponent).join('/')
-  return `${repoUrl}/pull/new/${encoded}`
+  const [remoteInfo, upstream] = await Promise.all([
+    getRemoteRepoInfo(target, { signal: options.signal, run }),
+    branch ? getRemoteUpstreamParts(target, branch, { signal: options.signal, run }) : Promise.resolve(null),
+  ])
+  if (options.signal?.aborted) return null
+  return branch
+    ? getNewPullRequestUrlForRemotes(remoteInfo.remotes, branch, upstream)
+    : getBrowserRemoteUrlForRemotes(remoteInfo.remotes, upstream)
 }
 
 export function parseRemoteSnapshot(output: string, worktrees: WorktreeInfo[] = []): RemoteRepoSnapshot | null {
@@ -340,6 +360,7 @@ export function parseRemoteSnapshot(output: string, worktrees: WorktreeInfo[] = 
   return {
     branches: prioritizeDefaultBranch(markedBranches, defaultBranch),
     current,
+    remote: repoRemoteInfoForRemotes([]),
   }
 }
 
@@ -437,6 +458,26 @@ async function getRemoteUpstream(
   return result.stdout.trim() || null
 }
 
+async function getRemoteUpstreamParts(
+  target: RemoteRepoTarget,
+  branch: string,
+  options: { signal?: AbortSignal; run: RemoteGitRunner },
+): Promise<UpstreamParts | null> {
+  const upstream = await getRemoteUpstream(target, branch, options)
+  return upstream ? splitUpstream(upstream) : null
+}
+
+async function getRemoteRepoInfo(
+  target: RemoteRepoTarget,
+  options: { signal?: AbortSignal; run: RemoteGitRunner },
+): Promise<RepoRemoteInfo> {
+  const result = await options.run({ type: 'gitRemoteVerbose', path: target.remotePath }, target, {
+    signal: options.signal,
+  })
+  if (!result.ok || options.signal?.aborted) return repoRemoteInfoForRemotes([])
+  return repoRemoteInfoForRemotes(parseRemoteVerbose(result.stdout))
+}
+
 async function isRemoteSafelyDeletableBranch(
   target: RemoteRepoTarget,
   branch: string,
@@ -459,24 +500,6 @@ function splitUpstream(upstream: string): { remote: string; branch: string } | n
     remote: upstream.slice(0, slashIndex),
     branch: upstream.slice(slashIndex + 1),
   }
-}
-
-function remoteUrlToHttps(value: string): string | null {
-  const trimmed = value.trim()
-  const scpLikeMatch = /^git@github\.com:([^/]+)\/(.+?)(?:\.git)?$/.exec(trimmed)
-  if (scpLikeMatch) return normalizeGitHubRepoUrl(scpLikeMatch[1]!, scpLikeMatch[2]!)
-
-  const sshMatch = /^ssh:\/\/(?:[^@/]+@)?github\.com(?::\d+)?\/([^/]+)\/(.+?)(?:\.git)?$/.exec(trimmed)
-  if (sshMatch) return normalizeGitHubRepoUrl(sshMatch[1]!, sshMatch[2]!)
-
-  const httpsMatch = /^https:\/\/github\.com\/([^/]+)\/(.+?)(?:\.git)?\/?$/.exec(trimmed)
-  if (httpsMatch) return normalizeGitHubRepoUrl(httpsMatch[1]!, httpsMatch[2]!)
-
-  return null
-}
-
-function normalizeGitHubRepoUrl(owner: string, repo: string): string {
-  return `https://github.com/${owner}/${repo.replace(/\.git$/, '').replace(/\/$/, '')}`
 }
 
 export function remoteExecResult(result: RemoteCommandResult): ExecResult {

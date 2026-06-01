@@ -251,6 +251,15 @@ describe('terminal IPC', () => {
     expect(invoke('goblin:terminal-prune-repo', { repoRoot: '/repo', worktreePaths: ['/repo-linked'] })).toBe(true)
   })
 
+  test('returns true after pruning a valid remote repo terminal scope', () => {
+    expect(
+      invoke('goblin:terminal-prune-repo', {
+        repoRoot: 'ssh-config://prod/srv/repo',
+        worktreePaths: ['/srv/repo', '/srv/repo-feature'],
+      }),
+    ).toBe(true)
+  })
+
   test('shows a system notification for trusted bell requests', async () => {
     const { BrowserWindow, Notification, app } = await import('electron')
     const flashFrame = vi.fn()

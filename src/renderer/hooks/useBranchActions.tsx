@@ -46,7 +46,7 @@ export function getBranchActionCapabilities(repo: RepoState, branch: RepoBranchS
     canPush: repo.remote.hasRemotes === true,
     canOpenRemote: repo.remote.hasBrowserRemote === true || repo.remote.hasGitHubRemote === true,
     canOpenTerminal: !!branch.worktree?.path,
-    canOpenEditor: !!branch.worktree?.path,
+    canOpenEditor: !!branch.worktree?.path && !repo.remote.target,
   }
 }
 
@@ -141,6 +141,12 @@ export function useBranchActions(repo: RepoState, branch: RepoBranchState) {
   function openTerminal() {
     if (!branch.worktree?.path) return
     const worktreePath = branch.worktree?.path
+    if (repo.remote.target) {
+      return runUiAction('terminal', async () => {
+        useReposStore.getState().setDetailTab(repo.id, 'terminal')
+        return { ok: true, message: '' }
+      })
+    }
     return runUiAction('terminal', () => rpc.repo.openTerminal.mutate({ path: worktreePath }))
   }
 
@@ -221,6 +227,7 @@ export function useBranchActions(repo: RepoState, branch: RepoBranchState) {
   const dialogs = (
     <BranchActionDialogs
       branch={branch}
+      remoteTarget={repo.remote.target}
       hasUpstream={hasUpstream}
       pushConfirm={pushConfirm}
       deleteConfirm={deleteConfirm}

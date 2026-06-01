@@ -1,9 +1,11 @@
 import type { GitRemoteInfo } from '#/renderer/types.ts'
+import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 
 export interface RepoTabSummary {
   id: string
   name: string
   remoteDetails: GitRemoteInfo[]
+  remoteTarget?: RemoteRepoTarget
   unavailable?: boolean
 }
 

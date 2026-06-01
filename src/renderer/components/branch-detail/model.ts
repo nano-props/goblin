@@ -13,7 +13,7 @@ export function getSelectedBranchDetail(repo: RepoState) {
   const worktreeState = branch ? getBranchWorktreeState(repo, branch) : null
   const statusCount = worktreeState?.changeCount ?? selectedStatus.reduce((n, wt) => n + wt.entries.length, 0)
 
-  return { branch, branchLog, selectedStatus, statusCount, worktreeState }
+  return { branch, branchLog, selectedStatus, statusCount, worktreeState, remoteTarget: repo.remote.target }
 }
 
 export function getSelectedBranchDetailPresentation(repo: RepoState) {

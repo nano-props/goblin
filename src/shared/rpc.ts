@@ -17,9 +17,12 @@ import { SETTINGS_PAGES, type SettingsPage } from '#/shared/settings-pages.ts'
 import type {
   RemoteConnectionInput,
   RemoteDiagnosticsResult,
+  RemotePathSuggestionsInput,
+  RepoSessionEntry,
   RemoteRepoTarget,
   ResolvedRemoteTarget,
   SshConfigHost,
+  SshConfigHostsResult,
 } from '#/shared/remote-repo.ts'
 
 export type { WorkspaceLayout } from '#/shared/workspace-layout.ts'
@@ -44,9 +47,9 @@ export interface ThemeState {
 }
 
 export interface SessionState {
-  /** Repo paths that were open, in tab order. */
-  openRepos: string[]
-  /** The active tab — null when no repos were open. */
+  /** Repo entries that were open, in tab order. */
+  openRepos: RepoSessionEntry[]
+  /** The active tab id — null when no repos were open. */
   activeRepo: string | null
   detailCollapsed: boolean
   detailFocusMode: boolean
@@ -68,7 +71,7 @@ export interface SettingsSnapshot {
   terminalApp: TerminalPref
   editorApp: EditorPref
   session: SessionState
-  recentRepos: string[]
+  recentRepos: RepoSessionEntry[]
 }
 
 export interface GlobalShortcutState {
@@ -193,7 +196,7 @@ export type MenuAction =
   | 'tab-terminal'
   | 'toggle-detail'
   | 'reset-layout'
-  | { type: 'open-recent-repo'; path: string }
+  | { type: 'open-recent-repo'; entry: RepoSessionEntry }
   | { type: 'set-workspace-layout'; layout: WorkspaceLayout }
 
 export type RpcEvent =
@@ -273,9 +276,9 @@ export interface AppRpcHandlers {
     openEditor: (input: { path: string }) => Promise<ExecResult>
   }
   remote: {
-    listSshHosts: () => Promise<SshConfigHost[]>
-    identityFileDialog: () => Promise<string | null>
+    listSshHosts: () => Promise<SshConfigHostsResult>
     resolveTarget: (input: RemoteConnectionInput) => Promise<ResolvedRemoteTarget>
+    listPathSuggestions: (input: RemotePathSuggestionsInput) => Promise<string[]>
     testRepository: (input: { target: RemoteRepoTarget }) => Promise<RemoteDiagnosticsResult>
   }
   theme: {
@@ -295,7 +298,7 @@ export interface AppRpcHandlers {
     setTerminalApp: (input: { pref: TerminalPref }) => Promise<TerminalAppState>
     setEditorApp: (input: { pref: EditorPref }) => Promise<EditorAppState>
     saveSession: (input: { session: SessionState }) => Promise<void>
-    addRecentRepo: (input: { repoPath: string }) => Promise<string[]>
+    addRecentRepo: (input: { repo: RepoSessionEntry }) => Promise<RepoSessionEntry[]>
     clearRecentRepos: () => Promise<void>
   }
   externalApps: {
@@ -329,33 +332,45 @@ const RemoteAbsolutePath = v.pipe(
 
 const RemoteTargetSchema = v.object({
   id: v.string(),
-  alias: v.nullable(v.string()),
+  alias: v.string(),
   host: v.string(),
   user: v.string(),
   port: PortNumber,
   remotePath: RemoteAbsolutePath,
-  identityFile: v.optional(v.string()),
   displayName: v.string(),
 })
 
+const RemoteRepoRefSchema = v.object({
+  id: v.string(),
+  alias: v.string(),
+  remotePath: RemoteAbsolutePath,
+  displayName: v.string(),
+})
 
-
-const RemoteConnectionInputSchema = v.union([
+const RepoSessionEntrySchema = v.union([
   v.object({
-    mode: v.literal('config'),
-    alias: v.string(),
-    remotePath: v.string(),
-    identityFile: v.optional(v.string()),
+    kind: v.literal('local'),
+    id: v.string(),
   }),
   v.object({
-    mode: v.literal('manual'),
-    host: v.string(),
-    user: v.string(),
-    port: v.optional(PortNumber),
-    remotePath: v.string(),
-    identityFile: v.optional(v.string()),
+    kind: v.literal('remote'),
+    id: v.string(),
+    ref: RemoteRepoRefSchema,
   }),
 ])
+
+
+
+const RemoteConnectionInputSchema = v.object({
+  alias: v.string(),
+  remotePath: v.string(),
+})
+
+const RemotePathSuggestionsInputSchema = v.object({
+  alias: v.string(),
+  remotePath: v.string(),
+  prefix: v.string(),
+})
 
 export function createAppRouter(handlers: AppRpcHandlers) {
   return t.router({
@@ -456,10 +471,12 @@ export function createAppRouter(handlers: AppRpcHandlers) {
     }),
     remote: t.router({
       listSshHosts: p.input(EmptyInput).query(() => handlers.remote.listSshHosts()),
-      identityFileDialog: p.input(EmptyInput).mutation(() => handlers.remote.identityFileDialog()),
       resolveTarget: p
         .input(RemoteConnectionInputSchema)
         .query(({ input }) => handlers.remote.resolveTarget(input)),
+      listPathSuggestions: p
+        .input(RemotePathSuggestionsInputSchema)
+        .query(({ input }) => handlers.remote.listPathSuggestions(input)),
       testRepository: p
         .input(v.object({ target: RemoteTargetSchema }))
         .query(({ input }) => handlers.remote.testRepository(input)),
@@ -506,7 +523,7 @@ export function createAppRouter(handlers: AppRpcHandlers) {
         .input(
           v.object({
             session: v.object({
-              openRepos: v.array(v.string()),
+              openRepos: v.array(RepoSessionEntrySchema),
               activeRepo: v.nullable(v.string()),
               detailCollapsed: v.boolean(),
               detailFocusMode: v.boolean(),
@@ -520,7 +537,7 @@ export function createAppRouter(handlers: AppRpcHandlers) {
         )
         .mutation(({ input }) => handlers.settings.saveSession(input)),
       addRecentRepo: p
-        .input(v.object({ repoPath: v.string() }))
+        .input(v.object({ repo: RepoSessionEntrySchema }))
         .mutation(({ input }) => handlers.settings.addRecentRepo(input)),
       clearRecentRepos: p.input(EmptyInput).mutation(() => handlers.settings.clearRecentRepos()),
     }),

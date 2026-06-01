@@ -214,6 +214,14 @@ describe('SettingsSurface', () => {
     expect(document.body.textContent).toContain('settings.github.status-unavailable')
     expect(document.body.textContent).toContain('settings.github.hint-missing')
   })
+
+  test('renders the SSH remotes settings page', async () => {
+    await render(<SettingsSurface page="ssh" onPageChange={() => {}} />)
+
+    expect(document.body.textContent).toContain('settings.ssh.title')
+    expect(document.body.textContent).toContain('settings.ssh.body')
+    expect(document.body.textContent).toContain('settings.ssh.example')
+  })
 })
 
 async function render(element: React.ReactNode) {

@@ -8,7 +8,7 @@ import { GeneralSettings } from '#/renderer/components/settings/pages/GeneralSet
 import { GitHubSettings } from '#/renderer/components/settings/pages/GitHubSettings.tsx'
 import { KeyboardShortcutSettings } from '#/renderer/components/settings/pages/KeyboardShortcutSettings.tsx'
 import { NotificationSettings } from '#/renderer/components/settings/pages/NotificationSettings.tsx'
-import { ProxySettings } from '#/renderer/components/settings/pages/ProxySettings.tsx'
+import { SshRemoteSettings } from '#/renderer/components/settings/pages/SshRemoteSettings.tsx'
 import { SyncSettings } from '#/renderer/components/settings/pages/SyncSettings.tsx'
 import { useT } from '#/renderer/stores/i18n.ts'
 import type { SettingsPage } from '#/shared/rpc.ts'
@@ -24,7 +24,7 @@ const SETTINGS_SURFACE_PAGES = [
   { page: 'general', labelKey: 'settings.group.general', titleKey: 'settings.group.general', Icon: Settings2 },
   { page: 'shortcuts', labelKey: 'settings.nav.shortcuts', titleKey: 'settings.shortcuts', Icon: Keyboard },
   { page: 'notifications', labelKey: 'settings.nav.notifications', titleKey: 'settings.nav.notifications', Icon: Bell },
-  { page: 'proxy', labelKey: 'settings.group.proxy', titleKey: 'settings.group.proxy', Icon: Shield },
+  { page: 'ssh', labelKey: 'settings.nav.ssh', titleKey: 'settings.ssh.title', Icon: Shield },
   { page: 'sync', labelKey: 'settings.nav.refresh', titleKey: 'settings.nav.refresh', Icon: SlidersHorizontal },
   { page: 'apps', labelKey: 'settings.group.apps', titleKey: 'settings.group.apps', Icon: AppWindow },
   { page: 'github', labelKey: 'settings.nav.github', titleKey: 'settings.github.title', Icon: GitHubMark },
@@ -68,7 +68,7 @@ export function SettingsSurface({ page, onPageChange, topInset = 0, autoFocusSel
         {page === 'github' && <GitHubSettings />}
         {page === 'apps' && <ExternalAppSettings />}
         {page === 'sync' && <SyncSettings />}
-        {page === 'proxy' && <ProxySettings />}
+        {page === 'ssh' && <SshRemoteSettings />}
         {page === 'shortcuts' && <KeyboardShortcutSettings />}
         {page === 'notifications' && <NotificationSettings />}
         {page === 'about' && <AboutSettings />}

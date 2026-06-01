@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import { rpc } from '#/renderer/rpc.ts'
 import type { SessionState } from '#/shared/rpc.ts'
+import { remoteRepoRefFromTarget, remoteRepoSessionEntry, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 
 const SESSION_SAVE_DEBOUNCE_MS = 200
 
@@ -13,13 +14,18 @@ export function useSessionPersistence() {
   const workspaceLayout = useReposStore((s) => s.workspaceLayout)
   const detailPaneSizes = useReposStore((s) => s.detailPaneSizes)
   const sessionReady = useReposStore((s) => s.sessionReady)
+  const repos = useReposStore((s) => s.repos)
   const lastSavedRef = useRef<string | null>(null)
   const lastImmediateKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!sessionReady) return
+    const openRepos: RepoSessionEntry[] = order.map((id) => {
+      const target = repos[id]?.remote.target
+      return target ? remoteRepoSessionEntry(remoteRepoRefFromTarget(target)) : { kind: 'local', id }
+    })
     const session: SessionState = {
-      openRepos: order,
+      openRepos,
       activeRepo: activeId,
       detailCollapsed,
       detailFocusMode,
@@ -28,7 +34,7 @@ export function useSessionPersistence() {
     }
     const serialized = JSON.stringify(session)
     const immediateKey = JSON.stringify({
-      openRepos: order,
+      openRepos,
       activeRepo: activeId,
       detailCollapsed,
       detailFocusMode,
@@ -50,5 +56,5 @@ export function useSessionPersistence() {
     }
     const timeout = window.setTimeout(save, SESSION_SAVE_DEBOUNCE_MS)
     return () => window.clearTimeout(timeout)
-  }, [sessionReady, order, activeId, detailCollapsed, detailFocusMode, workspaceLayout, detailPaneSizes])
+  }, [sessionReady, order, activeId, detailCollapsed, detailFocusMode, workspaceLayout, detailPaneSizes, repos])
 }

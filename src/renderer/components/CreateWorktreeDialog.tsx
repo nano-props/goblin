@@ -22,11 +22,13 @@ import { DialogError } from '#/renderer/components/ui/dialog-error.tsx'
 import { FormDialog } from '#/renderer/components/ui/form-dialog.tsx'
 import { Field, FieldDescription, FieldError, FieldLabel } from '#/renderer/components/ui/field.tsx'
 import { Input } from '#/renderer/components/ui/input.tsx'
+import { useRemotePathSuggestions } from '#/renderer/hooks/useRemotePathSuggestions.ts'
 import type { RepoState } from '#/renderer/stores/repos/types.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
-import { defaultWorktreePath, tildify, untildify } from '#/renderer/lib/paths.ts'
+import { defaultWorktreePath, formatWorktreePath, tildify, untildify } from '#/renderer/lib/paths.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import { validateBranchName } from '#/shared/refnames.ts'
+import { isResolvableRemotePathInput } from '#/shared/remote-repo.ts'
 
 export interface CreateWorktreeRequest {
   worktreePath: string
@@ -67,8 +69,9 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
   }, [open])
 
   const branchTrimmed = branch.trim()
-  const pathTrimmed = untildify(worktreePath.trim())
-  const defaultPath = defaultWorktreePath(repo.id, branchTrimmed)
+  const remoteTarget = repo.remote.target
+  const pathTrimmed = remoteTarget ? worktreePath.trim() : untildify(worktreePath.trim())
+  const defaultPath = remoteTarget ? defaultRemoteWorktreePath(remoteTarget.remotePath, branchTrimmed) : defaultWorktreePath(repo.id, branchTrimmed)
   const branchValidation = branchTrimmed ? validateBranchName(branchTrimmed) : { ok: true }
   const baseExists = base ? repo.data.branches.some((b) => b.name === base) : false
   const baseError = base && !baseExists ? t('action.create-worktree-base-missing') : ''
@@ -84,10 +87,17 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
   // provided, else the auto-derived sibling default. Shown as a
   // greyed-out preview so users know what they'll get without typing.
   const effectivePath = pathTrimmed || defaultPath
-  const displayDefaultPath = tildify(defaultPath)
-  const displayEffectivePath = tildify(effectivePath)
+  const displayDefaultPath = remoteTarget ? formatWorktreePath(defaultPath, remoteTarget) : tildify(defaultPath)
+  const displayEffectivePath = remoteTarget ? formatWorktreePath(effectivePath, remoteTarget) : tildify(effectivePath)
+  const pathSuggestions = useRemotePathSuggestions({
+    enabled: open && !!remoteTarget && !pending && branchTrimmed.length > 0,
+    alias: remoteTarget?.alias ?? '',
+    remotePath: remoteTarget?.remotePath ?? '/',
+    prefix: worktreePath,
+  })
   const branchActionBusy = repo.operations.branchAction.phase !== 'idle'
-  const canSubmit = branchTrimmed.length > 0 && !branchError && effectivePath.length > 0 && baseExists && !branchActionBusy && !pending
+  const validPath = remoteTarget ? isResolvableRemotePathInput(effectivePath) : effectivePath.length > 0
+  const canSubmit = branchTrimmed.length > 0 && !branchError && validPath && baseExists && !branchActionBusy && !pending
 
   async function handleSubmit() {
     if (!canSubmit) return
@@ -193,7 +203,15 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
               placeholder={displayDefaultPath}
               aria-describedby="cwt-path-hint"
               className="font-mono text-xs"
+              list={pathSuggestions.length > 0 ? 'create-worktree-path-suggestions' : undefined}
             />
+            {pathSuggestions.length > 0 && (
+              <datalist id="create-worktree-path-suggestions">
+                {pathSuggestions.map((item) => (
+                  <option key={item} value={item} />
+                ))}
+              </datalist>
+            )}
             <FieldDescription
               id="cwt-path-hint"
               reserveHeight
@@ -224,4 +242,13 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
       </form>
     </FormDialog>
   )
+}
+
+function defaultRemoteWorktreePath(repoPath: string, branch: string): string {
+  const slug = branch.trim().replaceAll('/', '-')
+  if (!slug) return ''
+  const normalized = repoPath.replace(/\/+$/, '')
+  const baseName = normalized.split('/').filter(Boolean).at(-1) ?? 'worktree'
+  const parent = normalized.slice(0, Math.max(0, normalized.lastIndexOf('/'))) || '/'
+  return `${parent === '/' ? '' : parent}/${baseName}-${slug}`
 }

@@ -1,18 +1,20 @@
 export type RepoKind = 'local' | 'remote'
 
-export interface RemoteRepoTarget {
+export interface RemoteRepoRef {
   id: string
-  alias: string | null
-  host: string
-  user: string
-  port: number
+  alias: string
   remotePath: string
-  identityFile?: string
   displayName: string
 }
 
+export interface RemoteRepoTarget extends RemoteRepoRef {
+  host: string
+  user: string
+  port: number
+}
+
 export type LocalRepoSessionEntry = { kind: 'local'; id: string }
-export type RemoteRepoSessionEntry = { kind: 'remote'; id: string; target: RemoteRepoTarget }
+export type RemoteRepoSessionEntry = { kind: 'remote'; id: string; ref: RemoteRepoRef }
 export type RepoSessionEntry = LocalRepoSessionEntry | RemoteRepoSessionEntry
 
 export interface SshConfigHost {
@@ -22,52 +24,15 @@ export interface SshConfigHost {
   port?: number
 }
 
-export type RemoteConnectionInput =
-  | { mode: 'config'; alias: string; remotePath: string; identityFile?: string }
-  | { mode: 'manual'; host: string; user: string; port?: number; remotePath: string; identityFile?: string }
-
-export interface SshInitConnectionInput {
-  host: string
-  user: string
-  port: number
+export interface SshConfigHostsResult {
+  hosts: SshConfigHost[]
+  hasInclude: boolean
 }
 
-export type SshInitKeyStatus = 'existing' | 'generated' | 'public-key-recreated'
-export type SshInitHostKeyStatus = 'trusted' | 'needs-confirmation' | 'changed'
+export type RemoteConnectionInput = { alias: string; remotePath: string }
 
-export interface SshHostKeyConfirmation {
-  host: string
-  port: number
-  key: string
-  keyType: string
-  fingerprint: string
-}
-
-export type SshInitPrepareResult =
-  | { ok: true; keyStatus: SshInitKeyStatus; hostKeyStatus: 'trusted' }
-  | {
-      ok: true
-      keyStatus: SshInitKeyStatus
-      hostKeyStatus: 'needs-confirmation'
-      confirmation: SshHostKeyConfirmation
-    }
-  | {
-      ok: true
-      keyStatus: SshInitKeyStatus
-      hostKeyStatus: 'changed'
-      confirmation: SshHostKeyConfirmation
-    }
-  | { ok: false; keyStatus?: SshInitKeyStatus; message: string }
-
-export interface SshInitTrustHostKeyInput {
-  host: string
-  port: number
-  key: string
-  fingerprint: string
-}
-
-export interface SshInitAccessInput extends SshInitConnectionInput {
-  password: string
+export interface RemotePathSuggestionsInput extends RemoteConnectionInput {
+  prefix: string
 }
 
 export interface ResolvedRemoteTarget {
@@ -77,16 +42,16 @@ export interface ResolvedRemoteTarget {
 export type RemoteDiagnosticStageName = 'ssh' | 'shell' | 'git' | 'path' | 'repo'
 export type RemoteDiagnosticStageStatus = 'pending' | 'running' | 'passed' | 'failed' | 'skipped'
 export type RemoteDiagnosticCategory =
-  | 'auth failed'
-  | 'host key'
+  | 'auth-failed'
+  | 'host-key'
   | 'unreachable'
-  | 'shell failed'
-  | 'git missing'
-  | 'path missing'
-  | 'not a repo'
+  | 'shell-failed'
+  | 'git-missing'
+  | 'path-missing'
+  | 'not-a-repo'
   | 'timeout'
   | 'cancelled'
-  | 'config changed'
+  | 'config-changed'
   | 'unknown'
 
 export interface RemoteDiagnosticStage {
@@ -113,20 +78,29 @@ export interface RemoteRepoTargetInput {
   user?: unknown
   port?: unknown
   remotePath?: unknown
-  identityFile?: unknown
   displayName?: unknown
 }
 
-export function normalizeRemoteRepoId(input: RemoteRepoTargetInput): string {
-  const normalized = remoteTargetFields(input)
-  if (!normalized) throw new TypeError('Invalid remote repository target')
-  return `ssh://${encodeURIComponent(normalized.user)}@${normalized.host}:${normalized.port}${encodeRemotePath(
-    normalized.remotePath,
-  )}`
+export interface RemoteRepoRefInput {
+  alias?: unknown
+  remotePath?: unknown
+  displayName?: unknown
 }
 
-export function normalizeRemoteTarget(input: RemoteRepoTargetInput): RemoteRepoTarget | null {
-  const fields = remoteTargetFields(input)
+const REMOTE_REPO_ID_PREFIX = 'ssh-config://'
+
+export function normalizeRemoteRepoId(input: RemoteRepoRefInput): string {
+  const normalized = remoteRefFields(input)
+  if (!normalized) throw new TypeError('Invalid remote repository reference')
+  return `${REMOTE_REPO_ID_PREFIX}${encodeURIComponent(normalized.alias)}${encodeRemotePath(normalized.remotePath)}`
+}
+
+export function isRemoteRepoId(value: string): boolean {
+  return value.startsWith(REMOTE_REPO_ID_PREFIX)
+}
+
+export function normalizeRemoteRepoRef(input: RemoteRepoRefInput): RemoteRepoRef | null {
+  const fields = remoteRefFields(input)
   if (!fields) return null
   const id = normalizeRemoteRepoId(fields)
   const displayName =
@@ -136,12 +110,20 @@ export function normalizeRemoteTarget(input: RemoteRepoTargetInput): RemoteRepoT
   return {
     id,
     alias: fields.alias,
+    remotePath: fields.remotePath,
+    displayName,
+  }
+}
+
+export function normalizeRemoteTarget(input: RemoteRepoTargetInput): RemoteRepoTarget | null {
+  const ref = normalizeRemoteRepoRef(input)
+  const fields = remoteTargetFields(input)
+  if (!ref || !fields) return null
+  return {
+    ...ref,
     host: fields.host,
     user: fields.user,
     port: fields.port,
-    remotePath: fields.remotePath,
-    ...(fields.identityFile ? { identityFile: fields.identityFile } : {}),
-    displayName,
   }
 }
 
@@ -171,33 +153,64 @@ export function repoSessionEntryId(entry: RepoSessionEntry): string {
   return entry.id
 }
 
-export function parseRemoteRepoId(repoId: string): Omit<RemoteRepoTarget, 'id' | 'displayName' | 'alias'> | null {
-  if (!repoId.startsWith('ssh://')) return null
-  const rest = repoId.slice('ssh://'.length)
-  const pathIdx = rest.indexOf('/')
-  if (pathIdx === -1) return null
-  const authority = rest.slice(0, pathIdx)
-  const remotePath = decodeURIComponent(rest.slice(pathIdx).replace(/\+/g, '%20'))
-  const atIdx = authority.lastIndexOf('@')
-  if (atIdx === -1) return null
-  const user = decodeURIComponent(authority.slice(0, atIdx))
-  const hostPort = authority.slice(atIdx + 1)
-  const colonIdx = hostPort.lastIndexOf(':')
-  const host = colonIdx === -1 ? hostPort : hostPort.slice(0, colonIdx)
-  const port = colonIdx === -1 ? 22 : Number(hostPort.slice(colonIdx + 1))
-  if (!host || !user || !Number.isFinite(port) || !Number.isInteger(port) || port < 1 || port > 65535) return null
-  return { host, user, port, remotePath }
+export function localRepoSessionEntry(id: string): LocalRepoSessionEntry {
+  return { kind: 'local', id }
 }
 
-function remoteTargetFields(input: RemoteRepoTargetInput): Omit<RemoteRepoTarget, 'id' | 'displayName'> | null {
+export function remoteRepoSessionEntry(ref: RemoteRepoRef | RemoteRepoTarget): RemoteRepoSessionEntry {
+  const normalized = normalizeRemoteRepoRef(ref)
+  if (!normalized) throw new TypeError('Invalid remote repository reference')
+  return { kind: 'remote', id: normalized.id, ref: normalized }
+}
+
+export function normalizeRepoSessionEntry(input: unknown): RepoSessionEntry | null {
+  if (!input || typeof input !== 'object') return null
+  const entry = input as Partial<RepoSessionEntry> & { target?: unknown; ref?: unknown }
+  if (entry.kind === 'local') {
+    return typeof entry.id === 'string' && safeText(entry.id) ? { kind: 'local', id: entry.id } : null
+  }
+  if (entry.kind === 'remote') {
+    if (typeof entry.id !== 'string') return null
+    const ref = normalizeRemoteRepoRef((entry.ref ?? entry.target) as RemoteRepoRefInput)
+    if (!ref) return null
+    return { kind: 'remote', id: ref.id, ref }
+  }
+  return null
+}
+
+export function parseRemoteRepoId(repoId: string): Pick<RemoteRepoRef, 'alias' | 'remotePath'> | null {
+  if (!isRemoteRepoId(repoId)) return null
+  const rest = repoId.slice(REMOTE_REPO_ID_PREFIX.length)
+  const pathIdx = rest.indexOf('/')
+  if (pathIdx === -1) return null
+  const alias = decodeURIComponent(rest.slice(0, pathIdx))
+  const remotePath = decodeURIComponent(rest.slice(pathIdx).replace(/\+/g, '%20'))
+  if (!alias || !safeText(alias) || !normalizeRemotePath(remotePath)) return null
+  return { alias, remotePath }
+}
+
+export function remoteRepoRefFromTarget(target: RemoteRepoTarget): RemoteRepoRef {
+  return {
+    id: target.id,
+    alias: target.alias,
+    remotePath: target.remotePath,
+    displayName: target.displayName,
+  }
+}
+
+function remoteTargetFields(input: RemoteRepoTargetInput): Pick<RemoteRepoTarget, 'host' | 'user' | 'port'> | null {
   const host = typeof input.host === 'string' ? input.host.trim() : ''
   const user = typeof input.user === 'string' ? input.user.trim() : ''
-  const alias = typeof input.alias === 'string' && safeText(input.alias) ? input.alias.trim() : null
-  const remotePath = typeof input.remotePath === 'string' ? normalizeRemotePath(input.remotePath) : null
   const port = normalizePort(input.port)
-  const identityFile = normalizeIdentityFile(input.identityFile)
-  if (!safeText(host) || !safeText(user) || !remotePath || port === null) return null
-  return { alias, host, user, port, remotePath, ...(identityFile ? { identityFile } : {}) }
+  if (!safeText(host) || !safeText(user) || port === null) return null
+  return { host, user, port }
+}
+
+function remoteRefFields(input: RemoteRepoRefInput): Pick<RemoteRepoRef, 'alias' | 'remotePath'> | null {
+  const alias = typeof input.alias === 'string' ? input.alias.trim() : ''
+  const remotePath = typeof input.remotePath === 'string' ? normalizeRemotePath(input.remotePath) : null
+  if (!safeText(alias) || !remotePath) return null
+  return { alias, remotePath }
 }
 
 function normalizePort(value: unknown): number | null {
@@ -211,12 +224,6 @@ function normalizeRemotePath(value: string): string | null {
   if (!safeText(trimmed) || !trimmed.startsWith('/')) return null
   const normalized = trimmed.replace(/\/+/g, '/').replace(/\/$/, '')
   return normalized || '/'
-}
-
-function normalizeIdentityFile(value: unknown): string | undefined {
-  if (typeof value !== 'string') return undefined
-  const trimmed = value.trim()
-  return safeText(trimmed) ? trimmed : undefined
 }
 
 function safeText(value: string): boolean {
@@ -238,4 +245,12 @@ function encodeRemotePath(remotePath: string): string {
 
 export function isAbsoluteRemotePath(value: string): boolean {
   return value.startsWith('/') && !value.includes('\0')
+}
+
+export function isHomeRelativeRemotePath(value: string): boolean {
+  return value.startsWith('~/') && !value.includes('\0')
+}
+
+export function isResolvableRemotePathInput(value: string): boolean {
+  return isAbsoluteRemotePath(value) || isHomeRelativeRemotePath(value)
 }

@@ -1,5 +1,6 @@
 import { goblin } from '#/renderer/rpc.ts'
 import { tildifyPath, untildifyPath } from '#/shared/paths.ts'
+import { remoteTargetSubtitle, remoteWorktreePathLabel, type RemoteRepoTarget } from '#/shared/remote-repo.ts'
 
 export { tildifyPath, untildifyPath } from '#/shared/paths.ts'
 
@@ -49,4 +50,12 @@ export function tildify(path: string): string {
 
 export function untildify(path: string): string {
   return untildifyPath(path, goblin.homeDir)
+}
+
+export function formatRepoLocator(path: string, target?: RemoteRepoTarget): string {
+  return target ? remoteTargetSubtitle(target) : tildify(path)
+}
+
+export function formatWorktreePath(path: string, target?: RemoteRepoTarget): string {
+  return target ? remoteWorktreePathLabel(target, path) : tildify(path)
 }

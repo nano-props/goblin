@@ -1,5 +1,3 @@
-import os from 'node:os'
-import path from 'node:path'
 import { execa, ExecaError } from 'execa'
 import { FIELD_SEP } from '#/main/git/parsers.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
@@ -15,8 +13,8 @@ export type RemoteCommandKind =
   | { type: 'checkShell' }
   | { type: 'checkGit' }
   | { type: 'testDirectory'; path: string }
-  | { type: 'revParseTopLevel'; path: string }
   | { type: 'listDirectories'; path: string; limit?: number }
+  | { type: 'revParseTopLevel'; path: string }
   | { type: 'gitSnapshot'; path: string }
   | { type: 'gitPatch'; path: string }
   | { type: 'gitWorktreeList'; path: string }
@@ -34,6 +32,7 @@ export type RemoteCommandKind =
   | { type: 'gitBranchDelete'; path: string; branch: string; force?: boolean }
   | { type: 'gitUpstream'; path: string; branch: string }
   | { type: 'gitIsAncestor'; path: string; ancestor: string; descendant: string }
+  | { type: 'gitRemoteVerbose'; path: string }
   | { type: 'gitRemoteGetUrl'; path: string }
 
 export interface RemoteCommandResult {
@@ -70,9 +69,7 @@ export function buildRemoteCommandInvocation(
     '-o',
     `ConnectTimeout=${SSH_CONNECT_TIMEOUT_SEC}`,
   ]
-  const destination = target.alias ?? `${target.user}@${target.host}`
-  if (target.identityFile) args.push('-i', expandIdentityFile(target.identityFile))
-  if (!target.alias) args.push('-p', String(target.port))
+  const destination = target.alias
   args.push('--', destination, `sh -lc ${shellQuote(script)}`)
   return { command: 'ssh', args, script }
 }
@@ -84,9 +81,7 @@ export function buildRemoteTerminalInvocation(
 ): RemoteCommandInvocation {
   const script = `cd ${shellQuote(remotePath)} && exec "\${SHELL:-/bin/sh}" -l`
   const args = ['-tt', '-o', 'StrictHostKeyChecking=yes', '-o', `ConnectTimeout=${SSH_CONNECT_TIMEOUT_SEC}`]
-  const destination = target.alias ?? `${target.user}@${target.host}`
-  if (target.identityFile) args.push('-i', expandIdentityFile(target.identityFile))
-  if (!target.alias) args.push('-p', String(target.port))
+  const destination = target.alias
   args.push('--', destination, `sh -lc ${shellQuote(script)}`)
   return { command: 'ssh', args, script }
 }
@@ -130,14 +125,14 @@ function scriptForCommand(command: RemoteCommandKind): string {
       return 'command -v git'
     case 'testDirectory':
       return `test -d ${shellQuote(command.path)}`
-    case 'revParseTopLevel':
-      return `git -C ${shellQuote(command.path)} rev-parse --show-toplevel`
     case 'listDirectories': {
-      const limit = Math.max(1, Math.min(201, Math.floor(command.limit ?? 201)))
+      const limit = Math.max(1, Math.min(50, Math.floor(command.limit ?? 20)))
       return `find ${shellQuote(
         command.path,
       )} -mindepth 1 -maxdepth 1 -type d -print 2>/dev/null | LC_ALL=C sort | head -n ${limit}`
     }
+    case 'revParseTopLevel':
+      return `git -C ${shellQuote(command.path)} rev-parse --show-toplevel`
     case 'gitSnapshot': {
       const repo = shellQuote(command.path)
       const branchFormat = [
@@ -215,6 +210,8 @@ function scriptForCommand(command: RemoteCommandKind): string {
       )} ${shellQuote(command.descendant)}`
     case 'gitRemoteGetUrl':
       return `git -C ${shellQuote(command.path)} remote get-url origin`
+    case 'gitRemoteVerbose':
+      return `git -C ${shellQuote(command.path)} remote -v`
   }
   const exhaustive: never = command
   return exhaustive
@@ -222,18 +219,4 @@ function scriptForCommand(command: RemoteCommandKind): string {
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`
-}
-
-function expandIdentityFile(value: string): string {
-  if (value === '~') return os.homedir()
-  if (value.startsWith('~/')) return path.join(os.homedir(), value.slice(2))
-  const tildeUserMatch = /^~([^/]+)(\/.*)?$/.exec(value)
-  if (tildeUserMatch) {
-    const user = tildeUserMatch[1]
-    const rest = tildeUserMatch[2] ?? ''
-    try {
-      if (user === os.userInfo().username) return path.join(os.homedir(), rest)
-    } catch {}
-  }
-  return value
 }

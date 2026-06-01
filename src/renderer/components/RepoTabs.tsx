@@ -28,6 +28,7 @@ function summariesEqual(a: RepoTabSummary[], b: RepoTabSummary[]): boolean {
     const x = a[i]!
     const y = b[i]!
     if (x.id !== y.id || x.name !== y.name || x.unavailable !== y.unavailable) return false
+    if (x.remoteTarget?.id !== y.remoteTarget?.id) return false
     if (x.remoteDetails.length !== y.remoteDetails.length) return false
     for (let j = 0; j < x.remoteDetails.length; j++) {
       const xr = x.remoteDetails[j]!
@@ -64,6 +65,7 @@ export function RepoTabs({ onOpenRemote, onClone }: RepoTabsProps) {
                 id: r.id,
                 name: r.name,
                 remoteDetails: r.remote.remoteDetails ?? [],
+                remoteTarget: r.remote.target,
                 unavailable: r.availability.phase === 'unavailable',
               }
             : null

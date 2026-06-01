@@ -1,7 +1,7 @@
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentPropsWithoutRef } from 'react'
 import { createPortal } from 'react-dom'
-import { tildify } from '#/renderer/lib/paths.ts'
+import { formatRepoLocator } from '#/renderer/lib/paths.ts'
 import type { RepoTabSummary } from '#/renderer/components/repo-tabs/types.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 
@@ -243,7 +243,9 @@ function RepoTabTooltip({ tooltip }: { tooltip: TooltipState }) {
       style={{ left: x, top: y, maxWidth: MAX_WIDTH, opacity: mounted ? 1 : 0, transition: mounted ? SLIDE_TRANSITION : FADE_TRANSITION }}
     >
       <div className="truncate text-xs font-semibold text-foreground">{tooltip.repo.name}</div>
-      <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{tildify(tooltip.repo.id)}</div>
+      <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
+        {formatRepoLocator(tooltip.repo.id, tooltip.repo.remoteTarget)}
+      </div>
       {tooltip.repo.remoteDetails.length > 0 && (
         <div className="mt-2 space-y-1 border-t border-border/40 pt-2">
           {tooltip.repo.remoteDetails.map((remote) => {

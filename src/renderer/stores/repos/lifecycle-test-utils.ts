@@ -1,3 +1,4 @@
+import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import { createBranchSnapshot, installGoblinTestBridge, resetReposStore } from '#/renderer/stores/repos/test-utils.ts'
 
 export const REPO_A = '/tmp/gbl-lifecycle-a'
@@ -10,9 +11,10 @@ export async function flushRpc(): Promise<void> {
 
 export function installGoblin(overrides: Record<string, (input: any) => unknown> = {}) {
   const calls = {
-    recent: [] as string[],
+    recent: [] as RepoSessionEntry[],
     snapshot: [] as string[],
     status: [] as string[],
+    resolveTarget: [] as Array<{ alias: string; remotePath: string }>,
   }
   const handlers: Record<string, (input: any) => unknown> = {
     'repo.probe': ({ cwd }: { cwd: string }) => {
@@ -29,8 +31,22 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
       return []
     },
     'repo.abort': async () => undefined,
-    'settings.addRecentRepo': ({ repoPath }: { repoPath: string }) => {
-      calls.recent.push(repoPath)
+    'remote.resolveTarget': ({ alias, remotePath }: { alias: string; remotePath: string }) => {
+      calls.resolveTarget.push({ alias, remotePath })
+      return {
+        target: {
+          id: `ssh-config://${encodeURIComponent(alias)}${remotePath}`,
+          alias,
+          host: alias === 'example' ? 'example.com' : `${alias}.example.com`,
+          user: 'alice',
+          port: 22,
+          remotePath,
+          displayName: `${alias}:${remotePath.split('/').at(-1) || '/'}`,
+        },
+      }
+    },
+    'settings.addRecentRepo': ({ repo }: { repo: RepoSessionEntry }) => {
+      calls.recent.push(repo)
       return calls.recent
     },
   }

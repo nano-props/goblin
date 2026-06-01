@@ -6,8 +6,9 @@ import { activateMainWindow } from '#/main/window.ts'
 import { t } from '#/main/i18n/index.ts'
 import { getWorktrees } from '#/main/git/worktrees.ts'
 import { resolveKnownWorktree } from '#/main/git/guards.ts'
-import { isValidAbsolutePath, isValidBranch, isValidCwd } from '#/main/ipc/validation.ts'
-import { parseRemoteRepoId, normalizeRemoteTarget } from '#/shared/remote-repo.ts'
+import { isValidAbsolutePath, isValidBranch, isValidCwd, isValidRepoLocator } from '#/main/ipc/validation.ts'
+import { resolveRemoteTarget } from '#/main/ssh/config.ts'
+import { isRemoteRepoId, parseRemoteRepoId } from '#/shared/remote-repo.ts'
 import { buildRemoteTerminalInvocation } from '#/main/ssh/commands.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 import {
@@ -76,7 +77,7 @@ export function wireTerminalIpc(): void {
   })
   ipcMain.handle('goblin:terminal-prune-repo', (event, input: TerminalPruneRepoInput): TerminalMutationResult => {
     if (!isTrustedIpcEvent(event)) return false
-    if (!isValidCwd(input?.repoRoot) || !isValidTerminalWorktreePathList(input?.worktreePaths)) return false
+    if (!isValidRepoLocator(input?.repoRoot) || !isValidTerminalWorktreePathList(input?.worktreePaths)) return false
     pruneRepoSessions(event.sender.id, input.repoRoot, input.worktreePaths)
     return true
   })
@@ -107,7 +108,7 @@ async function openGoblinWorktreeTerminal(
   input: TerminalOpenInput,
   options: { restart?: boolean } = {},
 ): Promise<TerminalOpenResult> {
-  const isRemote = input?.repoRoot?.startsWith('ssh://') ?? false
+  const isRemote = isRemoteRepoId(input?.repoRoot ?? '')
   if (
     (!isRemote && !isValidCwd(input?.repoRoot)) ||
     !isValidBranch(input?.branch) ||
@@ -121,11 +122,15 @@ async function openGoblinWorktreeTerminal(
 
   // Remote repository: launch SSH session instead of local shell
   if (isRemote) {
-    const parsed = parseRemoteRepoId(input.repoRoot)
-    if (!parsed) return { ok: false, message: 'error.invalid-arguments' }
-    const target = normalizeRemoteTarget({ ...parsed, alias: null })
-    if (!target) return { ok: false, message: 'error.invalid-arguments' }
-    const invocation = buildRemoteTerminalInvocation(target, input.worktreePath, { cols: input.cols, rows: input.rows })
+    const ref = parseRemoteRepoId(input.repoRoot)
+    if (!ref) return { ok: false, message: 'error.ssh-config-changed' }
+    let resolved
+    try {
+      resolved = await resolveRemoteTarget(ref)
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : 'error.ssh-config-changed' }
+    }
+    const invocation = buildRemoteTerminalInvocation(resolved.target, input.worktreePath, { cols: input.cols, rows: input.rows })
     return openTerminalSession({
       ownerWebContentsId,
       scope: input.repoRoot,
@@ -168,14 +173,14 @@ function registerTerminalOwnerCleanup(webContents: WebContents): void {
 }
 
 export function closeWorktreeSession(repoRoot: string, worktreePath: string): void {
-  const isRemote = repoRoot.startsWith('ssh://')
+  const isRemote = isRemoteRepoId(repoRoot)
   const resolvedRoot = isRemote ? repoRoot : path.resolve(repoRoot)
   const resolvedWorktree = isRemote ? worktreePath : path.resolve(worktreePath)
   closeTerminalKey(sessionKey(resolvedRoot, resolvedWorktree))
 }
 
 export function pruneRepoSessions(ownerWebContentsId: number, repoRoot: string, worktreePaths: string[]): void {
-  const isRemote = repoRoot.startsWith('ssh://')
+  const isRemote = isRemoteRepoId(repoRoot)
   const root = isRemote ? repoRoot : path.resolve(repoRoot)
   const liveKeys = new Set(
     worktreePaths

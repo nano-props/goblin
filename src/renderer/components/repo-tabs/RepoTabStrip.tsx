@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Download, FolderOpen, Globe, Plus } from 'lucide-react'
+import { Download, FolderOpen, Plus, Server } from 'lucide-react'
 import {
   DndContext,
   type DragEndEvent,
@@ -149,7 +149,7 @@ export function RepoTabStrip({
             {labels.openLocalShortcut && <DropdownMenuShortcut>{labels.openLocalShortcut}</DropdownMenuShortcut>}
           </DropdownMenuItem>
           <DropdownMenuItem className="whitespace-nowrap" onSelect={onOpenRemote}>
-            <Globe />
+            <Server />
             {labels.openRemote}
             {labels.openRemoteShortcut && <DropdownMenuShortcut>{labels.openRemoteShortcut}</DropdownMenuShortcut>}
           </DropdownMenuItem>
