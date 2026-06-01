@@ -1,7 +1,9 @@
 package dev.goblin.android.ui.screens.terminal
 
 import android.view.KeyEvent
+import dev.goblin.android.terminal.TerminalSessionRecord
 import dev.goblin.android.terminal.TerminalSessionState
+import dev.goblin.android.terminal.TerminalSessionStatus
 import dev.goblin.android.terminal.TerminalDisconnectedReason
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -113,4 +115,59 @@ class TerminalInteractionStateTest {
             terminalTargetLabel(repositoryTitle = "App", remotePath = "/srv/app-feature"),
         )
     }
+
+    @Test
+    fun `terminal title uses workspace session number and directory`() {
+        val sessions = listOf(
+            terminalRecord(id = "session-a", repositoryId = "repo-1", remotePath = "/srv/app", openedAt = 100L),
+            terminalRecord(id = "session-b", repositoryId = "repo-1", remotePath = "/srv/app", openedAt = 200L),
+            terminalRecord(id = "session-c", repositoryId = "repo-1", remotePath = "/srv/other", openedAt = 50L),
+        )
+
+        assertEquals(
+            "terminal-2 /srv/app",
+            terminalScreenTitle(
+                sessionId = "session-b",
+                sessions = sessions,
+                hostId = "host-1",
+                repositoryId = "repo-1",
+                remotePath = "/srv/app",
+            ),
+        )
+    }
+
+    @Test
+    fun `terminal title excludes sessions from other hosts`() {
+        val sessions = listOf(
+            terminalRecord(id = "session-a", hostId = "host-2", repositoryId = null, remotePath = "/", openedAt = 100L),
+            terminalRecord(id = "session-b", hostId = "host-1", repositoryId = null, remotePath = "/", openedAt = 200L),
+        )
+
+        assertEquals(
+            "terminal-1 /",
+            terminalScreenTitle(
+                sessionId = "session-b",
+                sessions = sessions,
+                hostId = "host-1",
+                repositoryId = null,
+                remotePath = "/",
+            ),
+        )
+    }
+
+    private fun terminalRecord(
+        id: String,
+        hostId: String = "host-1",
+        repositoryId: String?,
+        remotePath: String,
+        openedAt: Long,
+    ): TerminalSessionRecord = TerminalSessionRecord(
+        id = id,
+        hostId = hostId,
+        repositoryId = repositoryId,
+        remotePath = remotePath,
+        targetLabel = "App - $remotePath",
+        status = TerminalSessionStatus.Running,
+        openedAt = openedAt,
+    )
 }

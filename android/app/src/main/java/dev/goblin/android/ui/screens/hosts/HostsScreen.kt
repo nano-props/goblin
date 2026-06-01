@@ -48,28 +48,24 @@ internal fun hostTemporaryTerminalRoute(hostId: String): AppRoute.Terminal =
 internal enum class HostHealth {
     Online,
     Offline,
-    Unknown,
 }
 
 internal fun hostHealth(host: SshHostProfile): HostHealth =
     when (host.lastDiagnosticStatus?.lowercase()) {
         "healthy" -> HostHealth.Online
-        "unhealthy" -> HostHealth.Offline
-        else -> HostHealth.Unknown
+        else -> HostHealth.Offline
     }
 
 internal fun hostHealthLabel(health: HostHealth): String =
     when (health) {
         HostHealth.Online -> "online"
         HostHealth.Offline -> "offline"
-        HostHealth.Unknown -> "unknow"
     }
 
 internal fun hostHealthIndicatorColor(health: HostHealth): Color =
     when (health) {
         HostHealth.Online -> Color(0xFF137333)
         HostHealth.Offline -> Color(0xFFC5221F)
-        HostHealth.Unknown -> Color(0xFFF9AB00)
     }
 
 @Composable

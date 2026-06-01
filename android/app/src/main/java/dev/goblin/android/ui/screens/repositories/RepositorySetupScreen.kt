@@ -55,6 +55,7 @@ import dev.goblin.android.ssh.worktreeRemovalConfirmationText
 import dev.goblin.android.terminal.TerminalDisconnectedReason
 import dev.goblin.android.terminal.TerminalSessionRecord
 import dev.goblin.android.terminal.TerminalSessionStatus
+import dev.goblin.android.ui.screens.terminal.terminalSessionDisplayName
 import dev.goblin.android.ui.theme.GoblinSpacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -189,7 +190,7 @@ internal fun terminalWorkspaceSessions(
         .filter { it.repositoryId == repositoryId && it.remotePath == remotePath }
         .sortedWith(terminalWorkspaceSessionComparator)
 
-internal fun terminalSessionDefaultLabel(index: Int): String = "Terminal ${index + 1}"
+internal fun terminalSessionDefaultLabel(index: Int): String = terminalSessionDisplayName(index)
 
 internal fun terminalSessionStatusLabel(session: TerminalSessionRecord): String {
     val base = when (session.status) {

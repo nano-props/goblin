@@ -2,6 +2,7 @@ package dev.goblin.android.ui.screens.terminal
 
 import android.view.KeyEvent
 import dev.goblin.android.terminal.TerminalDisconnectedReason
+import dev.goblin.android.terminal.TerminalSessionRecord
 import dev.goblin.android.terminal.TerminalSessionState
 
 internal const val TerminalDisconnectedMessage = "Terminal disconnected. Reconnect or return to diagnostics."
@@ -104,4 +105,21 @@ internal fun terminalTargetLabel(repositoryTitle: String?, remotePath: String): 
     val path = remotePath.ifBlank { "/" }
     val title = repositoryTitle?.takeIf { it.isNotBlank() }
     return if (title == null) path else "$title - $path"
+}
+
+internal fun terminalSessionDisplayName(index: Int): String = "terminal-${index + 1}"
+
+internal fun terminalScreenTitle(
+    sessionId: String?,
+    sessions: List<TerminalSessionRecord>,
+    hostId: String,
+    repositoryId: String?,
+    remotePath: String,
+): String {
+    val path = remotePath.ifBlank { "/" }
+    val workspaceSessions = sessions
+        .filter { it.hostId == hostId && it.repositoryId == repositoryId && it.remotePath == path }
+        .sortedBy { it.openedAt }
+    val index = workspaceSessions.indexOfFirst { it.id == sessionId }.takeIf { it >= 0 } ?: 0
+    return "${terminalSessionDisplayName(index)} $path"
 }

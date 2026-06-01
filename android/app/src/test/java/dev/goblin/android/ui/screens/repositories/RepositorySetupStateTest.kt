@@ -196,8 +196,8 @@ class RepositorySetupStateTest {
 
     @Test
     fun `terminal workspace labels are stable and lowercase`() {
-        assertEquals("Terminal 1", terminalSessionDefaultLabel(index = 0))
-        assertEquals("Terminal 2", terminalSessionDefaultLabel(index = 1))
+        assertEquals("terminal-1", terminalSessionDefaultLabel(index = 0))
+        assertEquals("terminal-2", terminalSessionDefaultLabel(index = 1))
         assertEquals("starting", terminalSessionStatusLabel(terminalSession(status = TerminalSessionStatus.Starting)))
         assertEquals("running", terminalSessionStatusLabel(terminalSession(status = TerminalSessionStatus.Running)))
         assertEquals("exited", terminalSessionStatusLabel(terminalSession(status = TerminalSessionStatus.Exited)))

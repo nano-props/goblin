@@ -1,5 +1,9 @@
 package dev.goblin.android.ui.screens.terminal
 
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -42,11 +46,14 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import dev.goblin.android.domain.ssh.RemoteTarget
 import dev.goblin.android.domain.ssh.SshHostProfile
+import dev.goblin.android.notifications.NotificationPermissionPolicy
 import dev.goblin.android.terminal.TerminalForegroundBridge
 import dev.goblin.android.terminal.TerminalSessionManager
 import dev.goblin.android.terminal.TerminalSessionState
+import dev.goblin.android.terminal.TerminalSessionStatus
 import dev.goblin.android.terminal.toTerminalSessionState
 import dev.goblin.android.ui.theme.GoblinColors
 import dev.goblin.android.ui.theme.GoblinSpacing
@@ -80,7 +87,33 @@ fun TerminalScreen(
     val target = remember(host, remotePath) { RemoteTarget.fromHostProfile(host, remotePath) }
     var inputNotice by remember { mutableStateOf<String?>(null) }
     var stickToBottom by remember { mutableStateOf(true) }
+    var notificationPermissionRequested by remember { mutableStateOf(false) }
     val inputAvailable = terminalInputAvailable(terminalState)
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) {
+        terminalForegroundBridge.sync()
+    }
+
+    fun syncTerminalForeground() {
+        val permissionGranted = ContextCompat.checkSelfPermission(
+            context,
+            NotificationPermissionPolicy.Permission,
+        ) == PackageManager.PERMISSION_GRANTED
+        val hasRunningTerminal = terminalSessionManager.sessions().any { it.status == TerminalSessionStatus.Running }
+        if (
+            !notificationPermissionRequested &&
+            NotificationPermissionPolicy.shouldRequestNotificationPermission(
+                sdkInt = Build.VERSION.SDK_INT,
+                permissionGranted = permissionGranted,
+                foregroundNotificationNeeded = hasRunningTerminal,
+            )
+        ) {
+            notificationPermissionRequested = true
+            notificationPermissionLauncher.launch(NotificationPermissionPolicy.Permission)
+        }
+        terminalForegroundBridge.sync()
+    }
 
     fun connect() {
         scope.launch {
@@ -93,7 +126,7 @@ fun TerminalScreen(
             }
             activeSessionId = record.id
             terminalState = record.toTerminalSessionState()
-            terminalForegroundBridge.sync()
+            syncTerminalForeground()
         }
     }
 
@@ -103,7 +136,7 @@ fun TerminalScreen(
             val sent = withContext(Dispatchers.IO) {
                 sessionId?.let { terminalSessionManager.sendInput(it, value) } ?: false
             }
-            terminalForegroundBridge.sync()
+            syncTerminalForeground()
             onResult(sent)
         }
     }
@@ -114,7 +147,7 @@ fun TerminalScreen(
             withContext(Dispatchers.IO) {
                 if (sessionId != null) terminalSessionManager.close(sessionId)
             }
-            terminalForegroundBridge.sync()
+            syncTerminalForeground()
         }
     }
 
@@ -151,7 +184,7 @@ fun TerminalScreen(
             val observer = terminalSessionManager.observe(sessionId) { record ->
                 scope.launch {
                     terminalState = record.toTerminalSessionState()
-                    terminalForegroundBridge.sync()
+                    syncTerminalForeground()
                 }
             }
             onDispose {
@@ -172,12 +205,20 @@ fun TerminalScreen(
         }
         activeSessionId = record.id
         terminalState = record.toTerminalSessionState()
-        terminalForegroundBridge.sync()
+        syncTerminalForeground()
     }
 
     LaunchedEffect(terminalState) {
         inputNotice = terminalInputUnavailableMessage(terminalState)
     }
+
+    val screenTitle = terminalScreenTitle(
+        sessionId = activeSessionId,
+        sessions = terminalSessionManager.sessions(),
+        hostId = host.id,
+        repositoryId = repositoryId,
+        remotePath = remotePath,
+    )
 
     Scaffold(
         topBar = {
@@ -185,7 +226,7 @@ fun TerminalScreen(
                 title = {
                     Column {
                         Text(
-                            text = targetLabel,
+                            text = screenTitle,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -264,7 +305,7 @@ fun TerminalScreen(
                             val pasted = withContext(Dispatchers.IO) {
                                 activeSessionId?.let { terminalSessionManager.paste(it, text) } ?: false
                             }
-                            terminalForegroundBridge.sync()
+                            syncTerminalForeground()
                             inputNotice = if (pasted) null else "Terminal is not connected."
                         }
                     },

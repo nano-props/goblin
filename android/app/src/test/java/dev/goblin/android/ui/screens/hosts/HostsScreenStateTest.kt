@@ -28,15 +28,20 @@ class HostsScreenStateTest {
     }
 
     @Test
-    fun `host health defaults to unknown`() {
-        assertEquals(HostHealth.Unknown, hostHealth(host(lastDiagnosticStatus = null)))
-        assertEquals("unknow", hostHealthLabel(HostHealth.Unknown))
+    fun `host health defaults to offline`() {
+        assertEquals(HostHealth.Offline, hostHealth(host(lastDiagnosticStatus = null)))
+    }
+
+    @Test
+    fun `host health only exposes online and offline states`() {
+        assertEquals(listOf("online", "offline"), HostHealth.entries.map(::hostHealthLabel))
     }
 
     @Test
     fun `host health maps persisted diagnostics to online and offline labels`() {
         assertEquals(HostHealth.Online, hostHealth(host(lastDiagnosticStatus = "healthy")))
         assertEquals(HostHealth.Offline, hostHealth(host(lastDiagnosticStatus = "unhealthy")))
+        assertEquals(HostHealth.Offline, hostHealth(host(lastDiagnosticStatus = "pending")))
         assertEquals("online", hostHealthLabel(HostHealth.Online))
         assertEquals("offline", hostHealthLabel(HostHealth.Offline))
     }
@@ -45,7 +50,6 @@ class HostsScreenStateTest {
     fun `host health indicator colors are scoped to the status dot`() {
         assertEquals(Color(0xFF137333), hostHealthIndicatorColor(HostHealth.Online))
         assertEquals(Color(0xFFC5221F), hostHealthIndicatorColor(HostHealth.Offline))
-        assertEquals(Color(0xFFF9AB00), hostHealthIndicatorColor(HostHealth.Unknown))
     }
 
     private fun host(lastDiagnosticStatus: String?): SshHostProfile =
