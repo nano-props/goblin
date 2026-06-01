@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
+import { normalizeRemoteTarget, remoteRepoSessionEntry } from '#/shared/remote-repo.ts'
 import { useReposStore } from '#/renderer/stores/repos/store.ts'
 import type { BranchSnapshotInfo } from '#/renderer/types.ts'
 import {
@@ -21,7 +22,7 @@ describe('repo lifecycle', () => {
     expect(result).toEqual({ ok: true, id: REPO_A })
     expect(useReposStore.getState().order).toEqual([REPO_A])
     expect(useReposStore.getState().activeId).toBe(REPO_A)
-    expect(calls.recent).toEqual([REPO_A])
+    expect(calls.recent).toEqual([{ kind: 'local', id: REPO_A }])
     expect(calls.snapshot).toEqual([REPO_A])
     expect(calls.status).toEqual([REPO_A])
   })
@@ -75,5 +76,25 @@ describe('repo lifecycle', () => {
     await flushRpc()
 
     expect(useReposStore.getState().repos[REPO_A]?.data.currentBranch).toBe('fresh')
+  })
+
+  test('openRepo preserves remote target metadata for recent repos and later actions', async () => {
+    const target = normalizeRemoteTarget({
+      alias: 'example',
+      host: 'example.com',
+      user: 'alice',
+      port: 22,
+      remotePath: '/srv/repo',
+    })
+    expect(target).not.toBeNull()
+    const calls = installGoblin({
+      probe: (cwd: string) => ({ ok: true, root: cwd, name: 'repo' }),
+    })
+
+    const result = await useReposStore.getState().openRepo(remoteRepoSessionEntry(target!))
+
+    expect(result).toEqual({ ok: true, id: target!.id })
+    expect(useReposStore.getState().repos[target!.id]?.remote.target).toEqual(target)
+    expect(calls.recent).toEqual([remoteRepoSessionEntry(target!)])
   })
 })

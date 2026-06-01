@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { localRepoSessionEntry, normalizeRemoteTarget, remoteRepoSessionEntry } from '#/shared/remote-repo.ts'
 
 let tmp: string | null = null
 
@@ -196,7 +197,7 @@ test('adds opened repos to the OS recent documents list', async () => {
   }))
   const settings = await import('#/main/settings.ts')
 
-  await settings.addRecentRepo('/tmp/repo')
+  await settings.addRecentRepo(localRepoSessionEntry('/tmp/repo'))
 
   expect(addRecentDocument).toHaveBeenCalledWith('/tmp/repo')
 })
@@ -213,8 +214,62 @@ test('clears OS recent documents when recent repos are cleared', async () => {
   }))
   const settings = await import('#/main/settings.ts')
 
-  await settings.addRecentRepo('/tmp/repo')
+  await settings.addRecentRepo(localRepoSessionEntry('/tmp/repo'))
   await settings.clearRecentRepos()
 
   expect(clearRecentDocuments).toHaveBeenCalledTimes(1)
+})
+
+test('persists remote repo session entries without coercing them to local paths', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-settings-test-'))
+  vi.doMock('electron', () => ({ app: { getPath: () => tmp!, addRecentDocument: vi.fn(), clearRecentDocuments: vi.fn() } }))
+  const settings = await import('#/main/settings.ts')
+  const target = normalizeRemoteTarget({
+    alias: 'example',
+    host: 'example.com',
+    user: 'alice',
+    port: 22,
+    remotePath: '/srv/repo',
+  })
+  expect(target).not.toBeNull()
+
+  await settings.setSession({
+    openRepos: [remoteRepoSessionEntry(target!)],
+    activeRepo: target!.id,
+    detailCollapsed: true,
+    detailFocusMode: false,
+    workspaceLayout: 'top-bottom',
+    detailPaneSizes: { 'top-bottom': 50, 'left-right': 60 },
+  })
+  await settings.flushSettings()
+
+  const loaded = await settings.loadSettings()
+  expect(loaded.session.openRepos).toEqual([remoteRepoSessionEntry(target!)])
+  expect(loaded.session.activeRepo).toBe(target!.id)
+})
+
+test('does not add remote repos to OS recent documents', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-settings-test-'))
+  const addRecentDocument = vi.fn()
+  vi.doMock('electron', () => ({
+    app: {
+      getPath: () => tmp!,
+      addRecentDocument,
+      clearRecentDocuments: vi.fn(),
+    },
+  }))
+  const settings = await import('#/main/settings.ts')
+  const target = normalizeRemoteTarget({
+    alias: 'example',
+    host: 'example.com',
+    user: 'alice',
+    port: 22,
+    remotePath: '/srv/repo',
+  })
+  expect(target).not.toBeNull()
+
+  await settings.addRecentRepo(remoteRepoSessionEntry(target!))
+
+  expect(addRecentDocument).not.toHaveBeenCalled()
+  expect(settings.getRecentRepos()).toEqual([remoteRepoSessionEntry(target!)])
 })

@@ -28,6 +28,7 @@ function summariesEqual(a: RepoTabSummary[], b: RepoTabSummary[]): boolean {
     const x = a[i]!
     const y = b[i]!
     if (x.id !== y.id || x.name !== y.name || x.unavailable !== y.unavailable) return false
+    if (x.remoteTarget?.id !== y.remoteTarget?.id) return false
     if (x.remoteDetails.length !== y.remoteDetails.length) return false
     for (let j = 0; j < x.remoteDetails.length; j++) {
       const xr = x.remoteDetails[j]!
@@ -39,10 +40,11 @@ function summariesEqual(a: RepoTabSummary[], b: RepoTabSummary[]): boolean {
 }
 
 interface RepoTabsProps {
+  onOpenRemote: () => void
   onClone: () => void
 }
 
-export function RepoTabs({ onClone }: RepoTabsProps) {
+export function RepoTabs({ onOpenRemote, onClone }: RepoTabsProps) {
   const t = useT()
   const shortcutsDisabled = useSettingsStore((s) => s.shortcutsDisabled)
   // Build the summary array inside the selector but compare with our
@@ -63,6 +65,7 @@ export function RepoTabs({ onClone }: RepoTabsProps) {
                 id: r.id,
                 name: r.name,
                 remoteDetails: r.remote.remoteDetails ?? [],
+                remoteTarget: r.remote.target,
                 unavailable: r.availability.phase === 'unavailable',
               }
             : null
@@ -91,6 +94,8 @@ export function RepoTabs({ onClone }: RepoTabsProps) {
         open: t('topbar.open'),
         openLocal: t('repo-tabs.open-local'),
         openLocalShortcut: shortcutsDisabled ? null : '⌘O',
+        openRemote: t('repo-tabs.open-remote'),
+        openRemoteShortcut: shortcutsDisabled ? null : '⌘⇧R',
         clone: t('repo-tabs.clone'),
         cloneShortcut: shortcutsDisabled ? null : '⌘⇧O',
         unavailable: t('repo-unavailable.title'),
@@ -99,6 +104,7 @@ export function RepoTabs({ onClone }: RepoTabsProps) {
       onClose={closeRepo}
       onReorder={reorderRepos}
       onOpenLocal={handleOpenLocal}
+      onOpenRemote={onOpenRemote}
       onClone={onClone}
     />
   )

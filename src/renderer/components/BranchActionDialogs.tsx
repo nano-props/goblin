@@ -2,10 +2,11 @@ import { type ReactNode } from 'react'
 import { Trans } from 'react-i18next'
 import { ConfirmCheckbox } from '#/renderer/components/ConfirmCheckbox.tsx'
 import { ConfirmDialog } from '#/renderer/components/ConfirmDialog.tsx'
-import { tildify } from '#/renderer/lib/paths.ts'
+import { formatWorktreePath } from '#/renderer/lib/paths.ts'
 import { useT } from '#/renderer/stores/i18n.ts'
 import type { RepoBranchState } from '#/renderer/stores/repos/types.ts'
 import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
+import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 
 export interface RemoveConfirm {
   branch: string
@@ -20,6 +21,7 @@ interface RetainedDialogViewState<T> {
 
 interface BranchActionDialogsProps {
   branch: RepoBranchState
+  remoteTarget?: RemoteRepoTarget
   hasUpstream: boolean
   pushConfirm: RetainedDialogViewState<string>
   deleteConfirm: RetainedDialogViewState<string>
@@ -223,6 +225,7 @@ function ForceRemoveWorktreeConfirmBody({
 
 export function BranchActionDialogs({
   branch,
+  remoteTarget,
   hasUpstream,
   pushConfirm,
   deleteConfirm,
@@ -332,7 +335,7 @@ export function BranchActionDialogs({
           removeConfirm.payload ? (
             <RemoveWorktreeConfirmBody
               body={t('action.confirm-remove-worktree-body')}
-              path={tildify(removeConfirm.payload.path)}
+              path={formatWorktreePath(removeConfirm.payload.path, remoteTarget)}
               branch={removeConfirm.payload.branch}
               protectedHint={t('action.confirm-remove-worktree-protected-hint')}
               removeAlsoDeletes={removeAlsoDeletes}
@@ -367,7 +370,7 @@ export function BranchActionDialogs({
           forceRemoveConfirm.payload ? (
             <ForceRemoveWorktreeConfirmBody
               removeBody={t('action.confirm-remove-worktree-body')}
-              path={tildify(forceRemoveConfirm.payload.path)}
+              path={formatWorktreePath(forceRemoveConfirm.payload.path, remoteTarget)}
               forceDeleteBody={t('action.confirm-force-delete-branch-body')}
               branch={forceRemoveConfirm.payload.branch}
               note={t('action.confirm-force-delete-branch-note')}

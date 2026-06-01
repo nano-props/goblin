@@ -9,7 +9,7 @@ export interface UpstreamParts {
   branch: string
 }
 
-interface BrowserRemote {
+export interface BrowserRemote {
   url: string
   provider: BrowserRemoteProvider
 }
@@ -28,19 +28,12 @@ export async function getNewPullRequestUrl(
   options?: { signal?: AbortSignal },
 ): Promise<string | null> {
   const remote = await getBrowserRemote(cwd, { branch, signal: options?.signal })
-  if (!remote) return null
-  if (remote.provider === 'gitlab') {
-    const params = new URLSearchParams({ 'merge_request[source_branch]': branch })
-    return `${remote.url}/-/merge_requests/new?${params.toString()}`
-  }
-  if (remote.provider !== 'github') return null
-  const encoded = branch.split('/').map(encodeURIComponent).join('/')
   // `/pull/new/{branch}` redirects to the existing open PR if one is
   // associated with the branch; otherwise it lands on GitHub's "create
   // pull request" page pre-populated with that branch as the head. This
   // single URL covers both intents the user has when opening the branch's
   // remote page — see an existing PR, or start one.
-  return `${remote.url}/pull/new/${encoded}`
+  return newPullRequestUrlForBrowserRemote(remote, branch)
 }
 
 async function hasRemote(cwd: string, remote: string, signal?: AbortSignal): Promise<boolean> {
@@ -52,7 +45,7 @@ async function hasRemote(cwd: string, remote: string, signal?: AbortSignal): Pro
   }
 }
 
-function parseRemoteVerbose(output: string): GitRemoteInfo[] {
+export function parseRemoteVerbose(output: string): GitRemoteInfo[] {
   const remotes = new Map<string, { name: string; fetchUrl?: string; pushUrl?: string }>()
   for (const line of output.split('\n')) {
     const match = line.match(/^(\S+)\s+(.+?)\s+\((fetch|push)\)$/)
@@ -101,14 +94,14 @@ function browserRemoteProvider(host: string): BrowserRemoteProvider {
   return 'external'
 }
 
-function browserRemote(remote: GitRemoteInfo): BrowserRemote | null {
+export function browserRemote(remote: GitRemoteInfo): BrowserRemote | null {
   const parsed = parseGitRemoteUrl(remote.fetchUrl)
   const url = remoteUrlToHttps(remote.fetchUrl)
   if (!parsed || !url) return null
   return { url, provider: browserRemoteProvider(parsed.host) }
 }
 
-function pickBrowserRemote(remotes: GitRemoteInfo[], upstream?: UpstreamParts | null): BrowserRemote | null {
+export function pickBrowserRemote(remotes: GitRemoteInfo[], upstream?: UpstreamParts | null): BrowserRemote | null {
   return pickPreferredRemote(
     remotes
       .map((remote) => {
@@ -137,6 +130,10 @@ async function getBrowserRemote(
 
 export async function getRemoteInfo(cwd: string, signal?: AbortSignal): Promise<RepoRemoteInfo> {
   const remotes = await getRemotes(cwd, signal)
+  return repoRemoteInfoForRemotes(remotes)
+}
+
+export function repoRemoteInfoForRemotes(remotes: GitRemoteInfo[]): RepoRemoteInfo {
   const remoteProviders = Object.fromEntries(
     remotes.flatMap((remote) => {
       const browser = browserRemote(remote)
@@ -152,6 +149,29 @@ export async function getRemoteInfo(cwd: string, signal?: AbortSignal): Promise<
     remoteProviders,
     hasGitHubRemote: pickGitHubRemote(remotes) !== null,
   }
+}
+
+export function getBrowserRemoteUrlForRemotes(remotes: GitRemoteInfo[], upstream?: UpstreamParts | null): string | null {
+  return pickBrowserRemote(remotes, upstream)?.url ?? null
+}
+
+export function newPullRequestUrlForBrowserRemote(remote: BrowserRemote | null, branch: string): string | null {
+  if (!remote) return null
+  if (remote.provider === 'gitlab') {
+    const params = new URLSearchParams({ 'merge_request[source_branch]': branch })
+    return `${remote.url}/-/merge_requests/new?${params.toString()}`
+  }
+  if (remote.provider !== 'github') return null
+  const encoded = branch.split('/').map(encodeURIComponent).join('/')
+  return `${remote.url}/pull/new/${encoded}`
+}
+
+export function getNewPullRequestUrlForRemotes(
+  remotes: GitRemoteInfo[],
+  branch: string,
+  upstream?: UpstreamParts | null,
+): string | null {
+  return newPullRequestUrlForBrowserRemote(pickBrowserRemote(remotes, upstream), branch)
 }
 
 export async function getUpstreamParts(

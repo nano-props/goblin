@@ -29,7 +29,6 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
   const t = useT()
   const hostRef = useRef<HTMLDivElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
-  const initializedGroupRef = useRef<string | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const context = useTerminalSessionContext()
@@ -65,8 +64,6 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
   )
 
   useLayoutEffect(() => {
-    if (initializedGroupRef.current === groupKey) return
-    initializedGroupRef.current = groupKey
     ensureDefault(base)
   }, [base, ensureDefault, groupKey])
 

@@ -29,6 +29,7 @@ export const ja: Record<DictKey, string> = {
   // ---- Menu — File -------------------------------------------------------
   'menu.file.open-local-repo': 'ローカルリポジトリを開く…',
   'menu.file.open-local-repo-path': 'パスでローカルリポジトリを開く…',
+  'menu.file.open-remote-repo': 'Open Remote Repository…',
   'menu.file.clone-repo': 'リポジトリをクローン…',
   'menu.file.open-recent': '最近使った項目を開く',
   'menu.file.no-recent': '最近使ったリポジトリはありません',
@@ -76,6 +77,7 @@ export const ja: Record<DictKey, string> = {
   'repo-tabs.close': '閉じる',
   'repo-tabs.drag-to-reorder': 'ドラッグで並べ替え',
   'repo-tabs.open-local': 'ローカルリポジトリを開く…',
+  'repo-tabs.open-remote': 'Open remote repository…',
   'repo-tabs.open-title': 'ローカルリポジトリを開く',
   'repo-tabs.open-description': 'ローカルパスを入力するかフォルダを選択して、Git リポジトリを新しいタブで開きます。',
   'repo-tabs.open-path-label': 'リポジトリのパス',
@@ -97,10 +99,75 @@ export const ja: Record<DictKey, string> = {
   'repo-tabs.clone-confirm': 'クローンして開く',
   'repo-tabs.clone-cloning': 'クローン中…',
   'repo-tabs.clone-opened': 'リポジトリをクローンしました',
+  'repo-tabs.open-remote-title': 'リモートリポジトリを開く',
+  'repo-tabs.open-remote-description': 'SSH エイリアスを選び、リポジトリのパスを入力します。',
+  'repo-tabs.open-remote-host-label': 'Host',
+  'repo-tabs.open-remote-host-alias-label': 'SSH エイリアス',
+  'repo-tabs.open-remote-host-placeholder': 'example.com',
+  'repo-tabs.open-remote-port-label': 'Port',
+  'repo-tabs.open-remote-username-label': 'Username',
+  'repo-tabs.open-remote-private-key-label': 'Private key',
+  'repo-tabs.open-remote-private-key-choose': 'Choose private key',
+  'repo-tabs.open-remote-path-label': 'Remote path',
+  'repo-tabs.open-remote-path-placeholder': '/home/user/repo または ~/repo',
+  'repo-tabs.open-remote-test-connection': '接続をテスト',
+  'repo-tabs.open-remote-confirm': 'リモートリポジトリを開く',
+  'repo-tabs.open-remote-diagnostics-title': '接続テスト',
+  'repo-tabs.open-remote-diagnostics-retry': '再試行',
+  'repo-tabs.open-remote-diagnostics-testing': '接続をテスト中…',
+  'repo-tabs.open-remote-diagnostics-stage-ssh': 'SSH に接続可能',
+  'repo-tabs.open-remote-diagnostics-stage-shell': 'シェル利用可能',
+  'repo-tabs.open-remote-diagnostics-stage-git': 'Git インストール済み',
+  'repo-tabs.open-remote-diagnostics-stage-path': 'パスが存在する',
+  'repo-tabs.open-remote-diagnostics-stage-repo': '有効な Git リポジトリ',
+  'repo-tabs.open-remote-diagnostics-category-auth-failed': '認証に失敗しました',
+  'repo-tabs.open-remote-diagnostics-category-host-key': 'ホストキーの検証に失敗しました',
+  'repo-tabs.open-remote-diagnostics-category-unreachable': 'ホストに到達できません',
+  'repo-tabs.open-remote-diagnostics-category-shell-failed': 'シェルを利用できません',
+  'repo-tabs.open-remote-diagnostics-category-git-missing': 'Git が見つかりません',
+  'repo-tabs.open-remote-diagnostics-category-path-missing': 'パスが見つかりません',
+  'repo-tabs.open-remote-diagnostics-category-not-a-repo': 'Git リポジトリではありません',
+  'repo-tabs.open-remote-diagnostics-category-timeout': 'タイムアウトしました',
+  'repo-tabs.open-remote-diagnostics-category-cancelled': 'キャンセルされました',
+  'repo-tabs.open-remote-diagnostics-category-config-changed': 'SSH 設定が変更されました',
+  'repo-tabs.open-remote-diagnostics-category-unknown': '不明なエラー',
+  'repo-tabs.open-remote-diagnostics-copy-ssh-command': 'SSH コマンドをコピー',
+  'repo-tabs.open-remote-diagnostics-copy-details': '詳細をコピー',
+  'repo-tabs.open-remote-connect-via-ssh': 'システム SSH で接続',
+  'repo-tabs.open-remote-config-only-hint': 'Goblin は ~/.ssh/config に定義された別名からのみ SSH リモートを開きます。',
+  'repo-tabs.open-remote-include-manual-hint':
+    'Include ディレクティブが見つかったため、別名一覧は不完全な可能性があります。SSH エイリアスを手動で入力してください。候補は現在のファイルだけを元にしています。',
+  'repo-tabs.open-remote-config-required': '~/.ssh/config に具体的な Host エントリを追加してからリモートリポジトリを開いてください。',
+  'repo-tabs.open-remote-config-drift-hint':
+    'Goblin は接続のたびに ~/.ssh/config を再解決します。別名が削除されたり解決できなくなった場合は設定ドリフトとして扱います。',
+  'repo-tabs.open-remote-open-ssh-settings': 'SSH 設定を開く',
+  'repo-tabs.open-remote-ssh-config': 'SSH 設定',
+  'repo-tabs.open-remote-manual': '手動入力',
+  'repo-tabs.open-remote-no-ssh-hosts': '~/.ssh/config に SSH ホストが見つかりません',
+  'repo-tabs.open-remote-no-ssh-hosts-help': '`Host my-server` のような具体的な Host ブロックを追加してから、このダイアログを開き直してください。',
+  'repo-tabs.open-remote-path-preview': '{path} を開きます',
+  'repo-tabs.open-remote-path-preview-expanded': '{input} を開きます\n展開後のパス: {expanded}',
+  'repo-tabs.open-remote-private-key-hint': 'システム SSH を使用します。鍵が ssh-agent に追加されていることを確認するか、鍵のパスを指定してください。',
+  'repo-tabs.open-remote-port-error': '無効なポート',
+  'repo-tabs.open-remote-path-required': 'パスを入力してください',
+  'repo-tabs.open-remote-path-absolute': 'パスは / または ~/ で始まる必要があります',
+  'repo-tabs.open-remote-home-unavailable': 'リモートのホームディレクトリを解決できませんでした',
   'repo-tabs.tooltip.no-remotes': 'リモートなし',
   'repo-unavailable.title': 'リポジトリパスを利用できません',
   'repo-unavailable.body':
     'Goblin はこのパスを Git リポジトリとして読み取れません。フォルダを復元するか .git を作り直してから再試行してください。',
+  'repo-unavailable.remote-body':
+    'Goblin はこの SSH リポジトリに再接続できませんでした。SSH エイリアス、ネットワーク接続、リモートパスを確認してから再試行してください。',
+  'repo-unavailable.remote-connect-failed':
+    'Goblin はこのリポジトリに使える SSH セッションを確立できませんでした。認証、ホストへの到達性、ホストキーの信頼設定を確認してから再試行してください。',
+  'repo-unavailable.remote-config-changed':
+    '保存済みの SSH エイリアスを現在の SSH 設定から解決できなくなりました。エイリアス設定を確認してから再接続してください。',
+  'repo-unavailable.remote-home-unavailable':
+    'Goblin はこの SSH 接続先のホームディレクトリを解決できませんでした。ログインシェルと SSH 設定を確認してから再試行してください。',
+  'repo-unavailable.remote-path-missing':
+    'Goblin は SSH 接続先には到達できましたが、保存済みのリモートパスが存在しなくなっています。リモートパスを更新してから再接続してください。',
+  'repo-unavailable.remote-not-a-repo':
+    'Goblin は SSH 接続先には到達できましたが、保存済みのパスは Git リポジトリではなくなっています。パスを確認するか、別のリポジトリに再接続してください。',
   'repo-unavailable.path': 'パス',
   'repo-unavailable.reason': '理由',
   'repo-unavailable.retry': '再確認',
@@ -333,6 +400,7 @@ export const ja: Record<DictKey, string> = {
   // ---- Errors / banners --------------------------------------------------
   'error.not-git-repo': 'git リポジトリではありません',
   'error.failed-read-repo': 'リポジトリの読み込みに失敗しました',
+  'error.ssh-config-changed': 'SSH 設定が変更されました',
   'error.git-not-found': 'Git が見つかりません',
   'error.path-not-found': 'パスが見つかりません',
   'error.path-not-directory': 'フォルダではありません',
@@ -424,10 +492,10 @@ export const ja: Record<DictKey, string> = {
   'settings.github.auth-token-source': 'トークン保存元:',
   'settings.group.apps': '外部アプリ',
   'settings.group.sync': '同期',
-  'settings.group.proxy': 'プロキシ',
   'settings.nav.github': 'GitHub',
   'settings.nav.integrations': '連携',
   'settings.nav.notifications': '通知',
+  'settings.nav.ssh': 'SSH',
   'settings.nav.refresh': '更新',
   'settings.nav.shortcuts': 'ショートカット',
   'settings.about': '情報',
@@ -472,18 +540,21 @@ export const ja: Record<DictKey, string> = {
   'settings.fetch.3m': '3 分',
   'settings.fetch.5m': '5 分',
   'settings.fetch.15m': '15 分',
-  'settings.proxy.external-badge': '外部',
-  'settings.proxy.http-title': 'HTTP(S) リモート',
-  'settings.proxy.http-body':
-    'HTTPS リモートを使う場合は、Goblin の外で Git を設定してください。これは git の通信にのみ影響します。',
-  'settings.proxy.http-example':
-    'git config --global http.proxy http://127.0.0.1:7890\n' +
-    'git config --global https.proxy http://127.0.0.1:7890',
-  'settings.proxy.ssh-title': 'SSH リモート',
-  'settings.proxy.ssh-body':
-    'SSH リモートを使う場合は ~/.ssh/config を設定してください。Goblin はシステムの git/ssh 設定に従います。',
-  'settings.proxy.ssh-example':
-    'Host example\n  HostName github.com\n  User git\n  ProxyCommand nc -x 127.0.0.1:1080 %h %p',
+  'settings.ssh.title': 'SSH',
+  'settings.ssh.body':
+    '~/.ssh/config の Host 別名でリモートリポジトリを開きます。',
+  'settings.ssh.config-file-label': '設定ファイル',
+  'settings.ssh.config-file-hint': 'Goblin はこのファイルから SSH 別名を読み取ります。',
+  'settings.ssh.path-format-label': 'パス形式',
+  'settings.ssh.path-format-hint': '絶対パスとホーム相対パスをサポートします。',
+  'settings.ssh.rules':
+    'ルール: Goblin は毎回 ~/.ssh/config から別名を再解決します。別名が削除されたり、解決できなくなった場合は設定ドリフトとして扱います。',
+  'settings.ssh.example':
+    'Host my-server\n' +
+    '  HostName example.com\n' +
+    '  User ubuntu\n' +
+    '  Port 22\n' +
+    '  IdentityFile ~/.ssh/id_ed25519\n',
   'settings.shortcuts': 'キーボードショートカット',
   'settings.shortcuts-disable-app': 'アプリのショートカットを無効化',
   'settings.shortcuts-disable-global': 'グローバルショートカットを無効化',

@@ -10,7 +10,7 @@ import {
   StatusRows,
   type Tone,
 } from '#/renderer/components/branch-detail/status-ui.tsx'
-import { tildify } from '#/renderer/lib/paths.ts'
+import { formatWorktreePath } from '#/renderer/lib/paths.ts'
 import { PROTECTED_BRANCHES, branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import type { SelectedBranchDetail } from '#/renderer/components/branch-detail/model.ts'
 import type { RepoWorkspaceLayout } from '#/renderer/stores/repos/types.ts'
@@ -71,7 +71,7 @@ export function BranchStatus({ detail, layout }: Props) {
   if (!branch) return <EmptyState title={t('branches.empty')} />
 
   const protectedBranch = PROTECTED_BRANCHES.has(branch.name)
-  const worktreePath = branch.worktree?.path ? tildify(branch.worktree?.path) : ''
+  const worktreePath = branch.worktree?.path ? formatWorktreePath(branch.worktree?.path, detail.remoteTarget) : ''
   const worktreeChangeCount = detail.worktreeState?.changeCount ?? statusCount
   const pullRequest =
     branch.pullRequest && branchPullRequestBelongsToBranch(branch, branch.pullRequest) ? branch.pullRequest : undefined

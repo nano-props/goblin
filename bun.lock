@@ -36,6 +36,7 @@
         "react-i18next": "17.0.8",
         "react-resizable-panels": "4.11.2",
         "sonner": "2.0.7",
+        "ssh-config": "5.1.0",
         "tailwind-merge": "3.6.0",
         "valibot": "1.4.1",
         "write-file-atomic": "8.0.0",
@@ -956,6 +957,8 @@
     "source-map-support": ["source-map-support@0.5.21", "", { "dependencies": { "buffer-from": "^1.0.0", "source-map": "^0.6.0" } }, "sha512-uBHU3L3czsIyYXKX88fdrGovxdSCoTGDRZ6SYXtSRxLZUzHg5P/66Ht6uoUlHu9EZod+inXhKo3qQgwXUT/y1w=="],
 
     "sprintf-js": ["sprintf-js@1.1.3", "", {}, "sha512-Oo+0REFV59/rz3gfJNKQiBlwfHaSESl1pcGyABQsnnIfWOFt6JNj5gCog2U6MLZ//IGYD+nA8nI+mTShREReaA=="],
+
+    "ssh-config": ["ssh-config@5.1.0", "", {}, "sha512-z4fFE4MgCja706ajwYOg6uptS3BIu0TWSUj08UWLuwNB/awVktEA5LyOgIAmgazyDjyTULhlL2GaBv37k4zoxQ=="],
 
     "stackback": ["stackback@0.0.2", "", {}, "sha512-1XMJE5fQo1jGH6Y/7ebnwPOBEkIEnT4QF32d5R1+VXdXveM0IBMJt8zfaxX1P3QhVwrYe+576+jkANtSS2mBbw=="],
 

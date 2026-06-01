@@ -6,7 +6,10 @@ import { activateMainWindow } from '#/main/window.ts'
 import { t } from '#/main/i18n/index.ts'
 import { getWorktrees } from '#/main/git/worktrees.ts'
 import { resolveKnownWorktree } from '#/main/git/guards.ts'
-import { isValidAbsolutePath, isValidBranch, isValidCwd } from '#/main/ipc/validation.ts'
+import { isValidAbsolutePath, isValidBranch, isValidCwd, isValidRepoLocator } from '#/main/ipc/validation.ts'
+import { resolveRemoteTarget } from '#/main/ssh/config.ts'
+import { isRemoteRepoId, parseRemoteRepoId } from '#/shared/remote-repo.ts'
+import { buildRemoteTerminalInvocation } from '#/main/ssh/commands.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 import {
   closeAllTerminalSessions,
@@ -74,7 +77,7 @@ export function wireTerminalIpc(): void {
   })
   ipcMain.handle('goblin:terminal-prune-repo', (event, input: TerminalPruneRepoInput): TerminalMutationResult => {
     if (!isTrustedIpcEvent(event)) return false
-    if (!isValidCwd(input?.repoRoot) || !isValidTerminalWorktreePathList(input?.worktreePaths)) return false
+    if (!isValidRepoLocator(input?.repoRoot) || !isValidTerminalWorktreePathList(input?.worktreePaths)) return false
     pruneRepoSessions(event.sender.id, input.repoRoot, input.worktreePaths)
     return true
   })
@@ -105,14 +108,40 @@ async function openGoblinWorktreeTerminal(
   input: TerminalOpenInput,
   options: { restart?: boolean } = {},
 ): Promise<TerminalOpenResult> {
+  const isRemote = isRemoteRepoId(input?.repoRoot ?? '')
   if (
-    !isValidCwd(input?.repoRoot) ||
+    (!isRemote && !isValidCwd(input?.repoRoot)) ||
     !isValidBranch(input?.branch) ||
-    !isValidAbsolutePath(input?.worktreePath) ||
+    (!isRemote && !isValidAbsolutePath(input?.worktreePath)) ||
+    (isRemote && (!input.worktreePath || input.worktreePath.includes('\0'))) ||
     !isValidTerminalId(input?.terminalId) ||
     !isValidTerminalSize(input?.cols, input?.rows)
   ) {
     return { ok: false, message: 'error.invalid-arguments' }
+  }
+
+  // Remote repository: launch SSH session instead of local shell
+  if (isRemote) {
+    const ref = parseRemoteRepoId(input.repoRoot)
+    if (!ref) return { ok: false, message: 'error.ssh-config-changed' }
+    let resolved
+    try {
+      resolved = await resolveRemoteTarget(ref)
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : 'error.ssh-config-changed' }
+    }
+    const invocation = buildRemoteTerminalInvocation(resolved.target, input.worktreePath, { cols: input.cols, rows: input.rows })
+    return openTerminalSession({
+      ownerWebContentsId,
+      scope: input.repoRoot,
+      key: sessionKey(input.repoRoot, input.worktreePath, input.terminalId),
+      cwd: process.cwd(),
+      cols: input.cols,
+      rows: input.rows,
+      forceNew: options.restart === true,
+      command: invocation.command,
+      args: invocation.args,
+    })
   }
 
   const worktrees = await getWorktrees(input.repoRoot, { includeStatus: false })
@@ -144,12 +173,20 @@ function registerTerminalOwnerCleanup(webContents: WebContents): void {
 }
 
 export function closeWorktreeSession(repoRoot: string, worktreePath: string): void {
-  closeTerminalKey(sessionKey(path.resolve(repoRoot), path.resolve(worktreePath)))
+  const isRemote = isRemoteRepoId(repoRoot)
+  const resolvedRoot = isRemote ? repoRoot : path.resolve(repoRoot)
+  const resolvedWorktree = isRemote ? worktreePath : path.resolve(worktreePath)
+  closeTerminalKey(sessionKey(resolvedRoot, resolvedWorktree))
 }
 
 export function pruneRepoSessions(ownerWebContentsId: number, repoRoot: string, worktreePaths: string[]): void {
-  const root = path.resolve(repoRoot)
-  const liveKeys = new Set(worktreePaths.filter(isValidAbsolutePath).map((p) => sessionKey(root, path.resolve(p))))
+  const isRemote = isRemoteRepoId(repoRoot)
+  const root = isRemote ? repoRoot : path.resolve(repoRoot)
+  const liveKeys = new Set(
+    worktreePaths
+      .filter((p) => (isRemote ? !p.includes('\0') : isValidAbsolutePath(p)))
+      .map((p) => sessionKey(root, isRemote ? p : path.resolve(p))),
+  )
   pruneTerminalScope(ownerWebContentsId, root, liveKeys)
 }
 

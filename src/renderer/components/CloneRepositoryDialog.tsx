@@ -123,17 +123,18 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
         if (!nextOpen && !pending) void handleCancel()
       }}
       showCloseButton={!pending}
+      className="sm:max-w-xl"
       title={t('repo-tabs.clone-title')}
       description={t('repo-tabs.clone-description')}
     >
       <form
-        className="space-y-0"
+        className="space-y-4"
         onSubmit={(event) => {
           event.preventDefault()
           void handleSubmit()
         }}
       >
-          <Field>
+          <Field className="gap-2">
             <FieldLabel htmlFor="clone-url">{t('repo-tabs.clone-url-label')}</FieldLabel>
             <Input
               id="clone-url"
@@ -145,12 +146,12 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
                 setError(null)
               }}
               placeholder={t('repo-tabs.clone-url-placeholder')}
-              className="font-mono text-xs"
+              className="h-10 font-mono text-sm"
             />
             <FieldDescription reserveHeight aria-hidden />
           </Field>
 
-          <Field>
+          <Field className="gap-2">
             <FieldLabel htmlFor="clone-parent-path">{t('repo-tabs.clone-parent-label')}</FieldLabel>
             <div className="flex gap-2">
               <Input
@@ -160,14 +161,14 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
                   setParentPath(event.target.value)
                   setError(null)
                 }}
-                className="min-w-0 flex-1 font-mono text-xs"
+                className="h-10 min-w-0 flex-1 font-mono text-sm"
                 disabled={pending}
               />
               <Button
                 type="button"
                 variant="outline"
                 disabled={pending}
-                className="h-auto self-stretch px-3"
+                className="h-10 self-stretch px-3"
                 onClick={() => void chooseParentPath()}
               >
                 {t('repo-tabs.clone-parent-choose')}
@@ -176,7 +177,7 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
             <FieldDescription reserveHeight aria-hidden />
           </Field>
 
-          <Field data-invalid={directoryError ? true : undefined}>
+          <Field className="gap-2" data-invalid={directoryError ? true : undefined}>
             <FieldLabel htmlFor="clone-directory-name">{t('repo-tabs.clone-directory-label')}</FieldLabel>
             <Input
               id="clone-directory-name"
@@ -190,7 +191,7 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
               placeholder={t('repo-tabs.clone-directory-placeholder')}
               aria-invalid={!!directoryError}
               aria-describedby={directoryError ? 'clone-directory-error' : 'clone-path-preview'}
-              className="font-mono text-xs"
+              className="h-10 font-mono text-sm"
             />
             {directoryError ? (
               <FieldError id="clone-directory-error" reserveHeight>
@@ -209,11 +210,11 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
             </DialogError>
           )}
 
-          <DialogFooter className="pt-4">
+          <DialogFooter className="gap-2 pt-2">
             <Button type="button" variant="ghost" onClick={() => void handleCancel()}>
               {t('dialog.cancel')}
             </Button>
-            <Button type="submit" disabled={!canSubmit}>
+            <Button type="submit" className="min-w-28" disabled={!canSubmit}>
               {pending ? t('repo-tabs.clone-cloning') : t('repo-tabs.clone-confirm')}
             </Button>
           </DialogFooter>

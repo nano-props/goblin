@@ -7,6 +7,7 @@ const UNAVAILABLE_REASONS = new Set([
   'error.path-not-directory',
   'error.path-permission-denied',
   'error.not-git-repo',
+  'error.ssh-config-changed',
 ])
 
 export function isRepoUnavailableReason(message: string): boolean {

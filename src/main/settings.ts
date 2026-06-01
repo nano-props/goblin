@@ -24,9 +24,10 @@ import {
   type WorkspaceLayout,
 } from '#/shared/workspace-layout.ts'
 import { DEFAULT_COLOR_THEME, isColorTheme } from '#/shared/color-theme.ts'
-import { toSafeSessionPath } from '#/main/ipc/validation.ts'
+import { toSafeRepoLocator, toSafeSessionRepoEntry } from '#/main/ipc/validation.ts'
 import type { EditorPref, LangPref, SessionState, TerminalPref, ThemePref } from '#/shared/rpc.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
+import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 
 export interface WindowBounds {
   x?: number
@@ -56,7 +57,7 @@ export interface Settings {
   editorApp: EditorPref
   windowBounds: WindowBounds | null
   session: SessionState
-  recentRepos: string[]
+  recentRepos: RepoSessionEntry[]
 }
 
 const DEFAULTS: Settings = {
@@ -109,10 +110,10 @@ function normalizeSession(session: unknown): SessionState {
   if (!session || typeof session !== 'object') return { ...DEFAULTS.session }
   const value = session as Partial<SessionState>
   const openRepos = Array.isArray(value.openRepos)
-    ? value.openRepos.map(toSafeSessionPath).filter((p): p is string => p !== null)
+    ? dedupeRepoEntries(value.openRepos.map(toSafeSessionRepoEntry).filter((p): p is RepoSessionEntry => p !== null))
     : []
-  const activePath = toSafeSessionPath(value.activeRepo)
-  const activeRepo = activePath && openRepos.includes(activePath) ? activePath : null
+  const activePath = toSafeRepoLocator(value.activeRepo)
+  const activeRepo = activePath && openRepos.some((entry) => repoSessionEntryId(entry) === activePath) ? activePath : null
   const workspaceLayout = normalizeWorkspaceLayout(value.workspaceLayout)
   const detailCollapsed =
     typeof value.detailCollapsed === 'boolean' ? value.detailCollapsed : DEFAULTS.session.detailCollapsed
@@ -130,16 +131,22 @@ function normalizeSession(session: unknown): SessionState {
   }
 }
 
-function normalizeRecentRepos(recentRepos: unknown): string[] {
+function normalizeRecentRepos(recentRepos: unknown): RepoSessionEntry[] {
   if (!Array.isArray(recentRepos)) return []
+  return dedupeRepoEntries(recentRepos.map(toSafeSessionRepoEntry).filter((p): p is RepoSessionEntry => p !== null)).slice(
+    0,
+    MAX_RECENT_REPOS,
+  )
+}
+
+function dedupeRepoEntries(entries: RepoSessionEntry[]): RepoSessionEntry[] {
   const seen = new Set<string>()
-  const normalized: string[] = []
-  for (const value of recentRepos) {
-    const safePath = toSafeSessionPath(value)
-    if (!safePath || seen.has(safePath)) continue
-    seen.add(safePath)
-    normalized.push(safePath)
-    if (normalized.length >= MAX_RECENT_REPOS) break
+  const normalized: RepoSessionEntry[] = []
+  for (const entry of entries) {
+    const id = repoSessionEntryId(entry)
+    if (seen.has(id)) continue
+    seen.add(id)
+    normalized.push(entry)
   }
   return normalized
 }
@@ -227,7 +234,7 @@ export async function loadSettings(): Promise<Settings> {
   return cache
 }
 
-export function getRecentRepos(): string[] {
+export function getRecentRepos(): RepoSessionEntry[] {
   return cache?.recentRepos ?? []
 }
 
@@ -447,12 +454,16 @@ export async function setSession(session: SessionState): Promise<void> {
   scheduleWrite()
 }
 
-export async function addRecentRepo(repoPath: string): Promise<string[]> {
-  const safePath = toSafeSessionPath(repoPath)
-  if (!safePath) return getRecentRepos()
+export async function addRecentRepo(repo: RepoSessionEntry): Promise<RepoSessionEntry[]> {
+  const safeRepo = toSafeSessionRepoEntry(repo)
+  if (!safeRepo) return getRecentRepos()
   const s = await loadSettings()
-  s.recentRepos = [safePath, ...s.recentRepos.filter((p) => p !== safePath)].slice(0, MAX_RECENT_REPOS)
-  app.addRecentDocument(safePath)
+  const safeId = repoSessionEntryId(safeRepo)
+  s.recentRepos = [safeRepo, ...s.recentRepos.filter((entry) => repoSessionEntryId(entry) !== safeId)].slice(
+    0,
+    MAX_RECENT_REPOS,
+  )
+  if (safeRepo.kind === 'local') app.addRecentDocument(safeRepo.id)
   scheduleWrite()
   return s.recentRepos
 }

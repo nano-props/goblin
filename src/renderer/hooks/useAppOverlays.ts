@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import { useOverlayRegistry } from '#/renderer/hooks/useOverlayRegistry.ts'
 
-const APP_OVERLAY_KEYS = ['clone', 'openRepo'] as const
+const APP_OVERLAY_KEYS = ['clone', 'openRepo', 'openRemoteRepo'] as const
 type AppOverlayKey = (typeof APP_OVERLAY_KEYS)[number]
 
 export function useAppOverlays() {
@@ -27,6 +27,14 @@ export function useAppOverlays() {
     setOpen('openRepo', open)
   }, [setOpen])
 
+  const openRemoteRepo = useCallback(() => {
+    open('openRemoteRepo')
+  }, [open])
+
+  const setOpenRemoteRepoOpen = useCallback((open: boolean) => {
+    setOpen('openRemoteRepo', open)
+  }, [setOpen])
+
   const closeAllOverlays = useCallback(() => {
     closeAll()
   }, [closeAll])
@@ -34,7 +42,8 @@ export function useAppOverlays() {
   const state = useMemo(() => ({
     clone: { open: openByKey.clone },
     openRepo: { open: openByKey.openRepo },
-  }), [openByKey.clone, openByKey.openRepo])
+    openRemoteRepo: { open: openByKey.openRemoteRepo },
+  }), [openByKey.clone, openByKey.openRepo, openByKey.openRemoteRepo])
 
   return {
     state,
@@ -43,6 +52,8 @@ export function useAppOverlays() {
     setCloneOpen,
     openRepoPathDialog,
     setOpenRepoOpen,
+    openRemoteRepo,
+    setOpenRemoteRepoOpen,
     closeAllOverlays,
   }
 }

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 
 const mocks = vi.hoisted(() => {
   const template: any[] = []
@@ -12,7 +13,7 @@ const mocks = vi.hoisted(() => {
     getFocusedWindow: vi.fn((): any => null),
     focusedRegisteredSurface: vi.fn((): any => null),
     getMainWindow: vi.fn((): any => null),
-    getRecentRepos: vi.fn<() => string[]>(() => []),
+    getRecentRepos: vi.fn<() => RepoSessionEntry[]>(() => []),
     sendRpcEvent: vi.fn(),
     openSettingsWindow: vi.fn(() => Promise.resolve()),
     buildFromTemplate: vi.fn((nextTemplate: any[]) => {
@@ -138,7 +139,7 @@ describe('app menu actions', () => {
 
   test('tildifies Windows home paths in the recent repos menu', async () => {
     mocks.appGetPath.mockImplementation((name: string) => (name === 'home' ? 'C:\\Users\\user' : '/data'))
-    mocks.getRecentRepos.mockReturnValue(['C:\\Users\\user\\Developer\\repo'])
+    mocks.getRecentRepos.mockReturnValue([{ kind: 'local', id: 'C:\\Users\\user\\Developer\\repo' }])
     const { buildAppMenu } = await import('#/main/menu.ts')
 
     buildAppMenu()
@@ -171,6 +172,16 @@ describe('app menu actions', () => {
     await Promise.resolve()
 
     expect(mocks.openSettingsWindow).toHaveBeenCalledWith('general')
+  })
+
+  test('wires the remote open accelerator from the file menu', async () => {
+    const { buildAppMenu } = await import('#/main/menu.ts')
+
+    buildAppMenu()
+
+    const fileMenu = mocks.template.find((entry) => entry.label === 'menu.file')
+    const remoteItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.open-remote-repo')
+    expect(remoteItem?.accelerator).toBe('CmdOrCtrl+Shift+R')
   })
 })
 

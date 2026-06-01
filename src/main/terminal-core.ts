@@ -26,6 +26,8 @@ export interface TerminalOpenSessionInput {
   cols: number
   rows: number
   forceNew?: boolean
+  command?: string
+  args?: string[]
 }
 
 interface TerminalSession {
@@ -91,8 +93,8 @@ export function openTerminalSession(input: TerminalOpenSessionInput): TerminalOp
   sessionIdByOwnerKey.set(ownerKey, id)
 
   try {
-    const shell = process.env.SHELL || (process.platform === 'win32' ? process.env.COMSPEC || 'cmd.exe' : '/bin/zsh')
-    const args = process.platform === 'win32' ? [] : ['-l']
+    const shell = input.command || process.env.SHELL || (process.platform === 'win32' ? process.env.COMSPEC || 'cmd.exe' : '/bin/zsh')
+    const args = input.args ?? (process.platform === 'win32' ? [] : ['-l'])
     const env = { ...process.env, TERM: 'xterm-256color' }
     session.pty = pty.spawn(shell, args, {
       name: 'xterm-256color',

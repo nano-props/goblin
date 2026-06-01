@@ -14,6 +14,16 @@ import { COLOR_THEMES } from '#/shared/color-theme.ts'
 import type { WorkspaceDetailPaneSizes, WorkspaceLayout } from '#/shared/workspace-layout.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import { SETTINGS_PAGES, type SettingsPage } from '#/shared/settings-pages.ts'
+import type {
+  RemoteConnectionInput,
+  RemoteDiagnosticsResult,
+  RemotePathSuggestionsInput,
+  RepoSessionEntry,
+  RemoteRepoTarget,
+  ResolvedRemoteTarget,
+  SshConfigHost,
+  SshConfigHostsResult,
+} from '#/shared/remote-repo.ts'
 
 export type { WorkspaceLayout } from '#/shared/workspace-layout.ts'
 export type { SettingsPage } from '#/shared/settings-pages.ts'
@@ -37,9 +47,9 @@ export interface ThemeState {
 }
 
 export interface SessionState {
-  /** Repo paths that were open, in tab order. */
-  openRepos: string[]
-  /** The active tab — null when no repos were open. */
+  /** Repo entries that were open, in tab order. */
+  openRepos: RepoSessionEntry[]
+  /** The active tab id — null when no repos were open. */
   activeRepo: string | null
   detailCollapsed: boolean
   detailFocusMode: boolean
@@ -61,7 +71,7 @@ export interface SettingsSnapshot {
   terminalApp: TerminalPref
   editorApp: EditorPref
   session: SessionState
-  recentRepos: string[]
+  recentRepos: RepoSessionEntry[]
 }
 
 export interface GlobalShortcutState {
@@ -174,6 +184,7 @@ export type RpcResponse =
 export type MenuAction =
   | 'open-repo'
   | 'open-repo-path'
+  | 'open-remote-repo'
   | 'clone-repo'
   | 'close-repo'
   | 'next-repo'
@@ -185,7 +196,7 @@ export type MenuAction =
   | 'tab-terminal'
   | 'toggle-detail'
   | 'reset-layout'
-  | { type: 'open-recent-repo'; path: string }
+  | { type: 'open-recent-repo'; entry: RepoSessionEntry }
   | { type: 'set-workspace-layout'; layout: WorkspaceLayout }
 
 export type RpcEvent =
@@ -264,6 +275,12 @@ export interface AppRpcHandlers {
     openTerminal: (input: { path: string }) => Promise<ExecResult>
     openEditor: (input: { path: string }) => Promise<ExecResult>
   }
+  remote: {
+    listSshHosts: () => Promise<SshConfigHostsResult>
+    resolveTarget: (input: RemoteConnectionInput) => Promise<ResolvedRemoteTarget>
+    listPathSuggestions: (input: RemotePathSuggestionsInput) => Promise<string[]>
+    testRepository: (input: { target: RemoteRepoTarget }) => Promise<RemoteDiagnosticsResult>
+  }
   theme: {
     get: () => ThemeState
     setPref: (input: { pref: ThemePref }) => Promise<ThemeState>
@@ -281,7 +298,7 @@ export interface AppRpcHandlers {
     setTerminalApp: (input: { pref: TerminalPref }) => Promise<TerminalAppState>
     setEditorApp: (input: { pref: EditorPref }) => Promise<EditorAppState>
     saveSession: (input: { session: SessionState }) => Promise<void>
-    addRecentRepo: (input: { repoPath: string }) => Promise<string[]>
+    addRecentRepo: (input: { repo: RepoSessionEntry }) => Promise<RepoSessionEntry[]>
     clearRecentRepos: () => Promise<void>
   }
   externalApps: {
@@ -303,9 +320,57 @@ const p = t.procedure
 
 const EmptyInput = v.optional(v.void())
 const FiniteNumber = v.pipe(v.number(), v.finite())
+const PortNumber = v.pipe(FiniteNumber, v.integer(), v.minValue(1), v.maxValue(65535))
 const CwdInput = v.object({ cwd: v.string() })
 const PathInput = v.object({ path: v.string() })
 const BranchInput = v.object({ cwd: v.string(), branch: v.string() })
+
+const RemoteAbsolutePath = v.pipe(
+  v.string(),
+  v.check((value) => value.startsWith('/') && !value.includes('\0'), 'Invalid remote path'),
+)
+
+const RemoteTargetSchema = v.object({
+  id: v.string(),
+  alias: v.string(),
+  host: v.string(),
+  user: v.string(),
+  port: PortNumber,
+  remotePath: RemoteAbsolutePath,
+  displayName: v.string(),
+})
+
+const RemoteRepoRefSchema = v.object({
+  id: v.string(),
+  alias: v.string(),
+  remotePath: RemoteAbsolutePath,
+  displayName: v.string(),
+})
+
+const RepoSessionEntrySchema = v.union([
+  v.object({
+    kind: v.literal('local'),
+    id: v.string(),
+  }),
+  v.object({
+    kind: v.literal('remote'),
+    id: v.string(),
+    ref: RemoteRepoRefSchema,
+  }),
+])
+
+
+
+const RemoteConnectionInputSchema = v.object({
+  alias: v.string(),
+  remotePath: v.string(),
+})
+
+const RemotePathSuggestionsInputSchema = v.object({
+  alias: v.string(),
+  remotePath: v.string(),
+  prefix: v.string(),
+})
 
 export function createAppRouter(handlers: AppRpcHandlers) {
   return t.router({
@@ -404,6 +469,18 @@ export function createAppRouter(handlers: AppRpcHandlers) {
       openTerminal: p.input(PathInput).mutation(({ input }) => handlers.repo.openTerminal(input)),
       openEditor: p.input(PathInput).mutation(({ input }) => handlers.repo.openEditor(input)),
     }),
+    remote: t.router({
+      listSshHosts: p.input(EmptyInput).query(() => handlers.remote.listSshHosts()),
+      resolveTarget: p
+        .input(RemoteConnectionInputSchema)
+        .query(({ input }) => handlers.remote.resolveTarget(input)),
+      listPathSuggestions: p
+        .input(RemotePathSuggestionsInputSchema)
+        .query(({ input }) => handlers.remote.listPathSuggestions(input)),
+      testRepository: p
+        .input(v.object({ target: RemoteTargetSchema }))
+        .query(({ input }) => handlers.remote.testRepository(input)),
+    }),
     theme: t.router({
       get: p.input(EmptyInput).query(() => handlers.theme.get()),
       setPref: p
@@ -446,7 +523,7 @@ export function createAppRouter(handlers: AppRpcHandlers) {
         .input(
           v.object({
             session: v.object({
-              openRepos: v.array(v.string()),
+              openRepos: v.array(RepoSessionEntrySchema),
               activeRepo: v.nullable(v.string()),
               detailCollapsed: v.boolean(),
               detailFocusMode: v.boolean(),
@@ -460,7 +537,7 @@ export function createAppRouter(handlers: AppRpcHandlers) {
         )
         .mutation(({ input }) => handlers.settings.saveSession(input)),
       addRecentRepo: p
-        .input(v.object({ repoPath: v.string() }))
+        .input(v.object({ repo: RepoSessionEntrySchema }))
         .mutation(({ input }) => handlers.settings.addRecentRepo(input)),
       clearRecentRepos: p.input(EmptyInput).mutation(() => handlers.settings.clearRecentRepos()),
     }),

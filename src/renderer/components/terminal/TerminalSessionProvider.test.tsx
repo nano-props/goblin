@@ -249,6 +249,65 @@ describe('TerminalSessionProvider', () => {
       await unmount()
     }
   })
+
+  test('updates reused terminal descriptors when the branch changes on the same worktree', async () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      detailTab: 'terminal',
+    })
+    useSettingsStore.setState({ terminalNotificationsEnabled: true })
+    const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
+    const notifyBell = vi.fn(async () => true)
+    Object.assign(window.goblin.terminal, { notifyBell })
+    const { getContext, unmount } = await renderProvider()
+
+    try {
+      const base = { repoRoot: REPO_ID, branch: 'feature/worktree', worktreePath: WORKTREE_PATH }
+      await act(async () => {
+        getContext().ensureDefault(base)
+      })
+
+      await act(async () => {
+        useReposStore.setState((state) => ({
+          repos: {
+            ...state.repos,
+            [REPO_ID]: state.repos[REPO_ID]
+              ? {
+                  ...state.repos[REPO_ID],
+                  data: {
+                    ...state.repos[REPO_ID]!.data,
+                    branches: [createRepoBranch('feature/renamed', { worktree: { path: WORKTREE_PATH } })],
+                  },
+                  ui: {
+                    ...state.repos[REPO_ID]!.ui,
+                    selectedBranch: 'feature/renamed',
+                  },
+                }
+              : state.repos[REPO_ID],
+          },
+        }))
+        getContext().ensureDefault({ repoRoot: REPO_ID, branch: 'feature/renamed', worktreePath: WORKTREE_PATH })
+      })
+
+      const session = mockSessions.find((item) => item.descriptor.terminalId === 'terminal-1')
+      if (!session) throw new Error('missing terminal-1 mock session')
+
+      await act(async () => {
+        session.emitBell({ processName: 'zsh', visible: false })
+      })
+
+      expect(notifyBell).toHaveBeenLastCalledWith({
+        title: 'gbl-terminal-provider-repo',
+        body: 'feature/renamed\nzsh',
+        repoRoot: REPO_ID,
+      })
+    } finally {
+      hasFocus.mockRestore()
+      await unmount()
+    }
+  })
 })
 
 function CaptureContext({ onContext }: { onContext: (value: TerminalSessionContextValue) => void }) {

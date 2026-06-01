@@ -14,6 +14,7 @@ import {
   type EditorPref,
   type TerminalPref,
 } from '#/shared/rpc.ts'
+import { isHomeRelativeRemotePath, isRemoteRepoId, isResolvableRemotePathInput, parseRemoteRepoId } from '#/shared/remote-repo.ts'
 import {
   checkoutBranch,
   deleteBranch,
@@ -58,7 +59,9 @@ import {
   isValidBranch,
   isValidCwd,
   isValidOptionalBranch,
-  toSafeSessionPath,
+  isValidRepoLocator,
+  toSafeRepoLocator,
+  toSafeSessionRepoEntry,
 } from '#/main/ipc/validation.ts'
 import { applyMainWindowChromeTheme, getMainWindow } from '#/main/window.ts'
 import { allRegisteredSurfacesWithCapability, focusedRegisteredSurface } from '#/main/window-registry.ts'
@@ -101,6 +104,31 @@ import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 import { WINDOW_BACKGROUND_BY_COLOR_THEME } from '#/shared/theme-tokens.ts'
 import { consumeExternalOpenPaths } from '#/main/external-open.ts'
 import { applySettingsWindowChromeTheme, openSettingsWindow } from '#/main/settings-window.ts'
+import {
+  normalizeRemoteTarget,
+  type RemoteRepoTarget,
+} from '#/shared/remote-repo.ts'
+import {
+  listSshConfigHosts,
+  resolveRemoteTarget as resolveSshRemoteTarget,
+  resolveTrackedRemoteTarget,
+} from '#/main/ssh/config.ts'
+import { testRemoteRepository } from '#/main/ssh/diagnostics.ts'
+import {
+  checkoutRemoteBranch,
+  createRemoteWorktree,
+  deleteRemoteBranch,
+  fetchRemoteRepository,
+  getRemoteBrowserUrl,
+  getRemoteLog,
+  getRemotePatch,
+  getRemoteSnapshot,
+  getRemoteStatus,
+  pullRemoteBranch,
+  pushRemoteBranch,
+  removeRemoteWorktree,
+} from '#/main/ssh/git.ts'
+import { runRemoteCommand } from '#/main/ssh/commands.ts'
 
 const PROJECT_GITHUB_URL = 'https://github.com/nano-props/goblin'
 const PATCH_TIMEOUT_MS = 90_000
@@ -251,6 +279,79 @@ function toRpcError(err: unknown): Extract<RpcResponse, { ok: false }>['error'] 
   return { message: String(err) }
 }
 
+async function resolveRemoteRepoTarget(repoId: string): Promise<RemoteRepoTarget> {
+  const parsed = parseRemoteRepoId(repoId)
+  if (!parsed) throw new Error('error.ssh-config-changed')
+  return (await resolveRemoteTargetInput(parsed)).target
+}
+
+async function resolveRemoteHomeDirectory(target: RemoteRepoTarget): Promise<string> {
+  const homeResult = await runRemoteCommand(target, { type: 'printHome' }, { signal: currentRpcSignal() })
+  const homePath = homeResult.ok ? homeResult.stdout.trim().split(/\r?\n/, 1)[0]?.trim() ?? '' : ''
+  if (!homePath.startsWith('/')) throw new Error('repo-tabs.open-remote-home-unavailable')
+  return homePath
+}
+
+async function expandRemotePathInput(target: RemoteRepoTarget, remotePath: string): Promise<string> {
+  if (!isHomeRelativeRemotePath(remotePath)) return remotePath.trim()
+  const homePath = await resolveRemoteHomeDirectory(target)
+  return `${homePath}/${remotePath.trim().slice(2)}`.replace(/\/+/g, '/')
+}
+
+async function resolveRemoteTargetInput(input: { alias: string; remotePath: string }) {
+  const needsHomeExpansion = input.remotePath.startsWith('~/')
+  const resolved = await resolveSshRemoteTarget(
+    needsHomeExpansion ? { ...input, remotePath: '/' } : input,
+    currentRpcSignal(),
+  )
+  if (!needsHomeExpansion) return resolved
+  const normalized = normalizeRemoteTarget({
+    ...resolved.target,
+    remotePath: await expandRemotePathInput(resolved.target, input.remotePath),
+  })
+  if (!normalized) throw new Error('repo-tabs.open-remote-home-unavailable')
+  return { target: normalized }
+}
+
+async function listRemotePathSuggestions(input: { alias: string; remotePath: string; prefix: string }): Promise<string[]> {
+  const prefix = input.prefix.trim()
+  if (!isResolvableRemotePathInput(prefix)) return []
+  let target: RemoteRepoTarget
+  try {
+    target = (await resolveSshRemoteTarget({ alias: input.alias, remotePath: '/' }, currentRpcSignal())).target
+  } catch {
+    return []
+  }
+  let expandedPrefix: string
+  try {
+    expandedPrefix = await expandRemotePathInput(target, prefix)
+  } catch {
+    return []
+  }
+  const normalizedPrefix = expandedPrefix.replace(/\/+/g, '/')
+  const endsWithSlash = normalizedPrefix.endsWith('/')
+  const searchRoot = endsWithSlash
+    ? normalizedPrefix.replace(/\/+$/, '') || '/'
+    : normalizedPrefix.slice(0, Math.max(0, normalizedPrefix.lastIndexOf('/'))) || '/'
+  const typedLeaf = endsWithSlash ? '' : normalizedPrefix.slice(normalizedPrefix.lastIndexOf('/') + 1)
+  const result = await runRemoteCommand(target, { type: 'listDirectories', path: searchRoot, limit: 20 }, { signal: currentRpcSignal() })
+  if (!result.ok) return []
+  const suggestions = result.stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('/') && (typedLeaf.length === 0 || line.slice(line.lastIndexOf('/') + 1).startsWith(typedLeaf)))
+  let output = suggestions
+  if (prefix.startsWith('~/')) {
+    try {
+      const homePath = await resolveRemoteHomeDirectory(target)
+      output = suggestions.map((path) => (path === homePath ? '~/' : path.startsWith(`${homePath}/`) ? `~/${path.slice(homePath.length + 1)}` : path))
+    } catch {
+      output = suggestions
+    }
+  }
+  return Array.from(new Set(output)).slice(0, 20)
+}
+
 async function externalAppsState(terminalPref: TerminalPref, editorPref: EditorPref): Promise<ExternalAppsSnapshot> {
   const state = await probeExternalApps(terminalPref, editorPref, currentRpcSignal())
   return { terminal: state.terminals, editor: state.editors }
@@ -289,6 +390,17 @@ function createRpcHandlers(): AppRpcHandlers {
       consumeExternalOpenPaths: async () => consumeExternalOpenPaths(),
       cloneParentDialog: () => openDirectoryDialog('Choose Clone Destination'),
       probe: async ({ cwd }) => {
+        if (isRemoteRepoId(cwd)) {
+          let target: RemoteRepoTarget
+          try {
+            target = await resolveRemoteRepoTarget(cwd)
+          } catch (err) {
+            return { ok: false, message: err instanceof Error ? err.message : 'error.ssh-config-changed' }
+          }
+          const result = await testRemoteRepository(target)
+          if (!result.ok) return { ok: false, message: result.message || 'error.failed-read-repo' }
+          return { ok: true, root: target.id, name: target.displayName }
+        }
         if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-path' }
         const gitAvailable = await checkGitAvailable()
         if (!gitAvailable.ok) return gitAvailable
@@ -318,6 +430,14 @@ function createRpcHandlers(): AppRpcHandlers {
       },
       abortClone: async ({ operationId }) => abortCloneOperation(operationId),
       snapshot: async ({ cwd }) => {
+        if (isRemoteRepoId(cwd)) {
+          const target = await resolveRemoteRepoTarget(cwd)
+          const signal = currentRpcSignal()
+          const snapshot = await getRemoteSnapshot(target, { signal })
+          if (signal?.aborted) return null
+          if (!snapshot) return null
+          return { branches: snapshot.branches, current: snapshot.current, remote: snapshot.remote }
+        }
         if (!isValidCwd(cwd)) return null
         const signal = currentRpcSignal()
         try {
@@ -356,16 +476,28 @@ function createRpcHandlers(): AppRpcHandlers {
         return Array.from(prs, ([branch, pullRequest]) => ({ branch, pullRequest }))
       },
       log: async ({ cwd, branch, count, skip }) => {
-        if (!isValidCwd(cwd) || !isValidBranch(branch)) return []
+        if (!isValidBranch(branch)) return []
         const n = typeof count === 'number' && Number.isFinite(count) ? Math.floor(count) : 100
         const safeCount = Math.max(1, Math.min(1000, n))
         const offset = typeof skip === 'number' && Number.isFinite(skip) ? Math.floor(skip) : 0
         const safeSkip = Math.max(0, offset)
         const signal = currentRpcSignal()
+        if (isRemoteRepoId(cwd)) {
+          const target = await resolveRemoteRepoTarget(cwd)
+          const log = await getRemoteLog(target, branch, safeCount, safeSkip, { signal })
+          return signal?.aborted ? [] : log
+        }
+        if (!isValidCwd(cwd)) return []
         const log = await getLog(cwd, branch, safeCount, safeSkip, { signal })
         return signal?.aborted ? [] : log
       },
       status: async ({ cwd }) => {
+        if (isRemoteRepoId(cwd)) {
+          const target = await resolveRemoteRepoTarget(cwd)
+          const signal = currentRpcSignal()
+          const status = await getRemoteStatus(target, { signal })
+          return signal?.aborted ? [] : status
+        }
         if (!isValidCwd(cwd)) return []
         const available = await probeGitRepository(cwd)
         if (!available.ok) throw new Error(available.message)
@@ -373,7 +505,20 @@ function createRpcHandlers(): AppRpcHandlers {
         const status = await getWorkingStatus(cwd, { signal })
         return signal?.aborted ? [] : status
       },
-      patch: createPatch,
+      patch: async ({ cwd, worktreePath }) => {
+        if (isRemoteRepoId(cwd)) {
+          let target: RemoteRepoTarget
+          try {
+            target = await resolveRemoteRepoTarget(cwd)
+          } catch (err) {
+            return { ok: false, message: err instanceof Error ? err.message : 'error.ssh-config-changed' }
+          }
+          if (!isValidAbsolutePath(worktreePath)) return { ok: false, message: 'error.invalid-worktree-path' }
+          const signal = currentRpcSignal()
+          return getRemotePatch(target, worktreePath, { signal })
+        }
+        return createPatch({ cwd, worktreePath })
+      },
       commit: async ({ cwd, hash }) => {
         if (!isValidCwd(cwd) || typeof hash !== 'string' || !hash) return null
         if (!GIT_HASH_RE.test(hash)) return null
@@ -382,18 +527,35 @@ function createRpcHandlers(): AppRpcHandlers {
         return { meta, files }
       },
       checkout: async ({ cwd, branch }) => {
-        if (!isValidCwd(cwd) || !isValidBranch(branch)) return { ok: false, message: 'error.invalid-arguments' }
+        if (!isValidBranch(branch)) return { ok: false, message: 'error.invalid-arguments' }
+        if (isRemoteRepoId(cwd)) {
+          let target: RemoteRepoTarget
+          try {
+            target = await resolveRemoteRepoTarget(cwd)
+          } catch (err) {
+            return { ok: false, message: err instanceof Error ? err.message : 'error.ssh-config-changed' }
+          }
+          return runCancellable(cwd, 'user', (signal) => checkoutRemoteBranch(target, branch, undefined, { signal }))
+        }
+        if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-arguments' }
         return runCancellable(cwd, 'user', (signal) => checkoutBranch(cwd, branch, signal))
       },
       deleteBranch: async (input) => {
-        if (!isValidCwd(input.cwd) || !isValidBranch(input.branch)) {
-          return { ok: false, message: 'error.invalid-arguments' }
+        if (!isValidBranch(input.branch)) return { ok: false, message: 'error.invalid-arguments' }
+        if (isRemoteRepoId(input.cwd)) {
+          let target: RemoteRepoTarget
+          try {
+            target = await resolveRemoteRepoTarget(input.cwd)
+          } catch (err) {
+            return { ok: false, message: err instanceof Error ? err.message : 'error.ssh-config-changed' }
+          }
+          return runCancellable(input.cwd, 'user', (signal) => deleteRemoteBranch(target, { branch: input.branch, force: input.force, signal }))
         }
+        if (!isValidCwd(input.cwd)) return { ok: false, message: 'error.invalid-arguments' }
         return runCancellable(input.cwd, 'user', (signal) => deleteRepoBranch(input, signal))
       },
       removeWorktree: async (input) => {
         if (
-          !isValidCwd(input.cwd) ||
           !isValidBranch(input.branch) ||
           !isValidAbsolutePath(input.worktreePath) ||
           typeof input.alsoDeleteBranch !== 'boolean' ||
@@ -401,20 +563,62 @@ function createRpcHandlers(): AppRpcHandlers {
         ) {
           return { ok: false, message: 'error.invalid-arguments' }
         }
+        if (isRemoteRepoId(input.cwd)) {
+          let target: RemoteRepoTarget
+          try {
+            target = await resolveRemoteRepoTarget(input.cwd)
+          } catch (err) {
+            return { ok: false, message: err instanceof Error ? err.message : 'error.ssh-config-changed' }
+          }
+          return runCancellable(input.cwd, 'user', (signal) =>
+            removeRemoteWorktree(target, { ...input, signal }),
+          )
+        }
+        if (!isValidCwd(input.cwd)) return { ok: false, message: 'error.invalid-arguments' }
         return runCancellable(input.cwd, 'user', (signal) => removeRepoWorktree(input, signal))
       },
       createWorktree: async ({ cwd, worktreePath, newBranch, baseBranch }) => {
-        if (!isValidCwd(cwd) || !isValidBranch(newBranch) || !isValidBranch(baseBranch)) {
+        if (!isValidBranch(newBranch) || !isValidBranch(baseBranch)) {
           return { ok: false, message: 'error.invalid-arguments' }
         }
+        if (isRemoteRepoId(cwd)) {
+          if (!isResolvableRemotePathInput(worktreePath)) return { ok: false, message: 'error.invalid-path' }
+          let target: RemoteRepoTarget
+          try {
+            target = await resolveRemoteRepoTarget(cwd)
+          } catch (err) {
+            return { ok: false, message: err instanceof Error ? err.message : 'error.ssh-config-changed' }
+          }
+          let expandedPath: string
+          try {
+            expandedPath = await expandRemotePathInput(target, worktreePath)
+          } catch (err) {
+            return { ok: false, message: err instanceof Error ? err.message : 'repo-tabs.open-remote-home-unavailable' }
+          }
+          if (!isValidAbsolutePath(expandedPath)) return { ok: false, message: 'error.invalid-path' }
+          return runCancellable(cwd, 'user', (signal) =>
+            createRemoteWorktree(target, { worktreePath: expandedPath, newBranch, baseBranch, signal }),
+          )
+        }
         if (!isValidAbsolutePath(worktreePath)) return { ok: false, message: 'error.invalid-path' }
+        if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-arguments' }
         return runCancellable(cwd, 'user', (signal) => createWorktree(cwd, worktreePath, newBranch, baseBranch, signal))
       },
       pull: async ({ cwd, branch, worktreePath }) => {
-        if (!isValidCwd(cwd) || !isValidBranch(branch)) return { ok: false, message: 'error.invalid-arguments' }
+        if (!isValidBranch(branch)) return { ok: false, message: 'error.invalid-arguments' }
         if (worktreePath !== undefined && !isValidAbsolutePath(worktreePath)) {
           return { ok: false, message: 'error.invalid-worktree-path' }
         }
+        if (isRemoteRepoId(cwd)) {
+          let target: RemoteRepoTarget
+          try {
+            target = await resolveRemoteRepoTarget(cwd)
+          } catch (err) {
+            return { ok: false, message: err instanceof Error ? err.message : 'error.ssh-config-changed' }
+          }
+          return runCancellable(cwd, 'user', (signal) => pullRemoteBranch(target, branch, worktreePath, { signal }))
+        }
+        if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-arguments' }
         return runCancellable(cwd, 'user', async (signal) => {
           let targetPath: string | undefined
           if (worktreePath !== undefined) {
@@ -435,35 +639,105 @@ function createRpcHandlers(): AppRpcHandlers {
         })
       },
       push: async ({ cwd, branch }) => {
-        if (!isValidCwd(cwd) || !isValidBranch(branch)) return { ok: false, message: 'error.invalid-arguments' }
+        if (!isValidBranch(branch)) return { ok: false, message: 'error.invalid-arguments' }
+        if (isRemoteRepoId(cwd)) {
+          let target: RemoteRepoTarget
+          try {
+            target = await resolveRemoteRepoTarget(cwd)
+          } catch (err) {
+            return { ok: false, message: err instanceof Error ? err.message : 'error.ssh-config-changed' }
+          }
+          return runCancellable(cwd, 'user', (signal) => pushRemoteBranch(target, branch, { signal }))
+        }
+        if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-arguments' }
         return runCancellable(cwd, 'user', (signal) => pushBranch(cwd, branch, signal))
       },
       fetch: async ({ cwd, kind }) => {
+        if (isRemoteRepoId(cwd)) {
+          let target: RemoteRepoTarget
+          try {
+            target = await resolveRemoteRepoTarget(cwd)
+          } catch (err) {
+            return { ok: false, message: err instanceof Error ? err.message : 'error.ssh-config-changed' }
+          }
+          return runCancellable(cwd, kind === 'background' ? 'background' : 'user', (signal) =>
+            fetchRemoteRepository(target, { signal }),
+          )
+        }
         if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-arguments' }
         const available = await probeGitRepository(cwd)
         if (!available.ok) return available
         return runCancellable(cwd, kind === 'background' ? 'background' : 'user', (signal) => fetchAll(cwd, signal))
       },
       abort: async ({ cwd }) => {
-        if (!isValidCwd(cwd)) return false
+        if (!isValidRepoLocator(cwd)) return false
         const ctrl = activeOpControllers.get(cwd)
         if (!ctrl) return false
         ctrl.ctrl.abort()
         return true
       },
-      openRemote: openRepoRemote,
+      openRemote: async ({ cwd, branch }) => {
+        if (isRemoteRepoId(cwd)) {
+          let target: RemoteRepoTarget
+          try {
+            target = await resolveRemoteRepoTarget(cwd)
+          } catch (err) {
+            return { ok: false, message: err instanceof Error ? err.message : 'error.ssh-config-changed' }
+          }
+          const url = await getRemoteBrowserUrl(target, branch, { signal: currentRpcSignal() })
+          if (!url) return { ok: false, message: 'error.open-remote-unavailable' }
+          if (!(await openHttpsExternal(url))) return { ok: false, message: 'error.invalid-url' }
+          return { ok: true, message: url }
+        }
+        return openRepoRemote({ cwd, branch })
+      },
       openInFinder: async ({ path: p }) => {
         if (!isValidAbsolutePath(p)) return { ok: false, message: 'error.invalid-path' }
         shell.showItemInFolder(p)
         return { ok: true, message: p }
       },
       openTerminal: async ({ path: p }) => {
+        if (isRemoteRepoId(p)) {
+          return { ok: false, message: 'Remote terminal via external app not yet supported. Use the built-in terminal.' }
+        }
         if (!isValidAbsolutePath(p)) return { ok: false, message: 'error.invalid-path' }
         return openInPreferredTerminal(p, getTerminalApp())
       },
       openEditor: async ({ path: p }) => {
+        if (isRemoteRepoId(p)) {
+          return { ok: false, message: 'Remote editor not yet supported' }
+        }
         if (!isValidAbsolutePath(p)) return { ok: false, message: 'error.invalid-path' }
         return openInPreferredEditor(p, getEditorApp())
+      },
+    },
+    remote: {
+      listSshHosts: async () => listSshConfigHosts(),
+      resolveTarget: async (input) => resolveRemoteTargetInput(input),
+      listPathSuggestions: async (input) => listRemotePathSuggestions(input),
+      testRepository: async ({ target }) => {
+        const normalized = normalizeRemoteTarget(target)
+        if (!normalized || normalized.id !== target.id) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid remote repository target' })
+        }
+        try {
+          const resolved = await resolveTrackedRemoteTarget(normalized, currentRpcSignal())
+          return testRemoteRepository(resolved.target, { signal: currentRpcSignal() })
+        } catch {
+          return {
+            target: normalized,
+            ok: false,
+            category: 'config-changed',
+            message: 'config-changed',
+            stages: [
+              { name: 'ssh', label: 'ssh', status: 'failed', category: 'config-changed', message: 'config-changed' },
+              { name: 'shell', label: 'shell', status: 'skipped' },
+              { name: 'git', label: 'git', status: 'skipped' },
+              { name: 'path', label: 'path', status: 'skipped' },
+              { name: 'repo', label: 'repo', status: 'skipped' },
+            ],
+          }
+        }
       },
     },
     theme: {
@@ -554,10 +828,10 @@ function createRpcHandlers(): AppRpcHandlers {
         return payload
       },
       saveSession: async ({ session }) => saveSession(session),
-      addRecentRepo: async ({ repoPath }) => {
-        const safePath = toSafeSessionPath(repoPath)
-        if (!safePath) return []
-        const recentRepos = await addRecentRepo(safePath)
+      addRecentRepo: async ({ repo }) => {
+        const safeRepo = toSafeSessionRepoEntry(repo)
+        if (!safeRepo) return []
+        const recentRepos = await addRecentRepo(safeRepo)
         buildAppMenu()
         return recentRepos
       },
@@ -956,15 +1230,15 @@ function isValidCloneOperationId(value: unknown): value is string {
 
 async function saveSession(session: SessionState): Promise<void> {
   if (!session || !Array.isArray(session.openRepos)) return
-  const openRepos = session.openRepos.map(toSafeSessionPath).filter((p): p is string => p !== null)
-  const activeRepo = toSafeSessionPath(session.activeRepo)
+  const openRepos = session.openRepos.map(toSafeSessionRepoEntry).filter((p): p is NonNullable<typeof p> => p !== null)
+  const activeRepo = toSafeRepoLocator(session.activeRepo)
   const workspaceLayout = normalizeWorkspaceLayout(session.workspaceLayout)
   const detailCollapsed =
     typeof session.detailCollapsed === 'boolean' ? session.detailCollapsed : DEFAULT_SESSION_DETAIL_COLLAPSED
   const detailFocusMode = workspaceLayout === 'top-bottom' && session.detailFocusMode === true
   await setSession({
     openRepos,
-    activeRepo: activeRepo && openRepos.includes(activeRepo) ? activeRepo : null,
+    activeRepo: activeRepo && openRepos.some((repo) => repo.id === activeRepo) ? activeRepo : null,
     detailCollapsed: effectiveDetailCollapsed(workspaceLayout, detailCollapsed),
     detailFocusMode,
     workspaceLayout,

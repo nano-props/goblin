@@ -103,6 +103,7 @@ function HookHost() {
     closeAllOverlays,
     openRepoPathDialog: () => {},
     openCloneRepo: () => {},
+    openRemoteRepo: () => {},
     isOverlayOpen: () => overlayOpen,
   })
   return null

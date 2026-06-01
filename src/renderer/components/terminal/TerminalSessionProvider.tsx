@@ -131,17 +131,30 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     for (const [key, session] of Array.from(sessionsRef.current.entries())) {
       if (!isTerminalDescriptorLive(repos, session.descriptor)) {
         changed = true
-        removeSession(key, { dispose: true })
+        closeTerminalAndDismissDetailIfLast(key, session.descriptor)
       }
     }
     if (changed) notify()
-  }, [notify, repos])
+  }, [closeTerminalAndDismissDetailIfLast, notify, repos])
 
   const createTerminalDescriptor = useCallback((base: TerminalSessionBase): TerminalDescriptor => {
     const groupKey = terminalSessionGroupKey(base.repoRoot, base.worktreePath)
     const index = nextIndexByGroupRef.current.get(groupKey) ?? 1
     nextIndexByGroupRef.current.set(groupKey, index + 1)
     return terminalDescriptor(base, `terminal-${index}`, index)
+  }, [])
+
+  const syncGroupDescriptors = useCallback((base: TerminalSessionBase): void => {
+    const groupKey = terminalSessionGroupKey(base.repoRoot, base.worktreePath)
+    for (const session of sessionsRef.current.values()) {
+      if (session.descriptor.groupKey !== groupKey) continue
+      session.updateDescriptor({
+        ...session.descriptor,
+        repoRoot: base.repoRoot,
+        branch: base.branch,
+        worktreePath: base.worktreePath,
+      })
+    }
   }, [])
 
   const ensureSession = useCallback(
@@ -165,11 +178,15 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     (base: TerminalSessionBase): string => {
       const groupKey = terminalSessionGroupKey(base.repoRoot, base.worktreePath)
       const activeKey = activeKeyByGroupRef.current.get(groupKey)
-      if (activeKey && sessionsRef.current.has(activeKey)) return activeKey
+      if (activeKey && sessionsRef.current.has(activeKey)) {
+        syncGroupDescriptors(base)
+        return activeKey
+      }
       const existing = Array.from(sessionsRef.current.values()).find(
         (session) => session.descriptor.groupKey === groupKey,
       )
       if (existing) {
+        syncGroupDescriptors(base)
         activeKeyByGroupRef.current.set(groupKey, existing.descriptor.key)
         return existing.descriptor.key
       }
@@ -179,7 +196,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       notify()
       return descriptor.key
     },
-    [createTerminalDescriptor, ensureSession, notify],
+    [createTerminalDescriptor, ensureSession, notify, syncGroupDescriptors],
   )
 
   const createTerminal = useCallback(
