@@ -10,10 +10,11 @@ interface MenuActionHandlers {
   closeAllOverlays: () => void
   openRepoPathDialog: () => void
   openCloneRepo: () => void
+  openRemoteRepo: () => void
   isOverlayOpen: () => boolean
 }
 
-export function useMenuActions({ closeAllOverlays, openRepoPathDialog, openCloneRepo, isOverlayOpen }: MenuActionHandlers) {
+export function useMenuActions({ closeAllOverlays, openRepoPathDialog, openCloneRepo, openRemoteRepo, isOverlayOpen }: MenuActionHandlers) {
   const syncAndRefresh = useReposStore((s) => s.syncAndRefresh)
   const closeRepo = useReposStore((s) => s.closeRepo)
   const cycleActive = useReposStore((s) => s.cycleActive)
@@ -80,6 +81,9 @@ export function useMenuActions({ closeAllOverlays, openRepoPathDialog, openClone
           case 'clone-repo':
             openCloneRepo()
             break
+          case 'open-remote-repo':
+            openRemoteRepo()
+            break
           case 'close-repo': {
             if (state.activeId) closeRepo(state.activeId)
             else window.close()
@@ -137,6 +141,7 @@ export function useMenuActions({ closeAllOverlays, openRepoPathDialog, openClone
     cycleActive,
     openRepoPathDialog,
     openCloneRepo,
+    openRemoteRepo,
     resetLayout,
     setDetailCollapsed,
     setDetailTab,

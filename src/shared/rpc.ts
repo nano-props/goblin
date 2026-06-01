@@ -14,6 +14,13 @@ import { COLOR_THEMES } from '#/shared/color-theme.ts'
 import type { WorkspaceDetailPaneSizes, WorkspaceLayout } from '#/shared/workspace-layout.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import { SETTINGS_PAGES, type SettingsPage } from '#/shared/settings-pages.ts'
+import type {
+  RemoteConnectionInput,
+  RemoteDiagnosticsResult,
+  RemoteRepoTarget,
+  ResolvedRemoteTarget,
+  SshConfigHost,
+} from '#/shared/remote-repo.ts'
 
 export type { WorkspaceLayout } from '#/shared/workspace-layout.ts'
 export type { SettingsPage } from '#/shared/settings-pages.ts'
@@ -174,6 +181,7 @@ export type RpcResponse =
 export type MenuAction =
   | 'open-repo'
   | 'open-repo-path'
+  | 'open-remote-repo'
   | 'clone-repo'
   | 'close-repo'
   | 'next-repo'
@@ -264,6 +272,12 @@ export interface AppRpcHandlers {
     openTerminal: (input: { path: string }) => Promise<ExecResult>
     openEditor: (input: { path: string }) => Promise<ExecResult>
   }
+  remote: {
+    listSshHosts: () => Promise<SshConfigHost[]>
+    identityFileDialog: () => Promise<string | null>
+    resolveTarget: (input: RemoteConnectionInput) => Promise<ResolvedRemoteTarget>
+    testRepository: (input: { target: RemoteRepoTarget }) => Promise<RemoteDiagnosticsResult>
+  }
   theme: {
     get: () => ThemeState
     setPref: (input: { pref: ThemePref }) => Promise<ThemeState>
@@ -303,9 +317,45 @@ const p = t.procedure
 
 const EmptyInput = v.optional(v.void())
 const FiniteNumber = v.pipe(v.number(), v.finite())
+const PortNumber = v.pipe(FiniteNumber, v.integer(), v.minValue(1), v.maxValue(65535))
 const CwdInput = v.object({ cwd: v.string() })
 const PathInput = v.object({ path: v.string() })
 const BranchInput = v.object({ cwd: v.string(), branch: v.string() })
+
+const RemoteAbsolutePath = v.pipe(
+  v.string(),
+  v.check((value) => value.startsWith('/') && !value.includes('\0'), 'Invalid remote path'),
+)
+
+const RemoteTargetSchema = v.object({
+  id: v.string(),
+  alias: v.nullable(v.string()),
+  host: v.string(),
+  user: v.string(),
+  port: PortNumber,
+  remotePath: RemoteAbsolutePath,
+  identityFile: v.optional(v.string()),
+  displayName: v.string(),
+})
+
+
+
+const RemoteConnectionInputSchema = v.union([
+  v.object({
+    mode: v.literal('config'),
+    alias: v.string(),
+    remotePath: v.string(),
+    identityFile: v.optional(v.string()),
+  }),
+  v.object({
+    mode: v.literal('manual'),
+    host: v.string(),
+    user: v.string(),
+    port: v.optional(PortNumber),
+    remotePath: v.string(),
+    identityFile: v.optional(v.string()),
+  }),
+])
 
 export function createAppRouter(handlers: AppRpcHandlers) {
   return t.router({
@@ -403,6 +453,16 @@ export function createAppRouter(handlers: AppRpcHandlers) {
       openInFinder: p.input(PathInput).mutation(({ input }) => handlers.repo.openInFinder(input)),
       openTerminal: p.input(PathInput).mutation(({ input }) => handlers.repo.openTerminal(input)),
       openEditor: p.input(PathInput).mutation(({ input }) => handlers.repo.openEditor(input)),
+    }),
+    remote: t.router({
+      listSshHosts: p.input(EmptyInput).query(() => handlers.remote.listSshHosts()),
+      identityFileDialog: p.input(EmptyInput).mutation(() => handlers.remote.identityFileDialog()),
+      resolveTarget: p
+        .input(RemoteConnectionInputSchema)
+        .query(({ input }) => handlers.remote.resolveTarget(input)),
+      testRepository: p
+        .input(v.object({ target: RemoteTargetSchema }))
+        .query(({ input }) => handlers.remote.testRepository(input)),
     }),
     theme: t.router({
       get: p.input(EmptyInput).query(() => handlers.theme.get()),

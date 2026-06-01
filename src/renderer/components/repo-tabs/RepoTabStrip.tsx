@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Download, FolderOpen, Plus } from 'lucide-react'
+import { Download, FolderOpen, Globe, Plus } from 'lucide-react'
 import {
   DndContext,
   type DragEndEvent,
@@ -67,6 +67,7 @@ interface RepoTabStripProps {
   onClose: (id: string) => void
   onReorder: (activeId: string, overId: string) => void
   onOpenLocal: () => void
+  onOpenRemote: () => void
   onClone: () => void
 }
 
@@ -78,6 +79,7 @@ export function RepoTabStrip({
   onClose,
   onReorder,
   onOpenLocal,
+  onOpenRemote,
   onClone,
 }: RepoTabStripProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
@@ -145,6 +147,11 @@ export function RepoTabStrip({
             <FolderOpen />
             {labels.openLocal}
             {labels.openLocalShortcut && <DropdownMenuShortcut>{labels.openLocalShortcut}</DropdownMenuShortcut>}
+          </DropdownMenuItem>
+          <DropdownMenuItem className="whitespace-nowrap" onSelect={onOpenRemote}>
+            <Globe />
+            {labels.openRemote}
+            {labels.openRemoteShortcut && <DropdownMenuShortcut>{labels.openRemoteShortcut}</DropdownMenuShortcut>}
           </DropdownMenuItem>
           <DropdownMenuItem className="whitespace-nowrap" onSelect={onClone}>
             <Download />

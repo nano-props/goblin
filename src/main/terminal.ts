@@ -7,6 +7,8 @@ import { t } from '#/main/i18n/index.ts'
 import { getWorktrees } from '#/main/git/worktrees.ts'
 import { resolveKnownWorktree } from '#/main/git/guards.ts'
 import { isValidAbsolutePath, isValidBranch, isValidCwd } from '#/main/ipc/validation.ts'
+import { parseRemoteRepoId, normalizeRemoteTarget } from '#/shared/remote-repo.ts'
+import { buildRemoteTerminalInvocation } from '#/main/ssh/commands.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 import {
   closeAllTerminalSessions,
@@ -105,14 +107,36 @@ async function openGoblinWorktreeTerminal(
   input: TerminalOpenInput,
   options: { restart?: boolean } = {},
 ): Promise<TerminalOpenResult> {
+  const isRemote = input?.repoRoot?.startsWith('ssh://') ?? false
   if (
-    !isValidCwd(input?.repoRoot) ||
+    (!isRemote && !isValidCwd(input?.repoRoot)) ||
     !isValidBranch(input?.branch) ||
-    !isValidAbsolutePath(input?.worktreePath) ||
+    (!isRemote && !isValidAbsolutePath(input?.worktreePath)) ||
+    (isRemote && (!input.worktreePath || input.worktreePath.includes('\0'))) ||
     !isValidTerminalId(input?.terminalId) ||
     !isValidTerminalSize(input?.cols, input?.rows)
   ) {
     return { ok: false, message: 'error.invalid-arguments' }
+  }
+
+  // Remote repository: launch SSH session instead of local shell
+  if (isRemote) {
+    const parsed = parseRemoteRepoId(input.repoRoot)
+    if (!parsed) return { ok: false, message: 'error.invalid-arguments' }
+    const target = normalizeRemoteTarget({ ...parsed, alias: null })
+    if (!target) return { ok: false, message: 'error.invalid-arguments' }
+    const invocation = buildRemoteTerminalInvocation(target, input.worktreePath, { cols: input.cols, rows: input.rows })
+    return openTerminalSession({
+      ownerWebContentsId,
+      scope: input.repoRoot,
+      key: sessionKey(input.repoRoot, input.worktreePath, input.terminalId),
+      cwd: process.cwd(),
+      cols: input.cols,
+      rows: input.rows,
+      forceNew: options.restart === true,
+      command: invocation.command,
+      args: invocation.args,
+    })
   }
 
   const worktrees = await getWorktrees(input.repoRoot, { includeStatus: false })
@@ -144,12 +168,20 @@ function registerTerminalOwnerCleanup(webContents: WebContents): void {
 }
 
 export function closeWorktreeSession(repoRoot: string, worktreePath: string): void {
-  closeTerminalKey(sessionKey(path.resolve(repoRoot), path.resolve(worktreePath)))
+  const isRemote = repoRoot.startsWith('ssh://')
+  const resolvedRoot = isRemote ? repoRoot : path.resolve(repoRoot)
+  const resolvedWorktree = isRemote ? worktreePath : path.resolve(worktreePath)
+  closeTerminalKey(sessionKey(resolvedRoot, resolvedWorktree))
 }
 
 export function pruneRepoSessions(ownerWebContentsId: number, repoRoot: string, worktreePaths: string[]): void {
-  const root = path.resolve(repoRoot)
-  const liveKeys = new Set(worktreePaths.filter(isValidAbsolutePath).map((p) => sessionKey(root, path.resolve(p))))
+  const isRemote = repoRoot.startsWith('ssh://')
+  const root = isRemote ? repoRoot : path.resolve(repoRoot)
+  const liveKeys = new Set(
+    worktreePaths
+      .filter((p) => (isRemote ? !p.includes('\0') : isValidAbsolutePath(p)))
+      .map((p) => sessionKey(root, isRemote ? p : path.resolve(p))),
+  )
   pruneTerminalScope(ownerWebContentsId, root, liveKeys)
 }
 

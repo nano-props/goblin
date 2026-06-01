@@ -159,6 +159,10 @@ function createFileMenu(state: AppMenuState): MenuItemConstructorOptions {
         accelerator: accelerator(state, 'CmdOrCtrl+Shift+O'),
         click: () => send('clone-repo'),
       },
+      {
+        label: t('menu.file.open-remote-repo'),
+        click: () => send('open-remote-repo'),
+      },
       { label: t('menu.file.open-recent'), submenu: createRecentReposMenu(state.recentRepos) },
       { label: t('menu.file.open-data-folder'), click: () => void openDataFolder() },
       // Close-window uses Electron's `role: 'close'` so it works even

@@ -24,6 +24,7 @@ import { ErrorBoundary } from '#/renderer/components/ErrorBoundary.tsx'
 import { RepoTabs } from '#/renderer/components/RepoTabs.tsx'
 import { RepoCloneDialog } from '#/renderer/components/RepoCloneDialog.tsx'
 import { RepoOpenDialog } from '#/renderer/components/RepoOpenDialog.tsx'
+import { OpenRemoteRepositoryDialog } from '#/renderer/components/OpenRemoteRepositoryDialog.tsx'
 import { RepoView } from '#/renderer/components/RepoView.tsx'
 import { RepoWorkspaceSkeleton } from '#/renderer/components/Skeleton.tsx'
 import { RepoDropOverlay } from '#/renderer/components/RepoDropOverlay.tsx'
@@ -74,6 +75,7 @@ export function App() {
     closeAllOverlays: overlays.closeAllOverlays,
     openRepoPathDialog: overlays.openRepoPathDialog,
     openCloneRepo: overlays.openCloneRepo,
+    openRemoteRepo: overlays.openRemoteRepo,
     isOverlayOpen: () => modalOpen,
   })
 
@@ -100,7 +102,7 @@ export function App() {
           onDrop={repoDrop.onDrop}
         >
           <Topbar onOpenSettings={() => openSettingsWindow()}>
-            <RepoTabs onClone={overlays.openCloneRepo} />
+            <RepoTabs onOpenRemote={overlays.openRemoteRepo} onClone={overlays.openCloneRepo} />
           </Topbar>
           <main className="flex flex-1 min-h-0 min-w-0">
             <ErrorBoundary resetKey={activeId}>
@@ -119,6 +121,10 @@ export function App() {
           </main>
           <RepoOpenDialog open={overlays.state.openRepo.open} onOpenChange={overlays.setOpenRepoOpen} />
           <RepoCloneDialog open={overlays.state.clone.open} onOpenChange={overlays.setCloneOpen} />
+          <OpenRemoteRepositoryDialog
+            open={overlays.state.openRemoteRepo.open}
+            onOpenChange={overlays.setOpenRemoteRepoOpen}
+          />
           <RepoDropOverlay active={repoDrop.active} />
           {/* shadcn/ui Toaster wrapper — owns its own theme + style hooks.
            * App-level only sets position + closeButton; the rest of the

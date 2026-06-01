@@ -1,4 +1,4 @@
-import { AlertCircle, FolderGit2, X } from 'lucide-react'
+import { AlertCircle, FolderGit2, Globe, X } from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { cn } from '#/renderer/lib/cn.ts'
@@ -82,7 +82,11 @@ export function RepoTab({
         }}
         className="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm border-0 bg-transparent p-0 text-left text-inherit outline-none"
       >
-        <FolderGit2 size={13} className={cn('shrink-0', isActive ? 'text-foreground' : 'text-muted-foreground')} />
+        {repo.id.startsWith('ssh://') ? (
+          <Globe size={13} className={cn('shrink-0', isActive ? 'text-foreground' : 'text-muted-foreground')} />
+        ) : (
+          <FolderGit2 size={13} className={cn('shrink-0', isActive ? 'text-foreground' : 'text-muted-foreground')} />
+        )}
         <span className="truncate font-medium">{repo.name}</span>
         {repo.unavailable && <AlertCircle size={12} className="shrink-0 text-warning" aria-hidden />}
       </button>

@@ -1,6 +1,8 @@
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { promises as fs } from 'node:fs'
+import { promises as fs, readFileSync } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { TRPCError } from '@trpc/server'
 import {
   createAppRouter,
@@ -101,6 +103,24 @@ import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 import { WINDOW_BACKGROUND_BY_COLOR_THEME } from '#/shared/theme-tokens.ts'
 import { consumeExternalOpenPaths } from '#/main/external-open.ts'
 import { applySettingsWindowChromeTheme, openSettingsWindow } from '#/main/settings-window.ts'
+import { parseRemoteRepoId, normalizeRemoteTarget, type RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import { findSshAliasForHost, listSshConfigHosts, resolveRemoteTarget as resolveSshRemoteTarget } from '#/main/ssh/config.ts'
+import { testRemoteRepository } from '#/main/ssh/diagnostics.ts'
+import {
+  checkoutRemoteBranch,
+  createRemoteWorktree,
+  deleteRemoteBranch,
+  fetchRemoteRepository,
+  getRemoteGitHubUrl,
+  getRemoteLog,
+  getRemotePatch,
+  getRemoteSnapshot,
+  getRemoteStatus,
+  pullRemoteBranch,
+  pushRemoteBranch,
+  removeRemoteWorktree,
+} from '#/main/ssh/git.ts'
+import { buildRemoteTerminalInvocation } from '#/main/ssh/commands.ts'
 
 const PROJECT_GITHUB_URL = 'https://github.com/nano-props/goblin'
 const PATCH_TIMEOUT_MS = 90_000
@@ -251,6 +271,24 @@ function toRpcError(err: unknown): Extract<RpcResponse, { ok: false }>['error'] 
   return { message: String(err) }
 }
 
+function isRemoteRepoId(repoId: string): boolean {
+  return repoId.startsWith('ssh://')
+}
+
+function targetFromRemoteRepoId(repoId: string): RemoteRepoTarget | null {
+  const parsed = parseRemoteRepoId(repoId)
+  if (!parsed) return null
+  let alias: string | null = null
+  try {
+    const configPath = path.join(os.homedir(), '.ssh', 'config')
+    const content = readFileSync(configPath, 'utf-8')
+    alias = findSshAliasForHost(content, parsed.host, parsed.user, parsed.port)
+  } catch {
+    // ignore missing or unreadable config
+  }
+  return normalizeRemoteTarget({ ...parsed, alias })
+}
+
 async function externalAppsState(terminalPref: TerminalPref, editorPref: EditorPref): Promise<ExternalAppsSnapshot> {
   const state = await probeExternalApps(terminalPref, editorPref, currentRpcSignal())
   return { terminal: state.terminals, editor: state.editors }
@@ -289,6 +327,13 @@ function createRpcHandlers(): AppRpcHandlers {
       consumeExternalOpenPaths: async () => consumeExternalOpenPaths(),
       cloneParentDialog: () => openDirectoryDialog('Choose Clone Destination'),
       probe: async ({ cwd }) => {
+        if (isRemoteRepoId(cwd)) {
+          const target = targetFromRemoteRepoId(cwd)
+          if (!target) return { ok: false, message: 'error.invalid-path' }
+          const result = await testRemoteRepository(target)
+          if (!result.ok) return { ok: false, message: result.message || 'error.failed-read-repo' }
+          return { ok: true, root: target.id, name: target.displayName }
+        }
         if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-path' }
         const gitAvailable = await checkGitAvailable()
         if (!gitAvailable.ok) return gitAvailable
@@ -318,6 +363,15 @@ function createRpcHandlers(): AppRpcHandlers {
       },
       abortClone: async ({ operationId }) => abortCloneOperation(operationId),
       snapshot: async ({ cwd }) => {
+        if (isRemoteRepoId(cwd)) {
+          const target = targetFromRemoteRepoId(cwd)
+          if (!target) return null
+          const signal = currentRpcSignal()
+          const snapshot = await getRemoteSnapshot(target, { signal })
+          if (signal?.aborted) return null
+          if (!snapshot) return null
+          return { branches: snapshot.branches, current: snapshot.current, remote: undefined }
+        }
         if (!isValidCwd(cwd)) return null
         const signal = currentRpcSignal()
         try {
@@ -356,16 +410,30 @@ function createRpcHandlers(): AppRpcHandlers {
         return Array.from(prs, ([branch, pullRequest]) => ({ branch, pullRequest }))
       },
       log: async ({ cwd, branch, count, skip }) => {
-        if (!isValidCwd(cwd) || !isValidBranch(branch)) return []
+        if (!isValidBranch(branch)) return []
         const n = typeof count === 'number' && Number.isFinite(count) ? Math.floor(count) : 100
         const safeCount = Math.max(1, Math.min(1000, n))
         const offset = typeof skip === 'number' && Number.isFinite(skip) ? Math.floor(skip) : 0
         const safeSkip = Math.max(0, offset)
         const signal = currentRpcSignal()
+        if (isRemoteRepoId(cwd)) {
+          const target = targetFromRemoteRepoId(cwd)
+          if (!target) return []
+          const log = await getRemoteLog(target, branch, safeCount, safeSkip, { signal })
+          return signal?.aborted ? [] : log
+        }
+        if (!isValidCwd(cwd)) return []
         const log = await getLog(cwd, branch, safeCount, safeSkip, { signal })
         return signal?.aborted ? [] : log
       },
       status: async ({ cwd }) => {
+        if (isRemoteRepoId(cwd)) {
+          const target = targetFromRemoteRepoId(cwd)
+          if (!target) return []
+          const signal = currentRpcSignal()
+          const status = await getRemoteStatus(target, { signal })
+          return signal?.aborted ? [] : status
+        }
         if (!isValidCwd(cwd)) return []
         const available = await probeGitRepository(cwd)
         if (!available.ok) throw new Error(available.message)
@@ -373,7 +441,16 @@ function createRpcHandlers(): AppRpcHandlers {
         const status = await getWorkingStatus(cwd, { signal })
         return signal?.aborted ? [] : status
       },
-      patch: createPatch,
+      patch: async ({ cwd, worktreePath }) => {
+        if (isRemoteRepoId(cwd)) {
+          const target = targetFromRemoteRepoId(cwd)
+          if (!target) return { ok: false, message: 'error.invalid-arguments' }
+          if (!isValidAbsolutePath(worktreePath)) return { ok: false, message: 'error.invalid-worktree-path' }
+          const signal = currentRpcSignal()
+          return getRemotePatch(target, worktreePath, { signal })
+        }
+        return createPatch({ cwd, worktreePath })
+      },
       commit: async ({ cwd, hash }) => {
         if (!isValidCwd(cwd) || typeof hash !== 'string' || !hash) return null
         if (!GIT_HASH_RE.test(hash)) return null
@@ -382,18 +459,27 @@ function createRpcHandlers(): AppRpcHandlers {
         return { meta, files }
       },
       checkout: async ({ cwd, branch }) => {
-        if (!isValidCwd(cwd) || !isValidBranch(branch)) return { ok: false, message: 'error.invalid-arguments' }
+        if (!isValidBranch(branch)) return { ok: false, message: 'error.invalid-arguments' }
+        if (isRemoteRepoId(cwd)) {
+          const target = targetFromRemoteRepoId(cwd)
+          if (!target) return { ok: false, message: 'error.invalid-arguments' }
+          return runCancellable(cwd, 'user', (signal) => checkoutRemoteBranch(target, branch, undefined, { signal }))
+        }
+        if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-arguments' }
         return runCancellable(cwd, 'user', (signal) => checkoutBranch(cwd, branch, signal))
       },
       deleteBranch: async (input) => {
-        if (!isValidCwd(input.cwd) || !isValidBranch(input.branch)) {
-          return { ok: false, message: 'error.invalid-arguments' }
+        if (!isValidBranch(input.branch)) return { ok: false, message: 'error.invalid-arguments' }
+        if (isRemoteRepoId(input.cwd)) {
+          const target = targetFromRemoteRepoId(input.cwd)
+          if (!target) return { ok: false, message: 'error.invalid-arguments' }
+          return runCancellable(input.cwd, 'user', (signal) => deleteRemoteBranch(target, { branch: input.branch, force: input.force, signal }))
         }
+        if (!isValidCwd(input.cwd)) return { ok: false, message: 'error.invalid-arguments' }
         return runCancellable(input.cwd, 'user', (signal) => deleteRepoBranch(input, signal))
       },
       removeWorktree: async (input) => {
         if (
-          !isValidCwd(input.cwd) ||
           !isValidBranch(input.branch) ||
           !isValidAbsolutePath(input.worktreePath) ||
           typeof input.alsoDeleteBranch !== 'boolean' ||
@@ -401,20 +487,42 @@ function createRpcHandlers(): AppRpcHandlers {
         ) {
           return { ok: false, message: 'error.invalid-arguments' }
         }
+        if (isRemoteRepoId(input.cwd)) {
+          const target = targetFromRemoteRepoId(input.cwd)
+          if (!target) return { ok: false, message: 'error.invalid-arguments' }
+          return runCancellable(input.cwd, 'user', (signal) =>
+            removeRemoteWorktree(target, { ...input, signal }),
+          )
+        }
+        if (!isValidCwd(input.cwd)) return { ok: false, message: 'error.invalid-arguments' }
         return runCancellable(input.cwd, 'user', (signal) => removeRepoWorktree(input, signal))
       },
       createWorktree: async ({ cwd, worktreePath, newBranch, baseBranch }) => {
-        if (!isValidCwd(cwd) || !isValidBranch(newBranch) || !isValidBranch(baseBranch)) {
+        if (!isValidBranch(newBranch) || !isValidBranch(baseBranch)) {
           return { ok: false, message: 'error.invalid-arguments' }
         }
         if (!isValidAbsolutePath(worktreePath)) return { ok: false, message: 'error.invalid-path' }
+        if (isRemoteRepoId(cwd)) {
+          const target = targetFromRemoteRepoId(cwd)
+          if (!target) return { ok: false, message: 'error.invalid-arguments' }
+          return runCancellable(cwd, 'user', (signal) =>
+            createRemoteWorktree(target, { worktreePath, newBranch, baseBranch, signal }),
+          )
+        }
+        if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-arguments' }
         return runCancellable(cwd, 'user', (signal) => createWorktree(cwd, worktreePath, newBranch, baseBranch, signal))
       },
       pull: async ({ cwd, branch, worktreePath }) => {
-        if (!isValidCwd(cwd) || !isValidBranch(branch)) return { ok: false, message: 'error.invalid-arguments' }
+        if (!isValidBranch(branch)) return { ok: false, message: 'error.invalid-arguments' }
         if (worktreePath !== undefined && !isValidAbsolutePath(worktreePath)) {
           return { ok: false, message: 'error.invalid-worktree-path' }
         }
+        if (isRemoteRepoId(cwd)) {
+          const target = targetFromRemoteRepoId(cwd)
+          if (!target) return { ok: false, message: 'error.invalid-arguments' }
+          return runCancellable(cwd, 'user', (signal) => pullRemoteBranch(target, branch, worktreePath, { signal }))
+        }
+        if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-arguments' }
         return runCancellable(cwd, 'user', async (signal) => {
           let targetPath: string | undefined
           if (worktreePath !== undefined) {
@@ -435,10 +543,23 @@ function createRpcHandlers(): AppRpcHandlers {
         })
       },
       push: async ({ cwd, branch }) => {
-        if (!isValidCwd(cwd) || !isValidBranch(branch)) return { ok: false, message: 'error.invalid-arguments' }
+        if (!isValidBranch(branch)) return { ok: false, message: 'error.invalid-arguments' }
+        if (isRemoteRepoId(cwd)) {
+          const target = targetFromRemoteRepoId(cwd)
+          if (!target) return { ok: false, message: 'error.invalid-arguments' }
+          return runCancellable(cwd, 'user', (signal) => pushRemoteBranch(target, branch, { signal }))
+        }
+        if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-arguments' }
         return runCancellable(cwd, 'user', (signal) => pushBranch(cwd, branch, signal))
       },
       fetch: async ({ cwd, kind }) => {
+        if (isRemoteRepoId(cwd)) {
+          const target = targetFromRemoteRepoId(cwd)
+          if (!target) return { ok: false, message: 'error.invalid-arguments' }
+          return runCancellable(cwd, kind === 'background' ? 'background' : 'user', (signal) =>
+            fetchRemoteRepository(target, { signal }),
+          )
+        }
         if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-arguments' }
         const available = await probeGitRepository(cwd)
         if (!available.ok) return available
@@ -451,19 +572,48 @@ function createRpcHandlers(): AppRpcHandlers {
         ctrl.ctrl.abort()
         return true
       },
-      openRemote: openRepoRemote,
+      openRemote: async ({ cwd, branch }) => {
+        if (isRemoteRepoId(cwd)) {
+          const target = targetFromRemoteRepoId(cwd)
+          if (!target) return { ok: false, message: 'error.invalid-arguments' }
+          const url = await getRemoteGitHubUrl(target, branch, { signal: currentRpcSignal() })
+          if (!url) return { ok: false, message: 'error.open-remote-unavailable' }
+          if (!(await openHttpsExternal(url))) return { ok: false, message: 'error.invalid-url' }
+          return { ok: true, message: url }
+        }
+        return openRepoRemote({ cwd, branch })
+      },
       openInFinder: async ({ path: p }) => {
         if (!isValidAbsolutePath(p)) return { ok: false, message: 'error.invalid-path' }
         shell.showItemInFolder(p)
         return { ok: true, message: p }
       },
       openTerminal: async ({ path: p }) => {
+        if (isRemoteRepoId(p)) {
+          return { ok: false, message: 'Remote terminal via external app not yet supported. Use the built-in terminal.' }
+        }
         if (!isValidAbsolutePath(p)) return { ok: false, message: 'error.invalid-path' }
         return openInPreferredTerminal(p, getTerminalApp())
       },
       openEditor: async ({ path: p }) => {
+        if (isRemoteRepoId(p)) {
+          return { ok: false, message: 'Remote editor not yet supported' }
+        }
         if (!isValidAbsolutePath(p)) return { ok: false, message: 'error.invalid-path' }
         return openInPreferredEditor(p, getEditorApp())
+      },
+    },
+    remote: {
+
+      listSshHosts: async () => listSshConfigHosts(),
+      identityFileDialog: openSshIdentityFileDialog,
+      resolveTarget: async (input) => resolveSshRemoteTarget(input, currentRpcSignal()),
+      testRepository: async ({ target }) => {
+        const normalized = normalizeRemoteTarget(target)
+        if (!normalized || normalized.id !== target.id) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid remote repository target' })
+        }
+        return testRemoteRepository(normalized, { signal: currentRpcSignal() })
       },
     },
     theme: {
@@ -610,6 +760,18 @@ function createRpcHandlers(): AppRpcHandlers {
 
 async function openRepoDialog(): Promise<string | null> {
   return openDirectoryDialog('Open Git Repository')
+}
+
+async function openSshIdentityFileDialog(): Promise<string | null> {
+  const win = currentRpcWindow() ?? focusedRegisteredSurface()?.window ?? getMainWindow() ?? null
+  const opts: Electron.OpenDialogOptions = {
+    properties: ['openFile'],
+    title: 'Select SSH Private Key',
+    filters: [{ name: 'SSH Keys', extensions: ['', 'pem', 'key'] }],
+  }
+  const result = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+  if (result.canceled || result.filePaths.length === 0) return null
+  return result.filePaths[0]
 }
 
 async function openDirectoryDialog(title: string): Promise<string | null> {
