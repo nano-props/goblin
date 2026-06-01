@@ -30,8 +30,8 @@ import dev.goblin.android.ui.screens.addhost.AddHostScreen
 import dev.goblin.android.ui.screens.diagnostics.DiagnosticsScreen
 import dev.goblin.android.ui.navigation.MainTab
 import dev.goblin.android.ui.navigation.MainTabShell
-import dev.goblin.android.ui.screens.hosts.HOST_TEMPORARY_TERMINAL_REMOTE_PATH
 import dev.goblin.android.ui.screens.hosts.HostsScreen
+import dev.goblin.android.ui.screens.hosts.hostTemporaryTerminalRoute
 import dev.goblin.android.ui.screens.hosts.isHostTemporaryTerminal
 import dev.goblin.android.ui.screens.placeholders.SettingsPlaceholderScreen
 import dev.goblin.android.ui.screens.projects.ProjectsScreen
@@ -133,20 +133,8 @@ fun GoblinAndroidApp(
     }
 
     fun openHostTemporaryTerminal(hostId: String) {
-        val host = currentHosts().firstOrNull { it.id == hostId } ?: return
-        val target = RemoteTarget.fromHostProfile(host, HOST_TEMPORARY_TERMINAL_REMOTE_PATH)
-        val session = terminalSessionManager.createNew(
-            target = target,
-            repositoryId = null,
-            targetLabel = terminalTargetLabel(host.title, HOST_TEMPORARY_TERMINAL_REMOTE_PATH),
-        )
-        terminalForegroundBridge.sync()
-        route = AppRoute.Terminal(
-            hostId = hostId,
-            remotePath = HOST_TEMPORARY_TERMINAL_REMOTE_PATH,
-            repositoryId = null,
-            terminalSessionId = session.id,
-        )
+        if (currentHosts().none { it.id == hostId }) return
+        route = hostTemporaryTerminalRoute(hostId)
     }
 
     fun closeHostTemporaryTerminal(sessionId: String?) {
@@ -382,10 +370,10 @@ fun GoblinAndroidApp(
                     },
                     terminalSessionManager = terminalSessionManager,
                     terminalForegroundBridge = terminalForegroundBridge,
-                    onBack = {
+                    onBack = { activeSessionId ->
                         when {
                             isHostTemporaryTerminal(currentRoute.remotePath, currentRoute.repositoryId) -> {
-                                closeHostTemporaryTerminal(currentRoute.terminalSessionId)
+                                closeHostTemporaryTerminal(activeSessionId ?: currentRoute.terminalSessionId)
                                 route = AppRoute.Hosts
                             }
                             currentRoute.repositoryId != null -> {

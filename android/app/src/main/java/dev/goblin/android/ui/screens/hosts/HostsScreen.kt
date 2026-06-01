@@ -34,12 +34,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.goblin.android.domain.ResourceState
 import dev.goblin.android.domain.ssh.SshHostProfile
+import dev.goblin.android.navigation.AppRoute
 import dev.goblin.android.ui.theme.GoblinSpacing
 
 internal const val HOST_TEMPORARY_TERMINAL_REMOTE_PATH = "~"
 
 internal fun isHostTemporaryTerminal(remotePath: String, repositoryId: String?): Boolean =
     repositoryId == null && remotePath == HOST_TEMPORARY_TERMINAL_REMOTE_PATH
+
+internal fun hostTemporaryTerminalRoute(hostId: String): AppRoute.Terminal =
+    AppRoute.Terminal(hostId = hostId, remotePath = HOST_TEMPORARY_TERMINAL_REMOTE_PATH)
 
 internal enum class HostHealth {
     Online,

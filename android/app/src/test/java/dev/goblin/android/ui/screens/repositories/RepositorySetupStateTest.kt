@@ -1,6 +1,7 @@
 package dev.goblin.android.ui.screens.repositories
 
 import dev.goblin.android.domain.ResourceState
+import dev.goblin.android.domain.ssh.RemoteDirectoryEntry
 import dev.goblin.android.domain.ssh.RemoteRepositoryProfile
 import dev.goblin.android.domain.ssh.RemoteRepositoryInspection
 import dev.goblin.android.domain.ssh.RemoteRepositorySnapshot
@@ -12,6 +13,7 @@ import dev.goblin.android.terminal.TerminalSessionStatus
 import dev.goblin.android.ui.screens.placeholders.localTerminalPlaceholderText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -29,6 +31,35 @@ class RepositorySetupStateTest {
     fun `remote project paths must be absolute before saving or opening`() {
         assertFalse(canSaveRepository(host(id = "host-1", identityRefId = "identity-1"), "srv/app"))
         assertTrue(canSaveRepository(host(id = "host-1", identityRefId = "identity-1"), "/srv/app"))
+    }
+
+    @Test
+    fun `directory browser starts from typed absolute path or root`() {
+        assertEquals("/srv/app", directoryBrowserRootPath(" /srv/app "))
+        assertEquals("/", directoryBrowserRootPath(""))
+        assertEquals("/", directoryBrowserRootPath("srv/app"))
+    }
+
+    @Test
+    fun `directory browser resolves parent path for hierarchical navigation`() {
+        assertNull(directoryBrowserParentPath("/"))
+        assertEquals("/", directoryBrowserParentPath("/srv"))
+        assertEquals("/srv", directoryBrowserParentPath("/srv/app"))
+        assertEquals("/srv", directoryBrowserParentPath("/srv/app/"))
+    }
+
+    @Test
+    fun `directory browser loads only the current page when no usable listing exists`() {
+        val entry = RemoteDirectoryEntry(name = "app", path = "/srv/app", isDirectory = true)
+
+        assertTrue(shouldLoadDirectoryPage(null))
+        assertTrue(shouldLoadDirectoryPage(ResourceState.Idle))
+        assertTrue(shouldLoadDirectoryPage(ResourceState.Error("failed")))
+        assertFalse(shouldLoadDirectoryPage(ResourceState.Loading))
+        assertFalse(shouldLoadDirectoryPage(ResourceState.Loaded(listOf(entry))))
+        assertFalse(
+            shouldLoadDirectoryPage(ResourceState.Stale(value = listOf(entry), loadedAtMillis = 1L, reason = "offline")),
+        )
     }
 
     @Test

@@ -66,10 +66,15 @@ internal fun parseRemoteDirectoryEntries(output: String): List<RemoteDirectoryEn
             if (name.isBlank() || path.isBlank()) {
                 null
             } else {
-                RemoteDirectoryEntry(name = name, path = path, isDirectory = true)
+                RemoteDirectoryEntry(name = name, path = normalizeRemoteDirectoryPath(path), isDirectory = true)
             }
         }
         .toList()
+
+private fun normalizeRemoteDirectoryPath(path: String): String {
+    val normalized = path.replace(Regex("/{2,}"), "/")
+    return normalized.ifBlank { "/" }
+}
 
 internal fun parseRemoteRepositoryInspection(requestedPath: String, output: String): RemoteRepositoryInspection {
     val sections = parseMarkedSections(output, InspectMarkers)

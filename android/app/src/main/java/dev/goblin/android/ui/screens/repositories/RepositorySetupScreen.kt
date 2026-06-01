@@ -1,12 +1,20 @@
 package dev.goblin.android.ui.screens.repositories
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -31,7 +39,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import dev.goblin.android.domain.ResourceState
 import dev.goblin.android.domain.ssh.RemoteDirectoryEntry
 import dev.goblin.android.domain.ssh.RemoteRepositoryBranch
@@ -69,6 +79,28 @@ internal fun defaultAuthenticatedHost(hosts: List<SshHostProfile>): SshHostProfi
 
 internal fun canSaveRepository(host: SshHostProfile?, remotePath: String): Boolean =
     host?.identityRefId != null && remotePath.trim().startsWith("/")
+
+internal fun directoryBrowserRootPath(remotePath: String): String =
+    remotePath.trim().takeIf { it.startsWith("/") } ?: "/"
+
+internal fun directoryBrowserParentPath(path: String): String? {
+    val normalized = directoryBrowserRootPath(path)
+    if (normalized == "/") return null
+    val trimmed = normalized.trimEnd('/')
+    val parent = trimmed.substringBeforeLast("/", missingDelimiterValue = "")
+    return parent.ifBlank { "/" }
+}
+
+internal fun shouldLoadDirectoryPage(state: ResourceState<List<RemoteDirectoryEntry>>?): Boolean = when (state) {
+    null,
+    ResourceState.Idle,
+    is ResourceState.Error,
+    -> true
+    ResourceState.Loading,
+    is ResourceState.Loaded,
+    is ResourceState.Stale,
+    -> false
+}
 
 internal fun repositoryWorkspaceTabs(repository: RemoteRepositoryProfile): List<RepositoryWorkspaceTab> =
     if (repository.remotePath.startsWith("/")) {
@@ -242,24 +274,50 @@ fun RepositorySetupScreen(
     var remotePath by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var deleteTarget by remember { mutableStateOf<RemoteRepositoryProfile?>(null) }
-    var browseState: ResourceState<List<RemoteDirectoryEntry>> by remember { mutableStateOf(ResourceState.Idle) }
+    var directoryBrowserPath by remember { mutableStateOf<String?>(null) }
+    var directoryEntriesState: ResourceState<List<RemoteDirectoryEntry>> by remember { mutableStateOf(ResourceState.Idle) }
     var saving by remember { mutableStateOf(false) }
     val selectedHost = authenticated.firstOrNull { it.id == selectedHostId }
     val scope = rememberCoroutineScope()
 
-    fun browseDirectories() {
+    fun clearDirectoryBrowser() {
+        directoryBrowserPath = null
+        directoryEntriesState = ResourceState.Idle
+    }
+
+    fun loadDirectoryPage(path: String) {
         val host = selectedHost ?: return
-        val path = remotePath.trim().ifBlank { "/" }
-        browseState = ResourceState.Loading
+        val normalizedPath = directoryBrowserRootPath(path)
+        val requestHostId = host.id
+        directoryBrowserPath = normalizedPath
+        directoryEntriesState = ResourceState.Loading
         error = null
         scope.launch {
-            browseState = runCatching {
-                withContext(Dispatchers.IO) { onBrowseDirectories(host, path) }
+            val nextState = runCatching {
+                withContext(Dispatchers.IO) { onBrowseDirectories(host, normalizedPath) }
             }.fold(
                 onSuccess = { ResourceState.Loaded(it) },
                 onFailure = { ResourceState.Error(it.message ?: "Remote directory browse failed", it) },
             )
+            if (selectedHostId != requestHostId || directoryBrowserPath != normalizedPath) return@launch
+            directoryEntriesState = nextState
         }
+    }
+
+    fun openDirectoryPage(path: String) {
+        val normalizedPath = directoryBrowserRootPath(path)
+        if (directoryBrowserPath == normalizedPath && !shouldLoadDirectoryPage(directoryEntriesState)) {
+            return
+        }
+        loadDirectoryPage(normalizedPath)
+    }
+
+    fun browseDirectories() {
+        openDirectoryPage(remotePath)
+    }
+
+    fun openParentDirectory() {
+        directoryBrowserPath?.let(::directoryBrowserParentPath)?.let(::openDirectoryPage)
     }
 
     fun validateAndSaveRepository() {
@@ -276,7 +334,7 @@ fun RepositorySetupScreen(
                 onSaveRepository(it)
                 alias = ""
                 remotePath = ""
-                browseState = ResourceState.Idle
+                clearDirectoryBrowser()
                 error = null
             }.onFailure {
                 error = it.message ?: "Repository validation failed"
@@ -301,6 +359,7 @@ fun RepositorySetupScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
                 .padding(GoblinSpacing.Md),
             verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Md),
         ) {
@@ -326,6 +385,7 @@ fun RepositorySetupScreen(
                                     onClick = {
                                         selectedHostId = host.id
                                         menuExpanded = false
+                                        clearDirectoryBrowser()
                                     },
                                 )
                             }
@@ -341,7 +401,10 @@ fun RepositorySetupScreen(
                     OutlinedTextField(
                         modifier = Modifier.fillMaxWidth(),
                         value = remotePath,
-                        onValueChange = { remotePath = it },
+                        onValueChange = {
+                            remotePath = it
+                            clearDirectoryBrowser()
+                        },
                         label = { Text("Remote path") },
                         singleLine = true,
                         isError = error != null,
@@ -354,12 +417,14 @@ fun RepositorySetupScreen(
                             Text("Browse")
                         }
                     }
-                    when (val state = browseState) {
-                        ResourceState.Idle -> Unit
-                        ResourceState.Loading -> Text("Loading directories.")
-                        is ResourceState.Error -> Text(state.message, color = MaterialTheme.colorScheme.error)
-                        is ResourceState.Stale -> DirectoryEntries(entries = state.value, onSelect = { remotePath = it.path })
-                        is ResourceState.Loaded -> DirectoryEntries(entries = state.value, onSelect = { remotePath = it.path })
+                    directoryBrowserPath?.let { currentPath ->
+                        DirectoryPagePicker(
+                            currentPath = currentPath,
+                            state = directoryEntriesState,
+                            onOpenParent = ::openParentDirectory,
+                            onOpenDirectory = ::openDirectoryPage,
+                            onSelect = { selectedPath -> remotePath = selectedPath },
+                        )
                     }
                     Button(
                         enabled = canSaveRepository(selectedHost, remotePath) && !saving,
@@ -399,20 +464,148 @@ fun RepositorySetupScreen(
 }
 
 @Composable
-private fun DirectoryEntries(
-    entries: List<RemoteDirectoryEntry>,
-    onSelect: (RemoteDirectoryEntry) -> Unit,
+private fun DirectoryPagePicker(
+    currentPath: String,
+    state: ResourceState<List<RemoteDirectoryEntry>>,
+    onOpenParent: () -> Unit,
+    onOpenDirectory: (String) -> Unit,
+    onSelect: (String) -> Unit,
 ) {
-    if (entries.isEmpty()) {
-        Text("No child directories.")
-        return
-    }
     Column(verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs)) {
-        entries.forEach { entry ->
-            TextButton(onClick = { onSelect(entry) }) {
-                Text(entry.name)
+        Text("Remote directories", style = MaterialTheme.typography.titleSmall)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(currentPath, style = MaterialTheme.typography.bodyMedium)
+            }
+            TextButton(
+                enabled = directoryBrowserParentPath(currentPath) != null,
+                onClick = onOpenParent,
+            ) {
+                Text("Up")
+            }
+            TextButton(onClick = { onSelect(currentPath) }) {
+                Text("Select")
             }
         }
+        when (state) {
+            ResourceState.Idle -> Text("Not loaded.", style = MaterialTheme.typography.bodySmall)
+            ResourceState.Loading -> Text("Loading directories.", style = MaterialTheme.typography.bodySmall)
+            is ResourceState.Error -> Text(
+                state.message,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            is ResourceState.Loaded -> DirectoryPageEntries(
+                entries = state.value,
+                onOpenDirectory = onOpenDirectory,
+                onSelect = onSelect,
+            )
+            is ResourceState.Stale -> DirectoryPageEntries(
+                entries = state.value,
+                onOpenDirectory = onOpenDirectory,
+                onSelect = onSelect,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DirectoryPageEntries(
+    entries: List<RemoteDirectoryEntry>,
+    onOpenDirectory: (String) -> Unit,
+    onSelect: (String) -> Unit,
+) {
+    if (entries.isEmpty()) {
+        Text("No child directories.", style = MaterialTheme.typography.bodySmall)
+        return
+    }
+    val listState = rememberLazyListState()
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 260.dp),
+    ) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(end = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
+        ) {
+            items(entries, key = { it.path }) { entry ->
+                DirectoryPageEntryRow(
+                    entry = entry,
+                    onOpenDirectory = onOpenDirectory,
+                    onSelect = onSelect,
+                )
+            }
+        }
+        DirectoryPageScrollbar(
+            listState = listState,
+            totalItems = entries.size,
+            modifier = Modifier.align(Alignment.CenterEnd),
+        )
+    }
+}
+
+@Composable
+private fun DirectoryPageEntryRow(
+    entry: RemoteDirectoryEntry,
+    onOpenDirectory: (String) -> Unit,
+    onSelect: (String) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(entry.name, style = MaterialTheme.typography.bodyMedium)
+            Text(entry.path, style = MaterialTheme.typography.bodySmall)
+        }
+        TextButton(onClick = { onOpenDirectory(entry.path) }) {
+            Text("Open")
+        }
+        TextButton(onClick = { onSelect(entry.path) }) {
+            Text("Select")
+        }
+    }
+}
+
+@Composable
+private fun DirectoryPageScrollbar(
+    listState: LazyListState,
+    totalItems: Int,
+    modifier: Modifier = Modifier,
+) {
+    val visibleItems = listState.layoutInfo.visibleItemsInfo.size
+    if (totalItems <= 0 || visibleItems <= 0 || totalItems <= visibleItems) return
+
+    val availableItems = (totalItems - visibleItems).coerceAtLeast(1)
+    val scrollProgress = (listState.firstVisibleItemIndex.toFloat() / availableItems).coerceIn(0f, 1f)
+    val thumbFraction = (visibleItems.toFloat() / totalItems).coerceIn(0.15f, 0.9f)
+    val movableFraction = 1f - thumbFraction
+    val topWeight = scrollProgress * movableFraction
+    val bottomWeight = (movableFraction - topWeight).coerceAtLeast(0f)
+
+    Column(
+        modifier = modifier
+            .fillMaxHeight()
+            .width(4.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
+    ) {
+        if (topWeight > 0f) Box(Modifier.weight(topWeight))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(thumbFraction)
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)),
+        )
+        if (bottomWeight > 0f) Box(Modifier.weight(bottomWeight))
     }
 }
 

@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import dev.goblin.android.domain.ssh.SshHostProfile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -14,6 +15,16 @@ class HostsScreenStateTest {
         assertTrue(isHostTemporaryTerminal("~", repositoryId = null))
         assertFalse(isHostTemporaryTerminal("/", repositoryId = null))
         assertFalse(isHostTemporaryTerminal("~", repositoryId = "repo-1"))
+    }
+
+    @Test
+    fun `host temporary terminal route defers session startup to terminal screen`() {
+        val route = hostTemporaryTerminalRoute("host-1")
+
+        assertEquals("host-1", route.hostId)
+        assertEquals(HOST_TEMPORARY_TERMINAL_REMOTE_PATH, route.remotePath)
+        assertNull(route.repositoryId)
+        assertNull(route.terminalSessionId)
     }
 
     @Test

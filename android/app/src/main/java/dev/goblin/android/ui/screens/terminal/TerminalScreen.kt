@@ -66,7 +66,7 @@ fun TerminalScreen(
     terminalSessionId: String? = null,
     terminalSessionManager: TerminalSessionManager,
     terminalForegroundBridge: TerminalForegroundBridge,
-    onBack: () -> Unit,
+    onBack: (String?) -> Unit,
 ) {
     var terminalState: TerminalSessionState by remember { mutableStateOf(TerminalSessionState.Idle) }
     var activeSessionId by remember(host, remotePath, repositoryId, terminalSessionId) {
@@ -198,7 +198,7 @@ fun TerminalScreen(
                     }
                 },
                 navigationIcon = {
-                    TextButton(onClick = onBack) {
+                    TextButton(onClick = { onBack(activeSessionId) }) {
                         Text("Back")
                     }
                 },

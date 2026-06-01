@@ -29,6 +29,19 @@ class RemoteRepositoryGitServiceTest {
     }
 
     @Test
+    fun `directory listing parser normalizes root child paths`() {
+        val output = """
+            home	//home
+            srv	//srv
+        """.trimIndent()
+
+        val entries = parseRemoteDirectoryEntries(output)
+
+        assertEquals("/home", entries[0].path)
+        assertEquals("/srv", entries[1].path)
+    }
+
+    @Test
     fun `repository inspection parser reads top level current ref and default branch`() {
         val output = """
             __GOBLIN_ANDROID_INSPECT_TOP__
