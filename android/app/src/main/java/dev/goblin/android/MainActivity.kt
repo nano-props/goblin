@@ -20,16 +20,17 @@ import dev.goblin.android.ssh.SshjPortForwardBackend
 import dev.goblin.android.terminal.AndroidTerminalForegroundOwner
 import dev.goblin.android.terminal.SshTerminalService
 import dev.goblin.android.terminal.TerminalForegroundBridge
+import dev.goblin.android.terminal.TerminalNavigationRequest
 import dev.goblin.android.terminal.TerminalSessionIntentExtra
 import dev.goblin.android.terminal.TerminalSessionRuntime
 import dev.goblin.android.ui.theme.GoblinTheme
 
 class MainActivity : ComponentActivity() {
-    private val notificationTerminalSessionId = mutableStateOf<String?>(null)
+    private val terminalNavigationRequest = mutableStateOf<TerminalNavigationRequest?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        notificationTerminalSessionId.value = intent?.getStringExtra(TerminalSessionIntentExtra)
+        deliverTerminalNavigationIntent(intent)
         val hostProfileStore = HostProfileStore.create(this)
         val remoteRepositoryStore = RemoteRepositoryStore.create(this)
         val terminalSessionStore = TerminalSessionStore.create(this)
@@ -83,7 +84,7 @@ class MainActivity : ComponentActivity() {
                     initializationService = initializationService,
                     terminalSessionManager = terminalManager,
                     terminalForegroundBridge = terminalForegroundBridge,
-                    initialTerminalSessionId = notificationTerminalSessionId.value,
+                    terminalNavigationRequest = terminalNavigationRequest.value,
                 )
             }
         }
@@ -92,6 +93,15 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        notificationTerminalSessionId.value = intent.getStringExtra(TerminalSessionIntentExtra)
+        deliverTerminalNavigationIntent(intent)
+    }
+
+    private fun deliverTerminalNavigationIntent(intent: android.content.Intent?) {
+        val sessionId = intent?.getStringExtra(TerminalSessionIntentExtra) ?: return
+        val nextSequence = (terminalNavigationRequest.value?.sequence ?: 0L) + 1L
+        terminalNavigationRequest.value = TerminalNavigationRequest(
+            sessionId = sessionId,
+            sequence = nextSequence,
+        )
     }
 }

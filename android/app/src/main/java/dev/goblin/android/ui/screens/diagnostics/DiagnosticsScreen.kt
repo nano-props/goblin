@@ -31,12 +31,12 @@ import dev.goblin.android.domain.ssh.DiagnosticStage
 import dev.goblin.android.domain.ssh.DiagnosticStageResult
 import dev.goblin.android.domain.ssh.DiagnosticStatus
 import dev.goblin.android.domain.ssh.DiagnosticsResult
-import dev.goblin.android.domain.ssh.RemoteRepositoryInspection
-import dev.goblin.android.domain.ssh.RemoteRepositoryProfile
+import dev.goblin.android.domain.ssh.PortForwardRequest
+import dev.goblin.android.domain.ssh.PortForwardSession
 import dev.goblin.android.domain.ssh.RemoteTarget
 import dev.goblin.android.domain.ssh.SshHostProfile
 import dev.goblin.android.ssh.SshInitializationCheck
-import dev.goblin.android.ui.screens.repositories.createRepositoryFromInspection
+import dev.goblin.android.ui.screens.ports.PortForwardPanel
 import dev.goblin.android.ui.theme.GoblinSpacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -46,20 +46,17 @@ import kotlinx.coroutines.withContext
 @Composable
 fun DiagnosticsScreen(
     host: SshHostProfile,
-    repositories: List<RemoteRepositoryProfile> = emptyList(),
     onBack: () -> Unit,
     onOpenTerminal: () -> Unit,
-    onOpenRepository: (String) -> Unit = {},
-    onOpenRepositoryTerminal: (RemoteRepositoryProfile) -> Unit = {},
     onCheckSshInitialization: () -> SshInitializationCheck = { SshInitializationCheck.Ready },
     onInitializeSshAccess: (CharArray) -> Unit = {},
     onRunDiagnostics: () -> DiagnosticsResult,
     onTrustHostKey: (String) -> Unit,
-    onSaveRepository: (RemoteRepositoryProfile) -> Unit = {},
-    onDeleteRepository: (String) -> Unit = {},
-    onInspectRepository: (String) -> RemoteRepositoryInspection = { path ->
-        RemoteRepositoryInspection(path, path, null, null)
+    portForwardSessions: List<PortForwardSession> = emptyList(),
+    onStartPortForward: (PortForwardRequest) -> PortForwardSession = {
+        throw UnsupportedOperationException("Port forwarding is not available")
     },
+    onStopPortForward: (String) -> PortForwardSession? = { null },
 ) {
     val scope = rememberCoroutineScope()
     var diagnosticsState: ResourceState<DiagnosticsResult> by remember { mutableStateOf(ResourceState.Idle) }
@@ -156,14 +153,10 @@ fun DiagnosticsScreen(
             Button(onClick = { runDiagnostics() }) {
                 Text("Run diagnostics")
             }
-            RemoteRepositoriesSection(
-                host = host,
-                repositories = repositories,
-                onSaveRepository = onSaveRepository,
-                onDeleteRepository = onDeleteRepository,
-                onOpenRepository = onOpenRepository,
-                onOpenRepositoryTerminal = onOpenRepositoryTerminal,
-                onInspectRepository = onInspectRepository,
+            HostPortsSection(
+                sessions = portForwardSessions,
+                onStartPortForward = onStartPortForward,
+                onStopPortForward = onStopPortForward,
             )
             when (val state = diagnosticsState) {
                 ResourceState.Idle -> DiagnosticStageList(stages = pendingStages())
@@ -249,94 +242,42 @@ private fun SshInitializationCard(
 }
 
 @Composable
-private fun RemoteRepositoriesSection(
-    host: SshHostProfile,
-    repositories: List<RemoteRepositoryProfile>,
-    onSaveRepository: (RemoteRepositoryProfile) -> Unit,
-    onDeleteRepository: (String) -> Unit,
-    onOpenRepository: (String) -> Unit,
-    onOpenRepositoryTerminal: (RemoteRepositoryProfile) -> Unit,
-    onInspectRepository: (String) -> RemoteRepositoryInspection,
+private fun HostPortsSection(
+    sessions: List<PortForwardSession>,
+    onStartPortForward: (PortForwardRequest) -> PortForwardSession,
+    onStopPortForward: (String) -> PortForwardSession?,
 ) {
     val scope = rememberCoroutineScope()
-    var alias by remember(host.id) { mutableStateOf("") }
-    var remotePath by remember(host.id) { mutableStateOf("") }
-    var error by remember(host.id) { mutableStateOf<String?>(null) }
-    var saving by remember(host.id) { mutableStateOf(false) }
+    var visiblePortForwards by remember(sessions) { mutableStateOf(sessions) }
+    var error by remember { mutableStateOf<String?>(null) }
 
-    Card(Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(GoblinSpacing.Md),
-            verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
-        ) {
-            Text("Saved repositories", style = MaterialTheme.typography.titleMedium)
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = alias,
-                onValueChange = { alias = it },
-                label = { Text("Alias") },
-                singleLine = true,
-            )
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = remotePath,
-                onValueChange = { remotePath = it },
-                label = { Text("Remote path") },
-                singleLine = true,
-                isError = error != null,
-            )
-            Button(
-                enabled = remotePath.trim().startsWith("/") && !saving,
-                onClick = {
-                    saving = true
-                    error = null
-                    scope.launch {
-                        runCatching {
-                            withContext(Dispatchers.IO) {
-                                createRepositoryFromInspection(host, alias, onInspectRepository(remotePath))
-                            }
-                        }.onSuccess {
-                            onSaveRepository(it)
-                            alias = ""
-                            remotePath = ""
-                            error = null
-                        }.onFailure {
-                            error = it.message ?: "Repository validation failed"
-                        }
-                        saving = false
-                    }
-                },
-            ) {
-                Text(if (saving) "Validating..." else "Save repository")
+    fun upsertPortForwardSession(session: PortForwardSession) {
+        visiblePortForwards = visiblePortForwards.filterNot { it.id == session.id } + session
+    }
+
+    PortForwardPanel(
+        title = "Ports",
+        emptyText = "No port forwards for this host.",
+        sessions = visiblePortForwards,
+        onStartPortForward = { request ->
+            error = null
+            scope.launch {
+                runCatching { withContext(Dispatchers.IO) { onStartPortForward(request) } }
+                    .onSuccess(::upsertPortForwardSession)
+                    .onFailure { error = it.message ?: "Port forward failed" }
             }
-            if (error != null) {
-                Text(error.orEmpty(), color = MaterialTheme.colorScheme.error)
+        },
+        onStopPortForward = { sessionId ->
+            error = null
+            scope.launch {
+                runCatching { withContext(Dispatchers.IO) { onStopPortForward(sessionId) } }
+                    .onSuccess { session -> if (session != null) upsertPortForwardSession(session) }
+                    .onFailure { error = it.message ?: "Stop port forward failed" }
             }
-            if (repositories.isEmpty()) {
-                Text("No saved repositories.")
-            } else {
-                repositories.forEach { repository ->
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
-                    ) {
-                        Text(repository.title, style = MaterialTheme.typography.bodyMedium)
-                        Text(repository.remotePath, style = MaterialTheme.typography.bodySmall)
-                        Row(horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs)) {
-                            TextButton(onClick = { onOpenRepository(repository.id) }) {
-                                Text("Open")
-                            }
-                            TextButton(onClick = { onOpenRepositoryTerminal(repository) }) {
-                                Text("Terminal")
-                            }
-                            TextButton(onClick = { onDeleteRepository(repository.id) }) {
-                                Text("Delete")
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        },
+    )
+    if (error != null) {
+        Text(error.orEmpty(), color = MaterialTheme.colorScheme.error)
     }
 }
 
@@ -415,9 +356,6 @@ private fun pendingStages(running: DiagnosticStage? = null): List<DiagnosticStag
     listOf(
         DiagnosticStage.SSH,
         DiagnosticStage.Shell,
-        DiagnosticStage.Git,
-        DiagnosticStage.Path,
-        DiagnosticStage.Repo,
     ).map { stage ->
         DiagnosticStageResult(
             stage = stage,

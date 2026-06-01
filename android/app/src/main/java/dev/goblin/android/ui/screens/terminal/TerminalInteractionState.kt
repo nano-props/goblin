@@ -1,9 +1,22 @@
 package dev.goblin.android.ui.screens.terminal
 
+import android.view.KeyEvent
 import dev.goblin.android.terminal.TerminalDisconnectedReason
 import dev.goblin.android.terminal.TerminalSessionState
 
 internal const val TerminalDisconnectedMessage = "Terminal disconnected. Reconnect or return to diagnostics."
+
+internal const val TerminalBackKeepsSessionHint = "Back leaves the session running in the background."
+
+internal const val TerminalBackClosesSessionHint = "Back stops this temporary terminal."
+
+internal const val TerminalStickToBottomThresholdPx = 48
+
+internal fun terminalStickToBottom(
+    scrollValue: Int,
+    maxValue: Int,
+    thresholdPx: Int = TerminalStickToBottomThresholdPx,
+): Boolean = maxValue == 0 || scrollValue >= maxValue - thresholdPx
 
 internal fun terminalInputAvailable(state: TerminalSessionState): Boolean =
     state is TerminalSessionState.Connected
@@ -33,27 +46,51 @@ internal fun terminalInputUnavailableMessage(state: TerminalSessionState): Strin
 
 internal fun terminalLineInput(value: String): String = "$value\r"
 
-internal fun terminalDisplayText(state: TerminalSessionState): String = when (state) {
-    is TerminalSessionState.Connected -> state.output
-    is TerminalSessionState.Failed -> inactiveTerminalText(
-        output = state.output,
-        message = "$TerminalDisconnectedMessage\n${state.message}",
-    )
-    is TerminalSessionState.Exited -> inactiveTerminalText(
-        output = state.output,
-        message = "Terminal exited: ${terminalReasonLabel(state.reason)}",
-    )
-    is TerminalSessionState.Disconnected -> inactiveTerminalText(
-        output = state.output,
-        message = "Terminal disconnected: ${terminalReasonLabel(state.reason)}",
-    )
-    TerminalSessionState.Connecting -> "Connecting..."
-    is TerminalSessionState.Resizing -> "Resizing..."
-    TerminalSessionState.Idle -> ""
+internal fun terminalControlCharacter(key: Char): String? {
+    val letter = key.uppercaseChar()
+    if (letter !in 'A'..'Z') return null
+    return (letter.code - 'A'.code + 1).toChar().toString()
 }
 
-private fun inactiveTerminalText(output: String, message: String): String =
-    if (output.isBlank()) message else "$output\n$message"
+internal fun terminalControlInput(keyCode: Int, ctrlPressed: Boolean, action: Int = KeyEvent.ACTION_DOWN): String? {
+    if (!ctrlPressed || action != KeyEvent.ACTION_DOWN) return null
+    return when (keyCode) {
+        KeyEvent.KEYCODE_C -> "\u0003"
+        in KeyEvent.KEYCODE_A..KeyEvent.KEYCODE_Z -> {
+            val letter = ('A'.code + (keyCode - KeyEvent.KEYCODE_A)).toChar()
+            terminalControlCharacter(letter)
+        }
+        else -> null
+    }
+}
+
+internal fun terminalViewportText(state: TerminalSessionState): String = when (state) {
+    is TerminalSessionState.Connected -> state.output
+    is TerminalSessionState.Failed -> state.output
+    is TerminalSessionState.Exited -> state.output
+    is TerminalSessionState.Disconnected -> state.output
+    TerminalSessionState.Connecting,
+    is TerminalSessionState.Resizing,
+    TerminalSessionState.Idle,
+    -> ""
+}
+
+internal fun terminalSessionBannerMessage(state: TerminalSessionState): String? = when (state) {
+    TerminalSessionState.Connecting -> "Connecting..."
+    is TerminalSessionState.Resizing -> "Resizing..."
+    is TerminalSessionState.Failed -> "$TerminalDisconnectedMessage\n${state.message}"
+    is TerminalSessionState.Exited -> "Terminal exited: ${terminalReasonLabel(state.reason)}"
+    is TerminalSessionState.Disconnected -> "Terminal disconnected: ${terminalReasonLabel(state.reason)}"
+    TerminalSessionState.Idle,
+    is TerminalSessionState.Connected,
+    -> null
+}
+
+internal fun terminalDisplayText(state: TerminalSessionState): String {
+    val viewport = terminalViewportText(state)
+    val banner = terminalSessionBannerMessage(state) ?: return viewport
+    return if (viewport.isBlank()) banner else "$viewport\n$banner"
+}
 
 private fun terminalReasonLabel(reason: TerminalDisconnectedReason): String = when (reason) {
     TerminalDisconnectedReason.UserClosed -> "User closed"

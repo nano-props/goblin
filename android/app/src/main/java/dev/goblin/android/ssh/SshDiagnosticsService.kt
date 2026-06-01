@@ -65,18 +65,6 @@ class SshDiagnosticsService(
         if (shell.stdout.trim() != "ok") return fail(target, stages, 1, DiagnosticCategory.ShellFailed, "shell failed", shell.details())
         stages[1] = stages[1].copy(status = DiagnosticStatus.Passed)
 
-        val git = runProbe(target, SshDiagnosticProbe.CheckGit, trustedSecrets)
-        if (!git.ok) return fail(target, stages, 2, DiagnosticCategory.GitMissing, git.message, git.details())
-        stages[2] = stages[2].copy(status = DiagnosticStatus.Passed)
-
-        val path = runProbe(target, SshDiagnosticProbe.TestPath, trustedSecrets)
-        if (!path.ok) return fail(target, stages, 3, DiagnosticCategory.PathMissing, path.message, path.details())
-        stages[3] = stages[3].copy(status = DiagnosticStatus.Passed)
-
-        val repo = runProbe(target, SshDiagnosticProbe.RevParseTopLevel, trustedSecrets)
-        if (!repo.ok) return fail(target, stages, 4, DiagnosticCategory.NotARepo, repo.message, repo.details())
-        stages[4] = stages[4].copy(status = DiagnosticStatus.Passed)
-
         return DiagnosticsResult(target = target, ok = true, stages = stages)
     }
 
@@ -95,9 +83,6 @@ class SshDiagnosticsService(
     private fun createStages(): MutableList<DiagnosticStageResult> = mutableListOf(
         DiagnosticStageResult(DiagnosticStage.SSH, DiagnosticStatus.Pending),
         DiagnosticStageResult(DiagnosticStage.Shell, DiagnosticStatus.Pending),
-        DiagnosticStageResult(DiagnosticStage.Git, DiagnosticStatus.Pending),
-        DiagnosticStageResult(DiagnosticStage.Path, DiagnosticStatus.Pending),
-        DiagnosticStageResult(DiagnosticStage.Repo, DiagnosticStatus.Pending),
     )
 
     private fun fail(

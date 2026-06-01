@@ -5,9 +5,6 @@ import dev.goblin.android.domain.ssh.RemoteRepositoryProfile
 import dev.goblin.android.domain.ssh.RemoteRepositoryInspection
 import dev.goblin.android.domain.ssh.RemoteRepositorySnapshot
 import dev.goblin.android.domain.ssh.RemoteRepositoryWorktree
-import dev.goblin.android.domain.ssh.PortForwardRequest
-import dev.goblin.android.domain.ssh.PortForwardSession
-import dev.goblin.android.domain.ssh.PortForwardSessionStatus
 import dev.goblin.android.domain.ssh.SshHostProfile
 import dev.goblin.android.terminal.TerminalDisconnectedReason
 import dev.goblin.android.terminal.TerminalSessionRecord
@@ -42,79 +39,40 @@ class RepositorySetupStateTest {
             remotePath = "/srv/app",
         )
 
-        assertTrue(repositoryWorkspaceTabs(repository).contains(RepositoryWorkspaceTab.Terminal))
+        assertEquals(
+            listOf(
+                RepositoryWorkspaceTab.Branches,
+                RepositoryWorkspaceTab.Worktrees,
+                RepositoryWorkspaceTab.Changes,
+                RepositoryWorkspaceTab.Terminal,
+            ),
+            repositoryWorkspaceTabs(repository),
+        )
         assertEquals("/srv/app", repositoryTerminalPath(repository))
     }
 
     @Test
-    fun `workspace exposes ports tab for absolute remote repositories`() {
+    fun `workspace detail tabs exclude commits and ports`() {
         val repository = repository(id = "repo-1", remotePath = "/srv/app")
 
-        assertTrue(repositoryWorkspaceTabs(repository).contains(RepositoryWorkspaceTab.Ports))
+        assertFalse(repositoryWorkspaceTabs(repository).contains(RepositoryWorkspaceTab.Commits))
+        assertFalse(repositoryWorkspaceTabs(repository).contains(RepositoryWorkspaceTab.Ports))
     }
 
     @Test
     fun `workspace detail tabs use a scrollable strip when tab count is dense`() {
         val tabs = repositoryWorkspaceTabs(repository(id = "repo-1", remotePath = "/srv/app"))
 
-        assertTrue(repositoryWorkspaceTabsUseScrollableStrip(tabs))
-        assertEquals(4, repositoryWorkspaceTabIndex(tabs, RepositoryWorkspaceTab.Ports))
+        assertFalse(repositoryWorkspaceTabsUseScrollableStrip(tabs))
+        assertEquals(0, repositoryWorkspaceTabIndex(tabs, RepositoryWorkspaceTab.Branches))
         assertEquals(
             0,
             repositoryWorkspaceTabIndex(
-                tabs = listOf(RepositoryWorkspaceTab.Status),
+                tabs = listOf(RepositoryWorkspaceTab.Changes),
                 selectedTab = RepositoryWorkspaceTab.Ports,
-                fallback = RepositoryWorkspaceTab.Status,
+                fallback = RepositoryWorkspaceTab.Changes,
             ),
         )
-    }
-
-    @Test
-    fun `repository maps to port forward owner`() {
-        val repository = repository(id = "repo-1", remotePath = "/srv/app")
-
-        val owner = portForwardOwner(repository)
-
-        assertEquals("repo-1", owner.id)
-        assertEquals(repository.title, owner.label)
-    }
-
-    @Test
-    fun `port forward sessions are filtered by repository owner`() {
-        val appSession = portForwardSession(ownerId = "repo-1")
-        val apiSession = portForwardSession(ownerId = "repo-2")
-
-        assertEquals(
-            listOf(appSession),
-            portForwardSessionsForRepository(listOf(appSession, apiSession), repositoryId = "repo-1"),
-        )
-    }
-
-    @Test
-    fun `active port forward actions expose open copy and stop`() {
-        val session = portForwardSession(ownerId = "repo-1")
-
-        assertEquals(listOf("Open URL", "Copy URL", "Stop"), portForwardActionLabels(session))
-    }
-
-    @Test
-    fun `active port forward lifecycle text is explicit about app runtime scope`() {
-        val session = portForwardSession(ownerId = "repo-1")
-
-        assertEquals(
-            "active in this app session - stop it when the emergency task is done",
-            portForwardLifecycleText(session),
-        )
-    }
-
-    @Test
-    fun `failed port forward lifecycle text includes failure reason`() {
-        val session = portForwardSession(ownerId = "repo-1").copy(
-            status = PortForwardSessionStatus.Failed,
-            message = "connection refused",
-        )
-
-        assertEquals("failed - connection refused", portForwardLifecycleText(session))
     }
 
     @Test
@@ -386,15 +344,6 @@ class RepositorySetupStateTest {
             alias = null,
             remotePath = remotePath,
         ).copy(id = id)
-
-    private fun portForwardSession(ownerId: String): PortForwardSession =
-        PortForwardSession(
-            id = "session-$ownerId",
-            owner = dev.goblin.android.domain.ssh.PortForwardOwner(id = ownerId, label = "App"),
-            request = PortForwardRequest.create(remotePort = 3000),
-            status = PortForwardSessionStatus.Active,
-            localPort = 49152,
-        )
 
     private fun terminalSession(
         id: String = "terminal-1",

@@ -1,10 +1,5 @@
 package dev.goblin.android.ui.screens.repositories
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,16 +32,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import dev.goblin.android.domain.ResourceState
-import dev.goblin.android.domain.ssh.PortForwardOwner
-import dev.goblin.android.domain.ssh.PortForwardRequest
-import dev.goblin.android.domain.ssh.PortForwardSession
-import dev.goblin.android.domain.ssh.PortForwardSessionStatus
-import dev.goblin.android.domain.ssh.canCreatePortForward
 import dev.goblin.android.domain.ssh.RemoteDirectoryEntry
 import dev.goblin.android.domain.ssh.RemoteRepositoryBranch
-import dev.goblin.android.domain.ssh.RemoteRepositoryCommit
 import dev.goblin.android.domain.ssh.RemoteRepositoryInspection
 import dev.goblin.android.domain.ssh.RemoteRepositoryProfile
 import dev.goblin.android.domain.ssh.RemoteRepositorySnapshot
@@ -63,10 +51,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 internal enum class RepositoryWorkspaceTab(val label: String) {
-    Status("Status"),
     Branches("Branches"),
-    Commits("Commits"),
     Worktrees("Worktrees"),
+    Changes("Changes"),
+    Commits("Commits"),
     Ports("Ports"),
     Terminal("Terminal"),
 }
@@ -83,7 +71,16 @@ internal fun canSaveRepository(host: SshHostProfile?, remotePath: String): Boole
     host?.identityRefId != null && remotePath.trim().startsWith("/")
 
 internal fun repositoryWorkspaceTabs(repository: RemoteRepositoryProfile): List<RepositoryWorkspaceTab> =
-    if (repository.remotePath.startsWith("/")) RepositoryWorkspaceTab.entries else emptyList()
+    if (repository.remotePath.startsWith("/")) {
+        listOf(
+            RepositoryWorkspaceTab.Branches,
+            RepositoryWorkspaceTab.Worktrees,
+            RepositoryWorkspaceTab.Changes,
+            RepositoryWorkspaceTab.Terminal,
+        )
+    } else {
+        emptyList()
+    }
 
 internal fun repositoryWorkspaceTabsUseScrollableStrip(tabs: List<RepositoryWorkspaceTab>): Boolean =
     tabs.size > CompactWorkspaceTabLimit
@@ -91,7 +88,7 @@ internal fun repositoryWorkspaceTabsUseScrollableStrip(tabs: List<RepositoryWork
 internal fun repositoryWorkspaceTabIndex(
     tabs: List<RepositoryWorkspaceTab>,
     selectedTab: RepositoryWorkspaceTab,
-    fallback: RepositoryWorkspaceTab = RepositoryWorkspaceTab.Status,
+    fallback: RepositoryWorkspaceTab = RepositoryWorkspaceTab.Branches,
 ): Int {
     val selectedIndex = tabs.indexOf(selectedTab)
     if (selectedIndex >= 0) return selectedIndex
@@ -150,28 +147,6 @@ internal fun worktreeBadges(worktree: RemoteRepositoryWorktree): List<String> =
         if (worktree.isDirty) add("dirty ${worktree.changeCount}")
         if (worktree.isBare) add("bare")
     }
-
-internal fun portForwardOwner(repository: RemoteRepositoryProfile): PortForwardOwner =
-    PortForwardOwner(id = repository.id, label = repository.title)
-
-internal fun portForwardSessionsForRepository(
-    sessions: List<PortForwardSession>,
-    repositoryId: String,
-): List<PortForwardSession> = sessions.filter { it.owner.id == repositoryId }
-
-internal fun portForwardActionLabels(session: PortForwardSession): List<String> =
-    if (session.status == PortForwardSessionStatus.Active && session.localUrl != null) {
-        listOf("Open URL", "Copy URL", "Stop")
-    } else {
-        emptyList()
-    }
-
-internal fun portForwardLifecycleText(session: PortForwardSession): String = when (session.status) {
-    PortForwardSessionStatus.Starting -> "starting tunnel"
-    PortForwardSessionStatus.Active -> "active in this app session - stop it when the emergency task is done"
-    PortForwardSessionStatus.Stopped -> "stopped"
-    PortForwardSessionStatus.Failed -> session.message?.let { "failed - $it" } ?: "failed"
-}
 
 internal fun terminalWorkspaceSessions(
     sessions: List<TerminalSessionRecord>,
@@ -485,16 +460,11 @@ fun RepositoryWorkspaceScreen(
     onDeleteRepository: () -> Unit,
     onCreateWorktree: (String, String) -> Unit = { _, _ -> },
     onRemoveWorktree: (RemoteRepositoryWorktree) -> Unit = {},
-    portForwardSessions: List<PortForwardSession> = emptyList(),
-    onStartPortForward: (PortForwardRequest) -> PortForwardSession = {
-        throw UnsupportedOperationException("Port forwarding is not available")
-    },
-    onStopPortForward: (String) -> PortForwardSession? = { null },
 ) {
     var selectedTab by remember(repository.id) {
         mutableStateOf(
             if (initialTerminalWorkspacePath == null) {
-                RepositoryWorkspaceTab.Status
+                RepositoryWorkspaceTab.Branches
             } else {
                 RepositoryWorkspaceTab.Terminal
             },
@@ -505,9 +475,6 @@ fun RepositoryWorkspaceScreen(
     }
     var snapshotState: ResourceState<RemoteRepositorySnapshot> by remember(repository.id) {
         mutableStateOf(ResourceState.Idle)
-    }
-    var visiblePortForwards by remember(repository.id) {
-        mutableStateOf(portForwardSessionsForRepository(portForwardSessions, repository.id))
     }
     var confirmDelete by remember(repository.id) { mutableStateOf(false) }
     var removeTarget by remember(repository.id) { mutableStateOf<RemoteRepositoryWorktree?>(null) }
@@ -531,39 +498,6 @@ fun RepositoryWorkspaceScreen(
                     )
                 },
             )
-        }
-    }
-
-    fun upsertPortForwardSession(session: PortForwardSession) {
-        visiblePortForwards = portForwardSessionsForRepository(
-            visiblePortForwards.filterNot { it.id == session.id } + session,
-            repository.id,
-        )
-    }
-
-    fun startPortForward(request: PortForwardRequest) {
-        actionError = null
-        scope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) { onStartPortForward(request) }
-            }.onSuccess { session ->
-                upsertPortForwardSession(session)
-            }.onFailure {
-                actionError = it.message ?: "Port forward failed"
-            }
-        }
-    }
-
-    fun stopPortForward(sessionId: String) {
-        actionError = null
-        scope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) { onStopPortForward(sessionId) }
-            }.onSuccess { session ->
-                if (session != null) upsertPortForwardSession(session)
-            }.onFailure {
-                actionError = it.message ?: "Stop port forward failed"
-            }
         }
     }
 
@@ -687,21 +621,10 @@ fun RepositoryWorkspaceScreen(
                 onSelectTab = { selectedTab = it },
             )
             when (selectedTab) {
-                RepositoryWorkspaceTab.Status -> RepositoryStatusPanel(
-                    repository = repository,
-                    snapshotState = snapshotState,
-                    onRefresh = { refreshSnapshot() },
-                )
-
                 RepositoryWorkspaceTab.Branches -> RepositoryBranchesPanel(
                     snapshotState = snapshotState,
                     onRefresh = { refreshSnapshot() },
                     onSelectTerminalWorkspace = ::selectTerminalWorkspace,
-                )
-
-                RepositoryWorkspaceTab.Commits -> RepositoryCommitsPanel(
-                    snapshotState = snapshotState,
-                    onRefresh = { refreshSnapshot() },
                 )
 
                 RepositoryWorkspaceTab.Worktrees -> RepositoryWorktreesPanel(
@@ -713,13 +636,14 @@ fun RepositoryWorkspaceScreen(
                     onRemoveWorktree = { removeTarget = it },
                 )
 
-                RepositoryWorkspaceTab.Ports -> RepositoryPortsPanel(
+                RepositoryWorkspaceTab.Changes -> RepositoryChangesPanel(
                     repository = repository,
-                    sessions = visiblePortForwards,
-                    onStartPortForward = ::startPortForward,
-                    onStopPortForward = ::stopPortForward,
+                    snapshotState = snapshotState,
+                    onRefresh = { refreshSnapshot() },
                 )
 
+                RepositoryWorkspaceTab.Commits -> Unit
+                RepositoryWorkspaceTab.Ports -> Unit
                 RepositoryWorkspaceTab.Terminal -> RepositoryTerminalPanel(
                     repositoryId = repository.id,
                     path = selectedTerminalWorkspacePath,
@@ -813,124 +737,6 @@ private fun RepositoryWorkspaceTabStrip(
 }
 
 @Composable
-private fun RepositoryPortsPanel(
-    repository: RemoteRepositoryProfile,
-    sessions: List<PortForwardSession>,
-    onStartPortForward: (PortForwardRequest) -> Unit,
-    onStopPortForward: (String) -> Unit,
-) {
-    var remotePort by remember(repository.id) { mutableStateOf("") }
-    var localPort by remember(repository.id) { mutableStateOf("") }
-    var error by remember(repository.id) { mutableStateOf<String?>(null) }
-    val context = LocalContext.current
-
-    fun startForward() {
-        runCatching {
-            PortForwardRequest.fromInput(remotePort = remotePort, localPort = localPort)
-        }.onSuccess { request ->
-            error = null
-            onStartPortForward(request)
-        }.onFailure {
-            error = it.message ?: "Invalid port forward"
-        }
-    }
-
-    Column(verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm)) {
-        Card(Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(GoblinSpacing.Md),
-                verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
-            ) {
-                Text("Forward service", style = MaterialTheme.typography.titleMedium)
-                Text("Remote host defaults to 127.0.0.1. Tunnels are runtime sessions in this app.")
-                OutlinedTextField(
-                    modifier = Modifier.fillMaxWidth(),
-                    value = remotePort,
-                    onValueChange = { remotePort = it },
-                    label = { Text("Remote port") },
-                    singleLine = true,
-                )
-                OutlinedTextField(
-                    modifier = Modifier.fillMaxWidth(),
-                    value = localPort,
-                    onValueChange = { localPort = it },
-                    label = { Text("Local port (optional)") },
-                    singleLine = true,
-                )
-                Button(
-                    enabled = canCreatePortForward(remotePort = remotePort, localPort = localPort),
-                    onClick = { startForward() },
-                ) {
-                    Text("Start tunnel")
-                }
-                error?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                }
-            }
-        }
-
-        if (sessions.isEmpty()) {
-            Text("No port forwards for this project.")
-        } else {
-            sessions.forEach { session ->
-                PortForwardRow(
-                    session = session,
-                    onOpenUrl = { url -> openPortForwardUrl(context, url) },
-                    onCopyUrl = { url -> copyPortForwardUrl(context, url) },
-                    onStop = onStopPortForward,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun PortForwardRow(
-    session: PortForwardSession,
-    onOpenUrl: (String) -> Unit,
-    onCopyUrl: (String) -> Unit,
-    onStop: (String) -> Unit,
-) {
-    Card(Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(GoblinSpacing.Md),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs)) {
-                Text("${session.request.remoteHost}:${session.request.remotePort}", style = MaterialTheme.typography.bodyMedium)
-                Text(session.localUrl ?: "no local URL", style = MaterialTheme.typography.bodySmall)
-                Text(portForwardLifecycleText(session), style = MaterialTheme.typography.labelMedium)
-            }
-            Column {
-                if (session.status == PortForwardSessionStatus.Active) {
-                    session.localUrl?.let { url ->
-                        TextButton(onClick = { onOpenUrl(url) }) {
-                            Text("Open URL")
-                        }
-                        TextButton(onClick = { onCopyUrl(url) }) {
-                            Text("Copy URL")
-                        }
-                    }
-                    TextButton(onClick = { onStop(session.id) }) {
-                        Text("Stop")
-                    }
-                }
-            }
-        }
-    }
-}
-
-private fun copyPortForwardUrl(context: Context, url: String) {
-    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    clipboard.setPrimaryClip(ClipData.newPlainText("Goblin port forward", url))
-}
-
-private fun openPortForwardUrl(context: Context, url: String) {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    context.startActivity(intent)
-}
-
-@Composable
 private fun DeleteRepositoryDialog(
     repository: RemoteRepositoryProfile,
     onConfirm: () -> Unit,
@@ -956,7 +762,7 @@ private fun DeleteRepositoryDialog(
 }
 
 @Composable
-private fun RepositoryStatusPanel(
+private fun RepositoryChangesPanel(
     repository: RemoteRepositoryProfile,
     snapshotState: ResourceState<RemoteRepositorySnapshot>,
     onRefresh: () -> Unit,
@@ -967,7 +773,7 @@ private fun RepositoryStatusPanel(
                 modifier = Modifier.padding(GoblinSpacing.Md),
                 verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
             ) {
-                Text("Status", style = MaterialTheme.typography.titleMedium)
+                Text("Changes", style = MaterialTheme.typography.titleMedium)
                 Text(snapshot.currentRef ?: repository.remotePath, style = MaterialTheme.typography.bodySmall)
                 snapshot.defaultBranch?.let {
                     Text("default $it", style = MaterialTheme.typography.labelMedium)
@@ -1030,40 +836,6 @@ private fun BranchRow(
                     Text("Terminal")
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun RepositoryCommitsPanel(
-    snapshotState: ResourceState<RemoteRepositorySnapshot>,
-    onRefresh: () -> Unit,
-) {
-    SnapshotContent(snapshotState = snapshotState, onRefresh = onRefresh) { snapshot ->
-        Column(verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm)) {
-            if (snapshot.commits.isEmpty()) {
-                Text("No commits found.")
-            } else {
-                snapshot.commits.forEach { commit ->
-                    CommitRow(commit = commit)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CommitRow(commit: RemoteRepositoryCommit) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(GoblinSpacing.Md),
-            verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
-        ) {
-            Text(commit.subject, style = MaterialTheme.typography.bodyMedium)
-            Text(
-                listOfNotNull(commit.shortHash, commit.authorName, commit.relativeDate).joinToString(" - "),
-                style = MaterialTheme.typography.bodySmall,
-            )
         }
     }
 }

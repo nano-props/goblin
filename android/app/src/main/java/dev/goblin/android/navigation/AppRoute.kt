@@ -1,7 +1,10 @@
 package dev.goblin.android.navigation
 
+import dev.goblin.android.terminal.TerminalSessionRecord
+
 sealed interface AppRoute {
     data object Hosts : AppRoute
+    data object Projects : AppRoute
     data object AddHost : AppRoute
     data object AddRepository : AppRoute
     data object Settings : AppRoute
@@ -17,4 +20,14 @@ sealed interface AppRoute {
         val repositoryId: String? = null,
         val terminalSessionId: String? = null,
     ) : AppRoute
+
+    companion object {
+        fun terminal(session: TerminalSessionRecord): Terminal =
+            Terminal(
+                hostId = session.hostId,
+                remotePath = session.remotePath,
+                repositoryId = session.repositoryId,
+                terminalSessionId = session.id,
+            )
+    }
 }

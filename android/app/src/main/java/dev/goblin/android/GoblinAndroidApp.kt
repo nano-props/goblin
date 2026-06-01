@@ -2,6 +2,7 @@ package dev.goblin.android
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -11,7 +12,6 @@ import dev.goblin.android.data.HostProfileStore
 import dev.goblin.android.data.RemoteRepositoryStore
 import dev.goblin.android.data.ssh.SecureIdentityStore
 import dev.goblin.android.domain.ResourceState
-import dev.goblin.android.domain.ssh.PortForwardOwner
 import dev.goblin.android.domain.ssh.RemoteRepositoryProfile
 import dev.goblin.android.domain.ssh.RemoteTarget
 import dev.goblin.android.domain.ssh.SshHostProfile
@@ -21,15 +21,25 @@ import dev.goblin.android.ssh.RemoteWorktreeService
 import dev.goblin.android.ssh.PortForwardManager
 import dev.goblin.android.ssh.SshDiagnosticsService
 import dev.goblin.android.ssh.SshInitializationService
+import dev.goblin.android.navigation.AppRoute.Companion.terminal
 import dev.goblin.android.terminal.TerminalForegroundBridge
+import dev.goblin.android.terminal.TerminalNavigationRequest
 import dev.goblin.android.terminal.TerminalSessionManager
 import dev.goblin.android.terminal.TerminalSessionRecord
 import dev.goblin.android.ui.screens.addhost.AddHostScreen
 import dev.goblin.android.ui.screens.diagnostics.DiagnosticsScreen
+import dev.goblin.android.ui.navigation.MainTab
+import dev.goblin.android.ui.navigation.MainTabShell
+import dev.goblin.android.ui.screens.hosts.HOST_TEMPORARY_TERMINAL_REMOTE_PATH
 import dev.goblin.android.ui.screens.hosts.HostsScreen
+import dev.goblin.android.ui.screens.hosts.isHostTemporaryTerminal
 import dev.goblin.android.ui.screens.placeholders.SettingsPlaceholderScreen
+import dev.goblin.android.ui.screens.projects.ProjectsScreen
+import dev.goblin.android.ui.screens.ports.hostPortForwardOwner
 import dev.goblin.android.ui.screens.repositories.RepositorySetupScreen
 import dev.goblin.android.ui.screens.repositories.RepositoryWorkspaceScreen
+import dev.goblin.android.ui.screens.terminal.TerminalBackClosesSessionHint
+import dev.goblin.android.ui.screens.terminal.TerminalBackKeepsSessionHint
 import dev.goblin.android.ui.screens.terminal.TerminalScreen
 import dev.goblin.android.ui.screens.terminal.terminalTargetLabel
 import kotlinx.coroutines.launch
@@ -46,20 +56,14 @@ fun GoblinAndroidApp(
     initializationService: SshInitializationService,
     terminalSessionManager: TerminalSessionManager,
     terminalForegroundBridge: TerminalForegroundBridge,
-    initialTerminalSessionId: String? = null,
+    terminalNavigationRequest: TerminalNavigationRequest? = null,
 ) {
-    var route: AppRoute by remember(initialTerminalSessionId) {
-        val initialTerminalRoute = initialTerminalSessionId
-            ?.let { terminalSessionManager.session(it) }
-            ?.let {
-                AppRoute.Terminal(
-                    hostId = it.hostId,
-                    remotePath = it.remotePath,
-                    repositoryId = it.repositoryId,
-                    terminalSessionId = it.id,
-                )
-            }
-        mutableStateOf(initialTerminalRoute ?: AppRoute.Hosts)
+    var route: AppRoute by remember { mutableStateOf(AppRoute.Hosts) }
+
+    LaunchedEffect(terminalNavigationRequest?.sequence) {
+        val request = terminalNavigationRequest ?: return@LaunchedEffect
+        val record = terminalSessionManager.session(request.sessionId) ?: return@LaunchedEffect
+        route = terminal(record)
     }
     var hostsState: ResourceState<List<SshHostProfile>> by remember {
         mutableStateOf(ResourceState.Loaded(hostProfileStore.loadHosts()))
@@ -115,29 +119,82 @@ fun GoblinAndroidApp(
         reloadRepositories()
     }
 
-    when (val currentRoute = route) {
-        AppRoute.Hosts -> HostsScreen(
-            hostsState = hostsState,
-            repositories = currentRepositories(),
-            onAddHost = { route = AppRoute.AddHost },
-            onAddRepository = { route = AppRoute.AddRepository },
-            onOpenRepository = { repositoryId -> route = AppRoute.Repository(repositoryId) },
-            onDeleteRepository = { repositoryId ->
-                deleteRepositoryRecord(repositoryId)
-            },
-            onEditHost = { hostId -> route = AppRoute.EditHost(hostId) },
-            onDeleteHost = { hostId ->
-                currentRepositories()
-                    .filter { it.hostProfileId == hostId }
-                    .forEach { stopRepositoryRuntimeResources(it.id) }
-                hostProfileStore.deleteHost(hostId)
-                remoteRepositoryStore.deleteByHostId(hostId)
-                reloadHosts()
-                reloadRepositories()
-            },
-            onOpenDiagnostics = { hostId -> route = AppRoute.Diagnostics(hostId) },
-            onOpenSettings = { route = AppRoute.Settings },
+    fun selectMainTab(tab: MainTab) {
+        route = when (tab) {
+            MainTab.Hosts -> AppRoute.Hosts
+            MainTab.Projects -> AppRoute.Projects
+        }
+    }
+
+    fun mainTabForRoute(currentRoute: AppRoute): MainTab? = when (currentRoute) {
+        AppRoute.Hosts -> MainTab.Hosts
+        AppRoute.Projects -> MainTab.Projects
+        else -> null
+    }
+
+    fun openHostTemporaryTerminal(hostId: String) {
+        val host = currentHosts().firstOrNull { it.id == hostId } ?: return
+        val target = RemoteTarget.fromHostProfile(host, HOST_TEMPORARY_TERMINAL_REMOTE_PATH)
+        val session = terminalSessionManager.createNew(
+            target = target,
+            repositoryId = null,
+            targetLabel = terminalTargetLabel(host.title, HOST_TEMPORARY_TERMINAL_REMOTE_PATH),
         )
+        terminalForegroundBridge.sync()
+        route = AppRoute.Terminal(
+            hostId = hostId,
+            remotePath = HOST_TEMPORARY_TERMINAL_REMOTE_PATH,
+            repositoryId = null,
+            terminalSessionId = session.id,
+        )
+    }
+
+    fun closeHostTemporaryTerminal(sessionId: String?) {
+        sessionId?.let { terminalSessionManager.removeSession(it) }
+        terminalForegroundBridge.sync()
+    }
+
+    when (val currentRoute = route) {
+        AppRoute.Hosts,
+        AppRoute.Projects,
+        -> {
+            val selectedTab = mainTabForRoute(currentRoute) ?: MainTab.Hosts
+            MainTabShell(
+                selectedTab = selectedTab,
+                onSelectTab = ::selectMainTab,
+                onOpenSettings = { route = AppRoute.Settings },
+                hostsContent = {
+                    HostsScreen(
+                        hostsState = hostsState,
+                        onAddHost = { route = AppRoute.AddHost },
+                        onEditHost = { hostId -> route = AppRoute.EditHost(hostId) },
+                        onDeleteHost = { hostId ->
+                            portForwardManager.stopOwner(hostId)
+                            currentRepositories()
+                                .filter { it.hostProfileId == hostId }
+                                .forEach { stopRepositoryRuntimeResources(it.id) }
+                            hostProfileStore.deleteHost(hostId)
+                            remoteRepositoryStore.deleteByHostId(hostId)
+                            reloadHosts()
+                            reloadRepositories()
+                        },
+                        onOpenDiagnostics = { hostId -> route = AppRoute.Diagnostics(hostId) },
+                        onOpenTerminal = ::openHostTemporaryTerminal,
+                    )
+                },
+                projectsContent = {
+                    ProjectsScreen(
+                        repositoriesState = repositoriesState,
+                        hosts = currentHosts(),
+                        onAddProject = { route = AppRoute.AddRepository },
+                        onOpenProject = { repositoryId -> route = AppRoute.Repository(repositoryId) },
+                        onDeleteProject = { repositoryId ->
+                            deleteRepositoryRecord(repositoryId)
+                        },
+                    )
+                },
+            )
+        }
 
         AppRoute.AddHost -> AddHostScreen(
             initialHost = null,
@@ -185,39 +242,40 @@ fun GoblinAndroidApp(
             if (host == null) {
                 route = AppRoute.Hosts
             } else {
-                val repositories = currentRepositories().filter { it.hostProfileId == host.id }
                 fun routeHost(): SshHostProfile =
                     currentHosts().firstOrNull { it.id == currentRoute.hostId } ?: host
 
                 DiagnosticsScreen(
                     host = host,
-                    repositories = repositories,
                     onBack = { route = AppRoute.Hosts },
                     onOpenTerminal = { route = AppRoute.Terminal(currentRoute.hostId) },
-                    onOpenRepository = { repositoryId -> route = AppRoute.Repository(repositoryId) },
-                    onOpenRepositoryTerminal = { repository ->
-                        route = AppRoute.Terminal(currentRoute.hostId, repository.remotePath, repository.id)
-                    },
                     onCheckSshInitialization = { initializationService.check(routeHost()) },
                     onInitializeSshAccess = { password ->
                         val result = initializationService.initialize(routeHost(), password)
                         hostProfileStore.saveHost(result.profile)
                         reloadHosts()
                     },
-                    onRunDiagnostics = { diagnosticsService.runDiagnostics(RemoteTarget.fromHostProfile(routeHost())) },
+                    onRunDiagnostics = {
+                        val currentHost = routeHost()
+                        val result = diagnosticsService.runDiagnostics(RemoteTarget.fromHostProfile(currentHost))
+                        hostProfileStore.saveHost(
+                            currentHost.copy(lastDiagnosticStatus = if (result.ok) "healthy" else "unhealthy"),
+                        )
+                        reloadHosts()
+                        result
+                    },
                     onTrustHostKey = { fingerprint ->
                         initializationService.trustHostKey(routeHost(), fingerprint)
                     },
-                    onSaveRepository = { repository ->
-                        remoteRepositoryStore.saveRepository(repository)
-                        reloadRepositories()
+                    portForwardSessions = portForwardManager.sessions(host.id),
+                    onStartPortForward = { request ->
+                        portForwardManager.start(
+                            owner = hostPortForwardOwner(routeHost()),
+                            target = RemoteTarget.fromHostProfile(routeHost()),
+                            request = request,
+                        )
                     },
-                    onInspectRepository = { remotePath ->
-                        remoteRepositoryGitService.inspectRepository(RemoteTarget.fromHostProfile(routeHost(), remotePath))
-                    },
-                    onDeleteRepository = { repositoryId ->
-                        deleteRepositoryRecord(repositoryId)
-                    },
+                    onStopPortForward = { sessionId -> portForwardManager.stop(sessionId) },
                 )
             }
         }
@@ -225,7 +283,7 @@ fun GoblinAndroidApp(
         AppRoute.AddRepository -> RepositorySetupScreen(
             hosts = currentHosts(),
             repositories = currentRepositories(),
-            onBack = { route = AppRoute.Hosts },
+            onBack = { route = AppRoute.Projects },
             onSaveRepository = { repository ->
                 remoteRepositoryStore.saveRepository(repository)
                 reloadRepositories()
@@ -246,12 +304,12 @@ fun GoblinAndroidApp(
             val repository = currentRepositories().firstOrNull { it.id == currentRoute.repositoryId }
             val host = repository?.let { repo -> currentHosts().firstOrNull { it.id == repo.hostProfileId } }
             if (repository == null || host == null) {
-                route = AppRoute.Hosts
+                route = AppRoute.Projects
             } else {
                 RepositoryWorkspaceScreen(
                     host = host,
                     repository = repository,
-                    onBack = { route = AppRoute.Hosts },
+                    onBack = { route = AppRoute.Projects },
                     onLoadSnapshot = {
                         remoteRepositoryGitService.loadSnapshot(
                             RemoteTarget.fromHostProfile(host, repository.remotePath),
@@ -282,7 +340,7 @@ fun GoblinAndroidApp(
                     },
                     onDeleteRepository = {
                         deleteRepositoryRecord(repository.id)
-                        route = AppRoute.Hosts
+                        route = AppRoute.Projects
                     },
                     onCreateWorktree = { branch, worktreePath ->
                         remoteWorktreeService.createWorktree(
@@ -299,18 +357,6 @@ fun GoblinAndroidApp(
                         terminalSessionManager.removeWorkspaceSessions(repository.id, worktree.path)
                         terminalForegroundBridge.sync()
                     },
-                    portForwardSessions = portForwardManager.sessions(repository.id),
-                    onStartPortForward = { request ->
-                        portForwardManager.start(
-                            owner = PortForwardOwner(
-                                id = repository.id,
-                                label = repository.title,
-                            ),
-                            target = RemoteTarget.fromHostProfile(host, repository.remotePath),
-                            request = request,
-                        )
-                    },
-                    onStopPortForward = { sessionId -> portForwardManager.stop(sessionId) },
                 )
             }
         }
@@ -329,12 +375,27 @@ fun GoblinAndroidApp(
                     repositoryId = currentRoute.repositoryId,
                     targetLabel = terminalTargetLabel(repository?.title ?: host.title, currentRoute.remotePath),
                     terminalSessionId = currentRoute.terminalSessionId,
+                    backHint = if (isHostTemporaryTerminal(currentRoute.remotePath, currentRoute.repositoryId)) {
+                        TerminalBackClosesSessionHint
+                    } else {
+                        TerminalBackKeepsSessionHint
+                    },
                     terminalSessionManager = terminalSessionManager,
                     terminalForegroundBridge = terminalForegroundBridge,
                     onBack = {
-                        route = currentRoute.repositoryId
-                            ?.let { AppRoute.Repository(it, terminalWorkspacePath = currentRoute.remotePath) }
-                            ?: AppRoute.Diagnostics(currentRoute.hostId)
+                        when {
+                            isHostTemporaryTerminal(currentRoute.remotePath, currentRoute.repositoryId) -> {
+                                closeHostTemporaryTerminal(currentRoute.terminalSessionId)
+                                route = AppRoute.Hosts
+                            }
+                            currentRoute.repositoryId != null -> {
+                                route = AppRoute.Repository(
+                                    currentRoute.repositoryId,
+                                    terminalWorkspacePath = currentRoute.remotePath,
+                                )
+                            }
+                            else -> route = AppRoute.Diagnostics(currentRoute.hostId)
+                        }
                     },
                 )
             }

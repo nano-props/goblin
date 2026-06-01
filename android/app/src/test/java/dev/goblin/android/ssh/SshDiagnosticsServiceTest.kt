@@ -18,7 +18,8 @@ class SshDiagnosticsServiceTest {
         val result = service().runDiagnostics(target())
 
         assertTrue(result.ok)
-        assertEquals(List(5) { DiagnosticStatus.Passed }, result.stages.map { it.status })
+        assertEquals(listOf(DiagnosticStage.SSH, DiagnosticStage.Shell), result.stages.map { it.stage })
+        assertEquals(List(2) { DiagnosticStatus.Passed }, result.stages.map { it.status })
     }
 
     @Test
@@ -31,30 +32,25 @@ class SshDiagnosticsServiceTest {
     }
 
     @Test
-    fun `diagnostics report Git missing`() {
+    fun `host diagnostics do not run git path or repo probes`() {
+        val client = FakeSshClient(fingerprint = "SHA256:test", failures = emptyMap())
+        val result = SshDiagnosticsService(
+            client = client,
+            hostKeyStore = FakeHostKeyTrustStore("SHA256:test"),
+        ).runDiagnostics(target())
+
+        assertTrue(result.ok)
+        assertEquals(
+            listOf(SshDiagnosticProbe.CheckShell),
+            client.probes,
+        )
+    }
+
+    @Test
+    fun `git path and repo probe failures do not make host diagnostics unhealthy`() {
         val result = service(failures = mapOf(SshDiagnosticProbe.CheckGit to failed("git missing"))).runDiagnostics(target())
 
-        assertFalse(result.ok)
-        assertEquals(DiagnosticCategory.GitMissing, result.category)
-        assertStage(result, DiagnosticStage.Git, DiagnosticStatus.Failed)
-    }
-
-    @Test
-    fun `diagnostics report path missing`() {
-        val result = service(failures = mapOf(SshDiagnosticProbe.TestPath to failed("path missing"))).runDiagnostics(target())
-
-        assertFalse(result.ok)
-        assertEquals(DiagnosticCategory.PathMissing, result.category)
-        assertStage(result, DiagnosticStage.Path, DiagnosticStatus.Failed)
-    }
-
-    @Test
-    fun `diagnostics report not a repo`() {
-        val result = service(failures = mapOf(SshDiagnosticProbe.RevParseTopLevel to failed("not a repo"))).runDiagnostics(target())
-
-        assertFalse(result.ok)
-        assertEquals(DiagnosticCategory.NotARepo, result.category)
-        assertStage(result, DiagnosticStage.Repo, DiagnosticStatus.Failed)
+        assertTrue(result.ok)
     }
 
     @Test
