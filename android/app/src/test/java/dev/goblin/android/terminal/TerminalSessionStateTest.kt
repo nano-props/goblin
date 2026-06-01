@@ -2,10 +2,47 @@ package dev.goblin.android.terminal
 
 import dev.goblin.android.domain.ssh.RemoteTarget
 import dev.goblin.android.ssh.SshConnectionSecrets
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TerminalSessionStateTest {
+    @Test
+    fun `terminal record output snapshot keeps only recent content`() {
+        val snapshot = terminalOutputSnapshot("a".repeat(40_000))
+
+        assertEquals(TerminalSessionRecord.MaxOutputSnapshotChars, snapshot.length)
+    }
+
+    @Test
+    fun `terminal record with remote exit maps to exited state with reason`() {
+        val record = terminalRecord(
+            status = TerminalSessionStatus.Exited,
+            disconnectedReason = TerminalDisconnectedReason.RemoteExited,
+        )
+
+        val state = record.toTerminalSessionState()
+
+        assertTrue(state is TerminalSessionState.Exited)
+        assertEquals(TerminalDisconnectedReason.RemoteExited, (state as TerminalSessionState.Exited).reason)
+    }
+
+    @Test
+    fun `terminal record with stopped Android service maps to disconnected state with reason`() {
+        val record = terminalRecord(
+            status = TerminalSessionStatus.Disconnected,
+            disconnectedReason = TerminalDisconnectedReason.AndroidServiceStopped,
+        )
+
+        val state = record.toTerminalSessionState()
+
+        assertTrue(state is TerminalSessionState.Disconnected)
+        assertEquals(
+            TerminalDisconnectedReason.AndroidServiceStopped,
+            (state as TerminalSessionState.Disconnected).reason,
+        )
+    }
+
     @Test
     fun `terminal transitions connected to exited`() {
         val service = ControlledTerminalSessionFactory()
@@ -38,6 +75,23 @@ class TerminalSessionStateTest {
         identityRefId = null,
     )
 
+    private fun terminalRecord(
+        status: TerminalSessionStatus,
+        disconnectedReason: TerminalDisconnectedReason?,
+    ): TerminalSessionRecord = TerminalSessionRecord(
+        id = "terminal-1",
+        hostId = "lee@example.com:22/",
+        repositoryId = "repo-1",
+        remotePath = "/srv/app",
+        targetLabel = "App - /srv/app",
+        status = status,
+        lastOutputSnapshot = "recent output",
+        lastActivityAt = 200L,
+        openedAt = 100L,
+        foregroundServiceOwned = false,
+        disconnectedReason = disconnectedReason,
+    )
+
     private class ControlledTerminalSessionFactory : TerminalSessionFactory {
         private lateinit var onFailure: (Throwable) -> Unit
 
@@ -64,4 +118,3 @@ class TerminalSessionStateTest {
         }
     }
 }
-

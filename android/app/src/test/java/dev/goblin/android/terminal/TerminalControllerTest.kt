@@ -111,6 +111,31 @@ class TerminalControllerTest {
         assertEquals(32_000, state.output.length)
     }
 
+    @Test
+    fun `terminal output filters control sequences before display`() {
+        val service = FakeTerminalSessionFactory()
+        val controller = TerminalController(service)
+
+        controller.open(target())
+        service.emitOutput("\u001B[?2004h$ echo ok\n\u001B[?2004l")
+
+        val state = controller.state as TerminalSessionState.Connected
+        assertEquals("ready\n$ echo ok\n", state.output)
+    }
+
+    @Test
+    fun `terminal output filters split control sequences before display`() {
+        val service = FakeTerminalSessionFactory()
+        val controller = TerminalController(service)
+
+        controller.open(target())
+        service.emitOutput("\u001B[?20")
+        service.emitOutput("04hprompt")
+
+        val state = controller.state as TerminalSessionState.Connected
+        assertEquals("ready\nprompt", state.output)
+    }
+
     private fun target(): RemoteTarget = RemoteTarget(
         id = "lee@example.com:22/",
         alias = "Dev",

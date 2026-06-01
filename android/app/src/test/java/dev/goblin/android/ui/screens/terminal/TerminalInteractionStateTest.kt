@@ -1,6 +1,7 @@
 package dev.goblin.android.ui.screens.terminal
 
 import dev.goblin.android.terminal.TerminalSessionState
+import dev.goblin.android.terminal.TerminalDisconnectedReason
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -12,6 +13,14 @@ class TerminalInteractionStateTest {
     fun `input is unavailable until terminal is connected`() {
         assertFalse(terminalInputAvailable(TerminalSessionState.Idle))
         assertFalse(terminalInputAvailable(TerminalSessionState.Connecting))
+        assertFalse(
+            terminalInputAvailable(
+                TerminalSessionState.Disconnected(
+                    sessionId = "session-1",
+                    reason = TerminalDisconnectedReason.AndroidServiceStopped,
+                ),
+            ),
+        )
         assertTrue(terminalInputAvailable(TerminalSessionState.Connected("session-1", "", 80, 24)))
     }
 
@@ -32,6 +41,21 @@ class TerminalInteractionStateTest {
             terminalInputUnavailableMessage(TerminalSessionState.Exited("session-1")),
         )
         assertNull(terminalInputUnavailableMessage(TerminalSessionState.Connected("session-1", "", 80, 24)))
+    }
+
+    @Test
+    fun `disconnected display text includes last output and reason label`() {
+        val text = terminalDisplayText(
+            TerminalSessionState.Disconnected(
+                sessionId = "session-1",
+                reason = TerminalDisconnectedReason.AndroidServiceStopped,
+                output = "last output",
+            ),
+        )
+
+        assertTrue(text.contains("last output"))
+        assertTrue(text.contains("disconnected", ignoreCase = true))
+        assertTrue(text.contains("Android service stopped"))
     }
 
     @Test

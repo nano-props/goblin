@@ -36,13 +36,13 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import dev.goblin.android.domain.ssh.RemoteTarget
 import dev.goblin.android.domain.ssh.SshHostProfile
-import dev.goblin.android.terminal.TerminalController
-import dev.goblin.android.terminal.TerminalSessionFactory
+import dev.goblin.android.terminal.TerminalForegroundBridge
+import dev.goblin.android.terminal.TerminalSessionManager
 import dev.goblin.android.terminal.TerminalSessionState
+import dev.goblin.android.terminal.toTerminalSessionState
 import dev.goblin.android.ui.theme.GoblinColors
 import dev.goblin.android.ui.theme.GoblinSpacing
 import kotlin.math.roundToInt
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -52,45 +52,58 @@ import kotlinx.coroutines.withContext
 fun TerminalScreen(
     host: SshHostProfile,
     remotePath: String = "/",
-    terminalService: TerminalSessionFactory,
+    repositoryId: String? = null,
+    targetLabel: String = terminalTargetLabel(host.title, remotePath),
+    terminalSessionId: String? = null,
+    terminalSessionManager: TerminalSessionManager,
+    terminalForegroundBridge: TerminalForegroundBridge,
     onBack: () -> Unit,
 ) {
     var terminalState: TerminalSessionState by remember { mutableStateOf(TerminalSessionState.Idle) }
+    var activeSessionId by remember(host, remotePath, repositoryId, terminalSessionId) {
+        mutableStateOf(terminalSessionId)
+    }
     var input by remember { mutableStateOf("") }
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val controller = remember(terminalService, scope) {
-        TerminalController(terminalService = terminalService) { next ->
-            scope.launch { terminalState = next }
-        }
-    }
     val target = remember(host, remotePath) { RemoteTarget.fromHostProfile(host, remotePath) }
     var inputNotice by remember { mutableStateOf<String?>(null) }
     val inputAvailable = terminalInputAvailable(terminalState)
 
     fun connect() {
         scope.launch {
-            withContext(Dispatchers.IO) {
-                controller.open(target)
+            val record = withContext(Dispatchers.IO) {
+                terminalSessionManager.createOrAttach(
+                    target = target,
+                    repositoryId = repositoryId,
+                    targetLabel = targetLabel,
+                )
             }
+            activeSessionId = record.id
+            terminalState = record.toTerminalSessionState()
+            terminalForegroundBridge.sync()
         }
     }
 
     fun sendTerminalInput(value: String, onResult: (Boolean) -> Unit = {}) {
         scope.launch {
+            val sessionId = activeSessionId
             val sent = withContext(Dispatchers.IO) {
-                controller.sendInput(value)
+                sessionId?.let { terminalSessionManager.sendInput(it, value) } ?: false
             }
+            terminalForegroundBridge.sync()
             onResult(sent)
         }
     }
 
     fun closeTerminal() {
         scope.launch {
+            val sessionId = activeSessionId
             withContext(Dispatchers.IO) {
-                controller.close()
+                if (sessionId != null) terminalSessionManager.close(sessionId)
             }
+            terminalForegroundBridge.sync()
         }
     }
 
@@ -112,18 +125,36 @@ fun TerminalScreen(
         }
     }
 
-    DisposableEffect(controller) {
-        onDispose {
-            CoroutineScope(Dispatchers.IO).launch {
-                controller.close()
+    DisposableEffect(activeSessionId) {
+        val sessionId = activeSessionId
+        if (sessionId == null) {
+            onDispose { }
+        } else {
+            val observer = terminalSessionManager.observe(sessionId) { record ->
+                scope.launch {
+                    terminalState = record.toTerminalSessionState()
+                    terminalForegroundBridge.sync()
+                }
+            }
+            onDispose {
+                observer.close()
             }
         }
     }
 
-    LaunchedEffect(target) {
-        withContext(Dispatchers.IO) {
-            controller.open(target)
+    LaunchedEffect(target, repositoryId, targetLabel, terminalSessionId) {
+        val record = withContext(Dispatchers.IO) {
+            terminalSessionId
+                ?.let { terminalSessionManager.session(it) }
+                ?: terminalSessionManager.createOrAttach(
+                    target = target,
+                    repositoryId = repositoryId,
+                    targetLabel = targetLabel,
+                )
         }
+        activeSessionId = record.id
+        terminalState = record.toTerminalSessionState()
+        terminalForegroundBridge.sync()
     }
 
     LaunchedEffect(terminalState) {
@@ -149,9 +180,10 @@ fun TerminalScreen(
         ) {
             val cols = (maxWidth.value / 8f).roundToInt().coerceIn(20, 180)
             val rows = (maxHeight.value / 18f).roundToInt().coerceIn(6, 80)
-            LaunchedEffect(cols, rows) {
+            LaunchedEffect(activeSessionId, cols, rows) {
+                val sessionId = activeSessionId
                 withContext(Dispatchers.IO) {
-                    controller.resize(cols, rows)
+                    if (sessionId != null) terminalSessionManager.resize(sessionId, cols, rows)
                 }
             }
 
@@ -188,8 +220,9 @@ fun TerminalScreen(
                                 ?.toString()
                                 .orEmpty()
                             val pasted = withContext(Dispatchers.IO) {
-                                controller.paste(text)
+                                activeSessionId?.let { terminalSessionManager.paste(it, text) } ?: false
                             }
+                            terminalForegroundBridge.sync()
                             inputNotice = if (pasted) null else "Terminal is not connected."
                         }
                     },
@@ -253,6 +286,7 @@ private fun TerminalStatusStrip(host: SshHostProfile, remotePath: String, state:
         is TerminalSessionState.Resizing -> "resizing"
         is TerminalSessionState.Exited -> "exited"
         is TerminalSessionState.Failed -> "failed"
+        is TerminalSessionState.Disconnected -> "disconnected"
     }
     Text(
         text = "${host.title} - ${remotePath.ifBlank { "/" }} - $status",
@@ -263,14 +297,7 @@ private fun TerminalStatusStrip(host: SshHostProfile, remotePath: String, state:
 
 @Composable
 private fun TerminalViewport(modifier: Modifier = Modifier, state: TerminalSessionState) {
-    val output = when (state) {
-        is TerminalSessionState.Connected -> state.output
-        is TerminalSessionState.Failed -> "$TerminalDisconnectedMessage\n${state.message}"
-        is TerminalSessionState.Exited -> TerminalDisconnectedMessage
-        TerminalSessionState.Connecting -> "Connecting..."
-        is TerminalSessionState.Resizing -> "Resizing..."
-        TerminalSessionState.Idle -> ""
-    }
+    val output = terminalDisplayText(state)
     val verticalScrollState = rememberScrollState()
     val horizontalScrollState = rememberScrollState()
     LaunchedEffect(output) {

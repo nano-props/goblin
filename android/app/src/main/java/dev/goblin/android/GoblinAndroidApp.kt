@@ -1,9 +1,11 @@
 package dev.goblin.android
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import dev.goblin.android.data.HostProfileStore
 import dev.goblin.android.data.RemoteRepositoryStore
@@ -19,7 +21,9 @@ import dev.goblin.android.ssh.RemoteWorktreeService
 import dev.goblin.android.ssh.PortForwardManager
 import dev.goblin.android.ssh.SshDiagnosticsService
 import dev.goblin.android.ssh.SshInitializationService
-import dev.goblin.android.terminal.TerminalSessionFactory
+import dev.goblin.android.terminal.TerminalForegroundBridge
+import dev.goblin.android.terminal.TerminalSessionManager
+import dev.goblin.android.terminal.TerminalSessionRecord
 import dev.goblin.android.ui.screens.addhost.AddHostScreen
 import dev.goblin.android.ui.screens.diagnostics.DiagnosticsScreen
 import dev.goblin.android.ui.screens.hosts.HostsScreen
@@ -27,6 +31,8 @@ import dev.goblin.android.ui.screens.placeholders.SettingsPlaceholderScreen
 import dev.goblin.android.ui.screens.repositories.RepositorySetupScreen
 import dev.goblin.android.ui.screens.repositories.RepositoryWorkspaceScreen
 import dev.goblin.android.ui.screens.terminal.TerminalScreen
+import dev.goblin.android.ui.screens.terminal.terminalTargetLabel
+import kotlinx.coroutines.launch
 
 @Composable
 fun GoblinAndroidApp(
@@ -38,14 +44,43 @@ fun GoblinAndroidApp(
     remoteWorktreeService: RemoteWorktreeService,
     portForwardManager: PortForwardManager,
     initializationService: SshInitializationService,
-    terminalService: TerminalSessionFactory,
+    terminalSessionManager: TerminalSessionManager,
+    terminalForegroundBridge: TerminalForegroundBridge,
+    initialTerminalSessionId: String? = null,
 ) {
-    var route: AppRoute by remember { mutableStateOf(AppRoute.Hosts) }
+    var route: AppRoute by remember(initialTerminalSessionId) {
+        val initialTerminalRoute = initialTerminalSessionId
+            ?.let { terminalSessionManager.session(it) }
+            ?.let {
+                AppRoute.Terminal(
+                    hostId = it.hostId,
+                    remotePath = it.remotePath,
+                    repositoryId = it.repositoryId,
+                    terminalSessionId = it.id,
+                )
+            }
+        mutableStateOf(initialTerminalRoute ?: AppRoute.Hosts)
+    }
     var hostsState: ResourceState<List<SshHostProfile>> by remember {
         mutableStateOf(ResourceState.Loaded(hostProfileStore.loadHosts()))
     }
     var repositoriesState: ResourceState<List<RemoteRepositoryProfile>> by remember {
         mutableStateOf(ResourceState.Loaded(remoteRepositoryStore.loadRepositories()))
+    }
+    var terminalSessions: List<TerminalSessionRecord> by remember {
+        mutableStateOf(terminalSessionManager.sessions())
+    }
+    val scope = rememberCoroutineScope()
+
+    DisposableEffect(terminalSessionManager) {
+        val observer = terminalSessionManager.observeSessions { sessions ->
+            scope.launch {
+                terminalSessions = sessions
+            }
+        }
+        onDispose {
+            observer.close()
+        }
     }
 
     fun reloadHosts() {
@@ -68,6 +103,18 @@ fun GoblinAndroidApp(
         else -> remoteRepositoryStore.loadRepositories()
     }
 
+    fun stopRepositoryRuntimeResources(repositoryId: String) {
+        portForwardManager.stopOwner(repositoryId)
+        terminalSessionManager.removeRepositorySessions(repositoryId)
+        terminalForegroundBridge.sync()
+    }
+
+    fun deleteRepositoryRecord(repositoryId: String) {
+        stopRepositoryRuntimeResources(repositoryId)
+        remoteRepositoryStore.deleteRepository(repositoryId)
+        reloadRepositories()
+    }
+
     when (val currentRoute = route) {
         AppRoute.Hosts -> HostsScreen(
             hostsState = hostsState,
@@ -76,15 +123,13 @@ fun GoblinAndroidApp(
             onAddRepository = { route = AppRoute.AddRepository },
             onOpenRepository = { repositoryId -> route = AppRoute.Repository(repositoryId) },
             onDeleteRepository = { repositoryId ->
-                portForwardManager.stopOwner(repositoryId)
-                remoteRepositoryStore.deleteRepository(repositoryId)
-                reloadRepositories()
+                deleteRepositoryRecord(repositoryId)
             },
             onEditHost = { hostId -> route = AppRoute.EditHost(hostId) },
             onDeleteHost = { hostId ->
                 currentRepositories()
                     .filter { it.hostProfileId == hostId }
-                    .forEach { portForwardManager.stopOwner(it.id) }
+                    .forEach { stopRepositoryRuntimeResources(it.id) }
                 hostProfileStore.deleteHost(hostId)
                 remoteRepositoryStore.deleteByHostId(hostId)
                 reloadHosts()
@@ -171,9 +216,7 @@ fun GoblinAndroidApp(
                         remoteRepositoryGitService.inspectRepository(RemoteTarget.fromHostProfile(routeHost(), remotePath))
                     },
                     onDeleteRepository = { repositoryId ->
-                        portForwardManager.stopOwner(repositoryId)
-                        remoteRepositoryStore.deleteRepository(repositoryId)
-                        reloadRepositories()
+                        deleteRepositoryRecord(repositoryId)
                     },
                 )
             }
@@ -188,9 +231,7 @@ fun GoblinAndroidApp(
                 reloadRepositories()
             },
             onDeleteRepository = { repositoryId ->
-                portForwardManager.stopOwner(repositoryId)
-                remoteRepositoryStore.deleteRepository(repositoryId)
-                reloadRepositories()
+                deleteRepositoryRecord(repositoryId)
             },
             onOpenRepository = { repositoryId -> route = AppRoute.Repository(repositoryId) },
             onBrowseDirectories = { host, remotePath ->
@@ -216,13 +257,31 @@ fun GoblinAndroidApp(
                             RemoteTarget.fromHostProfile(host, repository.remotePath),
                         )
                     },
-                    onOpenTerminalAtPath = { remotePath ->
-                        route = AppRoute.Terminal(host.id, remotePath, repository.id)
+                    initialTerminalWorkspacePath = currentRoute.terminalWorkspacePath,
+                    terminalSessions = terminalSessions,
+                    onCreateTerminalAtPath = { remotePath ->
+                        val session = terminalSessionManager.createNew(
+                            target = RemoteTarget.fromHostProfile(host, remotePath),
+                            repositoryId = repository.id,
+                            targetLabel = terminalTargetLabel(repository.title, remotePath),
+                        )
+                        terminalForegroundBridge.sync()
+                        session
+                    },
+                    onOpenTerminalSession = { session ->
+                        route = AppRoute.Terminal(
+                            hostId = host.id,
+                            remotePath = session.remotePath,
+                            repositoryId = repository.id,
+                            terminalSessionId = session.id,
+                        )
+                    },
+                    onDeleteTerminalSession = { sessionId ->
+                        terminalSessionManager.removeSession(sessionId)
+                        terminalForegroundBridge.sync()
                     },
                     onDeleteRepository = {
-                        portForwardManager.stopOwner(repository.id)
-                        remoteRepositoryStore.deleteRepository(repository.id)
-                        reloadRepositories()
+                        deleteRepositoryRecord(repository.id)
                         route = AppRoute.Hosts
                     },
                     onCreateWorktree = { branch, worktreePath ->
@@ -237,6 +296,8 @@ fun GoblinAndroidApp(
                             target = RemoteTarget.fromHostProfile(host, repository.remotePath),
                             worktree = worktree,
                         )
+                        terminalSessionManager.removeWorkspaceSessions(repository.id, worktree.path)
+                        terminalForegroundBridge.sync()
                     },
                     portForwardSessions = portForwardManager.sessions(repository.id),
                     onStartPortForward = { request ->
@@ -259,13 +320,20 @@ fun GoblinAndroidApp(
             if (host == null) {
                 route = AppRoute.Hosts
             } else {
+                val repository = currentRoute.repositoryId?.let { repositoryId ->
+                    currentRepositories().firstOrNull { it.id == repositoryId }
+                }
                 TerminalScreen(
                     host = host,
                     remotePath = currentRoute.remotePath,
-                    terminalService = terminalService,
+                    repositoryId = currentRoute.repositoryId,
+                    targetLabel = terminalTargetLabel(repository?.title ?: host.title, currentRoute.remotePath),
+                    terminalSessionId = currentRoute.terminalSessionId,
+                    terminalSessionManager = terminalSessionManager,
+                    terminalForegroundBridge = terminalForegroundBridge,
                     onBack = {
                         route = currentRoute.repositoryId
-                            ?.let { AppRoute.Repository(it) }
+                            ?.let { AppRoute.Repository(it, terminalWorkspacePath = currentRoute.remotePath) }
                             ?: AppRoute.Diagnostics(currentRoute.hostId)
                     },
                 )

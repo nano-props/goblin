@@ -12,13 +12,15 @@ class TerminalController(
 
     private var session: TerminalSession? = null
     private var output: String = ""
-    private var cols: Int = DefaultCols
-    private var rows: Int = DefaultRows
+    private val outputFilter = TerminalOutputFilter()
+    private var cols: Int = TerminalSessionDefaults.Cols
+    private var rows: Int = TerminalSessionDefaults.Rows
 
     fun open(target: RemoteTarget, secrets: SshConnectionSecrets = SshConnectionSecrets()) {
         session?.close()
         session = null
         output = ""
+        outputFilter.reset()
         update(TerminalSessionState.Connecting)
         runCatching {
             terminalService.openShell(
@@ -28,13 +30,19 @@ class TerminalController(
                 rows = rows,
                 onOutput = ::appendOutput,
                 onExit = { closeFromRemote() },
-                onFailure = { fail(it) },
+                onFailure = { fail(it, TerminalDisconnectedReason.SshDisconnected) },
             )
         }.onSuccess {
             session = it
             update(TerminalSessionState.Connected(it.id, output, cols, rows))
         }.onFailure {
-            update(TerminalSessionState.Failed(it.message ?: "Terminal failed", it))
+            update(
+                TerminalSessionState.Failed(
+                    message = it.message ?: "Terminal failed",
+                    cause = it,
+                    reason = TerminalDisconnectedReason.TerminalFailure,
+                ),
+            )
         }
     }
 
@@ -46,7 +54,7 @@ class TerminalController(
         }.fold(
             onSuccess = { true },
             onFailure = {
-                fail(it)
+                fail(it, TerminalDisconnectedReason.SshDisconnected)
                 false
             },
         )
@@ -69,7 +77,7 @@ class TerminalController(
                 true
             },
             onFailure = {
-                fail(it)
+                fail(it, TerminalDisconnectedReason.SshDisconnected)
                 false
             },
         )
@@ -79,11 +87,13 @@ class TerminalController(
         val current = session ?: return
         session = null
         runCatching { current.close() }
-        update(TerminalSessionState.Exited(current.id))
+        update(TerminalSessionState.Exited(current.id, reason = TerminalDisconnectedReason.UserClosed, output = output))
     }
 
     private fun appendOutput(value: String) {
-        output = (output + value).takeLast(MaxOutputChars)
+        val visibleOutput = outputFilter.append(value)
+        if (visibleOutput.isEmpty()) return
+        output = (output + visibleOutput).takeLast(MaxOutputChars)
         val current = session
         if (current != null) update(TerminalSessionState.Connected(current.id, output, cols, rows))
     }
@@ -91,12 +101,21 @@ class TerminalController(
     private fun closeFromRemote() {
         val current = session ?: return
         session = null
-        update(TerminalSessionState.Exited(current.id))
+        update(TerminalSessionState.Exited(current.id, reason = TerminalDisconnectedReason.RemoteExited, output = output))
     }
 
-    private fun fail(error: Throwable) {
+    private fun fail(error: Throwable, reason: TerminalDisconnectedReason) {
+        val current = session
         session = null
-        update(TerminalSessionState.Failed(error.message ?: "Terminal failed", error))
+        update(
+            TerminalSessionState.Failed(
+                message = error.message ?: "Terminal failed",
+                cause = error,
+                reason = reason,
+                sessionId = current?.id,
+                output = output,
+            ),
+        )
     }
 
     private fun update(next: TerminalSessionState) {
@@ -105,8 +124,6 @@ class TerminalController(
     }
 
     companion object {
-        private const val DefaultCols = 80
-        private const val DefaultRows = 24
         private const val MinCols = 20
         private const val MaxCols = 240
         private const val MinRows = 6

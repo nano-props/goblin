@@ -54,6 +54,9 @@ import dev.goblin.android.domain.ssh.RemoteRepositoryWorktree
 import dev.goblin.android.domain.ssh.SshHostProfile
 import dev.goblin.android.ssh.evaluateWorktreeRemoval
 import dev.goblin.android.ssh.worktreeRemovalConfirmationText
+import dev.goblin.android.terminal.TerminalDisconnectedReason
+import dev.goblin.android.terminal.TerminalSessionRecord
+import dev.goblin.android.terminal.TerminalSessionStatus
 import dev.goblin.android.ui.theme.GoblinSpacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -169,6 +172,79 @@ internal fun portForwardLifecycleText(session: PortForwardSession): String = whe
     PortForwardSessionStatus.Stopped -> "stopped"
     PortForwardSessionStatus.Failed -> session.message?.let { "failed - $it" } ?: "failed"
 }
+
+internal fun terminalWorkspaceSessions(
+    sessions: List<TerminalSessionRecord>,
+    repositoryId: String,
+    remotePath: String,
+): List<TerminalSessionRecord> =
+    sessions
+        .filter { it.repositoryId == repositoryId && it.remotePath == remotePath }
+        .sortedWith(terminalWorkspaceSessionComparator)
+
+internal fun terminalSessionDefaultLabel(index: Int): String = "Terminal ${index + 1}"
+
+internal fun terminalSessionStatusLabel(session: TerminalSessionRecord): String {
+    val base = when (session.status) {
+        TerminalSessionStatus.Starting -> "starting"
+        TerminalSessionStatus.Running -> "running"
+        TerminalSessionStatus.Exited -> "exited"
+        TerminalSessionStatus.Failed -> "failed"
+        TerminalSessionStatus.Disconnected -> "disconnected"
+    }
+    if (session.status == TerminalSessionStatus.Running && session.foregroundServiceOwned) {
+        return "$base - foreground"
+    }
+    val reason = session.disconnectedReason ?: return base
+    return when (session.status) {
+        TerminalSessionStatus.Exited,
+        TerminalSessionStatus.Failed,
+        TerminalSessionStatus.Disconnected,
+        -> "$base - ${terminalDisconnectedReasonLabel(reason)}"
+        TerminalSessionStatus.Starting,
+        TerminalSessionStatus.Running,
+        -> base
+    }
+}
+
+private fun terminalDisconnectedReasonLabel(reason: TerminalDisconnectedReason): String =
+    when (reason) {
+        TerminalDisconnectedReason.UserClosed -> "user closed"
+        TerminalDisconnectedReason.RemoteExited -> "remote exited"
+        TerminalDisconnectedReason.SshDisconnected -> "ssh disconnected"
+        TerminalDisconnectedReason.AndroidServiceStopped -> "android service stopped"
+        TerminalDisconnectedReason.TerminalFailure -> "terminal failure"
+    }
+
+internal fun terminalSessionActivityText(session: TerminalSessionRecord): String =
+    session.lastActivityAt?.let { "last activity $it" } ?: "opened ${session.openedAt}"
+
+internal fun requiresTerminalDeleteConfirmation(session: TerminalSessionRecord): Boolean =
+    session.status == TerminalSessionStatus.Starting || session.status == TerminalSessionStatus.Running
+
+internal fun terminalDeleteConfirmationText(label: String, session: TerminalSessionRecord): String =
+    "$label at ${session.remotePath} is still active. This will stop the terminal process and remove the terminal record."
+
+private data class TerminalDeleteTarget(
+    val session: TerminalSessionRecord,
+    val label: String,
+)
+
+private fun TerminalSessionStatus.terminalWorkspacePriority(): Int =
+    when (this) {
+        TerminalSessionStatus.Starting,
+        TerminalSessionStatus.Running,
+        -> 0
+        TerminalSessionStatus.Exited,
+        TerminalSessionStatus.Failed,
+        TerminalSessionStatus.Disconnected,
+        -> 1
+    }
+
+private val terminalWorkspaceSessionComparator: Comparator<TerminalSessionRecord> =
+    compareBy<TerminalSessionRecord> { it.status.terminalWorkspacePriority() }
+        .thenByDescending { it.lastActivityAt ?: it.openedAt }
+        .thenBy { it.openedAt }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -399,7 +475,13 @@ fun RepositoryWorkspaceScreen(
     repository: RemoteRepositoryProfile,
     onBack: () -> Unit,
     onLoadSnapshot: () -> RemoteRepositorySnapshot,
-    onOpenTerminalAtPath: (String) -> Unit,
+    initialTerminalWorkspacePath: String? = null,
+    terminalSessions: List<TerminalSessionRecord> = emptyList(),
+    onCreateTerminalAtPath: (String) -> TerminalSessionRecord = {
+        throw UnsupportedOperationException("Terminal sessions are not available")
+    },
+    onOpenTerminalSession: (TerminalSessionRecord) -> Unit = {},
+    onDeleteTerminalSession: (String) -> Unit = {},
     onDeleteRepository: () -> Unit,
     onCreateWorktree: (String, String) -> Unit = { _, _ -> },
     onRemoveWorktree: (RemoteRepositoryWorktree) -> Unit = {},
@@ -409,7 +491,18 @@ fun RepositoryWorkspaceScreen(
     },
     onStopPortForward: (String) -> PortForwardSession? = { null },
 ) {
-    var selectedTab by remember(repository.id) { mutableStateOf(RepositoryWorkspaceTab.Status) }
+    var selectedTab by remember(repository.id) {
+        mutableStateOf(
+            if (initialTerminalWorkspacePath == null) {
+                RepositoryWorkspaceTab.Status
+            } else {
+                RepositoryWorkspaceTab.Terminal
+            },
+        )
+    }
+    var selectedTerminalWorkspacePath by remember(repository.id) {
+        mutableStateOf(initialTerminalWorkspacePath ?: repositoryTerminalPath(repository))
+    }
     var snapshotState: ResourceState<RemoteRepositorySnapshot> by remember(repository.id) {
         mutableStateOf(ResourceState.Idle)
     }
@@ -418,6 +511,7 @@ fun RepositoryWorkspaceScreen(
     }
     var confirmDelete by remember(repository.id) { mutableStateOf(false) }
     var removeTarget by remember(repository.id) { mutableStateOf<RemoteRepositoryWorktree?>(null) }
+    var terminalDeleteTarget by remember(repository.id) { mutableStateOf<TerminalDeleteTarget?>(null) }
     var actionError by remember(repository.id) { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -500,8 +594,51 @@ fun RepositoryWorkspaceScreen(
         }
     }
 
+    fun selectTerminalWorkspace(path: String) {
+        selectedTerminalWorkspacePath = path
+        selectedTab = RepositoryWorkspaceTab.Terminal
+    }
+
+    fun createTerminal(path: String) {
+        actionError = null
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { onCreateTerminalAtPath(path) }
+            }.onSuccess { session ->
+                onOpenTerminalSession(session)
+            }.onFailure {
+                actionError = it.message ?: "Terminal create failed"
+            }
+        }
+    }
+
+    fun deleteTerminalSession(session: TerminalSessionRecord) {
+        actionError = null
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { onDeleteTerminalSession(session.id) }
+            }.onSuccess {
+                terminalDeleteTarget = null
+            }.onFailure {
+                actionError = it.message ?: "Terminal delete failed"
+            }
+        }
+    }
+
+    fun requestDeleteTerminalSession(session: TerminalSessionRecord, label: String) {
+        if (requiresTerminalDeleteConfirmation(session)) {
+            terminalDeleteTarget = TerminalDeleteTarget(session = session, label = label)
+        } else {
+            deleteTerminalSession(session)
+        }
+    }
+
     LaunchedEffect(repository.id) {
         refreshSnapshot()
+    }
+
+    LaunchedEffect(repository.id, initialTerminalWorkspacePath) {
+        initialTerminalWorkspacePath?.let { selectTerminalWorkspace(it) }
     }
 
     Scaffold(
@@ -559,7 +696,7 @@ fun RepositoryWorkspaceScreen(
                 RepositoryWorkspaceTab.Branches -> RepositoryBranchesPanel(
                     snapshotState = snapshotState,
                     onRefresh = { refreshSnapshot() },
-                    onOpenTerminalAtPath = onOpenTerminalAtPath,
+                    onSelectTerminalWorkspace = ::selectTerminalWorkspace,
                 )
 
                 RepositoryWorkspaceTab.Commits -> RepositoryCommitsPanel(
@@ -571,7 +708,7 @@ fun RepositoryWorkspaceScreen(
                     repository = repository,
                     snapshotState = snapshotState,
                     onRefresh = { refreshSnapshot() },
-                    onOpenTerminalAtPath = onOpenTerminalAtPath,
+                    onSelectTerminalWorkspace = ::selectTerminalWorkspace,
                     onCreateWorktree = ::createWorktree,
                     onRemoveWorktree = { removeTarget = it },
                 )
@@ -584,8 +721,12 @@ fun RepositoryWorkspaceScreen(
                 )
 
                 RepositoryWorkspaceTab.Terminal -> RepositoryTerminalPanel(
-                    path = repositoryTerminalPath(repository),
-                    onOpenTerminalAtPath = onOpenTerminalAtPath,
+                    repositoryId = repository.id,
+                    path = selectedTerminalWorkspacePath,
+                    sessions = terminalSessions,
+                    onCreateTerminalAtPath = ::createTerminal,
+                    onOpenTerminalSession = onOpenTerminalSession,
+                    onDeleteTerminalSession = ::requestDeleteTerminalSession,
                 )
             }
         }
@@ -614,6 +755,24 @@ fun RepositoryWorkspaceScreen(
             },
             dismissButton = {
                 TextButton(onClick = { removeTarget = null }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+
+    terminalDeleteTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { terminalDeleteTarget = null },
+            title = { Text("Delete running terminal?") },
+            text = { Text(terminalDeleteConfirmationText(target.label, target.session)) },
+            confirmButton = {
+                TextButton(onClick = { deleteTerminalSession(target.session) }) {
+                    Text("Stop and delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { terminalDeleteTarget = null }) {
                     Text("Cancel")
                 }
             },
@@ -830,7 +989,7 @@ private fun RepositoryStatusPanel(
 private fun RepositoryBranchesPanel(
     snapshotState: ResourceState<RemoteRepositorySnapshot>,
     onRefresh: () -> Unit,
-    onOpenTerminalAtPath: (String) -> Unit,
+    onSelectTerminalWorkspace: (String) -> Unit,
 ) {
     SnapshotContent(snapshotState = snapshotState, onRefresh = onRefresh) { snapshot ->
         Column(verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm)) {
@@ -840,7 +999,7 @@ private fun RepositoryBranchesPanel(
                 snapshot.branches.forEach { branch ->
                     BranchRow(
                         branch = branch,
-                        onOpenTerminalAtPath = onOpenTerminalAtPath,
+                        onSelectTerminalWorkspace = onSelectTerminalWorkspace,
                     )
                 }
             }
@@ -851,7 +1010,7 @@ private fun RepositoryBranchesPanel(
 @Composable
 private fun BranchRow(
     branch: RemoteRepositoryBranch,
-    onOpenTerminalAtPath: (String) -> Unit,
+    onSelectTerminalWorkspace: (String) -> Unit,
 ) {
     Card(Modifier.fillMaxWidth()) {
         Row(
@@ -867,7 +1026,7 @@ private fun BranchRow(
                 }
             }
             branch.worktreePath?.let { path ->
-                TextButton(onClick = { onOpenTerminalAtPath(path) }) {
+                TextButton(onClick = { onSelectTerminalWorkspace(path) }) {
                     Text("Terminal")
                 }
             }
@@ -914,7 +1073,7 @@ private fun RepositoryWorktreesPanel(
     repository: RemoteRepositoryProfile,
     snapshotState: ResourceState<RemoteRepositorySnapshot>,
     onRefresh: () -> Unit,
-    onOpenTerminalAtPath: (String) -> Unit,
+    onSelectTerminalWorkspace: (String) -> Unit,
     onCreateWorktree: (String, String) -> Unit,
     onRemoveWorktree: (RemoteRepositoryWorktree) -> Unit,
 ) {
@@ -962,7 +1121,7 @@ private fun RepositoryWorktreesPanel(
                 snapshot.worktrees.forEach { worktree ->
                     WorktreeRow(
                         worktree = worktree,
-                        onOpenTerminalAtPath = onOpenTerminalAtPath,
+                        onSelectTerminalWorkspace = onSelectTerminalWorkspace,
                         onRemoveWorktree = onRemoveWorktree,
                     )
                 }
@@ -974,7 +1133,7 @@ private fun RepositoryWorktreesPanel(
 @Composable
 private fun WorktreeRow(
     worktree: RemoteRepositoryWorktree,
-    onOpenTerminalAtPath: (String) -> Unit,
+    onSelectTerminalWorkspace: (String) -> Unit,
     onRemoveWorktree: (RemoteRepositoryWorktree) -> Unit,
 ) {
     val removalSafety = evaluateWorktreeRemoval(worktree)
@@ -993,7 +1152,7 @@ private fun WorktreeRow(
                 }
             }
             Column {
-                TextButton(onClick = { onOpenTerminalAtPath(worktreeTerminalPath(worktree)) }) {
+                TextButton(onClick = { onSelectTerminalWorkspace(worktreeTerminalPath(worktree)) }) {
                     Text("Terminal")
                 }
                 if (removalSafety.allowed) {
@@ -1010,18 +1169,71 @@ private fun WorktreeRow(
 
 @Composable
 private fun RepositoryTerminalPanel(
+    repositoryId: String,
     path: String,
-    onOpenTerminalAtPath: (String) -> Unit,
+    sessions: List<TerminalSessionRecord>,
+    onCreateTerminalAtPath: (String) -> Unit,
+    onOpenTerminalSession: (TerminalSessionRecord) -> Unit,
+    onDeleteTerminalSession: (TerminalSessionRecord, String) -> Unit,
+) {
+    val workspaceSessions = terminalWorkspaceSessions(sessions, repositoryId, path)
+    val openedOrderLabels = workspaceSessions
+        .sortedBy { it.openedAt }
+        .mapIndexed { index, session -> session.id to terminalSessionDefaultLabel(index) }
+        .toMap()
+    Column(verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm)) {
+        Card(Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.padding(GoblinSpacing.Md),
+                verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
+            ) {
+                Text("Terminal workspace", style = MaterialTheme.typography.titleMedium)
+                Text(path)
+                Button(onClick = { onCreateTerminalAtPath(path) }) {
+                    Text("New terminal")
+                }
+            }
+        }
+        if (workspaceSessions.isEmpty()) {
+            Text("No terminals for this worktree.")
+        } else {
+            workspaceSessions.forEach { session ->
+                TerminalSessionRow(
+                    session = session,
+                    label = openedOrderLabels[session.id] ?: terminalSessionDefaultLabel(0),
+                    onOpenTerminalSession = onOpenTerminalSession,
+                    onDeleteTerminalSession = onDeleteTerminalSession,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TerminalSessionRow(
+    session: TerminalSessionRecord,
+    label: String,
+    onOpenTerminalSession: (TerminalSessionRecord) -> Unit,
+    onDeleteTerminalSession: (TerminalSessionRecord, String) -> Unit,
 ) {
     Card(Modifier.fillMaxWidth()) {
-        Column(
+        Row(
             modifier = Modifier.padding(GoblinSpacing.Md),
-            verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text("Terminal", style = MaterialTheme.typography.titleMedium)
-            Text(path)
-            Button(onClick = { onOpenTerminalAtPath(path) }) {
-                Text("Open terminal")
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs)) {
+                Text(label, style = MaterialTheme.typography.bodyMedium)
+                Text(session.remotePath, style = MaterialTheme.typography.bodySmall)
+                Text(terminalSessionStatusLabel(session), style = MaterialTheme.typography.labelMedium)
+                Text(terminalSessionActivityText(session), style = MaterialTheme.typography.bodySmall)
+            }
+            Column {
+                TextButton(onClick = { onOpenTerminalSession(session) }) {
+                    Text("Open")
+                }
+                TextButton(onClick = { onDeleteTerminalSession(session, label) }) {
+                    Text("Delete")
+                }
             }
         }
     }
