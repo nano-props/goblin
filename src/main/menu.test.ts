@@ -1,25 +1,44 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 
+interface MockMenuRuntimeState {
+  recentRepos: RepoSessionEntry[]
+  shortcutsDisabled: boolean
+  swapCloseShortcuts: boolean
+  langPref: 'auto' | 'en' | 'zh' | 'ko' | 'ja'
+  workspaceLayout: 'top-bottom' | 'left-right' | 'branches'
+}
+
+function defaultMenuRuntimeState(): MockMenuRuntimeState {
+  return {
+    recentRepos: [],
+    shortcutsDisabled: false,
+    swapCloseShortcuts: false,
+    langPref: 'auto',
+    workspaceLayout: 'top-bottom',
+  }
+}
+
 const mocks = vi.hoisted(() => {
   const template: any[] = []
   const win = { isDestroyed: () => false, webContents: { isDestroyed: () => false, send: vi.fn() } }
   return {
     appGetPath: vi.fn<(name: string) => string>((name: string) => (name === 'home' ? '/home/user' : '/data')),
-    getShortcutsDisabled: vi.fn(() => false),
+    clearRecentDocuments: vi.fn(),
+    openHttpExternal: vi.fn(() => Promise.resolve(true)),
+    readMenuRuntimeState: vi.fn<() => MockMenuRuntimeState>(() => defaultMenuRuntimeState()),
     template,
     win,
     activateMainWindow: vi.fn(() => Promise.resolve(win)),
     getFocusedWindow: vi.fn((): any => null),
     focusedRegisteredSurface: vi.fn((): any => null),
     getMainWindow: vi.fn((): any => null),
-    getRecentRepos: vi.fn<() => RepoSessionEntry[]>(() => []),
     sendRpcEvent: vi.fn(),
-    openSettingsWindow: vi.fn(() => Promise.resolve()),
     buildFromTemplate: vi.fn((nextTemplate: any[]) => {
       template.splice(0, template.length, ...nextTemplate)
       return nextTemplate
     }),
+    clearSettingsRecentRepos: vi.fn(async () => true),
     setApplicationMenu: vi.fn(),
   }
 })
@@ -27,6 +46,7 @@ const mocks = vi.hoisted(() => {
 vi.mock('electron', () => ({
   app: {
     name: 'Goblin',
+    clearRecentDocuments: mocks.clearRecentDocuments,
     getPath: mocks.appGetPath,
   },
   BrowserWindow: {
@@ -58,20 +78,15 @@ vi.mock('#/main/i18n/index.ts', () => ({
   t: vi.fn((key: string) => key),
 }))
 
-vi.mock('#/main/settings.ts', () => ({
-  clearRecentRepos: vi.fn(),
-  getLangPref: vi.fn(() => 'auto'),
-  getRecentRepos: mocks.getRecentRepos,
-  getSession: vi.fn(() => ({
-    openRepos: [],
-    activeRepo: null,
-    detailCollapsed: false,
-    detailFocusMode: false,
-    workspaceLayout: 'top-bottom',
-    detailPaneSizes: {},
-  })),
-  getShortcutsDisabled: mocks.getShortcutsDisabled,
-  getSwapCloseShortcuts: vi.fn(() => false),
+vi.mock('#/main/settings-server-facade.ts', () => ({
+  clearSettingsRecentRepos: mocks.clearSettingsRecentRepos,
+}))
+
+vi.mock('#/main/menu-state.ts', () => ({
+  readMenuRuntimeState: mocks.readMenuRuntimeState,
+  setMenuLangPref: vi.fn(),
+  setMenuRecentRepos: vi.fn(),
+  setMenuWorkspaceLayout: vi.fn(),
 }))
 
 vi.mock('#/main/events.ts', () => ({
@@ -79,13 +94,18 @@ vi.mock('#/main/events.ts', () => ({
   sendRpcEvent: mocks.sendRpcEvent,
 }))
 
+vi.mock('#/main/window-shell.ts', () => ({
+  getRendererBaseUrl: vi.fn(() => 'http://127.0.0.1:32100'),
+  getEmbeddedServerUrl: vi.fn(() => 'http://127.0.0.1:32100'),
+}))
+
+vi.mock('#/main/external-url.ts', () => ({
+  openHttpExternal: mocks.openHttpExternal,
+}))
+
 vi.mock('#/main/theme.ts', () => ({
   getTheme: vi.fn(() => ({ pref: 'auto', resolved: 'light', colorTheme: 'macos' })),
   setThemePref: vi.fn(),
-}))
-
-vi.mock('#/main/settings-window.ts', () => ({
-  openSettingsWindow: mocks.openSettingsWindow,
 }))
 
 describe('app menu actions', () => {
@@ -94,13 +114,11 @@ describe('app menu actions', () => {
     vi.clearAllMocks()
     mocks.template.length = 0
     mocks.appGetPath.mockImplementation((name: string) => (name === 'home' ? '/home/user' : '/data'))
-    mocks.getShortcutsDisabled.mockReturnValue(false)
-    mocks.getRecentRepos.mockReturnValue([])
+    mocks.readMenuRuntimeState.mockReturnValue(defaultMenuRuntimeState())
     mocks.getMainWindow.mockReturnValue(null)
     mocks.getFocusedWindow.mockReturnValue(null)
     mocks.focusedRegisteredSurface.mockReturnValue(null)
     mocks.activateMainWindow.mockResolvedValue(mocks.win)
-    mocks.openSettingsWindow.mockResolvedValue(undefined)
   })
 
   test('activates the main window before sending an action when no window exists', async () => {
@@ -139,7 +157,10 @@ describe('app menu actions', () => {
 
   test('tildifies Windows home paths in the recent repos menu', async () => {
     mocks.appGetPath.mockImplementation((name: string) => (name === 'home' ? 'C:\\Users\\user' : '/data'))
-    mocks.getRecentRepos.mockReturnValue([{ kind: 'local', id: 'C:\\Users\\user\\Developer\\repo' }])
+    mocks.readMenuRuntimeState.mockReturnValue({
+      ...defaultMenuRuntimeState(),
+      recentRepos: [{ kind: 'local', id: 'C:\\Users\\user\\Developer\\repo' }],
+    })
     const { buildAppMenu } = await import('#/main/menu.ts')
 
     buildAppMenu()
@@ -150,7 +171,10 @@ describe('app menu actions', () => {
   })
 
   test('keeps the shortcuts help item available when shortcuts are disabled', async () => {
-    mocks.getShortcutsDisabled.mockReturnValue(true)
+    mocks.readMenuRuntimeState.mockReturnValue({
+      ...defaultMenuRuntimeState(),
+      shortcutsDisabled: true,
+    })
     const { buildAppMenu } = await import('#/main/menu.ts')
 
     buildAppMenu()
@@ -161,17 +185,23 @@ describe('app menu actions', () => {
     shortcutsItem.click()
     await Promise.resolve()
 
-    expect(mocks.openSettingsWindow).toHaveBeenCalledWith('shortcuts')
+    expect(mocks.sendRpcEvent).toHaveBeenCalledWith(mocks.win, {
+      type: 'menu-action',
+      action: { type: 'open-settings', page: 'shortcuts' },
+    })
   })
 
-  test('opens the standalone settings window from the file menu', async () => {
+  test('routes settings from the file menu through the main window shell', async () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
 
     buildAppMenu()
     clickMenuItem('Goblin', 'menu.app.settings')
     await Promise.resolve()
 
-    expect(mocks.openSettingsWindow).toHaveBeenCalledWith('general')
+    expect(mocks.sendRpcEvent).toHaveBeenCalledWith(mocks.win, {
+      type: 'menu-action',
+      action: { type: 'open-settings', page: 'general' },
+    })
   })
 
   test('wires the remote open accelerator from the file menu', async () => {
@@ -182,6 +212,53 @@ describe('app menu actions', () => {
     const fileMenu = mocks.template.find((entry) => entry.label === 'menu.file')
     const remoteItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.open-remote-repo')
     expect(remoteItem?.accelerator).toBe('CmdOrCtrl+Shift+R')
+  })
+
+  test('wires the terminal primary action accelerator from the view menu', async () => {
+    const { buildAppMenu } = await import('#/main/menu.ts')
+
+    buildAppMenu()
+
+    const viewMenu = mocks.template.find((entry) => entry.label === 'menu.view')
+    const terminalPrimaryItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.terminal-primary-action')
+    expect(terminalPrimaryItem?.accelerator).toBe('CmdOrCtrl+Enter')
+
+    terminalPrimaryItem.click()
+    await Promise.resolve()
+
+    expect(mocks.sendRpcEvent).toHaveBeenCalledWith(mocks.win, {
+      type: 'menu-action',
+      action: 'terminal-primary-action',
+    })
+  })
+
+  test('clears recent repos through the server-backed path and OS recent documents', async () => {
+    mocks.readMenuRuntimeState.mockReturnValue({
+      ...defaultMenuRuntimeState(),
+      recentRepos: [{ kind: 'local', id: '/tmp/repo' }],
+    })
+    const { buildAppMenu } = await import('#/main/menu.ts')
+
+    buildAppMenu()
+    const fileMenu = mocks.template.find((entry) => entry.label === 'menu.file')
+    const recentMenu = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.open-recent')
+    const clearItem = recentMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.clear-recent')
+    expect(clearItem?.click).toBeTypeOf('function')
+    clearItem.click()
+    await Promise.resolve()
+
+    expect(mocks.clearSettingsRecentRepos).toHaveBeenCalledTimes(1)
+    expect(mocks.clearRecentDocuments).toHaveBeenCalledTimes(1)
+  })
+
+  test('opens the local web version from the file menu', async () => {
+    const { buildAppMenu } = await import('#/main/menu.ts')
+
+    buildAppMenu()
+    clickMenuItem('menu.file', 'menu.file.open-in-browser')
+    await Promise.resolve()
+
+    expect(mocks.openHttpExternal).toHaveBeenCalledWith('http://127.0.0.1:32100')
   })
 })
 

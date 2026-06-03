@@ -19,14 +19,22 @@ export interface InitialI18nSnapshot {
   dict: Record<string, string>
 }
 
+export interface InitialServerSnapshot {
+  url: string
+  secret: string
+  clientId?: string
+}
+
 export interface RendererBootstrapPayload {
   homeDir: string
   i18n: InitialI18nSnapshot
   settings: InitialSettingsSnapshot
+  server: InitialServerSnapshot | null
 }
 
 export interface RendererBootstrapSnapshot {
   homeDir: string
   initialI18n: InitialI18nSnapshot | null
   initialSettings: InitialSettingsSnapshot | null
+  initialServer: InitialServerSnapshot | null
 }

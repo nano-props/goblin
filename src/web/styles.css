@@ -1,0 +1,147 @@
+@import 'tailwindcss';
+/* tailwindcss-animate replacement for Tailwind v4. Provides the
+ * shadcn/ui motion utilities (animate-in, fade-in-0, zoom-in-95,
+ * slide-in-from-*, animate-out + their -out variants) that shadcn
+ * components reference for Radix open/close transitions. */
+@import 'tw-animate-css';
+@import './theme/theme.css';
+
+@font-face {
+  font-family: 'Goblin Mono';
+  src: url('./assets/fonts/MapleMono-NF-CN-Regular.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Goblin Mono';
+  src: url('./assets/fonts/MapleMono-NF-CN-Italic.woff2') format('woff2');
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Goblin Mono';
+  src: url('./assets/fonts/MapleMono-NF-CN-Bold.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Goblin Mono';
+  src: url('./assets/fonts/MapleMono-NF-CN-BoldItalic.woff2') format('woff2');
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@custom-variant dark (&:where(html[data-theme='dark'] *));
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+}
+* {
+  box-sizing: border-box;
+}
+
+/* Topbar — leaves room for macOS traffic lights on the left.
+ * Acts as the Electron drag region; child buttons opt out via
+ * -webkit-app-region: no-drag (set on `button` and `[data-interactive]`). */
+.topbar {
+  -webkit-app-region: drag;
+  padding: 0 16px;
+}
+html[data-host='electron']:not([data-chrome='overlay']) .topbar {
+  padding-left: 92px;
+}
+html[data-chrome='overlay'] .topbar {
+  padding: 0 150px 0 16px;
+}
+button,
+[data-interactive] {
+  -webkit-app-region: no-drag;
+}
+
+/* Visible focus ring for keyboard users. Tailwind v4 preflight removes
+ * the browser default; without an explicit rule, Tab navigation
+ * silently moves the cursor with no on-screen indication.
+ *
+ * Scoped to elements WITHOUT `data-slot` so shadcn-generated
+ * components (which already render their own ring via
+ * `focus-visible:ring-*`) don't get a redundant second ring stacked
+ * on top. The fallback outline is inset instead of offset outward so
+ * scroll/overflow containers don't clip it into a stray edge.
+ *
+ * Placed in @layer base so Tailwind utilities (which sit in @layer
+ * utilities, defined later) win when a specific element opts out via
+ * `focus-visible:outline-none` / `focus:outline-none`. Without the explicit layer, this
+ * rule lands in an unlayered block that comes *after* utilities in
+ * source order, defeating any utility-level override at equal
+ * specificity. */
+@layer base {
+  /* Tailwind v4 preflight resets borders with `border: 0 solid` — no
+   * color, which means any `border` / `border-t` utility (used heavily
+   * by shadcn components: DropdownMenuContent, Card, Input…) falls
+   * back to `currentColor` and paints near-black against the text
+   * color, not the intended muted `--color-border` (12% black). The
+   * canonical shadcn template fixes this by setting border-color on
+   * everything to the token. */
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-border, currentcolor);
+  }
+
+  :focus-visible:not([data-slot]) {
+    outline: 2px solid var(--color-ring);
+    outline-offset: -2px;
+    border-radius: 4px;
+  }
+  button:focus:not(:focus-visible),
+  [data-interactive]:focus:not(:focus-visible) {
+    outline: none;
+  }
+}
+
+/* Inline keycap chip — used by the help overlay. Defined as plain CSS
+ * (not @utility) so it's reachable even without Tailwind seeing every
+ * call site. */
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.35rem;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  background: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--color-foreground);
+  min-width: 1.5rem;
+  justify-content: center;
+}
+
+/* Honor the OS-level "reduce motion" preference. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

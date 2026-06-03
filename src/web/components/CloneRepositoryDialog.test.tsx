@@ -1,0 +1,214 @@
+// @vitest-environment jsdom
+
+import { act } from 'react'
+import type { ReactNode } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { CloneRepositoryDialog } from '#/web/components/CloneRepositoryDialog.tsx'
+import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import type { CloneRepoResult } from '#/shared/rpc.ts'
+
+let container: HTMLDivElement | null = null
+let root: Root | null = null
+let rpcCalls: Array<{ path: string; input?: unknown }> = []
+const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+const testWindow = window as unknown as { goblin?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
+const fetchMock = vi.fn(async () => ({
+  ok: true,
+  json: async () => true,
+}))
+
+beforeEach(() => {
+  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
+  rpcCalls = []
+  setRendererBridgeForTests(null)
+  fetchMock.mockClear()
+  vi.stubGlobal('fetch', fetchMock)
+  testWindow.__GOBLIN_BOOTSTRAP__ = {
+    homeDir: '/Users/tester',
+    initialI18n: null,
+    initialSettings: null,
+    initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+  }
+  testWindow.goblin = {
+    homeDir: '/Users/tester',
+    pathForFile: () => '',
+    invokeRpc: async (request: { path: string; input?: unknown }) => {
+      rpcCalls.push(request)
+      if (request.path === 'repo.abortClone') return { ok: true }
+      return null
+    },
+    abortRpc: async () => true,
+    onEvent: () => () => {},
+  }
+})
+
+afterEach(() => {
+  act(() => {
+    root?.unmount()
+  })
+  container?.remove()
+  root = null
+  container = null
+  document.body.innerHTML = ''
+  delete testWindow.goblin
+  delete testWindow.__GOBLIN_BOOTSTRAP__
+  setRendererBridgeForTests(null)
+  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
+})
+
+describe('CloneRepositoryDialog', () => {
+  test('waits for clone success before closing and hides the close button while pending', async () => {
+    const deferred = createDeferred<CloneRepoResult>()
+    const onClose = vi.fn()
+    const onClone = vi.fn(() => deferred.promise)
+
+    render(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
+
+    setInputValue('#clone-url', 'https://example.com/repo.git')
+    setInputValue('#clone-directory-name', 'repo')
+    click('button[type="submit"]')
+
+    expect(onClone).toHaveBeenCalledWith({
+      operationId: expect.any(String),
+      url: 'https://example.com/repo.git',
+      parentPath: '/Users/tester/Developer',
+      directoryName: 'repo',
+    })
+    expect(onClose).not.toHaveBeenCalled()
+    expect(buttonByText('dialog.cancel').disabled).toBe(false)
+    expect(queryButtonByText('Close')).toBeNull()
+
+    deferred.resolve({ ok: true, message: 'ok', path: '/Users/tester/Developer/repo' })
+    await flush()
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  test('keeps the dialog open on clone failure and preserves user input', async () => {
+    const onClose = vi.fn()
+    const onClone = vi.fn(async () => ({ ok: false, message: 'error.clone-failed' }))
+
+    render(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
+
+    setInputValue('#clone-url', 'https://example.com/repo.git')
+    setInputValue('#clone-directory-name', 'repo')
+    click('button[type="submit"]')
+    await flush()
+
+    expect(onClose).not.toHaveBeenCalled()
+    expect(input('#clone-url').value).toBe('https://example.com/repo.git')
+    expect(input('#clone-directory-name').value).toBe('repo')
+    expect(document.body.textContent).toContain('error.clone-failed')
+  })
+
+  test('cancel aborts an in-flight clone and closes the dialog', async () => {
+    const deferred = createDeferred<CloneRepoResult>()
+    const onClose = vi.fn()
+    const onClone = vi.fn(() => deferred.promise)
+
+    render(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
+
+    setInputValue('#clone-url', 'https://example.com/repo.git')
+    setInputValue('#clone-directory-name', 'repo')
+    click('button[type="submit"]')
+    clickButtonByText('dialog.cancel')
+    await flush()
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(
+      fetchMock.mock.calls.some(
+        (call) => String((call as unknown as [unknown])[0]) === 'http://127.0.0.1:32100/api/repo/abort-clone',
+      ),
+    ).toBe(true)
+
+    deferred.resolve({ ok: true, message: 'ok', path: '/Users/tester/Developer/repo' })
+    await flush()
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  test('hides native parent picker button when no Electron bridge exists', async () => {
+    delete testWindow.goblin
+    setRendererBridgeForTests(null)
+    const onClose = vi.fn()
+    const onClone = vi.fn(async () => ({ ok: true, message: 'ok', path: '/Users/tester/Developer/repo' }))
+
+    render(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
+
+    expect(queryButtonByText('repo-tabs.clone-parent-choose')).toBeNull()
+  })
+})
+
+function render(element: ReactNode) {
+  container = document.createElement('div')
+  document.body.append(container)
+  root = createRoot(container)
+  act(() => {
+    root!.render(element)
+  })
+}
+
+function input(selector: string): HTMLInputElement {
+  const element = document.body.querySelector(selector)
+  if (!(element instanceof HTMLInputElement)) throw new Error(`Missing input: ${selector}`)
+  return element
+}
+
+function button(selector: string): HTMLButtonElement {
+  const element = document.body.querySelector(selector)
+  if (!(element instanceof HTMLButtonElement)) throw new Error(`Missing button: ${selector}`)
+  return element
+}
+
+function queryButtonByText(text: string): HTMLButtonElement | null {
+  const element = [...document.body.querySelectorAll('button')].find(
+    (candidate) => candidate.textContent?.trim() === text,
+  )
+  return element instanceof HTMLButtonElement ? element : null
+}
+
+function buttonByText(text: string): HTMLButtonElement {
+  const element = queryButtonByText(text)
+  if (!element) throw new Error(`Missing button text: ${text}`)
+  return element
+}
+
+function setInputValue(selector: string, value: string) {
+  const element = input(selector)
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')
+  descriptor?.set?.call(element, value)
+  act(() => {
+    element.dispatchEvent(new Event('input', { bubbles: true }))
+    element.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+}
+
+function click(selector: string) {
+  const element = button(selector)
+  act(() => {
+    element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  })
+}
+
+function clickButtonByText(text: string) {
+  const element = buttonByText(text)
+  act(() => {
+    element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  })
+}
+
+async function flush() {
+  await act(async () => {
+    await Promise.resolve()
+  })
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, resolve, reject }
+}

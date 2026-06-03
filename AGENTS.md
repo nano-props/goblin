@@ -1,57 +1,57 @@
 # Project Notes
 
-## Git boundaries
+## Core conventions
+
+- Pin new package versions exactly in `package.json`; no range prefixes.
+- Use repo-alias imports with explicit `.ts`/`.tsx` extensions. Import canonical modules directly; do not add re-export shims.
+- Verify with `bun run typecheck` and `bun run test` (`bun run test:watch` for watch mode).
+- Keep examples, tests, docs, and snapshots privacy-safe: use generic placeholders, not real users, paths, emails, tokens, or internal identifiers.
+
+## Git and safety
 
 - Read-only git commands may run concurrently.
-- Keep network git commands (`fetch`, `pull`, `push`) cancellable and coalesced per repo where applicable.
-- Avoid adding destructive git operations to the app; prefer handing repository/worktree context to the user, terminal, or AI workflow.
-- If a destructive operation is introduced, design its safety, cancellation, and recovery behavior explicitly first.
+- Keep network git commands (`fetch`, `pull`, `push`) cancellable and coalesced per repo.
+- Avoid destructive git features in the app. If one is introduced, design safety, cancellation, and recovery explicitly first.
 
-## Dependency and import conventions
+## UI and copy
 
-- When adding packages to `package.json`, use the latest available version and pin the exact version (no `^` or other range prefixes).
-- Source imports should use the repo alias with explicit TypeScript extensions, e.g. `#/renderer/stores/i18n.ts` or `#/main/settings.ts`.
-- Do not add re-export shim files. Import from the canonical source module directly instead.
+- English copy: Title Case for native menu items; sentence case for buttons, actions, headings, and help text; lowercase for status chips/badges such as `open`, `dirty`, `no upstream`.
+- Preserve official casing (`GitHub`, `VS Code`, `PR`) and raw git/status data (`M`, `A`, `??`, branch names, paths).
+- Prefer shadcn/ui primitives in `src/web/components/ui/`, adapted to app density, colors, and interaction states. For forms, reuse shared field primitives and keep spacing/layout stable.
+- Display home-relative paths with `~` via existing `tildify` helpers.
 
-## Verification
+## App architecture
 
-- Run unit tests with `bun run test`; use `bun run test:watch` for watch mode.
-- Run TypeScript verification with `bun run typecheck`.
+- Keep app-level overlays in `src/web/hooks/useAppOverlays.ts`. Reuse `useOverlayRegistry.ts` only as a small boolean registry; keep dialog presentation and payload-specific state in components/domain hooks, and wire new app overlays through `closeAllOverlays()` plus any shared gates like shortcut or drag/drop suppression.
+- Default to a single main `BrowserWindow` with in-app routing. Reuse `window-shell.ts`, `renderer-surface.ts`, and `window-registry.ts` for trusted renderer surfaces instead of inventing parallel window bootstrapping paths.
+- Parent native dialogs to the actual RPC caller window when possible, and keep chrome sizing/colors in the shared window-chrome helpers.
+- Only add auxiliary windows when the product genuinely needs a separate renderer surface. If an auxiliary window owns meaningful in-memory state, wire the close-time lifecycle flush path.
+- Treat `src/server/` as the application runtime boundary. New repo, terminal, session, sync, settings, and realtime business logic should go in `src/server/` or `src/shared/` first, then be consumed by `src/web/` and Electron.
+- Keep `src/main/` limited to Electron-native shell concerns: window lifecycle, preload bridging, menus, shortcuts, native dialogs, dock/badge/notifications, trusted renderer security policy, and embedded server lifecycle. Do not add repo, terminal, settings, or session business ownership back into `src/main/` unless the browser path cannot support it.
+- When a main-process feature needs app data, prefer reading/writing through the embedded server contract instead of introducing new main-owned state. Main should act as a native host and thin adapter, not as a parallel business runtime.
+- Keep the architecture guard green with `bun run check:architecture`. The enforced boundaries are:
+  - `src/main/**` must not import `src/web/**` or `src/server/**`.
+  - `src/web/**` must not import `src/main/**`.
+  - `src/server/**` and `src/shared/**` must not import `electron`.
 
-## English UI copy conventions
+## Realtime and renderer model
 
-- Use Title Case for native menu items.
-- Use sentence case for buttons, actions, headings, and explanatory text.
-- Use lowercase for status chips and badges, e.g. `open`, `dirty`, `no upstream`, `no worktree`, `modified`.
-- Preserve official casing for proper nouns and acronyms, e.g. `GitHub`, `VS Code`, `PR`.
-- Preserve raw git/status data as-is, e.g. branch names, paths, `M`, `A`, and `??`.
+- Prefer WebSocket invalidation + targeted refetch for cross-window data; use streaming only for UX-critical continuous flows like terminal output. Document each new WebSocket path as invalidation or streaming and why refetch/polling is insufficient.
+- Treat the backend (embedded or standalone server mode) as the primary runtime. Design renderer behavior around the server contract first.
+- Treat Electron renderers as specialized browser clients, not a separate privileged app architecture. Prefer shared server-backed terminal/session/realtime paths across web and Electron.
+- Keep terminal identity semantics aligned across web and Electron:
+  - `clientId` = logical renderer client / session owner.
+  - `attachmentId` = specific renderer attachment under that client.
+  - Reconnect, mirror, and takeover should be described and implemented in client/attachment terms, not Electron-only window terms.
+- Prefer terminal/session/realtime fixes in the shared server-backed bridge or protocol layer. Add Electron-specific behavior only when the browser path cannot support it, and document the reason.
 
-## UI component conventions
+## Server-first renderer architecture
 
-- Prefer shadcn/ui primitives in `src/renderer/components/ui/`; adapt them to the current app design, including density, colors, and interaction states, instead of creating one-off controls or styles.
-- For forms, use shared primitives such as `Field`, `FieldLabel`, `FieldDescription`, `FieldError`, and `Input`. Keep label, control, helper, and error spacing consistent and layout-stable.
-
-## Path display conventions
-
-- Display user-visible paths under the home directory with `~`, e.g. `$HOME/Developer/project` as `~/Developer/project`. Use existing `tildify` helpers instead of hand-rolled replacements.
-
-## Privacy-safe examples
-
-- Use generic placeholders in examples, tests, docs, and snapshots. Do not include real user names, machine names, personal paths, emails, tokens, secrets, or company-internal identifiers.
-- Test fixtures and inline sample code should stay generic as well; avoid realistic business snippets, internal module names, or production-like file paths when a neutral placeholder communicates the same intent.
-
-## Overlay and dialog architecture
-
-- Keep app-level overlay orchestration in `src/renderer/hooks/useAppOverlays.ts`; do not add new top-level dialog booleans directly to `App.tsx`.
-- Reuse `src/renderer/hooks/useOverlayRegistry.ts` for generic open/close/close-all overlay state instead of hand-rolled boolean groups.
-- Keep UI primitives and dialog presentation inside components (for example shadcn/ui `Dialog` wrappers); overlay hooks should manage state and coordination only, not visual structure.
-- When adding a new app-level overlay, wire it through the overlay manager, `closeAllOverlays()`, and any overlay-aware gates such as keyboard shortcut suppression.
-
-## Window and multi-window architecture
-
-- Scope renderer entry trust per `BrowserWindow`, not globally.
-- Keep renderer windows on their own boot entry; route internally instead of cross-entry main-frame navigation.
-- Reuse `src/main/window-shell.ts` and `src/main/standalone-page-window.ts` for new trusted / auxiliary windows.
-- If an auxiliary window can lose meaningful in-memory UI state on close, use the close-time lifecycle flush path and register renderer flushers.
-- Parent native dialogs to the actual RPC caller window when possible.
-- Keep window chrome sizes in `src/shared/window-chrome.ts`, and use `src/main/window-chrome.ts` helpers for platform chrome / overlay colors.
+- Treat the embedded/server mode backend as the primary application runtime. Renderer behavior should be designed around the server contract first, then adapted for Electron convenience where needed.
+- Treat Electron renderers as specialized browser clients, not as a separate privileged app architecture. Prefer sharing the same server-backed terminal/session/realtime paths between web and Electron.
+- Keep client identity and attachment semantics aligned across web and Electron:
+  - `clientId` identifies the logical renderer client / session owner.
+  - `attachmentId` identifies a specific page/window attachment under that client.
+  - Reconnect, mirror, and takeover behavior should be explained and implemented in those terms, not in Electron-only window terms.
+- Prefer implementing terminal, realtime, and session lifecycle fixes in the shared server-backed bridge or protocol layer so web and Electron inherit the same behavior by default.
+- Only add Electron-specific terminal behavior when the browser path cannot support the requirement. When this happens, document why the divergence is necessary.

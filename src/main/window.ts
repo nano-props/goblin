@@ -8,9 +8,8 @@
 // before exit (without it the very last drag is truncated).
 
 import { BrowserWindow, app, screen } from 'electron'
-import { loadSettings, setWindowBounds, type WindowBounds } from '#/main/settings.ts'
+import { loadWindowState, setWindowBounds, type WindowBounds } from '#/main/window-state.ts'
 import { attachRendererSurfaceWindow, detachRendererSurfaceWindow } from '#/main/renderer-surface.ts'
-import { closeAllTerminalSessions } from '#/main/terminal.ts'
 import { defaultTitleBarStyle, macTrafficLightPosition, supportsTitleBarOverlay, titleBarOverlayForTheme } from '#/main/window-chrome.ts'
 import { getMainWindow as getRegisteredMainWindow } from '#/main/window-registry.ts'
 import {
@@ -24,7 +23,6 @@ import { WINDOW_TOPBAR_HEIGHT_PX } from '#/shared/window-chrome.ts'
 
 const DEFAULT_BOUNDS: WindowBounds = { width: 1200, height: 760 }
 const MAIN_WINDOW_SURFACE = {
-  kind: 'main',
   windowKey: 'main',
   capabilities: {
     rpcBroadcast: true,
@@ -90,8 +88,8 @@ async function createMainWindow(): Promise<BrowserWindow> {
   const backgroundColor = windowCanvasBackground()
   const { resolved, colorTheme } = getTheme()
 
-  const settings = await loadSettings()
-  const saved = settings.windowBounds
+  const windowState = await loadWindowState()
+  const saved = windowState.windowBounds
   const bounds = saved ? clampToDisplay(saved) : DEFAULT_BOUNDS
 
   const win = new BrowserWindow({
@@ -109,7 +107,7 @@ async function createMainWindow(): Promise<BrowserWindow> {
     webPreferences: await createRendererWindowWebPreferences(),
   })
   attachRendererSurfaceWindow(win, { logLabel: 'window', surface: MAIN_WINDOW_SURFACE })
-  const { url } = createRendererEntryUrl({ entryHtml: 'index.html' })
+  const { url } = createRendererEntryUrl({ routePath: '/' })
   allowRendererWindowEntryUrl(win, url.toString())
   // Persist bounds. We listen on both `resize` and `move` because the
   // user can do either independently. `getNormalBounds` returns the
@@ -125,7 +123,6 @@ async function createMainWindow(): Promise<BrowserWindow> {
   win.on('move', persistBounds)
 
   win.on('closed', () => {
-    closeAllTerminalSessions()
     detachRendererSurfaceWindow(win, MAIN_WINDOW_SURFACE)
   })
 

@@ -1,14 +1,18 @@
 #!/usr/bin/env bun
 import { watch } from 'node:fs'
 import path from 'node:path'
+import { reserveAvailablePort } from '#/system/port-allocation.ts'
 
 const repoRoot = path.resolve(import.meta.dirname, '..')
-const rendererDevHost = process.env.GOBLIN_RENDERER_DEV_HOST?.trim() || '127.0.0.1'
-const rendererDevPort = parsePort(process.env.GOBLIN_RENDERER_DEV_PORT) ?? 5173
-const rendererDevUrl = `http://${rendererDevHost}:${rendererDevPort}/`
-const viteArgs = [localBin('vite'), '--host', rendererDevHost, '--port', String(rendererDevPort), '--strictPort']
+const webDevHost = process.env.GOBLIN_WEB_DEV_HOST?.trim() || '127.0.0.1'
+const webDevPort = parsePort(process.env.GOBLIN_WEB_DEV_PORT) ?? 5173
+const webDevUrl = `http://${webDevHost}:${webDevPort}/`
+const embeddedServerPort = await chooseEmbeddedServerPort(webDevHost)
+const viteArgs = [localBin('vite'), '--host', webDevHost, '--port', String(webDevPort), '--strictPort']
 const electronArgs = [localBin('electron'), '.']
-const watchedPaths = ['src/main', 'src/preload', 'src/shared', 'vite.config.ts'].map((target) => path.join(repoRoot, target))
+const watchedPaths = ['src/main', 'src/preload', 'src/server', 'src/shared', 'vite.config.ts'].map((target) =>
+  path.join(repoRoot, target),
+)
 
 let shuttingDown = false
 let viteExited = false
@@ -22,10 +26,11 @@ const viteProc = Bun.spawn(viteArgs, {
   stdin: 'inherit',
   stdout: 'inherit',
   stderr: 'inherit',
-  env: process.env,
+  env: { ...process.env, GOBLIN_SERVER_HOST: webDevHost, GOBLIN_SERVER_PORT: String(embeddedServerPort) },
 })
 
-log(`starting Vite dev server at ${rendererDevUrl}`)
+log(`starting Vite dev server at ${webDevUrl}`)
+log(`proxying renderer /api and /ws to embedded server at http://${webDevHost}:${embeddedServerPort}/`)
 
 void viteProc.exited.then((code) => {
   viteExited = true
@@ -33,7 +38,7 @@ void viteProc.exited.then((code) => {
 })
 
 await waitForDevServer()
-log('renderer dev server ready; launching Electron')
+log('web dev server ready; launching Electron')
 electronProc = launchElectron()
 
 watchers = watchedPaths.map((target) =>
@@ -73,10 +78,15 @@ function parsePort(value: string | undefined): number | null {
   return Number.isInteger(port) && port > 0 && port <= 65535 ? port : null
 }
 
+async function chooseEmbeddedServerPort(host: string): Promise<number> {
+  const preferredPort = parsePort(process.env.GOBLIN_SERVER_PORT) ?? 32100
+  return await reserveAvailablePort(host, preferredPort, 'Failed to allocate dev embedded server port')
+}
+
 async function waitForDevServer(): Promise<void> {
   while (!viteExited) {
     try {
-      const response = await fetch(rendererDevUrl)
+      const response = await fetch(webDevUrl)
       if (response.ok) return
     } catch {}
     await Bun.sleep(150)
@@ -90,7 +100,12 @@ function launchElectron(): Bun.Subprocess {
     stdin: 'inherit',
     stdout: 'inherit',
     stderr: 'inherit',
-    env: { ...process.env, GOBLIN_RENDERER_DEV_URL: rendererDevUrl },
+    env: {
+      ...process.env,
+      GOBLIN_WEB_DEV_URL: webDevUrl,
+      GOBLIN_SERVER_HOST: webDevHost,
+      GOBLIN_SERVER_PORT: String(embeddedServerPort),
+    },
   })
   void proc.exited.then((code) => {
     if (shuttingDown) return
@@ -108,7 +123,7 @@ function launchElectron(): Bun.Subprocess {
 async function restartElectron(): Promise<void> {
   if (!electronProc || restartPending) return
   restartPending = true
-  log('main/preload/shared config changed; restarting Electron')
+  log('main/preload/server/shared config changed; restarting Electron')
   electronProc.kill()
 }
 

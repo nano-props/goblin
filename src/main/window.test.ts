@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
 const mocks = vi.hoisted(() => {
   const state = {
@@ -9,8 +10,14 @@ const mocks = vi.hoisted(() => {
     windowOn: vi.fn(),
     loadURL: vi.fn(),
     openHttpExternal: vi.fn(() => Promise.resolve(true)),
-    loadSettings: vi.fn(() => Promise.resolve({ windowBounds: null })),
+    getSettingsSnapshot: vi.fn(),
+    loadWindowState: vi.fn(() => Promise.resolve({ windowBounds: null })),
     setTitleBarOverlay: vi.fn(),
+    getEmbeddedServerRuntime: vi.fn<() => { url: string; secret: string; clientId: string } | null>(() => ({
+      url: 'http://127.0.0.1:32100/',
+      secret: 'secret',
+      clientId: 'client_sharedterminal',
+    })),
   }
   const BrowserWindow = Object.assign(
     vi.fn(function BrowserWindow(options: any) {
@@ -60,8 +67,8 @@ vi.mock('electron', () => ({
   },
 }))
 
-vi.mock('#/main/settings.ts', () => ({
-  loadSettings: mocks.loadSettings,
+vi.mock('#/main/window-state.ts', () => ({
+  loadWindowState: mocks.loadWindowState,
   setWindowBounds: vi.fn(),
 }))
 
@@ -69,22 +76,33 @@ vi.mock('#/main/theme.ts', () => ({
   getTheme: () => ({ resolved: 'light', colorTheme: 'macos' }),
 }))
 
-vi.mock('#/main/terminal.ts', () => ({
-  closeAllTerminalSessions: vi.fn(),
+vi.mock('#/main/i18n/index.ts', () => ({
+  getCurrentLang: () => 'en',
+  getLangPref: () => Promise.resolve('auto'),
+  getDictionary: () => ({}),
+}))
+
+vi.mock('#/main/settings-server-facade.ts', () => ({
+  getSettingsSnapshot: mocks.getSettingsSnapshot,
 }))
 
 vi.mock('#/main/external-url.ts', () => ({
   openHttpExternal: mocks.openHttpExternal,
 }))
 
+vi.mock('#/main/server-manager.ts', () => ({
+  getEmbeddedServerRuntime: mocks.getEmbeddedServerRuntime,
+}))
+
 describe('main window navigation boundaries', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
-    delete process.env.GOBLIN_RENDERER_DEV_URL
+    delete process.env.GOBLIN_WEB_DEV_URL
     mocks.windows.length = 0
     mocks.windowOptions.length = 0
-    mocks.loadSettings.mockReturnValue(Promise.resolve({ windowBounds: null }))
+    mocks.getSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
+    mocks.loadWindowState.mockReturnValue(Promise.resolve({ windowBounds: null }))
   })
 
   test('prevents renderer navigation away from the packaged app page', async () => {
@@ -115,7 +133,7 @@ describe('main window navigation boundaries', () => {
   test('coalesces concurrent main window creation', async () => {
     const { getOrCreateMainWindow } = await import('#/main/window.ts')
     let resolveSettings: (settings: { windowBounds: null }) => void = () => {}
-    mocks.loadSettings.mockImplementationOnce(
+    mocks.loadWindowState.mockImplementationOnce(
       () =>
         new Promise<{ windowBounds: null }>((resolve) => {
           resolveSettings = resolve
@@ -146,12 +164,36 @@ describe('main window navigation boundaries', () => {
   })
 
   test('loads the configured renderer dev server URL in development', async () => {
-    process.env.GOBLIN_RENDERER_DEV_URL = 'http://127.0.0.1:5173/'
+    process.env.GOBLIN_WEB_DEV_URL = 'http://127.0.0.1:5173/'
     const { getOrCreateMainWindow } = await import('#/main/window.ts')
 
     await getOrCreateMainWindow()
 
-    expect(mocks.loadURL).toHaveBeenCalledWith('http://127.0.0.1:5173/index.html?theme=light&colorTheme=macos')
+    expect(mocks.loadURL).toHaveBeenCalledWith('http://127.0.0.1:5173/?theme=light&colorTheme=macos')
+  })
+
+  test('uses the renderer dev server origin in bootstrap server config during development', async () => {
+    process.env.GOBLIN_WEB_DEV_URL = 'http://127.0.0.1:5173/'
+    const { getOrCreateMainWindow } = await import('#/main/window.ts')
+
+    await getOrCreateMainWindow()
+
+    const bootstrapArg = mocks.windowOptions[0]?.webPreferences?.additionalArguments?.find((arg: string) =>
+      arg.startsWith('--goblin-bootstrap='),
+    )
+    const payload = JSON.parse(Buffer.from(String(bootstrapArg).slice('--goblin-bootstrap='.length), 'base64').toString('utf8'))
+    expect(payload.server).toMatchObject({
+      url: 'http://127.0.0.1:5173/',
+      secret: expect.any(String),
+      clientId: expect.any(String),
+    })
+  })
+
+  test('fails window creation when no renderer base URL is available', async () => {
+    mocks.getEmbeddedServerRuntime.mockReturnValue(null)
+    const { getOrCreateMainWindow } = await import('#/main/window.ts')
+
+    await expect(getOrCreateMainWindow()).rejects.toThrow('Renderer base URL is unavailable')
   })
 
   test('configures chrome to match the current platform', async () => {

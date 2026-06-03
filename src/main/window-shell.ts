@@ -10,23 +10,24 @@
 import { app, type BrowserWindow, type BrowserWindowConstructorOptions } from 'electron'
 import os from 'node:os'
 import path from 'node:path'
-import { pathToFileURL } from 'node:url'
 import { openHttpExternal } from '#/main/external-url.ts'
 import {
   allowTrustedAppUrlForWebContents,
   isTrustedAppUrlForWebContents,
-  registerTrustedAppPath,
   registerTrustedAppUrl,
 } from '#/main/ipc/trusted-webcontents.ts'
-import { getCurrentLang, getDictionary } from '#/main/i18n/index.ts'
+import { getCurrentLang, getDictionary, getLangPref } from '#/main/i18n/index.ts'
 import { getTheme } from '#/main/theme.ts'
-import { loadSettings } from '#/main/settings.ts'
-import { isGlobalShortcutRegistered } from '#/main/shortcuts.ts'
-import type { RendererBootstrapPayload } from '#/shared/bootstrap.ts'
+import { getEmbeddedServerRuntime } from '#/main/server-manager.ts'
+import { getSettingsSnapshot } from '#/main/settings-server-facade.ts'
+import type { InitialSettingsSnapshot, RendererBootstrapPayload } from '#/shared/bootstrap.ts'
+import { createRendererBootstrapPayload, toInitialServerSnapshot } from '#/shared/bootstrap-builders.ts'
+import type { LangPref } from '#/shared/rpc.ts'
 import { WINDOW_BACKGROUND_BY_COLOR_THEME } from '#/shared/theme-tokens.ts'
+import { DEFAULT_COLOR_THEME, initialSettingsFromSnapshot } from '#/shared/settings-defaults.ts'
 
-const rendererDevUrl = process.env.GOBLIN_RENDERER_DEV_URL?.trim()
-const RENDERER_DIST_DIR = path.join(app.getAppPath(), 'dist/renderer')
+const webDevUrl = process.env.GOBLIN_WEB_DEV_URL?.trim()
+const WEB_DIST_DIR = path.join(app.getAppPath(), 'dist/web')
 const PRELOAD_PATH = path.join(app.getAppPath(), 'src/preload/preload.cjs')
 
 export function windowCanvasBackground(): string {
@@ -35,33 +36,29 @@ export function windowCanvasBackground(): string {
 }
 
 function buildRendererBootstrapPayload(
-  settings: Awaited<ReturnType<typeof loadSettings>>,
+  langPref: LangPref,
+  initialSettings: InitialSettingsSnapshot,
 ): RendererBootstrapPayload {
-  return {
+  const runtime = getEmbeddedServerRuntime()
+  return createRendererBootstrapPayload({
     homeDir: os.homedir(),
     i18n: {
       lang: getCurrentLang(),
-      pref: settings.lang,
+      pref: langPref,
       dict: getDictionary(),
     },
-    settings: {
-      fetchIntervalSec: settings.fetchIntervalSec,
-      terminalNotificationsEnabled: settings.terminalNotificationsEnabled,
-      shortcutsDisabled: settings.shortcutsDisabled,
-      globalShortcutDisabled: settings.globalShortcutDisabled,
-      swapCloseShortcuts: settings.swapCloseShortcuts,
-      toggleDetailOnActionBarBlankClick: settings.toggleDetailOnActionBarBlankClick,
-      globalShortcut: settings.globalShortcut,
-      globalShortcutRegistered: isGlobalShortcutRegistered(),
-      terminalApp: settings.terminalApp,
-      editorApp: settings.editorApp,
-    },
-  }
+    settings: initialSettings,
+    server: toInitialServerSnapshot(runtime ? { ...runtime, url: webDevUrl || runtime.url } : null),
+  })
 }
 
 export async function createRendererWindowWebPreferences(): Promise<BrowserWindowConstructorOptions['webPreferences']> {
-  const settings = await loadSettings()
-  const bootstrapPayload = Buffer.from(JSON.stringify(buildRendererBootstrapPayload(settings))).toString('base64')
+  const langPref = await getLangPref()
+  const settingsSnapshot = await getSettingsSnapshot()
+  const initialSettings: InitialSettingsSnapshot = initialSettingsFromSnapshot(settingsSnapshot)
+  const bootstrapPayload = Buffer.from(
+    JSON.stringify(buildRendererBootstrapPayload(langPref, initialSettings)),
+  ).toString('base64')
   return {
     preload: PRELOAD_PATH,
     contextIsolation: true,
@@ -73,22 +70,40 @@ export async function createRendererWindowWebPreferences(): Promise<BrowserWindo
 }
 
 interface RendererEntryUrlOptions {
-  entryHtml: string
-  hash?: string
+  entryHtml?: string
+  routePath?: string
 }
 
-export function createRendererEntryUrl({ entryHtml, hash }: RendererEntryUrlOptions): { url: URL; filePath: string } {
-  const filePath = path.join(RENDERER_DIST_DIR, entryHtml)
-  const url = rendererDevUrl
-    ? new URL(entryHtml, rendererDevUrl.endsWith('/') ? rendererDevUrl : `${rendererDevUrl}/`)
-    : pathToFileURL(filePath)
+export function getRendererBaseUrl(): string | null {
+  const runtime = getEmbeddedServerRuntime()
+  return webDevUrl || runtime?.url || null
+}
+
+export function getEmbeddedServerUrl(): string | null {
+  const runtime = getEmbeddedServerRuntime()
+  return runtime?.url || null
+}
+
+export function createRendererEntryUrl({ entryHtml = 'index.html', routePath = '/' }: RendererEntryUrlOptions): {
+  url: URL
+} {
+  const baseUrl = getRendererBaseUrl()
+  if (!baseUrl) {
+    throw new Error(
+      app.isPackaged
+        ? 'Embedded renderer server is unavailable in packaged app mode'
+        : `Renderer base URL is unavailable for ${path.join(WEB_DIST_DIR, entryHtml)}`,
+    )
+  }
+  const url = new URL(
+    routePath.startsWith('/') ? routePath : `/${routePath}`,
+    baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`,
+  )
   const { resolved, colorTheme } = getTheme()
-  if (rendererDevUrl) registerTrustedAppUrl(url.toString())
-  else registerTrustedAppPath(filePath)
+  registerTrustedAppUrl(url.toString())
   url.searchParams.set('theme', resolved)
-  url.searchParams.set('colorTheme', colorTheme)
-  if (hash) url.hash = hash
-  return { url, filePath }
+  url.searchParams.set('colorTheme', colorTheme || DEFAULT_COLOR_THEME)
+  return { url }
 }
 
 export function configureTrustedRendererWindow(win: BrowserWindow, logLabel: string): void {
@@ -97,8 +112,8 @@ export function configureTrustedRendererWindow(win: BrowserWindow, logLabel: str
     // route internally via app state / hash updates, not full-frame
     // navigations. We still allow the exact entry URL that main explicitly
     // bound to this webContents so dev/prod reloads and same-entry refresh
-    // remain possible, but any cross-entry hop (for example main -> settings)
-    // is blocked here and again at IPC trust time.
+    // remain possible. With the embedded app server + history routing we now
+    // trust the app origin, not individual hash-entry files.
     if (!isTrustedAppUrlForWebContents(win.webContents.id, nextUrl)) event.preventDefault()
   })
   win.webContents.setWindowOpenHandler(({ url: nextUrl }) => {
@@ -111,8 +126,6 @@ export function configureTrustedRendererWindow(win: BrowserWindow, logLabel: str
 
 export function allowRendererWindowEntryUrl(win: BrowserWindow, value: string): void {
   // Scope trust per BrowserWindow, not just per app origin. Once Goblin has
-  // multiple renderer entries, a globally-trusted URL set is too broad: a
-  // main window should not automatically inherit trust to settings.html, and
-  // vice versa.
+  // multiple renderer surfaces, a globally-trusted URL set is too broad.
   allowTrustedAppUrlForWebContents(win.webContents, value)
 }

@@ -8,15 +8,16 @@ const config: Configuration = {
     output: 'release',
   },
   files: [
+    'dist/server/**/*',
+    // Keep these runtime-loaded TS sources in the asar. Main resolves `#/*`
+    // imports through Electron's native TS loader, so removing these globs
+    // breaks packaged builds even though dev still works.
     'src/main/**/*.ts',
+    'src/system/**/*.ts',
+    'src/server/**/*.ts',
     'src/preload/**/*',
-    // `src/shared/` carries types and values consumed by both main
-    // and renderer (e.g. PROTECTED_BRANCHES). Renderer's vite build
-    // inlines its copy, but main loads .ts at runtime via Electron's
-    // native TS loader and reads through the package.json `#/*`
-    // imports map — so the actual files have to ship in the asar.
     'src/shared/**/*.ts',
-    'dist/renderer/**/*',
+    'dist/web/**/*',
     'package.json',
     '!src/**/*.test.ts',
     '!**/*.map',

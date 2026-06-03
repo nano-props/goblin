@@ -4,8 +4,25 @@
 // like `os`, `fs`, or `path`. Anything that needs Node lives
 // in the main process and is reached via IPC.
 const { contextBridge, ipcRenderer, webUtils } = require('electron')
-const WINDOW_LIFECYCLE_READY_CHANNEL = 'goblin:window-lifecycle-ready'
-const WINDOW_LIFECYCLE_FLUSH_DONE_CHANNEL = 'goblin:window-lifecycle-flush-done'
+const IPC = {
+  rpc: {
+    call: 'goblin:rpc',
+    abort: 'goblin:rpc-abort',
+    event: 'goblin:event',
+  },
+  shell: {
+    openSettingsWindow: 'goblin:shell-open-settings-window',
+    openExternalUrl: 'goblin:shell-open-external-url',
+    openDirectoryDialog: 'goblin:shell-open-directory-dialog',
+    consumeExternalOpenPaths: 'goblin:shell-consume-external-open-paths',
+    openInFinder: 'goblin:shell-open-in-finder',
+  },
+  terminal: {
+    notifyBell: 'goblin:terminal-notify-bell',
+    sendTestNotification: 'goblin:terminal-send-test-notification',
+    setBadge: 'goblin:terminal-set-badge',
+  },
+}
 
 // `ipcRenderer.invoke` rejects when the main handler throws. We log the
 // channel once at the bridge, then rethrow so renderer call sites can
@@ -22,16 +39,8 @@ function isObject(value) {
   return value !== null && typeof value === 'object'
 }
 
-function windowPageSetChannel(windowKey) {
-  return `goblin:window-page-set:${windowKey}`
-}
-
-function windowFlushRequestChannel(windowKey) {
-  return `goblin:window-flush-request:${windowKey}`
-}
-
 function rpcCall(request) {
-  return safeInvoke('goblin:rpc', request)
+  return safeInvoke(IPC.rpc.call, request)
     .then((response) => {
       if (!isObject(response) || typeof response.ok !== 'boolean') throw new Error('Malformed RPC response')
       if (response.ok) return response.data
@@ -67,12 +76,15 @@ const bootstrap = safeParseBase64JsonArgument(BOOTSTRAP_PREFIX, 'bootstrap paylo
 const homeDir = typeof bootstrap?.homeDir === 'string' ? bootstrap.homeDir : ''
 const initialI18n = isObject(bootstrap?.i18n) ? bootstrap.i18n : null
 const initialSettings = isObject(bootstrap?.settings) ? bootstrap.settings : null
+const initialServer =
+  isObject(bootstrap?.server) &&
+  typeof bootstrap.server.url === 'string' &&
+  typeof bootstrap.server.secret === 'string' &&
+  (typeof bootstrap.server.clientId === 'undefined' || typeof bootstrap.server.clientId === 'string')
+    ? bootstrap.server
+    : null
 const rpcEventSubscribers = new Set()
 let rpcEventListener = null
-const windowPageSubscribersByKey = new Map()
-const windowPageListenersByKey = new Map()
-const windowFlushSubscribersByKey = new Map()
-const windowFlushListenersByKey = new Map()
 
 function ensureRpcEventListener() {
   if (rpcEventListener) return
@@ -85,106 +97,35 @@ function ensureRpcEventListener() {
       }
     }
   }
-  ipcRenderer.on('goblin:event', rpcEventListener)
+  ipcRenderer.on(IPC.rpc.event, rpcEventListener)
 }
 
 function maybeDisposeRpcEventListener() {
   if (rpcEventSubscribers.size > 0 || !rpcEventListener) return
-  ipcRenderer.off('goblin:event', rpcEventListener)
+  ipcRenderer.off(IPC.rpc.event, rpcEventListener)
   rpcEventListener = null
-}
-
-function ensureWindowPageListener(windowKey) {
-  if (windowPageListenersByKey.has(windowKey)) return
-  const listener = (_event, page) => {
-    const subscribers = windowPageSubscribersByKey.get(windowKey)
-    if (!subscribers) return
-    for (const cb of subscribers) {
-      try {
-        cb(page)
-      } catch (err) {
-        console.warn(`[ipc] ${windowPageSetChannel(windowKey)} subscriber failed`, err)
-      }
-    }
-  }
-  windowPageListenersByKey.set(windowKey, listener)
-  ipcRenderer.on(windowPageSetChannel(windowKey), listener)
-}
-
-function maybeDisposeWindowPageListener(windowKey) {
-  const subscribers = windowPageSubscribersByKey.get(windowKey)
-  const listener = windowPageListenersByKey.get(windowKey)
-  if ((subscribers && subscribers.size > 0) || !listener) return
-  ipcRenderer.off(windowPageSetChannel(windowKey), listener)
-  windowPageListenersByKey.delete(windowKey)
-}
-
-function ensureWindowFlushListener(windowKey) {
-  if (windowFlushListenersByKey.has(windowKey)) return
-  const listener = (_event, requestId) => {
-    const subscribers = windowFlushSubscribersByKey.get(windowKey)
-    if (!subscribers || typeof requestId !== 'string' || requestId.length === 0) return
-    Promise.allSettled(
-      [...subscribers].map(async (cb) => {
-        const result = await cb(requestId)
-        return isObject(result) && typeof result.ok === 'boolean' && Array.isArray(result.errors)
-          ? result
-          : { ok: true, errors: [] }
-      }),
-    ).then((settled) => {
-      const errors = []
-      for (const result of settled) {
-        if (result.status === 'fulfilled') {
-          if (!result.value.ok) errors.push(...result.value.errors)
-        } else {
-          errors.push(result.reason instanceof Error ? result.reason.message : String(result.reason))
-        }
-      }
-      ipcRenderer.send(WINDOW_LIFECYCLE_FLUSH_DONE_CHANNEL, {
-        windowKey,
-        requestId,
-        result: { ok: errors.length === 0, errors },
-      })
-    })
-  }
-  windowFlushListenersByKey.set(windowKey, listener)
-  ipcRenderer.on(windowFlushRequestChannel(windowKey), listener)
-}
-
-function maybeDisposeWindowFlushListener(windowKey) {
-  const subscribers = windowFlushSubscribersByKey.get(windowKey)
-  const listener = windowFlushListenersByKey.get(windowKey)
-  if ((subscribers && subscribers.size > 0) || !listener) return
-  ipcRenderer.off(windowFlushRequestChannel(windowKey), listener)
-  windowFlushListenersByKey.delete(windowKey)
 }
 
 contextBridge.exposeInMainWorld('goblin', {
   homeDir,
   initialI18n,
   initialSettings,
+  initialServer,
   invokeRpc: ({ path, input, requestId }) => rpcCall({ path, input, requestId }),
-  abortRpc: (requestId) => safeInvoke('goblin:rpc-abort', { requestId }),
+  abortRpc: (requestId) => safeInvoke(IPC.rpc.abort, { requestId }),
   pathForFile: (file) => webUtils.getPathForFile(file),
+  shell: {
+    openSettingsWindow: (input) => safeInvoke(IPC.shell.openSettingsWindow, input),
+    openExternalUrl: (input) => safeInvoke(IPC.shell.openExternalUrl, input),
+    openDirectoryDialog: (input) => safeInvoke(IPC.shell.openDirectoryDialog, input),
+    consumeExternalOpenPaths: () => safeInvoke(IPC.shell.consumeExternalOpenPaths),
+    openInFinder: (input) => safeInvoke(IPC.shell.openInFinder, input),
+  },
   terminal: {
-    open: (input) => safeInvoke('goblin:terminal-open', input),
-    restart: (input) => safeInvoke('goblin:terminal-restart', input),
-    write: (input) => safeInvoke('goblin:terminal-write', input),
-    resize: (input) => safeInvoke('goblin:terminal-resize', input),
-    close: (input) => safeInvoke('goblin:terminal-close', input),
-    pruneRepo: (input) => safeInvoke('goblin:terminal-prune-repo', input),
-    notifyBell: (input) => safeInvoke('goblin:terminal-notify-bell', input),
-    sendTestNotification: () => safeInvoke('goblin:terminal-send-test-notification'),
-    setBadge: (count) => { ipcRenderer.send('goblin:terminal-set-badge', count) },
-    onOutput: (cb) => {
-      const listener = (_event, payload) => cb(payload)
-      ipcRenderer.on('goblin:terminal-output', listener)
-      return () => ipcRenderer.off('goblin:terminal-output', listener)
-    },
-    onExit: (cb) => {
-      const listener = (_event, payload) => cb(payload)
-      ipcRenderer.on('goblin:terminal-exit', listener)
-      return () => ipcRenderer.off('goblin:terminal-exit', listener)
+    notifyBell: (input) => safeInvoke(IPC.terminal.notifyBell, input),
+    sendTestNotification: () => safeInvoke(IPC.terminal.sendTestNotification),
+    setBadge: (count) => {
+      ipcRenderer.send(IPC.terminal.setBadge, count)
     },
   },
   onEvent: (cb) => {
@@ -193,44 +134,6 @@ contextBridge.exposeInMainWorld('goblin', {
     return () => {
       rpcEventSubscribers.delete(cb)
       maybeDisposeRpcEventListener()
-    }
-  },
-  onWindowPageSet: (windowKey, cb) => {
-    if (typeof windowKey !== 'string' || windowKey.length === 0) return () => {}
-    let subscribers = windowPageSubscribersByKey.get(windowKey)
-    if (!subscribers) {
-      subscribers = new Set()
-      windowPageSubscribersByKey.set(windowKey, subscribers)
-    }
-    subscribers.add(cb)
-    ensureWindowPageListener(windowKey)
-    return () => {
-      const nextSubscribers = windowPageSubscribersByKey.get(windowKey)
-      if (!nextSubscribers) return
-      nextSubscribers.delete(cb)
-      if (nextSubscribers.size === 0) windowPageSubscribersByKey.delete(windowKey)
-      maybeDisposeWindowPageListener(windowKey)
-    }
-  },
-  notifyWindowReady: (windowKey) => {
-    if (typeof windowKey !== 'string' || windowKey.length === 0) return
-    ipcRenderer.send(WINDOW_LIFECYCLE_READY_CHANNEL, { windowKey })
-  },
-  onWindowFlushRequest: (windowKey, cb) => {
-    if (typeof windowKey !== 'string' || windowKey.length === 0) return () => {}
-    let subscribers = windowFlushSubscribersByKey.get(windowKey)
-    if (!subscribers) {
-      subscribers = new Set()
-      windowFlushSubscribersByKey.set(windowKey, subscribers)
-    }
-    subscribers.add(cb)
-    ensureWindowFlushListener(windowKey)
-    return () => {
-      const nextSubscribers = windowFlushSubscribersByKey.get(windowKey)
-      if (!nextSubscribers) return
-      nextSubscribers.delete(cb)
-      if (nextSubscribers.size === 0) windowFlushSubscribersByKey.delete(windowKey)
-      maybeDisposeWindowFlushListener(windowKey)
     }
   },
 })

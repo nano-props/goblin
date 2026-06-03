@@ -6,14 +6,9 @@
 // fetched via IPC; this module is the source of truth.
 
 import { app } from 'electron'
-import { en, type DictKey } from '#/main/i18n/en.ts'
-import { ko } from '#/main/i18n/ko.ts'
-import { zh } from '#/main/i18n/zh.ts'
-import { ja } from '#/main/i18n/ja.ts'
-import { loadSettings, setLangPref as persistLangPref } from '#/main/settings.ts'
+import { DICTS, en, type DictKey } from '#/shared/i18n/dictionaries.ts'
+import { getSettingsPrefs, updateSettingsPrefs } from '#/main/settings-server-facade.ts'
 import type { I18nPayload, Lang, LangPref } from '#/shared/rpc.ts'
-
-const DICTS: Record<Lang, Record<DictKey, string>> = { en, zh, ko, ja }
 
 let currentLang: Lang = 'en'
 
@@ -80,11 +75,15 @@ export function getDictionary(): Record<DictKey, string> {
   return DICTS[currentLang]
 }
 
+export async function getLangPref(): Promise<LangPref> {
+  return (await getSettingsPrefs()).lang
+}
+
 export async function applyLangPref(pref: LangPref): Promise<I18nPayload | null> {
-  const settings = await loadSettings()
-  const lang = resolveLang(pref)
-  const changed = settings.lang !== pref || currentLang !== lang
-  await persistLangPref(pref)
+  const currentPref = await getLangPref()
+  const nextPref = (await updateSettingsPrefs({ lang: pref })).lang
+  const lang = resolveLang(nextPref)
+  const changed = currentPref !== nextPref || currentLang !== lang
   setCurrentLang(lang)
-  return changed ? { lang, pref, dict: getDictionary() } : null
+  return changed ? { lang, pref: nextPref, dict: getDictionary() } : null
 }

@@ -1,5 +1,5 @@
 import { broadcastRpcEvent } from '#/main/events.ts'
-import { toSafeSessionPath } from '#/main/ipc/validation.ts'
+import { toSafeSessionPath } from '#/shared/input-validation.ts'
 
 const queuedPaths = new Set<string>()
 

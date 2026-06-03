@@ -1,10 +1,12 @@
 import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
 import { ipcMain } from 'electron'
-import { closeWorktreeSession, pruneRepoSessions, wireTerminalIpc } from '#/main/terminal.ts'
-import { openTerminalSession } from '#/main/terminal-core.ts'
-import { getWorktrees } from '#/main/git/worktrees.ts'
-import { registerTrustedAppPath, registerTrustedWebContents } from '#/main/ipc/trusted-webcontents.ts'
-import type { TerminalOpenInput, TerminalRestartInput } from '#/shared/terminal.ts'
+import { wireTerminalIpc } from '#/main/terminal.ts'
+import { registerTrustedAppUrl, registerTrustedWebContents } from '#/main/ipc/trusted-webcontents.ts'
+import {
+  TERMINAL_NOTIFY_BELL_CHANNEL,
+  TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL,
+  TERMINAL_SET_BADGE_CHANNEL,
+} from '#/shared/ipc-channels.ts'
 
 const ipcHandlers = new Map<string, (_event: unknown, input: any) => unknown>()
 
@@ -17,12 +19,14 @@ const ipcHandlers = new Map<string, (_event: unknown, input: any) => unknown>()
 // which are hoisted to the top of the file by vitest's transformer.
 const { mockNotificationEmitting } = vi.hoisted(() => ({
   mockNotificationEmitting(emitEvent: 'show' | 'failed') {
-    return function MockNotification(
-      this: { show: ReturnType<typeof vi.fn>; once: ReturnType<typeof vi.fn> },
-    ) {
+    return function MockNotification(this: { show: ReturnType<typeof vi.fn>; once: ReturnType<typeof vi.fn> }) {
       const listeners = new Map<string, () => void>()
-      this.once = vi.fn((event: string, cb: () => void) => { listeners.set(event, cb) })
-      this.show = vi.fn(() => { listeners.get(emitEvent)?.() })
+      this.once = vi.fn((event: string, cb: () => void) => {
+        listeners.set(event, cb)
+      })
+      this.show = vi.fn(() => {
+        listeners.get(emitEvent)?.()
+      })
     }
   },
 }))
@@ -36,142 +40,38 @@ vi.mock('electron', () => ({
       ipcHandlers.set(channel, handler)
     }),
   },
-  BrowserWindow: { getAllWindows: () => [], fromWebContents: vi.fn(() => ({ isDestroyed: () => false, isFocused: () => false, flashFrame: vi.fn() })) },
-  Notification: Object.assign(
-    vi.fn(mockNotificationEmitting('show')),
-    { isSupported: vi.fn(() => true) },
-  ),
-  app: { on: vi.fn(), getAppPath: vi.fn(() => '/app'), dock: { bounce: vi.fn() } },
-}))
-
-vi.mock('#/main/git/worktrees.ts', () => ({
-  getWorktrees: vi.fn(),
-}))
-
-vi.mock('#/main/terminal-core.ts', () => ({
-  closeAllTerminalSessions: vi.fn(),
-  closeOwnedTerminalSession: vi.fn(),
-  closeTerminalKey: vi.fn(),
-  closeTerminalOwner: vi.fn(),
-  closeTerminalSession: vi.fn(),
-  isValidTerminalSessionId: (value: unknown) => typeof value === 'string' && value.startsWith('term_'),
-  isValidTerminalWriteData: (value: unknown) => typeof value === 'string',
-  openTerminalSession: vi.fn(() => ({
-    ok: true,
-    sessionId: 'term_123456789012',
-    replay: '',
-    replaySeq: 0,
-    replayTruncated: false,
-    processName: 'zsh',
-  })),
-  pruneTerminalScope: vi.fn(),
-  resizeTerminalSession: vi.fn(() => true),
-  wireTerminalSessionCleanup: vi.fn(),
-  writeTerminalSession: vi.fn(() => true),
+  BrowserWindow: {
+    getAllWindows: () => [],
+    fromWebContents: vi.fn(() => ({ isDestroyed: () => false, isFocused: () => false, flashFrame: vi.fn() })),
+  },
+  Notification: Object.assign(vi.fn(mockNotificationEmitting('show')), { isSupported: vi.fn(() => true) }),
+  app: { on: vi.fn(), getAppPath: vi.fn(() => '/app'), dock: { bounce: vi.fn(), setBadge: vi.fn() } },
 }))
 
 describe('terminal IPC', () => {
   beforeAll(() => {
-    registerTrustedAppPath('/app/dist/renderer/index.html')
+    registerTrustedAppUrl('http://127.0.0.1:5173/')
     registerTrustedWebContents({ id: 1, once: vi.fn() } as any)
-    registerTrustedWebContents({ id: 7, once: vi.fn() } as any)
-    registerTrustedWebContents({ id: 9, once: vi.fn() } as any)
     wireTerminalIpc()
   })
 
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(getWorktrees).mockResolvedValue([
-      { path: '/repo', branch: 'main', isBare: false, isPrimary: true },
-      { path: '/repo-linked', branch: 'feature', isBare: false, isPrimary: false },
-    ])
   })
 
-  test('wires terminal handlers', () => {
-    expect(ipcHandlers.has('goblin:terminal-open')).toBe(true)
-    expect(ipcHandlers.has('goblin:terminal-restart')).toBe(true)
-    expect(ipcHandlers.has('goblin:terminal-close')).toBe(true)
-    expect(ipcHandlers.has('goblin:terminal-prune-repo')).toBe(true)
-    expect(ipcHandlers.has('goblin:terminal-notify-bell')).toBe(true)
-    expect(ipcHandlers.has('goblin:terminal-close-repo')).toBe(false)
-    expect(ipcHandlers.has('goblin:terminal-close-worktree')).toBe(false)
-  })
-
-  test('opens a validated worktree terminal without replacement', async () => {
-    const result = await invoke<TerminalOpenInput>('goblin:terminal-open', {
-      repoRoot: '/repo',
-      branch: 'feature',
-      worktreePath: '/repo-linked',
-      terminalId: 'terminal-1',
-      cols: 80,
-      rows: 24,
-    })
-
-    expect(result).toEqual({
-      ok: true,
-      sessionId: 'term_123456789012',
-      replay: '',
-      replaySeq: 0,
-      replayTruncated: false,
-      processName: 'zsh',
-    })
-    expect(openTerminalSession).toHaveBeenCalledWith({
-      ownerWebContentsId: 1,
-      scope: '/repo',
-      key: '/repo\0/repo-linked\0terminal-1',
-      cwd: '/repo-linked',
-      cols: 80,
-      rows: 24,
-      forceNew: false,
-    })
-  })
-
-  test('restarts a validated worktree terminal with replacement', async () => {
-    await invoke<TerminalRestartInput>('goblin:terminal-restart', {
-      repoRoot: '/repo',
-      branch: 'feature',
-      worktreePath: '/repo-linked',
-      terminalId: 'terminal-1',
-      cols: 100,
-      rows: 30,
-    })
-
-    expect(openTerminalSession).toHaveBeenCalledWith({
-      ownerWebContentsId: 1,
-      scope: '/repo',
-      key: '/repo\0/repo-linked\0terminal-1',
-      cwd: '/repo-linked',
-      cols: 100,
-      rows: 30,
-      forceNew: true,
-    })
-  })
-
-  test('rejects invalid open inputs before reading worktrees', async () => {
-    const result = await invoke('goblin:terminal-open', {
-      repoRoot: '/repo',
-      branch: 'feature',
-      worktreePath: '/repo-linked',
-      terminalId: 'terminal-1',
-      cols: 0,
-      rows: 24,
-    })
-
-    expect(result).toEqual({ ok: false, message: 'error.invalid-arguments' })
-    expect(getWorktrees).not.toHaveBeenCalled()
-    expect(openTerminalSession).not.toHaveBeenCalled()
+  test('wires native terminal notification handlers', () => {
+    expect(ipcHandlers.has(TERMINAL_NOTIFY_BELL_CHANNEL)).toBe(true)
+    expect(ipcHandlers.has(TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL)).toBe(true)
+    expect(ipcHandlers.has(TERMINAL_SET_BADGE_CHANNEL)).toBe(true)
   })
 
   test('rejects terminal IPC calls from untrusted senders', async () => {
     const result = await invokeWithEvent(
-      'goblin:terminal-open',
+      TERMINAL_NOTIFY_BELL_CHANNEL,
       {
-        repoRoot: '/repo',
-        branch: 'feature',
-        worktreePath: '/repo-linked',
-        terminalId: 'terminal-1',
-        cols: 80,
-        rows: 24,
+        title: 'Terminal bell',
+        body: 'zsh needs attention',
+        repoRoot: '/tmp/repo',
       },
       {
         sender: { id: 99, once: vi.fn() },
@@ -179,85 +79,13 @@ describe('terminal IPC', () => {
       },
     )
 
-    expect(result).toEqual({ ok: false, message: 'error.invalid-arguments' })
-    expect(getWorktrees).not.toHaveBeenCalled()
-    expect(openTerminalSession).not.toHaveBeenCalled()
+    expect(result).toBe(false)
   })
 
-  test('rejects stale worktree paths and branch mismatches', async () => {
-    await expect(
-      invoke('goblin:terminal-open', {
-        repoRoot: '/repo',
-        branch: 'main',
-        worktreePath: '/repo-linked',
-        terminalId: 'terminal-1',
-        cols: 80,
-        rows: 24,
-      }),
-    ).resolves.toEqual({ ok: false, message: 'error.worktree-not-found-for-branch' })
-    expect(openTerminalSession).not.toHaveBeenCalled()
-  })
-
-  test('closes owner sessions when the renderer webContents is destroyed', async () => {
-    const core = await import('#/main/terminal-core.ts')
-    const sender = { id: 7, once: vi.fn() }
-
-    await invokeWithSender(
-      'goblin:terminal-open',
-      {
-        repoRoot: '/repo',
-        branch: 'feature',
-        worktreePath: '/repo-linked',
-        terminalId: 'terminal-1',
-        cols: 80,
-        rows: 24,
-      },
-      sender,
+  test('rejects malformed bell payloads', async () => {
+    await expect(invoke(TERMINAL_NOTIFY_BELL_CHANNEL, { title: 1, body: 'bad', repoRoot: '/tmp/repo' })).resolves.toBe(
+      false,
     )
-    const onDestroyed = sender.once.mock.calls.find(([eventName]) => eventName === 'destroyed')?.[1]
-    expect(onDestroyed).toBeTypeOf('function')
-
-    onDestroyed?.()
-    expect(core.closeTerminalOwner).toHaveBeenCalledWith(7)
-  })
-
-  test('scopes write, resize, and close IPC calls to the sender owner', async () => {
-    const core = await import('#/main/terminal-core.ts')
-    const sender = { id: 9, once: vi.fn() }
-
-    vi.mocked(core.closeOwnedTerminalSession).mockReturnValueOnce(true)
-
-    expect(invokeWithSender('goblin:terminal-write', { sessionId: 'term_123456789012', data: 'input' }, sender)).toBe(
-      true,
-    )
-    expect(
-      invokeWithSender('goblin:terminal-resize', { sessionId: 'term_123456789012', cols: 100, rows: 30 }, sender),
-    ).toBe(true)
-    expect(invokeWithSender('goblin:terminal-close', { sessionId: 'term_123456789012' }, sender)).toBe(true)
-
-    expect(core.writeTerminalSession).toHaveBeenCalledWith(9, 'term_123456789012', 'input')
-    expect(core.resizeTerminalSession).toHaveBeenCalledWith(9, 'term_123456789012', 100, 30)
-    expect(core.closeOwnedTerminalSession).toHaveBeenCalledWith(9, 'term_123456789012')
-  })
-
-  test('returns false for rejected terminal mutation inputs', () => {
-    expect(invoke('goblin:terminal-write', { sessionId: 'invalid', data: 'input' })).toBe(false)
-    expect(invoke('goblin:terminal-resize', { sessionId: 'term_123456789012', cols: 0, rows: 30 })).toBe(false)
-    expect(invoke('goblin:terminal-close', { sessionId: 'invalid' })).toBe(false)
-    expect(invoke('goblin:terminal-prune-repo', { repoRoot: '/repo', worktreePaths: ['relative'] })).toBe(false)
-  })
-
-  test('returns true after pruning a valid repo terminal scope', () => {
-    expect(invoke('goblin:terminal-prune-repo', { repoRoot: '/repo', worktreePaths: ['/repo-linked'] })).toBe(true)
-  })
-
-  test('returns true after pruning a valid remote repo terminal scope', () => {
-    expect(
-      invoke('goblin:terminal-prune-repo', {
-        repoRoot: 'ssh-config://prod/srv/repo',
-        worktreePaths: ['/srv/repo', '/srv/repo-feature'],
-      }),
-    ).toBe(true)
   })
 
   test('shows a system notification for trusted bell requests', async () => {
@@ -270,14 +98,17 @@ describe('terminal IPC', () => {
     } as any)
 
     await expect(
-      invoke('goblin:terminal-notify-bell', { title: 'Terminal bell', body: 'zsh needs attention in feature', repoRoot: '/tmp/repo' }),
+      invoke(TERMINAL_NOTIFY_BELL_CHANNEL, {
+        title: 'Terminal bell',
+        body: 'zsh needs attention in feature',
+        repoRoot: '/tmp/repo',
+      }),
     ).resolves.toBe(true)
     expect(flashFrame).toHaveBeenCalledWith(true)
     expect(app.dock?.bounce).toHaveBeenCalledWith('informational')
     expect(Notification).toHaveBeenCalledWith({
       title: 'Terminal bell',
       body: 'zsh needs attention in feature',
-      silent: true,
     })
   })
 
@@ -291,7 +122,11 @@ describe('terminal IPC', () => {
     vi.mocked(Notification).mockImplementationOnce(mockNotificationEmitting('failed') as any)
 
     await expect(
-      invoke('goblin:terminal-notify-bell', { title: 'Terminal bell', body: 'zsh needs attention', repoRoot: '/tmp/repo' }),
+      invoke(TERMINAL_NOTIFY_BELL_CHANNEL, {
+        title: 'Terminal bell',
+        body: 'zsh needs attention',
+        repoRoot: '/tmp/repo',
+      }),
     ).resolves.toBe(false)
   })
 
@@ -306,21 +141,26 @@ describe('terminal IPC', () => {
     vi.mocked(Notification.isSupported).mockReturnValueOnce(false)
 
     await expect(
-      invoke('goblin:terminal-notify-bell', { title: 'Terminal bell', body: 'zsh needs attention', repoRoot: '/tmp/repo' }),
+      invoke(TERMINAL_NOTIFY_BELL_CHANNEL, {
+        title: 'Terminal bell',
+        body: 'zsh needs attention',
+        repoRoot: '/tmp/repo',
+      }),
     ).resolves.toBe(true)
     expect(flashFrame).toHaveBeenCalledWith(true)
   })
-})
+ 
+  test('sends the dock badge count through the trusted ipc sender only', async () => {
+    const { app } = await import('electron')
+    invoke(TERMINAL_SET_BADGE_CHANNEL, 2)
+    expect(app.dock?.bounce).not.toHaveBeenCalled()
+    expect(app.dock?.setBadge).toHaveBeenCalledWith('2')
 
-describe('terminal session cleanup helpers', () => {
-  test('normalizes repo and worktree keys before closing or pruning', async () => {
-    const core = await import('#/main/terminal-core.ts')
-
-    closeWorktreeSession('/repo/../repo', '/repo-linked/../repo-linked')
-    pruneRepoSessions(7, '/repo/../repo', ['/repo-linked/../repo-linked'])
-
-    expect(core.closeTerminalKey).toHaveBeenCalledWith('/repo\0/repo-linked')
-    expect(core.pruneTerminalScope).toHaveBeenCalledWith(7, '/repo', new Set(['/repo\0/repo-linked']))
+    invokeWithEvent(TERMINAL_SET_BADGE_CHANNEL, 4, {
+      sender: { id: 99, once: vi.fn() },
+      senderFrame: { url: 'https://example.com/' },
+    })
+    expect(app.dock?.setBadge).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -335,7 +175,7 @@ function invokeWithSender<TInput>(
 ): unknown {
   return invokeWithEvent(channel, input, {
     sender,
-    senderFrame: { url: 'file:///app/dist/renderer/index.html?theme=light' },
+    senderFrame: { url: 'http://127.0.0.1:5173/?theme=light' },
   })
 }
 

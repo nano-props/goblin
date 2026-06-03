@@ -1,4 +1,4 @@
-// Keep this in sync with the pre-React allowlist in `src/renderer/public/boot.js`.
+// Keep this in sync with the pre-React allowlist in `src/web/public/boot.js`.
 export const COLOR_THEMES = ['macos', 'mono', 'github'] as const
 
 export type ColorTheme = (typeof COLOR_THEMES)[number]

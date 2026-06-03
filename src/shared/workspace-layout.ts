@@ -6,7 +6,8 @@ export type WorkspaceDetailPaneSizes = Record<WorkspaceLayout, number>
 
 export const DEFAULT_WORKSPACE_LAYOUT: WorkspaceLayout = 'top-bottom'
 export const DEFAULT_DETAIL_COLLAPSED = true
-export const DEFAULT_DETAIL_PANE_SIZES: WorkspaceDetailPaneSizes = { 'top-bottom': 50, 'left-right': 60 }
+export const DEFAULT_DETAIL_FOCUS_MODE = false
+export const DEFAULT_DETAIL_PANE_SIZES: WorkspaceDetailPaneSizes = { 'top-bottom': 61.8, 'left-right': 61.8 }
 
 const MIN_DETAIL_PANE_SIZE = 10
 const MAX_DETAIL_PANE_SIZE = 90
@@ -45,5 +46,33 @@ export function normalizeDetailPaneSizes(value: unknown): WorkspaceDetailPaneSiz
   return {
     'top-bottom': normalizeDetailPaneSize('top-bottom', sizes['top-bottom']),
     'left-right': normalizeDetailPaneSize('left-right', sizes['left-right']),
+  }
+}
+
+export function normalizeWorkspaceSessionLayoutState(value: {
+  workspaceLayout?: unknown
+  detailCollapsed?: unknown
+  detailFocusMode?: unknown
+  detailPaneSizes?: unknown
+}): {
+  workspaceLayout: WorkspaceLayout
+  detailCollapsed: boolean
+  detailFocusMode: boolean
+  detailPaneSizes: WorkspaceDetailPaneSizes
+} {
+  const workspaceLayout = normalizeWorkspaceLayout(value.workspaceLayout)
+  const detailCollapsed = effectiveDetailCollapsed(
+    workspaceLayout,
+    typeof value.detailCollapsed === 'boolean' ? value.detailCollapsed : DEFAULT_DETAIL_COLLAPSED,
+  )
+  const detailFocusMode =
+    workspaceLayout === 'top-bottom' && typeof value.detailFocusMode === 'boolean'
+      ? value.detailFocusMode
+      : DEFAULT_DETAIL_FOCUS_MODE
+  return {
+    workspaceLayout,
+    detailCollapsed,
+    detailFocusMode,
+    detailPaneSizes: normalizeDetailPaneSizes(value.detailPaneSizes),
   }
 }

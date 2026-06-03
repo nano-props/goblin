@@ -1,38 +1,39 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import type { SettingsSnapshot } from '#/shared/rpc.ts'
+import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
 const mocks = vi.hoisted(() => {
   const handlers = new Map<string, Array<(...args: any[]) => any>>()
   let resolveReady: () => void = () => {}
   let whenReadyPromise = Promise.resolve()
-  const settings = {
-    lang: 'auto',
-    globalShortcutDisabled: false,
-    globalShortcut: 'CommandOrControl+Shift+G',
-  }
   return {
     handlers,
-    settings,
     appOn: vi.fn((name: string, handler: (...args: any[]) => any) => {
       const next = handlers.get(name) ?? []
       next.push(handler)
       handlers.set(name, next)
     }),
     requestSingleInstanceLock: vi.fn(() => true),
+    getAppPath: vi.fn(() => '/app'),
     exit: vi.fn(),
     quit: vi.fn(),
     whenReady: vi.fn(() => whenReadyPromise),
     activateMainWindow: vi.fn(() => Promise.resolve({})),
     assertDictionaryParity: vi.fn(),
     buildAppMenu: vi.fn(),
-    flushSettings: vi.fn(() => Promise.resolve(true)),
+    flushWindowState: vi.fn(() => Promise.resolve(true)),
+    getSettingsSnapshot: vi.fn<() => Promise<SettingsSnapshot>>(),
+    setSettingsGlobalShortcutState: vi.fn(async () => true),
+    initializeMenuRuntimeState: vi.fn(),
     initTheme: vi.fn(() => Promise.resolve()),
-    loadSettings: vi.fn(() => Promise.resolve(settings)),
+    getLangPref: vi.fn(async () => 'auto'),
     resolveLang: vi.fn(() => 'en'),
     setCurrentLang: vi.fn(),
     syncGlobalShortcuts: vi.fn(),
     enqueueExternalOpenPath: vi.fn(() => true),
     unregisterAppShortcuts: vi.fn(),
     wireRpcIpc: vi.fn(),
+    wireShellBridgeIpc: vi.fn(),
     wireTerminalIpc: vi.fn(),
     resetReady() {
       whenReadyPromise = new Promise<void>((resolve) => {
@@ -48,6 +49,7 @@ const mocks = vi.hoisted(() => {
 vi.mock('electron', () => ({
   app: {
     focus: vi.fn(),
+    getAppPath: mocks.getAppPath,
     getPath: vi.fn(() => '/tmp/goblin'),
     isPackaged: false,
     on: mocks.appOn,
@@ -56,6 +58,9 @@ vi.mock('electron', () => ({
     requestSingleInstanceLock: mocks.requestSingleInstanceLock,
     show: vi.fn(),
     whenReady: mocks.whenReady,
+  },
+  dialog: {
+    showErrorBox: vi.fn(),
   },
 }))
 
@@ -67,17 +72,21 @@ vi.mock('#/main/theme.ts', () => ({
   initTheme: mocks.initTheme,
 }))
 
-vi.mock('#/main/settings.ts', () => ({
-  flushSettings: mocks.flushSettings,
-  loadSettings: mocks.loadSettings,
+vi.mock('#/main/window-state.ts', () => ({
+  flushWindowState: mocks.flushWindowState,
 }))
 
 vi.mock('#/main/menu.ts', () => ({
   buildAppMenu: mocks.buildAppMenu,
 }))
 
+vi.mock('#/main/menu-state.ts', () => ({
+  initializeMenuRuntimeState: mocks.initializeMenuRuntimeState,
+}))
+
 vi.mock('#/main/i18n/index.ts', () => ({
   assertDictionaryParity: mocks.assertDictionaryParity,
+  getLangPref: mocks.getLangPref,
   resolveLang: mocks.resolveLang,
   setCurrentLang: mocks.setCurrentLang,
 }))
@@ -86,8 +95,22 @@ vi.mock('#/main/rpc.ts', () => ({
   wireRpcIpc: mocks.wireRpcIpc,
 }))
 
+vi.mock('#/main/shell-bridge.ts', () => ({
+  wireShellBridgeIpc: mocks.wireShellBridgeIpc,
+}))
+
 vi.mock('#/main/terminal.ts', () => ({
   wireTerminalIpc: mocks.wireTerminalIpc,
+}))
+
+vi.mock('#/main/settings-server-facade.ts', () => ({
+  getSettingsSnapshot: mocks.getSettingsSnapshot,
+  setSettingsGlobalShortcutState: mocks.setSettingsGlobalShortcutState,
+}))
+
+vi.mock('#/main/server-manager.ts', () => ({
+  startEmbeddedServer: vi.fn(() => Promise.resolve()),
+  stopEmbeddedServer: vi.fn(() => Promise.resolve()),
 }))
 
 vi.mock('#/main/shortcuts.ts', () => ({
@@ -105,6 +128,7 @@ describe('main process startup lifecycle', () => {
     vi.clearAllMocks()
     mocks.handlers.clear()
     mocks.resetReady()
+    mocks.getSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
   })
 
   test('flushes settings and shortcut cleanup before exiting', async () => {
@@ -116,7 +140,7 @@ describe('main process startup lifecycle', () => {
     await emit('before-quit', secondPassEvent)
 
     expect(event.preventDefault).toHaveBeenCalledTimes(1)
-    expect(mocks.flushSettings).toHaveBeenCalledTimes(1)
+    expect(mocks.flushWindowState).toHaveBeenCalledTimes(1)
     expect(mocks.unregisterAppShortcuts).toHaveBeenCalledTimes(1)
     expect(mocks.exit).toHaveBeenCalledWith(0)
     expect(mocks.quit).not.toHaveBeenCalled()
@@ -151,6 +175,41 @@ describe('main process startup lifecycle', () => {
 
     expect(mocks.activateMainWindow).not.toHaveBeenCalled()
     expect(mocks.handlers.get('activate')).toBeUndefined()
+  })
+
+  test('initializes the current language from the server-owned preference when available', async () => {
+    mocks.getLangPref.mockResolvedValueOnce('ja')
+
+    await import('#/main/main.ts')
+    mocks.resolveReady()
+
+    await vi.waitFor(() => {
+      expect(mocks.buildAppMenu).toHaveBeenCalled()
+    })
+
+    expect(mocks.getLangPref).toHaveBeenCalled()
+    expect(mocks.resolveLang).toHaveBeenCalledWith('ja')
+    expect(mocks.setCurrentLang).toHaveBeenCalledWith('en')
+  })
+
+  test('initializes global shortcuts from the embedded server settings snapshot when available', async () => {
+    const snapshot = defaultSettingsSnapshot()
+    mocks.getSettingsSnapshot.mockResolvedValueOnce({
+      ...snapshot,
+      globalShortcutDisabled: true,
+      globalShortcut: 'Alt+K',
+      session: {
+        ...snapshot.session,
+        detailCollapsed: false,
+      },
+    })
+
+    await import('#/main/main.ts')
+    mocks.resolveReady()
+
+    await vi.waitFor(() => {
+      expect(mocks.syncGlobalShortcuts).toHaveBeenCalledWith(true, 'Alt+K')
+    })
   })
 
   test('queues open-file paths and defers activation until startup initialization finishes', async () => {

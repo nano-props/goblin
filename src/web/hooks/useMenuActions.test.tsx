@@ -1,0 +1,343 @@
+// @vitest-environment jsdom
+
+import { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { useMenuActions } from '#/web/hooks/useMenuActions.ts'
+import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
+import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-utils.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
+import { createBranchSnapshot, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
+
+let container: HTMLDivElement | null = null
+let root: Root | null = null
+const rpcEventListeners = new Set<(event: { type: string; repoRoot?: string; key?: string }) => void>()
+const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+const closeAllOverlays = vi.fn()
+let overlayOpen = false
+let workspaceShortcutSuppressed = false
+let currentRepoId: string | null = null
+let navigation!: MainWindowNavigationActions
+const activateRepoSpy = vi.fn()
+const closeRepoSpy = vi.fn()
+const showRepoBranchDetailTabSpy = vi.fn()
+
+beforeEach(() => {
+  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
+  resetReposStore()
+  setRendererBridgeForTests(null)
+  closeAllOverlays.mockClear()
+  activateRepoSpy.mockClear()
+  closeRepoSpy.mockClear()
+  showRepoBranchDetailTabSpy.mockClear()
+  overlayOpen = false
+  workspaceShortcutSuppressed = false
+  currentRepoId = null
+  navigation = {
+    activateRepo: (repoId) => {
+      activateRepoSpy(repoId)
+      useReposStore.getState().setActive(repoId)
+    },
+    closeRepo: (repoId) => {
+      closeRepoSpy(repoId)
+      useReposStore.getState().closeRepo(repoId)
+    },
+    cycleRepo: (direction) => useReposStore.getState().cycleActive(direction),
+    selectRepoBranch: (repoId, branch) => {
+      const state = useReposStore.getState()
+      state.setActive(repoId)
+      state.selectBranch(repoId, branch)
+    },
+    showRepoDetailTab: (repoId, tab) => {
+      const state = useReposStore.getState()
+      state.setActive(repoId)
+      state.setDetailTab(repoId, tab)
+    },
+    showRepoBranchDetailTab: (repoId, branch, tab) => {
+      showRepoBranchDetailTabSpy(repoId, branch, tab)
+      const state = useReposStore.getState()
+      state.setActive(repoId)
+      state.selectBranch(repoId, branch)
+      state.setDetailTab(repoId, tab)
+    },
+    openSettings: () => {},
+  }
+  Object.defineProperty(window, 'goblin', {
+    configurable: true,
+    value: {
+      homeDir: '/Users/test',
+      invokeRpc: vi.fn(async () => null),
+      abortRpc: vi.fn(async () => true),
+      onEvent: vi.fn((cb: (event: { type: string; repoRoot?: string; key?: string }) => void) => {
+        rpcEventListeners.add(cb)
+        return () => {
+          rpcEventListeners.delete(cb)
+        }
+      }),
+      pathForFile: vi.fn(() => ''),
+      terminal: {
+        open: vi.fn(),
+        restart: vi.fn(),
+        write: vi.fn(),
+        resize: vi.fn(),
+        takeover: vi.fn(),
+        close: vi.fn(),
+          create: vi.fn(),
+          pruneTerminals: vi.fn(),
+        notifyBell: vi.fn(),
+        sendTestNotification: vi.fn(),
+        setBadge: vi.fn(),
+        onOutput: vi.fn(() => () => {}),
+        onTitle: vi.fn(() => () => {}),
+        onExit: vi.fn(() => () => {}),
+      },
+    },
+  })
+})
+
+afterEach(() => {
+  act(() => {
+    root?.unmount()
+  })
+  container?.remove()
+  root = null
+  container = null
+  rpcEventListeners.clear()
+  setRendererBridgeForTests(null)
+  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
+})
+
+describe('useMenuActions', () => {
+  test('terminal bell clicks close all overlays and focus the repo terminal tab', async () => {
+    const repo = seedRepoState({
+      id: '/tmp/repo',
+      currentBranch: 'main',
+      selectedBranch: 'main',
+      detailTab: 'status',
+      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
+    })
+    currentRepoId = repo.id
+
+    await renderHookHost()
+
+    expect(rpcEventListeners.size).toBeGreaterThan(0)
+    await act(async () => {
+      for (const listener of rpcEventListeners) listener({ type: 'terminal-bell-click', repoRoot: repo.id })
+      await Promise.resolve()
+    })
+
+    expect(closeAllOverlays).toHaveBeenCalledTimes(1)
+    const state = useReposStore.getState()
+    expect(state.activeId).toBe(repo.id)
+    expect(state.repos[repo.id]?.ui.detailTab).toBe('terminal')
+    expect(state.detailCollapsed).toBe(false)
+  })
+
+  test('terminal bell clicks switch to the emitting worktree branch and selected terminal', async () => {
+    const repo = seedRepoState({
+      id: '/tmp/repo',
+      currentBranch: 'main',
+      selectedBranch: 'main',
+      detailTab: 'status',
+      branchSnapshots: [
+        createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-main' } }),
+        createBranchSnapshot('feature/test', { worktree: { path: '/tmp/repo-feature' } }),
+      ],
+    })
+    currentRepoId = repo.id
+    const key = '/tmp/repo\0/tmp/repo-feature\0terminal-2'
+
+    await renderHookHost()
+
+    await act(async () => {
+      for (const listener of rpcEventListeners) listener({ type: 'terminal-bell-click', repoRoot: repo.id, key })
+      await Promise.resolve()
+    })
+
+    const state = useReposStore.getState()
+    expect(showRepoBranchDetailTabSpy).toHaveBeenCalledWith(repo.id, 'feature/test', 'terminal')
+    expect(state.repos[repo.id]?.ui.selectedBranch).toBe('feature/test')
+    expect(state.repos[repo.id]?.ui.detailTab).toBe('terminal')
+    expect(state.selectedTerminalByWorktree).toMatchObject({
+      [worktreeTerminalKey(repo.id, '/tmp/repo-feature')]: key,
+    })
+  })
+
+  test('terminal bell clicks combine branch and terminal tab navigation in a single route-driven action', async () => {
+    const repo = seedRepoState({
+      id: '/tmp/repo',
+      currentBranch: 'main',
+      selectedBranch: 'main',
+      detailTab: 'status',
+      branchSnapshots: [
+        createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-main' } }),
+        createBranchSnapshot('feature/test', { worktree: { path: '/tmp/repo-feature' } }),
+      ],
+    })
+    const routeNavigationCalls: Array<{ repoId: string; branch: string; tab: string }> = []
+    navigation = {
+      ...navigation,
+      selectRepoBranch: vi.fn(),
+      showRepoDetailTab: vi.fn(),
+      showRepoBranchDetailTab: (repoId, branch, tab) => {
+        routeNavigationCalls.push({ repoId, branch, tab })
+      },
+    }
+    currentRepoId = repo.id
+    const key = '/tmp/repo\0/tmp/repo-feature\0terminal-2'
+
+    await renderHookHost()
+
+    await act(async () => {
+      for (const listener of rpcEventListeners) listener({ type: 'terminal-bell-click', repoRoot: repo.id, key })
+      await Promise.resolve()
+    })
+
+    expect(routeNavigationCalls).toEqual([{ repoId: repo.id, branch: 'feature/test', tab: 'terminal' }])
+  })
+
+  test('close-repo menu action delegates to navigation close', async () => {
+    const repo = seedRepoState({
+      id: '/tmp/repo',
+      currentBranch: 'main',
+      selectedBranch: 'main',
+      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
+    })
+    currentRepoId = repo.id
+
+    await renderHookHost()
+
+    await act(async () => {
+      for (const listener of rpcEventListeners)
+        listener({ type: 'menu-action', action: 'close-repo' } as { type: string; action: string })
+      await Promise.resolve()
+    })
+
+    expect(closeRepoSpy).toHaveBeenCalledWith(repo.id)
+    expect(useReposStore.getState().repos[repo.id]).toBeUndefined()
+  })
+
+  test('current repo menu actions prefer the visible routed repo over store activeId', async () => {
+    const activeRepo = seedRepoState({
+      id: '/tmp/active-repo',
+      currentBranch: 'main',
+      selectedBranch: 'main',
+      branchSnapshots: [
+        createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/active-repo-worktree' } }),
+      ],
+    })
+    const visibleRepo = seedRepoState({
+      id: '/tmp/visible-repo',
+      currentBranch: 'feature',
+      selectedBranch: 'feature',
+      branchSnapshots: [
+        createBranchSnapshot('feature', { isCurrent: true, worktree: { path: '/tmp/visible-repo-worktree' } }),
+      ],
+    })
+    useReposStore.setState((state) => ({
+      ...state,
+      repos: {
+        [activeRepo.id]: activeRepo,
+        [visibleRepo.id]: visibleRepo,
+      },
+      order: [activeRepo.id, visibleRepo.id],
+      activeId: activeRepo.id,
+      sessionReady: true,
+    }))
+    currentRepoId = visibleRepo.id
+
+    await renderHookHost()
+
+    await act(async () => {
+      for (const listener of rpcEventListeners)
+        listener({ type: 'menu-action', action: 'close-repo' } as { type: string; action: string })
+      await Promise.resolve()
+    })
+
+    expect(closeRepoSpy).toHaveBeenCalledWith(visibleRepo.id)
+    expect(useReposStore.getState().repos[visibleRepo.id]).toBeUndefined()
+    expect(useReposStore.getState().repos[activeRepo.id]).toBeDefined()
+  })
+
+  test('open-recent-repo opens without store activation and then delegates activation to navigation', async () => {
+    useReposStore.setState({
+      ensureWorkspaceOpen: vi.fn(async () => ({ ok: true as const, id: '/tmp/recent-repo' })),
+    })
+
+    await renderHookHost()
+
+    await act(async () => {
+      for (const listener of rpcEventListeners) {
+        listener({
+          type: 'menu-action',
+          action: {
+            type: 'open-recent-repo',
+            entry: { kind: 'local', id: '/tmp/recent-repo' },
+          },
+        } as {
+          type: string
+          action: { type: string; entry: { kind: 'local'; id: string } }
+        })
+      }
+      await Promise.resolve()
+    })
+
+    expect(useReposStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith({ kind: 'local', id: '/tmp/recent-repo' })
+    expect(activateRepoSpy).toHaveBeenCalledWith('/tmp/recent-repo')
+  })
+
+  test('workspace view menu actions are suppressed while settings-like routes are active', async () => {
+    const repo = seedRepoState({
+      id: '/tmp/repo',
+      currentBranch: 'main',
+      selectedBranch: 'main',
+      detailTab: 'status',
+      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
+    })
+    currentRepoId = repo.id
+    workspaceShortcutSuppressed = true
+    const before = useReposStore.getState()
+
+    await renderHookHost()
+
+    await act(async () => {
+      for (const listener of rpcEventListeners) {
+        listener({ type: 'menu-action', action: 'tab-terminal' } as { type: string; action: string })
+        listener({ type: 'menu-action', action: 'toggle-detail' } as { type: string; action: string })
+        listener({ type: 'menu-action', action: 'terminal-primary-action' } as { type: string; action: string })
+        listener({ type: 'menu-action', action: 'close-repo' } as { type: string; action: string })
+      }
+      await Promise.resolve()
+    })
+
+    const state = useReposStore.getState()
+    expect(state.repos[repo.id]?.ui.detailTab).toBe('status')
+    expect(state.detailCollapsed).toBe(before.detailCollapsed)
+    expect(closeRepoSpy).not.toHaveBeenCalled()
+  })
+})
+
+async function renderHookHost() {
+  container = document.createElement('div')
+  document.body.append(container)
+  root = createRoot(container)
+  await act(async () => {
+    root!.render(<HookHost />)
+    await Promise.resolve()
+  })
+}
+
+function HookHost() {
+  useMenuActions({
+    navigation,
+    currentRepoId,
+    closeAllOverlays,
+    openRepoPathDialog: () => {},
+    openCloneRepo: () => {},
+    openRemoteRepo: () => {},
+    isOverlayOpen: () => overlayOpen,
+    isWorkspaceShortcutSuppressed: () => workspaceShortcutSuppressed,
+  })
+  return null
+}

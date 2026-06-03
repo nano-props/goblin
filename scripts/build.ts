@@ -55,14 +55,20 @@ if (process.platform === 'darwin') {
 }
 await $`bun run typecheck`
 // Renderer bundle MUST exist before electron-builder packs it (the
-// `files` glob in electron-builder.ts expects `dist/renderer/`).
-await $`bun run build:renderer`
-const rendererDist = path.join(repoRoot, 'dist/renderer')
-for (const artifact of [path.join(rendererDist, 'index.html'), path.join(rendererDist, 'boot.js')]) {
+// `files` glob in electron-builder.ts expects `dist/web/`).
+await $`bun run build:web`
+await $`bun run build:server`
+const webDist = path.join(repoRoot, 'dist/web')
+for (const artifact of [path.join(webDist, 'index.html'), path.join(webDist, 'boot.js')]) {
   if (!existsSync(artifact)) {
-    console.error(`Error: renderer build artifact missing: ${artifact}`)
+    console.error(`Error: web build artifact missing: ${artifact}`)
     process.exit(1)
   }
+}
+const serverDistEntry = path.join(repoRoot, 'dist/server/main.js')
+if (!existsSync(serverDistEntry)) {
+  console.error(`Error: server build artifact missing: ${serverDistEntry}`)
+  process.exit(1)
 }
 // `dir` target skips dmg packaging — faster, and `install` only needs the .app.
 // In install mode we also pin to the host arch so we don't waste time

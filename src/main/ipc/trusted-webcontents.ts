@@ -1,15 +1,9 @@
 import type { IpcMainInvokeEvent, WebContents } from 'electron'
-import path from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
 import { isRegisteredRendererSurfaceId } from '#/main/window-registry.ts'
 
 const explicitlyTrustedWebContentsIds = new Set<number>()
 const trustedAppUrls = new Set<string>()
 const trustedAppUrlsByWebContentsId = new Map<number, Set<string>>()
-
-export function registerTrustedAppPath(filePath: string): void {
-  trustedAppUrls.add(normalizeTrustedAppPath(filePath))
-}
 
 export function registerTrustedWebContents(webContents: WebContents): void {
   explicitlyTrustedWebContentsIds.add(webContents.id)
@@ -55,17 +49,9 @@ export function isTrustedIpcEvent(event: IpcMainInvokeEvent): boolean {
   )
 }
 
-function normalizeTrustedAppPath(filePath: string): string {
-  const url = pathToFileURL(path.resolve(filePath))
-  url.search = ''
-  url.hash = ''
-  return url.toString()
-}
-
 function normalizeTrustedAppUrl(value: string): string | null {
   try {
     const url = new URL(value)
-    if (url.protocol === 'file:') return normalizeTrustedAppPath(fileURLToPath(url))
     if (url.protocol === 'http:' || url.protocol === 'https:') {
       url.pathname = normalizeTrustedHttpPath(url.pathname)
       url.search = ''
@@ -79,6 +65,5 @@ function normalizeTrustedAppUrl(value: string): string | null {
 }
 
 function normalizeTrustedHttpPath(pathname: string): string {
-  if (pathname === '/') return pathname
-  return pathname.endsWith('/') ? pathname.slice(0, -1) : pathname
+  return '/'
 }

@@ -1,20 +1,31 @@
 import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
-import { ipcMain } from 'electron'
-import { getDefaultBranch, isAncestor, getCurrentBranch, getUpstream, isGitRepo } from '#/main/git/branches.ts'
-import { createWorktree, getWorktrees } from '#/main/git/worktrees.ts'
-import { getWorkingStatus } from '#/main/git/status.ts'
-import { getWorktreePatch } from '#/main/git/patch.ts'
-import { resolveKnownWorktree, resolveRemovableWorktree } from '#/main/git/guards.ts'
-import { getBrowserRemoteUrl, getNewPullRequestUrl, pullBranch } from '#/main/git/remote.ts'
-import { getBranchPullRequest, getBranchPullRequests } from '#/main/git/pull-requests.ts'
+import { app, ipcMain } from 'electron'
+import { RPC_ABORT_CHANNEL, RPC_CHANNEL } from '#/shared/ipc-channels.ts'
+import { getDefaultBranch, isAncestor, getCurrentBranch, getUpstream, isGitRepo } from '#/system/git/branches.ts'
+import { createWorktree, getWorktrees } from '#/system/git/worktrees.ts'
+import { getWorkingStatus } from '#/system/git/status.ts'
+import { getWorktreePatch } from '#/system/git/patch.ts'
+import { resolveKnownWorktree, resolveRemovableWorktree } from '#/shared/worktree-guards.ts'
+import { getBrowserRemoteUrl, getNewPullRequestUrl, pullBranch } from '#/system/git/remote.ts'
+import { getBranchPullRequest, getBranchPullRequests } from '#/system/git/pull-requests.ts'
 import { openHttpsExternal } from '#/main/external-url.ts'
-import { registerTrustedAppPath, registerTrustedWebContents } from '#/main/ipc/trusted-webcontents.ts'
+import { registerTrustedAppUrl, registerTrustedWebContents } from '#/main/ipc/trusted-webcontents.ts'
 import { wireRpcIpc } from '#/main/rpc.ts'
 import { broadcastRpcEvent } from '#/main/events.ts'
-import { setTerminalApp, setEditorApp, setTerminalNotificationsEnabled } from '#/main/settings.ts'
-import { getTerminalActionAvailability, getTerminalAppAvailability, resolveTerminalApp } from '#/main/system/terminals.ts'
-import { getEditorAppAvailability, resolveEditorApp } from '#/main/system/editors.ts'
-import type { EditorAppState, ExternalAppsSnapshot, RpcResponse } from '#/shared/rpc.ts'
+import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
+import {
+  addSettingsRecentRepo,
+  clearSettingsRecentRepos,
+  getSettingsPrefs,
+  setSettingsFetchInterval,
+  setSettingsGlobalShortcutState,
+  getSettingsSnapshot,
+  saveSettingsSession,
+  updateSettingsPrefs,
+} from '#/main/settings-server-facade.ts'
+import { getTerminalActionAvailability, getTerminalAppAvailability, resolveTerminalApp } from '#/system/terminals.ts'
+import { getEditorAppAvailability, resolveEditorApp } from '#/system/editors.ts'
+import type { EditorAppState, ExternalAppsSnapshot, RpcResponse, SettingsPrefs } from '#/shared/rpc.ts'
 
 const ipcHandlers = new Map<string, (_event: unknown, input: any) => Promise<unknown>>()
 const browserWindowFromWebContents = vi.hoisted(() => vi.fn(() => null))
@@ -22,8 +33,33 @@ const listSshConfigHostsMock = vi.hoisted(() => vi.fn())
 const resolveRemoteTargetMock = vi.hoisted(() => vi.fn())
 const resolveTrackedRemoteTargetMock = vi.hoisted(() => vi.fn())
 const runRemoteCommandMock = vi.hoisted(() => vi.fn())
+const getEmbeddedServerRuntimeMock = vi.hoisted(() =>
+  vi.fn<() => { url: string; secret: string; clientId: string } | null>(() => null),
+)
+
+function settingsPrefs(overrides: Partial<SettingsPrefs> = {}): SettingsPrefs {
+  return {
+    lang: 'auto',
+    theme: 'auto',
+    colorTheme: 'macos',
+    fetchIntervalSec: 120,
+    terminalNotificationsEnabled: false,
+    shortcutsDisabled: false,
+    globalShortcutDisabled: false,
+    swapCloseShortcuts: false,
+    toggleDetailOnActionBarBlankClick: false,
+    globalShortcut: '',
+    terminalApp: 'auto',
+    editorApp: 'auto',
+    ...overrides,
+  }
+}
 
 vi.mock('electron', () => ({
+  app: {
+    addRecentDocument: vi.fn(),
+    clearRecentDocuments: vi.fn(),
+  },
   BrowserWindow: {
     getAllWindows: () => [],
     getFocusedWindow: () => null,
@@ -42,7 +78,7 @@ vi.mock('electron', () => ({
   },
 }))
 
-vi.mock('#/main/git/branches.ts', () => ({
+vi.mock('#/system/git/branches.ts', () => ({
   checkoutBranch: vi.fn(),
   deleteBranch: vi.fn(),
   getBranches: vi.fn(),
@@ -56,22 +92,22 @@ vi.mock('#/main/git/branches.ts', () => ({
   isGitRepo: vi.fn(),
 }))
 
-vi.mock('#/main/git/worktrees.ts', () => ({
+vi.mock('#/system/git/worktrees.ts', () => ({
   createWorktree: vi.fn(),
   getWorktrees: vi.fn(),
   removeWorktree: vi.fn(),
 }))
 
-vi.mock('#/main/git/guards.ts', () => ({
+vi.mock('#/shared/worktree-guards.ts', () => ({
   resolveKnownWorktree: vi.fn(),
   resolveRemovableWorktree: vi.fn(),
 }))
 
-vi.mock('#/main/git/helper.ts', () => ({
+vi.mock('#/system/git/helper.ts', () => ({
   checkGitAvailable: vi.fn(() => ({ ok: true })),
 }))
 
-vi.mock('#/main/git/remote.ts', () => ({
+vi.mock('#/system/git/remote.ts', () => ({
   fetchAll: vi.fn(),
   getBrowserRemoteUrl: vi.fn(),
   getNewPullRequestUrl: vi.fn(),
@@ -80,29 +116,25 @@ vi.mock('#/main/git/remote.ts', () => ({
   pushBranch: vi.fn(),
 }))
 
-vi.mock('#/main/git/status.ts', () => ({
+vi.mock('#/system/git/status.ts', () => ({
   getWorkingStatus: vi.fn(),
 }))
 
-vi.mock('#/main/git/patch.ts', () => ({
+vi.mock('#/system/git/patch.ts', () => ({
   getWorktreePatch: vi.fn(),
 }))
 
-vi.mock('#/main/git/clone.ts', () => ({
+vi.mock('#/system/git/clone.ts', () => ({
   cloneRepository: vi.fn(),
 }))
 
-vi.mock('#/main/git/pull-requests.ts', () => ({
+vi.mock('#/system/git/pull-requests.ts', () => ({
   getBranchPullRequest: vi.fn(),
   getBranchPullRequests: vi.fn(),
 }))
 
-vi.mock('#/main/git/log.ts', () => ({
-  getCommitFileStats: vi.fn(),
-  getCommitMeta: vi.fn(),
-}))
-
 vi.mock('#/main/window.ts', () => ({
+  activateMainWindow: vi.fn(() => Promise.resolve({ webContents: { send: vi.fn() } })),
   getMainWindow: vi.fn(() => null),
 }))
 
@@ -113,58 +145,11 @@ vi.mock('#/main/window-registry.ts', () => ({
   registeredRendererSurfaceByWebContentsId: vi.fn(() => null),
 }))
 
-vi.mock('#/main/settings-window.ts', () => ({
-  applySettingsWindowChromeTheme: vi.fn(),
-  openSettingsWindow: vi.fn(() => Promise.resolve()),
-}))
-
 vi.mock('#/main/theme.ts', () => ({
-  getTheme: vi.fn(() => ({ pref: 'auto', resolved: 'light', colorTheme: 'default' })),
+  getTheme: vi.fn(() => ({ pref: 'auto', resolved: 'light', colorTheme: 'macos' })),
   setColorTheme: vi.fn(),
   setThemePref: vi.fn(),
   subscribeTheme: vi.fn(),
-}))
-
-vi.mock('#/main/settings.ts', () => ({
-  DEFAULT_SESSION_DETAIL_COLLAPSED: false,
-  addRecentRepo: vi.fn(),
-  clearRecentRepos: vi.fn(),
-  getEditorApp: vi.fn(() => 'auto'),
-  getTerminalApp: vi.fn(() => 'auto'),
-  loadSettings: vi.fn(() => ({
-    theme: 'auto',
-    colorTheme: 'default',
-    fetchIntervalSec: 120,
-    terminalNotificationsEnabled: false,
-    shortcutsDisabled: false,
-    globalShortcutDisabled: false,
-    swapCloseShortcuts: false,
-    toggleDetailOnActionBarBlankClick: false,
-    globalShortcut: '',
-    terminalApp: 'auto',
-    editorApp: 'auto',
-    lang: 'auto',
-    session: {
-      openRepos: [],
-      activeRepo: null,
-      detailCollapsed: false,
-      detailFocusMode: false,
-      workspaceLayout: 'branches',
-      detailPaneSizes: {},
-    },
-    recentRepos: [],
-  })),
-  onSettingsWriteError: vi.fn(),
-  setEditorApp: vi.fn(),
-  setFetchInterval: vi.fn(),
-  setGlobalShortcut: vi.fn(),
-  setSession: vi.fn(),
-  setGlobalShortcutDisabled: vi.fn(),
-  setShortcutsDisabled: vi.fn(),
-  setSwapCloseShortcuts: vi.fn(),
-  setTerminalNotificationsEnabled: vi.fn(),
-  setToggleDetailOnActionBarBlankClick: vi.fn(),
-  setTerminalApp: vi.fn(),
 }))
 
 vi.mock('#/main/shortcuts.ts', () => ({
@@ -182,17 +167,20 @@ vi.mock('#/main/i18n/index.ts', () => ({
   applyLangPref: vi.fn(),
   getCurrentLang: vi.fn(() => 'en'),
   getDictionary: vi.fn(() => ({})),
+  getLangPref: vi.fn(async () => 'auto'),
 }))
 
-vi.mock('#/main/system/terminals.ts', () => ({
+vi.mock('#/system/terminals.ts', () => ({
   getResolvedTerminalApp: vi.fn(() => Promise.resolve(null)),
   getTerminalActionAvailability: vi.fn(() => ({ ghostty: false, terminal: true })),
   getTerminalAppAvailability: vi.fn(() => Promise.resolve({ ghostty: false, terminal: true })),
   openInPreferredTerminal: vi.fn(),
-  resolveTerminalApp: vi.fn((_pref, availability) => (availability.ghostty ? 'ghostty' : availability.terminal ? 'terminal' : null)),
+  resolveTerminalApp: vi.fn((_pref, availability) =>
+    availability.ghostty ? 'ghostty' : availability.terminal ? 'terminal' : null,
+  ),
 }))
 
-vi.mock('#/main/system/editors.ts', () => ({
+vi.mock('#/system/editors.ts', () => ({
   getResolvedEditorApp: vi.fn(() => null),
   getEditorAppAvailability: vi.fn(() => ({ vscode: false, cursor: false, windsurf: false })),
   openInPreferredEditor: vi.fn(),
@@ -203,9 +191,21 @@ vi.mock('#/main/system/editors.ts', () => ({
 
 vi.mock('#/main/events.ts', () => ({
   broadcastRpcEvent: vi.fn(),
+  sendRpcEvent: vi.fn(),
 }))
 
-vi.mock('#/main/system/github-cli.ts', () => ({
+vi.mock('#/main/settings-server-facade.ts', () => ({
+  setSettingsFetchInterval: vi.fn(),
+  setSettingsGlobalShortcutState: vi.fn(async () => true),
+  getSettingsPrefs: vi.fn(async () => settingsPrefs()),
+  getSettingsSnapshot: vi.fn(),
+  saveSettingsSession: vi.fn(),
+  updateSettingsPrefs: vi.fn(async (patch: Record<string, unknown>) => ({ ...settingsPrefs(), ...patch })),
+  addSettingsRecentRepo: vi.fn(),
+  clearSettingsRecentRepos: vi.fn(async () => true),
+}))
+
+vi.mock('#/system/github-cli.ts', () => ({
   probeGitHubCli: vi.fn(async (_signal?: AbortSignal, hosts?: string[]) => ({
     available: true,
     version: 'gh version 2.93.0',
@@ -228,20 +228,24 @@ vi.mock('#/main/external-url.ts', () => ({
   openHttpsExternal: vi.fn(),
 }))
 
-vi.mock('#/main/ssh/config.ts', () => ({
+vi.mock('#/system/ssh/config.ts', () => ({
   listSshConfigHosts: listSshConfigHostsMock,
   resolveRemoteTarget: resolveRemoteTargetMock,
   resolveTrackedRemoteTarget: resolveTrackedRemoteTargetMock,
 }))
 
-vi.mock('#/main/ssh/commands.ts', () => ({
+vi.mock('#/system/ssh/commands.ts', () => ({
   runRemoteCommand: runRemoteCommandMock,
+}))
+
+vi.mock('#/main/server-manager.ts', () => ({
+  getEmbeddedServerRuntime: getEmbeddedServerRuntimeMock,
 }))
 
 const trustedSender = { id: 1 }
 const trustedEvent = {
   sender: trustedSender,
-  senderFrame: { url: 'file:///app/dist/renderer/index.html?theme=light' },
+  senderFrame: { url: 'http://127.0.0.1:5173/?theme=light' },
 }
 
 async function invokeRpc(
@@ -250,39 +254,45 @@ async function invokeRpc(
   event: unknown = trustedEvent,
   requestId?: string,
 ): Promise<RpcResponse> {
-  const handler = ipcHandlers.get('goblin:rpc')
+  const handler = ipcHandlers.get(RPC_CHANNEL)
   if (!handler) throw new Error('RPC handler not wired')
   return handler(event, { path, input, requestId }) as Promise<RpcResponse>
 }
 
 async function invokeAbortRpc(input: unknown, event: unknown = trustedEvent): Promise<unknown> {
-  const handler = ipcHandlers.get('goblin:rpc-abort')
+  const handler = ipcHandlers.get(RPC_ABORT_CHANNEL)
   if (!handler) throw new Error('RPC abort handler not wired')
   return handler(event, input)
 }
 
 describe('main repo rpc cancellation', () => {
   beforeAll(() => {
-    registerTrustedAppPath('/app/dist/renderer/index.html')
+    registerTrustedAppUrl('http://127.0.0.1:5173/')
     registerTrustedWebContents({ id: 1, once: vi.fn() } as any)
     wireRpcIpc()
   })
 
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.unstubAllGlobals()
+    vi.mocked(setSettingsGlobalShortcutState).mockResolvedValue(true)
+    vi.mocked(getSettingsSnapshot).mockResolvedValue(defaultSettingsSnapshot({ globalShortcut: '' }))
     browserWindowFromWebContents.mockReturnValue(null)
+    getEmbeddedServerRuntimeMock.mockReturnValue(null)
     listSshConfigHostsMock.mockResolvedValue([])
-    resolveRemoteTargetMock.mockImplementation(async ({ alias, remotePath }: { alias: string; remotePath: string }) => ({
-      target: {
-        id: `ssh-config://${alias}${remotePath}`,
-        alias,
-        host: 'example.com',
-        user: 'alice',
-        port: 22,
-        remotePath,
-        displayName: `${alias}:repo`,
-      },
-    }))
+    resolveRemoteTargetMock.mockImplementation(
+      async ({ alias, remotePath }: { alias: string; remotePath: string }) => ({
+        target: {
+          id: `ssh-config://${alias}${remotePath}`,
+          alias,
+          host: 'example.com',
+          user: 'alice',
+          port: 22,
+          remotePath,
+          displayName: `${alias}:repo`,
+        },
+      }),
+    )
     resolveTrackedRemoteTargetMock.mockImplementation(async (target: any) => ({ target }))
     runRemoteCommandMock.mockResolvedValue({ ok: true, stdout: '/home/alice', stderr: '' })
     vi.mocked(isGitRepo).mockResolvedValue(true)
@@ -304,40 +314,6 @@ describe('main repo rpc cancellation', () => {
     vi.mocked(pullBranch).mockResolvedValue({ ok: true, message: 'ok' })
   })
 
-  test('returns cancelled when deleteBranch is aborted during safety checks', async () => {
-    const result = await invokeRpc('repo.deleteBranch', { cwd: '/repo', branch: 'feature/cancel' })
-
-    expect(result).toEqual({ ok: true, data: { ok: false, message: 'cancelled' } })
-  })
-
-  test('returns cancelled when removeWorktree is aborted during safety checks', async () => {
-    const result = await invokeRpc('repo.removeWorktree', {
-      cwd: '/repo',
-      branch: 'feature/cancel',
-      worktreePath: '/repo-feature',
-      alsoDeleteBranch: true,
-    })
-
-    expect(result).toEqual({ ok: true, data: { ok: false, message: 'cancelled' } })
-  })
-
-  test('returns cancelled when pull is aborted while resolving a worktree target', async () => {
-    vi.mocked(getWorktrees).mockImplementationOnce(async () => {
-      await invokeRpc('repo.abort', { cwd: '/repo' })
-      return [{ path: '/repo-feature', branch: 'feature/cancel', isBare: false, isPrimary: false, isDirty: false }]
-    })
-
-    const result = await invokeRpc('repo.pull', {
-      cwd: '/repo',
-      branch: 'feature/cancel',
-      worktreePath: '/repo-feature',
-    })
-
-    expect(result).toEqual({ ok: true, data: { ok: false, message: 'cancelled' } })
-    expect(resolveKnownWorktree).not.toHaveBeenCalled()
-    expect(pullBranch).not.toHaveBeenCalled()
-  })
-
   test('rejects RPC calls from untrusted senders', async () => {
     const result = await invokeRpc('settings.get', undefined, {
       sender: { id: 99 },
@@ -346,7 +322,7 @@ describe('main repo rpc cancellation', () => {
 
     expect(result).toEqual({
       ok: false,
-      error: { name: 'TRPCError', code: 'FORBIDDEN', message: 'Untrusted IPC sender' },
+      error: { name: 'RpcError', code: 'FORBIDDEN', message: 'Untrusted IPC sender' },
     })
   })
 
@@ -358,244 +334,136 @@ describe('main repo rpc cancellation', () => {
 
     expect(result).toEqual({
       ok: false,
-      error: { name: 'TRPCError', code: 'FORBIDDEN', message: 'Untrusted IPC sender' },
+      error: { name: 'RpcError', code: 'FORBIDDEN', message: 'Untrusted IPC sender' },
     })
   })
 
-  test('parents repo open dialogs to the RPC sender window before focus fallbacks', async () => {
-    const senderWindow = {} as any
-    browserWindowFromWebContents.mockReturnValue(senderWindow)
-    vi.mocked((await import('electron')).dialog.showOpenDialog).mockResolvedValueOnce({
-      canceled: false,
-      filePaths: ['/repo'],
-    } as any)
-
-    const result = await invokeRpc('repo.openDialog')
-
-    expect(result).toEqual({ ok: true, data: '/repo' })
-    expect(browserWindowFromWebContents).toHaveBeenCalledWith(trustedSender)
-    expect(vi.mocked((await import('electron')).dialog.showOpenDialog)).toHaveBeenCalledWith(senderWindow, {
-      properties: ['openDirectory'],
-      title: 'Open Git Repository',
+  test('proxies repo status reads through the embedded server when available', async () => {
+    getEmbeddedServerRuntimeMock.mockReturnValue({
+      url: 'http://127.0.0.1:32100',
+      secret: 'secret',
+      clientId: 'client_sharedterminal',
     })
-  })
-
-  test('expands home-relative remote paths before returning resolved targets', async () => {
-    resolveRemoteTargetMock.mockImplementationOnce(async ({ alias, remotePath }: { alias: string; remotePath: string }) => ({
-      target: {
-        id: `ssh-config://${alias}${remotePath}`,
-        alias,
-        host: 'example.com',
-        user: 'alice',
-        port: 22,
-        remotePath,
-        displayName: `${alias}:repo`,
-      },
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => [{ path: 'file.txt', staged: false, status: 'M' }],
     }))
+    vi.stubGlobal('fetch', fetchMock)
 
-    const result = await invokeRpc('remote.resolveTarget', { alias: 'prod', remotePath: '~/repo' })
+    const result = await invokeRpc('repo.status', { cwd: '/repo' })
 
-    expect(resolveRemoteTargetMock).toHaveBeenCalledWith({ alias: 'prod', remotePath: '/' }, undefined)
-    expect(runRemoteCommandMock).toHaveBeenCalledWith(
-      expect.objectContaining({ alias: 'prod' }),
-      { type: 'printHome' },
-      { signal: undefined },
+    expect(result).toEqual({ ok: true, data: [{ path: 'file.txt', staged: false, status: 'M' }] })
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:32100/api/repo/status',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'content-type': 'application/json',
+          'x-goblin-internal-secret': 'secret',
+        }),
+        body: JSON.stringify({ cwd: '/repo' }),
+      }),
     )
+    expect(getWorkingStatus).not.toHaveBeenCalled()
+  })
+
+  test('proxies remote target resolution through the embedded server when available', async () => {
+    getEmbeddedServerRuntimeMock.mockReturnValue({
+      url: 'http://127.0.0.1:32100',
+      secret: 'secret',
+      clientId: 'client_sharedterminal',
+    })
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        target: {
+          id: 'ssh-config://prod/repo',
+          alias: 'prod',
+          host: 'example.com',
+          user: 'tester',
+          port: 22,
+          remotePath: '/repo',
+          displayName: 'prod:repo',
+        },
+      }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await invokeRpc('remote.resolveTarget', { alias: 'prod', remotePath: '/repo' })
+
     expect(result).toEqual({
       ok: true,
       data: {
-        target: expect.objectContaining({
+        target: {
+          id: 'ssh-config://prod/repo',
           alias: 'prod',
-          remotePath: '/home/alice/repo',
-        }),
+          host: 'example.com',
+          user: 'tester',
+          port: 22,
+          remotePath: '/repo',
+          displayName: 'prod:repo',
+        },
       },
     })
-  })
-
-  test('expands home-relative remote worktree paths before creating remote worktrees', async () => {
-    resolveRemoteTargetMock.mockImplementationOnce(async ({ alias, remotePath }: { alias: string; remotePath: string }) => ({
-      target: {
-        id: `ssh-config://${alias}${remotePath}`,
-        alias,
-        host: 'example.com',
-        user: 'alice',
-        port: 22,
-        remotePath,
-        displayName: `${alias}:repo`,
-      },
-    }))
-    runRemoteCommandMock
-      .mockResolvedValueOnce({ ok: true, stdout: '/home/alice', stderr: '' })
-      .mockResolvedValueOnce({ ok: true, stdout: '', stderr: '' })
-
-    const result = await invokeRpc('repo.createWorktree', {
-      cwd: 'ssh-config://prod/srv/repo',
-      worktreePath: '~/trees/repo-feature',
-      newBranch: 'feature/new',
-      baseBranch: 'main',
-    })
-
-    expect(result).toEqual({ ok: true, data: { ok: true, message: 'ok' } })
-    expect(runRemoteCommandMock).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({ alias: 'prod' }),
-      { type: 'printHome' },
-      { signal: undefined },
-    )
-    expect(runRemoteCommandMock).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({ alias: 'prod', remotePath: '/srv/repo' }),
-      {
-        type: 'gitWorktreeAdd',
-        path: '/srv/repo',
-        worktreePath: '/home/alice/trees/repo-feature',
-        newBranch: 'feature/new',
-        baseBranch: 'main',
-      },
-      { signal: expect.any(AbortSignal), timeoutMs: 180000 },
-    )
-    expect(vi.mocked(createWorktree)).not.toHaveBeenCalled()
-  })
-
-  test('lists lightweight remote path suggestions and maps home-relative prefixes back to ~/', async () => {
-    resolveRemoteTargetMock.mockImplementationOnce(async ({ alias, remotePath }: { alias: string; remotePath: string }) => ({
-      target: {
-        id: `ssh-config://${alias}${remotePath}`,
-        alias,
-        host: 'example.com',
-        user: 'alice',
-        port: 22,
-        remotePath,
-        displayName: `${alias}:repo`,
-      },
-    }))
-    runRemoteCommandMock
-      .mockResolvedValueOnce({ ok: true, stdout: '/home/alice', stderr: '' })
-      .mockResolvedValueOnce({
-        ok: true,
-        stdout: ['/home/alice/repos', '/home/alice/Desktop', '/opt/shared'].join('\n'),
-        stderr: '',
-      })
-      .mockResolvedValueOnce({ ok: true, stdout: '/home/alice', stderr: '' })
-
-    const result = await invokeRpc('remote.listPathSuggestions', {
-      alias: 'prod',
-      remotePath: '~/repo',
-      prefix: '~/D',
-    })
-
-    expect(result).toEqual({ ok: true, data: ['~/Desktop'] })
-    expect(runRemoteCommandMock).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({ alias: 'prod' }),
-      { type: 'printHome' },
-      { signal: undefined },
-    )
-    expect(runRemoteCommandMock).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({ alias: 'prod' }),
-      { type: 'listDirectories', path: '/home/alice', limit: 20 },
-      { signal: undefined },
-    )
-  })
-
-  test('aborts a cancellable read RPC by request id', async () => {
-    let observedSignal: AbortSignal | undefined
-    vi.mocked(getWorkingStatus).mockImplementation(
-      (_cwd, options) =>
-        new Promise((resolve) => {
-          observedSignal = options?.signal
-          options?.signal?.addEventListener('abort', () => resolve([{ path: '/repo', isMain: true, entries: [] }]), {
-            once: true,
-          })
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:32100/api/remote/resolve-target',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'content-type': 'application/json',
+          'x-goblin-internal-secret': 'secret',
         }),
+        body: JSON.stringify({ alias: 'prod', remotePath: '/repo' }),
+      }),
     )
-
-    const status = invokeRpc('repo.status', { cwd: '/repo' }, trustedEvent, 'rpc-read-status')
-    await vi.waitFor(() => expect(getWorkingStatus).toHaveBeenCalled())
-    expect(observedSignal).toBeInstanceOf(AbortSignal)
-    const aborted = await invokeAbortRpc({ requestId: 'rpc-read-status' }, trustedEvent)
-
-    expect(aborted).toBe(true)
-    await expect(status).resolves.toEqual({ ok: true, data: [] })
-    expect(getWorkingStatus).toHaveBeenCalledWith('/repo', { signal: expect.any(AbortSignal) })
+    expect(resolveRemoteTargetMock).not.toHaveBeenCalled()
   })
 
-  test('returns cancelled when patch is aborted during worktree loading', async () => {
-    let observedSignal: AbortSignal | undefined
-    vi.mocked(getWorktrees).mockImplementationOnce(
-      (_cwd, options) =>
-        new Promise((resolve) => {
-          observedSignal = options?.signal
-          options?.signal?.addEventListener(
-            'abort',
-            () => resolve([{ path: '/repo-feature', branch: 'feature/cancel', isBare: false, isPrimary: false }]),
-            { once: true },
-          )
-        }),
-    )
-
-    const patch = invokeRpc(
-      'repo.patch',
-      { cwd: '/repo', worktreePath: '/repo-feature' },
-      trustedEvent,
-      'rpc-read-patch',
-    )
-    await vi.waitFor(() => expect(getWorktrees).toHaveBeenCalled())
-    expect(observedSignal).toBeInstanceOf(AbortSignal)
-    const aborted = await invokeAbortRpc({ requestId: 'rpc-read-patch' }, trustedEvent)
-
-    expect(aborted).toBe(true)
-    await expect(patch).resolves.toEqual({ ok: true, data: { ok: false, message: 'cancelled' } })
-    expect(resolveKnownWorktree).not.toHaveBeenCalled()
-    expect(getWorktreePatch).not.toHaveBeenCalled()
-  })
-
-  test('passes branch context when opening a default branch remote URL', async () => {
-    vi.mocked(getDefaultBranch).mockResolvedValue('main')
-    vi.mocked(getBranchPullRequest).mockResolvedValue(null)
-    vi.mocked(getBrowserRemoteUrl).mockResolvedValue('https://github.com/acme/repo')
-    vi.mocked(openHttpsExternal).mockResolvedValue(true)
-
-    const result = await invokeRpc('repo.openRemote', { cwd: '/repo', branch: 'main' })
-
-    expect(result).toEqual({ ok: true, data: { ok: true, message: 'https://github.com/acme/repo' } })
-    expect(getNewPullRequestUrl).not.toHaveBeenCalled()
-    expect(getBrowserRemoteUrl).toHaveBeenCalledWith('/repo', { branch: 'main' })
-  })
-
-  test('returns null when snapshot is aborted during worktree loading', async () => {
-    let observedSignal: AbortSignal | undefined
-    vi.mocked(getWorktrees).mockImplementation(
-      (_cwd, options) =>
-        new Promise((_resolve, reject) => {
-          observedSignal = options?.signal
-          options?.signal?.addEventListener('abort', () => reject(new Error('cancelled')), { once: true })
-        }),
-    )
-
-    const snapshot = invokeRpc('repo.snapshot', { cwd: '/repo' }, trustedEvent, 'rpc-read-snapshot')
-    await vi.waitFor(() => expect(getWorktrees).toHaveBeenCalled())
-    expect(observedSignal).toBeInstanceOf(AbortSignal)
-    const aborted = await invokeAbortRpc({ requestId: 'rpc-read-snapshot' }, trustedEvent)
-
-    expect(aborted).toBe(true)
-    await expect(snapshot).resolves.toEqual({ ok: true, data: null })
-  })
-
-  test('propagates pull request refresh errors', async () => {
-    vi.mocked(getBranchPullRequests).mockRejectedValueOnce(new Error('GoblinPullRequests failed on github.com: UNAUTHORIZED HTTP 401 (non-retryable) - Bad credentials'))
-
-    const result = await invokeRpc('repo.pullRequests', { cwd: '/repo', branches: ['feature/a'], options: { mode: 'full' } })
+  test('fails repo RPCs when the embedded server is unavailable', async () => {
+    const result = await invokeRpc('repo.deleteBranch', { cwd: '/repo', branch: 'feature/cancel' })
 
     expect(result).toEqual({
       ok: false,
       error: {
-        name: 'TRPCError',
+        name: 'RpcError',
         code: 'INTERNAL_SERVER_ERROR',
-        message: 'GoblinPullRequests failed on github.com: UNAUTHORIZED HTTP 401 (non-retryable) - Bad credentials',
+        message: 'Embedded server unavailable',
       },
     })
+  })
+
+  test('aborts an embedded server read request by request id', async () => {
+    getEmbeddedServerRuntimeMock.mockReturnValue({
+      url: 'http://127.0.0.1:32100',
+      secret: 'secret',
+      clientId: 'client_sharedterminal',
+    })
+    let observedSignal: AbortSignal | undefined
+    const fetchMock = vi.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((resolve) => {
+          observedSignal = init?.signal ?? undefined
+          init?.signal?.addEventListener(
+            'abort',
+            () =>
+              resolve({
+                ok: true,
+                json: async () => [],
+              } as Response),
+            { once: true },
+          )
+        }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const status = invokeRpc('repo.status', { cwd: '/repo' }, trustedEvent, 'rpc-read-status')
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    expect(observedSignal).toBeInstanceOf(AbortSignal)
+
+    const aborted = await invokeAbortRpc({ requestId: 'rpc-read-status' }, trustedEvent)
+
+    expect(aborted).toBe(true)
+    await expect(status).resolves.toEqual({ ok: true, data: [] })
   })
 
   test('returns persistable settings without external app detection in settings.get', async () => {
@@ -609,11 +477,92 @@ describe('main repo rpc cancellation', () => {
     expect(result).toEqual({
       ok: true,
       data: expect.objectContaining({
+        theme: 'auto',
+        colorTheme: 'macos',
         terminalNotificationsEnabled: false,
         terminalApp: 'auto',
         editorApp: 'auto',
       }),
     })
+  })
+
+  test('returns the embedded server settings snapshot when available', async () => {
+    const snapshot = defaultSettingsSnapshot()
+    vi.mocked(getSettingsSnapshot).mockResolvedValueOnce({
+      ...snapshot,
+      theme: 'dark',
+      fetchIntervalSec: 300,
+      terminalNotificationsEnabled: true,
+      shortcutsDisabled: true,
+      toggleDetailOnActionBarBlankClick: true,
+      globalShortcutRegistered: true,
+      terminalApp: 'ghostty',
+      editorApp: 'cursor',
+      session: {
+        ...snapshot.session,
+        openRepos: [{ kind: 'local', id: '/repo' }],
+        activeRepo: '/repo',
+      },
+      recentRepos: [{ kind: 'local', id: '/repo' }],
+    })
+
+    const result = await invokeRpc('settings.get')
+
+    expect(result).toEqual({
+      ok: true,
+      data: expect.objectContaining({
+        fetchIntervalSec: 300,
+        terminalNotificationsEnabled: true,
+        terminalApp: 'ghostty',
+        editorApp: 'cursor',
+        recentRepos: [{ kind: 'local', id: '/repo' }],
+      }),
+    })
+  })
+
+  test('mirrors fetch interval updates from the embedded server before broadcasting', async () => {
+    vi.mocked(setSettingsFetchInterval).mockResolvedValueOnce(300)
+
+    const result = await invokeRpc('settings.setFetchInterval', { sec: 299.6 })
+
+    expect(result).toEqual({ ok: true, data: undefined })
+    expect(setSettingsFetchInterval).toHaveBeenCalledWith(299.6)
+    expect(broadcastRpcEvent).toHaveBeenCalledWith({ type: 'fetch-interval-changed', sec: 300 })
+  })
+
+  test('persists session through the embedded server', async () => {
+    const session = {
+      ...defaultSettingsSnapshot().session,
+      openRepos: [{ kind: 'local' as const, id: '/repo' }],
+      activeRepo: '/repo',
+    }
+    vi.mocked(saveSettingsSession).mockResolvedValueOnce(session)
+
+    const result = await invokeRpc('settings.saveSession', { session })
+
+    expect(result).toEqual({ ok: true, data: undefined })
+    expect(saveSettingsSession).toHaveBeenCalledWith(session)
+  })
+
+  test('adds recent repos through the embedded server before returning the list', async () => {
+    const repo = { kind: 'local' as const, id: '/repo' }
+    vi.mocked(addSettingsRecentRepo).mockResolvedValueOnce([repo])
+
+    const result = await invokeRpc('settings.addRecentRepo', { repo })
+
+    expect(result).toEqual({ ok: true, data: [repo] })
+    expect(addSettingsRecentRepo).toHaveBeenCalledWith(repo)
+    expect(app.addRecentDocument).toHaveBeenCalledWith('/repo')
+  })
+
+  test('clears recent repos through the embedded server', async () => {
+    vi.mocked(clearSettingsRecentRepos).mockResolvedValueOnce(true)
+
+    const result = await invokeRpc('settings.clearRecentRepos')
+
+    expect(result).toEqual({ ok: true, data: undefined })
+    expect(clearSettingsRecentRepos).toHaveBeenCalled()
+    expect(app.clearRecentDocuments).toHaveBeenCalledTimes(1)
   })
 
   test('returns external app detection from externalApps.get', async () => {
@@ -707,8 +656,29 @@ describe('main repo rpc cancellation', () => {
     }
   })
 
+  test('prefers embedded server prefs in external app detection snapshots', async () => {
+    vi.mocked(getSettingsPrefs).mockResolvedValue(
+      settingsPrefs({ terminalApp: 'terminal', editorApp: 'vscode' }),
+    )
+    vi.mocked(getTerminalActionAvailability).mockReturnValue({ ghostty: false, terminal: true })
+    vi.mocked(getTerminalAppAvailability).mockResolvedValue({ ghostty: false, terminal: false })
+    vi.mocked(resolveTerminalApp).mockReturnValue('terminal')
+    vi.mocked(getEditorAppAvailability).mockReturnValue({ vscode: true, cursor: false, windsurf: false })
+    vi.mocked(resolveEditorApp).mockReturnValue('vscode')
+
+    const result = await invokeRpc('externalApps.get')
+
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        terminal: expect.objectContaining({ pref: 'terminal', resolved: 'terminal' }),
+        editor: expect.objectContaining({ pref: 'vscode', resolved: 'vscode' }),
+      },
+    })
+  })
+
   test('broadcasts terminal app detection when the preference changes', async () => {
-    vi.mocked(setTerminalApp).mockResolvedValue('ghostty')
+    vi.mocked(updateSettingsPrefs).mockResolvedValueOnce(settingsPrefs({ terminalApp: 'ghostty' }))
     vi.mocked(getTerminalAppAvailability).mockResolvedValue({ ghostty: true, terminal: true })
     vi.mocked(resolveTerminalApp).mockReturnValue('ghostty')
 
@@ -734,12 +704,30 @@ describe('main repo rpc cancellation', () => {
     })
   })
 
+  test('prefers embedded server prefs when validating a global shortcut change', async () => {
+    vi.mocked(getSettingsPrefs).mockResolvedValueOnce(
+      settingsPrefs({
+        globalShortcut: 'Alt+G',
+        globalShortcutDisabled: false,
+      }),
+    )
+    vi.mocked((await import('#/main/shortcuts.ts')).replaceGlobalShortcut).mockReturnValueOnce(false)
+
+    const result = await invokeRpc('settings.setGlobalShortcut', { accelerator: 'Alt+K' })
+
+    expect(result).toEqual({
+      ok: true,
+      data: { accelerator: 'Alt+G', registered: false },
+    })
+  })
+
   test('broadcasts terminal notification setting changes', async () => {
-    vi.mocked(setTerminalNotificationsEnabled).mockResolvedValue(true)
+    vi.mocked(updateSettingsPrefs).mockResolvedValueOnce(settingsPrefs({ terminalNotificationsEnabled: true }))
 
     const result = await invokeRpc('settings.setTerminalNotificationsEnabled', { enabled: true })
 
     expect(result).toEqual({ ok: true, data: undefined })
+    expect(updateSettingsPrefs).toHaveBeenCalledWith({ terminalNotificationsEnabled: true })
     expect(broadcastRpcEvent).toHaveBeenCalledWith({
       type: 'terminal-notifications-changed',
       enabled: true,
@@ -747,7 +735,7 @@ describe('main repo rpc cancellation', () => {
   })
 
   test('keeps Terminal.app available for actions even when detection reports unavailable', async () => {
-    vi.mocked(setTerminalApp).mockResolvedValue('terminal')
+    vi.mocked(updateSettingsPrefs).mockResolvedValueOnce(settingsPrefs({ terminalApp: 'terminal' }))
     vi.mocked(getTerminalActionAvailability).mockReturnValue({ ghostty: false, terminal: true })
     vi.mocked(getTerminalAppAvailability).mockResolvedValue({ ghostty: false, terminal: false })
     vi.mocked(resolveTerminalApp).mockReturnValue('terminal')
@@ -775,7 +763,7 @@ describe('main repo rpc cancellation', () => {
   })
 
   test('broadcasts editor app detection when the preference changes', async () => {
-    vi.mocked(setEditorApp).mockResolvedValue('cursor')
+    vi.mocked(updateSettingsPrefs).mockResolvedValueOnce(settingsPrefs({ editorApp: 'cursor' }))
     vi.mocked(getEditorAppAvailability).mockReturnValue({ vscode: false, cursor: true, windsurf: false })
     vi.mocked(resolveEditorApp).mockReturnValue('cursor')
 
@@ -803,7 +791,7 @@ describe('main repo rpc cancellation', () => {
 
   test('assigns monotonic detectedAt values to repeated editor preference changes in the same millisecond', async () => {
     const now = vi.spyOn(Date, 'now').mockReturnValue(2_000)
-    vi.mocked(setEditorApp).mockResolvedValue('cursor')
+    vi.mocked(updateSettingsPrefs).mockResolvedValue(settingsPrefs({ editorApp: 'cursor' }))
     vi.mocked(getEditorAppAvailability).mockReturnValue({ vscode: false, cursor: true, windsurf: false })
     vi.mocked(resolveEditorApp).mockReturnValue('cursor')
 

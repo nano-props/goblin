@@ -1,47 +1,15 @@
 import { BrowserWindow, Notification, app, ipcMain } from 'electron'
 import type { WebContents } from 'electron'
-import path from 'node:path'
 import { broadcastRpcEvent } from '#/main/events.ts'
 import { activateMainWindow } from '#/main/window.ts'
 import { t } from '#/main/i18n/index.ts'
-import { getWorktrees } from '#/main/git/worktrees.ts'
-import { resolveKnownWorktree } from '#/main/git/guards.ts'
-import { isValidAbsolutePath, isValidBranch, isValidCwd, isValidRepoLocator } from '#/main/ipc/validation.ts'
-import { resolveRemoteTarget } from '#/main/ssh/config.ts'
-import { isRemoteRepoId, parseRemoteRepoId } from '#/shared/remote-repo.ts'
-import { buildRemoteTerminalInvocation } from '#/main/ssh/commands.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
+import { isValidTerminalNotifyBellInput, type TerminalMutationResult, type TerminalNotifyBellInput } from '#/shared/terminal.ts'
 import {
-  closeAllTerminalSessions,
-  closeOwnedTerminalSession,
-  closeTerminalKey,
-  closeTerminalOwner,
-  isValidTerminalSessionId,
-  isValidTerminalWriteData,
-  openTerminalSession,
-  pruneTerminalScope,
-  resizeTerminalSession,
-  wireTerminalSessionCleanup,
-  writeTerminalSession,
-} from '#/main/terminal-core.ts'
-import {
-  isValidTerminalNotifyBellInput,
-  isValidTerminalSize,
-  type TerminalMutationResult,
-  type TerminalNotifyBellInput,
-  type TerminalOpenInput,
-  type TerminalOpenResult,
-  type TerminalPruneRepoInput,
-  type TerminalResizeInput,
-  type TerminalRestartInput,
-  type TerminalSessionInput,
-  type TerminalWriteInput,
-} from '#/shared/terminal.ts'
-
-const MAX_TERMINAL_PRUNE_WORKTREES = 1000
-const TERMINAL_ID_RE = /^[A-Za-z0-9_-]{1,64}$/
-
-export { closeAllTerminalSessions } from '#/main/terminal-core.ts'
+  TERMINAL_NOTIFY_BELL_CHANNEL,
+  TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL,
+  TERMINAL_SET_BADGE_CHANNEL,
+} from '#/shared/ipc-channels.ts'
 
 let wired = false
 
@@ -49,43 +17,14 @@ export function wireTerminalIpc(): void {
   if (wired) return
   wired = true
 
-  ipcMain.handle('goblin:terminal-open', async (event, input: TerminalOpenInput): Promise<TerminalOpenResult> => {
-    if (!isTrustedIpcEvent(event)) return { ok: false, message: 'error.invalid-arguments' }
-    registerTerminalOwnerCleanup(event.sender)
-    return openGoblinWorktreeTerminal(event.sender.id, input)
-  })
-  ipcMain.handle('goblin:terminal-restart', async (event, input: TerminalRestartInput): Promise<TerminalOpenResult> => {
-    if (!isTrustedIpcEvent(event)) return { ok: false, message: 'error.invalid-arguments' }
-    registerTerminalOwnerCleanup(event.sender)
-    return openGoblinWorktreeTerminal(event.sender.id, input, { restart: true })
-  })
-  ipcMain.handle('goblin:terminal-write', (event, input: TerminalWriteInput): TerminalMutationResult => {
-    if (!isTrustedIpcEvent(event)) return false
-    if (!isValidTerminalSessionId(input?.sessionId) || !isValidTerminalWriteData(input?.data)) return false
-    return writeTerminalSession(event.sender.id, input.sessionId, input.data)
-  })
-  ipcMain.handle('goblin:terminal-resize', (event, input: TerminalResizeInput): TerminalMutationResult => {
-    if (!isTrustedIpcEvent(event)) return false
-    if (!isValidTerminalSessionId(input?.sessionId) || !isValidTerminalSize(input?.cols, input?.rows)) return false
-    return resizeTerminalSession(event.sender.id, input.sessionId, input.cols, input.rows)
-  })
-  ipcMain.handle('goblin:terminal-close', (event, input: TerminalSessionInput): TerminalMutationResult => {
-    if (!isTrustedIpcEvent(event)) return false
-    return isValidTerminalSessionId(input?.sessionId)
-      ? closeOwnedTerminalSession(event.sender.id, input.sessionId)
-      : false
-  })
-  ipcMain.handle('goblin:terminal-prune-repo', (event, input: TerminalPruneRepoInput): TerminalMutationResult => {
-    if (!isTrustedIpcEvent(event)) return false
-    if (!isValidRepoLocator(input?.repoRoot) || !isValidTerminalWorktreePathList(input?.worktreePaths)) return false
-    pruneRepoSessions(event.sender.id, input.repoRoot, input.worktreePaths)
-    return true
-  })
-  ipcMain.handle('goblin:terminal-notify-bell', async (event, input: TerminalNotifyBellInput): Promise<TerminalMutationResult> => {
-    if (!isTrustedIpcEvent(event) || !isValidTerminalNotifyBellInput(input)) return false
-    return notifyTerminalBell(event.sender, input)
-  })
-  ipcMain.handle('goblin:terminal-send-test-notification', async (event): Promise<boolean> => {
+  ipcMain.handle(
+    TERMINAL_NOTIFY_BELL_CHANNEL,
+    async (event, input: TerminalNotifyBellInput): Promise<TerminalMutationResult> => {
+      if (!isTrustedIpcEvent(event) || !isValidTerminalNotifyBellInput(input)) return false
+      return notifyTerminalBell(event.sender, input)
+    },
+  )
+  ipcMain.handle(TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL, async (event): Promise<boolean> => {
     if (!isTrustedIpcEvent(event)) return false
     if (!Notification.isSupported()) return false
     return showNotificationWithResult(
@@ -94,116 +33,11 @@ export function wireTerminalIpc(): void {
       null,
     )
   })
-  ipcMain.on('goblin:terminal-set-badge', (event, count: unknown): void => {
+  ipcMain.on(TERMINAL_SET_BADGE_CHANNEL, (event, count: unknown): void => {
     if (!isTrustedIpcEvent(event)) return
     const n = typeof count === 'number' && Number.isFinite(count) && count >= 0 ? Math.floor(count) : 0
     if (process.platform === 'darwin') app.dock?.setBadge(n > 0 ? String(n) : '')
   })
-
-  wireTerminalSessionCleanup()
-}
-
-async function openGoblinWorktreeTerminal(
-  ownerWebContentsId: number,
-  input: TerminalOpenInput,
-  options: { restart?: boolean } = {},
-): Promise<TerminalOpenResult> {
-  const isRemote = isRemoteRepoId(input?.repoRoot ?? '')
-  if (
-    (!isRemote && !isValidCwd(input?.repoRoot)) ||
-    !isValidBranch(input?.branch) ||
-    (!isRemote && !isValidAbsolutePath(input?.worktreePath)) ||
-    (isRemote && (!input.worktreePath || input.worktreePath.includes('\0'))) ||
-    !isValidTerminalId(input?.terminalId) ||
-    !isValidTerminalSize(input?.cols, input?.rows)
-  ) {
-    return { ok: false, message: 'error.invalid-arguments' }
-  }
-
-  // Remote repository: launch SSH session instead of local shell
-  if (isRemote) {
-    const ref = parseRemoteRepoId(input.repoRoot)
-    if (!ref) return { ok: false, message: 'error.ssh-config-changed' }
-    let resolved
-    try {
-      resolved = await resolveRemoteTarget(ref)
-    } catch (err) {
-      return { ok: false, message: err instanceof Error ? err.message : 'error.ssh-config-changed' }
-    }
-    const invocation = buildRemoteTerminalInvocation(resolved.target, input.worktreePath, { cols: input.cols, rows: input.rows })
-    return openTerminalSession({
-      ownerWebContentsId,
-      scope: input.repoRoot,
-      key: sessionKey(input.repoRoot, input.worktreePath, input.terminalId),
-      cwd: process.cwd(),
-      cols: input.cols,
-      rows: input.rows,
-      forceNew: options.restart === true,
-      command: invocation.command,
-      args: invocation.args,
-    })
-  }
-
-  const worktrees = await getWorktrees(input.repoRoot, { includeStatus: false })
-  const resolved = resolveKnownWorktree(worktrees, input.worktreePath, input.branch)
-  if (!resolved.ok) return resolved
-
-  const repoRoot = path.resolve(input.repoRoot)
-  const worktreePath = path.resolve(resolved.path)
-  return openTerminalSession({
-    ownerWebContentsId,
-    scope: repoRoot,
-    key: sessionKey(repoRoot, worktreePath, input.terminalId),
-    cwd: worktreePath,
-    cols: input.cols,
-    rows: input.rows,
-    forceNew: options.restart === true,
-  })
-}
-
-const terminalOwnerCleanupIds = new Set<number>()
-
-function registerTerminalOwnerCleanup(webContents: WebContents): void {
-  if (terminalOwnerCleanupIds.has(webContents.id)) return
-  terminalOwnerCleanupIds.add(webContents.id)
-  webContents.once('destroyed', () => {
-    terminalOwnerCleanupIds.delete(webContents.id)
-    closeTerminalOwner(webContents.id)
-  })
-}
-
-export function closeWorktreeSession(repoRoot: string, worktreePath: string): void {
-  const isRemote = isRemoteRepoId(repoRoot)
-  const resolvedRoot = isRemote ? repoRoot : path.resolve(repoRoot)
-  const resolvedWorktree = isRemote ? worktreePath : path.resolve(worktreePath)
-  closeTerminalKey(sessionKey(resolvedRoot, resolvedWorktree))
-}
-
-export function pruneRepoSessions(ownerWebContentsId: number, repoRoot: string, worktreePaths: string[]): void {
-  const isRemote = isRemoteRepoId(repoRoot)
-  const root = isRemote ? repoRoot : path.resolve(repoRoot)
-  const liveKeys = new Set(
-    worktreePaths
-      .filter((p) => (isRemote ? !p.includes('\0') : isValidAbsolutePath(p)))
-      .map((p) => sessionKey(root, isRemote ? p : path.resolve(p))),
-  )
-  pruneTerminalScope(ownerWebContentsId, root, liveKeys)
-}
-
-function isValidTerminalWorktreePathList(value: unknown): boolean {
-  return (
-    Array.isArray(value) &&
-    value.length <= MAX_TERMINAL_PRUNE_WORKTREES &&
-    value.every((pathValue) => typeof pathValue === 'string' && isValidAbsolutePath(pathValue))
-  )
-}
-
-function isValidTerminalId(value: unknown): value is string {
-  return typeof value === 'string' && TERMINAL_ID_RE.test(value)
-}
-
-function sessionKey(repoRoot: string, worktreePath: string, terminalId?: string): string {
-  return terminalId ? `${repoRoot}\0${worktreePath}\0${terminalId}` : `${repoRoot}\0${worktreePath}`
 }
 
 // How long to wait for a 'show' or 'failed' event before treating the
@@ -235,7 +69,7 @@ async function notifyTerminalBell(webContents: WebContents, input: TerminalNotif
     if (!Notification.isSupported()) return true
     // showNotificationWithResult is async: it waits for the 'show' or 'failed'
     // event so the caller gets an accurate result instead of an optimistic true.
-    return await showNotificationWithResult(input.title, input.body, input.repoRoot)
+    return await showNotificationWithResult(input.title, input.body, input.repoRoot, input.key)
   } catch (err) {
     console.warn('[terminal] failed to show bell notification', err)
     return false
@@ -255,15 +89,9 @@ async function notifyTerminalBell(webContents: WebContents, input: TerminalNotif
 // resort: in practice one of the two events always fires, but it prevents the
 // IPC call from hanging indefinitely if neither does.
 //
-// silent: true suppresses the system sound; the bell audio (if any) is handled
-// separately by the renderer's terminal emulator, not the OS notification.
-function showNotificationWithResult(
-  title: string,
-  body: string,
-  repoRoot: string | null,
-): Promise<boolean> {
+function showNotificationWithResult(title: string, body: string, repoRoot: string | null, key?: string): Promise<boolean> {
   return new Promise((resolve) => {
-    const notif = new Notification({ title, body, silent: true })
+    const notif = new Notification({ title, body })
     let settled = false
     const settle = (result: boolean) => {
       if (settled) return
@@ -278,7 +106,7 @@ function showNotificationWithResult(
       // Bring the window to the foreground, then tell the renderer to switch
       // to the repo and open the terminal tab (only when repoRoot is known).
       void activateMainWindow().catch(() => {})
-      if (repoRoot) broadcastRpcEvent({ type: 'terminal-bell-click', repoRoot })
+      if (repoRoot) broadcastRpcEvent({ type: 'terminal-bell-click', repoRoot, key })
     })
     notif.show()
   })

@@ -4,7 +4,7 @@ import {
   isValidBranch,
   MAX_IPC_BRANCH_LENGTH,
   MAX_IPC_PATH_LENGTH,
-} from '#/main/ipc/validation.ts'
+} from '#/shared/input-validation.ts'
 
 describe('IPC validation', () => {
   test('rejects oversized paths', () => {
