@@ -20,10 +20,6 @@ export function useAppBootstrap() {
     if (hydratedRef.current) return
     hydratedRef.current = true
     void (async () => {
-      const externalAppsHydrate = useSettingsStore
-        .getState()
-        .hydrateExternalApps()
-        .catch((err) => console.warn('[bootstrap] external apps hydrate failed', err))
       try {
         await Promise.all([
           useThemeStore.getState().hydrate(),
@@ -41,7 +37,6 @@ export function useAppBootstrap() {
         applySessionLayoutState(normalizedLayout)
         applySessionSelectedTerminalState(restoredWorkspaceUiState.selectedTerminalByWorktree)
         await hydrateSession(session.openRepos, session.activeRepo)
-        await externalAppsHydrate
       } catch (err) {
         console.warn('[bootstrap] failed', err)
         useReposStore.setState({ sessionReady: true })

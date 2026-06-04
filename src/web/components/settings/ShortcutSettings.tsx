@@ -4,22 +4,30 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { Switch } from '#/web/components/ui/switch.tsx'
 import { canUseGlobalShortcutSettings } from '#/web/app-shell-client.ts'
 import { SettingsCard, SettingsListItem } from '#/web/components/settings/SettingsPrimitives.tsx'
+import {
+  useSetGlobalShortcutDisabledMutation,
+  useSetGlobalShortcutMutation,
+  useSetShortcutsDisabledMutation,
+  useSetSwapCloseShortcutsMutation,
+  useSettingsSnapshotQuery,
+} from '#/web/settings-queries.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { useSettingsStore } from '#/web/stores/settings.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { DEFAULT_GLOBAL_SHORTCUT, formatAccelerator, globalShortcutFromKeyboardEvent } from '#/shared/accelerator.ts'
 export function ShortcutSettings() {
   const t = useT()
   const shortcutStatusId = 'global-shortcut-status'
-  const shortcutsDisabled = useSettingsStore((s) => s.shortcutsDisabled)
-  const globalShortcutDisabled = useSettingsStore((s) => s.globalShortcutDisabled)
-  const swapCloseShortcuts = useSettingsStore((s) => s.swapCloseShortcuts)
-  const globalShortcut = useSettingsStore((s) => s.globalShortcut)
-  const globalShortcutRegistered = useSettingsStore((s) => s.globalShortcutRegistered)
-  const setShortcutsDisabled = useSettingsStore((s) => s.setShortcutsDisabled)
-  const setGlobalShortcutDisabled = useSettingsStore((s) => s.setGlobalShortcutDisabled)
-  const setSwapCloseShortcuts = useSettingsStore((s) => s.setSwapCloseShortcuts)
-  const setGlobalShortcut = useSettingsStore((s) => s.setGlobalShortcut)
+  const { data } = useSettingsSnapshotQuery()
+  if (!data) return null
+  const shortcutsDisabled = data.shortcutsDisabled
+  const globalShortcutDisabled = data.globalShortcutDisabled
+  const swapCloseShortcuts = data.swapCloseShortcuts
+  const globalShortcut = data.globalShortcut
+  const globalShortcutRegistered = data.globalShortcutRegistered
+  const setShortcutsDisabled = useSetShortcutsDisabledMutation()
+  const setGlobalShortcutDisabled = useSetGlobalShortcutDisabledMutation()
+  const setSwapCloseShortcuts = useSetSwapCloseShortcutsMutation()
+  const setGlobalShortcut = useSetGlobalShortcutMutation()
   const [recordingShortcut, setRecordingShortcut] = useState(false)
   const [shortcutError, setShortcutError] = useState<string | null>(null)
   const recordingShortcutRef = useRef(recordingShortcut)
@@ -30,25 +38,26 @@ export function ShortcutSettings() {
   }, [recordingShortcut])
 
   const saveShortcutsDisabled = (disabled: boolean) => {
-    void setShortcutsDisabled(disabled).catch((err) => {
+    void setShortcutsDisabled.mutateAsync(disabled).catch((err) => {
       console.warn('[settings] shortcuts update failed', err)
     })
   }
 
   const saveGlobalShortcutDisabled = (disabled: boolean) => {
-    void setGlobalShortcutDisabled(disabled).catch((err) => {
+    void setGlobalShortcutDisabled.mutateAsync(disabled).catch((err) => {
       console.warn('[settings] global shortcut disabled update failed', err)
     })
   }
 
   const saveSwapCloseShortcuts = (swapped: boolean) => {
-    void setSwapCloseShortcuts(swapped).catch((err) => {
+    void setSwapCloseShortcuts.mutateAsync(swapped).catch((err) => {
       console.warn('[settings] swap close shortcuts update failed', err)
     })
   }
 
   const saveGlobalShortcut = (accelerator: string) => {
-    void setGlobalShortcut(accelerator)
+    void setGlobalShortcut
+      .mutateAsync(accelerator)
       .then((state) => {
         const failedToUseRequested = state.accelerator !== accelerator || (!globalShortcutDisabled && !state.registered)
         setShortcutError(failedToUseRequested ? t('settings.global-shortcut-conflict') : null)

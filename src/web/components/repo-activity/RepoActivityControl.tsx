@@ -10,6 +10,7 @@ import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import type { RepoActivity, RepoCompletion } from '#/web/components/repo-activity/model.ts'
 import { getRepoActivity, getRepoActivityControlView, isRepoPrimaryRefreshBusy } from '#/web/components/repo-activity/model.ts'
 import { useVisibleLoadingValue } from '#/web/hooks/useLoadingVisibility.ts'
+import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { repoEventActionSuccessLabel } from '#/web/stores/repos/action-labels.ts'
@@ -47,11 +48,12 @@ function repoActivityControlRepoEqual(a: RepoState | undefined, b: RepoState | u
 
 export function RepoActivityControl({ repoId }: Props) {
   const repo = useStoreWithEqualityFn(useReposStore, (s) => s.repos[repoId], repoActivityControlRepoEqual)
+  const compact = useIsCompactUi()
   if (!repo) return null
-  return <RepoActivityControlView repo={repo} />
+  return <RepoActivityControlView repo={repo} compact={compact} />
 }
 
-function RepoActivityControlView({ repo }: { repo: RepoState }) {
+function RepoActivityControlView({ repo, compact }: { repo: RepoState; compact: boolean }) {
   const visibleActivity = useRepoActivityControlPresentation(repo)
   const completion = useRepoCompletion(repo.id)
   const view = getRepoActivityControlView({
@@ -62,13 +64,13 @@ function RepoActivityControlView({ repo }: { repo: RepoState }) {
 
   switch (view.kind) {
     case 'activity':
-      return <RepoActivityIndicator activity={view.activity} />
+      return <RepoActivityIndicator activity={view.activity} compact={compact} />
     case 'completion':
-      return <RepoCompletionIndicator completion={view.completion} />
+      return <RepoCompletionIndicator completion={view.completion} compact={compact} />
     case 'refresh-button':
       return (
         <div className="flex items-center gap-2">
-          <RepoRefreshButton repo={repo} manualSyncBusy={view.manualSyncBusy} />
+          <RepoRefreshButton repo={repo} manualSyncBusy={view.manualSyncBusy} compact={compact} />
           <RepoCacheIndicator repo={repo} />
           <RepoFetchFailureIndicator repo={repo} />
         </div>
@@ -112,8 +114,9 @@ function useRepoCompletion(repoId: string): RepoCompletion | null {
   return completion
 }
 
-function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoState; manualSyncBusy: boolean }) {
+function RepoRefreshButton({ repo, manualSyncBusy, compact }: { repo: RepoState; manualSyncBusy: boolean; compact: boolean }) {
   const t = useT()
+  const label = t('action.refresh')
 
   async function handleSync() {
     const token = repo.instanceToken
@@ -126,11 +129,17 @@ function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoState; manualSy
 
   return (
     <Tip label={t(repo.remote.hasRemotes === false ? 'action.fetch-local-title' : 'action.fetch-title')}>
-      <AsyncButton variant="ghost" disabled={manualSyncBusy} loading={manualSyncBusy} onClick={handleSync}>
+      <AsyncButton
+        variant="ghost"
+        disabled={manualSyncBusy}
+        loading={manualSyncBusy}
+        onClick={handleSync}
+        aria-label={label}
+      >
         {({ busy }) => (
           <>
             <RotateCw className={busy ? 'animate-spin' : ''} />
-            {t('action.refresh')}
+            {!compact && label}
           </>
         )}
       </AsyncButton>
@@ -138,7 +147,7 @@ function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoState; manualSy
   )
 }
 
-function RepoActivityIndicator({ activity }: { activity: RepoActivity }) {
+function RepoActivityIndicator({ activity, compact }: { activity: RepoActivity; compact: boolean }) {
   const t = useT()
   const label = t(activity.labelKey, activity.labelParams)
 
@@ -150,10 +159,11 @@ function RepoActivityIndicator({ activity }: { activity: RepoActivity }) {
             variant="ghost"
             disabled
             aria-busy
+            aria-label={label}
             className={cn('bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground')}
           >
             <Loader2 className="animate-spin" />
-            {label}
+            {!compact && label}
           </Button>
         </span>
       </Tip>
@@ -164,7 +174,7 @@ function RepoActivityIndicator({ activity }: { activity: RepoActivity }) {
   )
 }
 
-function RepoCompletionIndicator({ completion }: { completion: RepoCompletion }) {
+function RepoCompletionIndicator({ completion, compact }: { completion: RepoCompletion; compact: boolean }) {
   const t = useT()
   const label = t(completion.labelKey, completion.labelParams)
 
@@ -175,10 +185,11 @@ function RepoCompletionIndicator({ completion }: { completion: RepoCompletion })
           <Button
             variant="ghost"
             disabled
+            aria-label={label}
             className="border-success-border bg-success-surface text-success hover:bg-success-surface hover:text-success"
           >
             <Check />
-            {label}
+            {!compact && label}
           </Button>
         </span>
       </Tip>

@@ -18,7 +18,12 @@ import {
   SettingsList,
   SettingsRow,
 } from '#/web/components/settings/SettingsPrimitives.tsx'
-import { useSettingsStore } from '#/web/stores/settings.ts'
+import {
+  useExternalAppsQuery,
+  useRefreshExternalAppsMutation,
+  useSetEditorAppMutation,
+  useSetTerminalAppMutation,
+} from '#/web/settings-queries.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import type { EditorPref, TerminalPref } from '#/shared/rpc.ts'
 import { cn } from '#/web/lib/cn.ts'
@@ -107,22 +112,15 @@ function DetectionList({ items }: { items: Array<ExternalToolItem & { available:
 
 export function ExternalAppSettings() {
   const t = useT()
-  const terminalApp = useSettingsStore((s) => s.terminalApp)
-  const terminalAppAvailability = useSettingsStore((s) => s.terminalAppAvailability)
-  const editorApp = useSettingsStore((s) => s.editorApp)
-  const editorAppAvailability = useSettingsStore((s) => s.editorAppAvailability)
-  const setTerminalAppPref = useSettingsStore((s) => s.setTerminalApp)
-  const setEditorAppPref = useSettingsStore((s) => s.setEditorApp)
-  const refreshExternalAppsStore = useSettingsStore((s) => s.refreshExternalApps)
-  const refreshExternalApps = useMutation({
-    mutationFn: () => refreshExternalAppsStore(),
-  })
-  const setTerminalApp = useMutation({
-    mutationFn: (pref: TerminalPref) => setTerminalAppPref(pref),
-  })
-  const setEditorApp = useMutation({
-    mutationFn: (pref: EditorPref) => setEditorAppPref(pref),
-  })
+  const { data } = useExternalAppsQuery()
+  if (!data) return null
+  const terminalApp = data.terminal.pref
+  const terminalAppAvailability = data.terminal.appAvailability
+  const editorApp = data.editor.pref
+  const editorAppAvailability = data.editor.appAvailability
+  const refreshExternalApps = useRefreshExternalAppsMutation()
+  const setTerminalApp = useSetTerminalAppMutation()
+  const setEditorApp = useSetEditorAppMutation()
   const refreshing = refreshExternalApps.isPending
   const terminalOptions: { value: TerminalPref; labelKey: string }[] = [
     { value: 'auto', labelKey: 'settings.terminal.auto' },

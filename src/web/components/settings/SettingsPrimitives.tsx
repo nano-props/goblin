@@ -1,5 +1,6 @@
 import type { ComponentPropsWithoutRef, ElementType, ReactNode } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/web/components/ui/select.tsx'
+import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { cn } from '#/web/lib/cn.ts'
 
 type SettingsCardProps<T extends ElementType = 'div'> = {
@@ -24,9 +25,10 @@ export function SettingsGroup({
   action?: ReactNode
   children: ReactNode
 }) {
+  const compact = useIsCompactUi()
   return (
     <section className="space-y-1.5">
-      <div className="flex items-center justify-between gap-3 px-3">
+      <div className={cn('flex justify-between gap-3 px-3', compact ? 'items-start' : 'items-center')}>
         <h2 className="text-[11px] font-medium text-muted-foreground">{label}</h2>
         {action}
       </div>
@@ -88,15 +90,16 @@ export function SettingsRow({
   hint?: string
   control: ReactNode
 }) {
+  const compact = useIsCompactUi()
   return (
-    <SettingsListItem size="lg">
+    <SettingsListItem size="lg" className={cn(compact && 'flex-col items-stretch justify-start gap-2')}>
       <div className="min-w-0 flex-1 overflow-hidden">
         <label className="block truncate text-sm text-foreground" htmlFor={controlId}>
           {label}
         </label>
         {hint && <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{hint}</div>}
       </div>
-      <div className="shrink-0">{control}</div>
+      <div className={cn('min-w-0', compact ? 'w-full' : 'shrink-0')}>{control}</div>
     </SettingsListItem>
   )
 }
@@ -109,6 +112,7 @@ interface SettingsSelectProps<T extends string | number> {
 }
 
 export function SettingsSelect<T extends string | number>({ id, value, options, onChange }: SettingsSelectProps<T>) {
+  const compact = useIsCompactUi()
   return (
     <Select
       value={String(value)}
@@ -117,7 +121,10 @@ export function SettingsSelect<T extends string | number>({ id, value, options, 
         if (matched) onChange(matched.value)
       }}
     >
-      <SelectTrigger id={id} className="h-8 min-w-36 rounded-md bg-control px-2.5 text-xs shadow-none">
+      <SelectTrigger
+        id={id}
+        className={cn('h-8 rounded-md bg-control px-2.5 text-xs shadow-none', compact ? 'w-full min-w-0' : 'min-w-36')}
+      >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

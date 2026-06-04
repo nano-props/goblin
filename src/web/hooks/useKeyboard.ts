@@ -13,13 +13,13 @@
 import { useEffect, useRef } from 'react'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { visibleBranches } from '#/web/stores/repos/branch-view-mode.ts'
-import { useSettingsStore } from '#/web/stores/settings.ts'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { adjacentDetailTab } from '#/web/lib/detail-tabs.ts'
 import { runBranchActionShortcut } from '#/web/keyboard/branch-action-shortcuts.ts'
 import { isTerminalFocused } from '#/web/terminal-focus.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import type { RepoState, ReposStore } from '#/web/stores/repos/types.ts'
+import { getRuntimeShortcutSettings } from '#/web/runtime-settings-hooks.ts'
 
 type BranchShortcutAction = 'pull' | 'push' | 'terminal' | 'editor' | 'remote'
 type MoveDirection = 1 | -1
@@ -120,7 +120,7 @@ export function useKeyboard({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented) return
-      if (useSettingsStore.getState().shortcutsDisabled) return
+      if (getRuntimeShortcutSettings().shortcutsDisabled) return
       const settingsOpen = isSettingsOpenRef.current()
       const workspaceShortcutsSuppressed = isWorkspaceShortcutSuppressedRef.current() || isShortcutBlockingLayerOpen()
 

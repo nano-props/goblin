@@ -123,66 +123,6 @@ describe('web invalidation sync', () => {
     resetServerInvalidationIngressForTests()
   })
 
-  test('settings store refetches snapshot and external apps on settings invalidation', async () => {
-    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
-    const fetchMock = vi.fn(async (input: string) => {
-      if (input.endsWith('/api/settings/github-cli')) {
-        return { ok: true, json: async () => ({ available: false, version: null, detectedAt: 0, hosts: {} }) }
-      }
-      if (input.endsWith('/api/settings/external-apps')) {
-        return {
-          ok: true,
-          json: async () => ({
-            terminal: {
-              pref: 'ghostty',
-              resolved: 'ghostty',
-              available: true,
-              appAvailability: { ghostty: true, terminal: true },
-              detectedAt: 200,
-            },
-            editor: {
-              pref: 'cursor',
-              resolved: 'cursor',
-              available: true,
-              appAvailability: { vscode: false, cursor: true, windsurf: false },
-              detectedAt: 200,
-            },
-          }),
-        }
-      }
-      return {
-        ok: true,
-        json: async () =>
-          settingsSnapshotResponse({
-          fetchIntervalSec:
-            fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/api/settings')).length > 1 ? 300 : 120,
-          terminalApp:
-            fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/api/settings')).length > 1
-              ? 'ghostty'
-              : 'auto',
-          editorApp:
-            fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/api/settings')).length > 1
-              ? 'cursor'
-              : 'auto',
-          }),
-      }
-    })
-    vi.stubGlobal('fetch', fetchMock)
-
-    const { useSettingsStore } = await import('#/web/stores/settings.ts')
-    await useSettingsStore.getState().hydrate()
-    latestSocket().emitMessage({ type: 'settings-invalidated', scopes: ['settings-snapshot', 'external-apps'] })
-    await waitUntil(() => {
-      expect(useSettingsStore.getState()).toMatchObject({
-        fetchIntervalSec: 300,
-        terminalApp: 'ghostty',
-        editorApp: 'cursor',
-        resolvedTerminalApp: 'ghostty',
-        resolvedEditorApp: 'cursor',
-      })
-    })
-  })
-
   test('theme store refetches theme state on theme invalidation', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
     let settingsReadCount = 0
@@ -256,7 +196,11 @@ describe('web invalidation sync', () => {
     await flushAsyncWork()
 
     expect(fetchMock).toHaveBeenCalledTimes(beforeInvalidationFetchCount)
-    expect(useSettingsStore.getState()).toMatchObject({ fetchIntervalSec: 120, terminalApp: 'auto', editorApp: 'auto' })
+    expect(useSettingsStore.getState().bootSessionSnapshot).toMatchObject({
+      openRepos: [],
+      activeRepo: null,
+      workspaceLayout: 'top-bottom',
+    })
     expect(useThemeStore.getState()).toMatchObject({ pref: 'auto', resolved: 'light', colorTheme: 'default' })
   })
 

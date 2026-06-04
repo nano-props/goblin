@@ -2,8 +2,10 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createTerminalBellController } from '#/web/components/terminal/terminal-bell-controller.ts'
-import { useSettingsStore } from '#/web/stores/settings.ts'
 import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
+import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
+import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
+import { settingsSnapshotQueryKey } from '#/web/settings-queries.ts'
 
 const descriptor: TerminalDescriptor = {
   key: 'terminal-key',
@@ -16,7 +18,11 @@ const descriptor: TerminalDescriptor = {
 }
 
 beforeEach(() => {
-  useSettingsStore.setState({ terminalNotificationsEnabled: false })
+  mainWindowQueryClient.clear()
+  mainWindowQueryClient.setQueryData(
+    settingsSnapshotQueryKey(),
+    defaultSettingsSnapshot({ terminalNotificationsEnabled: false }),
+  )
   Object.defineProperty(window, 'goblinNative', {
     configurable: true,
     value: {
@@ -49,7 +55,10 @@ describe('terminal bell controller', () => {
   test('marks background bells unread and requests a system notification when enabled', async () => {
     const notify = vi.fn()
     const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
-    useSettingsStore.setState({ terminalNotificationsEnabled: true })
+    mainWindowQueryClient.setQueryData(
+      settingsSnapshotQueryKey(),
+      defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
+    )
     const controller = createTerminalBellController(notify, vi.fn())
 
     controller.handleBell(descriptor, { processName: 'zsh', visible: false })
@@ -70,7 +79,10 @@ describe('terminal bell controller', () => {
   test('prefers the server terminal title over process name in system notifications', async () => {
     const notify = vi.fn()
     const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
-    useSettingsStore.setState({ terminalNotificationsEnabled: true })
+    mainWindowQueryClient.setQueryData(
+      settingsSnapshotQueryKey(),
+      defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
+    )
     const controller = createTerminalBellController(notify, vi.fn())
 
     controller.handleBell(descriptor, { processName: 'zsh', canonicalTitle: '~/Developer/goblin — npm run dev', visible: false })
@@ -89,7 +101,10 @@ describe('terminal bell controller', () => {
   test('marks bells unread without requesting a system notification when disabled', async () => {
     const notify = vi.fn()
     const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
-    useSettingsStore.setState({ terminalNotificationsEnabled: false })
+    mainWindowQueryClient.setQueryData(
+      settingsSnapshotQueryKey(),
+      defaultSettingsSnapshot({ terminalNotificationsEnabled: false }),
+    )
     const controller = createTerminalBellController(notify, vi.fn())
 
     controller.handleBell(descriptor, { processName: 'zsh', visible: false })
@@ -105,7 +120,10 @@ describe('terminal bell controller', () => {
   test('ignores bells from the visible focused terminal', async () => {
     const notify = vi.fn()
     const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(true)
-    useSettingsStore.setState({ terminalNotificationsEnabled: true })
+    mainWindowQueryClient.setQueryData(
+      settingsSnapshotQueryKey(),
+      defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
+    )
     const controller = createTerminalBellController(notify, vi.fn())
 
     controller.handleBell(descriptor, { processName: 'zsh', visible: true })
@@ -122,7 +140,10 @@ describe('terminal bell controller', () => {
     const notify = vi.fn()
     const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
     const now = vi.spyOn(Date, 'now')
-    useSettingsStore.setState({ terminalNotificationsEnabled: true })
+    mainWindowQueryClient.setQueryData(
+      settingsSnapshotQueryKey(),
+      defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
+    )
     const controller = createTerminalBellController(notify, vi.fn())
 
     now.mockReturnValueOnce(10_000)
@@ -161,7 +182,10 @@ describe('terminal bell controller', () => {
   test('reset clears unread and notification debounce state', async () => {
     const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
     const now = vi.spyOn(Date, 'now')
-    useSettingsStore.setState({ terminalNotificationsEnabled: true })
+    mainWindowQueryClient.setQueryData(
+      settingsSnapshotQueryKey(),
+      defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
+    )
     const controller = createTerminalBellController(vi.fn(), vi.fn())
 
     now.mockReturnValueOnce(20_000)

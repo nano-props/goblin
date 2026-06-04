@@ -1,7 +1,7 @@
 import { lastPathSegment } from '#/web/lib/paths.ts'
-import { useSettingsStore } from '#/web/stores/settings.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 import type { TerminalBellEvent, TerminalDescriptor } from '#/web/components/terminal/types.ts'
+import { getRuntimeFetchSettings } from '#/web/runtime-settings-hooks.ts'
 const BELL_NOTIFICATION_DEBOUNCE_MS = 5000
 
 export interface TerminalBellController {
@@ -51,7 +51,7 @@ export function createTerminalBellController(
       const changed = !unreadKeys.has(descriptor.key)
       unreadKeys.add(descriptor.key)
       if (changed) notifyAndBadge(descriptor.key)
-      if (!useSettingsStore.getState().terminalNotificationsEnabled) return
+      if (!getRuntimeFetchSettings().terminalNotificationsEnabled) return
       const now = Date.now()
       const lastNotifiedAt = lastNotificationAt.get(descriptor.key) ?? 0
       if (now - lastNotifiedAt < BELL_NOTIFICATION_DEBOUNCE_MS) return

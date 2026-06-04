@@ -9,15 +9,17 @@ import { RepoToolbar } from '#/web/components/repo-toolbar/RepoToolbar.tsx'
 import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
 import { RepoWorkspace, RepoWorkspacePane } from '#/web/components/Layout.tsx'
 import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
-import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
+import { effectiveWorkspaceLayout, repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 import { getRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
 import { UnavailableRepoView } from '#/web/components/UnavailableRepoView.tsx'
+import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 
 interface Props {
   repoId: string
 }
 
 export function RepoView({ repoId }: Props) {
+  const uiMode = useResponsiveUiMode()
   const view = useStoreWithEqualityFn(
     useReposStore,
     (s) => {
@@ -29,7 +31,7 @@ export function RepoView({ repoId }: Props) {
         detailCollapsed: s.detailCollapsed,
         detailFocusMode: s.detailFocusMode,
         workspaceLayout: s.workspaceLayout,
-        detailPaneSize: s.detailPaneSizes[s.workspaceLayout],
+        detailPaneSizes: s.detailPaneSizes,
       }
     },
     (a, b) =>
@@ -38,20 +40,21 @@ export function RepoView({ repoId }: Props) {
       a.detailCollapsed === b.detailCollapsed &&
       a.detailFocusMode === b.detailFocusMode &&
       a.workspaceLayout === b.workspaceLayout &&
-      a.detailPaneSize === b.detailPaneSize,
+      a.detailPaneSizes['top-bottom'] === b.detailPaneSizes['top-bottom'] &&
+      a.detailPaneSizes['left-right'] === b.detailPaneSizes['left-right'],
   )
   const setDetailPaneSize = useReposStore((s) => s.setDetailPaneSize)
   const repo = useReposStore((s) => s.repos[repoId])
   useRepoToasts(repoId)
 
-  const behavior = repoWorkspaceBehavior(view.workspaceLayout, view.detailCollapsed, view.detailFocusMode)
+  const layout = effectiveWorkspaceLayout(view.workspaceLayout, uiMode)
+  const behavior = repoWorkspaceBehavior(layout, view.detailCollapsed, view.detailFocusMode)
+  const detailPaneSize = view.detailPaneSizes[layout]
 
   if (!view.exists || !repo) return <div />
   if (repo.availability.phase === 'unavailable') return <UnavailableRepoView repo={repo} />
   if (view.initialLoading) {
-    return (
-      <RepoWorkspaceSkeleton showRepoToolbar layout={view.workspaceLayout} detailCollapsed={behavior.detailCollapsed} />
-    )
+    return <RepoWorkspaceSkeleton showRepoToolbar layout={layout} detailCollapsed={behavior.detailCollapsed} />
   }
 
   return (
@@ -59,10 +62,10 @@ export function RepoView({ repoId }: Props) {
       <RepoToolbar repoId={repoId} />
 
       <RepoWorkspace
-        layout={view.workspaceLayout}
+        layout={layout}
         mode={behavior.mode}
-        detailSize={view.detailPaneSize}
-        onDetailSizeChange={(size) => setDetailPaneSize(view.workspaceLayout, size)}
+        detailSize={detailPaneSize}
+        onDetailSizeChange={(size) => setDetailPaneSize(layout, size)}
         branchPane={
           <RepoWorkspacePane>
             <BranchList
@@ -77,7 +80,7 @@ export function RepoView({ repoId }: Props) {
           <RepoWorkspacePane>
             <BranchDetail
               repoId={repoId}
-              layout={view.workspaceLayout}
+              layout={layout}
               collapsed={behavior.detailCollapsed}
               focusMode={behavior.detailFocusMode}
             />

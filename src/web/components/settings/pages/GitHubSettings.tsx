@@ -1,9 +1,8 @@
-import { useMutation } from '@tanstack/react-query'
 import { RotateCw } from 'lucide-react'
 import { Badge } from '#/web/components/ui/badge.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { SettingsGroup, SettingsList, SettingsRow } from '#/web/components/settings/SettingsPrimitives.tsx'
-import { useSettingsStore } from '#/web/stores/settings.ts'
+import { useGitHubCliQuery, useRefreshGitHubCliMutation } from '#/web/settings-queries.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { cn } from '#/web/lib/cn.ts'
 function hostLoginCommand(host: string): string {
@@ -12,13 +11,12 @@ function hostLoginCommand(host: string): string {
 
 export function GitHubSettings() {
   const t = useT()
-  const githubCliAvailable = useSettingsStore((s) => s.githubCliAvailable)
-  const githubCliVersion = useSettingsStore((s) => s.githubCliVersion)
-  const githubCliHosts = useSettingsStore((s) => s.githubCliHosts)
-  const refreshGitHubCliState = useSettingsStore((s) => s.refreshGitHubCli)
-  const refreshGitHubCli = useMutation({
-    mutationFn: () => refreshGitHubCliState(),
-  })
+  const { data } = useGitHubCliQuery()
+  if (!data) return null
+  const githubCliAvailable = data.available
+  const githubCliVersion = data.version
+  const githubCliHosts = data.hosts
+  const refreshGitHubCli = useRefreshGitHubCliMutation()
   const hostStates = Object.values(githubCliHosts).sort((a, b) => a.host.localeCompare(b.host))
   const refreshingGitHubCli = refreshGitHubCli.isPending
 
@@ -88,7 +86,7 @@ export function GitHubSettings() {
                   : `${t('settings.github.auth-login-required')} ${hostLoginCommand(hostState.host)}`
               }
               control={
-                <div className="flex w-72 items-center justify-end gap-2 text-xs text-muted-foreground">
+                <div className="flex min-w-0 items-center justify-end gap-2 text-xs text-muted-foreground">
                   {hostState.tokenSource ? (
                     <span className="truncate">
                       {t('settings.github.auth-token-source')} {hostState.tokenSource}

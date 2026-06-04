@@ -8,10 +8,13 @@ interface TerminalConnectionStateOptions {
 type TimerHandle = ReturnType<typeof setTimeout>
 
 export class TerminalConnectionState {
+  private readonly options: TerminalConnectionStateOptions
   private readonly ownershipTimerByAttachmentKey = new Map<string, TimerHandle>()
   private readonly disconnectTimerByClientId = new Map<string, TimerHandle>()
 
-  constructor(private readonly options: TerminalConnectionStateOptions) {}
+  constructor(options: TerminalConnectionStateOptions) {
+    this.options = options
+  }
 
   clearAttachmentDisconnect(clientId: string, attachmentId: string): void {
     this.clearOwnershipTimerByKey(terminalAttachmentKey(clientId, attachmentId))

@@ -4,14 +4,13 @@ import { persistedOpenWorkspaceEntries } from '#/web/open-workspace-state.ts'
 import { persistedActiveRepoIdForSession, persistedSelectedTerminalByWorktreeForSession } from '#/web/session-persistence-state.ts'
 
 export function sessionStateFromPersistableWorkspaceUi(input: {
-  routeRepoId: string | null | undefined
   repos: ReposStore['repos']
   persistableWorkspaceUiState: PersistableWorkspaceUiState
 }): SessionState {
-  const { routeRepoId, repos, persistableWorkspaceUiState } = input
+  const { repos, persistableWorkspaceUiState } = input
   return {
     openRepos: persistedOpenWorkspaceEntries(persistableWorkspaceUiState.order, repos),
-    activeRepo: persistedActiveRepoIdForSession(routeRepoId, persistableWorkspaceUiState.activeId, repos),
+    activeRepo: persistedActiveRepoIdForSession(persistableWorkspaceUiState.activeId),
     detailCollapsed: persistableWorkspaceUiState.detailCollapsed,
     detailFocusMode: persistableWorkspaceUiState.detailFocusMode,
     workspaceLayout: persistableWorkspaceUiState.workspaceLayout,

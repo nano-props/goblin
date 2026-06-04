@@ -83,9 +83,11 @@ function escapeBootstrapJson(value: unknown): string {
 }
 
 function injectBootstrapIntoHtml(indexHtml: string, bootstrap: RendererBootstrapSnapshot): string {
+  const baseHref = bootstrap.initialServer ? `${new URL(bootstrap.initialServer.url).origin}/` : '/'
   const bootstrapScript = `<script id="goblin-bootstrap" type="application/json">${escapeBootstrapJson(bootstrap)}</script>`
   return indexHtml
     .replace('<html lang="en">', `<html lang="${bootstrap.initialI18n?.lang ?? 'en'}">`)
+    .replace('<head>', `<head>\n    <base href="${baseHref}">`)
     .replace(
       '<script type="module" src="./boot.js"></script>',
       `${bootstrapScript}\n    <script type="module" src="./boot.js"></script>`,
@@ -133,6 +135,24 @@ export function createApp(options: ServerAppOptions): Hono {
     }
   })
   app.get('/index.html', async (c) => {
+    try {
+      return c.html(
+        await renderRendererIndexHtml(c.req.url, options.internalSecret, c.req.header('accept-language') ?? null),
+      )
+    } catch {
+      return c.text('Not Found', 404)
+    }
+  })
+  app.get('/settings', async (c) => {
+    try {
+      return c.html(
+        await renderRendererIndexHtml(c.req.url, options.internalSecret, c.req.header('accept-language') ?? null),
+      )
+    } catch {
+      return c.text('Not Found', 404)
+    }
+  })
+  app.get('/settings/*', async (c) => {
     try {
       return c.html(
         await renderRendererIndexHtml(c.req.url, options.internalSecret, c.req.header('accept-language') ?? null),

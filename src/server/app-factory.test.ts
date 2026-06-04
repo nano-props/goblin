@@ -104,4 +104,23 @@ describe('server app html bootstrap', () => {
     expect(html).toContain('"lang":"zh"')
     expect(html).toContain('打开本地仓库')
   })
+
+  test('serves renderer html for settings routes', async () => {
+    const { createApp } = await import('#/server/app-factory.ts')
+    const app = createApp({
+      version: '0.1.0',
+      startedAt: Date.now(),
+      internalSecret: 'secret',
+      terminalHost: terminalHostStub,
+    })
+
+    for (const path of ['/settings', '/settings/general']) {
+      const response = await app.request(new Request(`http://127.0.0.1:32100${path}`))
+      const html = await response.text()
+      expect(response.status).toBe(200)
+      expect(html).toContain('<script id="goblin-bootstrap" type="application/json">')
+      expect(html).toContain('"secret"')
+      expect(html).toContain('<base href="http://127.0.0.1:32100/">')
+    }
+  })
 })

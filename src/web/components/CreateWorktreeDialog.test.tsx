@@ -39,6 +39,12 @@ afterEach(() => {
 })
 
 describe('CreateWorktreeDialog', () => {
+  test('focuses the new branch input when opened', () => {
+    render(<CreateWorktreeDialog open repo={createRepo()} onClose={vi.fn()} onCreate={vi.fn(async () => ({ ok: true, message: 'ok' }))} />)
+
+    expect(document.activeElement).toBe(input('#cwt-branch'))
+  })
+
   test('waits for create success before closing', async () => {
     const deferred = createDeferred<ExecResult | null>()
     const onClose = vi.fn()

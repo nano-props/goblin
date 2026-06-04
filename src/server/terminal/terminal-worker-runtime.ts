@@ -18,9 +18,12 @@ export interface TerminalWorkerRuntimeOptions {
 }
 
 export class TerminalWorkerRuntime {
+  private readonly options: TerminalWorkerRuntimeOptions
   private readonly sockets = new Map<string, ServerTerminalSocket>()
 
-  constructor(private readonly options: TerminalWorkerRuntimeOptions) {}
+  constructor(options: TerminalWorkerRuntimeOptions) {
+    this.options = options
+  }
 
   async handleMessage(message: TerminalWorkerRequest | null | undefined): Promise<void> {
     if (!message || typeof message !== 'object') return

@@ -7,7 +7,9 @@ import { Field, FieldDescription, FieldLabel } from '#/web/components/ui/field.t
 import { Input } from '#/web/components/ui/input.tsx'
 import { tildify, untildify } from '#/web/lib/paths.ts'
 import { chooseLocalRepositoryPath, hasNativeDirectoryPicker } from '#/web/app-shell-client.ts'
+import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useT } from '#/web/stores/i18n.ts'
+import { cn } from '#/web/lib/cn.ts'
 import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
 interface Props {
   open: boolean
@@ -17,6 +19,7 @@ interface Props {
 
 export function OpenRepositoryDialog({ open, onClose, onOpen }: Props) {
   const t = useT()
+  const compact = useIsCompactUi()
   const [path, setPath] = useState('')
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -94,7 +97,7 @@ export function OpenRepositoryDialog({ open, onClose, onOpen }: Props) {
       >
         <Field>
           <FieldLabel htmlFor="open-repo-path">{t('repo-tabs.open-path-label')}</FieldLabel>
-          <div className="flex gap-2">
+          <div className={cn('gap-2', compact ? 'flex flex-col' : 'flex')}>
             <Input
               id="open-repo-path"
               autoFocus
@@ -112,7 +115,7 @@ export function OpenRepositoryDialog({ open, onClose, onOpen }: Props) {
                 type="button"
                 variant="outline"
                 disabled={pending}
-                className="h-auto self-stretch px-3"
+                className={cn('h-auto self-stretch px-3', compact && 'w-full')}
                 onClick={() => void choosePath()}
               >
                 {t('repo-tabs.open-path-choose')}
@@ -125,10 +128,10 @@ export function OpenRepositoryDialog({ open, onClose, onOpen }: Props) {
         {error ? <DialogError>{error}</DialogError> : null}
 
         <DialogFooter className="pt-4">
-          <Button type="button" variant="ghost" disabled={pending} onClick={onClose}>
+          <Button type="button" variant="outline" className={cn(compact && 'w-full')} disabled={pending} onClick={onClose}>
             {t('dialog.cancel')}
           </Button>
-          <Button type="submit" disabled={!canSubmit}>
+          <Button type="submit" className={cn(compact && 'w-full')} disabled={!canSubmit}>
             {pending ? t('repo-tabs.open-opening') : t('repo-tabs.open-local-confirm')}
           </Button>
         </DialogFooter>

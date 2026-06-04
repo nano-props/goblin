@@ -9,7 +9,9 @@ import { useTerminalSessionContext } from '#/web/components/terminal/terminal-se
 import { useTerminalCount, useTerminalSessionSummaries } from '#/web/components/terminal/terminal-session-store.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-utils.ts'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
-import { useSettingsStore } from '#/web/stores/settings.ts'
+import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
+import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
+import { settingsSnapshotQueryKey } from '#/web/settings-queries.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type {
@@ -292,7 +294,11 @@ beforeEach(() => {
   })
   resetReposStore()
   window.sessionStorage.setItem('goblin:web-terminal-attachment-id', 'attachment_local')
-  useSettingsStore.setState({ terminalNotificationsEnabled: false })
+  mainWindowQueryClient.clear()
+  mainWindowQueryClient.setQueryData(
+    settingsSnapshotQueryKey(),
+    defaultSettingsSnapshot({ terminalNotificationsEnabled: false }),
+  )
   document.body.innerHTML = ''
   Object.defineProperty(window, 'goblinNative', {
     configurable: true,
@@ -527,7 +533,10 @@ describe('TerminalSessionProvider', () => {
       selectedBranch: 'feature/worktree',
       detailTab: 'terminal',
     })
-    useSettingsStore.setState({ terminalNotificationsEnabled: true })
+    mainWindowQueryClient.setQueryData(
+      settingsSnapshotQueryKey(),
+      defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
+    )
     const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
     const notifyBell = vi.fn(async () => true)
     Object.assign(window.goblinNative.terminal, { notifyBell })
@@ -641,7 +650,10 @@ describe('TerminalSessionProvider', () => {
       selectedBranch: 'feature/worktree',
       detailTab: 'terminal',
     })
-    useSettingsStore.setState({ terminalNotificationsEnabled: true })
+    mainWindowQueryClient.setQueryData(
+      settingsSnapshotQueryKey(),
+      defaultSettingsSnapshot({ terminalNotificationsEnabled: true }),
+    )
     const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
     const notifyBell = vi.fn(async () => true)
     Object.assign(window.goblinNative.terminal, { notifyBell })

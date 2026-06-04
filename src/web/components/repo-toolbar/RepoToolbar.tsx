@@ -7,6 +7,7 @@ import { RepoToolbarActions } from '#/web/components/repo-toolbar/RepoToolbarAct
 import { WorkspaceLayoutControl } from '#/web/components/repo-toolbar/WorkspaceLayoutControl.tsx'
 import { Toolbar } from '#/web/components/Layout.tsx'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
+import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { visibleBranches } from '#/web/stores/repos/branch-view-mode.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -35,6 +36,7 @@ export function RepoToolbar({ repoId }: Props) {
 
 function BranchFilterControls({ repoId }: Props) {
   const t = useT()
+  const uiMode = useResponsiveUiMode()
   const navigation = useMainWindowNavigation()
   const { focusMode, branches, selectedBranch } = useStoreWithEqualityFn(
     useReposStore,
@@ -71,62 +73,88 @@ function BranchFilterControls({ repoId }: Props) {
   )
   const setBranchViewMode = useReposStore((s) => s.setBranchViewMode)
   const setBranchSearchQuery = useReposStore((s) => s.setBranchSearchQuery)
+  const branchPager = (
+    <BranchPager repoId={repoId} branches={branches} selectedBranch={selectedBranch} focusMode={focusMode} navigation={navigation} />
+  )
 
-  if (focusMode) {
-    if (branches.length <= 1) return null
-    const index = branches.findIndex((branch) => branch.name === selectedBranch)
-    const previous = index > 0 ? branches[index - 1] : null
-    const next = index >= 0 && index < branches.length - 1 ? branches[index + 1] : null
-    const current = index >= 0 ? index + 1 : 1
-
-    return (
-      <div className="flex items-center gap-1">
-        <span className="min-w-0 shrink-0 px-1 text-[11px] font-medium tabular-nums text-muted-foreground">
-          {current} / {branches.length}
-        </span>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          disabled={!previous}
-          aria-label={t('help.row.prev-branch')}
-          title={t('help.row.prev-branch')}
-          onClick={() => previous && navigation.selectRepoBranch(repoId, previous.name)}
-        >
-          <ChevronUp />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          disabled={!next}
-          aria-label={t('help.row.next-branch')}
-          title={t('help.row.next-branch')}
-          onClick={() => next && navigation.selectRepoBranch(repoId, next.name)}
-        >
-          <ChevronDown />
-        </Button>
-      </div>
-    )
-  }
+  if (focusMode) return branchPager
+  if (uiMode === 'compact') return branchPager
 
   return (
     <>
-      <BranchViewModeControl
-        value={branchViewMode as BranchViewMode}
-        disabled={branchCount === 0}
-        onChange={(viewMode) => setBranchViewMode(repoId, viewMode)}
-      />
-      <BranchSearchInput
-        value={branchSearchQuery}
-        disabled={branchCount === 0}
-        onChange={(query) => setBranchSearchQuery(repoId, query)}
-      />
+      <div className="flex items-center gap-2">
+        <BranchViewModeControl
+          value={branchViewMode as BranchViewMode}
+          disabled={branchCount === 0}
+          onChange={(viewMode) => setBranchViewMode(repoId, viewMode)}
+        />
+        <BranchSearchInput
+          value={branchSearchQuery}
+          disabled={branchCount === 0}
+          onChange={(query) => setBranchSearchQuery(repoId, query)}
+        />
+      </div>
     </>
   )
 }
 
+function BranchPager({
+  repoId,
+  branches,
+  selectedBranch,
+  focusMode,
+  navigation,
+}: {
+  repoId: string
+  branches: { name: string }[]
+  selectedBranch: string | null
+  focusMode: boolean
+  navigation: ReturnType<typeof useMainWindowNavigation>
+}) {
+  const t = useT()
+  if (branches.length <= 1) return null
+  const index = branches.findIndex((branch) => branch.name === selectedBranch)
+  const previous = index > 0 ? branches[index - 1] : null
+  const next = index >= 0 && index < branches.length - 1 ? branches[index + 1] : null
+  const current = index >= 0 ? index + 1 : 1
+
+  return (
+    <div className="flex items-center gap-1">
+      <span
+        className="min-w-0 shrink-0 px-1 text-[11px] font-medium tabular-nums text-muted-foreground"
+        aria-label={focusMode ? t('branches.selected') : undefined}
+      >
+        {current} / {branches.length}
+      </span>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        disabled={!previous}
+        aria-label={t('help.row.prev-branch')}
+        title={t('help.row.prev-branch')}
+        onClick={() => previous && navigation.selectRepoBranch(repoId, previous.name)}
+      >
+        <ChevronUp />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        disabled={!next}
+        aria-label={t('help.row.next-branch')}
+        title={t('help.row.next-branch')}
+        onClick={() => next && navigation.selectRepoBranch(repoId, next.name)}
+      >
+        <ChevronDown />
+      </Button>
+    </div>
+  )
+}
+
 function WorkspaceLayoutControlConnected() {
+  const uiMode = useResponsiveUiMode()
   const workspaceLayout = useReposStore((s) => s.workspaceLayout)
   const setWorkspaceLayout = useReposStore((s) => s.setWorkspaceLayout)
+  if (uiMode === 'compact') return null
 
   return <WorkspaceLayoutControl value={workspaceLayout} onChange={setWorkspaceLayout} />
 }

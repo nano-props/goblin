@@ -1,9 +1,5 @@
-export function persistedActiveRepoIdForSession(
-  routeRepoId: string | null | undefined,
-  activeId: string | null,
-  repos: Record<string, unknown>,
-): string | null {
-  return routeRepoId && repos[routeRepoId] ? routeRepoId : activeId
+export function persistedActiveRepoIdForSession(activeId: string | null): string | null {
+  return activeId
 }
 
 export function persistedSelectedTerminalByWorktreeForSession(

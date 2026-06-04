@@ -14,7 +14,6 @@ describe('workspace-ui-persistence-state', () => {
 
     expect(
       sessionStateFromPersistableWorkspaceUi({
-        routeRepoId: null,
         repos: { [repo.id]: repo },
         persistableWorkspaceUiState: {
           order: [repo.id],

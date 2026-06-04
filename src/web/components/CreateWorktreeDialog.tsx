@@ -21,9 +21,11 @@ import { FormDialog } from '#/web/components/ui/form-dialog.tsx'
 import { Field, FieldDescription, FieldError, FieldLabel } from '#/web/components/ui/field.tsx'
 import { Input } from '#/web/components/ui/input.tsx'
 import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.ts'
+import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { defaultWorktreePath, formatWorktreePath, tildify, untildify } from '#/web/lib/paths.ts'
+import { cn } from '#/web/lib/cn.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import { validateBranchName } from '#/shared/refnames.ts'
 import { isResolvableRemotePathInput } from '#/shared/remote-repo.ts'
@@ -43,6 +45,7 @@ interface Props {
 
 export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
   const t = useT()
+  const compact = useIsCompactUi()
 
   const [base, setBase] = useState<string>('')
   const [branch, setBranch] = useState('')
@@ -227,10 +230,15 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
         </Field>
         {error && <DialogError>{error}</DialogError>}
         <DialogFooter className="pt-4">
-          <Button type="button" variant="ghost" disabled={pending} onClick={onClose}>
+          <Button type="button" variant="outline" className={cn(compact && 'w-full')} disabled={pending} onClick={onClose}>
             {t('dialog.cancel')}
           </Button>
-          <Button type="submit" disabled={!canSubmit} aria-busy={pending ? true : undefined}>
+          <Button
+            type="submit"
+            className={cn(compact && 'w-full')}
+            disabled={!canSubmit}
+            aria-busy={pending ? true : undefined}
+          >
             {pending && <Loader2 className="animate-spin" />}
             {t('action.create-worktree-confirm')}
           </Button>

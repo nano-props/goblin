@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ComponentType } from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
+import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { cn } from '#/web/lib/cn.ts'
 export interface SettingsSidebarItem<TPage extends string> {
   page: TPage
@@ -24,6 +25,8 @@ export function SettingsSidebar<TPage extends string>({
   ariaLabel,
   onPageChange,
 }: SettingsSidebarProps<TPage>) {
+  const uiMode = useResponsiveUiMode()
+  const compact = uiMode === 'compact'
   const selectedPageButtonRef = useRef<HTMLButtonElement | null>(null)
 
   useEffect(() => {
@@ -33,7 +36,10 @@ export function SettingsSidebar<TPage extends string>({
 
   return (
     <aside
-      className="flex w-48 shrink-0 flex-col border-r border-separator bg-muted/30 px-3 pb-3"
+      className={cn(
+        'flex shrink-0 flex-col border-r border-separator bg-muted/30 pb-3',
+        compact ? 'w-14 px-2' : 'w-48 px-3',
+      )}
       style={{ paddingTop: topInset > 0 ? topInset + 12 : 12 }}
     >
       <nav className="space-y-1.5" aria-label={ariaLabel}>
@@ -46,11 +52,13 @@ export function SettingsSidebar<TPage extends string>({
             variant="ghost"
             onClick={() => onPageChange(item.page)}
             className={cn(
-              'h-9 w-full justify-start gap-2 px-2.5 text-left text-sm font-normal',
+              'h-9 w-full gap-2 text-left text-sm font-normal',
+              compact ? 'justify-center px-2' : 'justify-start px-2.5',
               page === item.page
                 ? 'bg-selected text-selected-foreground hover:bg-selected'
                 : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
             )}
+            aria-label={item.label}
             aria-current={page === item.page ? 'page' : undefined}
           >
             <item.Icon
@@ -59,7 +67,9 @@ export function SettingsSidebar<TPage extends string>({
                 page === item.page ? 'text-selected-foreground' : 'text-muted-foreground',
               )}
             />
-            <span className={cn('truncate', page === item.page ? 'font-medium' : 'font-normal')}>{item.label}</span>
+            <span className={cn(compact ? 'hidden' : 'truncate', page === item.page ? 'font-medium' : 'font-normal')}>
+              {item.label}
+            </span>
           </Button>
         ))}
       </nav>

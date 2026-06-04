@@ -96,6 +96,55 @@ afterEach(() => {
 })
 
 describe('OpenRemoteRepositoryDialog', () => {
+  test('focuses the host alias input when include mode requires manual host entry', async () => {
+    const onOpenChange = vi.fn()
+
+    render(
+      <MainWindowNavigationProvider value={navigationWith({})}>
+        <OpenRemoteRepositoryDialog open onOpenChange={onOpenChange} />
+      </MainWindowNavigationProvider>,
+    )
+    await flush()
+
+    expect(document.activeElement).toBe(input('#remote-ssh-host'))
+  })
+
+  test('focuses the remote path input when a host is already selected from ssh config', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL, init?: RequestInit) => {
+        const url = new URL(typeof input === 'string' ? input : input.toString())
+        const body =
+          typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, any>) : {}
+        if (url.pathname === '/api/remote/ssh-hosts') {
+          return { ok: true, json: async () => ({ hosts: [{ alias: 'prod', hostName: 'example.com' }], hasInclude: false }) }
+        }
+        if (url.pathname === '/api/remote/resolve-target') {
+          return {
+            ok: true,
+            json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
+          }
+        }
+        if (url.pathname === '/api/remote/test-repository') {
+          return { ok: true, json: async () => ({ ok: true, target: body.target, stages: [] }) }
+        }
+        if (url.pathname === '/api/remote/path-suggestions') {
+          return { ok: true, json: async () => [] }
+        }
+        throw new Error(`Unhandled fetch URL: ${url.pathname}`)
+      }),
+    )
+
+    render(
+      <MainWindowNavigationProvider value={navigationWith({})}>
+        <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
+      </MainWindowNavigationProvider>,
+    )
+    await flush()
+
+    expect(document.activeElement).toBe(input('#remote-path'))
+  })
+
   test('ensures the remote workspace is open before delegating activation to navigation', async () => {
     const ensureWorkspaceOpen = vi.fn(async () => ({ ok: true as const, id: target.id }))
     useReposStore.setState({ ensureWorkspaceOpen })

@@ -77,7 +77,11 @@ interface TerminalCatalogOptions {
 }
 
 class TerminalCatalog {
-  constructor(private readonly options: TerminalCatalogOptions) {}
+  private readonly options: TerminalCatalogOptions
+
+  constructor(options: TerminalCatalogOptions) {
+    this.options = options
+  }
 
   async ensureOrRestore(clientId: string, input: EnsureTerminalCatalogInput): Promise<EnsureTerminalCatalogResult> {
     if (!this.options.isValidClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }

@@ -7,8 +7,10 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '#/web/component
 import { Input } from '#/web/components/ui/input.tsx'
 import { abortCloneOperation } from '#/web/app-data-client.ts'
 import { chooseCloneParentPath, hasNativeDirectoryPicker, homeDirectory } from '#/web/app-shell-client.ts'
+import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { joinPath, tildify, untildify } from '#/web/lib/paths.ts'
+import { cn } from '#/web/lib/cn.ts'
 import type { CloneRepoResult } from '#/shared/rpc.ts'
 export interface CloneRepositoryRequest {
   operationId: string
@@ -25,6 +27,7 @@ interface Props {
 
 export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
   const t = useT()
+  const compact = useIsCompactUi()
   const [url, setUrl] = useState('')
   const [parentPath, setParentPath] = useState(tildify(defaultCloneParentPath()))
   const [directoryName, setDirectoryName] = useState('')
@@ -150,7 +153,7 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
 
         <Field className="gap-2">
           <FieldLabel htmlFor="clone-parent-path">{t('repo-tabs.clone-parent-label')}</FieldLabel>
-          <div className="flex gap-2">
+          <div className={cn('gap-2', compact ? 'flex flex-col' : 'flex')}>
             <Input
               id="clone-parent-path"
               value={parentPath}
@@ -166,7 +169,7 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
                 type="button"
                 variant="outline"
                 disabled={pending}
-                className="h-10 self-stretch px-3"
+                className={cn('h-10 self-stretch px-3', compact && 'w-full')}
                 onClick={() => void chooseParentPath()}
               >
                 {t('repo-tabs.clone-parent-choose')}
@@ -206,10 +209,10 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
         {error && <DialogError>{error}</DialogError>}
 
         <DialogFooter className="gap-2 pt-2">
-          <Button type="button" variant="ghost" onClick={() => void handleCancel()}>
+          <Button type="button" variant="outline" className={cn(compact && 'w-full')} onClick={() => void handleCancel()}>
             {t('dialog.cancel')}
           </Button>
-          <Button type="submit" className="min-w-28" disabled={!canSubmit}>
+          <Button type="submit" className={cn('min-w-28', compact && 'w-full min-w-0')} disabled={!canSubmit}>
             {pending ? t('repo-tabs.clone-cloning') : t('repo-tabs.clone-confirm')}
           </Button>
         </DialogFooter>

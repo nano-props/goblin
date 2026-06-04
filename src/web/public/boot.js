@@ -1,5 +1,5 @@
 // Boot script — applies theme attributes before the React app module runs.
-// Main passes them via `?theme=` and `?colorTheme=` on the file:// URL.
+// The renderer entry URL carries them via `?theme=` and `?colorTheme=`.
 //
 // This file lives under `public/` so vite copies it as-is into the
 // dist root rather than bundling it into main.js. Keep the color theme

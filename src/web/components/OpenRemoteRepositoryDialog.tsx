@@ -9,6 +9,7 @@ import { PanelInset } from '#/web/components/ui/panel.tsx'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/web/components/ui/select.tsx'
 import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.ts'
+import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import {
   getRemoteSshHosts,
   resolveRemoteRepositoryTarget,
@@ -18,6 +19,7 @@ import { useT } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { RemoteDiagnosticsPanel } from '#/web/components/RemoteDiagnosticsPanel.tsx'
 import { isResolvableRemotePathInput, isHomeRelativeRemotePath, remoteRepoSessionEntry } from '#/shared/remote-repo.ts'
+import { cn } from '#/web/lib/cn.ts'
 import type { RemoteDiagnosticsResult, RemoteRepoTarget, SshConfigHost } from '#/shared/remote-repo.ts'
 interface Props {
   open: boolean
@@ -26,6 +28,7 @@ interface Props {
 
 export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
   const t = useT()
+  const compact = useIsCompactUi()
   const navigation = useMainWindowNavigation()
   const [hosts, setHosts] = useState<SshConfigHost[]>([])
   const [hasInclude, setHasInclude] = useState(false)
@@ -165,6 +168,7 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
             <>
               <Input
                 id="remote-ssh-host"
+                autoFocus={hasInclude}
                 disabled={pending}
                 value={alias}
                 onChange={(event) => {
@@ -234,7 +238,7 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
           <FieldLabel htmlFor="remote-path">{t('repo-tabs.open-remote-path-label')}</FieldLabel>
           <Input
             id="remote-path"
-            autoFocus={hasInclude || hosts.length > 0}
+            autoFocus={!hasInclude && hosts.length > 0}
             disabled={pending}
             value={remotePath}
             onChange={(event) => {
@@ -266,19 +270,19 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
         {error && <DialogError>{error}</DialogError>}
 
         <DialogFooter className="gap-2 pt-2">
-          <Button type="button" variant="ghost" disabled={pending} onClick={handleCancel}>
+          <Button type="button" variant="outline" className={cn(compact && 'w-full')} disabled={pending} onClick={handleCancel}>
             {t('dialog.cancel')}
           </Button>
           <Button
             type="button"
             variant="outline"
-            className="min-w-24"
+            className={cn('min-w-24', compact && 'w-full min-w-0')}
             disabled={!canSubmit || pending}
             onClick={() => void handleTest()}
           >
             {t('repo-tabs.open-remote-test-connection')}
           </Button>
-          <Button type="submit" className="min-w-28" disabled={!canSubmit || pending}>
+          <Button type="submit" className={cn('min-w-28', compact && 'w-full min-w-0')} disabled={!canSubmit || pending}>
             {t('repo-tabs.open-remote-confirm')}
           </Button>
         </DialogFooter>

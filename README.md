@@ -1,15 +1,18 @@
 # Goblin
 
-Goblin is a desktop Git branch manager for keeping multiple repositories and worktrees organized.
+One workspace for Git branches and worktrees.
+
+## Requirements
+
+- Bun
+- Node.js 24+
 
 ## Core features
 
-- Open multiple repositories in tabs and restore the previous session.
-- Browse branches, commit logs, and working tree status in one place.
-- Fetch and refresh repository state, with remote sync and PR context.
-- Checkout, pull, push, open GitHub links, and manage branches from the branch list.
-- Create or open linked worktrees, including quick handoff to terminal or VS Code.
-- Navigate quickly with keyboard shortcuts, themes, and multilingual UI.
+- Headless terminals. Server-backed.
+- Compact on small screens.
+- Local and SSH repos.
+- Built for branch flow.
 
 ## Build & install (macOS)
 
@@ -18,6 +21,20 @@ Goblin is a desktop Git branch manager for keeping multiple repositories and wor
 ```
 
 Builds a host-architecture `.app` and installs it to `~/Applications`.
+
+## Run server mode
+
+```sh
+./serve.sh
+```
+
+Builds the web UI, then starts server mode. Default: `http://127.0.0.1:32100`.
+
+Use `--host` or `--port` to override the listen address:
+
+```sh
+./serve.sh --host 127.0.0.1 --port 32100
+```
 
 ## Develop
 

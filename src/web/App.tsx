@@ -4,9 +4,8 @@
 //
 // Boots in this order:
 //   1. theme.hydrate()       — reads server-backed theme settings
-//   2. settings.hydrate()    — persistable settings + saved session
-//   3. settings.hydrateExternalApps() — external app snapshot
-//   4. repos.hydrateSession  — re-opens the repos that were open last run
+//   2. settings.hydrate()    — saved session bootstrap snapshot
+//   3. repos.hydrateSession  — re-opens the repos that were open last run
 //
 // After hydration, side-effects run for the lifetime of the app:
 //   - background sync registration with the embedded server scheduler
@@ -16,7 +15,6 @@
 //   - settings write-error toast (warns the user if prefs aren't
 //     persisting instead of silently dropping their changes)
 
-import { useCallback, useMemo } from 'react'
 import { Trans } from 'react-i18next'
 import { Toaster } from '#/web/components/ui/sonner.tsx'
 import { Topbar } from '#/web/components/Topbar.tsx'
@@ -33,164 +31,54 @@ import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessi
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useKeyboard } from '#/web/hooks/useKeyboard.ts'
+import { useMainWindowShellState } from '#/web/hooks/useMainWindowShellState.ts'
 import { useRepoDrop } from '#/web/hooks/useRepoDrop.ts'
 import { useAppBootstrap } from '#/web/hooks/useAppBootstrap.ts'
 import { useBackgroundFetch } from '#/web/hooks/useBackgroundFetch.ts'
-import { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
 import { useRendererEffectIntentRouter } from '#/web/hooks/useRendererEffectIntentRouter.ts'
 import { useSessionPersistence } from '#/web/hooks/useSessionPersistence.ts'
 import { useSettingsWriteErrorToast } from '#/web/hooks/useSettingsWriteErrorToast.ts'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
-import { useRoutedActiveRepo } from '#/web/hooks/useRoutedActiveRepo.ts'
-import { useRoutedSelectedBranch } from '#/web/hooks/useRoutedSelectedBranch.ts'
-import { useRoutedDetailTab } from '#/web/hooks/useRoutedDetailTab.ts'
-import { MainWindowNavigationProvider, type MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
-import { nextRouteRepoIdAfterClose, visibleRepoIdForMainWindow } from '#/web/main-window-navigation-state.ts'
-import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
-import type { AppOverlayKey } from '#/web/hooks/useAppOverlays.ts'
-import type { DetailTab } from '#/web/stores/repos/types.ts'
+import { useSettingsQueryInvalidationSync } from '#/web/settings-queries.ts'
+import { MainWindowNavigationProvider } from '#/web/main-window-navigation.tsx'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 
-export interface MainWindowRoutePatch {
-  repoId?: string | null
-  branch?: string | null
-  overlay?: AppOverlayKey | null
-  detailTab?: DetailTab | null
-  settingsPage?: SettingsPage | null
-}
-
 interface AppProps {
-  routeRepoId?: string | null
-  onRouteRepoChange?: (repoId: string | null) => void
-  routeOverlay?: AppOverlayKey | null
-  onRouteOverlayChange?: (overlay: AppOverlayKey | null) => void
   routeSettingsPage?: SettingsPage | null
   onRouteSettingsPageChange?: (page: SettingsPage | null) => void
-  routeBranch?: string | null
-  onRouteBranchChange?: (branch: string | null) => void
-  routeDetailTab?: DetailTab | null
-  onRouteDetailTabChange?: (tab: DetailTab | null) => void
-  onRouteChange?: (patch: MainWindowRoutePatch) => void
 }
 
 export function App({
-  routeRepoId = null,
-  onRouteRepoChange,
-  routeOverlay = null,
-  onRouteOverlayChange,
   routeSettingsPage = null,
   onRouteSettingsPageChange,
-  routeBranch = null,
-  onRouteBranchChange,
-  routeDetailTab = null,
-  onRouteDetailTabChange,
-  onRouteChange,
 }: AppProps) {
-  const activeId = useReposStore((s) => s.activeId)
-  const repos = useReposStore((s) => s.repos)
-  const sessionReady = useReposStore((s) => s.sessionReady)
-  const detailCollapsed = useReposStore((s) => s.detailCollapsed)
-  const workspaceLayout = useReposStore((s) => s.workspaceLayout)
-  const order = useReposStore((s) => s.order)
-  const setActive = useReposStore((s) => s.setActive)
-  const closeRepo = useReposStore((s) => s.closeRepo)
-  const cycleActive = useReposStore((s) => s.cycleActive)
-  const selectBranch = useReposStore((s) => s.selectBranch)
-  const setDetailTab = useReposStore((s) => s.setDetailTab)
-  const overlays = useAppOverlays({ routeOverlay, onRouteOverlayChange })
-  const workspaceBehavior = repoWorkspaceBehavior(workspaceLayout, detailCollapsed)
-  const visibleRepoId = visibleRepoIdForMainWindow(routeRepoId, activeId, repos)
-  const settingsOpen = routeSettingsPage !== null
-  const workspaceShortcutsSuppressed = overlays.anyOpen || settingsOpen
-  const openSettings = useCallback(
-    (page: SettingsPage = 'general') => {
-      onRouteSettingsPageChange?.(page)
-    },
-    [onRouteSettingsPageChange],
-  )
-  const showHelp = useCallback(() => {
-    openSettings('shortcuts')
-  }, [openSettings])
-  const navigation = useMemo<MainWindowNavigationActions>(
-    () => ({
-      activateRepo(repoId) {
-        if (onRouteChange) {
-          onRouteChange({ repoId })
-          return
-        }
-        setActive(repoId)
-      },
-      closeRepo(repoId) {
-        const nextRepoId = nextRouteRepoIdAfterClose(order, visibleRepoId, repoId)
-        closeRepo(repoId)
-        if (onRouteChange && nextRepoId !== undefined) onRouteChange({ repoId: nextRepoId })
-      },
-      cycleRepo(direction) {
-        if (onRouteChange) {
-          if (order.length === 0) return
-          const current = visibleRepoId ? order.indexOf(visibleRepoId) : -1
-          const nextIndex = current === -1 ? 0 : (current + direction + order.length) % order.length
-          const nextRepoId = order[nextIndex]
-          if (nextRepoId) onRouteChange({ repoId: nextRepoId })
-          return
-        }
-        cycleActive(direction)
-      },
-      selectRepoBranch(repoId, branch) {
-        if (onRouteChange) {
-          onRouteChange({ repoId, branch })
-          return
-        }
-        if (repoId !== activeId) setActive(repoId)
-        selectBranch(repoId, branch)
-      },
-      showRepoDetailTab(repoId, tab) {
-        if (onRouteChange) {
-          onRouteChange({ repoId, detailTab: tab })
-          return
-        }
-        if (repoId !== activeId) setActive(repoId)
-        setDetailTab(repoId, tab)
-      },
-      showRepoBranchDetailTab(repoId, branch, tab) {
-        if (onRouteChange) {
-          onRouteChange({ repoId, branch, detailTab: tab })
-          return
-        }
-        if (repoId !== activeId) setActive(repoId)
-        selectBranch(repoId, branch)
-        setDetailTab(repoId, tab)
-      },
-      openSettings(page) {
-        openSettings(page)
-      },
-    }),
-    [
-      activeId,
-      closeRepo,
-      cycleActive,
-      onRouteChange,
-      openSettings,
-      order,
-      selectBranch,
-      setActive,
-      setDetailTab,
-      visibleRepoId,
-    ],
-  )
+  const {
+    overlays,
+    sessionReady,
+    visibleRepoId,
+    effectiveLayout,
+    workspaceBehavior,
+    settingsOpen,
+    modalOpen,
+    workspaceShortcutsSuppressed,
+    openSettings,
+    showHelp,
+    exitSettings,
+    navigation,
+  } = useMainWindowShellState({
+    routeSettingsPage,
+    onRouteSettingsPageChange,
+  })
   // Shared gate: any modal overlay suppresses both
   // keyboard shortcuts and the file-drop dashed border.
-  const modalOpen = overlays.anyOpen
   const repoDrop = useRepoDrop({ blocked: modalOpen })
 
   useAppBootstrap()
-  useSessionPersistence({ routeRepoId })
+  useSessionPersistence()
   useSettingsWriteErrorToast()
   useBackgroundFetch()
   useRepoStoreInvalidationRefresh()
-  useRoutedActiveRepo({ activeId, sessionReady, routeRepoId, onRouteRepoChange })
-  useRoutedSelectedBranch({ currentRepoId: visibleRepoId, sessionReady, routeBranch, onRouteBranchChange })
-  useRoutedDetailTab({ currentRepoId: visibleRepoId, sessionReady, routeDetailTab, onRouteDetailTabChange })
+  useSettingsQueryInvalidationSync()
   useRendererEffectIntentRouter({
     navigation,
     currentRepoId: visibleRepoId,
@@ -208,73 +96,156 @@ export function App({
     onShowHelp: showHelp,
     isWorkspaceShortcutSuppressed: () => workspaceShortcutsSuppressed,
     isSettingsOpen: () => settingsOpen,
-    onExitSettings: () => onRouteSettingsPageChange?.(null),
+    onExitSettings: exitSettings,
   })
 
+  return (
+    <ErrorBoundary>
+      <TerminalSessionProvider currentRepoId={visibleRepoId}>
+        <MainWindowNavigationProvider value={navigation}>
+          <MainWindowViewport
+            routeSettingsPage={routeSettingsPage}
+            onRouteSettingsPageChange={onRouteSettingsPageChange}
+            openSettings={openSettings}
+            visibleRepoId={visibleRepoId}
+            sessionReady={sessionReady}
+            effectiveLayout={effectiveLayout}
+            detailCollapsed={workspaceBehavior.detailCollapsed}
+            overlays={overlays}
+            repoDrop={repoDrop}
+          />
+        </MainWindowNavigationProvider>
+      </TerminalSessionProvider>
+    </ErrorBoundary>
+  )
+}
+
+interface MainWindowViewportProps {
+  routeSettingsPage: SettingsPage | null
+  onRouteSettingsPageChange?: (page: SettingsPage | null) => void
+  openSettings: (page?: SettingsPage) => void
+  visibleRepoId: string | null
+  sessionReady: boolean
+  effectiveLayout: 'top-bottom' | 'left-right'
+  detailCollapsed: boolean
+  overlays: ReturnType<typeof useMainWindowShellState>['overlays']
+  repoDrop: ReturnType<typeof useRepoDrop>
+}
+
+interface MainWindowViewportContentProps {
+  routeSettingsPage: SettingsPage | null
+  onRouteSettingsPageChange?: (page: SettingsPage | null) => void
+  openSettings: (page?: SettingsPage) => void
+  visibleRepoId: string | null
+  sessionReady: boolean
+  effectiveLayout: 'top-bottom' | 'left-right'
+  detailCollapsed: boolean
+  overlays: ReturnType<typeof useMainWindowShellState>['overlays']
+}
+
+interface MainWindowOverlaysProps {
+  overlays: ReturnType<typeof useMainWindowShellState>['overlays']
+  repoDrop: ReturnType<typeof useRepoDrop>
+}
+
+function MainWindowViewport({
+  routeSettingsPage,
+  onRouteSettingsPageChange,
+  openSettings,
+  visibleRepoId,
+  sessionReady,
+  effectiveLayout,
+  detailCollapsed,
+  overlays,
+  repoDrop,
+}: MainWindowViewportProps) {
   return (
     // Outer ErrorBoundary catches crashes in Topbar/Sidebar — without
     // this, a corrupt settings.json or rendering bug elsewhere blanks
     // the entire window. The inner ErrorBoundary around RepoView still
     // exists so a tab-specific crash doesn't take down the rest of the
     // app.
-    <ErrorBoundary>
-      <TerminalSessionProvider currentRepoId={visibleRepoId}>
-        <MainWindowNavigationProvider value={navigation}>
-          <div
-            className="relative flex h-full flex-col"
-            onDragEnter={repoDrop.onDragEnter}
-            onDragOver={repoDrop.onDragOver}
-            onDragLeave={repoDrop.onDragLeave}
-            onDrop={repoDrop.onDrop}
-          >
-            {routeSettingsPage ? (
-              <SettingsPageScreen
-                page={routeSettingsPage}
-                onBack={() => onRouteSettingsPageChange?.(null)}
-                onPageChange={(page) => onRouteSettingsPageChange?.(page)}
-              />
-            ) : (
-              <>
-                <Topbar onOpenSettings={() => openSettings()}>
-                  <RepoTabs
-                    currentRepoId={visibleRepoId}
-                    onOpenRepoPathDialog={overlays.openRepoPathDialog}
-                    onOpenRemote={overlays.openRemoteRepo}
-                    onClone={overlays.openCloneRepo}
-                  />
-                </Topbar>
-                <main className="flex flex-1 min-h-0 min-w-0">
-                  <ErrorBoundary resetKey={visibleRepoId}>
-                    {visibleRepoId ? (
-                      <RepoView repoId={visibleRepoId} />
-                    ) : !sessionReady ? (
-                      <RepoWorkspaceSkeleton
-                        showRepoToolbar
-                        layout={workspaceLayout}
-                        detailCollapsed={workspaceBehavior.detailCollapsed}
-                      />
-                    ) : (
-                      <EmptyState />
-                    )}
-                  </ErrorBoundary>
-                </main>
-              </>
-            )}
-            <RepoOpenDialog open={overlays.state.openRepo.open} onOpenChange={overlays.setOpenRepoOpen} />
-            <RepoCloneDialog open={overlays.state.clone.open} onOpenChange={overlays.setCloneOpen} />
-            <OpenRemoteRepositoryDialog
-              open={overlays.state.openRemoteRepo.open}
-              onOpenChange={overlays.setOpenRemoteRepoOpen}
-            />
-            <RepoDropOverlay active={repoDrop.active} />
-            {/* shadcn/ui Toaster wrapper — owns its own theme + style hooks.
-             * App-level only sets position + closeButton; the rest of the
-             * visual contract is in components/ui/sonner.tsx. */}
-            <Toaster position="bottom-right" closeButton />
-          </div>
-        </MainWindowNavigationProvider>
-      </TerminalSessionProvider>
-    </ErrorBoundary>
+    <div
+      className="relative flex h-full flex-col"
+      onDragEnter={repoDrop.onDragEnter}
+      onDragOver={repoDrop.onDragOver}
+      onDragLeave={repoDrop.onDragLeave}
+      onDrop={repoDrop.onDrop}
+    >
+      <MainWindowViewportContent
+        routeSettingsPage={routeSettingsPage}
+        onRouteSettingsPageChange={onRouteSettingsPageChange}
+        openSettings={openSettings}
+        visibleRepoId={visibleRepoId}
+        sessionReady={sessionReady}
+        effectiveLayout={effectiveLayout}
+        detailCollapsed={detailCollapsed}
+        overlays={overlays}
+      />
+      <MainWindowOverlays overlays={overlays} repoDrop={repoDrop} />
+    </div>
+  )
+}
+
+function MainWindowViewportContent({
+  routeSettingsPage,
+  onRouteSettingsPageChange,
+  openSettings,
+  visibleRepoId,
+  sessionReady,
+  effectiveLayout,
+  detailCollapsed,
+  overlays,
+}: MainWindowViewportContentProps) {
+  if (routeSettingsPage) {
+    return (
+      <SettingsPageScreen
+        page={routeSettingsPage}
+        onBack={() => onRouteSettingsPageChange?.(null)}
+        onPageChange={(page) => onRouteSettingsPageChange?.(page)}
+      />
+    )
+  }
+  return (
+    <>
+      <Topbar onOpenSettings={() => openSettings()}>
+        <RepoTabs
+          currentRepoId={visibleRepoId}
+          onOpenRepoPathDialog={overlays.openRepoPathDialog}
+          onOpenRemote={overlays.openRemoteRepo}
+          onClone={overlays.openCloneRepo}
+        />
+      </Topbar>
+      <main className="flex flex-1 min-h-0 min-w-0">
+        <ErrorBoundary resetKey={visibleRepoId}>
+          {visibleRepoId ? (
+            <RepoView repoId={visibleRepoId} />
+          ) : !sessionReady ? (
+            <RepoWorkspaceSkeleton showRepoToolbar layout={effectiveLayout} detailCollapsed={detailCollapsed} />
+          ) : (
+            <EmptyState />
+          )}
+        </ErrorBoundary>
+      </main>
+    </>
+  )
+}
+
+function MainWindowOverlays({ overlays, repoDrop }: MainWindowOverlaysProps) {
+  return (
+    <>
+      <RepoOpenDialog open={overlays.state.openRepo.open} onOpenChange={overlays.setOpenRepoOpen} />
+      <RepoCloneDialog open={overlays.state.clone.open} onOpenChange={overlays.setCloneOpen} />
+      <OpenRemoteRepositoryDialog
+        open={overlays.state.openRemoteRepo.open}
+        onOpenChange={overlays.setOpenRemoteRepoOpen}
+      />
+      <RepoDropOverlay active={repoDrop.active} />
+      {/* shadcn/ui Toaster wrapper — owns its own theme + style hooks.
+       * App-level only sets position + closeButton; the rest of the
+       * visual contract is in components/ui/sonner.tsx. */}
+      <Toaster position="bottom-right" closeButton />
+    </>
   )
 }
 

@@ -25,7 +25,7 @@ export function SettingsPageScreen({ page, onBack, onPageChange }: SettingsPageS
           <ArrowLeft className="size-4" />
           {t('settings.back')}
         </Button>
-        <div className="flex-1 text-center text-sm font-semibold text-foreground">{pageTitle}</div>
+        <div className="min-w-0 flex-1 truncate text-center text-sm font-semibold text-foreground">{pageTitle}</div>
       </div>
       <div className="min-h-0 flex-1">
         <SettingsSurface page={page} onPageChange={onPageChange} />

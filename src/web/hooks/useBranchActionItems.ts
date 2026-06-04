@@ -4,12 +4,12 @@ import { GitHubOutlineIcon } from '#/web/components/GitHubOutlineIcon.tsx'
 import { GitLabLogoIcon } from '#/web/components/GitLabLogoIcon.tsx'
 import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { useSettingsStore } from '#/web/stores/settings.ts'
 import { EditorAppIcon, TerminalAppIcon } from '#/web/components/ExternalAppIcon/index.tsx'
 import { useBranchActions, type BranchActionItemId } from '#/web/hooks/useBranchActions.tsx'
 import { branchActionDisplayPhase } from '#/web/hooks/branch-action-state.ts'
 import { branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import type { BrowserRemoteProvider } from '#/web/types.ts'
+import { useRuntimeExternalAppSettings } from '#/web/runtime-settings-hooks.ts'
 export interface BranchActionItem {
   id: BranchActionItemId
   label: string
@@ -53,12 +53,8 @@ function browserRemoteIcon(provider: BrowserRemoteProvider | undefined) {
 
 export function useBranchActionItems(repo: RepoState, branch: RepoBranchState): BranchActionItemGroups {
   const t = useT()
-  const terminalApp = useSettingsStore((s) => s.terminalApp)
-  const resolvedTerminalApp = useSettingsStore((s) => s.resolvedTerminalApp)
-  const terminalAvailable = useSettingsStore((s) => s.terminalAvailable)
-  const editorApp = useSettingsStore((s) => s.editorApp)
-  const resolvedEditorApp = useSettingsStore((s) => s.resolvedEditorApp)
-  const editorAvailable = useSettingsStore((s) => s.editorAvailable)
+  const { terminalApp, resolvedTerminalApp, terminalAvailable, editorApp, resolvedEditorApp, editorAvailable } =
+    useRuntimeExternalAppSettings()
   const { blocked, busyAction, capabilities, actions, dialogs } = useBranchActions(repo, branch)
   const disabled = blocked
   const busy = (id: BranchActionItemId) => busyAction === id

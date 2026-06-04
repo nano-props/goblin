@@ -2,11 +2,11 @@ import { useEffect } from 'react'
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
 import { setBackgroundSyncRepos } from '#/web/app-data-client.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { useSettingsStore } from '#/web/stores/settings.ts'
 import { backgroundSyncRepoIdsFromStore } from '#/web/hooks/background-sync.ts'
+import { useRuntimeFetchSettings } from '#/web/runtime-settings-hooks.ts'
 export function useBackgroundFetch() {
   const eligibleRepoIdsKey = useReposStore((s) => backgroundSyncRepoIdsFromStore(s).join('\0'))
-  const fetchIntervalSec = useSettingsStore((s) => s.fetchIntervalSec)
+  const { fetchIntervalSec } = useRuntimeFetchSettings()
   const hasEmbeddedServer = !!getInitialBootstrap().initialServer?.url
 
   useEffect(() => {

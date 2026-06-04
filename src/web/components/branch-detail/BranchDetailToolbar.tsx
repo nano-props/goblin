@@ -2,7 +2,6 @@ import { ChevronDown, Maximize2, Minimize2 } from 'lucide-react'
 import type { KeyboardEvent } from 'react'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoState, DetailTab, RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
-import { useSettingsStore } from '#/web/stores/settings.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { BranchActionControls } from '#/web/components/BranchActionBar.tsx'
@@ -15,6 +14,7 @@ import { useTerminalCount } from '#/web/components/terminal/terminal-session-sto
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import type { SelectedBranchDetailPresentation } from '#/web/components/branch-detail/model.ts'
 import type { BranchActionItemGroups } from '#/web/hooks/useBranchActionItems.ts'
+import { useRuntimeShortcutSettings } from '#/web/runtime-settings-hooks.ts'
 interface Props {
   repo: RepoState
   detail: SelectedBranchDetailPresentation
@@ -41,8 +41,7 @@ export function BranchDetailToolbar({
   const toggleDetailCollapsed = useReposStore((s) => s.toggleDetailCollapsed)
   const toggleDetailFocusMode = useReposStore((s) => s.toggleDetailFocusMode)
   const navigation = useMainWindowNavigation()
-  const shortcutsDisabled = useSettingsStore((s) => s.shortcutsDisabled)
-  const toggleDetailOnActionBarBlankClick = useSettingsStore((s) => s.toggleDetailOnActionBarBlankClick)
+  const { shortcutsDisabled, toggleDetailOnActionBarBlankClick } = useRuntimeShortcutSettings()
   const behavior = repoWorkspaceBehavior(layout, collapsed, focusMode)
   const tabs = visibleDetailTabs(!!detail.branch?.worktree?.path)
   const terminalWorktreeKey = detail.branch?.worktree?.path ? worktreeTerminalKey(repo.id, detail.branch.worktree.path) : null
@@ -119,7 +118,7 @@ export function BranchDetailToolbar({
         onClick={behavior.detailCollapseAllowed && toggleDetailOnActionBarBlankClick ? toggleDetailCollapsed : undefined}
       />
       <div className="flex shrink-0 items-center gap-1">
-        {layout === 'left-right' && branchActions && (
+        {branchActions && layout === 'left-right' && (
           <BranchActionControls actions={branchActions} variant="menu" />
         )}
         {behavior.detailFocusAllowed && (

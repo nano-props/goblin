@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
 import { ShortcutSettings } from '#/web/components/settings/ShortcutSettings.tsx'
 import { SettingsCard, SettingsGroup, SettingsListItem } from '#/web/components/settings/SettingsPrimitives.tsx'
+import { useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { useSettingsStore } from '#/web/stores/settings.ts'
 import {
   helpShortcutSections,
   type HelpShortcutRow,
@@ -66,8 +66,10 @@ function ShortcutList({ sections }: { sections: HelpShortcutSection[] }) {
 
 export function KeyboardShortcutSettings() {
   const t = useT()
-  const globalShortcut = useSettingsStore((s) => s.globalShortcut)
-  const swapCloseShortcuts = useSettingsStore((s) => s.swapCloseShortcuts)
+  const { data } = useSettingsSnapshotQuery()
+  if (!data) return null
+  const globalShortcut = data.globalShortcut
+  const swapCloseShortcuts = data.swapCloseShortcuts
   return (
     <>
       <SettingsGroup label={t('settings.shortcuts')}>

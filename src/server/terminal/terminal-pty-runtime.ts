@@ -40,7 +40,11 @@ export function spawnTerminalPtyRuntime(input: SpawnTerminalPtyRuntimeInput): Sp
 }
 
 class NodePtyTerminalRuntime implements TerminalPtyRuntime {
-  constructor(private readonly term: pty.IPty) {}
+  private readonly term: pty.IPty
+
+  constructor(term: pty.IPty) {
+    this.term = term
+  }
 
   write(data: string): void {
     this.term.write(data)

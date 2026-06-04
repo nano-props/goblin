@@ -111,11 +111,12 @@ export function createRendererEntryUrl({ entryHtml = 'index.html', routePath = '
 export function configureTrustedRendererWindow(win: BrowserWindow, logLabel: string): void {
   win.webContents.on('will-navigate', (event, nextUrl) => {
     // Renderer windows are expected to stay on their bootstrap entry and
-    // route internally via app state / hash updates, not full-frame
-    // navigations. We still allow the exact entry URL that main explicitly
-    // bound to this webContents so dev/prod reloads and same-entry refresh
-    // remain possible. With the embedded app server + history routing we now
-    // trust the app origin, not individual hash-entry files.
+    // route internally via app state / browser-history updates, not
+    // arbitrary full-frame navigations. We still allow the exact entry URL
+    // that main explicitly bound to this webContents so dev/prod reloads and
+    // same-entry refresh remain possible. With the embedded app server +
+    // history routing we now trust the app origin, not individual entry
+    // files.
     if (!isTrustedAppUrlForWebContents(win.webContents.id, nextUrl)) event.preventDefault()
   })
   win.webContents.setWindowOpenHandler(({ url: nextUrl }) => {

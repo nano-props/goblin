@@ -34,7 +34,6 @@ describe('useAppBootstrap', () => {
   test('canonicalizes boot session layout before applying it to the repos store', async () => {
     vi.spyOn(useThemeStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
-    vi.spyOn(useSettingsStore.getState(), 'hydrateExternalApps').mockResolvedValue(undefined)
     vi.spyOn(useSettingsStore.getState(), 'hydrate').mockResolvedValue({
       openRepos: [{ kind: 'local', id: '/tmp/repo' }],
       activeRepo: '/tmp/repo',

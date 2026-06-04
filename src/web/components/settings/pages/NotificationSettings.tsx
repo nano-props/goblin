@@ -3,13 +3,15 @@ import { toast } from 'sonner'
 import { Button } from '#/web/components/ui/button.tsx'
 import { Switch } from '#/web/components/ui/switch.tsx'
 import { SettingsGroup, SettingsList, SettingsRow } from '#/web/components/settings/SettingsPrimitives.tsx'
+import { useSetTerminalNotificationsEnabledMutation, useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { useSettingsStore } from '#/web/stores/settings.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 export function NotificationSettings() {
   const t = useT()
-  const terminalNotificationsEnabled = useSettingsStore((s) => s.terminalNotificationsEnabled)
-  const setTerminalNotificationsEnabled = useSettingsStore((s) => s.setTerminalNotificationsEnabled)
+  const { data } = useSettingsSnapshotQuery()
+  if (!data) return null
+  const terminalNotificationsEnabled = data.terminalNotificationsEnabled
+  const setTerminalNotificationsEnabled = useSetTerminalNotificationsEnabledMutation()
   const [testingTerminalNotification, setTestingTerminalNotification] = useState(false)
 
   const save = (fn: () => Promise<unknown>, label: string) => {
@@ -53,7 +55,7 @@ export function NotificationSettings() {
               id="settings-terminal-notifications"
               checked={terminalNotificationsEnabled}
               onCheckedChange={(enabled) =>
-                save(() => setTerminalNotificationsEnabled(enabled), 'terminal notifications')
+                save(() => setTerminalNotificationsEnabled.mutateAsync(enabled), 'terminal notifications')
               }
               aria-label={t('settings.terminal-notifications')}
             />

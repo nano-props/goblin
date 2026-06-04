@@ -1,19 +1,17 @@
-import { useMutation } from '@tanstack/react-query'
 import {
   SettingsGroup,
   SettingsList,
   SettingsRow,
   SettingsSelect,
 } from '#/web/components/settings/SettingsPrimitives.tsx'
+import { useSetFetchIntervalMutation, useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { useSettingsStore } from '#/web/stores/settings.ts'
 export function SyncSettings() {
   const t = useT()
-  const fetchInterval = useSettingsStore((s) => s.fetchIntervalSec)
-  const setFetchIntervalSec = useSettingsStore((s) => s.setFetchInterval)
-  const setFetchInterval = useMutation({
-    mutationFn: (sec: number) => setFetchIntervalSec(sec),
-  })
+  const { data } = useSettingsSnapshotQuery()
+  if (!data) return null
+  const fetchInterval = data.fetchIntervalSec
+  const setFetchInterval = useSetFetchIntervalMutation()
   const intervalOptions: { value: number; labelKey: string }[] = [
     { value: 0, labelKey: 'settings.fetch.off' },
     { value: 30, labelKey: 'settings.fetch.30s' },

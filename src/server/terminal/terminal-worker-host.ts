@@ -62,6 +62,7 @@ function defaultSpawnWorker(workerEntry: string): TerminalWorkerChildProcess {
 }
 
 export class WorkerBackedTerminalHost implements ServerTerminalHost {
+  private readonly options: WorkerBackedTerminalHostOptions
   private worker: TerminalWorkerChildProcess | null = null
   private readonly pending = new Map<string, PendingRequest<unknown>>()
   private readonly sockets = new Map<string, ServerTerminalSocket>()
@@ -75,7 +76,9 @@ export class WorkerBackedTerminalHost implements ServerTerminalHost {
   private lastExitSignal: NodeJS.Signals | null = null
   private lastWorkerFailure: { kind: 'exit' | 'error' | 'send-failed'; at: number; detail: string } | null = null
 
-  constructor(private readonly options: WorkerBackedTerminalHostOptions = {}) {}
+  constructor(options: WorkerBackedTerminalHostOptions = {}) {
+    this.options = options
+  }
 
   isValidClientId(value: unknown): value is string {
     return isValidTerminalClientId(value)

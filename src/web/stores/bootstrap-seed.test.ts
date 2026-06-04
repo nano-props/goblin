@@ -27,7 +27,7 @@ describe('renderer bootstrap seeding', () => {
     vi.resetModules()
   })
 
-  test('seeds settings store from preload bootstrap including editorApp', async () => {
+  test('settings store no longer mirrors preload settings payload', async () => {
     installBridge({
       initialSettings: {
         fetchIntervalSec: 300,
@@ -45,18 +45,7 @@ describe('renderer bootstrap seeding', () => {
 
     const { useSettingsStore } = await import('#/web/stores/settings.ts')
 
-    expect(useSettingsStore.getState()).toMatchObject({
-      fetchIntervalSec: 300,
-      terminalNotificationsEnabled: true,
-      shortcutsDisabled: true,
-      globalShortcutDisabled: true,
-      swapCloseShortcuts: true,
-      toggleDetailOnActionBarBlankClick: true,
-      globalShortcut: 'CommandOrControl+Alt+G',
-      globalShortcutRegistered: true,
-      terminalApp: 'ghostty',
-      editorApp: 'cursor',
-    })
+    expect(useSettingsStore.getState()).toMatchObject({ bootSessionSnapshot: null })
   })
 
   test('seeds i18n store from preload bootstrap including pref', async () => {

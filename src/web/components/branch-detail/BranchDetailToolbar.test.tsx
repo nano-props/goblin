@@ -2,6 +2,7 @@
 
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchDetailToolbar } from '#/web/components/branch-detail/BranchDetailToolbar.tsx'
 import { getSelectedBranchDetailPresentation } from '#/web/components/branch-detail/model.ts'
@@ -18,6 +19,7 @@ const WORKTREE_PATH = '/tmp/gbl-branch-detail-toolbar-worktree'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
+let queryClient: QueryClient | null = null
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 
 beforeEach(() => {
@@ -33,6 +35,7 @@ afterEach(() => {
   container?.remove()
   root = null
   container = null
+  queryClient = null
   setRendererBridgeForTests(null)
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
@@ -97,21 +100,24 @@ function renderToolbar(options: { terminalCount: number; navigation: MainWindowN
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
+  queryClient = new QueryClient()
   act(() => {
     root!.render(
-      <MainWindowNavigationProvider value={options.navigation}>
-        <TerminalSessionReadContext.Provider value={readContext}>
-          <BranchDetailToolbar
-            repo={repo}
-            detail={detail}
-            detailId="detail"
-            contentId="content"
-            collapsed={false}
-            focusMode={false}
-            layout={DEFAULT_WORKSPACE_LAYOUT}
-          />
-        </TerminalSessionReadContext.Provider>
-      </MainWindowNavigationProvider>,
+      <QueryClientProvider client={queryClient!}>
+        <MainWindowNavigationProvider value={options.navigation}>
+          <TerminalSessionReadContext.Provider value={readContext}>
+            <BranchDetailToolbar
+              repo={repo}
+              detail={detail}
+              detailId="detail"
+              contentId="content"
+              collapsed={false}
+              focusMode={false}
+              layout={DEFAULT_WORKSPACE_LAYOUT}
+            />
+          </TerminalSessionReadContext.Provider>
+        </MainWindowNavigationProvider>
+      </QueryClientProvider>,
     )
   })
 

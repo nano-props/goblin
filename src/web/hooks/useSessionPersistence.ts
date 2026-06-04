@@ -4,11 +4,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { sessionStateFromPersistableWorkspaceUi } from '#/web/workspace-ui-persistence-state.ts'
 const SESSION_SAVE_DEBOUNCE_MS = 200
 
-interface UseSessionPersistenceOptions {
-  routeRepoId?: string | null
-}
-
-export function useSessionPersistence({ routeRepoId = null }: UseSessionPersistenceOptions = {}) {
+export function useSessionPersistence() {
   const activeId = useReposStore((s) => s.activeId)
   const order = useReposStore((s) => s.order)
   const detailCollapsed = useReposStore((s) => s.detailCollapsed)
@@ -27,7 +23,6 @@ export function useSessionPersistence({ routeRepoId = null }: UseSessionPersiste
     // state with an empty pre-bootstrap workspace.
     if (!sessionReady) return
     const session = sessionStateFromPersistableWorkspaceUi({
-      routeRepoId,
       repos,
       persistableWorkspaceUiState: {
         order,
@@ -66,7 +61,6 @@ export function useSessionPersistence({ routeRepoId = null }: UseSessionPersiste
     return () => window.clearTimeout(timeout)
   }, [
     sessionReady,
-    routeRepoId,
     order,
     activeId,
     detailCollapsed,

@@ -11,6 +11,7 @@ import {
   type Tone,
 } from '#/web/components/branch-detail/status-ui.tsx'
 import { formatRelativeTime } from '#/web/lib/dates.ts'
+import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { formatWorktreePath } from '#/web/lib/paths.ts'
 import { PROTECTED_BRANCHES, branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import type { SelectedBranchDetail } from '#/web/components/branch-detail/model.ts'
@@ -67,6 +68,7 @@ function SyncValue({
 export function BranchStatus({ detail, layout }: Props) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
+  const compact = useIsCompactUi()
   const { branch, statusCount } = detail
   const behavior = repoWorkspaceBehavior(layout, false)
   if (!branch) return <EmptyState title={t('branches.empty')} />
@@ -217,7 +219,7 @@ export function BranchStatus({ detail, layout }: Props) {
           tone={mergeTone}
         />
       )}
-      <PullRequestStatusRow pullRequest={pullRequest} tooltipSide={behavior.prTooltipSide} />
+      <PullRequestStatusRow pullRequest={pullRequest} tooltipSide={compact ? 'top' : behavior.prTooltipSide} />
     </StatusRows>
   )
 }

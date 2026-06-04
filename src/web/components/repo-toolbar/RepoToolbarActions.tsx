@@ -18,6 +18,7 @@ import { Tip } from '#/web/components/Tip.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { CreateWorktreeDialog, type CreateWorktreeRequest } from '#/web/components/CreateWorktreeDialog.tsx'
 import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivityControl.tsx'
+import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import type { ExecResult } from '#/shared/git-types.ts'
 
 interface Props {
@@ -25,15 +26,16 @@ interface Props {
 }
 
 export function RepoToolbarActions({ repoId }: Props) {
+  const compact = useIsCompactUi()
   return (
     <div className="flex items-center gap-1">
       <RepoActivityControl repoId={repoId} />
-      <CreateWorktreeAction repoId={repoId} />
+      <CreateWorktreeAction repoId={repoId} compact={compact} />
     </div>
   )
 }
 
-function CreateWorktreeAction({ repoId }: Props) {
+function CreateWorktreeAction({ repoId, compact }: Props & { compact: boolean }) {
   const t = useT()
   const runBranchAction = useReposStore((s) => s.runBranchAction)
   const repo = useStoreWithEqualityFn(
@@ -99,7 +101,7 @@ function CreateWorktreeAction({ repoId }: Props) {
             aria-label={createTip}
           >
             <FolderPlus />
-            {t('action.create-worktree')}
+            {!compact && t('action.create-worktree')}
           </Button>
         </span>
       </Tip>

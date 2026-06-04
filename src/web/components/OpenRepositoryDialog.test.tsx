@@ -47,6 +47,18 @@ afterEach(() => {
 })
 
 describe('OpenRepositoryDialog', () => {
+  test('focuses the repository path input when opened', () => {
+    render(
+      <OpenRepositoryDialog
+        open
+        onClose={vi.fn()}
+        onOpen={vi.fn(async () => ({ ok: true as const, id: '/Users/tester/Developer/repo' }))}
+      />,
+    )
+
+    expect(document.activeElement).toBe(input('#open-repo-path'))
+  })
+
   test('waits for open success before closing', async () => {
     const deferred = createDeferred<OpenRepoResult>()
     const onClose = vi.fn()

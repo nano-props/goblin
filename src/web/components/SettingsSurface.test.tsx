@@ -117,13 +117,35 @@ beforeEach(() => {
   testWindow.__GOBLIN_BOOTSTRAP__ = {
     homeDir: '/Users/tester',
     initialI18n: null,
-    initialSettings: null,
+    initialSettings: {
+      fetchIntervalSec: 60,
+      terminalNotificationsEnabled: false,
+      shortcutsDisabled: false,
+      globalShortcutDisabled: false,
+      swapCloseShortcuts: false,
+      toggleDetailOnActionBarBlankClick: false,
+      globalShortcut: 'CommandOrControl+Shift+G',
+      globalShortcutRegistered: true,
+      terminalApp: 'auto',
+      editorApp: 'auto',
+    },
     initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
   }
   testWindow.goblinNative = {
     homeDir: '/Users/tester',
     initialI18n: null,
-    initialSettings: null,
+    initialSettings: {
+      fetchIntervalSec: 60,
+      terminalNotificationsEnabled: false,
+      shortcutsDisabled: false,
+      globalShortcutDisabled: false,
+      swapCloseShortcuts: false,
+      toggleDetailOnActionBarBlankClick: false,
+      globalShortcut: 'CommandOrControl+Shift+G',
+      globalShortcutRegistered: true,
+      terminalApp: 'auto',
+      editorApp: 'auto',
+    },
     initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
     pathForFile: () => '',
     invokeRpc,
@@ -145,11 +167,6 @@ beforeEach(() => {
       onExit: vi.fn(() => () => {}),
     },
   }
-  useSettingsStore.setState({
-    githubCliAvailable: true,
-    githubCliVersion: 'gh version 2.93.0',
-    githubCliHosts: {},
-  })
 })
 
 afterEach(() => {
@@ -193,36 +210,34 @@ describe('SettingsSurface', () => {
     })
   })
 
-  test('reflects notification preference changes directly from the settings store', async () => {
-    useSettingsStore.setState({ terminalNotificationsEnabled: false })
+  test('reflects notification preference from the settings query', async () => {
+    fetchMock.mockImplementation(async (input: string | URL) => {
+      const url = new URL(typeof input === 'string' ? input : input.toString())
+      let result: unknown = null
+      if (url.pathname === '/api/settings') {
+        result = {
+          ...defaultRpcResult('settings.get'),
+          terminalNotificationsEnabled: true,
+        }
+      } else if (url.pathname === '/api/settings/github-cli') {
+        result = defaultRpcResult('githubCli.get', { hosts: url.searchParams.getAll('host') })
+      } else if (url.pathname === '/api/settings/external-apps') {
+        result = defaultRpcResult('externalApps.get')
+      }
+      return {
+        ok: true,
+        json: async () => result,
+      }
+    })
     await render(<SettingsSurface page="notifications" onPageChange={() => {}} />)
 
-    expect(switchById('settings-terminal-notifications').getAttribute('aria-checked')).toBe('false')
-
-    await act(async () => {
-      useSettingsStore.setState({ terminalNotificationsEnabled: true })
-      await Promise.resolve()
-    })
-
-    expect(switchById('settings-terminal-notifications').getAttribute('aria-checked')).toBe('true')
+    await waitForSwitchState('settings-terminal-notifications', 'true')
   })
 
   test('shows GitHub CLI availability and version', async () => {
-    useSettingsStore.setState({
-      githubCliAvailable: true,
-      githubCliVersion: 'gh version 2.93.0',
-      githubCliHosts: {
-        'github.example.com': {
-          host: 'github.example.com',
-          authenticated: true,
-          activeLogin: 'tester',
-          logins: ['tester'],
-          tokenSource: 'keyring',
-        },
-      },
-    })
     await render(<SettingsSurface page="github" onPageChange={() => {}} />)
 
+    await waitForText('settings.github.status-available')
     expect(document.body.textContent).toContain('settings.github.status-available')
     expect(document.body.textContent).toContain('gh version 2.93.0')
     expect(document.body.textContent).toContain('github.example.com')
@@ -250,23 +265,22 @@ describe('SettingsSurface', () => {
   })
 
   test('shows unavailable GitHub CLI status when gh is missing', async () => {
-    invokeRpc.mockImplementation(async ({ path, input }: { path: string; input?: unknown }) => {
-      if (path === 'githubCli.get' || path === 'githubCli.refresh') {
-        const requestedHosts = (input as { hosts?: string[] } | undefined)?.hosts
-        const hosts = (requestedHosts && requestedHosts.length > 0 ? requestedHosts : []).reduce<
-          Record<string, unknown>
-        >((acc, host) => {
-          acc[host] = { host, authenticated: false, activeLogin: null, logins: [], tokenSource: null }
-          return acc
-        }, {})
-        return { available: false, version: null, detectedAt: 0, hosts }
+    fetchMock.mockImplementation(async (input: string | URL, init?: RequestInit) => {
+      const url = new URL(typeof input === 'string' ? input : input.toString())
+      let result: unknown = null
+      if (url.pathname === '/api/settings/github-cli/refresh') {
+        result = { available: false, version: null, detectedAt: 0, hosts: {} }
+      } else if (url.pathname === '/api/settings/github-cli') {
+        result = { available: false, version: null, detectedAt: 0, hosts: {} }
+      } else if (url.pathname === '/api/settings') {
+        result = defaultRpcResult('settings.get')
+      } else if (url.pathname === '/api/settings/external-apps') {
+        result = defaultRpcResult(init?.method === 'POST' ? 'externalApps.refresh' : 'externalApps.get')
       }
-      return defaultRpcResult(path, input)
-    })
-    useSettingsStore.setState({
-      githubCliAvailable: false,
-      githubCliVersion: null,
-      githubCliHosts: {},
+      return {
+        ok: true,
+        json: async () => result,
+      }
     })
     await render(<SettingsSurface page="github" onPageChange={() => {}} />)
 
@@ -324,4 +338,15 @@ function switchById(id: string): HTMLButtonElement {
   const match = document.getElementById(id)
   if (!(match instanceof HTMLButtonElement)) throw new Error(`Missing switch with id: ${id}`)
   return match
+}
+
+async function waitForSwitchState(id: string, checked: 'true' | 'false') {
+  for (let i = 0; i < 5; i += 1) {
+    if (switchById(id).getAttribute('aria-checked') === checked) return
+    await act(async () => {
+      await Promise.resolve()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+  }
+  throw new Error(`Switch ${id} did not reach ${checked}`)
 }

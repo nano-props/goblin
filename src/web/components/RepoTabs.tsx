@@ -11,11 +11,11 @@ import { toast } from 'sonner'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { useSettingsStore } from '#/web/stores/settings.ts'
 import { RepoTabStrip } from '#/web/components/repo-tabs/RepoTabStrip.tsx'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import type { RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
 import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
+import { useRuntimeShortcutSettings } from '#/web/runtime-settings-hooks.ts'
 
 /** Equality fn for the summaries array. Zustand's `useShallow` does
  *  Object.is on each element — but we re-create the inner objects
@@ -49,7 +49,7 @@ interface RepoTabsProps {
 
 export function RepoTabs({ currentRepoId, onOpenRepoPathDialog, onOpenRemote, onClone }: RepoTabsProps) {
   const t = useT()
-  const shortcutsDisabled = useSettingsStore((s) => s.shortcutsDisabled)
+  const { shortcutsDisabled } = useRuntimeShortcutSettings()
   // Build the summary array inside the selector but compare with our
   // explicit equality fn so re-derivations with identical contents
   // don't trigger a re-render. Zustand v5's primary `useReposStore`
