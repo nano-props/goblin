@@ -1,6 +1,4 @@
 import { spawn, type ChildProcess } from 'node:child_process'
-import { existsSync } from 'node:fs'
-import path from 'node:path'
 import crypto from 'node:crypto'
 import type {
   TerminalAttachInput,
@@ -39,6 +37,7 @@ type TerminalWorkerChildProcess = ChildProcess & {
 }
 
 export interface WorkerBackedTerminalHostOptions {
+  workerEntry?: string
   spawnWorker?: () => TerminalWorkerChildProcess
   now?: () => number
   setTimer?: (callback: () => void, delayMs: number) => WorkerTimerHandle
@@ -55,14 +54,8 @@ function isValidTerminalClientId(value: unknown): value is string {
   return typeof value === 'string' && TERMINAL_CLIENT_ID_RE.test(value)
 }
 
-function resolveTerminalWorkerEntry(): string {
-  const built = path.resolve(import.meta.dirname, 'terminal', 'terminal-worker.js')
-  if (existsSync(built)) return built
-  return path.resolve(import.meta.dirname, 'terminal-worker.ts')
-}
-
-function defaultSpawnWorker(): TerminalWorkerChildProcess {
-  return spawn(process.execPath, [resolveTerminalWorkerEntry()], {
+function defaultSpawnWorker(workerEntry: string): TerminalWorkerChildProcess {
+  return spawn(process.execPath, [workerEntry], {
     env: process.env,
     stdio: ['ignore', 'ignore', 'inherit', 'ipc'],
   })
@@ -236,7 +229,7 @@ export class WorkerBackedTerminalHost implements ServerTerminalHost {
   private ensureWorker(): TerminalWorkerChildProcess {
     this.clearRestartTimer()
     if (this.worker) return this.worker
-    const worker = (this.options.spawnWorker ?? defaultSpawnWorker)()
+    const worker = this.options.spawnWorker?.() ?? defaultSpawnWorker(this.resolveWorkerEntry())
     this.workerStartedAt = this.now()
     terminalWorkerLogger.info(
       { pid: worker.pid, restartAttempts: this.restartAttempts, sockets: this.socketMeta.size },
@@ -367,6 +360,12 @@ export class WorkerBackedTerminalHost implements ServerTerminalHost {
   private unavailableMessage(): string {
     if (!this.lastWorkerFailure) return 'Terminal worker unavailable'
     return `Terminal worker unavailable (${this.lastWorkerFailure.kind}: ${this.lastWorkerFailure.detail})`
+  }
+
+  private resolveWorkerEntry(): string {
+    const workerEntry = this.options.workerEntry?.trim()
+    if (workerEntry) return workerEntry
+    throw new Error('Terminal worker entry is required when spawnWorker is not provided')
   }
 }
 

@@ -2,6 +2,7 @@ import { serve } from '@hono/node-server'
 import { WebSocketServer } from 'ws'
 import { serverLogger } from '#/server/logger.ts'
 import { createServerRuntime } from '#/server/runtime.ts'
+import { resolveTerminalWorkerEntry } from '#/server/terminal/terminal-worker-entry.ts'
 
 const DEFAULT_HOST = '127.0.0.1'
 const DEFAULT_PORT = 32100
@@ -17,14 +18,24 @@ export interface BootstrappedServer {
   stop(): void
 }
 
-export function bootstrapServer(): BootstrappedServer {
+export interface BootstrapServerOptions {
+  terminalWorkerDir?: string
+  terminalWorkerEntry?: string
+}
+
+export function bootstrapServer(options: BootstrapServerOptions = {}): BootstrappedServer {
   const startedAt = Date.now()
   const hostname = process.env.GOBLIN_SERVER_HOST?.trim() || DEFAULT_HOST
   const port = parsePort(process.env.GOBLIN_SERVER_PORT)
+  const terminalWorkerEntry =
+    options.terminalWorkerEntry ??
+    (options.terminalWorkerDir ? resolveTerminalWorkerEntry(options.terminalWorkerDir) : null)
+  if (!terminalWorkerEntry) throw new Error('terminal worker entry or dir is required')
   const runtime = createServerRuntime({
     version: process.env.npm_package_version?.trim() || '0.1.0',
     startedAt,
     internalSecret: process.env.GOBLIN_SERVER_INTERNAL_SECRET?.trim() || '',
+    terminalWorkerEntry,
   })
   const websocket = new WebSocketServer({ noServer: true })
   const server = serve({
@@ -54,5 +65,3 @@ export function bootstrapServer(): BootstrappedServer {
     stop: shutdown,
   }
 }
-
-if (import.meta.main) bootstrapServer()

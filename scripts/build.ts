@@ -70,7 +70,7 @@ if (!existsSync(serverDistEntry)) {
   console.error(`Error: server build artifact missing: ${serverDistEntry}`)
   process.exit(1)
 }
-const terminalWorkerDistEntry = path.join(repoRoot, 'dist/server/terminal/terminal-worker.js')
+const terminalWorkerDistEntry = path.join(repoRoot, 'dist/server/terminal-worker.js')
 if (!existsSync(terminalWorkerDistEntry)) {
   console.error(`Error: server build artifact missing: ${terminalWorkerDistEntry}`)
   process.exit(1)

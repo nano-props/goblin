@@ -211,4 +211,13 @@ describe('worker-backed terminal host', () => {
       lastSuccessfulResponseAt: 2_000,
     })
   })
+
+  test('requires an explicit worker entry when using the default spawner', () => {
+    const host = new WorkerBackedTerminalHost()
+    const socket: ServerTerminalSocket = { send: vi.fn(), close: vi.fn() }
+
+    expect(() => host.registerSocket('client_1', 'attachment_a', socket)).toThrow(
+      'Terminal worker entry is required when spawnWorker is not provided',
+    )
+  })
 })

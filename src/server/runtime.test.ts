@@ -17,7 +17,7 @@ vi.mock('#/server/modules/background-sync.ts', () => ({
 
 vi.mock('#/server/terminal/terminal-worker-host.ts', () => ({
   WorkerBackedTerminalHost: class {
-    constructor() {
+    constructor(options?: unknown) {
       const host = {
         isValidClientId: (_value: unknown): _value is string => true,
         getDiagnostics: vi.fn(),
@@ -36,7 +36,7 @@ vi.mock('#/server/terminal/terminal-worker-host.ts', () => ({
         getSessionSnapshot: vi.fn(),
         shutdown: vi.fn(),
       }
-      mocks.workerHostCtor(host)
+      mocks.workerHostCtor({ host, options })
       return host
     }
   },
@@ -74,10 +74,15 @@ describe('server runtime', () => {
       version: '0.1.0',
       startedAt: 1,
       internalSecret: 'secret',
+      terminalWorkerEntry: '/tmp/entrypoints/terminal-worker.ts',
     })
 
     expect(mocks.workerHostCtor).toHaveBeenCalledTimes(1)
-    expect(runtime.terminalHost).toBe(mocks.workerHostCtor.mock.calls[0]?.[0])
+    expect(runtime.terminalHost).toBe(mocks.workerHostCtor.mock.calls[0]?.[0]?.host)
+    expect(mocks.workerHostCtor).toHaveBeenCalledWith({
+      host: runtime.terminalHost,
+      options: { workerEntry: '/tmp/entrypoints/terminal-worker.ts' },
+    })
     expect(mocks.createApp).toHaveBeenCalledWith({
       version: '0.1.0',
       startedAt: 1,

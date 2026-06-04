@@ -6,6 +6,7 @@ import { WorkerBackedTerminalHost } from '#/server/terminal/terminal-worker-host
 
 export interface ServerRuntimeOptions extends Omit<ServerAppOptions, 'terminalHost'> {
   terminalHost?: ServerTerminalHost
+  terminalWorkerEntry?: string
 }
 
 export interface ServerRuntime {
@@ -15,8 +16,9 @@ export interface ServerRuntime {
 }
 
 export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntime {
-  const terminalHost = options.terminalHost ?? new WorkerBackedTerminalHost()
-  const app = createApp({ ...options, terminalHost })
+  const { terminalHost: providedTerminalHost, terminalWorkerEntry, ...appOptions } = options
+  const terminalHost = providedTerminalHost ?? new WorkerBackedTerminalHost({ workerEntry: terminalWorkerEntry })
+  const app = createApp({ ...appOptions, terminalHost })
   let stopped = false
   return {
     app,

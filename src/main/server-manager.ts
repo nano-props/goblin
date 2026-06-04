@@ -37,7 +37,7 @@ function embeddedServerEnabled(): boolean {
 function serverEntryPath(): string {
   return app.isPackaged
     ? path.join(app.getAppPath(), 'dist/server/main.js')
-    : path.join(app.getAppPath(), 'src/server/main.ts')
+    : path.join(app.getAppPath(), 'src/server/entrypoints/main.ts')
 }
 
 function serverWorkingDirectory(): string {
