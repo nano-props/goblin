@@ -15,6 +15,7 @@ import {
   isBranchActionBlocked,
   type BranchActionItemId,
 } from '#/web/hooks/branch-action-state.ts'
+import { openBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
 import { useRetainedDialogState } from '#/web/hooks/useRetainedDialogState.ts'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
@@ -166,7 +167,7 @@ export function useBranchActions(repo: RepoState, branch: RepoBranchState) {
   }
 
   function openRemote() {
-    return runUiAction('remote', () => openRepositoryRemote(repo.id, branch.name))
+    return runUiAction('remote', () => openBranchExternalTarget(repo.id, branch))
   }
 
   function requestDeleteBranch() {
