@@ -14,7 +14,7 @@
     "start": "bun run build:web && electron .",
     "build": "bun scripts/build.ts",
     "build:web": "vite build",
-    "build:server": "bun build ./src/server/main.ts --outdir ./dist/server --target node --external node-pty",
+    "build:server": "bun build ./src/server/main.ts ./src/server/terminal/terminal-worker.ts --outdir ./dist/server --target node --external node-pty",
     "start:server": "node scripts/start-server.ts",
     "build:electron": "electron-builder",
     "check:architecture": "bun scripts/check-architecture.ts",

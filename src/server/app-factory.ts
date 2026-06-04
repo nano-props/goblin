@@ -12,6 +12,7 @@ import { createRealtimeRoutes } from '#/server/routes/realtime.ts'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
 import { createSettingsRoutes } from '#/server/routes/settings.ts'
 import { createTerminalRoutes } from '#/server/routes/terminal.ts'
+import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import { getServerSettingsPrefs } from '#/server/modules/settings-source.ts'
 import { createRendererBootstrapSnapshot, toInitialServerSnapshot } from '#/shared/bootstrap-builders.ts'
 import { DICTS } from '#/shared/i18n/dictionaries.ts'
@@ -23,6 +24,7 @@ export interface ServerAppOptions {
   version: string
   startedAt: number
   internalSecret: string
+  terminalHost: ServerTerminalHost
 }
 
 const WEB_DIST_DIR = path.resolve(import.meta.dirname, '../../dist/web')
@@ -108,7 +110,7 @@ export function createApp(options: ServerAppOptions): Hono {
       allowMethods: ['GET', 'POST', 'OPTIONS'],
     }),
   )
-  app.route('/api', createHealthRoutes({ version: options.version, startedAt: options.startedAt }))
+  app.route('/api', createHealthRoutes({ version: options.version, startedAt: options.startedAt, terminalHost: options.terminalHost }))
   app.use('/api/settings/*', createInternalAuthMiddleware(options.internalSecret))
   app.use('/api/remote/*', createInternalAuthMiddleware(options.internalSecret))
   app.use('/api/repo/*', createInternalAuthMiddleware(options.internalSecret))
@@ -116,8 +118,8 @@ export function createApp(options: ServerAppOptions): Hono {
   app.route('/api/settings', createSettingsRoutes())
   app.route('/api/remote', createRemoteRoutes())
   app.route('/api/repo', createRepoRoutes())
-  app.route('/api/terminal', createTerminalRoutes())
-  app.route('/ws', createRealtimeRoutes({ internalSecret: options.internalSecret }))
+  app.route('/api/terminal', createTerminalRoutes(options.terminalHost))
+  app.route('/ws', createRealtimeRoutes({ internalSecret: options.internalSecret, terminalHost: options.terminalHost }))
   app.get('/', async (c) => {
     try {
       return c.html(

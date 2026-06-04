@@ -1,15 +1,10 @@
 import crypto from 'node:crypto'
 import path from 'node:path'
-import * as pty from 'node-pty'
-import * as xtermHeadlessImport from '@xterm/headless'
-import type { SerializeAddon as XTermSerializeAddon } from '@xterm/addon-serialize'
-import { SerializeAddon } from '@xterm/addon-serialize'
 import {
   cloneTerminalController,
   normalizeTerminalSize,
   type TerminalAttachResult,
   type TerminalController,
-  type TerminalControllerStatus,
   type TerminalExitEvent,
   type TerminalOwnershipEvent,
   type TerminalOutputEvent,
@@ -17,8 +12,30 @@ import {
   type TerminalSessionSummary,
   type TerminalTakeoverResult,
 } from '#/shared/terminal.ts'
+import {
+  attachTerminalAttachment,
+  claimTerminalAttachmentControl,
+  registerTerminalAttachment,
+  releaseTerminalAttachmentControl,
+  restartTerminalAttachmentControl,
+  type TerminalAttachmentState,
+  updateTerminalAttachmentConnection,
+} from '#/server/terminal/terminal-ownership.ts'
+import {
+  appendTerminalReplayData,
+  bindTerminalRenderTitle,
+  createEmptyTerminalRenderState,
+  createTerminalRenderModel,
+  disposeTerminalRenderState,
+  maybeClearCanonicalTitleOnShellReturn,
+  queueTerminalRenderResize,
+  queueTerminalRenderWrite,
+  resetTerminalRenderState,
+  snapshotTerminalRenderState,
+  type TerminalRenderState,
+} from '#/server/terminal/terminal-render-state.ts'
+import { spawnTerminalPtyRuntime, type TerminalPtyRuntime } from '#/server/terminal/terminal-pty-runtime.ts'
 
-const MAX_SESSION_BUFFER_CHARS = 16 * 1024 * 1024
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 const SESSION_ID_RE = /^[A-Za-z0-9_-]{16,64}$/
 
@@ -36,12 +53,6 @@ export interface TerminalEnsureSessionInput<TOwner extends string | number> {
   args?: string[]
 }
 
-interface TerminalAttachment {
-  cols: number
-  rows: number
-  connected: boolean
-}
-
 interface TerminalSession<TOwner extends string | number> {
   id: string
   ownerId: TOwner
@@ -52,38 +63,14 @@ interface TerminalSession<TOwner extends string | number> {
   args?: string[]
   cols: number
   rows: number
-  pty: pty.IPty | null
+  pty: TerminalPtyRuntime | null
   disposables: Array<{ dispose: () => void }>
-  buffer: string
-  bufferTruncated: boolean
-  sequence: number
+  render: TerminalRenderState
   processName: string
-  canonicalTitle: string | null
-  titleEventVersion: number
-  renderModel: TerminalRenderModel | null
-  attachments: Map<string, TerminalAttachment>
+  attachments: Map<string, TerminalAttachmentState>
   controller: TerminalController | null
   allowImplicitAttachControl: boolean
 }
-
-interface HeadlessTerminalLike {
-  write(data: string | Uint8Array, callback?: () => void): void
-  resize(cols: number, rows: number): void
-  loadAddon(addon: XTermSerializeAddon): void
-  onTitleChange(listener: (title: string) => void): { dispose(): void }
-  dispose(): void
-}
-
-interface TerminalRenderModel {
-  term: HeadlessTerminalLike
-  serializeAddon: XTermSerializeAddon
-  chain: Promise<void>
-}
-
-const headlessModule = ('default' in xtermHeadlessImport ? xtermHeadlessImport.default : xtermHeadlessImport) as {
-  Terminal: new (options?: { cols?: number; rows?: number; scrollback?: number; allowProposedApi?: boolean }) => HeadlessTerminalLike
-}
-const { Terminal: HeadlessTerminal } = headlessModule
 
 export interface TerminalEventSink<TOwner extends string | number> {
   onOutput(ownerId: TOwner, event: TerminalOutputEvent): void
@@ -114,7 +101,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     const existing = existingId ? this.sessionsById.get(existingId) : undefined
     if (existing) {
       if (input.attachmentId) {
-        registerAttachment(existing, input.attachmentId, size.cols, size.rows, input.attachmentConnected)
+        registerTerminalAttachment(existing, input.attachmentId, size.cols, size.rows, input.attachmentConnected)
       } else {
         this.resizeSessionPty(existing, size.cols, size.rows)
       }
@@ -134,13 +121,8 @@ export class TerminalSessionManager<TOwner extends string | number> {
       rows: size.rows,
       pty: null,
       disposables: [],
-      buffer: '',
-      bufferTruncated: false,
-      sequence: 0,
+      render: createEmptyTerminalRenderState(),
       processName: '',
-      canonicalTitle: null,
-      titleEventVersion: 0,
-      renderModel: null,
       attachments: new Map(),
       controller: null,
       allowImplicitAttachControl: true,
@@ -148,61 +130,17 @@ export class TerminalSessionManager<TOwner extends string | number> {
     this.sessionsById.set(id, session)
     this.sessionIdByOwnerKey.set(ownerKey, id)
     if (input.attachmentId) {
-      registerAttachment(session, input.attachmentId, size.cols, size.rows, input.attachmentConnected ?? true)
+      registerTerminalAttachment(session, input.attachmentId, size.cols, size.rows, input.attachmentConnected ?? true)
       session.controller = session.attachments.get(input.attachmentId)?.connected
         ? { attachmentId: input.attachmentId, status: 'connected' }
         : null
     }
-
-    try {
-      const shell = input.command || process.env.SHELL || (process.platform === 'win32' ? process.env.COMSPEC || 'cmd.exe' : '/bin/zsh')
-      const args = input.args ?? (process.platform === 'win32' ? [] : ['-l'])
-      const env = { ...process.env, TERM: 'xterm-256color' }
-      session.pty = pty.spawn(shell, args, {
-        name: 'xterm-256color',
-        cols: size.cols,
-        rows: size.rows,
-        cwd,
-        env,
-      })
-      session.processName = terminalProcessName(session.pty)
-      session.renderModel = createTerminalRenderModel(size.cols, size.rows)
-      session.disposables.push(bindRenderModelTitle(session, this.sink))
-    } catch (err) {
+    const spawnResult = this.spawnSessionPty(session)
+    if (!spawnResult.ok) {
       this.closeSession(id)
-      return { ok: false, message: err instanceof Error ? err.message : 'error.unknown' }
+      return spawnResult
     }
-
-    session.disposables.push(
-      session.pty.onData((data) => {
-        const seq = appendSessionData(session, data)
-        const previousProcessName = session.processName
-        const processName = terminalProcessName(session.pty)
-        session.processName = processName
-        const canonicalTitleBeforeWrite = session.canonicalTitle
-        const titleEventVersionBeforeWrite = session.titleEventVersion
-        queueRenderWrite(session, data, () => {
-          maybeClearCanonicalTitleOnShellReturn(
-            session,
-            previousProcessName,
-            processName,
-            canonicalTitleBeforeWrite,
-            titleEventVersionBeforeWrite,
-            this.sink,
-          )
-        })
-        this.sink.onOutput(session.ownerId, { sessionId: session.id, data, seq, processName })
-      }),
-    )
-    session.disposables.push(
-      session.pty.onExit(() => {
-        session.pty = null
-        this.sink.onExit(session.ownerId, { sessionId: session.id })
-        this.closeSession(session.id)
-      }),
-    )
-
-    return this.attachResult(session)
+    return spawnResult
   }
 
   writeSession(ownerId: TOwner, sessionId: string, data: string, attachmentId?: string): boolean {
@@ -233,10 +171,8 @@ export class TerminalSessionManager<TOwner extends string | number> {
     const session = this.ownedSession(ownerId, sessionId)
     if (!session) return { ok: false, message: 'error.invalid-arguments' }
     if (attachmentId) {
-      registerAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
-      if (session.controller === null && session.allowImplicitAttachControl && session.attachments.get(attachmentId)?.connected) {
-        this.setControllerAttachment(session, attachmentId)
-      }
+      registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
+      this.applyOwnershipEffect(session, attachTerminalAttachment(session, attachmentId))
     } else {
       this.resizeSessionPty(session, size.cols, size.rows)
     }
@@ -257,7 +193,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     const session = this.ownedSession(ownerId, sessionId)
     if (!session) return false
     if (attachmentId) {
-      registerAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
+      registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
       if (session.controller?.attachmentId !== attachmentId) return false
     }
     return this.resizeSessionPty(session, size.cols, size.rows)
@@ -277,8 +213,8 @@ export class TerminalSessionManager<TOwner extends string | number> {
     const session = this.ownedSession(ownerId, sessionId)
     if (!session) return { ok: false, message: 'error.invalid-arguments' }
     if (attachmentId) {
-      registerAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
-      this.setControllerAttachment(session, attachmentId)
+      registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
+      this.applyOwnershipEffect(session, claimTerminalAttachmentControl(session, attachmentId))
       return this.takeoverResult(session)
     }
     return { ok: false, message: 'error.invalid-arguments' }
@@ -298,11 +234,8 @@ export class TerminalSessionManager<TOwner extends string | number> {
     const session = this.ownedSession(ownerId, sessionId)
     if (!session) return { ok: false, message: 'error.invalid-arguments' }
     if (attachmentId) {
-      registerAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
-      session.controller = session.attachments.get(attachmentId)?.connected
-        ? { attachmentId, status: 'connected' }
-        : null
-      if (session.controller) session.allowImplicitAttachControl = false
+      registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
+      restartTerminalAttachmentControl(session, attachmentId)
     }
     this.resetSessionState(session, size.cols, size.rows)
     const spawnResult = this.spawnSessionPty(session)
@@ -340,39 +273,14 @@ export class TerminalSessionManager<TOwner extends string | number> {
   setAttachmentConnected(ownerId: TOwner, attachmentId: string, connected: boolean): void {
     for (const session of Array.from(this.sessionsById.values())) {
       if (session.ownerId !== ownerId) continue
-      const attachment = session.attachments.get(attachmentId)
-      if (!attachment) continue
-      if (
-        attachment.connected === connected &&
-        (session.controller?.attachmentId !== attachmentId || session.controller?.status === (connected ? 'connected' : 'grace'))
-      ) {
-        continue
-      }
-      attachment.connected = connected
-      if (session.controller?.attachmentId !== attachmentId) {
-        if (connected && session.controller === null && session.allowImplicitAttachControl) {
-          this.setControllerAttachment(session, attachmentId)
-          continue
-        }
-        if (!connected) this.deleteAttachmentIfInactive(session, attachmentId)
-        continue
-      }
-      const nextStatus: Exclude<TerminalControllerStatus, 'none'> = connected ? 'connected' : 'grace'
-      if (session.controller.status === nextStatus) continue
-      session.controller = { attachmentId, status: nextStatus }
-      this.emitOwnership(session)
+      this.applyOwnershipEffect(session, updateTerminalAttachmentConnection(session, attachmentId, connected))
     }
   }
 
   releaseAttachmentControl(ownerId: TOwner, attachmentId: string): void {
     for (const session of Array.from(this.sessionsById.values())) {
-      if (session.ownerId !== ownerId || session.controller?.attachmentId !== attachmentId) continue
-      const attachment = session.attachments.get(attachmentId)
-      if (attachment?.connected) continue
-      session.controller = null
-      session.allowImplicitAttachControl = false
-      session.attachments.delete(attachmentId)
-      this.pruneInactiveAttachments(session)
+      if (session.ownerId !== ownerId) continue
+      if (!releaseTerminalAttachmentControl(session, attachmentId)) continue
       this.emitOwnership(session)
     }
   }
@@ -390,17 +298,8 @@ export class TerminalSessionManager<TOwner extends string | number> {
 
   async snapshotSession(sessionId: string): Promise<TerminalSessionSnapshot | null> {
     const session = this.sessionsById.get(sessionId)
-    if (!session?.renderModel) return null
-    const snapshotSeq = session.sequence
-    const chain = session.renderModel.chain
-    try {
-      await chain
-    } catch {}
-    return {
-      sessionId,
-      snapshot: session.renderModel.serializeAddon.serialize({ excludeAltBuffer: false }),
-      snapshotSeq,
-    }
+    if (!session) return null
+    return await snapshotTerminalRenderState(sessionId, session.render)
   }
 
   async listSessions(scope: string): Promise<TerminalSessionSummary[]> {
@@ -413,7 +312,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
           cwd: session.cwd,
           controller: cloneTerminalController(session.controller),
           processName: session.processName,
-          canonicalTitle: session.canonicalTitle,
+          canonicalTitle: session.render.canonicalTitle,
           cols: session.cols,
           rows: session.rows,
         })
@@ -446,28 +345,13 @@ export class TerminalSessionManager<TOwner extends string | number> {
       session.pty.resize(cols, rows)
       session.cols = cols
       session.rows = rows
-      queueRenderResize(session, cols, rows)
+      queueTerminalRenderResize(session.render, cols, rows)
       this.emitOwnership(session)
       return true
     } catch (err) {
       console.warn('[terminal] failed to resize PTY', err)
       return false
     }
-  }
-
-  private setControllerAttachment(session: TerminalSession<TOwner>, attachmentId: string): void {
-    const attachment = session.attachments.get(attachmentId)
-    if (!attachment) return
-    if (!attachment.connected) {
-      this.deleteAttachmentIfInactive(session, attachmentId)
-      return
-    }
-    const sizeChanged = session.cols !== attachment.cols || session.rows !== attachment.rows
-    session.controller = attachment.connected ? { attachmentId, status: 'connected' } : null
-    session.allowImplicitAttachControl = false
-    this.pruneInactiveAttachments(session)
-    this.resizeSessionPty(session, attachment.cols, attachment.rows)
-    if (!sizeChanged) this.emitOwnership(session)
   }
 
   private takeoverResult(session: TerminalSession<TOwner>): TerminalTakeoverResult {
@@ -484,11 +368,11 @@ export class TerminalSessionManager<TOwner extends string | number> {
     return {
       ok: true,
       sessionId: session.id,
-      replay: session.buffer,
-      replaySeq: session.sequence,
-      replayTruncated: session.bufferTruncated,
+      replay: session.render.buffer,
+      replaySeq: session.render.sequence,
+      replayTruncated: session.render.bufferTruncated,
       processName: session.processName,
-      canonicalTitle: session.canonicalTitle,
+      canonicalTitle: session.render.canonicalTitle,
       controller: cloneTerminalController(session.controller),
       canonicalCols: session.cols,
       canonicalRows: session.rows,
@@ -508,53 +392,62 @@ export class TerminalSessionManager<TOwner extends string | number> {
     })
   }
 
+  private applyOwnershipEffect(
+    session: TerminalSession<TOwner>,
+    effect: { resizeTo?: { cols: number; rows: number }; emitOwnership: boolean },
+  ): void {
+    if (effect.resizeTo) this.resizeSessionPty(session, effect.resizeTo.cols, effect.resizeTo.rows)
+    if (effect.emitOwnership) this.emitOwnership(session)
+  }
+
   private resetSessionState(session: TerminalSession<TOwner>, cols: number, rows: number): void {
     this.disposeSessionResources(session)
     session.cols = cols
     session.rows = rows
-    session.buffer = ''
-    session.bufferTruncated = false
-    session.sequence = 0
+    resetTerminalRenderState(session.render)
     session.processName = ''
-    session.canonicalTitle = null
-    session.titleEventVersion = 0
   }
 
   private spawnSessionPty(session: TerminalSession<TOwner>): TerminalAttachResult {
-    try {
-      const shell = session.command || process.env.SHELL || (process.platform === 'win32' ? process.env.COMSPEC || 'cmd.exe' : '/bin/zsh')
-      const args = session.args ?? (process.platform === 'win32' ? [] : ['-l'])
-      const env = { ...process.env, TERM: 'xterm-256color' }
-      session.pty = pty.spawn(shell, args, {
-        name: 'xterm-256color',
-        cols: session.cols,
-        rows: session.rows,
-        cwd: session.cwd,
-        env,
-      })
-      session.processName = terminalProcessName(session.pty)
-      session.renderModel = createTerminalRenderModel(session.cols, session.rows)
-      session.disposables.push(bindRenderModelTitle(session, this.sink))
-    } catch (err) {
+    const spawnResult = spawnTerminalPtyRuntime({
+      command: session.command,
+      args: session.args,
+      cwd: session.cwd,
+      cols: session.cols,
+      rows: session.rows,
+    })
+    if (!spawnResult.ok) {
       this.disposeSessionResources(session)
-      return { ok: false, message: err instanceof Error ? err.message : 'error.unknown' }
+      return spawnResult
     }
+    session.pty = spawnResult.runtime
+    session.processName = session.pty.processName()
+    session.render.model = createTerminalRenderModel(session.cols, session.rows)
+    session.disposables.push(
+      bindTerminalRenderTitle(session.render, (canonicalTitle) => {
+        this.sink.onTitle?.(session.ownerId, { sessionId: session.id, canonicalTitle })
+      }),
+    )
     session.disposables.push(
       session.pty.onData((data) => {
-        const seq = appendSessionData(session, data)
+        const seq = appendTerminalReplayData(session.render, data)
         const previousProcessName = session.processName
-        const processName = terminalProcessName(session.pty)
+        const processName = session.pty?.processName() ?? 'terminal'
         session.processName = processName
-        const canonicalTitleBeforeWrite = session.canonicalTitle
-        const titleEventVersionBeforeWrite = session.titleEventVersion
-        queueRenderWrite(session, data, () => {
+        const canonicalTitleBeforeWrite = session.render.canonicalTitle
+        const titleEventVersionBeforeWrite = session.render.titleEventVersion
+        queueTerminalRenderWrite(session.render, data, () => {
           maybeClearCanonicalTitleOnShellReturn(
-            session,
+            session.id,
+            session.render,
             previousProcessName,
             processName,
+            session.processName,
             canonicalTitleBeforeWrite,
             titleEventVersionBeforeWrite,
-            this.sink,
+            (canonicalTitle) => {
+              this.sink.onTitle?.(session.ownerId, { sessionId: session.id, canonicalTitle })
+            },
           )
         })
         this.sink.onOutput(session.ownerId, { sessionId: session.id, data, seq, processName })
@@ -580,30 +473,13 @@ export class TerminalSessionManager<TOwner extends string | number> {
       }
     }
     session.pty = null
-    try {
-      session.renderModel?.term.dispose()
-    } catch {}
-    session.renderModel = null
+    disposeTerminalRenderState(session.render)
   }
 
   private isValidOwnerId(ownerId: TOwner): boolean {
     return (typeof ownerId === 'number' && Number.isSafeInteger(ownerId) && ownerId > 0) || (typeof ownerId === 'string' && ownerId.length > 0)
   }
 
-  private deleteAttachmentIfInactive(session: TerminalSession<TOwner>, attachmentId: string): void {
-    if (session.controller?.attachmentId === attachmentId) return
-    const attachment = session.attachments.get(attachmentId)
-    if (!attachment || attachment.connected) return
-    session.attachments.delete(attachmentId)
-  }
-
-  private pruneInactiveAttachments(session: TerminalSession<TOwner>): void {
-    for (const [attachmentId, attachment] of session.attachments.entries()) {
-      if (attachment.connected) continue
-      if (session.controller?.attachmentId === attachmentId) continue
-      session.attachments.delete(attachmentId)
-    }
-  }
 }
 
 export function isValidTerminalSessionId(value: unknown): value is string {
@@ -612,16 +488,6 @@ export function isValidTerminalSessionId(value: unknown): value is string {
 
 export function isValidTerminalWriteData(value: unknown): value is string {
   return typeof value === 'string' && value.length <= MAX_TERMINAL_WRITE_CHARS
-}
-
-function appendSessionData<TOwner extends string | number>(session: TerminalSession<TOwner>, data: string): number {
-  session.sequence += 1
-  session.buffer += data
-  if (session.buffer.length > MAX_SESSION_BUFFER_CHARS) {
-    session.buffer = safeReplayTail(session.buffer, MAX_SESSION_BUFFER_CHARS)
-    session.bufferTruncated = true
-  }
-  return session.sequence
 }
 
 function disposeSessionListeners<TOwner extends string | number>(session: TerminalSession<TOwner>): void {
@@ -634,41 +500,6 @@ function disposeSessionListeners<TOwner extends string | number>(session: Termin
   }
 }
 
-function safeReplayTail(buffer: string, maxChars: number): string {
-  let tail = buffer.slice(buffer.length - maxChars)
-  if (tail.length === 0) return tail
-  const first = tail.charCodeAt(0)
-  const second = tail.length > 1 ? tail.charCodeAt(1) : 0
-  if (first >= 0xdc00 && first <= 0xdfff) tail = tail.slice(1)
-  else if (first >= 0xd800 && first <= 0xdbff && !(second >= 0xdc00 && second <= 0xdfff)) tail = tail.slice(1)
-  const boundary = tail.search(/[\n\r]/)
-  return boundary >= 0 && boundary < tail.length - 1 ? tail.slice(boundary + 1) : tail
-}
-
-function terminalProcessName(term: pty.IPty | null): string {
-  const processName = typeof term?.process === 'string' ? term.process.trim() : ''
-  return processName || 'terminal'
-}
-
-function normalizeTerminalTitle(title: string | null | undefined): string | null {
-  if (typeof title !== 'string') return null
-  const normalized = title.replace(/\s+/g, ' ').trim()
-  return normalized.length > 0 ? normalized : null
-}
-
-function bindRenderModelTitle<TOwner extends string | number>(
-  session: TerminalSession<TOwner>,
-  sink: TerminalEventSink<TOwner>,
-): { dispose(): void } {
-  return session.renderModel?.term.onTitleChange((title) => {
-    session.titleEventVersion += 1
-    const nextCanonicalTitle = normalizeTerminalTitle(title)
-    if (session.canonicalTitle === nextCanonicalTitle) return
-    session.canonicalTitle = nextCanonicalTitle
-    sink.onTitle?.(session.ownerId, { sessionId: session.id, canonicalTitle: nextCanonicalTitle })
-  }) ?? { dispose() {} }
-}
-
 function createSessionId(): string {
   return `term_${crypto.randomUUID()}`
 }
@@ -676,83 +507,4 @@ function createSessionId(): string {
 function terminalPruneKey(key: string): string {
   const parts = key.split('\0')
   return parts.length >= 2 ? `${parts[0]}\0${parts[1]}` : key
-}
-
-function registerAttachment<TOwner extends string | number>(
-  session: TerminalSession<TOwner>,
-  attachmentId: string,
-  cols: number,
-  rows: number,
-  connected?: boolean,
-): void {
-  const existing = session.attachments.get(attachmentId)
-  session.attachments.set(attachmentId, {
-    cols,
-    rows,
-    connected: connected ?? existing?.connected ?? false,
-  })
-}
-
-function createTerminalRenderModel(cols: number, rows: number): TerminalRenderModel {
-  const term = new HeadlessTerminal({ cols, rows, scrollback: 10000, allowProposedApi: true })
-  const serializeAddon = new SerializeAddon()
-  term.loadAddon(serializeAddon)
-  return {
-    term,
-    serializeAddon,
-    chain: Promise.resolve(),
-  }
-}
-
-function queueRenderWrite<TOwner extends string | number>(
-  session: TerminalSession<TOwner>,
-  data: string,
-  onParsed?: () => void,
-): void {
-  const model = session.renderModel
-  if (!model) return
-  model.chain = model.chain
-    .catch(() => {})
-    .then(
-      () =>
-        new Promise<void>((resolve) => {
-          model.term.write(data, resolve)
-        }),
-    )
-    .then(() => {
-      if (session.renderModel !== model) return
-      onParsed?.()
-    })
-}
-
-function queueRenderResize<TOwner extends string | number>(session: TerminalSession<TOwner>, cols: number, rows: number): void {
-  const model = session.renderModel
-  if (!model) return
-  model.chain = model.chain
-    .catch(() => {})
-    .then(() => {
-      model.term.resize(cols, rows)
-    })
-}
-
-function maybeClearCanonicalTitleOnShellReturn<TOwner extends string | number>(
-  session: TerminalSession<TOwner>,
-  previousProcessName: string,
-  nextProcessName: string,
-  canonicalTitleBeforeWrite: string | null,
-  titleEventVersionBeforeWrite: number,
-  sink: TerminalEventSink<TOwner>,
-): void {
-  if (!canonicalTitleBeforeWrite) return
-  if (previousProcessName === nextProcessName) return
-  if (!isShellProcessName(nextProcessName) || isShellProcessName(previousProcessName)) return
-  if (session.processName !== nextProcessName) return
-  if (session.titleEventVersion !== titleEventVersionBeforeWrite) return
-  if (session.canonicalTitle !== canonicalTitleBeforeWrite) return
-  session.canonicalTitle = null
-  sink.onTitle?.(session.ownerId, { sessionId: session.id, canonicalTitle: null })
-}
-
-function isShellProcessName(processName: string): boolean {
-  return /^(?:ba|z|fi|tc|c|k)?sh$|^nu$/.test(processName)
 }

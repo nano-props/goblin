@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 
 const mocks = vi.hoisted(() => ({
   access: vi.fn(async () => undefined),
@@ -29,6 +30,41 @@ const mocks = vi.hoisted(() => ({
   })),
 }))
 
+const terminalHostStub = {
+  isValidClientId: (_value: unknown): _value is string => true,
+  getDiagnostics: vi.fn(() => ({
+    mode: 'worker-backed' as const,
+    state: 'running' as const,
+    workerRunning: true,
+    workerPid: 1,
+    workerStartedAt: 1,
+    workerUptimeMs: 1,
+    pendingRequests: 0,
+    registeredSockets: 0,
+    restartAttempts: 0,
+    restartScheduled: false,
+    shuttingDown: false,
+    lastSuccessfulResponseAt: 1,
+    lastExitCode: null,
+    lastExitSignal: null,
+    lastWorkerFailure: null,
+  })),
+  registerSocket: vi.fn(),
+  unregisterSocket: vi.fn(),
+  attach: vi.fn(),
+  restart: vi.fn(),
+  write: vi.fn(),
+  resize: vi.fn(),
+  takeover: vi.fn(),
+  close: vi.fn(),
+  notifyBell: vi.fn(),
+  listSessions: vi.fn(),
+  create: vi.fn(),
+  prune: vi.fn(),
+  getSessionSnapshot: vi.fn(),
+  shutdown: vi.fn(),
+} satisfies ServerTerminalHost
+
 vi.mock('node:fs/promises', () => ({
   access: mocks.access,
   readFile: mocks.readFile,
@@ -50,6 +86,7 @@ describe('server app html bootstrap', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       internalSecret: 'secret',
+      terminalHost: terminalHostStub,
     })
 
     const response = await app.request(

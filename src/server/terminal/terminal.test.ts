@@ -12,7 +12,7 @@ import {
   takeoverServerTerminal,
   unregisterTerminalSocket,
   writeServerTerminal,
-} from '#/server/modules/terminal.ts'
+} from '#/server/terminal/terminal.ts'
 
 vi.mock('#/system/git/worktrees.ts', () => ({
   getWorktrees: vi.fn(async () => [{ path: '/repo-linked', branch: 'feature', isBare: false, isPrimary: false }]),

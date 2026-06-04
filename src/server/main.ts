@@ -1,8 +1,7 @@
 import { serve } from '@hono/node-server'
 import { WebSocketServer } from 'ws'
-import { createApp } from '#/server/app-factory.ts'
 import { serverLogger } from '#/server/logger.ts'
-import { closeAllServerTerminalSessions } from '#/server/modules/terminal.ts'
+import { createServerRuntime } from '#/server/runtime.ts'
 
 const DEFAULT_HOST = '127.0.0.1'
 const DEFAULT_PORT = 32100
@@ -22,7 +21,7 @@ export function bootstrapServer(): BootstrappedServer {
   const startedAt = Date.now()
   const hostname = process.env.GOBLIN_SERVER_HOST?.trim() || DEFAULT_HOST
   const port = parsePort(process.env.GOBLIN_SERVER_PORT)
-  const app = createApp({
+  const runtime = createServerRuntime({
     version: process.env.npm_package_version?.trim() || '0.1.0',
     startedAt,
     internalSecret: process.env.GOBLIN_SERVER_INTERNAL_SECRET?.trim() || '',
@@ -31,13 +30,17 @@ export function bootstrapServer(): BootstrappedServer {
   const server = serve({
     hostname,
     port,
-    fetch: app.fetch,
+    fetch: runtime.app.fetch,
     websocket: { server: websocket },
   })
   const shutdown = () => {
     try {
-      closeAllServerTerminalSessions()
+      runtime.shutdown()
+    } catch {}
+    try {
       websocket.close()
+    } catch {}
+    try {
       server.close()
     } catch {}
   }

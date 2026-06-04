@@ -70,6 +70,11 @@ if (!existsSync(serverDistEntry)) {
   console.error(`Error: server build artifact missing: ${serverDistEntry}`)
   process.exit(1)
 }
+const terminalWorkerDistEntry = path.join(repoRoot, 'dist/server/terminal/terminal-worker.js')
+if (!existsSync(terminalWorkerDistEntry)) {
+  console.error(`Error: server build artifact missing: ${terminalWorkerDistEntry}`)
+  process.exit(1)
+}
 // `dir` target skips dmg packaging — faster, and `install` only needs the .app.
 // In install mode we also pin to the host arch so we don't waste time
 // cross-building the other architecture's binaries when we're going to
