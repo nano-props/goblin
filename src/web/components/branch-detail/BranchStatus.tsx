@@ -1,5 +1,5 @@
-import { ArrowDown, ArrowUp, Check, FolderTree, GitBranch, GitMerge, RadioTower, RefreshCw } from 'lucide-react'
-import { useT } from '#/web/stores/i18n.ts'
+import { ArrowDown, ArrowUp, Check, FolderTree, GitBranch, GitCommitHorizontal, GitMerge, RadioTower, RefreshCw } from 'lucide-react'
+import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { PullRequestStatusRow } from '#/web/components/branch-detail/PullRequestStatusRow.tsx'
 import {
@@ -10,6 +10,7 @@ import {
   StatusRows,
   type Tone,
 } from '#/web/components/branch-detail/status-ui.tsx'
+import { formatRelativeTime } from '#/web/lib/dates.ts'
 import { formatWorktreePath } from '#/web/lib/paths.ts'
 import { PROTECTED_BRANCHES, branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import type { SelectedBranchDetail } from '#/web/components/branch-detail/model.ts'
@@ -65,6 +66,7 @@ function SyncValue({
 
 export function BranchStatus({ detail, layout }: Props) {
   const t = useT()
+  const lang = useI18nStore((s) => s.lang)
   const { branch, statusCount } = detail
   const behavior = repoWorkspaceBehavior(layout, false)
   if (!branch) return <EmptyState title={t('branches.empty')} />
@@ -78,6 +80,8 @@ export function BranchStatus({ detail, layout }: Props) {
   const hasWorktreeChanges = !!branch.worktree?.path && (detail.worktreeState?.dirty || worktreeChangeCount > 0)
   const mergeKnown = branch.isDefault || branch.mergedToDefault !== undefined
   const showMerged = !branch.isDefault
+  const commitTime = formatRelativeTime(branch.lastCommitDate, lang)
+  const commitMeta = branch.lastCommitAuthor ? `${branch.lastCommitAuthor} · ${commitTime}` : commitTime
   const mergeLabel = !mergeKnown
     ? t('branch-status.merge-unknown')
     : branch.mergedToDefault || branch.isDefault
@@ -175,6 +179,29 @@ export function BranchStatus({ detail, layout }: Props) {
         }
         valueLayout="chips"
         tone={syncTone}
+      />
+      <StatusRow
+        icon={<GitCommitHorizontal size={14} />}
+        label={t('branch-status.signal.commit')}
+        value={
+          <div className="flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden text-sm text-foreground">
+            {branch.lastCommitHash ? (
+              <span
+                className="shrink-0 font-mono text-sm font-medium tabular-nums leading-none text-brand-text/85"
+                title={branch.lastCommitHash}
+              >
+                {branch.lastCommitHash}
+              </span>
+            ) : null}
+            <span className="min-w-0 truncate leading-tight text-foreground/95" title={branch.lastCommitMessage || undefined}>
+              {branch.lastCommitMessage || '—'}
+            </span>
+            <span className="shrink-0 whitespace-nowrap text-[11px] leading-none text-muted-foreground/85" title={commitMeta}>
+              {commitMeta}
+            </span>
+          </div>
+        }
+        valueLayout="fill"
       />
       {showMerged && (
         <StatusRow

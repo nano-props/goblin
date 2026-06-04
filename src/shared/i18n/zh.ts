@@ -233,6 +233,7 @@ export const zh: Record<DictKey, string> = {
   'branch-status.signal.branch': '分支',
   'branch-status.signal.upstream': '上游',
   'branch-status.signal.sync': '同步',
+  'branch-status.signal.commit': '提交',
   'branch-status.signal.merge': '基线',
   'branch-status.signal.pr': 'PR',
   'branch-status.signal.worktree': '工作树',

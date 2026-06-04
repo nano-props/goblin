@@ -1,11 +1,17 @@
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
+import { Button } from '#/web/components/ui/button.tsx'
 import { BranchSearchInput } from '#/web/components/repo-toolbar/BranchSearchInput.tsx'
 import { BranchViewModeControl } from '#/web/components/repo-toolbar/BranchViewModeControl.tsx'
 import { RepoToolbarActions } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
 import { WorkspaceLayoutControl } from '#/web/components/repo-toolbar/WorkspaceLayoutControl.tsx'
 import { Toolbar } from '#/web/components/Layout.tsx'
+import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
+import { visibleBranches } from '#/web/stores/repos/branch-view-mode.ts'
+import { useT } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { BranchViewMode } from '#/web/stores/repos/types.ts'
+import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 interface Props {
   repoId: string
 }
@@ -28,6 +34,29 @@ export function RepoToolbar({ repoId }: Props) {
 }
 
 function BranchFilterControls({ repoId }: Props) {
+  const t = useT()
+  const navigation = useMainWindowNavigation()
+  const { focusMode, branches, selectedBranch } = useStoreWithEqualityFn(
+    useReposStore,
+    (s) => {
+      const repo = s.repos[repoId]
+      const behavior = repoWorkspaceBehavior(s.workspaceLayout, s.detailCollapsed, s.detailFocusMode)
+      return {
+        focusMode: behavior.mode === 'focus',
+        branches: repo
+          ? visibleBranches({
+              branches: repo.data.branches,
+              viewMode: repo.ui.branchViewMode,
+            })
+          : [],
+        selectedBranch: repo?.ui.selectedBranch ?? null,
+      }
+    },
+    (a, b) =>
+      a.focusMode === b.focusMode &&
+      a.branches === b.branches &&
+      a.selectedBranch === b.selectedBranch,
+  )
   const { branchCount, branchViewMode, branchSearchQuery } = useStoreWithEqualityFn(
     useReposStore,
     (s) => ({
@@ -42,6 +71,42 @@ function BranchFilterControls({ repoId }: Props) {
   )
   const setBranchViewMode = useReposStore((s) => s.setBranchViewMode)
   const setBranchSearchQuery = useReposStore((s) => s.setBranchSearchQuery)
+
+  if (focusMode) {
+    if (branches.length <= 1) return null
+    const index = branches.findIndex((branch) => branch.name === selectedBranch)
+    const previous = index > 0 ? branches[index - 1] : null
+    const next = index >= 0 && index < branches.length - 1 ? branches[index + 1] : null
+    const current = index >= 0 ? index + 1 : 1
+
+    return (
+      <div className="flex items-center gap-1">
+        <span className="min-w-0 shrink-0 px-1 text-[11px] font-medium tabular-nums text-muted-foreground">
+          {current} / {branches.length}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          disabled={!previous}
+          aria-label={t('help.row.prev-branch')}
+          title={t('help.row.prev-branch')}
+          onClick={() => previous && navigation.selectRepoBranch(repoId, previous.name)}
+        >
+          <ChevronUp />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          disabled={!next}
+          aria-label={t('help.row.next-branch')}
+          title={t('help.row.next-branch')}
+          onClick={() => next && navigation.selectRepoBranch(repoId, next.name)}
+        >
+          <ChevronDown />
+        </Button>
+      </div>
+    )
+  }
 
   return (
     <>

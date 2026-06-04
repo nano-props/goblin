@@ -74,37 +74,7 @@ export function BranchDetailToolbar({
 
   return (
     <Toolbar variant="detail">
-      <div className="flex shrink-0 items-center gap-1">
-        {behavior.detailCollapseAllowed && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleDetailCollapsed}
-            aria-label={t(collapsed ? 'branch-detail.expand' : 'branch-detail.collapse')}
-            title={detailToggleTitle}
-            aria-expanded={!collapsed}
-            aria-controls={collapsed ? undefined : contentId}
-          >
-            <ChevronDown className={cn(collapsed && '-rotate-90')} />
-          </Button>
-        )}
-        {behavior.detailFocusAllowed && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleDetailFocusMode}
-            aria-label={t(behavior.detailFocusMode ? 'branch-detail.exit-focus' : 'branch-detail.focus')}
-            // No accelerator is registered for focus mode, so the title intentionally omits shortcut text.
-            title={t(behavior.detailFocusMode ? 'branch-detail.exit-focus-title' : 'branch-detail.focus-title')}
-            aria-pressed={behavior.detailFocusMode}
-            className={cn(
-              behavior.detailFocusMode &&
-                'bg-accent text-accent-foreground shadow-xs hover:bg-accent hover:text-accent-foreground',
-            )}
-          >
-            {behavior.detailFocusMode ? <Minimize2 /> : <Maximize2 />}
-          </Button>
-        )}
+      <div className="flex min-w-0 flex-1 items-center gap-1">
         <div className="flex shrink-0 gap-1" role="tablist" aria-label={t('tab.branch-detail')}>
           {tabs.map((tab) => {
             const selected = repo.ui.detailTab === tab.id
@@ -143,14 +113,45 @@ export function BranchDetailToolbar({
           })}
         </div>
       </div>
-      {behavior.detailCollapseAllowed && (
-        <div
-          aria-hidden="true"
-          className="min-w-2 flex-1 self-stretch"
-          onClick={toggleDetailOnActionBarBlankClick ? toggleDetailCollapsed : undefined}
-        />
-      )}
-      {branchActions && <BranchActionControls actions={branchActions} variant={behavior.detailActionVariant} />}
+      <div
+        aria-hidden="true"
+        className="min-w-2 flex-1 self-stretch"
+        onClick={behavior.detailCollapseAllowed && toggleDetailOnActionBarBlankClick ? toggleDetailCollapsed : undefined}
+      />
+      <div className="flex shrink-0 items-center gap-1">
+        {layout === 'left-right' && branchActions && (
+          <BranchActionControls actions={branchActions} variant="menu" />
+        )}
+        {behavior.detailFocusAllowed && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleDetailFocusMode}
+            aria-label={t(behavior.detailFocusMode ? 'branch-detail.exit-focus' : 'branch-detail.focus')}
+            title={t(behavior.detailFocusMode ? 'branch-detail.exit-focus-title' : 'branch-detail.focus-title')}
+            aria-pressed={behavior.detailFocusMode}
+            className={cn(
+              behavior.detailFocusMode &&
+                'bg-accent text-accent-foreground shadow-xs hover:bg-accent hover:text-accent-foreground',
+            )}
+          >
+            {behavior.detailFocusMode ? <Minimize2 /> : <Maximize2 />}
+          </Button>
+        )}
+        {behavior.detailCollapseAllowed && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleDetailCollapsed}
+            aria-label={t(collapsed ? 'branch-detail.expand' : 'branch-detail.collapse')}
+            title={detailToggleTitle}
+            aria-expanded={!collapsed}
+            aria-controls={collapsed ? undefined : contentId}
+          >
+            <ChevronDown className={cn(collapsed && '-rotate-90')} />
+          </Button>
+        )}
+      </div>
     </Toolbar>
   )
 }

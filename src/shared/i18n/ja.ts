@@ -251,6 +251,7 @@ export const ja: Record<DictKey, string> = {
   'branch-status.signal.branch': 'ブランチ',
   'branch-status.signal.upstream': '上流',
   'branch-status.signal.sync': '同期',
+  'branch-status.signal.commit': 'コミット',
   'branch-status.signal.merge': 'ベースライン',
   'branch-status.signal.pr': 'PR',
   'branch-status.signal.worktree': 'ワークツリー',

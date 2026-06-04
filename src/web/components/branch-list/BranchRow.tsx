@@ -1,18 +1,16 @@
 import { type RefObject } from 'react'
 import { ArrowDown, ArrowUp, Check, FolderTree, GitBranch } from 'lucide-react'
-import { useT, type Lang } from '#/web/stores/i18n.ts'
+import { useT } from '#/web/stores/i18n.ts'
 import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
 import { Badge } from '#/web/components/ui/badge.tsx'
 import { BranchActionsMenu } from '#/web/components/BranchActionsMenu.tsx'
 import { cn } from '#/web/lib/cn.ts'
-import { formatRelativeTime } from '#/web/lib/dates.ts'
 import { getBranchWorktreeState } from '#/web/stores/repos/worktree-state.ts'
 interface BranchRowProps {
   repo: RepoState
   branch: RepoBranchState
   selected: string | null
   current: string
-  lang: Lang
   onSelectBranch: (branch: string) => void
   onOpenBranchStatus: (branch: string) => void
   selectedRef: RefObject<HTMLLIElement | null>
@@ -44,7 +42,6 @@ export function BranchRow({
   branch,
   selected,
   current,
-  lang,
   onSelectBranch,
   onOpenBranchStatus,
   selectedRef,
@@ -59,8 +56,6 @@ export function BranchRow({
   const isWorktree = hasWorktree && !isCurrent
   const worktreeState = getBranchWorktreeState(repo, branch)
   const worktreeDirty = worktreeState?.dirty ?? false
-  const commitTime = formatRelativeTime(branch.lastCommitDate, lang)
-  const commitMeta = branch.lastCommitAuthor ? `${branch.lastCommitAuthor} · ${commitTime}` : commitTime
   const ariaParts = [
     branch.name,
     isCurrent ? t('branch-status.current') : null,
@@ -69,9 +64,6 @@ export function BranchRow({
     branch.trackingGone ? t('branches.gone') : null,
     branch.ahead > 0 ? t('branch-status.sync.ahead', { n: branch.ahead }) : null,
     branch.behind > 0 ? t('branch-status.sync.behind', { n: branch.behind }) : null,
-    branch.lastCommitHash || null,
-    branch.lastCommitMessage || null,
-    commitMeta,
   ].filter(Boolean)
 
   return (
@@ -81,13 +73,13 @@ export function BranchRow({
       onClick={() => onSelectBranch(branch.name)}
       onDoubleClick={() => onOpenBranchStatus(branch.name)}
       className={cn(
-        'relative grid items-stretch cursor-pointer',
+        'relative grid min-h-9 items-stretch cursor-pointer',
         showActions ? 'grid-cols-[minmax(0,1fr)_auto]' : 'grid-cols-1',
         'transition-colors duration-100',
         isSelected ? 'bg-selected text-selected-foreground hover:bg-selected' : 'hover:bg-muted',
       )}
     >
-      <div className="pointer-events-none relative z-10 grid min-w-0 grid-cols-[1rem_minmax(0,1fr)] gap-x-2 gap-y-0.5 px-4 py-2">
+      <div className="pointer-events-none relative z-10 grid min-w-0 grid-cols-[1rem_minmax(0,1fr)] gap-x-2 px-4 py-1.5">
         <span className="flex w-4 shrink-0 items-center justify-center">
           {isCurrent ? (
             <Check size={14} className="text-success" />
@@ -100,13 +92,18 @@ export function BranchRow({
         <span className="flex min-w-0 items-center gap-2">
           <span
             className={cn(
-              'min-w-0 truncate text-sm font-medium',
+              'shrink-0 truncate text-sm font-medium',
               isSelected ? 'text-selected-foreground' : 'text-foreground',
             )}
           >
             {branch.name}
           </span>
-          <span className="flex shrink-0 items-center gap-1.5">
+          <span
+            className={cn(
+              'flex min-w-0 items-center gap-1.5 overflow-hidden text-xs',
+              isSelected ? 'text-selected-muted-foreground' : 'text-muted-foreground',
+            )}
+          >
             {branch.isDefault && (
               <Badge variant="outline" className="text-muted-foreground">
                 {t('branches.default')}
@@ -140,32 +137,9 @@ export function BranchRow({
             )}
           </span>
         </span>
-        <span
-          className={cn(
-            'col-start-2 flex min-w-0 items-baseline gap-1.5 text-xs',
-            isSelected ? 'text-selected-muted-foreground' : 'text-muted-foreground',
-          )}
-        >
-          <span className="flex min-w-0 items-baseline gap-1">
-            {branch.lastCommitHash ? (
-              <span
-                className="shrink-0 font-mono text-[11px] font-medium tabular-nums leading-none text-brand-text/85"
-                title={branch.lastCommitHash}
-              >
-                {branch.lastCommitHash}
-              </span>
-            ) : null}
-            <span className="min-w-0 truncate" title={branch.lastCommitMessage || undefined}>
-              {branch.lastCommitMessage || '—'}
-            </span>
-          </span>
-          <span className="shrink-0 whitespace-nowrap" title={commitMeta}>
-            {commitMeta}
-          </span>
-        </span>
       </div>
       {showActions && (
-        <div className="pointer-events-none relative z-20 flex shrink-0 items-center py-2 pr-4">
+        <div className="pointer-events-none relative z-20 flex shrink-0 items-center py-1.5 pr-4">
           <div className="pointer-events-auto">
             <BranchActionsMenu
               repo={repo}

@@ -252,6 +252,7 @@ export const en = {
   'branch-status.signal.branch': 'Branch',
   'branch-status.signal.upstream': 'Upstream',
   'branch-status.signal.sync': 'Sync',
+  'branch-status.signal.commit': 'Commit',
   'branch-status.signal.merge': 'Baseline',
   'branch-status.signal.pr': 'PR',
   'branch-status.signal.worktree': 'Worktree',

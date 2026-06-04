@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { useI18nStore, useT } from '#/web/stores/i18n.ts'
+import { useT } from '#/web/stores/i18n.ts'
 import { visibleBranches } from '#/web/stores/repos/branch-view-mode.ts'
 import { BranchRow } from '#/web/components/branch-list/BranchRow.tsx'
 import { EmptyState } from '#/web/components/Layout.tsx'
@@ -27,7 +27,6 @@ type OpenActionMenu = { repoId: string; branch: string }
 
 export function BranchList({ repoId, showActions = true, variant = 'list' }: Props) {
   const t = useT()
-  const lang = useI18nStore((s) => s.lang)
   const selectBranch = useReposStore((s) => s.selectBranch)
   const setDetailCollapsed = useReposStore((s) => s.setDetailCollapsed)
   const navigation = useMainWindowNavigation()
@@ -130,7 +129,6 @@ export function BranchList({ repoId, showActions = true, variant = 'list' }: Pro
             branch={branch}
             selected={selected}
             current={current}
-            lang={lang}
             onSelectBranch={handleSelectBranch}
             onOpenBranchStatus={handleOpenBranchStatus}
             selectedRef={selectedRef}

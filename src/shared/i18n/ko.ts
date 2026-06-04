@@ -243,6 +243,7 @@ export const ko: Record<DictKey, string> = {
   'branch-status.signal.branch': '브랜치',
   'branch-status.signal.upstream': '업스트림',
   'branch-status.signal.sync': '동기화',
+  'branch-status.signal.commit': '커밋',
   'branch-status.signal.merge': '기준선',
   'branch-status.signal.pr': 'PR',
   'branch-status.signal.worktree': '워크트리',
