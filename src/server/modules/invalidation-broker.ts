@@ -3,6 +3,7 @@ import type { SettingsInvalidationEvent, SettingsInvalidationScope } from '#/sha
 
 interface InvalidationSocket {
   send(data: string): unknown
+  close(code?: number, reason?: string): unknown
 }
 
 const sockets = new Set<InvalidationSocket>()
@@ -24,6 +25,15 @@ export function registerInvalidationSocket(ws: InvalidationSocket): void {
 
 export function unregisterInvalidationSocket(ws: InvalidationSocket): void {
   sockets.delete(ws)
+}
+
+export function disconnectAllInvalidationSockets(): void {
+  for (const socket of Array.from(sockets)) {
+    try {
+      socket.close(1001, 'server shutting down')
+    } catch {}
+  }
+  sockets.clear()
 }
 
 export function publishRepoQueryInvalidation(event: Omit<RepoQueryInvalidationEvent, 'type'>): void {

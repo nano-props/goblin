@@ -33,6 +33,7 @@ const mocks = vi.hoisted(() => {
     enqueueExternalOpenPath: vi.fn(() => true),
     unregisterAppShortcuts: vi.fn(),
     wireRpcIpc: vi.fn(),
+    broadcastRendererEffectIntent: vi.fn(),
     wireShellBridgeIpc: vi.fn(),
     wireTerminalIpc: vi.fn(),
     resetReady() {
@@ -95,6 +96,10 @@ vi.mock('#/main/rpc.ts', () => ({
   wireRpcIpc: mocks.wireRpcIpc,
 }))
 
+vi.mock('#/main/renderer-surface-events.ts', () => ({
+  broadcastRendererEffectIntent: mocks.broadcastRendererEffectIntent,
+}))
+
 vi.mock('#/main/shell-bridge.ts', () => ({
   wireShellBridgeIpc: mocks.wireShellBridgeIpc,
 }))
@@ -140,6 +145,7 @@ describe('main process startup lifecycle', () => {
     await emit('before-quit', secondPassEvent)
 
     expect(event.preventDefault).toHaveBeenCalledTimes(1)
+    expect(mocks.broadcastRendererEffectIntent).toHaveBeenCalledWith({ type: 'app-quitting' })
     expect(mocks.flushWindowState).toHaveBeenCalledTimes(1)
     expect(mocks.unregisterAppShortcuts).toHaveBeenCalledTimes(1)
     expect(mocks.exit).toHaveBeenCalledWith(0)

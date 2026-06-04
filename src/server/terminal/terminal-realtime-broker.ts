@@ -75,6 +75,13 @@ export class TerminalRealtimeBroker {
   }
 
   disconnectAll(): void {
+    for (const sockets of this.socketsByClientId.values()) {
+      for (const socket of Array.from(sockets)) {
+        try {
+          socket.close(1001, 'server shutting down')
+        } catch {}
+      }
+    }
     this.socketsByClientId.clear()
     this.socketCountByAttachmentKey.clear()
   }

@@ -188,6 +188,13 @@ function runBranchActionRpc(action: RepoBranchAction, repoId: string, signal?: A
 
 export function createBranchActions(set: ReposSet, get: ReposGet) {
   return {
+    submitBranchAction(id: string, action: RepoBranchAction, options?: RunBranchActionOptions): void {
+      const repo = get().repos[id]
+      const token = options?.token ?? repo?.instanceToken
+      if (!repo || repo.instanceToken !== token) return
+      void get().runBranchAction(id, action, options)
+    },
+
     async runBranchAction(
       id: string,
       action: RepoBranchAction,

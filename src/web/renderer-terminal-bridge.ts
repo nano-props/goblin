@@ -24,6 +24,7 @@ import type {
 } from '#/shared/terminal.ts'
 import type { RendererTerminalBridge } from '#/web/renderer-bridge-types.ts'
 import type { TerminalOwnershipViewModel } from '#/web/components/terminal/types.ts'
+import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'
 
 export interface RendererServerTerminalConfig {
   url: string
@@ -52,6 +53,7 @@ export function createServerTerminalBridge(options: {
   let reconnectTimer: number | null = null
   let manualSocketClose = false
   let socketGeneration = 0
+  let quitting = isAppQuitting()
 
   function hasSubscribers(): boolean {
     return (
@@ -88,7 +90,7 @@ export function createServerTerminalBridge(options: {
   }
 
   function scheduleReconnect() {
-    if (reconnectTimer !== null || !hasSubscribers()) {
+    if (reconnectTimer !== null || !hasSubscribers() || quitting) {
       return
     }
     reconnectTimer = window.setTimeout(() => {
@@ -98,7 +100,7 @@ export function createServerTerminalBridge(options: {
   }
 
   function ensureSocket() {
-    if (socket || typeof WebSocket === 'undefined') return
+    if (socket || typeof WebSocket === 'undefined' || quitting) return
     let socketUrl: string
     try {
       const server = options.getServerConfig()
@@ -168,6 +170,18 @@ export function createServerTerminalBridge(options: {
       socket.close()
     } catch {}
   }
+
+  subscribeAppQuitting(() => {
+    quitting = true
+    manualSocketClose = true
+    clearReconnectTimer()
+    const currentSocket = socket
+    socket = null
+    if (!currentSocket) return
+    try {
+      currentSocket.close()
+    } catch {}
+  })
 
   return {
     attach(input) {

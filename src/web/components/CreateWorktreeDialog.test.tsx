@@ -7,7 +7,6 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CreateWorktreeDialog } from '#/web/components/CreateWorktreeDialog.tsx'
 import { emptyRepo } from '#/web/stores/repos/helpers.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
-import type { ExecResult } from '#/shared/git-types.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 
 let container: HTMLDivElement | null = null
@@ -40,13 +39,13 @@ afterEach(() => {
 
 describe('CreateWorktreeDialog', () => {
   test('focuses the new branch input when opened', () => {
-    render(<CreateWorktreeDialog open repo={createRepo()} onClose={vi.fn()} onCreate={vi.fn(async () => ({ ok: true, message: 'ok' }))} />)
+    render(<CreateWorktreeDialog open repo={createRepo()} onClose={vi.fn()} onCreate={vi.fn(async () => {})} />)
 
     expect(document.activeElement).toBe(input('#cwt-branch'))
   })
 
-  test('waits for create success before closing', async () => {
-    const deferred = createDeferred<ExecResult | null>()
+  test('closes immediately after submitting create', () => {
+    const deferred = createDeferred<void>()
     const onClose = vi.fn()
     const onCreate = vi.fn(() => deferred.promise)
 
@@ -60,34 +59,28 @@ describe('CreateWorktreeDialog', () => {
       newBranch: 'feature/new',
       baseBranch: 'main',
     })
-    expect(onClose).not.toHaveBeenCalled()
-    expect(buttonByText('dialog.cancel').disabled).toBe(true)
-
-    deferred.resolve({ ok: true, message: 'ok' })
-    await flush()
-
     expect(onClose).toHaveBeenCalledTimes(1)
+    deferred.resolve()
   })
 
-  test('keeps the dialog open on create failure and preserves user input', async () => {
+  test('closes immediately even when create resolves with a failure result later', async () => {
     const onClose = vi.fn()
-    const onCreate = vi.fn(async () => ({ ok: false, message: 'error.invalid-path' }))
+    const deferred = createDeferred<void>()
+    const onCreate = vi.fn(() => deferred.promise)
 
     render(<CreateWorktreeDialog open repo={createRepo()} onClose={onClose} onCreate={onCreate} />)
 
     setInputValue('#cwt-branch', 'feature/new')
     click('button[type="submit"]')
-    await flush()
+    expect(onClose).toHaveBeenCalledTimes(1)
 
-    expect(onClose).not.toHaveBeenCalled()
-    expect(input('#cwt-branch').value).toBe('feature/new')
-    expect(document.body.textContent).toContain('error.invalid-path')
-    expect(buttonByText('dialog.cancel').disabled).toBe(false)
+    deferred.resolve()
+    await flush()
   })
 
   test('allows home-relative remote worktree paths', async () => {
     const onClose = vi.fn()
-    const onCreate = vi.fn(async () => ({ ok: true, message: 'ok' }))
+    const onCreate = vi.fn(async () => {})
 
     render(<CreateWorktreeDialog open repo={createRemoteRepo()} onClose={onClose} onCreate={onCreate} />)
 

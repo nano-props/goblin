@@ -11,12 +11,10 @@
 // names up front; anything else is git's responsibility and its errors
 // are precise enough to show as-is.
 
-import { Loader2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { DialogFooter } from '#/web/components/ui/dialog.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/web/components/ui/select.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
-import { DialogError } from '#/web/components/ui/dialog-error.tsx'
 import { FormDialog } from '#/web/components/ui/form-dialog.tsx'
 import { Field, FieldDescription, FieldError, FieldLabel } from '#/web/components/ui/field.tsx'
 import { Input } from '#/web/components/ui/input.tsx'
@@ -26,7 +24,6 @@ import type { RepoState } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { defaultWorktreePath, formatWorktreePath, tildify, untildify } from '#/web/lib/paths.ts'
 import { cn } from '#/web/lib/cn.ts'
-import type { ExecResult } from '#/shared/git-types.ts'
 import { validateBranchName } from '#/shared/refnames.ts'
 import { isResolvableRemotePathInput } from '#/shared/remote-repo.ts'
 
@@ -40,7 +37,7 @@ interface Props {
   open: boolean
   repo: RepoState
   onClose: () => void
-  onCreate: (request: CreateWorktreeRequest) => ExecResult | null | Promise<ExecResult | null>
+  onCreate: (request: CreateWorktreeRequest) => void | Promise<void>
 }
 
 export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
@@ -50,8 +47,6 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
   const [base, setBase] = useState<string>('')
   const [branch, setBranch] = useState('')
   const [worktreePath, setWorktreePath] = useState('')
-  const [pending, setPending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   // Reset on the rising edge of `open` only. Listing repo.data.branches /
   // repo.data.currentBranch in the deps would re-fire on every snapshot
@@ -65,8 +60,6 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
     setBase(initialBaseRef.current)
     setBranch('')
     setWorktreePath('')
-    setPending(false)
-    setError(null)
   }, [open])
 
   const branchTrimmed = branch.trim()
@@ -93,43 +86,27 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
   const displayDefaultPath = remoteTarget ? formatWorktreePath(defaultPath, remoteTarget) : tildify(defaultPath)
   const displayEffectivePath = remoteTarget ? formatWorktreePath(effectivePath, remoteTarget) : tildify(effectivePath)
   const pathSuggestions = useRemotePathSuggestions({
-    enabled: open && !!remoteTarget && !pending && branchTrimmed.length > 0,
+    enabled: open && !!remoteTarget && branchTrimmed.length > 0,
     alias: remoteTarget?.alias ?? '',
     remotePath: remoteTarget?.remotePath ?? '/',
     prefix: worktreePath,
   })
   const branchActionBusy = repo.operations.branchAction.phase !== 'idle'
   const validPath = remoteTarget ? isResolvableRemotePathInput(effectivePath) : effectivePath.length > 0
-  const canSubmit = branchTrimmed.length > 0 && !branchError && validPath && baseExists && !branchActionBusy && !pending
+  const canSubmit = branchTrimmed.length > 0 && !branchError && validPath && baseExists
 
-  async function handleSubmit() {
-    if (!canSubmit) return
-    setPending(true)
-    setError(null)
-    let result: ExecResult | null
-    try {
-      result = await onCreate({ worktreePath: effectivePath, newBranch: branchTrimmed, baseBranch: base })
-    } catch (err) {
-      setPending(false)
-      setError(err instanceof Error ? err.message : t('error.unknown'))
-      return
-    }
-    setPending(false)
-    if (!result || result.ok) {
-      onClose()
-      return
-    }
-    if (result.message === 'cancelled') return
-    setError(t(result.message || 'error.unknown'))
+  function handleSubmit() {
+    if (!canSubmit || branchActionBusy) return
+    void onCreate({ worktreePath: effectivePath, newBranch: branchTrimmed, baseBranch: base })
+    onClose()
   }
 
   return (
     <FormDialog
       open={open}
       onOpenChange={(o) => {
-        if (!o && !pending) onClose()
+        if (!o) onClose()
       }}
-      showCloseButton={!pending}
       title={t('action.create-worktree-title')}
       description={t('action.create-worktree-hint')}
     >
@@ -178,12 +155,8 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
           <Input
             id="cwt-branch"
             autoFocus
-            disabled={pending}
             value={branch}
-            onChange={(e) => {
-              setBranch(e.target.value)
-              setError(null)
-            }}
+            onChange={(e) => setBranch(e.target.value)}
             placeholder={t('action.create-worktree-branch-placeholder')}
             aria-invalid={!!branchError}
             aria-describedby={branchError ? 'cwt-branch-error' : undefined}
@@ -198,11 +171,8 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
           <Input
             id="cwt-path"
             value={worktreePath}
-            disabled={pending || !branchTrimmed}
-            onChange={(e) => {
-              setWorktreePath(e.target.value)
-              setError(null)
-            }}
+            disabled={!branchTrimmed}
+            onChange={(e) => setWorktreePath(e.target.value)}
             placeholder={displayDefaultPath}
             aria-describedby="cwt-path-hint"
             className="font-mono text-xs"
@@ -228,18 +198,11 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
                 : ''}
           </FieldDescription>
         </Field>
-        {error && <DialogError>{error}</DialogError>}
         <DialogFooter className="pt-4">
-          <Button type="button" variant="outline" className={cn(compact && 'w-full')} disabled={pending} onClick={onClose}>
+          <Button type="button" variant="outline" className={cn(compact && 'w-full')} onClick={onClose}>
             {t('dialog.cancel')}
           </Button>
-          <Button
-            type="submit"
-            className={cn(compact && 'w-full')}
-            disabled={!canSubmit}
-            aria-busy={pending ? true : undefined}
-          >
-            {pending && <Loader2 className="animate-spin" />}
+          <Button type="submit" className={cn(compact && 'w-full')} disabled={!canSubmit || branchActionBusy}>
             {t('action.create-worktree-confirm')}
           </Button>
         </DialogFooter>

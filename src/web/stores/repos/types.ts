@@ -201,6 +201,10 @@ export interface ReposStore extends PersistableWorkspaceUiState, WorkspaceFronte
     action: RepoBranchAction,
     options?: RunBranchActionOptions,
   ) => Promise<ExecResult | null>
+  /** Fire-and-forget submission for branch actions whose UI should close
+   *  immediately and let repo activity/toasts carry completion. This only
+   *  triggers submission; callers should not treat it as accepted/completed. */
+  submitBranchAction: (id: string, action: RepoBranchAction, options?: RunBranchActionOptions) => void
 
   setLastResult: (
     id: string,

@@ -1,6 +1,7 @@
 import { ELECTRON_RENDERER_CAPABILITIES } from '#/shared/bootstrap.ts'
 import type { RendererBootstrapSnapshot, RendererNativeCapability } from '#/shared/bootstrap.ts'
 import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
+import { readNativeBridge } from '#/web/native-bridge.ts'
 import {
   emptyRendererBridgeBootstrap as emptyBootstrapSnapshot,
   normalizeRendererServerClientId,
@@ -14,14 +15,6 @@ import {
 
 const WEB_TERMINAL_CLIENT_ID_STORAGE_KEY = 'goblin:web-terminal-client-id'
 
-function readBridge(): Window['goblinNative'] | null {
-  try {
-    return window.goblinNative ?? null
-  } catch {
-    return null
-  }
-}
-
 function readServerTerminalConfig(): RendererServerTerminalConfig | null {
   const server = readWebBootstrap(readOrCreateWebTerminalClientId).initialServer
   if (!server?.url || !server?.secret) return null
@@ -33,44 +26,44 @@ function readServerTerminalConfig(): RendererServerTerminalConfig | null {
 function electronBridge(): RendererBridge {
   const capabilities = new Set<RendererNativeCapability>([...ELECTRON_RENDERER_CAPABILITIES])
   const serverTerminalBridge = (() => {
-    const server = readBridge()?.initialServer
+    const server = readNativeBridge()?.initialServer
     if (!server?.url || !server?.secret) return null
     return createServerTerminalBridge({
       getAttachmentId: readOrCreateWebTerminalAttachmentId,
       getServerConfig() {
-        const nextServer = readBridge()?.initialServer
+        const nextServer = readNativeBridge()?.initialServer
         if (!nextServer?.url || !nextServer?.secret) throw new Error('Renderer terminal bridge is unavailable')
         const clientId = normalizeRendererServerClientId(nextServer.clientId) ?? readOrCreateWebTerminalClientId()
         if (!clientId) throw new Error('Renderer terminal bridge is unavailable')
         return { url: nextServer.url, secret: nextServer.secret, clientId }
       },
       notifyBell(input) {
-        const bridge = readBridge()
+        const bridge = readNativeBridge()
         if (!bridge?.terminal) throw new Error('Renderer terminal bridge is unavailable')
         return bridge.terminal.notifyBell(input)
       },
       sendTestNotification() {
-        const bridge = readBridge()
+        const bridge = readNativeBridge()
         if (!bridge?.terminal) throw new Error('Renderer terminal bridge is unavailable')
         return bridge.terminal.sendTestNotification()
       },
       setBadge(count) {
-        readBridge()?.terminal?.setBadge(count)
+        readNativeBridge()?.terminal?.setBadge(count)
       },
     })
   })()
   return {
     kind() {
-      return readBridge()?.runtime?.kind === 'web' ? 'web' : 'electron'
+      return readNativeBridge()?.runtime?.kind === 'web' ? 'web' : 'electron'
     },
     hasCapability(capability) {
-      const runtimeCapabilities = readBridge()?.runtime?.capabilities
+      const runtimeCapabilities = readNativeBridge()?.runtime?.capabilities
       return Array.isArray(runtimeCapabilities)
         ? runtimeCapabilities.includes(capability)
         : capabilities.has(capability)
     },
     getBootstrap() {
-      const bridge = readBridge()
+      const bridge = readNativeBridge()
       const bootstrap = readWebBootstrap(readOrCreateWebTerminalClientId)
       return {
         runtime:
@@ -87,32 +80,32 @@ function electronBridge(): RendererBridge {
       }
     },
     invokeRpc(request) {
-      const bridge = readBridge()
+      const bridge = readNativeBridge()
       if (!bridge) throw new Error('Goblin bridge is unavailable')
       return bridge.invokeRpc(request)
     },
     abortRpc(requestId) {
-      const bridge = readBridge()
+      const bridge = readNativeBridge()
       if (!bridge) throw new Error('Goblin bridge is unavailable')
       return bridge.abortRpc(requestId)
     },
     onRpcEvent(cb) {
-      const bridge = readBridge()
+      const bridge = readNativeBridge()
       if (!bridge) throw new Error('Goblin bridge is unavailable')
       return bridge.onEvent(cb)
     },
     onEffectIntent(cb) {
-      const bridge = readBridge()
+      const bridge = readNativeBridge()
       if (!bridge) throw new Error('Goblin bridge is unavailable')
       return bridge.onIntent?.(cb) ?? (() => {})
     },
     pathForFile(file) {
-      const bridge = readBridge()
+      const bridge = readNativeBridge()
       if (!bridge) throw new Error('Goblin bridge is unavailable')
       return bridge.pathForFile(file)
     },
     shell() {
-      return readBridge()?.shell ?? null
+      return readNativeBridge()?.shell ?? null
     },
     terminal() {
       if (!serverTerminalBridge) throw new Error('Renderer terminal bridge is unavailable')
@@ -167,7 +160,7 @@ function webBridge(): RendererBridge {
 }
 
 function detectRendererBridge(): RendererBridge {
-  return readBridge() ? electronBridge() : webBridge()
+  return readNativeBridge() ? electronBridge() : webBridge()
 }
 
 let currentBridge: RendererBridge | null = null
@@ -176,7 +169,7 @@ let hasTestOverride = false
 
 export function getRendererBridge(): RendererBridge {
   if (hasTestOverride && currentBridge) return currentBridge
-  const bridgeAvailable = readBridge() !== null
+  const bridgeAvailable = readNativeBridge() !== null
   if (
     !currentBridge ||
     (bridgeAvailable && currentBridgeKind !== 'electron') ||

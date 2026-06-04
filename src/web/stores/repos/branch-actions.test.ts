@@ -567,6 +567,35 @@ describe('runBranchAction', () => {
     expect(repoOperation(REPO_ID, 'branchAction').target).toBeNull()
   })
 
+  test('submitBranchAction starts create worktree without waiting for completion', async () => {
+    let release!: () => void
+    installGoblinTestBridge({
+      'repo.createWorktree': () =>
+        new Promise((resolve) => {
+          release = () => resolve({ ok: true, message: 'ok' })
+        }),
+      'repo.snapshot': async () => ({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
+      'repo.status': async () => [],
+      'repo.pullRequests': async () => [],
+    })
+
+    useReposStore.getState().submitBranchAction(REPO_ID, {
+      kind: 'createWorktree',
+      worktreePath: '/tmp/gbl-branch-actions-test-worktree',
+      newBranch: 'feature/new',
+      baseBranch: 'feature/a',
+    })
+
+    expect(useReposStore.getState().repos[REPO_ID]?.operations.branchAction).toMatchObject({
+      phase: 'running',
+      reason: 'branch:createWorktree',
+      target: 'feature/new',
+    })
+
+    release()
+    await flushAsyncWork()
+  })
+
   test('records branch action metadata on result events', async () => {
     installGoblinTestBridge({
       'repo.createWorktree': async () => ({ ok: false, message: 'error.invalid-path' }),

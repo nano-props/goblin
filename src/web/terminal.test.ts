@@ -361,6 +361,23 @@ describe('terminal web host bridge', () => {
     vi.useRealTimers()
   })
 
+  test('stops reconnecting terminal sockets after app quitting starts', async () => {
+    vi.useFakeTimers()
+    const { markAppQuitting } = await import('#/web/app-lifecycle.ts')
+    const { terminalBridge } = await import('#/web/terminal.ts')
+    const dispose = terminalBridge.onOutput(() => {})
+    const socket = MockWebSocket.instances[0]
+    if (!socket) throw new Error('missing initial terminal socket')
+
+    markAppQuitting()
+    await vi.advanceTimersByTimeAsync(300)
+
+    expect(socket.readyState).toBe(MockWebSocket.CLOSED)
+    expect(MockWebSocket.instances).toHaveLength(1)
+    dispose()
+    vi.useRealTimers()
+  })
+
   test('emits terminal bell click events from browser notifications in web host mode', async () => {
     const { terminalBridge } = await import('#/web/terminal.ts')
     const { onRendererLocalEventType, resetRendererLocalEventsForTests } = await import('#/web/local-events.ts')

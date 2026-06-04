@@ -48,6 +48,7 @@ class MockWebSocket {
 
 describe('server invalidation source', () => {
   beforeEach(() => {
+    vi.resetModules()
     MockWebSocket.instances.length = 0
     Object.defineProperty(globalThis, 'WebSocket', { configurable: true, value: MockWebSocket })
     Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
@@ -100,6 +101,26 @@ describe('server invalidation source', () => {
 
     expect(listener).toHaveBeenCalledTimes(1)
     expect(listener).toHaveBeenCalledWith({ type: 'settings-invalidated', scopes: ['session'] })
+    dispose()
+    resetServerInvalidationIngressForTests()
+    vi.useRealTimers()
+  })
+
+  test('stops reconnecting invalidation sockets after app quitting starts', async () => {
+    vi.useFakeTimers()
+    const { markAppQuitting } = await import('#/web/app-lifecycle.ts')
+    const { resetServerInvalidationIngressForTests, subscribeServerInvalidationIngress } = await import(
+      '#/web/server-invalidation-ingress.ts'
+    )
+    const dispose = subscribeServerInvalidationIngress(() => {})
+    const socket = MockWebSocket.instances[0]
+    if (!socket) throw new Error('missing initial invalidation socket')
+
+    markAppQuitting()
+    await vi.advanceTimersByTimeAsync(300)
+
+    expect(socket.readyState).toBe(MockWebSocket.CLOSED)
+    expect(MockWebSocket.instances).toHaveLength(1)
     dispose()
     resetServerInvalidationIngressForTests()
     vi.useRealTimers()
