@@ -11,21 +11,10 @@ import { getBranchPullRequest, getBranchPullRequests } from '#/system/git/pull-r
 import { openHttpsExternal } from '#/main/external-url.ts'
 import { registerTrustedAppUrl, registerTrustedWebContents } from '#/main/ipc/trusted-webcontents.ts'
 import { wireRpcIpc } from '#/main/rpc.ts'
-import { broadcastRpcEvent } from '#/main/events.ts'
-import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import {
-  addSettingsRecentRepo,
-  clearSettingsRecentRepos,
   getSettingsPrefs,
-  setSettingsFetchInterval,
-  setSettingsGlobalShortcutState,
-  getSettingsSnapshot,
-  saveSettingsSession,
-  updateSettingsPrefs,
 } from '#/main/settings-server-facade.ts'
-import { getTerminalActionAvailability, getTerminalAppAvailability, resolveTerminalApp } from '#/system/terminals.ts'
-import { getEditorAppAvailability, resolveEditorApp } from '#/system/editors.ts'
-import type { EditorAppState, ExternalAppsSnapshot, RpcResponse, SettingsPrefs } from '#/shared/rpc.ts'
+import type { RpcResponse, SettingsPrefs } from '#/shared/rpc.ts'
 
 const ipcHandlers = new Map<string, (_event: unknown, input: any) => Promise<unknown>>()
 const browserWindowFromWebContents = vi.hoisted(() => vi.fn(() => null))
@@ -275,8 +264,6 @@ describe('main repo rpc cancellation', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.unstubAllGlobals()
-    vi.mocked(setSettingsGlobalShortcutState).mockResolvedValue(true)
-    vi.mocked(getSettingsSnapshot).mockResolvedValue(defaultSettingsSnapshot({ globalShortcut: '' }))
     browserWindowFromWebContents.mockReturnValue(null)
     getEmbeddedServerRuntimeMock.mockReturnValue(null)
     listSshConfigHostsMock.mockResolvedValue([])
@@ -315,7 +302,7 @@ describe('main repo rpc cancellation', () => {
   })
 
   test('rejects RPC calls from untrusted senders', async () => {
-    const result = await invokeRpc('settings.get', undefined, {
+    const result = await invokeRpc('settings.setGlobalShortcut', { accelerator: 'Alt+K' }, {
       sender: { id: 99 },
       senderFrame: { url: 'https://example.com/' },
     })
@@ -327,7 +314,7 @@ describe('main repo rpc cancellation', () => {
   })
 
   test('rejects RPC calls without a sender frame', async () => {
-    const result = await invokeRpc('settings.get', undefined, {
+    const result = await invokeRpc('settings.setGlobalShortcut', { accelerator: 'Alt+K' }, {
       sender: trustedSender,
       senderFrame: null,
     })
@@ -466,242 +453,13 @@ describe('main repo rpc cancellation', () => {
     await expect(status).resolves.toEqual({ ok: true, data: [] })
   })
 
-  test('returns persistable settings without external app detection in settings.get', async () => {
-    vi.mocked(getTerminalAppAvailability).mockResolvedValue({ ghostty: true, terminal: true })
-    vi.mocked(resolveTerminalApp).mockReturnValue('ghostty')
-    vi.mocked(getEditorAppAvailability).mockReturnValue({ vscode: false, cursor: true, windsurf: false })
-    vi.mocked(resolveEditorApp).mockReturnValue('cursor')
-
-    const result = await invokeRpc('settings.get')
-
-    expect(result).toEqual({
-      ok: true,
-      data: expect.objectContaining({
-        theme: 'auto',
-        colorTheme: 'macos',
-        terminalNotificationsEnabled: false,
-        terminalApp: 'auto',
-        editorApp: 'auto',
-      }),
-    })
-  })
-
-  test('returns the embedded server settings snapshot when available', async () => {
-    const snapshot = defaultSettingsSnapshot()
-    vi.mocked(getSettingsSnapshot).mockResolvedValueOnce({
-      ...snapshot,
-      theme: 'dark',
-      fetchIntervalSec: 300,
-      terminalNotificationsEnabled: true,
-      shortcutsDisabled: true,
-      toggleDetailOnActionBarBlankClick: true,
-      globalShortcutRegistered: true,
-      terminalApp: 'ghostty',
-      editorApp: 'cursor',
-      session: {
-        ...snapshot.session,
-        openRepos: [{ kind: 'local', id: '/repo' }],
-        activeRepo: '/repo',
-      },
-      recentRepos: [{ kind: 'local', id: '/repo' }],
-    })
-
-    const result = await invokeRpc('settings.get')
-
-    expect(result).toEqual({
-      ok: true,
-      data: expect.objectContaining({
-        fetchIntervalSec: 300,
-        terminalNotificationsEnabled: true,
-        terminalApp: 'ghostty',
-        editorApp: 'cursor',
-        recentRepos: [{ kind: 'local', id: '/repo' }],
-      }),
-    })
-  })
-
-  test('mirrors fetch interval updates from the embedded server before broadcasting', async () => {
-    vi.mocked(setSettingsFetchInterval).mockResolvedValueOnce(300)
-
-    const result = await invokeRpc('settings.setFetchInterval', { sec: 299.6 })
-
-    expect(result).toEqual({ ok: true, data: undefined })
-    expect(setSettingsFetchInterval).toHaveBeenCalledWith(299.6)
-    expect(broadcastRpcEvent).toHaveBeenCalledWith({ type: 'fetch-interval-changed', sec: 300 })
-  })
-
-  test('persists session through the embedded server', async () => {
-    const session = {
-      ...defaultSettingsSnapshot().session,
-      openRepos: [{ kind: 'local' as const, id: '/repo' }],
-      activeRepo: '/repo',
-    }
-    vi.mocked(saveSettingsSession).mockResolvedValueOnce(session)
-
-    const result = await invokeRpc('settings.saveSession', { session })
-
-    expect(result).toEqual({ ok: true, data: undefined })
-    expect(saveSettingsSession).toHaveBeenCalledWith(session)
-  })
-
-  test('adds recent repos through the embedded server before returning the list', async () => {
+  test('projects recent repos into native shell state without mutating the embedded server', async () => {
     const repo = { kind: 'local' as const, id: '/repo' }
-    vi.mocked(addSettingsRecentRepo).mockResolvedValueOnce([repo])
 
-    const result = await invokeRpc('settings.addRecentRepo', { repo })
-
-    expect(result).toEqual({ ok: true, data: [repo] })
-    expect(addSettingsRecentRepo).toHaveBeenCalledWith(repo)
-    expect(app.addRecentDocument).toHaveBeenCalledWith('/repo')
-  })
-
-  test('clears recent repos through the embedded server', async () => {
-    vi.mocked(clearSettingsRecentRepos).mockResolvedValueOnce(true)
-
-    const result = await invokeRpc('settings.clearRecentRepos')
+    const result = await invokeRpc('settings.applyRecentReposProjection', { recentRepos: [repo], addedRepo: repo })
 
     expect(result).toEqual({ ok: true, data: undefined })
-    expect(clearSettingsRecentRepos).toHaveBeenCalled()
-    expect(app.clearRecentDocuments).toHaveBeenCalledTimes(1)
-  })
-
-  test('returns external app detection from externalApps.get', async () => {
-    vi.mocked(getTerminalAppAvailability).mockResolvedValue({ ghostty: true, terminal: true })
-    vi.mocked(resolveTerminalApp).mockReturnValue('ghostty')
-    vi.mocked(getEditorAppAvailability).mockReturnValue({ vscode: false, cursor: true, windsurf: false })
-    vi.mocked(resolveEditorApp).mockReturnValue('cursor')
-
-    const result = await invokeRpc('externalApps.get')
-
-    expect(result).toEqual({
-      ok: true,
-      data: {
-        terminal: {
-          pref: 'auto',
-          resolved: 'ghostty',
-          available: true,
-          appAvailability: { ghostty: true, terminal: true },
-          detectedAt: expect.any(Number),
-        },
-        editor: {
-          pref: 'auto',
-          resolved: 'cursor',
-          available: true,
-          appAvailability: { vscode: false, cursor: true, windsurf: false },
-          detectedAt: expect.any(Number),
-        },
-      },
-    })
-  })
-
-  test('assigns monotonic detectedAt values across external app snapshots in the same millisecond', async () => {
-    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000)
-    vi.mocked(getTerminalActionAvailability).mockReturnValue({ ghostty: false, terminal: true })
-    vi.mocked(getTerminalAppAvailability).mockResolvedValue({ ghostty: false, terminal: false })
-    vi.mocked(resolveTerminalApp).mockReturnValue('terminal')
-    vi.mocked(getEditorAppAvailability).mockReturnValue({ vscode: true, cursor: false, windsurf: false })
-    vi.mocked(resolveEditorApp).mockReturnValue('vscode')
-
-    try {
-      const first = await invokeRpc('externalApps.get')
-      const second = await invokeRpc('externalApps.refresh')
-
-      expect(first).toEqual({
-        ok: true,
-        data: {
-          terminal: {
-            pref: 'auto',
-            resolved: 'terminal',
-            available: true,
-            appAvailability: { ghostty: false, terminal: false },
-            detectedAt: expect.any(Number),
-          },
-          editor: {
-            pref: 'auto',
-            resolved: 'vscode',
-            available: true,
-            appAvailability: { vscode: true, cursor: false, windsurf: false },
-            detectedAt: expect.any(Number),
-          },
-        },
-      })
-      expect(second).toEqual({
-        ok: true,
-        data: {
-          terminal: {
-            pref: 'auto',
-            resolved: 'terminal',
-            available: true,
-            appAvailability: { ghostty: false, terminal: false },
-            detectedAt: expect.any(Number),
-          },
-          editor: {
-            pref: 'auto',
-            resolved: 'vscode',
-            available: true,
-            appAvailability: { vscode: true, cursor: false, windsurf: false },
-            detectedAt: expect.any(Number),
-          },
-        },
-      })
-
-      if (!first.ok || !second.ok) throw new Error('expected successful RPC responses')
-      const firstData = first.data as ExternalAppsSnapshot
-      const secondData = second.data as ExternalAppsSnapshot
-      expect(firstData.terminal.detectedAt).toBe(firstData.editor.detectedAt)
-      expect(secondData.terminal.detectedAt).toBe(secondData.editor.detectedAt)
-      expect(secondData.terminal.detectedAt).toBeGreaterThan(firstData.terminal.detectedAt)
-    } finally {
-      now.mockRestore()
-    }
-  })
-
-  test('prefers embedded server prefs in external app detection snapshots', async () => {
-    vi.mocked(getSettingsPrefs).mockResolvedValue(
-      settingsPrefs({ terminalApp: 'terminal', editorApp: 'vscode' }),
-    )
-    vi.mocked(getTerminalActionAvailability).mockReturnValue({ ghostty: false, terminal: true })
-    vi.mocked(getTerminalAppAvailability).mockResolvedValue({ ghostty: false, terminal: false })
-    vi.mocked(resolveTerminalApp).mockReturnValue('terminal')
-    vi.mocked(getEditorAppAvailability).mockReturnValue({ vscode: true, cursor: false, windsurf: false })
-    vi.mocked(resolveEditorApp).mockReturnValue('vscode')
-
-    const result = await invokeRpc('externalApps.get')
-
-    expect(result).toEqual({
-      ok: true,
-      data: {
-        terminal: expect.objectContaining({ pref: 'terminal', resolved: 'terminal' }),
-        editor: expect.objectContaining({ pref: 'vscode', resolved: 'vscode' }),
-      },
-    })
-  })
-
-  test('broadcasts terminal app detection when the preference changes', async () => {
-    vi.mocked(updateSettingsPrefs).mockResolvedValueOnce(settingsPrefs({ terminalApp: 'ghostty' }))
-    vi.mocked(getTerminalAppAvailability).mockResolvedValue({ ghostty: true, terminal: true })
-    vi.mocked(resolveTerminalApp).mockReturnValue('ghostty')
-
-    const result = await invokeRpc('settings.setTerminalApp', { pref: 'ghostty' })
-
-    expect(result).toEqual({
-      ok: true,
-      data: {
-        pref: 'ghostty',
-        resolved: 'ghostty',
-        available: true,
-        appAvailability: { ghostty: true, terminal: true },
-        detectedAt: expect.any(Number),
-      },
-    })
-    expect(broadcastRpcEvent).toHaveBeenCalledWith({
-      type: 'terminal-app-changed',
-      pref: 'ghostty',
-      resolved: 'ghostty',
-      available: true,
-      appAvailability: { ghostty: true, terminal: true },
-      detectedAt: expect.any(Number),
-    })
+    expect(app.addRecentDocument).toHaveBeenCalledWith('/repo')
   })
 
   test('prefers embedded server prefs when validating a global shortcut change', async () => {
@@ -721,156 +479,21 @@ describe('main repo rpc cancellation', () => {
     })
   })
 
-  test('broadcasts terminal notification setting changes', async () => {
-    vi.mocked(updateSettingsPrefs).mockResolvedValueOnce(settingsPrefs({ terminalNotificationsEnabled: true }))
-
-    const result = await invokeRpc('settings.setTerminalNotificationsEnabled', { enabled: true })
-
-    expect(result).toEqual({ ok: true, data: undefined })
-    expect(updateSettingsPrefs).toHaveBeenCalledWith({ terminalNotificationsEnabled: true })
-    expect(broadcastRpcEvent).toHaveBeenCalledWith({
-      type: 'terminal-notifications-changed',
-      enabled: true,
-    })
-  })
-
-  test('keeps Terminal.app available for actions even when detection reports unavailable', async () => {
-    vi.mocked(updateSettingsPrefs).mockResolvedValueOnce(settingsPrefs({ terminalApp: 'terminal' }))
-    vi.mocked(getTerminalActionAvailability).mockReturnValue({ ghostty: false, terminal: true })
-    vi.mocked(getTerminalAppAvailability).mockResolvedValue({ ghostty: false, terminal: false })
-    vi.mocked(resolveTerminalApp).mockReturnValue('terminal')
-
-    const result = await invokeRpc('settings.setTerminalApp', { pref: 'terminal' })
-
-    expect(result).toEqual({
-      ok: true,
-      data: {
-        pref: 'terminal',
-        resolved: 'terminal',
-        available: true,
-        appAvailability: { ghostty: false, terminal: false },
-        detectedAt: expect.any(Number),
-      },
-    })
-    expect(broadcastRpcEvent).toHaveBeenCalledWith({
-      type: 'terminal-app-changed',
-      pref: 'terminal',
-      resolved: 'terminal',
-      available: true,
-      appAvailability: { ghostty: false, terminal: false },
-      detectedAt: expect.any(Number),
-    })
-  })
-
-  test('broadcasts editor app detection when the preference changes', async () => {
-    vi.mocked(updateSettingsPrefs).mockResolvedValueOnce(settingsPrefs({ editorApp: 'cursor' }))
-    vi.mocked(getEditorAppAvailability).mockReturnValue({ vscode: false, cursor: true, windsurf: false })
-    vi.mocked(resolveEditorApp).mockReturnValue('cursor')
-
+  test('returns NOT_FOUND for settings mutations that now belong to the embedded server path', async () => {
     const result = await invokeRpc('settings.setEditorApp', { pref: 'cursor' })
 
     expect(result).toEqual({
-      ok: true,
-      data: {
-        pref: 'cursor',
-        resolved: 'cursor',
-        available: true,
-        appAvailability: { vscode: false, cursor: true, windsurf: false },
-        detectedAt: expect.any(Number),
-      },
-    })
-    expect(broadcastRpcEvent).toHaveBeenCalledWith({
-      type: 'editor-app-changed',
-      pref: 'cursor',
-      resolved: 'cursor',
-      available: true,
-      appAvailability: { vscode: false, cursor: true, windsurf: false },
-      detectedAt: expect.any(Number),
+      ok: false,
+      error: { name: 'RpcError', code: 'NOT_FOUND', message: 'Unknown RPC procedure: settings.setEditorApp' },
     })
   })
 
-  test('assigns monotonic detectedAt values to repeated editor preference changes in the same millisecond', async () => {
-    const now = vi.spyOn(Date, 'now').mockReturnValue(2_000)
-    vi.mocked(updateSettingsPrefs).mockResolvedValue(settingsPrefs({ editorApp: 'cursor' }))
-    vi.mocked(getEditorAppAvailability).mockReturnValue({ vscode: false, cursor: true, windsurf: false })
-    vi.mocked(resolveEditorApp).mockReturnValue('cursor')
-
-    try {
-      const first = await invokeRpc('settings.setEditorApp', { pref: 'cursor' })
-      const second = await invokeRpc('settings.setEditorApp', { pref: 'cursor' })
-
-      expect(first).toEqual({
-        ok: true,
-        data: {
-          pref: 'cursor',
-          resolved: 'cursor',
-          available: true,
-          appAvailability: { vscode: false, cursor: true, windsurf: false },
-          detectedAt: expect.any(Number),
-        },
-      })
-      expect(second).toEqual({
-        ok: true,
-        data: {
-          pref: 'cursor',
-          resolved: 'cursor',
-          available: true,
-          appAvailability: { vscode: false, cursor: true, windsurf: false },
-          detectedAt: expect.any(Number),
-        },
-      })
-
-      if (!first.ok || !second.ok) throw new Error('expected successful RPC responses')
-      const firstData = first.data as EditorAppState
-      const secondData = second.data as EditorAppState
-      expect(secondData.detectedAt).toBeGreaterThan(firstData.detectedAt)
-    } finally {
-      now.mockRestore()
-    }
-  })
-
-  test('refreshes and broadcasts external app detection', async () => {
-    vi.mocked(getTerminalAppAvailability).mockResolvedValue({ ghostty: false, terminal: true })
-    vi.mocked(resolveTerminalApp).mockReturnValue('terminal')
-    vi.mocked(getEditorAppAvailability).mockReturnValue({ vscode: true, cursor: false, windsurf: false })
-    vi.mocked(resolveEditorApp).mockReturnValue('vscode')
-
-    const result = await invokeRpc('externalApps.refresh')
+  test('returns NOT_FOUND for removed native namespaces like externalApps', async () => {
+    const result = await invokeRpc('externalApps.get')
 
     expect(result).toEqual({
-      ok: true,
-      data: {
-        terminal: {
-          pref: 'auto',
-          resolved: 'terminal',
-          available: true,
-          appAvailability: { ghostty: false, terminal: true },
-          detectedAt: expect.any(Number),
-        },
-        editor: {
-          pref: 'auto',
-          resolved: 'vscode',
-          available: true,
-          appAvailability: { vscode: true, cursor: false, windsurf: false },
-          detectedAt: expect.any(Number),
-        },
-      },
-    })
-    expect(broadcastRpcEvent).toHaveBeenCalledWith({
-      type: 'terminal-app-changed',
-      pref: 'auto',
-      resolved: 'terminal',
-      available: true,
-      appAvailability: { ghostty: false, terminal: true },
-      detectedAt: expect.any(Number),
-    })
-    expect(broadcastRpcEvent).toHaveBeenCalledWith({
-      type: 'editor-app-changed',
-      pref: 'auto',
-      resolved: 'vscode',
-      available: true,
-      appAvailability: { vscode: true, cursor: false, windsurf: false },
-      detectedAt: expect.any(Number),
+      ok: false,
+      error: { name: 'RpcError', code: 'NOT_FOUND', message: 'Unknown RPC procedure: externalApps.get' },
     })
   })
 })

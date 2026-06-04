@@ -3,9 +3,9 @@
 // around dark/light flips).
 //
 // Hydrate at boot pulls the persistable settings snapshot plus a
-// separate external-app snapshot via IPC; setters write through to
-// main, which broadcasts changes so any other window we eventually
-// open stays in sync.
+// separate external-app snapshot from the embedded server; setters write
+// back through the server contract. Cross-window coherence comes from
+// server invalidation + refetch, not from a main-owned settings runtime.
 
 import { create } from 'zustand'
 import type {

@@ -163,6 +163,111 @@ describe('server-client web host bootstrap', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  test('projects recent repos through the native bridge using the server-authoritative added repo', async () => {
+    const invokeRpc = vi.fn(async () => undefined)
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {
+        __GOBLIN_BOOTSTRAP__: {
+          homeDir: '/Users/test',
+          initialI18n: null,
+          initialSettings: null,
+          initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+        },
+        goblin: {
+          homeDir: '/Users/test',
+          invokeRpc,
+          abortRpc: async () => true,
+          onEvent: () => () => {},
+          pathForFile: () => '',
+        },
+        location: {
+          href: 'http://127.0.0.1:32100/',
+          origin: 'http://127.0.0.1:32100',
+          search: '',
+        },
+        matchMedia: vi.fn(() => ({ matches: true })),
+      },
+    })
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        recentRepos: [{ kind: 'local', id: '/tmp/repo' }],
+        addedRepo: { kind: 'local', id: '/tmp/repo' },
+      }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { addRecentRepo } = await import('#/web/app-data-client.ts')
+    await expect(addRecentRepo({ kind: 'local', id: '/tmp/../tmp/repo' })).resolves.toBeUndefined()
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:32100/api/settings/recent-repos/add',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ 'x-goblin-internal-secret': 'secret' }),
+        body: JSON.stringify({ repo: { kind: 'local', id: '/tmp/../tmp/repo' } }),
+      }),
+    )
+    expect(invokeRpc).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: 'settings.applyRecentReposProjection',
+        input: {
+          recentRepos: [{ kind: 'local', id: '/tmp/repo' }],
+          addedRepo: { kind: 'local', id: '/tmp/repo' },
+        },
+      }),
+    )
+  })
+
+  test('does not project an added recent repo when the embedded server rejects the candidate', async () => {
+    const invokeRpc = vi.fn(async () => undefined)
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {
+        __GOBLIN_BOOTSTRAP__: {
+          homeDir: '/Users/test',
+          initialI18n: null,
+          initialSettings: null,
+          initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+        },
+        goblin: {
+          homeDir: '/Users/test',
+          invokeRpc,
+          abortRpc: async () => true,
+          onEvent: () => () => {},
+          pathForFile: () => '',
+        },
+        location: {
+          href: 'http://127.0.0.1:32100/',
+          origin: 'http://127.0.0.1:32100',
+          search: '',
+        },
+        matchMedia: vi.fn(() => ({ matches: true })),
+      },
+    })
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        recentRepos: [{ kind: 'local', id: '/existing' }],
+        addedRepo: null,
+      }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { addRecentRepo } = await import('#/web/app-data-client.ts')
+    await expect(addRecentRepo({ kind: 'local', id: '/bad\0repo' } as unknown as { kind: 'local'; id: string })).resolves.toBeUndefined()
+    expect(invokeRpc).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: 'settings.applyRecentReposProjection',
+        input: {
+          recentRepos: [{ kind: 'local', id: '/existing' }],
+        },
+      }),
+    )
+  })
+
   test('opens terminal and editor through embedded server routes even when a native shell exists', async () => {
     const openTerminal = vi.fn(async () => ({ ok: true, message: 'native-terminal' }))
     const openEditor = vi.fn(async () => ({ ok: true, message: 'native-editor' }))

@@ -1,4 +1,4 @@
-import type { RpcEvent, RpcRequest } from '#/shared/rpc.ts'
+import type { NativeRpcPath, RpcEvent, RpcRequest } from '#/shared/rpc.ts'
 import { getRendererBridge } from '#/web/renderer-bridge.ts'
 
 type NativeEventType = RpcEvent['type']
@@ -45,7 +45,7 @@ async function invokeNativeRpc(request: RpcRequest, signal?: AbortSignal): Promi
 }
 
 export async function invokeNativeRpcPath<TOutput>(
-  path: string,
+  path: NativeRpcPath,
   input: unknown,
   signal?: AbortSignal,
 ): Promise<TOutput> {

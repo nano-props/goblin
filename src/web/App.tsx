@@ -3,7 +3,7 @@
 //   row 2 (1fr):  active RepoView body
 //
 // Boots in this order:
-//   1. theme.hydrate()       — pulls main's resolved theme + subscribes
+//   1. theme.hydrate()       — reads server-backed theme settings
 //   2. settings.hydrate()    — persistable settings + saved session
 //   3. settings.hydrateExternalApps() — external app snapshot
 //   4. repos.hydrateSession  — re-opens the repos that were open last run
@@ -11,7 +11,7 @@
 // After hydration, side-effects run for the lifetime of the app:
 //   - background sync registration with the embedded server scheduler
 //   - session persistence (any change to open repos / active id writes
-//     through to main so the next launch can restore)
+//     through to the embedded server so the next launch can restore)
 //   - menu-action listener (forwards typed RPC events to store actions)
 //   - settings write-error toast (warns the user if prefs aren't
 //     persisting instead of silently dropping their changes)

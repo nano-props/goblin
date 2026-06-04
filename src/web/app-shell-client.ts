@@ -12,7 +12,7 @@ function nativeShell() {
   }
 }
 
-function hasNativeRpcBridge(): boolean {
+export function canUseNativeRpcBridge(): boolean {
   try {
     return typeof window.goblin?.invokeRpc === 'function'
   } catch {
@@ -29,7 +29,7 @@ export function canOpenAppSettings(): boolean {
 }
 
 export function canUseGlobalShortcutSettings(): boolean {
-  return hasNativeRpcBridge()
+  return canUseNativeRpcBridge()
 }
 
 export function homeDirectory(): string {

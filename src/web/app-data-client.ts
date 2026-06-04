@@ -1,5 +1,5 @@
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
-import { canUseGlobalShortcutSettings } from '#/web/app-shell-client.ts'
+import { canUseGlobalShortcutSettings, canUseNativeRpcBridge } from '#/web/app-shell-client.ts'
 import { invokeNativeRpcPath } from '#/web/native-bridge.ts'
 import type {
   CloneRepoResult,
@@ -175,7 +175,15 @@ export async function testRemoteRepositoryConnection(
 }
 
 export async function addRecentRepo(repo: RepoSessionEntry): Promise<void> {
-  await postServerJson('/api/settings/recent-repos/add', { repo })
+  const result = await postServerJson<
+    { repo: RepoSessionEntry },
+    { ok: boolean; recentRepos: RepoSessionEntry[]; addedRepo?: RepoSessionEntry | null }
+  >('/api/settings/recent-repos/add', { repo })
+  if (!canUseNativeRpcBridge()) return
+  await invokeNativeRpcPath<void>('settings.applyRecentReposProjection', {
+    recentRepos: result.recentRepos,
+    ...(result.addedRepo ? { addedRepo: result.addedRepo } : {}),
+  })
 }
 
 export async function saveSession(session: SettingsSnapshot['session']): Promise<void> {

@@ -12,6 +12,8 @@ import {
   setServerSessionState,
   updateServerSettingsPrefs,
 } from '#/server/modules/settings-source.ts'
+import { toSafeSessionRepoEntry } from '#/shared/input-validation.ts'
+import { repoSessionEntryId } from '#/shared/remote-repo.ts'
 import { settingsInvalidationScopesForPrefsPatch } from '#/shared/server-invalidation.ts'
 
 export function createSettingsRoutes() {
@@ -60,9 +62,14 @@ export function createSettingsRoutes() {
   })
   app.post('/recent-repos/add', async (c) => {
     const body = await c.req.json().catch(() => null)
+    const requestedRepo = toSafeSessionRepoEntry(body?.repo)
     const recentRepos = await addServerRecentRepo(body?.repo)
+    const addedRepo =
+      requestedRepo && recentRepos.length > 0 && repoSessionEntryId(recentRepos[0]) === repoSessionEntryId(requestedRepo)
+        ? recentRepos[0]
+        : null
     publishSettingsInvalidation(['settings-snapshot'])
-    return c.json({ ok: true, recentRepos })
+    return c.json({ ok: true, recentRepos, addedRepo })
   })
   app.post('/recent-repos/clear', async (c) => {
     await clearServerRecentRepos()

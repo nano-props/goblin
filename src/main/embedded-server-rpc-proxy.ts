@@ -1,7 +1,7 @@
 import { getEmbeddedServerRuntime } from '#/main/server-manager.ts'
 import { invokeEmbeddedServerRpc, type EmbeddedServerRuntime } from '#/shared/embedded-server-client.ts'
 import type { EmbeddedServerRpcPath } from '#/shared/embedded-server-rpc-routes.ts'
-import { RpcError, type AppRpcHandlers } from '#/shared/rpc.ts'
+import { RpcError, type NativeRpcHandlers } from '#/shared/rpc.ts'
 
 function getEmbeddedServerRuntimeOrThrow(): EmbeddedServerRuntime {
   const runtime = getEmbeddedServerRuntime()
@@ -11,7 +11,7 @@ function getEmbeddedServerRuntimeOrThrow(): EmbeddedServerRuntime {
 
 export function createEmbeddedServerRepoRpcProxyHandlers(
   getSignal?: () => AbortSignal | undefined,
-): AppRpcHandlers['repo'] {
+): NativeRpcHandlers['repo'] {
   const call = <T>(path: EmbeddedServerRpcPath, input?: object) =>
     invokeEmbeddedServerRpc<T>(getEmbeddedServerRuntimeOrThrow(), path, input, { signal: getSignal?.() })
   return {
@@ -47,7 +47,7 @@ export function createEmbeddedServerRepoRpcProxyHandlers(
 
 export function createEmbeddedServerRemoteRpcProxyHandlers(
   getSignal?: () => AbortSignal | undefined,
-): AppRpcHandlers['remote'] {
+): NativeRpcHandlers['remote'] {
   const call = <T>(path: EmbeddedServerRpcPath, input?: object) =>
     invokeEmbeddedServerRpc<T>(getEmbeddedServerRuntimeOrThrow(), path, input, { signal: getSignal?.() })
   return {

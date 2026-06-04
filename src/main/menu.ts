@@ -7,6 +7,9 @@
 // Toggle View) are dispatched as typed RPC events so the
 // renderer can run them in its existing store/state, instead of
 // duplicating that logic in main.
+// A small number of truly native menu actions (for example open data
+// folder, open in browser, and native-only projections) still run in
+// main because they need Electron shell APIs.
 //
 // Labels run through `t()` so the menu re-renders in the active
 // language whenever `setCurrentLang` fires (the i18n IPC handler

@@ -1,8 +1,8 @@
-// Single source of truth for the user's theme. Mirrors deck-app's design:
-// pref ('auto' | 'light' | 'dark') persists; resolved ('light' | 'dark')
-// is computed against `nativeTheme.shouldUseDarkColors` when pref === 'auto'.
-// Renderers pull `{ pref, resolved, colorTheme }` at boot and subscribe to changes —
-// they never read prefers-color-scheme themselves.
+// Native projection for the user's server-backed theme preference:
+// pref ('auto' | 'light' | 'dark') persists in settings; resolved
+// ('light' | 'dark') is computed against `nativeTheme.shouldUseDarkColors`
+// when pref === 'auto'. Main owns the Electron-native projection and
+// emits updates, but it is not the persistence source of truth.
 
 import { nativeTheme } from 'electron'
 import { getSettingsPrefs, updateSettingsPrefs } from '#/main/settings-server-facade.ts'

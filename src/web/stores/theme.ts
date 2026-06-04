@@ -1,8 +1,8 @@
-// Renderer-side mirror of main's theme state. Hydrate at boot pulls
-// `{pref, resolved, colorTheme}` over IPC; the subscription keeps html[data-theme]
-// in lock-step with cross-window changes (and OS-appearance flips when
-// pref === 'auto'). Renderers don't read prefers-color-scheme on their
-// own — main is the single source of truth.
+// Renderer-side view of server-backed theme settings. Hydrate reads
+// `{pref, colorTheme}` from the embedded server snapshot and derives the
+// resolved browser theme locally. Electron main still projects that
+// server-owned preference into native shell state, but it is not the
+// business source of truth.
 
 import { create } from 'zustand'
 import { DEFAULT_COLOR_THEME, isColorTheme } from '#/shared/color-theme.ts'

@@ -271,6 +271,7 @@ export interface AppRpcHandlers {
     setTerminalApp: (input: { pref: TerminalPref }) => Promise<TerminalAppState>
     setEditorApp: (input: { pref: EditorPref }) => Promise<EditorAppState>
     saveSession: (input: { session: SessionState }) => Promise<void>
+    applyRecentReposProjection: (input: { recentRepos: RepoSessionEntry[]; addedRepo?: RepoSessionEntry }) => Promise<void>
     addRecentRepo: (input: { repo: RepoSessionEntry }) => Promise<RepoSessionEntry[]>
     clearRecentRepos: () => Promise<void>
   }
@@ -287,6 +288,21 @@ export interface AppRpcHandlers {
     setPref: (input: { pref: LangPref }) => Promise<I18nPayload | null>
   }
 }
+
+export interface NativeRpcHandlers {
+  repo: AppRpcHandlers['repo']
+  remote: AppRpcHandlers['remote']
+  settings: {
+    setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
+    applyRecentReposProjection: (input: { recentRepos: RepoSessionEntry[]; addedRepo?: RepoSessionEntry }) => Promise<void>
+  }
+}
+
+export type NativeBridgeHandlers = Pick<NativeRpcHandlers, 'settings'>
+
+export type NativeRpcPath = {
+  [NS in keyof NativeBridgeHandlers]: `${Extract<NS, string>}.${Extract<keyof NativeBridgeHandlers[NS], string>}`
+}[keyof NativeBridgeHandlers]
 
 const EmptyInput = v.optional(v.void())
 const FiniteNumber = v.pipe(v.number(), v.finite())
@@ -353,11 +369,11 @@ export class RpcError extends Error {
 
 type ValibotSchema = Parameters<typeof v.safeParse>[0]
 
-type AppRpcProcedureSchemas = {
-  [NS in keyof AppRpcHandlers]: { [Proc in keyof AppRpcHandlers[NS]]: ValibotSchema }
+type NativeRpcProcedureSchemas = {
+  [NS in keyof NativeRpcHandlers]: { [Proc in keyof NativeRpcHandlers[NS]]: ValibotSchema }
 }
 
-export const RPC_PROCEDURE_SCHEMAS: AppRpcProcedureSchemas = {
+export const RPC_PROCEDURE_SCHEMAS: NativeRpcProcedureSchemas = {
   repo: {
     probe: CwdInput,
     clone: v.object({ operationId: v.string(), url: v.string(), parentPath: v.string(), directoryName: v.string() }),
@@ -405,47 +421,12 @@ export const RPC_PROCEDURE_SCHEMAS: AppRpcProcedureSchemas = {
     listPathSuggestions: RemotePathSuggestionsInputSchema,
     testRepository: v.object({ target: RemoteTargetSchema }),
   },
-  theme: {
-    get: EmptyInput,
-    setPref: v.object({ pref: v.picklist(['auto', 'light', 'dark']) }),
-    setColorTheme: v.object({ colorTheme: v.picklist(COLOR_THEMES) }),
-  },
   settings: {
-    get: EmptyInput,
-    setFetchInterval: v.object({ sec: FiniteNumber }),
-    setTerminalNotificationsEnabled: v.object({ enabled: v.boolean() }),
-    setShortcutsDisabled: v.object({ disabled: v.boolean() }),
-    setGlobalShortcutDisabled: v.object({ disabled: v.boolean() }),
-    setSwapCloseShortcuts: v.object({ swapped: v.boolean() }),
-    setToggleDetailOnActionBarBlankClick: v.object({ enabled: v.boolean() }),
     setGlobalShortcut: v.object({ accelerator: v.string() }),
-    setTerminalApp: v.object({ pref: v.picklist(['auto', 'ghostty', 'terminal']) }),
-    setEditorApp: v.object({ pref: v.picklist(['auto', 'vscode', 'cursor', 'windsurf']) }),
-    saveSession: v.object({
-      session: v.object({
-        openRepos: v.array(RepoSessionEntrySchema),
-        activeRepo: v.nullable(v.string()),
-        detailCollapsed: v.boolean(),
-        detailFocusMode: v.boolean(),
-        workspaceLayout: v.picklist(WORKSPACE_LAYOUTS),
-        detailPaneSizes: v.object({ 'top-bottom': FiniteNumber, 'left-right': FiniteNumber }),
-        selectedTerminalByWorktree: v.optional(v.record(v.string(), v.string())),
-      }),
+    applyRecentReposProjection: v.object({
+      recentRepos: v.array(RepoSessionEntrySchema),
+      addedRepo: v.optional(RepoSessionEntrySchema),
     }),
-    addRecentRepo: v.object({ repo: RepoSessionEntrySchema }),
-    clearRecentRepos: EmptyInput,
-  },
-  externalApps: {
-    get: EmptyInput,
-    refresh: EmptyInput,
-  },
-  githubCli: {
-    get: v.optional(v.object({ hosts: v.optional(v.array(v.string())) })),
-    refresh: v.optional(v.object({ hosts: v.optional(v.array(v.string())) })),
-  },
-  i18n: {
-    get: EmptyInput,
-    setPref: v.object({ pref: v.picklist(['auto', 'en', 'zh', 'ko', 'ja']) }),
   },
 }
 
@@ -483,47 +464,27 @@ function createValidatedNamespace<THandlers extends Record<string, (...args: nev
 export interface AppRouter {
   createCaller: () => {
     repo: {
-      [K in keyof AppRpcHandlers['repo']]: (input: unknown) => Promise<Awaited<ReturnType<AppRpcHandlers['repo'][K]>>>
+      [K in keyof NativeRpcHandlers['repo']]: (input: unknown) => Promise<Awaited<ReturnType<NativeRpcHandlers['repo'][K]>>>
     }
     remote: {
-      [K in keyof AppRpcHandlers['remote']]: (
+      [K in keyof NativeRpcHandlers['remote']]: (
         input: unknown,
-      ) => Promise<Awaited<ReturnType<AppRpcHandlers['remote'][K]>>>
-    }
-    theme: {
-      [K in keyof AppRpcHandlers['theme']]: (input: unknown) => Promise<Awaited<ReturnType<AppRpcHandlers['theme'][K]>>>
+      ) => Promise<Awaited<ReturnType<NativeRpcHandlers['remote'][K]>>>
     }
     settings: {
-      [K in keyof AppRpcHandlers['settings']]: (
+      [K in keyof NativeRpcHandlers['settings']]: (
         input: unknown,
-      ) => Promise<Awaited<ReturnType<AppRpcHandlers['settings'][K]>>>
-    }
-    externalApps: {
-      [K in keyof AppRpcHandlers['externalApps']]: (
-        input: unknown,
-      ) => Promise<Awaited<ReturnType<AppRpcHandlers['externalApps'][K]>>>
-    }
-    githubCli: {
-      [K in keyof AppRpcHandlers['githubCli']]: (
-        input: unknown,
-      ) => Promise<Awaited<ReturnType<AppRpcHandlers['githubCli'][K]>>>
-    }
-    i18n: {
-      [K in keyof AppRpcHandlers['i18n']]: (input: unknown) => Promise<Awaited<ReturnType<AppRpcHandlers['i18n'][K]>>>
+      ) => Promise<Awaited<ReturnType<NativeRpcHandlers['settings'][K]>>>
     }
   }
 }
 
-export function createAppRouter(handlers: AppRpcHandlers): AppRouter {
+export function createAppRouter(handlers: NativeRpcHandlers): AppRouter {
   return {
     createCaller: () => ({
       repo: createValidatedNamespace(handlers.repo, RPC_PROCEDURE_SCHEMAS.repo),
       remote: createValidatedNamespace(handlers.remote, RPC_PROCEDURE_SCHEMAS.remote),
-      theme: createValidatedNamespace(handlers.theme, RPC_PROCEDURE_SCHEMAS.theme),
       settings: createValidatedNamespace(handlers.settings, RPC_PROCEDURE_SCHEMAS.settings),
-      externalApps: createValidatedNamespace(handlers.externalApps, RPC_PROCEDURE_SCHEMAS.externalApps),
-      githubCli: createValidatedNamespace(handlers.githubCli, RPC_PROCEDURE_SCHEMAS.githubCli),
-      i18n: createValidatedNamespace(handlers.i18n, RPC_PROCEDURE_SCHEMAS.i18n),
     }),
   }
 }

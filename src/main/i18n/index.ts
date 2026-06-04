@@ -2,8 +2,9 @@
 //
 // One in-memory `currentLang` mirrors the user's setting (settings.lang
 // resolved against `app.getLocale()` if 'auto'). Reads go through
-// `t(key, params)`. The renderer holds its own copy of the dictionary
-// fetched via IPC; this module is the source of truth.
+// `t(key, params)`. Server-backed settings remain the persistence source
+// of truth; this module only keeps the native menu/dialog projection that
+// Electron needs at runtime.
 
 import { app } from 'electron'
 import { DICTS, en, type DictKey } from '#/shared/i18n/dictionaries.ts'

@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { RpcError, createAppRouter, type AppRpcHandlers, type RpcRequest, type RpcResponse } from '#/shared/rpc.ts'
+import { RpcError, createAppRouter, type NativeRpcHandlers, type RpcRequest, type RpcResponse } from '#/shared/rpc.ts'
 import { applyMainWindowChromeTheme } from '#/main/window.ts'
 import { allRegisteredSurfacesWithCapability } from '#/main/window-registry.ts'
 import { subscribeTheme } from '#/main/theme.ts'
@@ -124,10 +124,10 @@ function toRpcError(err: unknown): Extract<RpcResponse, { ok: false }>['error'] 
   return { message: String(err) }
 }
 
-function createRpcHandlers(): AppRpcHandlers {
+function createRpcHandlers(): NativeRpcHandlers {
   return {
     repo: createEmbeddedServerRepoRpcProxyHandlers(currentRpcSignal),
     remote: createEmbeddedServerRemoteRpcProxyHandlers(currentRpcSignal),
-    ...createNativeRpcHandlers({ currentRpcSignal }),
+    ...createNativeRpcHandlers(),
   }
 }
