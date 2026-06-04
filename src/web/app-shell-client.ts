@@ -58,22 +58,26 @@ function openBrowserUrl(url: string): ExecResult {
   return opened ? { ok: true, message: url } : { ok: false, message: 'error.failed-open-browser' }
 }
 
+function openExternalUrlInBrowser(url: string, allowHttp: boolean): ExecResult {
+  return isAllowedExternalUrl(url, allowHttp) ? openBrowserUrl(url) : { ok: false, message: 'error.invalid-url' }
+}
+
+async function openExternalUrlWithPolicy(url: string, allowHttp: boolean): Promise<ExecResult> {
+  const shell = nativeShell()
+  if (shell?.openExternalUrl) return await shell.openExternalUrl({ url, allowHttp })
+  return openExternalUrlInBrowser(url, allowHttp)
+}
+
 export async function openAppSettings(page: SettingsPage = 'general'): Promise<boolean> {
   return (await nativeShell()?.openSettingsWindow?.({ page })) ?? false
 }
 
 export async function openProjectGitHub(): Promise<ExecResult> {
-  const shell = nativeShell()
-  if (shell?.openExternalUrl) return await shell.openExternalUrl({ url: PROJECT_GITHUB_URL, allowHttp: false })
-  return isAllowedExternalUrl(PROJECT_GITHUB_URL, false)
-    ? openBrowserUrl(PROJECT_GITHUB_URL)
-    : { ok: false, message: 'error.invalid-url' }
+  return await openExternalUrlWithPolicy(PROJECT_GITHUB_URL, false)
 }
 
 export async function openExternalUrl(url: string): Promise<ExecResult> {
-  const shell = nativeShell()
-  if (shell?.openExternalUrl) return await shell.openExternalUrl({ url, allowHttp: true })
-  return isAllowedExternalUrl(url, true) ? openBrowserUrl(url) : { ok: false, message: 'error.invalid-url' }
+  return await openExternalUrlWithPolicy(url, true)
 }
 
 export async function chooseLocalRepositoryPath(): Promise<string | null> {

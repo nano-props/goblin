@@ -63,6 +63,30 @@ describe('app shell client', () => {
     expect(window.open).toHaveBeenCalledWith('https://example.com', '_blank', 'noopener,noreferrer')
   })
 
+  test('opens the project GitHub URL through the native shell with https-only policy', async () => {
+    const bridgeModule = await import('#/web/renderer-bridge.ts')
+    const shellOpenExternalUrl = vi.fn(async () => ({ ok: true, message: 'https://github.com/nano-props/goblin' }))
+    bridgeModule.setRendererBridgeForTests(
+      testBridge({
+        shell: () => ({
+          openSettingsWindow: vi.fn(),
+          openExternalUrl: shellOpenExternalUrl,
+          openDirectoryDialog: vi.fn(),
+          consumeExternalOpenPaths: vi.fn(),
+          openInFinder: vi.fn(),
+        }),
+      }),
+    )
+
+    const { openProjectGitHub } = await import('#/web/app-shell-client.ts')
+    await expect(openProjectGitHub()).resolves.toEqual({ ok: true, message: 'https://github.com/nano-props/goblin' })
+    expect(shellOpenExternalUrl).toHaveBeenCalledWith({
+      url: 'https://github.com/nano-props/goblin',
+      allowHttp: false,
+    })
+    expect(window.open).not.toHaveBeenCalled()
+  })
+
   test('chooses repository paths through the renderer bridge shell', async () => {
     const bridgeModule = await import('#/web/renderer-bridge.ts')
     const openDirectoryDialog = vi.fn(async (input?: { title?: string }) =>

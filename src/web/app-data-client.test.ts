@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { RendererBootstrapSnapshot } from '#/shared/bootstrap.ts'
+import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+
 function installWebBootstrap(bootstrap: RendererBootstrapSnapshot): void {
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
@@ -14,6 +16,21 @@ function installWebBootstrap(bootstrap: RendererBootstrapSnapshot): void {
       matchMedia: vi.fn(() => ({ matches: true })),
     },
   })
+}
+
+function testBridge(overrides: Partial<RendererBridge> = {}): RendererBridge {
+  return {
+    getBootstrap: () => ({ homeDir: '/Users/test', initialI18n: null, initialSettings: null, initialServer: null }),
+    invokeRpc: vi.fn(),
+    abortRpc: vi.fn(async () => false),
+    onRpcEvent: () => () => {},
+    pathForFile: () => '',
+    shell: () => null,
+    terminal: (() => {
+      throw new Error('unused terminal bridge')
+    }) as never,
+    ...overrides,
+  }
 }
 
 describe('server-client web host bootstrap', () => {
@@ -83,6 +100,56 @@ describe('server-client web host bootstrap', () => {
       'http://127.0.0.1:32100/api/settings/i18n',
       expect.objectContaining({
         headers: expect.objectContaining({ 'x-goblin-internal-secret': 'secret' }),
+      }),
+    )
+  })
+
+  test('opens repository remote through the native shell bridge when available', async () => {
+    installWebBootstrap({
+      homeDir: '',
+      initialI18n: null,
+      initialSettings: null,
+      initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+    })
+    window.open = vi.fn(() => null)
+    const bridgeModule = await import('#/web/renderer-bridge.ts')
+    const openExternalUrl = vi.fn(async () => ({ ok: true, message: 'https://github.com/acme/repo/tree/feature/test' }))
+    bridgeModule.setRendererBridgeForTests(
+      testBridge({
+        getBootstrap: () => ({
+          homeDir: '',
+          initialI18n: null,
+          initialSettings: null,
+          initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+        }),
+        shell: () => ({
+          openSettingsWindow: vi.fn(),
+          openExternalUrl,
+          openDirectoryDialog: vi.fn(),
+          consumeExternalOpenPaths: vi.fn(),
+          openInFinder: vi.fn(),
+        }),
+      }),
+    )
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, message: 'https://github.com/acme/repo/tree/feature/test' }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { openRepositoryRemote } = await import('#/web/app-data-client.ts')
+    await expect(openRepositoryRemote('/tmp/repo', 'feature/test')).resolves.toEqual({ ok: true, message: '' })
+    expect(openExternalUrl).toHaveBeenCalledWith({
+      url: 'https://github.com/acme/repo/tree/feature/test',
+      allowHttp: true,
+    })
+    expect(window.open).not.toHaveBeenCalled()
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:32100/api/repo/open-remote',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ 'x-goblin-internal-secret': 'secret' }),
+        body: JSON.stringify({ cwd: '/tmp/repo', branch: 'feature/test' }),
       }),
     )
   })

@@ -1,5 +1,5 @@
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
-import { canUseGlobalShortcutSettings, canUseNativeRpcBridge } from '#/web/app-shell-client.ts'
+import { canUseGlobalShortcutSettings, canUseNativeRpcBridge, openExternalUrl } from '#/web/app-shell-client.ts'
 import { invokeNativeRpcPath } from '#/web/native-bridge.ts'
 import type {
   CloneRepoResult,
@@ -339,8 +339,8 @@ export async function openRepositoryRemote(cwd: string, branch?: string): Promis
     branch ? { cwd, branch } : { cwd },
   )
   if (!result.ok || !result.message) return result
-  const opened = window.open(result.message, '_blank', 'noopener,noreferrer')
-  return opened ? { ok: true, message: '' } : { ok: false, message: 'error.failed-open-browser' }
+  const opened = await openExternalUrl(result.message)
+  return opened.ok ? { ok: true, message: '' } : opened
 }
 
 export async function openRepositoryTerminal(path: string): Promise<ExecResult> {
