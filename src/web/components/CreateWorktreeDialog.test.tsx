@@ -13,11 +13,11 @@ import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 let container: HTMLDivElement | null = null
 let root: Root | null = null
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-const testWindow = window as unknown as { goblin?: unknown }
+const testWindow = window as unknown as { goblinNative?: unknown }
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
-  testWindow.goblin = {
+  testWindow.goblinNative = {
     homeDir: '/Users/tester',
     pathForFile: () => '',
     invokeRpc: async () => null,
@@ -34,7 +34,7 @@ afterEach(() => {
   root = null
   container = null
   document.body.innerHTML = ''
-  delete testWindow.goblin
+  delete testWindow.goblinNative
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 

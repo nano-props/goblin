@@ -82,7 +82,7 @@ vi.mock('#/main/i18n/index.ts', () => ({
   getDictionary: () => ({}),
 }))
 
-vi.mock('#/main/settings-server-facade.ts', () => ({
+vi.mock('#/main/settings-server-client.ts', () => ({
   getSettingsSnapshot: mocks.getSettingsSnapshot,
 }))
 

@@ -3,6 +3,7 @@ import { postEmbeddedServerJson, requestEmbeddedServerJson } from '#/shared/embe
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import { getEmbeddedServerRuntime } from '#/main/server-manager.ts'
 
+// Main-process client for server-owned settings/session APIs.
 export type SettingsPrefsPatch = Partial<SettingsPrefs>
 
 function requireEmbeddedServerRuntime() {

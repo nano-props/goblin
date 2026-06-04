@@ -1,17 +1,14 @@
 import { app, dialog, shell } from 'electron'
 import { promises as fs } from 'node:fs'
-import { broadcastRpcEvent } from '#/main/events.ts'
+import { broadcastRpcEvent } from '#/main/renderer-surface-events.ts'
+import { applyNativeHostClearRecentReposState } from '#/main/native-host-settings-effects.ts'
 import { applyLangPref, t } from '#/main/i18n/index.ts'
-import { setMenuLangPref, setMenuRecentRepos } from '#/main/menu-state.ts'
-import { clearSettingsRecentRepos } from '#/main/settings-server-facade.ts'
+import { setMenuLangPref } from '#/main/menu-state.ts'
+import { clearSettingsRecentRepos } from '#/main/settings-server-client.ts'
 import { setThemePref } from '#/main/theme.ts'
 import { getEmbeddedServerUrl } from '#/main/window-shell.ts'
 import { openHttpExternal } from '#/main/external-url.ts'
 import type { LangPref, ThemePref } from '#/shared/rpc.ts'
-
-interface NativeMenuActionOptions {
-  rebuildMenu: () => void
-}
 
 export async function setThemePrefFromMenu(pref: ThemePref): Promise<void> {
   try {
@@ -21,7 +18,7 @@ export async function setThemePrefFromMenu(pref: ThemePref): Promise<void> {
   }
 }
 
-export async function setLangPrefFromMenu(pref: LangPref, options: NativeMenuActionOptions): Promise<void> {
+export async function setLangPrefFromMenu(pref: LangPref, options: { rebuildMenu: () => void }): Promise<void> {
   try {
     const payload = await applyLangPref(pref)
     if (!payload) return
@@ -44,11 +41,9 @@ export async function openWebVersionFromMenu(): Promise<void> {
   dialog.showErrorBox(t('menu.file.open-in-browser'), baseUrl)
 }
 
-export async function clearRecentReposFromMenu(options: NativeMenuActionOptions): Promise<void> {
+export async function clearRecentReposFromMenu(): Promise<void> {
   await clearSettingsRecentRepos()
-  app.clearRecentDocuments()
-  setMenuRecentRepos([])
-  options.rebuildMenu()
+  applyNativeHostClearRecentReposState()
 }
 
 export async function openDataFolder(): Promise<void> {

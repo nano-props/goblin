@@ -166,24 +166,6 @@ export type RpcResponse =
   | { ok: true; data: unknown }
   | { ok: false; error: { message: string; code?: string; name?: string } }
 
-export type MenuAction =
-  | 'open-repo'
-  | 'open-repo-path'
-  | 'open-remote-repo'
-  | 'clone-repo'
-  | 'close-repo'
-  | 'next-repo'
-  | 'prev-repo'
-  | 'refresh'
-  | 'tab-status'
-  | 'tab-terminal'
-  | 'terminal-primary-action'
-  | 'toggle-detail'
-  | 'reset-layout'
-  | { type: 'open-settings'; page: SettingsPage }
-  | { type: 'open-recent-repo'; entry: RepoSessionEntry }
-  | { type: 'set-workspace-layout'; layout: WorkspaceLayout }
-
 export type RpcEvent =
   | { type: 'theme-changed'; state: ThemeState }
   | { type: 'fetch-interval-changed'; sec: number }
@@ -197,9 +179,6 @@ export type RpcEvent =
   | ({ type: 'editor-app-changed' } & EditorAppState)
   | { type: 'github-cli-changed'; state: GitHubCliState }
   | { type: 'settings-write-error'; message: string }
-  | { type: 'external-open-enqueued' }
-  | { type: 'menu-action'; action: MenuAction }
-  | { type: 'terminal-bell-click'; repoRoot: string; key?: string }
   | { type: 'i18n-changed'; payload: I18nPayload }
   | RepoQueryInvalidationEvent
 
@@ -290,15 +269,13 @@ export interface AppRpcHandlers {
 }
 
 export interface NativeRpcHandlers {
-  repo: AppRpcHandlers['repo']
-  remote: AppRpcHandlers['remote']
   settings: {
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
     applyRecentReposProjection: (input: { recentRepos: RepoSessionEntry[]; addedRepo?: RepoSessionEntry }) => Promise<void>
   }
 }
 
-export type NativeBridgeHandlers = Pick<NativeRpcHandlers, 'settings'>
+export type NativeBridgeHandlers = NativeRpcHandlers
 
 export type NativeRpcPath = {
   [NS in keyof NativeBridgeHandlers]: `${Extract<NS, string>}.${Extract<keyof NativeBridgeHandlers[NS], string>}`
@@ -374,53 +351,6 @@ type NativeRpcProcedureSchemas = {
 }
 
 export const RPC_PROCEDURE_SCHEMAS: NativeRpcProcedureSchemas = {
-  repo: {
-    probe: CwdInput,
-    clone: v.object({ operationId: v.string(), url: v.string(), parentPath: v.string(), directoryName: v.string() }),
-    abortClone: v.object({ operationId: v.string() }),
-    snapshot: CwdInput,
-    pullRequests: v.object({
-      cwd: v.string(),
-      branches: v.optional(v.array(v.string())),
-      options: v.optional(
-        v.object({ mode: v.optional(v.picklist(['summary', 'full'])), clearMissing: v.optional(v.boolean()) }),
-      ),
-    }),
-    status: CwdInput,
-    patch: v.object({ cwd: v.string(), worktreePath: v.string() }),
-    checkout: BranchInput,
-    deleteBranch: v.object({
-      cwd: v.string(),
-      branch: v.string(),
-      force: v.optional(v.boolean()),
-      alsoDeleteUpstream: v.optional(v.boolean()),
-    }),
-    removeWorktree: v.object({
-      cwd: v.string(),
-      branch: v.string(),
-      worktreePath: v.string(),
-      alsoDeleteBranch: v.boolean(),
-      forceDeleteBranch: v.optional(v.boolean()),
-      alsoDeleteUpstream: v.optional(v.boolean()),
-    }),
-    createWorktree: v.object({
-      cwd: v.string(),
-      worktreePath: v.string(),
-      newBranch: v.string(),
-      baseBranch: v.string(),
-    }),
-    pull: v.object({ cwd: v.string(), branch: v.string(), worktreePath: v.optional(v.string()) }),
-    push: BranchInput,
-    fetch: v.object({ cwd: v.string(), kind: v.optional(v.picklist(['user', 'background'])) }),
-    abort: CwdInput,
-    openRemote: v.object({ cwd: v.string(), branch: v.optional(v.string()) }),
-  },
-  remote: {
-    listSshHosts: EmptyInput,
-    resolveTarget: RemoteConnectionInputSchema,
-    listPathSuggestions: RemotePathSuggestionsInputSchema,
-    testRepository: v.object({ target: RemoteTargetSchema }),
-  },
   settings: {
     setGlobalShortcut: v.object({ accelerator: v.string() }),
     applyRecentReposProjection: v.object({
@@ -463,14 +393,6 @@ function createValidatedNamespace<THandlers extends Record<string, (...args: nev
 
 export interface AppRouter {
   createCaller: () => {
-    repo: {
-      [K in keyof NativeRpcHandlers['repo']]: (input: unknown) => Promise<Awaited<ReturnType<NativeRpcHandlers['repo'][K]>>>
-    }
-    remote: {
-      [K in keyof NativeRpcHandlers['remote']]: (
-        input: unknown,
-      ) => Promise<Awaited<ReturnType<NativeRpcHandlers['remote'][K]>>>
-    }
     settings: {
       [K in keyof NativeRpcHandlers['settings']]: (
         input: unknown,
@@ -482,8 +404,6 @@ export interface AppRouter {
 export function createAppRouter(handlers: NativeRpcHandlers): AppRouter {
   return {
     createCaller: () => ({
-      repo: createValidatedNamespace(handlers.repo, RPC_PROCEDURE_SCHEMAS.repo),
-      remote: createValidatedNamespace(handlers.remote, RPC_PROCEDURE_SCHEMAS.remote),
       settings: createValidatedNamespace(handlers.settings, RPC_PROCEDURE_SCHEMAS.settings),
     }),
   }

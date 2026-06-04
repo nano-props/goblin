@@ -109,12 +109,6 @@ export class TerminalSessionRegistry {
     this.bellController.reset()
   }
 
-  pruneDeadSessions(): void {
-    // Server-side pruning is now authoritative. This method is kept for compatibility
-    // but no longer makes lifecycle decisions based on frontend state.
-    // The server will prune invalid terminals via the /api/terminal/prune endpoint.
-  }
-
   handleOutput(event: { sessionId: string; data: string; seq: number; processName: string }): void {
     const directKey = this.sessionKeyBySessionId.get(event.sessionId)
     const directSession = directKey ? this.sessions.get(directKey) : null

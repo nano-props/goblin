@@ -28,7 +28,7 @@ vi.mock('electron', () => ({
   },
 }))
 
-vi.mock('#/main/settings-server-facade.ts', () => ({
+vi.mock('#/main/settings-server-client.ts', () => ({
   getSettingsPrefs: mocks.getSettingsPrefs,
   updateSettingsPrefs: mocks.updateSettingsPrefs,
 }))

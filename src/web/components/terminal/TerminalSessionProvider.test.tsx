@@ -3,6 +3,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessionProvider.tsx'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { useTerminalCount, useTerminalSessionSummaries } from '#/web/components/terminal/terminal-session-store.ts'
@@ -293,9 +294,14 @@ beforeEach(() => {
   window.sessionStorage.setItem('goblin:web-terminal-attachment-id', 'attachment_local')
   useSettingsStore.setState({ terminalNotificationsEnabled: false })
   document.body.innerHTML = ''
-  Object.defineProperty(window, 'goblin', {
+  Object.defineProperty(window, 'goblinNative', {
     configurable: true,
     value: {
+      runtime: {
+        kind: 'electron',
+        bridgeVersion: RENDERER_BRIDGE_VERSION,
+        capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+      },
       homeDir: '/Users/test',
       initialI18n: null,
       initialSettings: null,
@@ -373,6 +379,11 @@ beforeEach(() => {
   Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
     configurable: true,
     value: {
+      runtime: {
+        kind: 'web',
+        bridgeVersion: RENDERER_BRIDGE_VERSION,
+        capabilities: [],
+      },
       homeDir: '/Users/test',
       initialI18n: null,
       initialSettings: null,
@@ -380,7 +391,22 @@ beforeEach(() => {
     },
   })
   setRendererBridgeForTests({
+    kind: () => 'electron',
+    hasCapability: (capability) =>
+      capability === 'settings-rpc' ||
+      capability === 'open-settings-window' ||
+      capability === 'open-external-url' ||
+      capability === 'open-directory-dialog' ||
+      capability === 'consume-external-open-paths' ||
+      capability === 'open-in-finder' ||
+      capability === 'terminal-notifications' ||
+      capability === 'terminal-badge',
     getBootstrap: () => ({
+      runtime: {
+        kind: 'electron',
+        bridgeVersion: RENDERER_BRIDGE_VERSION,
+        capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+      },
       homeDir: '/Users/test',
       initialI18n: null,
       initialSettings: null,
@@ -389,6 +415,7 @@ beforeEach(() => {
     invokeRpc: vi.fn(async () => []),
     abortRpc: vi.fn(async () => false),
     onRpcEvent: vi.fn(() => () => {}),
+    onEffectIntent: vi.fn(() => () => {}),
     pathForFile: vi.fn(() => ''),
     shell: () => null,
     terminal: () => ({
@@ -408,9 +435,9 @@ beforeEach(() => {
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       listSessions: listSessionsMock,
       getSessionSnapshot: getSessionSnapshotMock,
-      notifyBell: window.goblin.terminal.notifyBell,
+      notifyBell: window.goblinNative.terminal.notifyBell,
       sendTestNotification: vi.fn(async () => true),
-      setBadge: window.goblin.terminal.setBadge,
+      setBadge: window.goblinNative.terminal.setBadge,
       onOutput: vi.fn((cb: (event: TerminalOutputEvent) => void) => {
         outputHandler = cb
         return () => {}
@@ -503,7 +530,7 @@ describe('TerminalSessionProvider', () => {
     useSettingsStore.setState({ terminalNotificationsEnabled: true })
     const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
     const notifyBell = vi.fn(async () => true)
-    Object.assign(window.goblin.terminal, { notifyBell })
+    Object.assign(window.goblinNative.terminal, { notifyBell })
     const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
@@ -617,7 +644,7 @@ describe('TerminalSessionProvider', () => {
     useSettingsStore.setState({ terminalNotificationsEnabled: true })
     const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
     const notifyBell = vi.fn(async () => true)
-    Object.assign(window.goblin.terminal, { notifyBell })
+    Object.assign(window.goblinNative.terminal, { notifyBell })
     const { getContext, unmount } = await renderProvider()
 
     try {

@@ -1,4 +1,4 @@
-// Preload bridge. Exposes low-level IPC under `window.goblin` to the renderer.
+// Preload bridge. Exposes low-level IPC under `window.goblinNative` to the renderer.
 // IMPORTANT: This preload runs with sandbox: true (see window.ts). Only
 // the `electron` module is available here — do NOT require Node built-ins
 // like `os`, `fs`, or `path`. Anything that needs Node lives
@@ -9,6 +9,7 @@ const IPC = {
     call: 'goblin:rpc',
     abort: 'goblin:rpc-abort',
     event: 'goblin:event',
+    effectIntent: 'goblin:effect-intent',
   },
   shell: {
     openSettingsWindow: 'goblin:shell-open-settings-window',
@@ -73,6 +74,14 @@ function safeParseBase64JsonArgument(prefix, label) {
 
 const BOOTSTRAP_PREFIX = '--goblin-bootstrap='
 const bootstrap = safeParseBase64JsonArgument(BOOTSTRAP_PREFIX, 'bootstrap payload')
+const runtime =
+  isObject(bootstrap?.runtime) &&
+  (bootstrap.runtime.kind === 'electron' || bootstrap.runtime.kind === 'web') &&
+  typeof bootstrap.runtime.bridgeVersion === 'number' &&
+  Array.isArray(bootstrap.runtime.capabilities) &&
+  bootstrap.runtime.capabilities.every((value) => typeof value === 'string')
+    ? bootstrap.runtime
+    : { kind: 'electron', bridgeVersion: 1, capabilities: [] }
 const homeDir = typeof bootstrap?.homeDir === 'string' ? bootstrap.homeDir : ''
 const initialI18n = isObject(bootstrap?.i18n) ? bootstrap.i18n : null
 const initialSettings = isObject(bootstrap?.settings) ? bootstrap.settings : null
@@ -85,6 +94,8 @@ const initialServer =
     : null
 const rpcEventSubscribers = new Set()
 let rpcEventListener = null
+const effectIntentSubscribers = new Set()
+let effectIntentListener = null
 
 function ensureRpcEventListener() {
   if (rpcEventListener) return
@@ -106,7 +117,28 @@ function maybeDisposeRpcEventListener() {
   rpcEventListener = null
 }
 
-contextBridge.exposeInMainWorld('goblin', {
+function ensureEffectIntentListener() {
+  if (effectIntentListener) return
+  effectIntentListener = (_event, payload) => {
+    for (const cb of effectIntentSubscribers) {
+      try {
+        cb(payload)
+      } catch (err) {
+        console.warn('[ipc] goblin:effect-intent subscriber failed', err)
+      }
+    }
+  }
+  ipcRenderer.on(IPC.rpc.effectIntent, effectIntentListener)
+}
+
+function maybeDisposeEffectIntentListener() {
+  if (effectIntentSubscribers.size > 0 || !effectIntentListener) return
+  ipcRenderer.off(IPC.rpc.effectIntent, effectIntentListener)
+  effectIntentListener = null
+}
+
+contextBridge.exposeInMainWorld('goblinNative', {
+  runtime,
   homeDir,
   initialI18n,
   initialSettings,
@@ -134,6 +166,14 @@ contextBridge.exposeInMainWorld('goblin', {
     return () => {
       rpcEventSubscribers.delete(cb)
       maybeDisposeRpcEventListener()
+    }
+  },
+  onIntent: (cb) => {
+    effectIntentSubscribers.add(cb)
+    ensureEffectIntentListener()
+    return () => {
+      effectIntentSubscribers.delete(cb)
+      maybeDisposeEffectIntentListener()
     }
   },
 })

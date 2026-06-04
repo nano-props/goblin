@@ -12,13 +12,13 @@ const {
   ipcHandlers,
   browserWindowFromWebContents,
   showOpenDialog,
-  sendRpcEvent,
+  sendRendererEffectIntent,
   activateMainWindow,
 } = vi.hoisted(() => ({
   ipcHandlers: new Map<string, (_event: unknown, input: any) => unknown>(),
   browserWindowFromWebContents: vi.fn(),
   showOpenDialog: vi.fn(),
-  sendRpcEvent: vi.fn(),
+  sendRendererEffectIntent: vi.fn(),
   activateMainWindow: vi.fn(),
 }))
 
@@ -38,8 +38,8 @@ vi.mock('#/main/window.ts', () => ({
   getMainWindow: vi.fn(() => null),
 }))
 
-vi.mock('#/main/events.ts', () => ({
-  sendRpcEvent,
+vi.mock('#/main/renderer-surface-events.ts', () => ({
+  sendRendererEffectIntent,
 }))
 
 const trustedSender = { id: 1, once: vi.fn() }
@@ -81,16 +81,16 @@ describe('shell bridge IPC', () => {
     })
   })
 
-  test('opens settings through a menu-action on the activated main window', async () => {
+  test('opens settings through an effect intent on the activated main window', async () => {
     const mainWindow = {} as any
     activateMainWindow.mockResolvedValue(mainWindow)
 
     const result = await invoke(SHELL_OPEN_SETTINGS_WINDOW_CHANNEL, { page: 'about' })
 
     expect(result).toBe(true)
-    expect(sendRpcEvent).toHaveBeenCalledWith(mainWindow, {
-      type: 'menu-action',
-      action: { type: 'open-settings', page: 'about' },
+    expect(sendRendererEffectIntent).toHaveBeenCalledWith(mainWindow, {
+      type: 'open-settings-requested',
+      page: 'about',
     })
   })
 

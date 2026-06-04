@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 
 class MockWebSocket {
   static readonly CONNECTING = 0
@@ -52,6 +53,7 @@ describe('server invalidation source', () => {
     Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
       configurable: true,
       value: {
+        runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
         homeDir: '',
         initialI18n: null,
         initialSettings: null,
@@ -61,29 +63,29 @@ describe('server invalidation source', () => {
   })
 
   test('reuses a connecting socket when listeners unsubscribe and resubscribe before close completes', async () => {
-    const { resetServerInvalidationSourceForTests, subscribeServerInvalidation } = await import(
-      '#/web/server-invalidation-source.ts'
+    const { resetServerInvalidationIngressForTests, subscribeServerInvalidationIngress } = await import(
+      '#/web/server-invalidation-ingress.ts'
     )
 
-    const disposeFirst = subscribeServerInvalidation(() => {})
+    const disposeFirst = subscribeServerInvalidationIngress(() => {})
     expect(MockWebSocket.instances).toHaveLength(1)
 
     disposeFirst()
-    const disposeSecond = subscribeServerInvalidation(() => {})
+    const disposeSecond = subscribeServerInvalidationIngress(() => {})
     expect(MockWebSocket.instances).toHaveLength(1)
 
     MockWebSocket.instances[0]?.emitOpen()
     disposeSecond()
-    resetServerInvalidationSourceForTests()
+    resetServerInvalidationIngressForTests()
   })
 
   test('ignores stale invalidation socket events after reconnect creates a newer socket', async () => {
     vi.useFakeTimers()
-    const { resetServerInvalidationSourceForTests, subscribeServerInvalidation } = await import(
-      '#/web/server-invalidation-source.ts'
+    const { resetServerInvalidationIngressForTests, subscribeServerInvalidationIngress } = await import(
+      '#/web/server-invalidation-ingress.ts'
     )
     const listener = vi.fn()
-    const dispose = subscribeServerInvalidation(listener)
+    const dispose = subscribeServerInvalidationIngress(listener)
     const firstSocket = MockWebSocket.instances[0]
     if (!firstSocket) throw new Error('missing initial invalidation socket')
 
@@ -99,7 +101,7 @@ describe('server invalidation source', () => {
     expect(listener).toHaveBeenCalledTimes(1)
     expect(listener).toHaveBeenCalledWith({ type: 'settings-invalidated', scopes: ['session'] })
     dispose()
-    resetServerInvalidationSourceForTests()
+    resetServerInvalidationIngressForTests()
     vi.useRealTimers()
   })
 })

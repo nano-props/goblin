@@ -137,10 +137,13 @@ function rendererBridgeWith(overrides: {
   create: NonNullable<ReturnType<RendererBridge['terminal']>['create']>
 }): RendererBridge {
   return {
+    kind: () => 'web',
+    hasCapability: () => false,
     getBootstrap: emptyRendererBridgeBootstrap,
     invokeRpc: async () => null,
     abortRpc: async () => false,
     onRpcEvent: () => () => {},
+    onEffectIntent: () => () => {},
     pathForFile: () => '',
     shell: () => null,
     terminal: () => ({

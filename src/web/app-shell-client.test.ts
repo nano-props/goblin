@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
 
 function installWindow() {
@@ -16,11 +17,29 @@ function installWindow() {
 }
 
 function testBridge(overrides: Partial<RendererBridge> = {}): RendererBridge {
+  const nativeShell = overrides.shell?.() ?? null
   return {
-    getBootstrap: () => ({ homeDir: '/Users/test', initialI18n: null, initialSettings: null, initialServer: null }),
+    kind: () => 'web',
+    hasCapability: (capability) => {
+      if (capability === 'settings-rpc') return typeof overrides.invokeRpc === 'function'
+      if (capability === 'open-settings-window') return nativeShell?.openSettingsWindow !== undefined
+      if (capability === 'open-external-url') return nativeShell?.openExternalUrl !== undefined
+      if (capability === 'open-directory-dialog') return nativeShell?.openDirectoryDialog !== undefined
+      if (capability === 'consume-external-open-paths') return nativeShell?.consumeExternalOpenPaths !== undefined
+      if (capability === 'open-in-finder') return nativeShell?.openInFinder !== undefined
+      return false
+    },
+    getBootstrap: () => ({
+      runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+      homeDir: '/Users/test',
+      initialI18n: null,
+      initialSettings: null,
+      initialServer: null,
+    }),
     invokeRpc: vi.fn(),
     abortRpc: vi.fn(async () => false),
     onRpcEvent: () => () => {},
+    onEffectIntent: () => () => {},
     pathForFile: () => '',
     shell: () => null,
     terminal: (() => {

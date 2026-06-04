@@ -146,13 +146,6 @@ export interface ReposStore extends PersistableWorkspaceUiState, WorkspaceFronte
   repos: Record<string, RepoState>
   repoCache: Record<string, CachedRepoState>
 
-  /** Convenience action: ensure a repo is open, then
-   *  optionally focus it. Prefer `ensureWorkspaceOpen(...)` plus a
-   *  navigation-driven activate step for new route-first entry flows.
-   *  Returns the resolved repo id (the toplevel git root) on success so
-   *  callers can still drive a final `setActive` without re-reading the
-   *  store. */
-  openRepo: (path: string | RepoSessionEntry, options?: { activate?: boolean }) => Promise<OpenRepoResult>
   /** Ensure a repo belongs to the open workspace set without implying
    *  anything about the current active selection. */
   ensureWorkspaceOpen: (path: string | RepoSessionEntry) => Promise<OpenRepoResult>

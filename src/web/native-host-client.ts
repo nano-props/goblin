@@ -1,7 +1,5 @@
-import type { NativeRpcPath, RpcEvent, RpcRequest } from '#/shared/rpc.ts'
+import type { NativeRpcPath, RpcRequest } from '#/shared/rpc.ts'
 import { getRendererBridge } from '#/web/renderer-bridge.ts'
-
-type NativeEventType = RpcEvent['type']
 
 let nextNativeRequestId = 1
 
@@ -50,13 +48,4 @@ export async function invokeNativeRpcPath<TOutput>(
   signal?: AbortSignal,
 ): Promise<TOutput> {
   return (await invokeNativeRpc({ path, input, requestId: createNativeRequestId() }, signal)) as TOutput
-}
-
-export function onNativeEventType<TType extends NativeEventType>(
-  type: TType,
-  cb: (event: Extract<RpcEvent, { type: TType }>) => void,
-): () => void {
-  return getRendererBridge().onRpcEvent((event) => {
-    if (event.type === type) cb(event as Extract<RpcEvent, { type: TType }>)
-  })
 }

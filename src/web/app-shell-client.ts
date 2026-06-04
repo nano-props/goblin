@@ -14,18 +14,26 @@ function nativeShell() {
 
 export function canUseNativeRpcBridge(): boolean {
   try {
-    return typeof window.goblin?.invokeRpc === 'function'
+    return getRendererBridge().hasCapability('settings-rpc')
   } catch {
     return false
   }
 }
 
 export function hasNativeDirectoryPicker(): boolean {
-  return nativeShell()?.openDirectoryDialog !== undefined
+  try {
+    return getRendererBridge().hasCapability('open-directory-dialog')
+  } catch {
+    return false
+  }
 }
 
 export function canOpenAppSettings(): boolean {
-  return nativeShell()?.openSettingsWindow !== undefined
+  try {
+    return getRendererBridge().hasCapability('open-settings-window')
+  } catch {
+    return false
+  }
 }
 
 export function canUseGlobalShortcutSettings(): boolean {

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { RendererBootstrapSnapshot } from '#/shared/bootstrap.ts'
+import { RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
 class FakeWebSocket {
@@ -63,6 +64,17 @@ function installWebBootstrap(bootstrap: RendererBootstrapSnapshot): void {
   vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket)
 }
 
+function webBootstrap(overrides: Partial<RendererBootstrapSnapshot> = {}): RendererBootstrapSnapshot {
+  return {
+    runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+    homeDir: '',
+    initialI18n: null,
+    initialSettings: null,
+    initialServer: null,
+    ...overrides,
+  }
+}
+
 function latestSocket(): FakeWebSocket {
   const socket = FakeWebSocket.instances.at(-1)
   if (!socket) throw new Error('Expected websocket to be created')
@@ -107,17 +119,12 @@ describe('web invalidation sync', () => {
   })
 
   afterEach(async () => {
-    const { resetServerInvalidationSourceForTests } = await import('#/web/server-invalidation-source.ts')
-    resetServerInvalidationSourceForTests()
+    const { resetServerInvalidationIngressForTests } = await import('#/web/server-invalidation-ingress.ts')
+    resetServerInvalidationIngressForTests()
   })
 
   test('settings store refetches snapshot and external apps on settings invalidation', async () => {
-    installWebBootstrap({
-      homeDir: '',
-      initialI18n: null,
-      initialSettings: null,
-      initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
-    })
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
     const fetchMock = vi.fn(async (input: string) => {
       if (input.endsWith('/api/settings/github-cli')) {
         return { ok: true, json: async () => ({ available: false, version: null, detectedAt: 0, hosts: {} }) }
@@ -177,12 +184,7 @@ describe('web invalidation sync', () => {
   })
 
   test('theme store refetches theme state on theme invalidation', async () => {
-    installWebBootstrap({
-      homeDir: '',
-      initialI18n: null,
-      initialSettings: null,
-      initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
-    })
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
     let settingsReadCount = 0
     vi.stubGlobal(
       'fetch',
@@ -209,12 +211,7 @@ describe('web invalidation sync', () => {
   })
 
   test('settings snapshot invalidation no longer refetches theme state', async () => {
-    installWebBootstrap({
-      homeDir: '',
-      initialI18n: null,
-      initialSettings: null,
-      initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
-    })
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
     let settingsReadCount = 0
     vi.stubGlobal(
       'fetch',
@@ -242,12 +239,7 @@ describe('web invalidation sync', () => {
   })
 
   test('session invalidation does not refetch settings or theme state', async () => {
-    installWebBootstrap({
-      homeDir: '',
-      initialI18n: null,
-      initialSettings: null,
-      initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
-    })
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => settingsSnapshotResponse(),
@@ -269,12 +261,7 @@ describe('web invalidation sync', () => {
   })
 
   test('i18n store refetches payload only on i18n invalidation', async () => {
-    installWebBootstrap({
-      homeDir: '',
-      initialI18n: null,
-      initialSettings: null,
-      initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
-    })
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
     let i18nReadCount = 0
     vi.stubGlobal(
       'fetch',
@@ -302,12 +289,7 @@ describe('web invalidation sync', () => {
   })
 
   test('settings refetch subscription coalesces repeated invalidations while a fetch is in flight', async () => {
-    installWebBootstrap({
-      homeDir: '',
-      initialI18n: null,
-      initialSettings: null,
-      initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
-    })
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
 
     const resolvers: Array<(value: number) => void> = []
     const apply = vi.fn()
@@ -318,8 +300,8 @@ describe('web invalidation sync', () => {
         }),
     )
 
-    const { subscribeSettingsRefetch } = await import('#/web/settings-sync-subscription.ts')
-    const dispose = subscribeSettingsRefetch({
+    const { subscribeSettingsInvalidationRefetch } = await import('#/web/settings-invalidation-refetch.ts')
+    const dispose = subscribeSettingsInvalidationRefetch({
       scope: 'settings-snapshot',
       fetch,
       apply,

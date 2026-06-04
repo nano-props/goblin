@@ -75,7 +75,7 @@ export function installGoblinTestBridge(handlers: Record<string, RpcTestHandler>
         initialSettings: null,
         initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
       },
-      goblin: {
+      goblinNative: {
         homeDir: '/Users/test',
         initialI18n: null,
         initialSettings: null,

@@ -42,7 +42,7 @@ import {
 } from '#/web/app-data-client.ts'
 import { DEFAULT_GLOBAL_SHORTCUT } from '#/shared/accelerator.ts'
 import { DEFAULT_DETAIL_PANE_SIZES, DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
-import { subscribeSettingsRefetch } from '#/web/settings-sync-subscription.ts'
+import { subscribeSettingsInvalidationRefetch } from '#/web/settings-invalidation-refetch.ts'
 
 export const EMPTY_SESSION_STATE: SessionState = {
   openRepos: [],
@@ -308,7 +308,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     })
     const nextUnsubscribers: Array<() => void> = []
     nextUnsubscribers.push(
-      subscribeSettingsRefetch({
+      subscribeSettingsInvalidationRefetch({
         scope: 'settings-snapshot',
         fetch: getSettingsSnapshot,
         label: 'settings',
@@ -319,7 +319,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
           })
         },
       }),
-      subscribeSettingsRefetch({
+      subscribeSettingsInvalidationRefetch({
         scope: 'external-apps',
         fetch: getExternalAppsSnapshot,
         label: 'settings external apps',

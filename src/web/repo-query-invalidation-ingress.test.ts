@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 
 class FakeWebSocket {
   static instances: FakeWebSocket[] = []
@@ -44,20 +45,26 @@ describe('repo query invalidation source', () => {
   })
 
   afterEach(async () => {
-    const { resetServerInvalidationSourceForTests } = await import('#/web/server-invalidation-source.ts')
-    resetServerInvalidationSourceForTests()
+    const { resetServerInvalidationIngressForTests } = await import('#/web/server-invalidation-ingress.ts')
+    resetServerInvalidationIngressForTests()
     vi.useRealTimers()
   })
 
   test('uses server invalidation stream when Electron shell and embedded server are both present', async () => {
     installWindow({
       __GOBLIN_BOOTSTRAP__: {
+        runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
         homeDir: '',
         initialI18n: null,
         initialSettings: null,
         initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
       },
-      goblin: {
+      goblinNative: {
+        runtime: {
+          kind: 'electron',
+          bridgeVersion: RENDERER_BRIDGE_VERSION,
+          capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+        },
         homeDir: '',
         initialI18n: null,
         initialSettings: null,
@@ -85,7 +92,7 @@ describe('repo query invalidation source', () => {
     })
 
     const listener = vi.fn()
-    const { subscribeRepoQueryInvalidation } = await import('#/web/repo-query-invalidation-source.ts')
+    const { subscribeRepoQueryInvalidation } = await import('#/web/repo-query-invalidation-ingress.ts')
     const dispose = subscribeRepoQueryInvalidation(listener)
 
     expect(FakeWebSocket.instances).toHaveLength(1)
@@ -106,6 +113,7 @@ describe('repo query invalidation source', () => {
   test('uses server invalidation stream in pure web mode', async () => {
     installWindow({
       __GOBLIN_BOOTSTRAP__: {
+        runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
         homeDir: '',
         initialI18n: null,
         initialSettings: null,
@@ -119,7 +127,7 @@ describe('repo query invalidation source', () => {
     })
 
     const listener = vi.fn()
-    const { subscribeRepoQueryInvalidation } = await import('#/web/repo-query-invalidation-source.ts')
+    const { subscribeRepoQueryInvalidation } = await import('#/web/repo-query-invalidation-ingress.ts')
     const dispose = subscribeRepoQueryInvalidation(listener)
 
     expect(FakeWebSocket.instances).toHaveLength(1)
@@ -132,6 +140,7 @@ describe('repo query invalidation source', () => {
   test('reconnects invalidation socket with a short delay after unexpected close', async () => {
     installWindow({
       __GOBLIN_BOOTSTRAP__: {
+        runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
         homeDir: '',
         initialI18n: null,
         initialSettings: null,
@@ -145,7 +154,7 @@ describe('repo query invalidation source', () => {
     })
 
     const listener = vi.fn()
-    const { subscribeRepoQueryInvalidation } = await import('#/web/repo-query-invalidation-source.ts')
+    const { subscribeRepoQueryInvalidation } = await import('#/web/repo-query-invalidation-ingress.ts')
     const dispose = subscribeRepoQueryInvalidation(listener)
 
     expect(FakeWebSocket.instances).toHaveLength(1)

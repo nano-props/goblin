@@ -8,7 +8,7 @@
 
 import { app } from 'electron'
 import { DICTS, en, type DictKey } from '#/shared/i18n/dictionaries.ts'
-import { getSettingsPrefs, updateSettingsPrefs } from '#/main/settings-server-facade.ts'
+import { getSettingsPrefs, updateSettingsPrefs } from '#/main/settings-server-client.ts'
 import type { I18nPayload, Lang, LangPref } from '#/shared/rpc.ts'
 
 let currentLang: Lang = 'en'

@@ -3,7 +3,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { useMenuActions } from '#/web/hooks/useMenuActions.ts'
+import { useRendererEffectIntentRouter } from '#/web/hooks/useRendererEffectIntentRouter.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-utils.ts'
@@ -13,6 +13,7 @@ import { createBranchSnapshot, resetReposStore, seedRepoState } from '#/web/stor
 let container: HTMLDivElement | null = null
 let root: Root | null = null
 const rpcEventListeners = new Set<(event: { type: string; repoRoot?: string; key?: string }) => void>()
+const intentListeners = new Set<(event: any) => void>()
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 const closeAllOverlays = vi.fn()
 let overlayOpen = false
@@ -22,6 +23,7 @@ let navigation!: MainWindowNavigationActions
 const activateRepoSpy = vi.fn()
 const closeRepoSpy = vi.fn()
 const showRepoBranchDetailTabSpy = vi.fn()
+const consumeExternalOpenPathsSpy = vi.fn<() => Promise<string[]>>(async () => [])
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
@@ -31,6 +33,8 @@ beforeEach(() => {
   activateRepoSpy.mockClear()
   closeRepoSpy.mockClear()
   showRepoBranchDetailTabSpy.mockClear()
+  consumeExternalOpenPathsSpy.mockReset()
+  consumeExternalOpenPathsSpy.mockResolvedValue([])
   overlayOpen = false
   workspaceShortcutSuppressed = false
   currentRepoId = null
@@ -63,7 +67,7 @@ beforeEach(() => {
     },
     openSettings: () => {},
   }
-  Object.defineProperty(window, 'goblin', {
+  Object.defineProperty(window, 'goblinNative', {
     configurable: true,
     value: {
       homeDir: '/Users/test',
@@ -75,7 +79,16 @@ beforeEach(() => {
           rpcEventListeners.delete(cb)
         }
       }),
+      onIntent: vi.fn((cb: (event: any) => void) => {
+        intentListeners.add(cb)
+        return () => {
+          intentListeners.delete(cb)
+        }
+      }),
       pathForFile: vi.fn(() => ''),
+      shell: {
+        consumeExternalOpenPaths: consumeExternalOpenPathsSpy,
+      },
       terminal: {
         open: vi.fn(),
         restart: vi.fn(),
@@ -104,11 +117,12 @@ afterEach(() => {
   root = null
   container = null
   rpcEventListeners.clear()
+  intentListeners.clear()
   setRendererBridgeForTests(null)
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
-describe('useMenuActions', () => {
+describe('useRendererEffectIntentRouter', () => {
   test('terminal bell clicks close all overlays and focus the repo terminal tab', async () => {
     const repo = seedRepoState({
       id: '/tmp/repo',
@@ -121,9 +135,9 @@ describe('useMenuActions', () => {
 
     await renderHookHost()
 
-    expect(rpcEventListeners.size).toBeGreaterThan(0)
+    expect(intentListeners.size).toBeGreaterThan(0)
     await act(async () => {
-      for (const listener of rpcEventListeners) listener({ type: 'terminal-bell-click', repoRoot: repo.id })
+      for (const listener of intentListeners) listener({ type: 'terminal-bell-click', repoRoot: repo.id })
       await Promise.resolve()
     })
 
@@ -151,7 +165,7 @@ describe('useMenuActions', () => {
     await renderHookHost()
 
     await act(async () => {
-      for (const listener of rpcEventListeners) listener({ type: 'terminal-bell-click', repoRoot: repo.id, key })
+      for (const listener of intentListeners) listener({ type: 'terminal-bell-click', repoRoot: repo.id, key })
       await Promise.resolve()
     })
 
@@ -190,7 +204,7 @@ describe('useMenuActions', () => {
     await renderHookHost()
 
     await act(async () => {
-      for (const listener of rpcEventListeners) listener({ type: 'terminal-bell-click', repoRoot: repo.id, key })
+      for (const listener of intentListeners) listener({ type: 'terminal-bell-click', repoRoot: repo.id, key })
       await Promise.resolve()
     })
 
@@ -209,8 +223,8 @@ describe('useMenuActions', () => {
     await renderHookHost()
 
     await act(async () => {
-      for (const listener of rpcEventListeners)
-        listener({ type: 'menu-action', action: 'close-repo' } as { type: string; action: string })
+      for (const listener of intentListeners)
+        listener({ type: 'close-repo-requested' })
       await Promise.resolve()
     })
 
@@ -250,8 +264,8 @@ describe('useMenuActions', () => {
     await renderHookHost()
 
     await act(async () => {
-      for (const listener of rpcEventListeners)
-        listener({ type: 'menu-action', action: 'close-repo' } as { type: string; action: string })
+      for (const listener of intentListeners)
+        listener({ type: 'close-repo-requested' })
       await Promise.resolve()
     })
 
@@ -268,16 +282,10 @@ describe('useMenuActions', () => {
     await renderHookHost()
 
     await act(async () => {
-      for (const listener of rpcEventListeners) {
+      for (const listener of intentListeners) {
         listener({
-          type: 'menu-action',
-          action: {
-            type: 'open-recent-repo',
-            entry: { kind: 'local', id: '/tmp/recent-repo' },
-          },
-        } as {
-          type: string
-          action: { type: string; entry: { kind: 'local'; id: string } }
+          type: 'open-recent-repo-requested',
+          entry: { kind: 'local', id: '/tmp/recent-repo' },
         })
       }
       await Promise.resolve()
@@ -302,11 +310,11 @@ describe('useMenuActions', () => {
     await renderHookHost()
 
     await act(async () => {
-      for (const listener of rpcEventListeners) {
-        listener({ type: 'menu-action', action: 'tab-terminal' } as { type: string; action: string })
-        listener({ type: 'menu-action', action: 'toggle-detail' } as { type: string; action: string })
-        listener({ type: 'menu-action', action: 'terminal-primary-action' } as { type: string; action: string })
-        listener({ type: 'menu-action', action: 'close-repo' } as { type: string; action: string })
+      for (const listener of intentListeners) {
+        listener({ type: 'show-detail-tab-requested', tab: 'terminal' })
+        listener({ type: 'toggle-detail-requested' })
+        listener({ type: 'terminal-primary-action-requested' })
+        listener({ type: 'close-repo-requested' })
       }
       await Promise.resolve()
     })
@@ -315,6 +323,29 @@ describe('useMenuActions', () => {
     expect(state.repos[repo.id]?.ui.detailTab).toBe('status')
     expect(state.detailCollapsed).toBe(before.detailCollapsed)
     expect(closeRepoSpy).not.toHaveBeenCalled()
+  })
+
+  test('drains externally opened repo paths through the centralized intent router', async () => {
+    useReposStore.setState({
+      ensureWorkspaceOpen: vi.fn(async (path: string | { id: string }) => ({
+        ok: true as const,
+        id: typeof path === 'string' ? path : path.id,
+      })),
+    })
+    consumeExternalOpenPathsSpy
+      .mockResolvedValueOnce(['/tmp/repo-a', '/tmp/repo-b'] as string[])
+      .mockResolvedValueOnce([] as string[])
+
+    await renderHookHost()
+    await act(async () => {
+      for (const listener of intentListeners) listener({ type: 'external-open-enqueued' })
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(useReposStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/repo-a')
+    expect(useReposStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/repo-b')
+    expect(activateRepoSpy).toHaveBeenCalledWith('/tmp/repo-a')
   })
 })
 
@@ -329,7 +360,7 @@ async function renderHookHost() {
 }
 
 function HookHost() {
-  useMenuActions({
+  useRendererEffectIntentRouter({
     navigation,
     currentRepoId,
     closeAllOverlays,

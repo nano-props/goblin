@@ -7,13 +7,14 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoCloneDialog } from '#/web/components/RepoCloneDialog.tsx'
 import { MainWindowNavigationProvider, type MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { resetReposStore } from '#/web/stores/repos/test-utils.ts'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-const testWindow = window as unknown as { goblin?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
+const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
 const fetchMock = vi.fn(async (input: string | URL) => {
   const url = new URL(typeof input === 'string' ? input : input.toString())
   if (url.pathname === '/api/repo/clone') {
@@ -32,14 +33,24 @@ beforeEach(() => {
   fetchMock.mockClear()
   vi.stubGlobal('fetch', fetchMock)
   testWindow.__GOBLIN_BOOTSTRAP__ = {
+    runtime: {
+      kind: 'electron',
+      bridgeVersion: RENDERER_BRIDGE_VERSION,
+      capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+    },
     homeDir: '/Users/test',
     initialI18n: null,
     initialSettings: null,
     initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
   }
-  Object.defineProperty(window, 'goblin', {
+  Object.defineProperty(window, 'goblinNative', {
     configurable: true,
     value: {
+      runtime: {
+        kind: 'electron',
+        bridgeVersion: RENDERER_BRIDGE_VERSION,
+        capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+      },
       homeDir: '/Users/test',
       pathForFile: () => '',
       invokeRpc: async () => null,
@@ -56,7 +67,7 @@ afterEach(() => {
   container?.remove()
   root = null
   container = null
-  delete testWindow.goblin
+  delete testWindow.goblinNative
   delete testWindow.__GOBLIN_BOOTSTRAP__
   setRendererBridgeForTests(null)
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false

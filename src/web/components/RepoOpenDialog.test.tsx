@@ -13,13 +13,13 @@ import { resetReposStore } from '#/web/stores/repos/test-utils.ts'
 let container: HTMLDivElement | null = null
 let root: Root | null = null
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-const testWindow = window as unknown as { goblin?: unknown }
+const testWindow = window as unknown as { goblinNative?: unknown }
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
   setRendererBridgeForTests(null)
-  Object.defineProperty(window, 'goblin', {
+  Object.defineProperty(window, 'goblinNative', {
     configurable: true,
     value: {
       homeDir: '/Users/tester',
@@ -38,7 +38,7 @@ afterEach(() => {
   container?.remove()
   root = null
   container = null
-  delete testWindow.goblin
+  delete testWindow.goblinNative
   setRendererBridgeForTests(null)
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })

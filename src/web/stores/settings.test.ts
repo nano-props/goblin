@@ -47,7 +47,7 @@ function installBridge(handlers: Record<string, () => unknown>) {
         initialSettings: null,
         initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
       },
-      goblin: {
+      goblinNative: {
         homeDir: '/Users/test',
         initialI18n: null,
         initialSettings: null,
@@ -148,8 +148,8 @@ describe('settings store external app hydration', () => {
   })
 
   afterEach(async () => {
-    const { resetServerInvalidationSourceForTests } = await import('#/web/server-invalidation-source.ts')
-    resetServerInvalidationSourceForTests()
+    const { resetServerInvalidationIngressForTests } = await import('#/web/server-invalidation-ingress.ts')
+    resetServerInvalidationIngressForTests()
   })
 
   test('ignores stale externalApps.get results after a newer refresh', async () => {

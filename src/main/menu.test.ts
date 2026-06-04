@@ -33,7 +33,7 @@ const mocks = vi.hoisted(() => {
     getFocusedWindow: vi.fn((): any => null),
     focusedRegisteredSurface: vi.fn((): any => null),
     getMainWindow: vi.fn((): any => null),
-    sendRpcEvent: vi.fn(),
+    sendRendererEffectIntent: vi.fn(),
     buildFromTemplate: vi.fn((nextTemplate: any[]) => {
       template.splice(0, template.length, ...nextTemplate)
       return nextTemplate
@@ -78,7 +78,7 @@ vi.mock('#/main/i18n/index.ts', () => ({
   t: vi.fn((key: string) => key),
 }))
 
-vi.mock('#/main/settings-server-facade.ts', () => ({
+vi.mock('#/main/settings-server-client.ts', () => ({
   clearSettingsRecentRepos: mocks.clearSettingsRecentRepos,
 }))
 
@@ -89,9 +89,9 @@ vi.mock('#/main/menu-state.ts', () => ({
   setMenuWorkspaceLayout: vi.fn(),
 }))
 
-vi.mock('#/main/events.ts', () => ({
+vi.mock('#/main/renderer-surface-events.ts', () => ({
   broadcastRpcEvent: vi.fn(),
-  sendRpcEvent: mocks.sendRpcEvent,
+  sendRendererEffectIntent: mocks.sendRendererEffectIntent,
 }))
 
 vi.mock('#/main/window-shell.ts', () => ({
@@ -129,7 +129,7 @@ describe('app menu actions', () => {
     await Promise.resolve()
 
     expect(mocks.activateMainWindow).toHaveBeenCalledTimes(1)
-    expect(mocks.sendRpcEvent).toHaveBeenCalledWith(mocks.win, { type: 'menu-action', action: 'open-repo' })
+    expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-repo-requested' })
   })
 
   test('reuses an existing main window for menu actions', async () => {
@@ -141,7 +141,7 @@ describe('app menu actions', () => {
     await Promise.resolve()
 
     expect(mocks.activateMainWindow).not.toHaveBeenCalled()
-    expect(mocks.sendRpcEvent).toHaveBeenCalledWith(mocks.win, { type: 'menu-action', action: 'open-repo' })
+    expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-repo-requested' })
   })
 
   test('sends the path dialog action from the file menu', async () => {
@@ -152,7 +152,7 @@ describe('app menu actions', () => {
     clickMenuItem('menu.file', 'menu.file.open-local-repo-path')
     await Promise.resolve()
 
-    expect(mocks.sendRpcEvent).toHaveBeenCalledWith(mocks.win, { type: 'menu-action', action: 'open-repo-path' })
+    expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-repo-path-requested' })
   })
 
   test('tildifies Windows home paths in the recent repos menu', async () => {
@@ -185,9 +185,9 @@ describe('app menu actions', () => {
     shortcutsItem.click()
     await Promise.resolve()
 
-    expect(mocks.sendRpcEvent).toHaveBeenCalledWith(mocks.win, {
-      type: 'menu-action',
-      action: { type: 'open-settings', page: 'shortcuts' },
+    expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, {
+      type: 'open-settings-requested',
+      page: 'shortcuts',
     })
   })
 
@@ -198,9 +198,9 @@ describe('app menu actions', () => {
     clickMenuItem('Goblin', 'menu.app.settings')
     await Promise.resolve()
 
-    expect(mocks.sendRpcEvent).toHaveBeenCalledWith(mocks.win, {
-      type: 'menu-action',
-      action: { type: 'open-settings', page: 'general' },
+    expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, {
+      type: 'open-settings-requested',
+      page: 'general',
     })
   })
 
@@ -226,9 +226,8 @@ describe('app menu actions', () => {
     terminalPrimaryItem.click()
     await Promise.resolve()
 
-    expect(mocks.sendRpcEvent).toHaveBeenCalledWith(mocks.win, {
-      type: 'menu-action',
-      action: 'terminal-primary-action',
+    expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, {
+      type: 'terminal-primary-action-requested',
     })
   })
 

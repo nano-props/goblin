@@ -11,7 +11,7 @@ import { wireShellBridgeIpc } from '#/main/shell-bridge.ts'
 import { wireTerminalIpc } from '#/main/terminal.ts'
 import { syncGlobalShortcuts, unregisterAppShortcuts } from '#/main/shortcuts.ts'
 import { enqueueExternalOpenPath } from '#/main/external-open.ts'
-import { getSettingsSnapshot, setSettingsGlobalShortcutState } from '#/main/settings-server-facade.ts'
+import { getSettingsSnapshot, setSettingsGlobalShortcutState } from '#/main/settings-server-client.ts'
 import { startEmbeddedServer, stopEmbeddedServer } from '#/main/server-manager.ts'
 
 function activateMainWindowFromEvent(): void {

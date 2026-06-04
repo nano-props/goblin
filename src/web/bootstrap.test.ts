@@ -1,6 +1,33 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
 import type { InitialSettingsSnapshot, RendererBootstrapSnapshot } from '#/shared/bootstrap.ts'
+import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+
+function webBootstrap(overrides: Partial<RendererBootstrapSnapshot> = {}): RendererBootstrapSnapshot {
+  return {
+    runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+    homeDir: '',
+    initialI18n: null,
+    initialSettings: null,
+    initialServer: null,
+    ...overrides,
+  }
+}
+
+function electronBootstrap(overrides: Partial<RendererBootstrapSnapshot> = {}): RendererBootstrapSnapshot {
+  return {
+    runtime: {
+      kind: 'electron',
+      bridgeVersion: RENDERER_BRIDGE_VERSION,
+      capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+    },
+    homeDir: '/Users/test',
+    initialI18n: null,
+    initialSettings: null,
+    initialServer: null,
+    ...overrides,
+  }
+}
 
 describe('renderer bootstrap', () => {
   beforeEach(() => {
@@ -23,16 +50,16 @@ describe('renderer bootstrap', () => {
       terminalApp: 'auto',
       editorApp: 'windsurf',
     }
-    const bootstrap: RendererBootstrapSnapshot = {
-      homeDir: '/Users/test',
+    const bootstrap: RendererBootstrapSnapshot = electronBootstrap({
       initialI18n: { lang: 'ko', pref: 'ko', dict: { hello: '안녕' } },
       initialSettings,
       initialServer: null,
-    }
+    })
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
-        goblin: {
+        goblinNative: {
+          runtime: bootstrap.runtime,
           homeDir: bootstrap.homeDir,
           initialI18n: bootstrap.initialI18n,
           initialSettings: bootstrap.initialSettings,
@@ -48,6 +75,7 @@ describe('renderer bootstrap', () => {
   test('falls back when the goblin bridge is unavailable', async () => {
     const { getInitialBootstrap } = await import('#/web/bootstrap.ts')
     expect(getInitialBootstrap()).toEqual({
+      runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
       homeDir: '',
       initialI18n: null,
       initialSettings: null,
@@ -58,6 +86,7 @@ describe('renderer bootstrap', () => {
   test('re-detects the Electron bridge after an early web-host bootstrap', async () => {
     const { getInitialBootstrap } = await import('#/web/bootstrap.ts')
     expect(getInitialBootstrap()).toEqual({
+      runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
       homeDir: '',
       initialI18n: null,
       initialSettings: null,
@@ -67,7 +96,12 @@ describe('renderer bootstrap', () => {
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
-        goblin: {
+        goblinNative: {
+          runtime: {
+            kind: 'electron',
+            bridgeVersion: RENDERER_BRIDGE_VERSION,
+            capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+          },
           homeDir: '/Users/later',
           initialI18n: null,
           initialSettings: null,
@@ -96,6 +130,11 @@ describe('renderer bootstrap', () => {
     })
 
     expect(getInitialBootstrap()).toEqual({
+      runtime: {
+        kind: 'electron',
+        bridgeVersion: RENDERER_BRIDGE_VERSION,
+        capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+      },
       homeDir: '/Users/later',
       initialI18n: null,
       initialSettings: null,
@@ -103,19 +142,20 @@ describe('renderer bootstrap', () => {
     })
   })
 
-  test('prefers the configured renderer bridge over directly reading window.goblin', async () => {
-    const bootstrap: RendererBootstrapSnapshot = {
+  test('prefers the configured renderer bridge over directly reading window.goblinNative', async () => {
+    const bootstrap: RendererBootstrapSnapshot = webBootstrap({
       homeDir: '/Users/host',
-      initialI18n: null,
-      initialSettings: null,
       initialServer: { url: 'http://127.0.0.1:32100', secret: 'secret', clientId: 'client_sharedterminal' },
-    }
+    })
     const bridgeModule = await import('#/web/renderer-bridge.ts')
     bridgeModule.setRendererBridgeForTests({
+      kind: () => 'web',
+      hasCapability: () => false,
       getBootstrap: () => bootstrap,
       invokeRpc: async () => null,
       abortRpc: async () => false,
       onRpcEvent: () => () => {},
+      onEffectIntent: () => () => {},
       pathForFile: () => '',
       shell: () => null,
       terminal: () => ({
@@ -148,12 +188,9 @@ describe('renderer bootstrap', () => {
   })
 
   test('reads injected web bootstrap when the Electron bridge is unavailable', async () => {
-    const bootstrap: RendererBootstrapSnapshot = {
-      homeDir: '',
-      initialI18n: null,
-      initialSettings: null,
+    const bootstrap: RendererBootstrapSnapshot = webBootstrap({
       initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret', clientId: 'client_sharedterminal' },
-    }
+    })
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
@@ -167,12 +204,11 @@ describe('renderer bootstrap', () => {
   })
 
   test('reads injected web bootstrap from the html json script when the Electron bridge is unavailable', async () => {
-    const bootstrap: RendererBootstrapSnapshot = {
+    const bootstrap: RendererBootstrapSnapshot = webBootstrap({
       homeDir: '/Users/tester',
       initialI18n: { lang: 'ko', pref: 'ko', dict: { hello: '안녕' } },
-      initialSettings: null,
       initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret', clientId: 'client_sharedterminal' },
-    }
+    })
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
@@ -204,6 +240,7 @@ describe('renderer bootstrap', () => {
 
     const { getInitialBootstrap } = await import('#/web/bootstrap.ts')
     expect(getInitialBootstrap()).toEqual({
+      runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
       homeDir: '',
       initialI18n: null,
       initialSettings: null,

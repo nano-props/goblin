@@ -15,6 +15,8 @@ import { createTerminalRoutes } from '#/server/routes/terminal.ts'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import { getServerSettingsPrefs } from '#/server/modules/settings-source.ts'
 import { createRendererBootstrapSnapshot, toInitialServerSnapshot } from '#/shared/bootstrap-builders.ts'
+import { createRendererRuntimeSnapshot } from '#/shared/bootstrap-builders.ts'
+import { WEB_RENDERER_CAPABILITIES } from '#/shared/bootstrap.ts'
 import { DICTS } from '#/shared/i18n/dictionaries.ts'
 import { initialSettingsFromSnapshot } from '#/shared/settings-defaults.ts'
 import type { Lang, LangPref } from '#/shared/rpc.ts'
@@ -52,6 +54,7 @@ function buildWebBootstrap(
   const lang = resolveRequestLang(langPref, acceptLanguageHeader)
   const origin = new URL(requestUrl).origin
   return createRendererBootstrapSnapshot({
+    runtime: createRendererRuntimeSnapshot('web', WEB_RENDERER_CAPABILITIES),
     homeDir: os.homedir(),
     i18n: {
       lang,

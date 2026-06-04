@@ -14,10 +14,11 @@ import {
 beforeEach(resetLifecycleTest)
 
 describe('repo lifecycle', () => {
-  test('openRepo opens the resolved repo, records it as recent, and starts initial local refresh', async () => {
+  test('ensureWorkspaceOpen plus setActive opens the resolved repo, records it as recent, and starts initial local refresh', async () => {
     const calls = installGoblin()
 
-    const result = await useReposStore.getState().openRepo(REPO_A)
+    const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
+    if (result.ok) useReposStore.getState().setActive(result.id)
 
     expect(result).toEqual({ ok: true, id: REPO_A })
     expect(useReposStore.getState().order).toEqual([REPO_A])
@@ -30,7 +31,8 @@ describe('repo lifecycle', () => {
   test('ensureWorkspaceOpen adds a repo to the open set without changing the active selection', async () => {
     const calls = installGoblin()
 
-    await useReposStore.getState().openRepo(REPO_A)
+    const first = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
+    if (first.ok) useReposStore.getState().setActive(first.id)
     const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_B)
 
     expect(result).toEqual({ ok: true, id: REPO_B })
@@ -40,11 +42,12 @@ describe('repo lifecycle', () => {
     expect(calls.status).toEqual([REPO_A, REPO_B])
   })
 
-  test('openRepo with activate false opens without changing the active repo', async () => {
+  test('ensureWorkspaceOpen opens without changing the active repo', async () => {
     const calls = installGoblin()
 
-    await useReposStore.getState().openRepo(REPO_A)
-    await useReposStore.getState().openRepo(REPO_B, { activate: false })
+    const first = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
+    if (first.ok) useReposStore.getState().setActive(first.id)
+    await useReposStore.getState().ensureWorkspaceOpen(REPO_B)
 
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().activeId).toBe(REPO_A)
@@ -52,23 +55,27 @@ describe('repo lifecycle', () => {
     expect(calls.status).toEqual([REPO_A, REPO_B])
   })
 
-  test('openRepo with activate false still ensures the workspace is added to the open set', async () => {
+  test('ensureWorkspaceOpen still ensures the workspace is added to the open set', async () => {
     installGoblin()
 
-    await useReposStore.getState().openRepo(REPO_A)
-    await useReposStore.getState().openRepo(REPO_B, { activate: false })
+    const first = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
+    if (first.ok) useReposStore.getState().setActive(first.id)
+    await useReposStore.getState().ensureWorkspaceOpen(REPO_B)
 
     expect(Object.keys(useReposStore.getState().repos)).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().activeId).toBe(REPO_A)
   })
 
-  test('openRepo activates and locally refreshes an already-open repo', async () => {
+  test('ensureWorkspaceOpen plus setActive locally refreshes an already-open repo', async () => {
     const calls = installGoblin()
 
-    await useReposStore.getState().openRepo(REPO_A)
-    await useReposStore.getState().openRepo(REPO_B)
-    await useReposStore.getState().openRepo(REPO_A)
+    const first = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
+    if (first.ok) useReposStore.getState().setActive(first.id)
+    const second = await useReposStore.getState().ensureWorkspaceOpen(REPO_B)
+    if (second.ok) useReposStore.getState().setActive(second.id)
+    const third = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
+    if (third.ok) useReposStore.getState().setActive(third.id)
 
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().activeId).toBe(REPO_A)
@@ -84,10 +91,12 @@ describe('repo lifecycle', () => {
         }),
     })
 
-    await useReposStore.getState().openRepo(REPO_A)
+    const first = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
+    if (first.ok) useReposStore.getState().setActive(first.id)
     const firstToken = useReposStore.getState().repos[REPO_A]?.instanceToken
     useReposStore.getState().closeRepo(REPO_A)
-    await useReposStore.getState().openRepo(REPO_A)
+    const second = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
+    if (second.ok) useReposStore.getState().setActive(second.id)
     const secondToken = useReposStore.getState().repos[REPO_A]?.instanceToken
 
     snapshotResolvers[1]?.({ branches: [branchSnapshot('fresh')], current: 'fresh' })
@@ -104,7 +113,7 @@ describe('repo lifecycle', () => {
     expect(useReposStore.getState().repos[REPO_A]?.data.currentBranch).toBe('fresh')
   })
 
-  test('openRepo preserves remote target metadata for recent repos and later actions', async () => {
+  test('ensureWorkspaceOpen preserves remote target metadata for recent repos and later actions', async () => {
     const target = normalizeRemoteTarget({
       alias: 'example',
       host: 'example.com',
@@ -117,7 +126,7 @@ describe('repo lifecycle', () => {
       probe: (cwd: string) => ({ ok: true, root: cwd, name: 'repo' }),
     })
 
-    const result = await useReposStore.getState().openRepo(remoteRepoSessionEntry(target!))
+    const result = await useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(target!))
 
     expect(result).toEqual({ ok: true, id: target!.id })
     expect(useReposStore.getState().repos[target!.id]?.remote.target).toEqual(target)

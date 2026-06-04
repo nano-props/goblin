@@ -1,5 +1,6 @@
-import { subscribeSettingsInvalidation } from '#/web/settings-invalidation-source.ts'
+import { subscribeSettingsInvalidation } from '#/web/settings-invalidation-ingress.ts'
 import type { SettingsInvalidationScope } from '#/shared/server-invalidation.ts'
+
 interface SettingsInvalidationSubscriptionOptions<T> {
   scope: SettingsInvalidationScope
   fetch: () => Promise<T>
@@ -7,7 +8,9 @@ interface SettingsInvalidationSubscriptionOptions<T> {
   label: string
 }
 
-export function subscribeSettingsRefetch<T>({
+// Settings-specific server ingress adapter that turns invalidation events into
+// coalesced refetch work for renderer stores.
+export function subscribeSettingsInvalidationRefetch<T>({
   scope,
   fetch,
   apply,

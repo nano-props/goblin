@@ -1,6 +1,10 @@
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
 import { isServerInvalidationEvent, type ServerInvalidationEvent } from '#/shared/server-invalidation.ts'
+
 type Listener = (event: ServerInvalidationEvent) => void
+// Shared server-owned invalidation ingress for browser and Electron renderers.
+// This is distinct from native-host ingress (`renderer-ingress.ts`), which is
+// only for Electron IPC-driven events/intents.
 
 const listeners = new Set<Listener>()
 let socket: WebSocket | null = null
@@ -88,7 +92,7 @@ function maybeCloseSocket(): void {
   } catch {}
 }
 
-export function subscribeServerInvalidation(listener: Listener): () => void {
+export function subscribeServerInvalidationIngress(listener: Listener): () => void {
   listeners.add(listener)
   manualSocketClose = false
   ensureSocket()
@@ -98,7 +102,7 @@ export function subscribeServerInvalidation(listener: Listener): () => void {
   }
 }
 
-export function resetServerInvalidationSourceForTests(): void {
+export function resetServerInvalidationIngressForTests(): void {
   listeners.clear()
   manualSocketClose = false
   clearReconnectTimer()

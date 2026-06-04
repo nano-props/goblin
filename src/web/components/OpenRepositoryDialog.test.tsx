@@ -12,13 +12,13 @@ let container: HTMLDivElement | null = null
 let root: Root | null = null
 let rpcCalls: Array<{ path: string; input?: unknown }> = []
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-const testWindow = window as unknown as { goblin?: unknown }
+const testWindow = window as unknown as { goblinNative?: unknown }
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   rpcCalls = []
   setRendererBridgeForTests(null)
-  testWindow.goblin = {
+  testWindow.goblinNative = {
     homeDir: '/Users/tester',
     pathForFile: () => '',
     shell: {
@@ -41,7 +41,7 @@ afterEach(() => {
   root = null
   container = null
   document.body.innerHTML = ''
-  delete testWindow.goblin
+  delete testWindow.goblinNative
   setRendererBridgeForTests(null)
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
@@ -76,7 +76,7 @@ describe('OpenRepositoryDialog', () => {
 
     clickButtonByText('repo-tabs.open-path-choose')
     await flush()
-    expect(testWindow.goblin).toEqual(
+    expect(testWindow.goblinNative).toEqual(
       expect.objectContaining({
         shell: expect.objectContaining({ openDirectoryDialog: expect.any(Function) }),
       }),
@@ -115,7 +115,7 @@ describe('OpenRepositoryDialog', () => {
   })
 
   test('hides native picker button when no Electron bridge exists', async () => {
-    delete testWindow.goblin
+    delete testWindow.goblinNative
     setRendererBridgeForTests(null)
     const onClose = vi.fn()
     const onOpen = vi.fn(async (): Promise<OpenRepoResult> => ({ ok: true, id: '/Users/tester/Developer/repo' }))

@@ -13,7 +13,7 @@ const storeState = {
   refreshStatus: vi.fn(),
 }
 
-vi.mock('#/web/repo-query-invalidation-source.ts', () => ({
+vi.mock('#/web/repo-query-invalidation-ingress.ts', () => ({
   subscribeRepoQueryInvalidation(listener: (event: any) => void) {
     listeners.add(listener)
     return () => listeners.delete(listener)

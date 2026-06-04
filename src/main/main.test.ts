@@ -103,7 +103,7 @@ vi.mock('#/main/terminal.ts', () => ({
   wireTerminalIpc: mocks.wireTerminalIpc,
 }))
 
-vi.mock('#/main/settings-server-facade.ts', () => ({
+vi.mock('#/main/settings-server-client.ts', () => ({
   getSettingsSnapshot: mocks.getSettingsSnapshot,
   setSettingsGlobalShortcutState: mocks.setSettingsGlobalShortcutState,
 }))

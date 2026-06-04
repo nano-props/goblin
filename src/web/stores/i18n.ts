@@ -10,7 +10,7 @@ import { create, type StoreApi } from 'zustand'
 import type { I18nPayload, Lang, LangPref } from '#/shared/rpc.ts'
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
 import { getI18nPayload, setI18nPref } from '#/web/app-data-client.ts'
-import { subscribeSettingsRefetch } from '#/web/settings-sync-subscription.ts'
+import { subscribeSettingsInvalidationRefetch } from '#/web/settings-invalidation-refetch.ts'
 
 export type { Lang, LangPref }
 export type Dict = Record<string, string>
@@ -85,7 +85,7 @@ export const useI18nStore = create<I18nState>((set) => ({
     if (version !== hydrateVersion) return
     await commitPayload(set, payload)
     if (version !== hydrateVersion) return
-    const nextUnsubscribe = subscribeSettingsRefetch({
+    const nextUnsubscribe = subscribeSettingsInvalidationRefetch({
       scope: 'i18n',
       fetch: getI18nPayload,
       label: 'i18n',

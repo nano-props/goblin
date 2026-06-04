@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { ManagedTerminalSession } from '#/web/components/terminal/ManagedTerminalSession.ts'
 import { installTerminalThemeStyles } from '#/web/components/terminal/terminal-theme-test-utils.ts'
 import { isTerminalFocused } from '#/web/terminal-focus.ts'
@@ -383,10 +384,10 @@ const terminalCalls = {
   takeover: vi.fn<(input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>>(),
   close: vi.fn<(input: TerminalSessionInput) => Promise<TerminalMutationResult>>(),
   notifyBell: vi.fn<(input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>>(),
-  setBadge: vi.fn<Window['goblin']['terminal']['setBadge']>(),
+  setBadge: vi.fn<Window['goblinNative']['terminal']['setBadge']>(),
 }
-const invokeRpc = vi.fn<Window['goblin']['invokeRpc']>()
-const shellOpenExternalUrl = vi.fn<NonNullable<Window['goblin']['shell']>['openExternalUrl']>()
+const invokeRpc = vi.fn<Window['goblinNative']['invokeRpc']>()
+const shellOpenExternalUrl = vi.fn<NonNullable<Window['goblinNative']['shell']>['openExternalUrl']>()
 const mockFonts = new MockFontFaceSet()
 
 const descriptor = {
@@ -442,11 +443,16 @@ beforeEach(() => {
         toJSON: () => ({}),
       }) as DOMRect,
   )
-  Object.defineProperty(window, 'goblin', {
+  Object.defineProperty(window, 'goblinNative', {
     configurable: true,
     value: {
       invokeRpc: invokeRpc.mockResolvedValue({ ok: true }),
       abortRpc: vi.fn(),
+      runtime: {
+        kind: 'electron',
+        bridgeVersion: RENDERER_BRIDGE_VERSION,
+        capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+      },
       homeDir: '/home',
       initialI18n: null,
       initialSettings: null,
@@ -479,7 +485,22 @@ beforeEach(() => {
     },
   })
   setRendererBridgeForTests({
+    kind: () => 'electron',
+    hasCapability: (capability) =>
+      capability === 'settings-rpc' ||
+      capability === 'open-settings-window' ||
+      capability === 'open-external-url' ||
+      capability === 'open-directory-dialog' ||
+      capability === 'consume-external-open-paths' ||
+      capability === 'open-in-finder' ||
+      capability === 'terminal-notifications' ||
+      capability === 'terminal-badge',
     getBootstrap: () => ({
+      runtime: {
+        kind: 'electron',
+        bridgeVersion: RENDERER_BRIDGE_VERSION,
+        capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+      },
       homeDir: '/home',
       initialI18n: null,
       initialSettings: null,
@@ -488,8 +509,9 @@ beforeEach(() => {
     invokeRpc,
     abortRpc: vi.fn(async () => false),
     onRpcEvent: vi.fn(() => () => {}),
+    onEffectIntent: vi.fn(() => () => {}),
     pathForFile: vi.fn(() => ''),
-    shell: () => window.goblin.shell ?? null,
+    shell: () => window.goblinNative.shell ?? null,
     terminal: () => ({
       attach: terminalCalls.attach.mockResolvedValue(attachResult('session-1')),
       restart: terminalCalls.restart.mockResolvedValue(attachResult('session-2')),

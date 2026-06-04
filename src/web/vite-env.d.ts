@@ -2,15 +2,18 @@
 
 import type {
   InitialI18nSnapshot,
+  RendererRuntimeSnapshot,
   InitialServerSnapshot,
   InitialSettingsSnapshot,
   RendererBootstrapSnapshot,
 } from '#/shared/bootstrap.ts'
 import type { RpcEvent, RpcRequest, SettingsPage } from '#/shared/rpc.ts'
+import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import type { TerminalMutationResult, TerminalNotifyBellInput } from '#/shared/terminal.ts'
 
-interface GoblinBridge {
+interface GoblinNativeBridge {
+  runtime: RendererRuntimeSnapshot
   homeDir: string
   initialI18n: InitialI18nSnapshot | null
   initialSettings: InitialSettingsSnapshot | null
@@ -18,6 +21,7 @@ interface GoblinBridge {
   invokeRpc: (request: RpcRequest) => Promise<unknown>
   abortRpc: (requestId: string) => Promise<boolean>
   onEvent: (cb: (event: RpcEvent) => void) => () => void
+  onIntent?: (cb: (event: RendererEffectIntent) => void) => () => void
   pathForFile: (file: File) => string
   shell?: {
     openSettingsWindow: (input?: { page?: SettingsPage }) => Promise<boolean>
@@ -35,7 +39,7 @@ interface GoblinBridge {
 
 declare global {
   interface Window {
-    goblin: GoblinBridge
+    goblinNative: GoblinNativeBridge
     __GOBLIN_BOOTSTRAP__?: RendererBootstrapSnapshot
   }
   /** Injected by vite.config.ts `define`. */

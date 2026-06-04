@@ -137,7 +137,8 @@ describe('repo session hydration', () => {
 
   test('hydrateSession keeps a user-selected active repo when boot probing settles later', async () => {
     installGoblin()
-    await useReposStore.getState().openRepo(REPO_A)
+    const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
+    if (result.ok) useReposStore.getState().setActive(result.id)
 
     await useReposStore.getState().hydrateSession([localRepoSessionEntry(REPO_B)], REPO_B)
 

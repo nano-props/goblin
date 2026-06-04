@@ -1,16 +1,30 @@
-import type { RendererBootstrapSnapshot } from '#/shared/bootstrap.ts'
+import type { RendererBootstrapSnapshot, RendererRuntimeSnapshot } from '#/shared/bootstrap.ts'
+import { RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 
 const EMPTY_BOOTSTRAP: RendererBootstrapSnapshot = {
+  runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
   homeDir: '',
   initialI18n: null,
   initialSettings: null,
   initialServer: null,
 }
 
+function isRendererRuntimeSnapshot(value: unknown): value is RendererRuntimeSnapshot {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<RendererRuntimeSnapshot>
+  return (
+    (candidate.kind === 'electron' || candidate.kind === 'web') &&
+    typeof candidate.bridgeVersion === 'number' &&
+    Array.isArray(candidate.capabilities) &&
+    candidate.capabilities.every((capability) => typeof capability === 'string')
+  )
+}
+
 function isRendererBootstrapSnapshot(value: unknown): value is RendererBootstrapSnapshot {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<RendererBootstrapSnapshot>
   return (
+    isRendererRuntimeSnapshot(candidate.runtime) &&
     typeof candidate.homeDir === 'string' &&
     'initialI18n' in candidate &&
     'initialSettings' in candidate &&
@@ -55,6 +69,7 @@ export function readQueryBootstrap(createWebTerminalClientId: () => string): Ren
     if (!url || !clientId) return null
     return {
       ...EMPTY_BOOTSTRAP,
+      runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
       initialServer: { url, secret, clientId },
     }
   } catch {

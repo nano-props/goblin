@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 
 describe('repo web transport helpers', () => {
   beforeEach(() => {
@@ -8,6 +9,7 @@ describe('repo web transport helpers', () => {
       configurable: true,
       value: {
         __GOBLIN_BOOTSTRAP__: {
+          runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
           homeDir: '',
           initialI18n: null,
           initialSettings: null,
@@ -75,6 +77,7 @@ describe('repo web transport helpers', () => {
       configurable: true,
       value: {
         __GOBLIN_BOOTSTRAP__: {
+          runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
           homeDir: '',
           initialI18n: null,
           initialSettings: null,

@@ -13,7 +13,7 @@ import { registerTrustedAppUrl, registerTrustedWebContents } from '#/main/ipc/tr
 import { wireRpcIpc } from '#/main/rpc.ts'
 import {
   getSettingsPrefs,
-} from '#/main/settings-server-facade.ts'
+} from '#/main/settings-server-client.ts'
 import type { RpcResponse, SettingsPrefs } from '#/shared/rpc.ts'
 
 const ipcHandlers = new Map<string, (_event: unknown, input: any) => Promise<unknown>>()
@@ -178,12 +178,12 @@ vi.mock('#/system/editors.ts', () => ({
   ),
 }))
 
-vi.mock('#/main/events.ts', () => ({
+vi.mock('#/main/renderer-surface-events.ts', () => ({
   broadcastRpcEvent: vi.fn(),
   sendRpcEvent: vi.fn(),
 }))
 
-vi.mock('#/main/settings-server-facade.ts', () => ({
+vi.mock('#/main/settings-server-client.ts', () => ({
   setSettingsFetchInterval: vi.fn(),
   setSettingsGlobalShortcutState: vi.fn(async () => true),
   getSettingsPrefs: vi.fn(async () => settingsPrefs()),
@@ -325,7 +325,7 @@ describe('main repo rpc cancellation', () => {
     })
   })
 
-  test('proxies repo status reads through the embedded server when available', async () => {
+  test('returns NOT_FOUND for repo RPCs that now belong to the embedded server http path', async () => {
     getEmbeddedServerRuntimeMock.mockReturnValue({
       url: 'http://127.0.0.1:32100',
       secret: 'secret',
@@ -339,22 +339,15 @@ describe('main repo rpc cancellation', () => {
 
     const result = await invokeRpc('repo.status', { cwd: '/repo' })
 
-    expect(result).toEqual({ ok: true, data: [{ path: 'file.txt', staged: false, status: 'M' }] })
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:32100/api/repo/status',
-      expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({
-          'content-type': 'application/json',
-          'x-goblin-internal-secret': 'secret',
-        }),
-        body: JSON.stringify({ cwd: '/repo' }),
-      }),
-    )
+    expect(result).toEqual({
+      ok: false,
+      error: { name: 'RpcError', code: 'NOT_FOUND', message: 'Unknown RPC procedure: repo.status' },
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
     expect(getWorkingStatus).not.toHaveBeenCalled()
   })
 
-  test('proxies remote target resolution through the embedded server when available', async () => {
+  test('returns NOT_FOUND for remote RPCs that now belong to the embedded server http path', async () => {
     getEmbeddedServerRuntimeMock.mockReturnValue({
       url: 'http://127.0.0.1:32100',
       secret: 'secret',
@@ -379,47 +372,23 @@ describe('main repo rpc cancellation', () => {
     const result = await invokeRpc('remote.resolveTarget', { alias: 'prod', remotePath: '/repo' })
 
     expect(result).toEqual({
-      ok: true,
-      data: {
-        target: {
-          id: 'ssh-config://prod/repo',
-          alias: 'prod',
-          host: 'example.com',
-          user: 'tester',
-          port: 22,
-          remotePath: '/repo',
-          displayName: 'prod:repo',
-        },
-      },
+      ok: false,
+      error: { name: 'RpcError', code: 'NOT_FOUND', message: 'Unknown RPC procedure: remote.resolveTarget' },
     })
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:32100/api/remote/resolve-target',
-      expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({
-          'content-type': 'application/json',
-          'x-goblin-internal-secret': 'secret',
-        }),
-        body: JSON.stringify({ alias: 'prod', remotePath: '/repo' }),
-      }),
-    )
+    expect(fetchMock).not.toHaveBeenCalled()
     expect(resolveRemoteTargetMock).not.toHaveBeenCalled()
   })
 
-  test('fails repo RPCs when the embedded server is unavailable', async () => {
+  test('returns NOT_FOUND for removed business rpc procedures regardless of embedded server runtime', async () => {
     const result = await invokeRpc('repo.deleteBranch', { cwd: '/repo', branch: 'feature/cancel' })
 
     expect(result).toEqual({
       ok: false,
-      error: {
-        name: 'RpcError',
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Embedded server unavailable',
-      },
+      error: { name: 'RpcError', code: 'NOT_FOUND', message: 'Unknown RPC procedure: repo.deleteBranch' },
     })
   })
 
-  test('aborts an embedded server read request by request id', async () => {
+  test('returns false when aborting a missing native rpc request id', async () => {
     getEmbeddedServerRuntimeMock.mockReturnValue({
       url: 'http://127.0.0.1:32100',
       secret: 'secret',
@@ -443,14 +412,11 @@ describe('main repo rpc cancellation', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    const status = invokeRpc('repo.status', { cwd: '/repo' }, trustedEvent, 'rpc-read-status')
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
-    expect(observedSignal).toBeInstanceOf(AbortSignal)
-
     const aborted = await invokeAbortRpc({ requestId: 'rpc-read-status' }, trustedEvent)
 
-    expect(aborted).toBe(true)
-    await expect(status).resolves.toEqual({ ok: true, data: [] })
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(observedSignal).toBeUndefined()
+    expect(aborted).toBe(false)
   })
 
   test('projects recent repos into native shell state without mutating the embedded server', async () => {

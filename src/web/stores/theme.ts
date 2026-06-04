@@ -9,7 +9,7 @@ import { DEFAULT_COLOR_THEME, isColorTheme } from '#/shared/color-theme.ts'
 import type { ResolvedTheme, ThemePref, ThemeState } from '#/shared/rpc.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import { getThemeState, setThemeColorTheme, setThemePref } from '#/web/app-data-client.ts'
-import { subscribeSettingsRefetch } from '#/web/settings-sync-subscription.ts'
+import { subscribeSettingsInvalidationRefetch } from '#/web/settings-invalidation-refetch.ts'
 
 interface ThemeStore extends ThemeState {
   setPref: (pref: ThemePref) => Promise<void>
@@ -52,7 +52,7 @@ export const useThemeStore = create<ThemeStore>((set, get) => ({
       s.pref === state.pref && s.resolved === state.resolved && s.colorTheme === state.colorTheme ? s : state,
     )
     if (version !== hydrateVersion) return
-    const nextUnsubscribe = subscribeSettingsRefetch({
+    const nextUnsubscribe = subscribeSettingsInvalidationRefetch({
       scope: 'theme',
       fetch: getThemeState,
       label: 'theme',

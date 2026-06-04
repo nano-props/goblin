@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { useT } from '#/web/stores/i18n.ts'
-import { onNativeEventType } from '#/web/native-bridge.ts'
+import { subscribeNativeHostEventType } from '#/web/renderer-ingress.ts'
 export function useSettingsWriteErrorToast() {
   const t = useT()
   // `t` is read through a ref so a language switch doesn't tear down /
@@ -15,7 +15,7 @@ export function useSettingsWriteErrorToast() {
   tRef.current = t
 
   useEffect(() => {
-    const off = onNativeEventType('settings-write-error', (event) => {
+    const off = subscribeNativeHostEventType('settings-write-error', (event) => {
       toast.error(tRef.current('error.settings-write-title'), { description: event.message })
     })
     return off

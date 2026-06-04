@@ -17,7 +17,7 @@ const descriptor: TerminalDescriptor = {
 
 beforeEach(() => {
   useSettingsStore.setState({ terminalNotificationsEnabled: false })
-  Object.defineProperty(window, 'goblin', {
+  Object.defineProperty(window, 'goblinNative', {
     configurable: true,
     value: {
       homeDir: '/Users/test',
@@ -57,7 +57,7 @@ describe('terminal bell controller', () => {
 
     expect(controller.hasBell(descriptor.key)).toBe(true)
     expect(notify).toHaveBeenCalledTimes(1)
-    expect(window.goblin.terminal.notifyBell).toHaveBeenCalledWith({
+    expect(window.goblinNative.terminal.notifyBell).toHaveBeenCalledWith({
       title: 'repo',
       body: 'feature/test\nzsh',
       key: 'terminal-key',
@@ -76,7 +76,7 @@ describe('terminal bell controller', () => {
     controller.handleBell(descriptor, { processName: 'zsh', canonicalTitle: '~/Developer/goblin — npm run dev', visible: false })
     await Promise.resolve()
 
-    expect(window.goblin.terminal.notifyBell).toHaveBeenCalledWith({
+    expect(window.goblinNative.terminal.notifyBell).toHaveBeenCalledWith({
       title: 'repo',
       body: 'feature/test\n~/Developer/goblin — npm run dev',
       key: 'terminal-key',
@@ -97,7 +97,7 @@ describe('terminal bell controller', () => {
 
     expect(controller.hasBell(descriptor.key)).toBe(true)
     expect(notify).toHaveBeenCalledTimes(1)
-    expect(window.goblin.terminal.notifyBell).not.toHaveBeenCalled()
+    expect(window.goblinNative.terminal.notifyBell).not.toHaveBeenCalled()
 
     hasFocus.mockRestore()
   })
@@ -113,7 +113,7 @@ describe('terminal bell controller', () => {
 
     expect(controller.hasBell(descriptor.key)).toBe(false)
     expect(notify).not.toHaveBeenCalled()
-    expect(window.goblin.terminal.notifyBell).not.toHaveBeenCalled()
+    expect(window.goblinNative.terminal.notifyBell).not.toHaveBeenCalled()
 
     hasFocus.mockRestore()
   })
@@ -138,7 +138,7 @@ describe('terminal bell controller', () => {
     await Promise.resolve()
 
     expect(notify).toHaveBeenCalledTimes(1)
-    expect(window.goblin.terminal.notifyBell).toHaveBeenCalledTimes(2)
+    expect(window.goblinNative.terminal.notifyBell).toHaveBeenCalledTimes(2)
 
     now.mockRestore()
     hasFocus.mockRestore()
@@ -175,7 +175,7 @@ describe('terminal bell controller', () => {
     controller.handleBell(descriptor, { processName: 'zsh', visible: false })
     await Promise.resolve()
 
-    expect(window.goblin.terminal.notifyBell).toHaveBeenCalledTimes(2)
+    expect(window.goblinNative.terminal.notifyBell).toHaveBeenCalledTimes(2)
 
     now.mockRestore()
     hasFocus.mockRestore()

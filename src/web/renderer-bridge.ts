@@ -1,4 +1,5 @@
-import type { RendererBootstrapSnapshot } from '#/shared/bootstrap.ts'
+import { ELECTRON_RENDERER_CAPABILITIES } from '#/shared/bootstrap.ts'
+import type { RendererBootstrapSnapshot, RendererNativeCapability } from '#/shared/bootstrap.ts'
 import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
 import {
   emptyRendererBridgeBootstrap as emptyBootstrapSnapshot,
@@ -13,9 +14,9 @@ import {
 
 const WEB_TERMINAL_CLIENT_ID_STORAGE_KEY = 'goblin:web-terminal-client-id'
 
-function readBridge(): Window['goblin'] | null {
+function readBridge(): Window['goblinNative'] | null {
   try {
-    return window.goblin ?? null
+    return window.goblinNative ?? null
   } catch {
     return null
   }
@@ -30,6 +31,7 @@ function readServerTerminalConfig(): RendererServerTerminalConfig | null {
 }
 
 function electronBridge(): RendererBridge {
+  const capabilities = new Set<RendererNativeCapability>([...ELECTRON_RENDERER_CAPABILITIES])
   const serverTerminalBridge = (() => {
     const server = readBridge()?.initialServer
     if (!server?.url || !server?.secret) return null
@@ -58,10 +60,26 @@ function electronBridge(): RendererBridge {
     })
   })()
   return {
+    kind() {
+      return readBridge()?.runtime?.kind === 'web' ? 'web' : 'electron'
+    },
+    hasCapability(capability) {
+      const runtimeCapabilities = readBridge()?.runtime?.capabilities
+      return Array.isArray(runtimeCapabilities)
+        ? runtimeCapabilities.includes(capability)
+        : capabilities.has(capability)
+    },
     getBootstrap() {
       const bridge = readBridge()
       const bootstrap = readWebBootstrap(readOrCreateWebTerminalClientId)
       return {
+        runtime:
+          bridge?.runtime &&
+          (bridge.runtime.kind === 'electron' || bridge.runtime.kind === 'web') &&
+          typeof bridge.runtime.bridgeVersion === 'number' &&
+          Array.isArray(bridge.runtime.capabilities)
+            ? bridge.runtime
+            : bootstrap.runtime,
         homeDir: typeof bridge?.homeDir === 'string' ? bridge.homeDir : bootstrap.homeDir,
         initialI18n: bridge?.initialI18n ?? bootstrap.initialI18n ?? null,
         initialSettings: bridge?.initialSettings ?? bootstrap.initialSettings ?? null,
@@ -83,6 +101,11 @@ function electronBridge(): RendererBridge {
       if (!bridge) throw new Error('Goblin bridge is unavailable')
       return bridge.onEvent(cb)
     },
+    onEffectIntent(cb) {
+      const bridge = readBridge()
+      if (!bridge) throw new Error('Goblin bridge is unavailable')
+      return bridge.onIntent?.(cb) ?? (() => {})
+    },
     pathForFile(file) {
       const bridge = readBridge()
       if (!bridge) throw new Error('Goblin bridge is unavailable')
@@ -99,6 +122,7 @@ function electronBridge(): RendererBridge {
 }
 
 function webBridge(): RendererBridge {
+  const bootstrap = readWebBootstrap(readOrCreateWebTerminalClientId)
   const terminalBridge = createServerTerminalBridge({
     getAttachmentId: readOrCreateWebTerminalAttachmentId,
     getServerConfig() {
@@ -109,8 +133,14 @@ function webBridge(): RendererBridge {
   })
 
   return {
+    kind() {
+      return bootstrap.runtime.kind
+    },
+    hasCapability() {
+      return false
+    },
     getBootstrap() {
-      return readWebBootstrap(readOrCreateWebTerminalClientId)
+      return bootstrap
     },
     async invokeRpc() {
       throw new Error('Web renderer RPC bridge is unavailable')
@@ -119,6 +149,9 @@ function webBridge(): RendererBridge {
       return false
     },
     onRpcEvent() {
+      return () => {}
+    },
+    onEffectIntent() {
       return () => {}
     },
     pathForFile() {

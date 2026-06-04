@@ -1,7 +1,34 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { RendererBootstrapSnapshot } from '#/shared/bootstrap.ts'
+import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+
+function webBootstrap(overrides: Partial<RendererBootstrapSnapshot> = {}): RendererBootstrapSnapshot {
+  return {
+    runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+    homeDir: '',
+    initialI18n: null,
+    initialSettings: null,
+    initialServer: null,
+    ...overrides,
+  }
+}
+
+function electronBootstrap(overrides: Partial<RendererBootstrapSnapshot> = {}): RendererBootstrapSnapshot {
+  return {
+    runtime: {
+      kind: 'electron',
+      bridgeVersion: RENDERER_BRIDGE_VERSION,
+      capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+    },
+    homeDir: '/Users/test',
+    initialI18n: null,
+    initialSettings: null,
+    initialServer: null,
+    ...overrides,
+  }
+}
 
 function installWebBootstrap(bootstrap: RendererBootstrapSnapshot): void {
   Object.defineProperty(globalThis, 'window', {
@@ -20,10 +47,13 @@ function installWebBootstrap(bootstrap: RendererBootstrapSnapshot): void {
 
 function testBridge(overrides: Partial<RendererBridge> = {}): RendererBridge {
   return {
-    getBootstrap: () => ({ homeDir: '/Users/test', initialI18n: null, initialSettings: null, initialServer: null }),
+    kind: () => 'web',
+    hasCapability: () => false,
+    getBootstrap: () => electronBootstrap(),
     invokeRpc: vi.fn(),
     abortRpc: vi.fn(async () => false),
     onRpcEvent: () => () => {},
+    onEffectIntent: () => () => {},
     pathForFile: () => '',
     shell: () => null,
     terminal: (() => {
@@ -41,12 +71,7 @@ describe('server-client web host bootstrap', () => {
   })
 
   test('reads theme state from embedded server settings when no Electron bridge exists', async () => {
-    installWebBootstrap({
-      homeDir: '',
-      initialI18n: null,
-      initialSettings: null,
-      initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
-    })
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({
@@ -82,12 +107,7 @@ describe('server-client web host bootstrap', () => {
   })
 
   test('fetches i18n payload from embedded server when no Electron bridge exists', async () => {
-    installWebBootstrap({
-      homeDir: '',
-      initialI18n: null,
-      initialSettings: null,
-      initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
-    })
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => ({ lang: 'ko', pref: 'auto', dict: { hello: '안녕' } }),
@@ -105,21 +125,14 @@ describe('server-client web host bootstrap', () => {
   })
 
   test('opens repository remote through the native shell bridge when available', async () => {
-    installWebBootstrap({
-      homeDir: '',
-      initialI18n: null,
-      initialSettings: null,
-      initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
-    })
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
     window.open = vi.fn(() => null)
     const bridgeModule = await import('#/web/renderer-bridge.ts')
     const openExternalUrl = vi.fn(async () => ({ ok: true, message: 'https://github.com/acme/repo/tree/feature/test' }))
     bridgeModule.setRendererBridgeForTests(
       testBridge({
         getBootstrap: () => ({
-          homeDir: '',
-          initialI18n: null,
-          initialSettings: null,
+          ...webBootstrap(),
           initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
         }),
         shell: () => ({
@@ -155,12 +168,7 @@ describe('server-client web host bootstrap', () => {
   })
 
   test('clones repositories through the embedded server when no Electron bridge exists', async () => {
-    installWebBootstrap({
-      homeDir: '',
-      initialI18n: null,
-      initialSettings: null,
-      initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
-    })
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => ({ ok: true, message: 'ok', path: '/tmp/repo' }),
@@ -192,13 +200,15 @@ describe('server-client web host bootstrap', () => {
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
-        __GOBLIN_BOOTSTRAP__: {
-          homeDir: '/Users/test',
-          initialI18n: null,
-          initialSettings: null,
+        __GOBLIN_BOOTSTRAP__: electronBootstrap({
           initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
-        },
-        goblin: {
+        }),
+        goblinNative: {
+          runtime: {
+            kind: 'electron',
+            bridgeVersion: RENDERER_BRIDGE_VERSION,
+            capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+          },
           homeDir: '/Users/test',
           invokeRpc,
           abortRpc: async () => true,
@@ -235,13 +245,15 @@ describe('server-client web host bootstrap', () => {
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
-        __GOBLIN_BOOTSTRAP__: {
-          homeDir: '/Users/test',
-          initialI18n: null,
-          initialSettings: null,
+        __GOBLIN_BOOTSTRAP__: electronBootstrap({
           initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
-        },
-        goblin: {
+        }),
+        goblinNative: {
+          runtime: {
+            kind: 'electron',
+            bridgeVersion: RENDERER_BRIDGE_VERSION,
+            capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+          },
           homeDir: '/Users/test',
           invokeRpc,
           abortRpc: async () => true,
@@ -292,13 +304,15 @@ describe('server-client web host bootstrap', () => {
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
-        __GOBLIN_BOOTSTRAP__: {
-          homeDir: '/Users/test',
-          initialI18n: null,
-          initialSettings: null,
+        __GOBLIN_BOOTSTRAP__: electronBootstrap({
           initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
-        },
-        goblin: {
+        }),
+        goblinNative: {
+          runtime: {
+            kind: 'electron',
+            bridgeVersion: RENDERER_BRIDGE_VERSION,
+            capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+          },
           homeDir: '/Users/test',
           invokeRpc,
           abortRpc: async () => true,
@@ -345,13 +359,15 @@ describe('server-client web host bootstrap', () => {
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
-        __GOBLIN_BOOTSTRAP__: {
-          homeDir: '/Users/test',
-          initialI18n: null,
-          initialSettings: null,
+        __GOBLIN_BOOTSTRAP__: electronBootstrap({
           initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
-        },
-        goblin: {
+        }),
+        goblinNative: {
+          runtime: {
+            kind: 'electron',
+            bridgeVersion: RENDERER_BRIDGE_VERSION,
+            capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+          },
           homeDir: '/Users/test',
           invokeRpc: vi.fn(),
           abortRpc: async () => true,

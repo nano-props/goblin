@@ -12,7 +12,7 @@
 //   - background sync registration with the embedded server scheduler
 //   - session persistence (any change to open repos / active id writes
 //     through to the embedded server so the next launch can restore)
-//   - menu-action listener (forwards typed RPC events to store actions)
+//   - renderer effect-intent listeners (menu actions / native attention events)
 //   - settings write-error toast (warns the user if prefs aren't
 //     persisting instead of silently dropping their changes)
 
@@ -36,9 +36,8 @@ import { useKeyboard } from '#/web/hooks/useKeyboard.ts'
 import { useRepoDrop } from '#/web/hooks/useRepoDrop.ts'
 import { useAppBootstrap } from '#/web/hooks/useAppBootstrap.ts'
 import { useBackgroundFetch } from '#/web/hooks/useBackgroundFetch.ts'
-import { useExternalOpenPaths } from '#/web/hooks/useExternalOpenPaths.ts'
 import { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
-import { useMenuActions } from '#/web/hooks/useMenuActions.ts'
+import { useRendererEffectIntentRouter } from '#/web/hooks/useRendererEffectIntentRouter.ts'
 import { useSessionPersistence } from '#/web/hooks/useSessionPersistence.ts'
 import { useSettingsWriteErrorToast } from '#/web/hooks/useSettingsWriteErrorToast.ts'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
@@ -188,12 +187,11 @@ export function App({
   useSessionPersistence({ routeRepoId })
   useSettingsWriteErrorToast()
   useBackgroundFetch()
-  useExternalOpenPaths()
   useRepoStoreInvalidationRefresh()
   useRoutedActiveRepo({ activeId, sessionReady, routeRepoId, onRouteRepoChange })
   useRoutedSelectedBranch({ currentRepoId: visibleRepoId, sessionReady, routeBranch, onRouteBranchChange })
   useRoutedDetailTab({ currentRepoId: visibleRepoId, sessionReady, routeDetailTab, onRouteDetailTabChange })
-  useMenuActions({
+  useRendererEffectIntentRouter({
     navigation,
     currentRepoId: visibleRepoId,
     closeAllOverlays: overlays.closeAllOverlays,

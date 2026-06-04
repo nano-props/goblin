@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
 
 class MockWebSocket {
@@ -72,7 +73,7 @@ describe('terminal web host bridge', () => {
     mockNotifications.length = 0
     window.localStorage.clear()
     window.sessionStorage.clear()
-    Object.defineProperty(window, 'goblin', {
+    Object.defineProperty(window, 'goblinNative', {
       configurable: true,
       value: undefined,
     })
@@ -81,6 +82,7 @@ describe('terminal web host bridge', () => {
     Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
       configurable: true,
       value: {
+        runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
         homeDir: '',
         initialI18n: null,
         initialSettings: null,

@@ -85,7 +85,7 @@ vi.mock('sonner', () => ({
 let container: HTMLDivElement | null = null
 let root: Root | null = null
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-const testWindow = window as unknown as { goblin?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
+const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
 const sendTestNotification = vi.fn(async () => true)
 const invokeRpc = vi.fn(async ({ path, input }: { path: string; input?: unknown }) => defaultRpcResult(path, input))
 const fetchMock = vi.fn(async (input: string | URL) => {
@@ -120,7 +120,7 @@ beforeEach(() => {
     initialSettings: null,
     initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
   }
-  testWindow.goblin = {
+  testWindow.goblinNative = {
     homeDir: '/Users/tester',
     initialI18n: null,
     initialSettings: null,
@@ -161,7 +161,7 @@ afterEach(() => {
   root = null
   container = null
   document.body.innerHTML = ''
-  delete testWindow.goblin
+  delete testWindow.goblinNative
   delete testWindow.__GOBLIN_BOOTSTRAP__
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })

@@ -19,9 +19,10 @@ import {
 import { getCurrentLang, getDictionary, getLangPref } from '#/main/i18n/index.ts'
 import { getTheme } from '#/main/theme.ts'
 import { getEmbeddedServerRuntime } from '#/main/server-manager.ts'
-import { getSettingsSnapshot } from '#/main/settings-server-facade.ts'
+import { getSettingsSnapshot } from '#/main/settings-server-client.ts'
 import type { InitialSettingsSnapshot, RendererBootstrapPayload } from '#/shared/bootstrap.ts'
-import { createRendererBootstrapPayload, toInitialServerSnapshot } from '#/shared/bootstrap-builders.ts'
+import { ELECTRON_RENDERER_CAPABILITIES } from '#/shared/bootstrap.ts'
+import { createRendererBootstrapPayload, createRendererRuntimeSnapshot, toInitialServerSnapshot } from '#/shared/bootstrap-builders.ts'
 import type { LangPref } from '#/shared/rpc.ts'
 import { WINDOW_BACKGROUND_BY_COLOR_THEME } from '#/shared/theme-tokens.ts'
 import { DEFAULT_COLOR_THEME, initialSettingsFromSnapshot } from '#/shared/settings-defaults.ts'
@@ -41,6 +42,7 @@ function buildRendererBootstrapPayload(
 ): RendererBootstrapPayload {
   const runtime = getEmbeddedServerRuntime()
   return createRendererBootstrapPayload({
+    runtime: createRendererRuntimeSnapshot('electron', ELECTRON_RENDERER_CAPABILITIES),
     homeDir: os.homedir(),
     i18n: {
       lang: getCurrentLang(),

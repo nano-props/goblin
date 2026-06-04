@@ -1,12 +1,12 @@
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
-import { applyRecentReposEffects } from '#/main/settings-native-effects.ts'
+import { applyNativeHostRecentReposMenuState } from '#/main/native-host-settings-effects.ts'
 
 function syncRecentDocumentOnAdd(repo: RepoSessionEntry, addRecentDocument: (path: string) => void): void {
   if (repo.kind !== 'local') return
   addRecentDocument(repo.id)
 }
 
-export function applyRecentReposProjection(
+export function applyNativeHostRecentReposProjection(
   recentRepos: RepoSessionEntry[],
   options: {
     addRecentDocument: (path: string) => void
@@ -14,5 +14,5 @@ export function applyRecentReposProjection(
   },
 ): void {
   if (options.addedRepo) syncRecentDocumentOnAdd(options.addedRepo, options.addRecentDocument)
-  applyRecentReposEffects(recentRepos)
+  applyNativeHostRecentReposMenuState(recentRepos)
 }

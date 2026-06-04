@@ -8,6 +8,8 @@ interface RealtimeRouteOptions {
   terminalHost: ServerTerminalHost
 }
 
+// Server-authoritative realtime only. Native-host renderer effect intents stay
+// on Electron IPC so the server does not become a broker for local shell APIs.
 export function createRealtimeRoutes({ internalSecret, terminalHost }: RealtimeRouteOptions) {
   const app = new Hono()
   app.use('/invalidation', async (c, next) => {

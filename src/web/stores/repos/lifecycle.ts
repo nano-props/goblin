@@ -211,18 +211,6 @@ export function createLifecycleActions(set: ReposSet, get: ReposGet) {
       return { ok: true, id }
     },
 
-    async openRepo(pathOrEntry: string | RepoSessionEntry, options?: { activate?: boolean }): Promise<OpenRepoResult> {
-      // Compatibility wrapper for older call sites that still expect a
-      // combined "ensure open + maybe focus" action. Route-first flows
-      // should prefer `ensureWorkspaceOpen(...)` and let navigation own
-      // the active selection separately.
-      const activate = options?.activate !== false
-      const result = await get().ensureWorkspaceOpen(pathOrEntry)
-      if (!result.ok || !activate) return result
-      set((s) => (s.activeId === result.id ? s : { activeId: result.id }))
-      return result
-    },
-
     closeRepo(id: string) {
       disposeRepoRuntime(id)
       // Tell main to abort any cancellable network op for this repo —

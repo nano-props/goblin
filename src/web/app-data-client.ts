@@ -1,6 +1,6 @@
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
 import { canUseGlobalShortcutSettings, canUseNativeRpcBridge, openExternalUrl } from '#/web/app-shell-client.ts'
-import { invokeNativeRpcPath } from '#/web/native-bridge.ts'
+import { invokeNativeRpcPath } from '#/web/native-host-client.ts'
 import type {
   CloneRepoResult,
   EditorPref,

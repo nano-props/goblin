@@ -5,15 +5,11 @@ import { applyMainWindowChromeTheme } from '#/main/window.ts'
 import { allRegisteredSurfacesWithCapability } from '#/main/window-registry.ts'
 import { subscribeTheme } from '#/main/theme.ts'
 import { buildAppMenu } from '#/main/menu.ts'
-import { broadcastRpcEvent } from '#/main/events.ts'
+import { broadcastRpcEvent } from '#/main/renderer-surface-events.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 import { WINDOW_BACKGROUND_BY_COLOR_THEME } from '#/shared/theme-tokens.ts'
 import { RPC_ABORT_CHANNEL, RPC_CHANNEL } from '#/shared/ipc-channels.ts'
-import {
-  createEmbeddedServerRemoteRpcProxyHandlers,
-  createEmbeddedServerRepoRpcProxyHandlers,
-} from '#/main/embedded-server-rpc-proxy.ts'
-import { createNativeRpcHandlers } from '#/main/native-rpc-handlers.ts'
+import { createNativeHostRpcHandlers } from '#/main/native-host-rpc-handlers.ts'
 
 const MAX_RPC_PROCEDURE_PATH_LENGTH = 128
 const MAX_RPC_REQUEST_ID_LENGTH = 128
@@ -125,9 +121,6 @@ function toRpcError(err: unknown): Extract<RpcResponse, { ok: false }>['error'] 
 }
 
 function createRpcHandlers(): NativeRpcHandlers {
-  return {
-    repo: createEmbeddedServerRepoRpcProxyHandlers(currentRpcSignal),
-    remote: createEmbeddedServerRemoteRpcProxyHandlers(currentRpcSignal),
-    ...createNativeRpcHandlers(),
-  }
+  void currentRpcSignal
+  return createNativeHostRpcHandlers()
 }

@@ -15,8 +15,8 @@ const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENV
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   vi.useFakeTimers()
-  const testWindow = globalThis as typeof globalThis & { goblin?: unknown }
-  testWindow.goblin = {
+  const testWindow = globalThis as typeof globalThis & { goblinNative?: unknown }
+  testWindow.goblinNative = {
     homeDir: '/Users/tester',
     pathForFile: () => '',
     invokeRpc: async () => null,
@@ -33,8 +33,8 @@ afterEach(() => {
   root = null
   container = null
   document.body.innerHTML = ''
-  const testWindow = globalThis as typeof globalThis & { goblin?: unknown }
-  delete testWindow.goblin
+  const testWindow = globalThis as typeof globalThis & { goblinNative?: unknown }
+  delete testWindow.goblinNative
   vi.useRealTimers()
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })

@@ -18,12 +18,13 @@
 import { app, Menu, type MenuItemConstructorOptions } from 'electron'
 import { activateMainWindow, getMainWindow } from '#/main/window.ts'
 import { t } from '#/main/i18n/index.ts'
-import { sendRpcEvent } from '#/main/events.ts'
+import { sendRendererEffectIntent } from '#/main/renderer-surface-events.ts'
 import { getTheme } from '#/main/theme.ts'
 import { normalizeWorkspaceLayout, type WorkspaceLayout } from '#/shared/workspace-layout.ts'
 import { tildifyPath } from '#/shared/paths.ts'
-import type { LangPref, MenuAction, ThemePref } from '#/shared/rpc.ts'
+import type { LangPref, ThemePref } from '#/shared/rpc.ts'
 import { remoteTargetSubtitle, type RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
 import { focusedRegisteredSurface } from '#/main/window-registry.ts'
 import { readMenuRuntimeState, setMenuWorkspaceLayout as setMenuWorkspaceLayoutState } from '#/main/menu-state.ts'
 import {
@@ -70,16 +71,16 @@ const WORKSPACE_LAYOUT_MENU_OPTIONS = [
 // later confirms the same value through saveSession.
 let menuWorkspaceLayout: WorkspaceLayout | null = null
 
-function send(action: MenuAction): void {
-  void sendMenuAction(action)
+function send(intent: RendererEffectIntent): void {
+  void sendRendererIntent(intent)
 }
 
-async function sendMenuAction(action: MenuAction): Promise<void> {
+async function sendRendererIntent(intent: RendererEffectIntent): Promise<void> {
   try {
     const win = getMainWindow() ?? focusedRegisteredSurface()?.window ?? (await activateMainWindow())
-    sendRpcEvent(win, { type: 'menu-action', action })
+    sendRendererEffectIntent(win, intent)
   } catch (err) {
-    console.warn('[menu] failed to send menu action', err)
+    console.warn('[menu] failed to send renderer intent', err)
   }
 }
 
@@ -128,9 +129,9 @@ function createMacAppMenu(state: AppMenuState): MenuItemConstructorOptions {
   return {
     label: state.name,
     submenu: [
-      { label: t('menu.app.about', { name: state.name }), click: () => send({ type: 'open-settings', page: 'about' }) },
+      { label: t('menu.app.about', { name: state.name }), click: () => send({ type: 'open-settings-requested', page: 'about' }) },
       separator(),
-      { label: t('menu.app.settings'), accelerator: accelerator(state, 'Cmd+,'), click: () => send({ type: 'open-settings', page: 'general' }) },
+      { label: t('menu.app.settings'), accelerator: accelerator(state, 'Cmd+,'), click: () => send({ type: 'open-settings-requested', page: 'general' }) },
       createAppearanceMenu(state.themePref),
       createLanguageMenu(state.langPref),
       separator(),
@@ -152,21 +153,21 @@ function createFileMenu(state: AppMenuState): MenuItemConstructorOptions {
       {
         label: t('menu.file.open-local-repo'),
         accelerator: accelerator(state, 'CmdOrCtrl+O'),
-        click: () => send('open-repo'),
+        click: () => send({ type: 'open-repo-requested' }),
       },
       {
         label: t('menu.file.open-local-repo-path'),
-        click: () => send('open-repo-path'),
+        click: () => send({ type: 'open-repo-path-requested' }),
       },
       {
         label: t('menu.file.clone-repo'),
         accelerator: accelerator(state, 'CmdOrCtrl+Shift+O'),
-        click: () => send('clone-repo'),
+        click: () => send({ type: 'clone-repo-requested' }),
       },
       {
         label: t('menu.file.open-remote-repo'),
         accelerator: accelerator(state, 'CmdOrCtrl+Shift+R'),
-        click: () => send('open-remote-repo'),
+        click: () => send({ type: 'open-remote-repo-requested' }),
       },
       { label: t('menu.file.open-recent'), submenu: createRecentReposMenu(state.recentRepos) },
       { label: t('menu.file.open-in-browser'), click: () => void openWebVersionFromMenu() },
@@ -185,7 +186,7 @@ function createFileMenu(state: AppMenuState): MenuItemConstructorOptions {
       {
         label: t('menu.file.close-tab'),
         accelerator: accelerator(state, state.swapCloseShortcuts ? 'CmdOrCtrl+W' : 'CmdOrCtrl+Shift+W'),
-        click: () => send('close-repo'),
+        click: () => send({ type: 'close-repo-requested' }),
       },
       ...(state.isMac
         ? []
@@ -194,7 +195,7 @@ function createFileMenu(state: AppMenuState): MenuItemConstructorOptions {
             {
               label: t('menu.file.settings'),
               accelerator: accelerator(state, 'Ctrl+,'),
-              click: () => send({ type: 'open-settings', page: 'general' }),
+              click: () => send({ type: 'open-settings-requested', page: 'general' }),
             },
             separator(),
             { role: 'quit' as const, label: t('menu.file.quit') },
@@ -212,7 +213,7 @@ function createRecentReposMenu(recentRepos: RepoSessionEntry[]): MenuItemConstru
             entry.kind === 'local'
               ? tildifyPath(entry.id, home)
               : `${entry.ref.displayName} — ${entry.ref.alias}:${entry.ref.remotePath}`,
-          click: () => send({ type: 'open-recent-repo', entry }),
+          click: () => send({ type: 'open-recent-repo-requested', entry }),
         })),
         separator(),
         { label: t('menu.file.clear-recent'), click: () => void clearRecentReposFromMenu() },
@@ -236,27 +237,35 @@ function createViewMenu(state: AppMenuState): MenuItemConstructorOptions {
   return {
     label: t('menu.view'),
     submenu: [
-      { label: t('menu.view.status'), accelerator: accelerator(state, 'CmdOrCtrl+1'), click: () => send('tab-status') },
+      {
+        label: t('menu.view.status'),
+        accelerator: accelerator(state, 'CmdOrCtrl+1'),
+        click: () => send({ type: 'show-detail-tab-requested', tab: 'status' }),
+      },
       {
         label: t('menu.view.terminal'),
         accelerator: accelerator(state, 'CmdOrCtrl+2'),
-        click: () => send('tab-terminal'),
+        click: () => send({ type: 'show-detail-tab-requested', tab: 'terminal' }),
       },
       {
         label: t('menu.view.terminal-primary-action'),
         accelerator: accelerator(state, 'CmdOrCtrl+Enter'),
-        click: () => send('terminal-primary-action'),
+        click: () => send({ type: 'terminal-primary-action-requested' }),
       },
       createWorkspaceLayoutMenu(state.workspaceLayout),
       {
         label: t('menu.view.toggle-detail'),
         accelerator: accelerator(state, 'CmdOrCtrl+J'),
         enabled: state.workspaceLayout === 'top-bottom',
-        click: () => send('toggle-detail'),
+        click: () => send({ type: 'toggle-detail-requested' }),
       },
       ...(state.isMac ? [] : [separator(), createAppearanceMenu(state.themePref), createLanguageMenu(state.langPref)]),
       separator(),
-      { label: t('menu.view.refresh'), accelerator: accelerator(state, 'CmdOrCtrl+R'), click: () => send('refresh') },
+      {
+        label: t('menu.view.refresh'),
+        accelerator: accelerator(state, 'CmdOrCtrl+R'),
+        click: () => send({ type: 'repo-refresh-requested' }),
+      },
       separator(),
       state.shortcutsDisabled
         ? {
@@ -279,15 +288,15 @@ function createWindowMenu(state: AppMenuState): MenuItemConstructorOptions {
       {
         label: t('menu.window.next-repo'),
         accelerator: accelerator(state, 'CmdOrCtrl+]'),
-        click: () => send('next-repo'),
+        click: () => send({ type: 'cycle-repo-requested', direction: 1 }),
       },
       {
         label: t('menu.window.prev-repo'),
         accelerator: accelerator(state, 'CmdOrCtrl+['),
-        click: () => send('prev-repo'),
+        click: () => send({ type: 'cycle-repo-requested', direction: -1 }),
       },
       separator(),
-      { label: t('menu.window.reset-layout'), click: () => send('reset-layout') },
+      { label: t('menu.window.reset-layout'), click: () => send({ type: 'workspace-layout-reset-requested' }) },
       separator(),
       { role: 'minimize', label: t('menu.window.minimize') },
       { role: 'zoom', label: t('menu.window.zoom') },
@@ -302,7 +311,7 @@ function createHelpMenu(): MenuItemConstructorOptions {
     // No menu accelerator: Electron requires a modifier on accelerators,
     // and bare `?` is rejected at registration. The renderer's keyboard
     // hook handles `?` directly so the binding still works.
-    submenu: [{ label: t('menu.help.shortcuts'), click: () => send({ type: 'open-settings', page: 'shortcuts' }) }],
+    submenu: [{ label: t('menu.help.shortcuts'), click: () => send({ type: 'open-settings-requested', page: 'shortcuts' }) }],
   }
 }
 
@@ -348,7 +357,7 @@ function accelerator(state: AppMenuState, value: string): string | undefined {
 
 function setWorkspaceLayoutFromMenu(layout: WorkspaceLayout): void {
   setMenuWorkspaceLayout(layout)
-  send({ type: 'set-workspace-layout', layout })
+  send({ type: 'workspace-layout-set-requested', layout })
 }
 
 async function setThemePrefFromMenu(pref: ThemePref): Promise<void> {
@@ -364,7 +373,7 @@ async function openWebVersionFromMenu(): Promise<void> {
 }
 
 async function clearRecentReposFromMenu(): Promise<void> {
-  await runClearRecentReposFromMenu({ rebuildMenu: buildAppMenu })
+  await runClearRecentReposFromMenu()
 }
 
 async function openDataFolder(): Promise<void> {

@@ -9,7 +9,7 @@ function installBridge(
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
     value: {
-      goblin: {
+      goblinNative: {
         homeDir: '/Users/test',
         initialI18n: overrides.initialI18n ?? null,
         initialSettings: overrides.initialSettings ?? null,

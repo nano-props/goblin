@@ -5,7 +5,7 @@
 // emits updates, but it is not the persistence source of truth.
 
 import { nativeTheme } from 'electron'
-import { getSettingsPrefs, updateSettingsPrefs } from '#/main/settings-server-facade.ts'
+import { getSettingsPrefs, updateSettingsPrefs } from '#/main/settings-server-client.ts'
 import { isColorTheme } from '#/shared/color-theme.ts'
 import { DEFAULT_COLOR_THEME } from '#/shared/settings-defaults.ts'
 import type { ResolvedTheme, ThemePref, ThemeState } from '#/shared/rpc.ts'

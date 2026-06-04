@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { subscribeRepoQueryInvalidation } from '#/web/repo-query-invalidation-source.ts'
+import { subscribeRepoQueryInvalidation } from '#/web/repo-query-invalidation-ingress.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 export function useRepoStoreInvalidationRefresh() {
