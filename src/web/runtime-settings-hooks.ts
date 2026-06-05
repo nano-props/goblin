@@ -74,10 +74,6 @@ export function useRuntimeFetchSettings() {
   return readRuntimeFetchSettings(data)
 }
 
-export function getRuntimeExternalAppSettings() {
-  return readRuntimeExternalAppSettings(currentExternalAppsSnapshot())
-}
-
 export function useRuntimeExternalAppSettings() {
   const { data } = useExternalAppsQuery()
   return readRuntimeExternalAppSettings(data)

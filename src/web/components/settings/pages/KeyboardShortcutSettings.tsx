@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 import { ShortcutSettings } from '#/web/components/settings/ShortcutSettings.tsx'
 import { SettingsCard, SettingsGroup, SettingsListItem } from '#/web/components/settings/SettingsPrimitives.tsx'
 import { useSettingsSnapshotQuery } from '#/web/settings-queries.ts'

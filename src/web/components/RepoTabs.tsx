@@ -7,7 +7,6 @@
 // tanstack ecosystem). PointerSensor with a small activation distance lets
 // a regular click still focus the repo without triggering a drag; keyboard
 // users use Arrow keys for tab activation.
-import { toast } from 'sonner'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'

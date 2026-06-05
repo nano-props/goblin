@@ -2,7 +2,7 @@ import type { ITheme } from '@xterm/xterm'
 import type { ISearchOptions } from '@xterm/addon-search'
 type TerminalSearchDecorations = NonNullable<ISearchOptions['decorations']>
 
-export const TERMINAL_THEME_TOKENS_CHANGED_EVENT = 'goblin-theme-tokens-changed'
+export const TERMINAL_THEME_TOKENS_CHANGED_EVENT = 'theme-tokens-changed'
 
 export function terminalThemeForCurrentDocument(): ITheme {
   const styles = getComputedStyle(document.documentElement)

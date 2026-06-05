@@ -104,10 +104,6 @@ function abortRpcRequest(input: unknown): boolean {
   return true
 }
 
-function currentRpcSignal(): AbortSignal | undefined {
-  return rpcSignalStorage.getStore()
-}
-
 function resolveRpcPathSegment(target: unknown, segment: string): unknown {
   if (FORBIDDEN_RPC_PATH_SEGMENTS.has(segment)) return undefined
   if (!target || (typeof target !== 'object' && typeof target !== 'function')) return undefined
@@ -121,6 +117,5 @@ function toRpcError(err: unknown): Extract<RpcResponse, { ok: false }>['error'] 
 }
 
 function createRpcHandlers(): NativeRpcHandlers {
-  void currentRpcSignal
   return createNativeHostRpcHandlers()
 }

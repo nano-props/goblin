@@ -62,10 +62,6 @@ function nextIndex(current: number, length: number, direction: MoveDirection): n
   return Math.max(0, current < 0 ? 0 : current - 1)
 }
 
-function moveBranchSelection(state: ReposStore, repo: RepoState, direction: MoveDirection): boolean {
-  return moveBranchSelectionWithNavigation(state, repo, direction)
-}
-
 function moveBranchSelectionWithNavigation(
   state: ReposStore,
   repo: RepoState,

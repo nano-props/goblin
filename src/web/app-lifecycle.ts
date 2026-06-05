@@ -27,11 +27,6 @@ export function markAppQuitting(): void {
   listeners.clear()
 }
 
-export function resetAppLifecycleForTests(): void {
-  quitting = false
-  listeners.clear()
-}
-
 // Keep native quit lifecycle wiring at this low level so every Electron
 // renderer that imports app-lifecycle-aware realtime code inherits it, even if
 // a future surface does not mount the main React intent router.
