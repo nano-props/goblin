@@ -10,12 +10,11 @@ import { BranchDetailToolbar } from '#/web/components/branch-detail/BranchDetail
 import { BranchDetailContent } from '#/web/components/branch-detail/BranchDetailContent.tsx'
 import { DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
-import { BranchActionDialogs } from '#/web/components/BranchActionBar.tsx'
 interface Props {
   repoId: string
   layout?: RepoWorkspaceLayout
   collapsed?: boolean
-  focusMode?: boolean
+  detailFocusMode?: boolean
 }
 
 // Keep this equality in sync with fields read by BranchDetail children.
@@ -45,7 +44,7 @@ export function BranchDetail({
   repoId,
   layout = DEFAULT_WORKSPACE_LAYOUT,
   collapsed = false,
-  focusMode = false,
+  detailFocusMode = false,
 }: Props) {
   const detailId = useId()
   const repo = useStoreWithEqualityFn(useReposStore, (s) => s.repos[repoId], branchDetailRepoEqual)
@@ -65,7 +64,7 @@ export function BranchDetail({
           detailId={detailId}
           contentId={contentId}
           collapsed={collapsed}
-          focusMode={focusMode}
+          detailFocusMode={detailFocusMode}
           layout={layout}
         />
       ) : (
@@ -76,7 +75,7 @@ export function BranchDetail({
             detailId={detailId}
             contentId={contentId}
             collapsed={collapsed}
-            focusMode={focusMode}
+            detailFocusMode={detailFocusMode}
             layout={layout}
           />
           {!collapsed && (
@@ -101,7 +100,7 @@ interface BranchDetailWithActionsProps {
   detailId: string
   contentId: string
   collapsed: boolean
-  focusMode: boolean
+  detailFocusMode: boolean
   layout: RepoWorkspaceLayout
 }
 
@@ -112,7 +111,7 @@ function BranchDetailWithActions({
   detailId,
   contentId,
   collapsed,
-  focusMode,
+  detailFocusMode,
   layout,
 }: BranchDetailWithActionsProps) {
   const actions = useBranchActionItems(repo, branch)
@@ -125,11 +124,11 @@ function BranchDetailWithActions({
         detailId={detailId}
         contentId={contentId}
         collapsed={collapsed}
-        focusMode={focusMode}
+        detailFocusMode={detailFocusMode}
         layout={layout}
         branchActions={actions}
       />
-      <BranchActionDialogs actions={actions} />
+      {actions.dialogs}
       {!collapsed && (
         <BranchDetailContent repo={repo} detail={detail} detailId={detailId} contentId={contentId} layout={layout} />
       )}

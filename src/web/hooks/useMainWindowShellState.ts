@@ -19,6 +19,7 @@ export function useMainWindowShellState({
   const activeId = useReposStore((s) => s.activeId)
   const sessionReady = useReposStore((s) => s.sessionReady)
   const detailCollapsed = useReposStore((s) => s.detailCollapsed)
+  const detailFocusMode = useReposStore((s) => s.detailFocusMode)
   const workspaceLayout = useReposStore((s) => s.workspaceLayout)
   const order = useReposStore((s) => s.order)
   const setActive = useReposStore((s) => s.setActive)
@@ -28,7 +29,7 @@ export function useMainWindowShellState({
   const setDetailTab = useReposStore((s) => s.setDetailTab)
   const overlays = useAppOverlays()
   const effectiveLayout = effectiveWorkspaceLayout(workspaceLayout, uiMode)
-  const workspaceBehavior = repoWorkspaceBehavior(effectiveLayout, detailCollapsed)
+  const workspaceBehavior = repoWorkspaceBehavior(effectiveLayout, detailCollapsed, detailFocusMode)
   const visibleRepoId = activeId
   const settingsOpen = routeSettingsPage !== null
   const modalOpen = overlays.anyOpen

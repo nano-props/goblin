@@ -1,39 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
-import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
 import { AsyncButton } from '#/web/components/AsyncButton.tsx'
 import { BranchActionsDropdown } from '#/web/components/BranchActionsMenu.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
-import {
-  useBranchActionItems,
-  type BranchActionItem,
-  type BranchActionItemGroups,
-} from '#/web/hooks/useBranchActionItems.ts'
+import { type BranchActionItem, type BranchActionItemGroups } from '#/web/hooks/useBranchActionItems.ts'
 import { setBranchActionShortcutHandler } from '#/web/keyboard/branch-action-shortcuts.ts'
 import { cn } from '#/web/lib/cn.ts'
-interface Props {
-  repo: RepoState
-  branch: RepoBranchState
-  variant?: BranchActionBarVariant
-}
-
-export type BranchActionBarVariant = 'bar' | 'menu' | 'auto'
+type BranchActionControlsVariant = 'bar' | 'menu' | 'auto'
 
 interface BranchActionControlsProps {
   actions: BranchActionItemGroups
-  variant?: BranchActionBarVariant
-}
-
-export function BranchActionBar({ repo, branch, variant = 'bar' }: Props) {
-  const actions = useBranchActionItems(repo, branch)
-
-  return (
-    <>
-      <BranchActionControls actions={actions} variant={variant} />
-
-      <BranchActionDialogs actions={actions} />
-    </>
-  )
+  variant?: BranchActionControlsVariant
 }
 
 export function BranchActionControls({ actions, variant = 'bar' }: BranchActionControlsProps) {
@@ -68,10 +45,6 @@ export function BranchActionControls({ actions, variant = 'bar' }: BranchActionC
   }
 
   return <BranchActionButtonScroller visibleItems={visibleItems} />
-}
-
-export function BranchActionDialogs({ actions }: { actions: BranchActionItemGroups }) {
-  return actions.dialogs
 }
 
 function BranchActionAuto({

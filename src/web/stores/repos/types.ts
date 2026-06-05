@@ -125,6 +125,10 @@ export interface PersistableWorkspaceUiState {
   /** Active workspace tab restored from SessionState.activeRepo. */
   activeId: string | null
   detailCollapsed: boolean
+  /** Persisted focus-toggle preference for the top-bottom detail pane. This
+   *  is not itself proof that the workspace is currently rendering in focus
+   *  mode — a collapsed top-bottom layout preserves the preference while the
+   *  effective layout mode remains collapsed. */
   detailFocusMode: boolean
   workspaceLayout: RepoWorkspaceLayout
   detailPaneSizes: WorkspaceDetailPaneSizes
@@ -164,6 +168,8 @@ export interface ReposStore extends PersistableWorkspaceUiState, WorkspaceFronte
   ) => void
   setDetailCollapsed: (collapsed: boolean) => void
   toggleDetailCollapsed: () => void
+  /** Update the persisted top-bottom focus-toggle preference. The effective
+   *  rendered layout mode should be derived from `repoWorkspaceBehavior()`. */
   setDetailFocusMode: (focused: boolean) => void
   toggleDetailFocusMode: () => void
   setWorkspaceLayout: (layout: RepoWorkspaceLayout) => void

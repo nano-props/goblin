@@ -293,6 +293,12 @@
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-ring) 85%, transparent);
 }
 
+.goblin-terminal-switcher__select > svg {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+}
+
 .goblin-terminal-switcher__select span {
   min-width: 0;
   overflow: hidden;

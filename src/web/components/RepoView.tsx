@@ -82,7 +82,7 @@ export function RepoView({ repoId }: Props) {
               repoId={repoId}
               layout={layout}
               collapsed={behavior.detailCollapsed}
-              focusMode={behavior.detailFocusMode}
+              detailFocusMode={behavior.detailFocusMode}
             />
           </RepoWorkspacePane>
         }

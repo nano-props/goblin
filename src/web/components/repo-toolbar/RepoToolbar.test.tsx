@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoToolbar } from '#/web/components/repo-toolbar/RepoToolbar.tsx'
 import { MainWindowNavigationProvider, type MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
+import { useReposStore } from '#/web/stores/repos/store.ts'
 import { resetReposStore, seedRepoState, createRepoBranch } from '#/web/stores/repos/test-utils.ts'
 
 const REPO_ID = '/tmp/gbl-repo-toolbar-repo'
@@ -67,6 +68,21 @@ describe('RepoToolbar', () => {
 
     expect(selectRepoBranch).toHaveBeenNthCalledWith(1, REPO_ID, 'main')
     expect(selectRepoBranch).toHaveBeenNthCalledWith(2, REPO_ID, 'feature/b')
+  })
+
+  test('keeps compact branch pager behavior when left-right layout is downgraded on small screens', () => {
+    useReposStore.setState({ workspaceLayout: 'left-right' })
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('main'), createRepoBranch('feature/a'), createRepoBranch('feature/b')],
+      currentBranch: 'main',
+      selectedBranch: 'feature/a',
+    })
+
+    renderToolbar(navigationWith({}))
+
+    expect(container?.textContent).toContain('2 / 3')
+    expect(container?.querySelector('[aria-label="workspace.layout-label"]')).toBeNull()
   })
 })
 

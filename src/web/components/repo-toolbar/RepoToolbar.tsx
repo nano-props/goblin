@@ -12,7 +12,7 @@ import { visibleBranches } from '#/web/stores/repos/branch-view-mode.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { BranchViewMode } from '#/web/stores/repos/types.ts'
-import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
+import { effectiveWorkspaceLayout, repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 interface Props {
   repoId: string
 }
@@ -38,13 +38,14 @@ function BranchFilterControls({ repoId }: Props) {
   const t = useT()
   const uiMode = useResponsiveUiMode()
   const navigation = useMainWindowNavigation()
-  const { focusMode, branches, selectedBranch } = useStoreWithEqualityFn(
+  const { focusedLayout, branches, selectedBranch } = useStoreWithEqualityFn(
     useReposStore,
     (s) => {
       const repo = s.repos[repoId]
-      const behavior = repoWorkspaceBehavior(s.workspaceLayout, s.detailCollapsed, s.detailFocusMode)
+      const layout = effectiveWorkspaceLayout(s.workspaceLayout, uiMode)
+      const behavior = repoWorkspaceBehavior(layout, s.detailCollapsed, s.detailFocusMode)
       return {
-        focusMode: behavior.mode === 'focus',
+        focusedLayout: behavior.mode === 'focus',
         branches: repo
           ? visibleBranches({
               branches: repo.data.branches,
@@ -55,7 +56,7 @@ function BranchFilterControls({ repoId }: Props) {
       }
     },
     (a, b) =>
-      a.focusMode === b.focusMode &&
+      a.focusedLayout === b.focusedLayout &&
       a.branches === b.branches &&
       a.selectedBranch === b.selectedBranch,
   )
@@ -74,10 +75,16 @@ function BranchFilterControls({ repoId }: Props) {
   const setBranchViewMode = useReposStore((s) => s.setBranchViewMode)
   const setBranchSearchQuery = useReposStore((s) => s.setBranchSearchQuery)
   const branchPager = (
-    <BranchPager repoId={repoId} branches={branches} selectedBranch={selectedBranch} focusMode={focusMode} navigation={navigation} />
+    <BranchPager
+      repoId={repoId}
+      branches={branches}
+      selectedBranch={selectedBranch}
+      focusedLayout={focusedLayout}
+      navigation={navigation}
+    />
   )
 
-  if (focusMode) return branchPager
+  if (focusedLayout) return branchPager
   if (uiMode === 'compact') return branchPager
 
   return (
@@ -102,13 +109,13 @@ function BranchPager({
   repoId,
   branches,
   selectedBranch,
-  focusMode,
+  focusedLayout,
   navigation,
 }: {
   repoId: string
   branches: { name: string }[]
   selectedBranch: string | null
-  focusMode: boolean
+  focusedLayout: boolean
   navigation: ReturnType<typeof useMainWindowNavigation>
 }) {
   const t = useT()
@@ -122,7 +129,7 @@ function BranchPager({
     <div className="flex items-center gap-1">
       <span
         className="min-w-0 shrink-0 px-1 text-[11px] font-medium tabular-nums text-muted-foreground"
-        aria-label={focusMode ? t('branches.selected') : undefined}
+        aria-label={focusedLayout ? t('branches.selected') : undefined}
       >
         {current} / {branches.length}
       </span>

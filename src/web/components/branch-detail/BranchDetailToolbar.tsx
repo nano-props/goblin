@@ -4,7 +4,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoState, DetailTab, RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { Button } from '#/web/components/ui/button.tsx'
-import { BranchActionControls } from '#/web/components/BranchActionBar.tsx'
+import { BranchActionControls } from '#/web/components/BranchActionControls.tsx'
 import { Toolbar } from '#/web/components/Layout.tsx'
 import { detailTabNavigationKey, navigatedDetailTab, visibleDetailTabs } from '#/web/lib/detail-tabs.ts'
 import { cn } from '#/web/lib/cn.ts'
@@ -21,7 +21,7 @@ interface Props {
   detailId: string
   contentId: string
   collapsed: boolean
-  focusMode: boolean
+  detailFocusMode: boolean
   layout: RepoWorkspaceLayout
   branchActions?: BranchActionItemGroups
 }
@@ -32,7 +32,7 @@ export function BranchDetailToolbar({
   detailId,
   contentId,
   collapsed,
-  focusMode,
+  detailFocusMode,
   layout,
   branchActions,
 }: Props) {
@@ -42,7 +42,7 @@ export function BranchDetailToolbar({
   const toggleDetailFocusMode = useReposStore((s) => s.toggleDetailFocusMode)
   const navigation = useMainWindowNavigation()
   const { shortcutsDisabled, toggleDetailOnActionBarBlankClick } = useRuntimeShortcutSettings()
-  const behavior = repoWorkspaceBehavior(layout, collapsed, focusMode)
+  const behavior = repoWorkspaceBehavior(layout, collapsed, detailFocusMode)
   const tabs = visibleDetailTabs(!!detail.branch?.worktree?.path)
   const terminalWorktreeKey = detail.branch?.worktree?.path ? worktreeTerminalKey(repo.id, detail.branch.worktree.path) : null
   const terminalCount = useTerminalCount(terminalWorktreeKey)
@@ -70,6 +70,9 @@ export function BranchDetailToolbar({
         ? 'branch-detail.expand-title'
         : 'branch-detail.collapse-title',
   )
+  const showBranchActions = !!branchActions && (layout === 'left-right' || behavior.mode === 'focus')
+  const showPanelControls = behavior.detailFocusAllowed || behavior.detailCollapseAllowed
+  const focusTogglePressed = behavior.detailFocusMode
 
   return (
     <Toolbar variant="detail">
@@ -118,23 +121,25 @@ export function BranchDetailToolbar({
         onClick={behavior.detailCollapseAllowed && toggleDetailOnActionBarBlankClick ? toggleDetailCollapsed : undefined}
       />
       <div className="flex shrink-0 items-center gap-1">
-        {branchActions && layout === 'left-right' && (
+        {showBranchActions && (
           <BranchActionControls actions={branchActions} variant="menu" />
+        )}
+        {showBranchActions && showPanelControls && (
+          <div aria-hidden="true" data-testid="branch-detail-toolbar-divider" className="mx-1 h-4 border-l border-separator/70" />
         )}
         {behavior.detailFocusAllowed && (
           <Button
             variant="ghost"
             size="icon"
             onClick={toggleDetailFocusMode}
-            aria-label={t(behavior.detailFocusMode ? 'branch-detail.exit-focus' : 'branch-detail.focus')}
-            title={t(behavior.detailFocusMode ? 'branch-detail.exit-focus-title' : 'branch-detail.focus-title')}
-            aria-pressed={behavior.detailFocusMode}
+            aria-label={t(focusTogglePressed ? 'branch-detail.exit-focus' : 'branch-detail.focus')}
+            title={t(focusTogglePressed ? 'branch-detail.exit-focus-title' : 'branch-detail.focus-title')}
+            aria-pressed={focusTogglePressed}
             className={cn(
-              behavior.detailFocusMode &&
-                'bg-accent text-accent-foreground shadow-xs hover:bg-accent hover:text-accent-foreground',
+              focusTogglePressed && 'bg-accent text-accent-foreground shadow-xs hover:bg-accent hover:text-accent-foreground',
             )}
           >
-            {behavior.detailFocusMode ? <Minimize2 /> : <Maximize2 />}
+            {focusTogglePressed ? <Minimize2 /> : <Maximize2 />}
           </Button>
         )}
         {behavior.detailCollapseAllowed && (

@@ -45,6 +45,8 @@ function Harness() {
       <output id="active-repo">{activeId ?? 'none'}</output>
       <output id="selected-branch">{selectedBranch ?? 'none'}</output>
       <output id="detail-tab">{detailTab ?? 'none'}</output>
+      <output id="effective-layout">{shell.effectiveLayout}</output>
+      <output id="workspace-mode">{shell.workspaceBehavior.mode}</output>
     </>
   )
 }
@@ -92,6 +94,19 @@ describe('useMainWindowShellState', () => {
     expect(text('#active-repo')).toBe('/tmp/repo')
     expect(text('#selected-branch')).toBe('feature/test')
     expect(text('#detail-tab')).toBe('terminal')
+  })
+
+  test('derives focus workspace mode from the effective layout and focus preference', async () => {
+    useReposStore.setState({
+      workspaceLayout: 'top-bottom',
+      detailCollapsed: false,
+      detailFocusMode: true,
+    })
+
+    await render(<Harness />)
+
+    expect(text('#effective-layout')).toBe('top-bottom')
+    expect(text('#workspace-mode')).toBe('focus')
   })
 })
 
