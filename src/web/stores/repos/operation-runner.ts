@@ -110,13 +110,14 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
       if (ctx.isCurrent()) markOperationState(options, token, operationId, phase)
     },
   }
-  let error: string | null = null
-  let staleHandled = false
-  async function handleStale() {
-    if (staleHandled) return
-    staleHandled = true
-    await options.onStale?.(ctx)
-  }
+
+  // Phase 1: 执行核心任务，得到 outcome（不会被后续副作用污染）
+  type Outcome =
+    | { kind: 'stale' }
+    | { kind: 'error'; error: string; original: unknown }
+    | { kind: 'success'; result: T; error: string | null }
+
+  let outcome: Outcome
   try {
     const result = await scheduleRepoTask(options.id, options.lane, (signal) => options.task(signal, ctx), {
       priority: options.priority,
@@ -128,26 +129,37 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
       onStart: (wasQueued) => markOperationState(options, token, operationId, 'running', wasQueued),
     })
     if (!ctx.isCurrent()) {
-      settleOperationState(options, token, operationId, null)
-      await handleStale()
-      return null
+      outcome = { kind: 'stale' }
+    } else {
+      outcome = { kind: 'success', result, error: options.errorFromResult?.(result) ?? null }
     }
-    error = options.errorFromResult?.(result) ?? null
-    settleOperationState(options, token, operationId, error)
-    await options.onResult?.(result, ctx)
-    return result
   } catch (err) {
-    error = err instanceof Error ? err.message : String(err)
-    settleOperationState(options, token, operationId, error)
-    if (ctx.isCurrent()) {
-      await options.onError?.(error, ctx)
-      if (options.rethrow) throw err
-      return options.errorResult?.(error) ?? null
-    }
-    await handleStale()
-    if (options.rethrow) throw err
+    outcome = { kind: 'error', error: err instanceof Error ? err.message : String(err), original: err }
+  }
+
+  // Phase 2: 统一 settle（只发生一次，在副作用之前）
+  const settleError = outcome.kind === 'success' ? outcome.error : outcome.kind === 'error' ? outcome.error : null
+  settleOperationState(options, token, operationId, settleError)
+
+  // Phase 3: 副作用回调（onResult/onError/onStale）
+  if (outcome.kind === 'stale') {
+    await options.onStale?.(ctx)
     return null
   }
+
+  if (outcome.kind === 'error') {
+    if (ctx.isCurrent()) {
+      await options.onError?.(outcome.error, ctx)
+      if (options.rethrow) throw outcome.original
+      return options.errorResult?.(outcome.error) ?? null
+    }
+    await options.onStale?.(ctx)
+    if (options.rethrow) throw outcome.original
+    return null
+  }
+
+  await options.onResult?.(outcome.result, ctx)
+  return outcome.result
 }
 
 export function runLatestOperation<T>(options: RepoOperationBaseOptions<T>): Promise<T | null> {

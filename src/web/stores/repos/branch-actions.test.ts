@@ -151,7 +151,7 @@ describe('branch action capabilities', () => {
     })
   })
 
-  test('disables external editor actions for remote worktrees while keeping terminal access', () => {
+  test('disables external editor and terminal actions for remote worktrees', () => {
     const branch = createRepoBranch('feature/remote', { worktree: { path: '/srv/repo-feature' } })
     const target = normalizeRemoteTarget({
       alias: 'example',
@@ -176,7 +176,7 @@ describe('branch action capabilities', () => {
     })
 
     expect(getBranchActionCapabilities(useReposStore.getState().repos[target!.id]!, branch)).toMatchObject({
-      canOpenTerminal: true,
+      canOpenTerminal: false,
       canOpenEditor: false,
     })
   })

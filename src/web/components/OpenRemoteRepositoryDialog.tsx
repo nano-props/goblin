@@ -125,7 +125,10 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
     setActionError(null)
     try {
       const nextTarget = await resolveCurrentTarget()
-      if (!nextTarget) return
+      if (!nextTarget) {
+        setLoading(false)
+        return
+      }
       const needsTest = !diagnostics?.ok || diagnostics.target.id !== nextTarget.id
       if (needsTest) {
         const result = await testRemoteRepositoryConnection(nextTarget)

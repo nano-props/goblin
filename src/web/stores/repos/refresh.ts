@@ -15,7 +15,11 @@ import {
   stripBranchWorktreeMetadata,
   worktreeStatesFromBranches,
 } from '#/web/stores/repos/worktree-state.ts'
-import { pruneRepoBranchPullRequestOperations, repoOperationCurrent } from '#/web/stores/repos/runtime.ts'
+import {
+  pruneRepoBranchPullRequestOperations,
+  repoOperationCurrent,
+  waitForRepoOperationsIdle,
+} from '#/web/stores/repos/runtime.ts'
 import {
   runManualSyncResultWorkflow,
   runRefreshAllWorkflow,
@@ -419,7 +423,25 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         await get().refreshAll(id, { token })
         return
       }
-      if (!canStartRemoteFetch(repoBefore)) return
+      if (!canStartRemoteFetch(repoBefore)) {
+        // Wait for in-flight snapshot/status operations to finish so the
+        // manual refresh behaves consistently with local-only repos:
+        // the button stays clickable and the work queues instead of
+        // silently dropping.
+        try {
+          await waitForRepoOperationsIdle(id, ['snapshot', 'status'])
+        } catch {
+          return
+        }
+        const repoAfterWait = get().repos[id]
+        if (!repoAfterWait || repoAfterWait.instanceToken !== token) return
+        if (!canStartRemoteFetch(repoAfterWait)) {
+          // Still blocked (e.g. branch action in progress). Fall back to
+          // a local refresh so the user gets *some* feedback.
+          await get().refreshAll(id, { token })
+          return
+        }
+      }
       let result: ExecResult | null
       try {
         result = await runNetworkTask(id, (signal) => fetchRepository(id, 'user', signal), {

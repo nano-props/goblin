@@ -55,7 +55,7 @@ export function getBranchActionCapabilities(repo: BranchActionRepo, branch: Repo
     canPull: !!branch.tracking,
     canPush: repo.remote.hasRemotes === true,
     canOpenRemote: repo.remote.hasBrowserRemote === true || repo.remote.hasGitHubRemote === true,
-    canOpenTerminal: !!branch.worktree?.path,
+    canOpenTerminal: !!branch.worktree?.path && !repo.remote.target,
     canOpenEditor: !!branch.worktree?.path && !repo.remote.target,
   }
 }
@@ -133,11 +133,11 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   }
 
   function checkout() {
-    return runRepoAction({ kind: 'checkout', branch: branch.name })
+    void runRepoAction({ kind: 'checkout', branch: branch.name })
   }
 
   function pull() {
-    return runRepoAction({ kind: 'pull', branch: branch.name, worktreePath: branch.worktree?.path })
+    void runRepoAction({ kind: 'pull', branch: branch.name, worktreePath: branch.worktree?.path })
   }
 
   function push() {
@@ -146,7 +146,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
       pushConfirm.openWith(branch.name)
       return
     }
-    return runRepoAction({ kind: 'push', branch: branch.name })
+    void runRepoAction({ kind: 'push', branch: branch.name })
   }
 
   function openTerminal() {
@@ -185,7 +185,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   }
 
   function deleteBranch(target: string, force = false, alsoDeleteUpstream = false) {
-    return runRepoAction(
+    void runRepoAction(
       { kind: 'deleteBranch', branch: target, force, alsoDeleteUpstream },
       {
         deferResultMessages: force ? [] : ['error.branch-not-fully-merged'],
@@ -206,7 +206,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
     forceDeleteBranch: boolean,
     alsoDeleteUpstream = false,
   ) {
-    return runRepoAction(
+    void runRepoAction(
       {
         kind: 'removeWorktree',
         branch: target.branch,
