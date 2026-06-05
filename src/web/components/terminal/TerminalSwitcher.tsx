@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { Plus, Terminal as TerminalIcon, Trash2 } from 'lucide-react'
-import { DelegatedTooltipLayer, DELEGATED_TOOLTIP_DEFAULTS } from '#/web/components/DelegatedTooltipLayer.tsx'
 import { Badge } from '#/web/components/ui/badge.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
+import { TerminalSwitcherTooltipLayer } from '#/web/components/terminal/TerminalSwitcherTooltipLayer.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { cn } from '#/web/lib/cn.ts'
 import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
@@ -89,22 +89,7 @@ export function TerminalSwitcher({
             {t('terminal.new')}
           </button>
         ) : (
-          <DelegatedTooltipLayer
-            items={sessions}
-            selector="[data-terminal-switcher-tooltip-id]"
-            attributeName="data-terminal-switcher-tooltip-id"
-            getItemId={(session) => session.key}
-            renderTooltip={(session) => (
-              <div className="truncate px-3 py-2 text-xs font-semibold text-foreground">
-                {session.fullTitle ?? session.title}
-              </div>
-            )}
-            delayMs={DELEGATED_TOOLTIP_DEFAULTS.delayMs}
-            placement="left"
-            maxWidth={360}
-            tooltipClassName="max-w-[min(22rem,calc(100vw-2rem))]"
-            role="list"
-          >
+          <TerminalSwitcherTooltipLayer sessions={sessions} role="list">
             {sessions.map((session) => {
               const fullTitle = session.fullTitle ?? session.title
               return (
@@ -153,7 +138,7 @@ export function TerminalSwitcher({
                 </div>
               )
             })}
-          </DelegatedTooltipLayer>
+          </TerminalSwitcherTooltipLayer>
         )}
       </ScrollArea>
     </div>

@@ -201,8 +201,11 @@ function useDelegatedTooltipStateMachine<T>(input: {
 
     function handlePointerItemLeave(e: PointerEvent) {
       const prevEl = itemElementFromTarget(e.target)
-      if (!prevEl || prevEl === itemElementFromTarget(e.relatedTarget)) return
+      const nextEl = itemElementFromTarget(e.relatedTarget)
+      if (!prevEl || prevEl === nextEl) return
       clearShowTimer()
+      if (nextEl || isEventTargetWithin(container, e.relatedTarget)) return
+      startGrace()
     }
 
     function handleContainerLeave(e: PointerEvent) {
@@ -341,6 +344,10 @@ function clamp(value: number, min: number, max: number): number {
 function isPointerWithin(container: HTMLElement, e: PointerEvent): boolean {
   const rect = container.getBoundingClientRect()
   return e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom
+}
+
+function isEventTargetWithin(container: HTMLElement, target: EventTarget | null): boolean {
+  return target instanceof Node && container.contains(target)
 }
 
 function findItemElement(root: HTMLElement, selector: string, attributeName: string, id: string): HTMLElement | null {

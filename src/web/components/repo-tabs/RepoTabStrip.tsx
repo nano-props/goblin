@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '#/web/components/ui/dropdown-menu.tsx'
 import { RepoTab } from '#/web/components/repo-tabs/RepoTab.tsx'
-import { TabTooltipLayer } from '#/web/components/repo-tabs/TabTooltipLayer.tsx'
+import { RepoTabTooltipLayer } from '#/web/components/repo-tabs/RepoTabTooltipLayer.tsx'
 import type { RepoTabStripLabels, RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
@@ -168,7 +168,7 @@ export function RepoTabStrip({
             openMenu
           ) : (
             <>
-              <TabTooltipLayer repos={repos} className="flex h-full items-center gap-1" role="tablist">
+              <RepoTabTooltipLayer repos={repos} className="flex h-full items-center gap-1" role="tablist">
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
@@ -200,7 +200,7 @@ export function RepoTabStrip({
                     })}
                   </SortableContext>
                 </DndContext>
-              </TabTooltipLayer>
+              </RepoTabTooltipLayer>
               {openMenu}
             </>
           )}

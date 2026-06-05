@@ -7,18 +7,23 @@ import type { RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
 import { TOOLTIP_META_TEXT_CLASS, TOOLTIP_STACK_MD_CLASS, TOOLTIP_STACK_SM_CLASS } from '#/web/components/ui/tooltip.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 
-interface TabTooltipLayerProps extends ComponentPropsWithoutRef<'div'> {
+interface RepoTabTooltipLayerProps extends ComponentPropsWithoutRef<'div'> {
   repos: RepoTabSummary[]
   delayMs?: number
 }
 
-const TAB_TOOLTIP_SELECTOR = '[data-repo-tab-tooltip-id]'
+const REPO_TAB_TOOLTIP_SELECTOR = '[data-repo-tab-tooltip-id]'
 
-export function TabTooltipLayer({ repos, delayMs = DELEGATED_TOOLTIP_DEFAULTS.delayMs, children, ...props }: TabTooltipLayerProps) {
+export function RepoTabTooltipLayer({
+  repos,
+  delayMs = DELEGATED_TOOLTIP_DEFAULTS.delayMs,
+  children,
+  ...props
+}: RepoTabTooltipLayerProps) {
   return (
     <DelegatedTooltipLayer
       items={repos}
-      selector={TAB_TOOLTIP_SELECTOR}
+      selector={REPO_TAB_TOOLTIP_SELECTOR}
       attributeName="data-repo-tab-tooltip-id"
       getItemId={(repo) => repo.id}
       renderTooltip={(repo) => <RepoTabTooltipContent repo={repo} />}
