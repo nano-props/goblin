@@ -68,6 +68,15 @@ export function classifySshFailure(result: RemoteCommandResult): RemoteDiagnosti
   if (text.includes('host key verification failed') || text.includes('remote host identification has changed')) return 'host-key'
   if (text.includes('permission denied') || text.includes('authentication failed')) return 'auth-failed'
   if (
+    text.includes('kex_exchange_identification') ||
+    text.includes('ssh_exchange_identification') ||
+    text.includes('banner exchange') ||
+    text.includes('connection reset by peer') ||
+    text.includes('connection closed by remote host')
+  ) {
+    return 'handshake-failed'
+  }
+  if (
     text.includes('could not resolve hostname') ||
     text.includes('name or service not known') ||
     text.includes('connection timed out') ||

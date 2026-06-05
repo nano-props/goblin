@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { DialogFooter } from '#/web/components/ui/dialog.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
-import { DialogError } from '#/web/components/ui/dialog-error.tsx'
+import { DialogStatusRow } from '#/web/components/ui/dialog-status-row.tsx'
 import { FormDialog } from '#/web/components/ui/form-dialog.tsx'
-import { Field, FieldDescription, FieldLabel } from '#/web/components/ui/field.tsx'
+import { Field, FieldLabel } from '#/web/components/ui/field.tsx'
 import { Input } from '#/web/components/ui/input.tsx'
 import { tildify, untildify } from '#/web/lib/paths.ts'
 import { chooseLocalRepositoryPath, hasNativeDirectoryPicker } from '#/web/app-shell-client.ts'
@@ -29,6 +29,7 @@ export function OpenRepositoryDialog({ open, onClose, onOpen }: Props) {
   const resolvedPath = untildify(trimmedPath)
   const canSubmit = resolvedPath.length > 0 && !pending
   const canChoosePath = hasNativeDirectoryPicker()
+  const statusText = error ?? ''
 
   useEffect(() => {
     if (!open) return
@@ -122,10 +123,8 @@ export function OpenRepositoryDialog({ open, onClose, onOpen }: Props) {
               </Button>
             ) : null}
           </div>
-          <FieldDescription reserveHeight>{trimmedPath ? tildify(resolvedPath) : ''}</FieldDescription>
+          <DialogStatusRow message={statusText} tone={error ? 'danger' : 'default'} />
         </Field>
-
-        {error ? <DialogError>{error}</DialogError> : null}
 
         <DialogFooter className="pt-4">
           <Button type="button" variant="outline" className={cn(compact && 'w-full')} disabled={pending} onClick={onClose}>

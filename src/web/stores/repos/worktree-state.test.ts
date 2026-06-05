@@ -132,4 +132,24 @@ describe('worktree state selectors', () => {
       changeCount: 0,
     })
   })
+
+  test('falls back to a generic dirty change count when exact metadata is unavailable', () => {
+    const repo = emptyRepo('/tmp/repo', 'repo')
+    const snapshot = createBranchSnapshot('feature/a', {
+      worktree: {
+        path: '/tmp/worktree-a',
+        summary: {
+          dirty: true,
+        },
+      },
+    })
+
+    repo.data.worktreesByPath = worktreeStatesFromBranches([snapshot])
+    const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
+
+    expect(getBranchWorktreeState(repo, branch)).toMatchObject({
+      dirty: true,
+      changeCount: 1,
+    })
+  })
 })

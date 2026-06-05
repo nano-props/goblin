@@ -69,6 +69,12 @@ afterEach(() => {
 })
 
 describe('CloneRepositoryDialog', () => {
+  test('keeps the inline status row mounted', () => {
+    render(<CloneRepositoryDialog open onClose={vi.fn()} onClone={vi.fn(async () => ({ ok: true, message: 'ok', path: '/Users/tester/Developer/repo' }))} />)
+
+    expect(document.body.querySelector('[data-slot="dialog-status-row"]')).not.toBeNull()
+  })
+
   test('focuses the clone url input when opened', () => {
     render(<CloneRepositoryDialog open onClose={vi.fn()} onClone={vi.fn(async () => ({ ok: true, message: 'ok', path: '/Users/tester/Developer/repo' }))} />)
 

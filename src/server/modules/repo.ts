@@ -74,32 +74,40 @@ const activeBackgroundFetches = new Map<string, Promise<{ ok: boolean; message: 
 async function probeReadableDirectory(cwd: string): Promise<ProbeAvailability> {
   try {
     const stat = await fs.stat(cwd)
-    if (!stat.isDirectory()) return { ok: false, message: 'error.invalid-path' }
+    if (!stat.isDirectory()) return { ok: false, message: 'error.path-not-directory' }
     await fs.access(cwd, fsConstants.R_OK)
     return { ok: true }
-  } catch {
-    return { ok: false, message: 'error.invalid-path' }
+  } catch (err) {
+    return { ok: false, message: classifyPathProbeError(err) }
   }
 }
 
 async function probeWritableDirectory(cwd: string): Promise<ProbeAvailability> {
   try {
     const stat = await fs.stat(cwd)
-    if (!stat.isDirectory()) return { ok: false, message: 'error.invalid-path' }
+    if (!stat.isDirectory()) return { ok: false, message: 'error.path-not-directory' }
     await fs.access(cwd, fsConstants.R_OK | fsConstants.W_OK)
     return { ok: true }
-  } catch {
-    return { ok: false, message: 'error.invalid-path' }
+  } catch (err) {
+    return { ok: false, message: classifyPathProbeError(err) }
   }
 }
 
 async function ensureWritableDirectory(cwd: string): Promise<ProbeAvailability> {
   try {
     await fs.mkdir(cwd, { recursive: true })
-  } catch {
-    return { ok: false, message: 'error.invalid-path' }
+  } catch (err) {
+    return { ok: false, message: classifyPathProbeError(err) }
   }
   return await probeWritableDirectory(cwd)
+}
+
+function classifyPathProbeError(err: unknown): string {
+  const code = typeof err === 'object' && err && 'code' in err ? String((err as { code?: unknown }).code) : ''
+  if (code === 'ENOENT') return 'error.path-not-found'
+  if (code === 'ENOTDIR') return 'error.path-not-directory'
+  if (code === 'EACCES' || code === 'EPERM') return 'error.path-permission-denied'
+  return 'error.invalid-path'
 }
 
 function isValidCloneUrl(value: unknown): value is string {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { DialogFooter } from '#/web/components/ui/dialog.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
-import { DialogError } from '#/web/components/ui/dialog-error.tsx'
+import { DialogStatusRow } from '#/web/components/ui/dialog-status-row.tsx'
 import { FormDialog } from '#/web/components/ui/form-dialog.tsx'
 import { Field, FieldDescription, FieldError, FieldLabel } from '#/web/components/ui/field.tsx'
 import { Input } from '#/web/components/ui/input.tsx'
@@ -206,7 +206,7 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
           )}
         </Field>
 
-        {error && <DialogError>{error}</DialogError>}
+        <DialogStatusRow message={error ?? ''} tone="danger" />
 
         <DialogFooter className="gap-2 pt-2">
           <Button type="button" variant="outline" className={cn(compact && 'w-full')} onClick={() => void handleCancel()}>

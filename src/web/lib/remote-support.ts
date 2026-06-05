@@ -11,6 +11,7 @@ const REMOTE_DIAGNOSTIC_REASONS = new Set([
   'auth-failed',
   'host-key',
   'unreachable',
+  'handshake-failed',
   'shell-failed',
   'git-missing',
   'path-missing',

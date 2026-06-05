@@ -96,6 +96,247 @@ afterEach(() => {
 })
 
 describe('OpenRemoteRepositoryDialog', () => {
+  test('keeps the remote status row mounted before running a connection test', async () => {
+    render(
+      <MainWindowNavigationProvider value={navigationWith({})}>
+        <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
+      </MainWindowNavigationProvider>,
+    )
+    await flush()
+
+    expect(document.body.querySelector('[data-slot="remote-diagnostics-status"]')).not.toBeNull()
+  })
+
+  test('renders a minimal remote status row in the initial state', async () => {
+    render(
+      <MainWindowNavigationProvider value={navigationWith({})}>
+        <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
+      </MainWindowNavigationProvider>,
+    )
+    await flush()
+
+    expect(document.body.querySelector('[data-slot="remote-diagnostics-status"]')).not.toBeNull()
+    expect(document.body.querySelector('[data-slot="dialog-status-row"]')).not.toBeNull()
+    expect(document.body.textContent).toContain('repo-tabs.open-remote-diagnostics-idle-detail')
+    expect(document.body.textContent).not.toContain('repo-tabs.open-remote-path-required')
+  })
+
+  test('updates typed values in the host and path inputs', async () => {
+    render(
+      <MainWindowNavigationProvider value={navigationWith({})}>
+        <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
+      </MainWindowNavigationProvider>,
+    )
+    await flush()
+
+    setInputValue('#remote-ssh-host', 'prod')
+    setInputValue('#remote-path', '/srv/repo')
+
+    expect(input('#remote-ssh-host').value).toBe('prod')
+    expect(input('#remote-path').value).toBe('/srv/repo')
+    expect(document.body.textContent).not.toContain('prod:/srv/repo')
+  })
+
+  test('shows a success tip after a passing connection test', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL, init?: RequestInit) => {
+        const url = new URL(typeof input === 'string' ? input : input.toString())
+        const body =
+          typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, any>) : {}
+        if (url.pathname === '/api/remote/ssh-hosts') {
+          return { ok: true, json: async () => ({ hosts: [], hasInclude: true }) }
+        }
+        if (url.pathname === '/api/remote/resolve-target') {
+          return {
+            ok: true,
+            json: async () => ({
+              target: { ...target, alias: body.alias, remotePath: '/home/alice/repo' },
+            }),
+          }
+        }
+        if (url.pathname === '/api/remote/test-repository') {
+          return { ok: true, json: async () => ({ ok: true, target: body.target, stages: [] }) }
+        }
+        if (url.pathname === '/api/remote/path-suggestions') {
+          return { ok: true, json: async () => [] }
+        }
+        throw new Error(`Unhandled fetch URL: ${url.pathname}`)
+      }),
+    )
+
+    render(
+      <MainWindowNavigationProvider value={navigationWith({})}>
+        <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
+      </MainWindowNavigationProvider>,
+    )
+    await flush()
+
+    setInputValue('#remote-ssh-host', 'prod')
+    setInputValue('#remote-path', '~/repo')
+    clickButtonByText('repo-tabs.open-remote-test-connection')
+    await flush()
+
+    expect(document.body.textContent).toContain('repo-tabs.open-remote-diagnostics-ok')
+  })
+
+  test('shows a testing tip while connection test is running', async () => {
+    let resolveTest: ((value: { ok: true; target: typeof target; stages: [] }) => void) | undefined
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL, init?: RequestInit) => {
+        const url = new URL(typeof input === 'string' ? input : input.toString())
+        const body =
+          typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, any>) : {}
+        if (url.pathname === '/api/remote/ssh-hosts') {
+          return { ok: true, json: async () => ({ hosts: [], hasInclude: true }) }
+        }
+        if (url.pathname === '/api/remote/resolve-target') {
+          return {
+            ok: true,
+            json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
+          }
+        }
+        if (url.pathname === '/api/remote/test-repository') {
+          return {
+            ok: true,
+            json: () =>
+              new Promise((resolve) => {
+                resolveTest = resolve as (value: { ok: true; target: typeof target; stages: [] }) => void
+              }),
+          }
+        }
+        if (url.pathname === '/api/remote/path-suggestions') {
+          return { ok: true, json: async () => [] }
+        }
+        throw new Error(`Unhandled fetch URL: ${url.pathname}`)
+      }),
+    )
+
+    render(
+      <MainWindowNavigationProvider value={navigationWith({})}>
+        <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
+      </MainWindowNavigationProvider>,
+    )
+    await flush()
+
+    setInputValue('#remote-ssh-host', 'prod')
+    setInputValue('#remote-path', '/srv/repo')
+    clickButtonByText('repo-tabs.open-remote-test-connection')
+    await flush()
+
+    expect(document.body.textContent).toContain('repo-tabs.open-remote-diagnostics-testing')
+
+    if (resolveTest) resolveTest({ ok: true, target, stages: [] })
+    await flush()
+  })
+
+  test('shows copy-details next to a failed status tip', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL, init?: RequestInit) => {
+        const url = new URL(typeof input === 'string' ? input : input.toString())
+        const body =
+          typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, any>) : {}
+        if (url.pathname === '/api/remote/ssh-hosts') {
+          return { ok: true, json: async () => ({ hosts: [], hasInclude: true }) }
+        }
+        if (url.pathname === '/api/remote/resolve-target') {
+          return {
+            ok: true,
+            json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
+          }
+        }
+        if (url.pathname === '/api/remote/test-repository') {
+          return {
+            ok: true,
+            json: async () => ({
+              ok: false,
+              target: body.target,
+              category: 'handshake-failed',
+              message: 'handshake-failed',
+              details: 'full diagnostic details',
+              stages: [],
+            }),
+          }
+        }
+        if (url.pathname === '/api/remote/path-suggestions') {
+          return { ok: true, json: async () => [] }
+        }
+        throw new Error(`Unhandled fetch URL: ${url.pathname}`)
+      }),
+    )
+
+    render(
+      <MainWindowNavigationProvider value={navigationWith({})}>
+        <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
+      </MainWindowNavigationProvider>,
+    )
+    await flush()
+
+    setInputValue('#remote-ssh-host', 'prod')
+    setInputValue('#remote-path', '/srv/repo')
+    clickButtonByText('repo-tabs.open-remote-test-connection')
+    await flush()
+
+    const copyButton = findButtonByText('repo-tabs.open-remote-diagnostics-copy-details')
+    const row = copyButton.parentElement
+    expect(row?.textContent).toContain('handshake-failed')
+    expect(row?.textContent).toContain('repo-tabs.open-remote-diagnostics-copy-details')
+  })
+
+  test('does not reserve an empty helper row below the SSH alias select', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL, init?: RequestInit) => {
+        const url = new URL(typeof input === 'string' ? input : input.toString())
+        const body =
+          typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, any>) : {}
+        if (url.pathname === '/api/remote/ssh-hosts') {
+          return { ok: true, json: async () => ({ hosts: [{ alias: 'prod', hostName: 'example.com' }], hasInclude: false }) }
+        }
+        if (url.pathname === '/api/remote/resolve-target') {
+          return {
+            ok: true,
+            json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
+          }
+        }
+        if (url.pathname === '/api/remote/test-repository') {
+          return { ok: true, json: async () => ({ ok: true, target: body.target, stages: [] }) }
+        }
+        if (url.pathname === '/api/remote/path-suggestions') {
+          return { ok: true, json: async () => [] }
+        }
+        throw new Error(`Unhandled fetch URL: ${url.pathname}`)
+      }),
+    )
+
+    render(
+      <MainWindowNavigationProvider value={navigationWith({})}>
+        <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
+      </MainWindowNavigationProvider>,
+    )
+    await flush()
+
+    const descriptions = document.body.querySelectorAll('[data-slot="field-description"]')
+    expect(descriptions).toHaveLength(1)
+  })
+
+  test('keeps the empty remote path in a neutral state until the user types an invalid path', async () => {
+    render(
+      <MainWindowNavigationProvider value={navigationWith({})}>
+        <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
+      </MainWindowNavigationProvider>,
+    )
+    await flush()
+
+    expect(document.body.textContent).not.toContain('repo-tabs.open-remote-path-required')
+
+    setInputValue('#remote-path', 'repo')
+
+    expect(document.body.textContent).toContain('repo-tabs.open-remote-path-absolute')
+  })
+
   test('focuses the host alias input when include mode requires manual host entry', async () => {
     const onOpenChange = vi.fn()
 
@@ -176,6 +417,80 @@ describe('OpenRemoteRepositoryDialog', () => {
     expect(activateRepo).toHaveBeenCalledWith(target.id)
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
+
+  test('clears a previous connection error after editing the target', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL, init?: RequestInit) => {
+        const url = new URL(typeof input === 'string' ? input : input.toString())
+        const body =
+          typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, any>) : {}
+        if (url.pathname === '/api/remote/ssh-hosts') {
+          return { ok: true, json: async () => ({ hosts: [], hasInclude: true }) }
+        }
+        if (url.pathname === '/api/remote/resolve-target') {
+          return {
+            ok: true,
+            json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
+          }
+        }
+        if (url.pathname === '/api/remote/test-repository') {
+          throw new Error('Permission denied')
+        }
+        if (url.pathname === '/api/remote/path-suggestions') {
+          return { ok: true, json: async () => [] }
+        }
+        throw new Error(`Unhandled fetch URL: ${url.pathname}`)
+      }),
+    )
+
+    render(
+      <MainWindowNavigationProvider value={navigationWith({})}>
+        <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
+      </MainWindowNavigationProvider>,
+    )
+    await flush()
+
+    setInputValue('#remote-ssh-host', 'prod')
+    setInputValue('#remote-path', '/srv/repo')
+    click('button[type="submit"]')
+    await flush()
+
+    expect(document.body.textContent).toContain('Permission denied')
+
+    setInputValue('#remote-path', '/srv/repo-next')
+
+    expect(document.body.textContent).not.toContain('Permission denied')
+  })
+
+  test('keeps the ssh host loading error visible while editing other inputs', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL) => {
+        const url = new URL(typeof input === 'string' ? input : input.toString())
+        if (url.pathname === '/api/remote/ssh-hosts') {
+          throw new Error('SSH config unavailable')
+        }
+        if (url.pathname === '/api/remote/path-suggestions') {
+          return { ok: true, json: async () => [] }
+        }
+        throw new Error(`Unhandled fetch URL: ${url.pathname}`)
+      }),
+    )
+
+    render(
+      <MainWindowNavigationProvider value={navigationWith({})}>
+        <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
+      </MainWindowNavigationProvider>,
+    )
+    await flush()
+
+    expect(document.body.textContent).toContain('SSH config unavailable')
+
+    setInputValue('#remote-path', '/srv/repo')
+
+    expect(document.body.textContent).toContain('SSH config unavailable')
+  })
 })
 
 function navigationWith(overrides: Partial<MainWindowNavigationActions>): MainWindowNavigationActions {
@@ -227,6 +542,19 @@ function click(selector: string) {
   act(() => {
     element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
+}
+
+function clickButtonByText(text: string) {
+  const element = findButtonByText(text)
+  act(() => {
+    element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  })
+}
+
+function findButtonByText(text: string): HTMLButtonElement {
+  const element = Array.from(document.body.querySelectorAll('button')).find((item) => item.textContent?.includes(text))
+  if (!(element instanceof HTMLButtonElement)) throw new Error(`Missing button text: ${text}`)
+  return element
 }
 
 async function flush() {

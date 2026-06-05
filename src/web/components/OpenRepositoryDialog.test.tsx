@@ -47,6 +47,18 @@ afterEach(() => {
 })
 
 describe('OpenRepositoryDialog', () => {
+  test('keeps the inline status row mounted', () => {
+    render(
+      <OpenRepositoryDialog
+        open
+        onClose={vi.fn()}
+        onOpen={vi.fn(async () => ({ ok: true as const, id: '/Users/tester/Developer/repo' }))}
+      />,
+    )
+
+    expect(document.body.querySelector('[data-slot="dialog-status-row"]')).not.toBeNull()
+  })
+
   test('focuses the repository path input when opened', () => {
     render(
       <OpenRepositoryDialog
@@ -57,6 +69,22 @@ describe('OpenRepositoryDialog', () => {
     )
 
     expect(document.activeElement).toBe(input('#open-repo-path'))
+  })
+
+  test('does not echo the typed path into the inline status row during normal input', () => {
+    render(
+      <OpenRepositoryDialog
+        open
+        onClose={vi.fn()}
+        onOpen={vi.fn(async () => ({ ok: true as const, id: '/Users/tester/Developer/repo' }))}
+      />,
+    )
+
+    setInputValue('#open-repo-path', '~/asdasdasd')
+
+    const status = document.body.querySelector('[data-slot="dialog-status-text"]')
+    expect(status?.textContent).toBe('')
+    expect(document.body.textContent).not.toContain('~/asdasdasd~/asdasdasd')
   })
 
   test('waits for open success before closing', async () => {
@@ -124,6 +152,23 @@ describe('OpenRepositoryDialog', () => {
     expect(onOpen).toHaveBeenNthCalledWith(1, '/Users/tester/Developer/repo')
     expect(onOpen).toHaveBeenNthCalledWith(2, '/Users/tester/Developer/repo')
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  test('clears a previous inline error after editing the path', async () => {
+    const onClose = vi.fn()
+    const onOpen = vi.fn<() => Promise<OpenRepoResult>>().mockRejectedValueOnce(new Error('boom'))
+
+    render(<OpenRepositoryDialog open onClose={onClose} onOpen={onOpen} />)
+
+    setInputValue('#open-repo-path', '~/Developer/repo')
+    click('button[type="submit"]')
+    await flush()
+
+    expect(document.body.textContent).toContain('boom')
+
+    setInputValue('#open-repo-path', '~/Developer/repo-next')
+
+    expect(document.body.textContent).not.toContain('boom')
   })
 
   test('hides native picker button when no Electron bridge exists', async () => {

@@ -45,6 +45,7 @@ export type RemoteDiagnosticCategory =
   | 'auth-failed'
   | 'host-key'
   | 'unreachable'
+  | 'handshake-failed'
   | 'shell-failed'
   | 'git-missing'
   | 'path-missing'

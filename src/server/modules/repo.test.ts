@@ -3,15 +3,21 @@ import type { PullRequestInfo } from '#/shared/git-types.ts'
 import type { PullRequestEntry, RepoSnapshot } from '#/shared/rpc.ts'
 
 const mocks = vi.hoisted(() => ({
+  checkGitAvailable: vi.fn(),
   checkoutBranch: vi.fn(),
   createWorktree: vi.fn(),
   deleteBranch: vi.fn(),
   deleteUpstreamBranch: vi.fn(),
+  fsAccess: vi.fn(),
+  fsMkdir: vi.fn(),
+  fsStat: vi.fn(),
   isGitRepo: vi.fn(),
   getBranches: vi.fn(),
   getBranchPullRequests: vi.fn(),
   getCurrentBranch: vi.fn(),
   getDefaultBranch: vi.fn(),
+  getRepoName: vi.fn(),
+  getRepoRoot: vi.fn(),
   getRemoteInfo: vi.fn(),
   getUpstream: vi.fn(),
   getWorktrees: vi.fn(),
@@ -38,15 +44,27 @@ vi.mock('#/system/git/branches.ts', () => ({
   getBranches: mocks.getBranches,
   getCurrentBranch: mocks.getCurrentBranch,
   getDefaultBranch: mocks.getDefaultBranch,
-  getRepoName: vi.fn(),
-  getRepoRoot: vi.fn(),
+  getRepoName: mocks.getRepoName,
+  getRepoRoot: mocks.getRepoRoot,
   getUpstream: mocks.getUpstream,
   isAncestor: mocks.isAncestor,
   isGitRepo: mocks.isGitRepo,
 }))
 
 vi.mock('#/system/git/helper.ts', () => ({
-  checkGitAvailable: vi.fn(),
+  checkGitAvailable: mocks.checkGitAvailable,
+}))
+
+vi.mock('node:fs', () => ({
+  promises: {
+    access: mocks.fsAccess,
+    mkdir: mocks.fsMkdir,
+    stat: mocks.fsStat,
+  },
+  constants: {
+    R_OK: 4,
+    W_OK: 2,
+  },
 }))
 
 vi.mock('#/system/git/remote.ts', () => ({
@@ -115,6 +133,10 @@ vi.mock('#/server/modules/background-sync.ts', () => ({
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.runServerCancellable.mockImplementation(async (_cwd, _kind, task) => await task(new AbortController().signal))
+  mocks.checkGitAvailable.mockResolvedValue({ ok: true, message: '' })
+  mocks.fsStat.mockResolvedValue({ isDirectory: () => true })
+  mocks.fsAccess.mockResolvedValue(undefined)
+  mocks.fsMkdir.mockResolvedValue(undefined)
   mocks.isGitRepo.mockResolvedValue(true)
   mocks.checkoutBranch.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.pullBranch.mockResolvedValue({ ok: true, message: 'ok' })
@@ -124,6 +146,8 @@ beforeEach(() => {
   mocks.deleteUpstreamBranch.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.removeWorktree.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.getCurrentBranch.mockResolvedValue('main')
+  mocks.getRepoName.mockResolvedValue('repo')
+  mocks.getRepoRoot.mockResolvedValue('/tmp/repo')
   mocks.getWorktrees.mockResolvedValue([])
   mocks.getDefaultBranch.mockResolvedValue('main')
   mocks.getUpstream.mockResolvedValue(null)
@@ -312,6 +336,29 @@ describe('fetchRepository invalidation publishing', () => {
 
     expect(result).toEqual({ ok: false, message: 'fatal: offline' })
     expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
+  })
+})
+
+describe('probeRepository path errors', () => {
+  test('reports missing paths specifically', async () => {
+    mocks.fsStat.mockRejectedValueOnce({ code: 'ENOENT' })
+
+    const { probeRepository } = await import('#/server/modules/repo.ts')
+    await expect(probeRepository('/tmp/missing')).resolves.toEqual({ ok: false, message: 'error.path-not-found' })
+  })
+
+  test('reports non-directory paths specifically', async () => {
+    mocks.fsStat.mockResolvedValueOnce({ isDirectory: () => false })
+
+    const { probeRepository } = await import('#/server/modules/repo.ts')
+    await expect(probeRepository('/tmp/file')).resolves.toEqual({ ok: false, message: 'error.path-not-directory' })
+  })
+
+  test('reports permission-denied paths specifically', async () => {
+    mocks.fsAccess.mockRejectedValueOnce({ code: 'EACCES' })
+
+    const { probeRepository } = await import('#/server/modules/repo.ts')
+    await expect(probeRepository('/tmp/private')).resolves.toEqual({ ok: false, message: 'error.path-permission-denied' })
   })
 })
 
