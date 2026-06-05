@@ -245,6 +245,11 @@
     color 100ms ease;
 }
 
+.goblin-terminal-switcher__row:last-child {
+  border-bottom-right-radius: var(--goblin-terminal-float-radius);
+  border-bottom-left-radius: var(--goblin-terminal-float-radius);
+}
+
 .goblin-terminal-switcher__row:hover {
   background: color-mix(in srgb, var(--color-muted) 62%, transparent);
 }
@@ -281,6 +286,12 @@
 
 .goblin-terminal-switcher__select {
   padding-right: var(--goblin-terminal-switcher-close-space);
+}
+
+.goblin-terminal-switcher__row:last-child .goblin-terminal-switcher__select,
+.goblin-terminal-switcher__empty {
+  border-bottom-right-radius: var(--goblin-terminal-float-radius);
+  border-bottom-left-radius: var(--goblin-terminal-float-radius);
 }
 
 .goblin-terminal-switcher__empty:hover {

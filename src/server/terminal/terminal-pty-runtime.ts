@@ -67,7 +67,16 @@ class NodePtyTerminalRuntime implements TerminalPtyRuntime {
   }
 
   processName(): string {
-    const processName = typeof this.term.process === 'string' ? this.term.process.trim() : ''
-    return processName || 'terminal'
+    return readTerminalProcessName(this.term)
+  }
+}
+
+function readTerminalProcessName(term: pty.IPty): string {
+  try {
+    const processName = term.process
+    if (typeof processName !== 'string') return 'terminal'
+    return processName.trim() || 'terminal'
+  } catch {
+    return 'terminal'
   }
 }

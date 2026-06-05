@@ -219,7 +219,10 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
 
   return (
     <div
-      className={cn('goblin-terminal-slot', isReadOnly && 'goblin-terminal-slot--mirror')}
+      className={cn(
+        'goblin-terminal-slot focus-visible:outline-none',
+        isReadOnly && 'goblin-terminal-slot--mirror',
+      )}
       tabIndex={-1}
       onFocusCapture={handleFocus}
       onBlurCapture={handleBlur}
