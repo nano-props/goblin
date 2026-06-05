@@ -877,30 +877,134 @@ describe('TerminalSessionProvider', () => {
     }
   })
 
+  test('initial mount only syncs the current repo session list', async () => {
+    const firstRepo = seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      detailTab: 'terminal',
+    })
+    const secondRepo = {
+      ...firstRepo,
+      id: SECOND_REPO_ID,
+      instanceToken: firstRepo.instanceToken + 1,
+      data: {
+        ...firstRepo.data,
+        branches: [createRepoBranch('feature/other', { worktree: { path: SECOND_WORKTREE_PATH } })],
+        worktreesByPath: {
+          [SECOND_WORKTREE_PATH]: {
+            path: SECOND_WORKTREE_PATH,
+            branch: 'feature/other',
+            isMain: false,
+            isLocked: false,
+          },
+        },
+      },
+      ui: {
+        ...firstRepo.ui,
+        selectedBranch: 'feature/other',
+        detailTab: 'terminal',
+      },
+    } satisfies typeof firstRepo
+    useReposStore.setState((state) => ({
+      ...state,
+      repos: {
+        ...state.repos,
+        [SECOND_REPO_ID]: secondRepo,
+      },
+      order: [REPO_ID, SECOND_REPO_ID],
+    }))
+    const { unmount } = await renderProviderWithProbe(worktreeTerminalKey(REPO_ID, WORKTREE_PATH), REPO_ID)
+
+    try {
+      await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
+      expect(listSessionsMock).toHaveBeenCalledWith({ repoRoot: REPO_ID })
+    } finally {
+      await unmount()
+    }
+  })
+
   test('focus sync only refreshes the current repo session list', async () => {
+    const firstRepo = seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      detailTab: 'terminal',
+    })
+    const secondRepo = {
+      ...firstRepo,
+      id: SECOND_REPO_ID,
+      instanceToken: firstRepo.instanceToken + 1,
+      data: {
+        ...firstRepo.data,
+        branches: [createRepoBranch('feature/other', { worktree: { path: SECOND_WORKTREE_PATH } })],
+        worktreesByPath: {
+          [SECOND_WORKTREE_PATH]: {
+            path: SECOND_WORKTREE_PATH,
+            branch: 'feature/other',
+            isMain: false,
+            isLocked: false,
+          },
+        },
+      },
+      ui: {
+        ...firstRepo.ui,
+        selectedBranch: 'feature/other',
+        detailTab: 'terminal',
+      },
+    } satisfies typeof firstRepo
+    useReposStore.setState((state) => ({
+      ...state,
+      repos: {
+        ...state.repos,
+        [SECOND_REPO_ID]: secondRepo,
+      },
+      order: [REPO_ID, SECOND_REPO_ID],
+    }))
+    const { unmount } = await renderProviderWithProbe(worktreeTerminalKey(REPO_ID, WORKTREE_PATH), REPO_ID)
+
+    try {
+      await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
+      listSessionsMock.mockClear()
+      await act(async () => {
+        window.dispatchEvent(new Event('focus'))
+      })
+      await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
+      expect(listSessionsMock).toHaveBeenCalledWith({ repoRoot: REPO_ID })
+    } finally {
+      await unmount()
+    }
+  })
+
+  test('does not resync sessions when repo changes do not affect terminal worktree mapping', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
       detailTab: 'terminal',
     })
-    seedRepoState({
-      id: SECOND_REPO_ID,
-      branches: [createRepoBranch('feature/other', { worktree: { path: SECOND_WORKTREE_PATH } })],
-      selectedBranch: 'feature/other',
-      detailTab: 'terminal',
-    })
-    const { unmount } = await renderProvider(REPO_ID)
+    const { unmount } = await renderProviderWithProbe(worktreeTerminalKey(REPO_ID, WORKTREE_PATH), REPO_ID)
 
     try {
+      await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
       listSessionsMock.mockClear()
       await act(async () => {
-        window.dispatchEvent(new Event('focus'))
-        await Promise.resolve()
+        useReposStore.setState((state) => ({
+          ...state,
+          repos: {
+            ...state.repos,
+            [REPO_ID]: {
+              ...state.repos[REPO_ID]!,
+              remote: {
+                ...state.repos[REPO_ID]!.remote,
+                fetchFailed: true,
+              },
+            },
+          },
+        }))
       })
-
-      expect(listSessionsMock).toHaveBeenCalledTimes(1)
-      expect(listSessionsMock).toHaveBeenCalledWith({ repoRoot: REPO_ID })
+      await Promise.resolve()
+      expect(listSessionsMock).not.toHaveBeenCalled()
     } finally {
       await unmount()
     }

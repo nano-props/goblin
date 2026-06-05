@@ -71,6 +71,13 @@ export interface TerminalSessionBase {
   worktreePath: string
 }
 
+export interface TerminalRepoSnapshot {
+  instanceToken: number
+  branchByWorktreePath: Record<string, string>
+}
+
+export type TerminalRepoIndex = Record<string, TerminalRepoSnapshot>
+
 export interface TerminalSessionSummary {
   key: string
   worktreeTerminalKey: string

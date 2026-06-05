@@ -3,7 +3,7 @@ import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { CopyButton } from '#/web/components/CopyButton.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
 import { TOOLTIP_META_TEXT_CLASS, TOOLTIP_STACK_MD_CLASS, TOOLTIP_STACK_SM_CLASS } from '#/web/components/ui/tooltip.tsx'
-import { formatRelativeTime } from '#/web/lib/dates.ts'
+import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
 import { cn } from '#/web/lib/cn.ts'
 import {
   prChipTone,
@@ -87,7 +87,7 @@ function PrSignalChip({ signal }: { signal: PrHealthSignal }) {
 }
 
 function prTooltip(pr: PullRequestInfo, lang: Lang, t: TFn): { title: string; meta: string[] } {
-  const created = pr.createdAt ? formatRelativeTime(pr.createdAt, lang) : null
+  const created = formatRelativeTimeOrNull(pr.createdAt, lang)
   const byline =
     pr.author && created
       ? t('branch-status.pr.created-by', { author: pr.author, time: created })

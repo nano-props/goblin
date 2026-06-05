@@ -17,3 +17,14 @@ export function formatRelativeTime(value: string, lang: Lang, baseDate: Date = n
   if (!isValid(date)) return value
   return formatDistanceStrict(date, baseDate, { addSuffix: true, locale: LOCALES[lang] })
 }
+
+export function formatRelativeTimeOrNull(
+  value: string | null | undefined,
+  lang: Lang,
+  baseDate: Date = new Date(),
+): string | null {
+  if (!value) return null
+  const date = parseISO(value)
+  if (!isValid(date)) return null
+  return formatDistanceStrict(date, baseDate, { addSuffix: true, locale: LOCALES[lang] })
+}

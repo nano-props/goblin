@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react'
+import { useStoreWithEqualityFn } from 'zustand/traditional'
 import type { TerminalSessionSnapshot, TerminalSessionSummary } from '#/shared/terminal.ts'
 import '#/web/components/terminal/terminal-session.css'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -9,6 +10,7 @@ import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
 import { terminalSessionsQueryKey, terminalSessionsQueryOptions } from '#/web/terminal-session-queries.ts'
 import { TerminalSessionRegistry } from '#/web/components/terminal/TerminalSessionRegistry.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { repoIndexEqual, repoIndexFromRepos } from '#/web/components/terminal/terminal-repo-utils.ts'
 import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 
 interface TerminalSessionProviderProps {
@@ -17,12 +19,15 @@ interface TerminalSessionProviderProps {
 }
 
 export function TerminalSessionProvider({ currentRepoId, children }: TerminalSessionProviderProps) {
-  const repos = useReposStore((s) => s.repos)
+  const repoIndex = useStoreWithEqualityFn(useReposStore, (s) => repoIndexFromRepos(s.repos), repoIndexEqual)
+  const currentRepoInstanceToken = currentRepoId ? repoIndex[currentRepoId]?.instanceToken ?? null : null
   const selectedTerminalByWorktree = useReposStore((s) => s.selectedTerminalByWorktree)
   const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
   const parkingRootRef = useRef<HTMLDivElement | null>(null)
   const currentRepoIdRef = useRef(currentRepoId)
   currentRepoIdRef.current = currentRepoId
+  const repoIndexRef = useRef(repoIndex)
+  repoIndexRef.current = repoIndex
   const repoSyncReadyRef = useRef(new Map<string, number>())
   const repoSyncListenersRef = useRef(new Map<string, Set<() => void>>())
 
@@ -33,39 +38,60 @@ export function TerminalSessionProvider({ currentRepoId, children }: TerminalSes
   const registry = registryRef.current
   registry.setParkingRoot(parkingRootRef.current)
 
-  const loadMissingSnapshots = async (serverSessions: TerminalSessionSummary[]): Promise<Map<string, TerminalSessionSnapshot>> => {
-    const snapshotEntries = await Promise.all(
-      serverSessions.map(async (session) => {
-        if (registry.hasCachedServerSnapshot(session.key, session.sessionId)) return null
-        try {
-          const snapshot = await terminalBridge.getSessionSnapshot({ sessionId: session.sessionId })
-          return snapshot ? ([session.sessionId, snapshot] as const) : null
-        } catch (err) {
-          console.debug('[TerminalSessionProvider] failed to load terminal session snapshot:', err)
-          return null
-        }
-      }),
-    )
-    return new Map(snapshotEntries.filter((entry) => entry !== null))
-  }
+  const loadMissingSnapshots = useCallback(
+    async (serverSessions: TerminalSessionSummary[]): Promise<Map<string, TerminalSessionSnapshot>> => {
+      const snapshotEntries = await Promise.all(
+        serverSessions.map(async (session) => {
+          if (registry.hasCachedServerSnapshot(session.key, session.sessionId)) return null
+          try {
+            const snapshot = await terminalBridge.getSessionSnapshot({ sessionId: session.sessionId })
+            return snapshot ? ([session.sessionId, snapshot] as const) : null
+          } catch (err) {
+            console.debug('[TerminalSessionProvider] failed to load terminal session snapshot:', err)
+            return null
+          }
+        }),
+      )
+      return new Map(snapshotEntries.filter((entry) => entry !== null))
+    },
+    [registry],
+  )
 
-  const markRepoSyncReady = (repoRoot: string) => {
-    const instanceToken = repos[repoRoot]?.instanceToken
+  const markRepoSyncReady = useCallback((repoRoot: string) => {
+    const instanceToken = repoIndexRef.current[repoRoot]?.instanceToken
     if (typeof instanceToken !== 'number') return
     if (repoSyncReadyRef.current.get(repoRoot) === instanceToken) return
     repoSyncReadyRef.current.set(repoRoot, instanceToken)
     const listeners = repoSyncListenersRef.current.get(repoRoot)
     if (!listeners) return
     for (const listener of Array.from(listeners)) listener()
-  }
+  }, [])
+
+  const syncServerSessions = useCallback(
+    async (repoRoot: string) => {
+      if (!repoRoot || !repoIndexRef.current[repoRoot]) return
+      try {
+        const attachmentId = readOrCreateWebTerminalAttachmentId()
+        const serverSessions = await mainWindowQueryClient.fetchQuery(terminalSessionsQueryOptions(repoRoot))
+        const snapshotsBySessionId = await loadMissingSnapshots(serverSessions)
+        if (!repoIndexRef.current[repoRoot]) return
+        registry.reconcileServerSessions(repoRoot, serverSessions, attachmentId, snapshotsBySessionId)
+      } catch (err) {
+        console.debug('[TerminalSessionProvider] failed to sync server sessions:', err)
+      } finally {
+        markRepoSyncReady(repoRoot)
+      }
+    },
+    [loadMissingSnapshots, markRepoSyncReady, registry],
+  )
 
   useEffect(() => {
     registry.setParkingRoot(parkingRootRef.current)
   })
 
   useEffect(() => {
-    registry.setRepos(repos)
-  }, [registry, repos])
+    registry.setRepoIndex(repoIndex)
+  }, [registry, repoIndex])
 
   useEffect(() => {
     registry.setPreferredSelectedTerminalKeys(selectedTerminalByWorktree)
@@ -106,32 +132,11 @@ export function TerminalSessionProvider({ currentRepoId, children }: TerminalSes
   }, [registry])
 
   useEffect(() => {
-    const syncServerSessions = async (repoRoot?: string) => {
-      try {
-        const attachmentId = readOrCreateWebTerminalAttachmentId()
-        const repoRoots = repoRoot ? new Set([repoRoot]) : new Set<string>()
-        if (!repoRoot) {
-          for (const repo of Object.values(repos)) {
-            if (repo.id) repoRoots.add(repo.id)
-          }
-        }
-        for (const root of repoRoots) {
-          try {
-            const serverSessions = await mainWindowQueryClient.fetchQuery(terminalSessionsQueryOptions(root))
-            const snapshotsBySessionId = await loadMissingSnapshots(serverSessions)
-            registry.reconcileServerSessions(root, serverSessions, attachmentId, snapshotsBySessionId)
-          } catch (err) {
-            console.debug('[TerminalSessionProvider] failed to sync server sessions:', err)
-          } finally {
-            markRepoSyncReady(root)
-          }
-        }
-      } catch (err) {
-        console.debug('[TerminalSessionProvider] failed to sync sessions:', err)
-      }
-    }
+    if (!currentRepoId) return
+    void syncServerSessions(currentRepoId)
+  }, [currentRepoId, currentRepoInstanceToken, syncServerSessions])
 
-    void syncServerSessions()
+  useEffect(() => {
     const handleFocus = () => {
       if (!currentRepoIdRef.current) return
       void syncServerSessions(currentRepoIdRef.current)
@@ -147,7 +152,7 @@ export function TerminalSessionProvider({ currentRepoId, children }: TerminalSes
       window.removeEventListener('focus', handleFocus)
       offSessionsChanged()
     }
-  }, [registry, repos])
+  }, [syncServerSessions])
 
   const commandValue = useMemo<TerminalSessionContextValue>(
     () => ({
@@ -174,7 +179,7 @@ export function TerminalSessionProvider({ currentRepoId, children }: TerminalSes
       worktreeSnapshot: registry.worktreeSnapshot,
       subscribeWorktree: registry.subscribeWorktree,
       repoSyncReady: (repoRoot: string) => {
-        const instanceToken = repos[repoRoot]?.instanceToken
+        const instanceToken = repoIndex[repoRoot]?.instanceToken
         return typeof instanceToken === 'number' && repoSyncReadyRef.current.get(repoRoot) === instanceToken
       },
       subscribeRepoSync: (repoRoot: string, listener: () => void) => {
@@ -194,7 +199,7 @@ export function TerminalSessionProvider({ currentRepoId, children }: TerminalSes
       snapshot: registry.snapshot,
       subscribeSnapshot: registry.subscribeSnapshot,
     }),
-    [registry, repos],
+    [registry, repoIndex],
   )
 
   return (

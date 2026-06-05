@@ -10,14 +10,15 @@ import { terminalBridge } from '#/web/terminal.ts'
 import { readOrCreateWebTerminalAttachmentId } from '#/web/renderer-terminal-bridge.ts'
 import { resolveTerminalOwnership } from '#/shared/terminal.ts'
 import type { TerminalSessionSnapshot, TerminalSessionSummary as ServerTerminalSessionSummary } from '#/shared/terminal.ts'
+import { branchForTerminalWorktree } from '#/web/components/terminal/terminal-repo-utils.ts'
 import type {
   TerminalDescriptor,
+  TerminalRepoIndex,
   WorktreeTerminalSnapshot,
   TerminalSessionBase,
   TerminalSessionSummary,
   TerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
-import type { ReposStore } from '#/web/stores/repos/types.ts'
 
 const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = { phase: 'opening', message: null, processName: 'terminal', canonicalTitle: null }
 const ACTIVE_RENDER_CACHE_REFRESH_INTERVAL_MS = 250
@@ -51,7 +52,7 @@ interface TerminalLocalRenderCacheEntry {
 }
 
 export class TerminalSessionRegistry {
-  private repos: ReposStore['repos'] = {}
+  private repoIndex: TerminalRepoIndex = {}
   private parkingRoot: HTMLDivElement | null = null
   private readonly sessions = new Map<string, ManagedTerminalSession>()
   private readonly sessionKeyBySessionId = new Map<string, string>()
@@ -82,8 +83,8 @@ export class TerminalSessionRegistry {
     private readonly onSelectedWorktreeChange: (worktreeTerminalKey: string, key: string | null) => void = () => {},
   ) {}
 
-  setRepos(repos: ReposStore['repos']): void {
-    this.repos = repos
+  setRepoIndex(repoIndex: TerminalRepoIndex): void {
+    this.repoIndex = repoIndex
     this.syncDescriptorsFromRepos()
   }
 
@@ -173,8 +174,7 @@ export class TerminalSessionRegistry {
     attachmentId: string,
     snapshotsBySessionId: ReadonlyMap<string, TerminalSessionSnapshot>,
   ): void {
-    const repo = this.repos[repoRoot]
-    if (!repo) return
+    if (!this.repoIndex[repoRoot]) return
     const serverSessionsByKey = new Map(serverSessions.map((session) => [session.key, session]))
     const controllerKeyByWorktree = new Map<string, string>()
     const touchedWorktrees = new Set<string>()
@@ -188,7 +188,7 @@ export class TerminalSessionRegistry {
     for (const serverSession of serverSessions) {
       const parsed = parseServerSessionKey(serverSession.key)
       if (!parsed || parsed.repoRoot !== repoRoot) continue
-      const branch = repo.data.branches.find((candidate) => candidate.worktree?.path === parsed.worktreePath)?.name
+      const branch = branchForTerminalWorktree(this.repoIndex, parsed.repoRoot, parsed.worktreePath)
       if (!branch) continue
       const terminalWorktreeKey = worktreeTerminalKey(parsed.repoRoot, parsed.worktreePath)
       touchedWorktrees.add(terminalWorktreeKey)
@@ -537,9 +537,11 @@ export class TerminalSessionRegistry {
   private syncDescriptorsFromRepos(): void {
     const changedWorktrees = new Set<string>()
     for (const session of this.sessions.values()) {
-      const repo = this.repos[session.descriptor.repoRoot]
-      if (!repo) continue
-      const branch = repo.data.branches.find((candidate) => candidate.worktree?.path === session.descriptor.worktreePath)?.name
+      const branch = branchForTerminalWorktree(
+        this.repoIndex,
+        session.descriptor.repoRoot,
+        session.descriptor.worktreePath,
+      )
       if (!branch || branch === session.descriptor.branch) continue
       session.updateDescriptor({ ...session.descriptor, branch })
       changedWorktrees.add(session.descriptor.worktreeTerminalKey)
