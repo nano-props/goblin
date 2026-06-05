@@ -10,7 +10,6 @@ import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
 interface TerminalSwitcherProps {
   worktreeTerminalKey: string
   sessions: TerminalSessionSummary[]
-  offsetForSearch: boolean
   onNew: () => void
   onSelect: (worktreeTerminalKey: string, key: string) => void
   onScrollToBottom: (key: string) => void
@@ -20,7 +19,6 @@ interface TerminalSwitcherProps {
 export function TerminalSwitcher({
   worktreeTerminalKey,
   sessions,
-  offsetForSearch,
   onNew,
   onSelect,
   onScrollToBottom,
@@ -48,11 +46,7 @@ export function TerminalSwitcher({
     previousSelectedKeyRef.current = selectedKey
   }, [selectedKey])
   return (
-    <div
-      className={cn('goblin-terminal-switcher', offsetForSearch && 'goblin-terminal-switcher--below-search')}
-      role="region"
-      aria-label={t('terminal.sessions')}
-    >
+    <div className="goblin-terminal-switcher" role="region" aria-label={t('terminal.sessions')}>
       <div className="goblin-terminal-switcher__header">
         <div className="goblin-terminal-switcher__title-wrap">
           <span className="goblin-terminal-switcher__title">{t('terminal.sessions')}</span>

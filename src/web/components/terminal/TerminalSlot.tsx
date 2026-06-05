@@ -18,11 +18,10 @@ import { pathForDroppedFile } from '#/web/app-shell-client.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-utils.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
-import {
-  useWorktreeTerminalSnapshot,
-  useTerminalSnapshot,
-} from '#/web/components/terminal/terminal-session-store.ts'
+import { useWorktreeTerminalSnapshot, useTerminalSnapshot } from '#/web/components/terminal/terminal-session-store.ts'
 import { TerminalSwitcher } from '#/web/components/terminal/TerminalSwitcher.tsx'
+import { MobileTerminalToolbar } from '#/web/components/terminal/mobile-terminal-toolbar.tsx'
+import { isMobileDevice } from '#/web/components/terminal/mobile-detection.ts'
 import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
 interface TerminalSlotProps {
   repoRoot: string
@@ -45,6 +44,7 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
     attach,
     detach,
     scrollToBottom,
+    scrollLines,
     isTerminalFocusTarget,
     findNext,
     findPrevious,
@@ -219,10 +219,7 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
 
   return (
     <div
-      className={cn(
-        'goblin-terminal-slot focus-visible:outline-none',
-        isReadOnly && 'goblin-terminal-slot--mirror',
-      )}
+      className={cn('goblin-terminal-slot focus-visible:outline-none', isReadOnly && 'goblin-terminal-slot--mirror')}
       tabIndex={-1}
       onFocusCapture={handleFocus}
       onBlurCapture={handleBlur}
@@ -262,46 +259,54 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
           </div>
         )}
       </div>
-      <TerminalSwitcher
-        worktreeTerminalKey={terminalWorktreeKey}
-        sessions={summaries}
-        offsetForSearch={searchOpen}
-        onNew={newTerminal}
-        onSelect={selectTerminal}
-        onScrollToBottom={scrollToBottom}
-        onClose={closeTerminalKey}
-      />
+      <div className="goblin-terminal-float-group">
+        {searchOpen && (
+          <div className="goblin-terminal-slot__search">
+            <input
+              ref={searchInputRef}
+              className="goblin-terminal-slot__search-input"
+              value={searchTerm}
+              aria-label={t('terminal.search-placeholder')}
+              placeholder={t('terminal.search-placeholder')}
+              onChange={(event) => handleSearchChange(event.target.value)}
+              onKeyDown={handleSearchKeyDown}
+            />
+            <span className="goblin-terminal-slot__search-result" role="status" aria-live="polite" aria-atomic="true">
+              {resultLabel}
+            </span>
+            <Button type="button" size="sm" variant="ghost" onClick={searchPrevious} disabled={!searchTerm}>
+              {t('terminal.search-previous')}
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => searchNext()} disabled={!searchTerm}>
+              {t('terminal.search-next')}
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={closeSearch}>
+              {t('terminal.search-close')}
+            </Button>
+          </div>
+        )}
+        <TerminalSwitcher
+          worktreeTerminalKey={terminalWorktreeKey}
+          sessions={summaries}
+          onNew={newTerminal}
+          onSelect={selectTerminal}
+          onScrollToBottom={scrollToBottom}
+          onClose={closeTerminalKey}
+        />
+        {isMobileDevice() && hasSessions && key && (
+          <MobileTerminalToolbar
+            onInput={(data) => writeInput(key, data)}
+            onScrollLines={(amount) => scrollLines(key, amount)}
+            disabled={isReadOnly}
+          />
+        )}
+      </div>
       {isReadOnly && <div className="goblin-terminal-slot__mirror-overlay" aria-hidden="true" />}
       {isReadOnly && attachmentBannerKey && (
         <div className="goblin-terminal-slot__mirror-banner" role="status" aria-live="polite">
           <span>{t(attachmentBannerKey)}</span>
           <Button type="button" size="sm" variant="secondary" onClick={() => key && takeover(key)} disabled={!key}>
             {t('terminal.takeover')}
-          </Button>
-        </div>
-      )}
-      {searchOpen && (
-        <div className="goblin-terminal-slot__search">
-          <input
-            ref={searchInputRef}
-            className="goblin-terminal-slot__search-input"
-            value={searchTerm}
-            aria-label={t('terminal.search-placeholder')}
-            placeholder={t('terminal.search-placeholder')}
-            onChange={(event) => handleSearchChange(event.target.value)}
-            onKeyDown={handleSearchKeyDown}
-          />
-          <span className="goblin-terminal-slot__search-result" role="status" aria-live="polite" aria-atomic="true">
-            {resultLabel}
-          </span>
-          <Button type="button" size="sm" variant="ghost" onClick={searchPrevious} disabled={!searchTerm}>
-            {t('terminal.search-previous')}
-          </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={() => searchNext()} disabled={!searchTerm}>
-            {t('terminal.search-next')}
-          </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={closeSearch}>
-            {t('terminal.search-close')}
           </Button>
         </div>
       )}

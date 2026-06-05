@@ -18,10 +18,7 @@ import {
   terminalSearchDecorationsForCurrentDocument,
   terminalThemeForCurrentDocument,
 } from '#/web/components/terminal/terminal-theme.ts'
-import {
-  isMacNavigatorPlatform,
-  terminalInputForMacOptionArrow,
-} from '#/web/components/terminal/terminal-keyboard.ts'
+import { isMacNavigatorPlatform, terminalInputForMacOptionArrow } from '#/web/components/terminal/terminal-keyboard.ts'
 const DEFAULT_PARKING_WIDTH = 800
 const DEFAULT_PARKING_HEIGHT = 400
 const DEFAULT_TERMINAL_COLS = 80
@@ -137,6 +134,7 @@ export class TerminalSessionView {
       macOptionIsMeta: true,
       rescaleOverlappingGlyphs: true,
       scrollOnUserInput: true,
+      smoothScrollDuration: 125,
       theme,
     })
     const fitAddon = new FitAddon()
@@ -177,6 +175,10 @@ export class TerminalSessionView {
 
   scrollToBottom(): void {
     this.term?.scrollToBottom()
+  }
+
+  scrollLines(amount: number): void {
+    this.term?.scrollLines(amount)
   }
 
   find(term: string, direction: 'next' | 'previous', incremental: boolean): boolean {

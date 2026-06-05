@@ -54,7 +54,12 @@ describe('TerminalSlot', () => {
       branch: 'feature',
       worktreePath: '/worktree',
     }
-    const worktreeSnapshot = { worktreeTerminalKey: '/repo\0/worktree', selectedDescriptor: descriptor, sessions: summaries, count: 1 }
+    const worktreeSnapshot = {
+      worktreeTerminalKey: '/repo\0/worktree',
+      selectedDescriptor: descriptor,
+      sessions: summaries,
+      count: 1,
+    }
     const snapshot = {
       phase: 'open' as const,
       message: null,
@@ -72,6 +77,7 @@ describe('TerminalSlot', () => {
       createTerminal: async () => 'terminal-1',
       selectTerminal: vi.fn(),
       scrollToBottom: vi.fn(),
+      scrollLines: vi.fn(),
       clearBell: vi.fn(() => false),
       closeTerminalAndDismissDetailIfLast: vi.fn(() => []),
       attach: vi.fn(),
@@ -141,12 +147,18 @@ describe('TerminalSlot', () => {
     document.body.appendChild(container)
     const root: Root = createRoot(container)
     let repoReady = false
-    const emptyWorktreeSnapshot = { worktreeTerminalKey: '/repo\0/worktree', selectedDescriptor: null, sessions: [], count: 0 }
+    const emptyWorktreeSnapshot = {
+      worktreeTerminalKey: '/repo\0/worktree',
+      selectedDescriptor: null,
+      sessions: [],
+      count: 0,
+    }
     const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
     const context: TerminalSessionContextValue = {
       createTerminal: vi.fn(async () => 'terminal-2'),
       selectTerminal: vi.fn(),
       scrollToBottom: vi.fn(),
+      scrollLines: vi.fn(),
       clearBell: vi.fn(() => false),
       closeTerminalAndDismissDetailIfLast: vi.fn(() => []),
       attach: vi.fn(),
@@ -192,7 +204,6 @@ describe('TerminalSlot', () => {
           </TerminalSessionContext.Provider>,
         )
       })
-
     } finally {
       await act(async () => root.unmount())
       container.remove()

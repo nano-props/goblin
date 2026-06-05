@@ -9,7 +9,10 @@ import {
 import { terminalBridge } from '#/web/terminal.ts'
 import { readOrCreateWebTerminalAttachmentId } from '#/web/renderer-terminal-bridge.ts'
 import { resolveTerminalOwnership } from '#/shared/terminal.ts'
-import type { TerminalSessionSnapshot, TerminalSessionSummary as ServerTerminalSessionSummary } from '#/shared/terminal.ts'
+import type {
+  TerminalSessionSnapshot,
+  TerminalSessionSummary as ServerTerminalSessionSummary,
+} from '#/shared/terminal.ts'
 import { branchForTerminalWorktree } from '#/web/components/terminal/terminal-repo-utils.ts'
 import type {
   TerminalDescriptor,
@@ -20,7 +23,12 @@ import type {
   TerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
 
-const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = { phase: 'opening', message: null, processName: 'terminal', canonicalTitle: null }
+const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
+  phase: 'opening',
+  message: null,
+  processName: 'terminal',
+  canonicalTitle: null,
+}
 const ACTIVE_RENDER_CACHE_REFRESH_INTERVAL_MS = 250
 
 function parseServerSessionKey(key: string): { repoRoot: string; worktreePath: string; terminalId: string } | null {
@@ -251,7 +259,12 @@ export class TerminalSessionRegistry {
     for (const worktreeTerminalKey of touchedWorktrees) {
       const current = this.selectedKeyByWorktree.get(worktreeTerminalKey) ?? null
       const preferred = this.preferredSelectedKeyByWorktree.get(worktreeTerminalKey) ?? null
-      const next = this.resolveSelectedTerminalKey(worktreeTerminalKey, preferred, current, controllerKeyByWorktree.get(worktreeTerminalKey) ?? null)
+      const next = this.resolveSelectedTerminalKey(
+        worktreeTerminalKey,
+        preferred,
+        current,
+        controllerKeyByWorktree.get(worktreeTerminalKey) ?? null,
+      )
       this.selectTerminalKey(worktreeTerminalKey, next)
     }
   }
@@ -270,7 +283,12 @@ export class TerminalSessionRegistry {
       throw new Error(result.message)
     }
     this.setPreferredSelectedTerminalKey(terminalWorktreeKey, result.key)
-    this.reconcileServerSessions(base.repoRoot, result.sessions, attachmentId, new Map<string, TerminalSessionSnapshot>())
+    this.reconcileServerSessions(
+      base.repoRoot,
+      result.sessions,
+      attachmentId,
+      new Map<string, TerminalSessionSnapshot>(),
+    )
     return result.key
   }
 
@@ -287,7 +305,8 @@ export class TerminalSessionRegistry {
       ...Array.from(this.selectedKeyByWorktree.keys()),
     ])
     this.preferredSelectedKeyByWorktree.clear()
-    for (const [worktreeTerminalKey, key] of nextPreferred) this.preferredSelectedKeyByWorktree.set(worktreeTerminalKey, key)
+    for (const [worktreeTerminalKey, key] of nextPreferred)
+      this.preferredSelectedKeyByWorktree.set(worktreeTerminalKey, key)
     for (const worktreeTerminalKey of worktrees) {
       const preferred = this.preferredSelectedKeyByWorktree.get(worktreeTerminalKey) ?? null
       if (!preferred || !this.isSelectedKeyValid(worktreeTerminalKey, preferred)) continue
@@ -357,9 +376,14 @@ export class TerminalSessionRegistry {
     this.sessions.get(key)?.scrollToBottom()
   }
 
+  scrollLines = (key: string, amount: number): void => {
+    this.sessions.get(key)?.scrollLines(amount)
+  }
+
   closeTerminalAndDismissDetailIfLast = (key: string, base: TerminalSessionBase): TerminalSessionSummary[] => {
     const session = this.sessions.get(key)
-    if (!session || session.descriptor.worktreeTerminalKey !== worktreeTerminalKey(base.repoRoot, base.worktreePath)) return []
+    if (!session || session.descriptor.worktreeTerminalKey !== worktreeTerminalKey(base.repoRoot, base.worktreePath))
+      return []
     return this.closeTerminal(key)
   }
 
@@ -452,7 +476,8 @@ export class TerminalSessionRegistry {
   }
 
   private notifyAllWorktrees(): void {
-    for (const worktreeTerminalKey of Array.from(this.worktreeListeners.keys())) this.notifyWorktree(worktreeTerminalKey)
+    for (const worktreeTerminalKey of Array.from(this.worktreeListeners.keys()))
+      this.notifyWorktree(worktreeTerminalKey)
   }
 
   private subscribeToKeyedListeners(
@@ -476,7 +501,11 @@ export class TerminalSessionRegistry {
 
   private syncSessionIdIndex(key: string, sessionId: string | null): void {
     const previousSessionId = this.sessionIdByKey.get(key)
-    if (previousSessionId && previousSessionId !== sessionId && this.sessionKeyBySessionId.get(previousSessionId) === key) {
+    if (
+      previousSessionId &&
+      previousSessionId !== sessionId &&
+      this.sessionKeyBySessionId.get(previousSessionId) === key
+    ) {
       this.sessionKeyBySessionId.delete(previousSessionId)
     }
     if (!sessionId) {
@@ -493,8 +522,7 @@ export class TerminalSessionRegistry {
     if (session) {
       this.snapshotCache.set(key, session.snapshot())
       this.captureActiveRenderCache(key, session)
-    }
-    else this.snapshotCache.delete(key)
+    } else this.snapshotCache.delete(key)
     this.notifySnapshot(key)
     const worktreeTerminalKey = session?.descriptor.worktreeTerminalKey
     if (worktreeTerminalKey) this.notifyWorktree(worktreeTerminalKey)
@@ -513,7 +541,10 @@ export class TerminalSessionRegistry {
     this.bellController.remove(key)
     if (options.dispose) session.dispose({ closeSession: options.closeSession !== false })
     if (this.selectedKeyByWorktree.get(worktreeTerminalKey) === key) {
-      const next = this.resolveSelectedTerminalKey(worktreeTerminalKey, this.preferredSelectedKeyByWorktree.get(worktreeTerminalKey) ?? null)
+      const next = this.resolveSelectedTerminalKey(
+        worktreeTerminalKey,
+        this.preferredSelectedKeyByWorktree.get(worktreeTerminalKey) ?? null,
+      )
       this.selectTerminalKey(worktreeTerminalKey, next, { notify: false })
     }
     this.notifyWorktree(worktreeTerminalKey)
@@ -522,7 +553,8 @@ export class TerminalSessionRegistry {
 
   private closeTerminal(key: string): TerminalSessionSummary[] {
     const worktreeTerminalKey = this.sessions.get(key)?.descriptor.worktreeTerminalKey
-    if (!this.removeSession(key, { dispose: true, closeSession: true })) return worktreeTerminalKey ? this.sessionSummaries(worktreeTerminalKey) : []
+    if (!this.removeSession(key, { dispose: true, closeSession: true }))
+      return worktreeTerminalKey ? this.sessionSummaries(worktreeTerminalKey) : []
     return worktreeTerminalKey ? this.sessionSummaries(worktreeTerminalKey) : []
   }
 
@@ -530,7 +562,8 @@ export class TerminalSessionRegistry {
     const session = this.sessions.get(key)
     const terminalWorktreeKey = worktreeTerminalKey(base.repoRoot, base.worktreePath)
     if (!session || session.descriptor.worktreeTerminalKey !== terminalWorktreeKey) return []
-    if (!this.removeSession(key, { dispose: true, closeSession: false })) return this.sessionSummaries(terminalWorktreeKey)
+    if (!this.removeSession(key, { dispose: true, closeSession: false }))
+      return this.sessionSummaries(terminalWorktreeKey)
     return this.sessionSummaries(terminalWorktreeKey)
   }
 
@@ -560,13 +593,18 @@ export class TerminalSessionRegistry {
       this.notifyWorktree(descriptor.worktreeTerminalKey)
       return current
     }
-    const session = new ManagedTerminalSession(descriptor, () => this.notifySession(descriptor.key), this.bellController.handleBell)
+    const session = new ManagedTerminalSession(
+      descriptor,
+      () => this.notifySession(descriptor.key),
+      this.bellController.handleBell,
+    )
     this.sessions.set(descriptor.key, session)
     this.syncSessionIdIndex(descriptor.key, session.currentSessionId())
     this.snapshotCache.set(descriptor.key, session.snapshot())
     if (!this.selectedKeyByWorktree.has(descriptor.worktreeTerminalKey)) {
       const preferred = this.preferredSelectedKeyByWorktree.get(descriptor.worktreeTerminalKey)
-      if (!preferred || preferred === descriptor.key) this.selectTerminalKey(descriptor.worktreeTerminalKey, descriptor.key, { notify: false })
+      if (!preferred || preferred === descriptor.key)
+        this.selectTerminalKey(descriptor.worktreeTerminalKey, descriptor.key, { notify: false })
     }
     this.notifyWorktree(descriptor.worktreeTerminalKey)
     return session
@@ -694,12 +732,12 @@ export class TerminalSessionRegistry {
   }
 
   private maxCachedSnapshotSeq(key: string, sessionId: string): number {
-    const serverSeq = this.serverSnapshotCache.get(key)?.sessionId === sessionId
-      ? this.serverSnapshotCache.get(key)?.snapshotSeq ?? 0
-      : 0
-    const localSeq = this.localRenderCache.get(key)?.sessionId === sessionId
-      ? this.localRenderCache.get(key)?.snapshotSeq ?? 0
-      : 0
+    const serverSeq =
+      this.serverSnapshotCache.get(key)?.sessionId === sessionId
+        ? (this.serverSnapshotCache.get(key)?.snapshotSeq ?? 0)
+        : 0
+    const localSeq =
+      this.localRenderCache.get(key)?.sessionId === sessionId ? (this.localRenderCache.get(key)?.snapshotSeq ?? 0) : 0
     return Math.max(serverSeq, localSeq)
   }
 }

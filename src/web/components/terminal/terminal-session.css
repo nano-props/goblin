@@ -165,10 +165,6 @@
 }
 
 .goblin-terminal-slot__search {
-  position: absolute;
-  top: var(--goblin-terminal-float-offset);
-  right: var(--goblin-terminal-float-offset);
-  z-index: 2;
   display: flex;
   max-width: calc(100% - 20px);
   align-items: center;
@@ -180,21 +176,24 @@
   box-shadow: var(--shadow-sm);
 }
 
-.goblin-terminal-switcher {
+.goblin-terminal-float-group {
   position: absolute;
   top: var(--goblin-terminal-float-offset);
   right: var(--goblin-terminal-float-offset);
   z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--goblin-terminal-float-offset);
+  align-items: flex-end;
+}
+
+.goblin-terminal-switcher {
   width: var(--goblin-terminal-switcher-width);
   max-width: calc(100% - 20px);
   border: 1px solid var(--color-border);
   border-radius: var(--goblin-terminal-float-radius);
   background: var(--color-popover);
   box-shadow: var(--shadow-sm);
-}
-
-.goblin-terminal-switcher--below-search {
-  top: 52px;
 }
 
 .goblin-terminal-switcher__header {
@@ -417,4 +416,34 @@
 
 .goblin-terminal-parking__item {
   overflow: hidden;
+}
+
+.goblin-terminal-mobile-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--goblin-terminal-float-radius);
+  background: color-mix(in srgb, var(--color-popover) 96%, transparent);
+  padding: 6px;
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.goblin-terminal-mobile-toolbar__row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.goblin-terminal-mobile-toolbar__btn {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 500;
+  flex-shrink: 0;
 }

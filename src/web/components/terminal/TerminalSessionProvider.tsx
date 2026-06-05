@@ -4,7 +4,10 @@ import type { TerminalSessionSnapshot, TerminalSessionSummary } from '#/shared/t
 import '#/web/components/terminal/terminal-session.css'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { terminalBridge } from '#/web/terminal.ts'
-import { TerminalSessionContext, TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
+import {
+  TerminalSessionContext,
+  TerminalSessionReadContext,
+} from '#/web/components/terminal/terminal-session-context.ts'
 import { readOrCreateWebTerminalAttachmentId } from '#/web/renderer-terminal-bridge.ts'
 import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
 import { terminalSessionsQueryKey, terminalSessionsQueryOptions } from '#/web/terminal-session-queries.ts'
@@ -20,7 +23,7 @@ interface TerminalSessionProviderProps {
 
 export function TerminalSessionProvider({ currentRepoId, children }: TerminalSessionProviderProps) {
   const repoIndex = useStoreWithEqualityFn(useReposStore, (s) => repoIndexFromRepos(s.repos), repoIndexEqual)
-  const currentRepoInstanceToken = currentRepoId ? repoIndex[currentRepoId]?.instanceToken ?? null : null
+  const currentRepoInstanceToken = currentRepoId ? (repoIndex[currentRepoId]?.instanceToken ?? null) : null
   const selectedTerminalByWorktree = useReposStore((s) => s.selectedTerminalByWorktree)
   const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
   const parkingRootRef = useRef<HTMLDivElement | null>(null)
@@ -159,6 +162,7 @@ export function TerminalSessionProvider({ currentRepoId, children }: TerminalSes
       createTerminal: registry.createTerminal,
       selectTerminal: registry.selectTerminal,
       scrollToBottom: registry.scrollToBottom,
+      scrollLines: registry.scrollLines,
       clearBell: registry.clearBell,
       closeTerminalAndDismissDetailIfLast: registry.closeTerminalAndDismissDetailIfLast,
       attach: registry.attach,

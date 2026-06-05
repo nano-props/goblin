@@ -125,6 +125,10 @@ export class ManagedTerminalSession {
     this.view.scrollToBottom()
   }
 
+  scrollLines(amount: number): void {
+    this.view.scrollLines(amount)
+  }
+
   serialize(): string {
     return this.view.serialize()
   }
@@ -246,7 +250,10 @@ export class ManagedTerminalSession {
         if (this.runtime.failAttachAttempt(result.message)) this.notify()
         return
       }
-      let changed = this.runtime.applyAttachResult(this.withLocalOwnership(result), { cols: term.cols, rows: term.rows })
+      let changed = this.runtime.applyAttachResult(this.withLocalOwnership(result), {
+        cols: term.cols,
+        rows: term.rows,
+      })
       await this.replayActiveView(
         token,
         term,
@@ -282,7 +289,10 @@ export class ManagedTerminalSession {
     }
   }
 
-  private withLocalOwnership(result: Extract<TerminalAttachResult, { ok: true }>): Extract<TerminalAttachResult, { ok: true }> & {
+  private withLocalOwnership(result: Extract<TerminalAttachResult, { ok: true }>): Extract<
+    TerminalAttachResult,
+    { ok: true }
+  > & {
     role: TerminalOwnershipViewModel['role']
     controllerStatus: TerminalOwnershipViewModel['controllerStatus']
   } {

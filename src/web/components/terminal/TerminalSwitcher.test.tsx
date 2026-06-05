@@ -31,7 +31,6 @@ function renderTerminalSwitcher(root: Root, sessions: TerminalSwitcherSession[])
     root.render(
       <TerminalSwitcher
         worktreeTerminalKey="repo::worktree"
-        offsetForSearch={false}
         sessions={sessions}
         onNew={() => {}}
         onSelect={() => {}}
@@ -53,7 +52,6 @@ describe('TerminalSwitcher', () => {
       root.render(
         <TerminalSwitcher
           worktreeTerminalKey="repo::worktree"
-          offsetForSearch={false}
           sessions={[
             {
               key: 'terminal-1',
@@ -87,7 +85,9 @@ describe('TerminalSwitcher', () => {
     try {
       const selectedRow = container.querySelector<HTMLElement>(".goblin-terminal-switcher__row[data-selected='true']")
       const selectedButton = selectedRow?.querySelector<HTMLButtonElement>('.goblin-terminal-switcher__select')
-      const unselectedRow = container.querySelector<HTMLElement>(".goblin-terminal-switcher__row:not([data-selected='true'])")
+      const unselectedRow = container.querySelector<HTMLElement>(
+        ".goblin-terminal-switcher__row:not([data-selected='true'])",
+      )
       const unselectedButton = unselectedRow?.querySelector<HTMLButtonElement>('.goblin-terminal-switcher__select')
 
       expect(selectedRow).not.toBeNull()
@@ -111,7 +111,6 @@ describe('TerminalSwitcher', () => {
       root.render(
         <TerminalSwitcher
           worktreeTerminalKey="repo::worktree"
-          offsetForSearch={false}
           sessions={[
             {
               key: 'terminal-1',
@@ -191,7 +190,9 @@ describe('TerminalSwitcher', () => {
       expect(tooltip?.style.transform).toBe('translateX(-100%)')
 
       await act(async () => {
-        buttons[1]?.dispatchEvent(new MouseEvent('pointerover', { bubbles: true, relatedTarget: buttons[0] ?? undefined }))
+        buttons[1]?.dispatchEvent(
+          new MouseEvent('pointerover', { bubbles: true, relatedTarget: buttons[0] ?? undefined }),
+        )
       })
 
       tooltip = document.body.querySelector<HTMLElement>('[role="tooltip"]')
@@ -219,7 +220,6 @@ describe('TerminalSwitcher', () => {
       root.render(
         <TerminalSwitcher
           worktreeTerminalKey="repo::worktree"
-          offsetForSearch={false}
           sessions={[
             {
               key: 'terminal-1',
@@ -392,7 +392,6 @@ describe('TerminalSwitcher', () => {
       root.render(
         <TerminalSwitcher
           worktreeTerminalKey="repo::worktree"
-          offsetForSearch={false}
           sessions={[
             {
               key: 'terminal-1',
@@ -451,7 +450,6 @@ describe('TerminalSwitcher', () => {
       root.render(
         <TerminalSwitcher
           worktreeTerminalKey="repo::worktree"
-          offsetForSearch={false}
           sessions={[
             {
               key: 'terminal-1',
