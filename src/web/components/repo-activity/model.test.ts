@@ -3,6 +3,7 @@ import { getRepoActivity, isRepoPrimaryRefreshBusy } from '#/web/components/repo
 import { seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { resetReposStore } from '#/web/stores/repos/test-utils.ts'
+import { markRepoOperationTargets, nextRepoOperationId, settleRepoOperationTargets } from '#/web/stores/repos/runtime.ts'
 
 const REPO_ID = '/tmp/gbl-repo-activity-model'
 
@@ -39,27 +40,16 @@ describe('repo activity model', () => {
     expect(getRepoActivity(repo!)).toBeNull()
   })
 
-  test('only marks the primary refresh control busy for manual sync operations', () => {
+  test('marks the primary refresh control busy while any fetch is active', () => {
     resetReposStore()
     seedRepoState({ id: REPO_ID })
-    useReposStore.setState((state) => {
-      const repo = state.repos[REPO_ID]
-      if (!repo) return state
-      repo.operations.fetch.phase = 'running'
-      repo.operations.fetch.reason = 'fetch'
-      return { repos: { ...state.repos, [REPO_ID]: { ...repo } } }
-    })
-
-    expect(isRepoPrimaryRefreshBusy(useReposStore.getState().repos[REPO_ID]!)).toBe(false)
-
-    useReposStore.setState((state) => {
-      const repo = state.repos[REPO_ID]
-      if (!repo) return state
-      repo.operations.fetch.phase = 'running'
-      repo.operations.fetch.reason = 'user-fetch'
-      return { repos: { ...state.repos, [REPO_ID]: { ...repo } } }
-    })
+    const opId = nextRepoOperationId(REPO_ID)
+    markRepoOperationTargets(REPO_ID, opId, [{ key: 'fetch', reason: 'fetch' }], 'running')
 
     expect(isRepoPrimaryRefreshBusy(useReposStore.getState().repos[REPO_ID]!)).toBe(true)
+
+    settleRepoOperationTargets(REPO_ID, opId, [{ key: 'fetch', reason: 'fetch' }], null)
+
+    expect(isRepoPrimaryRefreshBusy(useReposStore.getState().repos[REPO_ID]!)).toBe(false)
   })
 })

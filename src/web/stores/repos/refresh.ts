@@ -45,6 +45,7 @@ import {
 } from '#/web/app-data-client.ts'
 import { branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import type { RepoOperationReason, RepoPullRequestReason } from '#/web/stores/repos/operations.ts'
+import type { RepoState } from '#/web/stores/repos/types.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 import type { ExecResult, PullRequestFetchMode, PullRequestInfo } from '#/web/types.ts'
 function mergePullRequest(
@@ -113,13 +114,14 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       lane: 'network',
       priority: options?.priority ?? 50,
       targets: [{ key: 'fetch', reason: options?.reason ?? 'network' }],
+      canStart: canStartRemoteFetch,
       busyResult: { ok: false, message: 'error.network-op-in-progress' },
       task,
       errorFromResult: (result) => (!result.ok && result.message !== 'cancelled' ? result.message : null),
       onResult: (result) => {
         updateIfFresh(set, id, token, (r) => {
           if (result.ok) finishResourceSuccess(r.resources.fetch)
-          else if (result.message !== 'cancelled' && result.message !== 'error.network-op-in-progress') {
+          else if (result.message !== 'cancelled') {
             finishResourceError(r.resources.fetch, result.message)
           } else {
             cancelResource(r.resources.fetch)
@@ -128,11 +130,23 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       },
       onError: (message) => {
         updateIfFresh(set, id, token, (r) => {
-          finishResourceError(r.resources.fetch, message)
+          if (message === 'cancelled') cancelResource(r.resources.fetch)
+          else finishResourceError(r.resources.fetch, message)
         })
       },
       rethrow: true,
     })
+  }
+
+  function syncStrategy(
+    repo: RepoState,
+    token: number,
+  ): 'noop' | 'refresh-all' | 'wait-then-retry' | 'fetch' {
+    if (repo.instanceToken !== token) return 'noop'
+    if (repo.availability.phase === 'unavailable') return 'refresh-all'
+    if (repo.remote.hasRemotes === false) return 'refresh-all'
+    if (!canStartRemoteFetch(repo)) return 'wait-then-retry'
+    return 'fetch'
   }
 
   function pullRequestReason(mode: PullRequestFetchMode): RepoPullRequestReason {
@@ -414,34 +428,28 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       const repoBefore = get().repos[id]
       if (!repoBefore) return
       const token = options?.token ?? repoBefore.instanceToken
-      if (repoBefore.instanceToken !== token) return
-      if (repoBefore.availability.phase === 'unavailable') {
-        await get().refreshAll(id, { token })
-        return
-      }
-      if (repoBefore.remote.hasRemotes === false) {
-        await get().refreshAll(id, { token })
-        return
-      }
-      if (!canStartRemoteFetch(repoBefore)) {
-        // Wait for in-flight snapshot/status operations to finish so the
-        // manual refresh behaves consistently with local-only repos:
-        // the button stays clickable and the work queues instead of
-        // silently dropping.
+
+      let strategy = syncStrategy(repoBefore, token)
+      if (strategy === 'noop') return
+
+      if (strategy === 'wait-then-retry') {
         try {
           await waitForRepoOperationsIdle(id, ['snapshot', 'status'])
         } catch {
           return
         }
         const repoAfterWait = get().repos[id]
-        if (!repoAfterWait || repoAfterWait.instanceToken !== token) return
-        if (!canStartRemoteFetch(repoAfterWait)) {
-          // Still blocked (e.g. branch action in progress). Fall back to
-          // a local refresh so the user gets *some* feedback.
-          await get().refreshAll(id, { token })
-          return
-        }
+        strategy = repoAfterWait ? syncStrategy(repoAfterWait, token) : 'noop'
+        if (strategy === 'noop') return
+        if (strategy === 'wait-then-retry') strategy = 'refresh-all'
       }
+
+      if (strategy === 'refresh-all') {
+        await get().refreshAll(id, { token })
+        return
+      }
+
+      // strategy === 'fetch'
       let result: ExecResult | null
       try {
         result = await runNetworkTask(id, (signal) => fetchRepository(id, 'user', signal), {

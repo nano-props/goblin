@@ -10,7 +10,6 @@ import {
   cancelResource,
   finishResourceError,
   finishResourceSuccess,
-  resourceBusy,
   startResource,
 } from '#/web/stores/repos/resources.ts'
 import type {
@@ -120,7 +119,7 @@ function evaluateRepoBranchActionSchedule(repo: RepoState, action: RepoBranchAct
   const branchOperation = repoOperation(repo.id, 'branchAction')
   return evaluateBranchActionScheduleDecision({
     actionKind: action.kind,
-    fetchBusy: resourceBusy(repo.resources.fetch) || fetchOperation.phase !== 'idle',
+    fetchBusy: fetchOperation.phase !== 'idle',
     branchOperationPhase: branchOperation.phase,
     coreRefreshBusy: coreRefreshBusy(repo.id),
   })

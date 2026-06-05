@@ -1,4 +1,5 @@
 import type { RepoState } from '#/web/stores/repos/types.ts'
+import { repoOperationBusy } from '#/web/stores/repos/runtime.ts'
 import { repoBranchActionLoadingLabel, type RepoActionLabel } from '#/web/stores/repos/action-labels.ts'
 import { branchActionKindFromReason, isBranchActionReason } from '#/web/stores/repos/operations.ts'
 export type RepoActivityKind =
@@ -35,7 +36,7 @@ export function getRepoActivity(repo: RepoState): RepoActivity | null {
 }
 
 export function isRepoPrimaryRefreshBusy(repo: RepoState): boolean {
-  return repo.operations.fetch.phase !== 'idle' && repo.operations.fetch.reason === 'user-fetch'
+  return repoOperationBusy(repo.id, 'fetch')
 }
 
 export function getRepoActivityControlView(input: {
