@@ -10,8 +10,41 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { randomBytes } from 'node:crypto'
+import os from 'node:os'
+import qrcode from 'qrcode'
 import { bootstrapServer } from '#/server/bootstrap.ts'
 import { serverDataDir } from '#/server/common/data-dir.ts'
+
+function isLanAddress(address: string): boolean {
+  if (address.startsWith('10.')) return true
+  if (address.startsWith('192.168.')) return true
+  if (address.startsWith('169.254.')) return true
+  if (address.startsWith('172.')) {
+    const parts = address.split('.')
+    if (parts.length < 2) return false
+    const second = Number(parts[1])
+    return Number.isFinite(second) && second >= 16 && second <= 31
+  }
+  return false
+}
+
+function getLanAddresses(): string[] {
+  const interfaces = os.networkInterfaces()
+  const addresses: string[] = []
+  if (!interfaces) return addresses
+  for (const [, infos] of Object.entries(interfaces)) {
+    if (!infos) continue
+    for (const iface of infos) {
+      // @types/node version mismatch: narrow manually
+      const info = iface as unknown as { family: string | number; internal: boolean; address: string }
+      const family = typeof info.family === 'number' ? `IPv${info.family}` : info.family
+      if (family === 'IPv4' && !info.internal && isLanAddress(info.address)) {
+        addresses.push(info.address)
+      }
+    }
+  }
+  return addresses
+}
 
 const repoRoot = path.resolve(import.meta.dirname, '..')
 process.chdir(repoRoot)
@@ -46,6 +79,24 @@ const server = bootstrapServer({ terminalWorkerDir: path.join(repoRoot, 'src/ser
 console.log(`[embedded-server] listening on http://${server.hostname}:${server.port}`)
 console.log(`[embedded-server] data dir: ${serverDataDir()}`)
 console.log(`[embedded-server] internal secret: ${process.env.GOBLIN_SERVER_INTERNAL_SECRET}`)
+
+const lanUrls: string[] = []
+if (server.hostname === '0.0.0.0') {
+  lanUrls.push(...getLanAddresses().map((addr) => `http://${addr}:${server.port}`))
+} else if (isLanAddress(server.hostname)) {
+  lanUrls.push(`http://${server.hostname}:${server.port}`)
+}
+
+for (const url of lanUrls) {
+  console.log(`[embedded-server] LAN QR code for ${url}`)
+  try {
+    const qr = await qrcode.toString(url, { type: 'terminal', small: true })
+    console.log(qr)
+  } catch {
+    console.warn(`[embedded-server] failed to generate QR code for ${url}`)
+  }
+}
+
 if (!webReady) {
   console.warn('[embedded-server] web assets missing; run `bun run build:web` for the web UI')
 }
