@@ -24,7 +24,7 @@ import {
 } from '#/web/stores/repos/branch-action-scheduler.ts'
 import type { RepoEventAction, RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 import type { ExecResult } from '#/web/types.ts'
-import { runBranchActionRefreshWorkflow } from '#/web/stores/repos/refresh-workflows.ts'
+import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import {
   checkoutRepositoryBranch,
   createRepositoryWorktree,
@@ -239,7 +239,9 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
         if (!result.ok && result.message === BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE) return
         if (result.ok || options?.refreshOnError !== false) {
           const repo = get().repos[id]
-          if (repo?.instanceToken === token) await runBranchActionRefreshWorkflow(get, { id, token })
+          if (repo?.instanceToken === token) {
+            await runRepoRefreshIntent(get, { kind: 'core-data-changed', reason: 'branch-action', id, token })
+          }
         }
         if (result.ok && network) get().clearFetchFailed(id, token)
       }

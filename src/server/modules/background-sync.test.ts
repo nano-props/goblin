@@ -72,6 +72,37 @@ describe('server background sync scheduler', () => {
     expect(mocks.abortBackgroundServerNetworkOp).toHaveBeenCalledWith('/tmp/repo-a')
   })
 
+  test('only re-fetches a repo on re-activation once its previous fetch is overdue', async () => {
+    mocks.fetchRepository.mockResolvedValue({ ok: true, message: 'ok' })
+    const { getBackgroundSyncDiagnostics, setBackgroundSyncRepos } = await import('#/server/modules/background-sync.ts')
+
+    await setBackgroundSyncRepos(['/tmp/repo-a'])
+    await vi.runOnlyPendingTimersAsync()
+    expect(mocks.fetchRepository).toHaveBeenNthCalledWith(1, '/tmp/repo-a', 'background')
+
+    await vi.advanceTimersByTimeAsync(1000)
+    await setBackgroundSyncRepos(['/tmp/repo-b'])
+    await vi.runOnlyPendingTimersAsync()
+    expect(mocks.fetchRepository).toHaveBeenNthCalledWith(2, '/tmp/repo-b', 'background')
+
+    await vi.advanceTimersByTimeAsync(1000)
+    await setBackgroundSyncRepos(['/tmp/repo-a'])
+    await vi.runOnlyPendingTimersAsync()
+    expect(mocks.fetchRepository).toHaveBeenCalledTimes(2)
+
+    const now = Date.now()
+    const repoA = getBackgroundSyncDiagnostics(now).repos.find((repo) => repo.repoId === '/tmp/repo-a')
+    expect(repoA?.lastFetchAt).not.toBeNull()
+    expect(repoA?.nextEligibleAt).toBeGreaterThan(now)
+    const remainingUntilDue = (repoA?.nextEligibleAt ?? now) - now
+
+    await vi.advanceTimersByTimeAsync(Math.max(remainingUntilDue - 1, 0))
+    expect(mocks.fetchRepository).toHaveBeenCalledTimes(2)
+
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(mocks.fetchRepository).toHaveBeenNthCalledWith(3, '/tmp/repo-a', 'background')
+  })
+
   test('re-schedules when the server fetch interval changes', async () => {
     let onChange: ((sec: number) => void) | undefined
     mocks.fetchRepository.mockResolvedValue({ ok: true, message: 'ok' })

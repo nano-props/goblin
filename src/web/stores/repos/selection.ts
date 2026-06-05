@@ -224,10 +224,10 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
       if (changed && token !== undefined && repo) persistRepoCache(set, repo, token)
       if (changed && token !== undefined && repo) {
         void runRepoRefreshIntent(get, {
-          kind: 'branch-view-mode-changed',
+          kind: 'visible-pull-request-changed',
           id,
           token,
-          selectedForPullRequest,
+          branch: selectedForPullRequest,
         })
       }
     },
@@ -263,11 +263,10 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
       if (changed && token !== undefined && repo) persistRepoCache(set, repo, token)
       if (changed && token !== undefined && repo) {
         void runRepoRefreshIntent(get, {
-          kind: 'detail-tab-changed',
+          kind: 'visible-pull-request-changed',
           id,
           token,
-          tab: repo.ui.detailTab,
-          selectedBranch: repo.ui.selectedBranch,
+          branch: repo.ui.detailTab === 'status' ? repo.ui.selectedBranch : null,
         })
       }
     },
@@ -301,10 +300,10 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
       if (changed && token !== undefined && repo) persistRepoCache(set, repo, token)
       if (changed && token !== undefined && repo) {
         void runRepoRefreshIntent(get, {
-          kind: 'selected-branch-status',
+          kind: 'visible-pull-request-changed',
           id,
           token,
-          selectedBranch: repo.ui.selectedBranch,
+          branch: repo.ui.selectedBranch,
         })
       }
     },
@@ -328,11 +327,10 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
       if (changed && token !== undefined && repo) persistRepoCache(set, repo, token)
       if (changed && token !== undefined && repo) {
         void runRepoRefreshIntent(get, {
-          kind: 'selected-branch-changed',
+          kind: 'visible-pull-request-changed',
           id,
           token,
           branch,
-          tab: repo.ui.detailTab,
         })
       }
     },

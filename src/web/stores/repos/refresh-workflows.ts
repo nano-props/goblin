@@ -1,55 +1,8 @@
 import { appendRepoEvent, errorEvent, updateIfFresh } from '#/web/stores/repos/helpers.ts'
 import { persistRepoCache } from '#/web/stores/repos/persistence.ts'
-import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import { terminalBridge } from '#/web/terminal.ts'
-import type { DetailTab, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
+import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 import type { ExecResult } from '#/web/types.ts'
-
-// Fire-and-forget refresh orchestration. Callers pass the repo token captured
-// when the UI change happened; refresh methods still own final repo-exists and
-// stale-token validation before writing results.
-export function runInitialRepoLoad(get: ReposGet, refresh: { id: string; token: number }): void {
-  void runRepoRefreshIntent(get, { kind: 'initial-load', id: refresh.id, token: refresh.token })
-}
-
-export function runBranchViewModeChangedWorkflow(
-  get: ReposGet,
-  options: {
-    id: string
-    token: number
-    selectedForPullRequest: string | null
-  },
-): void {
-  void runRepoRefreshIntent(get, { kind: 'branch-view-mode-changed', ...options })
-}
-
-export function runDetailTabChangedWorkflow(
-  get: ReposGet,
-  options: { id: string; token: number; tab: DetailTab | undefined; selectedBranch: string | null | undefined },
-): void {
-  void runRepoRefreshIntent(get, { kind: 'detail-tab-changed', ...options })
-}
-
-export function runSelectedBranchChangedWorkflow(
-  get: ReposGet,
-  options: { id: string; token: number; branch: string; tab: DetailTab | undefined },
-): void {
-  void runRepoRefreshIntent(get, { kind: 'selected-branch-changed', ...options })
-}
-
-export function runSelectedBranchStatusWorkflow(
-  get: ReposGet,
-  options: { id: string; token: number; selectedBranch: string | null | undefined },
-): void {
-  void runRepoRefreshIntent(get, { kind: 'selected-branch-status', ...options })
-}
-
-export async function runBranchActionRefreshWorkflow(
-  get: ReposGet,
-  options: { id: string; token: number },
-): Promise<void> {
-  await runRepoRefreshIntent(get, { kind: 'branch-action-settled', ...options })
-}
 
 function repoFresh(get: ReposGet, id: string, token: number): boolean {
   const repo = get().repos[id]

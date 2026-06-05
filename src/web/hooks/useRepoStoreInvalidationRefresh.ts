@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { subscribeRepoQueryInvalidation } from '#/web/repo-query-invalidation-ingress.ts'
-import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
+import { handleRepoInvalidationRefresh } from '#/web/stores/repos/refresh-coordinator.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 export function useRepoStoreInvalidationRefresh() {
   useEffect(() => {
@@ -10,11 +10,7 @@ export function useRepoStoreInvalidationRefresh() {
       const repo = state.repos[event.repoId]
       if (!repo || repo.availability.phase === 'unavailable') return
       const token = repo.instanceToken
-      void runRepoRefreshIntent(useReposStore.getState, {
-        kind: 'repo-invalidated',
-        id: event.repoId,
-        token,
-      })
+      void handleRepoInvalidationRefresh(useReposStore.getState, event.repoId, token)
     })
   }, [])
 }

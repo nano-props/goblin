@@ -188,19 +188,11 @@ export async function setBackgroundSyncRepos(repoIds: string[]): Promise<void> {
   const nextRepoIds = Array.from(new Set(repoIds.filter((repoId) => typeof repoId === 'string' && repoId.length > 0)))
   const removedRepoIds = state.repoIds.filter((repoId) => !nextRepoIds.includes(repoId))
   state.generation += 1
-  const nextLastFetchAtByRepo: Record<string, number | null> = {}
-  const nextFailureCountByRepo: Record<string, number> = {}
-  const nextBackoffUntilByRepo: Record<string, number | null> = {}
   for (const repoId of removedRepoIds) abortBackgroundServerNetworkOp(repoId)
   for (const repoId of nextRepoIds) {
-    nextLastFetchAtByRepo[repoId] = state.lastFetchAtByRepo[repoId] ?? null
-    if (state.failureCountByRepo[repoId]) nextFailureCountByRepo[repoId] = state.failureCountByRepo[repoId]!
-    if (state.backoffUntilByRepo[repoId] !== undefined) nextBackoffUntilByRepo[repoId] = state.backoffUntilByRepo[repoId]!
+    if (state.lastFetchAtByRepo[repoId] === undefined) state.lastFetchAtByRepo[repoId] = null
   }
   state.repoIds = nextRepoIds
-  state.lastFetchAtByRepo = nextLastFetchAtByRepo
-  state.failureCountByRepo = nextFailureCountByRepo
-  state.backoffUntilByRepo = nextBackoffUntilByRepo
   if (state.nextRepoIndex >= state.repoIds.length) state.nextRepoIndex = 0
   ensureBackgroundSyncJob(state.generation)
 }

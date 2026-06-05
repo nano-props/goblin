@@ -169,7 +169,12 @@ function addUnavailableRepo(
 function refreshInitialRepoState(get: ReposGet, refresh: InitialRepoRefresh) {
   const repo = get().repos[refresh.id]
   if (!repo || repo.instanceToken !== refresh.token) return
-  void runRepoRefreshIntent(get, { kind: 'initial-load', id: refresh.id, token: refresh.token })
+  void runRepoRefreshIntent(get, {
+    kind: 'core-data-changed',
+    reason: 'initial-load',
+    id: refresh.id,
+    token: refresh.token,
+  })
 }
 
 function ensureWorkspaceOpen(

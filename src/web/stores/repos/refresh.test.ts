@@ -134,6 +134,47 @@ describe('remote fetch timestamps', () => {
     expect(snapshotCount).toBe(1)
   })
 
+  test('manual sync refreshes fetch, snapshot, status, and pull request data for the active repo', async () => {
+    const token = seedRepo([branch('feature/a')])
+    let fetchCount = 0
+    let snapshotCount = 0
+    let statusCount = 0
+    const pullRequestCalls: Array<{ branches?: string[]; mode?: string }> = []
+    rpcHandlers['repo.fetch'] = async () => {
+      fetchCount += 1
+      return { ok: true, message: 'ok' }
+    }
+    rpcHandlers['repo.snapshot'] = async () => {
+      snapshotCount += 1
+      return { branches: [branch('feature/a'), branch('feature/b')], current: 'feature/a' }
+    }
+    rpcHandlers['repo.status'] = async () => {
+      statusCount += 1
+      return []
+    }
+    rpcHandlers['repo.pullRequests'] = async ({
+      branches,
+      options,
+    }: {
+      branches?: string[]
+      options?: { mode?: string }
+    }) => {
+      pullRequestCalls.push({ branches, mode: options?.mode })
+      return []
+    }
+
+    await useReposStore.getState().syncAndRefresh(REPO_ID, { token })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(fetchCount).toBe(1)
+    expect(snapshotCount).toBe(1)
+    expect(statusCount).toBe(1)
+    expect(pullRequestCalls).toEqual([
+      { branches: ['feature/a', 'feature/b'], mode: 'summary' },
+      { branches: ['feature/a'], mode: 'full' },
+    ])
+  })
+
   test('manual sync records thrown fetch failures instead of rejecting', async () => {
     const token = seedRepo([branch('feature/a')])
     rpcHandlers['repo.fetch'] = async () => {
