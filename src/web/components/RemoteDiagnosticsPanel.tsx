@@ -41,7 +41,7 @@ export function RemoteDiagnosticsPanel({ diagnostics, error, loading, idleText }
     <div data-slot="remote-diagnostics-status">
       <DialogStatusRow
         message={statusText}
-        tone={error || (diagnostics && !diagnostics.ok) ? 'danger' : 'default'}
+        tone={error || (diagnostics && !diagnostics.ok) ? 'danger' : diagnostics?.ok ? 'success' : 'default'}
         actionLabel={copyDetailsValue ? t('repo-tabs.open-remote-diagnostics-copy-details') : undefined}
         onAction={copyDetailsValue ? () => void copyText(copyDetailsValue) : undefined}
       />
