@@ -1,3 +1,6 @@
+// Resources state tracks UI-facing load phases (idle/loading/refreshing).
+// Executability decisions use the operations system (operations.ts) instead;
+// keeping the two separate eliminates the risk of drift.
 import type { PullRequestFetchMode } from '#/web/types.ts'
 export type RepoResourcePhase = 'idle' | 'loading' | 'refreshing'
 

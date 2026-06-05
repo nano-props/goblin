@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { repoOperation } from '#/web/stores/repos/runtime.ts'
-import { startResource } from '#/web/stores/repos/resources.ts'
+import { markRepoOperationTargets, nextRepoOperationId, repoOperation } from '#/web/stores/repos/runtime.ts'
 import { replaceRepo } from '#/web/stores/repos/helpers.ts'
 import { getBranchActionCapabilities } from '#/web/hooks/useBranchActions.tsx'
 import { branchBrowserRemoteProvider } from '#/web/hooks/useBranchActionItems.ts'
@@ -245,14 +244,7 @@ describe('runBranchAction', () => {
         return { ok: true, message: 'ok' }
       },
     })
-    useReposStore.setState((s) => ({
-      repos: {
-        ...s.repos,
-        [REPO_ID]: replaceRepo(s.repos[REPO_ID]!, (repo) => {
-          startResource(repo.resources.fetch)
-        }),
-      },
-    }))
+    markRepoOperationTargets(REPO_ID, nextRepoOperationId(REPO_ID), [{ key: 'fetch', reason: 'fetch' }], 'running')
 
     const result = await useReposStore.getState().runBranchAction(REPO_ID, { kind: 'checkout', branch: 'feature/a' })
 

@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, test } from 'vitest'
 import { emptyRepo } from '#/web/stores/repos/helpers.ts'
-import { markRepoOperationViews } from '#/web/stores/repos/operations.ts'
-import { finishResourceSuccess, startResource } from '#/web/stores/repos/resources.ts'
+import { finishResourceSuccess } from '#/web/stores/repos/resources.ts'
 import { disposeRepoRuntime, markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/repos/runtime.ts'
 import { canStartRemoteFetch, isRemoteFetchDue } from '#/web/stores/repos/sync-state.ts'
 import type { RepoRuntimeOperationTarget } from '#/web/stores/repos/runtime.ts'
@@ -18,17 +17,23 @@ interface RepoOverrides {
 
 function repo(overrides: RepoOverrides = {}): RepoState {
   const base = emptyRepo('/tmp/goblin-sync-state-test', 'repo')
-  if (overrides.fetchBusy) startResource(base.resources.fetch)
+  if (overrides.fetchBusy) {
+    markRepoOperationTargets(base.id, nextRepoOperationId(base.id), [{ key: 'fetch', reason: 'fetch' }], 'running')
+  }
   if (overrides.branchActionBusy) {
-    markRepoOperationViews(
-      base.operations,
-      1,
+    markRepoOperationTargets(
+      base.id,
+      nextRepoOperationId(base.id),
       [{ key: 'branchAction', reason: 'branch:checkout', target: 'feature/a' }],
       'running',
     )
   }
-  if (overrides.snapshotBusy) startResource(base.resources.snapshot)
-  if (overrides.statusBusy) startResource(base.resources.status)
+  if (overrides.snapshotBusy) {
+    markRepoOperationTargets(base.id, nextRepoOperationId(base.id), [{ key: 'snapshot', reason: 'snapshot' }], 'running')
+  }
+  if (overrides.statusBusy) {
+    markRepoOperationTargets(base.id, nextRepoOperationId(base.id), [{ key: 'status', reason: 'status' }], 'running')
+  }
   if (overrides.lastFetchSettledAt !== undefined && overrides.lastFetchSettledAt !== null) {
     finishResourceSuccess(base.resources.fetch, overrides.lastFetchSettledAt)
   }

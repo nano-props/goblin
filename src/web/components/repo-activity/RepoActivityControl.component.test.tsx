@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivityControl.tsx'
 import { resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/repos/runtime.ts'
 
 const REPO_ID = '/tmp/repo-activity-control-component'
 
@@ -48,13 +49,7 @@ describe('RepoActivityControl component', () => {
 
   test('disables the primary refresh button during manual refreshes', () => {
     seedRepoState({ id: REPO_ID, remote: { hasRemotes: true } })
-    useReposStore.setState((state) => {
-      const repo = state.repos[REPO_ID]
-      if (!repo) return state
-      repo.operations.fetch.phase = 'running'
-      repo.operations.fetch.reason = 'user-fetch'
-      return { repos: { ...state.repos, [REPO_ID]: { ...repo } } }
-    })
+    markRepoOperationTargets(REPO_ID, nextRepoOperationId(REPO_ID), [{ key: 'fetch', reason: 'user-fetch' }], 'running')
 
     render(<RepoActivityControl repoId={REPO_ID} />)
 
