@@ -303,7 +303,7 @@ export const ko: Record<DictKey, string> = {
   'terminal.sessions': '터미널',
   'terminal.new': '새 터미널',
   'terminal.empty-title': '아직 터미널이 없습니다',
-  'terminal.empty-hint': '⌘↩로 터미널을 열거나 생성하세요',
+  'terminal.empty-hint': '⌘⏎로 터미널을 열거나 생성하세요',
   'terminal.close': '터미널 닫기',
   'terminal.progress': '터미널 진행률',
   'terminal.empty': '열린 터미널 없음',

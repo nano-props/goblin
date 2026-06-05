@@ -293,7 +293,7 @@ export const zh: Record<DictKey, string> = {
   'terminal.sessions': '终端',
   'terminal.new': '新建终端',
   'terminal.empty-title': '还没有终端',
-  'terminal.empty-hint': '按 ⌘↩ 打开或创建终端',
+  'terminal.empty-hint': '按 ⌘⏎ 打开或创建终端',
   'terminal.close': '关闭终端',
   'terminal.progress': '终端进度',
   'terminal.empty': '没有打开的终端',
