@@ -18,22 +18,22 @@ const RULES: Rule[] = [
   {
     fromPrefix: '/src/main/',
     disallow: ['#/web/', '#/server/'],
-    reason: 'main 只能承载 Electron-native shell concerns，不应直接依赖 web 或 server runtime 模块',
+    reason: 'main must only cover Electron-native shell concerns; must not import web or server runtime modules',
   },
   {
     fromPrefix: '/src/web/',
     disallow: ['#/main/'],
-    reason: 'web renderer 不应直接依赖 main；请通过 preload bridge、native RPC 或 server contract 访问能力',
+    reason: 'web renderer must not directly import main; use preload bridge, native RPC, or server contract instead',
   },
   {
     fromPrefix: '/src/server/',
     disallow: ['electron'],
-    reason: 'server runtime 必须保持 Electron 无关，避免把后端能力绑定到桌面壳',
+    reason: 'server runtime must stay Electron-agnostic; avoid coupling backend capabilities to the desktop shell',
   },
   {
     fromPrefix: '/src/shared/',
     disallow: ['electron'],
-    reason: 'shared 层必须在 web/server/main 之间可复用，不能依赖 Electron',
+    reason: 'shared layer must be reusable across web/server/main; must not depend on Electron',
   },
 ]
 

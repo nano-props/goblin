@@ -78,7 +78,6 @@ export const ja: Record<DictKey, string> = {
   'repo-tabs.repos': 'リポジトリ',
   'repo-tabs.close': '閉じる',
   'repo-tabs.more': 'その他のタブ',
-  'repo-tabs.more-count': '{count}',
   'repo-tabs.drag-to-reorder': 'ドラッグで並べ替え',
   'repo-tabs.open-local': 'ローカルリポジトリを開く…',
   'repo-tabs.open-remote': 'Open remote repository…',

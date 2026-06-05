@@ -96,7 +96,6 @@ export function RepoTabs({ currentRepoId, onOpenRepoPathDialog, onOpenRemote, on
         repositories: t('repo-tabs.repos'),
         close: t('repo-tabs.close'),
         more: t('repo-tabs.more'),
-        moreCount: t('repo-tabs.more-count'),
         dragToReorder: t('repo-tabs.drag-to-reorder'),
         open: t('topbar.open'),
         openLocal: t('repo-tabs.open-local'),

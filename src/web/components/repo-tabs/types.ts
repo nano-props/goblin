@@ -12,7 +12,6 @@ export interface RepoTabStripLabels {
   repositories: string
   close: string
   more: string
-  moreCount: string
   dragToReorder: string
   open: string
   openLocal: string

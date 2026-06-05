@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, Download, FolderOpen, Plus, Server, X } from 'lucide-react'
+import { ChevronDown, Download, FolderOpen, Plus, Server } from 'lucide-react'
 import {
   DndContext,
   type DragEndEvent,
@@ -17,6 +17,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '#/web/components/ui/dropdown-menu.tsx'
@@ -168,43 +169,6 @@ export function RepoTabStrip({
     </div>
   )
 
-  const overflowMenu = isSmallScreen && overflowRepos.length > 0 && (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 shrink-0 gap-0.5 px-1.5 text-xs" aria-label={labels.more}>
-          {labels.moreCount.replace('{count}', String(overflowRepos.length))}
-          <ChevronDown size={14} />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent side="bottom" align="start" className="w-max">
-        {overflowRepos.map((repo) => (
-          <DropdownMenuItem
-            key={repo.id}
-            className="whitespace-nowrap justify-between gap-4"
-            onSelect={() => onActivate(repo.id)}
-          >
-            <span className="flex items-center gap-2">
-              <span className="truncate">{repo.name}</span>
-            </span>
-              <button
-                type="button"
-                tabIndex={-1}
-                aria-label={labels.close}
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onClose(repo.id)
-                }}
-                className="cursor-pointer rounded border-0 bg-transparent p-0.5 text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-accent-foreground"
-              >
-                <X size={14} />
-              </button>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-
   return (
     <nav className="flex h-full min-w-0 flex-1 items-center" aria-label={labels.repositories}>
       <ScrollArea orientation="horizontal" className="h-full min-w-0 flex-1" viewportClassName="[&>div]:h-full">
@@ -214,7 +178,7 @@ export function RepoTabStrip({
           ) : (
             <>
               {isSmallScreen ? (
-                <div className="flex h-full items-center gap-1" role="tablist">
+                <RepoTabTooltipLayer repos={visibleRepos} className="flex h-full items-center gap-1" role="tablist">
                   {visibleRepos.map((repo) => (
                     <RepoTab
                       key={repo.id}
@@ -229,8 +193,43 @@ export function RepoTabStrip({
                       unavailableLabel={labels.unavailable}
                     />
                   ))}
-                  {overflowMenu}
-                </div>
+                  <DropdownMenu>
+                    <Tip label={labels.more}>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="size-8 shrink-0" aria-label={labels.more}>
+                          <ChevronDown />
+                        </Button>
+                      </DropdownMenuTrigger>
+                    </Tip>
+                    <DropdownMenuContent side="bottom" align="start" className="w-max">
+                      {overflowRepos.map((repo) => (
+                        <DropdownMenuItem
+                          key={repo.id}
+                          className="whitespace-nowrap"
+                          onSelect={() => onActivate(repo.id)}
+                        >
+                          <span className="truncate">{repo.name}</span>
+                        </DropdownMenuItem>
+                      ))}
+                      {overflowRepos.length > 0 && <DropdownMenuSeparator />}
+                      <DropdownMenuItem className="whitespace-nowrap" onSelect={onOpenLocal}>
+                        <FolderOpen />
+                        {labels.openLocal}
+                        {labels.openLocalShortcut && <DropdownMenuShortcut>{labels.openLocalShortcut}</DropdownMenuShortcut>}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="whitespace-nowrap" onSelect={onOpenRemote}>
+                        <Server />
+                        {labels.openRemote}
+                        {labels.openRemoteShortcut && <DropdownMenuShortcut>{labels.openRemoteShortcut}</DropdownMenuShortcut>}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="whitespace-nowrap" onSelect={onClone}>
+                        <Download />
+                        {labels.clone}
+                        {labels.cloneShortcut && <DropdownMenuShortcut>{labels.cloneShortcut}</DropdownMenuShortcut>}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </RepoTabTooltipLayer>
               ) : (
                 <RepoTabTooltipLayer repos={repos} className="flex h-full items-center gap-1" role="tablist">
                   <DndContext
@@ -266,7 +265,7 @@ export function RepoTabStrip({
                   </DndContext>
                 </RepoTabTooltipLayer>
               )}
-              {openMenu}
+              {!isSmallScreen && openMenu}
             </>
           )}
         </div>

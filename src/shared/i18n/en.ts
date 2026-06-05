@@ -78,7 +78,6 @@ export const en = {
   'repo-tabs.repos': 'Repositories',
   'repo-tabs.close': 'Close',
   'repo-tabs.more': 'More tabs',
-  'repo-tabs.more-count': '{count}',
   'repo-tabs.drag-to-reorder': 'Drag to reorder',
   'repo-tabs.open-local': 'Open local repository…',
   'repo-tabs.open-remote': 'Open remote repository…',
