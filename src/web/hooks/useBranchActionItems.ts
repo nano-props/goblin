@@ -2,11 +2,11 @@ import { ArrowDown, ArrowUp, ClipboardCopy, ExternalLink, GitBranch, GitPullRequ
 import { createElement, type ReactNode } from 'react'
 import { GitHubOutlineIcon } from '#/web/components/GitHubOutlineIcon.tsx'
 import { GitLabLogoIcon } from '#/web/components/GitLabLogoIcon.tsx'
-import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
+import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { EditorAppIcon, TerminalAppIcon } from '#/web/components/ExternalAppIcon/index.tsx'
 import { useBranchActions, type BranchActionItemId } from '#/web/hooks/useBranchActions.tsx'
-import { branchActionDisplayPhase } from '#/web/hooks/branch-action-state.ts'
+import { branchActionDisplayPhase, type BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import type { BrowserRemoteProvider } from '#/web/types.ts'
 import { useRuntimeExternalAppSettings } from '#/web/runtime-settings-hooks.ts'
@@ -32,7 +32,7 @@ export interface BranchActionItemGroups {
 }
 
 export function branchBrowserRemoteProvider(
-  repo: RepoState,
+  repo: BranchActionRepo,
   branch: RepoBranchState,
 ): BrowserRemoteProvider | undefined {
   const providers = repo.remote.remoteProviders
@@ -51,7 +51,7 @@ function browserRemoteIcon(provider: BrowserRemoteProvider | undefined) {
   return ExternalLink
 }
 
-export function useBranchActionItems(repo: RepoState, branch: RepoBranchState): BranchActionItemGroups {
+export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchState): BranchActionItemGroups {
   const t = useT()
   const { terminalApp, resolvedTerminalApp, terminalAvailable, editorApp, resolvedEditorApp, editorAvailable } =
     useRuntimeExternalAppSettings()

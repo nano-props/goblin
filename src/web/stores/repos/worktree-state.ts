@@ -9,6 +9,10 @@ export interface BranchWorktreeState {
   isLocked: boolean
 }
 
+export interface BranchWorktreeRepo {
+  data: Pick<RepoState['data'], 'worktreesByPath' | 'status'>
+}
+
 export function worktreeStatesFromBranches(
   branches: BranchSnapshotInfo[],
   previous: Record<string, RepoWorktreeState> = {},
@@ -65,7 +69,7 @@ export function applyStatusToWorktreeStates(
   return next
 }
 
-export function getBranchWorktreeState(repo: RepoState, branch: RepoBranchState): BranchWorktreeState | null {
+export function getBranchWorktreeState(repo: BranchWorktreeRepo, branch: RepoBranchState): BranchWorktreeState | null {
   if (!branch.worktree) return null
   const worktree = repo.data.worktreesByPath[branch.worktree.path]
   const status = repo.data.status.find((wt) => wt.path === branch.worktree?.path)
@@ -82,6 +86,6 @@ export function getBranchWorktreeState(repo: RepoState, branch: RepoBranchState)
   }
 }
 
-export function selectedBranchStatus(repo: RepoState, branch: RepoBranchState | null): WorktreeStatus[] {
+export function selectedBranchStatus(repo: BranchWorktreeRepo, branch: RepoBranchState | null): WorktreeStatus[] {
   return branch?.worktree ? repo.data.status.filter((wt) => wt.path === branch.worktree?.path) : []
 }

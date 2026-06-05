@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
+import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 import { BranchActionDialogs, type RemoveConfirm } from '#/web/components/BranchActionDialogs.tsx'
 import type { ExecResult } from '#/web/types.ts'
 import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
@@ -12,6 +12,7 @@ import {
 } from '#/web/app-data-client.ts'
 import {
   branchActionBusyItemId,
+  type BranchActionRepo,
   isBranchActionBlocked,
   type BranchActionItemId,
 } from '#/web/hooks/branch-action-state.ts'
@@ -37,7 +38,7 @@ export interface BranchActionCapabilities {
   canOpenEditor: boolean
 }
 
-export function getBranchActionCapabilities(repo: RepoState, branch: RepoBranchState): BranchActionCapabilities {
+export function getBranchActionCapabilities(repo: BranchActionRepo, branch: RepoBranchState): BranchActionCapabilities {
   const isCurrent = branch.name === repo.data.currentBranch
   const checkedOutInAnotherWorktree = !!branch.worktree?.path && !isCurrent
   const isProtected = PROTECTED_BRANCHES.has(branch.name)
@@ -59,7 +60,7 @@ export function getBranchActionCapabilities(repo: RepoState, branch: RepoBranchS
   }
 }
 
-export function useBranchActions(repo: RepoState, branch: RepoBranchState) {
+export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState) {
   const navigation = useMainWindowNavigation()
   const setLastResult = useReposStore((s) => s.setLastResult)
   const runBranchAction = useReposStore((s) => s.runBranchAction)

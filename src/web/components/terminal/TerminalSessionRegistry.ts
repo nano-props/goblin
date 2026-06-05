@@ -85,7 +85,7 @@ export class TerminalSessionRegistry {
 
   setRepoIndex(repoIndex: TerminalRepoIndex): void {
     this.repoIndex = repoIndex
-    this.syncDescriptorsFromRepos()
+    this.syncDescriptorsFromRepoIndex()
   }
 
   setParkingRoot(root: HTMLDivElement | null): void {
@@ -534,7 +534,7 @@ export class TerminalSessionRegistry {
     return this.sessionSummaries(terminalWorktreeKey)
   }
 
-  private syncDescriptorsFromRepos(): void {
+  private syncDescriptorsFromRepoIndex(): void {
     const changedWorktrees = new Set<string>()
     for (const session of this.sessions.values()) {
       const branch = branchForTerminalWorktree(

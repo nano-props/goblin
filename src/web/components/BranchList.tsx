@@ -16,6 +16,8 @@ import { BranchRow } from '#/web/components/branch-list/BranchRow.tsx'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
+import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
+import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 
 interface Props {
   repoId: string
@@ -25,9 +27,41 @@ interface Props {
 
 type OpenActionMenu = { repoId: string; branch: string }
 
+type BranchListRepo = BranchActionRepo & {
+  data: BranchActionRepo['data'] & {
+    branches: RepoBranchState[]
+  }
+  ui: {
+    selectedBranch: string | null
+    branchViewMode: 'all' | 'worktrees' | 'no-worktree'
+  }
+}
+
+function branchListRepoEqual(a: BranchListRepo | undefined, b: BranchListRepo | undefined): boolean {
+  return (
+    a === b ||
+    (!!a &&
+      !!b &&
+      a.id === b.id &&
+      a.instanceToken === b.instanceToken &&
+      a.data.branches === b.data.branches &&
+      a.data.currentBranch === b.data.currentBranch &&
+      a.data.status === b.data.status &&
+      a.data.worktreesByPath === b.data.worktreesByPath &&
+      a.ui.selectedBranch === b.ui.selectedBranch &&
+      a.ui.branchViewMode === b.ui.branchViewMode &&
+      a.operations.branchAction === b.operations.branchAction &&
+      a.remote.target === b.remote.target &&
+      a.remote.hasRemotes === b.remote.hasRemotes &&
+      a.remote.hasBrowserRemote === b.remote.hasBrowserRemote &&
+      a.remote.hasGitHubRemote === b.remote.hasGitHubRemote &&
+      a.remote.browserRemoteProvider === b.remote.browserRemoteProvider &&
+      a.remote.remoteProviders === b.remote.remoteProviders)
+  )
+}
+
 export function BranchList({ repoId, showActions = true, variant = 'list' }: Props) {
   const t = useT()
-  const selectBranch = useReposStore((s) => s.selectBranch)
   const setDetailCollapsed = useReposStore((s) => s.setDetailCollapsed)
   const navigation = useMainWindowNavigation()
   const selectedRef = useRef<HTMLLIElement | null>(null)
@@ -46,61 +80,61 @@ export function BranchList({ repoId, showActions = true, variant = 'list' }: Pro
     },
     [repoId, handleSelectBranch, navigation, setDetailCollapsed],
   )
-  const { repo, branches, selected, current } = useStoreWithEqualityFn(
+  const branchSearchQuery = useReposStore((s) => s.branchSearchQueries[repoId] ?? '')
+  const repo = useStoreWithEqualityFn(
     useReposStore,
     (s) => {
       const repo = s.repos[repoId]
-      const branchSearchQuery = s.branchSearchQueries[repoId] ?? ''
-      return {
-        repo,
-        branches: repo
-          ? visibleBranches({
+      return repo
+        ? {
+            id: repo.id,
+            instanceToken: repo.instanceToken,
+            data: {
               branches: repo.data.branches,
-              viewMode: repo.ui.branchViewMode,
-              searchQuery: branchSearchQuery,
-            })
-          : [],
-        branchCount: repo?.data.branches.length ?? 0,
-        branchSearchQuery,
-        selected: repo?.ui.selectedBranch ?? null,
-        current: repo?.data.currentBranch ?? '',
-      }
+              currentBranch: repo.data.currentBranch,
+              status: repo.data.status,
+              worktreesByPath: repo.data.worktreesByPath,
+            },
+            ui: {
+              selectedBranch: repo.ui.selectedBranch,
+              branchViewMode: repo.ui.branchViewMode,
+            },
+            operations: {
+              branchAction: repo.operations.branchAction,
+            },
+            remote: {
+              target: repo.remote.target,
+              hasRemotes: repo.remote.hasRemotes,
+              hasBrowserRemote: repo.remote.hasBrowserRemote,
+              hasGitHubRemote: repo.remote.hasGitHubRemote,
+              browserRemoteProvider: repo.remote.browserRemoteProvider,
+              remoteProviders: repo.remote.remoteProviders,
+            },
+          }
+        : undefined
     },
-    (a, b) =>
-      a.repo === b.repo
-        ? a.branchSearchQuery === b.branchSearchQuery
-        : !!a.repo &&
-          !!b.repo &&
-          a.repo.id === b.repo.id &&
-          a.repo.instanceToken === b.repo.instanceToken &&
-          a.repo.data.branches === b.repo.data.branches &&
-          a.repo.ui.branchViewMode === b.repo.ui.branchViewMode &&
-          a.branchSearchQuery === b.branchSearchQuery &&
-          a.repo.data.worktreesByPath === b.repo.data.worktreesByPath &&
-          a.repo.operations.branchAction === b.repo.operations.branchAction &&
-          a.branchCount === b.branchCount &&
-          a.selected === b.selected &&
-          a.current === b.current,
+    branchListRepoEqual,
   )
 
   // Keep the selected row in view as the user navigates with j/k.
   useEffect(() => {
     const selectedEl = selectedRef.current
     if (selectedEl && variant === 'list') selectedEl.scrollIntoView({ block: 'nearest' })
-  }, [selected, variant])
+  }, [repo?.ui.selectedBranch, variant])
 
+  if (!repo) return null
+
+  const branches = visibleBranches({
+    branches: repo.data.branches,
+    viewMode: repo.ui.branchViewMode,
+    searchQuery: branchSearchQuery,
+  })
   const selectedBranch =
-    repo && selected
-      ? (branches.find((branch) => branch.name === selected) ??
-        repo.data.branches.find((branch) => branch.name === selected))
+    repo.ui.selectedBranch
+      ? (branches.find((branch) => branch.name === repo.ui.selectedBranch) ??
+        repo.data.branches.find((branch) => branch.name === repo.ui.selectedBranch))
       : null
-  const renderedBranches = repo
-    ? variant === 'selected-strip'
-      ? selectedBranch
-        ? [selectedBranch]
-        : []
-      : branches
-    : []
+  const renderedBranches = variant === 'selected-strip' ? (selectedBranch ? [selectedBranch] : []) : branches
 
   useEffect(() => {
     if (!openActionMenu) return
@@ -112,8 +146,6 @@ export function BranchList({ repoId, showActions = true, variant = 'list' }: Pro
       setOpenActionMenu(null)
     }
   }, [openActionMenu, renderedBranches, repoId, showActions])
-
-  if (!repo) return null
 
   if (renderedBranches.length === 0) {
     return <EmptyState title={t(repo.data.branches.length === 0 ? 'branches.empty' : 'branches.filter-empty')} />
@@ -127,8 +159,8 @@ export function BranchList({ repoId, showActions = true, variant = 'list' }: Pro
             key={branch.name}
             repo={repo}
             branch={branch}
-            selected={selected}
-            current={current}
+            selected={repo.ui.selectedBranch}
+            current={repo.data.currentBranch}
             onSelectBranch={handleSelectBranch}
             onOpenBranchStatus={handleOpenBranchStatus}
             selectedRef={selectedRef}

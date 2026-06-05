@@ -1,14 +1,14 @@
 import { useEffect, type ReactNode } from 'react'
 import { useT } from '#/web/stores/i18n.ts'
-import type { DetailTab, RepoState, RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
+import type { DetailTab, RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import { BranchStatus } from '#/web/components/branch-detail/BranchStatus.tsx'
 import { TerminalSlot } from '#/web/components/terminal/TerminalSlot.tsx'
-import type { SelectedBranchDetailPresentation } from '#/web/components/branch-detail/model.ts'
+import type { BranchDetailRepo, SelectedBranchDetailPresentation } from '#/web/components/branch-detail/model.ts'
 import { detailTabForWorktree } from '#/web/lib/detail-tabs.ts'
 interface Props {
-  repo: RepoState
+  repo: Pick<BranchDetailRepo, 'id' | 'data' | 'ui'>
   detail: SelectedBranchDetailPresentation
   detailId: string
   contentId: string

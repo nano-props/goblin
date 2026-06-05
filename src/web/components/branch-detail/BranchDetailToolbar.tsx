@@ -1,7 +1,7 @@
 import { ChevronDown, Maximize2, Minimize2 } from 'lucide-react'
 import type { KeyboardEvent } from 'react'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { RepoState, DetailTab, RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
+import type { DetailTab, RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { BranchActionControls } from '#/web/components/BranchActionControls.tsx'
@@ -12,11 +12,11 @@ import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-utils.ts'
 import { useTerminalCount } from '#/web/components/terminal/terminal-session-store.ts'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
-import type { SelectedBranchDetailPresentation } from '#/web/components/branch-detail/model.ts'
+import type { BranchDetailRepo, SelectedBranchDetailPresentation } from '#/web/components/branch-detail/model.ts'
 import type { BranchActionItemGroups } from '#/web/hooks/useBranchActionItems.ts'
 import { useRuntimeShortcutSettings } from '#/web/runtime-settings-hooks.ts'
 interface Props {
-  repo: RepoState
+  repo: Pick<BranchDetailRepo, 'id' | 'ui'>
   detail: SelectedBranchDetailPresentation
   detailId: string
   contentId: string

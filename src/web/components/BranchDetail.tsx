@@ -1,9 +1,10 @@
 import { useId } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { RepoState, RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
+import type { RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
 import {
   getSelectedBranchDetailPresentation,
+  type BranchDetailRepo,
   type SelectedBranchDetailPresentation,
 } from '#/web/components/branch-detail/model.ts'
 import { BranchDetailToolbar } from '#/web/components/branch-detail/BranchDetailToolbar.tsx'
@@ -18,7 +19,7 @@ interface Props {
 }
 
 // Keep this equality in sync with fields read by BranchDetail children.
-function branchDetailRepoEqual(a: RepoState | undefined, b: RepoState | undefined): boolean {
+function branchDetailRepoEqual(a: BranchDetailRepo | undefined, b: BranchDetailRepo | undefined): boolean {
   return (
     a === b ||
     (!!a &&
@@ -26,17 +27,20 @@ function branchDetailRepoEqual(a: RepoState | undefined, b: RepoState | undefine
       a.id === b.id &&
       a.instanceToken === b.instanceToken &&
       a.data.branches === b.data.branches &&
-      a.ui.selectedBranch === b.ui.selectedBranch &&
-      a.ui.branchViewMode === b.ui.branchViewMode &&
       a.data.currentBranch === b.data.currentBranch &&
       a.data.status === b.data.status &&
-      a.data.statusLoaded === b.data.statusLoaded &&
       a.data.worktreesByPath === b.data.worktreesByPath &&
+      a.ui.selectedBranch === b.ui.selectedBranch &&
+      a.ui.detailTab === b.ui.detailTab &&
       a.resources.status === b.resources.status &&
       a.resources.pullRequests === b.resources.pullRequests &&
       a.operations.branchAction === b.operations.branchAction &&
-      a.remote === b.remote &&
-      a.ui.detailTab === b.ui.detailTab)
+      a.remote.target === b.remote.target &&
+      a.remote.hasRemotes === b.remote.hasRemotes &&
+      a.remote.hasBrowserRemote === b.remote.hasBrowserRemote &&
+      a.remote.hasGitHubRemote === b.remote.hasGitHubRemote &&
+      a.remote.browserRemoteProvider === b.remote.browserRemoteProvider &&
+      a.remote.remoteProviders === b.remote.remoteProviders)
   )
 }
 
@@ -47,7 +51,44 @@ export function BranchDetail({
   detailFocusMode = false,
 }: Props) {
   const detailId = useId()
-  const repo = useStoreWithEqualityFn(useReposStore, (s) => s.repos[repoId], branchDetailRepoEqual)
+  const repo = useStoreWithEqualityFn(
+    useReposStore,
+    (s) => {
+      const repo = s.repos[repoId]
+      return repo
+        ? {
+            id: repo.id,
+            instanceToken: repo.instanceToken,
+            data: {
+              branches: repo.data.branches,
+              currentBranch: repo.data.currentBranch,
+              status: repo.data.status,
+              worktreesByPath: repo.data.worktreesByPath,
+            },
+            ui: {
+              selectedBranch: repo.ui.selectedBranch,
+              detailTab: repo.ui.detailTab,
+            },
+            resources: {
+              status: repo.resources.status,
+              pullRequests: repo.resources.pullRequests,
+            },
+            operations: {
+              branchAction: repo.operations.branchAction,
+            },
+            remote: {
+              target: repo.remote.target,
+              hasRemotes: repo.remote.hasRemotes,
+              hasBrowserRemote: repo.remote.hasBrowserRemote,
+              hasGitHubRemote: repo.remote.hasGitHubRemote,
+              browserRemoteProvider: repo.remote.browserRemoteProvider,
+              remoteProviders: repo.remote.remoteProviders,
+            },
+          }
+        : undefined
+    },
+    branchDetailRepoEqual,
+  )
   if (!repo) return null
 
   const detail = getSelectedBranchDetailPresentation(repo)
@@ -94,7 +135,7 @@ export function BranchDetail({
 }
 
 interface BranchDetailWithActionsProps {
-  repo: RepoState
+  repo: BranchDetailRepo
   detail: SelectedBranchDetailPresentation
   branch: NonNullable<SelectedBranchDetailPresentation['branch']>
   detailId: string

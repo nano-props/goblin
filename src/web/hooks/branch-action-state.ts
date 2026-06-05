@@ -12,7 +12,18 @@ export type BranchActionItemId =
   | 'deleteBranch'
   | 'removeWorktree'
 
-export function isBranchActionBlocked(repo: RepoState): boolean {
+export interface BranchActionRepo {
+  id: RepoState['id']
+  instanceToken: RepoState['instanceToken']
+  data: Pick<RepoState['data'], 'currentBranch' | 'status' | 'worktreesByPath'>
+  operations: Pick<RepoState['operations'], 'branchAction'>
+  remote: Pick<
+    RepoState['remote'],
+    'hasRemotes' | 'hasBrowserRemote' | 'hasGitHubRemote' | 'target' | 'browserRemoteProvider' | 'remoteProviders'
+  >
+}
+
+export function isBranchActionBlocked(repo: Pick<BranchActionRepo, 'operations'>): boolean {
   return repo.operations.branchAction.phase !== 'idle'
 }
 
@@ -33,13 +44,13 @@ export function branchActionItemIdFromKind(kind: RepoBranchActionKind): BranchAc
   }
 }
 
-export function branchActionBusyItemId(repo: RepoState, branchName: string): BranchActionItemId | null {
+export function branchActionBusyItemId(repo: Pick<BranchActionRepo, 'operations'>, branchName: string): BranchActionItemId | null {
   const action = repo.operations.branchAction
   if (action.phase === 'idle' || action.target !== branchName || !isBranchActionReason(action.reason)) return null
   return branchActionItemIdFromKind(branchActionKindFromReason(action.reason))
 }
 
-export function branchActionDisplayPhase(repo: RepoState, branchName: string): 'queued' | 'running' | null {
+export function branchActionDisplayPhase(repo: Pick<BranchActionRepo, 'operations'>, branchName: string): 'queued' | 'running' | null {
   const action = repo.operations.branchAction
   if (action.phase === 'idle' || action.target !== branchName) return null
   return action.phase

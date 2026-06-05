@@ -1,14 +1,15 @@
 import { type RefObject } from 'react'
 import { ArrowDown, ArrowUp, Check, FolderTree, GitBranch } from 'lucide-react'
 import { useI18nStore, useT } from '#/web/stores/i18n.ts'
-import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
+import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 import { Badge } from '#/web/components/ui/badge.tsx'
 import { BranchActionsMenu } from '#/web/components/BranchActionsMenu.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
 import { getBranchWorktreeState } from '#/web/stores/repos/worktree-state.ts'
+import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 interface BranchRowProps {
-  repo: RepoState
+  repo: BranchActionRepo
   branch: RepoBranchState
   selected: string | null
   current: string
