@@ -128,14 +128,17 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
       onStart: (wasQueued) => markOperationState(options, token, operationId, 'running', wasQueued),
     })
     if (!ctx.isCurrent()) {
+      settleOperationState(options, token, operationId, null)
       await handleStale()
       return null
     }
     error = options.errorFromResult?.(result) ?? null
+    settleOperationState(options, token, operationId, error)
     await options.onResult?.(result, ctx)
     return result
   } catch (err) {
     error = err instanceof Error ? err.message : String(err)
+    settleOperationState(options, token, operationId, error)
     if (ctx.isCurrent()) {
       await options.onError?.(error, ctx)
       if (options.rethrow) throw err
@@ -144,8 +147,6 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
     await handleStale()
     if (options.rethrow) throw err
     return null
-  } finally {
-    settleOperationState(options, token, operationId, error)
   }
 }
 

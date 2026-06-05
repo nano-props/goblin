@@ -118,9 +118,12 @@ function RepoRefreshButton({ repo, manualSyncBusy, compact }: { repo: RepoState;
   const t = useT()
   const label = t('action.refresh')
 
-  async function handleSync() {
+  function handleSync() {
     const token = repo.instanceToken
-    await runRepoRefreshIntent(useReposStore.getState, {
+    // Fire-and-forget so AsyncButton's internal pending state does not fight
+    // the external manualSyncBusy prop. The visual loading state is owned by
+    // the operation, not the click promise.
+    void runRepoRefreshIntent(useReposStore.getState, {
       kind: 'manual-refresh-requested',
       id: repo.id,
       token,
