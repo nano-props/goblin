@@ -119,7 +119,7 @@ function BranchPager({
   navigation: ReturnType<typeof useMainWindowNavigation>
 }) {
   const t = useT()
-  if (branches.length <= 1) return null
+  if (branches.length === 0) return null
   const index = branches.findIndex((branch) => branch.name === selectedBranch)
   const previous = index > 0 ? branches[index - 1] : null
   const next = index >= 0 && index < branches.length - 1 ? branches[index + 1] : null
