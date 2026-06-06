@@ -22,6 +22,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Button
@@ -94,6 +95,7 @@ fun TerminalScreen(
     var isSendingQuickInput by remember { mutableStateOf(false) }
     var isSendingSubmitInput by remember { mutableStateOf(false) }
     var terminalActionMenuExpanded by remember { mutableStateOf(false) }
+    var closeConfirmationVisible by remember { mutableStateOf(false) }
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -223,6 +225,10 @@ fun TerminalScreen(
             syncTerminalForeground()
             onBack(sessionId)
         }
+    }
+
+    fun requestCloseTerminal() {
+        closeConfirmationVisible = true
     }
 
     fun sendControlInput(value: String) {
@@ -423,7 +429,7 @@ fun TerminalScreen(
                                 text = { Text("Close terminal") },
                                 onClick = {
                                     terminalActionMenuExpanded = false
-                                    closeTerminal()
+                                    requestCloseTerminal()
                                 },
                             )
                             DropdownMenuItem(
@@ -524,7 +530,7 @@ fun TerminalScreen(
                     }
                     TextButton(
                         enabled = inlineActions.closeEnabled,
-                        onClick = { closeTerminal() },
+                        onClick = { requestCloseTerminal() },
                     ) {
                         Text("Close")
                     }
@@ -585,6 +591,29 @@ fun TerminalScreen(
                 }
             }
         }
+    }
+
+    if (closeConfirmationVisible) {
+        AlertDialog(
+            onDismissRequest = { closeConfirmationVisible = false },
+            title = { Text("Close terminal?") },
+            text = { Text(terminalCloseConfirmationText(screenTitle)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        closeConfirmationVisible = false
+                        closeTerminal()
+                    },
+                ) {
+                    Text("Stop and close")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { closeConfirmationVisible = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
     }
 }
 

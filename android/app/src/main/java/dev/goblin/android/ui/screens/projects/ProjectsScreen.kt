@@ -33,6 +33,7 @@ fun ProjectsScreen(
     repositoriesState: ResourceState<List<RemoteRepositoryProfile>>,
     hosts: List<SshHostProfile>,
     onOpenProject: (String) -> Unit,
+    onOpenProjectTerminals: (String, String) -> Unit,
     onDeleteProject: (String) -> Unit,
 ) {
     Column(
@@ -50,23 +51,39 @@ fun ProjectsScreen(
                 repositories = repositoriesState.value,
                 hosts = hosts,
                 onOpenProject = onOpenProject,
+                onOpenProjectTerminals = onOpenProjectTerminals,
                 onDeleteProject = onDeleteProject,
             )
             is ResourceState.Loaded -> ProjectList(
                 repositories = repositoriesState.value,
                 hosts = hosts,
                 onOpenProject = onOpenProject,
+                onOpenProjectTerminals = onOpenProjectTerminals,
                 onDeleteProject = onDeleteProject,
             )
         }
     }
 }
 
+internal data class ProjectTerminalTarget(
+    val repositoryId: String,
+    val terminalWorkspacePath: String,
+)
+
+internal fun projectTerminalTarget(repository: RemoteRepositoryProfile): ProjectTerminalTarget =
+    ProjectTerminalTarget(
+        repositoryId = repository.id,
+        terminalWorkspacePath = repository.remotePath,
+    )
+
+internal fun projectActionLabels(): List<String> = listOf("Open", "Terminals", "Delete")
+
 @Composable
 private fun ProjectList(
     repositories: List<RemoteRepositoryProfile>,
     hosts: List<SshHostProfile>,
     onOpenProject: (String) -> Unit,
+    onOpenProjectTerminals: (String, String) -> Unit,
     onDeleteProject: (String) -> Unit,
 ) {
     var deleteTarget by remember { mutableStateOf<RemoteRepositoryProfile?>(null) }
@@ -94,6 +111,10 @@ private fun ProjectList(
                     repository = repository,
                     host = hostById[repository.hostProfileId],
                     onOpenProject = { onOpenProject(repository.id) },
+                    onOpenProjectTerminals = {
+                        val target = projectTerminalTarget(repository)
+                        onOpenProjectTerminals(target.repositoryId, target.terminalWorkspacePath)
+                    },
                     onDeleteProject = { deleteTarget = repository },
                 )
             }
@@ -144,36 +165,35 @@ private fun ProjectRow(
     repository: RemoteRepositoryProfile,
     host: SshHostProfile?,
     onOpenProject: () -> Unit,
+    onOpenProjectTerminals: () -> Unit,
     onDeleteProject: () -> Unit,
 ) {
     val rootAddress = remember(host?.host) {
         host?.let { "root@${it.host}:${it.port}" }
     }
+    val actionLabels = projectActionLabels()
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         onClick = onOpenProject,
     ) {
-        Row(
+        Column(
             modifier = Modifier.padding(GoblinSpacing.Md),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
-                ) {
-                Text("${repository.title}: ${repository.remotePath}", style = MaterialTheme.typography.bodySmall)
-                rootAddress?.let { address ->
-                    Text(address, style = MaterialTheme.typography.labelMedium)
-                }
+            verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
+        ) {
+            Text("${repository.title}: ${repository.remotePath}", style = MaterialTheme.typography.bodySmall)
+            rootAddress?.let { address ->
+                Text(address, style = MaterialTheme.typography.labelMedium)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm)) {
                 TextButton(onClick = onOpenProject) {
-                    Text("Open")
+                    Text(actionLabels[0])
+                }
+                TextButton(onClick = onOpenProjectTerminals) {
+                    Text(actionLabels[1])
                 }
                 TextButton(onClick = onDeleteProject) {
-                    Text("Delete")
+                    Text(actionLabels[2])
                 }
             }
         }

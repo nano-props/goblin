@@ -209,6 +209,13 @@ class RepositorySetupStateTest {
     }
 
     @Test
+    fun `terminal workspace count label handles singular and plural`() {
+        assertEquals("0 terminals", terminalWorkspaceCountLabel(0))
+        assertEquals("1 terminal", terminalWorkspaceCountLabel(1))
+        assertEquals("2 terminals", terminalWorkspaceCountLabel(2))
+    }
+
+    @Test
     fun `terminal workspace status exposes foreground ownership`() {
         assertEquals(
             "running - foreground",

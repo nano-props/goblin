@@ -199,6 +199,12 @@ fun GoblinAndroidApp(
                         repositoriesState = repositoriesState,
                         hosts = currentHosts(),
                         onOpenProject = { repositoryId -> route = AppRoute.Repository(repositoryId) },
+                        onOpenProjectTerminals = { repositoryId, terminalWorkspacePath ->
+                            route = AppRoute.Repository(
+                                repositoryId = repositoryId,
+                                terminalWorkspacePath = terminalWorkspacePath,
+                            )
+                        },
                         onDeleteProject = { repositoryId ->
                             deleteRepositoryRecord(repositoryId)
                         },

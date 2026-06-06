@@ -257,6 +257,9 @@ internal fun terminalWorkspaceOptionLabel(path: String): String =
         .substringAfterLast('/', missingDelimiterValue = path)
         .ifBlank { path }
 
+internal fun terminalWorkspaceCountLabel(count: Int): String =
+    if (count == 1) "1 terminal" else "$count terminals"
+
 internal fun terminalSessionDefaultLabel(index: Int): String = terminalSessionDisplayName(index)
 
 internal fun terminalSessionDefaultLabel(session: TerminalSessionRecord, index: Int): String =
@@ -1607,19 +1610,16 @@ private fun RepositoryTerminalPanel(
                 modifier = Modifier.padding(GoblinSpacing.Md),
                 verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
             ) {
-                Text("Terminal workspace", style = MaterialTheme.typography.titleMedium)
-                Text(selectedPath)
-                Text("$activeWorktreeCount terminals in this worktree")
-                Text("Workspace", style = MaterialTheme.typography.labelMedium)
-                OutlinedButton(
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    onClick = { workspaceMenuExpanded = true },
+                    horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
+                    verticalAlignment = Alignment.Top,
                 ) {
                     Column(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
                     ) {
-                        Text(selectedWorkspaceOption.label, style = MaterialTheme.typography.labelMedium)
+                        Text(selectedWorkspaceOption.label, style = MaterialTheme.typography.titleMedium)
                         Text(
                             selectedWorkspaceOption.path,
                             style = MaterialTheme.typography.bodySmall,
@@ -1629,6 +1629,30 @@ private fun RepositoryTerminalPanel(
                             softWrap = false,
                             overflow = TextOverflow.Ellipsis,
                         )
+                    }
+                    Text(
+                        terminalWorkspaceCountLabel(activeWorktreeCount),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    OutlinedButton(
+                        modifier = Modifier.weight(1f),
+                        onClick = { workspaceMenuExpanded = true },
+                    ) {
+                        Text(
+                            "Switch workspace",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Button(onClick = { onCreateTerminalAtPath(path) }) {
+                        Text("New terminal", maxLines = 1)
                     }
                 }
                 DropdownMenu(
@@ -1643,7 +1667,7 @@ private fun RepositoryTerminalPanel(
                                 Column {
                                     Text(option.label)
                                     Text(
-                                        "${option.path} · $count terminals",
+                                        "${option.path} · ${terminalWorkspaceCountLabel(count)}",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,
@@ -1658,9 +1682,6 @@ private fun RepositoryTerminalPanel(
                             },
                         )
                     }
-                }
-                Button(onClick = { onCreateTerminalAtPath(path) }) {
-                    Text("New terminal")
                 }
             }
         }
@@ -1756,17 +1777,38 @@ private fun TerminalSessionRow(
             .fillMaxWidth()
             .clickable { onOpenTerminalSession(session) },
     ) {
-        Row(
+        Column(
             modifier = Modifier.padding(GoblinSpacing.Md),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
         ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs)) {
-                Text(label, style = MaterialTheme.typography.bodyMedium)
-                Text(session.remotePath, style = MaterialTheme.typography.bodySmall)
-                Text(terminalSessionStatusLabel(session), style = MaterialTheme.typography.labelMedium)
-                Text(terminalSessionActivityText(session), style = MaterialTheme.typography.bodySmall)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    terminalSessionStatusLabel(session),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            Column {
+            Text(
+                terminalSessionActivityText(session),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 TextButton(onClick = { onOpenTerminalSession(session) }) {
                     Text("Open")
                 }

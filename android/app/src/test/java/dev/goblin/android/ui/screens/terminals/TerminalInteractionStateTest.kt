@@ -49,6 +49,15 @@ class TerminalInteractionStateTest {
     }
 
     @Test
+    fun `terminal close confirmation explains that the session will stop`() {
+        val text = terminalCloseConfirmationText("App - /srv/app")
+
+        assertTrue(text.contains("App - /srv/app"))
+        assertTrue(text.contains("stop"))
+        assertTrue(text.contains("return"))
+    }
+
+    @Test
     fun `unavailable input state explains why send is disabled`() {
         assertEquals("Connecting to terminal...", terminalInputUnavailableMessage(TerminalSessionState.Connecting))
         assertEquals(

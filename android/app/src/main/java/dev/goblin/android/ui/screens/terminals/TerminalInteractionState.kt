@@ -165,6 +165,9 @@ internal fun terminalDetailInlineActions(state: TerminalSessionState): TerminalD
         closeEnabled = true,
     )
 
+internal fun terminalCloseConfirmationText(targetLabel: String): String =
+    "This will stop $targetLabel and return to the previous screen. You can reconnect it later from the terminal list."
+
 internal fun terminalInputUnavailableMessage(state: TerminalSessionState): String? = when (state) {
     TerminalSessionState.Idle -> "Terminal is not connected."
     TerminalSessionState.Connecting -> "Connecting to terminal..."
