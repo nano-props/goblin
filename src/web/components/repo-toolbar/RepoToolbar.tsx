@@ -12,7 +12,7 @@ import { visibleBranches } from '#/web/stores/repos/branch-view-mode.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { BranchViewMode } from '#/web/stores/repos/types.ts'
-import { effectiveWorkspaceLayout, repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
+import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 interface Props {
   repoId: string
 }
@@ -42,7 +42,7 @@ function BranchFilterControls({ repoId }: Props) {
     useReposStore,
     (s) => {
       const repo = s.repos[repoId]
-      const layout = effectiveWorkspaceLayout(s.workspaceLayout, uiMode)
+      const layout = s.workspaceLayout
       const behavior = repoWorkspaceBehavior(layout, s.detailCollapsed, s.detailFocusMode)
       return {
         focusedLayout: behavior.mode === 'focus',

@@ -45,7 +45,7 @@ function Harness() {
       <output id="active-repo">{activeId ?? 'none'}</output>
       <output id="selected-branch">{selectedBranch ?? 'none'}</output>
       <output id="detail-tab">{detailTab ?? 'none'}</output>
-      <output id="effective-layout">{shell.effectiveLayout}</output>
+      <output id="workspace-layout">{shell.workspaceLayout}</output>
       <output id="workspace-mode">{shell.workspaceBehavior.mode}</output>
     </>
   )
@@ -105,7 +105,7 @@ describe('useMainWindowShellState', () => {
 
     await render(<Harness />)
 
-    expect(text('#effective-layout')).toBe('top-bottom')
+    expect(text('#workspace-layout')).toBe('top-bottom')
     expect(text('#workspace-mode')).toBe('focus')
   })
 })
