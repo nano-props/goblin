@@ -779,10 +779,23 @@ fun RepositoryWorkspaceScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(repository.title) },
+                title = {
+                    Text(
+                        text = host.subtitle,
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                },
                 navigationIcon = {
                     TextButton(onClick = onBack) {
                         Text("Back")
+                    }
+                },
+                actions = {
+                    TextButton(onClick = { refreshSnapshot() }) {
+                        Text("Refresh")
+                    }
+                    TextButton(onClick = { confirmDelete = true }) {
+                        Text("Delete")
                     }
                 },
             )
@@ -796,26 +809,9 @@ fun RepositoryWorkspaceScreen(
                 .padding(GoblinSpacing.Md),
             verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Md),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(host.subtitle, style = MaterialTheme.typography.bodyMedium)
-                    Text(repository.remotePath, style = MaterialTheme.typography.bodySmall)
-                    actionError?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                    }
+                actionError?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs)) {
-                    TextButton(onClick = { refreshSnapshot() }) {
-                        Text("Refresh")
-                    }
-                    TextButton(onClick = { confirmDelete = true }) {
-                        Text("Delete")
-                    }
-                }
-            }
             RepositoryWorkspaceTabStrip(
                 tabs = repositoryWorkspaceTabs(repository),
                 selectedTab = selectedTab,

@@ -13,6 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.zIndex
+import dev.goblin.android.domain.ResourceState
+import dev.goblin.android.domain.ssh.RemoteRepositoryProfile
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -20,16 +22,28 @@ fun MainTabShell(
     selectedTab: MainTab,
     onSelectTab: (MainTab) -> Unit,
     onOpenSettings: () -> Unit,
+    onAddHost: () -> Unit,
+    onAddProject: () -> Unit,
+    repositoriesState: ResourceState<List<RemoteRepositoryProfile>>,
     hostsContent: @Composable () -> Unit,
     projectsContent: @Composable () -> Unit,
 ) {
+    val topBarTitle = when (selectedTab) {
+        MainTab.Hosts -> "SSH Hosts"
+        MainTab.Projects -> repositoriesState.projectScreenTitle()
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(selectedTab.screenTitle) },
+                title = { Text(topBarTitle) },
                 actions = {
                     TextButton(onClick = onOpenSettings) {
                         Text("Settings")
+                    }
+                    when (selectedTab) {
+                        MainTab.Hosts -> TextButton(onClick = onAddHost) { Text("Add host") }
+                        MainTab.Projects -> TextButton(onClick = onAddProject) { Text("Add project") }
                     }
                 },
             )
@@ -58,6 +72,13 @@ fun MainTabShell(
     }
 }
 
+private fun ResourceState<List<RemoteRepositoryProfile>>.projectScreenTitle(): String = when (this) {
+    is ResourceState.Loaded -> "Projects"
+    is ResourceState.Stale -> "Projects"
+    is ResourceState.Error -> "Projects"
+    ResourceState.Idle, ResourceState.Loading -> "Projects"
+}
+
 @Composable
 private fun MainTabPane(
     visible: Boolean,
@@ -82,9 +103,3 @@ private fun MainTabPane(
         content()
     }
 }
-
-private val MainTab.screenTitle: String
-    get() = when (this) {
-        MainTab.Hosts -> "SSH Hosts"
-        MainTab.Projects -> "Projects"
-    }

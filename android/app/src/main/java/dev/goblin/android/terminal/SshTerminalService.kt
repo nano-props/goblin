@@ -104,6 +104,10 @@ private class SshTerminalSession(
 ) : TerminalSession {
     private val open = AtomicBoolean(true)
 
+    override fun isConnected(): Boolean = runCatching {
+        open.get() && client.isConnected && sshSession.isOpen && shell.isOpen
+    }.getOrDefault(false)
+
     fun startReader(onOutput: (String) -> Unit) {
         thread(name = "goblin-ssh-terminal-$id", isDaemon = true) {
             runCatching {

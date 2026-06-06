@@ -4,6 +4,8 @@ import dev.goblin.android.data.TerminalSessionSnapshotStore
 import dev.goblin.android.domain.ssh.RemoteTarget
 import dev.goblin.android.ssh.SshConnectionSecrets
 import java.util.UUID
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 class TerminalSessionManager(
     private val terminalService: TerminalSessionFactory,
@@ -16,6 +18,9 @@ class TerminalSessionManager(
     private val controllers = mutableMapOf<String, TerminalController>()
     private val observers = mutableMapOf<String, MutableMap<String, (TerminalSessionRecord) -> Unit>>()
     private val collectionObservers = mutableMapOf<String, (List<TerminalSessionRecord>) -> Unit>()
+    private val heartbeatScheduler = Executors.newSingleThreadScheduledExecutor { task ->
+        Thread(task, "goblin-terminal-heartbeat").apply { isDaemon = true }
+    }
 
     init {
         val restored = sessionStore
@@ -28,6 +33,12 @@ class TerminalSessionManager(
             }
             sessionStore?.saveSessions(restored)
         }
+        heartbeatScheduler.scheduleAtFixedRate(
+            ::checkRunningSessionsHeartbeat,
+            HEARTBEAT_INTERVAL_SECONDS,
+            HEARTBEAT_INTERVAL_SECONDS,
+            TimeUnit.SECONDS,
+        )
     }
 
     fun sessions(): List<TerminalSessionRecord> = synchronized(lock) {
@@ -205,6 +216,24 @@ class TerminalSessionManager(
         }
     }
 
+    private fun checkRunningSessionsHeartbeat() {
+        val runningSessionIds = synchronized(lock) {
+            sessions.values
+                .asSequence()
+                .filter { it.status == TerminalSessionStatus.Running }
+                .map { it.id }
+                .toList()
+        }
+        if (runningSessionIds.isEmpty()) return
+        runningSessionIds.forEach { sessionId ->
+            val controller = synchronized(lock) { controllers[sessionId] } ?: return@forEach
+            val alive = runCatching { controller.isConnected() }.getOrDefault(false)
+            if (!alive) {
+                runCatching { controller.disconnectForHeartbeat() }
+            }
+        }
+    }
+
     private fun findAttachable(target: RemoteTarget, repositoryId: String?): TerminalSessionRecord? =
         synchronized(lock) {
             sessions.values.firstOrNull {
@@ -346,6 +375,7 @@ class TerminalSessionManager(
 
     private companion object {
         val attachableStatuses = setOf(TerminalSessionStatus.Starting, TerminalSessionStatus.Running)
+        private const val HEARTBEAT_INTERVAL_SECONDS = 30L
     }
 }
 

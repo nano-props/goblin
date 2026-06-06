@@ -69,6 +69,17 @@ fun DiagnosticsScreen(
     fun runDiagnostics() {
         diagnosticsState = ResourceState.Loading
         scope.launch {
+            if (host.identityRefId != null) {
+                initializationCheck = null
+                diagnosticsState = runCatching {
+                    withContext(Dispatchers.IO) { onRunDiagnostics() }
+                }.fold(
+                    onSuccess = { ResourceState.Loaded(it) },
+                    onFailure = { ResourceState.Error(it.message ?: "Diagnostics failed", it) },
+                )
+                return@launch
+            }
+
             val ready = runCatching {
                 withContext(Dispatchers.IO) { onCheckSshInitialization() }
             }.getOrElse {

@@ -16,6 +16,19 @@ class TerminalController(
     private var cols: Int = TerminalSessionDefaults.Cols
     private var rows: Int = TerminalSessionDefaults.Rows
 
+    fun isConnected(): Boolean = runCatching {
+        session?.isConnected() == true
+    }.getOrDefault(false)
+
+    fun disconnectForHeartbeat(reason: TerminalDisconnectedReason = TerminalDisconnectedReason.SshDisconnected) {
+        val current = session ?: return
+        runCatching { current.close() }
+        fail(
+            IllegalStateException("Terminal heartbeat failed: $reason"),
+            reason,
+        )
+    }
+
     fun open(target: RemoteTarget, secrets: SshConnectionSecrets = SshConnectionSecrets()) {
         session?.close()
         session = null
@@ -146,6 +159,7 @@ interface TerminalSessionFactory {
 
 interface TerminalSession {
     val id: String
+    fun isConnected(): Boolean
     fun sendInput(value: String)
     fun resize(cols: Int, rows: Int)
     fun close()

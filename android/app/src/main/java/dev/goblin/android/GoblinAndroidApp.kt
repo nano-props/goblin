@@ -151,10 +151,12 @@ fun GoblinAndroidApp(
                 selectedTab = selectedTab,
                 onSelectTab = ::selectMainTab,
                 onOpenSettings = { route = AppRoute.Settings },
+                onAddHost = { route = AppRoute.AddHost },
+                onAddProject = { route = AppRoute.AddRepository },
+                repositoriesState = repositoriesState,
                 hostsContent = {
                     HostsScreen(
                         hostsState = hostsState,
-                        onAddHost = { route = AppRoute.AddHost },
                         onEditHost = { hostId -> route = AppRoute.EditHost(hostId) },
                         onDeleteHost = { hostId ->
                             portForwardManager.stopOwner(hostId)
@@ -174,7 +176,6 @@ fun GoblinAndroidApp(
                     ProjectsScreen(
                         repositoriesState = repositoriesState,
                         hosts = currentHosts(),
-                        onAddProject = { route = AppRoute.AddRepository },
                         onOpenProject = { repositoryId -> route = AppRoute.Repository(repositoryId) },
                         onDeleteProject = { repositoryId ->
                             deleteRepositoryRecord(repositoryId)

@@ -15,7 +15,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -71,7 +70,6 @@ internal fun hostHealthIndicatorColor(health: HostHealth): Color =
 @Composable
 fun HostsScreen(
     hostsState: ResourceState<List<SshHostProfile>>,
-    onAddHost: () -> Unit,
     onEditHost: (String) -> Unit,
     onDeleteHost: (String) -> Unit,
     onOpenDiagnostics: (String) -> Unit,
@@ -87,10 +85,9 @@ fun HostsScreen(
             ResourceState.Loading,
             -> LoadingHosts()
 
-            is ResourceState.Error -> ErrorHosts(message = hostsState.message, onAddHost = onAddHost)
+            is ResourceState.Error -> ErrorHosts(message = hostsState.message)
             is ResourceState.Stale -> HostList(
                 hosts = hostsState.value,
-                onAddHost = onAddHost,
                 onEditHost = onEditHost,
                 onDeleteHost = onDeleteHost,
                 onOpenDiagnostics = onOpenDiagnostics,
@@ -98,7 +95,6 @@ fun HostsScreen(
             )
             is ResourceState.Loaded -> HostList(
                 hosts = hostsState.value,
-                onAddHost = onAddHost,
                 onEditHost = onEditHost,
                 onDeleteHost = onDeleteHost,
                 onOpenDiagnostics = onOpenDiagnostics,
@@ -117,20 +113,16 @@ private fun LoadingHosts() {
 }
 
 @Composable
-private fun ErrorHosts(message: String, onAddHost: () -> Unit) {
+private fun ErrorHosts(message: String) {
     Column(verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Md)) {
         Text("error", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium)
         Text(message)
-        Button(onClick = onAddHost) {
-            Text("Add host")
-        }
     }
 }
 
 @Composable
 private fun HostList(
     hosts: List<SshHostProfile>,
-    onAddHost: () -> Unit,
     onEditHost: (String) -> Unit,
     onDeleteHost: (String) -> Unit,
     onOpenDiagnostics: (String) -> Unit,
@@ -148,26 +140,11 @@ private fun HostList(
             Spacer(Modifier.height(GoblinSpacing.Sm))
             Text("Add a remote development machine to start diagnostics and terminal access.")
             Spacer(Modifier.height(GoblinSpacing.Lg))
-            Button(
-                modifier = Modifier.semantics { contentDescription = "Add host" },
-                onClick = onAddHost,
-            ) {
-                Text("Add host")
-            }
         }
         return
     }
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text("Saved hosts", style = MaterialTheme.typography.titleMedium)
-        Button(onClick = onAddHost) {
-            Text("Add host")
-        }
-    }
+    Text("Saved hosts", style = MaterialTheme.typography.titleMedium)
     Spacer(Modifier.height(GoblinSpacing.Md))
     LazyColumn(verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm)) {
         items(hosts, key = { it.id }) { host ->
