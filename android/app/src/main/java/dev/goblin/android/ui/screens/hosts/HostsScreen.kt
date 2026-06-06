@@ -37,7 +37,7 @@ import dev.goblin.android.domain.ssh.SshHostProfile
 import dev.goblin.android.navigation.AppRoute
 import dev.goblin.android.ui.theme.GoblinSpacing
 
-internal const val HOST_TEMPORARY_TERMINAL_REMOTE_PATH = "~"
+internal const val HOST_TEMPORARY_TERMINAL_REMOTE_PATH = "/"
 
 internal fun isHostTemporaryTerminal(remotePath: String, repositoryId: String?): Boolean =
     repositoryId == null && remotePath == HOST_TEMPORARY_TERMINAL_REMOTE_PATH
@@ -171,8 +171,10 @@ private fun HostList(
     Spacer(Modifier.height(GoblinSpacing.Md))
     LazyColumn(verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm)) {
         items(hosts, key = { it.id }) { host ->
+            val health = hostHealth(host)
             HostRow(
                 host = host,
+                canOpenTerminal = health == HostHealth.Online,
                 onOpenDiagnostics = { onOpenDiagnostics(host.id) },
                 onOpenTerminal = { onOpenTerminal(host.id) },
                 onEditHost = { onEditHost(host.id) },
@@ -208,6 +210,7 @@ private fun HostList(
 @Composable
 private fun HostRow(
     host: SshHostProfile,
+    canOpenTerminal: Boolean,
     onOpenDiagnostics: () -> Unit,
     onOpenTerminal: () -> Unit,
     onEditHost: () -> Unit,
@@ -226,7 +229,10 @@ private fun HostRow(
             Text(host.subtitle, style = MaterialTheme.typography.bodyMedium)
             HostStatusIndicator(health)
             Row(horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm)) {
-                TextButton(onClick = onOpenTerminal) {
+                TextButton(
+                    enabled = canOpenTerminal,
+                    onClick = onOpenTerminal,
+                ) {
                     Text("Terminal")
                 }
                 TextButton(onClick = onEditHost) {

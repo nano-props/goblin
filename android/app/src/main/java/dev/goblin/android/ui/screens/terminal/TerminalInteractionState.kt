@@ -11,6 +11,9 @@ internal const val TerminalBackKeepsSessionHint = "Back leaves the session runni
 
 internal const val TerminalBackClosesSessionHint = "Back stops this temporary terminal."
 
+internal const val TerminalQuickConfirmInput = "YES"
+internal const val TerminalQuickCancelInput = "NO"
+
 internal const val TerminalStickToBottomThresholdPx = 48
 
 internal fun terminalStickToBottom(
@@ -46,6 +49,8 @@ internal fun terminalInputUnavailableMessage(state: TerminalSessionState): Strin
 }
 
 internal fun terminalLineInput(value: String): String = "$value\r"
+
+internal fun terminalQuickInput(value: String): String = "$value\r"
 
 internal fun terminalControlCharacter(key: Char): String? {
     val letter = key.uppercaseChar()

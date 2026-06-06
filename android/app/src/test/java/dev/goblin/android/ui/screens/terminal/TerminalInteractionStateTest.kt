@@ -86,6 +86,12 @@ class TerminalInteractionStateTest {
     }
 
     @Test
+    fun `quick confirm and cancel append carriage return by default`() {
+        assertEquals("YES\r", terminalQuickInput(TerminalQuickConfirmInput))
+        assertEquals("NO\r", terminalQuickInput(TerminalQuickCancelInput))
+    }
+
+    @Test
     fun `control character maps letters to terminal bytes`() {
         assertEquals("\u0001", terminalControlCharacter('a'))
         assertEquals("\u0003", terminalControlCharacter('C'))

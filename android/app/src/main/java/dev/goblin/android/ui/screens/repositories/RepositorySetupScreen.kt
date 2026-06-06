@@ -1,6 +1,8 @@
 package dev.goblin.android.ui.screens.repositories
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -41,6 +44,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.goblin.android.domain.ResourceState
 import dev.goblin.android.domain.ssh.RemoteDirectoryEntry
@@ -60,6 +66,7 @@ import dev.goblin.android.ui.theme.GoblinSpacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 
 internal enum class RepositoryWorkspaceTab(val label: String) {
     Branches("Branches"),
@@ -1044,11 +1051,25 @@ private fun RepositoryWorktreesPanel(
     onRemoveWorktree: (RemoteRepositoryWorktree) -> Unit,
 ) {
     var branch by remember(repository.id) { mutableStateOf("") }
+    var branchMenuExpanded by remember(repository.id) { mutableStateOf(false) }
     var worktreePath by remember(repository.id) { mutableStateOf("") }
 
     fun updateBranch(value: String) {
         branch = value
         worktreePath = suggestedWorktreePath(repository.remotePath, value)
+    }
+
+    val branches = when (snapshotState) {
+        is ResourceState.Loaded -> snapshotState.value.branches
+        is ResourceState.Stale -> snapshotState.value.branches
+        else -> emptyList()
+    }
+    val defaultBranch = branches.firstOrNull { it.isDefault } ?: branches.firstOrNull()
+
+    LaunchedEffect(repository.id, defaultBranch?.name, snapshotState) {
+        if (branch.isBlank() && defaultBranch != null) {
+            updateBranch(defaultBranch.name)
+        }
     }
 
     SnapshotContent(snapshotState = snapshotState, onRefresh = onRefresh) { snapshot ->
@@ -1059,13 +1080,38 @@ private fun RepositoryWorktreesPanel(
                     verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
                 ) {
                     Text("Create worktree", style = MaterialTheme.typography.titleMedium)
-                    OutlinedTextField(
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        value = branch,
-                        onValueChange = { updateBranch(it) },
-                        label = { Text("Base branch") },
-                        singleLine = true,
-                    )
+                        horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        OutlinedTextField(
+                            modifier = Modifier.weight(1f),
+                            value = branch,
+                            onValueChange = { updateBranch(it) },
+                            label = { Text("Base branch") },
+                            singleLine = true,
+                        )
+                        if (branches.isNotEmpty()) {
+                            TextButton(onClick = { branchMenuExpanded = true }) {
+                                Text("Select branch")
+                            }
+                            DropdownMenu(
+                                expanded = branchMenuExpanded,
+                                onDismissRequest = { branchMenuExpanded = false },
+                            ) {
+                                branches.forEach { branchEntry ->
+                                    DropdownMenuItem(
+                                        text = { Text(branchEntry.name) },
+                                        onClick = {
+                                            updateBranch(branchEntry.name)
+                                            branchMenuExpanded = false
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    }
                     OutlinedTextField(
                         modifier = Modifier.fillMaxWidth(),
                         value = worktreePath,
@@ -1163,14 +1209,79 @@ private fun RepositoryTerminalPanel(
         if (workspaceSessions.isEmpty()) {
             Text("No terminals for this worktree.")
         } else {
-            workspaceSessions.forEach { session ->
-                TerminalSessionRow(
-                    session = session,
-                    label = openedOrderLabels[session.id] ?: terminalSessionDefaultLabel(0),
-                    onOpenTerminalSession = onOpenTerminalSession,
-                    onDeleteTerminalSession = onDeleteTerminalSession,
-                )
+            Column(
+                verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
+            ) {
+                workspaceSessions.forEach { session ->
+                    val label = openedOrderLabels[session.id] ?: terminalSessionDefaultLabel(0)
+                    SwipeDeleteTerminalSessionRow(
+                        onDelete = { onDeleteTerminalSession(session, label) },
+                    ) {
+                        TerminalSessionRow(
+                            session = session,
+                            label = label,
+                            onOpenTerminalSession = onOpenTerminalSession,
+                            onDeleteTerminalSession = onDeleteTerminalSession,
+                        )
+                    }
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun SwipeDeleteTerminalSessionRow(
+    onDelete: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val density = LocalDensity.current
+    val revealDistancePx = with(density) { 88.dp.toPx() }
+    val confirmDistancePx = with(density) { 48.dp.toPx() }
+    val offsetX = remember {
+        Animatable(0f)
+    }
+    val scope = rememberCoroutineScope()
+
+    Box(Modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(MaterialTheme.colorScheme.errorContainer)
+                .padding(GoblinSpacing.Md),
+            contentAlignment = Alignment.CenterEnd,
+        ) {
+            TextButton(onClick = onDelete) {
+                Text("Delete")
+            }
+        }
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(offsetX.value.roundToInt(), 0) }
+                .pointerInput(revealDistancePx) {
+                    detectHorizontalDragGestures(
+                        onHorizontalDrag = { _, amount ->
+                            val next = (offsetX.value + amount).coerceIn(-revealDistancePx, 0f)
+                            scope.launch {
+                                offsetX.snapTo(next)
+                            }
+                        },
+                        onDragEnd = {
+                            scope.launch {
+                                val shouldDelete = offsetX.value <= -confirmDistancePx
+                                offsetX.animateTo(0f)
+                                if (shouldDelete) onDelete()
+                            }
+                        },
+                        onDragCancel = {
+                            scope.launch {
+                                offsetX.animateTo(0f)
+                            }
+                        },
+                    )
+                },
+        ) {
+            content()
         }
     }
 }

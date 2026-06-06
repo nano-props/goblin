@@ -2,6 +2,12 @@ package dev.goblin.android.ui.screens.terminal
 
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -13,6 +19,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -79,8 +86,12 @@ fun TerminalScreen(
     var activeSessionId by remember(host, remotePath, repositoryId, terminalSessionId) {
         mutableStateOf(terminalSessionId)
     }
+    var terminalSessions by remember { mutableStateOf(terminalSessionManager.sessions()) }
     var input by remember { mutableStateOf("") }
     var ctrlModifierActive by remember { mutableStateOf(false) }
+    var terminalMaximized by remember { mutableStateOf(false) }
+    var isSendingQuickInput by remember { mutableStateOf(false) }
+    var isSendingSubmitInput by remember { mutableStateOf(false) }
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -94,6 +105,7 @@ fun TerminalScreen(
     ) {
         terminalForegroundBridge.sync()
     }
+    val activeTerminalPath = remotePath.ifBlank { "/" }
 
     fun syncTerminalForeground() {
         val permissionGranted = ContextCompat.checkSelfPermission(
@@ -130,14 +142,59 @@ fun TerminalScreen(
         }
     }
 
-    fun sendTerminalInput(value: String, onResult: (Boolean) -> Unit = {}) {
+    fun sendTerminalInputLocked(
+        value: String,
+        isSending: Boolean,
+        setSending: (Boolean) -> Unit,
+        onResult: (Boolean) -> Unit = {},
+    ) {
+        if (isSending) return
+        setSending(true)
         scope.launch {
-            val sessionId = activeSessionId
-            val sent = withContext(Dispatchers.IO) {
-                sessionId?.let { terminalSessionManager.sendInput(it, value) } ?: false
+            val sent = try {
+                val sessionId = activeSessionId
+                withContext(Dispatchers.IO) {
+                    sessionId?.let { terminalSessionManager.sendInput(it, value) } ?: false
+                }
+            } catch (_: Exception) {
+                false
             }
             syncTerminalForeground()
+            setSending(false)
             onResult(sent)
+        }
+    }
+
+    fun sendQuickInput(value: String) {
+        sendTerminalInputLocked(
+            value = terminalQuickInput(value),
+            isSending = isSendingQuickInput,
+            setSending = { isSendingQuickInput = it },
+        ) { sent ->
+            inputNotice = if (sent) null else "Terminal is not connected."
+        }
+    }
+
+    fun submitInput() {
+        if (isSendingSubmitInput) return
+        val unavailable = terminalInputUnavailableMessage(terminalState)
+        if (unavailable != null) {
+            inputNotice = unavailable
+            return
+        }
+        val value = input
+        if (value.isEmpty()) return
+        sendTerminalInputLocked(
+            value = terminalLineInput(value),
+            isSending = isSendingSubmitInput,
+            setSending = { isSendingSubmitInput = it },
+        ) { sent ->
+            inputNotice = if (sent) {
+                input = ""
+                null
+            } else {
+                "Terminal is not connected."
+            }
         }
     }
 
@@ -148,32 +205,36 @@ fun TerminalScreen(
                 if (sessionId != null) terminalSessionManager.close(sessionId)
             }
             syncTerminalForeground()
+            onBack(sessionId)
         }
     }
 
     fun sendControlInput(value: String) {
-        sendTerminalInput(value) { sent ->
+        sendTerminalInputLocked(
+            value = value,
+            isSending = false,
+            setSending = { _ -> },
+        ) { sent ->
             inputNotice = if (sent) null else "Terminal is not connected."
         }
         ctrlModifierActive = false
     }
 
-    fun submitInput() {
-        val unavailable = terminalInputUnavailableMessage(terminalState)
-        if (unavailable != null) {
-            inputNotice = unavailable
-            return
-        }
-        val value = input
-        if (value.isEmpty()) return
-        sendTerminalInput(terminalLineInput(value)) { sent ->
-            inputNotice = if (sent) {
-                input = ""
-                null
-            } else {
-                "Terminal is not connected."
-            }
-        }
+    fun switchToSession(targetSessionId: String) {
+        if (targetSessionId == activeSessionId) return
+        val targetSession = terminalSessionManager.session(targetSessionId) ?: return
+        activeSessionId = targetSessionId
+        terminalState = targetSession.toTerminalSessionState()
+    }
+
+    fun cycleWorkspaceTerminal(direction: Int) {
+        val availableSessions = terminalSessions
+            .filter { it.hostId == host.id && it.repositoryId == repositoryId && it.remotePath == activeTerminalPath }
+            .sortedBy { it.openedAt }
+        if (availableSessions.size <= 1) return
+        val currentIndex = availableSessions.indexOfFirst { it.id == activeSessionId }.takeIf { it >= 0 } ?: 0
+        val nextIndex = (currentIndex + direction).mod(availableSessions.size)
+        switchToSession(availableSessions[nextIndex].id)
     }
 
     DisposableEffect(activeSessionId) {
@@ -191,6 +252,15 @@ fun TerminalScreen(
                 observer.close()
             }
         }
+    }
+
+    DisposableEffect(terminalSessionManager) {
+        val observer = terminalSessionManager.observeSessions { sessions ->
+            scope.launch {
+                terminalSessions = sessions
+            }
+        }
+        onDispose { observer.close() }
     }
 
     LaunchedEffect(target, repositoryId, targetLabel, terminalSessionId) {
@@ -212,38 +282,75 @@ fun TerminalScreen(
         inputNotice = terminalInputUnavailableMessage(terminalState)
     }
 
+    LaunchedEffect(terminalSessions, activeSessionId, host.id, repositoryId, activeTerminalPath) {
+        val workspaceSession = terminalSessions
+            .filter { it.hostId == host.id && it.repositoryId == repositoryId && it.remotePath == activeTerminalPath }
+            .maxByOrNull { it.openedAt }
+        val fallbackSession = workspaceSession ?: terminalSessions.maxByOrNull { it.openedAt }
+        if (activeSessionId == null && fallbackSession != null) {
+            switchToSession(fallbackSession.id)
+        } else if (activeSessionId != null && terminalSessions.none { it.id == activeSessionId }) {
+            if (fallbackSession != null) {
+                switchToSession(fallbackSession.id)
+            } else {
+                activeSessionId = null
+                terminalState = TerminalSessionState.Idle
+            }
+        }
+    }
+
     val screenTitle = terminalScreenTitle(
         sessionId = activeSessionId,
-        sessions = terminalSessionManager.sessions(),
+        sessions = terminalSessions,
         hostId = host.id,
         repositoryId = repositoryId,
         remotePath = remotePath,
     )
+    val workspaceSessions = terminalSessions
+        .filter { it.hostId == host.id && it.repositoryId == repositoryId && it.remotePath == activeTerminalPath }
+        .sortedBy { it.openedAt }
+    val hasWorkspaceSwitchTargets = workspaceSessions.size > 1
+    val chromeVisible = !terminalMaximized
+    val topBarHint = if (terminalMaximized) "Back restores terminal controls." else backHint
+
+    if (terminalMaximized) {
+        BackHandler {
+            terminalMaximized = false
+        }
+    }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = screenTitle,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            text = backHint,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                        )
-                    }
-                },
-                navigationIcon = {
-                    TextButton(onClick = { onBack(activeSessionId) }) {
-                        Text("Back")
-                    }
-                },
-            )
+            if (!terminalMaximized) {
+                TopAppBar(
+                    modifier = Modifier.height(56.dp),
+                    title = {
+                        Column {
+                            Text(
+                                text = screenTitle,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            Text(
+                                text = topBarHint,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    },
+                    navigationIcon = {
+                        TextButton(
+                            onClick = { onBack(activeSessionId) },
+                        ) {
+                            Text("BACK")
+                        }
+                    },
+                    actions = {},
+                )
+            }
         },
     ) { padding ->
         BoxWithConstraints(
@@ -268,13 +375,21 @@ fun TerminalScreen(
                     .padding(GoblinSpacing.Md),
                 verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
             ) {
-                TerminalStatusStrip(
-                    host = host,
-                    remotePath = remotePath,
-                    state = terminalState,
-                    followOutput = stickToBottom,
-                    onFollowOutputChange = { stickToBottom = it },
-                )
+                AnimatedVisibility(
+                    visible = chromeVisible,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically(),
+                ) {
+                    TerminalStatusStrip(
+                        host = host,
+                        remotePath = remotePath,
+                        state = terminalState,
+                        followOutput = stickToBottom,
+                        onFollowOutputChange = { stickToBottom = it },
+                        terminalMaximized = terminalMaximized,
+                        onToggleMaximize = { terminalMaximized = !terminalMaximized },
+                    )
+                }
                 TerminalViewport(
                     modifier = Modifier.weight(1f),
                     state = terminalState,
@@ -282,13 +397,17 @@ fun TerminalScreen(
                     onStickToBottomChange = { stickToBottom = it },
                 )
                 HelperKeyRow(
-                    enabled = inputAvailable,
+                    showBackButton = terminalMaximized,
+                    onBack = { terminalMaximized = false },
+                    enabled = inputAvailable && !isSendingQuickInput && !isSendingSubmitInput,
                     ctrlModifierActive = ctrlModifierActive,
                     onCtrlToggle = { ctrlModifierActive = !ctrlModifierActive },
                     onCtrlC = { sendControlInput("\u0003") },
-                    onEsc = { sendTerminalInput("\u001b") },
-                    onTab = { sendTerminalInput("\t") },
-                    onArrow = { code -> sendTerminalInput(code) },
+                    onEsc = { sendTerminalInputLocked("\u001b", false, { _ -> }) },
+                    onQuickConfirm = { sendQuickInput(TerminalQuickConfirmInput) },
+                    onQuickCancel = { sendQuickInput(TerminalQuickCancelInput) },
+                    onTab = { sendTerminalInputLocked("\t", false, { _ -> }) },
+                    onArrow = { code -> sendTerminalInputLocked(code, false, { _ -> }) },
                     onPaste = {
                         val unavailable = terminalInputUnavailableMessage(terminalState)
                         if (unavailable != null) {
@@ -310,6 +429,36 @@ fun TerminalScreen(
                         }
                     },
                 )
+                AnimatedVisibility(
+                    visible = chromeVisible,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm)) {
+                        Button(
+                            enabled = terminalReconnectAvailable(terminalState),
+                            onClick = { connect() },
+                        ) {
+                            Text("Reconnect")
+                        }
+                        TextButton(onClick = { closeTerminal() }) {
+                            Text("Close")
+                        }
+                    }
+                }
+                if (hasWorkspaceSwitchTargets) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
+                    ) {
+                        TextButton(onClick = { cycleWorkspaceTerminal(-1) }) {
+                            Text("↑")
+                        }
+                        TextButton(onClick = { cycleWorkspaceTerminal(1) }) {
+                            Text("↓")
+                        }
+                    }
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
@@ -351,7 +500,7 @@ fun TerminalScreen(
                         ),
                     )
                     Button(
-                        enabled = inputAvailable && input.isNotEmpty(),
+                        enabled = inputAvailable && input.isNotEmpty() && !isSendingSubmitInput && !isSendingQuickInput,
                         onClick = { submitInput() },
                     ) {
                         Text("Send")
@@ -363,17 +512,6 @@ fun TerminalScreen(
                         color = GoblinColors.TerminalForeground,
                         style = MaterialTheme.typography.labelMedium,
                     )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm)) {
-                    Button(
-                        enabled = terminalReconnectAvailable(terminalState),
-                        onClick = { connect() },
-                    ) {
-                        Text("Reconnect")
-                    }
-                    TextButton(onClick = { closeTerminal() }) {
-                        Text("Close")
-                    }
                 }
             }
         }
@@ -387,6 +525,8 @@ private fun TerminalStatusStrip(
     state: TerminalSessionState,
     followOutput: Boolean,
     onFollowOutputChange: (Boolean) -> Unit,
+    terminalMaximized: Boolean,
+    onToggleMaximize: () -> Unit,
 ) {
     val status = when (state) {
         TerminalSessionState.Idle -> "idle"
@@ -411,6 +551,9 @@ private fun TerminalStatusStrip(
         TextButton(onClick = { onFollowOutputChange(!followOutput) }) {
             Text(if (followOutput) "Following" else "Follow output")
         }
+        TextButton(onClick = onToggleMaximize) {
+            Text(if (terminalMaximized) "Restore" else "Maximize")
+        }
     }
 }
 
@@ -424,8 +567,6 @@ private fun TerminalViewport(
     val output = terminalViewportText(state)
     val banner = terminalSessionBannerMessage(state)
     val verticalScrollState = rememberScrollState()
-    val horizontalScrollState = rememberScrollState()
-
     LaunchedEffect(verticalScrollState) {
         snapshotFlow { verticalScrollState.value to verticalScrollState.maxValue }
             .collect { (value, max) ->
@@ -447,12 +588,13 @@ private fun TerminalViewport(
         Text(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(verticalScrollState)
-                .horizontalScroll(horizontalScrollState),
+                .verticalScroll(verticalScrollState),
             text = output,
             color = GoblinColors.TerminalForeground,
             fontFamily = FontFamily.Monospace,
             style = MaterialTheme.typography.bodyMedium,
+            softWrap = true,
+            overflow = TextOverflow.Clip,
         )
         banner?.let { message ->
             Text(
@@ -471,10 +613,14 @@ private fun TerminalViewport(
 @Composable
 private fun HelperKeyRow(
     enabled: Boolean,
+    showBackButton: Boolean,
+    onBack: () -> Unit,
     ctrlModifierActive: Boolean,
     onCtrlToggle: () -> Unit,
     onCtrlC: () -> Unit,
     onEsc: () -> Unit,
+    onQuickConfirm: () -> Unit,
+    onQuickCancel: () -> Unit,
     onTab: () -> Unit,
     onArrow: (String) -> Unit,
     onPaste: () -> Unit,
@@ -483,12 +629,17 @@ private fun HelperKeyRow(
         modifier = Modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
     ) {
+        if (showBackButton) {
+            TextButton(onClick = onBack) { Text("BACK") }
+        }
+        TextButton(enabled = enabled, onClick = onQuickConfirm) { Text("YES") }
+        TextButton(enabled = enabled, onClick = onQuickCancel) { Text("NO") }
+        TextButton(enabled = enabled, onClick = onCtrlC) { Text("CTRL+C") }
+        TextButton(enabled = enabled, onClick = onTab) { Text("Tab") }
         TextButton(enabled = enabled, onClick = onEsc) { Text("Esc") }
         TextButton(enabled = enabled, onClick = onCtrlToggle) {
             Text(if (ctrlModifierActive) "Ctrl on" else "Ctrl")
         }
-        TextButton(enabled = enabled, onClick = onCtrlC) { Text("Ctrl+C") }
-        TextButton(enabled = enabled, onClick = onTab) { Text("Tab") }
         TextButton(enabled = enabled, onClick = { onArrow("\u001b[A") }) { Text("Up") }
         TextButton(enabled = enabled, onClick = { onArrow("\u001b[B") }) { Text("Down") }
         TextButton(enabled = enabled, onClick = { onArrow("\u001b[D") }) { Text("Left") }
