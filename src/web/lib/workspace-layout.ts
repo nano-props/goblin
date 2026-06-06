@@ -1,6 +1,5 @@
 import { effectiveDetailCollapsed, workspaceLayoutAllowsDetailCollapse } from '#/shared/workspace-layout.ts'
 import type { WorkspaceLayout } from '#/shared/workspace-layout.ts'
-import type { ResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 export type RepoWorkspaceMode = 'split' | 'collapsed' | 'focus'
 
 export interface RepoWorkspaceBehavior {
@@ -35,10 +34,6 @@ const REPO_WORKSPACE_BEHAVIOR = {
     'detailCollapsed' | 'detailCollapseAllowed' | 'detailFocusAllowed' | 'detailFocusMode' | 'mode'
   >
 >
-
-export function effectiveWorkspaceLayout(layout: WorkspaceLayout, uiMode: ResponsiveUiMode): WorkspaceLayout {
-  return uiMode === 'compact' && layout === 'left-right' ? 'top-bottom' : layout
-}
 
 export function repoWorkspaceBehavior(
   layout: WorkspaceLayout,

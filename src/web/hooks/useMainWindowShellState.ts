@@ -2,7 +2,7 @@ import { useCallback, useMemo } from 'react'
 import { createMainWindowNavigationActions } from '#/web/main-window-navigation-actions.ts'
 import { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
-import { effectiveWorkspaceLayout, repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
+import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 
@@ -28,8 +28,7 @@ export function useMainWindowShellState({
   const selectBranch = useReposStore((s) => s.selectBranch)
   const setDetailTab = useReposStore((s) => s.setDetailTab)
   const overlays = useAppOverlays()
-  const effectiveLayout = effectiveWorkspaceLayout(workspaceLayout, uiMode)
-  const workspaceBehavior = repoWorkspaceBehavior(effectiveLayout, detailCollapsed, detailFocusMode)
+  const workspaceBehavior = repoWorkspaceBehavior(workspaceLayout, detailCollapsed, detailFocusMode)
   const visibleRepoId = activeId
   const settingsOpen = routeSettingsPage !== null
   const modalOpen = overlays.anyOpen
@@ -74,7 +73,7 @@ export function useMainWindowShellState({
     overlays,
     sessionReady,
     visibleRepoId,
-    effectiveLayout,
+    workspaceLayout,
     workspaceBehavior,
     settingsOpen,
     modalOpen,

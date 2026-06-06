@@ -56,7 +56,7 @@ export function App({
     overlays,
     sessionReady,
     visibleRepoId,
-    effectiveLayout,
+    workspaceLayout,
     workspaceBehavior,
     settingsOpen,
     modalOpen,
@@ -110,7 +110,7 @@ export function App({
             openSettings={openSettings}
             visibleRepoId={visibleRepoId}
             sessionReady={sessionReady}
-            effectiveLayout={effectiveLayout}
+            workspaceLayout={workspaceLayout}
             detailCollapsed={workspaceBehavior.detailCollapsed}
             overlays={overlays}
             repoDrop={repoDrop}
@@ -127,7 +127,7 @@ interface MainWindowViewportProps {
   openSettings: (page?: SettingsPage) => void
   visibleRepoId: string | null
   sessionReady: boolean
-  effectiveLayout: 'top-bottom' | 'left-right'
+  workspaceLayout: 'top-bottom' | 'left-right'
   detailCollapsed: boolean
   overlays: ReturnType<typeof useMainWindowShellState>['overlays']
   repoDrop: ReturnType<typeof useRepoDrop>
@@ -139,7 +139,7 @@ interface MainWindowViewportContentProps {
   openSettings: (page?: SettingsPage) => void
   visibleRepoId: string | null
   sessionReady: boolean
-  effectiveLayout: 'top-bottom' | 'left-right'
+  workspaceLayout: 'top-bottom' | 'left-right'
   detailCollapsed: boolean
   overlays: ReturnType<typeof useMainWindowShellState>['overlays']
 }
@@ -155,7 +155,7 @@ function MainWindowViewport({
   openSettings,
   visibleRepoId,
   sessionReady,
-  effectiveLayout,
+  workspaceLayout,
   detailCollapsed,
   overlays,
   repoDrop,
@@ -179,7 +179,7 @@ function MainWindowViewport({
         openSettings={openSettings}
         visibleRepoId={visibleRepoId}
         sessionReady={sessionReady}
-        effectiveLayout={effectiveLayout}
+        workspaceLayout={workspaceLayout}
         detailCollapsed={detailCollapsed}
         overlays={overlays}
       />
@@ -194,7 +194,7 @@ function MainWindowViewportContent({
   openSettings,
   visibleRepoId,
   sessionReady,
-  effectiveLayout,
+  workspaceLayout,
   detailCollapsed,
   overlays,
 }: MainWindowViewportContentProps) {
@@ -222,7 +222,7 @@ function MainWindowViewportContent({
           {visibleRepoId ? (
             <RepoView repoId={visibleRepoId} />
           ) : !sessionReady ? (
-            <RepoWorkspaceSkeleton showRepoToolbar layout={effectiveLayout} detailCollapsed={detailCollapsed} />
+            <RepoWorkspaceSkeleton showRepoToolbar layout={workspaceLayout} detailCollapsed={detailCollapsed} />
           ) : (
             <EmptyState />
           )}
