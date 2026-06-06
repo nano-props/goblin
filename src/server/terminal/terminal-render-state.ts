@@ -115,6 +115,7 @@ export async function snapshotTerminalRenderState(
   try {
     await chain
   } catch {}
+  if (!state.model) return null
   return {
     sessionId,
     snapshot: state.model.serializeAddon.serialize({ excludeAltBuffer: false }),
