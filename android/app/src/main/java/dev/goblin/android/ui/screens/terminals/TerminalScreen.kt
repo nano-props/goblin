@@ -134,14 +134,26 @@ fun TerminalScreen(
     fun connect() {
         scope.launch {
             val record = withContext(Dispatchers.IO) {
-                terminalSessionManager.createOrAttach(
-                    target = target,
-                    repositoryId = repositoryId,
-                    targetLabel = targetLabel,
-                )
+                val sessionId = activeSessionId
+                if (sessionId != null && terminalReconnectAvailable(terminalState)) {
+                    terminalSessionManager.reconnect(
+                        sessionId = sessionId,
+                        target = target,
+                        repositoryId = repositoryId,
+                        targetLabel = targetLabel,
+                    )
+                } else {
+                    terminalSessionManager.createOrAttach(
+                        target = target,
+                        repositoryId = repositoryId,
+                        targetLabel = targetLabel,
+                    )
+                }
             }
-            activeSessionId = record.id
-            terminalState = record.toTerminalSessionState()
+            if (record != null) {
+                activeSessionId = record.id
+                terminalState = record.toTerminalSessionState()
+            }
             syncTerminalForeground()
         }
     }
@@ -320,6 +332,7 @@ fun TerminalScreen(
         remotePath = activeTerminalPath,
     )
     val hasWorkspaceSwitchTargets = workspaceSessions.size > 1
+    val inlineActions = terminalDetailInlineActions(terminalState)
     val topBarInfo = terminalStatusLine(host = host, remotePath = remotePath, state = terminalState)
 
     val navigateBack = {
@@ -491,17 +504,29 @@ fun TerminalScreen(
                         }
                     },
                 )
-                if (hasWorkspaceSwitchTargets) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
-                    ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
+                ) {
+                    if (hasWorkspaceSwitchTargets) {
                         TextButton(onClick = { cycleWorkspaceTerminal(-1) }) {
                             Text("↑")
                         }
                         TextButton(onClick = { cycleWorkspaceTerminal(1) }) {
                             Text("↓")
                         }
+                    }
+                    TextButton(
+                        enabled = inlineActions.reconnectEnabled,
+                        onClick = { connect() },
+                    ) {
+                        Text("Reconnect")
+                    }
+                    TextButton(
+                        enabled = inlineActions.closeEnabled,
+                        onClick = { closeTerminal() },
+                    ) {
+                        Text("Close")
                     }
                 }
                 Row(

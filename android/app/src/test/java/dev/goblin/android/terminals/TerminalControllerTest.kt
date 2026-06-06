@@ -81,6 +81,29 @@ class TerminalControllerTest {
     }
 
     @Test
+    fun `open can preserve existing output for reconnect`() {
+        val service = FakeTerminalSessionFactory()
+        val controller = TerminalController(service, initialOutput = "before\n")
+
+        controller.open(target())
+
+        val state = controller.state as TerminalSessionState.Connected
+        assertEquals("before\nready\n", state.output)
+    }
+
+    @Test
+    fun `open failure preserves existing output for reconnect`() {
+        val service = FakeTerminalSessionFactory()
+        service.openError = IllegalStateException("connection refused")
+        val controller = TerminalController(service, initialOutput = "before\n")
+
+        controller.open(target())
+
+        val state = controller.state as TerminalSessionState.Failed
+        assertEquals("before\n", state.output)
+    }
+
+    @Test
     fun `sendInput returns false without active session`() {
         val controller = TerminalController(FakeTerminalSessionFactory())
 
@@ -151,6 +174,7 @@ class TerminalControllerTest {
         var openCols: Int = 0
         var openRows: Int = 0
         var sessionInputError: RuntimeException? = null
+        var openError: RuntimeException? = null
         private lateinit var onOutput: (String) -> Unit
 
         override fun openShell(
@@ -162,6 +186,7 @@ class TerminalControllerTest {
             onExit: () -> Unit,
             onFailure: (Throwable) -> Unit,
         ): TerminalSession {
+            openError?.let { throw it }
             openCols = cols
             openRows = rows
             this.onOutput = onOutput

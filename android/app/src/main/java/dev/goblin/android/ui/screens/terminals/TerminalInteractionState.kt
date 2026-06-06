@@ -154,6 +154,17 @@ internal fun terminalReconnectAvailable(state: TerminalSessionState): Boolean = 
     -> false
 }
 
+internal data class TerminalDetailInlineActions(
+    val reconnectEnabled: Boolean,
+    val closeEnabled: Boolean,
+)
+
+internal fun terminalDetailInlineActions(state: TerminalSessionState): TerminalDetailInlineActions =
+    TerminalDetailInlineActions(
+        reconnectEnabled = terminalReconnectAvailable(state),
+        closeEnabled = true,
+    )
+
 internal fun terminalInputUnavailableMessage(state: TerminalSessionState): String? = when (state) {
     TerminalSessionState.Idle -> "Terminal is not connected."
     TerminalSessionState.Connecting -> "Connecting to terminal..."

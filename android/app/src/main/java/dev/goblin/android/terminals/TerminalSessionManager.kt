@@ -111,6 +111,48 @@ class TerminalSessionManager(
         return session(sessionId) ?: starting
     }
 
+    fun reconnect(
+        sessionId: String,
+        target: RemoteTarget,
+        repositoryId: String?,
+        targetLabel: String,
+        secrets: SshConnectionSecrets = SshConnectionSecrets(),
+    ): TerminalSessionRecord? {
+        val existing = session(sessionId) ?: return null
+        if (existing.status in attachableStatuses) return touchSession(sessionId) ?: existing
+        val controllerToClose = synchronized(lock) {
+            controllers.remove(sessionId)
+        }
+        controllerToClose?.close()
+
+        val starting = existing.copy(
+            hostId = target.id,
+            repositoryId = repositoryId,
+            remotePath = target.remotePath,
+            targetLabel = targetLabel,
+            status = TerminalSessionStatus.Starting,
+            lastActivityAt = clock(),
+            foregroundServiceOwned = false,
+            disconnectedReason = null,
+        )
+        val controller = TerminalController(
+            terminalService = terminalService,
+            initialOutput = existing.lastOutputSnapshot,
+        ) { state ->
+            handleControllerState(sessionId, state)
+        }
+        synchronized(lock) {
+            sessions[sessionId] = starting
+            controllers[sessionId] = controller
+            heartbeatFailureStreaks[sessionId] = 0
+        }
+        persist(starting)
+        notifyObservers(starting)
+
+        controller.open(target, secrets)
+        return session(sessionId)
+    }
+
     fun sessionsForWorkspace(repositoryId: String, remotePath: String): List<TerminalSessionRecord> =
         synchronized(lock) {
             sessions.values

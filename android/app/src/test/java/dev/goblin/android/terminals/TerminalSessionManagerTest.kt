@@ -75,6 +75,50 @@ class TerminalSessionManagerTest {
     }
 
     @Test
+    fun `reconnect reuses inactive terminal record without creating a new item`() {
+        val service = FakeTerminalSessionFactory()
+        val manager = terminalSessionManager(service, ids = terminalIds())
+        val record = manager.createNew(target(remotePath = "/srv/app"), repositoryId = "repo-1", targetLabel = "App - /srv/app")
+        service.emitOutput("before\n")
+        service.fail(IOException("connection lost"))
+
+        val reconnected = manager.reconnect(
+            sessionId = record.id,
+            target = target(remotePath = "/srv/app"),
+            repositoryId = "repo-1",
+            targetLabel = "App - /srv/app",
+        )
+
+        assertEquals(record.id, reconnected?.id)
+        assertEquals(record.displayName, reconnected?.displayName)
+        assertEquals(record.openedAt, reconnected?.openedAt)
+        assertEquals(2, service.openCount)
+        assertEquals(listOf(record.id), manager.sessions().map { it.id })
+        assertEquals(TerminalSessionStatus.Running, manager.session(record.id)?.status)
+        assertEquals("before\n", manager.session(record.id)?.lastOutputSnapshot)
+    }
+
+    @Test
+    fun `reconnect does not replace an already running terminal`() {
+        val service = FakeTerminalSessionFactory()
+        val manager = terminalSessionManager(service, ids = terminalIds())
+        val record = manager.createNew(target(remotePath = "/srv/app"), repositoryId = "repo-1", targetLabel = "App - /srv/app")
+
+        val reconnected = manager.reconnect(
+            sessionId = record.id,
+            target = target(remotePath = "/srv/app"),
+            repositoryId = "repo-1",
+            targetLabel = "App - /srv/app",
+        )
+
+        assertEquals(record.id, reconnected?.id)
+        assertEquals(1, service.openCount)
+        assertEquals(0, service.session.closeCount)
+        assertEquals(TerminalSessionStatus.Running, manager.session(record.id)?.status)
+        assertEquals(listOf(record.id), manager.sessions().map { it.id })
+    }
+
+    @Test
     fun `workspace sessions are filtered and ordered by status priority and activity`() {
         var now = 100L
         val service = FakeTerminalSessionFactory()

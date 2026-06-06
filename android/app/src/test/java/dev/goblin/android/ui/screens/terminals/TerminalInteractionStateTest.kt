@@ -37,6 +37,18 @@ class TerminalInteractionStateTest {
     }
 
     @Test
+    fun `terminal detail inline actions keep close visible and enable reconnect only when available`() {
+        assertEquals(
+            TerminalDetailInlineActions(reconnectEnabled = true, closeEnabled = true),
+            terminalDetailInlineActions(TerminalSessionState.Exited("session-1")),
+        )
+        assertEquals(
+            TerminalDetailInlineActions(reconnectEnabled = false, closeEnabled = true),
+            terminalDetailInlineActions(TerminalSessionState.Connected("session-1", "", 80, 24)),
+        )
+    }
+
+    @Test
     fun `unavailable input state explains why send is disabled`() {
         assertEquals("Connecting to terminal...", terminalInputUnavailableMessage(TerminalSessionState.Connecting))
         assertEquals(

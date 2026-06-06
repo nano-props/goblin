@@ -5,13 +5,15 @@ import dev.goblin.android.ssh.SshConnectionSecrets
 
 class TerminalController(
     private val terminalService: TerminalSessionFactory,
+    initialOutput: String = "",
     private val onStateChanged: (TerminalSessionState) -> Unit = {},
 ) {
     var state: TerminalSessionState = TerminalSessionState.Idle
         private set
 
     private var session: TerminalSession? = null
-    private var output: String = ""
+    private val initialOutputSnapshot: String = terminalOutputSnapshot(initialOutput)
+    private var output: String = initialOutputSnapshot
     private val outputFilter = TerminalOutputFilter()
     private var cols: Int = TerminalSessionDefaults.Cols
     private var rows: Int = TerminalSessionDefaults.Rows
@@ -32,7 +34,7 @@ class TerminalController(
     fun open(target: RemoteTarget, secrets: SshConnectionSecrets = SshConnectionSecrets()) {
         session?.close()
         session = null
-        output = ""
+        output = initialOutputSnapshot
         outputFilter.reset()
         update(TerminalSessionState.Connecting)
         runCatching {
@@ -54,6 +56,7 @@ class TerminalController(
                     message = it.message ?: "Terminal failed",
                     cause = it,
                     reason = TerminalDisconnectedReason.TerminalFailure,
+                    output = output,
                 ),
             )
         }

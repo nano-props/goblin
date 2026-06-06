@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
@@ -252,6 +251,12 @@ internal fun terminalWorkspaceSessions(
 ): List<TerminalSessionRecord> =
     terminalWorkspaceOrderedSessions(sessions = sessions, hostIds = hostIds, remotePath = remotePath)
 
+internal fun terminalWorkspaceOptionLabel(path: String): String =
+    path.trim()
+        .trimEnd('/')
+        .substringAfterLast('/', missingDelimiterValue = path)
+        .ifBlank { path }
+
 internal fun terminalSessionDefaultLabel(index: Int): String = terminalSessionDisplayName(index)
 
 internal fun terminalSessionDefaultLabel(session: TerminalSessionRecord, index: Int): String =
@@ -300,12 +305,45 @@ internal fun requiresTerminalDeleteConfirmation(session: TerminalSessionRecord):
     session.status == TerminalSessionStatus.Starting || session.status == TerminalSessionStatus.Running
 
 internal fun terminalDeleteConfirmationText(label: String, session: TerminalSessionRecord): String =
-    "$label at ${session.remotePath} is still active. This will stop the terminal process and remove the terminal record."
+    if (requiresTerminalDeleteConfirmation(session)) {
+        "$label at ${session.remotePath} is still active. This will stop the terminal process and remove the terminal record."
+    } else {
+        "$label at ${session.remotePath} will be removed from the terminal list."
+    }
 
 private data class TerminalDeleteTarget(
     val session: TerminalSessionRecord,
     val label: String,
 )
+
+private data class TerminalWorkspaceOption(
+    val path: String,
+    val label: String,
+)
+
+private fun repositoryTerminalWorkspaceOptions(
+    repository: RemoteRepositoryProfile,
+    snapshotState: ResourceState<RemoteRepositorySnapshot>,
+): List<TerminalWorkspaceOption> {
+    val root = TerminalWorkspaceOption(
+        path = repositoryTerminalPath(repository),
+        label = repository.title.ifBlank { "Repository root" },
+    )
+    val worktrees = when (snapshotState) {
+        is ResourceState.Loaded -> snapshotState.value.worktrees
+        is ResourceState.Stale -> snapshotState.value.worktrees
+        else -> emptyList()
+    }
+    return buildList {
+        add(root)
+        worktrees.forEach { worktree ->
+            val path = worktreeTerminalPath(worktree)
+            if (path != root.path) {
+                add(TerminalWorkspaceOption(path = path, label = terminalWorkspaceOptionLabel(path)))
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -736,6 +774,9 @@ fun RepositoryWorkspaceScreen(
     val workspaceTabs = remember(repository.id, repository.remotePath) {
         repositoryWorkspaceTabs(repository)
     }
+    val terminalWorkspaceOptions = remember(repository, snapshotState) {
+        repositoryTerminalWorkspaceOptions(repository = repository, snapshotState = snapshotState)
+    }
 
     fun refreshSnapshot() {
         val previous = snapshotState
@@ -856,11 +897,7 @@ fun RepositoryWorkspaceScreen(
     }
 
     fun requestDeleteTerminalSession(session: TerminalSessionRecord, label: String) {
-        if (requiresTerminalDeleteConfirmation(session)) {
-            terminalDeleteTarget = TerminalDeleteTarget(session = session, label = label)
-        } else {
-            deleteTerminalSession(session)
-        }
+        terminalDeleteTarget = TerminalDeleteTarget(session = session, label = label)
     }
 
     LaunchedEffect(repository.id) {
@@ -941,7 +978,12 @@ fun RepositoryWorkspaceScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(GoblinSpacing.Md),
+                .padding(
+                    start = GoblinSpacing.Md,
+                    top = GoblinSpacing.Xs,
+                    end = GoblinSpacing.Md,
+                    bottom = GoblinSpacing.Md,
+                ),
             verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Md),
         ) {
                 actionError?.let {
@@ -990,7 +1032,9 @@ fun RepositoryWorkspaceScreen(
                     hostProfileId = host.id,
                     targetHostId = RemoteTarget.fromHostProfile(host, selectedTerminalWorkspacePath).id,
                     path = selectedTerminalWorkspacePath,
+                    workspaceOptions = terminalWorkspaceOptions,
                     sessions = terminalSessions,
+                    onSelectWorkspace = ::selectTerminalWorkspace,
                     onCreateTerminalAtPath = ::createTerminal,
                     onOpenTerminalSession = onOpenTerminalSession,
                     onDeleteTerminalSession = ::requestDeleteTerminalSession,
@@ -1067,11 +1111,11 @@ fun RepositoryWorkspaceScreen(
     terminalDeleteTarget?.let { target ->
         AlertDialog(
             onDismissRequest = { terminalDeleteTarget = null },
-            title = { Text("Delete running terminal?") },
+            title = { Text("Delete terminal?") },
             text = { Text(terminalDeleteConfirmationText(target.label, target.session)) },
             confirmButton = {
                 TextButton(onClick = { deleteTerminalSession(target.session) }) {
-                    Text("Stop and delete")
+                    Text(if (requiresTerminalDeleteConfirmation(target.session)) "Stop and delete" else "Delete")
                 }
             },
             dismissButton = {
@@ -1280,22 +1324,37 @@ private fun BranchRow(
 ) {
     val deleteBlockedReason = branchDeleteBlockedReason(branch)
     Card(Modifier.fillMaxWidth()) {
-        Row(
+        Column(
             modifier = Modifier.padding(GoblinSpacing.Md),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
         ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs)) {
-                Text(branch.name, style = MaterialTheme.typography.bodyMedium)
-                Text(branch.worktreePath ?: "no worktree", style = MaterialTheme.typography.bodySmall)
-                Row(horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs)) {
-                    if (branch.isCurrent) Text("current", style = MaterialTheme.typography.labelMedium)
-                    if (branch.isDefault) Text("default", style = MaterialTheme.typography.labelMedium)
-                }
-                deleteBlockedReason?.let {
-                    Text(it, style = MaterialTheme.typography.labelSmall)
-                }
-            }
+            Text(
+                branch.name,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                branch.worktreePath ?: "no worktree",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs)) {
+                if (branch.isCurrent) Text("current", style = MaterialTheme.typography.labelMedium)
+                if (branch.isDefault) Text("default", style = MaterialTheme.typography.labelMedium)
+            }
+            deleteBlockedReason?.let {
+                Text(it, style = MaterialTheme.typography.labelSmall)
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 branch.worktreePath?.let { path ->
                     TextButton(onClick = { onSelectTerminalWorkspace(path) }) {
                         Text("Terminals")
@@ -1477,38 +1536,33 @@ private fun WorktreeRow(
                 softWrap = false,
                 overflow = TextOverflow.Clip,
             )
+            if (!removalSafety.allowed) {
+                Text(
+                    removalSafety.reason.orEmpty(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (removalSafety.allowed) {
-                    Spacer(Modifier.weight(1f))
-                } else {
-                    Text(
-                        removalSafety.reason.orEmpty(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                TextButton(
+                    onClick = { onSelectTerminalWorkspace(worktreeTerminalPath(worktree)) },
+                    contentPadding = actionButtonPadding,
+                ) {
+                    Text("Terminals", style = MaterialTheme.typography.labelMedium)
                 }
-                Row {
+                if (removalSafety.allowed) {
                     TextButton(
-                        onClick = { onSelectTerminalWorkspace(worktreeTerminalPath(worktree)) },
+                        onClick = { onRemoveWorktree(worktree) },
                         contentPadding = actionButtonPadding,
                     ) {
-                        Text("Terminals", style = MaterialTheme.typography.labelMedium)
-                    }
-                    if (removalSafety.allowed) {
-                        Spacer(Modifier.width(4.dp))
-                        TextButton(
-                            onClick = { onRemoveWorktree(worktree) },
-                            contentPadding = actionButtonPadding,
-                        ) {
-                            Text("Remove", style = MaterialTheme.typography.labelMedium)
-                        }
+                        Text("Remove", style = MaterialTheme.typography.labelMedium)
                     }
                 }
             }
@@ -1521,7 +1575,9 @@ private fun RepositoryTerminalPanel(
     hostProfileId: String,
     targetHostId: String,
     path: String,
+    workspaceOptions: List<TerminalWorkspaceOption>,
     sessions: List<TerminalSessionRecord>,
+    onSelectWorkspace: (String) -> Unit,
     onCreateTerminalAtPath: (String) -> Unit,
     onOpenTerminalSession: (TerminalSessionRecord) -> Unit,
     onDeleteTerminalSession: (TerminalSessionRecord, String) -> Unit,
@@ -1532,12 +1588,19 @@ private fun RepositoryTerminalPanel(
         sessions = sessions,
         hostIds = terminalHostIds,
     )
-    val workspaceSessions = terminalWorkspaceSessions(hostIds = terminalHostIds, sessions = sessions, remotePath = selectedPath)
+    val workspaceSessions = terminalWorkspaceSessions(
+        hostIds = terminalHostIds,
+        sessions = sessions,
+        remotePath = selectedPath,
+    )
     val stableOrderedSessions = terminalWorkspaceCreatedSessions(sessions, terminalHostIds, path)
     val openedOrderLabels = stableOrderedSessions
         .mapIndexed { index, session -> session.id to terminalSessionDefaultLabel(session, index) }
         .toMap()
-    val activeWorktreeCount = workspaceSessionCounts.find { it.first == selectedPath }?.second ?: 0
+    val activeWorktreeCount = workspaceSessions.size
+    var workspaceMenuExpanded by remember(path, workspaceOptions) { mutableStateOf(false) }
+    val selectedWorkspaceOption = workspaceOptions.firstOrNull { terminalSessionRemotePath(it.path) == selectedPath }
+        ?: TerminalWorkspaceOption(path = selectedPath, label = terminalWorkspaceOptionLabel(selectedPath))
     Column(verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm)) {
         Card(Modifier.fillMaxWidth()) {
             Column(
@@ -1547,16 +1610,53 @@ private fun RepositoryTerminalPanel(
                 Text("Terminal workspace", style = MaterialTheme.typography.titleMedium)
                 Text(selectedPath)
                 Text("$activeWorktreeCount terminals in this worktree")
-                if (workspaceSessionCounts.isNotEmpty()) {
-                    Text("Worktree terminal counts:")
+                Text("Workspace", style = MaterialTheme.typography.labelMedium)
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { workspaceMenuExpanded = true },
+                ) {
                     Column(
-                        modifier = Modifier.padding(start = GoblinSpacing.Xs),
+                        modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
                     ) {
-                        workspaceSessionCounts.forEach { (worktreePath, count) ->
-                            val selectedMark = if (worktreePath == selectedPath) "*" else "-"
-                            Text("$selectedMark $worktreePath: $count")
-                        }
+                        Text(selectedWorkspaceOption.label, style = MaterialTheme.typography.labelMedium)
+                        Text(
+                            selectedWorkspaceOption.path,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth(),
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                DropdownMenu(
+                    expanded = workspaceMenuExpanded,
+                    onDismissRequest = { workspaceMenuExpanded = false },
+                ) {
+                    workspaceOptions.forEach { option ->
+                        val optionPath = terminalSessionRemotePath(option.path)
+                        val count = workspaceSessionCounts.find { it.first == optionPath }?.second ?: 0
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(option.label)
+                                    Text(
+                                        "${option.path} · $count terminals",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            },
+                            onClick = {
+                                workspaceMenuExpanded = false
+                                onSelectWorkspace(option.path)
+                            },
+                        )
                     }
                 }
                 Button(onClick = { onCreateTerminalAtPath(path) }) {
