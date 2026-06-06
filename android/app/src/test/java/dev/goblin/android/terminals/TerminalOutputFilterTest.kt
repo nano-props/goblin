@@ -1,4 +1,4 @@
-package dev.goblin.android.terminal
+package dev.goblin.android.terminals
 
 import org.junit.Assert.assertEquals
 import org.junit.Test

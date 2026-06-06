@@ -1,5 +1,6 @@
 package dev.goblin.android.ui.navigation
 
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -11,8 +12,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.unit.dp
 import dev.goblin.android.domain.ResourceState
 import dev.goblin.android.domain.ssh.RemoteRepositoryProfile
 
@@ -32,6 +36,8 @@ fun MainTabShell(
         MainTab.Hosts -> "SSH Hosts"
         MainTab.Projects -> repositoriesState.projectScreenTitle()
     }
+    val density = LocalDensity.current
+    val swipeThresholdPx = with(density) { 72.dp.toPx() }
 
     Scaffold(
         topBar = {
@@ -58,7 +64,32 @@ fun MainTabShell(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
+                .padding(padding)
+                .pointerInput(selectedTab) {
+                    var draggedDistance = 0f
+                    detectHorizontalDragGestures(
+                        onHorizontalDrag = { _, amount ->
+                            draggedDistance += amount
+                            when {
+                                selectedTab == MainTab.Hosts && draggedDistance <= -swipeThresholdPx -> {
+                                    onSelectTab(MainTab.Projects)
+                                    draggedDistance = 0f
+                                }
+
+                                selectedTab == MainTab.Projects && draggedDistance >= swipeThresholdPx -> {
+                                    onSelectTab(MainTab.Hosts)
+                                    draggedDistance = 0f
+                                }
+                            }
+                        },
+                        onDragEnd = {
+                            draggedDistance = 0f
+                        },
+                        onDragCancel = {
+                            draggedDistance = 0f
+                        },
+                    )
+                },
         ) {
             MainTabPane(
                 visible = selectedTab == MainTab.Hosts,

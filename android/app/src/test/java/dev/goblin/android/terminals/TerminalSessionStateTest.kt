@@ -1,4 +1,4 @@
-package dev.goblin.android.terminal
+package dev.goblin.android.terminals
 
 import dev.goblin.android.domain.ssh.RemoteTarget
 import dev.goblin.android.ssh.SshConnectionSecrets
@@ -107,6 +107,7 @@ class TerminalSessionStateTest {
             this.onFailure = onFailure
             return object : TerminalSession {
                 override val id: String = "session-1"
+                override fun isConnected(): Boolean = true
                 override fun sendInput(value: String) = Unit
                 override fun resize(cols: Int, rows: Int) = Unit
                 override fun close() = Unit

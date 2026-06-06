@@ -12,3 +12,5 @@ android/.gradle/
 android/**/build/
 android/local.properties
 .idea
+
+.worktrees/

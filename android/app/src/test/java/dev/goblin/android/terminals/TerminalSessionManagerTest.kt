@@ -1,4 +1,4 @@
-package dev.goblin.android.terminal
+package dev.goblin.android.terminals
 
 import dev.goblin.android.data.TerminalSessionSnapshotStore
 import dev.goblin.android.domain.ssh.RemoteTarget
@@ -25,6 +25,41 @@ class TerminalSessionManagerTest {
         assertEquals(listOf("backend-session-1", "backend-session-2"), service.sessions.map { it.id })
         assertEquals(TerminalSessionStatus.Running, manager.session(first.id)?.status)
         assertEquals(TerminalSessionStatus.Running, manager.session(second.id)?.status)
+    }
+
+    @Test
+    fun `create new uses incremental terminal display names by worktree path`() {
+        val manager = terminalSessionManager(FakeTerminalSessionFactory(), ids = terminalIds())
+
+        val first = manager.createNew(target(remotePath = "/srv/app"), repositoryId = "repo-1", targetLabel = "App - /srv/app")
+        val second = manager.createNew(target(remotePath = "/srv/app/"), repositoryId = "repo-2", targetLabel = "Another - /srv/app")
+        val third = manager.createNew(target(remotePath = "/srv/other"), repositoryId = "repo-1", targetLabel = "App - /srv/other")
+        val fourth = manager.createNew(target(remotePath = "/srv/app"), repositoryId = "repo-3", targetLabel = "More - /srv/app")
+
+        assertEquals("terminal-1", first.displayName)
+        assertEquals("terminal-2", second.displayName)
+        assertEquals("terminal-1", third.displayName)
+        assertEquals("terminal-3", fourth.displayName)
+    }
+
+    @Test
+    fun `old sessions without display name get normalized when loading session store`() {
+        val manager = terminalSessionManager(
+            service = FakeTerminalSessionFactory(),
+            ids = terminalIds(),
+            store = RecordingTerminalSessionStore(
+                initial = listOf(
+                    legacyTerminalRecord(id = "terminal-1", remotePath = "/srv/app", openedAt = 2L),
+                    legacyTerminalRecord(id = "terminal-2", remotePath = "/srv/app", openedAt = 1L),
+                ),
+            ),
+        )
+
+        val sessions = manager.sessions()
+        val normalizedById = sessions.associateBy { it.id }
+
+        assertEquals("terminal-1", normalizedById["terminal-2"]?.displayName)
+        assertEquals("terminal-2", normalizedById["terminal-1"]?.displayName)
     }
 
     @Test
@@ -381,6 +416,8 @@ class TerminalSessionManagerTest {
         var closed = false
         var closeCount = 0
 
+        override fun isConnected(): Boolean = !closed
+
         override fun sendInput(value: String) {
             sentInput.add(value)
         }
@@ -404,4 +441,20 @@ class TerminalSessionManagerTest {
             records = sessions
         }
     }
+
+    private fun legacyTerminalRecord(
+        id: String,
+        remotePath: String,
+        openedAt: Long,
+    ): TerminalSessionRecord = TerminalSessionRecord(
+        id = id,
+        hostId = "lee@example.com:22/",
+        repositoryId = "repo-1",
+        remotePath = remotePath,
+        targetLabel = "App - $remotePath",
+        status = TerminalSessionStatus.Running,
+        openedAt = openedAt,
+        foregroundServiceOwned = true,
+        disconnectedReason = null,
+    )
 }

@@ -1,4 +1,4 @@
-package dev.goblin.android.terminal
+package dev.goblin.android.terminals
 
 import android.content.Context
 import androidx.core.content.ContextCompat

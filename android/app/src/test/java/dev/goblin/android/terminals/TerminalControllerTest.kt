@@ -1,4 +1,4 @@
-package dev.goblin.android.terminal
+package dev.goblin.android.terminals
 
 import dev.goblin.android.domain.ssh.RemoteTarget
 import dev.goblin.android.ssh.SshConnectionSecrets
@@ -182,6 +182,8 @@ class TerminalControllerTest {
         val sentInput = mutableListOf<String>()
         val resizes = mutableListOf<Pair<Int, Int>>()
         var closed = false
+
+        override fun isConnected(): Boolean = !closed
 
         override fun sendInput(value: String) {
             inputError?.let { throw it }

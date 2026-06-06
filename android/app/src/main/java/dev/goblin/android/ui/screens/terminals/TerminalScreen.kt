@@ -1,12 +1,7 @@
-package dev.goblin.android.ui.screens.terminal
+package dev.goblin.android.ui.screens.terminals
 
 import android.content.pm.PackageManager
 import android.os.Build
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -27,6 +22,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -57,11 +54,13 @@ import androidx.core.content.ContextCompat
 import dev.goblin.android.domain.ssh.RemoteTarget
 import dev.goblin.android.domain.ssh.SshHostProfile
 import dev.goblin.android.notifications.NotificationPermissionPolicy
-import dev.goblin.android.terminal.TerminalForegroundBridge
-import dev.goblin.android.terminal.TerminalSessionManager
-import dev.goblin.android.terminal.TerminalSessionState
-import dev.goblin.android.terminal.TerminalSessionStatus
-import dev.goblin.android.terminal.toTerminalSessionState
+import dev.goblin.android.terminals.TerminalForegroundBridge
+import dev.goblin.android.terminals.TerminalSessionManager
+import dev.goblin.android.terminals.TerminalSessionState
+import dev.goblin.android.terminals.TerminalSessionStatus
+import dev.goblin.android.terminals.TerminalSessionDefaults
+import dev.goblin.android.ui.screens.terminals.terminalWorkspaceCreatedSessions
+import dev.goblin.android.terminals.toTerminalSessionState
 import dev.goblin.android.ui.theme.GoblinColors
 import dev.goblin.android.ui.theme.GoblinSpacing
 import kotlin.math.roundToInt
@@ -80,6 +79,8 @@ fun TerminalScreen(
     terminalSessionId: String? = null,
     terminalSessionManager: TerminalSessionManager,
     terminalForegroundBridge: TerminalForegroundBridge,
+    fitToScreen: Boolean,
+    onFitToScreenChange: (Boolean) -> Unit,
     onBack: (String?) -> Unit,
 ) {
     var terminalState: TerminalSessionState by remember { mutableStateOf(TerminalSessionState.Idle) }
@@ -92,10 +93,13 @@ fun TerminalScreen(
     var terminalMaximized by remember { mutableStateOf(false) }
     var isSendingQuickInput by remember { mutableStateOf(false) }
     var isSendingSubmitInput by remember { mutableStateOf(false) }
+    var terminalActionMenuExpanded by remember { mutableStateOf(false) }
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val target = remember(host, remotePath) { RemoteTarget.fromHostProfile(host, remotePath) }
+    val workspaceHostId = target.id
+    val workspaceHostIds = remember(host.id, workspaceHostId) { setOf(host.id, workspaceHostId) }
     var inputNotice by remember { mutableStateOf<String?>(null) }
     var stickToBottom by remember { mutableStateOf(true) }
     var notificationPermissionRequested by remember { mutableStateOf(false) }
@@ -228,9 +232,11 @@ fun TerminalScreen(
     }
 
     fun cycleWorkspaceTerminal(direction: Int) {
-        val availableSessions = terminalSessions
-            .filter { it.hostId == host.id && it.repositoryId == repositoryId && it.remotePath == activeTerminalPath }
-            .sortedBy { it.openedAt }
+        val availableSessions = terminalWorkspaceCreatedSessions(
+            sessions = terminalSessions,
+            hostIds = workspaceHostIds,
+            remotePath = activeTerminalPath,
+        )
         if (availableSessions.size <= 1) return
         val currentIndex = availableSessions.indexOfFirst { it.id == activeSessionId }.takeIf { it >= 0 } ?: 0
         val nextIndex = (currentIndex + direction).mod(availableSessions.size)
@@ -282,10 +288,13 @@ fun TerminalScreen(
         inputNotice = terminalInputUnavailableMessage(terminalState)
     }
 
-    LaunchedEffect(terminalSessions, activeSessionId, host.id, repositoryId, activeTerminalPath) {
-        val workspaceSession = terminalSessions
-            .filter { it.hostId == host.id && it.repositoryId == repositoryId && it.remotePath == activeTerminalPath }
-            .maxByOrNull { it.openedAt }
+    LaunchedEffect(terminalSessions, activeSessionId, workspaceHostIds, activeTerminalPath) {
+        val workspaceSessions = terminalWorkspaceCreatedSessions(
+            sessions = terminalSessions,
+            hostIds = workspaceHostIds,
+            remotePath = activeTerminalPath,
+        )
+        val workspaceSession = workspaceSessions.maxByOrNull { it.openedAt }
         val fallbackSession = workspaceSession ?: terminalSessions.maxByOrNull { it.openedAt }
         if (activeSessionId == null && fallbackSession != null) {
             switchToSession(fallbackSession.id)
@@ -302,55 +311,119 @@ fun TerminalScreen(
     val screenTitle = terminalScreenTitle(
         sessionId = activeSessionId,
         sessions = terminalSessions,
-        hostId = host.id,
-        repositoryId = repositoryId,
+        hostIds = workspaceHostIds,
         remotePath = remotePath,
     )
-    val workspaceSessions = terminalSessions
-        .filter { it.hostId == host.id && it.repositoryId == repositoryId && it.remotePath == activeTerminalPath }
-        .sortedBy { it.openedAt }
+    val workspaceSessions = terminalWorkspaceCreatedSessions(
+        sessions = terminalSessions,
+        hostIds = workspaceHostIds,
+        remotePath = activeTerminalPath,
+    )
     val hasWorkspaceSwitchTargets = workspaceSessions.size > 1
-    val chromeVisible = !terminalMaximized
-    val topBarHint = if (terminalMaximized) "Back restores terminal controls." else backHint
+    val topBarInfo = terminalStatusLine(host = host, remotePath = remotePath, state = terminalState)
 
-    if (terminalMaximized) {
-        BackHandler {
+    val navigateBack = {
+        if (terminalMaximized) {
             terminalMaximized = false
+        } else {
+            onBack(activeSessionId)
         }
+    }
+
+    BackHandler {
+        navigateBack()
     }
 
     Scaffold(
         topBar = {
-            if (!terminalMaximized) {
-                TopAppBar(
-                    modifier = Modifier.height(56.dp),
-                    title = {
-                        Column {
-                            Text(
-                                text = screenTitle,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                style = MaterialTheme.typography.titleSmall,
-                            )
-                            Text(
-                                text = topBarHint,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+            TopAppBar(
+                modifier = Modifier.height(56.dp),
+                title = {
+                    Column {
+                        Text(
+                            text = screenTitle,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        Text(
+                            text = topBarInfo,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                },
+                navigationIcon = {
+                    TextButton(onClick = { navigateBack() }) {
+                        Text("BACK")
+                    }
+                },
+                actions = {
+                    Box {
+                        TextButton(onClick = { terminalActionMenuExpanded = true }) {
+                            Text("⋮")
                         }
-                    },
-                    navigationIcon = {
-                        TextButton(
-                            onClick = { onBack(activeSessionId) },
+                        DropdownMenu(
+                            expanded = terminalActionMenuExpanded,
+                            onDismissRequest = { terminalActionMenuExpanded = false },
                         ) {
-                            Text("BACK")
+                            DropdownMenuItem(
+                                text = {
+                                    Text(if (stickToBottom) "Following output" else "Follow output")
+                                },
+                                onClick = {
+                                    stickToBottom = !stickToBottom
+                                    terminalActionMenuExpanded = false
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        if (fitToScreen) "Original width" else "Fit to screen width",
+                                    )
+                                },
+                                onClick = {
+                                    onFitToScreenChange(!fitToScreen)
+                                    terminalActionMenuExpanded = false
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(if (terminalMaximized) "Restore" else "Maximize") },
+                                onClick = {
+                                    terminalMaximized = !terminalMaximized
+                                    terminalActionMenuExpanded = false
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Reconnect terminal") },
+                                enabled = terminalReconnectAvailable(terminalState),
+                                onClick = {
+                                    terminalActionMenuExpanded = false
+                                    if (terminalReconnectAvailable(terminalState)) {
+                                        connect()
+                                    }
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Close terminal") },
+                                onClick = {
+                                    terminalActionMenuExpanded = false
+                                    closeTerminal()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Back") },
+                                onClick = {
+                                    terminalActionMenuExpanded = false
+                                    navigateBack()
+                                },
+                            )
                         }
-                    },
-                    actions = {},
-                )
-            }
+                    }
+                },
+            )
         },
     ) { padding ->
         BoxWithConstraints(
@@ -358,7 +431,11 @@ fun TerminalScreen(
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            val cols = (maxWidth.value / 8f).roundToInt().coerceIn(20, 180)
+            val cols = if (fitToScreen) {
+                (maxWidth.value / 8f).roundToInt().coerceIn(20, 180)
+            } else {
+                TerminalSessionDefaults.Cols
+            }
             val rows = (maxHeight.value / 18f).roundToInt().coerceIn(6, 80)
             LaunchedEffect(activeSessionId, cols, rows) {
                 val sessionId = activeSessionId
@@ -375,34 +452,19 @@ fun TerminalScreen(
                     .padding(GoblinSpacing.Md),
                 verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
             ) {
-                AnimatedVisibility(
-                    visible = chromeVisible,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically(),
-                ) {
-                    TerminalStatusStrip(
-                        host = host,
-                        remotePath = remotePath,
-                        state = terminalState,
-                        followOutput = stickToBottom,
-                        onFollowOutputChange = { stickToBottom = it },
-                        terminalMaximized = terminalMaximized,
-                        onToggleMaximize = { terminalMaximized = !terminalMaximized },
-                    )
-                }
                 TerminalViewport(
                     modifier = Modifier.weight(1f),
                     state = terminalState,
                     stickToBottom = stickToBottom,
+                    fitToScreen = fitToScreen,
                     onStickToBottomChange = { stickToBottom = it },
                 )
                 HelperKeyRow(
-                    showBackButton = terminalMaximized,
-                    onBack = { terminalMaximized = false },
                     enabled = inputAvailable && !isSendingQuickInput && !isSendingSubmitInput,
                     ctrlModifierActive = ctrlModifierActive,
                     onCtrlToggle = { ctrlModifierActive = !ctrlModifierActive },
                     onCtrlC = { sendControlInput("\u0003") },
+                    onEnter = { sendTerminalInputLocked("\r", false, { _ -> }) },
                     onEsc = { sendTerminalInputLocked("\u001b", false, { _ -> }) },
                     onQuickConfirm = { sendQuickInput(TerminalQuickConfirmInput) },
                     onQuickCancel = { sendQuickInput(TerminalQuickCancelInput) },
@@ -429,23 +491,6 @@ fun TerminalScreen(
                         }
                     },
                 )
-                AnimatedVisibility(
-                    visible = chromeVisible,
-                    enter = fadeIn(),
-                    exit = fadeOut(),
-                ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm)) {
-                        Button(
-                            enabled = terminalReconnectAvailable(terminalState),
-                            onClick = { connect() },
-                        ) {
-                            Text("Reconnect")
-                        }
-                        TextButton(onClick = { closeTerminal() }) {
-                            Text("Close")
-                        }
-                    }
-                }
                 if (hasWorkspaceSwitchTargets) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -518,16 +563,11 @@ fun TerminalScreen(
     }
 }
 
-@Composable
-private fun TerminalStatusStrip(
+private fun terminalStatusLine(
     host: SshHostProfile,
     remotePath: String,
     state: TerminalSessionState,
-    followOutput: Boolean,
-    onFollowOutputChange: (Boolean) -> Unit,
-    terminalMaximized: Boolean,
-    onToggleMaximize: () -> Unit,
-) {
+): String {
     val status = when (state) {
         TerminalSessionState.Idle -> "idle"
         TerminalSessionState.Connecting -> "connecting"
@@ -537,24 +577,7 @@ private fun TerminalStatusStrip(
         is TerminalSessionState.Failed -> "failed"
         is TerminalSessionState.Disconnected -> "disconnected"
     }
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            modifier = Modifier.weight(1f),
-            text = "${host.title} - ${remotePath.ifBlank { "/" }} - $status",
-            color = GoblinColors.TerminalForeground,
-            style = MaterialTheme.typography.labelMedium,
-        )
-        TextButton(onClick = { onFollowOutputChange(!followOutput) }) {
-            Text(if (followOutput) "Following" else "Follow output")
-        }
-        TextButton(onClick = onToggleMaximize) {
-            Text(if (terminalMaximized) "Restore" else "Maximize")
-        }
-    }
+    return "${host.title} - ${remotePath.ifBlank { "/" }} - $status"
 }
 
 @Composable
@@ -562,11 +585,13 @@ private fun TerminalViewport(
     modifier: Modifier = Modifier,
     state: TerminalSessionState,
     stickToBottom: Boolean,
+    fitToScreen: Boolean,
     onStickToBottomChange: (Boolean) -> Unit,
 ) {
     val output = terminalViewportText(state)
     val banner = terminalSessionBannerMessage(state)
     val verticalScrollState = rememberScrollState()
+    val horizontalScrollState = rememberScrollState()
     LaunchedEffect(verticalScrollState) {
         snapshotFlow { verticalScrollState.value to verticalScrollState.maxValue }
             .collect { (value, max) ->
@@ -585,15 +610,23 @@ private fun TerminalViewport(
             .fillMaxWidth()
             .background(GoblinColors.TerminalBackground),
     ) {
-        Text(
-            modifier = Modifier
+        val viewportModifier = if (fitToScreen) {
+            Modifier
                 .fillMaxSize()
-                .verticalScroll(verticalScrollState),
+                .verticalScroll(verticalScrollState)
+        } else {
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(horizontalScrollState)
+                .verticalScroll(verticalScrollState)
+        }
+        Text(
+            modifier = viewportModifier,
             text = output,
             color = GoblinColors.TerminalForeground,
             fontFamily = FontFamily.Monospace,
             style = MaterialTheme.typography.bodyMedium,
-            softWrap = true,
+            softWrap = fitToScreen,
             overflow = TextOverflow.Clip,
         )
         banner?.let { message ->
@@ -613,11 +646,10 @@ private fun TerminalViewport(
 @Composable
 private fun HelperKeyRow(
     enabled: Boolean,
-    showBackButton: Boolean,
-    onBack: () -> Unit,
     ctrlModifierActive: Boolean,
     onCtrlToggle: () -> Unit,
     onCtrlC: () -> Unit,
+    onEnter: () -> Unit,
     onEsc: () -> Unit,
     onQuickConfirm: () -> Unit,
     onQuickCancel: () -> Unit,
@@ -629,9 +661,7 @@ private fun HelperKeyRow(
         modifier = Modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
     ) {
-        if (showBackButton) {
-            TextButton(onClick = onBack) { Text("BACK") }
-        }
+        TextButton(enabled = enabled, onClick = onEnter) { Text("ENTER") }
         TextButton(enabled = enabled, onClick = onQuickConfirm) { Text("YES") }
         TextButton(enabled = enabled, onClick = onQuickCancel) { Text("NO") }
         TextButton(enabled = enabled, onClick = onCtrlC) { Text("CTRL+C") }

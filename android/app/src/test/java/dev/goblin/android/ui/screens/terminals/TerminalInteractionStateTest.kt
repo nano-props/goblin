@@ -1,10 +1,10 @@
-package dev.goblin.android.ui.screens.terminal
+package dev.goblin.android.ui.screens.terminals
 
 import android.view.KeyEvent
-import dev.goblin.android.terminal.TerminalSessionRecord
-import dev.goblin.android.terminal.TerminalSessionState
-import dev.goblin.android.terminal.TerminalSessionStatus
-import dev.goblin.android.terminal.TerminalDisconnectedReason
+import dev.goblin.android.terminals.TerminalSessionRecord
+import dev.goblin.android.terminals.TerminalSessionState
+import dev.goblin.android.terminals.TerminalSessionStatus
+import dev.goblin.android.terminals.TerminalDisconnectedReason
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -55,9 +55,7 @@ class TerminalInteractionStateTest {
         )
 
         assertEquals("last output", terminalViewportText(disconnected))
-        val banner = terminalSessionBannerMessage(disconnected)
-        assertTrue(banner!!.contains("disconnected", ignoreCase = true))
-        assertTrue(banner.contains("Android service stopped"))
+        assertNull(terminalSessionBannerMessage(disconnected))
     }
 
     @Test
@@ -77,7 +75,7 @@ class TerminalInteractionStateTest {
         )
 
         assertTrue(text.contains("last output"))
-        assertTrue(text.contains("disconnected", ignoreCase = true))
+        assertFalse(text.contains("disconnected", ignoreCase = true))
     }
 
     @Test
@@ -136,7 +134,6 @@ class TerminalInteractionStateTest {
                 sessionId = "session-b",
                 sessions = sessions,
                 hostId = "host-1",
-                repositoryId = "repo-1",
                 remotePath = "/srv/app",
             ),
         )
@@ -155,7 +152,6 @@ class TerminalInteractionStateTest {
                 sessionId = "session-b",
                 sessions = sessions,
                 hostId = "host-1",
-                repositoryId = null,
                 remotePath = "/",
             ),
         )

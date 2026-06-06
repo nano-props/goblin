@@ -4,6 +4,7 @@ import net.schmizz.sshj.DefaultConfig
 import net.schmizz.sshj.DefaultSecurityProviderConfig
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.common.SecurityUtils
+import net.schmizz.keepalive.KeepAliveProvider
 
 internal class AndroidCompatibleSshConfig private constructor() : DefaultSecurityProviderConfig() {
     override fun initKeyExchangeFactories() {
@@ -27,5 +28,7 @@ internal class AndroidCompatibleSshConfig private constructor() : DefaultSecurit
 internal object SshjClients {
     fun create(): SSHClient = SSHClient(createConfig())
 
-    fun createConfig(): DefaultConfig = AndroidCompatibleSshConfig.create()
+    fun createConfig(): DefaultConfig = AndroidCompatibleSshConfig.create().apply {
+        setKeepAliveProvider(KeepAliveProvider.KEEP_ALIVE)
+    }
 }

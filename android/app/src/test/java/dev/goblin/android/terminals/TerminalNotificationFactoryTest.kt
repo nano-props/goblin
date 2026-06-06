@@ -1,4 +1,4 @@
-package dev.goblin.android.terminal
+package dev.goblin.android.terminals
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -29,7 +29,7 @@ class TerminalNotificationFactoryTest {
     }
 
     @Test
-    fun `notification routes to most recently active terminal`() {
+    fun `notification routes to first opened terminal`() {
         val content = TerminalNotificationFactory.contentFor(
             listOf(
                 record(id = "terminal-1", label = "App - /srv/app", lastActivityAt = 500L),
@@ -37,12 +37,12 @@ class TerminalNotificationFactoryTest {
             ),
         )
 
-        assertTrue(content.text.contains("Api - /srv/api"))
-        assertEquals("terminal-2", content.terminalSessionId)
+        assertTrue(content.text.contains("App - /srv/app"))
+        assertEquals("terminal-1", content.terminalSessionId)
     }
 
     @Test
-    fun `notification falls back to most recently opened running terminal`() {
+    fun `notification falls back to first opened running terminal`() {
         val content = TerminalNotificationFactory.contentFor(
             listOf(
                 record(id = "terminal-1", label = "App - /srv/app", openedAt = 500L, lastActivityAt = null),
@@ -50,8 +50,8 @@ class TerminalNotificationFactoryTest {
             ),
         )
 
-        assertTrue(content.text.contains("Api - /srv/api"))
-        assertEquals("terminal-2", content.terminalSessionId)
+        assertTrue(content.text.contains("App - /srv/app"))
+        assertEquals("terminal-1", content.terminalSessionId)
     }
 
     private fun record(

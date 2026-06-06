@@ -3,10 +3,10 @@ package dev.goblin.android.data
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
-import dev.goblin.android.terminal.TerminalDisconnectedReason
-import dev.goblin.android.terminal.TerminalSessionRecord
-import dev.goblin.android.terminal.TerminalSessionStatus
-import dev.goblin.android.terminal.terminalOutputSnapshot
+import dev.goblin.android.terminals.TerminalDisconnectedReason
+import dev.goblin.android.terminals.TerminalSessionRecord
+import dev.goblin.android.terminals.TerminalSessionStatus
+import dev.goblin.android.terminals.terminalOutputSnapshot
 import java.nio.charset.StandardCharsets
 import java.util.Base64
 
@@ -69,6 +69,8 @@ object TerminalSessionStorePolicy {
 object TerminalSessionCodec {
     private const val FieldSeparator = "."
     private const val RecordSeparator = "\n"
+    private const val LegacyRecordFieldCount = 11
+    private const val RecordFieldCount = 12
 
     fun encode(sessions: List<TerminalSessionRecord>): String =
         sessions.joinToString(RecordSeparator) { session ->
@@ -78,6 +80,7 @@ object TerminalSessionCodec {
                 session.repositoryId.orEmpty(),
                 session.remotePath,
                 session.targetLabel,
+                session.displayName,
                 session.status.name,
                 terminalOutputSnapshot(session.lastOutputSnapshot),
                 session.lastActivityAt?.toString().orEmpty(),
@@ -91,13 +94,13 @@ object TerminalSessionCodec {
         if (payload.isBlank()) return emptyList()
         return payload.lineSequence()
             .filter { it.isNotBlank() }
-            .mapNotNull(::decodeSession)
+            .mapIndexedNotNull(::decodeSession)
             .toList()
     }
 
-    private fun decodeSession(line: String): TerminalSessionRecord? {
+    private fun decodeSession(index: Int, line: String): TerminalSessionRecord? {
         val fields = line.split(FieldSeparator).map { it.decodeField() }
-        if (fields.size != 11) return null
+        if (fields.size !in listOf(LegacyRecordFieldCount, RecordFieldCount)) return null
         return runCatching {
             TerminalSessionRecord(
                 id = fields[0],
@@ -105,12 +108,15 @@ object TerminalSessionCodec {
                 repositoryId = fields[2].takeIf { it.isNotBlank() },
                 remotePath = fields[3],
                 targetLabel = fields[4],
-                status = TerminalSessionStatus.valueOf(fields[5]),
-                lastOutputSnapshot = terminalOutputSnapshot(fields[6]),
-                lastActivityAt = fields[7].takeIf { it.isNotBlank() }?.toLong(),
-                openedAt = fields[8].toLong(),
-                foregroundServiceOwned = fields[9].toBooleanStrict(),
-                disconnectedReason = fields[10].takeIf { it.isNotBlank() }?.let(TerminalDisconnectedReason::valueOf),
+                displayName = fields[5].takeIf { fields.size == RecordFieldCount } ?: "",
+                status = TerminalSessionStatus.valueOf(if (fields.size == RecordFieldCount) fields[6] else fields[5]),
+                lastOutputSnapshot = terminalOutputSnapshot(if (fields.size == RecordFieldCount) fields[7] else fields[6]),
+                lastActivityAt = (if (fields.size == RecordFieldCount) fields[8] else fields[7]).takeIf { it.isNotBlank() }?.toLong(),
+                openedAt = (if (fields.size == RecordFieldCount) fields[9] else fields[8]).toLong(),
+                foregroundServiceOwned = (if (fields.size == RecordFieldCount) fields[10] else fields[9]).toBooleanStrict(),
+                disconnectedReason = (if (fields.size == RecordFieldCount) fields[11] else fields[10]).takeIf { it.isNotBlank() }?.let(
+                    TerminalDisconnectedReason::valueOf,
+                ),
             )
         }.getOrNull()
     }

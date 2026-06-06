@@ -1,4 +1,4 @@
-package dev.goblin.android.terminal
+package dev.goblin.android.terminals
 
 import dev.goblin.android.domain.ssh.RemoteTarget
 import dev.goblin.android.ssh.SshConnectionSecrets

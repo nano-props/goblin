@@ -1,4 +1,4 @@
-package dev.goblin.android.terminal
+package dev.goblin.android.terminals
 
 import dev.goblin.android.data.ssh.HostKeyTrustStore
 import dev.goblin.android.domain.ssh.HostKeyTrust

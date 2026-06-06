@@ -1,4 +1,4 @@
-package dev.goblin.android.terminal
+package dev.goblin.android.terminals
 
 data class TerminalRendererDecision(
     val selectedRenderer: String = "Compose native text viewport",

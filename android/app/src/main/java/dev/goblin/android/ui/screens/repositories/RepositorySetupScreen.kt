@@ -1,8 +1,11 @@
 package dev.goblin.android.ui.screens.repositories
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,7 +16,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -35,6 +40,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import android.text.format.DateUtils
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,6 +54,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import dev.goblin.android.domain.ResourceState
 import dev.goblin.android.domain.ssh.RemoteDirectoryEntry
 import dev.goblin.android.domain.ssh.RemoteRepositoryBranch
@@ -56,25 +63,30 @@ import dev.goblin.android.domain.ssh.RemoteRepositoryProfile
 import dev.goblin.android.domain.ssh.RemoteRepositorySnapshot
 import dev.goblin.android.domain.ssh.RemoteRepositoryWorktree
 import dev.goblin.android.domain.ssh.SshHostProfile
+import dev.goblin.android.domain.ssh.RemoteTarget
 import dev.goblin.android.ssh.evaluateWorktreeRemoval
 import dev.goblin.android.ssh.worktreeRemovalConfirmationText
-import dev.goblin.android.terminal.TerminalDisconnectedReason
-import dev.goblin.android.terminal.TerminalSessionRecord
-import dev.goblin.android.terminal.TerminalSessionStatus
-import dev.goblin.android.ui.screens.terminal.terminalSessionDisplayName
+import dev.goblin.android.terminals.TerminalDisconnectedReason
+import dev.goblin.android.terminals.TerminalSessionRecord
+import dev.goblin.android.terminals.TerminalSessionStatus
+import dev.goblin.android.ui.screens.terminals.terminalSessionRemotePath
+import dev.goblin.android.ui.screens.terminals.terminalSessionDisplayName
+import dev.goblin.android.ui.screens.terminals.terminalWorkspaceSessionCountsByPath
+import dev.goblin.android.ui.screens.terminals.terminalWorkspaceCreatedSessions
+import dev.goblin.android.ui.screens.terminals.terminalWorkspaceOrderedSessions
 import dev.goblin.android.ui.theme.GoblinSpacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 
 internal enum class RepositoryWorkspaceTab(val label: String) {
     Branches("Branches"),
     Worktrees("Worktrees"),
-    Changes("Changes"),
     Commits("Commits"),
     Ports("Ports"),
-    Terminal("Terminal"),
+    Terminal("Terminals"),
 }
 
 private const val CompactWorkspaceTabLimit = 4
@@ -115,7 +127,6 @@ internal fun repositoryWorkspaceTabs(repository: RemoteRepositoryProfile): List<
         listOf(
             RepositoryWorkspaceTab.Branches,
             RepositoryWorkspaceTab.Worktrees,
-            RepositoryWorkspaceTab.Changes,
             RepositoryWorkspaceTab.Terminal,
         )
     } else {
@@ -153,6 +164,45 @@ internal fun suggestedWorktreePath(repositoryPath: String, branch: String): Stri
 internal fun canCreateWorktree(branch: String, worktreePath: String): Boolean =
     branch.isNotBlank() && worktreePath.trim().startsWith("/")
 
+internal fun suggestedBranchName(baseBranch: String, existingBranchNames: Set<String>): String {
+    val base = baseBranch.trim().ifBlank { "new-branch" }
+    val candidate = "$base-new"
+    if (candidate !in existingBranchNames) return candidate
+    var suffix = 2
+    while ("$candidate-$suffix" in existingBranchNames) {
+        suffix += 1
+    }
+    return "$candidate-$suffix"
+}
+
+internal fun canCreateBranch(
+    baseBranch: String,
+    newBranch: String,
+    existingBranchNames: Set<String>,
+): Boolean {
+    val base = baseBranch.trim()
+    val next = newBranch.trim()
+    return base.isNotBlank() && next.isNotBlank() && next !in existingBranchNames
+}
+
+internal fun branchDeleteBlockedReason(branch: RemoteRepositoryBranch): String? = when {
+    branch.isCurrent -> "Current branch cannot be deleted."
+    branch.isDefault -> "Default branch cannot be deleted."
+    branch.worktreePath != null -> "Branch with a worktree cannot be deleted."
+    else -> null
+}
+
+internal fun canDeleteBranch(branch: RemoteRepositoryBranch): Boolean =
+    branchDeleteBlockedReason(branch) == null
+
+internal fun branchDeleteConfirmationText(branch: RemoteRepositoryBranch): String =
+    "Delete remote branch ${branch.name}? This does not delete worktrees."
+
+internal fun canCheckoutBranch(branch: RemoteRepositoryBranch): Boolean = !branch.isCurrent
+
+internal fun branchCheckoutConfirmationText(branch: RemoteRepositoryBranch): String =
+    "Checkout remote branch ${branch.name}? This changes the repository working tree."
+
 internal fun repositoriesAfterLocalDelete(
     repositories: List<RemoteRepositoryProfile>,
     repositoryId: String,
@@ -189,15 +239,23 @@ internal fun worktreeBadges(worktree: RemoteRepositoryWorktree): List<String> =
     }
 
 internal fun terminalWorkspaceSessions(
+    hostId: String,
     sessions: List<TerminalSessionRecord>,
-    repositoryId: String,
     remotePath: String,
 ): List<TerminalSessionRecord> =
-    sessions
-        .filter { it.repositoryId == repositoryId && it.remotePath == remotePath }
-        .sortedWith(terminalWorkspaceSessionComparator)
+    terminalWorkspaceOrderedSessions(sessions = sessions, hostId = hostId, remotePath = remotePath)
+
+internal fun terminalWorkspaceSessions(
+    hostIds: Set<String>,
+    sessions: List<TerminalSessionRecord>,
+    remotePath: String,
+): List<TerminalSessionRecord> =
+    terminalWorkspaceOrderedSessions(sessions = sessions, hostIds = hostIds, remotePath = remotePath)
 
 internal fun terminalSessionDefaultLabel(index: Int): String = terminalSessionDisplayName(index)
+
+internal fun terminalSessionDefaultLabel(session: TerminalSessionRecord, index: Int): String =
+    session.displayName.ifBlank { terminalSessionDisplayName(index) }
 
 internal fun terminalSessionStatusLabel(session: TerminalSessionRecord): String {
     val base = when (session.status) {
@@ -232,7 +290,11 @@ private fun terminalDisconnectedReasonLabel(reason: TerminalDisconnectedReason):
     }
 
 internal fun terminalSessionActivityText(session: TerminalSessionRecord): String =
-    session.lastActivityAt?.let { "last activity $it" } ?: "opened ${session.openedAt}"
+    DateUtils.getRelativeTimeSpanString(
+        session.lastActivityAt ?: session.openedAt,
+        System.currentTimeMillis(),
+        DateUtils.MINUTE_IN_MILLIS,
+    ).let { "last activated $it" }
 
 internal fun requiresTerminalDeleteConfirmation(session: TerminalSessionRecord): Boolean =
     session.status == TerminalSessionStatus.Starting || session.status == TerminalSessionStatus.Running
@@ -244,22 +306,6 @@ private data class TerminalDeleteTarget(
     val session: TerminalSessionRecord,
     val label: String,
 )
-
-private fun TerminalSessionStatus.terminalWorkspacePriority(): Int =
-    when (this) {
-        TerminalSessionStatus.Starting,
-        TerminalSessionStatus.Running,
-        -> 0
-        TerminalSessionStatus.Exited,
-        TerminalSessionStatus.Failed,
-        TerminalSessionStatus.Disconnected,
-        -> 1
-    }
-
-private val terminalWorkspaceSessionComparator: Comparator<TerminalSessionRecord> =
-    compareBy<TerminalSessionRecord> { it.status.terminalWorkspacePriority() }
-        .thenByDescending { it.lastActivityAt ?: it.openedAt }
-        .thenBy { it.openedAt }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -659,6 +705,9 @@ fun RepositoryWorkspaceScreen(
     onOpenTerminalSession: (TerminalSessionRecord) -> Unit = {},
     onDeleteTerminalSession: (String) -> Unit = {},
     onDeleteRepository: () -> Unit,
+    onCreateBranch: (String, String) -> Unit = { _, _ -> },
+    onCheckoutBranch: (RemoteRepositoryBranch) -> Unit = {},
+    onDeleteBranch: (RemoteRepositoryBranch) -> Unit = {},
     onCreateWorktree: (String, String) -> Unit = { _, _ -> },
     onRemoveWorktree: (RemoteRepositoryWorktree) -> Unit = {},
 ) {
@@ -678,10 +727,15 @@ fun RepositoryWorkspaceScreen(
         mutableStateOf(ResourceState.Idle)
     }
     var confirmDelete by remember(repository.id) { mutableStateOf(false) }
+    var branchCheckoutTarget by remember(repository.id) { mutableStateOf<RemoteRepositoryBranch?>(null) }
+    var branchDeleteTarget by remember(repository.id) { mutableStateOf<RemoteRepositoryBranch?>(null) }
     var removeTarget by remember(repository.id) { mutableStateOf<RemoteRepositoryWorktree?>(null) }
     var terminalDeleteTarget by remember(repository.id) { mutableStateOf<TerminalDeleteTarget?>(null) }
     var actionError by remember(repository.id) { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val workspaceTabs = remember(repository.id, repository.remotePath) {
+        repositoryWorkspaceTabs(repository)
+    }
 
     fun refreshSnapshot() {
         val previous = snapshotState
@@ -711,6 +765,47 @@ fun RepositoryWorkspaceScreen(
                 refreshSnapshot()
             }.onFailure {
                 actionError = it.message ?: "Remote worktree create failed"
+            }
+        }
+    }
+
+    fun createBranch(baseBranch: String, newBranch: String) {
+        actionError = null
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { onCreateBranch(baseBranch, newBranch) }
+            }.onSuccess {
+                refreshSnapshot()
+            }.onFailure {
+                actionError = it.message ?: "Remote branch create failed"
+            }
+        }
+    }
+
+    fun deleteBranch(branch: RemoteRepositoryBranch) {
+        actionError = null
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { onDeleteBranch(branch) }
+            }.onSuccess {
+                branchDeleteTarget = null
+                refreshSnapshot()
+            }.onFailure {
+                actionError = it.message ?: "Remote branch delete failed"
+            }
+        }
+    }
+
+    fun checkoutBranch(branch: RemoteRepositoryBranch) {
+        actionError = null
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { onCheckoutBranch(branch) }
+            }.onSuccess {
+                branchCheckoutTarget = null
+                refreshSnapshot()
+            }.onFailure {
+                actionError = it.message ?: "Remote branch checkout failed"
             }
         }
     }
@@ -776,7 +871,47 @@ fun RepositoryWorkspaceScreen(
         initialTerminalWorkspacePath?.let { selectTerminalWorkspace(it) }
     }
 
+    BackHandler { onBack() }
+
+    val density = LocalDensity.current
+    val backSwipeDistancePx = with(density) { 72.dp.toPx() }
+    val backSwipeEdgePx = with(density) { 28.dp.toPx() }
+
     Scaffold(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(onBack) {
+                var draggedDistance = 0f
+                var tracking = false
+                var shouldHandle = true
+                detectHorizontalDragGestures(
+                    onHorizontalDrag = { change, amount ->
+                        if (!shouldHandle) return@detectHorizontalDragGestures
+                        if (!tracking) {
+                            if (change.position.x <= backSwipeEdgePx) {
+                                tracking = true
+                            } else {
+                                return@detectHorizontalDragGestures
+                            }
+                        }
+                        draggedDistance += amount
+                        if (draggedDistance.absoluteValue >= backSwipeDistancePx) {
+                            onBack()
+                            shouldHandle = false
+                        }
+                    },
+                    onDragEnd = {
+                        draggedDistance = 0f
+                        tracking = false
+                        shouldHandle = true
+                    },
+                    onDragCancel = {
+                        draggedDistance = 0f
+                        tracking = false
+                        shouldHandle = true
+                    },
+                )
+            },
         topBar = {
             TopAppBar(
                 title = {
@@ -813,15 +948,32 @@ fun RepositoryWorkspaceScreen(
                     Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
             RepositoryWorkspaceTabStrip(
-                tabs = repositoryWorkspaceTabs(repository),
+                tabs = workspaceTabs,
                 selectedTab = selectedTab,
                 onSelectTab = { selectedTab = it },
+                onSelectPreviousTab = {
+                    if (workspaceTabs.isNotEmpty()) {
+                        val currentIndex = repositoryWorkspaceTabIndex(workspaceTabs, selectedTab)
+                        val previousIndex = if (currentIndex <= 0) workspaceTabs.lastIndex else currentIndex - 1
+                        selectedTab = workspaceTabs[previousIndex]
+                    }
+                },
+                onSelectNextTab = {
+                    if (workspaceTabs.isNotEmpty()) {
+                        val currentIndex = repositoryWorkspaceTabIndex(workspaceTabs, selectedTab)
+                        val nextIndex = if (currentIndex >= workspaceTabs.lastIndex) 0 else currentIndex + 1
+                        selectedTab = workspaceTabs[nextIndex]
+                    }
+                },
             )
             when (selectedTab) {
                 RepositoryWorkspaceTab.Branches -> RepositoryBranchesPanel(
                     snapshotState = snapshotState,
                     onRefresh = { refreshSnapshot() },
                     onSelectTerminalWorkspace = ::selectTerminalWorkspace,
+                    onCreateBranch = ::createBranch,
+                    onCheckoutBranch = { branchCheckoutTarget = it },
+                    onDeleteBranch = { branchDeleteTarget = it },
                 )
 
                 RepositoryWorkspaceTab.Worktrees -> RepositoryWorktreesPanel(
@@ -832,17 +984,11 @@ fun RepositoryWorkspaceScreen(
                     onCreateWorktree = ::createWorktree,
                     onRemoveWorktree = { removeTarget = it },
                 )
-
-                RepositoryWorkspaceTab.Changes -> RepositoryChangesPanel(
-                    repository = repository,
-                    snapshotState = snapshotState,
-                    onRefresh = { refreshSnapshot() },
-                )
-
                 RepositoryWorkspaceTab.Commits -> Unit
                 RepositoryWorkspaceTab.Ports -> Unit
                 RepositoryWorkspaceTab.Terminal -> RepositoryTerminalPanel(
-                    repositoryId = repository.id,
+                    hostProfileId = host.id,
+                    targetHostId = RemoteTarget.fromHostProfile(host, selectedTerminalWorkspacePath).id,
                     path = selectedTerminalWorkspacePath,
                     sessions = terminalSessions,
                     onCreateTerminalAtPath = ::createTerminal,
@@ -861,6 +1007,42 @@ fun RepositoryWorkspaceScreen(
                 confirmDelete = false
             },
             onDismiss = { confirmDelete = false },
+        )
+    }
+
+    branchCheckoutTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { branchCheckoutTarget = null },
+            title = { Text("Checkout remote branch?") },
+            text = { Text(branchCheckoutConfirmationText(target)) },
+            confirmButton = {
+                TextButton(onClick = { checkoutBranch(target) }) {
+                    Text("Checkout")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { branchCheckoutTarget = null }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+
+    branchDeleteTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { branchDeleteTarget = null },
+            title = { Text("Delete remote branch?") },
+            text = { Text(branchDeleteConfirmationText(target)) },
+            confirmButton = {
+                TextButton(onClick = { deleteBranch(target) }) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { branchDeleteTarget = null }) {
+                    Text("Cancel")
+                }
+            },
         )
     }
 
@@ -906,28 +1088,64 @@ private fun RepositoryWorkspaceTabStrip(
     tabs: List<RepositoryWorkspaceTab>,
     selectedTab: RepositoryWorkspaceTab,
     onSelectTab: (RepositoryWorkspaceTab) -> Unit,
+    onSelectPreviousTab: () -> Unit,
+    onSelectNextTab: () -> Unit,
 ) {
     if (tabs.isEmpty()) return
-    if (repositoryWorkspaceTabsUseScrollableStrip(tabs)) {
-        PrimaryScrollableTabRow(
-            selectedTabIndex = repositoryWorkspaceTabIndex(tabs, selectedTab),
-            edgePadding = GoblinSpacing.Xs,
-        ) {
-            tabs.forEach { tab ->
-                Tab(
-                    selected = tab == selectedTab,
-                    onClick = { onSelectTab(tab) },
-                    text = { Text(tab.label) },
+    val canCycle = tabs.size > 1
+    val density = LocalDensity.current
+    val tabSwipeDistancePx = with(density) { 72.dp.toPx() }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .pointerInput(tabs, canCycle, onSelectNextTab, onSelectPreviousTab) {
+                if (!canCycle) return@pointerInput
+                var draggedDistance = 0f
+                detectHorizontalDragGestures(
+                    onHorizontalDrag = { _, amount ->
+                        draggedDistance += amount
+                        when {
+                            draggedDistance >= tabSwipeDistancePx -> {
+                                onSelectPreviousTab()
+                                draggedDistance = 0f
+                            }
+                            draggedDistance <= -tabSwipeDistancePx -> {
+                                onSelectNextTab()
+                                draggedDistance = 0f
+                            }
+                        }
+                    },
+                    onDragEnd = { draggedDistance = 0f },
+                    onDragCancel = { draggedDistance = 0f },
                 )
+            },
+        horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (repositoryWorkspaceTabsUseScrollableStrip(tabs)) {
+            PrimaryScrollableTabRow(
+                modifier = Modifier.weight(1f),
+                selectedTabIndex = repositoryWorkspaceTabIndex(tabs, selectedTab),
+                edgePadding = GoblinSpacing.Xs,
+            ) {
+                tabs.forEach { tab ->
+                    Tab(
+                        selected = tab == selectedTab,
+                        onClick = { onSelectTab(tab) },
+                        text = { Text(tab.label) },
+                    )
+                }
             }
-        }
-        return
-    }
-
-    Row(horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm)) {
-        tabs.forEach { tab ->
-            TextButton(onClick = { onSelectTab(tab) }) {
-                Text(tab.label)
+        } else {
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
+            ) {
+                tabs.forEach { tab ->
+                    TextButton(onClick = { onSelectTab(tab) }) {
+                        Text(tab.label)
+                    }
+                }
             }
         }
     }
@@ -959,50 +1177,93 @@ private fun DeleteRepositoryDialog(
 }
 
 @Composable
-private fun RepositoryChangesPanel(
-    repository: RemoteRepositoryProfile,
-    snapshotState: ResourceState<RemoteRepositorySnapshot>,
-    onRefresh: () -> Unit,
-) {
-    SnapshotContent(snapshotState = snapshotState, onRefresh = onRefresh) { snapshot ->
-        Card(Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(GoblinSpacing.Md),
-                verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
-            ) {
-                Text("Changes", style = MaterialTheme.typography.titleMedium)
-                Text(snapshot.currentRef ?: repository.remotePath, style = MaterialTheme.typography.bodySmall)
-                snapshot.defaultBranch?.let {
-                    Text("default $it", style = MaterialTheme.typography.labelMedium)
-                }
-                if (snapshot.statusLines.isEmpty()) {
-                    Text("Working tree clean.")
-                } else {
-                    Text("${snapshot.statusChangeCount} changes", style = MaterialTheme.typography.labelMedium)
-                    snapshot.statusLines.forEach { line ->
-                        Text(line, style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun RepositoryBranchesPanel(
     snapshotState: ResourceState<RemoteRepositorySnapshot>,
     onRefresh: () -> Unit,
     onSelectTerminalWorkspace: (String) -> Unit,
+    onCreateBranch: (String, String) -> Unit,
+    onCheckoutBranch: (RemoteRepositoryBranch) -> Unit,
+    onDeleteBranch: (RemoteRepositoryBranch) -> Unit,
 ) {
     SnapshotContent(snapshotState = snapshotState, onRefresh = onRefresh) { snapshot ->
+        val branchNames = snapshot.branches.map { it.name }
+        val existingBranchNames = branchNames.toSet()
+        val initialBaseBranch = snapshot.branches.firstOrNull { it.isCurrent }?.name
+            ?: snapshot.branches.firstOrNull { it.isDefault }?.name
+            ?: branchNames.firstOrNull()
+            ?: ""
+        var baseBranch by remember(snapshot.branches) { mutableStateOf(initialBaseBranch) }
+        var newBranch by remember(snapshot.branches) {
+            mutableStateOf(suggestedBranchName(initialBaseBranch, existingBranchNames))
+        }
+        var branchMenuExpanded by remember(snapshot.branches) { mutableStateOf(false) }
+
+        fun updateBaseBranch(value: String) {
+            baseBranch = value
+            newBranch = suggestedBranchName(value, existingBranchNames)
+        }
+
         Column(verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm)) {
             if (snapshot.branches.isEmpty()) {
                 Text("No branches found.")
             } else {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(GoblinSpacing.Md),
+                        verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
+                    ) {
+                        Text("Create branch", style = MaterialTheme.typography.titleMedium)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            OutlinedTextField(
+                                modifier = Modifier.weight(1f),
+                                value = baseBranch,
+                                onValueChange = ::updateBaseBranch,
+                                label = { Text("Base branch") },
+                                singleLine = true,
+                            )
+                            TextButton(onClick = { branchMenuExpanded = true }) {
+                                Text("Select")
+                            }
+                            DropdownMenu(
+                                expanded = branchMenuExpanded,
+                                onDismissRequest = { branchMenuExpanded = false },
+                            ) {
+                                branchNames.forEach { branchName ->
+                                    DropdownMenuItem(
+                                        text = { Text(branchName) },
+                                        onClick = {
+                                            updateBaseBranch(branchName)
+                                            branchMenuExpanded = false
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                        OutlinedTextField(
+                            modifier = Modifier.fillMaxWidth(),
+                            value = newBranch,
+                            onValueChange = { newBranch = it },
+                            label = { Text("New branch") },
+                            singleLine = true,
+                        )
+                        Button(
+                            enabled = canCreateBranch(baseBranch, newBranch, existingBranchNames),
+                            onClick = { onCreateBranch(baseBranch.trim(), newBranch.trim()) },
+                        ) {
+                            Text("Create branch")
+                        }
+                    }
+                }
                 snapshot.branches.forEach { branch ->
                     BranchRow(
                         branch = branch,
                         onSelectTerminalWorkspace = onSelectTerminalWorkspace,
+                        onCheckoutBranch = onCheckoutBranch,
+                        onDeleteBranch = onDeleteBranch,
                     )
                 }
             }
@@ -1014,7 +1275,10 @@ private fun RepositoryBranchesPanel(
 private fun BranchRow(
     branch: RemoteRepositoryBranch,
     onSelectTerminalWorkspace: (String) -> Unit,
+    onCheckoutBranch: (RemoteRepositoryBranch) -> Unit,
+    onDeleteBranch: (RemoteRepositoryBranch) -> Unit,
 ) {
+    val deleteBlockedReason = branchDeleteBlockedReason(branch)
     Card(Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(GoblinSpacing.Md),
@@ -1027,10 +1291,27 @@ private fun BranchRow(
                     if (branch.isCurrent) Text("current", style = MaterialTheme.typography.labelMedium)
                     if (branch.isDefault) Text("default", style = MaterialTheme.typography.labelMedium)
                 }
+                deleteBlockedReason?.let {
+                    Text(it, style = MaterialTheme.typography.labelSmall)
+                }
             }
-            branch.worktreePath?.let { path ->
-                TextButton(onClick = { onSelectTerminalWorkspace(path) }) {
-                    Text("Terminal")
+            Row(horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs)) {
+                branch.worktreePath?.let { path ->
+                    TextButton(onClick = { onSelectTerminalWorkspace(path) }) {
+                        Text("Terminals")
+                    }
+                }
+                TextButton(
+                    enabled = canCheckoutBranch(branch),
+                    onClick = { onCheckoutBranch(branch) },
+                ) {
+                    Text("Checkout")
+                }
+                TextButton(
+                    enabled = deleteBlockedReason == null,
+                    onClick = { onDeleteBranch(branch) },
+                ) {
+                    Text("Delete")
                 }
             }
         }
@@ -1145,30 +1426,90 @@ private fun WorktreeRow(
     onRemoveWorktree: (RemoteRepositoryWorktree) -> Unit,
 ) {
     val removalSafety = evaluateWorktreeRemoval(worktree)
-    Card(Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(GoblinSpacing.Md),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs)) {
-                Text(worktree.path, style = MaterialTheme.typography.bodyMedium)
-                Text(worktree.branch ?: "detached", style = MaterialTheme.typography.bodySmall)
-                Row(horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs)) {
-                    worktreeBadges(worktree).forEach { badge ->
-                        Text(badge, style = MaterialTheme.typography.labelMedium)
-                    }
-                }
+    val worktreeTitle = worktree.path
+        .trim()
+        .trimEnd('/')
+        .substringAfterLast('/', missingDelimiterValue = worktree.path)
+        .ifBlank { worktree.path }
+    val workspaceSummary = run {
+        val badges = worktreeBadges(worktree).joinToString(" ")
+        buildString {
+            append(worktree.branch ?: "detached")
+            if (badges.isNotBlank()) {
+                append(" · ")
+                append(badges)
             }
-            Column {
-                TextButton(onClick = { onSelectTerminalWorkspace(worktreeTerminalPath(worktree)) }) {
-                    Text("Terminal")
-                }
+        }
+    }
+    val actionButtonPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+
+    Card(Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(GoblinSpacing.Md),
+            verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
+        ) {
+            Text(
+                worktreeTitle,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (workspaceSummary.isNotBlank()) {
+                Text(
+                    workspaceSummary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Clip,
+                )
+            }
+            Text(
+                worktree.path,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 if (removalSafety.allowed) {
-                    TextButton(onClick = { onRemoveWorktree(worktree) }) {
-                        Text("Remove")
-                    }
+                    Spacer(Modifier.weight(1f))
                 } else {
-                    Text(removalSafety.reason.orEmpty(), style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        removalSafety.reason.orEmpty(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Row {
+                    TextButton(
+                        onClick = { onSelectTerminalWorkspace(worktreeTerminalPath(worktree)) },
+                        contentPadding = actionButtonPadding,
+                    ) {
+                        Text("Terminals", style = MaterialTheme.typography.labelMedium)
+                    }
+                    if (removalSafety.allowed) {
+                        Spacer(Modifier.width(4.dp))
+                        TextButton(
+                            onClick = { onRemoveWorktree(worktree) },
+                            contentPadding = actionButtonPadding,
+                        ) {
+                            Text("Remove", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
                 }
             }
         }
@@ -1177,18 +1518,26 @@ private fun WorktreeRow(
 
 @Composable
 private fun RepositoryTerminalPanel(
-    repositoryId: String,
+    hostProfileId: String,
+    targetHostId: String,
     path: String,
     sessions: List<TerminalSessionRecord>,
     onCreateTerminalAtPath: (String) -> Unit,
     onOpenTerminalSession: (TerminalSessionRecord) -> Unit,
     onDeleteTerminalSession: (TerminalSessionRecord, String) -> Unit,
 ) {
-    val workspaceSessions = terminalWorkspaceSessions(sessions, repositoryId, path)
-    val openedOrderLabels = workspaceSessions
-        .sortedBy { it.openedAt }
-        .mapIndexed { index, session -> session.id to terminalSessionDefaultLabel(index) }
+    val selectedPath = terminalSessionRemotePath(path)
+    val terminalHostIds = remember(hostProfileId, targetHostId) { setOf(hostProfileId, targetHostId) }
+    val workspaceSessionCounts = terminalWorkspaceSessionCountsByPath(
+        sessions = sessions,
+        hostIds = terminalHostIds,
+    )
+    val workspaceSessions = terminalWorkspaceSessions(hostIds = terminalHostIds, sessions = sessions, remotePath = selectedPath)
+    val stableOrderedSessions = terminalWorkspaceCreatedSessions(sessions, terminalHostIds, path)
+    val openedOrderLabels = stableOrderedSessions
+        .mapIndexed { index, session -> session.id to terminalSessionDefaultLabel(session, index) }
         .toMap()
+    val activeWorktreeCount = workspaceSessionCounts.find { it.first == selectedPath }?.second ?: 0
     Column(verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm)) {
         Card(Modifier.fillMaxWidth()) {
             Column(
@@ -1196,7 +1545,20 @@ private fun RepositoryTerminalPanel(
                 verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
             ) {
                 Text("Terminal workspace", style = MaterialTheme.typography.titleMedium)
-                Text(path)
+                Text(selectedPath)
+                Text("$activeWorktreeCount terminals in this worktree")
+                if (workspaceSessionCounts.isNotEmpty()) {
+                    Text("Worktree terminal counts:")
+                    Column(
+                        modifier = Modifier.padding(start = GoblinSpacing.Xs),
+                        verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
+                    ) {
+                        workspaceSessionCounts.forEach { (worktreePath, count) ->
+                            val selectedMark = if (worktreePath == selectedPath) "*" else "-"
+                            Text("$selectedMark $worktreePath: $count")
+                        }
+                    }
+                }
                 Button(onClick = { onCreateTerminalAtPath(path) }) {
                     Text("New terminal")
                 }
@@ -1289,7 +1651,11 @@ private fun TerminalSessionRow(
     onOpenTerminalSession: (TerminalSessionRecord) -> Unit,
     onDeleteTerminalSession: (TerminalSessionRecord, String) -> Unit,
 ) {
-    Card(Modifier.fillMaxWidth()) {
+    Card(
+        Modifier
+            .fillMaxWidth()
+            .clickable { onOpenTerminalSession(session) },
+    ) {
         Row(
             modifier = Modifier.padding(GoblinSpacing.Md),
             horizontalArrangement = Arrangement.SpaceBetween,

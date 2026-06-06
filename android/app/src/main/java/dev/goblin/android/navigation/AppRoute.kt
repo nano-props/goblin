@@ -1,6 +1,6 @@
 package dev.goblin.android.navigation
 
-import dev.goblin.android.terminal.TerminalSessionRecord
+import dev.goblin.android.terminals.TerminalSessionRecord
 
 sealed interface AppRoute {
     data object Hosts : AppRoute

@@ -1,4 +1,4 @@
-package dev.goblin.android.terminal
+package dev.goblin.android.terminals
 
 const val TerminalSessionIntentExtra = "dev.goblin.android.extra.TERMINAL_SESSION_ID"
 
@@ -15,23 +15,23 @@ object TerminalNotificationFactory {
 
     fun contentFor(sessions: List<TerminalSessionRecord>): TerminalNotificationContent {
         val running = sessions.filter { it.status == TerminalSessionStatus.Running }
-        val recent = mostRecentRunningSession(running)
+        val first = firstRunningSession(running)
         val count = running.size
         val title = when (count) {
             0 -> "No terminals running"
             1 -> "1 terminal running"
             else -> "$count terminals running"
         }
-        val text = recent?.targetLabel ?: "No active terminal"
+        val text = first?.targetLabel ?: "No active terminal"
         return TerminalNotificationContent(
             title = title,
             text = text,
-            terminalSessionId = recent?.id,
+            terminalSessionId = first?.id,
         )
     }
 
-    fun mostRecentRunningSession(sessions: List<TerminalSessionRecord>): TerminalSessionRecord? =
+    fun firstRunningSession(sessions: List<TerminalSessionRecord>): TerminalSessionRecord? =
         sessions
             .filter { it.status == TerminalSessionStatus.Running }
-            .maxWithOrNull(compareBy<TerminalSessionRecord> { it.lastActivityAt ?: Long.MIN_VALUE }.thenBy { it.openedAt })
+            .minByOrNull { it.openedAt }
 }

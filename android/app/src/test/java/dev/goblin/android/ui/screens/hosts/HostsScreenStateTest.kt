@@ -11,10 +11,10 @@ import org.junit.Test
 class HostsScreenStateTest {
     @Test
     fun `host temporary terminal opens at home directory without a project`() {
-        assertEquals("~", HOST_TEMPORARY_TERMINAL_REMOTE_PATH)
-        assertTrue(isHostTemporaryTerminal("~", repositoryId = null))
-        assertFalse(isHostTemporaryTerminal("/", repositoryId = null))
-        assertFalse(isHostTemporaryTerminal("~", repositoryId = "repo-1"))
+        assertEquals("/", HOST_TEMPORARY_TERMINAL_REMOTE_PATH)
+        assertTrue(isHostTemporaryTerminal("/", repositoryId = null))
+        assertFalse(isHostTemporaryTerminal("~", repositoryId = null))
+        assertFalse(isHostTemporaryTerminal("/", repositoryId = "repo-1"))
     }
 
     @Test

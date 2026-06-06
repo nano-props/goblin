@@ -1,4 +1,4 @@
-package dev.goblin.android.terminal
+package dev.goblin.android.terminals
 
 import dev.goblin.android.domain.ssh.RemoteTarget
 import dev.goblin.android.ssh.SshConnectionSecrets
@@ -88,6 +88,7 @@ class TerminalForegroundBridgeTest {
             onFailure: (Throwable) -> Unit,
         ): TerminalSession = object : TerminalSession {
             override val id: String = "backend-session-1"
+            override fun isConnected(): Boolean = true
             override fun sendInput(value: String) = Unit
             override fun resize(cols: Int, rows: Int) = Unit
             override fun close() = Unit

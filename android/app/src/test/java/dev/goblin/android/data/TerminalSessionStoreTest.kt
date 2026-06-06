@@ -1,9 +1,9 @@
 package dev.goblin.android.data
 
-import dev.goblin.android.terminal.TerminalDisconnectedReason
-import dev.goblin.android.terminal.TerminalSessionRecord
-import dev.goblin.android.terminal.TerminalSessionStatus
-import dev.goblin.android.terminal.terminalOutputSnapshot
+import dev.goblin.android.terminals.TerminalDisconnectedReason
+import dev.goblin.android.terminals.TerminalSessionRecord
+import dev.goblin.android.terminals.TerminalSessionStatus
+import dev.goblin.android.terminals.terminalOutputSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -21,6 +21,7 @@ class TerminalSessionStoreTest {
         assertEquals("host-1", decoded.single().hostId)
         assertEquals("repo-1", decoded.single().repositoryId)
         assertEquals("/srv/app", decoded.single().remotePath)
+        assertEquals("terminal-1", decoded.single().displayName)
         assertEquals(TerminalSessionStatus.Disconnected, decoded.single().status)
         assertEquals(250L, decoded.single().lastActivityAt)
         assertEquals("recent output", decoded.single().lastOutputSnapshot)
@@ -73,6 +74,7 @@ class TerminalSessionStoreTest {
         remotePath = "/srv/app",
         targetLabel = "App - /srv/app",
         status = TerminalSessionStatus.Disconnected,
+        displayName = "terminal-1",
         lastOutputSnapshot = lastOutputSnapshot,
         lastActivityAt = 250L,
         openedAt = 100L,

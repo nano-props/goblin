@@ -1,4 +1,4 @@
-package dev.goblin.android.terminal
+package dev.goblin.android.terminals
 
 import dev.goblin.android.data.ssh.HostKeyTrustStore
 import dev.goblin.android.data.ssh.SecureIdentityStore
@@ -20,6 +20,7 @@ import net.schmizz.sshj.transport.verification.HostKeyVerifier
 class SshTerminalService(
     private val identityStore: SecureIdentityStore? = null,
     private val hostKeyTrustStore: HostKeyTrustStore? = null,
+    private val keepAliveIntervalSeconds: () -> Long = { TerminalHeartbeatIntervalSeconds },
 ) : TerminalSessionFactory {
     // Shares the same SSHJ boundary and trust expectations as SshClientFacade.kt.
     override fun openShell(
@@ -32,6 +33,9 @@ class SshTerminalService(
         onFailure: (Throwable) -> Unit,
     ): TerminalSession {
         val client = SshjClients.create()
+        val interval = keepAliveIntervalSeconds()
+            .coerceIn(MinTerminalHeartbeatIntervalSeconds..MaxTerminalHeartbeatIntervalSeconds)
+        client.getConnection().getKeepAlive().setKeepAliveInterval(interval.toInt())
         client.addHostKeyVerifier(capturingVerifier(target, secrets.acceptedHostFingerprint))
         client.connect(target.host, target.port)
         val identityBytes = secrets.identityBytes ?: target.identityRefId?.let { identityStore?.loadProtectedBytesById(it) }

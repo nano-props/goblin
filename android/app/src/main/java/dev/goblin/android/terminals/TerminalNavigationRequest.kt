@@ -1,4 +1,4 @@
-package dev.goblin.android.terminal
+package dev.goblin.android.terminals
 
 data class TerminalNavigationRequest(
     val sessionId: String,

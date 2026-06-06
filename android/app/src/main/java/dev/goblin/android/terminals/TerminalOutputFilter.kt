@@ -1,4 +1,4 @@
-package dev.goblin.android.terminal
+package dev.goblin.android.terminals
 
 class TerminalOutputFilter {
     private var pendingControlSequence: String = ""

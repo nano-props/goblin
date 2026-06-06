@@ -1,4 +1,4 @@
-package dev.goblin.android.terminal
+package dev.goblin.android.terminals
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -79,10 +79,10 @@ class TerminalForegroundService : Service() {
         }
 
     companion object {
-        private const val ActionStartOrUpdate = "dev.goblin.android.terminal.START_OR_UPDATE"
-        private const val ActionStop = "dev.goblin.android.terminal.STOP"
-        private const val ExtraTitle = "dev.goblin.android.terminal.extra.TITLE"
-        private const val ExtraText = "dev.goblin.android.terminal.extra.TEXT"
+        private const val ActionStartOrUpdate = "dev.goblin.android.terminals.START_OR_UPDATE"
+        private const val ActionStop = "dev.goblin.android.terminals.STOP"
+        private const val ExtraTitle = "dev.goblin.android.terminals.extra.TITLE"
+        private const val ExtraText = "dev.goblin.android.terminals.extra.TEXT"
 
         fun startIntent(context: Context, content: TerminalNotificationContent): Intent =
             Intent(context, TerminalForegroundService::class.java).apply {

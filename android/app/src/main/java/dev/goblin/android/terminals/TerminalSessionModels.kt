@@ -1,4 +1,4 @@
-package dev.goblin.android.terminal
+package dev.goblin.android.terminals
 
 data class TerminalSessionRecord(
     val id: String,
@@ -6,6 +6,7 @@ data class TerminalSessionRecord(
     val repositoryId: String?,
     val remotePath: String,
     val targetLabel: String,
+    val displayName: String = "",
     val status: TerminalSessionStatus,
     val lastOutputSnapshot: String = "",
     val lastActivityAt: Long? = null,

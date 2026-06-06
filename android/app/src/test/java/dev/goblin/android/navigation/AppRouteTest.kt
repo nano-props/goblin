@@ -1,7 +1,7 @@
 package dev.goblin.android.navigation
 
-import dev.goblin.android.terminal.TerminalSessionRecord
-import dev.goblin.android.terminal.TerminalSessionStatus
+import dev.goblin.android.terminals.TerminalSessionRecord
+import dev.goblin.android.terminals.TerminalSessionStatus
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

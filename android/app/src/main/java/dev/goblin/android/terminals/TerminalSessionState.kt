@@ -1,4 +1,4 @@
-package dev.goblin.android.terminal
+package dev.goblin.android.terminals
 
 sealed interface TerminalSessionState {
     data object Idle : TerminalSessionState

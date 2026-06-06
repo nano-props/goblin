@@ -1,4 +1,4 @@
-package dev.goblin.android.terminal
+package dev.goblin.android.terminals
 
 import dev.goblin.android.data.TerminalSessionSnapshotStore
 import dev.goblin.android.domain.ssh.RemoteTarget
@@ -12,20 +12,25 @@ class TerminalSessionManager(
     private val clock: () -> Long = System::currentTimeMillis,
     private val idGenerator: () -> String = { UUID.randomUUID().toString() },
     private val sessionStore: TerminalSessionSnapshotStore? = null,
+    private val heartbeatIntervalSeconds: () -> Long = { TerminalHeartbeatIntervalSeconds },
+    private val heartbeatFailureThreshold: () -> Int = { TerminalHeartbeatFailureThreshold },
 ) {
     private val lock = Any()
     private val sessions = linkedMapOf<String, TerminalSessionRecord>()
     private val controllers = mutableMapOf<String, TerminalController>()
+    private val heartbeatFailureStreaks = mutableMapOf<String, Int>()
     private val observers = mutableMapOf<String, MutableMap<String, (TerminalSessionRecord) -> Unit>>()
     private val collectionObservers = mutableMapOf<String, (List<TerminalSessionRecord>) -> Unit>()
     private val heartbeatScheduler = Executors.newSingleThreadScheduledExecutor { task ->
         Thread(task, "goblin-terminal-heartbeat").apply { isDaemon = true }
     }
+    private var nextHeartbeatRunAt = 0L
 
     init {
         val restored = sessionStore
             ?.loadSessions()
             ?.map(::staleRunningAsDisconnected)
+            ?.let(::normalizeTerminalSessionDisplayNames)
             .orEmpty()
         if (restored.isNotEmpty()) {
             synchronized(lock) {
@@ -33,10 +38,10 @@ class TerminalSessionManager(
             }
             sessionStore?.saveSessions(restored)
         }
-        heartbeatScheduler.scheduleAtFixedRate(
+        heartbeatScheduler.scheduleWithFixedDelay(
             ::checkRunningSessionsHeartbeat,
-            HEARTBEAT_INTERVAL_SECONDS,
-            HEARTBEAT_INTERVAL_SECONDS,
+            1,
+            1,
             TimeUnit.SECONDS,
         )
     }
@@ -49,13 +54,18 @@ class TerminalSessionManager(
         sessions[sessionId]
     }
 
+    fun touchSession(sessionId: String): TerminalSessionRecord? = updateSession(sessionId) {
+        it.copy(lastActivityAt = clock())
+    }
+
     fun createOrAttach(
         target: RemoteTarget,
         repositoryId: String?,
         targetLabel: String,
         secrets: SshConnectionSecrets = SshConnectionSecrets(),
     ): TerminalSessionRecord {
-        findAttachable(target, repositoryId)?.let { return it }
+        findAttachable(target, repositoryId)
+            ?.let { it -> return touchSession(it.id) ?: it }
         return createNew(
             target = target,
             repositoryId = repositoryId,
@@ -72,12 +82,16 @@ class TerminalSessionManager(
     ): TerminalSessionRecord {
         val sessionId = idGenerator()
         val openedAt = clock()
+        val displayName = synchronized(lock) {
+            nextWorkspaceTerminalDisplayName(hostId = target.id, remotePath = target.remotePath)
+        }
         val starting = TerminalSessionRecord(
             id = sessionId,
             hostId = target.id,
             repositoryId = repositoryId,
             remotePath = target.remotePath,
             targetLabel = targetLabel,
+            displayName = displayName,
             status = TerminalSessionStatus.Starting,
             openedAt = openedAt,
             lastActivityAt = openedAt,
@@ -88,6 +102,7 @@ class TerminalSessionManager(
         synchronized(lock) {
             sessions[sessionId] = starting
             controllers[sessionId] = controller
+            heartbeatFailureStreaks[sessionId] = 0
         }
         persist(starting)
         notifyObservers(starting)
@@ -176,6 +191,7 @@ class TerminalSessionManager(
         val removed = synchronized(lock) {
             val record = sessions.remove(sessionId) ?: return null
             val controller = controllers.remove(sessionId)
+            heartbeatFailureStreaks.remove(sessionId)
             observers.remove(sessionId)
             record to controller
         }
@@ -217,18 +233,41 @@ class TerminalSessionManager(
     }
 
     private fun checkRunningSessionsHeartbeat() {
-        val runningSessionIds = synchronized(lock) {
+        val now = clock()
+        val intervalSeconds = heartbeatIntervalSeconds()
+            .coerceIn(MinTerminalHeartbeatIntervalSeconds..MaxTerminalHeartbeatIntervalSeconds)
+        val failureThreshold = heartbeatFailureThreshold()
+            .coerceIn(MinTerminalHeartbeatFailureThreshold..MaxTerminalHeartbeatFailureThreshold)
+        val due = now >= nextHeartbeatRunAt
+        if (nextHeartbeatRunAt == 0L || due && intervalSeconds > 0L) {
+            nextHeartbeatRunAt = now + intervalSeconds * 1000L
+        }
+        if (!due) return
+
+        val runningSessionControllers = synchronized(lock) {
             sessions.values
                 .asSequence()
                 .filter { it.status == TerminalSessionStatus.Running }
-                .map { it.id }
+                .mapNotNull { session ->
+                    val id = session.id
+                    controllers[id]?.let { id to it }
+                }
                 .toList()
         }
-        if (runningSessionIds.isEmpty()) return
-        runningSessionIds.forEach { sessionId ->
-            val controller = synchronized(lock) { controllers[sessionId] } ?: return@forEach
+        if (runningSessionControllers.isEmpty()) return
+        runningSessionControllers.forEach { (sessionId, controller) ->
             val alive = runCatching { controller.isConnected() }.getOrDefault(false)
-            if (!alive) {
+            val shouldDisconnect = synchronized(lock) {
+                if (alive) {
+                    heartbeatFailureStreaks.remove(sessionId)
+                    false
+                } else {
+                    val nextFailureCount = (heartbeatFailureStreaks[sessionId] ?: 0) + 1
+                    heartbeatFailureStreaks[sessionId] = nextFailureCount
+                    nextFailureCount >= failureThreshold
+                }
+            }
+            if (shouldDisconnect) {
                 runCatching { controller.disconnectForHeartbeat() }
             }
         }
@@ -301,6 +340,7 @@ class TerminalSessionManager(
             if (next == current) return current
             sessions[sessionId] = next
             if (next.status !in attachableStatuses) controllers.remove(sessionId)
+            if (next.status !in attachableStatuses) heartbeatFailureStreaks.remove(sessionId)
             next
         }
         persist(updated)
@@ -362,6 +402,55 @@ class TerminalSessionManager(
             .thenByDescending { it.lastActivityAt ?: it.openedAt }
             .thenBy { it.openedAt }
 
+    private fun nextWorkspaceTerminalDisplayName(hostId: String, remotePath: String): String {
+        val normalizedPath = terminalSessionRemotePath(remotePath)
+        val workspaceSessions = sessions.values
+            .asSequence()
+            .filter { it.hostId == hostId && terminalSessionRemotePath(it.remotePath) == normalizedPath }
+            .toList()
+        val maxIndex = workspaceSessions
+            .mapNotNull { terminalDisplayNameIndex(it.displayName) }
+            .maxOrNull() ?: 0
+        if (maxIndex == 0) {
+            return terminalSessionDisplayNameFromIndex(workspaceSessions.size + 1)
+        }
+        return terminalSessionDisplayNameFromIndex(maxIndex + 1)
+    }
+
+    private fun normalizeTerminalSessionDisplayNames(sessions: List<TerminalSessionRecord>): List<TerminalSessionRecord> {
+        if (sessions.isEmpty()) return sessions
+
+        val updatedById = sessions.associateBy { it.id }.toMutableMap()
+        val sessionsByWorkspace = sessions.groupBy { it.hostId to terminalSessionRemotePath(it.remotePath) }
+        sessionsByWorkspace.values.forEach { workspaceSessions ->
+            val orderedSessions = workspaceSessions
+                .sortedWith(compareBy<TerminalSessionRecord> { it.openedAt }.thenBy { it.id })
+            val usedIndices = orderedSessions
+                .mapNotNull { terminalDisplayNameIndex(it.displayName) }
+                .toMutableSet()
+            var nextIndex = 1
+
+            orderedSessions.forEach { session ->
+                if (terminalDisplayNameIndex(session.displayName) != null) return@forEach
+                while (usedIndices.contains(nextIndex)) {
+                    nextIndex += 1
+                }
+                updatedById[session.id] = session.copy(displayName = terminalSessionDisplayNameFromIndex(nextIndex))
+                usedIndices.add(nextIndex)
+                nextIndex += 1
+            }
+        }
+        return sessions.map { updatedById[it.id] ?: it }
+    }
+
+    private fun terminalDisplayNameIndex(displayName: String): Int? =
+        TerminalDisplayNamePattern.matchEntire(displayName)?.groupValues?.getOrNull(1)?.toIntOrNull()
+
+    private fun terminalSessionDisplayNameFromIndex(index: Int): String = "terminal-$index"
+
+    private fun terminalSessionRemotePath(remotePath: String): String =
+        remotePath.ifBlank { "/" }.trimEnd('/').ifEmpty { "/" }
+
     private fun TerminalDisconnectedReason.toInactiveStatus(): TerminalSessionStatus =
         when (this) {
             TerminalDisconnectedReason.SshDisconnected,
@@ -375,7 +464,7 @@ class TerminalSessionManager(
 
     private companion object {
         val attachableStatuses = setOf(TerminalSessionStatus.Starting, TerminalSessionStatus.Running)
-        private const val HEARTBEAT_INTERVAL_SECONDS = 30L
+        val TerminalDisplayNamePattern = Regex("^terminal-(\\d+)$")
     }
 }
 
@@ -385,11 +474,15 @@ object TerminalSessionRuntime {
     fun manager(
         terminalService: TerminalSessionFactory,
         sessionStore: TerminalSessionSnapshotStore? = null,
+        heartbeatIntervalSeconds: () -> Long = { TerminalHeartbeatIntervalSeconds },
+        heartbeatFailureThreshold: () -> Int = { TerminalHeartbeatFailureThreshold },
     ): TerminalSessionManager =
         synchronized(this) {
             manager ?: TerminalSessionManager(
                 terminalService = terminalService,
                 sessionStore = sessionStore,
+                heartbeatIntervalSeconds = heartbeatIntervalSeconds,
+                heartbeatFailureThreshold = heartbeatFailureThreshold,
             ).also { manager = it }
         }
 }

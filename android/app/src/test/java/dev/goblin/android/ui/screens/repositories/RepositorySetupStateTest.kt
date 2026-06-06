@@ -2,14 +2,15 @@ package dev.goblin.android.ui.screens.repositories
 
 import dev.goblin.android.domain.ResourceState
 import dev.goblin.android.domain.ssh.RemoteDirectoryEntry
+import dev.goblin.android.domain.ssh.RemoteRepositoryBranch
 import dev.goblin.android.domain.ssh.RemoteRepositoryProfile
 import dev.goblin.android.domain.ssh.RemoteRepositoryInspection
 import dev.goblin.android.domain.ssh.RemoteRepositorySnapshot
 import dev.goblin.android.domain.ssh.RemoteRepositoryWorktree
 import dev.goblin.android.domain.ssh.SshHostProfile
-import dev.goblin.android.terminal.TerminalDisconnectedReason
-import dev.goblin.android.terminal.TerminalSessionRecord
-import dev.goblin.android.terminal.TerminalSessionStatus
+import dev.goblin.android.terminals.TerminalDisconnectedReason
+import dev.goblin.android.terminals.TerminalSessionRecord
+import dev.goblin.android.terminals.TerminalSessionStatus
 import dev.goblin.android.ui.screens.placeholders.localTerminalPlaceholderText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -74,7 +75,6 @@ class RepositorySetupStateTest {
             listOf(
                 RepositoryWorkspaceTab.Branches,
                 RepositoryWorkspaceTab.Worktrees,
-                RepositoryWorkspaceTab.Changes,
                 RepositoryWorkspaceTab.Terminal,
             ),
             repositoryWorkspaceTabs(repository),
@@ -99,9 +99,9 @@ class RepositorySetupStateTest {
         assertEquals(
             0,
             repositoryWorkspaceTabIndex(
-                tabs = listOf(RepositoryWorkspaceTab.Changes),
+                tabs = listOf(RepositoryWorkspaceTab.Branches),
                 selectedTab = RepositoryWorkspaceTab.Ports,
-                fallback = RepositoryWorkspaceTab.Changes,
+                fallback = RepositoryWorkspaceTab.Branches,
             ),
         )
     }
@@ -132,22 +132,22 @@ class RepositorySetupStateTest {
     }
 
     @Test
-    fun `terminal workspace sessions are filtered by repository and path`() {
+    fun `terminal workspace sessions are filtered by host and path`() {
         val appTerminal = terminalSession(
             id = "terminal-1",
-            repositoryId = "repo-1",
+            hostId = "host-1",
             remotePath = "/srv/app",
             openedAt = 100,
         )
         val otherPath = terminalSession(
             id = "terminal-2",
-            repositoryId = "repo-1",
+            hostId = "host-1",
             remotePath = "/srv/other",
             openedAt = 200,
         )
-        val otherRepository = terminalSession(
+        val otherHost = terminalSession(
             id = "terminal-3",
-            repositoryId = "repo-2",
+            hostId = "host-2",
             remotePath = "/srv/app",
             openedAt = 300,
         )
@@ -155,8 +155,8 @@ class RepositorySetupStateTest {
         assertEquals(
             listOf(appTerminal),
             terminalWorkspaceSessions(
-                sessions = listOf(otherPath, appTerminal, otherRepository),
-                repositoryId = "repo-1",
+                sessions = listOf(otherPath, appTerminal, otherHost),
+                hostId = "host-1",
                 remotePath = "/srv/app",
             ),
         )
@@ -188,7 +188,7 @@ class RepositorySetupStateTest {
             listOf(newerRunning, olderRunning, exited),
             terminalWorkspaceSessions(
                 sessions = listOf(exited, olderRunning, newerRunning),
-                repositoryId = "repo-1",
+                hostId = "host-1",
                 remotePath = "/srv/app",
             ),
         )
@@ -291,6 +291,68 @@ class RepositorySetupStateTest {
     }
 
     @Test
+    fun `new branch name is recommended from base branch and avoids conflicts`() {
+        assertEquals(
+            "main-new",
+            suggestedBranchName(baseBranch = "main", existingBranchNames = emptySet()),
+        )
+        assertEquals(
+            "feature/android-new-2",
+            suggestedBranchName(
+                baseBranch = "feature/android",
+                existingBranchNames = setOf("feature/android-new"),
+            ),
+        )
+    }
+
+    @Test
+    fun `branch create requires base branch and unique editable new branch`() {
+        val existing = setOf("main", "main-new")
+
+        assertFalse(canCreateBranch(baseBranch = "", newBranch = "main-new-2", existingBranchNames = existing))
+        assertFalse(canCreateBranch(baseBranch = "main", newBranch = "", existingBranchNames = existing))
+        assertFalse(canCreateBranch(baseBranch = "main", newBranch = "main-new", existingBranchNames = existing))
+        assertTrue(canCreateBranch(baseBranch = "main", newBranch = "main-new-2", existingBranchNames = existing))
+    }
+
+    @Test
+    fun `branch delete safety blocks current default and worktree branches`() {
+        assertEquals("Current branch cannot be deleted.", branchDeleteBlockedReason(branch(isCurrent = true)))
+        assertEquals("Default branch cannot be deleted.", branchDeleteBlockedReason(branch(isDefault = true)))
+        assertEquals(
+            "Branch with a worktree cannot be deleted.",
+            branchDeleteBlockedReason(branch(worktreePath = "/srv/app-feature")),
+        )
+        assertNull(branchDeleteBlockedReason(branch()))
+        assertFalse(canDeleteBranch(branch(isCurrent = true)))
+        assertTrue(canDeleteBranch(branch()))
+    }
+
+    @Test
+    fun `branch delete confirmation names remote branch`() {
+        val text = branchDeleteConfirmationText(branch(name = "feature/android"))
+
+        assertTrue(text.contains("feature/android"))
+        assertTrue(text.contains("remote branch"))
+        assertTrue(text.contains("not delete worktrees"))
+    }
+
+    @Test
+    fun `branch checkout is available only for non current branches`() {
+        assertFalse(canCheckoutBranch(branch(isCurrent = true)))
+        assertTrue(canCheckoutBranch(branch(isCurrent = false)))
+    }
+
+    @Test
+    fun `branch checkout confirmation names target branch`() {
+        val text = branchCheckoutConfirmationText(branch(name = "feature/android"))
+
+        assertTrue(text.contains("feature/android"))
+        assertTrue(text.contains("remote branch"))
+        assertTrue(text.contains("working tree"))
+    }
+
+    @Test
     fun `local project delete removes only the selected saved project record`() {
         val app = repository(id = "repo-1", remotePath = "/srv/app")
         val api = repository(id = "repo-2", remotePath = "/srv/api")
@@ -378,6 +440,7 @@ class RepositorySetupStateTest {
 
     private fun terminalSession(
         id: String = "terminal-1",
+        hostId: String = "host-1",
         repositoryId: String = "repo-1",
         remotePath: String = "/srv/app",
         status: TerminalSessionStatus = TerminalSessionStatus.Running,
@@ -387,7 +450,7 @@ class RepositorySetupStateTest {
         disconnectedReason: TerminalDisconnectedReason? = null,
     ): TerminalSessionRecord = TerminalSessionRecord(
         id = id,
-        hostId = "host-1",
+        hostId = hostId,
         repositoryId = repositoryId,
         remotePath = remotePath,
         targetLabel = "App - $remotePath",
@@ -396,6 +459,18 @@ class RepositorySetupStateTest {
         lastActivityAt = lastActivityAt,
         foregroundServiceOwned = foregroundServiceOwned,
         disconnectedReason = disconnectedReason,
+    )
+
+    private fun branch(
+        name: String = "feature/android",
+        isCurrent: Boolean = false,
+        isDefault: Boolean = false,
+        worktreePath: String? = null,
+    ): RemoteRepositoryBranch = RemoteRepositoryBranch(
+        name = name,
+        isCurrent = isCurrent,
+        isDefault = isDefault,
+        worktreePath = worktreePath,
     )
 
     private fun snapshot(): RemoteRepositorySnapshot = RemoteRepositorySnapshot(

@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.mutableStateOf
 import dev.goblin.android.data.HostProfileStore
+import dev.goblin.android.data.TerminalSettingsStore
 import dev.goblin.android.data.RemoteRepositoryStore
 import dev.goblin.android.data.TerminalSessionStore
 import dev.goblin.android.data.ssh.HostKeyStore
@@ -13,16 +14,17 @@ import dev.goblin.android.ssh.SshDiagnosticsService
 import dev.goblin.android.ssh.SshInitializationService
 import dev.goblin.android.ssh.SshjInitializationClient
 import dev.goblin.android.ssh.SshjClientFacade
+import dev.goblin.android.ssh.RemoteBranchService
 import dev.goblin.android.ssh.RemoteRepositoryGitService
 import dev.goblin.android.ssh.RemoteWorktreeService
 import dev.goblin.android.ssh.PortForwardManager
 import dev.goblin.android.ssh.SshjPortForwardBackend
-import dev.goblin.android.terminal.AndroidTerminalForegroundOwner
-import dev.goblin.android.terminal.SshTerminalService
-import dev.goblin.android.terminal.TerminalForegroundBridge
-import dev.goblin.android.terminal.TerminalNavigationRequest
-import dev.goblin.android.terminal.TerminalSessionIntentExtra
-import dev.goblin.android.terminal.TerminalSessionRuntime
+import dev.goblin.android.terminals.AndroidTerminalForegroundOwner
+import dev.goblin.android.terminals.SshTerminalService
+import dev.goblin.android.terminals.TerminalForegroundBridge
+import dev.goblin.android.terminals.TerminalNavigationRequest
+import dev.goblin.android.terminals.TerminalSessionIntentExtra
+import dev.goblin.android.terminals.TerminalSessionRuntime
 import dev.goblin.android.ui.theme.GoblinTheme
 
 class MainActivity : ComponentActivity() {
@@ -34,6 +36,7 @@ class MainActivity : ComponentActivity() {
         val hostProfileStore = HostProfileStore.create(this)
         val remoteRepositoryStore = RemoteRepositoryStore.create(this)
         val terminalSessionStore = TerminalSessionStore.create(this)
+        val terminalSettingsStore = TerminalSettingsStore.create(this)
         val secureIdentityStore = SecureIdentityStore.create(this)
         val hostKeyStore = HostKeyStore.create(this)
         val diagnosticsService = SshDiagnosticsService(
@@ -41,6 +44,10 @@ class MainActivity : ComponentActivity() {
             hostKeyStore = hostKeyStore,
         )
         val remoteRepositoryGitService = RemoteRepositoryGitService(
+            client = SshjClientFacade(identityStore = secureIdentityStore),
+            hostKeyStore = hostKeyStore,
+        )
+        val remoteBranchService = RemoteBranchService(
             client = SshjClientFacade(identityStore = secureIdentityStore),
             hostKeyStore = hostKeyStore,
         )
@@ -62,10 +69,13 @@ class MainActivity : ComponentActivity() {
         val terminalService = SshTerminalService(
             identityStore = secureIdentityStore,
             hostKeyTrustStore = hostKeyStore,
+            keepAliveIntervalSeconds = terminalSettingsStore::loadKeepAliveIntervalSeconds,
         )
         val terminalManager = TerminalSessionRuntime.manager(
             terminalService = terminalService,
             sessionStore = terminalSessionStore,
+            heartbeatIntervalSeconds = terminalSettingsStore::loadKeepAliveIntervalSeconds,
+            heartbeatFailureThreshold = terminalSettingsStore::loadHeartbeatFailureThreshold,
         )
         val terminalForegroundBridge = TerminalForegroundBridge(
             manager = terminalManager,
@@ -79,7 +89,9 @@ class MainActivity : ComponentActivity() {
                     secureIdentityStore = secureIdentityStore,
                     diagnosticsService = diagnosticsService,
                     remoteRepositoryGitService = remoteRepositoryGitService,
+                    remoteBranchService = remoteBranchService,
                     remoteWorktreeService = remoteWorktreeService,
+                    terminalSettingsStore = terminalSettingsStore,
                     portForwardManager = portForwardManager,
                     initializationService = initializationService,
                     terminalSessionManager = terminalManager,

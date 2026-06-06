@@ -21,7 +21,7 @@
             </intent-filter>
         </activity>
         <service
-            android:name=".terminal.TerminalForegroundService"
+            android:name=".terminals.TerminalForegroundService"
             android:exported="false"
             android:foregroundServiceType="specialUse">
             <property
