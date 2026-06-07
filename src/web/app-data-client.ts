@@ -29,6 +29,8 @@ import type {
   SshConfigHostsResult,
 } from '#/shared/remote-repo.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
+import { resolveApiBaseUrl } from '#/web/lib/websocket-url.ts'
+
 interface EmbeddedServerConfig {
   url: string
   secret: string
@@ -48,7 +50,7 @@ function requireEmbeddedServer(): EmbeddedServerConfig {
 
 async function fetchServerJson<T>(path: string, init?: RequestInit): Promise<T> {
   const server = requireEmbeddedServer()
-  const response = await fetch(new URL(path, server.url).toString(), {
+  const response = await fetch(new URL(path, resolveApiBaseUrl(server.url)).toString(), {
     ...init,
     headers: {
       'x-goblin-internal-secret': server.secret,
