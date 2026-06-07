@@ -332,15 +332,20 @@ export async function getRepositoryPullRequests(
 }
 
 export async function fetchRepository(cwd: string, kind: NetworkOpKind = 'user'): Promise<{ ok: boolean; message: string }> {
-  async function runFetch(task: (signal: AbortSignal) => Promise<{ ok: boolean; message: string }>) {
+  async function runFetch(
+    task: (signal: AbortSignal) => Promise<{ ok: boolean; message: string }>,
+    opts?: { skipInvalidation?: boolean },
+  ) {
     const result = await runServerCancellable(cwd, kind, task)
     if (result.ok) {
       await invalidateCachedRepoReadModel(cwd)
-      publishRepoQueryInvalidation({ repoId: cwd, query: 'repo-snapshot' })
+      if (!opts?.skipInvalidation) {
+        publishRepoQueryInvalidation({ repoId: cwd, query: 'repo-snapshot' })
+      }
     }
     return result
   }
-  async function executeFetch(): Promise<{ ok: boolean; message: string }> {
+  async function executeFetch(opts?: { skipInvalidation?: boolean }): Promise<{ ok: boolean; message: string }> {
     if (isRemoteRepoId(cwd)) {
       let target: RemoteRepoTarget
       try {
@@ -348,18 +353,22 @@ export async function fetchRepository(cwd: string, kind: NetworkOpKind = 'user')
       } catch (err) {
         return { ok: false, message: err instanceof Error ? err.message : 'error.ssh-config-changed' }
       }
-      return await runFetch((signal) => fetchRemoteRepository(target, { signal }))
+      return await runFetch((signal) => fetchRemoteRepository(target, { signal }), opts)
     }
     if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-arguments' }
     const available = await probeGitRepository(cwd)
     if (!available.ok) return available
-    return await runFetch((signal) => fetchAll(cwd, signal))
+    return await runFetch((signal) => fetchAll(cwd, signal), opts)
   }
 
   if (kind === 'user') {
     const backgroundFetch = activeBackgroundFetches.get(cwd)
     if (backgroundFetch) return await backgroundFetch
-    return await executeFetch()
+    // User-triggered fetches are followed by a client-side refreshAll
+    // in syncAndRefresh, so skip the invalidation to avoid a redundant
+    // snapshot+status refresh that can outlive the sync promise and
+    // block the next manual sync.
+    return await executeFetch({ skipInvalidation: true })
   }
 
   const existingBackgroundFetch = activeBackgroundFetches.get(cwd)

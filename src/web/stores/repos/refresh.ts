@@ -21,7 +21,6 @@ import {
   waitForRepoOperationsIdle,
 } from '#/web/stores/repos/runtime.ts'
 import {
-  runManualSyncResultWorkflow,
   runRefreshAllWorkflow,
   runSnapshotSuccessWorkflow,
 } from '#/web/stores/repos/refresh-workflows.ts'
@@ -138,15 +137,44 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
     })
   }
 
-  function syncStrategy(
-    repo: RepoState,
+  /** Attempt a best-effort fetch from configured remotes.
+   *  Returns null when the fetch was skipped (repo gone, unavailable,
+   *  or conflicting ops still active after a brief wait). */
+  async function attemptFetch(
+    id: string,
     token: number,
-  ): 'noop' | 'refresh-all' | 'wait-then-retry' | 'fetch' {
-    if (repo.instanceToken !== token) return 'noop'
-    if (repo.availability.phase === 'unavailable') return 'refresh-all'
-    if (repo.remote.hasRemotes === false) return 'refresh-all'
-    if (!canStartRemoteFetch(repo)) return 'wait-then-retry'
-    return 'fetch'
+  ): Promise<ExecResult | null> {
+    let repo = get().repos[id]
+    if (!repo || repo.instanceToken !== token) return null
+
+    // Skip fetch entirely when there are no remotes or the repo is
+    // unavailable — the caller will fall through to refreshAll.
+    if (repo.remote.hasRemotes !== true || repo.availability.phase === 'unavailable') return null
+
+    // If core operations are active, wait briefly for them to settle
+    // so manual sync doesn't stall behind a snapshot/status that is
+    // still running from a previous action. If they don't settle,
+    // skip the fetch and rely on refreshAll.
+    if (!canStartRemoteFetch(repo)) {
+      try {
+        await waitForRepoOperationsIdle(id, ['snapshot', 'status'])
+      } catch {
+        return null
+      }
+      repo = get().repos[id]
+      if (!repo || repo.instanceToken !== token || repo.availability.phase === 'unavailable') return null
+      if (!canStartRemoteFetch(repo)) return null
+    }
+
+    try {
+      return await runNetworkTask(id, (signal) => fetchRepository(id, 'user', signal), {
+        token,
+        reason: 'user-fetch',
+        priority: 100,
+      })
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : String(err) }
+    }
   }
 
   function pullRequestReason(mode: PullRequestFetchMode): RepoPullRequestReason {
@@ -424,46 +452,38 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       await runRefreshAllWorkflow(get, { id, token })
     },
 
+    /** Unified sync pipeline — local and remote repos follow the same path.
+     *  1) Attempt a best-effort fetch when remotes are configured.
+     *  2) Always refresh the local snapshot + status afterwards.
+     *  Bookkeeping (setLastResult, clearFetchFailed) is handled inline
+     *  so there is one source of truth for post-sync cleanup. */
     async syncAndRefresh(id: string, options?: { token?: number }) {
       const repoBefore = get().repos[id]
       if (!repoBefore) return
       const token = options?.token ?? repoBefore.instanceToken
+      if (repoBefore.instanceToken !== token) return
 
-      let strategy = syncStrategy(repoBefore, token)
-      if (strategy === 'noop') return
-
-      if (strategy === 'wait-then-retry') {
-        try {
-          await waitForRepoOperationsIdle(id, ['snapshot', 'status'])
-        } catch {
-          return
-        }
-        const repoAfterWait = get().repos[id]
-        strategy = repoAfterWait ? syncStrategy(repoAfterWait, token) : 'noop'
-        if (strategy === 'noop') return
-        if (strategy === 'wait-then-retry') strategy = 'refresh-all'
+      // Step 1: optional fetch — skipped when there are no remotes
+      let fetchResult: ExecResult | null = null
+      if (repoBefore.remote.hasRemotes === true && repoBefore.availability.phase !== 'unavailable') {
+        fetchResult = await attemptFetch(id, token)
       }
 
-      if (strategy === 'refresh-all') {
+      // Step 2: always refresh local state
+      const repoBeforeRefresh = get().repos[id]
+      if (repoBeforeRefresh && repoBeforeRefresh.instanceToken === token) {
         await get().refreshAll(id, { token })
-        return
       }
 
-      // strategy === 'fetch'
-      let result: ExecResult | null
-      try {
-        result = await runNetworkTask(id, (signal) => fetchRepository(id, 'user', signal), {
-          token,
-          reason: 'user-fetch',
-          priority: 100,
-        })
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err)
-        get().setLastResult(id, { ok: false, message }, token)
-        return
+      // Step 3: bookkeeping — surface the fetch result if present.
+      // Local-only repos never enter this branch because fetchResult is null.
+      if (fetchResult) {
+        if (fetchResult.ok) {
+          get().clearFetchFailed(id, token)
+        } else if (fetchResult.message !== 'cancelled') {
+          get().setLastResult(id, fetchResult, token)
+        }
       }
-      if (!result) return
-      await runManualSyncResultWorkflow(get, { id, token, result })
     },
   }
 }
