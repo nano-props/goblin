@@ -78,6 +78,7 @@ internal fun AndroidTerminalViewport(
                     factory = { context ->
                         GoblinTerminalView(context).apply {
                             setHorizontalViewportWidthPx(horizontalViewportWidthPx)
+                            setFitToScreen(fitToScreen)
                             setFontSizeSp(fontSizeSp)
                             bind(currentController)
                             requestFocus()
@@ -85,6 +86,7 @@ internal fun AndroidTerminalViewport(
                     },
                     update = { view ->
                         view.setHorizontalViewportWidthPx(horizontalViewportWidthPx)
+                        view.setFitToScreen(fitToScreen)
                         view.setFontSizeSp(fontSizeSp)
                         view.bind(currentController)
                         view.requestFocus()

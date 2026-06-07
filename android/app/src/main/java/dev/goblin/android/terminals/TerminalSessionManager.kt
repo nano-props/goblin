@@ -16,8 +16,12 @@ class TerminalSessionManager(
     private val sessionStore: TerminalSessionSnapshotStore? = null,
     private val heartbeatIntervalSeconds: () -> Long = { TerminalHeartbeatIntervalSeconds },
     private val heartbeatFailureThreshold: () -> Int = { TerminalHeartbeatFailureThreshold },
+    private val terminalWriteTimeoutMillis: () -> Long = { TerminalWriteTimeoutMillis },
     private val terminalIoExecutor: Executor = Executors.newSingleThreadExecutor { task ->
         Thread(task, "goblin-terminal-io").apply { isDaemon = true }
+    },
+    private val terminalCloseExecutor: Executor = Executors.newCachedThreadPool { task ->
+        Thread(task, "goblin-terminal-close").apply { isDaemon = true }
     },
     private val emulatorControllerFactory: (
         sessionId: String,
@@ -36,12 +40,14 @@ class TerminalSessionManager(
     private val controllers = mutableMapOf<String, TerminalController>()
     private val emulatorControllers = mutableMapOf<String, RemoteTerminalEmulatorController>()
     private val heartbeatFailureStreaks = mutableMapOf<String, Int>()
+    private val pendingTerminalWrites = mutableMapOf<String, PendingTerminalWrite>()
     private val observers = mutableMapOf<String, MutableMap<String, (TerminalSessionRecord) -> Unit>>()
     private val collectionObservers = mutableMapOf<String, (List<TerminalSessionRecord>) -> Unit>()
     private val heartbeatScheduler = Executors.newSingleThreadScheduledExecutor { task ->
         Thread(task, "goblin-terminal-heartbeat").apply { isDaemon = true }
     }
     private var nextHeartbeatRunAt = 0L
+    private var nextTerminalWriteId = 0L
 
     init {
         val restored = sessionStore
@@ -56,7 +62,7 @@ class TerminalSessionManager(
             sessionStore?.saveSessions(restored)
         }
         heartbeatScheduler.scheduleWithFixedDelay(
-            ::checkRunningSessionsHeartbeat,
+            ::checkTerminalBackgroundHealth,
             1,
             1,
             TimeUnit.SECONDS,
@@ -144,9 +150,10 @@ class TerminalSessionManager(
         if (existing.status in attachableStatuses) return touchSession(sessionId) ?: existing
         val controllerToClose = synchronized(lock) {
             emulatorControllers.remove(sessionId)?.detach()
+            pendingTerminalWrites.remove(sessionId)
             controllers.remove(sessionId)
         }
-        controllerToClose?.close()
+        controllerToClose?.let(::closeTerminalController)
 
         val starting = existing.copy(
             hostId = target.id,
@@ -229,11 +236,17 @@ class TerminalSessionManager(
     fun sendInputBytes(sessionId: String, value: ByteArray): Boolean {
         val controller = synchronized(lock) { controllers[sessionId] } ?: return false
         if (value.isEmpty()) return false
+        val writeId = beginTerminalWrite(sessionId, TerminalWriteOperation.Input)
         terminalIoExecutor.execute {
-            val sent = controller.sendInputBytes(value)
-            if (sent) {
-                updateSession(sessionId) {
-                    it.copy(lastActivityAt = clock())
+            var sent = false
+            try {
+                sent = controller.sendInputBytes(value)
+            } finally {
+                val stillCurrent = finishTerminalWrite(sessionId, writeId)
+                if (sent && stillCurrent) {
+                    updateSession(sessionId) {
+                        it.copy(lastActivityAt = clock())
+                    }
                 }
             }
         }
@@ -244,10 +257,85 @@ class TerminalSessionManager(
 
     fun resize(sessionId: String, cols: Int, rows: Int): Boolean {
         val controller = synchronized(lock) { controllers[sessionId] } ?: return false
+        val writeId = beginTerminalWrite(sessionId, TerminalWriteOperation.Resize)
         terminalIoExecutor.execute {
-            controller.resize(cols, rows)
+            try {
+                controller.resize(cols, rows)
+            } finally {
+                finishTerminalWrite(sessionId, writeId)
+            }
         }
         return true
+    }
+
+    private fun beginTerminalWrite(sessionId: String, operation: TerminalWriteOperation): Long {
+        val timeoutMillis = terminalWriteTimeoutMillis().coerceAtLeast(1L)
+        return synchronized(lock) {
+            nextTerminalWriteId += 1
+            val writeId = nextTerminalWriteId
+            pendingTerminalWrites[sessionId] = PendingTerminalWrite(
+                id = writeId,
+                deadlineAt = clock() + timeoutMillis,
+                operation = operation,
+            )
+            writeId
+        }
+    }
+
+    private fun finishTerminalWrite(sessionId: String, writeId: Long): Boolean =
+        synchronized(lock) {
+            val current = pendingTerminalWrites[sessionId]
+            if (current?.id != writeId) return@synchronized false
+            pendingTerminalWrites.remove(sessionId)
+            true
+        }
+
+    private fun checkTerminalBackgroundHealth() {
+        checkPendingTerminalWrites()
+        checkRunningSessionsHeartbeat()
+    }
+
+    private fun checkPendingTerminalWrites() {
+        val now = clock()
+        val expired = synchronized(lock) {
+            buildList {
+                val iterator = pendingTerminalWrites.entries.iterator()
+                while (iterator.hasNext()) {
+                    val (sessionId, pending) = iterator.next()
+                    if (now < pending.deadlineAt) continue
+                    val controller = controllers[sessionId]
+                    iterator.remove()
+                    if (controller != null) {
+                        add(
+                            ExpiredTerminalWrite(
+                                controller = controller,
+                                operation = pending.operation,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+        expired.forEach { expiredWrite ->
+            runCatching {
+                expiredWrite.controller.disconnectForWriteTimeout(
+                    message = expiredWrite.operation.timeoutMessage,
+                    closeSession = ::closeTerminalSession,
+                )
+            }
+        }
+    }
+
+    private fun closeTerminalController(controller: TerminalController) {
+        controller.close(::closeTerminalSession)
+    }
+
+    private fun closeTerminalSession(session: TerminalSession) {
+        terminalCloseExecutor.execute {
+            runCatching {
+                session.close()
+            }
+        }
     }
 
     fun close(sessionId: String): TerminalSessionRecord? {
@@ -256,7 +344,7 @@ class TerminalSessionManager(
 
         val controller = synchronized(lock) { controllers[sessionId] }
         if (controller != null) {
-            controller.close()
+            closeTerminalController(controller)
             return session(sessionId)
         }
         return updateSession(sessionId) {
@@ -276,13 +364,14 @@ class TerminalSessionManager(
             val controller = controllers.remove(sessionId)
             val emulatorController = emulatorControllers.remove(sessionId)
             heartbeatFailureStreaks.remove(sessionId)
+            pendingTerminalWrites.remove(sessionId)
             observers.remove(sessionId)
             Triple(record, controller, emulatorController)
         }
         val (record, controller, emulatorController) = removed
         emulatorController?.detach()
         if (record.status in attachableStatuses) {
-            controller?.close()
+            controller?.let(::closeTerminalController)
         }
         sessionStore?.deleteSession(record.id)
         notifyCollectionObservers()
@@ -436,8 +525,11 @@ class TerminalSessionManager(
             val next = transform(current)
             if (next == current) return current
             sessions[sessionId] = next
-            if (next.status !in attachableStatuses) controllers.remove(sessionId)
-            if (next.status !in attachableStatuses) heartbeatFailureStreaks.remove(sessionId)
+            if (next.status !in attachableStatuses) {
+                controllers.remove(sessionId)
+                heartbeatFailureStreaks.remove(sessionId)
+                pendingTerminalWrites.remove(sessionId)
+            }
             next
         }
         persist(updated)
@@ -553,6 +645,7 @@ class TerminalSessionManager(
         when (this) {
             TerminalDisconnectedReason.SshDisconnected,
             TerminalDisconnectedReason.AndroidServiceStopped,
+            TerminalDisconnectedReason.TerminalWriteTimeout,
             -> TerminalSessionStatus.Disconnected
             TerminalDisconnectedReason.UserClosed,
             TerminalDisconnectedReason.RemoteExited,
@@ -563,6 +656,22 @@ class TerminalSessionManager(
     private companion object {
         val attachableStatuses = setOf(TerminalSessionStatus.Starting, TerminalSessionStatus.Running)
         val TerminalDisplayNamePattern = Regex("^terminal-(\\d+)$")
+    }
+
+    private data class PendingTerminalWrite(
+        val id: Long,
+        val deadlineAt: Long,
+        val operation: TerminalWriteOperation,
+    )
+
+    private data class ExpiredTerminalWrite(
+        val controller: TerminalController,
+        val operation: TerminalWriteOperation,
+    )
+
+    private enum class TerminalWriteOperation(val timeoutMessage: String) {
+        Input("Terminal input write timed out."),
+        Resize("Terminal resize timed out."),
     }
 }
 

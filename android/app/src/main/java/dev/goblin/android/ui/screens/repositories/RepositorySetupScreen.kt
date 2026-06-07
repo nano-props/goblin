@@ -331,6 +331,7 @@ private fun terminalDisconnectedReasonLabel(reason: TerminalDisconnectedReason):
         TerminalDisconnectedReason.RemoteExited -> "remote exited"
         TerminalDisconnectedReason.SshDisconnected -> "ssh disconnected"
         TerminalDisconnectedReason.AndroidServiceStopped -> "android service stopped"
+        TerminalDisconnectedReason.TerminalWriteTimeout -> "terminal write timeout"
         TerminalDisconnectedReason.TerminalFailure -> "terminal failure"
     }
 

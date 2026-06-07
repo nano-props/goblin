@@ -47,6 +47,7 @@ enum class TerminalDisconnectedReason {
     RemoteExited,
     SshDisconnected,
     AndroidServiceStopped,
+    TerminalWriteTimeout,
     TerminalFailure,
 }
 

@@ -2,7 +2,6 @@ package dev.goblin.android.ui.screens.terminals
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Typeface
 import android.text.InputType
 import android.util.AttributeSet
 import android.util.TypedValue
@@ -14,6 +13,7 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import com.termux.view.TerminalRenderer
 import dev.goblin.android.terminals.emulator.RemoteTerminalEmulatorController
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 internal data class TerminalGridSize(val columns: Int, val rows: Int)
@@ -22,6 +22,7 @@ internal const val TerminalMinFontSizeSp = 12
 internal const val TerminalDefaultFontSizeSp = 12
 internal const val TerminalMaxFontSizeSp = 24
 internal const val TerminalFontSizeStepSp = 2
+internal const val TerminalCellWidthScale = 1.12f
 
 internal fun terminalHorizontalOffset(
     currentOffsetPx: Int,
@@ -38,6 +39,24 @@ internal fun terminalAdjustedFontSize(currentFontSizeSp: Int, steps: Int): Int {
         ?: TerminalDefaultFontSizeSp
     return (safeCurrent + (steps * TerminalFontSizeStepSp))
         .coerceIn(TerminalMinFontSizeSp, TerminalMaxFontSizeSp)
+}
+
+internal fun terminalCellWidthPx(measuredFontWidthPx: Float): Int =
+    ceil(measuredFontWidthPx * TerminalCellWidthScale)
+        .toInt()
+        .coerceAtLeast(1)
+
+internal fun terminalRenderScaleX(
+    widthPx: Int,
+    gridColumns: Int,
+    measuredFontWidthPx: Float,
+    fitToScreen: Boolean,
+): Float {
+    if (!fitToScreen) return 1f
+    val safeMeasuredWidth = measuredFontWidthPx.coerceAtLeast(1f)
+    val safeColumns = gridColumns.coerceAtLeast(1)
+    val renderedWidth = safeMeasuredWidth * safeColumns
+    return (widthPx.toFloat() / renderedWidth).coerceAtLeast(1f)
 }
 
 internal fun terminalGridSize(
@@ -76,7 +95,9 @@ internal class GoblinTerminalView @JvmOverloads constructor(
     private var controller: RemoteTerminalEmulatorController? = null
     private var observer: AutoCloseable? = null
     private var currentFontSizeSp = TerminalDefaultFontSizeSp
-    private var renderer = TerminalRenderer(currentFontSizeSp.spToPx(), Typeface.MONOSPACE)
+    private var fitToScreen = true
+    private val terminalTypeface = TerminalTypefaceProvider.terminalTypeface(context)
+    private var renderer = TerminalRenderer(currentFontSizeSp.spToPx(), terminalTypeface)
     private var lastGrid: TerminalGridSize? = null
     private var horizontalViewportWidthPx = 0
     private var horizontalOffsetPx = 0
@@ -120,11 +141,20 @@ internal class GoblinTerminalView @JvmOverloads constructor(
         setHorizontalOffset(horizontalOffset(deltaPx = 0))
     }
 
+    fun setFitToScreen(nextFitToScreen: Boolean) {
+        if (fitToScreen == nextFitToScreen) return
+        fitToScreen = nextFitToScreen
+        lastGrid = null
+        setHorizontalOffset(horizontalOffset(deltaPx = 0))
+        updateGrid(width, height)
+        invalidate()
+    }
+
     fun setFontSizeSp(nextFontSizeSp: Int) {
         val safeFontSizeSp = terminalAdjustedFontSize(nextFontSizeSp, steps = 0)
         if (currentFontSizeSp == safeFontSizeSp) return
         currentFontSizeSp = safeFontSizeSp
-        renderer = TerminalRenderer(currentFontSizeSp.spToPx(), Typeface.MONOSPACE)
+        renderer = TerminalRenderer(currentFontSizeSp.spToPx(), terminalTypeface)
         lastGrid = null
         updateGrid(width, height)
         invalidate()
@@ -154,8 +184,18 @@ internal class GoblinTerminalView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val activeController = controller ?: return
+        val grid = lastGrid
+        val horizontalScale = terminalRenderScaleX(
+            widthPx = width,
+            gridColumns = grid?.columns ?: activeController.emulator.mColumns,
+            measuredFontWidthPx = renderer.fontWidth,
+            fitToScreen = fitToScreen,
+        )
         val checkpoint = canvas.save()
         canvas.translate(-horizontalOffsetPx.toFloat(), 0f)
+        if (fitToScreen && horizontalScale != 1f) {
+            canvas.scale(horizontalScale, 1f)
+        }
         renderer.render(activeController.emulator, canvas, -scrollbackOffsetRows, -1, -1, -1, -1)
         canvas.restoreToCount(checkpoint)
     }
@@ -299,7 +339,7 @@ internal class GoblinTerminalView @JvmOverloads constructor(
     private fun updateGrid(widthPx: Int, heightPx: Int) {
         val activeController = controller ?: return
         if (widthPx <= 0 || heightPx <= 0) return
-        val cellWidthPx = renderer.fontWidth.roundToInt().coerceAtLeast(1)
+        val cellWidthPx = terminalCellWidthPx(renderer.fontWidth)
         val cellHeightPx = renderer.fontLineSpacing.coerceAtLeast(1)
         val nextGrid = terminalGridSize(widthPx, heightPx, cellWidthPx, cellHeightPx)
         if (nextGrid == lastGrid) return

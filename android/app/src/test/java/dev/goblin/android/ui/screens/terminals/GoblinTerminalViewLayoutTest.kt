@@ -22,6 +22,89 @@ class GoblinTerminalViewLayoutTest {
     }
 
     @Test
+    fun `terminal cell width adds breathing room for small fonts`() {
+        assertEquals(9, terminalCellWidthPx(measuredFontWidthPx = 8f))
+        assertEquals(12, terminalCellWidthPx(measuredFontWidthPx = 10.2f))
+    }
+
+    @Test
+    fun `grid size uses adjusted cell width to reduce visual density`() {
+        assertEquals(
+            TerminalGridSize(columns = 88, rows = 30),
+            terminalGridSize(
+                widthPx = 800,
+                heightPx = 540,
+                cellWidthPx = terminalCellWidthPx(measuredFontWidthPx = 8f),
+                cellHeightPx = 18,
+            ),
+        )
+    }
+
+    @Test
+    fun `fit render scale fills available viewport width`() {
+        val grid = terminalGridSize(
+            widthPx = 360,
+            heightPx = 540,
+            cellWidthPx = terminalCellWidthPx(measuredFontWidthPx = 8f),
+            cellHeightPx = 18,
+        )
+
+        val renderScale = terminalRenderScaleX(
+            widthPx = 360,
+            gridColumns = grid.columns,
+            measuredFontWidthPx = 8f,
+            fitToScreen = true,
+        )
+
+        assertEquals(40, grid.columns)
+        assertEquals(1.125f, renderScale, 0.001f)
+        assertEquals(360f, 8f * renderScale * grid.columns, 0.001f)
+    }
+
+    @Test
+    fun `fit render scale does not increase terminal grid columns`() {
+        val grid = terminalGridSize(
+            widthPx = 360,
+            heightPx = 540,
+            cellWidthPx = terminalCellWidthPx(measuredFontWidthPx = 8f),
+            cellHeightPx = 18,
+        )
+
+        assertEquals(
+            40,
+            grid.columns,
+        )
+    }
+
+    @Test
+    fun `original width render scale keeps measured renderer width`() {
+        assertEquals(
+            1f,
+            terminalRenderScaleX(
+                widthPx = 360,
+                gridColumns = 40,
+                measuredFontWidthPx = 8f,
+                fitToScreen = false,
+            ),
+            0.001f,
+        )
+    }
+
+    @Test
+    fun `fit render scale never compresses terminal text`() {
+        assertEquals(
+            1f,
+            terminalRenderScaleX(
+                widthPx = 300,
+                gridColumns = 40,
+                measuredFontWidthPx = 8f,
+                fitToScreen = true,
+            ),
+            0.001f,
+        )
+    }
+
+    @Test
     fun `fit to screen keeps terminal viewport at available width`() {
         assertEquals(
             360.dp,

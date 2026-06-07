@@ -34,6 +34,18 @@ class TerminalController(
         )
     }
 
+    fun disconnectForWriteTimeout(
+        message: String,
+        closeSession: (TerminalSession) -> Unit = { it.close() },
+    ) {
+        val current = session ?: return
+        runCatching { closeSession(current) }
+        fail(
+            IllegalStateException(message),
+            TerminalDisconnectedReason.TerminalWriteTimeout,
+        )
+    }
+
     fun open(target: RemoteTarget, secrets: SshConnectionSecrets = SshConnectionSecrets()) {
         session?.close()
         session = null
@@ -118,11 +130,11 @@ class TerminalController(
         )
     }
 
-    fun close() {
+    fun close(closeSession: (TerminalSession) -> Unit = { it.close() }) {
         val current = session ?: return
         session = null
         activeRemotePath = null
-        runCatching { current.close() }
+        runCatching { closeSession(current) }
         update(TerminalSessionState.Exited(current.id, reason = TerminalDisconnectedReason.UserClosed, output = output))
     }
 

@@ -331,6 +331,96 @@ class TerminalSessionManagerTest {
     }
 
     @Test
+    fun `pending terminal input write timeout disconnects stuck connected session`() {
+        var now = 1_000L
+        val executor = RecordingExecutor()
+        val service = FakeTerminalSessionFactory()
+        val manager = terminalSessionManager(
+            service = service,
+            now = { now },
+            terminalIoExecutor = executor,
+            terminalWriteTimeoutMillis = { 5_000L },
+        )
+        val record = manager.createOrAttach(target(), repositoryId = null, targetLabel = "Dev - /")
+
+        assertTrue(manager.sendInputBytes(record.id, "ls\n".toByteArray(Charsets.UTF_8)))
+        now += 5_001L
+        manager.runTerminalWriteTimeoutsForTest()
+
+        val disconnected = manager.session(record.id)
+        assertEquals(TerminalSessionStatus.Disconnected, disconnected?.status)
+        assertEquals(TerminalDisconnectedReason.TerminalWriteTimeout, disconnected?.disconnectedReason)
+        assertEquals("Terminal input write timed out.", disconnected?.disconnectedMessage)
+        assertEquals(1, service.session.closeCount)
+    }
+
+    @Test
+    fun `completed terminal input write does not disconnect after timeout window`() {
+        var now = 1_000L
+        val executor = RecordingExecutor()
+        val service = FakeTerminalSessionFactory()
+        val manager = terminalSessionManager(
+            service = service,
+            now = { now },
+            terminalIoExecutor = executor,
+            terminalWriteTimeoutMillis = { 5_000L },
+        )
+        val record = manager.createOrAttach(target(), repositoryId = null, targetLabel = "Dev - /")
+
+        assertTrue(manager.sendInputBytes(record.id, "ls\n".toByteArray(Charsets.UTF_8)))
+        executor.runNext()
+        now += 5_001L
+        manager.runTerminalWriteTimeoutsForTest()
+
+        assertEquals(TerminalSessionStatus.Running, manager.session(record.id)?.status)
+        assertEquals(listOf("ls\n"), service.session.sentInput)
+    }
+
+    @Test
+    fun `late terminal input write completion after timeout does not restore running status`() {
+        var now = 1_000L
+        val executor = RecordingExecutor()
+        val service = FakeTerminalSessionFactory()
+        val manager = terminalSessionManager(
+            service = service,
+            now = { now },
+            terminalIoExecutor = executor,
+            terminalWriteTimeoutMillis = { 5_000L },
+        )
+        val record = manager.createOrAttach(target(), repositoryId = null, targetLabel = "Dev - /")
+
+        assertTrue(manager.sendInputBytes(record.id, "ls\n".toByteArray(Charsets.UTF_8)))
+        now += 5_001L
+        manager.runTerminalWriteTimeoutsForTest()
+        executor.runNext()
+
+        assertEquals(TerminalSessionStatus.Disconnected, manager.session(record.id)?.status)
+        assertEquals(TerminalDisconnectedReason.TerminalWriteTimeout, manager.session(record.id)?.disconnectedReason)
+    }
+
+    @Test
+    fun `close pending terminal input write is not overwritten by later timeout`() {
+        var now = 1_000L
+        val executor = RecordingExecutor()
+        val service = FakeTerminalSessionFactory()
+        val manager = terminalSessionManager(
+            service = service,
+            now = { now },
+            terminalIoExecutor = executor,
+            terminalWriteTimeoutMillis = { 5_000L },
+        )
+        val record = manager.createOrAttach(target(), repositoryId = null, targetLabel = "Dev - /")
+
+        assertTrue(manager.sendInputBytes(record.id, "ls\n".toByteArray(Charsets.UTF_8)))
+        manager.close(record.id)
+        now += 5_001L
+        manager.runTerminalWriteTimeoutsForTest()
+
+        assertEquals(TerminalSessionStatus.Exited, manager.session(record.id)?.status)
+        assertEquals(TerminalDisconnectedReason.UserClosed, manager.session(record.id)?.disconnectedReason)
+    }
+
+    @Test
     fun `resize queues remote resize on terminal io executor`() {
         val executor = RecordingExecutor()
         val service = FakeTerminalSessionFactory()
@@ -492,7 +582,9 @@ class TerminalSessionManagerTest {
         ids: Iterator<String> = listOf("terminal-1").iterator(),
         heartbeatIntervalSeconds: () -> Long = { TerminalHeartbeatIntervalSeconds },
         heartbeatFailureThreshold: () -> Int = { TerminalHeartbeatFailureThreshold },
+        terminalWriteTimeoutMillis: () -> Long = { TerminalWriteTimeoutMillis },
         terminalIoExecutor: Executor = DirectExecutor,
+        terminalCloseExecutor: Executor = DirectExecutor,
     ): TerminalSessionManager = TerminalSessionManager(
         terminalService = service,
         clock = now,
@@ -500,7 +592,9 @@ class TerminalSessionManagerTest {
         sessionStore = store,
         heartbeatIntervalSeconds = heartbeatIntervalSeconds,
         heartbeatFailureThreshold = heartbeatFailureThreshold,
+        terminalWriteTimeoutMillis = terminalWriteTimeoutMillis,
         terminalIoExecutor = terminalIoExecutor,
+        terminalCloseExecutor = terminalCloseExecutor,
         emulatorControllerFactory = { sessionId, sendInputBytes, resizeRemote ->
             RemoteTerminalEmulatorController(
                 sessionId = sessionId,
@@ -642,6 +736,12 @@ class TerminalSessionManagerTest {
 
     private fun TerminalSessionManager.runHeartbeatForTest() {
         val method = TerminalSessionManager::class.java.getDeclaredMethod("checkRunningSessionsHeartbeat")
+        method.isAccessible = true
+        method.invoke(this)
+    }
+
+    private fun TerminalSessionManager.runTerminalWriteTimeoutsForTest() {
+        val method = TerminalSessionManager::class.java.getDeclaredMethod("checkPendingTerminalWrites")
         method.isAccessible = true
         method.invoke(this)
     }

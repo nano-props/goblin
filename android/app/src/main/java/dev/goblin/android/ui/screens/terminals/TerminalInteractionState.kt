@@ -290,6 +290,7 @@ private fun terminalReasonLabel(reason: TerminalDisconnectedReason): String = wh
     TerminalDisconnectedReason.RemoteExited -> "Remote exited"
     TerminalDisconnectedReason.SshDisconnected -> "SSH disconnected"
     TerminalDisconnectedReason.AndroidServiceStopped -> "Android service stopped"
+    TerminalDisconnectedReason.TerminalWriteTimeout -> "Terminal write timeout"
     TerminalDisconnectedReason.TerminalFailure -> "Terminal failure"
 }
 
