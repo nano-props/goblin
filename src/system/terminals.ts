@@ -31,6 +31,10 @@ const backends: Record<ResolvedTerminalApp, TerminalBackend> = {
 /** Auto-detection priority — first installed backend wins. */
 const AUTO_PRIORITY: ResolvedTerminalApp[] = ['ghostty', 'terminal']
 
+function isDarwin(): boolean {
+  return process.platform === 'darwin'
+}
+
 export function resolveTerminalApp(pref: TerminalPref, availability: TerminalAppAvailability): ResolvedTerminalApp | null {
   if (pref !== 'auto') {
     return availability[pref] ? pref : null
@@ -41,28 +45,27 @@ export function resolveTerminalApp(pref: TerminalPref, availability: TerminalApp
   return null
 }
 
-export function getTerminalActionAvailability(): TerminalAppAvailability {
+export async function getTerminalAppAvailability(signal?: AbortSignal): Promise<TerminalAppAvailability> {
+  if (!isDarwin()) {
+    return {
+      ghostty: false,
+      terminal: false,
+    }
+  }
   return {
     ghostty: backends.ghostty.isInstalled(),
-    terminal: true,
+    terminal: await isAppleTerminalInstalled(signal),
   }
 }
 
 /** Open `path` in the terminal selected by `pref`. */
 export async function openInPreferredTerminal(path: string, pref: TerminalPref): Promise<{ ok: boolean; message: string }> {
-  const resolved = resolveTerminalApp(pref, getTerminalActionAvailability())
+  const resolved = resolveTerminalApp(pref, await getTerminalAppAvailability())
   return resolved
     ? backends[resolved].open(path)
     : Promise.resolve({ ok: false, message: 'error.terminal-not-installed' })
 }
 
 export async function getResolvedTerminalApp(pref: TerminalPref): Promise<ResolvedTerminalApp | null> {
-  return resolveTerminalApp(pref, getTerminalActionAvailability())
-}
-
-export async function getTerminalAppAvailability(signal?: AbortSignal): Promise<TerminalAppAvailability> {
-  return {
-    ghostty: backends.ghostty.isInstalled(),
-    terminal: await isAppleTerminalInstalled(signal),
-  }
+  return resolveTerminalApp(pref, await getTerminalAppAvailability())
 }

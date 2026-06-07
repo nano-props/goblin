@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { openInPreferredTerminal } from '#/system/terminals.ts'
 import { openInAppleTerminal, isAppleTerminalInstalled } from '#/system/apple-terminal.ts'
 import { isGhosttyInstalled, openInGhostty } from '#/system/ghostty.ts'
@@ -14,13 +14,24 @@ vi.mock('#/system/apple-terminal.ts', () => ({
 }))
 
 describe('openInPreferredTerminal', () => {
+  const originalPlatform = process.platform
+
+  function setPlatform(platform: NodeJS.Platform) {
+    Object.defineProperty(process, 'platform', { value: platform })
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
+    setPlatform('darwin')
   })
 
-  test('opens Terminal.app explicitly even when detection reports unavailable', async () => {
+  afterEach(() => {
+    setPlatform(originalPlatform)
+  })
+
+  test('opens Terminal.app explicitly on darwin when detection reports available', async () => {
     vi.mocked(isGhosttyInstalled).mockReturnValue(false)
-    vi.mocked(isAppleTerminalInstalled).mockResolvedValue(false)
+    vi.mocked(isAppleTerminalInstalled).mockResolvedValue(true)
 
     await expect(openInPreferredTerminal('/repo', 'terminal')).resolves.toEqual({
       ok: true,
@@ -39,9 +50,9 @@ describe('openInPreferredTerminal', () => {
     expect(openInAppleTerminal).not.toHaveBeenCalled()
   })
 
-  test('falls back to Terminal.app in auto mode without waiting on detection', async () => {
+  test('falls back to Terminal.app in auto mode when detection reports available', async () => {
     vi.mocked(isGhosttyInstalled).mockReturnValue(false)
-    vi.mocked(isAppleTerminalInstalled).mockResolvedValue(false)
+    vi.mocked(isAppleTerminalInstalled).mockResolvedValue(true)
 
     await expect(openInPreferredTerminal('/repo', 'auto')).resolves.toEqual({
       ok: true,
@@ -49,5 +60,44 @@ describe('openInPreferredTerminal', () => {
     })
 
     expect(openInAppleTerminal).toHaveBeenCalledWith('/repo')
+  })
+
+  test('does not open Terminal.app on darwin when detection reports unavailable', async () => {
+    vi.mocked(isGhosttyInstalled).mockReturnValue(false)
+    vi.mocked(isAppleTerminalInstalled).mockResolvedValue(false)
+
+    await expect(openInPreferredTerminal('/repo', 'terminal')).resolves.toEqual({
+      ok: false,
+      message: 'error.terminal-not-installed',
+    })
+
+    expect(openInAppleTerminal).not.toHaveBeenCalled()
+  })
+
+  test('does not expose Terminal.app on linux when selected explicitly', async () => {
+    setPlatform('linux')
+    vi.mocked(isGhosttyInstalled).mockReturnValue(false)
+    vi.mocked(isAppleTerminalInstalled).mockResolvedValue(true)
+
+    await expect(openInPreferredTerminal('/repo', 'terminal')).resolves.toEqual({
+      ok: false,
+      message: 'error.terminal-not-installed',
+    })
+
+    expect(openInAppleTerminal).not.toHaveBeenCalled()
+    expect(openInGhostty).not.toHaveBeenCalled()
+  })
+
+  test('does not fall back to Terminal.app in auto mode on linux', async () => {
+    setPlatform('linux')
+    vi.mocked(isGhosttyInstalled).mockReturnValue(false)
+    vi.mocked(isAppleTerminalInstalled).mockResolvedValue(true)
+
+    await expect(openInPreferredTerminal('/repo', 'auto')).resolves.toEqual({
+      ok: false,
+      message: 'error.terminal-not-installed',
+    })
+
+    expect(openInAppleTerminal).not.toHaveBeenCalled()
   })
 })

@@ -1,0 +1,92 @@
+// @vitest-environment jsdom
+
+import { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
+
+vi.mock('#/web/components/SplitPane.tsx', () => ({
+  SplitPane: ({ before, after }: { before: React.ReactNode; after: React.ReactNode }) => (
+    <div data-testid="mock-split-pane">
+      {before}
+      {after}
+    </div>
+  ),
+}))
+
+let container: HTMLDivElement | null = null
+let root: Root | null = null
+
+const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+
+beforeEach(() => {
+  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
+  container = document.createElement('div')
+  document.body.appendChild(container)
+  root = createRoot(container)
+})
+
+afterEach(() => {
+  act(() => {
+    root?.unmount()
+  })
+  container?.remove()
+  root = null
+  container = null
+  reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
+})
+
+describe('RepoWorkspaceSkeleton', () => {
+  test('shows compact branch rows with list actions in top-bottom split mode', () => {
+    render(<RepoWorkspaceSkeleton showRepoToolbar layout="top-bottom" detailCollapsed={false} detailFocusMode={false} />)
+
+    expect(container?.querySelectorAll('li')).toHaveLength(14)
+    expect(container?.querySelectorAll('[data-testid="branch-list-skeleton-action"]')).toHaveLength(6)
+    expect(container?.querySelector('[data-testid="branch-detail-skeleton-action"]')).toBeNull()
+    expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-branch-view"]')).not.toBeNull()
+    expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-branch-search"]')).not.toBeNull()
+    expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-layout-control"]')).not.toBeNull()
+    expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-pager"]')).toBeNull()
+  })
+
+  test('moves branch actions into the detail toolbar for left-right mode', () => {
+    render(<RepoWorkspaceSkeleton showRepoToolbar layout="left-right" detailCollapsed={false} detailFocusMode={false} />)
+
+    expect(container?.querySelectorAll('li')).toHaveLength(14)
+    expect(container?.querySelectorAll('[data-testid="branch-list-skeleton-action"]')).toHaveLength(0)
+    expect(container?.querySelector('[data-testid="branch-detail-skeleton-action"]')).not.toBeNull()
+  })
+
+  test('hides the branch pane entirely in top-bottom focus mode', () => {
+    render(<RepoWorkspaceSkeleton showRepoToolbar layout="top-bottom" detailCollapsed={false} detailFocusMode />)
+
+    expect(container?.querySelectorAll('li')).toHaveLength(8)
+    expect(container?.querySelectorAll('[data-testid="branch-list-skeleton-action"]')).toHaveLength(0)
+    expect(container?.querySelector('[data-testid="branch-detail-skeleton-action"]')).not.toBeNull()
+    expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-pager"]')).not.toBeNull()
+    expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-branch-view"]')).toBeNull()
+  })
+
+  test('uses the compact toolbar shape on small screens', () => {
+    render(
+      <RepoWorkspaceSkeleton
+        showRepoToolbar
+        layout="top-bottom"
+        detailCollapsed={false}
+        detailFocusMode={false}
+        compact
+      />,
+    )
+
+    expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-pager"]')).not.toBeNull()
+    expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-branch-view"]')).toBeNull()
+    expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-branch-search"]')).toBeNull()
+    expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-layout-control"]')).toBeNull()
+  })
+})
+
+function render(element: React.ReactNode) {
+  act(() => {
+    root!.render(element)
+  })
+}

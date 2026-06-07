@@ -41,6 +41,7 @@ import { useSettingsWriteErrorToast } from '#/web/hooks/useSettingsWriteErrorToa
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
 import { useSettingsQueryInvalidationSync } from '#/web/settings-queries.ts'
 import { MainWindowNavigationProvider } from '#/web/main-window-navigation.tsx'
+import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 
 interface AppProps {
@@ -112,6 +113,7 @@ export function App({
             sessionReady={sessionReady}
             workspaceLayout={workspaceLayout}
             detailCollapsed={workspaceBehavior.detailCollapsed}
+            detailFocusMode={workspaceBehavior.detailFocusMode}
             overlays={overlays}
             repoDrop={repoDrop}
           />
@@ -129,6 +131,7 @@ interface MainWindowViewportProps {
   sessionReady: boolean
   workspaceLayout: 'top-bottom' | 'left-right'
   detailCollapsed: boolean
+  detailFocusMode: boolean
   overlays: ReturnType<typeof useMainWindowShellState>['overlays']
   repoDrop: ReturnType<typeof useRepoDrop>
 }
@@ -141,6 +144,7 @@ interface MainWindowViewportContentProps {
   sessionReady: boolean
   workspaceLayout: 'top-bottom' | 'left-right'
   detailCollapsed: boolean
+  detailFocusMode: boolean
   overlays: ReturnType<typeof useMainWindowShellState>['overlays']
 }
 
@@ -157,6 +161,7 @@ function MainWindowViewport({
   sessionReady,
   workspaceLayout,
   detailCollapsed,
+  detailFocusMode,
   overlays,
   repoDrop,
 }: MainWindowViewportProps) {
@@ -181,6 +186,7 @@ function MainWindowViewport({
         sessionReady={sessionReady}
         workspaceLayout={workspaceLayout}
         detailCollapsed={detailCollapsed}
+        detailFocusMode={detailFocusMode}
         overlays={overlays}
       />
       <MainWindowOverlays overlays={overlays} repoDrop={repoDrop} />
@@ -196,8 +202,10 @@ function MainWindowViewportContent({
   sessionReady,
   workspaceLayout,
   detailCollapsed,
+  detailFocusMode,
   overlays,
 }: MainWindowViewportContentProps) {
+  const uiMode = useResponsiveUiMode()
   if (routeSettingsPage) {
     return (
       <SettingsPageScreen
@@ -222,7 +230,13 @@ function MainWindowViewportContent({
           {visibleRepoId ? (
             <RepoView repoId={visibleRepoId} />
           ) : !sessionReady ? (
-            <RepoWorkspaceSkeleton showRepoToolbar layout={workspaceLayout} detailCollapsed={detailCollapsed} />
+            <RepoWorkspaceSkeleton
+              showRepoToolbar
+              layout={workspaceLayout}
+              detailCollapsed={detailCollapsed}
+              detailFocusMode={detailFocusMode}
+              compact={uiMode === 'compact'}
+            />
           ) : (
             <EmptyState />
           )}

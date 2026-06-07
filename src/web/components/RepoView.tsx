@@ -61,7 +61,15 @@ export function RepoView({ repoId }: Props) {
   if (!view.exists || !repo) return <div />
   if (repo.availability.phase === 'unavailable') return <UnavailableRepoView repo={repo} />
   if (view.initialLoading) {
-    return <RepoWorkspaceSkeleton showRepoToolbar layout={layout} detailCollapsed={behavior.detailCollapsed} />
+    return (
+      <RepoWorkspaceSkeleton
+        showRepoToolbar
+        layout={layout}
+        detailCollapsed={behavior.detailCollapsed}
+        detailFocusMode={behavior.detailFocusMode}
+        compact={uiMode === 'compact'}
+      />
+    )
   }
 
   const detailPane = (
