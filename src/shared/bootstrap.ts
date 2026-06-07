@@ -35,6 +35,7 @@ export interface InitialSettingsSnapshot {
   globalShortcutRegistered: boolean
   terminalApp: TerminalPref
   editorApp: EditorPref
+  lanEnabled: boolean
 }
 
 export interface InitialI18nSnapshot {

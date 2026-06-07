@@ -20,6 +20,7 @@ export function buildSettingsSnapshot(input: {
     globalShortcutRegistered: input.globalShortcutRegistered,
     terminalApp: input.prefs.terminalApp,
     editorApp: input.prefs.editorApp,
+    lanEnabled: input.prefs.lanEnabled,
     session: input.session,
     recentRepos: input.recentRepos,
   }

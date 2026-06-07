@@ -5,7 +5,8 @@ import { useT } from '#/web/stores/i18n.ts'
 import { SETTINGS_PAGE_CONFIG, SETTINGS_PAGES } from '#/shared/settings-pages.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import { GitHubMark } from '#/web/components/GitHubMark.tsx'
-import { AppWindow, Bell, Info, Keyboard, Settings2, Shield, SlidersHorizontal, type LucideIcon } from 'lucide-react'
+import { AppWindow, Bell, Globe, Info, Keyboard, Settings2, Shield, SlidersHorizontal, type LucideIcon } from 'lucide-react'
+import { getInitialBootstrap } from '#/web/bootstrap.ts'
 const SETTINGS_PAGE_ICONS = {
   general: Settings2,
   shortcuts: Keyboard,
@@ -14,6 +15,7 @@ const SETTINGS_PAGE_ICONS = {
   sync: SlidersHorizontal,
   apps: AppWindow,
   github: GitHubMark,
+  lan: Globe,
   about: Info,
 } as const satisfies Record<SettingsPage, LucideIcon | typeof GitHubMark>
 
@@ -25,6 +27,10 @@ interface SettingsLayoutProps {
   onPageChange?: (page: SettingsPage) => void
 }
 
+function isLanPageVisible(): boolean {
+  return getInitialBootstrap().runtime.kind === 'electron'
+}
+
 export function SettingsLayout({
   page,
   topInset = 0,
@@ -33,7 +39,7 @@ export function SettingsLayout({
   onPageChange,
 }: SettingsLayoutProps) {
   const t = useT()
-  const pages = SETTINGS_PAGES.map((pageKey) => {
+  const pages = SETTINGS_PAGES.filter((pageKey) => pageKey !== 'lan' || isLanPageVisible()).map((pageKey) => {
     const config = SETTINGS_PAGE_CONFIG[pageKey]
     return {
       page: pageKey,

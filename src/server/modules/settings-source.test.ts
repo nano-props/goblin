@@ -38,6 +38,7 @@ test('initializes server-settings.json with defaults when no persisted settings 
     globalShortcut: 'Alt+G',
     terminalApp: 'auto',
     editorApp: 'auto',
+    lanEnabled: false,
   })
   expect(await mod.getServerSessionState()).toMatchObject({
     openRepos: [],
@@ -72,6 +73,7 @@ test('persists updates and notifies subscribers from the server settings store',
     globalShortcut: 'CommandOrControl+Alt+G',
     terminalApp: 'ghostty',
     editorApp: 'cursor',
+    lanEnabled: false,
   })
   await mod.setServerSessionState({
     ...defaultSessionState(),
@@ -100,6 +102,7 @@ test('persists updates and notifies subscribers from the server settings store',
     globalShortcut: 'Alt+G',
     terminalApp: 'ghostty',
     editorApp: 'cursor',
+    lanEnabled: false,
   })
   expect(await reloaded.getServerSessionState()).toMatchObject({
     openRepos: [{ kind: 'local', id: '/repo-b' }],

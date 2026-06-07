@@ -13,6 +13,8 @@ import {
   updateServerSettingsPrefs,
 } from '#/server/modules/settings-source.ts'
 import { toSafeSessionRepoEntry } from '#/shared/input-validation.ts'
+import { getLanUrls, isLanAddress } from '#/shared/lan-addresses.ts'
+import type { LanInfo } from '#/shared/rpc.ts'
 import { repoSessionEntryId } from '#/shared/remote-repo.ts'
 import { settingsInvalidationScopesForPrefsPatch } from '#/shared/server-invalidation.ts'
 
@@ -34,6 +36,12 @@ export function createSettingsRoutes() {
   app.get('/external-apps', async (c) => c.json(await getServerExternalAppsSnapshot(c.req.raw.signal)))
   app.post('/external-apps/refresh', async (c) => c.json(await getServerExternalAppsSnapshot(c.req.raw.signal)))
   app.get('/prefs', async (c) => c.json(await getServerSettingsPrefs()))
+  app.get('/lan', async (c) => {
+    const host = process.env.GOBLIN_SERVER_HOST?.trim() || '127.0.0.1'
+    const port = Number(process.env.GOBLIN_SERVER_PORT) || 32100
+    const lanUrls = host === '0.0.0.0' ? getLanUrls(port) : isLanAddress(host) ? [`http://${host}:${port}`] : []
+    return c.json({ host, port, lanUrls } satisfies LanInfo)
+  })
   app.post('/fetch-interval', async (c) => {
     const body = await c.req.json().catch(() => null)
     const sec = typeof body?.sec === 'number' ? body.sec : 0

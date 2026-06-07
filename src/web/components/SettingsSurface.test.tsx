@@ -42,6 +42,7 @@ function defaultRpcResult(path: string, input?: unknown) {
       globalShortcutRegistered: true,
       terminalApp: 'auto',
       editorApp: 'auto',
+      lanEnabled: false,
       session: {
         openRepos: [],
         activeRepo: null,
@@ -128,6 +129,7 @@ beforeEach(() => {
       globalShortcutRegistered: true,
       terminalApp: 'auto',
       editorApp: 'auto',
+      lanEnabled: false,
     },
     initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
   }
@@ -145,6 +147,7 @@ beforeEach(() => {
       globalShortcutRegistered: true,
       terminalApp: 'auto',
       editorApp: 'auto',
+      lanEnabled: false,
     },
     initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
     pathForFile: () => '',

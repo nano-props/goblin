@@ -10,6 +10,7 @@ import type {
   GlobalShortcutState,
   I18nPayload,
   LangPref,
+  LanInfo,
   PullRequestEntry,
   RepoSnapshot,
   ProbeResult,
@@ -131,6 +132,14 @@ export async function getGitHubCliState(hosts?: string[]): Promise<GitHubCliStat
 
 export async function refreshGitHubCliState(hosts?: string[]): Promise<GitHubCliState> {
   return await postServerJson('/api/settings/github-cli/refresh', hosts && hosts.length > 0 ? { hosts } : {})
+}
+
+export async function getLanInfo(): Promise<LanInfo> {
+  return await fetchServerJson('/api/settings/lan')
+}
+
+export async function setLanEnabled(enabled: boolean): Promise<void> {
+  await updateSettingsPrefsPatch({ lanEnabled: enabled })
 }
 
 export async function getExternalAppsSnapshot(): Promise<ExternalAppsSnapshot> {

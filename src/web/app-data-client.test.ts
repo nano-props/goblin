@@ -89,6 +89,7 @@ describe('server-client web host bootstrap', () => {
           globalShortcutRegistered: false,
           terminalApp: 'auto',
           editorApp: 'auto',
+          lanEnabled: false,
           session: {
             openRepos: [],
             activeRepo: null,

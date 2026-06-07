@@ -9,6 +9,7 @@ import {
 } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/router-devtools'
 import { App } from '#/web/App.tsx'
+import { getInitialBootstrap } from '#/web/bootstrap.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 
 const rootRoute = createRootRoute()
@@ -77,6 +78,17 @@ const settingsGitHubRoute = createRoute({
   component: SettingsGitHubRoute,
 })
 
+const settingsLanRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/settings/lan',
+  beforeLoad: () => {
+    if (getInitialBootstrap().runtime.kind !== 'electron') {
+      throw redirect({ to: '/settings/general' })
+    }
+  },
+  component: SettingsLanRoute,
+})
+
 const settingsAboutRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/settings/about',
@@ -94,6 +106,7 @@ const mainRouteTree = rootRoute.addChildren([
   settingsSyncRoute,
   settingsAppsRoute,
   settingsGitHubRoute,
+  settingsLanRoute,
   settingsAboutRoute,
 ])
 
@@ -140,6 +153,10 @@ function SettingsAppsRoute() {
 
 function SettingsGitHubRoute() {
   return <SettingsRoutePage settingsPage="github" />
+}
+
+function SettingsLanRoute() {
+  return <SettingsRoutePage settingsPage="lan" />
 }
 
 function SettingsAboutRoute() {

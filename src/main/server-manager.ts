@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessByStdio } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import type { Readable } from 'node:stream'
 import path from 'node:path'
 import { app } from 'electron'
@@ -106,12 +106,26 @@ function pipeProcessLogs(proc: ServerChildProcess): void {
   })
 }
 
+function readLanEnabledFromSettings(): boolean {
+  try {
+    const file = path.join(app.getPath('userData'), 'server-settings.json')
+    const raw = readFileSync(file, 'utf-8')
+    const parsed = JSON.parse(raw)
+    return parsed.lanEnabled === true
+  } catch {
+    return false
+  }
+}
+
 export async function startEmbeddedServer(): Promise<EmbeddedServerRuntime | null> {
   if (runtime) return runtime
   if (startPromise) return await startPromise
   if (!embeddedServerEnabled()) return null
   startPromise = (async () => {
-    const host = process.env.GOBLIN_SERVER_HOST?.trim() || DEFAULT_HOST
+    let host = process.env.GOBLIN_SERVER_HOST?.trim()
+    if (!host) {
+      host = readLanEnabledFromSettings() ? '0.0.0.0' : DEFAULT_HOST
+    }
     const preferredPort = parseServerPort(process.env.GOBLIN_SERVER_PORT)
     const port = await reserveEmbeddedServerPort(host, preferredPort)
     const secret = randomBytes(32).toString('hex')

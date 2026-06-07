@@ -45,6 +45,7 @@ interface ServerSettingsData {
   globalShortcut: string
   terminalApp: TerminalPref
   editorApp: EditorPref
+  lanEnabled: boolean
   session: SessionState
   recentRepos: RepoSessionEntry[]
 }
@@ -87,6 +88,10 @@ function normalizeTerminalNotificationsEnabled(value: unknown): boolean {
   return value === true
 }
 
+function normalizeLanEnabled(value: unknown): boolean {
+  return value === true
+}
+
 function settingsPrefsFromData(data: ServerSettingsData): SettingsPrefs {
   return {
     lang: data.lang,
@@ -101,6 +106,7 @@ function settingsPrefsFromData(data: ServerSettingsData): SettingsPrefs {
     globalShortcut: data.globalShortcut,
     terminalApp: data.terminalApp,
     editorApp: data.editorApp,
+    lanEnabled: data.lanEnabled,
   }
 }
 
@@ -183,6 +189,7 @@ async function readServerSettingsFile(): Promise<ServerSettingsData | null> {
       globalShortcut: normalizeGlobalShortcut(parsed.globalShortcut),
       terminalApp: normalizeTerminalPref(parsed.terminalApp),
       editorApp: normalizeEditorPref(parsed.editorApp),
+      lanEnabled: normalizeLanEnabled(parsed.lanEnabled),
       session: normalizeSession(parsed.session),
       recentRepos: normalizeRecentRepos(parsed.recentRepos),
     }
@@ -260,6 +267,7 @@ export async function updateServerSettingsPrefs(patch: ServerSettingsPrefsPatch)
     patch.globalShortcut === undefined ? data.globalShortcut : normalizeGlobalShortcut(patch.globalShortcut)
   const nextTerminalApp = patch.terminalApp === undefined ? data.terminalApp : normalizeTerminalPref(patch.terminalApp)
   const nextEditorApp = patch.editorApp === undefined ? data.editorApp : normalizeEditorPref(patch.editorApp)
+  const nextLanEnabled = patch.lanEnabled === undefined ? data.lanEnabled : normalizeLanEnabled(patch.lanEnabled)
   const changed =
     data.lang !== nextLang ||
     data.theme !== nextTheme ||
@@ -272,7 +280,8 @@ export async function updateServerSettingsPrefs(patch: ServerSettingsPrefsPatch)
     data.toggleDetailOnActionBarBlankClick !== nextToggleDetailOnActionBarBlankClick ||
     data.globalShortcut !== nextGlobalShortcut ||
     data.terminalApp !== nextTerminalApp ||
-    data.editorApp !== nextEditorApp
+    data.editorApp !== nextEditorApp ||
+    data.lanEnabled !== nextLanEnabled
   data.lang = nextLang
   data.theme = nextTheme
   data.colorTheme = nextColorTheme
@@ -285,6 +294,7 @@ export async function updateServerSettingsPrefs(patch: ServerSettingsPrefsPatch)
   data.globalShortcut = nextGlobalShortcut
   data.terminalApp = nextTerminalApp
   data.editorApp = nextEditorApp
+  data.lanEnabled = nextLanEnabled
   if (changed) await writeServerSettingsFile(data)
   if (cachedFetchIntervalSec !== nextFetchIntervalSec) {
     cachedFetchIntervalSec = nextFetchIntervalSec
