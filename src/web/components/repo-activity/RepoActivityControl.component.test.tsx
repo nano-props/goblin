@@ -32,14 +32,7 @@ afterEach(() => {
 describe('RepoActivityControl component', () => {
   test('keeps the primary refresh button enabled during background-blocked refresh states', () => {
     seedRepoState({ id: REPO_ID, remote: { hasRemotes: true } })
-    useReposStore.setState((state) => {
-      const repo = state.repos[REPO_ID]
-      if (!repo) return state
-      repo.resources.status.phase = 'refreshing'
-      repo.operations.status.phase = 'running'
-      repo.operations.status.reason = 'status'
-      return { repos: { ...state.repos, [REPO_ID]: { ...repo } } }
-    })
+    markRepoOperationTargets(REPO_ID, nextRepoOperationId(REPO_ID), [{ key: 'status', reason: 'status' }], 'running')
 
     render(<RepoActivityControl repoId={REPO_ID} />)
 
@@ -49,7 +42,12 @@ describe('RepoActivityControl component', () => {
 
   test('disables the primary refresh button during manual refreshes', () => {
     seedRepoState({ id: REPO_ID, remote: { hasRemotes: true } })
-    markRepoOperationTargets(REPO_ID, nextRepoOperationId(REPO_ID), [{ key: 'fetch', reason: 'user-fetch' }], 'running')
+    markRepoOperationTargets(
+      REPO_ID,
+      nextRepoOperationId(REPO_ID),
+      [{ key: 'manualRefresh', reason: 'manual-refresh' }],
+      'running',
+    )
 
     render(<RepoActivityControl repoId={REPO_ID} />)
 

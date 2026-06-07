@@ -255,16 +255,25 @@ describe('SettingsSurface', () => {
       await Promise.resolve()
     })
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:32100/api/settings/github-cli/refresh',
-      expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({
-          'content-type': 'application/json',
-          'x-goblin-internal-secret': 'secret',
-        }),
+    expect(
+      fetchMock.mock.calls.some((call) => {
+        const [url, options] = call as unknown as [unknown, RequestInit | undefined]
+        if (new URL(String(url)).pathname !== '/api/settings/github-cli/refresh') return false
+        return (
+          options &&
+          typeof options === 'object' &&
+          'method' in options &&
+          'headers' in options &&
+          (options as RequestInit).method === 'POST' &&
+          expect
+            .objectContaining({
+              'content-type': 'application/json',
+              'x-goblin-internal-secret': 'secret',
+            })
+            .asymmetricMatch((options as RequestInit).headers)
+        )
       }),
-    )
+    ).toBe(true)
   })
 
   test('shows unavailable GitHub CLI status when gh is missing', async () => {

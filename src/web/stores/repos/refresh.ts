@@ -24,6 +24,7 @@ import {
   runRefreshAllWorkflow,
   runSnapshotSuccessWorkflow,
 } from '#/web/stores/repos/refresh-workflows.ts'
+import { runWithRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
 import {
   cancelResource,
   finishPullRequestResourceError,
@@ -143,6 +144,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
   async function attemptFetch(
     id: string,
     token: number,
+    sourceToken?: string,
   ): Promise<ExecResult | null> {
     let repo = get().repos[id]
     if (!repo || repo.instanceToken !== token) return null
@@ -167,7 +169,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
     }
 
     try {
-      return await runNetworkTask(id, (signal) => fetchRepository(id, 'user', signal), {
+      return await runNetworkTask(id, (signal) => fetchRepository(id, 'user', signal, sourceToken), {
         token,
         reason: 'user-fetch',
         priority: 100,
@@ -186,6 +188,15 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
     }
     const exhaustive: never = mode
     return exhaustive
+  }
+
+  function finalizeSyncFetchResult(id: string, token: number, fetchResult: ExecResult | null): void {
+    if (!fetchResult) return
+    if (fetchResult.ok) {
+      get().clearFetchFailed(id, token)
+      return
+    }
+    if (fetchResult.message !== 'cancelled') get().setLastResult(id, fetchResult, token)
   }
 
   return {
@@ -462,28 +473,35 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (!repoBefore) return
       const token = options?.token ?? repoBefore.instanceToken
       if (repoBefore.instanceToken !== token) return
+      await runExclusiveOperation({
+        set,
+        get,
+        id,
+        token,
+        lane: 'read',
+        priority: 100,
+        targets: [{ key: 'manualRefresh', reason: 'manual-refresh' }],
+        task: async () =>
+          await runWithRepoInvalidationSource('manual', async (sourceToken) => {
+            // Step 1: optional fetch — skipped when there are no remotes
+            let fetchResult: ExecResult | null = null
+            const repoBeforeFetch = get().repos[id]
+            if (repoBeforeFetch?.instanceToken !== token) return
+            if (repoBeforeFetch.remote.hasRemotes === true && repoBeforeFetch.availability.phase !== 'unavailable') {
+              fetchResult = await attemptFetch(id, token, sourceToken)
+            }
 
-      // Step 1: optional fetch — skipped when there are no remotes
-      let fetchResult: ExecResult | null = null
-      if (repoBefore.remote.hasRemotes === true && repoBefore.availability.phase !== 'unavailable') {
-        fetchResult = await attemptFetch(id, token)
-      }
+            // Step 2: always refresh local state
+            const repoBeforeRefresh = get().repos[id]
+            if (repoBeforeRefresh && repoBeforeRefresh.instanceToken === token) {
+              await get().refreshAll(id, { token })
+            }
 
-      // Step 2: always refresh local state
-      const repoBeforeRefresh = get().repos[id]
-      if (repoBeforeRefresh && repoBeforeRefresh.instanceToken === token) {
-        await get().refreshAll(id, { token })
-      }
-
-      // Step 3: bookkeeping — surface the fetch result if present.
-      // Local-only repos never enter this branch because fetchResult is null.
-      if (fetchResult) {
-        if (fetchResult.ok) {
-          get().clearFetchFailed(id, token)
-        } else if (fetchResult.message !== 'cancelled') {
-          get().setLastResult(id, fetchResult, token)
-        }
-      }
+            // Step 3: bookkeeping — surface the fetch result if present.
+            // Local-only repos never enter this branch because fetchResult is null.
+            finalizeSyncFetchResult(id, token, fetchResult)
+          }),
+      })
     },
   }
 }

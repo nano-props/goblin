@@ -2,11 +2,11 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { resetRepoRefreshCoordinatorState } from '#/web/stores/repos/refresh-coordinator.ts'
 import {
-  recordBranchActionCoreRefreshSettled,
-  recordBranchActionCoreRefreshStart,
-  resetRepoRefreshCoordinatorState,
-} from '#/web/stores/repos/refresh-coordinator.ts'
+  beginRepoInvalidationSource,
+  settleRepoInvalidationSource,
+} from '#/web/stores/repos/invalidation-sources.ts'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
 
 const listeners = new Set<(event: any) => void>()
@@ -92,19 +92,8 @@ describe('useRepoStoreInvalidationRefresh', () => {
     expect(storeState.refreshStatus).toHaveBeenCalledWith('/tmp/repo', { token: 7 })
   })
 
-  test('skips duplicate invalidation refreshes right after a local branch-action refresh has already refreshed core repo data', async () => {
-    recordBranchActionCoreRefreshStart('/tmp/repo', 7)
-    vi.setSystemTime(Date.now() + 1)
-    storeState.repos['/tmp/repo'] = {
-      id: '/tmp/repo',
-      availability: { phase: 'available' },
-      instanceToken: 7,
-      resources: {
-        snapshot: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },
-        status: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },
-      },
-    }
-    recordBranchActionCoreRefreshSettled('/tmp/repo', 7)
+  test('skips duplicate invalidation refreshes from an active local source token', async () => {
+    beginRepoInvalidationSource('repo_branch_1')
 
     await act(async () => {
       root.render(<Harness />)
@@ -112,10 +101,43 @@ describe('useRepoStoreInvalidationRefresh', () => {
 
     await act(async () => {
       for (const listener of listeners)
-        listener({ type: 'repo-query-invalidated', repoId: '/tmp/repo', query: 'repo-snapshot' })
+        listener({ type: 'repo-query-invalidated', repoId: '/tmp/repo', query: 'repo-snapshot', sourceToken: 'repo_branch_1' })
     })
 
     expect(storeState.refreshSnapshot).not.toHaveBeenCalled()
     expect(storeState.refreshStatus).not.toHaveBeenCalled()
+  })
+
+  test('skips duplicate invalidation refreshes from a recently settled local source token', async () => {
+    beginRepoInvalidationSource('repo_manual_1')
+    settleRepoInvalidationSource('repo_manual_1')
+
+    await act(async () => {
+      root.render(<Harness />)
+    })
+
+    await act(async () => {
+      for (const listener of listeners)
+        listener({ type: 'repo-query-invalidated', repoId: '/tmp/repo', query: 'repo-snapshot', sourceToken: 'repo_manual_1' })
+    })
+
+    expect(storeState.refreshSnapshot).not.toHaveBeenCalled()
+    expect(storeState.refreshStatus).not.toHaveBeenCalled()
+  })
+
+  test('refreshes when invalidation source token does not match a local action', async () => {
+    beginRepoInvalidationSource('repo_manual_2')
+
+    await act(async () => {
+      root.render(<Harness />)
+    })
+
+    await act(async () => {
+      for (const listener of listeners)
+        listener({ type: 'repo-query-invalidated', repoId: '/tmp/repo', query: 'repo-snapshot', sourceToken: 'repo_manual_other' })
+    })
+
+    expect(storeState.refreshSnapshot).toHaveBeenCalledWith('/tmp/repo', { token: 7 })
+    expect(storeState.refreshStatus).toHaveBeenCalledWith('/tmp/repo', { token: 7 })
   })
 })

@@ -141,7 +141,7 @@ describe('CloneRepositoryDialog', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
     expect(
       fetchMock.mock.calls.some(
-        (call) => String((call as unknown as [unknown])[0]) === 'http://127.0.0.1:32100/api/repo/abort-clone',
+        (call) => new URL(String((call as unknown as [unknown])[0])).pathname === '/api/repo/abort-clone',
       ),
     ).toBe(true)
 

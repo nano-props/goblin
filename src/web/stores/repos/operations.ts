@@ -2,6 +2,7 @@ import type { RepoBranchActionKind } from '#/web/stores/repos/branch-action-type
 export type RepoOperationPhase = 'idle' | 'queued' | 'running'
 export type RepoOperationKey =
   | 'fetch'
+  | 'manualRefresh'
   | 'snapshot'
   | 'status'
   | 'pullRequests'
@@ -24,6 +25,7 @@ export type RepoOperationReason =
   | 'status'
   | 'pullRequests'
   | 'user-fetch'
+  | 'manual-refresh'
   | RepoPullRequestReason
   | RepoBranchActionReason
 
@@ -45,6 +47,7 @@ export interface RepoOperationTarget {
 
 export interface RepoOperationsState {
   fetch: RepoOperationState
+  manualRefresh: RepoOperationState
   snapshot: RepoOperationState
   status: RepoOperationState
   pullRequests: RepoOperationState
@@ -75,6 +78,7 @@ export function idleOperation(): RepoOperationState {
 export function emptyRepoOperations(): RepoOperationsState {
   return {
     fetch: idleOperation(),
+    manualRefresh: idleOperation(),
     snapshot: idleOperation(),
     status: idleOperation(),
     pullRequests: idleOperation(),
@@ -94,6 +98,8 @@ function operationForKey(operations: RepoOperationsState, key: RepoOperationKey)
   switch (key) {
     case 'fetch':
       return operations.fetch
+    case 'manualRefresh':
+      return operations.manualRefresh
     case 'snapshot':
       return operations.snapshot
     case 'status':
@@ -113,6 +119,8 @@ function readOperationForKey(operations: RepoOperationsState, key: RepoOperation
   switch (key) {
     case 'fetch':
       return operations.fetch
+    case 'manualRefresh':
+      return operations.manualRefresh
     case 'snapshot':
       return operations.snapshot
     case 'status':

@@ -282,12 +282,18 @@ export async function fetchRepository(
   cwd: string,
   kind?: 'user' | 'background',
   signal?: AbortSignal,
+  sourceToken?: string,
 ): Promise<{ ok: boolean; message: string }> {
-  return await postServerJson('/api/repo/fetch', kind ? { cwd, kind } : { cwd }, { signal })
+  return await postServerJson('/api/repo/fetch', kind ? { cwd, kind, sourceToken } : { cwd, sourceToken }, { signal })
 }
 
-export async function checkoutRepositoryBranch(cwd: string, branch: string, signal?: AbortSignal): Promise<ExecResult> {
-  return await postServerJson('/api/repo/checkout', { cwd, branch }, { signal })
+export async function checkoutRepositoryBranch(
+  cwd: string,
+  branch: string,
+  signal?: AbortSignal,
+  sourceToken?: string,
+): Promise<ExecResult> {
+  return await postServerJson('/api/repo/checkout', { cwd, branch, sourceToken }, { signal })
 }
 
 export async function pullRepositoryBranch(
@@ -295,12 +301,18 @@ export async function pullRepositoryBranch(
   branch: string,
   worktreePath?: string,
   signal?: AbortSignal,
+  sourceToken?: string,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/pull', { cwd, branch, worktreePath }, { signal })
+  return await postServerJson('/api/repo/pull', { cwd, branch, worktreePath, sourceToken }, { signal })
 }
 
-export async function pushRepositoryBranch(cwd: string, branch: string, signal?: AbortSignal): Promise<ExecResult> {
-  return await postServerJson('/api/repo/push', { cwd, branch }, { signal })
+export async function pushRepositoryBranch(
+  cwd: string,
+  branch: string,
+  signal?: AbortSignal,
+  sourceToken?: string,
+): Promise<ExecResult> {
+  return await postServerJson('/api/repo/push', { cwd, branch, sourceToken }, { signal })
 }
 
 export async function createRepositoryWorktree(
@@ -309,8 +321,9 @@ export async function createRepositoryWorktree(
   newBranch: string,
   baseBranch: string,
   signal?: AbortSignal,
+  sourceToken?: string,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/create-worktree', { cwd, worktreePath, newBranch, baseBranch }, { signal })
+  return await postServerJson('/api/repo/create-worktree', { cwd, worktreePath, newBranch, baseBranch, sourceToken }, { signal })
 }
 
 export async function deleteRepositoryBranch(
@@ -318,10 +331,11 @@ export async function deleteRepositoryBranch(
   branch: string,
   options?: { force?: boolean; alsoDeleteUpstream?: boolean },
   signal?: AbortSignal,
+  sourceToken?: string,
 ): Promise<ExecResult> {
   return await postServerJson(
     '/api/repo/delete-branch',
-    { cwd, branch, force: options?.force, alsoDeleteUpstream: options?.alsoDeleteUpstream },
+    { cwd, branch, force: options?.force, alsoDeleteUpstream: options?.alsoDeleteUpstream, sourceToken },
     { signal },
   )
 }
@@ -336,8 +350,9 @@ export async function removeRepositoryWorktree(
     alsoDeleteUpstream?: boolean
   },
   signal?: AbortSignal,
+  sourceToken?: string,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/remove-worktree', { cwd, ...options }, { signal })
+  return await postServerJson('/api/repo/remove-worktree', { cwd, ...options, sourceToken }, { signal })
 }
 
 export async function getRepositoryPatch(cwd: string, worktreePath: string, signal?: AbortSignal): Promise<ExecResult> {

@@ -39,6 +39,7 @@ function repoActivityControlRepoEqual(a: RepoState | undefined, b: RepoState | u
       a.instanceToken === b.instanceToken &&
       a.resources === b.resources &&
       a.operations.fetch === b.operations.fetch &&
+      a.operations.manualRefresh === b.operations.manualRefresh &&
       a.operations.branchAction === b.operations.branchAction &&
       a.availability === b.availability &&
       a.cache === b.cache &&

@@ -36,14 +36,7 @@ export function getRepoActivity(repo: RepoState): RepoActivity | null {
 }
 
 export function isRepoPrimaryRefreshBusy(repo: RepoState): boolean {
-  // Must match canStartRemoteFetch guards (minus branchAction, which has its
-  // own activity indicator) so the button stays busy through the entire sync
-  // pipeline — fetch + refreshAll (snapshot + status) — not just the fetch.
-  return (
-    repoOperationBusy(repo.id, 'fetch') ||
-    repoOperationBusy(repo.id, 'snapshot') ||
-    repoOperationBusy(repo.id, 'status')
-  )
+  return repoOperationBusy(repo.id, 'manualRefresh') || repoOperationBusy(repo.id, 'fetch')
 }
 
 export function getRepoActivityControlView(input: {

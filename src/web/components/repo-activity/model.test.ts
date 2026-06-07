@@ -40,15 +40,15 @@ describe('repo activity model', () => {
     expect(getRepoActivity(repo!)).toBeNull()
   })
 
-  test('marks the primary refresh control busy while any fetch is active', () => {
+  test('marks the primary refresh control busy while a manual refresh is active', () => {
     resetReposStore()
     seedRepoState({ id: REPO_ID })
     const opId = nextRepoOperationId(REPO_ID)
-    markRepoOperationTargets(REPO_ID, opId, [{ key: 'fetch', reason: 'fetch' }], 'running')
+    markRepoOperationTargets(REPO_ID, opId, [{ key: 'manualRefresh', reason: 'manual-refresh' }], 'running')
 
     expect(isRepoPrimaryRefreshBusy(useReposStore.getState().repos[REPO_ID]!)).toBe(true)
 
-    settleRepoOperationTargets(REPO_ID, opId, [{ key: 'fetch', reason: 'fetch' }], null)
+    settleRepoOperationTargets(REPO_ID, opId, [{ key: 'manualRefresh', reason: 'manual-refresh' }], null)
 
     expect(isRepoPrimaryRefreshBusy(useReposStore.getState().repos[REPO_ID]!)).toBe(false)
   })
