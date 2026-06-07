@@ -57,7 +57,8 @@ export const en = {
   'menu.view.workspace-layout': 'Workspace Layout',
   'menu.view.layout-top-bottom': 'Top/Bottom Layout',
   'menu.view.layout-left-right': 'Left/Right Layout',
-  'menu.view.refresh': 'Refresh',
+  'menu.view.refresh': 'Sync Repository',
+  'menu.view.reload-page': 'Reload Page',
   'menu.view.toggle-dev-tools': 'Toggle Developer Tools',
 
   // ---- Menu — Window (gbl-specific) ---------------------------------------
@@ -364,8 +365,8 @@ export const en = {
   'action.pull-from': 'Pull from {tracking}',
   'action.pull-no-upstream': 'No upstream',
   'action.push-title': 'Push {branch}',
-  'action.fetch-title': 'Sync remote and refresh status',
-  'action.fetch-local-title': 'Refresh local branches and status',
+  'action.fetch-title': 'Sync remote and sync status',
+  'action.fetch-local-title': 'Sync local branches and status',
   'action.remote-title': 'Open repo in browser',
   'action.result-ok': 'OK',
   'action.result-error': 'Error',
@@ -410,7 +411,7 @@ export const en = {
   'action.create-worktree-base-current': 'current',
   'action.create-worktree-confirm': 'Create worktree',
   'action.menu': 'Actions',
-  'action.refresh': 'Refresh',
+  'action.refresh': 'Sync',
   'action.refresh-title': 'git branch · git status · git log',
 
   // ---- Errors / banners ---------------------------------------------------
@@ -622,7 +623,8 @@ export const en = {
   'help.row.activate-window': 'Show Goblin window',
   'help.row.close-repo': 'Close current tab',
   'help.row.close-window': 'Close window',
-  'help.row.refresh': 'Refresh',
+  'help.row.refresh': 'Sync Repository',
+  'help.row.reload-page': 'Reload Page',
   'help.row.settings': 'Settings',
   'help.row.this-help': 'This help',
   'help.row.dismiss': 'Dismiss overlay / leave focused non-text control',

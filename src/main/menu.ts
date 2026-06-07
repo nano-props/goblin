@@ -263,8 +263,13 @@ function createViewMenu(state: AppMenuState): MenuItemConstructorOptions {
       separator(),
       {
         label: t('menu.view.refresh'),
-        accelerator: accelerator(state, 'CmdOrCtrl+R'),
+        accelerator: accelerator(state, 'CmdOrCtrl+U'),
         click: () => send({ type: 'repo-refresh-requested' }),
+      },
+      {
+        label: t('menu.view.reload-page'),
+        accelerator: accelerator(state, 'CmdOrCtrl+R'),
+        click: () => focusedRegisteredSurface()?.window.webContents.reload(),
       },
       separator(),
       state.shortcutsDisabled

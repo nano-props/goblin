@@ -57,7 +57,8 @@ export const ja: Record<DictKey, string> = {
   'menu.view.workspace-layout': 'ワークスペースレイアウト',
   'menu.view.layout-top-bottom': '上下レイアウト',
   'menu.view.layout-left-right': '左右レイアウト',
-  'menu.view.refresh': '更新',
+  'menu.view.refresh': 'リポジトリを同期',
+  'menu.view.reload-page': 'ページを再読み込み',
   'menu.view.toggle-dev-tools': '開発者ツールを切替',
 
   // ---- Menu — Window (gbl-specific) --------------------------------------
@@ -363,8 +364,8 @@ export const ja: Record<DictKey, string> = {
   'action.pull-from': '{tracking} から取得',
   'action.pull-no-upstream': '上流なし',
   'action.push-title': '{branch} をプッシュ',
-  'action.fetch-title': 'リモートを同期してステータスを更新',
-  'action.fetch-local-title': 'ローカルブランチとステータスを更新',
+  'action.fetch-title': 'リモートとステータスを同期',
+  'action.fetch-local-title': 'ローカルブランチとステータスを同期',
   'action.remote-title': 'リポジトリをブラウザで開く',
   'action.result-ok': 'OK',
   'action.result-error': 'エラー',
@@ -409,7 +410,7 @@ export const ja: Record<DictKey, string> = {
   'action.create-worktree-base-current': '現在',
   'action.create-worktree-confirm': 'ワークツリーを作成',
   'action.menu': '操作',
-  'action.refresh': '更新',
+  'action.refresh': '同期',
   'action.refresh-title': 'git branch · git status · git log',
 
   // ---- Errors / banners --------------------------------------------------
@@ -621,7 +622,8 @@ export const ja: Record<DictKey, string> = {
   'help.row.activate-window': 'Goblin ウィンドウを表示',
   'help.row.close-repo': '現在のタブを閉じる',
   'help.row.close-window': 'ウィンドウを閉じる',
-  'help.row.refresh': '更新',
+  'help.row.refresh': 'リポジトリを同期',
+  'help.row.reload-page': 'ページを再読み込み',
   'help.row.settings': '設定',
   'help.row.this-help': 'このヘルプ',
   'help.row.dismiss': 'オーバーレイを閉じる / フォーカス中の非テキストコントロールを抜ける',
