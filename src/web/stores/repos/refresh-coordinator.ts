@@ -1,13 +1,13 @@
 import type { RepoQueryInvalidationEvent } from '#/shared/repo-query-invalidation.ts'
 import { shouldSuppressRepoInvalidationSource, resetRepoInvalidationSourceState } from '#/web/stores/repos/invalidation-sources.ts'
-import type { RepoState, ReposGet } from '#/web/stores/repos/types.ts'
+import type { ReposGet } from '#/web/stores/repos/types.ts'
 
 interface RepoRefreshIntentBase {
   id: string
   token: number
 }
 
-type CoreRepoRefreshReason = 'initial-load' | 'branch-action' | 'repo-invalidated'
+type CoreRepoRefreshReason = 'initial-load' | 'branch-action'
 
 export type RepoRefreshIntent =
   | (RepoRefreshIntentBase & { kind: 'core-data-changed'; reason: CoreRepoRefreshReason })
@@ -15,10 +15,6 @@ export type RepoRefreshIntent =
   | (RepoRefreshIntentBase & { kind: 'visible-pull-request-changed'; branch: string | null })
 
 type RepoInvalidationRefreshDisposition = 'refresh' | 'suppress'
-
-async function runCoreRepoRefresh(get: ReposGet, id: string, token: number): Promise<void> {
-  await Promise.all([get().refreshSnapshot(id, { token }), get().refreshStatus(id, { token })])
-}
 
 async function runVisiblePullRequestRefresh(
   get: ReposGet,
@@ -31,7 +27,6 @@ async function runVisiblePullRequestRefresh(
 }
 
 export function repoInvalidationRefreshDisposition(
-  _repo: Pick<RepoState, 'id' | 'instanceToken' | 'resources'>,
   event: Pick<RepoQueryInvalidationEvent, 'sourceToken'>,
 ): RepoInvalidationRefreshDisposition {
   if (shouldSuppressRepoInvalidationSource(event.sourceToken)) return 'suppress'
@@ -46,9 +41,9 @@ export async function handleRepoInvalidationRefresh(
   const repoId = event.repoId
   const repo = get().repos[repoId]
   if (!repo || repo.instanceToken !== token || repo.availability.phase === 'unavailable') return
-  const disposition = repoInvalidationRefreshDisposition(repo, event)
+  const disposition = repoInvalidationRefreshDisposition(event)
   if (disposition !== 'refresh') return
-  await runRepoRefreshIntent(get, { kind: 'core-data-changed', reason: 'repo-invalidated', id: repoId, token })
+  await get().refreshCoreData(repoId, { token })
 }
 
 export function resetRepoRefreshCoordinatorState(): void {
@@ -61,7 +56,7 @@ export async function runRepoRefreshIntent(get: ReposGet, intent: RepoRefreshInt
       await get().syncAndRefresh(intent.id, { token: intent.token })
       return
     case 'core-data-changed':
-      await runCoreRepoRefresh(get, intent.id, intent.token)
+      await get().refreshCoreData(intent.id, { token: intent.token })
       return
     case 'visible-pull-request-changed':
       await runVisiblePullRequestRefresh(get, intent.id, intent.branch, intent.token)

@@ -21,7 +21,7 @@ import {
   waitForRepoOperationsIdle,
 } from '#/web/stores/repos/runtime.ts'
 import {
-  runRefreshAllWorkflow,
+  runCoreDataRefreshWorkflow,
   runSnapshotSuccessWorkflow,
 } from '#/web/stores/repos/refresh-workflows.ts'
 import { runWithRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
@@ -150,13 +150,13 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
     if (!repo || repo.instanceToken !== token) return null
 
     // Skip fetch entirely when there are no remotes or the repo is
-    // unavailable — the caller will fall through to refreshAll.
+    // unavailable — the caller will fall through to refreshCoreData.
     if (repo.remote.hasRemotes !== true || repo.availability.phase === 'unavailable') return null
 
     // If core operations are active, wait briefly for them to settle
     // so manual sync doesn't stall behind a snapshot/status that is
     // still running from a previous action. If they don't settle,
-    // skip the fetch and rely on refreshAll.
+    // skip the fetch and rely on refreshCoreData.
     if (!canStartRemoteFetch(repo)) {
       try {
         await waitForRepoOperationsIdle(id, ['snapshot', 'status'])
@@ -455,12 +455,12 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       })
     },
 
-    async refreshAll(id: string, options?: { token?: number }) {
+    async refreshCoreData(id: string, options?: { token?: number }) {
       const repoBefore = get().repos[id]
       if (!repoBefore) return
       const token = options?.token ?? repoBefore.instanceToken
       if (repoBefore.instanceToken !== token) return
-      await runRefreshAllWorkflow(get, { id, token })
+      await runCoreDataRefreshWorkflow(get, { id, token })
     },
 
     /** Unified sync pipeline — local and remote repos follow the same path.
@@ -494,7 +494,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
             // Step 2: always refresh local state
             const repoBeforeRefresh = get().repos[id]
             if (repoBeforeRefresh && repoBeforeRefresh.instanceToken === token) {
-              await get().refreshAll(id, { token })
+              await get().refreshCoreData(id, { token })
             }
 
             // Step 3: bookkeeping — surface the fetch result if present.

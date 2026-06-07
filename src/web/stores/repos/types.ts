@@ -200,7 +200,7 @@ export interface ReposStore extends PersistableWorkspaceUiState, WorkspaceFronte
     },
   ) => Promise<void>
   refreshStatus: (id: string, options?: { token?: number }) => Promise<void>
-  refreshAll: (id: string, options?: { token?: number }) => Promise<void>
+  refreshCoreData: (id: string, options?: { token?: number }) => Promise<void>
   syncAndRefresh: (id: string, options?: { token?: number }) => Promise<void>
   runBranchAction: (
     id: string,

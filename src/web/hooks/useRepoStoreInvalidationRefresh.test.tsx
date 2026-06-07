@@ -22,8 +22,7 @@ const storeState = {
       },
     },
   },
-  refreshSnapshot: vi.fn(),
-  refreshStatus: vi.fn(),
+  refreshCoreData: vi.fn(),
 }
 
 vi.mock('#/web/repo-query-invalidation-ingress.ts', () => ({
@@ -56,8 +55,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
     document.body.appendChild(container)
     root = createRoot(container)
     resetRepoRefreshCoordinatorState()
-    storeState.refreshSnapshot.mockReset()
-    storeState.refreshStatus.mockReset()
+    storeState.refreshCoreData.mockReset()
     storeState.repos['/tmp/repo'] = {
       id: '/tmp/repo',
       availability: { phase: 'available' },
@@ -88,8 +86,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
         listener({ type: 'repo-query-invalidated', repoId: '/tmp/repo', query: 'repo-snapshot' })
     })
 
-    expect(storeState.refreshSnapshot).toHaveBeenCalledWith('/tmp/repo', { token: 7 })
-    expect(storeState.refreshStatus).toHaveBeenCalledWith('/tmp/repo', { token: 7 })
+    expect(storeState.refreshCoreData).toHaveBeenCalledWith('/tmp/repo', { token: 7 })
   })
 
   test('skips duplicate invalidation refreshes from an active local source token', async () => {
@@ -104,8 +101,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
         listener({ type: 'repo-query-invalidated', repoId: '/tmp/repo', query: 'repo-snapshot', sourceToken: 'repo_branch_1' })
     })
 
-    expect(storeState.refreshSnapshot).not.toHaveBeenCalled()
-    expect(storeState.refreshStatus).not.toHaveBeenCalled()
+    expect(storeState.refreshCoreData).not.toHaveBeenCalled()
   })
 
   test('skips duplicate invalidation refreshes from a recently settled local source token', async () => {
@@ -121,8 +117,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
         listener({ type: 'repo-query-invalidated', repoId: '/tmp/repo', query: 'repo-snapshot', sourceToken: 'repo_manual_1' })
     })
 
-    expect(storeState.refreshSnapshot).not.toHaveBeenCalled()
-    expect(storeState.refreshStatus).not.toHaveBeenCalled()
+    expect(storeState.refreshCoreData).not.toHaveBeenCalled()
   })
 
   test('refreshes when invalidation source token does not match a local action', async () => {
@@ -137,7 +132,6 @@ describe('useRepoStoreInvalidationRefresh', () => {
         listener({ type: 'repo-query-invalidated', repoId: '/tmp/repo', query: 'repo-snapshot', sourceToken: 'repo_manual_other' })
     })
 
-    expect(storeState.refreshSnapshot).toHaveBeenCalledWith('/tmp/repo', { token: 7 })
-    expect(storeState.refreshStatus).toHaveBeenCalledWith('/tmp/repo', { token: 7 })
+    expect(storeState.refreshCoreData).toHaveBeenCalledWith('/tmp/repo', { token: 7 })
   })
 })
