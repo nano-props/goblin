@@ -1,8 +1,8 @@
-// Skeleton row used as a placeholder while a list loads. Pulses via CSS
-// keyframe so the user sees motion (not a frozen list) during the IPC
-// round-trip. We render a fixed number of rows — the real list usually
-// has dozens, so a half-dozen skeletons is enough to fill the visible
-// area without committing to an exact count.
+// Skeleton row used as a placeholder while a list loads. Each bar shows a
+// shimmer sweep via CSS so the user sees motion (not a frozen list) during
+// the IPC round-trip. We render a fixed number of rows — the real list
+// usually has dozens, so a half-dozen skeletons is enough to fill the
+// visible area without committing to an exact count.
 
 import { cn } from '#/web/lib/cn.ts'
 import { RepoWorkspace, RepoWorkspacePane, Toolbar } from '#/web/components/Layout.tsx'
@@ -98,20 +98,23 @@ export function RepoWorkspaceSkeleton({
 export function BranchDetailSkeleton({ collapsed = false }: { collapsed?: boolean }) {
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
-      <Toolbar className="justify-between gap-2 bg-card px-2">
-        <div className="flex gap-0.5">
-          <div className="h-7 px-2.5 flex items-center">
-            <Bar w="42px" h="14px" tone="strong" />
-          </div>
-          <div className="h-7 px-2.5 flex items-center">
-            <Bar w="42px" h="14px" tone="strong" />
+      <Toolbar variant="detail">
+        <div className="flex min-w-0 flex-1 items-center gap-1">
+          <div className="flex shrink-0 gap-1">
+            <div className="h-7 px-2.5 flex items-center">
+              <Bar w="42px" h="14px" tone="strong" />
+            </div>
+            <div className="h-7 px-2.5 flex items-center">
+              <Bar w="42px" h="14px" tone="strong" />
+            </div>
           </div>
         </div>
-        <div className="flex min-w-0 items-center justify-end gap-1 overflow-hidden py-1">
-          <Bar w="66px" h="24px" tone="strong" />
-          <Bar w="56px" h="24px" tone="strong" />
-          <Bar w="58px" h="24px" tone="strong" />
+        <div aria-hidden="true" className="min-w-2 flex-1 self-stretch" />
+        <div className="flex shrink-0 items-center gap-1">
           <Bar w="72px" h="24px" tone="strong" />
+          <div aria-hidden="true" className="mx-1 h-4 border-l border-separator/70" />
+          <Bar w="28px" h="28px" tone="strong" />
+          <Bar w="28px" h="28px" tone="strong" />
         </div>
       </Toolbar>
 
@@ -140,8 +143,8 @@ function Bar({
   return (
     <span
       className={cn(
-        'block animate-pulse',
-        tone === 'strong' ? 'bg-accent' : 'bg-muted',
+        'block',
+        tone === 'strong' ? 'skeleton-shimmer-strong' : 'skeleton-shimmer',
         round ? 'rounded-full' : 'rounded',
         className,
       )}
