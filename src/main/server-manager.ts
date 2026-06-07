@@ -130,7 +130,8 @@ export async function startEmbeddedServer(): Promise<EmbeddedServerRuntime | nul
     const port = await reserveEmbeddedServerPort(host, preferredPort)
     const secret = randomBytes(32).toString('hex')
     const clientId = deriveServerClientId(secret)
-    const url = `http://${host}:${port}`
+    const accessHost = host === '0.0.0.0' ? '127.0.0.1' : host
+    const url = `http://${accessHost}:${port}`
     const command = serverCommand()
     const proc = spawn(command.bin, command.args, {
       cwd: serverWorkingDirectory(),
