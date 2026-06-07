@@ -28,6 +28,15 @@ android {
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
+
+    packaging {
+        jniLibs {
+            excludes += setOf(
+                "lib/*/libtermux.so",
+                "lib/*/liblocal-socket.so",
+            )
+        }
+    }
 }
 
 dependencies {
@@ -40,6 +49,8 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.sshj)
+    implementation(libs.termux.terminal.emulator)
+    implementation(libs.termux.terminal.view)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 

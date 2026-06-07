@@ -78,6 +78,9 @@ internal fun projectTerminalTarget(repository: RemoteRepositoryProfile): Project
 
 internal fun projectActionLabels(): List<String> = listOf("Open", "Terminals", "Delete")
 
+internal fun emptyProjectsDescription(): String =
+    "Add a remote Git project to open its workspace and terminal."
+
 @Composable
 private fun ProjectList(
     repositories: List<RemoteRepositoryProfile>,
@@ -97,7 +100,7 @@ private fun ProjectList(
         ) {
             Text("No projects", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(GoblinSpacing.Sm))
-            Text("Add a remote Git project to open its workspace, terminal, and port forwards.")
+            Text(emptyProjectsDescription())
             Spacer(Modifier.height(GoblinSpacing.Lg))
         }
         return

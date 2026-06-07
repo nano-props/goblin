@@ -64,6 +64,25 @@ class TerminalInteractionStateTest {
             "Terminal disconnected. Reconnect or return to diagnostics.",
             terminalInputUnavailableMessage(TerminalSessionState.Exited("session-1")),
         )
+        assertEquals(
+            "Terminal disconnected: Android service stopped. Reconnect or return to diagnostics.",
+            terminalInputUnavailableMessage(
+                TerminalSessionState.Disconnected(
+                    sessionId = "session-1",
+                    reason = TerminalDisconnectedReason.AndroidServiceStopped,
+                ),
+            ),
+        )
+        assertEquals(
+            "Terminal disconnected: SSH disconnected - connection lost. Reconnect or return to diagnostics.",
+            terminalInputUnavailableMessage(
+                TerminalSessionState.Disconnected(
+                    sessionId = "session-1",
+                    reason = TerminalDisconnectedReason.SshDisconnected,
+                    message = "connection lost",
+                ),
+            ),
+        )
         assertNull(terminalInputUnavailableMessage(TerminalSessionState.Connected("session-1", "", 80, 24)))
     }
 
@@ -76,7 +95,10 @@ class TerminalInteractionStateTest {
         )
 
         assertEquals("last output", terminalViewportText(disconnected))
-        assertNull(terminalSessionBannerMessage(disconnected))
+        assertEquals(
+            "Terminal disconnected: Android service stopped. Reconnect or return to diagnostics.",
+            terminalSessionBannerMessage(disconnected),
+        )
     }
 
     @Test
@@ -96,7 +118,74 @@ class TerminalInteractionStateTest {
         )
 
         assertTrue(text.contains("last output"))
-        assertFalse(text.contains("disconnected", ignoreCase = true))
+        assertTrue(text.contains("disconnected", ignoreCase = true))
+        assertTrue(text.contains("Android service stopped"))
+    }
+
+    @Test
+    fun `terminal status label includes disconnected reason`() {
+        assertEquals(
+            "disconnected: Android service stopped",
+            terminalSessionStatusLabel(
+                TerminalSessionState.Disconnected(
+                    sessionId = "session-1",
+                    reason = TerminalDisconnectedReason.AndroidServiceStopped,
+                ),
+            ),
+        )
+        assertEquals(
+            "disconnected: SSH disconnected - connection lost",
+            terminalSessionStatusLabel(
+                TerminalSessionState.Disconnected(
+                    sessionId = "session-1",
+                    reason = TerminalDisconnectedReason.SshDisconnected,
+                    message = "connection lost",
+                ),
+            ),
+        )
+        assertEquals("connected", terminalSessionStatusLabel(TerminalSessionState.Connected("session-1", "", 80, 24)))
+    }
+
+    @Test
+    fun `command input is enabled only while terminal is connected`() {
+        assertTrue(terminalCommandInputEnabled(TerminalSessionState.Connected("session-1", "", 80, 24)))
+        assertFalse(
+            terminalCommandInputEnabled(
+                TerminalSessionState.Disconnected(
+                    sessionId = "session-1",
+                    reason = TerminalDisconnectedReason.SshDisconnected,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun `command input placeholder explains disabled state`() {
+        assertEquals(
+            "Type a command",
+            terminalCommandInputPlaceholder(TerminalSessionState.Connected("session-1", "", 80, 24)),
+        )
+        assertEquals(
+            "Terminal disconnected: SSH disconnected. Reconnect or return to diagnostics.",
+            terminalCommandInputPlaceholder(
+                TerminalSessionState.Disconnected(
+                    sessionId = "session-1",
+                    reason = TerminalDisconnectedReason.SshDisconnected,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun `terminal command controls stay compact`() {
+        assertTrue(TerminalCommandInputHeight.value <= 40f)
+        assertTrue(TerminalActionButtonHeight.value <= 36f)
+    }
+
+    @Test
+    fun `native terminal fallback is visible only without emulator controller`() {
+        assertTrue(terminalFallbackVisible(hasEmulatorController = false))
+        assertFalse(terminalFallbackVisible(hasEmulatorController = true))
     }
 
     @Test
@@ -120,9 +209,29 @@ class TerminalInteractionStateTest {
     @Test
     fun `control input maps ctrl+c and other ctrl letters from key codes`() {
         assertEquals("\u0003", terminalControlInput(KeyEvent.KEYCODE_C, ctrlPressed = true))
+        assertEquals("\u000C", terminalControlInput(KeyEvent.KEYCODE_L, ctrlPressed = true))
         assertEquals("\u0004", terminalControlInput(KeyEvent.KEYCODE_D, ctrlPressed = true))
         assertNull(terminalControlInput(KeyEvent.KEYCODE_C, ctrlPressed = false))
         assertNull(terminalControlInput(KeyEvent.KEYCODE_ENTER, ctrlPressed = true))
+    }
+
+    @Test
+    fun `helper key labels include ctrl l after ctrl c`() {
+        val labels = terminalHelperKeyLabels(ctrlModifierActive = false)
+
+        assertEquals("CTRL+C", labels[3])
+        assertEquals("CTRL+L", labels[4])
+        assertEquals("Tab", labels[5])
+    }
+
+    @Test
+    fun `top bar is hidden while terminal is maximized`() {
+        assertTrue(terminalTopBarVisible(terminalMaximized = false))
+        assertFalse(terminalTopBarVisible(terminalMaximized = true))
+        assertEquals("Maximize", terminalMaximizeActionLabel(terminalMaximized = false))
+        assertEquals("Restore", terminalMaximizeActionLabel(terminalMaximized = true))
+        assertTrue(terminalRestoreInlineActionVisible(terminalMaximized = true))
+        assertFalse(terminalRestoreInlineActionVisible(terminalMaximized = false))
     }
 
     @Test

@@ -20,7 +20,6 @@ import dev.goblin.android.navigation.AppRoute
 import dev.goblin.android.ssh.RemoteBranchService
 import dev.goblin.android.ssh.RemoteRepositoryGitService
 import dev.goblin.android.ssh.RemoteWorktreeService
-import dev.goblin.android.ssh.PortForwardManager
 import dev.goblin.android.ssh.SshDiagnosticsService
 import dev.goblin.android.ssh.SshInitializationService
 import dev.goblin.android.navigation.AppRoute.Companion.terminal
@@ -28,6 +27,8 @@ import dev.goblin.android.terminals.TerminalForegroundBridge
 import dev.goblin.android.terminals.TerminalNavigationRequest
 import dev.goblin.android.terminals.TerminalSessionManager
 import dev.goblin.android.terminals.TerminalSessionRecord
+import dev.goblin.android.termux.ExternalTermuxLauncher
+import dev.goblin.android.termux.externalTermuxLaunchRequest
 import dev.goblin.android.ui.screens.addhost.AddHostScreen
 import dev.goblin.android.ui.screens.diagnostics.DiagnosticsScreen
 import dev.goblin.android.ui.navigation.MainTab
@@ -36,7 +37,6 @@ import dev.goblin.android.ui.screens.hosts.HostsScreen
 import dev.goblin.android.ui.screens.hosts.hostTemporaryTerminalRoute
 import dev.goblin.android.ui.screens.hosts.isHostTemporaryTerminal
 import dev.goblin.android.ui.screens.projects.ProjectsScreen
-import dev.goblin.android.ui.screens.ports.hostPortForwardOwner
 import dev.goblin.android.ui.screens.settings.SettingsScreen
 import dev.goblin.android.ui.screens.repositories.RepositorySetupScreen
 import dev.goblin.android.ui.screens.repositories.RepositoryWorkspaceScreen
@@ -55,11 +55,11 @@ fun GoblinAndroidApp(
     remoteRepositoryGitService: RemoteRepositoryGitService,
     remoteBranchService: RemoteBranchService,
     remoteWorktreeService: RemoteWorktreeService,
-    portForwardManager: PortForwardManager,
     initializationService: SshInitializationService,
     terminalSettingsStore: TerminalSettingsStore,
     terminalSessionManager: TerminalSessionManager,
     terminalForegroundBridge: TerminalForegroundBridge,
+    externalTermuxLauncher: ExternalTermuxLauncher,
     terminalNavigationRequest: TerminalNavigationRequest? = null,
 ) {
     val initialRepositories = remember {
@@ -121,7 +121,6 @@ fun GoblinAndroidApp(
     }
 
     fun stopRepositoryRuntimeResources(repositoryId: String) {
-        portForwardManager.stopOwner(repositoryId)
         terminalSessionManager.removeRepositorySessions(repositoryId)
         terminalForegroundBridge.sync()
     }
@@ -181,7 +180,6 @@ fun GoblinAndroidApp(
                         hostsState = hostsState,
                         onEditHost = { hostId -> route = AppRoute.EditHost(hostId) },
                         onDeleteHost = { hostId ->
-                            portForwardManager.stopOwner(hostId)
                             currentRepositories()
                                 .filter { it.hostProfileId == hostId }
                                 .forEach { stopRepositoryRuntimeResources(it.id) }
@@ -284,15 +282,6 @@ fun GoblinAndroidApp(
                     onTrustHostKey = { fingerprint ->
                         initializationService.trustHostKey(routeHost(), fingerprint)
                     },
-                    portForwardSessions = portForwardManager.sessions(host.id),
-                    onStartPortForward = { request ->
-                        portForwardManager.start(
-                            owner = hostPortForwardOwner(routeHost()),
-                            target = RemoteTarget.fromHostProfile(routeHost()),
-                            request = request,
-                        )
-                    },
-                    onStopPortForward = { sessionId -> portForwardManager.stop(sessionId) },
                 )
             }
         }
@@ -342,6 +331,19 @@ fun GoblinAndroidApp(
                         )
                         terminalForegroundBridge.sync()
                         session
+                    },
+                    onOpenExternalTermuxAtPath = { target ->
+                        val request = externalTermuxLaunchRequest(target) { identityId ->
+                            secureIdentityStore.loadProtectedBytesById(identityId)
+                        }
+                        try {
+                            externalTermuxLauncher.openInTermux(request)
+                        } finally {
+                            request.privateKeyBytes?.fill(0)
+                        }
+                    },
+                    onCopyExternalTermuxCommandAtPath = { target ->
+                        externalTermuxLauncher.copyCommand(target)
                     },
                     onOpenTerminalSession = { session ->
                         terminalSessionManager.touchSession(session.id)

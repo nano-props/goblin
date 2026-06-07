@@ -2,6 +2,7 @@ package dev.goblin.android.terminals
 
 import dev.goblin.android.domain.ssh.RemoteTarget
 import dev.goblin.android.ssh.SshConnectionSecrets
+import java.io.IOException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -28,6 +29,34 @@ class TerminalControllerTest {
 
         assertTrue(controller.paste("echo ok"))
         assertEquals(listOf("echo ok"), service.session.sentInput)
+    }
+
+    @Test
+    fun `raw output is emitted before plain text filtering`() {
+        val service = FakeTerminalSessionFactory()
+        val rawFrames = mutableListOf<String>()
+        val controller = TerminalController(
+            terminalService = service,
+            onRawOutput = { bytes -> rawFrames += bytes.toString(Charsets.UTF_8) },
+        )
+
+        controller.open(target())
+        service.emitOutput("\u001B[?2004hprompt")
+
+        val state = controller.state as TerminalSessionState.Connected
+        assertEquals(listOf("ready\n", "\u001B[?2004hprompt"), rawFrames)
+        assertEquals("ready\nprompt", state.output)
+    }
+
+    @Test
+    fun `sendInputBytes writes raw bytes to active shell session`() {
+        val service = FakeTerminalSessionFactory()
+        val controller = TerminalController(service)
+
+        controller.open(target())
+
+        assertTrue(controller.sendInputBytes(byteArrayOf(0x1B, 0x5B, 0x41)))
+        assertEquals(listOf("\u001B[A"), service.session.sentInput)
     }
 
     @Test
@@ -104,6 +133,81 @@ class TerminalControllerTest {
     }
 
     @Test
+    fun `remote EOF failure includes startup context and last output`() {
+        val service = FakeTerminalSessionFactory()
+        val controller = TerminalController(service)
+
+        controller.open(target(remotePath = "/srv/app"))
+        service.emitOutput("cd '/srv/app' && pwd\r\n/srv/app\r\n")
+        service.fail(IOException("broken transport, encountered EOF"))
+
+        val state = controller.state as TerminalSessionState.Failed
+        assertEquals(TerminalDisconnectedReason.SshDisconnected, state.reason)
+        assertTrue(state.message.contains("SSH disconnected after startup for /srv/app"))
+        assertTrue(state.message.contains("broken transport, encountered EOF"))
+        assertTrue(state.message.contains("Last output:"))
+        assertTrue(state.message.contains("/srv/app"))
+    }
+
+    @Test
+    fun `remote failure with blank message includes exception class`() {
+        val service = FakeTerminalSessionFactory()
+        val controller = TerminalController(service)
+
+        controller.open(target(remotePath = "/srv/app"))
+        service.fail(BlankMessageException())
+
+        val state = controller.state as TerminalSessionState.Failed
+        assertTrue(state.message.contains("SSH disconnected after startup for /srv/app"))
+        assertTrue(state.message.contains("BlankMessageException"))
+    }
+
+    @Test
+    fun `remote shell exit includes startup context and last output`() {
+        val service = FakeTerminalSessionFactory()
+        val controller = TerminalController(service)
+
+        controller.open(target(remotePath = "/srv/app"))
+        service.emitOutput("cd '/srv/app' && pwd\r\n/srv/app\r\n")
+        service.exit()
+
+        val state = controller.state as TerminalSessionState.Exited
+        assertEquals(TerminalDisconnectedReason.RemoteExited, state.reason)
+        assertTrue(state.exitMessage.contains("SSH shell closed after startup for /srv/app"))
+        assertTrue(state.exitMessage.contains("Last output:"))
+        assertTrue(state.exitMessage.contains("/srv/app"))
+    }
+
+    @Test
+    fun `remote exit during shell startup is not overwritten by connected state`() {
+        val service = FakeTerminalSessionFactory()
+        service.exitBeforeReturn = true
+        val controller = TerminalController(service)
+
+        controller.open(target(remotePath = "/srv/app"))
+
+        val state = controller.state as TerminalSessionState.Exited
+        assertEquals("session-1", state.sessionId)
+        assertTrue(state.exitMessage.contains("SSH shell closed after startup for /srv/app"))
+        assertTrue(service.session.closed)
+    }
+
+    @Test
+    fun `remote failure during shell startup is not overwritten by connected state`() {
+        val service = FakeTerminalSessionFactory()
+        service.failureBeforeReturn = IOException("broken transport, encountered EOF")
+        val controller = TerminalController(service)
+
+        controller.open(target(remotePath = "/srv/app"))
+
+        val state = controller.state as TerminalSessionState.Failed
+        assertEquals("session-1", state.sessionId)
+        assertTrue(state.message.contains("SSH disconnected after startup for /srv/app"))
+        assertTrue(state.message.contains("broken transport, encountered EOF"))
+        assertTrue(service.session.closed)
+    }
+
+    @Test
     fun `sendInput returns false without active session`() {
         val controller = TerminalController(FakeTerminalSessionFactory())
 
@@ -159,15 +263,17 @@ class TerminalControllerTest {
         assertEquals("ready\nprompt", state.output)
     }
 
-    private fun target(): RemoteTarget = RemoteTarget(
+    private fun target(remotePath: String = "/"): RemoteTarget = RemoteTarget(
         id = "lee@example.com:22/",
         alias = "Dev",
         host = "example.com",
         user = "lee",
         port = 22,
-        remotePath = "/",
+        remotePath = remotePath,
         identityRefId = null,
     )
+
+    private class BlankMessageException : RuntimeException()
 
     private class FakeTerminalSessionFactory : TerminalSessionFactory {
         lateinit var session: FakeTerminalSession
@@ -175,14 +281,18 @@ class TerminalControllerTest {
         var openRows: Int = 0
         var sessionInputError: RuntimeException? = null
         var openError: RuntimeException? = null
-        private lateinit var onOutput: (String) -> Unit
+        var exitBeforeReturn: Boolean = false
+        var failureBeforeReturn: Throwable? = null
+        private lateinit var onOutput: (ByteArray) -> Unit
+        private lateinit var onExit: () -> Unit
+        private lateinit var onFailure: (Throwable) -> Unit
 
         override fun openShell(
             target: RemoteTarget,
             secrets: SshConnectionSecrets,
             cols: Int,
             rows: Int,
-            onOutput: (String) -> Unit,
+            onOutput: (ByteArray) -> Unit,
             onExit: () -> Unit,
             onFailure: (Throwable) -> Unit,
         ): TerminalSession {
@@ -190,13 +300,25 @@ class TerminalControllerTest {
             openCols = cols
             openRows = rows
             this.onOutput = onOutput
+            this.onExit = onExit
+            this.onFailure = onFailure
             session = FakeTerminalSession(sessionInputError)
-            onOutput("ready\n")
+            onOutput("ready\n".toByteArray(Charsets.UTF_8))
+            if (exitBeforeReturn) onExit()
+            failureBeforeReturn?.let(onFailure)
             return session
         }
 
         fun emitOutput(value: String) {
-            onOutput(value)
+            onOutput(value.toByteArray(Charsets.UTF_8))
+        }
+
+        fun exit() {
+            onExit()
+        }
+
+        fun fail(error: Throwable) {
+            onFailure(error)
         }
     }
 
@@ -210,9 +332,9 @@ class TerminalControllerTest {
 
         override fun isConnected(): Boolean = !closed
 
-        override fun sendInput(value: String) {
+        override fun sendInputBytes(value: ByteArray) {
             inputError?.let { throw it }
-            sentInput.add(value)
+            sentInput.add(value.toString(Charsets.UTF_8))
         }
 
         override fun resize(cols: Int, rows: Int) {

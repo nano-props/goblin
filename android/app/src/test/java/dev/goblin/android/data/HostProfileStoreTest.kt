@@ -79,7 +79,6 @@ class HostProfileStoreTest {
         assertFalse(payload.contains("terminal", ignoreCase = true))
         assertFalse(payload.contains("session", ignoreCase = true))
         assertFalse(payload.contains("socket", ignoreCase = true))
-        assertFalse(payload.contains("portForward", ignoreCase = true))
         assertTrue(payload.isNotBlank())
     }
 }

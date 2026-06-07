@@ -11,10 +11,12 @@ internal object SshPrivateKeys {
         client: SSHClient,
         identityBytes: ByteArray,
         passphrase: CharArray?,
-    ): KeyProvider = client.loadKeys(
-        identityBytes.toString(StandardCharsets.UTF_8),
-        null as String?,
-        StaticPasswordFinder(passphrase),
+    ): KeyProvider = SshKeyCompatibility.keyProviderForSshj(
+        client.loadKeys(
+            identityBytes.toString(StandardCharsets.UTF_8),
+            null as String?,
+            StaticPasswordFinder(passphrase),
+        ),
     )
 
     fun publicKeyLine(privateKeyBytes: ByteArray, comment: String): String =

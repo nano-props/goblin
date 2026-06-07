@@ -6,6 +6,7 @@ import androidx.core.content.edit
 import dev.goblin.android.terminals.TerminalDisconnectedReason
 import dev.goblin.android.terminals.TerminalSessionRecord
 import dev.goblin.android.terminals.TerminalSessionStatus
+import dev.goblin.android.terminals.terminalDisconnectedMessageSnapshot
 import dev.goblin.android.terminals.terminalOutputSnapshot
 import java.nio.charset.StandardCharsets
 import java.util.Base64
@@ -70,7 +71,8 @@ object TerminalSessionCodec {
     private const val FieldSeparator = "."
     private const val RecordSeparator = "\n"
     private const val LegacyRecordFieldCount = 11
-    private const val RecordFieldCount = 12
+    private const val DisplayNameRecordFieldCount = 12
+    private const val RecordFieldCount = 13
 
     fun encode(sessions: List<TerminalSessionRecord>): String =
         sessions.joinToString(RecordSeparator) { session ->
@@ -87,6 +89,7 @@ object TerminalSessionCodec {
                 session.openedAt.toString(),
                 session.foregroundServiceOwned.toString(),
                 session.disconnectedReason?.name.orEmpty(),
+                terminalDisconnectedMessageSnapshot(session.disconnectedMessage).orEmpty(),
             ).joinToString(FieldSeparator) { it.encodeField() }
         }
 
@@ -100,23 +103,28 @@ object TerminalSessionCodec {
 
     private fun decodeSession(index: Int, line: String): TerminalSessionRecord? {
         val fields = line.split(FieldSeparator).map { it.decodeField() }
-        if (fields.size !in listOf(LegacyRecordFieldCount, RecordFieldCount)) return null
+        if (fields.size !in listOf(LegacyRecordFieldCount, DisplayNameRecordFieldCount, RecordFieldCount)) return null
         return runCatching {
+            val hasDisplayName = fields.size >= DisplayNameRecordFieldCount
+            val hasDisconnectMessage = fields.size == RecordFieldCount
             TerminalSessionRecord(
                 id = fields[0],
                 hostId = fields[1],
                 repositoryId = fields[2].takeIf { it.isNotBlank() },
                 remotePath = fields[3],
                 targetLabel = fields[4],
-                displayName = fields[5].takeIf { fields.size == RecordFieldCount } ?: "",
-                status = TerminalSessionStatus.valueOf(if (fields.size == RecordFieldCount) fields[6] else fields[5]),
-                lastOutputSnapshot = terminalOutputSnapshot(if (fields.size == RecordFieldCount) fields[7] else fields[6]),
-                lastActivityAt = (if (fields.size == RecordFieldCount) fields[8] else fields[7]).takeIf { it.isNotBlank() }?.toLong(),
-                openedAt = (if (fields.size == RecordFieldCount) fields[9] else fields[8]).toLong(),
-                foregroundServiceOwned = (if (fields.size == RecordFieldCount) fields[10] else fields[9]).toBooleanStrict(),
-                disconnectedReason = (if (fields.size == RecordFieldCount) fields[11] else fields[10]).takeIf { it.isNotBlank() }?.let(
+                displayName = fields[5].takeIf { hasDisplayName } ?: "",
+                status = TerminalSessionStatus.valueOf(if (hasDisplayName) fields[6] else fields[5]),
+                lastOutputSnapshot = terminalOutputSnapshot(if (hasDisplayName) fields[7] else fields[6]),
+                lastActivityAt = (if (hasDisplayName) fields[8] else fields[7]).takeIf { it.isNotBlank() }?.toLong(),
+                openedAt = (if (hasDisplayName) fields[9] else fields[8]).toLong(),
+                foregroundServiceOwned = (if (hasDisplayName) fields[10] else fields[9]).toBooleanStrict(),
+                disconnectedReason = (if (hasDisplayName) fields[11] else fields[10]).takeIf { it.isNotBlank() }?.let(
                     TerminalDisconnectedReason::valueOf,
                 ),
+                disconnectedMessage = fields.getOrNull(12)
+                    ?.takeIf { hasDisconnectMessage && it.isNotBlank() }
+                    ?.let(::terminalDisconnectedMessageSnapshot),
             )
         }.getOrNull()
     }

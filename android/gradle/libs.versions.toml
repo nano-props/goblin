@@ -6,6 +6,7 @@ activityCompose = "1.13.0"
 coreKtx = "1.18.0"
 sshj = "0.40.0"
 junit = "4.13.2"
+termux = "0.118.0"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
@@ -19,6 +20,8 @@ androidx-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
 androidx-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
 junit = { module = "junit:junit", version.ref = "junit" }
 sshj = { module = "com.hierynomus:sshj", version.ref = "sshj" }
+termux-terminal-emulator = { module = "com.termux.termux-app:terminal-emulator", version.ref = "termux" }
+termux-terminal-view = { module = "com.termux.termux-app:terminal-view", version.ref = "termux" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

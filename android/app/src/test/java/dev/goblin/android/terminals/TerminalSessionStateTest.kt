@@ -32,6 +32,7 @@ class TerminalSessionStateTest {
         val record = terminalRecord(
             status = TerminalSessionStatus.Disconnected,
             disconnectedReason = TerminalDisconnectedReason.AndroidServiceStopped,
+            disconnectedMessage = "service process stopped",
         )
 
         val state = record.toTerminalSessionState()
@@ -41,6 +42,7 @@ class TerminalSessionStateTest {
             TerminalDisconnectedReason.AndroidServiceStopped,
             (state as TerminalSessionState.Disconnected).reason,
         )
+        assertEquals("service process stopped", state.message)
     }
 
     @Test
@@ -78,6 +80,7 @@ class TerminalSessionStateTest {
     private fun terminalRecord(
         status: TerminalSessionStatus,
         disconnectedReason: TerminalDisconnectedReason?,
+        disconnectedMessage: String? = null,
     ): TerminalSessionRecord = TerminalSessionRecord(
         id = "terminal-1",
         hostId = "lee@example.com:22/",
@@ -90,6 +93,7 @@ class TerminalSessionStateTest {
         openedAt = 100L,
         foregroundServiceOwned = false,
         disconnectedReason = disconnectedReason,
+        disconnectedMessage = disconnectedMessage,
     )
 
     private class ControlledTerminalSessionFactory : TerminalSessionFactory {
@@ -100,7 +104,7 @@ class TerminalSessionStateTest {
             secrets: SshConnectionSecrets,
             cols: Int,
             rows: Int,
-            onOutput: (String) -> Unit,
+            onOutput: (ByteArray) -> Unit,
             onExit: () -> Unit,
             onFailure: (Throwable) -> Unit,
         ): TerminalSession {
@@ -108,7 +112,7 @@ class TerminalSessionStateTest {
             return object : TerminalSession {
                 override val id: String = "session-1"
                 override fun isConnected(): Boolean = true
-                override fun sendInput(value: String) = Unit
+                override fun sendInputBytes(value: ByteArray) = Unit
                 override fun resize(cols: Int, rows: Int) = Unit
                 override fun close() = Unit
             }

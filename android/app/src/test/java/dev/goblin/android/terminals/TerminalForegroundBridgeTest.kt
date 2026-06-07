@@ -49,6 +49,36 @@ class TerminalForegroundBridgeTest {
     }
 
     @Test
+    fun `unchanged running sessions do not enqueue duplicate foreground updates`() {
+        val owner = RecordingForegroundOwner()
+        val bridge = TerminalForegroundBridge(
+            sessionProvider = {
+                listOf(
+                    TerminalSessionRecord(
+                        id = "terminal-1",
+                        hostId = "host-1",
+                        repositoryId = null,
+                        remotePath = "/",
+                        targetLabel = "Dev - /",
+                        status = TerminalSessionStatus.Running,
+                        openedAt = 100L,
+                        lastActivityAt = 200L,
+                    ),
+                )
+            },
+            owner = owner,
+        )
+
+        bridge.sync()
+        bridge.sync()
+        bridge.sync()
+
+        assertEquals(0, owner.stopCount)
+        assertEquals(1, owner.startedContent.size)
+        assertEquals("terminal-1", owner.startedContent.single().terminalSessionId)
+    }
+
+    @Test
     fun `manager owned running sessions update foreground ownership`() {
         val owner = RecordingForegroundOwner()
         val manager = TerminalSessionManager(
@@ -83,13 +113,13 @@ class TerminalForegroundBridgeTest {
             secrets: SshConnectionSecrets,
             cols: Int,
             rows: Int,
-            onOutput: (String) -> Unit,
+            onOutput: (ByteArray) -> Unit,
             onExit: () -> Unit,
             onFailure: (Throwable) -> Unit,
         ): TerminalSession = object : TerminalSession {
             override val id: String = "backend-session-1"
             override fun isConnected(): Boolean = true
-            override fun sendInput(value: String) = Unit
+            override fun sendInputBytes(value: ByteArray) = Unit
             override fun resize(cols: Int, rows: Int) = Unit
             override fun close() = Unit
         }

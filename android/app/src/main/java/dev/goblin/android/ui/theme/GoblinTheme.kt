@@ -15,6 +15,14 @@ object GoblinColors {
     const val DestructiveHex = "#DC2626"
     const val TerminalBackgroundHex = "#0B0F14"
     const val TerminalForegroundHex = "#E5E7EB"
+    const val TerminalOverlayBackgroundHex = "#111827"
+    const val TerminalOverlayForegroundHex = TerminalForegroundHex
+    const val TerminalInputBackgroundHex = "#111827"
+    const val TerminalInputBorderHex = "#334155"
+    const val TerminalInputForegroundHex = TerminalForegroundHex
+    const val TerminalInputPlaceholderHex = "#94A3B8"
+    const val TerminalActionForegroundHex = "#60A5FA"
+    const val TerminalDisabledForegroundHex = "#94A3B8"
 
     val Accent = Color(0xFF2563EB)
     val Success = Color(0xFF16A34A)
@@ -22,6 +30,14 @@ object GoblinColors {
     val Destructive = Color(0xFFDC2626)
     val TerminalBackground = Color(0xFF0B0F14)
     val TerminalForeground = Color(0xFFE5E7EB)
+    val TerminalOverlayBackground = Color(0xFF111827)
+    val TerminalOverlayForeground = TerminalForeground
+    val TerminalInputBackground = Color(0xFF111827)
+    val TerminalInputBorder = Color(0xFF334155)
+    val TerminalInputForeground = TerminalForeground
+    val TerminalInputPlaceholder = Color(0xFF94A3B8)
+    val TerminalActionForeground = Color(0xFF60A5FA)
+    val TerminalDisabledForeground = Color(0xFF94A3B8)
 }
 
 object GoblinSpacing {
@@ -63,4 +79,3 @@ fun GoblinTheme(
         content = content,
     )
 }
-

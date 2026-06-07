@@ -3,7 +3,9 @@ package dev.goblin.android.terminals
 import dev.goblin.android.data.TerminalSessionSnapshotStore
 import dev.goblin.android.domain.ssh.RemoteTarget
 import dev.goblin.android.ssh.SshConnectionSecrets
+import dev.goblin.android.terminals.emulator.RemoteTerminalEmulatorController
 import java.io.IOException
+import java.util.concurrent.Executor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -289,6 +291,76 @@ class TerminalSessionManagerTest {
     }
 
     @Test
+    fun `terminal emulator receives raw output before snapshot filtering`() {
+        val service = FakeTerminalSessionFactory()
+        val manager = terminalSessionManager(service)
+        val record = manager.createOrAttach(target(), repositoryId = null, targetLabel = "Dev - /")
+
+        service.emitOutput("\u001B[31mred\u001B[0m")
+
+        assertEquals("red", manager.emulatorController(record.id)?.visibleText())
+        assertEquals("red", manager.session(record.id)?.lastOutputSnapshot)
+    }
+
+    @Test
+    fun `sendInputBytes routes bytes through the active controller`() {
+        val service = FakeTerminalSessionFactory()
+        val manager = terminalSessionManager(service)
+        val record = manager.createOrAttach(target(), repositoryId = null, targetLabel = "Dev - /")
+
+        assertTrue(manager.sendInputBytes(record.id, byteArrayOf(0x1B, 0x5B, 0x41)))
+
+        assertEquals(listOf("\u001B[A"), service.session.sentInput)
+    }
+
+    @Test
+    fun `sendInputBytes queues remote write on terminal io executor`() {
+        val executor = RecordingExecutor()
+        val service = FakeTerminalSessionFactory()
+        val manager = terminalSessionManager(service, terminalIoExecutor = executor)
+        val record = manager.createOrAttach(target(), repositoryId = null, targetLabel = "Dev - /")
+
+        assertTrue(manager.sendInputBytes(record.id, byteArrayOf(0x1B, 0x5B, 0x41)))
+
+        assertEquals(emptyList<String>(), service.session.sentInput)
+        assertEquals(1, executor.pendingCount)
+
+        executor.runNext()
+
+        assertEquals(listOf("\u001B[A"), service.session.sentInput)
+    }
+
+    @Test
+    fun `resize queues remote resize on terminal io executor`() {
+        val executor = RecordingExecutor()
+        val service = FakeTerminalSessionFactory()
+        val manager = terminalSessionManager(service, terminalIoExecutor = executor)
+        val record = manager.createOrAttach(target(), repositoryId = null, targetLabel = "Dev - /")
+
+        assertTrue(manager.resize(record.id, 100, 30))
+
+        assertEquals(emptyList<Pair<Int, Int>>(), service.session.resizes)
+        assertEquals(1, executor.pendingCount)
+
+        executor.runNext()
+
+        assertEquals(listOf(100 to 30), service.session.resizes)
+    }
+
+    @Test
+    fun `removing terminal detaches emulator controller`() {
+        val service = FakeTerminalSessionFactory()
+        val manager = terminalSessionManager(service)
+        val record = manager.createOrAttach(target(), repositoryId = null, targetLabel = "Dev - /")
+        val controller = manager.emulatorController(record.id)
+
+        manager.removeSession(record.id)
+
+        assertTrue(controller?.output?.isDetached == true)
+        assertNull(manager.emulatorController(record.id))
+    }
+
+    @Test
     fun `explicit close marks user closed and closes backend once`() {
         val service = FakeTerminalSessionFactory()
         val manager = terminalSessionManager(service)
@@ -327,6 +399,34 @@ class TerminalSessionManagerTest {
         val failed = manager.session(record.id)
         assertEquals(TerminalSessionStatus.Disconnected, failed?.status)
         assertEquals(TerminalDisconnectedReason.SshDisconnected, failed?.disconnectedReason)
+        assertEquals("SSH disconnected after startup for /: connection lost", failed?.disconnectedMessage)
+    }
+
+    @Test
+    fun `first heartbeat primes schedule without disconnecting running session`() {
+        var now = 1_000L
+        val service = FakeTerminalSessionFactory()
+        val manager = terminalSessionManager(
+            service = service,
+            now = { now },
+            heartbeatIntervalSeconds = { 5L },
+            heartbeatFailureThreshold = { 1 },
+        )
+        val record = manager.createOrAttach(target(), repositoryId = null, targetLabel = "Dev - /")
+        service.session.connected = false
+
+        manager.runHeartbeatForTest()
+
+        assertEquals(TerminalSessionStatus.Running, manager.session(record.id)?.status)
+        assertEquals(0, service.session.closeCount)
+
+        now += 5_000L
+        manager.runHeartbeatForTest()
+
+        val disconnected = manager.session(record.id)
+        assertEquals(TerminalSessionStatus.Disconnected, disconnected?.status)
+        assertEquals(TerminalDisconnectedReason.SshDisconnected, disconnected?.disconnectedReason)
+        assertEquals(1, service.session.closeCount)
     }
 
     @Test
@@ -390,11 +490,25 @@ class TerminalSessionManagerTest {
         now: () -> Long = { 100L },
         store: TerminalSessionSnapshotStore? = null,
         ids: Iterator<String> = listOf("terminal-1").iterator(),
+        heartbeatIntervalSeconds: () -> Long = { TerminalHeartbeatIntervalSeconds },
+        heartbeatFailureThreshold: () -> Int = { TerminalHeartbeatFailureThreshold },
+        terminalIoExecutor: Executor = DirectExecutor,
     ): TerminalSessionManager = TerminalSessionManager(
         terminalService = service,
         clock = now,
         idGenerator = { ids.next() },
         sessionStore = store,
+        heartbeatIntervalSeconds = heartbeatIntervalSeconds,
+        heartbeatFailureThreshold = heartbeatFailureThreshold,
+        terminalIoExecutor = terminalIoExecutor,
+        emulatorControllerFactory = { sessionId, sendInputBytes, resizeRemote ->
+            RemoteTerminalEmulatorController(
+                sessionId = sessionId,
+                postToMain = { action -> action() },
+                sendInputBytes = sendInputBytes,
+                resizeRemote = resizeRemote,
+            )
+        },
     )
 
     private fun terminalIds(): Iterator<String> = generateSequence(1) { it + 1 }
@@ -423,7 +537,7 @@ class TerminalSessionManagerTest {
             secrets: SshConnectionSecrets,
             cols: Int,
             rows: Int,
-            onOutput: (String) -> Unit,
+            onOutput: (ByteArray) -> Unit,
             onExit: () -> Unit,
             onFailure: (Throwable) -> Unit,
         ): TerminalSession {
@@ -435,7 +549,7 @@ class TerminalSessionManagerTest {
         }
 
         fun emitOutput(value: String, index: Int = opened.lastIndex) {
-            opened[index].onOutput(value)
+            opened[index].onOutput(value.toByteArray(Charsets.UTF_8))
         }
 
         fun exit(index: Int = opened.lastIndex) {
@@ -447,7 +561,7 @@ class TerminalSessionManagerTest {
         }
 
         private data class OpenedTerminal(
-            val onOutput: (String) -> Unit,
+            val onOutput: (ByteArray) -> Unit,
             val onExit: () -> Unit,
             val onFailure: (Throwable) -> Unit,
         )
@@ -457,16 +571,20 @@ class TerminalSessionManagerTest {
         override val id: String,
     ) : TerminalSession {
         val sentInput = mutableListOf<String>()
+        val resizes = mutableListOf<Pair<Int, Int>>()
+        var connected = true
         var closed = false
         var closeCount = 0
 
-        override fun isConnected(): Boolean = !closed
+        override fun isConnected(): Boolean = connected && !closed
 
-        override fun sendInput(value: String) {
-            sentInput.add(value)
+        override fun sendInputBytes(value: ByteArray) {
+            sentInput.add(value.toString(Charsets.UTF_8))
         }
 
-        override fun resize(cols: Int, rows: Int) = Unit
+        override fun resize(cols: Int, rows: Int) {
+            resizes.add(cols to rows)
+        }
 
         override fun close() {
             closeCount += 1
@@ -501,4 +619,30 @@ class TerminalSessionManagerTest {
         foregroundServiceOwned = true,
         disconnectedReason = null,
     )
+
+    private object DirectExecutor : Executor {
+        override fun execute(command: Runnable) {
+            command.run()
+        }
+    }
+
+    private class RecordingExecutor : Executor {
+        private val pending = ArrayDeque<Runnable>()
+        val pendingCount: Int
+            get() = pending.size
+
+        override fun execute(command: Runnable) {
+            pending += command
+        }
+
+        fun runNext() {
+            pending.removeFirst().run()
+        }
+    }
+
+    private fun TerminalSessionManager.runHeartbeatForTest() {
+        val method = TerminalSessionManager::class.java.getDeclaredMethod("checkRunningSessionsHeartbeat")
+        method.isAccessible = true
+        method.invoke(this)
+    }
 }

@@ -33,12 +33,9 @@ import dev.goblin.android.domain.ssh.DiagnosticStage
 import dev.goblin.android.domain.ssh.DiagnosticStageResult
 import dev.goblin.android.domain.ssh.DiagnosticStatus
 import dev.goblin.android.domain.ssh.DiagnosticsResult
-import dev.goblin.android.domain.ssh.PortForwardRequest
-import dev.goblin.android.domain.ssh.PortForwardSession
 import dev.goblin.android.domain.ssh.RemoteTarget
 import dev.goblin.android.domain.ssh.SshHostProfile
 import dev.goblin.android.ssh.SshInitializationCheck
-import dev.goblin.android.ui.screens.ports.PortForwardPanel
 import dev.goblin.android.ui.theme.GoblinSpacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -54,11 +51,6 @@ fun DiagnosticsScreen(
     onInitializeSshAccess: (CharArray) -> Unit = {},
     onRunDiagnostics: () -> DiagnosticsResult,
     onTrustHostKey: (String) -> Unit,
-    portForwardSessions: List<PortForwardSession> = emptyList(),
-    onStartPortForward: (PortForwardRequest) -> PortForwardSession = {
-        throw UnsupportedOperationException("Port forwarding is not available")
-    },
-    onStopPortForward: (String) -> PortForwardSession? = { null },
 ) {
     val scope = rememberCoroutineScope()
     var diagnosticsState: ResourceState<DiagnosticsResult> by remember { mutableStateOf(ResourceState.Idle) }
@@ -167,11 +159,6 @@ fun DiagnosticsScreen(
             Button(onClick = { runDiagnostics() }) {
                 Text("Run diagnostics")
             }
-            HostPortsSection(
-                sessions = portForwardSessions,
-                onStartPortForward = onStartPortForward,
-                onStopPortForward = onStopPortForward,
-            )
             when (val state = diagnosticsState) {
                 ResourceState.Idle -> DiagnosticStageList(stages = pendingStages())
                 ResourceState.Loading -> DiagnosticStageList(stages = pendingStages(running = DiagnosticStage.SSH))
@@ -252,46 +239,6 @@ private fun SshInitializationCard(
                 Text(error, color = MaterialTheme.colorScheme.error)
             }
         }
-    }
-}
-
-@Composable
-private fun HostPortsSection(
-    sessions: List<PortForwardSession>,
-    onStartPortForward: (PortForwardRequest) -> PortForwardSession,
-    onStopPortForward: (String) -> PortForwardSession?,
-) {
-    val scope = rememberCoroutineScope()
-    var visiblePortForwards by remember(sessions) { mutableStateOf(sessions) }
-    var error by remember { mutableStateOf<String?>(null) }
-
-    fun upsertPortForwardSession(session: PortForwardSession) {
-        visiblePortForwards = visiblePortForwards.filterNot { it.id == session.id } + session
-    }
-
-    PortForwardPanel(
-        title = "Ports",
-        emptyText = "No port forwards for this host.",
-        sessions = visiblePortForwards,
-        onStartPortForward = { request ->
-            error = null
-            scope.launch {
-                runCatching { withContext(Dispatchers.IO) { onStartPortForward(request) } }
-                    .onSuccess(::upsertPortForwardSession)
-                    .onFailure { error = it.message ?: "Port forward failed" }
-            }
-        },
-        onStopPortForward = { sessionId ->
-            error = null
-            scope.launch {
-                runCatching { withContext(Dispatchers.IO) { onStopPortForward(sessionId) } }
-                    .onSuccess { session -> if (session != null) upsertPortForwardSession(session) }
-                    .onFailure { error = it.message ?: "Stop port forward failed" }
-            }
-        },
-    )
-    if (error != null) {
-        Text(error.orEmpty(), color = MaterialTheme.colorScheme.error)
     }
 }
 

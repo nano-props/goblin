@@ -17,6 +17,30 @@ internal const val TerminalQuickCancelInput = "NO"
 
 internal const val TerminalStickToBottomThresholdPx = 48
 
+internal fun terminalHelperKeyLabels(ctrlModifierActive: Boolean): List<String> =
+    listOf(
+        "ENTER",
+        "YES",
+        "NO",
+        "CTRL+C",
+        "CTRL+L",
+        "Tab",
+        "Esc",
+        if (ctrlModifierActive) "Ctrl on" else "Ctrl",
+        "Up",
+        "Down",
+        "Left",
+        "Right",
+        "Paste",
+    )
+
+internal fun terminalTopBarVisible(terminalMaximized: Boolean): Boolean = !terminalMaximized
+
+internal fun terminalMaximizeActionLabel(terminalMaximized: Boolean): String =
+    if (terminalMaximized) "Restore" else "Maximize"
+
+internal fun terminalRestoreInlineActionVisible(terminalMaximized: Boolean): Boolean = terminalMaximized
+
 internal fun terminalSessionRemotePath(remotePath: String): String =
     remotePath.ifBlank { "/" }.trimEnd('/').ifEmpty { "/" }
 
@@ -142,6 +166,16 @@ internal fun terminalStickToBottom(
 internal fun terminalInputAvailable(state: TerminalSessionState): Boolean =
     state is TerminalSessionState.Connected
 
+internal fun terminalCommandInputEnabled(state: TerminalSessionState): Boolean =
+    terminalInputAvailable(state)
+
+internal fun terminalCommandInputPlaceholder(state: TerminalSessionState): String =
+    if (terminalCommandInputEnabled(state)) {
+        "Type a command"
+    } else {
+        terminalInputUnavailableMessage(state) ?: "Terminal is not connected."
+    }
+
 internal fun terminalReconnectAvailable(state: TerminalSessionState): Boolean = when (state) {
     TerminalSessionState.Idle,
     is TerminalSessionState.Exited,
@@ -175,7 +209,7 @@ internal fun terminalInputUnavailableMessage(state: TerminalSessionState): Strin
     is TerminalSessionState.Resizing -> "Terminal is resizing..."
     is TerminalSessionState.Exited -> TerminalDisconnectedMessage
     is TerminalSessionState.Failed -> TerminalDisconnectedMessage
-    is TerminalSessionState.Disconnected -> null
+    is TerminalSessionState.Disconnected -> terminalDisconnectedMessage(state.reason, state.message)
 }
 
 internal fun terminalLineInput(value: String): String = "$value\r"
@@ -211,21 +245,44 @@ internal fun terminalViewportText(state: TerminalSessionState): String = when (s
     -> ""
 }
 
+internal fun terminalFallbackVisible(hasEmulatorController: Boolean): Boolean =
+    !hasEmulatorController
+
 internal fun terminalSessionBannerMessage(state: TerminalSessionState): String? = when (state) {
     TerminalSessionState.Connecting -> "Connecting..."
     is TerminalSessionState.Resizing -> "Resizing..."
     is TerminalSessionState.Failed -> "$TerminalDisconnectedMessage\n${state.message}"
     is TerminalSessionState.Exited -> "Terminal exited: ${terminalReasonLabel(state.reason)}"
-    is TerminalSessionState.Disconnected -> null
+    is TerminalSessionState.Disconnected -> terminalDisconnectedMessage(state.reason, state.message)
     TerminalSessionState.Idle,
     is TerminalSessionState.Connected,
     -> null
+}
+
+internal fun terminalSessionStatusLabel(state: TerminalSessionState): String = when (state) {
+    TerminalSessionState.Idle -> "idle"
+    TerminalSessionState.Connecting -> "connecting"
+    is TerminalSessionState.Connected -> "connected"
+    is TerminalSessionState.Resizing -> "resizing"
+    is TerminalSessionState.Exited -> "exited: ${terminalReasonLabel(state.reason)}"
+    is TerminalSessionState.Failed -> "failed: ${terminalReasonLabel(state.reason)}"
+    is TerminalSessionState.Disconnected -> "disconnected: ${terminalReasonWithDetail(state.reason, state.message)}"
 }
 
 internal fun terminalDisplayText(state: TerminalSessionState): String {
     val viewport = terminalViewportText(state)
     val banner = terminalSessionBannerMessage(state) ?: return viewport
     return if (viewport.isBlank()) banner else "$viewport\n$banner"
+}
+
+private fun terminalDisconnectedMessage(reason: TerminalDisconnectedReason, detail: String? = null): String =
+    "Terminal disconnected: ${terminalReasonWithDetail(reason, detail)}. Reconnect or return to diagnostics."
+
+private fun terminalReasonWithDetail(reason: TerminalDisconnectedReason, detail: String? = null): String {
+    val cleanDetail = detail
+        ?.trim()
+        ?.takeIf { it.isNotBlank() && it != "disconnected" }
+    return listOfNotNull(terminalReasonLabel(reason), cleanDetail).joinToString(" - ")
 }
 
 private fun terminalReasonLabel(reason: TerminalDisconnectedReason): String = when (reason) {

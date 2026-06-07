@@ -27,6 +27,7 @@ class TerminalSessionStoreTest {
         assertEquals("recent output", decoded.single().lastOutputSnapshot)
         assertTrue(decoded.single().foregroundServiceOwned)
         assertEquals(TerminalDisconnectedReason.AndroidServiceStopped, decoded.single().disconnectedReason)
+        assertEquals("service process stopped", decoded.single().disconnectedMessage)
     }
 
     @Test
@@ -80,5 +81,6 @@ class TerminalSessionStoreTest {
         openedAt = 100L,
         foregroundServiceOwned = true,
         disconnectedReason = TerminalDisconnectedReason.AndroidServiceStopped,
+        disconnectedMessage = "service process stopped",
     )
 }

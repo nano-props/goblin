@@ -6,6 +6,13 @@ import org.junit.Test
 
 class ProjectsScreenStateTest {
     @Test
+    fun `empty projects copy describes workspace and terminal only`() {
+        val text = emptyProjectsDescription()
+
+        assertEquals("Add a remote Git project to open its workspace and terminal.", text)
+    }
+
+    @Test
     fun `project item actions match hosts-style bottom action order`() {
         assertEquals(listOf("Open", "Terminals", "Delete"), projectActionLabels())
     }

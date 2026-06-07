@@ -7,12 +7,11 @@ import dev.goblin.android.domain.ssh.RemoteTarget
 import dev.goblin.android.domain.ssh.SshHostProfile
 import java.nio.charset.StandardCharsets
 import java.security.KeyPairGenerator
+import java.security.MessageDigest
 import java.security.PublicKey
 import java.util.Base64
 import java.util.concurrent.TimeUnit
-import net.schmizz.sshj.common.Buffer
 import net.schmizz.sshj.common.KeyType
-import net.schmizz.sshj.common.SecurityUtils
 import net.schmizz.sshj.transport.verification.HostKeyVerifier
 
 sealed interface SshInitializationCheck {
@@ -164,14 +163,21 @@ class SshjPublicKeyReader : SshPublicKeyReader {
 
 object SshPublicKeyEncoding {
     fun publicKeyLine(publicKey: PublicKey, comment: String): String {
-        val keyType = KeyType.fromKey(publicKey).toString()
+        val keyType = KeyType.fromKey(SshKeyCompatibility.publicKeyForSshj(publicKey)).toString()
         require(keyType != KeyType.UNKNOWN.toString()) { "Unsupported SSH public key type" }
-        val blob = Buffer.PlainBuffer().putPublicKey(publicKey).compactDataBase64()
+        val blob = SshKeyCompatibility.publicKeyBlob(publicKey).base64()
         return "$keyType $blob $comment"
     }
 
-    private fun Buffer.PlainBuffer.compactDataBase64(): String =
-        Base64.getEncoder().encodeToString(compactData)
+    fun fingerprint(publicKey: PublicKey): String =
+        MessageDigest.getInstance("MD5")
+            .digest(SshKeyCompatibility.publicKeyBlob(publicKey))
+            .joinToString(":") { byte ->
+                (byte.toInt() and 0xff).toString(16).padStart(2, '0')
+            }
+
+    private fun ByteArray.base64(): String =
+        Base64.getEncoder().encodeToString(this)
 }
 
 class SshjInitializationClient : SshInitializationClient {
@@ -231,7 +237,7 @@ class SshjInitializationClient : SshInitializationClient {
     private fun capturingVerifier(onFingerprint: (String) -> Unit): HostKeyVerifier =
         object : HostKeyVerifier {
             override fun verify(hostname: String, port: Int, key: PublicKey): Boolean {
-                onFingerprint(SecurityUtils.getFingerprint(key))
+                onFingerprint(SshPublicKeyEncoding.fingerprint(key))
                 return true
             }
 
@@ -241,7 +247,7 @@ class SshjInitializationClient : SshInitializationClient {
     private fun expectedFingerprintVerifier(expectedFingerprint: String): HostKeyVerifier =
         object : HostKeyVerifier {
             override fun verify(hostname: String, port: Int, key: PublicKey): Boolean =
-                SecurityUtils.getFingerprint(key) == expectedFingerprint
+                SshPublicKeyEncoding.fingerprint(key) == expectedFingerprint
 
             override fun findExistingAlgorithms(hostname: String, port: Int): MutableList<String> = mutableListOf()
         }

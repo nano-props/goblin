@@ -17,14 +17,14 @@ import dev.goblin.android.ssh.SshjClientFacade
 import dev.goblin.android.ssh.RemoteBranchService
 import dev.goblin.android.ssh.RemoteRepositoryGitService
 import dev.goblin.android.ssh.RemoteWorktreeService
-import dev.goblin.android.ssh.PortForwardManager
-import dev.goblin.android.ssh.SshjPortForwardBackend
 import dev.goblin.android.terminals.AndroidTerminalForegroundOwner
 import dev.goblin.android.terminals.SshTerminalService
 import dev.goblin.android.terminals.TerminalForegroundBridge
 import dev.goblin.android.terminals.TerminalNavigationRequest
 import dev.goblin.android.terminals.TerminalSessionIntentExtra
 import dev.goblin.android.terminals.TerminalSessionRuntime
+import dev.goblin.android.termux.AndroidExternalTermuxEnvironment
+import dev.goblin.android.termux.ExternalTermuxLauncher
 import dev.goblin.android.ui.theme.GoblinTheme
 
 class MainActivity : ComponentActivity() {
@@ -55,12 +55,6 @@ class MainActivity : ComponentActivity() {
             client = SshjClientFacade(identityStore = secureIdentityStore),
             hostKeyStore = hostKeyStore,
         )
-        val portForwardManager = PortForwardManager(
-            backend = SshjPortForwardBackend(
-                identityStore = secureIdentityStore,
-                hostKeyTrustStore = hostKeyStore,
-            ),
-        )
         val initializationService = SshInitializationService(
             identityStore = secureIdentityStore,
             hostKeyStore = hostKeyStore,
@@ -81,6 +75,9 @@ class MainActivity : ComponentActivity() {
             manager = terminalManager,
             owner = AndroidTerminalForegroundOwner(this),
         )
+        val externalTermuxLauncher = ExternalTermuxLauncher(
+            AndroidExternalTermuxEnvironment(this),
+        )
         setContent {
             GoblinTheme {
                 GoblinAndroidApp(
@@ -92,10 +89,10 @@ class MainActivity : ComponentActivity() {
                     remoteBranchService = remoteBranchService,
                     remoteWorktreeService = remoteWorktreeService,
                     terminalSettingsStore = terminalSettingsStore,
-                    portForwardManager = portForwardManager,
                     initializationService = initializationService,
                     terminalSessionManager = terminalManager,
                     terminalForegroundBridge = terminalForegroundBridge,
+                    externalTermuxLauncher = externalTermuxLauncher,
                     terminalNavigationRequest = terminalNavigationRequest.value,
                 )
             }

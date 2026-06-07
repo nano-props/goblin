@@ -35,6 +35,9 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -68,6 +71,7 @@ import dev.goblin.android.ssh.worktreeRemovalConfirmationText
 import dev.goblin.android.terminals.TerminalDisconnectedReason
 import dev.goblin.android.terminals.TerminalSessionRecord
 import dev.goblin.android.terminals.TerminalSessionStatus
+import dev.goblin.android.termux.ExternalTermuxLaunchResult
 import dev.goblin.android.ui.screens.terminals.terminalSessionRemotePath
 import dev.goblin.android.ui.screens.terminals.terminalSessionDisplayName
 import dev.goblin.android.ui.screens.terminals.terminalWorkspaceSessionCountsByPath
@@ -84,11 +88,44 @@ internal enum class RepositoryWorkspaceTab(val label: String) {
     Branches("Branches"),
     Worktrees("Worktrees"),
     Commits("Commits"),
-    Ports("Ports"),
     Terminal("Terminals"),
 }
 
+internal enum class RepositoryTerminalMode(val label: String) {
+    RemoteSsh("Remote SSH"),
+    ExternalTermux("External Termux"),
+}
+
+internal enum class ExternalTermuxStatus(val label: String) {
+    Ready("ready"),
+    CommandCopied("command copied"),
+    OpenedInTermux("opened in Termux"),
+    TermuxNotInstalled("Termux not installed"),
+    CommandApiUnavailable("Termux command API unavailable"),
+    Failed("failed"),
+}
+
 private const val CompactWorkspaceTabLimit = 4
+
+internal fun repositoryTerminalModes(): List<RepositoryTerminalMode> =
+    RepositoryTerminalMode.entries.toList()
+
+internal fun externalTermuxTargetLabel(host: SshHostProfile): String =
+    "${host.user}@${host.host}:${host.port}"
+
+internal fun externalTermuxStatusLabel(status: ExternalTermuxStatus): String =
+    status.label
+
+internal fun externalTermuxStatusAfterLaunch(result: ExternalTermuxLaunchResult): ExternalTermuxStatus =
+    when (result) {
+        ExternalTermuxLaunchResult.Launched -> ExternalTermuxStatus.OpenedInTermux
+        is ExternalTermuxLaunchResult.CopiedFallback -> ExternalTermuxStatus.CommandApiUnavailable
+        is ExternalTermuxLaunchResult.Unavailable -> ExternalTermuxStatus.TermuxNotInstalled
+        is ExternalTermuxLaunchResult.Failed -> ExternalTermuxStatus.Failed
+    }
+
+internal fun externalTermuxActionError(result: ExternalTermuxLaunchResult): String? =
+    if (result is ExternalTermuxLaunchResult.Failed) result.message else null
 
 internal fun authenticatedHosts(hosts: List<SshHostProfile>): List<SshHostProfile> =
     hosts.filter { it.identityRefId != null }
@@ -743,6 +780,10 @@ fun RepositoryWorkspaceScreen(
     onCreateTerminalAtPath: (String) -> TerminalSessionRecord = {
         throw UnsupportedOperationException("Terminal sessions are not available")
     },
+    onOpenExternalTermuxAtPath: (RemoteTarget) -> ExternalTermuxLaunchResult = {
+        ExternalTermuxLaunchResult.Unavailable(copiedCommand = false)
+    },
+    onCopyExternalTermuxCommandAtPath: (RemoteTarget) -> Boolean = { false },
     onOpenTerminalSession: (TerminalSessionRecord) -> Unit = {},
     onDeleteTerminalSession: (String) -> Unit = {},
     onDeleteRepository: () -> Unit,
@@ -882,6 +923,46 @@ fun RepositoryWorkspaceScreen(
                 onOpenTerminalSession(session)
             }.onFailure {
                 actionError = it.message ?: "Terminal create failed"
+            }
+        }
+    }
+
+    fun openExternalTermux(path: String, onResult: (ExternalTermuxLaunchResult) -> Unit) {
+        actionError = null
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    onOpenExternalTermuxAtPath(RemoteTarget.fromHostProfile(host, path))
+                }
+            }.onSuccess { result ->
+                actionError = externalTermuxActionError(result)
+                onResult(result)
+            }.onFailure {
+                actionError = it.message ?: "External Termux launch failed"
+                onResult(
+                    ExternalTermuxLaunchResult.Failed(
+                        copiedCommand = false,
+                        openedTermux = false,
+                        message = it.message ?: "External Termux launch failed",
+                    ),
+                )
+            }
+        }
+    }
+
+    fun copyExternalTermuxCommand(path: String, onCopied: (Boolean) -> Unit) {
+        actionError = null
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    onCopyExternalTermuxCommandAtPath(RemoteTarget.fromHostProfile(host, path))
+                }
+            }.onSuccess { copied ->
+                onCopied(copied)
+                if (!copied) actionError = "External Termux command copy failed"
+            }.onFailure {
+                actionError = it.message ?: "External Termux command copy failed"
+                onCopied(false)
             }
         }
     }
@@ -1030,8 +1111,8 @@ fun RepositoryWorkspaceScreen(
                     onRemoveWorktree = { removeTarget = it },
                 )
                 RepositoryWorkspaceTab.Commits -> Unit
-                RepositoryWorkspaceTab.Ports -> Unit
                 RepositoryWorkspaceTab.Terminal -> RepositoryTerminalPanel(
+                    host = host,
                     hostProfileId = host.id,
                     targetHostId = RemoteTarget.fromHostProfile(host, selectedTerminalWorkspacePath).id,
                     path = selectedTerminalWorkspacePath,
@@ -1039,6 +1120,8 @@ fun RepositoryWorkspaceScreen(
                     sessions = terminalSessions,
                     onSelectWorkspace = ::selectTerminalWorkspace,
                     onCreateTerminalAtPath = ::createTerminal,
+                    onOpenExternalTermuxAtPath = ::openExternalTermux,
+                    onCopyExternalTermuxCommandAtPath = ::copyExternalTermuxCommand,
                     onOpenTerminalSession = onOpenTerminalSession,
                     onDeleteTerminalSession = ::requestDeleteTerminalSession,
                 )
@@ -1575,6 +1658,7 @@ private fun WorktreeRow(
 
 @Composable
 private fun RepositoryTerminalPanel(
+    host: SshHostProfile,
     hostProfileId: String,
     targetHostId: String,
     path: String,
@@ -1582,6 +1666,8 @@ private fun RepositoryTerminalPanel(
     sessions: List<TerminalSessionRecord>,
     onSelectWorkspace: (String) -> Unit,
     onCreateTerminalAtPath: (String) -> Unit,
+    onOpenExternalTermuxAtPath: (String, (ExternalTermuxLaunchResult) -> Unit) -> Unit,
+    onCopyExternalTermuxCommandAtPath: (String, (Boolean) -> Unit) -> Unit,
     onOpenTerminalSession: (TerminalSessionRecord) -> Unit,
     onDeleteTerminalSession: (TerminalSessionRecord, String) -> Unit,
 ) {
@@ -1602,107 +1688,249 @@ private fun RepositoryTerminalPanel(
         .toMap()
     val activeWorktreeCount = workspaceSessions.size
     var workspaceMenuExpanded by remember(path, workspaceOptions) { mutableStateOf(false) }
+    var selectedMode by remember(path) { mutableStateOf(RepositoryTerminalMode.RemoteSsh) }
+    var externalTermuxStatus by remember(path) { mutableStateOf(ExternalTermuxStatus.Ready) }
     val selectedWorkspaceOption = workspaceOptions.firstOrNull { terminalSessionRemotePath(it.path) == selectedPath }
         ?: TerminalWorkspaceOption(path = selectedPath, label = terminalWorkspaceOptionLabel(selectedPath))
     Column(verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm)) {
-        Card(Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(GoblinSpacing.Md),
-                verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
+        RepositoryTerminalModeSelector(
+            selectedMode = selectedMode,
+            onSelectMode = {
+                selectedMode = it
+                externalTermuxStatus = ExternalTermuxStatus.Ready
+            },
+        )
+        when (selectedMode) {
+            RepositoryTerminalMode.RemoteSsh -> RemoteSshTerminalPanelContent(
+                selectedWorkspaceOption = selectedWorkspaceOption,
+                workspaceOptions = workspaceOptions,
+                workspaceSessionCounts = workspaceSessionCounts,
+                workspaceSessions = workspaceSessions,
+                openedOrderLabels = openedOrderLabels,
+                activeWorktreeCount = activeWorktreeCount,
+                workspaceMenuExpanded = workspaceMenuExpanded,
+                onWorkspaceMenuExpandedChange = { workspaceMenuExpanded = it },
+                onSelectWorkspace = onSelectWorkspace,
+                onCreateTerminalAtPath = onCreateTerminalAtPath,
+                onOpenTerminalSession = onOpenTerminalSession,
+                onDeleteTerminalSession = onDeleteTerminalSession,
+            )
+            RepositoryTerminalMode.ExternalTermux -> ExternalTermuxPanel(
+                host = host,
+                path = path,
+                status = externalTermuxStatus,
+                onOpenExternalTermuxAtPath = onOpenExternalTermuxAtPath,
+                onCopyExternalTermuxCommandAtPath = onCopyExternalTermuxCommandAtPath,
+                onStatusChange = { externalTermuxStatus = it },
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RepositoryTerminalModeSelector(
+    selectedMode: RepositoryTerminalMode,
+    onSelectMode: (RepositoryTerminalMode) -> Unit,
+) {
+    val modes = repositoryTerminalModes()
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+        modes.forEachIndexed { index, mode ->
+            SegmentedButton(
+                selected = selectedMode == mode,
+                onClick = { onSelectMode(mode) },
+                shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size),
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
-                    verticalAlignment = Alignment.Top,
+                Text(mode.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExternalTermuxPanel(
+    host: SshHostProfile,
+    path: String,
+    status: ExternalTermuxStatus,
+    onOpenExternalTermuxAtPath: (String, (ExternalTermuxLaunchResult) -> Unit) -> Unit,
+    onCopyExternalTermuxCommandAtPath: (String, (Boolean) -> Unit) -> Unit,
+    onStatusChange: (ExternalTermuxStatus) -> Unit,
+) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(GoblinSpacing.Md),
+            verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
                 ) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
-                    ) {
-                        Text(selectedWorkspaceOption.label, style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            selectedWorkspaceOption.path,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.fillMaxWidth(),
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                    Text(externalTermuxTargetLabel(host), style = MaterialTheme.typography.titleMedium)
                     Text(
-                        terminalWorkspaceCountLabel(activeWorktreeCount),
-                        style = MaterialTheme.typography.labelMedium,
+                        path,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
-                    verticalAlignment = Alignment.CenterVertically,
+                Text(
+                    externalTermuxStatusLabel(status),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedButton(
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        onCopyExternalTermuxCommandAtPath(path) { copied ->
+                            onStatusChange(
+                                if (copied) ExternalTermuxStatus.CommandCopied else ExternalTermuxStatus.Failed,
+                            )
+                        }
+                    },
                 ) {
-                    OutlinedButton(
-                        modifier = Modifier.weight(1f),
-                        onClick = { workspaceMenuExpanded = true },
-                    ) {
-                        Text(
-                            "Switch workspace",
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    Button(onClick = { onCreateTerminalAtPath(path) }) {
-                        Text("New terminal", maxLines = 1)
-                    }
+                    Text("Copy command", maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                DropdownMenu(
-                    expanded = workspaceMenuExpanded,
-                    onDismissRequest = { workspaceMenuExpanded = false },
+                Button(
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        onOpenExternalTermuxAtPath(path) { result ->
+                            onStatusChange(externalTermuxStatusAfterLaunch(result))
+                        }
+                    },
                 ) {
-                    workspaceOptions.forEach { option ->
-                        val optionPath = terminalSessionRemotePath(option.path)
-                        val count = workspaceSessionCounts.find { it.first == optionPath }?.second ?: 0
-                        DropdownMenuItem(
-                            text = {
-                                Column {
-                                    Text(option.label)
-                                    Text(
-                                        "${option.path} · ${terminalWorkspaceCountLabel(count)}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        softWrap = false,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            },
-                            onClick = {
-                                workspaceMenuExpanded = false
-                                onSelectWorkspace(option.path)
-                            },
-                        )
-                    }
+                    Text("Open in Termux", maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
-        if (workspaceSessions.isEmpty()) {
-            Text("No terminals for this worktree.")
-        } else {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
+    }
+}
+
+@Composable
+private fun RemoteSshTerminalPanelContent(
+    selectedWorkspaceOption: TerminalWorkspaceOption,
+    workspaceOptions: List<TerminalWorkspaceOption>,
+    workspaceSessionCounts: List<Pair<String, Int>>,
+    workspaceSessions: List<TerminalSessionRecord>,
+    openedOrderLabels: Map<String, String>,
+    activeWorktreeCount: Int,
+    workspaceMenuExpanded: Boolean,
+    onWorkspaceMenuExpandedChange: (Boolean) -> Unit,
+    onSelectWorkspace: (String) -> Unit,
+    onCreateTerminalAtPath: (String) -> Unit,
+    onOpenTerminalSession: (TerminalSessionRecord) -> Unit,
+    onDeleteTerminalSession: (TerminalSessionRecord, String) -> Unit,
+) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(GoblinSpacing.Md),
+            verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
+                verticalAlignment = Alignment.Top,
             ) {
-                workspaceSessions.forEach { session ->
-                    val label = openedOrderLabels[session.id] ?: terminalSessionDefaultLabel(0)
-                    SwipeDeleteTerminalSessionRow(
-                        onDelete = { onDeleteTerminalSession(session, label) },
-                    ) {
-                        TerminalSessionRow(
-                            session = session,
-                            label = label,
-                            onOpenTerminalSession = onOpenTerminalSession,
-                            onDeleteTerminalSession = onDeleteTerminalSession,
-                        )
-                    }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Xs),
+                ) {
+                    Text(selectedWorkspaceOption.label, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        selectedWorkspaceOption.path,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Text(
+                    terminalWorkspaceCountLabel(activeWorktreeCount),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedButton(
+                    modifier = Modifier.weight(1f),
+                    onClick = { onWorkspaceMenuExpandedChange(true) },
+                ) {
+                    Text(
+                        "Switch workspace",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Button(onClick = { onCreateTerminalAtPath(selectedWorkspaceOption.path) }) {
+                    Text("New terminal", maxLines = 1)
+                }
+            }
+            DropdownMenu(
+                expanded = workspaceMenuExpanded,
+                onDismissRequest = { onWorkspaceMenuExpandedChange(false) },
+            ) {
+                workspaceOptions.forEach { option ->
+                    val optionPath = terminalSessionRemotePath(option.path)
+                    val count = workspaceSessionCounts.find { it.first == optionPath }?.second ?: 0
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text(option.label)
+                                Text(
+                                    "${option.path} · ${terminalWorkspaceCountLabel(count)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        },
+                        onClick = {
+                            onWorkspaceMenuExpandedChange(false)
+                            onSelectWorkspace(option.path)
+                        },
+                    )
+                }
+            }
+        }
+    }
+    if (workspaceSessions.isEmpty()) {
+        Text("No terminals for this worktree.")
+    } else {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(GoblinSpacing.Sm),
+        ) {
+            workspaceSessions.forEach { session ->
+                val label = openedOrderLabels[session.id] ?: terminalSessionDefaultLabel(0)
+                SwipeDeleteTerminalSessionRow(
+                    onDelete = { onDeleteTerminalSession(session, label) },
+                ) {
+                    TerminalSessionRow(
+                        session = session,
+                        label = label,
+                        onOpenTerminalSession = onOpenTerminalSession,
+                        onDeleteTerminalSession = onDeleteTerminalSession,
+                    )
                 }
             }
         }

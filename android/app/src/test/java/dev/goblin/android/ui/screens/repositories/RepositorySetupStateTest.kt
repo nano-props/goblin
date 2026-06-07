@@ -11,6 +11,7 @@ import dev.goblin.android.domain.ssh.SshHostProfile
 import dev.goblin.android.terminals.TerminalDisconnectedReason
 import dev.goblin.android.terminals.TerminalSessionRecord
 import dev.goblin.android.terminals.TerminalSessionStatus
+import dev.goblin.android.termux.ExternalTermuxLaunchResult
 import dev.goblin.android.ui.screens.placeholders.localTerminalPlaceholderText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -83,11 +84,10 @@ class RepositorySetupStateTest {
     }
 
     @Test
-    fun `workspace detail tabs exclude commits and ports`() {
+    fun `workspace detail tabs exclude commits`() {
         val repository = repository(id = "repo-1", remotePath = "/srv/app")
 
         assertFalse(repositoryWorkspaceTabs(repository).contains(RepositoryWorkspaceTab.Commits))
-        assertFalse(repositoryWorkspaceTabs(repository).contains(RepositoryWorkspaceTab.Ports))
     }
 
     @Test
@@ -100,7 +100,7 @@ class RepositorySetupStateTest {
             0,
             repositoryWorkspaceTabIndex(
                 tabs = listOf(RepositoryWorkspaceTab.Branches),
-                selectedTab = RepositoryWorkspaceTab.Ports,
+                selectedTab = RepositoryWorkspaceTab.Commits,
                 fallback = RepositoryWorkspaceTab.Branches,
             ),
         )
@@ -226,6 +226,69 @@ class RepositorySetupStateTest {
                 ),
             ),
         )
+    }
+
+    @Test
+    fun `terminal modes expose remote ssh and external termux`() {
+        assertEquals(
+            listOf("Remote SSH", "External Termux"),
+            repositoryTerminalModes().map { it.label },
+        )
+    }
+
+    @Test
+    fun `external termux target label uses ssh authority`() {
+        assertEquals(
+            "root@example.com:2222",
+            externalTermuxTargetLabel(host(id = "host-1", identityRefId = "identity-1").copy(port = 2222)),
+        )
+    }
+
+    @Test
+    fun `external termux launch results map to stable status labels`() {
+        assertEquals("ready", externalTermuxStatusLabel(ExternalTermuxStatus.Ready))
+        assertEquals("command copied", externalTermuxStatusLabel(ExternalTermuxStatus.CommandCopied))
+        assertEquals(
+            "opened in Termux",
+            externalTermuxStatusLabel(
+                externalTermuxStatusAfterLaunch(ExternalTermuxLaunchResult.Launched),
+            ),
+        )
+        assertEquals(
+            "Termux not installed",
+            externalTermuxStatusLabel(
+                externalTermuxStatusAfterLaunch(ExternalTermuxLaunchResult.Unavailable(copiedCommand = true)),
+            ),
+        )
+        assertEquals(
+            "Termux command API unavailable",
+            externalTermuxStatusLabel(
+                externalTermuxStatusAfterLaunch(ExternalTermuxLaunchResult.CopiedFallback(openedTermux = true)),
+            ),
+        )
+        assertEquals(
+            "failed",
+            externalTermuxStatusLabel(
+                externalTermuxStatusAfterLaunch(
+                    ExternalTermuxLaunchResult.Failed(
+                        copiedCommand = false,
+                        openedTermux = false,
+                        message = "Termux command API unavailable",
+                    ),
+                ),
+            ),
+        )
+        assertEquals(
+            "Termux RUN_COMMAND permission and allow-external-apps are required to pass the private key.",
+            externalTermuxActionError(
+                ExternalTermuxLaunchResult.Failed(
+                    copiedCommand = false,
+                    openedTermux = false,
+                    message = "Termux RUN_COMMAND permission and allow-external-apps are required to pass the private key.",
+                ),
+            ),
+        )
+        assertEquals(null, externalTermuxActionError(ExternalTermuxLaunchResult.Launched))
     }
 
     @Test

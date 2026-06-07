@@ -14,6 +14,8 @@ class TerminalForegroundBridge(
     private val owner: TerminalForegroundOwner,
     private val onForegroundOwnershipChanged: (Set<String>) -> Unit = {},
 ) {
+    private var lastState: ForegroundState? = null
+
     constructor(
         manager: TerminalSessionManager,
         owner: TerminalForegroundOwner,
@@ -25,14 +27,25 @@ class TerminalForegroundBridge(
 
     fun sync() {
         val running = sessionProvider().filter { it.status == TerminalSessionStatus.Running }
+        val runningIds = running.map { it.id }.toSet()
+        val content = running.takeIf { it.isNotEmpty() }?.let(TerminalNotificationFactory::contentFor)
+        val nextState = ForegroundState(runningIds = runningIds, content = content)
+        if (nextState == lastState) return
+        lastState = nextState
+
         if (running.isEmpty()) {
             onForegroundOwnershipChanged(emptySet())
             owner.stop()
         } else {
-            onForegroundOwnershipChanged(running.map { it.id }.toSet())
-            owner.startOrUpdate(TerminalNotificationFactory.contentFor(running))
+            onForegroundOwnershipChanged(runningIds)
+            owner.startOrUpdate(requireNotNull(content))
         }
     }
+
+    private data class ForegroundState(
+        val runningIds: Set<String>,
+        val content: TerminalNotificationContent?,
+    )
 }
 
 class AndroidTerminalForegroundOwner(

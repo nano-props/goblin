@@ -3,7 +3,9 @@ package dev.goblin.android.terminals
 import dev.goblin.android.data.TerminalSessionSnapshotStore
 import dev.goblin.android.domain.ssh.RemoteTarget
 import dev.goblin.android.ssh.SshConnectionSecrets
+import dev.goblin.android.terminals.emulator.RemoteTerminalEmulatorController
 import java.util.UUID
+import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -14,10 +16,25 @@ class TerminalSessionManager(
     private val sessionStore: TerminalSessionSnapshotStore? = null,
     private val heartbeatIntervalSeconds: () -> Long = { TerminalHeartbeatIntervalSeconds },
     private val heartbeatFailureThreshold: () -> Int = { TerminalHeartbeatFailureThreshold },
+    private val terminalIoExecutor: Executor = Executors.newSingleThreadExecutor { task ->
+        Thread(task, "goblin-terminal-io").apply { isDaemon = true }
+    },
+    private val emulatorControllerFactory: (
+        sessionId: String,
+        sendInputBytes: (ByteArray) -> Boolean,
+        resizeRemote: (Int, Int) -> Boolean,
+    ) -> RemoteTerminalEmulatorController = { sessionId, sendInputBytes, resizeRemote ->
+        RemoteTerminalEmulatorController(
+            sessionId = sessionId,
+            sendInputBytes = sendInputBytes,
+            resizeRemote = resizeRemote,
+        )
+    },
 ) {
     private val lock = Any()
     private val sessions = linkedMapOf<String, TerminalSessionRecord>()
     private val controllers = mutableMapOf<String, TerminalController>()
+    private val emulatorControllers = mutableMapOf<String, RemoteTerminalEmulatorController>()
     private val heartbeatFailureStreaks = mutableMapOf<String, Int>()
     private val observers = mutableMapOf<String, MutableMap<String, (TerminalSessionRecord) -> Unit>>()
     private val collectionObservers = mutableMapOf<String, (List<TerminalSessionRecord>) -> Unit>()
@@ -96,12 +113,17 @@ class TerminalSessionManager(
             openedAt = openedAt,
             lastActivityAt = openedAt,
         )
-        val controller = TerminalController(terminalService = terminalService) { state ->
+        val emulatorController = createEmulatorController(sessionId)
+        val controller = TerminalController(
+            terminalService = terminalService,
+            onRawOutput = emulatorController::appendOutput,
+        ) { state ->
             handleControllerState(sessionId, state)
         }
         synchronized(lock) {
             sessions[sessionId] = starting
             controllers[sessionId] = controller
+            emulatorControllers[sessionId] = emulatorController
             heartbeatFailureStreaks[sessionId] = 0
         }
         persist(starting)
@@ -121,6 +143,7 @@ class TerminalSessionManager(
         val existing = session(sessionId) ?: return null
         if (existing.status in attachableStatuses) return touchSession(sessionId) ?: existing
         val controllerToClose = synchronized(lock) {
+            emulatorControllers.remove(sessionId)?.detach()
             controllers.remove(sessionId)
         }
         controllerToClose?.close()
@@ -134,16 +157,20 @@ class TerminalSessionManager(
             lastActivityAt = clock(),
             foregroundServiceOwned = false,
             disconnectedReason = null,
+            disconnectedMessage = null,
         )
+        val emulatorController = createEmulatorController(sessionId)
         val controller = TerminalController(
             terminalService = terminalService,
             initialOutput = existing.lastOutputSnapshot,
+            onRawOutput = emulatorController::appendOutput,
         ) { state ->
             handleControllerState(sessionId, state)
         }
         synchronized(lock) {
             sessions[sessionId] = starting
             controllers[sessionId] = controller
+            emulatorControllers[sessionId] = emulatorController
             heartbeatFailureStreaks[sessionId] = 0
         }
         persist(starting)
@@ -192,22 +219,35 @@ class TerminalSessionManager(
         }
     }
 
-    fun sendInput(sessionId: String, value: String): Boolean {
+    fun emulatorController(sessionId: String): RemoteTerminalEmulatorController? = synchronized(lock) {
+        emulatorControllers[sessionId]
+    }
+
+    fun sendInput(sessionId: String, value: String): Boolean =
+        sendInputBytes(sessionId, value.toByteArray(Charsets.UTF_8))
+
+    fun sendInputBytes(sessionId: String, value: ByteArray): Boolean {
         val controller = synchronized(lock) { controllers[sessionId] } ?: return false
-        val sent = controller.sendInput(value)
-        if (sent) {
-            updateSession(sessionId) {
-                it.copy(lastActivityAt = clock())
+        if (value.isEmpty()) return false
+        terminalIoExecutor.execute {
+            val sent = controller.sendInputBytes(value)
+            if (sent) {
+                updateSession(sessionId) {
+                    it.copy(lastActivityAt = clock())
+                }
             }
         }
-        return sent
+        return true
     }
 
     fun paste(sessionId: String, value: String): Boolean = sendInput(sessionId, value)
 
     fun resize(sessionId: String, cols: Int, rows: Int): Boolean {
         val controller = synchronized(lock) { controllers[sessionId] } ?: return false
-        return controller.resize(cols, rows)
+        terminalIoExecutor.execute {
+            controller.resize(cols, rows)
+        }
+        return true
     }
 
     fun close(sessionId: String): TerminalSessionRecord? {
@@ -223,6 +263,7 @@ class TerminalSessionManager(
             it.copy(
                 status = TerminalSessionStatus.Exited,
                 disconnectedReason = TerminalDisconnectedReason.UserClosed,
+                disconnectedMessage = "User closed",
                 foregroundServiceOwned = false,
                 lastActivityAt = clock(),
             )
@@ -233,11 +274,13 @@ class TerminalSessionManager(
         val removed = synchronized(lock) {
             val record = sessions.remove(sessionId) ?: return null
             val controller = controllers.remove(sessionId)
+            val emulatorController = emulatorControllers.remove(sessionId)
             heartbeatFailureStreaks.remove(sessionId)
             observers.remove(sessionId)
-            record to controller
+            Triple(record, controller, emulatorController)
         }
-        val (record, controller) = removed
+        val (record, controller, emulatorController) = removed
+        emulatorController?.detach()
         if (record.status in attachableStatuses) {
             controller?.close()
         }
@@ -280,11 +323,12 @@ class TerminalSessionManager(
             .coerceIn(MinTerminalHeartbeatIntervalSeconds..MaxTerminalHeartbeatIntervalSeconds)
         val failureThreshold = heartbeatFailureThreshold()
             .coerceIn(MinTerminalHeartbeatFailureThreshold..MaxTerminalHeartbeatFailureThreshold)
-        val due = now >= nextHeartbeatRunAt
-        if (nextHeartbeatRunAt == 0L || due && intervalSeconds > 0L) {
+        if (nextHeartbeatRunAt == 0L) {
             nextHeartbeatRunAt = now + intervalSeconds * 1000L
+            return
         }
-        if (!due) return
+        if (now < nextHeartbeatRunAt) return
+        nextHeartbeatRunAt = now + intervalSeconds * 1000L
 
         val runningSessionControllers = synchronized(lock) {
             sessions.values
@@ -325,6 +369,13 @@ class TerminalSessionManager(
             }
         }
 
+    private fun createEmulatorController(sessionId: String): RemoteTerminalEmulatorController =
+        emulatorControllerFactory(
+            sessionId,
+            { bytes -> sendInputBytes(sessionId, bytes) },
+            { cols, rows -> resize(sessionId, cols, rows) },
+        )
+
     private fun handleControllerState(sessionId: String, state: TerminalSessionState) {
         when (state) {
             TerminalSessionState.Idle -> Unit
@@ -337,6 +388,7 @@ class TerminalSessionManager(
                     lastOutputSnapshot = terminalOutputSnapshot(state.output),
                     lastActivityAt = clock(),
                     disconnectedReason = null,
+                    disconnectedMessage = null,
                 )
             }
             is TerminalSessionState.Resizing -> updateSession(sessionId) {
@@ -349,6 +401,7 @@ class TerminalSessionManager(
                     lastActivityAt = clock(),
                     foregroundServiceOwned = false,
                     disconnectedReason = state.reason,
+                    disconnectedMessage = terminalDisconnectedMessageSnapshot(state.exitMessage),
                 )
             }
             is TerminalSessionState.Failed -> updateSession(sessionId) {
@@ -358,6 +411,7 @@ class TerminalSessionManager(
                     lastActivityAt = clock(),
                     foregroundServiceOwned = false,
                     disconnectedReason = state.reason,
+                    disconnectedMessage = terminalDisconnectedMessageSnapshot(state.message),
                 )
             }
             is TerminalSessionState.Disconnected -> updateSession(sessionId) {
@@ -367,6 +421,7 @@ class TerminalSessionManager(
                     lastActivityAt = clock(),
                     foregroundServiceOwned = false,
                     disconnectedReason = state.reason,
+                    disconnectedMessage = terminalDisconnectedMessageSnapshot(state.message),
                 )
             }
         }
@@ -405,6 +460,7 @@ class TerminalSessionManager(
             status = TerminalSessionStatus.Disconnected,
             foregroundServiceOwned = false,
             disconnectedReason = TerminalDisconnectedReason.AndroidServiceStopped,
+            disconnectedMessage = "Android service stopped",
             lastActivityAt = record.lastActivityAt ?: record.openedAt,
         )
     }

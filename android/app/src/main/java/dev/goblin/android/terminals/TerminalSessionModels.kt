@@ -13,6 +13,7 @@ data class TerminalSessionRecord(
     val openedAt: Long,
     val foregroundServiceOwned: Boolean = false,
     val disconnectedReason: TerminalDisconnectedReason? = null,
+    val disconnectedMessage: String? = null,
 ) {
     init {
         require(id.isNotBlank()) { "Terminal session id is required" }
@@ -22,10 +23,14 @@ data class TerminalSessionRecord(
         require(lastOutputSnapshot.length <= MaxOutputSnapshotChars) {
             "Terminal output snapshot must be bounded"
         }
+        require((disconnectedMessage?.length ?: 0) <= MaxDisconnectedMessageChars) {
+            "Terminal disconnect message must be bounded"
+        }
     }
 
     companion object {
         const val MaxOutputSnapshotChars = 32_000
+        const val MaxDisconnectedMessageChars = 1_000
     }
 }
 
@@ -48,6 +53,12 @@ enum class TerminalDisconnectedReason {
 fun terminalOutputSnapshot(value: String): String =
     value.takeLast(TerminalSessionRecord.MaxOutputSnapshotChars)
 
+fun terminalDisconnectedMessageSnapshot(value: String?): String? =
+    value
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+        ?.take(TerminalSessionRecord.MaxDisconnectedMessageChars)
+
 fun TerminalSessionRecord.toTerminalSessionState(): TerminalSessionState = when (status) {
     TerminalSessionStatus.Starting -> TerminalSessionState.Connecting
     TerminalSessionStatus.Running -> TerminalSessionState.Connected(
@@ -62,7 +73,7 @@ fun TerminalSessionRecord.toTerminalSessionState(): TerminalSessionState = when 
         output = lastOutputSnapshot,
     )
     TerminalSessionStatus.Failed -> TerminalSessionState.Failed(
-        message = "Terminal failed",
+        message = disconnectedMessage ?: "Terminal failed",
         reason = disconnectedReason ?: TerminalDisconnectedReason.TerminalFailure,
         sessionId = id,
         output = lastOutputSnapshot,
@@ -70,6 +81,7 @@ fun TerminalSessionRecord.toTerminalSessionState(): TerminalSessionState = when 
     TerminalSessionStatus.Disconnected -> TerminalSessionState.Disconnected(
         sessionId = id,
         reason = disconnectedReason ?: TerminalDisconnectedReason.SshDisconnected,
+        message = disconnectedMessage ?: "disconnected",
         output = lastOutputSnapshot,
     )
 }

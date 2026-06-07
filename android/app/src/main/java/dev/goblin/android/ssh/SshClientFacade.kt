@@ -6,7 +6,6 @@ import dev.goblin.android.domain.ssh.RemoteTarget
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 import net.schmizz.sshj.SSHClient
-import net.schmizz.sshj.common.SecurityUtils
 import net.schmizz.sshj.transport.verification.HostKeyVerifier
 
 enum class SshDiagnosticProbe {
@@ -119,7 +118,7 @@ class SshjClientFacade(
     ): HostKeyVerifier =
         object : HostKeyVerifier {
             override fun verify(hostname: String, port: Int, key: java.security.PublicKey): Boolean {
-                val fingerprint = SecurityUtils.getFingerprint(key)
+                val fingerprint = SshPublicKeyEncoding.fingerprint(key)
                 onFingerprint(fingerprint)
                 return expectedFingerprint == null || expectedFingerprint == fingerprint
             }
