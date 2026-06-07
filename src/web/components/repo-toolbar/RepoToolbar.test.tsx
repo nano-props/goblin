@@ -40,6 +40,27 @@ afterEach(() => {
 })
 
 describe('RepoToolbar', () => {
+  test('shows the selected branch summary beside the pager in focus mode', () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [
+        createRepoBranch('main'),
+        createRepoBranch('feature/a', { ahead: 2, behind: 1, lastCommitAuthor: 'alice', lastCommitDate: '2026-06-07T10:00:00.000Z' }),
+        createRepoBranch('feature/b'),
+      ],
+      currentBranch: 'main',
+      selectedBranch: 'feature/a',
+    })
+    useReposStore.setState({ workspaceLayout: 'top-bottom', detailCollapsed: false, detailFocusMode: true })
+
+    renderToolbar(navigationWith({}))
+
+    expect(container?.textContent).toContain('2 / 3')
+    expect(container?.textContent).toContain('feature/a')
+    expect(container?.textContent).toContain('2')
+    expect(container?.textContent).toContain('1')
+  })
+
   test('shows branch pager on small screens instead of filter and search', () => {
     const selectRepoBranch = vi.fn()
     seedRepoState({

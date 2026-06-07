@@ -61,6 +61,12 @@ export function RepoWorkspaceSkeleton({
   detailCollapsed = false,
 }: WorkspaceSkeletonProps) {
   const behavior = repoWorkspaceBehavior(layout, detailCollapsed)
+  const detailPane = (
+    <RepoWorkspacePane>
+      <BranchDetailSkeleton collapsed={behavior.detailCollapsed} />
+    </RepoWorkspacePane>
+  )
+  const workspaceMode = behavior.mode === 'collapsed' ? 'collapsed' : 'split'
 
   return (
     <section className="flex min-w-0 flex-1 flex-col">
@@ -79,17 +85,13 @@ export function RepoWorkspaceSkeleton({
       )}
       <RepoWorkspace
         layout={layout}
-        mode={behavior.mode}
+        mode={workspaceMode}
         branchPane={
           <RepoWorkspacePane>
             <ListSkeleton variant="branch" />
           </RepoWorkspacePane>
         }
-        detailPane={
-          <RepoWorkspacePane>
-            <BranchDetailSkeleton collapsed={behavior.detailCollapsed} />
-          </RepoWorkspacePane>
-        }
+        detailPane={detailPane}
       />
     </section>
   )

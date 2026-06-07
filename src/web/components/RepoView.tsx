@@ -1,5 +1,6 @@
-// Active-repo body. Header (name + path + actions) sits above a
-// persistent branch list plus selected-branch detail area.
+// Active-repo body. The repo toolbar stays on top; split layouts render
+// branch list + detail, while focus mode renders detail directly under
+// the toolbar with the selected-branch summary in the toolbar itself.
 
 import { Smartphone } from 'lucide-react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
@@ -63,6 +64,36 @@ export function RepoView({ repoId }: Props) {
     return <RepoWorkspaceSkeleton showRepoToolbar layout={layout} detailCollapsed={behavior.detailCollapsed} />
   }
 
+  const detailPane = (
+    <RepoWorkspacePane>
+      <BranchDetail
+        repoId={repoId}
+        layout={layout}
+        collapsed={behavior.detailCollapsed}
+        detailFocusMode={behavior.detailFocusMode}
+      />
+    </RepoWorkspacePane>
+  )
+  const workspaceMode = behavior.mode === 'collapsed' ? 'collapsed' : 'split'
+
+  const workspaceBody =
+    behavior.mode === 'focus' ? (
+      detailPane
+    ) : (
+      <RepoWorkspace
+        layout={layout}
+        mode={workspaceMode}
+        detailSize={detailPaneSize}
+        onDetailSizeChange={(size) => setDetailPaneSize(layout, size)}
+        branchPane={
+          <RepoWorkspacePane>
+            <BranchList repoId={repoId} showActions={behavior.branchListActionsVisible} />
+          </RepoWorkspacePane>
+        }
+        detailPane={detailPane}
+      />
+    )
+
   return (
     <section className="relative flex min-w-0 flex-1 flex-col">
       <RepoToolbar repoId={repoId} />
@@ -77,33 +108,7 @@ export function RepoView({ repoId }: Props) {
           </Button>
         </div>
       )}
-
-      <RepoWorkspace
-        layout={layout}
-        mode={behavior.mode}
-        detailSize={detailPaneSize}
-        onDetailSizeChange={(size) => setDetailPaneSize(layout, size)}
-        branchPane={
-          <RepoWorkspacePane>
-            <BranchList
-              repoId={repoId}
-              showActions={behavior.branchListActionsVisible}
-              // Focus mode pins the selected branch as a strip so the detail pane can use the remaining space.
-              variant={behavior.mode === 'focus' ? 'selected-strip' : 'list'}
-            />
-          </RepoWorkspacePane>
-        }
-        detailPane={
-          <RepoWorkspacePane>
-            <BranchDetail
-              repoId={repoId}
-              layout={layout}
-              collapsed={behavior.detailCollapsed}
-              detailFocusMode={behavior.detailFocusMode}
-            />
-          </RepoWorkspacePane>
-        }
-      />
+      {workspaceBody}
     </section>
   )
 }

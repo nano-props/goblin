@@ -5,6 +5,7 @@ import { BranchSearchInput } from '#/web/components/repo-toolbar/BranchSearchInp
 import { BranchViewModeControl } from '#/web/components/repo-toolbar/BranchViewModeControl.tsx'
 import { RepoToolbarActions } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
 import { WorkspaceLayoutControl } from '#/web/components/repo-toolbar/WorkspaceLayoutControl.tsx'
+import { BranchSummaryInline } from '#/web/components/repo-workspace/BranchSummaryInline.tsx'
 import { Toolbar } from '#/web/components/Layout.tsx'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
@@ -38,14 +39,14 @@ function BranchFilterControls({ repoId }: Props) {
   const t = useT()
   const uiMode = useResponsiveUiMode()
   const navigation = useMainWindowNavigation()
-  const { focusedLayout, branches, selectedBranch } = useStoreWithEqualityFn(
+  const { focusMode, branches, selectedBranch, selectedBranchData, summaryRepo } = useStoreWithEqualityFn(
     useReposStore,
     (s) => {
       const repo = s.repos[repoId]
       const layout = s.workspaceLayout
       const behavior = repoWorkspaceBehavior(layout, s.detailCollapsed, s.detailFocusMode)
       return {
-        focusedLayout: behavior.mode === 'focus',
+        focusMode: behavior.mode === 'focus',
         branches: repo
           ? visibleBranches({
               branches: repo.data.branches,
@@ -53,12 +54,28 @@ function BranchFilterControls({ repoId }: Props) {
             })
           : [],
         selectedBranch: repo?.ui.selectedBranch ?? null,
+        selectedBranchData: repo?.ui.selectedBranch
+          ? (repo.data.branches.find((branch) => branch.name === repo.ui.selectedBranch) ?? null)
+          : null,
+        summaryRepo: repo
+          ? {
+              data: {
+                currentBranch: repo.data.currentBranch,
+                status: repo.data.status,
+                worktreesByPath: repo.data.worktreesByPath,
+              },
+            }
+          : null,
       }
     },
     (a, b) =>
-      a.focusedLayout === b.focusedLayout &&
+      a.focusMode === b.focusMode &&
       a.branches === b.branches &&
-      a.selectedBranch === b.selectedBranch,
+      a.selectedBranch === b.selectedBranch &&
+      a.selectedBranchData === b.selectedBranchData &&
+      a.summaryRepo?.data.currentBranch === b.summaryRepo?.data.currentBranch &&
+      a.summaryRepo?.data.status === b.summaryRepo?.data.status &&
+      a.summaryRepo?.data.worktreesByPath === b.summaryRepo?.data.worktreesByPath,
   )
   const { branchCount, branchViewMode, branchSearchQuery } = useStoreWithEqualityFn(
     useReposStore,
@@ -79,12 +96,23 @@ function BranchFilterControls({ repoId }: Props) {
       repoId={repoId}
       branches={branches}
       selectedBranch={selectedBranch}
-      focusedLayout={focusedLayout}
+      focusMode={focusMode}
       navigation={navigation}
     />
   )
 
-  if (focusedLayout) return branchPager
+  if (focusMode)
+    return (
+      <div className="flex min-w-0 items-center gap-2">
+        {branchPager}
+        {selectedBranchData && summaryRepo && (
+          <>
+            <div aria-hidden="true" className="mx-1 h-4 border-l border-separator/70" />
+            <BranchSummaryInline repo={summaryRepo} branch={selectedBranchData} className="min-w-0 flex-1" />
+          </>
+        )}
+      </div>
+    )
   if (uiMode === 'compact') return branchPager
 
   return (
@@ -109,13 +137,13 @@ function BranchPager({
   repoId,
   branches,
   selectedBranch,
-  focusedLayout,
+  focusMode,
   navigation,
 }: {
   repoId: string
   branches: { name: string }[]
   selectedBranch: string | null
-  focusedLayout: boolean
+  focusMode: boolean
   navigation: ReturnType<typeof useMainWindowNavigation>
 }) {
   const t = useT()
@@ -129,7 +157,7 @@ function BranchPager({
     <div className="flex items-center gap-1">
       <span
         className="min-w-0 shrink-0 px-1 text-[11px] font-medium tabular-nums text-muted-foreground"
-        aria-label={focusedLayout ? t('branches.selected') : undefined}
+        aria-label={focusMode ? t('branches.selected') : undefined}
       >
         {current} / {branches.length}
       </span>

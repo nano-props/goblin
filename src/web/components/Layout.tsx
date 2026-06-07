@@ -18,7 +18,7 @@ interface RepoWorkspaceProps {
   branchPane: ReactNode
   detailPane: ReactNode
   layout?: RepoWorkspaceLayout
-  mode?: RepoWorkspaceMode
+  mode?: Exclude<RepoWorkspaceMode, 'focus'>
   detailSize?: number
   onDetailSizeChange?: (size: number) => void
 }
@@ -84,15 +84,6 @@ export function RepoWorkspace({
 }: RepoWorkspaceProps) {
   const axis = workspaceLayoutAxis(layout)
   const workspaceMode = axis === 'rows' ? mode : 'split'
-  if (workspaceMode === 'focus') {
-    return (
-      <div className="grid min-h-0 flex-1 grid-rows-[auto_1px_minmax(0,1fr)]">
-        {branchPane}
-        <WorkspaceSeparator />
-        {detailPane}
-      </div>
-    )
-  }
   if (workspaceMode === 'split') {
     return (
       <SplitPane
