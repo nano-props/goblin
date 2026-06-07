@@ -1,4 +1,5 @@
 import { emitRendererLocalEvent } from '#/web/local-events.ts'
+import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
 import {
   normalizeTerminalRealtimeMessage,
   normalizeTerminalSessionSnapshot,
@@ -293,7 +294,7 @@ export function createServerTerminalBridge(options: {
 
 export function createTerminalWebSocketUrl(baseUrl: string, secret: string, clientId: string, attachmentId: string): string {
   const httpUrl = new URL('/ws/terminal', baseUrl)
-  httpUrl.protocol = httpUrl.protocol === 'https:' ? 'wss:' : 'ws:'
+  httpUrl.protocol = resolveWebSocketProtocol()
   httpUrl.searchParams.set('token', secret)
   httpUrl.searchParams.set('clientId', clientId)
   httpUrl.searchParams.set('attachmentId', attachmentId)
