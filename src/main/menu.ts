@@ -226,6 +226,7 @@ function createViewMenu(state: AppMenuState): MenuItemConstructorOptions {
     label: t('menu.view'),
     submenu: [
       createRendererCommandMenuItem(state, 'view-status'),
+      createRendererCommandMenuItem(state, 'view-changes'),
       createRendererCommandMenuItem(state, 'view-terminal'),
       createRendererCommandMenuItem(state, 'view-terminal-primary-action'),
       createWorkspaceLayoutMenu(state.workspaceLayout),

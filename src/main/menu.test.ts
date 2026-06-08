@@ -264,6 +264,21 @@ describe('app menu actions', () => {
     })
   })
 
+  test('wires changes and terminal detail accelerators from the view menu', async () => {
+    const { buildAppMenu } = await import('#/main/menu.ts')
+
+    buildAppMenu()
+
+    const viewMenu = mocks.template.find((entry) => entry.label === 'menu.view')
+    const statusItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.status')
+    const changesItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.changes')
+    const terminalItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.terminal')
+
+    expect(statusItem?.accelerator).toBe('CmdOrCtrl+1')
+    expect(changesItem?.accelerator).toBe('CmdOrCtrl+2')
+    expect(terminalItem?.accelerator).toBe('CmdOrCtrl+3')
+  })
+
   test('includes standard edit roles and full screen in the menu', async () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
 

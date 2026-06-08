@@ -53,6 +53,7 @@ export const en = {
 
   // ---- Menu — View --------------------------------------------------------
   'menu.view.status': 'Branch Status',
+  'menu.view.changes': 'Changes',
   'menu.view.terminal': 'Terminal',
   'menu.view.terminal-primary-action': 'Open or Create Terminal',
   'menu.view.toggle-detail': 'Toggle Detail Panel',

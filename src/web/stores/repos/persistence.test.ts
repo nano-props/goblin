@@ -67,6 +67,16 @@ describe('normalizeRepoCache', () => {
     expect(normalized.repo?.ui.detailTab).toBe('terminal')
   })
 
+  test('restores the changes detail tab from cache', () => {
+    const now = Date.now()
+    const raw = cachedRepo(now) as any
+    raw.ui.detailTab = 'changes'
+
+    const normalized = normalizeRepoCache({ repo: raw })
+
+    expect(normalized.repo?.ui.detailTab).toBe('changes')
+  })
+
   test('normalizes cached branch worktree metadata into canonical worktree state', () => {
     const now = Date.now()
     const raw = cachedRepo(now)

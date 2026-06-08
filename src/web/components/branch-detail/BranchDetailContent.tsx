@@ -1,14 +1,19 @@
+import { FolderTree } from 'lucide-react'
 import { useEffect, type ReactNode } from 'react'
 import { useT } from '#/web/stores/i18n.ts'
 import type { DetailTab, RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
+import { StatusListSkeleton } from '#/web/components/Skeleton.tsx'
+import { StatusList } from '#/web/components/StatusList.tsx'
 import { BranchStatus } from '#/web/components/branch-detail/BranchStatus.tsx'
 import { TerminalSlot } from '#/web/components/terminal/TerminalSlot.tsx'
 import type { BranchDetailRepo, SelectedBranchDetailPresentation } from '#/web/components/branch-detail/model.ts'
 import { detailTabForWorktree } from '#/web/lib/detail-tabs.ts'
 interface Props {
-  repo: Pick<BranchDetailRepo, 'id' | 'data' | 'ui'>
+  repo: Pick<BranchDetailRepo, 'id' | 'data' | 'ui'> & {
+    data: BranchDetailRepo['data'] & Pick<BranchDetailRepo['data'], 'statusLoaded'>
+  }
   detail: SelectedBranchDetailPresentation
   detailId: string
   contentId: string
@@ -40,6 +45,17 @@ export function BranchDetailContent({ repo, detail, detailId, contentId, layout 
     <div id={contentId} className="flex min-h-0 flex-1 flex-col">
       {repo.ui.detailTab === 'status' && (
         <BranchStatusTab detailId={detailId} detail={detail} layout={layout} busy={detail.loading.pullRequests} />
+      )}
+      {repo.ui.detailTab === 'changes' && (
+        <BranchChangesTab
+          detailId={detailId}
+          repo={repo}
+          branch={branch}
+          selectedStatus={detail.selectedStatus}
+          statusLoading={detail.loading.status}
+          statusError={detail.errors.status}
+          statusStale={detail.stale.status}
+        />
       )}
       {repo.ui.detailTab === 'terminal' && branch.worktree?.path && (
         <BranchTerminalTab detailId={detailId} repoId={repo.id} branch={branch} />
@@ -96,5 +112,63 @@ function BranchTerminalTab({
     <BranchTabPanel detailId={detailId} tabId="terminal">
       <TerminalSlot repoRoot={repoId} branch={branch.name} worktreePath={branch.worktree?.path} />
     </BranchTabPanel>
+  )
+}
+
+function BranchChangesTab({
+  detailId,
+  repo,
+  branch,
+  selectedStatus,
+  statusLoading,
+  statusError,
+  statusStale,
+}: {
+  detailId: string
+  repo: Props['repo']
+  branch: BranchDetailBranch
+  selectedStatus: SelectedBranchDetailPresentation['selectedStatus']
+  statusLoading: boolean
+  statusError: string | null
+  statusStale: boolean
+}) {
+  const t = useT()
+  const totalEntries = selectedStatus.reduce((n, wt) => n + wt.entries.length, 0)
+
+  return (
+    <BranchTabPanel detailId={detailId} tabId="changes" busy={statusLoading}>
+      {branch.worktree?.path && statusLoading && !repo.data.statusLoaded ? (
+        <StatusListSkeleton rows={8} />
+      ) : branch.worktree?.path && !repo.data.statusLoaded && statusError ? (
+        <EmptyState title={t(statusError)} />
+      ) : branch.worktree?.path ? (
+        <div className="flex min-h-0 flex-1 flex-col">
+          {statusStale && statusError && <StaleStatusNotice message={statusError} />}
+          {totalEntries > 0 ? (
+            <ScrollPane>
+              <StatusList status={selectedStatus} />
+            </ScrollPane>
+          ) : (
+            <StatusList status={selectedStatus} />
+          )}
+        </div>
+      ) : (
+        <EmptyState
+          icon={<FolderTree size={16} />}
+          title={t('status.no-worktree-title')}
+          body={t('status.no-worktree-body')}
+        />
+      )}
+    </BranchTabPanel>
+  )
+}
+
+function StaleStatusNotice({ message }: { message: string }) {
+  const t = useT()
+  return (
+    <div className="border-b border-warning-border bg-warning-surface px-4 py-2 text-xs text-warning">
+      <span className="font-medium">{t('status.stale-title')}</span>
+      <span className="text-muted-foreground"> — {t(message)}</span>
+    </div>
   )
 }

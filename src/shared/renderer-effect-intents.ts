@@ -12,7 +12,7 @@ export type RendererEffectIntent =
   | { type: 'close-repo-requested' }
   | { type: 'cycle-repo-requested'; direction: 1 | -1 }
   | { type: 'repo-refresh-requested' }
-  | { type: 'show-detail-tab-requested'; tab: 'status' | 'terminal' }
+  | { type: 'show-detail-tab-requested'; tab: 'status' | 'changes' | 'terminal' }
   | { type: 'terminal-primary-action-requested' }
   | { type: 'toggle-detail-requested' }
   | { type: 'workspace-layout-set-requested'; layout: WorkspaceLayout }

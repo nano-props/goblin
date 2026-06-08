@@ -47,6 +47,7 @@ export const zh: Record<DictKey, string> = {
   'menu.edit.select-all': '全选',
 
   'menu.view.status': '分支状态',
+  'menu.view.changes': '变更',
   'menu.view.terminal': '终端',
   'menu.view.terminal-primary-action': '打开或创建终端',
   'menu.view.toggle-detail': '展开/收起详情面板',

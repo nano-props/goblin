@@ -48,6 +48,7 @@ export const ko: Record<DictKey, string> = {
   'menu.edit.select-all': '전체 선택',
 
   'menu.view.status': '브랜치 상태',
+  'menu.view.changes': '변경 사항',
   'menu.view.terminal': '터미널',
   'menu.view.terminal-primary-action': '터미널 열기 또는 생성',
   'menu.view.toggle-detail': '세부 패널 접기/펼치기',

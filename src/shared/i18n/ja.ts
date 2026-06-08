@@ -53,6 +53,7 @@ export const ja: Record<DictKey, string> = {
 
   // ---- Menu — View -------------------------------------------------------
   'menu.view.status': 'ブランチステータス',
+  'menu.view.changes': '変更',
   'menu.view.terminal': 'ターミナル',
   'menu.view.terminal-primary-action': 'ターミナルを開く/作成',
   'menu.view.toggle-detail': '詳細パネルを折りたたむ/展開',

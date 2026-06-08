@@ -3,11 +3,12 @@ export type DetailTabNavigationKey = 'ArrowRight' | 'ArrowLeft' | 'Home' | 'End'
 
 export const DETAIL_TABS = [
   { id: 'status', labelKey: 'tab.status' },
+  { id: 'changes', labelKey: 'tab.changes' },
   { id: 'terminal', labelKey: 'tab.terminal' },
 ] as const satisfies readonly { id: DetailTab; labelKey: string }[]
 
 export function isDetailTab(value: string | null | undefined): value is DetailTab {
-  return value === 'status' || value === 'terminal'
+  return value === 'status' || value === 'changes' || value === 'terminal'
 }
 
 export function visibleDetailTabs(hasWorktree: boolean) {
@@ -16,7 +17,7 @@ export function visibleDetailTabs(hasWorktree: boolean) {
 
 export function detailTabForWorktree(tab: DetailTab, hasWorktree: boolean): DetailTab {
   if (tab === 'terminal') return hasWorktree ? tab : 'status'
-  return 'status'
+  return tab
 }
 
 export function detailTabNavigationKey(key: string): DetailTabNavigationKey | null {

@@ -17,7 +17,7 @@ function Harness() {
 function createRepo(
   id: string,
   options: {
-    detailTab?: 'status' | 'terminal'
+    detailTab?: 'status' | 'changes' | 'terminal'
     statusLoaded?: boolean
     statusLoadedAt?: number | null
     statusStale?: boolean
@@ -74,6 +74,35 @@ describe('useHeuristicRepoStatusRefresh', () => {
     })
 
     expect(refreshStatus).toHaveBeenCalledWith('/repo-b', { token: 2 })
+  })
+
+  test('refreshes status when opening the changes tab with stale status data', async () => {
+    const repo = createRepo('/repo-a', {
+      detailTab: 'terminal',
+      statusLoadedAt: Date.now() - 20_000,
+    })
+    await act(async () => {
+      useReposStore.setState({
+        repos: { '/repo-a': repo },
+        order: ['/repo-a'],
+        activeId: '/repo-a',
+      })
+      root.render(<Harness />)
+    })
+    refreshStatus.mockClear()
+
+    await act(async () => {
+      useReposStore.setState((state) => ({
+        repos: {
+          ...state.repos,
+          '/repo-a': replaceRepo(state.repos['/repo-a']!, (draft) => {
+            draft.ui.detailTab = 'changes'
+          }),
+        },
+      }))
+    })
+
+    expect(refreshStatus).toHaveBeenCalledWith('/repo-a', { token: 1 })
   })
 
   test('refreshes status when opening the status tab with stale status data', async () => {

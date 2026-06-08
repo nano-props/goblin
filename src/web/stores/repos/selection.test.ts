@@ -253,14 +253,14 @@ describe('setDetailTab', () => {
     expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
   })
 
-  test('normalizes removed detail tabs back to status', async () => {
+  test('persists the changes tab immediately', async () => {
     seedRepo({ selectedBranch: 'main', detailTab: 'status' })
 
-    useReposStore.getState().setDetailTab(REPO_ID, 'changes' as DetailTab)
+    useReposStore.getState().setDetailTab(REPO_ID, 'changes')
     await flushAsyncWork()
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.detailTab).toBe('status')
-    expect(useReposStore.getState().repoCache[REPO_ID]?.ui.detailTab ?? 'status').toBe('status')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.detailTab).toBe('changes')
+    expect(useReposStore.getState().repoCache[REPO_ID]?.ui.detailTab).toBe('changes')
   })
 
   test('passes the current repo token to detail tab refreshes', () => {

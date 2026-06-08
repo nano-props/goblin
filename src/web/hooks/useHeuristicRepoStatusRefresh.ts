@@ -78,11 +78,14 @@ export function useHeuristicRepoStatusRefresh() {
     const nextActiveRepoId = activeRepo?.id ?? null
     const nextDetailTab = activeRepo?.detailTab ?? null
     const activeRepoChanged = nextActiveRepoId !== lastActiveRepoId
-    const openedStatusTab =
-      !activeRepoChanged && nextActiveRepoId !== null && nextDetailTab === 'status' && lastDetailTab !== 'status'
+    const openedStatusLikeTab =
+      !activeRepoChanged &&
+      nextActiveRepoId !== null &&
+      (nextDetailTab === 'status' || nextDetailTab === 'changes') &&
+      nextDetailTab !== lastDetailTab
     previousActiveRepoId.current = nextActiveRepoId
     previousDetailTab.current = nextDetailTab
-    if (!activeRepo || (!activeRepoChanged && !openedStatusTab)) return
+    if (!activeRepo || (!activeRepoChanged && !openedStatusLikeTab)) return
     if (!shouldHeuristicallyRefreshRepoStatus(activeRepo)) return
     void useReposStore.getState().refreshStatus(activeRepo.id, { token: activeRepo.token })
   }, [activeRepo])

@@ -107,6 +107,9 @@ export function BranchDetailSkeleton({
             <div className="h-7 px-2.5 flex items-center">
               <Bar w="42px" h="14px" tone="strong" />
             </div>
+            <div className="h-7 px-2.5 flex items-center">
+              <Bar w="42px" h="14px" tone="strong" />
+            </div>
           </div>
         </div>
         <div aria-hidden="true" className="min-w-2 flex-1 self-stretch" />
@@ -261,10 +264,9 @@ function BranchListSkeletonRow({ index, showActions }: { index: number; showActi
 
 function StatusListSkeletonRow() {
   return (
-    <li className="px-4 py-2.5 flex items-start gap-2">
-      <Bar w="32px" h="14px" />
-      <Bar w="60px" h="14px" />
-      <Bar w="60%" h="14px" />
+    <li className="grid grid-cols-[2ch_minmax(0,1fr)] items-center gap-3 px-1.5">
+      <Bar w="2ch" h="14px" />
+      <Bar w="100%" h="14px" />
     </li>
   )
 }

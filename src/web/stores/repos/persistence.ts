@@ -89,9 +89,13 @@ const CachedRepoSchema = v.object({
   ui: v.object({
     selectedBranch: v.nullable(v.string()),
     branchViewMode: v.picklist(['all', 'worktrees', 'no-worktree']),
-    detailTab: v.picklist(['status', 'terminal']),
+    detailTab: v.picklist(['status', 'changes', 'terminal']),
   }),
 })
+
+function normalizeCachedDetailTab(tab: string): 'status' | 'changes' | 'terminal' {
+  return tab === 'terminal' || tab === 'changes' ? tab : 'status'
+}
 
 export function hydrateCachedRepo(repo: RepoState, cached: CachedRepoState | undefined): RepoState {
   if (!cached || isExpired(cached.savedAt)) return repo
@@ -125,7 +129,7 @@ export function hydrateCachedRepo(repo: RepoState, cached: CachedRepoState | und
       ...repo.ui,
       selectedBranch,
       branchViewMode: cached.ui.branchViewMode,
-      detailTab: cached.ui.detailTab === 'terminal' ? 'terminal' : 'status',
+      detailTab: normalizeCachedDetailTab(cached.ui.detailTab),
     },
     cache: {
       source: 'cache',
@@ -169,7 +173,7 @@ function repoCacheEntry(repo: RepoState): CachedRepoState | null {
     ui: {
       selectedBranch: repo.ui.selectedBranch,
       branchViewMode: repo.ui.branchViewMode,
-      detailTab: repo.ui.detailTab === 'terminal' ? 'terminal' : 'status',
+      detailTab: normalizeCachedDetailTab(repo.ui.detailTab),
     },
   }
 }
@@ -204,7 +208,7 @@ function normalizeRepoCacheEntry(value: unknown): CachedRepoState | null {
     },
     ui: {
       ...cached.ui,
-      detailTab: cached.ui.detailTab === 'terminal' ? 'terminal' : 'status',
+      detailTab: normalizeCachedDetailTab(cached.ui.detailTab),
     },
   }
 }

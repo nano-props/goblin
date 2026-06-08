@@ -3,6 +3,7 @@ import type { KeyboardEvent } from 'react'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { DetailTab, RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
+import { Badge } from '#/web/components/ui/badge.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { BranchActionControls } from '#/web/components/BranchActionControls.tsx'
 import { Toolbar } from '#/web/components/Layout.tsx'
@@ -105,10 +106,15 @@ export function BranchDetailToolbar({
                 )}
               >
                 {t(tab.labelKey)}
+                {tab.id === 'changes' && detail.statusCount > 0 && (
+                  <Badge variant="attention" className="font-normal font-mono tabular-nums">
+                    {detail.statusCount}
+                  </Badge>
+                )}
                 {tab.id === 'terminal' && terminalCount > 0 && (
-                  <span className="rounded-sm border border-separator px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
+                  <Badge variant="outline" className="font-normal font-mono tabular-nums text-muted-foreground">
                     {terminalCount}
-                  </span>
+                  </Badge>
                 )}
               </Button>
             )

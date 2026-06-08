@@ -43,6 +43,14 @@ afterEach(() => {
 })
 
 describe('BranchDetailToolbar', () => {
+  test('renders changes between status and terminal and shows the change count badge', () => {
+    renderToolbar({ terminalCount: 0, changeCount: 3, navigation: navigationWith({}) })
+
+    const tabs = Array.from(container?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [])
+    expect(tabs.map((tab) => tab.id)).toEqual(['detail-status-tab', 'detail-changes-tab', 'detail-terminal-tab'])
+    expect(container?.querySelector('#detail-changes-tab')?.textContent).toContain('3')
+  })
+
   test('clicking the terminal tab only navigates and does not create a terminal', async () => {
     const create = vi.fn(async () => ({ ok: true as const, action: 'created' as const, key: 'k', sessions: [] }))
     setRendererBridgeForTests(rendererBridgeWith({ create }))
@@ -180,6 +188,7 @@ describe('BranchDetailToolbar', () => {
 
 function renderToolbar(options: {
   terminalCount: number
+  changeCount?: number
   navigation: MainWindowNavigationActions
   detailFocusMode?: boolean
   collapsed?: boolean
@@ -191,6 +200,22 @@ function renderToolbar(options: {
     branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
     selectedBranch: 'feature/worktree',
     detailTab: 'status',
+    status:
+      options.changeCount && options.changeCount > 0
+        ? [
+            {
+              path: WORKTREE_PATH,
+              branch: 'feature/worktree',
+              isMain: false,
+              entries: Array.from({ length: options.changeCount }, (_, index) => ({
+                x: 'M',
+                y: ' ',
+                path: `src/file-${index}.ts`,
+              })),
+            },
+          ]
+        : [],
+    statusLoaded: true,
   })
   const detail = getSelectedBranchDetailPresentation(repo)
   const worktreeSnapshot = {

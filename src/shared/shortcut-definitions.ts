@@ -18,6 +18,7 @@ export type RendererMenuCommandId =
   | 'file-close-tab'
   | 'file-settings'
   | 'view-status'
+  | 'view-changes'
   | 'view-terminal'
   | 'view-terminal-primary-action'
   | 'view-toggle-detail'
@@ -128,9 +129,13 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
     helpLabelKey: 'help.row.view-status',
     accelerator: 'CmdOrCtrl+1',
   }),
+  rendererMenuCommand('view-changes', 'menu.view.changes', { type: 'show-detail-tab-requested', tab: 'changes' }, {
+    helpLabelKey: 'help.row.view-changes',
+    accelerator: 'CmdOrCtrl+2',
+  }),
   rendererMenuCommand('view-terminal', 'menu.view.terminal', { type: 'show-detail-tab-requested', tab: 'terminal' }, {
     helpLabelKey: 'help.row.view-terminal',
-    accelerator: 'CmdOrCtrl+2',
+    accelerator: 'CmdOrCtrl+3',
   }),
   rendererMenuCommand('view-terminal-primary-action', 'menu.view.terminal-primary-action', { type: 'terminal-primary-action-requested' }, {
     helpLabelKey: 'help.row.terminal-primary-action',
@@ -170,6 +175,7 @@ export const WINDOW_REPO_SHORTCUTS: AcceleratorShortcutDefinition[] = rendererMe
 
 export const VIEW_SHORTCUTS: AcceleratorShortcutDefinition[] = rendererMenuAcceleratorShortcuts([
   'view-status',
+  'view-changes',
   'view-terminal',
   'view-terminal-primary-action',
   'view-toggle-detail',
