@@ -452,6 +452,7 @@ export const zh: Record<DictKey, string> = {
   'error.vscode-not-installed': '未安装 VS Code',
   'error.editor-not-installed': '未找到编辑器',
   'error.remote-editor-not-supported': '所选编辑器无法打开远程 SSH 工作区',
+  'error.remote-terminal-not-supported': '所选终端无法打开远程 SSH 工作区',
   'error.render-crash-title': '渲染该视图时出错',
   'error.render-crash-unknown': '未知渲染错误。',
   'error.try-again': '重试',

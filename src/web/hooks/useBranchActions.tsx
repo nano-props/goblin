@@ -10,6 +10,7 @@ import {
   openRepositoryRemote,
   openRepositoryTerminal,
   openRemoteRepositoryEditor,
+  openRemoteRepositoryTerminal,
 } from '#/web/app-data-client.ts'
 import {
   branchActionBusyItemId,
@@ -20,7 +21,6 @@ import {
 import { openBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
 import { useRetainedDialogState } from '#/web/hooks/useRetainedDialogState.ts'
-import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import { getBranchWorktreeState } from '#/web/stores/repos/worktree-state.ts'
 export type { BranchActionItemId } from '#/web/hooks/branch-action-state.ts'
 const SILENT_SUCCESS_OPS = new Set<BranchActionItemId>(['remote', 'terminal', 'editor'])
@@ -62,7 +62,6 @@ export function getBranchActionCapabilities(repo: BranchActionRepo, branch: Repo
 }
 
 export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState) {
-  const navigation = useMainWindowNavigation()
   const setLastResult = useReposStore((s) => s.setLastResult)
   const runBranchAction = useReposStore((s) => s.runBranchAction)
   const branchActionBusy = isBranchActionBlocked(repo)
@@ -154,10 +153,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
     if (!branch.worktree?.path) return
     const worktreePath = branch.worktree?.path
     if (repo.remote.target) {
-      return runUiAction('terminal', async () => {
-        navigation.showRepoDetailTab(repo.id, 'terminal')
-        return { ok: true, message: '' }
-      })
+      return runUiAction('terminal', () => openRemoteRepositoryTerminal(repo.id, worktreePath))
     }
     return runUiAction('terminal', () => openRepositoryTerminal(worktreePath))
   }
