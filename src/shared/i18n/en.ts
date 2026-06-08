@@ -229,6 +229,7 @@ export const en = {
   'branches.search-placeholder': 'Search branches',
   'branches.search-clear': 'Clear branch search',
   'branches.selected': 'Selected branch',
+  'branches.switch': 'Switch branch',
   'branches.filter.all': 'All',
   'branches.filter.worktrees': 'Worktrees',
   'branches.filter.no-worktree': 'No worktree',

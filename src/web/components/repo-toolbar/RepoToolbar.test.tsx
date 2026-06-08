@@ -61,8 +61,7 @@ describe('RepoToolbar', () => {
     expect(container?.textContent).toContain('1')
   })
 
-  test('shows branch pager on small screens instead of filter and search', () => {
-    const selectRepoBranch = vi.fn()
+  test('hides branch pager but keeps filter controls on small screens in non-focus mode', () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('main'), createRepoBranch('feature/a'), createRepoBranch('feature/b')],
@@ -70,28 +69,45 @@ describe('RepoToolbar', () => {
       selectedBranch: 'feature/a',
     })
 
-    renderToolbar(navigationWith({ selectRepoBranch }))
+    renderToolbar(navigationWith({}))
 
-    expect(container?.textContent).toContain('2 / 3')
+    expect(container?.textContent).not.toContain('2 / 3')
     expect(container?.querySelector('[aria-label="workspace.layout-label"]')).toBeNull()
 
     const buttons = Array.from(container?.querySelectorAll('button') ?? [])
     const prevButton = buttons.find((button) => button.getAttribute('aria-label') === 'help.row.prev-branch')
     const nextButton = buttons.find((button) => button.getAttribute('aria-label') === 'help.row.next-branch')
-    if (!(prevButton instanceof HTMLButtonElement) || !(nextButton instanceof HTMLButtonElement)) {
-      throw new Error('missing branch pager buttons')
-    }
+    expect(prevButton).toBeUndefined()
+    expect(nextButton).toBeUndefined()
 
-    act(() => {
-      prevButton.click()
-      nextButton.click()
-    })
-
-    expect(selectRepoBranch).toHaveBeenNthCalledWith(1, REPO_ID, 'main')
-    expect(selectRepoBranch).toHaveBeenNthCalledWith(2, REPO_ID, 'feature/b')
+    expect(container?.querySelector('[aria-label="branches.filter-label"]')).not.toBeNull()
+    expect(container?.querySelector('[placeholder="branches.search-placeholder"]')).not.toBeNull()
   })
 
-  test('keeps compact branch pager behavior when left-right layout is downgraded on small screens', () => {
+  test('shows a branch dropdown in focus mode instead of prev/next buttons', () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('main'), createRepoBranch('feature/a'), createRepoBranch('feature/b')],
+      currentBranch: 'main',
+      selectedBranch: 'feature/a',
+    })
+    useReposStore.setState({ workspaceLayout: 'top-bottom', detailCollapsed: false, detailFocusMode: true })
+
+    renderToolbar(navigationWith({}))
+
+    expect(container?.textContent).toContain('2 / 3')
+
+    const buttons = Array.from(container?.querySelectorAll('button') ?? [])
+    const prevButton = buttons.find((button) => button.getAttribute('aria-label') === 'help.row.prev-branch')
+    const nextButton = buttons.find((button) => button.getAttribute('aria-label') === 'help.row.next-branch')
+    expect(prevButton).toBeUndefined()
+    expect(nextButton).toBeUndefined()
+
+    const switchButton = buttons.find((button) => button.getAttribute('aria-label') === 'branches.switch')
+    expect(switchButton).toBeInstanceOf(HTMLButtonElement)
+  })
+
+  test('hides branch pager on small screens with left-right layout', () => {
     useReposStore.setState({ workspaceLayout: 'left-right' })
     seedRepoState({
       id: REPO_ID,
@@ -102,7 +118,7 @@ describe('RepoToolbar', () => {
 
     renderToolbar(navigationWith({}))
 
-    expect(container?.textContent).toContain('2 / 3')
+    expect(container?.textContent).not.toContain('2 / 3')
     expect(container?.querySelector('[aria-label="workspace.layout-label"]')).toBeNull()
   })
 })

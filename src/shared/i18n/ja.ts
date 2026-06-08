@@ -228,6 +228,7 @@ export const ja: Record<DictKey, string> = {
   'branches.search-placeholder': 'ブランチを検索',
   'branches.search-clear': 'ブランチ検索をクリア',
   'branches.selected': '選択中のブランチ',
+  'branches.switch': 'ブランチを切り替え',
   'branches.filter.all': 'すべて',
   'branches.filter.worktrees': 'ワークツリー',
   'branches.filter.no-worktree': 'ワークツリーなし',

@@ -220,6 +220,7 @@ export const ko: Record<DictKey, string> = {
   'branches.search-placeholder': '브랜치 검색',
   'branches.search-clear': '브랜치 검색 지우기',
   'branches.selected': '선택한 브랜치',
+  'branches.switch': '브랜치 전환',
   'branches.filter.all': '전체',
   'branches.filter.worktrees': '워크트리',
   'branches.filter.no-worktree': '워크트리 없음',

@@ -210,6 +210,7 @@ export const zh: Record<DictKey, string> = {
   'branches.search-placeholder': '搜索分支',
   'branches.search-clear': '清除分支搜索',
   'branches.selected': '选中的分支',
+  'branches.switch': '切换分支',
   'branches.filter.all': '全部',
   'branches.filter.worktrees': '工作树',
   'branches.filter.no-worktree': '无工作树',
