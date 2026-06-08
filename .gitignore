@@ -5,3 +5,12 @@ release
 *.log
 .vscode
 .claude/
+.planning/
+.superpowers
+
+android/.gradle/
+android/**/build/
+android/local.properties
+.idea
+
+.worktrees/
