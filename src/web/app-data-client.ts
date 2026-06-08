@@ -8,7 +8,7 @@ import type {
   ExternalAppsSnapshot,
   GitHubCliState,
   GlobalShortcutState,
-  I18nPayload,
+  I18nSnapshot,
   LangPref,
   LanInfo,
   PullRequestEntry,
@@ -128,13 +128,13 @@ export async function setThemeColorTheme(colorTheme: ColorTheme): Promise<ThemeS
   return resolveThemeStateFromPrefs((await updateSettingsPrefsPatch({ colorTheme })).settings)
 }
 
-export async function getI18nPayload(): Promise<I18nPayload> {
-  return await fetchServerJson<I18nPayload>('/api/settings/i18n')
+export async function getI18nSnapshot(): Promise<I18nSnapshot> {
+  return await fetchServerJson<I18nSnapshot>('/api/settings/i18n')
 }
 
-export async function setI18nPref(pref: LangPref): Promise<I18nPayload> {
+export async function setI18nPref(pref: LangPref): Promise<I18nSnapshot> {
   const result = await updateSettingsPrefsPatch({ lang: pref })
-  return result.i18n ?? (await getI18nPayload())
+  return result.i18n ?? (await getI18nSnapshot())
 }
 
 export async function getGitHubCliState(hosts?: string[]): Promise<GitHubCliState> {

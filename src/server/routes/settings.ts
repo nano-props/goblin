@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
 import { buildServerExternalAppsSnapshot, getServerExternalAppsSnapshot } from '#/server/modules/external-apps.ts'
 import { getServerGitHubCliState } from '#/server/modules/github-cli.ts'
-import { buildServerI18nPayload, getServerI18nPayload } from '#/server/modules/i18n.ts'
+import { getServerI18nSnapshot } from '#/server/modules/i18n.ts'
 import { getSettingsSnapshot, setServerGlobalShortcutRegistered } from '#/server/modules/settings.ts'
 import {
   addServerRecentRepo,
@@ -12,6 +12,7 @@ import {
   setServerSessionState,
   updateServerSettingsPrefs,
 } from '#/server/modules/settings-source.ts'
+import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
 import { toSafeSessionRepoEntry } from '#/shared/input-validation.ts'
 import { getLanUrls, isLanAddress } from '#/shared/lan-addresses.ts'
 import type { LanInfo, SettingsPrefsUpdateResponse } from '#/shared/rpc.ts'
@@ -21,7 +22,7 @@ import { settingsInvalidationScopesForPrefsPatch } from '#/shared/server-invalid
 export function createSettingsRoutes() {
   const app = new Hono()
   app.get('/', async (c) => c.json(await getSettingsSnapshot()))
-  app.get('/i18n', async (c) => c.json(await getServerI18nPayload(c.req.header('accept-language'))))
+  app.get('/i18n', async (c) => c.json(await getServerI18nSnapshot(c.req.header('accept-language'))))
   app.get('/github-cli', async (c) => {
     const hosts = (c.req.queries('host') ?? []).filter((host): host is string => typeof host === 'string' && host.length > 0)
     return c.json(await getServerGitHubCliState(c.req.raw.signal, hosts))
@@ -57,7 +58,7 @@ export function createSettingsRoutes() {
     return c.json({
       ok: true,
       settings,
-      ...('lang' in patch ? { i18n: buildServerI18nPayload(settings, c.req.header('accept-language')) } : {}),
+      ...('lang' in patch ? { i18n: resolveI18nSnapshot(settings.lang, c.req.header('accept-language')) } : {}),
       ...(patch.terminalApp !== undefined || patch.editorApp !== undefined
         ? { externalApps: await buildServerExternalAppsSnapshot(settings, c.req.raw.signal) }
         : {}),

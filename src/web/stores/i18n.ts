@@ -7,9 +7,9 @@
 import i18next from 'i18next'
 import { initReactI18next, useTranslation } from 'react-i18next'
 import { create, type StoreApi } from 'zustand'
-import type { I18nPayload, Lang, LangPref } from '#/shared/rpc.ts'
+import type { I18nSnapshot, Lang, LangPref } from '#/shared/rpc.ts'
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
-import { getI18nPayload, setI18nPref } from '#/web/app-data-client.ts'
+import { getI18nSnapshot, setI18nPref } from '#/web/app-data-client.ts'
 import { subscribeSettingsInvalidationRefetch } from '#/web/settings-invalidation-refetch.ts'
 
 export type { Lang, LangPref }
@@ -38,7 +38,7 @@ const initial = getInitialI18n()
 void i18next.use(initReactI18next).init({
   lng: initial?.lang ?? 'en',
   fallbackLng: 'en',
-  resources: initial ? { [initial.lang]: { translation: initial.dict } } : { en: { translation: {} } },
+  resources: initial ? { [initial.lang]: { translation: { ...initial.dict } } } : { en: { translation: {} } },
   defaultNS: 'translation',
   keySeparator: false,
   interpolation: {
@@ -67,7 +67,7 @@ type I18nSet = StoreApi<I18nState>['setState']
 
 let unsubscribe: (() => void) | null = null
 let hydrateVersion = 0
-let payloadQueue = Promise.resolve()
+let snapshotQueue = Promise.resolve()
 
 function clearI18nSubscription() {
   unsubscribe?.()
@@ -81,15 +81,15 @@ export const useI18nStore = create<I18nState>((set) => ({
 
   async hydrate() {
     const version = ++hydrateVersion
-    const payload = await getI18nPayload()
+    const snapshot = await getI18nSnapshot()
     if (version !== hydrateVersion) return
-    await commitPayload(set, payload)
+    await commitSnapshot(set, snapshot)
     if (version !== hydrateVersion) return
     const nextUnsubscribe = subscribeSettingsInvalidationRefetch({
       scope: 'i18n',
-      fetch: getI18nPayload,
+      fetch: getI18nSnapshot,
       label: 'i18n',
-      apply: (next) => commitPayload(set, next),
+      apply: (next) => commitSnapshot(set, next),
     })
     if (version !== hydrateVersion) {
       nextUnsubscribe()
@@ -100,38 +100,38 @@ export const useI18nStore = create<I18nState>((set) => ({
   },
 
   async setPref(pref) {
-    const payload = await setI18nPref(pref)
-    if (payload) {
-      await commitPayload(set, payload)
+    const snapshot = await setI18nPref(pref)
+    if (snapshot) {
+      await commitSnapshot(set, snapshot)
     }
   },
 }))
 
-function commitPayload(set: I18nSet, payload: I18nPayload): Promise<void> {
-  const work = payloadQueue.then(() => commitPayloadNow(set, payload))
-  payloadQueue = work.catch(() => {})
+function commitSnapshot(set: I18nSet, snapshot: I18nSnapshot): Promise<void> {
+  const work = snapshotQueue.then(() => commitSnapshotNow(set, snapshot))
+  snapshotQueue = work.catch(() => {})
   return work
 }
 
-async function commitPayloadNow(set: I18nSet, payload: I18nPayload): Promise<void> {
+async function commitSnapshotNow(set: I18nSet, snapshot: I18nSnapshot): Promise<void> {
   const current = useI18nStore.getState()
-  if (samePayload(current, payload)) return
-  await applyPayload(payload)
-  set((s) => (samePayload(s, payload) ? s : { lang: payload.lang, pref: payload.pref, dict: payload.dict }))
-  document.documentElement.setAttribute('lang', payload.lang)
+  if (sameSnapshot(current, snapshot)) return
+  await applySnapshot(snapshot)
+  set((s) => (sameSnapshot(s, snapshot) ? s : { lang: snapshot.lang, pref: snapshot.pref, dict: snapshot.dict }))
+  document.documentElement.setAttribute('lang', snapshot.lang)
 }
 
-function samePayload(state: Pick<I18nState, 'lang' | 'pref' | 'dict'>, payload: I18nPayload): boolean {
-  if (state.lang !== payload.lang || state.pref !== payload.pref) return false
+function sameSnapshot(state: Pick<I18nState, 'lang' | 'pref' | 'dict'>, snapshot: I18nSnapshot): boolean {
+  if (state.lang !== snapshot.lang || state.pref !== snapshot.pref) return false
   const stateKeys = Object.keys(state.dict)
-  const payloadKeys = Object.keys(payload.dict)
-  if (stateKeys.length !== payloadKeys.length) return false
-  return stateKeys.every((key) => state.dict[key] === payload.dict[key])
+  const snapshotKeys = Object.keys(snapshot.dict)
+  if (stateKeys.length !== snapshotKeys.length) return false
+  return stateKeys.every((key) => state.dict[key] === snapshot.dict[key])
 }
 
-async function applyPayload(payload: { lang: Lang; dict: Dict }): Promise<void> {
-  i18next.addResourceBundle(payload.lang, 'translation', payload.dict, true, true)
-  await i18next.changeLanguage(payload.lang)
+async function applySnapshot(snapshot: { lang: Lang; dict: Dict }): Promise<void> {
+  i18next.addResourceBundle(snapshot.lang, 'translation', { ...snapshot.dict }, true, true)
+  await i18next.changeLanguage(snapshot.lang)
 }
 
 /** Render-bound translator backed by react-i18next. */

@@ -7,7 +7,7 @@ import {
   redirect,
   useNavigate,
 } from '@tanstack/react-router'
-import { TanStackRouterDevtools } from '@tanstack/router-devtools'
+import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import { App } from '#/web/App.tsx'
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
@@ -113,6 +113,12 @@ const mainRouteTree = rootRoute.addChildren([
 export const mainRouter = createRouter({
   routeTree: mainRouteTree,
   history: createBrowserHistory(),
+  InnerWrap: ({ children }) => (
+    <>
+      {children}
+      {import.meta.env.DEV ? <TanStackRouterDevtools /> : null}
+    </>
+  ),
 })
 
 function WorkspaceRoute() {
@@ -180,10 +186,5 @@ function SettingsRoutePage({ settingsPage }: { settingsPage: SettingsPage }) {
 }
 
 export function MainWindowRouterProvider() {
-  return (
-    <>
-      <RouterProvider router={mainRouter} />
-      {import.meta.env.DEV && <TanStackRouterDevtools />}
-    </>
-  )
+  return <RouterProvider router={mainRouter} />
 }

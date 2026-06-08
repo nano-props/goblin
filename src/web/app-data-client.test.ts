@@ -145,8 +145,8 @@ describe('server-client web host bootstrap', () => {
     }))
     vi.stubGlobal('fetch', fetchMock)
 
-    const { getI18nPayload } = await import('#/web/app-data-client.ts')
-    await expect(getI18nPayload()).resolves.toEqual({ lang: 'ko', pref: 'auto', dict: { hello: '안녕' } })
+    const { getI18nSnapshot } = await import('#/web/app-data-client.ts')
+    await expect(getI18nSnapshot()).resolves.toEqual({ lang: 'ko', pref: 'auto', dict: { hello: '안녕' } })
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:32100/api/settings/i18n',
       expect.objectContaining({

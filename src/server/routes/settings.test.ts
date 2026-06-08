@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
 
 const mocks = vi.hoisted(() => ({
   publishSettingsInvalidation: vi.fn(),
   buildServerExternalAppsSnapshot: vi.fn(),
   getServerExternalAppsSnapshot: vi.fn(),
   getServerGitHubCliState: vi.fn(),
-  buildServerI18nPayload: vi.fn(),
-  getServerI18nPayload: vi.fn(),
   getSettingsSnapshot: vi.fn(),
   setServerGlobalShortcutRegistered: vi.fn(),
   addServerRecentRepo: vi.fn(),
@@ -29,11 +28,6 @@ vi.mock('#/server/modules/external-apps.ts', () => ({
 
 vi.mock('#/server/modules/github-cli.ts', () => ({
   getServerGitHubCliState: mocks.getServerGitHubCliState,
-}))
-
-vi.mock('#/server/modules/i18n.ts', () => ({
-  buildServerI18nPayload: mocks.buildServerI18nPayload,
-  getServerI18nPayload: mocks.getServerI18nPayload,
 }))
 
 vi.mock('#/server/modules/settings.ts', () => ({
@@ -63,7 +57,7 @@ describe('settings routes', () => {
     vi.clearAllMocks()
   })
 
-  test('returns authoritative i18n payload together with updated prefs for language writes', async () => {
+  test('returns authoritative i18n snapshot together with updated prefs for language writes', async () => {
     const updatedSettings = {
       lang: 'ja',
       theme: 'auto',
@@ -79,11 +73,10 @@ describe('settings routes', () => {
       editorApp: 'auto',
       lanEnabled: false,
     } as const
-    const i18nPayload = { lang: 'ja', pref: 'ja', dict: { hello: 'こんにちは' } } as const
+    const i18nSnapshot = resolveI18nSnapshot('ja', 'ja-JP,ja;q=0.9,en;q=0.8')
 
     mocks.updateServerSettingsPrefs.mockResolvedValue(updatedSettings)
     mocks.settingsInvalidationScopesForPrefsPatch.mockReturnValue(['i18n'])
-    mocks.buildServerI18nPayload.mockReturnValue(i18nPayload)
 
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
     const app = createSettingsRoutes()
@@ -101,9 +94,8 @@ describe('settings routes', () => {
     await expect(response.json()).resolves.toEqual({
       ok: true,
       settings: updatedSettings,
-      i18n: i18nPayload,
+      i18n: i18nSnapshot,
     })
-    expect(mocks.buildServerI18nPayload).toHaveBeenCalledWith(updatedSettings, 'ja-JP,ja;q=0.9,en;q=0.8')
     expect(mocks.publishSettingsInvalidation).toHaveBeenCalledWith(['i18n'])
   })
 

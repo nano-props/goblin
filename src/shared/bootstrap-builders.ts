@@ -1,5 +1,4 @@
 import type {
-  InitialI18nSnapshot,
   InitialServerSnapshot,
   InitialSettingsSnapshot,
   RendererBootstrapPayload,
@@ -8,12 +7,13 @@ import type {
   RendererRuntimeKind,
   RendererRuntimeSnapshot,
 } from '#/shared/bootstrap.ts'
+import type { I18nSnapshot } from '#/shared/rpc.ts'
 import { RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 
 interface RendererBootstrapSeed {
   runtime: RendererRuntimeSnapshot
   homeDir: string
-  i18n: InitialI18nSnapshot
+  i18n: I18nSnapshot
   settings: InitialSettingsSnapshot
   server: InitialServerSnapshot | null
 }

@@ -17,8 +17,7 @@ import { getServerSettingsPrefs } from '#/server/modules/settings-source.ts'
 import { createRendererBootstrapSnapshot, toInitialServerSnapshot } from '#/shared/bootstrap-builders.ts'
 import { createRendererRuntimeSnapshot } from '#/shared/bootstrap-builders.ts'
 import { WEB_RENDERER_CAPABILITIES } from '#/shared/bootstrap.ts'
-import { DICTS } from '#/shared/i18n/dictionaries.ts'
-import { resolvePreferredLang } from '#/shared/i18n/resolve-lang.ts'
+import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
 import { initialSettingsFromSnapshot } from '#/shared/settings-defaults.ts'
 import type { LangPref } from '#/shared/rpc.ts'
 import type { RendererBootstrapSnapshot } from '#/shared/bootstrap.ts'
@@ -43,16 +42,11 @@ function buildWebBootstrap(
   langPref: LangPref,
   settings: Awaited<ReturnType<typeof getServerSettingsPrefs>>,
 ): RendererBootstrapSnapshot {
-  const lang = resolvePreferredLang(langPref, acceptLanguageHeader)
   const origin = new URL(requestUrl).origin
   return createRendererBootstrapSnapshot({
     runtime: createRendererRuntimeSnapshot('web', WEB_RENDERER_CAPABILITIES),
     homeDir: os.homedir(),
-    i18n: {
-      lang,
-      pref: langPref,
-      dict: DICTS[lang],
-    },
+    i18n: resolveI18nSnapshot(langPref, acceptLanguageHeader),
     settings: initialSettingsFromSnapshot({
       ...settings,
       globalShortcutRegistered: false,

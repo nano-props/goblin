@@ -16,13 +16,14 @@ import {
   isTrustedAppUrlForWebContents,
   registerTrustedAppUrl,
 } from '#/main/ipc/trusted-webcontents.ts'
-import { getCurrentLang, getDictionary } from '#/main/i18n/index.ts'
+import { getCurrentLang } from '#/main/i18n/index.ts'
 import { getTheme } from '#/main/theme.ts'
 import { getEmbeddedServerRuntime } from '#/main/server-manager.ts'
 import { getSettingsSnapshot } from '#/main/settings-server-client.ts'
 import type { InitialSettingsSnapshot, RendererBootstrapPayload } from '#/shared/bootstrap.ts'
 import { ELECTRON_RENDERER_CAPABILITIES } from '#/shared/bootstrap.ts'
 import { createRendererBootstrapPayload, createRendererRuntimeSnapshot, toInitialServerSnapshot } from '#/shared/bootstrap-builders.ts'
+import { buildI18nSnapshot } from '#/shared/i18n/snapshot.ts'
 import type { LangPref } from '#/shared/rpc.ts'
 import { WINDOW_BACKGROUND_BY_COLOR_THEME } from '#/shared/theme-tokens.ts'
 import { DEFAULT_COLOR_THEME, initialSettingsFromSnapshot } from '#/shared/settings-defaults.ts'
@@ -44,11 +45,7 @@ function buildRendererBootstrapPayload(
   return createRendererBootstrapPayload({
     runtime: createRendererRuntimeSnapshot('electron', ELECTRON_RENDERER_CAPABILITIES),
     homeDir: os.homedir(),
-    i18n: {
-      lang: getCurrentLang(),
-      pref: langPref,
-      dict: getDictionary(),
-    },
+    i18n: buildI18nSnapshot({ lang: getCurrentLang(), pref: langPref }),
     settings: initialSettings,
     server: toInitialServerSnapshot(runtime ? { ...runtime, url: webDevUrl || runtime.url } : null),
   })
