@@ -67,3 +67,42 @@ export function openByAppCli(appName: string, cliName: string, dir: string): Pro
     return { ok: true, message: dir }
   })
 }
+
+function isSafeRemoteAlias(alias: string): boolean {
+  return alias.length > 0 && alias.length <= 255 && !/[\s\0/?#\\]/.test(alias)
+}
+
+function isSafeRemoteAbsolutePath(remotePath: string): boolean {
+  return (
+    remotePath.length > 0 &&
+    remotePath.length <= 4096 &&
+    remotePath.startsWith('/') &&
+    !/[\0-\x1f\x7f]/.test(remotePath)
+  )
+}
+
+export function openRemoteByAppCli(
+  appName: string,
+  cliName: string,
+  alias: string,
+  remotePath: string,
+): Promise<{ ok: boolean; message: string }> {
+  if (!isSafeRemoteAlias(alias) || !isSafeRemoteAbsolutePath(remotePath)) {
+    return Promise.resolve({ ok: false, message: 'error.invalid-arguments' })
+  }
+
+  const cli = resolveAppCli(appName, cliName)
+  if (!cli) return Promise.resolve({ ok: false, message: 'error.editor-not-installed' })
+
+  return execa(cli, ['--remote', `ssh-remote+${alias}`, remotePath], {
+    timeout: OPEN_TIMEOUT_MS,
+    forceKillAfterDelay: 500,
+    reject: false,
+  }).then((result) => {
+    if (result.failed) {
+      const message = result.stderr?.trim() || result.shortMessage || result.message || 'error.remote-editor-not-supported'
+      return { ok: false, message }
+    }
+    return { ok: true, message: remotePath }
+  })
+}

@@ -18,6 +18,7 @@ beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   testWindow.goblinNative = {
     homeDir: '/Users/tester',
+    initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
     pathForFile: () => '',
     invokeRpc: async () => null,
     abortRpc: async () => true,
@@ -34,6 +35,7 @@ afterEach(() => {
   container = null
   document.body.innerHTML = ''
   delete testWindow.goblinNative
+  vi.unstubAllGlobals()
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
@@ -55,9 +57,10 @@ describe('CreateWorktreeDialog', () => {
     click('button[type="submit"]')
 
     expect(onCreate).toHaveBeenCalledWith({
-      worktreePath: '/tmp/goblin-repo-feature-new',
-      newBranch: 'feature/new',
-      baseBranch: 'main',
+      input: {
+        worktreePath: '/tmp/goblin-repo-feature-new',
+        mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'main' },
+      },
     })
     expect(onClose).toHaveBeenCalledTimes(1)
     deferred.resolve()
@@ -90,9 +93,69 @@ describe('CreateWorktreeDialog', () => {
     await flush()
 
     expect(onCreate).toHaveBeenCalledWith({
-      worktreePath: '~/trees/repo-feature-new',
-      newBranch: 'feature/new',
-      baseBranch: 'main',
+      input: {
+        worktreePath: '~/trees/repo-feature-new',
+        mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'main' },
+      },
+    })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  test('creates a worktree from an existing local branch without new branch args', () => {
+    const onClose = vi.fn()
+    const onCreate = vi.fn(async () => {})
+
+    render(<CreateWorktreeDialog open repo={createRepo()} onClose={onClose} onCreate={onCreate} />)
+
+    clickButtonByText('action.create-worktree-mode-existing')
+    click('button[type="submit"]')
+
+    expect(onCreate).toHaveBeenCalledWith({
+      input: {
+        worktreePath: '/tmp/goblin-repo-main',
+        mode: { kind: 'existingBranch', branch: 'main' },
+      },
+    })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  test('creates a tracking worktree from the first remote branch', async () => {
+    const onClose = vi.fn()
+    const onCreate = vi.fn(async () => {})
+    testWindow.goblinNative = {
+      ...(testWindow.goblinNative as object),
+      initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+    }
+    const jsonMock = vi.fn(async () => ['origin/feature/remote'])
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: jsonMock,
+    }))
+    vi.stubGlobal(
+      'fetch',
+      fetchMock,
+    )
+
+    render(<CreateWorktreeDialog open repo={createRepo()} onClose={onClose} onCreate={onCreate} />)
+
+    clickButtonByText('action.create-worktree-mode-remote')
+    await waitForAssertion(() => {
+      expect(fetchMock).toHaveBeenCalled()
+    })
+    await waitForAssertion(() => {
+      expect(jsonMock).toHaveBeenCalled()
+    })
+    await waitForAssertion(() => {
+      expect(input('#cwt-local-branch').placeholder).toBe('feature/remote')
+    })
+    expect(button('button[type="submit"]').disabled).toBe(false)
+    click('button[type="submit"]')
+
+    expect(onCreate).toHaveBeenCalledWith({
+      input: {
+        worktreePath: '/tmp/goblin-repo-feature-remote',
+        mode: { kind: 'trackRemoteBranch', remoteRef: 'origin/feature/remote', localBranch: 'feature/remote' },
+      },
     })
     expect(onClose).toHaveBeenCalledTimes(1)
   })
@@ -187,10 +250,31 @@ function click(selector: string) {
   })
 }
 
+function clickButtonByText(text: string) {
+  const element = buttonByText(text)
+  act(() => {
+    element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  })
+}
+
 async function flush() {
   await act(async () => {
-    await Promise.resolve()
+    await new Promise((resolve) => setTimeout(resolve, 0))
   })
+}
+
+async function waitForAssertion(assertion: () => void) {
+  let lastError: unknown
+  for (let i = 0; i < 10; i += 1) {
+    try {
+      assertion()
+      return
+    } catch (err) {
+      lastError = err
+      await flush()
+    }
+  }
+  throw lastError
 }
 
 function createDeferred<T>() {

@@ -2,6 +2,7 @@ import { git, gitResultWithOptions } from '#/system/git/helper.ts'
 import { parseStatus, parseWorktrees } from '#/system/git/parsers.ts'
 import { mapWithConcurrency } from '#/system/git/concurrency.ts'
 import type { ExecResult, WorktreeInfo } from '#/shared/git-types.ts'
+import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 
 const WORKTREE_STATUS_CONCURRENCY = 16
 
@@ -67,27 +68,23 @@ export async function removeWorktree(cwd: string, worktreePath: string, signal?:
   )
 }
 
-/** `git worktree add -b <newBranch> <path> <baseBranch>`. Always creates
- *  a new branch from base — the renderer's CreateWorktree flow is
- *  guided to that one mode. Git refuses on path-already-exists,
- *  branch-already-exists, parent-dir-missing, etc.; we surface those
- *  errors directly rather than pre-checking. */
 export async function createWorktree(
   cwd: string,
-  worktreePath: string,
-  newBranch: string,
-  baseBranch: string,
+  input: CreateWorktreeInput,
   signal?: AbortSignal,
 ): Promise<ExecResult> {
-  return gitResultWithOptions(
-    cwd,
-    { timeoutMs: WORKTREE_OP_TIMEOUT_MS, signal },
-    'worktree',
-    'add',
-    '-b',
-    newBranch,
-    '--',
-    worktreePath,
-    baseBranch,
-  )
+  return gitResultWithOptions(cwd, { timeoutMs: WORKTREE_OP_TIMEOUT_MS, signal }, 'worktree', 'add', ...createWorktreeArgs(input))
+}
+
+function createWorktreeArgs(input: CreateWorktreeInput): string[] {
+  switch (input.mode.kind) {
+    case 'newBranch':
+      return ['-b', input.mode.newBranch, '--', input.worktreePath, input.mode.baseRef]
+    case 'existingBranch':
+      return ['--', input.worktreePath, input.mode.branch]
+    case 'trackRemoteBranch':
+      return ['-b', input.mode.localBranch, '--track', '--', input.worktreePath, input.mode.remoteRef]
+    case 'detached':
+      return ['--detach', '--', input.worktreePath, input.mode.ref]
+  }
 }

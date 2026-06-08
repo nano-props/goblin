@@ -72,6 +72,9 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
   const pullRequest =
     branch.pullRequest && branchPullRequestBelongsToBranch(branch, branch.pullRequest) ? branch.pullRequest : undefined
   const remoteIcon = pullRequest ? GitPullRequest : browserRemoteIcon(branchBrowserRemoteProvider(repo, branch))
+  const isRemoteRepo = !!repo.remote.target
+  const showTerminalAction = capabilities.canOpenTerminal && (isRemoteRepo || terminalAvailable)
+  const terminalIconPref = isRemoteRepo ? 'auto' : (resolvedTerminalApp ?? terminalApp)
 
   const patchItems: BranchActionItem[] = capabilities.canCopyPatch
     ? [
@@ -120,7 +123,7 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
       icon: createElement(ArrowUp),
       onSelect: actions.push,
     },
-    ...(capabilities.canOpenTerminal && terminalAvailable
+    ...(showTerminalAction
       ? [
           {
             id: 'terminal' as const,
@@ -129,7 +132,7 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
             busy: busy('terminal'),
             visible: true,
             shortcut: 'G',
-            icon: createElement(TerminalAppIcon, { pref: resolvedTerminalApp ?? terminalApp }),
+            icon: createElement(TerminalAppIcon, { pref: terminalIconPref }),
             onSelect: actions.openTerminal,
           },
         ]

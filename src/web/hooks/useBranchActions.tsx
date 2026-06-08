@@ -9,6 +9,7 @@ import {
   openRepositoryEditor,
   openRepositoryRemote,
   openRepositoryTerminal,
+  openRemoteRepositoryEditor,
 } from '#/web/app-data-client.ts'
 import {
   branchActionBusyItemId,
@@ -55,8 +56,8 @@ export function getBranchActionCapabilities(repo: BranchActionRepo, branch: Repo
     canPull: !!branch.tracking,
     canPush: repo.remote.hasRemotes === true,
     canOpenRemote: repo.remote.hasBrowserRemote === true || repo.remote.hasGitHubRemote === true,
-    canOpenTerminal: !!branch.worktree?.path && !repo.remote.target,
-    canOpenEditor: !!branch.worktree?.path && !repo.remote.target,
+    canOpenTerminal: !!branch.worktree?.path,
+    canOpenEditor: !!branch.worktree?.path,
   }
 }
 
@@ -164,6 +165,9 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   function openEditor() {
     if (!branch.worktree?.path) return
     const worktreePath = branch.worktree?.path
+    if (repo.remote.target) {
+      return runUiAction('editor', () => openRemoteRepositoryEditor(repo.id, worktreePath))
+    }
     return runUiAction('editor', () => openRepositoryEditor(worktreePath))
   }
 

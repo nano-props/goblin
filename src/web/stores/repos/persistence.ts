@@ -63,6 +63,7 @@ const StatusEntrySchema = v.object({
 const WorktreeStatusSchema = v.object({
   path: v.string(),
   branch: v.optional(v.string()),
+  head: v.optional(v.string()),
   isMain: v.boolean(),
   entries: v.array(StatusEntrySchema),
 })
@@ -70,6 +71,8 @@ const WorktreeStatusSchema = v.object({
 const WorktreeStateSchema = v.object({
   path: v.string(),
   branch: v.optional(v.string()),
+  head: v.optional(v.string()),
+  isDetached: v.optional(v.boolean()),
   isMain: v.boolean(),
   isDirty: v.optional(v.boolean()),
   changeCount: v.optional(FiniteNumber),
@@ -90,6 +93,7 @@ const CachedRepoSchema = v.object({
     selectedBranch: v.nullable(v.string()),
     branchViewMode: v.picklist(['all', 'worktrees', 'no-worktree']),
     detailTab: v.picklist(['status', 'terminal']),
+    worktreePathOrder: v.optional(v.array(v.string()), []),
   }),
 })
 
@@ -126,6 +130,7 @@ export function hydrateCachedRepo(repo: RepoState, cached: CachedRepoState | und
       selectedBranch,
       branchViewMode: cached.ui.branchViewMode,
       detailTab: cached.ui.detailTab === 'terminal' ? 'terminal' : 'status',
+      worktreePathOrder: cached.ui.worktreePathOrder,
     },
     cache: {
       source: 'cache',
@@ -170,6 +175,7 @@ function repoCacheEntry(repo: RepoState): CachedRepoState | null {
       selectedBranch: repo.ui.selectedBranch,
       branchViewMode: repo.ui.branchViewMode,
       detailTab: repo.ui.detailTab === 'terminal' ? 'terminal' : 'status',
+      worktreePathOrder: repo.ui.worktreePathOrder,
     },
   }
 }
@@ -205,6 +211,7 @@ function normalizeRepoCacheEntry(value: unknown): CachedRepoState | null {
     ui: {
       ...cached.ui,
       detailTab: cached.ui.detailTab === 'terminal' ? 'terminal' : 'status',
+      worktreePathOrder: cached.ui.worktreePathOrder,
     },
   }
 }

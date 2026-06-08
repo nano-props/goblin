@@ -7,10 +7,15 @@ import { act } from 'react'
 import { useBranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { openBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
 import { createPullRequest, createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
+import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 
 const mocks = vi.hoisted(() => ({
   openExternalUrl: vi.fn(),
+  openRepositoryEditor: vi.fn(),
   openRepositoryRemote: vi.fn(),
+  openRepositoryTerminal: vi.fn(),
+  openRemoteRepositoryEditor: vi.fn(),
+  showRepoDetailTab: vi.fn(),
 }))
 
 vi.mock('#/web/app-shell-client.ts', () => ({
@@ -19,14 +24,15 @@ vi.mock('#/web/app-shell-client.ts', () => ({
 
 vi.mock('#/web/app-data-client.ts', () => ({
   getRepositoryPatch: vi.fn(),
-  openRepositoryEditor: vi.fn(),
+  openRepositoryEditor: mocks.openRepositoryEditor,
   openRepositoryRemote: mocks.openRepositoryRemote,
-  openRepositoryTerminal: vi.fn(),
+  openRepositoryTerminal: mocks.openRepositoryTerminal,
+  openRemoteRepositoryEditor: mocks.openRemoteRepositoryEditor,
 }))
 
 vi.mock('#/web/main-window-navigation.tsx', () => ({
   useMainWindowNavigation: () => ({
-    showRepoDetailTab: vi.fn(),
+    showRepoDetailTab: mocks.showRepoDetailTab,
   }),
 }))
 
@@ -40,7 +46,11 @@ describe('useBranchActions', () => {
   beforeEach(() => {
     resetReposStore()
     mocks.openExternalUrl.mockReset()
+    mocks.openRepositoryEditor.mockReset()
     mocks.openRepositoryRemote.mockReset()
+    mocks.openRepositoryTerminal.mockReset()
+    mocks.openRemoteRepositoryEditor.mockReset()
+    mocks.showRepoDetailTab.mockReset()
     reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
     container = document.createElement('div')
     document.body.appendChild(container)
@@ -115,6 +125,67 @@ describe('useBranchActions', () => {
 
     expect(mocks.openRepositoryRemote).toHaveBeenCalledWith(REPO_ID, 'feature/no-pr')
     expect(mocks.openExternalUrl).not.toHaveBeenCalled()
+  })
+
+  test('opens remote terminals in the Goblin terminal detail tab', async () => {
+    const branch = createRepoBranch('feature/remote-terminal', { worktree: { path: '/srv/repo-feature' } })
+    const target = normalizeRemoteTarget({
+      alias: 'prod',
+      host: 'example.com',
+      user: 'alice',
+      port: 22,
+      remotePath: '/srv/repo',
+    })
+    expect(target).not.toBeNull()
+    const repo = seedRepoState({
+      id: target!.id,
+      branches: [branch],
+      remote: { target: target!, hasRemotes: true, hasBrowserRemote: true, hasGitHubRemote: true },
+    })
+
+    let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
+    root = createRoot(container)
+    await act(async () => {
+      root!.render(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
+    })
+
+    await act(async () => {
+      await actions?.openTerminal?.()
+    })
+
+    expect(mocks.showRepoDetailTab).toHaveBeenCalledWith(target!.id, 'terminal')
+    expect(mocks.openRepositoryTerminal).not.toHaveBeenCalled()
+  })
+
+  test('opens remote editors through the remote editor client', async () => {
+    mocks.openRemoteRepositoryEditor.mockResolvedValue({ ok: true, message: '' })
+    const branch = createRepoBranch('feature/remote-editor', { worktree: { path: '/srv/repo-feature' } })
+    const target = normalizeRemoteTarget({
+      alias: 'prod',
+      host: 'example.com',
+      user: 'alice',
+      port: 22,
+      remotePath: '/srv/repo',
+    })
+    expect(target).not.toBeNull()
+    const repo = seedRepoState({
+      id: target!.id,
+      branches: [branch],
+      remote: { target: target!, hasRemotes: true, hasBrowserRemote: true, hasGitHubRemote: true },
+    })
+
+    let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
+    root = createRoot(container)
+    await act(async () => {
+      root!.render(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
+    })
+
+    await act(async () => {
+      await actions?.openEditor?.()
+    })
+
+    expect(mocks.openRemoteRepositoryEditor).toHaveBeenCalledWith(target!.id, '/srv/repo-feature')
+    expect(mocks.openRepositoryEditor).not.toHaveBeenCalled()
   })
 })
 

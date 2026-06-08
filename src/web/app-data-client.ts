@@ -22,6 +22,7 @@ import type {
 } from '#/shared/rpc.ts'
 import type { ExecResult, PullRequestFetchMode, WorktreeStatus } from '#/shared/git-types.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import type {
   RemoteDiagnosticsResult,
   RemotePathSuggestionsInput,
@@ -185,6 +186,10 @@ export async function testRemoteRepositoryConnection(
   return await postServerJson('/api/remote/test-repository', { target }, { signal })
 }
 
+export async function openRemoteRepositoryEditor(repoId: string, worktreePath: string): Promise<ExecResult> {
+  return await postServerJson('/api/remote/open-editor', { repoId, worktreePath })
+}
+
 export async function addRecentRepo(repo: RepoSessionEntry): Promise<void> {
   const result = await postServerJson<
     { repo: RepoSessionEntry },
@@ -265,6 +270,10 @@ export async function getRepositoryStatus(cwd: string, signal?: AbortSignal): Pr
   return await postServerJson('/api/repo/status', { cwd }, { signal })
 }
 
+export async function getRepositoryRemoteBranches(cwd: string, signal?: AbortSignal): Promise<string[]> {
+  return await postServerJson('/api/repo/remote-branches', { cwd }, { signal })
+}
+
 export async function getRepositoryPullRequests(
   cwd: string,
   branches?: string[],
@@ -317,13 +326,11 @@ export async function pushRepositoryBranch(
 
 export async function createRepositoryWorktree(
   cwd: string,
-  worktreePath: string,
-  newBranch: string,
-  baseBranch: string,
+  input: CreateWorktreeInput,
   signal?: AbortSignal,
   sourceToken?: string,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/create-worktree', { cwd, worktreePath, newBranch, baseBranch, sourceToken }, { signal })
+  return await postServerJson('/api/repo/create-worktree', { cwd, ...input, sourceToken }, { signal })
 }
 
 export async function deleteRepositoryBranch(

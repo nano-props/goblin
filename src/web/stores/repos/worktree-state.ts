@@ -29,9 +29,12 @@ export function worktreeStatesFromBranches(
     const snapshotSummary = snapshotWorktree.summary
     const changeCount = statusCount ?? snapshotSummary?.changeCount ?? prev?.changeCount
     const isDirty = statusCount === undefined ? (snapshotSummary?.dirty ?? prev?.isDirty) : statusCount > 0
+    const head = statusEntry?.head ?? prev?.head
     next[snapshotWorktree.path] = {
       path: snapshotWorktree.path,
       branch: statusEntry?.branch ?? branch.name,
+      ...(head ? { head } : {}),
+      isDetached: statusEntry ? !statusEntry.branch : false,
       isMain: snapshotWorktree.isPrimary ?? statusEntry?.isMain ?? prev?.isMain ?? false,
       isDirty,
       changeCount,
@@ -59,7 +62,9 @@ export function applyStatusToWorktreeStates(
     const changeCount = wt.entries.length
     next[wt.path] = {
       path: wt.path,
-      branch: wt.branch ?? prev?.branch,
+      ...(wt.branch ? { branch: wt.branch } : {}),
+      ...(wt.head ? { head: wt.head } : {}),
+      isDetached: !wt.branch,
       isMain: wt.isMain,
       isDirty: changeCount > 0,
       changeCount,

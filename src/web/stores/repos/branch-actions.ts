@@ -23,6 +23,7 @@ import {
 } from '#/web/stores/repos/branch-action-scheduler.ts'
 import type { RepoEventAction, RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 import type { ExecResult } from '#/web/types.ts'
+import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import {
   runWithRepoInvalidationSource,
@@ -53,6 +54,21 @@ const NETWORK_FETCH_REASON_BY_KIND: Record<NetworkRepoBranchAction['kind'], Netw
   push: 'push',
 }
 
+function createWorktreeEventBranch(input: CreateWorktreeInput): string {
+  switch (input.mode.kind) {
+    case 'newBranch':
+      return input.mode.newBranch
+    case 'existingBranch':
+      return input.mode.branch
+    case 'trackRemoteBranch':
+      return input.mode.localBranch
+    case 'detached':
+      return input.mode.ref
+  }
+  const exhaustive: never = input.mode
+  return exhaustive
+}
+
 export function repoBranchActionReason(kind: RepoBranchActionKind): RepoBranchActionReason {
   return BRANCH_ACTION_REASON_BY_KIND[kind]
 }
@@ -70,7 +86,7 @@ function branchActionOperationTarget(action: RepoBranchAction): string | null {
     case 'removeWorktree':
       return action.branch
     case 'createWorktree':
-      return action.newBranch
+      return createWorktreeEventBranch(action.input)
   }
   const exhaustive: never = action
   return exhaustive
@@ -84,7 +100,7 @@ function branchActionEventAction(action: RepoBranchAction): RepoEventAction {
     case 'deleteBranch':
       return { kind: action.kind, branch: action.branch }
     case 'createWorktree':
-      return { kind: action.kind, branch: action.newBranch, worktreePath: action.worktreePath }
+      return { kind: action.kind, branch: createWorktreeEventBranch(action.input), worktreePath: action.input.worktreePath }
     case 'removeWorktree':
       return {
         kind: action.kind,
@@ -199,7 +215,7 @@ function runBranchActionRpc(
     case 'push':
       return pushRepositoryBranch(repoId, action.branch, signal, sourceToken)
     case 'createWorktree':
-      return createRepositoryWorktree(repoId, action.worktreePath, action.newBranch, action.baseBranch, signal, sourceToken)
+      return createRepositoryWorktree(repoId, action.input, signal, sourceToken)
     case 'deleteBranch':
       return deleteRepositoryBranch(
         repoId,
