@@ -37,14 +37,16 @@ export const zh: Record<DictKey, string> = {
   'menu.file.settings': '设置…',
   'menu.file.quit': '退出',
 
+  'menu.edit.undo': '撤销',
+  'menu.edit.redo': '重做',
   'menu.edit.cut': '剪切',
   'menu.edit.copy': '复制',
   'menu.edit.paste': '粘贴',
+  'menu.edit.paste-match-style': '粘贴并匹配样式',
+  'menu.edit.delete': '删除',
   'menu.edit.select-all': '全选',
 
   'menu.view.status': '分支状态',
-  'menu.view.changes': '变更',
-  'menu.view.log': '提交历史',
   'menu.view.terminal': '终端',
   'menu.view.terminal-primary-action': '打开或创建终端',
   'menu.view.toggle-detail': '展开/收起详情面板',
@@ -53,6 +55,7 @@ export const zh: Record<DictKey, string> = {
   'menu.view.layout-left-right': '左右布局',
   'menu.view.refresh': '同步仓库',
   'menu.view.reload-page': '重新加载页面',
+  'menu.view.toggle-full-screen': '切换全屏',
   'menu.view.toggle-dev-tools': '切换开发者工具',
 
   'menu.window.next-repo': '下一个仓库',

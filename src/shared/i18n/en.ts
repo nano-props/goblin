@@ -42,15 +42,17 @@ export const en = {
   'menu.file.quit': 'Quit',
 
   // ---- Menu — Edit --------------------------------------------------------
+  'menu.edit.undo': 'Undo',
+  'menu.edit.redo': 'Redo',
   'menu.edit.cut': 'Cut',
   'menu.edit.copy': 'Copy',
   'menu.edit.paste': 'Paste',
+  'menu.edit.paste-match-style': 'Paste and Match Style',
+  'menu.edit.delete': 'Delete',
   'menu.edit.select-all': 'Select All',
 
   // ---- Menu — View --------------------------------------------------------
   'menu.view.status': 'Branch Status',
-  'menu.view.changes': 'Changes',
-  'menu.view.log': 'Log',
   'menu.view.terminal': 'Terminal',
   'menu.view.terminal-primary-action': 'Open or Create Terminal',
   'menu.view.toggle-detail': 'Toggle Detail Panel',
@@ -59,6 +61,7 @@ export const en = {
   'menu.view.layout-left-right': 'Left/Right Layout',
   'menu.view.refresh': 'Sync Repository',
   'menu.view.reload-page': 'Reload Page',
+  'menu.view.toggle-full-screen': 'Toggle Full Screen',
   'menu.view.toggle-dev-tools': 'Toggle Developer Tools',
 
   // ---- Menu — Window (gbl-specific) ---------------------------------------

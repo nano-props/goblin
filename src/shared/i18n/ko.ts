@@ -38,14 +38,16 @@ export const ko: Record<DictKey, string> = {
   'menu.file.settings': '설정…',
   'menu.file.quit': '종료',
 
+  'menu.edit.undo': '실행 취소',
+  'menu.edit.redo': '다시 실행',
   'menu.edit.cut': '잘라내기',
   'menu.edit.copy': '복사',
   'menu.edit.paste': '붙여넣기',
+  'menu.edit.paste-match-style': '스타일에 맞춰 붙여넣기',
+  'menu.edit.delete': '삭제',
   'menu.edit.select-all': '전체 선택',
 
   'menu.view.status': '브랜치 상태',
-  'menu.view.changes': '변경 사항',
-  'menu.view.log': '커밋 로그',
   'menu.view.terminal': '터미널',
   'menu.view.terminal-primary-action': '터미널 열기 또는 생성',
   'menu.view.toggle-detail': '세부 패널 접기/펼치기',
@@ -54,6 +56,7 @@ export const ko: Record<DictKey, string> = {
   'menu.view.layout-left-right': '좌우 레이아웃',
   'menu.view.refresh': '리포지토리 동기화',
   'menu.view.reload-page': '페이지 새로 고침',
+  'menu.view.toggle-full-screen': '전체 화면 전환',
   'menu.view.toggle-dev-tools': '개발자 도구',
 
   'menu.window.next-repo': '다음 리포지토리',

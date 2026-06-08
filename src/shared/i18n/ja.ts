@@ -42,15 +42,17 @@ export const ja: Record<DictKey, string> = {
   'menu.file.quit': '終了',
 
   // ---- Menu — Edit -------------------------------------------------------
+  'menu.edit.undo': '取り消す',
+  'menu.edit.redo': 'やり直す',
   'menu.edit.cut': 'カット',
   'menu.edit.copy': 'コピー',
   'menu.edit.paste': 'ペースト',
+  'menu.edit.paste-match-style': 'スタイルを合わせてペースト',
+  'menu.edit.delete': '削除',
   'menu.edit.select-all': 'すべてを選択',
 
   // ---- Menu — View -------------------------------------------------------
   'menu.view.status': 'ブランチステータス',
-  'menu.view.changes': '変更',
-  'menu.view.log': 'ログ',
   'menu.view.terminal': 'ターミナル',
   'menu.view.terminal-primary-action': 'ターミナルを開く/作成',
   'menu.view.toggle-detail': '詳細パネルを折りたたむ/展開',
@@ -59,6 +61,7 @@ export const ja: Record<DictKey, string> = {
   'menu.view.layout-left-right': '左右レイアウト',
   'menu.view.refresh': 'リポジトリを同期',
   'menu.view.reload-page': 'ページを再読み込み',
+  'menu.view.toggle-full-screen': 'フルスクリーンを切り替え',
   'menu.view.toggle-dev-tools': '開発者ツールを切替',
 
   // ---- Menu — Window (gbl-specific) --------------------------------------
