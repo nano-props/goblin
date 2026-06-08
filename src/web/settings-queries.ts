@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import QRCode from 'qrcode'
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type {
   EditorAppState,
@@ -6,6 +7,7 @@ import type {
   ExternalAppsSnapshot,
   GitHubCliState,
   GlobalShortcutState,
+  LanInfo,
   SettingsSnapshot,
   TerminalAppState,
   TerminalPref,
@@ -13,11 +15,13 @@ import type {
 import {
   getExternalAppsSnapshot,
   getGitHubCliState,
+  getLanInfo,
   getSettingsSnapshot,
   refreshExternalAppsSnapshot,
   refreshGitHubCliState,
   setGlobalShortcut,
   setGlobalShortcutDisabled,
+  setLanEnabled,
   setPreferredEditorApp,
   setPreferredTerminalApp,
   setSettingsFetchInterval,
@@ -93,6 +97,10 @@ export function githubCliQueryKey(hosts?: string[]) {
   return ['settings', 'github-cli', ...(hosts?.filter((host) => host.trim()).sort() ?? [])] as const
 }
 
+export function lanInfoQueryKey() {
+  return ['settings', 'lan'] as const
+}
+
 export function settingsSnapshotQueryOptions() {
   return queryOptions<SettingsSnapshot>({
     queryKey: settingsSnapshotQueryKey(),
@@ -123,6 +131,30 @@ export function githubCliQueryOptions(hosts?: string[]) {
   })
 }
 
+export interface LanInfoWithQrCodes extends LanInfo {
+  qrCodes: Record<string, string>
+}
+
+export function lanInfoQueryOptions() {
+  return queryOptions<LanInfoWithQrCodes>({
+    queryKey: lanInfoQueryKey(),
+    queryFn: async () => {
+      const info = await getLanInfo()
+      const qrCodes: Record<string, string> = {}
+      for (const url of info.lanUrls) {
+        try {
+          qrCodes[url] = await QRCode.toDataURL(url, { width: 180, margin: 2 })
+        } catch {
+          // ignore
+        }
+      }
+      return { ...info, qrCodes }
+    },
+    staleTime: 5 * 60_000,
+    gcTime: 10 * 60_000,
+  })
+}
+
 export function useSettingsSnapshotQuery() {
   return useQuery(settingsSnapshotQueryOptions())
 }
@@ -133,6 +165,10 @@ export function useExternalAppsQuery() {
 
 export function useGitHubCliQuery(hosts?: string[]) {
   return useQuery(githubCliQueryOptions(hosts))
+}
+
+export function useLanInfoQuery() {
+  return useQuery(lanInfoQueryOptions())
 }
 
 function updateSettingsSnapshotCache(
@@ -290,6 +326,17 @@ export function useRefreshGitHubCliMutation(hosts?: string[]) {
     mutationFn: () => refreshGitHubCliState(hosts),
     onSuccess(state) {
       updateGitHubCliCache(queryClient, hosts, state)
+    },
+  })
+}
+
+export function useSetLanEnabledMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: setLanEnabled,
+    onSuccess(_value, enabled) {
+      updateSettingsSnapshotCache(queryClient, (current) => ({ ...current, lanEnabled: enabled }))
+      void queryClient.invalidateQueries({ queryKey: lanInfoQueryKey() })
     },
   })
 }

@@ -63,9 +63,18 @@ export class ManagedTerminalSession {
   attach(host: HTMLElement): void {
     if (this.disposed) return
     this.view.attach(host)
-    if (this.view.currentTerminal()) this.view.fitSoon()
+    if (this.view.currentTerminal()) {
+      if (this.runtime.canResize()) {
+        this.view.fitSoon()
+      } else {
+        const canonicalSize = this.runtime.currentCanonicalSize()
+        if (canonicalSize.cols > 0 && canonicalSize.rows > 0) {
+          this.view.resizeTo(canonicalSize.cols, canonicalSize.rows)
+        }
+      }
+    }
     this.start()
-    if (this.runtime.phase() === 'open') this.view.focus()
+    if (this.runtime.phase() === 'open' && this.runtime.canResize()) this.view.focus()
   }
 
   detach(host: HTMLElement, parkingRoot: HTMLElement): void {
@@ -173,7 +182,19 @@ export class ManagedTerminalSession {
   }
 
   handleOwnership(event: TerminalOwnershipViewModel): void {
-    if (this.runtime.handleOwnership(event)) this.notify()
+    const wasController = this.runtime.canResize()
+    if (this.runtime.handleOwnership(event)) {
+      const isController = this.runtime.canResize()
+      if (!isController) {
+        const size = this.runtime.currentCanonicalSize()
+        if (size.cols > 0 && size.rows > 0) {
+          this.view.resizeTo(size.cols, size.rows)
+        }
+      } else if (!wasController && isController) {
+        this.view.fitSoon()
+      }
+      this.notify()
+    }
   }
 
   handleServerTitle(canonicalTitle: string | null): void {
@@ -254,6 +275,12 @@ export class ManagedTerminalSession {
         cols: term.cols,
         rows: term.rows,
       })
+      if (!this.runtime.canResize()) {
+        const canonicalSize = this.runtime.currentCanonicalSize()
+        if (canonicalSize.cols > 0 && canonicalSize.rows > 0) {
+          this.view.resizeTo(canonicalSize.cols, canonicalSize.rows)
+        }
+      }
       await this.replayActiveView(
         token,
         term,
@@ -345,7 +372,7 @@ export class ManagedTerminalSession {
   }
 
   private queueResize(cols: number, rows: number): void {
-    if (!this.runtime.currentSessionId()) return
+    if (!this.runtime.currentSessionId() || !this.runtime.canResize()) return
     const canonicalSize = this.runtime.currentCanonicalSize()
     if (canonicalSize.cols === cols && canonicalSize.rows === rows && !this.pendingResize) return
     this.pendingResize = { cols, rows }

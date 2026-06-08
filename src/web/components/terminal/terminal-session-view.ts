@@ -165,6 +165,12 @@ export class TerminalSessionView {
     this.term?.focus()
   }
 
+  resizeTo(cols: number, rows: number): void {
+    if (!this.term) return
+    if (this.term.cols === cols && this.term.rows === rows) return
+    this.term.resize(cols, rows)
+  }
+
   serialize(): string {
     return this.serializeAddon?.serialize({ excludeAltBuffer: true }) ?? ''
   }

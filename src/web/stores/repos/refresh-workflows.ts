@@ -2,7 +2,6 @@ import { appendRepoEvent, errorEvent, updateIfFresh } from '#/web/stores/repos/h
 import { persistRepoCache } from '#/web/stores/repos/persistence.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
-import type { ExecResult } from '#/web/types.ts'
 
 function repoFresh(get: ReposGet, id: string, token: number): boolean {
   const repo = get().repos[id]
@@ -73,21 +72,10 @@ async function runSnapshotVisibleDetailBackfill(
   await refreshVisibleDetailPullRequest(get, options.id, options.token)
 }
 
-export async function runRefreshAllWorkflow(get: ReposGet, options: { id: string; token: number }): Promise<void> {
+export async function runCoreDataRefreshWorkflow(get: ReposGet, options: { id: string; token: number }): Promise<void> {
   await get().refreshSnapshot(options.id, { skipLogBackfill: true, token: options.token })
   const after = get().repos[options.id]
   if (!after || after.instanceToken !== options.token) return
   if (after.availability.phase === 'unavailable') return
   await get().refreshStatus(options.id, { token: options.token })
-}
-
-export async function runManualSyncResultWorkflow(
-  get: ReposGet,
-  options: { id: string; token: number; result: ExecResult },
-): Promise<void> {
-  if (!options.result.ok && options.result.message === 'cancelled') return
-  get().setLastResult(options.id, options.result, options.token)
-  if (!options.result.ok && options.result.message === 'error.network-op-in-progress') return
-  await get().refreshAll(options.id, { token: options.token })
-  if (options.result.ok) get().clearFetchFailed(options.id, options.token)
 }

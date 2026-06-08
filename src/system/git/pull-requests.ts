@@ -471,32 +471,30 @@ async function fetchSingleBranchPullRequestMap(
   return byBranch
 }
 
-export async function getBranchPullRequests(
-  cwd: string,
+export async function getBranchPullRequestsForRepoRef(
+  scopeId: string,
+  repo: GitHubRepoRef,
   branchNames?: ReadonlySet<string>,
   options?: { mode?: PullRequestFetchMode; signal?: AbortSignal },
 ): Promise<Map<string, PullRequestInfo> | null> {
   const mode = options?.mode ?? 'full'
   const singleBranch = branchNames?.size === 1 ? Array.from(branchNames)[0] : undefined
-  let repo: GitHubRepoRef | null = null
   try {
-    repo = await getGitHubRepoRef(cwd, { branch: singleBranch, signal: options?.signal })
-    if (!repo) return null
-    const cached = prCache.get(repoCacheKey(cwd, repo))
+    const cached = prCache.get(repoCacheKey(scopeId, repo))
     if (!singleBranch && cached && cacheFresh(cached.expiresAt) && cacheSatisfiesMode(cached.mode, mode)) {
       return filterPullRequests(cached.prs, branchNames)
     }
     if (isGitHubHostCoolingDown(repo.host)) return null
     if (singleBranch) {
-      const cached = getCachedBranchPullRequest(cwd, repo, singleBranch, mode)
+      const cached = getCachedBranchPullRequest(scopeId, repo, singleBranch, mode)
       if (cached.hit) {
         return cached.pr ? new Map([[singleBranch, cached.pr]]) : new Map()
       }
       if (!(await hasPullRequestQueryCapability(repo, options?.signal))) return null
 
-      const key = pendingRequestKey(branchCacheKey(cwd, repo, singleBranch, mode), options?.signal)
+      const key = pendingRequestKey(branchCacheKey(scopeId, repo, singleBranch, mode), options?.signal)
       const existing = pendingBranchRequests.get(key)
-      const byBranch = existing ?? fetchSingleBranchPullRequestMap(cwd, repo, singleBranch, mode, options?.signal)
+      const byBranch = existing ?? fetchSingleBranchPullRequestMap(scopeId, repo, singleBranch, mode, options?.signal)
       if (!existing) pendingBranchRequests.set(key, byBranch)
       try {
         return await byBranch
@@ -505,10 +503,10 @@ export async function getBranchPullRequests(
       }
     }
 
-    const key = pendingRequestKey(repoRequestKey(cwd, repo, mode), options?.signal)
+    const key = pendingRequestKey(repoRequestKey(scopeId, repo, mode), options?.signal)
     if (!(await hasPullRequestQueryCapability(repo, options?.signal))) return null
     const existing = pendingRepoRequests.get(key)
-    const byBranch = existing ?? fetchRepositoryPullRequestMap(cwd, repo, mode, options?.signal)
+    const byBranch = existing ?? fetchRepositoryPullRequestMap(scopeId, repo, mode, options?.signal)
     if (!existing) pendingRepoRequests.set(key, byBranch)
     try {
       return filterPullRequests(await byBranch, branchNames)
@@ -517,8 +515,8 @@ export async function getBranchPullRequests(
     }
   } catch (err) {
     if (options?.signal?.aborted) return null
-    if (!singleBranch && repo) {
-      const key = repoCacheKey(cwd, repo)
+    if (!singleBranch) {
+      const key = repoCacheKey(scopeId, repo)
       const current = prCache.get(key)
       if (!current || !cacheFresh(current.expiresAt) || current.prs === null) {
         prCache.set(key, { expiresAt: Date.now() + PR_CACHE_TTL_MS, mode, prs: null })
@@ -526,6 +524,17 @@ export async function getBranchPullRequests(
     }
     throw err instanceof Error ? err : new Error(String(err))
   }
+}
+
+export async function getBranchPullRequests(
+  cwd: string,
+  branchNames?: ReadonlySet<string>,
+  options?: { mode?: PullRequestFetchMode; signal?: AbortSignal },
+): Promise<Map<string, PullRequestInfo> | null> {
+  const singleBranch = branchNames?.size === 1 ? Array.from(branchNames)[0] : undefined
+  const repo = await getGitHubRepoRef(cwd, { branch: singleBranch, signal: options?.signal })
+  if (!repo) return null
+  return await getBranchPullRequestsForRepoRef(cwd, repo, branchNames, options)
 }
 
 export function resetPullRequestCachesForTests(): void {

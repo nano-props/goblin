@@ -32,6 +32,7 @@ function installBridge(sessionOverrides: Record<string, unknown> = {}) {
             globalShortcutRegistered: false,
             terminalApp: 'auto',
             editorApp: 'auto',
+            lanEnabled: false,
             session: {
               openRepos: [],
               activeRepo: null,

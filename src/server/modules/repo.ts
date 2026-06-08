@@ -1,6 +1,7 @@
 import { runServerCancellable, abortServerNetworkOp } from '#/server/common/network-ops.ts'
 import { getBackgroundSyncRepos as getRegisteredBackgroundSyncRepos, setBackgroundSyncRepos as setRegisteredBackgroundSyncRepos } from '#/server/modules/background-sync.ts'
 import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
+import { resolveRepoBackend } from '#/server/modules/repo-backend.ts'
 import {
   invalidateCachedRepoReadModel,
   readCachedPullRequests,
@@ -8,54 +9,17 @@ import {
   writeCachedPullRequests,
   writeCachedRepoSnapshot,
 } from '#/server/modules/repo-read-model.ts'
-import {
-  checkoutBranch,
-  deleteBranch,
-  deleteUpstreamBranch,
-  getBranches,
-  getCurrentBranch,
-  getDefaultBranch,
-  getRepoName,
-  getRepoRoot,
-  getUpstream,
-  isAncestor,
-  isGitRepo,
-} from '#/system/git/branches.ts'
 import { cloneRepository as cloneGitRepository } from '#/system/git/clone.ts'
 import { type ExecResult, type PullRequestFetchMode, type WorktreeStatus } from '#/shared/git-types.ts'
 import { checkGitAvailable } from '#/system/git/helper.ts'
-import { fetchAll, getBrowserRemoteUrl, getRemoteInfo, pullBranch, pushBranch } from '#/system/git/remote.ts'
-import { getWorkingStatus } from '#/system/git/status.ts'
-import { createWorktree, getWorktrees, removeWorktree } from '#/system/git/worktrees.ts'
-import { getWorktreePatch } from '#/system/git/patch.ts'
-import { resolveKnownWorktree, resolveRemovableWorktree } from '#/shared/worktree-guards.ts'
 import { isValidCwd, isValidRepoLocator } from '#/shared/input-validation.ts'
-import { resolveRemoteTarget as resolveSshRemoteTarget } from '#/system/ssh/config.ts'
-import { testRemoteRepository } from '#/system/ssh/diagnostics.ts'
-import {
-  checkoutRemoteBranch,
-  createRemoteWorktree,
-  deleteRemoteBranch,
-  fetchRemoteRepository,
-  getRemoteBrowserUrl,
-  getRemotePatch,
-  getRemoteSnapshot,
-  getRemoteStatus,
-  pullRemoteBranch,
-  pushRemoteBranch,
-  removeRemoteWorktree,
-} from '#/system/ssh/git.ts'
-import { getBranchPullRequests } from '#/system/git/pull-requests.ts'
 import { openInPreferredEditor } from '#/system/editors.ts'
 import { openInPreferredTerminal } from '#/system/terminals.ts'
 import {
-  isRemoteRepoId,
-  parseRemoteRepoId,
   type CloneRepoResult,
   type NetworkOpKind,
   type ProbeResult,
   type PullRequestEntry,
-  type RemoteRepoTarget,
   type RepoSnapshot,
 } from '#/shared/rpc.ts'
 import { constants as fsConstants, promises as fs } from 'node:fs'
@@ -68,6 +32,7 @@ const MAX_CLONE_DIR_NAME_LENGTH = 255
 const CLONE_URL_SCHEME_RE = /^(?:https?|ssh|git|file):\/\/\S+$/i
 const SCP_LIKE_CLONE_URL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+:[^\s]+$/
 const CLONE_OPERATION_ID_RE = /^[A-Za-z0-9_-]{1,128}$/
+const INVALIDATION_SOURCE_TOKEN_RE = /^[A-Za-z0-9_-]{1,128}$/
 const activeCloneControllers = new Map<string, AbortController>()
 const activeBackgroundFetches = new Map<string, Promise<{ ok: boolean; message: string }>>()
 
@@ -135,35 +100,31 @@ function isValidCloneOperationId(value: unknown): value is string {
   return typeof value === 'string' && CLONE_OPERATION_ID_RE.test(value)
 }
 
-async function resolveRemoteRepoTarget(repoId: string): Promise<RemoteRepoTarget> {
-  const parsed = parseRemoteRepoId(repoId)
-  if (!parsed) throw new Error('error.ssh-config-changed')
-  return (await resolveSshRemoteTarget(parsed)).target
+function normalizeInvalidationSourceToken(value: unknown): string | undefined {
+  return typeof value === 'string' && INVALIDATION_SOURCE_TOKEN_RE.test(value) ? value : undefined
+}
+
+function repoSnapshotInvalidationEvent(cwd: string, sourceToken?: string) {
+  const normalizedSourceToken = normalizeInvalidationSourceToken(sourceToken)
+  return normalizedSourceToken
+    ? { repoId: cwd, query: 'repo-snapshot' as const, sourceToken: normalizedSourceToken }
+    : { repoId: cwd, query: 'repo-snapshot' as const }
+}
+
+async function invalidateRepoReadModelAndNotify(cwd: string, sourceToken?: string): Promise<void> {
+  await invalidateCachedRepoReadModel(cwd)
+  publishRepoQueryInvalidation(repoSnapshotInvalidationEvent(cwd, sourceToken))
+}
+
+async function runWithRepoBackend<T>(
+  cwd: string,
+  task: (backend: Awaited<ReturnType<typeof resolveRepoBackend>>) => Promise<T>,
+): Promise<T> {
+  return await task(await resolveRepoBackend(cwd))
 }
 
 export async function probeRepository(cwd: string): Promise<ProbeResult> {
-  if (isRemoteRepoId(cwd)) {
-    let target: RemoteRepoTarget
-    try {
-      target = await resolveRemoteRepoTarget(cwd)
-    } catch (err) {
-      return { ok: false, message: err instanceof Error ? err.message : 'error.ssh-config-changed' }
-    }
-    const result = await testRemoteRepository(target)
-    if (!result.ok) return { ok: false, message: result.message || 'error.failed-read-repo' }
-    return { ok: true, root: target.id, name: target.displayName }
-  }
-  if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-path' }
-  const gitAvailable = await checkGitAvailable()
-  if (!gitAvailable.ok) return gitAvailable
-  const readable = await probeReadableDirectory(cwd)
-  if (!readable.ok) return readable
-  const ok = await isGitRepo(cwd)
-  if (!ok) return { ok: false, message: 'error.not-git-repo' }
-  const root = await getRepoRoot(cwd)
-  if (!root) return { ok: false, message: 'error.failed-read-repo' }
-  const name = await getRepoName(cwd)
-  return { ok: true, root, name }
+  return await runWithRepoBackend(cwd, async (backend) => await backend.probe())
 }
 
 export async function cloneRepository(
@@ -202,18 +163,13 @@ export function abortCloneOperation(operationId: string): boolean {
   return true
 }
 
-async function probeGitRepository(cwd: string): Promise<ProbeAvailability> {
-  const ok = await isGitRepo(cwd)
-  if (ok) return { ok: true }
-  const readable = await probeReadableDirectory(cwd)
-  if (!readable.ok) return readable
-  return { ok: false, message: 'error.not-git-repo' }
-}
-
-async function invalidateRepoReadModelAfterMutation(cwd: string, result: ExecResult): Promise<ExecResult> {
+async function invalidateRepoReadModelAfterMutation(
+  cwd: string,
+  result: ExecResult,
+  sourceToken?: string,
+): Promise<ExecResult> {
   if (!result.ok) return result
-  await invalidateCachedRepoReadModel(cwd)
-  publishRepoQueryInvalidation({ repoId: cwd, query: 'repo-snapshot' })
+  await invalidateRepoReadModelAndNotify(cwd, sourceToken)
   return result
 }
 
@@ -245,6 +201,7 @@ async function withMergedAbortSignal<T>(
 async function runUserNetworkMutation(
   cwd: string,
   signal: AbortSignal | undefined,
+  sourceToken: string | undefined,
   task: (signal: AbortSignal | undefined) => Promise<ExecResult>,
 ): Promise<ExecResult> {
   return await invalidateRepoReadModelAfterMutation(
@@ -252,55 +209,22 @@ async function runUserNetworkMutation(
     await runServerCancellable(cwd, 'user', async (networkSignal) => {
       return await withMergedAbortSignal([signal, networkSignal], task)
     }),
+    sourceToken,
   )
 }
 
 export async function getRepositorySnapshot(cwd: string, signal?: AbortSignal): Promise<RepoSnapshot | null> {
   let snapshot: RepoSnapshot | null
-  if (isRemoteRepoId(cwd)) {
-    const target = await resolveRemoteRepoTarget(cwd)
-    const cached = await readCachedRepoSnapshot(cwd)
-    if (cached) return cached
-    const remoteSnapshot = await getRemoteSnapshot(target, { signal })
-    if (signal?.aborted || !remoteSnapshot) return null
-    snapshot = { branches: remoteSnapshot.branches, current: remoteSnapshot.current, remote: remoteSnapshot.remote }
-  } else {
-    if (!isValidCwd(cwd)) return null
-    const available = await probeGitRepository(cwd)
-    if (!available.ok) throw new Error(available.message)
-    const cached = await readCachedRepoSnapshot(cwd)
-    if (cached) return cached
-    try {
-      const worktrees = await getWorktrees(cwd, { signal })
-      if (signal?.aborted) return null
-      const branches = await getBranches(cwd, worktrees, { signal })
-      if (signal?.aborted) return null
-      const current = await getCurrentBranch(cwd, { signal })
-      if (signal?.aborted) return null
-      const remote = await getRemoteInfo(cwd, signal)
-      if (signal?.aborted) return null
-      snapshot = { branches, current, remote }
-    } catch (err) {
-      if (signal?.aborted) return null
-      throw err
-    }
-  }
+  const cached = await readCachedRepoSnapshot(cwd)
+  if (cached) return cached
+  snapshot = await runWithRepoBackend(cwd, async (backend) => await backend.getSnapshot(signal))
   if (signal?.aborted || !snapshot) return null
   await writeCachedRepoSnapshot(cwd, snapshot)
   return snapshot
 }
 
 export async function getRepositoryStatus(cwd: string, signal?: AbortSignal): Promise<WorktreeStatus[]> {
-  if (isRemoteRepoId(cwd)) {
-    const target = await resolveRemoteRepoTarget(cwd)
-    const status = await getRemoteStatus(target, { signal })
-    return signal?.aborted ? [] : status
-  }
-  if (!isValidCwd(cwd)) return []
-  const available = await probeGitRepository(cwd)
-  if (!available.ok) throw new Error(available.message)
-  const status = await getWorkingStatus(cwd, { signal })
-  return signal?.aborted ? [] : status
+  return signal?.aborted ? [] : await runWithRepoBackend(cwd, async (backend) => await backend.getStatus(signal))
 }
 
 export async function getRepositoryPullRequests(
@@ -308,7 +232,6 @@ export async function getRepositoryPullRequests(
   branches?: string[],
   options?: { mode?: PullRequestFetchMode; signal?: AbortSignal },
 ): Promise<PullRequestEntry[] | null> {
-  if (!isValidCwd(cwd)) return null
   if (branches !== undefined && !Array.isArray(branches)) return null
   const mode: PullRequestFetchMode = options?.mode === 'summary' ? 'summary' : 'full'
   const branchSet =
@@ -324,36 +247,26 @@ export async function getRepositoryPullRequests(
   const cached = await readCachedPullRequests(cwd, branchNames, mode)
   if (cached) return cached
   if (cached !== undefined) return []
-  const prs = await getBranchPullRequests(cwd, branchSet, { mode, signal: options?.signal })
+  const prs = await runWithRepoBackend(cwd, async (backend) => await backend.getPullRequests(branchNames, { mode, signal: options?.signal }))
   if (!prs) return null
-  const entries = Array.from(prs, ([branch, pullRequest]) => ({ branch, pullRequest }))
-  await writeCachedPullRequests(cwd, entries, { branches: branchNames, mode })
-  return entries
+  await writeCachedPullRequests(cwd, prs, { branches: branchNames, mode })
+  return prs
 }
 
-export async function fetchRepository(cwd: string, kind: NetworkOpKind = 'user'): Promise<{ ok: boolean; message: string }> {
+export async function fetchRepository(
+  cwd: string,
+  kind: NetworkOpKind = 'user',
+  sourceToken?: string,
+): Promise<{ ok: boolean; message: string }> {
   async function runFetch(task: (signal: AbortSignal) => Promise<{ ok: boolean; message: string }>) {
     const result = await runServerCancellable(cwd, kind, task)
     if (result.ok) {
-      await invalidateCachedRepoReadModel(cwd)
-      publishRepoQueryInvalidation({ repoId: cwd, query: 'repo-snapshot' })
+      await invalidateRepoReadModelAndNotify(cwd, sourceToken)
     }
     return result
   }
   async function executeFetch(): Promise<{ ok: boolean; message: string }> {
-    if (isRemoteRepoId(cwd)) {
-      let target: RemoteRepoTarget
-      try {
-        target = await resolveRemoteRepoTarget(cwd)
-      } catch (err) {
-        return { ok: false, message: err instanceof Error ? err.message : 'error.ssh-config-changed' }
-      }
-      return await runFetch((signal) => fetchRemoteRepository(target, { signal }))
-    }
-    if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-arguments' }
-    const available = await probeGitRepository(cwd)
-    if (!available.ok) return available
-    return await runFetch((signal) => fetchAll(cwd, signal))
+    return await runWithRepoBackend(cwd, async (backend) => await runFetch((signal) => backend.fetch(signal)))
   }
 
   if (kind === 'user') {
@@ -371,15 +284,15 @@ export async function fetchRepository(cwd: string, kind: NetworkOpKind = 'user')
   return await backgroundFetch
 }
 
-export async function checkoutRepositoryBranch(cwd: string, branch: string, signal?: AbortSignal): Promise<ExecResult> {
-  if (isRemoteRepoId(cwd)) {
-    return await invalidateRepoReadModelAfterMutation(
-      cwd,
-      await checkoutRemoteBranch(await resolveRemoteRepoTarget(cwd), branch, undefined, { signal }),
-    )
-  }
-  if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-arguments' }
-  return await invalidateRepoReadModelAfterMutation(cwd, await checkoutBranch(cwd, branch, signal))
+export async function checkoutRepositoryBranch(
+  cwd: string,
+  branch: string,
+  signal?: AbortSignal,
+  sourceToken?: string,
+): Promise<ExecResult> {
+  return await runWithRepoBackend(cwd, async (backend) => {
+    return await invalidateRepoReadModelAfterMutation(cwd, await backend.checkout(branch, signal), sourceToken)
+  })
 }
 
 export async function pullRepositoryBranch(
@@ -387,27 +300,23 @@ export async function pullRepositoryBranch(
   branch: string,
   worktreePath?: string,
   signal?: AbortSignal,
+  sourceToken?: string,
 ): Promise<ExecResult> {
-  if (isRemoteRepoId(cwd)) {
-    return await runUserNetworkMutation(cwd, signal, async (mergedSignal) => {
-      return await pullRemoteBranch(await resolveRemoteRepoTarget(cwd), branch, worktreePath, { signal: mergedSignal })
-    })
-  }
-  if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-arguments' }
-  return await runUserNetworkMutation(cwd, signal, async (mergedSignal) => {
-    return await pullBranch(cwd, branch, worktreePath, mergedSignal)
+  const backend = await resolveRepoBackend(cwd)
+  return await runUserNetworkMutation(cwd, signal, sourceToken, async (mergedSignal) => {
+    return await backend.pull(branch, worktreePath, mergedSignal)
   })
 }
 
-export async function pushRepositoryBranch(cwd: string, branch: string, signal?: AbortSignal): Promise<ExecResult> {
-  if (isRemoteRepoId(cwd)) {
-    return await runUserNetworkMutation(cwd, signal, async (mergedSignal) => {
-      return await pushRemoteBranch(await resolveRemoteRepoTarget(cwd), branch, { signal: mergedSignal })
-    })
-  }
-  if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-arguments' }
-  return await runUserNetworkMutation(cwd, signal, async (mergedSignal) => {
-    return await pushBranch(cwd, branch, mergedSignal)
+export async function pushRepositoryBranch(
+  cwd: string,
+  branch: string,
+  signal?: AbortSignal,
+  sourceToken?: string,
+): Promise<ExecResult> {
+  const backend = await resolveRepoBackend(cwd)
+  return await runUserNetworkMutation(cwd, signal, sourceToken, async (mergedSignal) => {
+    return await backend.push(branch, mergedSignal)
   })
 }
 
@@ -417,44 +326,15 @@ export async function createRepositoryWorktree(
   newBranch: string,
   baseBranch: string,
   signal?: AbortSignal,
+  sourceToken?: string,
 ): Promise<ExecResult> {
-  if (isRemoteRepoId(cwd)) {
+  return await runWithRepoBackend(cwd, async (backend) => {
     return await invalidateRepoReadModelAfterMutation(
       cwd,
-      await createRemoteWorktree(await resolveRemoteRepoTarget(cwd), { worktreePath, newBranch, baseBranch, signal }),
+      await backend.createWorktree(worktreePath, newBranch, baseBranch, signal),
+      sourceToken,
     )
-  }
-  if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-arguments' }
-  return await invalidateRepoReadModelAfterMutation(cwd, await createWorktree(cwd, worktreePath, newBranch, baseBranch, signal))
-}
-
-async function deleteRepositoryBranchImpl(
-  cwd: string,
-  branch: string,
-  options?: { force?: boolean; alsoDeleteUpstream?: boolean },
-  signal?: AbortSignal,
-): Promise<ExecResult> {
-  if (isRemoteRepoId(cwd)) {
-    return await deleteRemoteBranch(await resolveRemoteRepoTarget(cwd), { branch, force: options?.force, signal })
-  }
-  if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-arguments' }
-  const current = await getCurrentBranch(cwd, { signal })
-  if (branch === current) return { ok: false, message: 'error.cannot-delete-current-branch' }
-  const worktrees = await getWorktrees(cwd, { includeStatus: false, signal })
-  if (worktrees.some((wt) => wt.branch === branch)) return { ok: false, message: 'error.cannot-delete-checked-out-branch' }
-  if (!options?.force) {
-    const defaultBranch = await getDefaultBranch(cwd, { signal })
-    const mergedToDefault = defaultBranch ? await isAncestor(cwd, branch, defaultBranch, signal) : false
-    const upstream = await getUpstream(cwd, branch, signal)
-    const mergedToUpstream = upstream ? await isAncestor(cwd, branch, upstream, signal) : false
-    if (!mergedToDefault && !mergedToUpstream) return { ok: false, message: 'error.branch-not-fully-merged' }
-  }
-  const upstream = options?.alsoDeleteUpstream ? await getUpstream(cwd, branch, signal) : null
-  const deleted = await deleteBranch(cwd, branch, { force: options?.force, signal })
-  if (!deleted.ok || !upstream) return deleted
-  const slash = upstream.indexOf('/')
-  if (slash <= 0) return deleted
-  return await deleteUpstreamBranch(cwd, upstream.slice(0, slash), upstream.slice(slash + 1), signal)
+  })
 }
 
 export async function deleteRepositoryBranch(
@@ -462,15 +342,11 @@ export async function deleteRepositoryBranch(
   branch: string,
   options?: { force?: boolean; alsoDeleteUpstream?: boolean },
   signal?: AbortSignal,
+  sourceToken?: string,
 ): Promise<ExecResult> {
-  if (isRemoteRepoId(cwd)) {
-    return await invalidateRepoReadModelAfterMutation(
-      cwd,
-      await deleteRemoteBranch(await resolveRemoteRepoTarget(cwd), { branch, force: options?.force, signal }),
-    )
-  }
-  if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-arguments' }
-  return await invalidateRepoReadModelAfterMutation(cwd, await deleteRepositoryBranchImpl(cwd, branch, options, signal))
+  return await runWithRepoBackend(cwd, async (backend) => {
+    return await invalidateRepoReadModelAfterMutation(cwd, await backend.deleteBranch(branch, options, signal), sourceToken)
+  })
 }
 
 export async function removeRepositoryWorktree(
@@ -483,49 +359,19 @@ export async function removeRepositoryWorktree(
     alsoDeleteUpstream?: boolean
   },
   signal?: AbortSignal,
+  sourceToken?: string,
 ): Promise<ExecResult> {
-  if (isRemoteRepoId(cwd)) {
-    return await invalidateRepoReadModelAfterMutation(
-      cwd,
-      await removeRemoteWorktree(await resolveRemoteRepoTarget(cwd), { ...input, signal }),
-    )
-  }
-  if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-arguments' }
-  const worktrees = await getWorktrees(cwd, { signal })
-  const removable = resolveRemovableWorktree(worktrees, input.branch, input.worktreePath, cwd)
-  if (!removable.ok) return { ok: false, message: removable.message }
-  if ((removable.target.changeCount ?? 0) > 0) return { ok: false, message: 'error.cannot-remove-dirty-worktree' }
-  const removed = await removeWorktree(cwd, removable.target.path, signal)
-  if (!removed.ok) return removed
-  if (!input.alsoDeleteBranch) return await invalidateRepoReadModelAfterMutation(cwd, removed)
-  return await invalidateRepoReadModelAfterMutation(
-    cwd,
-    await deleteRepositoryBranchImpl(
-      cwd,
-      input.branch,
-      { force: input.forceDeleteBranch, alsoDeleteUpstream: input.alsoDeleteUpstream },
-      signal,
-    ),
-  )
+  return await runWithRepoBackend(cwd, async (backend) => {
+    return await invalidateRepoReadModelAfterMutation(cwd, await backend.removeWorktree(input, signal), sourceToken)
+  })
 }
 
 export async function getRepositoryPatch(cwd: string, worktreePath: string, signal?: AbortSignal): Promise<ExecResult> {
-  if (isRemoteRepoId(cwd)) return await getRemotePatch(await resolveRemoteRepoTarget(cwd), worktreePath, { signal })
-  if (!isValidCwd(cwd)) return { ok: false, message: 'error.invalid-arguments' }
-  const worktrees = await getWorktrees(cwd, { includeStatus: false, signal })
-  const known = resolveKnownWorktree(worktrees, worktreePath)
-  if (!known.ok) return { ok: false, message: known.message }
-  try {
-    return { ok: true, message: await getWorktreePatch(known.path, { signal }) }
-  } catch (err) {
-    return { ok: false, message: err instanceof Error ? err.message : String(err) }
-  }
+  return await runWithRepoBackend(cwd, async (backend) => await backend.getPatch(worktreePath, signal))
 }
 
 export async function openRepositoryRemote(cwd: string, branch?: string, signal?: AbortSignal): Promise<ExecResult> {
-  const url = isRemoteRepoId(cwd)
-    ? await getRemoteBrowserUrl(await resolveRemoteRepoTarget(cwd), branch, { signal })
-    : await getBrowserRemoteUrl(cwd, { branch, signal })
+  const url = await runWithRepoBackend(cwd, async (backend) => await backend.getBrowserRemoteUrl(branch, signal))
   return url ? { ok: true, message: url } : { ok: false, message: 'error.no-remote-url' }
 }
 

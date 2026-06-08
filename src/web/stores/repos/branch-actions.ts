@@ -25,6 +25,9 @@ import type { RepoEventAction, RepoState, ReposGet, ReposSet } from '#/web/store
 import type { ExecResult } from '#/web/types.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import {
+  runWithRepoInvalidationSource,
+} from '#/web/stores/repos/invalidation-sources.ts'
+import {
   checkoutRepositoryBranch,
   createRepositoryWorktree,
   deleteRepositoryBranch,
@@ -129,6 +132,37 @@ function throwIfStale(get: ReposGet, id: string, token: number): void {
   if (get().repos[id]?.instanceToken !== token) throw new Error('cancelled')
 }
 
+function syncNetworkFetchResourceState(
+  set: ReposSet,
+  id: string,
+  token: number,
+  network: boolean,
+  result: ExecResult | { ok: false; message: string },
+): void {
+  if (!network) return
+  updateIfFresh(set, id, token, (r) => {
+    if (result.message === 'cancelled') {
+      cancelResource(r.resources.fetch)
+      return
+    }
+    if (result.ok) finishResourceSuccess(r.resources.fetch)
+    else finishResourceError(r.resources.fetch, result.message)
+  })
+}
+
+function shouldSuppressBranchActionResultMessage(result: ExecResult, options?: RunBranchActionOptions): boolean {
+  if (result.message === 'cancelled') return true
+  if (options?.deferResultMessages?.includes(result.message)) return true
+  return false
+}
+
+function shouldSkipBranchActionRefresh(result: ExecResult, options?: RunBranchActionOptions): boolean {
+  if (shouldSuppressBranchActionResultMessage(result, options)) return true
+  if (!result.ok && result.message === 'error.network-op-in-progress') return true
+  if (!result.ok && result.message === BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE) return true
+  return false
+}
+
 function waitForBranchActionIdle(
   id: string,
   keys: Parameters<typeof waitForRepoOperationsIdle>[1],
@@ -151,22 +185,28 @@ function waitForBranchActionIdle(
     })
 }
 
-function runBranchActionRpc(action: RepoBranchAction, repoId: string, signal?: AbortSignal): Promise<ExecResult> {
+function runBranchActionRpc(
+  action: RepoBranchAction,
+  repoId: string,
+  signal?: AbortSignal,
+  sourceToken?: string,
+): Promise<ExecResult> {
   switch (action.kind) {
     case 'checkout':
-      return checkoutRepositoryBranch(repoId, action.branch, signal)
+      return checkoutRepositoryBranch(repoId, action.branch, signal, sourceToken)
     case 'pull':
-      return pullRepositoryBranch(repoId, action.branch, action.worktreePath, signal)
+      return pullRepositoryBranch(repoId, action.branch, action.worktreePath, signal, sourceToken)
     case 'push':
-      return pushRepositoryBranch(repoId, action.branch, signal)
+      return pushRepositoryBranch(repoId, action.branch, signal, sourceToken)
     case 'createWorktree':
-      return createRepositoryWorktree(repoId, action.worktreePath, action.newBranch, action.baseBranch, signal)
+      return createRepositoryWorktree(repoId, action.worktreePath, action.newBranch, action.baseBranch, signal, sourceToken)
     case 'deleteBranch':
       return deleteRepositoryBranch(
         repoId,
         action.branch,
         { force: action.force, alsoDeleteUpstream: action.alsoDeleteUpstream },
         signal,
+        sourceToken,
       )
     case 'removeWorktree':
       return removeRepositoryWorktree(
@@ -179,6 +219,7 @@ function runBranchActionRpc(action: RepoBranchAction, repoId: string, signal?: A
           alsoDeleteUpstream: action.alsoDeleteUpstream,
         },
         signal,
+        sourceToken,
       )
   }
   const exhaustive: never = action
@@ -222,20 +263,11 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
         if (network) startResource(r.resources.fetch, { hasData: r.resources.fetch.loadedAt !== null })
       })
       const handleResult = async (result: ExecResult) => {
-        updateIfFresh(set, id, token, (r) => {
-          if (result.message === 'cancelled') {
-            if (network) cancelResource(r.resources.fetch)
-          } else if (result.ok) {
-            if (network) finishResourceSuccess(r.resources.fetch)
-          } else {
-            if (network) finishResourceError(r.resources.fetch, result.message)
-          }
-        })
-        if (result.message === 'cancelled') return
-        if (options?.deferResultMessages?.includes(result.message)) return
-        get().setLastResult(id, result, token, { action: branchActionEventAction(action) })
-        if (!result.ok && result.message === 'error.network-op-in-progress') return
-        if (!result.ok && result.message === BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE) return
+        syncNetworkFetchResourceState(set, id, token, network, result)
+        if (!shouldSuppressBranchActionResultMessage(result, options)) {
+          get().setLastResult(id, result, token, { action: branchActionEventAction(action) })
+        }
+        if (shouldSkipBranchActionRefresh(result, options)) return
         if (result.ok || options?.refreshOnError !== false) {
           const repo = get().repos[id]
           if (repo?.instanceToken === token) {
@@ -245,71 +277,66 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
         if (result.ok && network) get().clearFetchFailed(id, token)
       }
       const handleError = (message: string) => {
-        if (message === 'cancelled') {
-          updateIfFresh(set, id, token, (r) => {
-            if (network) cancelResource(r.resources.fetch)
-          })
-          return
-        }
-        updateIfFresh(set, id, token, (r) => {
-          if (network) finishResourceError(r.resources.fetch, message)
-        })
+        syncNetworkFetchResourceState(set, id, token, network, { ok: false, message })
+        if (message === 'cancelled') return
         get().setLastResult(id, { ok: false, message }, token, { action: branchActionEventAction(action) })
       }
       const errorFromResult = (result: ExecResult) =>
         !result.ok && result.message !== 'cancelled' ? result.message : null
       const errorResult = (message: string): ExecResult => ({ ok: false, message })
-      const runActionTask = async (signal: AbortSignal, ctx: { setPhase: (phase: 'queued' | 'running') => void }) => {
-        try {
-          if (coreRefreshBusy(id)) {
-            ctx.setPhase('queued')
-            signal.throwIfAborted()
-            await waitForBranchActionIdle(id, ['snapshot', 'status'], signal, options?.waitTimeoutMs)
+      return await runWithRepoInvalidationSource('branch', async (sourceToken) => {
+        const runActionTask = async (signal: AbortSignal, ctx: { setPhase: (phase: 'queued' | 'running') => void }) => {
+          try {
+            if (coreRefreshBusy(id)) {
+              ctx.setPhase('queued')
+              signal.throwIfAborted()
+              await waitForBranchActionIdle(id, ['snapshot', 'status'], signal, options?.waitTimeoutMs)
+            }
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err)
+            if (message === BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE) return { ok: false, message }
+            throw err
           }
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err)
-          if (message === BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE) return { ok: false, message }
-          throw err
+          throwIfStale(get, id, token)
+          ctx.setPhase('running')
+          return runBranchActionRpc(action, id, signal, sourceToken)
         }
-        throwIfStale(get, id, token)
-        ctx.setPhase('running')
-        return runBranchActionRpc(action, id, signal)
-      }
 
-      if (network) {
-        return runLatestOperation({
+        if (network) {
+          return await runLatestOperation({
+            set,
+            get,
+            id,
+            token,
+            lane: 'network',
+            operationKey: BRANCH_NETWORK_OPERATION_KEY,
+            priority: 100,
+            targets: [branchActionTarget(action), { key: 'fetch', reason: networkFetchReason(action) }],
+            task: runActionTask,
+            queuedTimeoutMs: options?.waitTimeoutMs ?? BRANCH_ACTION_WAIT_TIMEOUT_MS,
+            queuedTimeoutMessage: BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE,
+            errorFromResult,
+            errorResult,
+            onResult: handleResult,
+            onError: handleError,
+          })
+        }
+
+        return await runExclusiveOperation({
           set,
           get,
           id,
           token,
-          lane: 'network',
-          operationKey: BRANCH_NETWORK_OPERATION_KEY,
+          lane: 'write',
           priority: 100,
-          targets: [branchActionTarget(action), { key: 'fetch', reason: networkFetchReason(action) }],
+          targets: [branchActionTarget(action)],
+          busyResult: { ok: false, message: 'cancelled' },
           task: runActionTask,
-          queuedTimeoutMs: options?.waitTimeoutMs ?? BRANCH_ACTION_WAIT_TIMEOUT_MS,
-          queuedTimeoutMessage: BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE,
           errorFromResult,
           errorResult,
           onResult: handleResult,
           onError: handleError,
         })
-      }
-
-      return runExclusiveOperation({
-        set,
-        get,
-        id,
-        token,
-        lane: 'write',
-        priority: 100,
-        targets: [branchActionTarget(action)],
-        busyResult: { ok: false, message: 'cancelled' },
-        task: runActionTask,
-        errorFromResult,
-        errorResult,
-        onResult: handleResult,
-        onError: handleError,
       })
     },
   }

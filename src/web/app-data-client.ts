@@ -10,6 +10,7 @@ import type {
   GlobalShortcutState,
   I18nPayload,
   LangPref,
+  LanInfo,
   PullRequestEntry,
   RepoSnapshot,
   ProbeResult,
@@ -28,6 +29,8 @@ import type {
   SshConfigHostsResult,
 } from '#/shared/remote-repo.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
+import { resolveApiBaseUrl } from '#/web/lib/websocket-url.ts'
+
 interface EmbeddedServerConfig {
   url: string
   secret: string
@@ -47,7 +50,7 @@ function requireEmbeddedServer(): EmbeddedServerConfig {
 
 async function fetchServerJson<T>(path: string, init?: RequestInit): Promise<T> {
   const server = requireEmbeddedServer()
-  const response = await fetch(new URL(path, server.url).toString(), {
+  const response = await fetch(new URL(path, resolveApiBaseUrl(server.url)).toString(), {
     ...init,
     headers: {
       'x-goblin-internal-secret': server.secret,
@@ -131,6 +134,14 @@ export async function getGitHubCliState(hosts?: string[]): Promise<GitHubCliStat
 
 export async function refreshGitHubCliState(hosts?: string[]): Promise<GitHubCliState> {
   return await postServerJson('/api/settings/github-cli/refresh', hosts && hosts.length > 0 ? { hosts } : {})
+}
+
+export async function getLanInfo(): Promise<LanInfo> {
+  return await fetchServerJson('/api/settings/lan')
+}
+
+export async function setLanEnabled(enabled: boolean): Promise<void> {
+  await updateSettingsPrefsPatch({ lanEnabled: enabled })
 }
 
 export async function getExternalAppsSnapshot(): Promise<ExternalAppsSnapshot> {
@@ -271,12 +282,18 @@ export async function fetchRepository(
   cwd: string,
   kind?: 'user' | 'background',
   signal?: AbortSignal,
+  sourceToken?: string,
 ): Promise<{ ok: boolean; message: string }> {
-  return await postServerJson('/api/repo/fetch', kind ? { cwd, kind } : { cwd }, { signal })
+  return await postServerJson('/api/repo/fetch', kind ? { cwd, kind, sourceToken } : { cwd, sourceToken }, { signal })
 }
 
-export async function checkoutRepositoryBranch(cwd: string, branch: string, signal?: AbortSignal): Promise<ExecResult> {
-  return await postServerJson('/api/repo/checkout', { cwd, branch }, { signal })
+export async function checkoutRepositoryBranch(
+  cwd: string,
+  branch: string,
+  signal?: AbortSignal,
+  sourceToken?: string,
+): Promise<ExecResult> {
+  return await postServerJson('/api/repo/checkout', { cwd, branch, sourceToken }, { signal })
 }
 
 export async function pullRepositoryBranch(
@@ -284,12 +301,18 @@ export async function pullRepositoryBranch(
   branch: string,
   worktreePath?: string,
   signal?: AbortSignal,
+  sourceToken?: string,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/pull', { cwd, branch, worktreePath }, { signal })
+  return await postServerJson('/api/repo/pull', { cwd, branch, worktreePath, sourceToken }, { signal })
 }
 
-export async function pushRepositoryBranch(cwd: string, branch: string, signal?: AbortSignal): Promise<ExecResult> {
-  return await postServerJson('/api/repo/push', { cwd, branch }, { signal })
+export async function pushRepositoryBranch(
+  cwd: string,
+  branch: string,
+  signal?: AbortSignal,
+  sourceToken?: string,
+): Promise<ExecResult> {
+  return await postServerJson('/api/repo/push', { cwd, branch, sourceToken }, { signal })
 }
 
 export async function createRepositoryWorktree(
@@ -298,8 +321,9 @@ export async function createRepositoryWorktree(
   newBranch: string,
   baseBranch: string,
   signal?: AbortSignal,
+  sourceToken?: string,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/create-worktree', { cwd, worktreePath, newBranch, baseBranch }, { signal })
+  return await postServerJson('/api/repo/create-worktree', { cwd, worktreePath, newBranch, baseBranch, sourceToken }, { signal })
 }
 
 export async function deleteRepositoryBranch(
@@ -307,10 +331,11 @@ export async function deleteRepositoryBranch(
   branch: string,
   options?: { force?: boolean; alsoDeleteUpstream?: boolean },
   signal?: AbortSignal,
+  sourceToken?: string,
 ): Promise<ExecResult> {
   return await postServerJson(
     '/api/repo/delete-branch',
-    { cwd, branch, force: options?.force, alsoDeleteUpstream: options?.alsoDeleteUpstream },
+    { cwd, branch, force: options?.force, alsoDeleteUpstream: options?.alsoDeleteUpstream, sourceToken },
     { signal },
   )
 }
@@ -325,8 +350,9 @@ export async function removeRepositoryWorktree(
     alsoDeleteUpstream?: boolean
   },
   signal?: AbortSignal,
+  sourceToken?: string,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/remove-worktree', { cwd, ...options }, { signal })
+  return await postServerJson('/api/repo/remove-worktree', { cwd, ...options, sourceToken }, { signal })
 }
 
 export async function getRepositoryPatch(cwd: string, worktreePath: string, signal?: AbortSignal): Promise<ExecResult> {

@@ -386,7 +386,7 @@ describe('remote fetch timestamps', () => {
 })
 
 describe('core refresh request ordering', () => {
-  test('refreshAll refreshes snapshot and status', async () => {
+  test('refreshCoreData refreshes snapshot and status', async () => {
     const token = seedRepo([branch('old')])
     const calls: string[] = []
     rpcHandlers['repo.snapshot'] = async () => {
@@ -398,12 +398,12 @@ describe('core refresh request ordering', () => {
       return []
     }
 
-    await useReposStore.getState().refreshAll(REPO_ID, { token })
+    await useReposStore.getState().refreshCoreData(REPO_ID, { token })
 
     expect(calls).toEqual(['snapshot', 'status'])
   })
 
-  test('refreshAll stops after snapshot when the repo is reopened', async () => {
+  test('refreshCoreData stops after snapshot when the repo is reopened', async () => {
     const token = seedRepo([branch('old')], 1)
     let statusCalls = 0
     rpcHandlers['repo.snapshot'] = async () => {
@@ -415,7 +415,7 @@ describe('core refresh request ordering', () => {
       return []
     }
 
-    await useReposStore.getState().refreshAll(REPO_ID, { token })
+    await useReposStore.getState().refreshCoreData(REPO_ID, { token })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.instanceToken).toBe(2)
@@ -423,7 +423,7 @@ describe('core refresh request ordering', () => {
     expect(statusCalls).toBe(0)
   })
 
-  test('refreshAll marks deleted or non-git paths unavailable and skips follow-up reads', async () => {
+  test('refreshCoreData marks deleted or non-git paths unavailable and skips follow-up reads', async () => {
     const token = seedRepo([branch('main')])
     let statusCalls = 0
     rpcHandlers['repo.snapshot'] = async () => {
@@ -434,7 +434,7 @@ describe('core refresh request ordering', () => {
       return []
     }
 
-    await useReposStore.getState().refreshAll(REPO_ID, { token })
+    await useReposStore.getState().refreshCoreData(REPO_ID, { token })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.availability).toMatchObject({ phase: 'unavailable', reason: 'error.not-git-repo' })
@@ -457,7 +457,7 @@ describe('core refresh request ordering', () => {
     expect(repo?.resources.snapshot.error).toBeNull()
   })
 
-  test('refreshAll stops after status when the repo is reopened', async () => {
+  test('refreshCoreData stops after status when the repo is reopened', async () => {
     const token = seedRepo([branch('main')], 1)
     rpcHandlers['repo.snapshot'] = async () => ({ branches: [branch('main')], current: 'main' })
     rpcHandlers['repo.status'] = async () => {
@@ -465,7 +465,7 @@ describe('core refresh request ordering', () => {
       return []
     }
 
-    await useReposStore.getState().refreshAll(REPO_ID, { token })
+    await useReposStore.getState().refreshCoreData(REPO_ID, { token })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.instanceToken).toBe(2)

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { backgroundSyncRepoIdsFromStore } from '#/web/hooks/background-sync.ts'
+import { backgroundSyncRepoIdsFromStore } from '#/web/hooks/useBackgroundFetch.ts'
 import type { RepoState, ReposStore } from '#/web/stores/repos/types.ts'
 
 describe('backgroundSyncRepoIdsFromStore', () => {
@@ -69,6 +69,15 @@ function createRepo(input: {
     },
     operations: {
       fetch: { operationId: 0, phase: 'idle', reason: null, target: null, startedAt: null, settledAt: null, error: null },
+      manualRefresh: {
+        operationId: 0,
+        phase: 'idle',
+        reason: null,
+        target: null,
+        startedAt: null,
+        settledAt: null,
+        error: null,
+      },
       snapshot: {
         operationId: 0,
         phase: 'idle',

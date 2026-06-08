@@ -36,7 +36,7 @@ export function getRepoActivity(repo: RepoState): RepoActivity | null {
 }
 
 export function isRepoPrimaryRefreshBusy(repo: RepoState): boolean {
-  return repoOperationBusy(repo.id, 'fetch')
+  return repoOperationBusy(repo.id, 'manualRefresh') || repoOperationBusy(repo.id, 'fetch')
 }
 
 export function getRepoActivityControlView(input: {

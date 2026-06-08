@@ -117,6 +117,50 @@ button,
   }
 }
 
+@keyframes skeleton-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@layer utilities {
+  .skeleton-shimmer,
+  .skeleton-shimmer-strong {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .skeleton-shimmer {
+    background: var(--color-muted);
+  }
+
+  .skeleton-shimmer::after,
+  .skeleton-shimmer-strong::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in srgb, var(--skeleton-shimmer-base, var(--color-muted)) 70%, var(--color-foreground)) 50%,
+      transparent 100%
+    );
+    transform: translateX(-100%);
+    animation: skeleton-shimmer 1.6s ease-in-out infinite;
+  }
+
+  .skeleton-shimmer-strong {
+    background: var(--color-accent);
+  }
+
+  .skeleton-shimmer-strong::after {
+    --skeleton-shimmer-base: var(--color-accent);
+  }
+}
+
 /* Inline keycap chip — used by the help overlay. Defined as plain CSS
  * (not @utility) so it's reachable even without Tailwind seeing every
  * call site. */

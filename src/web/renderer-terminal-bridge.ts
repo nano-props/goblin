@@ -1,4 +1,5 @@
 import { emitRendererLocalEvent } from '#/web/local-events.ts'
+import { resolveApiBaseUrl, resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
 import {
   normalizeTerminalRealtimeMessage,
   normalizeTerminalSessionSnapshot,
@@ -71,7 +72,7 @@ export function createServerTerminalBridge(options: {
 
   async function fetchTerminalJson<T>(path: string, body: object): Promise<T> {
     const server = options.getServerConfig()
-    const response = await fetch(new URL(path, server.url).toString(), {
+    const response = await fetch(new URL(path, resolveApiBaseUrl(server.url)).toString(), {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -293,7 +294,7 @@ export function createServerTerminalBridge(options: {
 
 export function createTerminalWebSocketUrl(baseUrl: string, secret: string, clientId: string, attachmentId: string): string {
   const httpUrl = new URL('/ws/terminal', baseUrl)
-  httpUrl.protocol = httpUrl.protocol === 'https:' ? 'wss:' : 'ws:'
+  httpUrl.protocol = resolveWebSocketProtocol()
   httpUrl.searchParams.set('token', secret)
   httpUrl.searchParams.set('clientId', clientId)
   httpUrl.searchParams.set('attachmentId', attachmentId)

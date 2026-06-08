@@ -390,10 +390,49 @@ describe('runBranchAction', () => {
 
     expect(result).toEqual({ ok: false, message: 'error.branch-action-wait-timeout' })
     expect(checkoutCalls).toBe(0)
+    expect(useReposStore.getState().repos[REPO_ID]?.events.at(-1)).toMatchObject({
+      kind: 'result',
+      result: { ok: false, message: 'error.branch-action-wait-timeout' },
+      action: {
+        kind: 'checkout',
+        branch: 'feature/a',
+      },
+    })
     expect(useReposStore.getState().repos[REPO_ID]?.operations.branchAction).toMatchObject({
       phase: 'idle',
       target: null,
     })
+  })
+
+  test('records network-op-in-progress results without triggering branch-action refresh follow-up', async () => {
+    let snapshotCalls = 0
+    let statusCalls = 0
+    installGoblinTestBridge({
+      'repo.pull': async () => ({ ok: false, message: 'error.network-op-in-progress' }),
+      'repo.snapshot': async () => {
+        snapshotCalls += 1
+        return { branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }
+      },
+      'repo.status': async () => {
+        statusCalls += 1
+        return []
+      },
+      'repo.pullRequests': async () => [],
+    })
+
+    const result = await useReposStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
+
+    expect(result).toEqual({ ok: false, message: 'error.network-op-in-progress' })
+    expect(useReposStore.getState().repos[REPO_ID]?.events.at(-1)).toMatchObject({
+      kind: 'result',
+      result: { ok: false, message: 'error.network-op-in-progress' },
+      action: {
+        kind: 'pull',
+        branch: 'feature/a',
+      },
+    })
+    expect(snapshotCalls).toBe(0)
+    expect(statusCalls).toBe(0)
   })
 
   test('clears operation phase after failed branch network actions', async () => {

@@ -22,7 +22,6 @@ import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 interface Props {
   repoId: string
   showActions?: boolean
-  variant?: 'list' | 'selected-strip'
 }
 
 type OpenActionMenu = { repoId: string; branch: string }
@@ -60,7 +59,7 @@ function branchListRepoEqual(a: BranchListRepo | undefined, b: BranchListRepo | 
   )
 }
 
-export function BranchList({ repoId, showActions = true, variant = 'list' }: Props) {
+export function BranchList({ repoId, showActions = true }: Props) {
   const t = useT()
   const setDetailCollapsed = useReposStore((s) => s.setDetailCollapsed)
   const navigation = useMainWindowNavigation()
@@ -119,8 +118,8 @@ export function BranchList({ repoId, showActions = true, variant = 'list' }: Pro
   // Keep the selected row in view as the user navigates with j/k.
   useEffect(() => {
     const selectedEl = selectedRef.current
-    if (selectedEl && variant === 'list') selectedEl.scrollIntoView({ block: 'nearest' })
-  }, [repo?.ui.selectedBranch, variant])
+    if (selectedEl) selectedEl.scrollIntoView({ block: 'nearest' })
+  }, [repo?.ui.selectedBranch])
 
   if (!repo) return null
 
@@ -129,38 +128,26 @@ export function BranchList({ repoId, showActions = true, variant = 'list' }: Pro
     viewMode: repo.ui.branchViewMode,
     searchQuery: branchSearchQuery,
   })
-  const selectedBranch =
-    repo.ui.selectedBranch
-      ? (branches.find((branch) => branch.name === repo.ui.selectedBranch) ??
-        repo.data.branches.find((branch) => branch.name === repo.ui.selectedBranch))
-      : null
-  const renderedBranches = variant === 'selected-strip' ? (selectedBranch ? [selectedBranch] : []) : branches
-
   useEffect(() => {
     if (!openActionMenu) return
-    if (
-      openActionMenu.repoId !== repoId ||
-      !showActions ||
-      !renderedBranches.some((branch) => branch.name === openActionMenu.branch)
-    ) {
+    if (openActionMenu.repoId !== repoId || !showActions || !branches.some((branch) => branch.name === openActionMenu.branch)) {
       setOpenActionMenu(null)
     }
-  }, [openActionMenu, renderedBranches, repoId, showActions])
+  }, [openActionMenu, branches, repoId, showActions])
 
-  if (renderedBranches.length === 0) {
+  if (branches.length === 0) {
     return <EmptyState title={t(repo.data.branches.length === 0 ? 'branches.empty' : 'branches.filter-empty')} />
   }
 
   const list = (
     <ul>
-      {renderedBranches.map((branch) => {
+      {branches.map((branch) => {
         return (
           <BranchRow
             key={branch.name}
             repo={repo}
             branch={branch}
             selected={repo.ui.selectedBranch}
-            current={repo.data.currentBranch}
             onSelectBranch={handleSelectBranch}
             onOpenBranchStatus={handleOpenBranchStatus}
             selectedRef={selectedRef}
@@ -180,13 +167,6 @@ export function BranchList({ repoId, showActions = true, variant = 'list' }: Pro
       })}
     </ul>
   )
-
-  if (variant === 'selected-strip')
-    return (
-      <div className="shrink-0 overflow-hidden" role="region" aria-label={t('branches.selected')} aria-live="polite">
-        {list}
-      </div>
-    )
 
   return <ScrollArea className="min-h-0 flex-1">{list}</ScrollArea>
 }

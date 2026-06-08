@@ -26,14 +26,7 @@ describe('RepoActivityControl', () => {
   test('keeps the primary refresh button idle during contextual status refreshes', () => {
     resetReposStore()
     seedRepoState({ id: REPO_ID })
-    useReposStore.setState((state) => {
-      const repo = state.repos[REPO_ID]
-      if (!repo) return state
-      repo.resources.status.phase = 'refreshing'
-      repo.operations.status.phase = 'running'
-      repo.operations.status.reason = 'status'
-      return { repos: { ...state.repos, [REPO_ID]: { ...repo } } }
-    })
+    markRepoOperationTargets(REPO_ID, nextRepoOperationId(REPO_ID), [{ key: 'status', reason: 'status' }], 'running')
 
     const repo = useReposStore.getState().repos[REPO_ID]!
     expect(isRepoPrimaryRefreshBusy(repo)).toBe(false)
@@ -49,7 +42,12 @@ describe('RepoActivityControl', () => {
   test('marks the primary refresh button busy during manual refreshes', () => {
     resetReposStore()
     seedRepoState({ id: REPO_ID })
-    markRepoOperationTargets(REPO_ID, nextRepoOperationId(REPO_ID), [{ key: 'fetch', reason: 'user-fetch' }], 'running')
+    markRepoOperationTargets(
+      REPO_ID,
+      nextRepoOperationId(REPO_ID),
+      [{ key: 'manualRefresh', reason: 'manual-refresh' }],
+      'running',
+    )
 
     const repo = useReposStore.getState().repos[REPO_ID]!
     expect(isRepoPrimaryRefreshBusy(repo)).toBe(true)

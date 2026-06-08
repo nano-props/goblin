@@ -25,7 +25,9 @@ describe('repo lifecycle', () => {
     expect(useReposStore.getState().activeId).toBe(REPO_A)
     expect(calls.recent).toEqual([{ kind: 'local', id: REPO_A }])
     expect(calls.snapshot).toEqual([REPO_A])
-    expect(calls.status).toEqual([REPO_A])
+    await vi.waitFor(() => {
+      expect(calls.status).toEqual([REPO_A])
+    })
   })
 
   test('ensureWorkspaceOpen adds a repo to the open set without changing the active selection', async () => {
@@ -39,7 +41,9 @@ describe('repo lifecycle', () => {
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().activeId).toBe(REPO_A)
     expect(calls.snapshot).toEqual([REPO_A, REPO_B])
-    expect(calls.status).toEqual([REPO_A, REPO_B])
+    await vi.waitFor(() => {
+      expect(calls.status).toEqual([REPO_A, REPO_B])
+    })
   })
 
   test('ensureWorkspaceOpen opens without changing the active repo', async () => {
@@ -52,7 +56,9 @@ describe('repo lifecycle', () => {
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().activeId).toBe(REPO_A)
     expect(calls.snapshot).toEqual([REPO_A, REPO_B])
-    expect(calls.status).toEqual([REPO_A, REPO_B])
+    await vi.waitFor(() => {
+      expect(calls.status).toEqual([REPO_A, REPO_B])
+    })
   })
 
   test('ensureWorkspaceOpen still ensures the workspace is added to the open set', async () => {
@@ -80,7 +86,9 @@ describe('repo lifecycle', () => {
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().activeId).toBe(REPO_A)
     expect(calls.snapshot).toEqual([REPO_A, REPO_B, REPO_A])
-    expect(calls.status).toEqual([REPO_A, REPO_B, REPO_A])
+    await vi.waitFor(() => {
+      expect(calls.status).toEqual([REPO_A, REPO_B, REPO_A])
+    })
   })
   test('initial refresh results from a closed repo instance do not overwrite a reopened repo', async () => {
     const snapshotResolvers: Array<(value: { branches: BranchSnapshotInfo[]; current: string }) => void> = []

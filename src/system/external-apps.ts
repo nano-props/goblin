@@ -1,6 +1,6 @@
 import type { EditorAppState, EditorPref, TerminalAppState, TerminalPref } from '#/shared/rpc.ts'
 import { getEditorAppAvailability, resolveEditorApp } from '#/system/editors.ts'
-import { getTerminalActionAvailability, getTerminalAppAvailability, resolveTerminalApp } from '#/system/terminals.ts'
+import { getTerminalAppAvailability, resolveTerminalApp } from '#/system/terminals.ts'
 
 export interface ExternalAppsProbe {
   terminals: TerminalAppState
@@ -21,7 +21,7 @@ export async function probeTerminalApps(
   detectedAt = nextDetectedAt(),
 ): Promise<TerminalAppState> {
   const appAvailability = await getTerminalAppAvailability(signal)
-  const resolved = resolveTerminalApp(pref, getTerminalActionAvailability())
+  const resolved = resolveTerminalApp(pref, appAvailability)
   return {
     pref,
     resolved,

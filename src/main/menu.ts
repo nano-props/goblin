@@ -170,12 +170,18 @@ function createFileMenu(state: AppMenuState): MenuItemConstructorOptions {
         click: () => send({ type: 'open-remote-repo-requested' }),
       },
       { label: t('menu.file.open-recent'), submenu: createRecentReposMenu(state.recentRepos) },
-      { label: t('menu.file.open-in-browser'), click: () => void openWebVersionFromMenu() },
-      { label: t('menu.file.open-data-folder'), click: () => void openDataFolder() },
-      // Close-window uses Electron's `role: 'close'` so it works even
-      // when the renderer is hung. The swap setting flips which shortcut
-      // closes the window vs. the tab. Default: ⌘W = close window,
-      // ⌘⇧W = close tab. Swapped: ⌘W = close tab, ⌘⇧W = close window.
+      separator(),
+      // Goblin intentionally treats the window as the primary workspace
+      // container. Keep the default mapping as ⌘W = close window and
+      // ⇧⌘W = close tab unless the user explicitly opts into swapped
+      // close shortcuts.
+      {
+        label: t('menu.file.close-tab'),
+        accelerator: accelerator(state, state.swapCloseShortcuts ? 'CmdOrCtrl+W' : 'CmdOrCtrl+Shift+W'),
+        click: () => send({ type: 'close-repo-requested' }),
+      },
+      // Close-window uses Electron's `role: 'close'` so it still works
+      // even if the renderer is hung.
       state.shortcutsDisabled
         ? { label: t('menu.file.close-window'), click: () => focusedRegisteredSurface()?.window.close() }
         : {
@@ -183,11 +189,9 @@ function createFileMenu(state: AppMenuState): MenuItemConstructorOptions {
             label: t('menu.file.close-window'),
             accelerator: state.swapCloseShortcuts ? 'CmdOrCtrl+Shift+W' : 'CmdOrCtrl+W',
           },
-      {
-        label: t('menu.file.close-tab'),
-        accelerator: accelerator(state, state.swapCloseShortcuts ? 'CmdOrCtrl+W' : 'CmdOrCtrl+Shift+W'),
-        click: () => send({ type: 'close-repo-requested' }),
-      },
+      separator(),
+      { label: t('menu.file.open-in-browser'), click: () => void openWebVersionFromMenu() },
+      { label: t('menu.file.open-data-folder'), click: () => void openDataFolder() },
       ...(state.isMac
         ? []
         : [
@@ -225,9 +229,14 @@ function createEditMenu(): MenuItemConstructorOptions {
   return {
     label: t('menu.edit'),
     submenu: [
+      { role: 'undo', label: t('menu.edit.undo') },
+      { role: 'redo', label: t('menu.edit.redo') },
+      separator(),
       { role: 'cut', label: t('menu.edit.cut') },
       { role: 'copy', label: t('menu.edit.copy') },
       { role: 'paste', label: t('menu.edit.paste') },
+      { role: 'pasteAndMatchStyle', label: t('menu.edit.paste-match-style') },
+      { role: 'delete', label: t('menu.edit.delete') },
       { role: 'selectAll', label: t('menu.edit.select-all') },
     ],
   }
@@ -263,9 +272,15 @@ function createViewMenu(state: AppMenuState): MenuItemConstructorOptions {
       separator(),
       {
         label: t('menu.view.refresh'),
-        accelerator: accelerator(state, 'CmdOrCtrl+R'),
+        accelerator: accelerator(state, 'CmdOrCtrl+U'),
         click: () => send({ type: 'repo-refresh-requested' }),
       },
+      {
+        label: t('menu.view.reload-page'),
+        accelerator: accelerator(state, 'CmdOrCtrl+R'),
+        click: () => focusedRegisteredSurface()?.window.webContents.reload(),
+      },
+      { role: 'togglefullscreen', label: t('menu.view.toggle-full-screen') },
       separator(),
       state.shortcutsDisabled
         ? {
@@ -285,6 +300,9 @@ function createWindowMenu(state: AppMenuState): MenuItemConstructorOptions {
   return {
     label: t('menu.window'),
     submenu: [
+      { role: 'minimize', label: t('menu.window.minimize') },
+      { role: 'zoom', label: t('menu.window.zoom') },
+      separator(),
       {
         label: t('menu.window.next-repo'),
         accelerator: accelerator(state, 'CmdOrCtrl+]'),
@@ -297,9 +315,6 @@ function createWindowMenu(state: AppMenuState): MenuItemConstructorOptions {
       },
       separator(),
       { label: t('menu.window.reset-layout'), click: () => send({ type: 'workspace-layout-reset-requested' }) },
-      separator(),
-      { role: 'minimize', label: t('menu.window.minimize') },
-      { role: 'zoom', label: t('menu.window.zoom') },
       ...(state.isMac ? [separator(), { role: 'front' as const, label: t('menu.window.front') }] : []),
     ],
   }

@@ -1,27 +1,30 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
+  handleRepoInvalidationRefresh,
   repoInvalidationRefreshDisposition,
-  recordBranchActionCoreRefreshSettled,
-  recordBranchActionCoreRefreshStart,
   resetRepoRefreshCoordinatorState,
   runRepoRefreshIntent,
 } from '#/web/stores/repos/refresh-coordinator.ts'
+import { beginRepoInvalidationSource, settleRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
 import type { ReposGet } from '#/web/stores/repos/types.ts'
 
 function callsGet() {
   const calls: string[] = []
   const get: ReposGet = () =>
     ({
+      repos: {
+        '/repo': {
+          id: '/repo',
+          instanceToken: 9,
+          availability: { phase: 'available' },
+        },
+      },
       syncAndRefresh: (id: string, options?: { token?: number }) => {
         calls.push(`manual:${id}:${options?.token ?? ''}`)
         return Promise.resolve()
       },
-      refreshSnapshot: (id: string, options?: { token?: number }) => {
-        calls.push(`snapshot:${id}:${options?.token ?? ''}`)
-        return Promise.resolve()
-      },
-      refreshStatus: (id: string, options?: { token?: number }) => {
-        calls.push(`status:${id}:${options?.token ?? ''}`)
+      refreshCoreData: (id: string, options?: { token?: number }) => {
+        calls.push(`core:${id}:${options?.token ?? ''}`)
         return Promise.resolve()
       },
       refreshPullRequests: (
@@ -32,7 +35,7 @@ function callsGet() {
         calls.push(`prs:${id}:${branches?.join(',') ?? ''}:${options?.mode ?? ''}:${options?.token ?? ''}`)
         return Promise.resolve()
       },
-    }) as ReturnType<ReposGet>
+    }) as unknown as ReturnType<ReposGet>
   return { calls, get }
 }
 
@@ -51,7 +54,7 @@ describe('repo refresh coordinator', () => {
 
     await runRepoRefreshIntent(get, { kind: 'core-data-changed', reason: 'initial-load', id: '/repo', token: 7 })
 
-    expect(calls).toEqual(['snapshot:/repo:7', 'status:/repo:7'])
+    expect(calls).toEqual(['core:/repo:7'])
   })
 
   test('routes manual refresh requests through syncAndRefresh', async () => {
@@ -62,12 +65,12 @@ describe('repo refresh coordinator', () => {
     expect(calls).toEqual(['manual:/repo:5'])
   })
 
-  test('runs invalidation refreshes through a single coordinated plan', async () => {
+  test('routes repo invalidation refreshes directly through the core refresh path', async () => {
     const { calls, get } = callsGet()
 
-    await runRepoRefreshIntent(get, { kind: 'core-data-changed', reason: 'repo-invalidated', id: '/repo', token: 9 })
+    await handleRepoInvalidationRefresh(get, { repoId: '/repo', query: 'repo-snapshot' }, 9)
 
-    expect(calls).toEqual(['snapshot:/repo:9', 'status:/repo:9'])
+    expect(calls).toEqual(['core:/repo:9'])
   })
 
   test('runs visible pull request refreshes only when a branch is visible', async () => {
@@ -89,50 +92,41 @@ describe('repo refresh coordinator', () => {
     expect(calls).toEqual(['prs:/repo:feature/a:full:3'])
   })
 
-  test('suppresses repo invalidation refreshes that immediately follow a settled branch-action refresh', () => {
+  test('suppresses repo invalidations from an active local source token', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
-    recordBranchActionCoreRefreshStart('/repo', 11)
-    const refreshedAt = Date.now() + 1
-    vi.setSystemTime(refreshedAt)
-    recordBranchActionCoreRefreshSettled('/repo', 11)
+    beginRepoInvalidationSource('repo_branch_1')
 
     expect(
-      repoInvalidationRefreshDisposition({
-        id: '/repo',
-        instanceToken: 11,
-        resources: {
-          snapshot: { loadedAt: refreshedAt, stale: false },
-          status: { loadedAt: refreshedAt, stale: false },
-        },
-      } as any),
+      repoInvalidationRefreshDisposition({ sourceToken: 'repo_branch_1' }),
     ).toBe('suppress')
   })
 
-  test('defers repo invalidation refreshes while the branch-action follow-up refresh is still running', () => {
+  test('suppresses repo invalidations from a recently settled local source token', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
-    recordBranchActionCoreRefreshStart('/repo', 12)
+    beginRepoInvalidationSource('repo_manual_1')
+    settleRepoInvalidationSource('repo_manual_1')
 
     expect(
-      repoInvalidationRefreshDisposition({
-        id: '/repo',
-        instanceToken: 12,
-        resources: {
-          snapshot: { loadedAt: null, stale: false },
-          status: { loadedAt: null, stale: false },
-        },
-      } as any),
-    ).toBe('defer')
+      repoInvalidationRefreshDisposition({ sourceToken: 'repo_manual_1' }),
+    ).toBe('suppress')
   })
 
-  test('settles branch-action invalidation tracking even when the coordinated core refresh throws', async () => {
+  test('refreshes repo invalidations from unrelated sources', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
+    beginRepoInvalidationSource('repo_manual_2')
+
+    expect(
+      repoInvalidationRefreshDisposition({ sourceToken: 'repo_manual_other' }),
+    ).toBe('refresh')
+  })
+
+  test('does not change invalidation behavior when the coordinated core refresh throws', async () => {
     const get: ReposGet = () =>
       ({
-        refreshSnapshot: () => Promise.reject(new Error('boom')),
-        refreshStatus: () => Promise.resolve(),
+        refreshCoreData: () => Promise.reject(new Error('boom')),
       }) as unknown as ReturnType<ReposGet>
 
     await expect(
@@ -140,14 +134,7 @@ describe('repo refresh coordinator', () => {
     ).rejects.toThrow('boom')
 
     expect(
-      repoInvalidationRefreshDisposition({
-        id: '/repo',
-        instanceToken: 13,
-        resources: {
-          snapshot: { loadedAt: null, stale: false },
-          status: { loadedAt: null, stale: false },
-        },
-      } as any),
+      repoInvalidationRefreshDisposition({}),
     ).toBe('refresh')
   })
 })

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
-import { Check, Loader2, RotateCw } from 'lucide-react'
+import { Check, Loader2, RefreshCw } from 'lucide-react'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoEvent, RepoState } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
@@ -39,6 +39,7 @@ function repoActivityControlRepoEqual(a: RepoState | undefined, b: RepoState | u
       a.instanceToken === b.instanceToken &&
       a.resources === b.resources &&
       a.operations.fetch === b.operations.fetch &&
+      a.operations.manualRefresh === b.operations.manualRefresh &&
       a.operations.branchAction === b.operations.branchAction &&
       a.availability === b.availability &&
       a.cache === b.cache &&
@@ -141,7 +142,7 @@ function RepoRefreshButton({ repo, manualSyncBusy, compact }: { repo: RepoState;
       >
         {({ busy }) => (
           <>
-            <RotateCw className={busy ? 'animate-spin' : ''} />
+            <RefreshCw className={busy ? 'animate-spin' : ''} />
             {!compact && label}
           </>
         )}

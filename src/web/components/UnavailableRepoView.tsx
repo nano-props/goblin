@@ -1,4 +1,4 @@
-import { AlertCircle, RotateCw, Shield, X } from 'lucide-react'
+import { AlertCircle, RefreshCw, Shield, X } from 'lucide-react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { PanelInset } from '#/web/components/ui/panel.tsx'
@@ -53,7 +53,7 @@ export function UnavailableRepoView({ repo }: Props) {
                   })
                 }
               >
-                <RotateCw />
+                <RefreshCw />
                 {t('repo-unavailable.retry')}
               </Button>
               {canOpenSshSettings && (

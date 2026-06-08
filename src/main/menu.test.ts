@@ -214,6 +214,18 @@ describe('app menu actions', () => {
     expect(remoteItem?.accelerator).toBe('CmdOrCtrl+Shift+R')
   })
 
+  test('keeps the intentional default close shortcut mapping', async () => {
+    const { buildAppMenu } = await import('#/main/menu.ts')
+
+    buildAppMenu()
+
+    const fileMenu = mocks.template.find((entry) => entry.label === 'menu.file')
+    const closeTabItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.close-tab')
+    const closeWindowItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.close-window')
+    expect(closeTabItem?.accelerator).toBe('CmdOrCtrl+Shift+W')
+    expect(closeWindowItem?.accelerator).toBe('CmdOrCtrl+W')
+  })
+
   test('wires the terminal primary action accelerator from the view menu', async () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
 
@@ -229,6 +241,42 @@ describe('app menu actions', () => {
     expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, {
       type: 'terminal-primary-action-requested',
     })
+  })
+
+  test('includes standard edit roles and full screen in the menu', async () => {
+    const { buildAppMenu } = await import('#/main/menu.ts')
+
+    buildAppMenu()
+
+    const editMenu = mocks.template.find((entry) => entry.label === 'menu.edit')
+    expect(editMenu?.submenu?.map((entry: any) => entry.label)).toEqual([
+      'menu.edit.undo',
+      'menu.edit.redo',
+      undefined,
+      'menu.edit.cut',
+      'menu.edit.copy',
+      'menu.edit.paste',
+      'menu.edit.paste-match-style',
+      'menu.edit.delete',
+      'menu.edit.select-all',
+    ])
+
+    const viewMenu = mocks.template.find((entry) => entry.label === 'menu.view')
+    const fullScreenItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.toggle-full-screen')
+    expect(fullScreenItem?.role).toBe('togglefullscreen')
+  })
+
+  test('puts native window management items before repo navigation', async () => {
+    const { buildAppMenu } = await import('#/main/menu.ts')
+
+    buildAppMenu()
+
+    const windowMenu = mocks.template.find((entry) => entry.label === 'menu.window')
+    expect(windowMenu?.submenu?.slice(0, 3).map((entry: any) => entry.label)).toEqual([
+      'menu.window.minimize',
+      'menu.window.zoom',
+      undefined,
+    ])
   })
 
   test('clears recent repos through the server-backed path and OS recent documents', async () => {

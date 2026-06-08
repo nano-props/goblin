@@ -26,7 +26,9 @@ describe('repo session hydration', () => {
     expect(useReposStore.getState().sessionReady).toBe(true)
     expect(calls.recent).toEqual([])
     expect(calls.snapshot).toEqual([REPO_A, REPO_B])
-    expect(calls.status).toEqual([REPO_A, REPO_B])
+    await vi.waitFor(() => {
+      expect(calls.status).toEqual([REPO_A, REPO_B])
+    })
   })
 
   test('hydrateSession uses cached repo data while the initial refresh runs', async () => {

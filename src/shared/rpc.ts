@@ -28,6 +28,12 @@ import type { RepoQueryInvalidationEvent } from '#/shared/repo-query-invalidatio
 export type { WorkspaceLayout } from '#/shared/workspace-layout.ts'
 export type { SettingsPage } from '#/shared/settings-pages.ts'
 
+export interface LanInfo {
+  host: string
+  port: number
+  lanUrls: string[]
+}
+
 export type ThemePref = 'auto' | 'light' | 'dark'
 export type ResolvedTheme = 'light' | 'dark'
 export type LangPref = 'auto' | 'en' | 'zh' | 'ko' | 'ja'
@@ -71,6 +77,7 @@ export interface SettingsPrefs {
   globalShortcut: string
   terminalApp: TerminalPref
   editorApp: EditorPref
+  lanEnabled: boolean
 }
 
 export interface SettingsSnapshot extends Omit<SettingsPrefs, 'lang'> {

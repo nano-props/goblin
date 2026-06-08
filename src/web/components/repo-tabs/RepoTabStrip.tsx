@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import { ChevronDown, Download, FolderOpen, Plus, Server } from 'lucide-react'
 import {
   DndContext,
@@ -26,7 +26,7 @@ import { RepoTab } from '#/web/components/repo-tabs/RepoTab.tsx'
 import { RepoTabTooltipLayer } from '#/web/components/repo-tabs/RepoTabTooltipLayer.tsx'
 import type { RepoTabStripLabels, RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
 function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min, max))
+  return Math.min(Math.max(value, min), max)
 }
 
 const restrictToVisibleTabStrip: Modifier = ({
@@ -70,6 +70,26 @@ interface RepoTabStripProps {
   onOpenLocal: () => void
   onOpenRemote: () => void
   onClone: () => void
+}
+
+function RepoTabEdgeAction({
+  children,
+  showSeparator = false,
+}: {
+  children: ReactNode
+  showSeparator?: boolean
+}) {
+  return (
+    <div className="relative flex h-8 shrink-0 items-center pl-1">
+      {showSeparator && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute left-0 top-1/2 h-4 -translate-y-1/2 border-l border-separator"
+        />
+      )}
+      {children}
+    </div>
+  )
 }
 
 export function RepoTabStrip({
@@ -131,15 +151,11 @@ export function RepoTabStrip({
   const visibleRepos = isSmallScreen ? (activeRepo ? [activeRepo] : repos.slice(0, 1)) : repos
   const visibleIds = new Set(visibleRepos.map((r) => r.id))
   const overflowRepos = isSmallScreen ? repos.filter((r) => !visibleIds.has(r.id)) : []
+  const lastVisibleRepo = visibleRepos[visibleRepos.length - 1]
+  const showMoreSeparator = !!lastVisibleRepo && lastVisibleRepo.id !== activeId && lastVisibleRepo.id !== hoveredId
 
   const openMenu = (
-    <div className="relative flex h-8 shrink-0 items-center pl-1">
-      {showOpenSeparator && (
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute left-0 top-1/2 h-4 -translate-y-1/2 border-l border-separator"
-        />
-      )}
+    <RepoTabEdgeAction showSeparator={showOpenSeparator}>
       <DropdownMenu>
         <Tip label={labels.open}>
           <DropdownMenuTrigger asChild>
@@ -166,7 +182,7 @@ export function RepoTabStrip({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-    </div>
+    </RepoTabEdgeAction>
   )
 
   return (
@@ -178,58 +194,62 @@ export function RepoTabStrip({
           ) : (
             <>
               {isSmallScreen ? (
-                <RepoTabTooltipLayer repos={visibleRepos} className="flex h-full items-center gap-1" role="tablist">
-                  {visibleRepos.map((repo) => (
-                    <RepoTab
-                      key={repo.id}
-                      repo={repo}
-                      isActive={repo.id === activeId}
-                      showSeparator={false}
-                      onHoverChange={setHoveredId}
-                      onActivate={onActivate}
-                      onClose={onClose}
-                      onKeyboardNavigate={handleKeyboardNavigate}
-                      closeLabel={labels.close}
-                      unavailableLabel={labels.unavailable}
-                    />
-                  ))}
-                  <DropdownMenu>
-                    <Tip label={labels.more}>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="size-8 shrink-0" aria-label={labels.more}>
-                          <ChevronDown />
-                        </Button>
-                      </DropdownMenuTrigger>
-                    </Tip>
-                    <DropdownMenuContent side="bottom" align="start" className="w-max">
-                      {overflowRepos.map((repo) => (
-                        <DropdownMenuItem
-                          key={repo.id}
-                          className="whitespace-nowrap"
-                          onSelect={() => onActivate(repo.id)}
-                        >
-                          <span className="truncate">{repo.name}</span>
+                <div className="flex h-full items-center gap-1">
+                  <RepoTabTooltipLayer repos={visibleRepos} className="flex h-full items-center gap-1" role="tablist">
+                    {visibleRepos.map((repo) => (
+                      <RepoTab
+                        key={repo.id}
+                        repo={repo}
+                        isActive={repo.id === activeId}
+                        showSeparator={false}
+                        onHoverChange={setHoveredId}
+                        onActivate={onActivate}
+                        onClose={onClose}
+                        onKeyboardNavigate={handleKeyboardNavigate}
+                        closeLabel={labels.close}
+                        unavailableLabel={labels.unavailable}
+                      />
+                    ))}
+                  </RepoTabTooltipLayer>
+                  <RepoTabEdgeAction showSeparator={showMoreSeparator}>
+                    <DropdownMenu>
+                      <Tip label={labels.more}>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="size-8 shrink-0" aria-label={labels.more}>
+                            <ChevronDown />
+                          </Button>
+                        </DropdownMenuTrigger>
+                      </Tip>
+                      <DropdownMenuContent side="bottom" align="start" className="w-max">
+                        {overflowRepos.map((repo) => (
+                          <DropdownMenuItem
+                            key={repo.id}
+                            className="whitespace-nowrap"
+                            onSelect={() => onActivate(repo.id)}
+                          >
+                            <span className="truncate">{repo.name}</span>
+                          </DropdownMenuItem>
+                        ))}
+                        {overflowRepos.length > 0 && <DropdownMenuSeparator />}
+                        <DropdownMenuItem className="whitespace-nowrap" onSelect={onOpenLocal}>
+                          <FolderOpen />
+                          {labels.openLocal}
+                          {labels.openLocalShortcut && <DropdownMenuShortcut>{labels.openLocalShortcut}</DropdownMenuShortcut>}
                         </DropdownMenuItem>
-                      ))}
-                      {overflowRepos.length > 0 && <DropdownMenuSeparator />}
-                      <DropdownMenuItem className="whitespace-nowrap" onSelect={onOpenLocal}>
-                        <FolderOpen />
-                        {labels.openLocal}
-                        {labels.openLocalShortcut && <DropdownMenuShortcut>{labels.openLocalShortcut}</DropdownMenuShortcut>}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="whitespace-nowrap" onSelect={onOpenRemote}>
-                        <Server />
-                        {labels.openRemote}
-                        {labels.openRemoteShortcut && <DropdownMenuShortcut>{labels.openRemoteShortcut}</DropdownMenuShortcut>}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="whitespace-nowrap" onSelect={onClone}>
-                        <Download />
-                        {labels.clone}
-                        {labels.cloneShortcut && <DropdownMenuShortcut>{labels.cloneShortcut}</DropdownMenuShortcut>}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </RepoTabTooltipLayer>
+                        <DropdownMenuItem className="whitespace-nowrap" onSelect={onOpenRemote}>
+                          <Server />
+                          {labels.openRemote}
+                          {labels.openRemoteShortcut && <DropdownMenuShortcut>{labels.openRemoteShortcut}</DropdownMenuShortcut>}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="whitespace-nowrap" onSelect={onClone}>
+                          <Download />
+                          {labels.clone}
+                          {labels.cloneShortcut && <DropdownMenuShortcut>{labels.cloneShortcut}</DropdownMenuShortcut>}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </RepoTabEdgeAction>
+                </div>
               ) : (
                 <RepoTabTooltipLayer repos={repos} className="flex h-full items-center gap-1" role="tablist">
                   <DndContext

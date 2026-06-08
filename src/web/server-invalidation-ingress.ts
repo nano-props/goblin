@@ -1,6 +1,7 @@
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
 import { isServerInvalidationEvent, type ServerInvalidationEvent } from '#/shared/server-invalidation.ts'
 import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'
+import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
 
 type Listener = (event: ServerInvalidationEvent) => void
 // Shared server-owned invalidation ingress for browser and Electron renderers.
@@ -17,7 +18,7 @@ const INVALIDATION_RECONNECT_DELAY_MS = 300
 
 function createInvalidationWebSocketUrl(baseUrl: string, secret: string): string {
   const httpUrl = new URL('/ws/invalidation', baseUrl)
-  httpUrl.protocol = httpUrl.protocol === 'https:' ? 'wss:' : 'ws:'
+  httpUrl.protocol = resolveWebSocketProtocol()
   httpUrl.searchParams.set('token', secret)
   return httpUrl.toString()
 }
