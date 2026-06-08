@@ -1,5 +1,4 @@
 import { type ComponentType } from 'react'
-import { useMutation } from '@tanstack/react-query'
 import { RotateCw } from 'lucide-react'
 import { Badge } from '#/web/components/ui/badge.tsx'
 import { Button } from '#/web/components/ui/button.tsx'

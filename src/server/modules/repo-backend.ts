@@ -17,7 +17,7 @@ import { fetchAll, getBrowserRemoteUrl, getRemoteInfo, pickPreferredRemote, pull
 import { getWorkingStatus } from '#/system/git/status.ts'
 import { createWorktree, getWorktrees, removeWorktree } from '#/system/git/worktrees.ts'
 import { getWorktreePatch } from '#/system/git/patch.ts'
-import { type ExecResult, type PullRequestFetchMode, type PullRequestInfo, type WorktreeInfo, type WorktreeStatus } from '#/shared/git-types.ts'
+import { type ExecResult, type PullRequestFetchMode, type PullRequestInfo, type WorktreeStatus } from '#/shared/git-types.ts'
 import { resolveKnownWorktree, resolveRemovableWorktree } from '#/shared/worktree-guards.ts'
 import { isValidCwd } from '#/shared/input-validation.ts'
 import { validateBranchDeletionPolicy, validateCreateWorktreeInput, validateRemovableWorktreeState } from '#/shared/repo-action-policy.ts'

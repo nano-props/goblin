@@ -5,7 +5,6 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { TerminalSwitcherTooltipLayer } from '#/web/components/terminal/TerminalSwitcherTooltipLayer.tsx'
 import { useT } from '#/web/stores/i18n.ts'
-import { cn } from '#/web/lib/cn.ts'
 import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
 interface TerminalSwitcherProps {
   worktreeTerminalKey: string

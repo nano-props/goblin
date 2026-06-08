@@ -45,7 +45,6 @@ import {
 } from '#/web/app-data-client.ts'
 import { branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import type { RepoOperationReason, RepoPullRequestReason } from '#/web/stores/repos/operations.ts'
-import type { RepoState } from '#/web/stores/repos/types.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 import type { ExecResult, PullRequestFetchMode, PullRequestInfo } from '#/web/types.ts'
 function mergePullRequest(

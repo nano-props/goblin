@@ -1,6 +1,5 @@
 import type { NativeRpcHandlers } from '#/shared/rpc.ts'
 import { isReservedGlobalShortcut, parseGlobalShortcut } from '#/shared/accelerator.ts'
-import { DEFAULT_GLOBAL_SHORTCUT } from '#/shared/settings-defaults.ts'
 import { getSettingsPrefs, updateSettingsPrefs } from '#/main/settings-server-client.ts'
 import { applyNativeHostShellProjection, broadcastNativeHostGlobalShortcutState } from '#/main/native-host-settings-effects.ts'
 import { isGlobalShortcutRegistered, replaceGlobalShortcut } from '#/main/shortcuts.ts'
