@@ -252,9 +252,10 @@ describe('remote fetch timestamps', () => {
       REPO_ID,
       {
         kind: 'createWorktree',
-        worktreePath: '/tmp/worktrees/feature-a',
-        newBranch: 'feature/a',
-        baseBranch: 'main',
+        input: {
+          worktreePath: '/tmp/worktrees/feature-a',
+          mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+        },
       },
       { token, refreshOnError: false },
     )
@@ -279,9 +280,10 @@ describe('remote fetch timestamps', () => {
       REPO_ID,
       {
         kind: 'createWorktree',
-        worktreePath: '/tmp/worktrees/feature-a',
-        newBranch: 'feature/a',
-        baseBranch: 'main',
+        input: {
+          worktreePath: '/tmp/worktrees/feature-a',
+          mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+        },
       },
       { token, refreshOnError: false },
     )

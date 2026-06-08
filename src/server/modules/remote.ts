@@ -1,14 +1,19 @@
 import { runRemoteCommand } from '#/system/ssh/commands.ts'
+import { openRemoteInPreferredEditor } from '#/system/editors.ts'
 import { testRemoteRepository } from '#/system/ssh/diagnostics.ts'
 import {
   listSshConfigHosts,
   resolveRemoteTarget as resolveSshRemoteTarget,
   resolveTrackedRemoteTarget,
 } from '#/system/ssh/config.ts'
+import { getServerSettingsPrefs } from '#/server/modules/settings-source.ts'
 import {
+  isAbsoluteRemotePath,
   isHomeRelativeRemotePath,
+  isRemoteRepoId,
   isResolvableRemotePathInput,
   normalizeRemoteTarget,
+  parseRemoteRepoId,
   type RemoteConnectionInput,
   type RemoteDiagnosticsResult,
   type RemotePathSuggestionsInput,
@@ -16,6 +21,7 @@ import {
   type ResolvedRemoteTarget,
   type SshConfigHostsResult,
 } from '#/shared/remote-repo.ts'
+import type { ExecResult } from '#/shared/git-types.ts'
 
 async function resolveRemoteHomeDirectory(target: RemoteRepoTarget, signal?: AbortSignal): Promise<string> {
   const homeResult = await runRemoteCommand(target, { type: 'printHome' }, { signal })
@@ -117,4 +123,25 @@ export async function testServerRemoteRepository(
       ],
     }
   }
+}
+
+export async function openServerRemoteEditor(
+  input: { repoId: string; worktreePath: string },
+  signal?: AbortSignal,
+): Promise<ExecResult> {
+  if (!isRemoteRepoId(input.repoId) || !isAbsoluteRemotePath(input.worktreePath)) {
+    return { ok: false, message: 'error.invalid-arguments' }
+  }
+  const ref = parseRemoteRepoId(input.repoId)
+  if (!ref) return { ok: false, message: 'error.invalid-arguments' }
+
+  let resolved: ResolvedRemoteTarget
+  try {
+    resolved = await resolveSshRemoteTarget(ref, signal)
+  } catch {
+    return { ok: false, message: 'error.ssh-config-changed' }
+  }
+
+  const prefs = await getServerSettingsPrefs()
+  return await openRemoteInPreferredEditor(resolved.target.alias, input.worktreePath, prefs.editorApp)
 }

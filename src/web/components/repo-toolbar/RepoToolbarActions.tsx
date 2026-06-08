@@ -74,9 +74,7 @@ function CreateWorktreeAction({ repoId, compact }: Props & { compact: boolean })
       targetRepoId,
       {
         kind: 'createWorktree',
-        worktreePath: request.worktreePath,
-        newBranch: request.newBranch,
-        baseBranch: request.baseBranch,
+        input: request.input,
       },
       { token, refreshOnError: false },
     )

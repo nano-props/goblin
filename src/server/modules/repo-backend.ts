@@ -13,6 +13,7 @@ import {
   isGitRepo,
 } from '#/system/git/branches.ts'
 import { fetchAll, getBrowserRemoteUrl, getRemoteInfo, pickPreferredRemote, pullBranch, pushBranch } from '#/system/git/remote.ts'
+import { getRemoteTrackingBranches as getLocalRemoteTrackingBranches } from '#/system/git/remote-refs.ts'
 import { getWorkingStatus } from '#/system/git/status.ts'
 import { createWorktree, getWorktrees, removeWorktree } from '#/system/git/worktrees.ts'
 import { getWorktreePatch } from '#/system/git/patch.ts'
@@ -29,6 +30,7 @@ import {
   getRemotePatch,
   getRemoteSnapshot,
   getRemoteStatus,
+  getRemoteTrackingBranches as getSshRemoteTrackingBranches,
   pullRemoteBranch,
   pushRemoteBranch,
   removeRemoteWorktree,
@@ -44,6 +46,7 @@ import {
   type RepoSnapshot,
 } from '#/shared/rpc.ts'
 import type { ExecResult, PullRequestFetchMode, PullRequestInfo, WorktreeStatus } from '#/shared/git-types.ts'
+import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 
 type ProbeAvailability = { ok: true } | { ok: false; message: string }
 
@@ -57,11 +60,12 @@ export interface RepoBackend {
     branches?: string[],
     options?: { mode?: PullRequestFetchMode; signal?: AbortSignal },
   ): Promise<PullRequestEntry[] | null>
+  getRemoteBranches(signal?: AbortSignal): Promise<string[]>
   fetch(signal: AbortSignal): Promise<{ ok: boolean; message: string }>
   checkout(branch: string, signal?: AbortSignal): Promise<ExecResult>
   pull(branch: string, worktreePath?: string, signal?: AbortSignal): Promise<ExecResult>
   push(branch: string, signal?: AbortSignal): Promise<ExecResult>
-  createWorktree(worktreePath: string, newBranch: string, baseBranch: string, signal?: AbortSignal): Promise<ExecResult>
+  createWorktree(input: CreateWorktreeInput, signal?: AbortSignal): Promise<ExecResult>
   deleteBranch(
     branch: string,
     options?: { force?: boolean; alsoDeleteUpstream?: boolean },
@@ -175,6 +179,10 @@ function createLocalRepoBackend(repoId: string): RepoBackend {
       const prs = await getBranchPullRequests(repoId, branchSet, { mode: options?.mode, signal: options?.signal })
       return pullRequestEntries(prs)
     },
+    async getRemoteBranches(signal) {
+      if (!isValidCwd(repoId)) return []
+      return await getLocalRemoteTrackingBranches(repoId, signal)
+    },
     async fetch(signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
       const available = await probeGitRepository(repoId)
@@ -193,9 +201,9 @@ function createLocalRepoBackend(repoId: string): RepoBackend {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
       return await pushBranch(repoId, branch, signal)
     },
-    async createWorktree(worktreePath, newBranch, baseBranch, signal) {
+    async createWorktree(input, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
-      return await createWorktree(repoId, worktreePath, newBranch, baseBranch, signal)
+      return await createWorktree(repoId, input, signal)
     },
     async deleteBranch(branch, options, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
@@ -280,6 +288,9 @@ async function createRemoteRepoBackend(repoId: string): Promise<RepoBackend> {
       })
       return pullRequestEntries(prs)
     },
+    async getRemoteBranches(signal) {
+      return await getSshRemoteTrackingBranches(target, { signal })
+    },
     async fetch(signal) {
       return await fetchRemoteRepository(target, { signal })
     },
@@ -292,8 +303,8 @@ async function createRemoteRepoBackend(repoId: string): Promise<RepoBackend> {
     async push(branch, signal) {
       return await pushRemoteBranch(target, branch, { signal })
     },
-    async createWorktree(worktreePath, newBranch, baseBranch, signal) {
-      return await createRemoteWorktree(target, { worktreePath, newBranch, baseBranch, signal })
+    async createWorktree(input, signal) {
+      return await createRemoteWorktree(target, { ...input, signal })
     },
     async deleteBranch(branch, options, signal) {
       return await deleteRemoteBranch(target, { branch, force: options?.force, signal })

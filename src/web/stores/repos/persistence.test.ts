@@ -24,6 +24,7 @@ function cachedRepo(savedAt: number): CachedRepoState {
       selectedBranch: null,
       branchViewMode: 'all',
       detailTab: 'status',
+      worktreePathOrder: [],
     },
   }
 }
@@ -92,6 +93,19 @@ describe('normalizeRepoCache', () => {
       isLocked: true,
     })
   })
+
+  test('normalizes missing and invalid worktree path order to an empty array', () => {
+    const now = Date.now()
+    const missing = cachedRepo(now) as any
+    delete missing.ui.worktreePathOrder
+    const invalid = cachedRepo(now) as any
+    invalid.ui.worktreePathOrder = [123, '/tmp/worktree-a']
+
+    const normalized = normalizeRepoCache({ missing, invalid })
+
+    expect(normalized.missing?.ui.worktreePathOrder).toEqual([])
+    expect(normalized.invalid).toBeUndefined()
+  })
 })
 
 describe('persistRepoCache', () => {
@@ -141,6 +155,21 @@ describe('persistRepoCache', () => {
       isDirty: true,
       changeCount: 2,
     })
+  })
+
+  test('persists worktree path order in repo cache', () => {
+    const repo = seedRepoState({
+      id: '/repo',
+      instanceToken: 1,
+      branches: [createRepoBranch('main', { worktree: { path: '/repo' } })],
+      currentBranch: 'main',
+      selectedBranch: 'main',
+      worktreePathOrder: ['/repo'],
+    })
+
+    persistRepoCache(useReposStore.setState, repo, 1)
+
+    expect(useReposStore.getState().repoCache['/repo']?.ui.worktreePathOrder).toEqual(['/repo'])
   })
 })
 

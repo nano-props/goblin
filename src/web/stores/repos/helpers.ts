@@ -35,6 +35,7 @@ export function emptyRepo(id: string, name: string): RepoState {
       selectedBranch: null,
       branchViewMode: 'all',
       detailTab: 'status',
+      worktreePathOrder: [],
     },
     cache: {
       source: 'fresh',

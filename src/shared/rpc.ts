@@ -36,6 +36,7 @@ import type {
   SshConfigHostsResult,
 } from '#/shared/remote-repo.ts'
 import type { RepoQueryInvalidationEvent } from '#/shared/repo-query-invalidation.ts'
+import type { CreateWorktreeRpcInput } from '#/shared/worktree-create.ts'
 import {
   NativeShellProjectionSchema,
   type NativeShellProjection,
@@ -232,12 +233,8 @@ export interface AppRpcHandlers {
       forceDeleteBranch?: boolean
       alsoDeleteUpstream?: boolean
     }) => Promise<ExecResult>
-    createWorktree: (input: {
-      cwd: string
-      worktreePath: string
-      newBranch: string
-      baseBranch: string
-    }) => Promise<ExecResult>
+    createWorktree: (input: CreateWorktreeRpcInput) => Promise<ExecResult>
+    remoteBranches: (input: { cwd: string }) => Promise<string[]>
     pull: (input: { cwd: string; branch: string; worktreePath?: string }) => Promise<ExecResult>
     push: (input: { cwd: string; branch: string }) => Promise<ExecResult>
     fetch: (input: { cwd: string; kind?: NetworkOpKind }) => Promise<ExecResult>

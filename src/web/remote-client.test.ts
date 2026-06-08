@@ -75,4 +75,26 @@ describe('remote client web helpers', () => {
       }),
     ).resolves.toMatchObject({ ok: true })
   })
+
+  test('opens remote editors through embedded server in web host mode', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, message: '/srv/repo-feature' }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { openRemoteRepositoryEditor } = await import('#/web/app-data-client.ts')
+
+    await expect(openRemoteRepositoryEditor('ssh-config://prod/srv/repo', '/srv/repo-feature')).resolves.toEqual({
+      ok: true,
+      message: '/srv/repo-feature',
+    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:32100/api/remote/open-editor',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ 'x-goblin-internal-secret': 'secret' }),
+        body: JSON.stringify({ repoId: 'ssh-config://prod/srv/repo', worktreePath: '/srv/repo-feature' }),
+      }),
+    )
+  })
 })

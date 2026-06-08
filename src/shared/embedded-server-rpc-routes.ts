@@ -5,6 +5,7 @@ export const EMBEDDED_SERVER_RPC_ROUTES = {
   'repo.snapshot': { route: '/api/repo/snapshot', method: 'POST' },
   'repo.pullRequests': { route: '/api/repo/pull-requests', method: 'POST' },
   'repo.status': { route: '/api/repo/status', method: 'POST' },
+  'repo.remoteBranches': { route: '/api/repo/remote-branches', method: 'POST' },
   'repo.patch': { route: '/api/repo/patch', method: 'POST' },
   'repo.checkout': { route: '/api/repo/checkout', method: 'POST' },
   'repo.deleteBranch': { route: '/api/repo/delete-branch', method: 'POST' },

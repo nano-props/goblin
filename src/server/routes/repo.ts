@@ -10,6 +10,7 @@ import {
   getBackgroundSyncRepos,
   getRepositoryPatch,
   getRepositoryPullRequests,
+  getRepositoryRemoteBranches,
   getRepositorySnapshot,
   getRepositoryStatus,
   openRepositoryEditor,
@@ -47,6 +48,11 @@ export function createRepoRoutes() {
     const body = await c.req.json().catch(() => null)
     const cwd = typeof body?.cwd === 'string' ? body.cwd : ''
     return c.json(await jsonOr(() => getRepositoryStatus(cwd, c.req.raw.signal), [], 'status'))
+  })
+  app.post('/remote-branches', async (c) => {
+    const body = await c.req.json().catch(() => null)
+    const cwd = typeof body?.cwd === 'string' ? body.cwd : ''
+    return c.json(await jsonOr(() => getRepositoryRemoteBranches(cwd, c.req.raw.signal), [], 'remote-branches'))
   })
   app.post('/patch', async (c) => {
     const body = await c.req.json().catch(() => null)
@@ -109,10 +115,9 @@ export function createRepoRoutes() {
     const body = await c.req.json().catch(() => null)
     const cwd = typeof body?.cwd === 'string' ? body.cwd : ''
     const worktreePath = typeof body?.worktreePath === 'string' ? body.worktreePath : ''
-    const newBranch = typeof body?.newBranch === 'string' ? body.newBranch : ''
-    const baseBranch = typeof body?.baseBranch === 'string' ? body.baseBranch : ''
+    const input = { worktreePath, mode: body?.mode } as Parameters<typeof createRepositoryWorktree>[1]
     const sourceToken = typeof body?.sourceToken === 'string' ? body.sourceToken : undefined
-    return c.json(await jsonOr(() => createRepositoryWorktree(cwd, worktreePath, newBranch, baseBranch, c.req.raw.signal, sourceToken), { ok: false, message: 'error.failed-read-repo' }, 'create-worktree'))
+    return c.json(await jsonOr(() => createRepositoryWorktree(cwd, input, c.req.raw.signal, sourceToken), { ok: false, message: 'error.failed-read-repo' }, 'create-worktree'))
   })
   app.post('/delete-branch', async (c) => {
     const body = await c.req.json().catch(() => null)
