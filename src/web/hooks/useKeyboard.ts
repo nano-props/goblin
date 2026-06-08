@@ -16,12 +16,12 @@ import { visibleBranches } from '#/web/stores/repos/branch-view-mode.ts'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { adjacentDetailTab } from '#/web/lib/detail-tabs.ts'
 import { runBranchActionShortcut } from '#/web/keyboard/branch-action-shortcuts.ts'
+import { matchRendererKeyboardShortcut } from '#/shared/shortcut-definitions.ts'
 import { isTerminalFocused } from '#/web/terminal-focus.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import type { RepoState, ReposStore } from '#/web/stores/repos/types.ts'
 import { getRuntimeShortcutSettings } from '#/web/runtime-settings-hooks.ts'
 
-type BranchShortcutAction = 'pull' | 'push' | 'terminal' | 'editor' | 'remote'
 type MoveDirection = 1 | -1
 const INTERACTIVE_SHORTCUT_TARGET_SELECTOR =
   'button,a,input,textarea,select,[role="button"],[role="tab"],[role="menuitem"],[data-interactive]'
@@ -48,13 +48,6 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
 
 function activeElement(): HTMLElement | null {
   return document.activeElement instanceof HTMLElement ? document.activeElement : null
-}
-
-function branchShortcutAction(e: KeyboardEvent): BranchShortcutAction | null {
-  if (e.code === 'KeyP') return e.shiftKey ? 'push' : 'pull'
-  if (e.code === 'KeyG') return e.shiftKey ? 'remote' : 'terminal'
-  if (e.code === 'KeyV' && !e.shiftKey) return 'editor'
-  return null
 }
 
 function nextIndex(current: number, length: number, direction: MoveDirection): number {
@@ -119,8 +112,9 @@ export function useKeyboard({
       if (getRuntimeShortcutSettings().shortcutsDisabled) return
       const settingsOpen = isSettingsOpenRef.current()
       const workspaceShortcutsSuppressed = isWorkspaceShortcutSuppressedRef.current() || isShortcutBlockingLayerOpen()
+      const action = matchRendererKeyboardShortcut(e)
 
-      if (settingsOpen && e.key === 'Escape') {
+      if (settingsOpen && action === 'dismiss') {
         e.preventDefault()
         onExitSettingsRef.current()
         return
@@ -136,7 +130,7 @@ export function useKeyboard({
       const overlayOpen = workspaceShortcutsSuppressed
       const interactiveTarget = isInteractiveTarget(e.target)
 
-      if (e.key === 'Escape') {
+      if (action === 'dismiss') {
         if (overlayOpen) return
         const active = activeElement()
         if (!active || active === document.body || active === document.documentElement) return
@@ -147,48 +141,46 @@ export function useKeyboard({
 
       if (interactiveTarget) return
 
-      // `?` honours the overlay gate so it doesn't stack a second modal on top of Settings/Help. Modal owns Esc.
-      if (e.key === '?') {
-        if (overlayOpen) return
-        e.preventDefault()
-        onShowHelpRef.current()
-        return
-      }
-
-      const action = branchShortcutAction(e)
-      if (action) {
-        if (overlayOpen || !repo || !repo.ui.selectedBranch) return
-        e.preventDefault()
-        runBranchActionShortcut(action)
-        return
-      }
-
-      switch (e.key) {
-        case 'j':
-        case 'ArrowDown': {
+      switch (action) {
+        case 'show-help': {
+          if (overlayOpen) break
+          e.preventDefault()
+          onShowHelpRef.current()
+          break
+        }
+        case 'pull':
+        case 'push':
+        case 'terminal':
+        case 'editor':
+        case 'remote': {
+          if (overlayOpen || !repo || !repo.ui.selectedBranch) break
+          e.preventDefault()
+          runBranchActionShortcut(action)
+          break
+        }
+        case 'next-branch': {
           if (overlayOpen || !repo) break
           if (moveSelection(state, repo, 1, navigation)) e.preventDefault()
           break
         }
-        case 'k':
-        case 'ArrowUp': {
+        case 'prev-branch': {
           if (overlayOpen || !repo) break
           if (moveSelection(state, repo, -1, navigation)) e.preventDefault()
           break
         }
-        case 'ArrowRight':
-        case 'ArrowLeft': {
+        case 'next-detail-tab':
+        case 'prev-detail-tab': {
           if (overlayOpen || !repo || !repo.ui.selectedBranch || state.detailCollapsed) break
           e.preventDefault()
           const selected = repo.data.branches.find((branch) => branch.name === repo.ui.selectedBranch)
           // Global shortcuts do not own tab focus; a missing branch is treated as "no worktree".
           navigation.showRepoDetailTab(
             repo.id,
-            adjacentDetailTab(repo.ui.detailTab, e.key === 'ArrowRight' ? 1 : -1, !!selected?.worktree?.path),
+            adjacentDetailTab(repo.ui.detailTab, action === 'next-detail-tab' ? 1 : -1, !!selected?.worktree?.path),
           )
           break
         }
-        case 'Enter': {
+        case 'checkout-selected': {
           if (overlayOpen || !repo) break
           e.preventDefault()
           void state.checkoutSelectedInRepo(repo.id)

@@ -31,6 +31,14 @@ export interface BranchActionItemGroups {
   dialogs: ReactNode
 }
 
+export function visibleBranchActionItems({
+  patchItems,
+  mainItems,
+  destructiveItems,
+}: Pick<BranchActionItemGroups, 'patchItems' | 'mainItems' | 'destructiveItems'>): BranchActionItem[] {
+  return [...patchItems, ...mainItems, ...destructiveItems].filter((item) => item.visible)
+}
+
 export function branchBrowserRemoteProvider(
   repo: BranchActionRepo,
   branch: RepoBranchState,

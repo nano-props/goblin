@@ -11,6 +11,7 @@ import { BranchDetailToolbar } from '#/web/components/branch-detail/BranchDetail
 import { BranchDetailContent } from '#/web/components/branch-detail/BranchDetailContent.tsx'
 import { DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
+import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
 interface Props {
   repoId: string
   layout?: RepoWorkspaceLayout
@@ -156,6 +157,7 @@ function BranchDetailWithActions({
   layout,
 }: BranchDetailWithActionsProps) {
   const actions = useBranchActionItems(repo, branch)
+  useBranchActionShortcutRegistry(actions)
 
   return (
     <>

@@ -100,6 +100,30 @@ describe('BranchDetailToolbar', () => {
     expect(container?.querySelector('[data-testid="branch-detail-toolbar-divider"]')).not.toBeNull()
   })
 
+  test('does not show branch actions in the detail bar in top-bottom split mode', () => {
+    renderToolbar({
+      terminalCount: 0,
+      navigation: navigationWith({}),
+      branchActions: {
+        patchItems: [],
+        mainItems: [
+          {
+            id: 'pull',
+            label: 'Pull',
+            disabled: false,
+            visible: true,
+            icon: null,
+            onSelect: vi.fn(),
+          },
+        ],
+        destructiveItems: [],
+        dialogs: null,
+      },
+    })
+
+    expect(container?.querySelector('button[aria-label="action.menu"]')).toBeNull()
+  })
+
   test('does not show branch actions in the detail bar when focus preference is on but detail is collapsed', () => {
     renderToolbar({
       terminalCount: 0,

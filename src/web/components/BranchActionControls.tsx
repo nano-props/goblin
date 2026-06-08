@@ -1,10 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { AsyncButton } from '#/web/components/AsyncButton.tsx'
 import { BranchActionsDropdown } from '#/web/components/BranchActionsMenu.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
-import { type BranchActionItem, type BranchActionItemGroups } from '#/web/hooks/useBranchActionItems.ts'
-import { setBranchActionShortcutHandler } from '#/web/keyboard/branch-action-shortcuts.ts'
+import { type BranchActionItem, type BranchActionItemGroups, visibleBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
 import { cn } from '#/web/lib/cn.ts'
 type BranchActionControlsVariant = 'bar' | 'menu' | 'auto'
 
@@ -15,19 +14,7 @@ interface BranchActionControlsProps {
 
 export function BranchActionControls({ actions, variant = 'bar' }: BranchActionControlsProps) {
   const { patchItems, mainItems, destructiveItems } = actions
-  const visibleItems = [...patchItems, ...mainItems, ...destructiveItems].filter((item) => item.visible)
-  // Register the global shortcut once. The ref is reassigned on every render,
-  // including the latest item callbacks, so repo/branch changes don't stale the handler.
-  const visibleItemsRef = useRef(visibleItems)
-  visibleItemsRef.current = visibleItems
-
-  useEffect(() => {
-    return setBranchActionShortcutHandler((action) => {
-      const item = visibleItemsRef.current.find((item) => item.id === action)
-      if (!item || item.disabled) return
-      void item.onSelect()
-    })
-  }, [])
+  const visibleItems = visibleBranchActionItems(actions)
 
   if (variant === 'menu') {
     return <BranchActionsDropdown patchItems={patchItems} mainItems={mainItems} destructiveItems={destructiveItems} />
