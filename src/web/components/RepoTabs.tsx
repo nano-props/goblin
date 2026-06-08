@@ -11,33 +11,11 @@ import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { RepoTabStrip } from '#/web/components/repo-tabs/RepoTabStrip.tsx'
+import { repoTabSummariesEqual } from '#/web/components/repo-tabs/summary-equality.ts'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import type { RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
 import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
 import { useRuntimeShortcutSettings } from '#/web/runtime-settings-hooks.ts'
-
-/** Equality fn for the summaries array. Zustand's `useShallow` does
- *  Object.is on each element — but we re-create the inner objects
- *  every selector run, so refs always differ. Compare the relevant
- *  string fields explicitly so the tab strip only re-renders when the
- *  rendered text actually changes. */
-function summariesEqual(a: RepoTabSummary[], b: RepoTabSummary[]): boolean {
-  if (a === b) return true
-  if (a.length !== b.length) return false
-  for (let i = 0; i < a.length; i++) {
-    const x = a[i]!
-    const y = b[i]!
-    if (x.id !== y.id || x.name !== y.name || x.unavailable !== y.unavailable) return false
-    if (x.remoteTarget?.id !== y.remoteTarget?.id) return false
-    if (x.remoteDetails.length !== y.remoteDetails.length) return false
-    for (let j = 0; j < x.remoteDetails.length; j++) {
-      const xr = x.remoteDetails[j]!
-      const yr = y.remoteDetails[j]!
-      if (xr.name !== yr.name || xr.fetchUrl !== yr.fetchUrl || xr.pushUrl !== yr.pushUrl) return false
-    }
-  }
-  return true
-}
 
 interface RepoTabsProps {
   currentRepoId: string | null
@@ -73,7 +51,7 @@ export function RepoTabs({ currentRepoId, onOpenRepoPathDialog, onOpenRemote, on
             : null
         })
         .filter((x): x is RepoTabSummary => x !== null),
-    summariesEqual,
+    repoTabSummariesEqual,
   )
   const navigation = useMainWindowNavigation()
   const ensureWorkspaceOpen = useReposStore((s) => s.ensureWorkspaceOpen)

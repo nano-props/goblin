@@ -156,14 +156,14 @@ function BranchPager({
   return (
     <div className="flex items-center gap-1">
       <span
-        className="min-w-0 shrink-0 px-1 text-[11px] font-medium tabular-nums text-muted-foreground"
+        className="min-w-0 shrink-0 px-1 text-xs font-medium tabular-nums text-muted-foreground"
         aria-label={focusMode ? t('branches.selected') : undefined}
       >
         {current} / {branches.length}
       </span>
       <Button
         variant="ghost"
-        size="icon-sm"
+        size="icon"
         disabled={!previous}
         aria-label={t('help.row.prev-branch')}
         title={t('help.row.prev-branch')}
@@ -173,7 +173,7 @@ function BranchPager({
       </Button>
       <Button
         variant="ghost"
-        size="icon-sm"
+        size="icon"
         disabled={!next}
         aria-label={t('help.row.next-branch')}
         title={t('help.row.next-branch')}

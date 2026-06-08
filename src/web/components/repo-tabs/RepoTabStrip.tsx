@@ -26,7 +26,7 @@ import { RepoTab } from '#/web/components/repo-tabs/RepoTab.tsx'
 import { RepoTabTooltipLayer } from '#/web/components/repo-tabs/RepoTabTooltipLayer.tsx'
 import type { RepoTabStripLabels, RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
 function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min, max))
+  return Math.min(Math.max(value, min), max)
 }
 
 const restrictToVisibleTabStrip: Modifier = ({
@@ -194,21 +194,23 @@ export function RepoTabStrip({
           ) : (
             <>
               {isSmallScreen ? (
-                <RepoTabTooltipLayer repos={visibleRepos} className="flex h-full items-center gap-1" role="tablist">
-                  {visibleRepos.map((repo) => (
-                    <RepoTab
-                      key={repo.id}
-                      repo={repo}
-                      isActive={repo.id === activeId}
-                      showSeparator={false}
-                      onHoverChange={setHoveredId}
-                      onActivate={onActivate}
-                      onClose={onClose}
-                      onKeyboardNavigate={handleKeyboardNavigate}
-                      closeLabel={labels.close}
-                      unavailableLabel={labels.unavailable}
-                    />
-                  ))}
+                <div className="flex h-full items-center gap-1">
+                  <RepoTabTooltipLayer repos={visibleRepos} className="flex h-full items-center gap-1" role="tablist">
+                    {visibleRepos.map((repo) => (
+                      <RepoTab
+                        key={repo.id}
+                        repo={repo}
+                        isActive={repo.id === activeId}
+                        showSeparator={false}
+                        onHoverChange={setHoveredId}
+                        onActivate={onActivate}
+                        onClose={onClose}
+                        onKeyboardNavigate={handleKeyboardNavigate}
+                        closeLabel={labels.close}
+                        unavailableLabel={labels.unavailable}
+                      />
+                    ))}
+                  </RepoTabTooltipLayer>
                   <RepoTabEdgeAction showSeparator={showMoreSeparator}>
                     <DropdownMenu>
                       <Tip label={labels.more}>
@@ -247,7 +249,7 @@ export function RepoTabStrip({
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </RepoTabEdgeAction>
-                </RepoTabTooltipLayer>
+                </div>
               ) : (
                 <RepoTabTooltipLayer repos={repos} className="flex h-full items-center gap-1" role="tablist">
                   <DndContext
