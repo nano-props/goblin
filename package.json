@@ -40,7 +40,7 @@
     "@types/ws": "8.18.1",
     "@vitejs/plugin-react": "6.0.2",
     "electron": "42.3.3",
-    "electron-builder": "26.15.0",
+    "electron-builder": "26.15.2",
     "jsdom": "29.1.1",
     "prettier": "3.8.3",
     "tailwindcss": "4.3.0",
