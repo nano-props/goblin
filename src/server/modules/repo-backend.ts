@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { checkGitAvailable } from '#/system/git/helper.ts'
 import {
   checkoutBranch,
@@ -16,8 +17,10 @@ import { fetchAll, getBrowserRemoteUrl, getRemoteInfo, pickPreferredRemote, pull
 import { getWorkingStatus } from '#/system/git/status.ts'
 import { createWorktree, getWorktrees, removeWorktree } from '#/system/git/worktrees.ts'
 import { getWorktreePatch } from '#/system/git/patch.ts'
+import { type ExecResult, type PullRequestFetchMode, type PullRequestInfo, type WorktreeInfo, type WorktreeStatus } from '#/shared/git-types.ts'
 import { resolveKnownWorktree, resolveRemovableWorktree } from '#/shared/worktree-guards.ts'
 import { isValidCwd } from '#/shared/input-validation.ts'
+import { validateBranchDeletionPolicy, validateCreateWorktreeInput, validateRemovableWorktreeState } from '#/shared/repo-action-policy.ts'
 import { resolveRemoteTarget as resolveSshRemoteTarget } from '#/system/ssh/config.ts'
 import { testRemoteRepository } from '#/system/ssh/diagnostics.ts'
 import {
@@ -43,7 +46,6 @@ import {
   type RemoteRepoTarget,
   type RepoSnapshot,
 } from '#/shared/rpc.ts'
-import type { ExecResult, PullRequestFetchMode, PullRequestInfo, WorktreeStatus } from '#/shared/git-types.ts'
 
 type ProbeAvailability = { ok: true } | { ok: false; message: string }
 
@@ -125,6 +127,47 @@ async function probeGitRepository(cwd: string): Promise<ProbeAvailability> {
 
 function createLocalRepoBackend(repoId: string): RepoBackend {
   const capabilities: RepoBackendCapabilities = { pullRequests: 'cwd-github' }
+
+  async function validateBranchDeletion(
+    branch: string,
+    options?: { force?: boolean; notMergedMessage?: 'error.branch-not-fully-merged' | 'error.cannot-remove-unpushed-worktree' },
+    signal?: AbortSignal,
+    ignoredWorktreePath?: string,
+  ): Promise<ExecResult | null> {
+    const current = await getCurrentBranch(repoId, { signal })
+    const worktrees = await getWorktrees(repoId, { includeStatus: false, signal })
+    const ignoredPath = ignoredWorktreePath ? path.resolve(ignoredWorktreePath) : null
+    const isCheckedOutElsewhere = worktrees.some((wt) => {
+      if (wt.branch !== branch) return false
+      return ignoredPath ? path.resolve(wt.path) !== ignoredPath : true
+    })
+    const mergedToCurrent = !options?.force && current ? await isAncestor(repoId, branch, current, signal) : false
+    const upstream = !options?.force ? await getUpstream(repoId, branch, signal) : null
+    const mergedToUpstream = !options?.force && upstream ? await isAncestor(repoId, branch, upstream, signal) : false
+    return validateBranchDeletionPolicy({
+      branch,
+      currentBranch: current,
+      isCheckedOutElsewhere,
+      force: options?.force,
+      mergedToCurrent,
+      mergedToUpstream,
+      notMergedMessage: options?.notMergedMessage,
+    })
+  }
+
+  async function deleteBranchAfterValidation(
+    branch: string,
+    options?: { force?: boolean; alsoDeleteUpstream?: boolean },
+    signal?: AbortSignal,
+  ): Promise<ExecResult> {
+    const upstream = options?.alsoDeleteUpstream ? await getUpstream(repoId, branch, signal) : null
+    const deleted = await deleteBranch(repoId, branch, { force: options?.force, signal })
+    if (!deleted.ok || !upstream) return deleted
+    const slash = upstream.indexOf('/')
+    if (slash <= 0) return deleted
+    return await deleteUpstreamBranch(repoId, upstream.slice(0, slash), upstream.slice(slash + 1), signal)
+  }
+
   return {
     id: repoId,
     kind: 'local',
@@ -195,37 +238,35 @@ function createLocalRepoBackend(repoId: string): RepoBackend {
     },
     async createWorktree(worktreePath, newBranch, baseBranch, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
+      const invalid = validateCreateWorktreeInput(worktreePath, newBranch, baseBranch)
+      if (invalid) return invalid
       return await createWorktree(repoId, worktreePath, newBranch, baseBranch, signal)
     },
     async deleteBranch(branch, options, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
-      const current = await getCurrentBranch(repoId, { signal })
-      if (branch === current) return { ok: false, message: 'error.cannot-delete-current-branch' }
-      const worktrees = await getWorktrees(repoId, { includeStatus: false, signal })
-      if (worktrees.some((wt) => wt.branch === branch)) return { ok: false, message: 'error.cannot-delete-checked-out-branch' }
-      if (!options?.force) {
-        const defaultBranch = await getDefaultBranch(repoId, { signal })
-        const mergedToDefault = defaultBranch ? await isAncestor(repoId, branch, defaultBranch, signal) : false
-        const upstream = await getUpstream(repoId, branch, signal)
-        const mergedToUpstream = upstream ? await isAncestor(repoId, branch, upstream, signal) : false
-        if (!mergedToDefault && !mergedToUpstream) return { ok: false, message: 'error.branch-not-fully-merged' }
-      }
-      const upstream = options?.alsoDeleteUpstream ? await getUpstream(repoId, branch, signal) : null
-      const deleted = await deleteBranch(repoId, branch, { force: options?.force, signal })
-      if (!deleted.ok || !upstream) return deleted
-      const slash = upstream.indexOf('/')
-      if (slash <= 0) return deleted
-      return await deleteUpstreamBranch(repoId, upstream.slice(0, slash), upstream.slice(slash + 1), signal)
+      const validation = await validateBranchDeletion(branch, { force: options?.force }, signal)
+      if (validation) return validation
+      return await deleteBranchAfterValidation(branch, options, signal)
     },
     async removeWorktree(input, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
       const worktrees = await getWorktrees(repoId, { signal })
       const removable = resolveRemovableWorktree(worktrees, input.branch, input.worktreePath, repoId)
       if (!removable.ok) return { ok: false, message: removable.message }
-      if ((removable.target.changeCount ?? 0) > 0) return { ok: false, message: 'error.cannot-remove-dirty-worktree' }
+      const invalid = validateRemovableWorktreeState(removable.target)
+      if (invalid) return invalid
+      if (input.alsoDeleteBranch) {
+        const validation = await validateBranchDeletion(
+          input.branch,
+          { force: input.forceDeleteBranch, notMergedMessage: 'error.cannot-remove-unpushed-worktree' },
+          signal,
+          removable.target.path,
+        )
+        if (validation) return validation
+      }
       const removed = await removeWorktree(repoId, removable.target.path, signal)
       if (!removed.ok || !input.alsoDeleteBranch) return removed
-      return await this.deleteBranch(
+      return await deleteBranchAfterValidation(
         input.branch,
         { force: input.forceDeleteBranch, alsoDeleteUpstream: input.alsoDeleteUpstream },
         signal,

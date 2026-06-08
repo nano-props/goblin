@@ -9,6 +9,12 @@ export interface UpstreamParts {
   branch: string
 }
 
+export interface PushTarget {
+  remote: string
+  branch: string
+  setUpstream: boolean
+}
+
 export interface BrowserRemote {
   url: string
   provider: BrowserRemoteProvider
@@ -19,7 +25,7 @@ export async function getBrowserRemoteUrl(
   options?: { branch?: string; signal?: AbortSignal },
 ): Promise<string | null> {
   const remote = await getBrowserRemote(cwd, options)
-  return remote?.url ?? null
+  return options?.branch ? newPullRequestUrlForBrowserRemote(remote, options.branch) : (remote?.url ?? null)
 }
 
 export async function getNewPullRequestUrl(
@@ -155,6 +161,10 @@ export function getBrowserRemoteUrlForRemotes(remotes: GitRemoteInfo[], upstream
   return pickBrowserRemote(remotes, upstream)?.url ?? null
 }
 
+export function resolveFetchRemoteForRemotes(remotes: GitRemoteInfo[], upstream?: UpstreamParts | null): string | null {
+  return pickPreferredRemote(remotes, upstream)?.name ?? null
+}
+
 export function newPullRequestUrlForBrowserRemote(remote: BrowserRemote | null, branch: string): string | null {
   if (!remote) return null
   if (remote.provider === 'gitlab') {
@@ -199,12 +209,11 @@ function resolveFallbackPushRemote(remotes: GitRemoteInfo[]): string | null {
   return remotes.length === 1 ? remotes[0]!.name : null
 }
 
-async function resolvePushTarget(
-  cwd: string,
+export function resolvePushTargetForRemotes(
+  remotes: GitRemoteInfo[],
+  upstream: UpstreamParts | null | undefined,
   branch: string,
-  signal?: AbortSignal,
-): Promise<{ remote: string; branch: string; setUpstream: boolean } | ExecResult> {
-  const [remotes, upstream] = await Promise.all([getRemotes(cwd, signal), getUpstreamParts(cwd, branch, signal)])
+): PushTarget | ExecResult {
   const remoteNames = new Set(remotes.map((remote) => remote.name))
   const upstreamRemoteExists = !!upstream && upstream.remote !== '.' && remoteNames.has(upstream.remote)
   if (upstreamRemoteExists) {
@@ -215,6 +224,15 @@ async function resolvePushTarget(
     return { ok: false, message: remotes.length === 0 ? 'error.push-no-remote' : 'error.push-ambiguous-remote' }
   }
   return { remote, branch, setUpstream: true }
+}
+
+async function resolvePushTarget(
+  cwd: string,
+  branch: string,
+  signal?: AbortSignal,
+): Promise<PushTarget | ExecResult> {
+  const [remotes, upstream] = await Promise.all([getRemotes(cwd, signal), getUpstreamParts(cwd, branch, signal)])
+  return resolvePushTargetForRemotes(remotes, upstream, branch)
 }
 
 export async function fetchAll(cwd: string, signal?: AbortSignal): Promise<ExecResult> {
@@ -232,7 +250,7 @@ export async function fetchAll(cwd: string, signal?: AbortSignal): Promise<ExecR
   }
   if (signal?.aborted) return { ok: false, message: 'cancelled' }
   if (remotes?.length === 0) return { ok: true, message: '' }
-  const remote = pickPreferredRemote(remotes ?? [], upstream)
+  const remote = resolveFetchRemoteForRemotes(remotes ?? [], upstream)
   if (!remote) return { ok: true, message: '' }
   return gitResultWithOptions(
     cwd,
@@ -240,7 +258,7 @@ export async function fetchAll(cwd: string, signal?: AbortSignal): Promise<ExecR
     'fetch',
     '--prune',
     '--',
-    remote.name,
+    remote,
   )
 }
 
