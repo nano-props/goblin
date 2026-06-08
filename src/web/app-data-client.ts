@@ -14,6 +14,7 @@ import type {
   PullRequestEntry,
   RepoSnapshot,
   ProbeResult,
+  SettingsPrefs,
   SettingsSnapshot,
   TerminalPref,
   TerminalAppState,
@@ -30,6 +31,7 @@ import type {
 } from '#/shared/remote-repo.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import { resolveApiBaseUrl } from '#/web/lib/websocket-url.ts'
+import { nativeSettingsProjectionStateFromSettings, pickNativeSettingsProjectionPatch } from '#/shared/native-shell-projection.ts'
 
 interface EmbeddedServerConfig {
   url: string
@@ -95,12 +97,20 @@ export async function getThemeState(): Promise<ThemeState> {
 }
 
 async function updateSettingsPrefsPatch(settings: Record<string, unknown>): Promise<void> {
-  await fetchServerJson<{ ok: boolean; settings: unknown }>('/api/settings/prefs', {
+  const result = await fetchServerJson<{ ok: boolean; settings: SettingsPrefs }>('/api/settings/prefs', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
     },
     body: JSON.stringify({ settings }),
+  })
+  const patch = pickNativeSettingsProjectionPatch(settings as Partial<SettingsPrefs>)
+  if (!patch || !canUseNativeRpcBridge()) return
+  await invokeNativeRpcPath<void>('settings.applyShellProjection', {
+    prefs: {
+      patch,
+      settings: nativeSettingsProjectionStateFromSettings(result.settings),
+    },
   })
 }
 
@@ -191,9 +201,11 @@ export async function addRecentRepo(repo: RepoSessionEntry): Promise<void> {
     { ok: boolean; recentRepos: RepoSessionEntry[]; addedRepo?: RepoSessionEntry | null }
   >('/api/settings/recent-repos/add', { repo })
   if (!canUseNativeRpcBridge()) return
-  await invokeNativeRpcPath<void>('settings.applyRecentReposProjection', {
-    recentRepos: result.recentRepos,
-    ...(result.addedRepo ? { addedRepo: result.addedRepo } : {}),
+  await invokeNativeRpcPath<void>('settings.applyShellProjection', {
+    recentRepos: {
+      recentRepos: result.recentRepos,
+      ...(result.addedRepo ? { addedRepo: result.addedRepo } : {}),
+    },
   })
 }
 

@@ -84,8 +84,7 @@ vi.mock('#/main/settings-server-client.ts', () => ({
 
 vi.mock('#/main/menu-state.ts', () => ({
   readMenuRuntimeState: mocks.readMenuRuntimeState,
-  setMenuLangPref: vi.fn(),
-  setMenuRecentRepos: vi.fn(),
+  applyMenuRuntimeState: vi.fn(),
   setMenuWorkspaceLayout: vi.fn(),
 }))
 

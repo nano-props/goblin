@@ -2,7 +2,7 @@ import { DEFAULT_WORKSPACE_LAYOUT, normalizeWorkspaceLayout, type WorkspaceLayou
 import type { LangPref } from '#/shared/rpc.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 
-interface MenuRuntimeState {
+export interface MenuRuntimeState {
   recentRepos: RepoSessionEntry[]
   shortcutsDisabled: boolean
   swapCloseShortcuts: boolean
@@ -20,14 +20,18 @@ const DEFAULT_MENU_RUNTIME_STATE: MenuRuntimeState = {
 
 let state: MenuRuntimeState = { ...DEFAULT_MENU_RUNTIME_STATE }
 
-export function initializeMenuRuntimeState(next: Partial<MenuRuntimeState>): void {
-  state = {
-    recentRepos: next.recentRepos ? [...next.recentRepos] : [...DEFAULT_MENU_RUNTIME_STATE.recentRepos],
-    shortcutsDisabled: next.shortcutsDisabled ?? DEFAULT_MENU_RUNTIME_STATE.shortcutsDisabled,
-    swapCloseShortcuts: next.swapCloseShortcuts ?? DEFAULT_MENU_RUNTIME_STATE.swapCloseShortcuts,
-    langPref: next.langPref ?? DEFAULT_MENU_RUNTIME_STATE.langPref,
-    workspaceLayout: normalizeWorkspaceLayout(next.workspaceLayout),
+function nextMenuRuntimeState(base: MenuRuntimeState, next: Partial<MenuRuntimeState>): MenuRuntimeState {
+  return {
+    recentRepos: next.recentRepos ? [...next.recentRepos] : [...base.recentRepos],
+    shortcutsDisabled: next.shortcutsDisabled ?? base.shortcutsDisabled,
+    swapCloseShortcuts: next.swapCloseShortcuts ?? base.swapCloseShortcuts,
+    langPref: next.langPref ?? base.langPref,
+    workspaceLayout: next.workspaceLayout === undefined ? base.workspaceLayout : normalizeWorkspaceLayout(next.workspaceLayout),
   }
+}
+
+export function initializeMenuRuntimeState(next: Partial<MenuRuntimeState>): void {
+  state = nextMenuRuntimeState(DEFAULT_MENU_RUNTIME_STATE, next)
 }
 
 export function readMenuRuntimeState(): MenuRuntimeState {
@@ -40,22 +44,10 @@ export function readMenuRuntimeState(): MenuRuntimeState {
   }
 }
 
-export function setMenuRecentRepos(recentRepos: RepoSessionEntry[]): void {
-  state.recentRepos = [...recentRepos]
-}
-
-export function setMenuShortcutsDisabled(shortcutsDisabled: boolean): void {
-  state.shortcutsDisabled = shortcutsDisabled
-}
-
-export function setMenuSwapCloseShortcuts(swapCloseShortcuts: boolean): void {
-  state.swapCloseShortcuts = swapCloseShortcuts
-}
-
-export function setMenuLangPref(langPref: LangPref): void {
-  state.langPref = langPref
+export function applyMenuRuntimeState(next: Partial<MenuRuntimeState>): void {
+  state = nextMenuRuntimeState(state, next)
 }
 
 export function setMenuWorkspaceLayout(workspaceLayout: WorkspaceLayout): void {
-  state.workspaceLayout = normalizeWorkspaceLayout(workspaceLayout)
+  applyMenuRuntimeState({ workspaceLayout })
 }

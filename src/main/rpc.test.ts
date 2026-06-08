@@ -136,6 +136,7 @@ vi.mock('#/main/window-registry.ts', () => ({
 }))
 
 vi.mock('#/main/theme.ts', () => ({
+  applyThemeSettingsProjection: vi.fn(),
   getTheme: vi.fn(() => ({ pref: 'auto', resolved: 'light', colorTheme: 'macos' })),
   setColorTheme: vi.fn(),
   setThemePref: vi.fn(),
@@ -158,6 +159,12 @@ vi.mock('#/main/i18n/index.ts', () => ({
   getCurrentLang: vi.fn(() => 'en'),
   getDictionary: vi.fn(() => ({})),
   getLangPref: vi.fn(async () => 'auto'),
+  resolveLang: vi.fn((pref: string) => (pref === 'auto' ? 'en' : pref)),
+  setCurrentLang: vi.fn(),
+}))
+
+vi.mock('#/main/menu-state.ts', () => ({
+  applyMenuRuntimeState: vi.fn(),
 }))
 
 vi.mock('#/system/terminals.ts', () => ({
@@ -423,10 +430,82 @@ describe('main repo rpc cancellation', () => {
   test('projects recent repos into native shell state without mutating the embedded server', async () => {
     const repo = { kind: 'local' as const, id: '/repo' }
 
-    const result = await invokeRpc('settings.applyRecentReposProjection', { recentRepos: [repo], addedRepo: repo })
+    const result = await invokeRpc('settings.applyShellProjection', { recentRepos: { recentRepos: [repo], addedRepo: repo } })
 
     expect(result).toEqual({ ok: true, data: undefined })
     expect(app.addRecentDocument).toHaveBeenCalledWith('/repo')
+  })
+
+  test('projects server-owned prefs into native shell state when the renderer updates them', async () => {
+    const result = await invokeRpc('settings.applyShellProjection', {
+      prefs: {
+        patch: {
+          lang: 'ja',
+          theme: 'dark',
+          colorTheme: 'github',
+          shortcutsDisabled: true,
+          globalShortcutDisabled: true,
+          swapCloseShortcuts: true,
+        },
+        settings: {
+          lang: 'ja',
+          theme: 'dark',
+          colorTheme: 'github',
+          shortcutsDisabled: true,
+          globalShortcutDisabled: true,
+          swapCloseShortcuts: true,
+          globalShortcut: 'Alt+K',
+        },
+      },
+    })
+
+    expect(result).toEqual({ ok: true, data: undefined })
+    expect((await import('#/main/i18n/index.ts')).resolveLang).toHaveBeenCalledWith('ja')
+    expect((await import('#/main/i18n/index.ts')).setCurrentLang).toHaveBeenCalledWith('ja')
+    expect((await import('#/main/theme.ts')).applyThemeSettingsProjection).toHaveBeenCalledWith({
+      theme: 'dark',
+      colorTheme: 'github',
+    })
+    expect((await import('#/main/menu-state.ts')).applyMenuRuntimeState).toHaveBeenCalledWith({
+      langPref: 'ja',
+      shortcutsDisabled: true,
+      swapCloseShortcuts: true,
+    })
+    expect((await import('#/main/shortcuts.ts')).syncGlobalShortcuts).toHaveBeenCalledWith(true, 'Alt+K')
+    expect((await import('#/main/menu.ts')).buildAppMenu).toHaveBeenCalled()
+  })
+
+  test('rejects an empty native shell projection payload', async () => {
+    const result = await invokeRpc('settings.applyShellProjection', {})
+
+    expect(result).toEqual({
+      ok: false,
+      error: { name: 'RpcError', code: 'BAD_REQUEST', message: 'Invalid RPC input' },
+    })
+  })
+
+  test('rejects recent repo projections with invalid remote paths', async () => {
+    const result = await invokeRpc('settings.applyShellProjection', {
+      recentRepos: {
+        recentRepos: [
+          {
+            kind: 'remote',
+            id: 'ssh-config://prodrepo',
+            ref: {
+              id: 'ssh-config://prodrepo',
+              alias: 'prod',
+              remotePath: 'repo',
+              displayName: 'prod:repo',
+            },
+          },
+        ],
+      },
+    })
+
+    expect(result).toEqual({
+      ok: false,
+      error: { name: 'RpcError', code: 'BAD_REQUEST', message: 'Invalid RPC input' },
+    })
   })
 
   test('prefers embedded server prefs when validating a global shortcut change', async () => {

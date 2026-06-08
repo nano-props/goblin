@@ -45,10 +45,7 @@ export async function initTheme(): Promise<void> {
   if (inited) return
   inited = true
   const serverSettings = await getSettingsPrefs()
-  currentPref = serverSettings.theme
-  currentColorTheme = serverSettings.colorTheme
-  applyToNativeTheme(currentPref)
-  currentResolved = resolveTheme(currentPref)
+  applyThemeSettingsProjection({ theme: serverSettings.theme, colorTheme: serverSettings.colorTheme })
 
   // Fires both on OS appearance changes AND when we assign themeSource
   // ourselves. We only care about the former, only when pref === 'auto'.
@@ -66,15 +63,19 @@ export function getTheme(): ThemeState {
   return { pref: currentPref, resolved: currentResolved, colorTheme: currentColorTheme }
 }
 
-export async function setThemePref(pref: ThemePref): Promise<ThemeState> {
-  if (pref === currentPref) return getTheme()
+export function applyThemeSettingsProjection(input: { theme: ThemePref; colorTheme: ColorTheme }): ThemeState {
   transitionDepth++
   try {
-    const serverSettings = await updateSettingsPrefs({ theme: pref })
-    const nextPref = serverSettings.theme
-    currentPref = nextPref
+    const nextPref = input.theme
+    const nextColorTheme = input.colorTheme
     applyToNativeTheme(nextPref)
-    currentResolved = resolveTheme(nextPref)
+    const nextResolved = resolveTheme(nextPref)
+    if (currentPref === nextPref && currentResolved === nextResolved && currentColorTheme === nextColorTheme) {
+      return getTheme()
+    }
+    currentPref = nextPref
+    currentResolved = nextResolved
+    currentColorTheme = nextColorTheme
     emit()
     return getTheme()
   } finally {
@@ -82,13 +83,17 @@ export async function setThemePref(pref: ThemePref): Promise<ThemeState> {
   }
 }
 
+export async function setThemePref(pref: ThemePref): Promise<ThemeState> {
+  if (pref === currentPref) return getTheme()
+  const serverSettings = await updateSettingsPrefs({ theme: pref })
+  return applyThemeSettingsProjection({ theme: serverSettings.theme, colorTheme: serverSettings.colorTheme })
+}
+
 export async function setColorTheme(colorTheme: ColorTheme): Promise<ThemeState> {
   if (!isColorTheme(colorTheme)) return getTheme()
   if (colorTheme === currentColorTheme) return getTheme()
   const serverSettings = await updateSettingsPrefs({ colorTheme })
-  currentColorTheme = serverSettings.colorTheme
-  emit()
-  return getTheme()
+  return applyThemeSettingsProjection({ theme: serverSettings.theme, colorTheme: serverSettings.colorTheme })
 }
 
 export function subscribeTheme(listener: Listener): () => void {

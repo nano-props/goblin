@@ -48,7 +48,7 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
       calls.recent.push(repo)
       return calls.recent
     },
-    'settings.applyRecentReposProjection': async () => undefined,
+    'settings.applyShellProjection': async () => undefined,
   }
   for (const [key, handler] of Object.entries(overrides)) {
     if (key === 'probe') handlers['repo.probe'] = ({ cwd }: { cwd: string }) => handler(cwd)

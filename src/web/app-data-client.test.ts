@@ -241,6 +241,86 @@ describe('server-client web host bootstrap', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  test('projects native prefs after updating language through the embedded server', async () => {
+    const invokeRpc = vi.fn(async () => undefined)
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {
+        __GOBLIN_BOOTSTRAP__: electronBootstrap({
+          initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+        }),
+        goblinNative: {
+          runtime: {
+            kind: 'electron',
+            bridgeVersion: RENDERER_BRIDGE_VERSION,
+            capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+          },
+          homeDir: '/Users/test',
+          invokeRpc,
+          abortRpc: async () => true,
+          onEvent: () => () => {},
+          pathForFile: () => '',
+        },
+        location: {
+          href: 'http://127.0.0.1:32100/',
+          origin: 'http://127.0.0.1:32100',
+          search: '',
+        },
+        matchMedia: vi.fn(() => ({ matches: true })),
+      },
+    })
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          ok: true,
+          settings: {
+            lang: 'ja',
+            theme: 'auto',
+            colorTheme: 'macos',
+            fetchIntervalSec: 120,
+            terminalNotificationsEnabled: false,
+            shortcutsDisabled: false,
+            globalShortcutDisabled: false,
+            swapCloseShortcuts: false,
+            toggleDetailOnActionBarBlankClick: false,
+            globalShortcut: 'CommandOrControl+Shift+G',
+            terminalApp: 'auto',
+            editorApp: 'auto',
+            lanEnabled: false,
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ lang: 'ja', pref: 'ja', dict: { hello: 'こんにちは' } }),
+      })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { setI18nPref } = await import('#/web/app-data-client.ts')
+    await expect(setI18nPref('ja')).resolves.toEqual({ lang: 'ja', pref: 'ja', dict: { hello: 'こんにちは' } })
+    expect(invokeRpc).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: 'settings.applyShellProjection',
+        input: {
+          prefs: {
+            patch: { lang: 'ja' },
+            settings: {
+              lang: 'ja',
+              theme: 'auto',
+              colorTheme: 'macos',
+              shortcutsDisabled: false,
+              globalShortcutDisabled: false,
+              swapCloseShortcuts: false,
+              globalShortcut: 'CommandOrControl+Shift+G',
+            },
+          },
+        },
+      }),
+    )
+  })
+
   test('projects recent repos through the native bridge using the server-authoritative added repo', async () => {
     const invokeRpc = vi.fn(async () => undefined)
     Object.defineProperty(globalThis, 'window', {
@@ -291,10 +371,12 @@ describe('server-client web host bootstrap', () => {
     )
     expect(invokeRpc).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: 'settings.applyRecentReposProjection',
+        path: 'settings.applyShellProjection',
         input: {
-          recentRepos: [{ kind: 'local', id: '/tmp/repo' }],
-          addedRepo: { kind: 'local', id: '/tmp/repo' },
+          recentRepos: {
+            recentRepos: [{ kind: 'local', id: '/tmp/repo' }],
+            addedRepo: { kind: 'local', id: '/tmp/repo' },
+          },
         },
       }),
     )
@@ -342,9 +424,11 @@ describe('server-client web host bootstrap', () => {
     await expect(addRecentRepo({ kind: 'local', id: '/bad\0repo' } as unknown as { kind: 'local'; id: string })).resolves.toBeUndefined()
     expect(invokeRpc).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: 'settings.applyRecentReposProjection',
+        path: 'settings.applyShellProjection',
         input: {
-          recentRepos: [{ kind: 'local', id: '/existing' }],
+          recentRepos: {
+            recentRepos: [{ kind: 'local', id: '/existing' }],
+          },
         },
       }),
     )
