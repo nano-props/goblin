@@ -1,13 +1,12 @@
 /// <reference types="vite/client" />
 
 import type {
-  InitialI18nSnapshot,
   RendererRuntimeSnapshot,
   InitialServerSnapshot,
   InitialSettingsSnapshot,
   RendererBootstrapSnapshot,
 } from '#/shared/bootstrap.ts'
-import type { RpcEvent, RpcRequest, SettingsPage } from '#/shared/rpc.ts'
+import type { I18nSnapshot, RpcEvent, RpcRequest, SettingsPage } from '#/shared/rpc.ts'
 import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import type { TerminalMutationResult, TerminalNotifyBellInput } from '#/shared/terminal.ts'
@@ -15,7 +14,7 @@ import type { TerminalMutationResult, TerminalNotifyBellInput } from '#/shared/t
 interface GoblinNativeBridge {
   runtime: RendererRuntimeSnapshot
   homeDir: string
-  initialI18n: InitialI18nSnapshot | null
+  initialI18n: I18nSnapshot | null
   initialSettings: InitialSettingsSnapshot | null
   initialServer: InitialServerSnapshot | null
   invokeRpc: (request: RpcRequest) => Promise<unknown>

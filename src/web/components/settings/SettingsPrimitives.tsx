@@ -113,8 +113,10 @@ interface SettingsSelectProps<T extends string | number> {
 
 export function SettingsSelect<T extends string | number>({ id, value, options, onChange }: SettingsSelectProps<T>) {
   const compact = useIsCompactUi()
+  const optionsSignature = options.map((opt) => `${String(opt.value)}:${opt.label}`).join('|')
   return (
     <Select
+      key={optionsSignature}
       value={String(value)}
       onValueChange={(v) => {
         const matched = options.find((o) => String(o.value) === v)

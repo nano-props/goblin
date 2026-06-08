@@ -1,4 +1,4 @@
-import type { EditorPref, Lang, LangPref, TerminalPref } from '#/shared/rpc.ts'
+import type { EditorPref, I18nSnapshot, TerminalPref } from '#/shared/rpc.ts'
 
 export type RendererRuntimeKind = 'electron' | 'web'
 export type RendererNativeCapability =
@@ -38,12 +38,6 @@ export interface InitialSettingsSnapshot {
   lanEnabled: boolean
 }
 
-export interface InitialI18nSnapshot {
-  lang: Lang
-  pref: LangPref
-  dict: Record<string, string>
-}
-
 export interface InitialServerSnapshot {
   url: string
   secret: string
@@ -59,7 +53,7 @@ export interface RendererRuntimeSnapshot {
 export interface RendererBootstrapPayload {
   runtime: RendererRuntimeSnapshot
   homeDir: string
-  i18n: InitialI18nSnapshot
+  i18n: I18nSnapshot
   settings: InitialSettingsSnapshot
   server: InitialServerSnapshot | null
 }
@@ -67,7 +61,7 @@ export interface RendererBootstrapPayload {
 export interface RendererBootstrapSnapshot {
   runtime: RendererRuntimeSnapshot
   homeDir: string
-  initialI18n: InitialI18nSnapshot | null
+  initialI18n: I18nSnapshot | null
   initialSettings: InitialSettingsSnapshot | null
   initialServer: InitialServerSnapshot | null
 }

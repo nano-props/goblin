@@ -78,7 +78,6 @@ vi.mock('#/main/theme.ts', () => ({
 
 vi.mock('#/main/i18n/index.ts', () => ({
   getCurrentLang: () => 'en',
-  getLangPref: () => Promise.resolve('auto'),
   getDictionary: () => ({}),
 }))
 
@@ -187,6 +186,19 @@ describe('main window navigation boundaries', () => {
       secret: expect.any(String),
       clientId: expect.any(String),
     })
+  })
+
+  test('uses the settings snapshot language preference in renderer bootstrap', async () => {
+    mocks.getSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot({ lang: 'ja' }))
+    const { getOrCreateMainWindow } = await import('#/main/window.ts')
+
+    await getOrCreateMainWindow()
+
+    const bootstrapArg = mocks.windowOptions[0]?.webPreferences?.additionalArguments?.find((arg: string) =>
+      arg.startsWith('--goblin-bootstrap='),
+    )
+    const payload = JSON.parse(Buffer.from(String(bootstrapArg).slice('--goblin-bootstrap='.length), 'base64').toString('utf8'))
+    expect(payload.i18n).toMatchObject({ pref: 'ja' })
   })
 
   test('fails window creation when no renderer base URL is available', async () => {

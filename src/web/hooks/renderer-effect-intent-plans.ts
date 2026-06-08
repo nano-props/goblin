@@ -4,6 +4,7 @@ import type { DetailTab, RepoState } from '#/web/stores/repos/types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspaceLayout } from '#/shared/workspace-layout.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
+import type { LangPref, ThemePref } from '#/shared/settings.ts'
 
 type WorkspaceRendererIntent = Extract<
   RendererEffectIntent,
@@ -35,6 +36,9 @@ export type AppLevelIntentPlan =
   | { kind: 'set-workspace-layout'; layout: WorkspaceLayout }
   | { kind: 'reset-workspace-layout' }
   | { kind: 'open-settings'; page: SettingsPage }
+  | { kind: 'set-theme-pref'; pref: ThemePref }
+  | { kind: 'set-lang-pref'; pref: LangPref }
+  | { kind: 'clear-recent-repos' }
   | { kind: 'ensure-recent-repo-open'; entry: RepoSessionEntry }
 
 export type WorkspaceIntentPlan =
@@ -100,6 +104,12 @@ export function createAppLevelIntentPlan(
       return { kind: 'reset-workspace-layout' }
     case 'open-settings-requested':
       return { kind: 'open-settings', page: event.page }
+    case 'theme-pref-set-requested':
+      return { kind: 'set-theme-pref', pref: event.pref }
+    case 'lang-pref-set-requested':
+      return { kind: 'set-lang-pref', pref: event.pref }
+    case 'clear-recent-repos-requested':
+      return context.overlayBlocked ? { kind: 'noop' } : { kind: 'clear-recent-repos' }
     case 'open-recent-repo-requested':
       return context.overlayBlocked ? { kind: 'noop' } : { kind: 'ensure-recent-repo-open', entry: event.entry }
   }

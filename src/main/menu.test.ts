@@ -38,7 +38,6 @@ const mocks = vi.hoisted(() => {
       template.splice(0, template.length, ...nextTemplate)
       return nextTemplate
     }),
-    clearSettingsRecentRepos: vi.fn(async () => true),
     setApplicationMenu: vi.fn(),
   }
 })
@@ -74,12 +73,7 @@ vi.mock('#/main/window-registry.ts', () => ({
 }))
 
 vi.mock('#/main/i18n/index.ts', () => ({
-  applyLangPref: vi.fn(),
   t: vi.fn((key: string) => key),
-}))
-
-vi.mock('#/main/settings-server-client.ts', () => ({
-  clearSettingsRecentRepos: mocks.clearSettingsRecentRepos,
 }))
 
 vi.mock('#/main/menu-state.ts', () => ({
@@ -104,7 +98,9 @@ vi.mock('#/main/external-url.ts', () => ({
 
 vi.mock('#/main/theme.ts', () => ({
   getTheme: vi.fn(() => ({ pref: 'auto', resolved: 'light', colorTheme: 'macos' })),
-  setThemePref: vi.fn(),
+  applyThemeSettingsProjection: vi.fn(),
+  initTheme: vi.fn(),
+  subscribeTheme: vi.fn(() => () => {}),
 }))
 
 describe('app menu actions', () => {
@@ -203,6 +199,32 @@ describe('app menu actions', () => {
     })
   })
 
+  test('routes appearance changes through renderer intent instead of mutating settings in main', async () => {
+    const { buildAppMenu } = await import('#/main/menu.ts')
+
+    buildAppMenu()
+    clickNestedMenuItem('Goblin', 'settings.appearance', 'settings.appearance.dark')
+    await Promise.resolve()
+
+    expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, {
+      type: 'theme-pref-set-requested',
+      pref: 'dark',
+    })
+  })
+
+  test('routes language changes through renderer intent instead of mutating settings in main', async () => {
+    const { buildAppMenu } = await import('#/main/menu.ts')
+
+    buildAppMenu()
+    clickNestedMenuItem('Goblin', 'settings.lang', 'settings.lang.ko')
+    await Promise.resolve()
+
+    expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, {
+      type: 'lang-pref-set-requested',
+      pref: 'ko',
+    })
+  })
+
   test('wires the remote open accelerator from the file menu', async () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
 
@@ -278,7 +300,7 @@ describe('app menu actions', () => {
     ])
   })
 
-  test('clears recent repos through the server-backed path and OS recent documents', async () => {
+  test('routes clear recent through renderer intent', async () => {
     mocks.readMenuRuntimeState.mockReturnValue({
       ...defaultMenuRuntimeState(),
       recentRepos: [{ kind: 'local', id: '/tmp/repo' }],
@@ -293,8 +315,9 @@ describe('app menu actions', () => {
     clearItem.click()
     await Promise.resolve()
 
-    expect(mocks.clearSettingsRecentRepos).toHaveBeenCalledTimes(1)
-    expect(mocks.clearRecentDocuments).toHaveBeenCalledTimes(1)
+    expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, {
+      type: 'clear-recent-repos-requested',
+    })
   })
 
   test('opens the local web version from the file menu', async () => {
@@ -311,6 +334,14 @@ describe('app menu actions', () => {
 function clickMenuItem(menuLabel: string, itemLabel: string): void {
   const menu = mocks.template.find((entry) => entry.label === menuLabel)
   const item = menu?.submenu?.find((entry: any) => entry.label === itemLabel)
+  expect(item?.click).toBeTypeOf('function')
+  item.click()
+}
+
+function clickNestedMenuItem(menuLabel: string, parentItemLabel: string, itemLabel: string): void {
+  const menu = mocks.template.find((entry) => entry.label === menuLabel)
+  const parent = menu?.submenu?.find((entry: any) => entry.label === parentItemLabel)
+  const item = parent?.submenu?.find((entry: any) => entry.label === itemLabel)
   expect(item?.click).toBeTypeOf('function')
   item.click()
 }

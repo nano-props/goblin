@@ -6,6 +6,7 @@ export function createNativeHostRpcHandlers(): Pick<NativeRpcHandlers, 'settings
   return {
     ...createNativeHostSettingsRpcHandlers({
       addRecentDocument: (path) => app.addRecentDocument(path),
+      clearRecentDocuments: () => app.clearRecentDocuments(),
     }),
   }
 }

@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 import { publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
-import { getServerExternalAppsSnapshot } from '#/server/modules/external-apps.ts'
+import { buildServerExternalAppsSnapshot, getServerExternalAppsSnapshot } from '#/server/modules/external-apps.ts'
 import { getServerGitHubCliState } from '#/server/modules/github-cli.ts'
-import { getServerI18nPayload } from '#/server/modules/i18n.ts'
+import { getServerI18nSnapshot } from '#/server/modules/i18n.ts'
 import { getSettingsSnapshot, setServerGlobalShortcutRegistered } from '#/server/modules/settings.ts'
 import {
   addServerRecentRepo,
@@ -12,16 +12,17 @@ import {
   setServerSessionState,
   updateServerSettingsPrefs,
 } from '#/server/modules/settings-source.ts'
+import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
 import { toSafeSessionRepoEntry } from '#/shared/input-validation.ts'
 import { getLanUrls, isLanAddress } from '#/shared/lan-addresses.ts'
-import type { LanInfo } from '#/shared/rpc.ts'
+import type { LanInfo, SettingsPrefsUpdateResponse } from '#/shared/rpc.ts'
 import { repoSessionEntryId } from '#/shared/remote-repo.ts'
 import { settingsInvalidationScopesForPrefsPatch } from '#/shared/server-invalidation.ts'
 
 export function createSettingsRoutes() {
   const app = new Hono()
   app.get('/', async (c) => c.json(await getSettingsSnapshot()))
-  app.get('/i18n', async (c) => c.json(await getServerI18nPayload(c.req.header('accept-language'))))
+  app.get('/i18n', async (c) => c.json(await getServerI18nSnapshot(c.req.header('accept-language'))))
   app.get('/github-cli', async (c) => {
     const hosts = (c.req.queries('host') ?? []).filter((host): host is string => typeof host === 'string' && host.length > 0)
     return c.json(await getServerGitHubCliState(c.req.raw.signal, hosts))
@@ -54,7 +55,14 @@ export function createSettingsRoutes() {
     const patch = (body?.settings ?? {}) as Record<string, unknown>
     const settings = await updateServerSettingsPrefs(patch)
     publishSettingsInvalidation(settingsInvalidationScopesForPrefsPatch(patch))
-    return c.json({ ok: true, settings })
+    return c.json({
+      ok: true,
+      settings,
+      ...('lang' in patch ? { i18n: resolveI18nSnapshot(settings.lang, c.req.header('accept-language')) } : {}),
+      ...(patch.terminalApp !== undefined || patch.editorApp !== undefined
+        ? { externalApps: await buildServerExternalAppsSnapshot(settings, c.req.raw.signal) }
+        : {}),
+    } satisfies SettingsPrefsUpdateResponse)
   })
   app.post('/global-shortcut-state', async (c) => {
     const body = await c.req.json().catch(() => null)

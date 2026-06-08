@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
   getSettingsPrefs: vi.fn<
     () => Promise<{ theme?: 'auto' | 'light' | 'dark'; colorTheme?: 'macos' | 'mono' | 'github' }>
   >(async () => ({ theme: 'auto', colorTheme: 'macos' })),
-  updateSettingsPrefs: vi.fn(async (patch: Record<string, unknown>) => patch),
 }))
 
 vi.mock('electron', () => ({
@@ -30,7 +29,6 @@ vi.mock('electron', () => ({
 
 vi.mock('#/main/settings-server-client.ts', () => ({
   getSettingsPrefs: mocks.getSettingsPrefs,
-  updateSettingsPrefs: mocks.updateSettingsPrefs,
 }))
 
 describe('theme persistence mirroring', () => {
@@ -40,27 +38,6 @@ describe('theme persistence mirroring', () => {
     mocks.shouldUseDarkColors = false
     mocks.themeSource = 'system'
     mocks.getSettingsPrefs.mockResolvedValue({ theme: 'auto', colorTheme: 'macos' })
-    mocks.updateSettingsPrefs.mockImplementation(async (patch: Record<string, unknown>) => ({ theme: 'auto', colorTheme: 'macos', ...patch }))
-  })
-
-  test('mirrors theme preference changes to the embedded server settings repository', async () => {
-    const theme = await import('#/main/theme.ts')
-    await theme.initTheme()
-
-    const next = await theme.setThemePref('dark')
-
-    expect(next.pref).toBe('dark')
-    expect(mocks.updateSettingsPrefs).toHaveBeenCalledWith({ theme: 'dark' })
-  })
-
-  test('mirrors color theme changes to the embedded server settings repository', async () => {
-    const theme = await import('#/main/theme.ts')
-    await theme.initTheme()
-
-    const next = await theme.setColorTheme('github')
-
-    expect(next.colorTheme).toBe('github')
-    expect(mocks.updateSettingsPrefs).toHaveBeenCalledWith({ colorTheme: 'github' })
   })
 
   test('initializes theme state from embedded server prefs when available', async () => {

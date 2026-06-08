@@ -37,8 +37,10 @@ import { DEFAULT_DETAIL_PANE_SIZES, DEFAULT_WORKSPACE_LAYOUT } from '#/shared/wo
 
 function initialSettingsSnapshot(): SettingsSnapshot | undefined {
   const initialSettings = getInitialBootstrap().initialSettings
+  const initialI18n = getInitialBootstrap().initialI18n
   if (!initialSettings) return undefined
   return {
+    lang: initialI18n?.pref ?? 'auto',
     theme: 'auto',
     colorTheme: DEFAULT_COLOR_THEME,
     ...initialSettings,

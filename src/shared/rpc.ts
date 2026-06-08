@@ -91,7 +91,7 @@ export interface SessionState {
   selectedTerminalByWorktree?: Record<string, string>
 }
 
-export interface SettingsSnapshot extends Omit<SettingsPrefs, 'lang'> {
+export interface SettingsSnapshot extends SettingsPrefs {
   globalShortcutRegistered: boolean
   session: SessionState
   recentRepos: RepoSessionEntry[]
@@ -138,10 +138,17 @@ export interface ExternalAppsSnapshot {
   editor: EditorAppState
 }
 
-export interface I18nPayload {
+export interface I18nSnapshot {
   lang: Lang
   pref: LangPref
   dict: Record<string, string>
+}
+
+export interface SettingsPrefsUpdateResponse {
+  ok: true
+  settings: SettingsPrefs
+  i18n?: I18nSnapshot
+  externalApps?: ExternalAppsSnapshot
 }
 
 export interface RepoSnapshot {
@@ -184,8 +191,11 @@ export type RpcResponse =
   | { ok: true; data: unknown }
   | { ok: false; error: { message: string; code?: string; name?: string } }
 
+export type I18nChangedEvent =
+  | { type: 'i18n-changed'; snapshot: I18nSnapshot; payload?: never }
+  | { type: 'i18n-changed'; payload: I18nSnapshot; snapshot?: never }
+
 export type RpcEvent =
-  | { type: 'theme-changed'; state: ThemeState }
   | { type: 'fetch-interval-changed'; sec: number }
   | { type: 'terminal-notifications-changed'; enabled: boolean }
   | { type: 'shortcuts-disabled-changed'; disabled: boolean }
@@ -197,7 +207,7 @@ export type RpcEvent =
   | ({ type: 'editor-app-changed' } & EditorAppState)
   | { type: 'github-cli-changed'; state: GitHubCliState }
   | { type: 'settings-write-error'; message: string }
-  | { type: 'i18n-changed'; payload: I18nPayload }
+  | I18nChangedEvent
   | RepoQueryInvalidationEvent
 
 export interface AppRpcHandlers {
@@ -277,8 +287,8 @@ export interface AppRpcHandlers {
     refresh: (input: { hosts?: string[] } | undefined) => Promise<GitHubCliState>
   }
   i18n: {
-    get: () => Promise<I18nPayload>
-    setPref: (input: { pref: LangPref }) => Promise<I18nPayload | null>
+    get: () => Promise<I18nSnapshot>
+    setPref: (input: { pref: LangPref }) => Promise<I18nSnapshot | null>
   }
 }
 
@@ -286,6 +296,7 @@ export interface NativeRpcHandlers {
   settings: {
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
     applyShellProjection: (input: NativeShellProjection) => Promise<void>
+    clearNativeRecentDocuments: () => Promise<void>
   }
 }
 
@@ -344,6 +355,7 @@ export const RPC_PROCEDURE_SCHEMAS: NativeRpcProcedureSchemas = {
   settings: {
     setGlobalShortcut: v.object({ accelerator: v.string() }),
     applyShellProjection: NativeShellProjectionSchema,
+    clearNativeRecentDocuments: EmptyInput,
   },
 }
 

@@ -14,7 +14,7 @@ describe('renderer ingress', () => {
     const off = vi.fn()
     const onEvent = vi.fn((cb: (event: RpcEvent) => void) => {
       cb({ type: 'settings-write-error', message: 'failed' })
-      cb({ type: 'theme-changed', state: { pref: 'auto', resolved: 'light', colorTheme: 'macos' } })
+      cb({ type: 'terminal-notifications-changed', enabled: true })
       return off
     })
     Object.defineProperty(globalThis, 'window', {
@@ -45,7 +45,7 @@ describe('renderer ingress', () => {
     const unsubscribe = subscribeNativeHostEventType('settings-write-error', cb)
 
     expect(cb).toHaveBeenCalledWith({ type: 'settings-write-error', message: 'failed' })
-    expect(cb).not.toHaveBeenCalledWith({ type: 'theme-changed', state: expect.any(Object) })
+    expect(cb).not.toHaveBeenCalledWith({ type: 'terminal-notifications-changed', enabled: true })
     unsubscribe()
     expect(off).toHaveBeenCalled()
   })

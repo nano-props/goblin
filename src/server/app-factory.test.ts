@@ -106,6 +106,29 @@ describe('server app html bootstrap', () => {
     expect(html).toContain('打开本地仓库')
   })
 
+  test('resolves auto language from the first supported accept-language candidate', async () => {
+    const { createApp } = await import('#/server/app-factory.ts')
+    const app = createApp({
+      version: '0.1.0',
+      startedAt: Date.now(),
+      internalSecret: 'secret',
+      terminalHost: terminalHostStub,
+    })
+
+    const response = await app.request(
+      new Request('http://127.0.0.1:32100/', {
+        headers: {
+          'accept-language': 'fr-FR,ja;q=0.9,en;q=0.8',
+        },
+      }),
+    )
+
+    const html = await response.text()
+    expect(response.status).toBe(200)
+    expect(html).toContain('"lang":"ja"')
+    expect(html).toContain('ローカルリポジトリを開く')
+  })
+
   test('serves renderer html for settings routes', async () => {
     const { createApp } = await import('#/server/app-factory.ts')
     const app = createApp({

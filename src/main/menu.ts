@@ -28,11 +28,8 @@ import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
 import { focusedRegisteredSurface } from '#/main/window-registry.ts'
 import { readMenuRuntimeState, setMenuWorkspaceLayout as setMenuWorkspaceLayoutState } from '#/main/menu-state.ts'
 import {
-  clearRecentReposFromMenu as runClearRecentReposFromMenu,
   openDataFolder as runOpenDataFolder,
   openWebVersionFromMenu as runOpenWebVersionFromMenu,
-  setLangPrefFromMenu as runSetLangPrefFromMenu,
-  setThemePrefFromMenu as runSetThemePrefFromMenu,
 } from '#/main/native-menu-actions.ts'
 
 interface AppMenuState {
@@ -220,7 +217,7 @@ function createRecentReposMenu(recentRepos: RepoSessionEntry[]): MenuItemConstru
           click: () => send({ type: 'open-recent-repo-requested', entry }),
         })),
         separator(),
-        { label: t('menu.file.clear-recent'), click: () => void clearRecentReposFromMenu() },
+        { label: t('menu.file.clear-recent'), click: () => send({ type: 'clear-recent-repos-requested' }) },
       ]
     : [{ label: t('menu.file.no-recent'), enabled: false }]
 }
@@ -349,7 +346,7 @@ function createAppearanceMenu(themePref: ThemePref): MenuItemConstructorOptions 
       type: 'radio' as const,
       label: t(labelKey),
       checked: themePref === pref,
-      click: () => void setThemePrefFromMenu(pref),
+      click: () => send({ type: 'theme-pref-set-requested', pref }),
     })),
   }
 }
@@ -361,7 +358,7 @@ function createLanguageMenu(langPref: LangPref): MenuItemConstructorOptions {
       type: 'radio' as const,
       label: t(labelKey),
       checked: langPref === pref,
-      click: () => void setLangPrefFromMenu(pref),
+      click: () => send({ type: 'lang-pref-set-requested', pref }),
     })),
   }
 }
@@ -375,20 +372,8 @@ function setWorkspaceLayoutFromMenu(layout: WorkspaceLayout): void {
   send({ type: 'workspace-layout-set-requested', layout })
 }
 
-async function setThemePrefFromMenu(pref: ThemePref): Promise<void> {
-  await runSetThemePrefFromMenu(pref)
-}
-
-async function setLangPrefFromMenu(pref: LangPref): Promise<void> {
-  await runSetLangPrefFromMenu(pref, { rebuildMenu: buildAppMenu })
-}
-
 async function openWebVersionFromMenu(): Promise<void> {
   await runOpenWebVersionFromMenu()
-}
-
-async function clearRecentReposFromMenu(): Promise<void> {
-  await runClearRecentReposFromMenu()
 }
 
 async function openDataFolder(): Promise<void> {

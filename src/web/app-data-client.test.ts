@@ -107,6 +107,36 @@ describe('server-client web host bootstrap', () => {
     await expect(getThemeState()).resolves.toEqual({ pref: 'auto', resolved: 'dark', colorTheme: 'default' })
   })
 
+  test('returns authoritative theme state directly from the settings write response', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        settings: {
+          lang: 'auto',
+          theme: 'dark',
+          colorTheme: 'github',
+          fetchIntervalSec: 120,
+          terminalNotificationsEnabled: false,
+          shortcutsDisabled: false,
+          globalShortcutDisabled: false,
+          swapCloseShortcuts: false,
+          toggleDetailOnActionBarBlankClick: false,
+          globalShortcut: 'CommandOrControl+Shift+G',
+          terminalApp: 'auto',
+          editorApp: 'auto',
+          lanEnabled: false,
+        },
+      }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { setThemePref } = await import('#/web/app-data-client.ts')
+    await expect(setThemePref('dark')).resolves.toEqual({ pref: 'dark', resolved: 'dark', colorTheme: 'github' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   test('fetches i18n payload from embedded server when no Electron bridge exists', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
     const fetchMock = vi.fn(async () => ({
@@ -115,8 +145,8 @@ describe('server-client web host bootstrap', () => {
     }))
     vi.stubGlobal('fetch', fetchMock)
 
-    const { getI18nPayload } = await import('#/web/app-data-client.ts')
-    await expect(getI18nPayload()).resolves.toEqual({ lang: 'ko', pref: 'auto', dict: { hello: '안녕' } })
+    const { getI18nSnapshot } = await import('#/web/app-data-client.ts')
+    await expect(getI18nSnapshot()).resolves.toEqual({ lang: 'ko', pref: 'auto', dict: { hello: '안녕' } })
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:32100/api/settings/i18n',
       expect.objectContaining({
@@ -290,16 +320,14 @@ describe('server-client web host bootstrap', () => {
             editorApp: 'auto',
             lanEnabled: false,
           },
+          i18n: { lang: 'ja', pref: 'ja', dict: { hello: 'こんにちは' } },
         }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ lang: 'ja', pref: 'ja', dict: { hello: 'こんにちは' } }),
       })
     vi.stubGlobal('fetch', fetchMock)
 
     const { setI18nPref } = await import('#/web/app-data-client.ts')
     await expect(setI18nPref('ja')).resolves.toEqual({ lang: 'ja', pref: 'ja', dict: { hello: 'こんにちは' } })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(invokeRpc).toHaveBeenCalledWith(
       expect.objectContaining({
         path: 'settings.applyShellProjection',
@@ -380,6 +408,169 @@ describe('server-client web host bootstrap', () => {
         },
       }),
     )
+  })
+
+  test('clears recent repos through the embedded server and then clears native recent documents', async () => {
+    const invokeRpc = vi.fn(async () => undefined)
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {
+        __GOBLIN_BOOTSTRAP__: electronBootstrap({
+          initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+        }),
+        goblinNative: {
+          runtime: {
+            kind: 'electron',
+            bridgeVersion: RENDERER_BRIDGE_VERSION,
+            capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+          },
+          homeDir: '/Users/test',
+          invokeRpc,
+          abortRpc: async () => true,
+          onEvent: () => () => {},
+          onIntent: () => () => {},
+          pathForFile: () => '',
+        },
+        location: {
+          href: 'http://127.0.0.1:32100/',
+          origin: 'http://127.0.0.1:32100',
+          search: '',
+        },
+        matchMedia: vi.fn(() => ({ matches: true })),
+      },
+    })
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { clearRecentRepos } = await import('#/web/app-data-client.ts')
+    await expect(clearRecentRepos()).resolves.toBeUndefined()
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:32100/api/settings/recent-repos/clear',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ 'x-goblin-internal-secret': 'secret' }),
+      }),
+    )
+    expect(invokeRpc).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        path: 'settings.applyShellProjection',
+        input: { recentRepos: { recentRepos: [] } },
+      }),
+    )
+    expect(invokeRpc).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        path: 'settings.clearNativeRecentDocuments',
+      }),
+    )
+  })
+
+  test('returns authoritative terminal app state directly from the settings write response', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        settings: {
+          lang: 'auto',
+          theme: 'auto',
+          colorTheme: 'macos',
+          fetchIntervalSec: 120,
+          terminalNotificationsEnabled: false,
+          shortcutsDisabled: false,
+          globalShortcutDisabled: false,
+          swapCloseShortcuts: false,
+          toggleDetailOnActionBarBlankClick: false,
+          globalShortcut: 'CommandOrControl+Shift+G',
+          terminalApp: 'ghostty',
+          editorApp: 'auto',
+          lanEnabled: false,
+        },
+        externalApps: {
+          terminal: {
+            pref: 'ghostty',
+            resolved: 'ghostty',
+            available: true,
+            appAvailability: { ghostty: true, terminal: false },
+            detectedAt: 1,
+          },
+          editor: {
+            pref: 'auto',
+            resolved: null,
+            available: false,
+            appAvailability: { vscode: false, cursor: false, windsurf: false },
+            detectedAt: 1,
+          },
+        },
+      }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { setPreferredTerminalApp } = await import('#/web/app-data-client.ts')
+    await expect(setPreferredTerminalApp('ghostty')).resolves.toEqual({
+      pref: 'ghostty',
+      resolved: 'ghostty',
+      available: true,
+      appAvailability: { ghostty: true, terminal: false },
+      detectedAt: 1,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  test('returns authoritative editor app state directly from the settings write response', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        settings: {
+          lang: 'auto',
+          theme: 'auto',
+          colorTheme: 'macos',
+          fetchIntervalSec: 120,
+          terminalNotificationsEnabled: false,
+          shortcutsDisabled: false,
+          globalShortcutDisabled: false,
+          swapCloseShortcuts: false,
+          toggleDetailOnActionBarBlankClick: false,
+          globalShortcut: 'CommandOrControl+Shift+G',
+          terminalApp: 'auto',
+          editorApp: 'cursor',
+          lanEnabled: false,
+        },
+        externalApps: {
+          terminal: {
+            pref: 'auto',
+            resolved: null,
+            available: false,
+            appAvailability: { ghostty: false, terminal: false },
+            detectedAt: 1,
+          },
+          editor: {
+            pref: 'cursor',
+            resolved: 'cursor',
+            available: true,
+            appAvailability: { vscode: true, cursor: true, windsurf: false },
+            detectedAt: 1,
+          },
+        },
+      }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { setPreferredEditorApp } = await import('#/web/app-data-client.ts')
+    await expect(setPreferredEditorApp('cursor')).resolves.toEqual({
+      pref: 'cursor',
+      resolved: 'cursor',
+      available: true,
+      appAvailability: { vscode: true, cursor: true, windsurf: false },
+      detectedAt: 1,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
   test('does not project an added recent repo when the embedded server rejects the candidate', async () => {
