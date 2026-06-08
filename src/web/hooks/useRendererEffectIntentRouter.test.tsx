@@ -8,7 +8,21 @@ import type { MainWindowNavigationActions } from '#/web/main-window-navigation.t
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useThemeStore } from '#/web/stores/theme.ts'
+import { useI18nStore } from '#/web/stores/i18n.ts'
 import { createBranchSnapshot, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
+
+const appDataClientMocks = vi.hoisted(() => ({
+  clearRecentRepos: vi.fn(async () => {}),
+}))
+
+vi.mock('#/web/app-data-client.ts', async () => {
+  const actual = await vi.importActual<typeof import('#/web/app-data-client.ts')>('#/web/app-data-client.ts')
+  return {
+    ...actual,
+    clearRecentRepos: appDataClientMocks.clearRecentRepos,
+  }
+})
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
@@ -33,6 +47,7 @@ beforeEach(() => {
   activateRepoSpy.mockClear()
   closeRepoSpy.mockClear()
   showRepoBranchDetailTabSpy.mockClear()
+  appDataClientMocks.clearRecentRepos.mockClear()
   consumeExternalOpenPathsSpy.mockReset()
   consumeExternalOpenPathsSpy.mockResolvedValue([])
   overlayOpen = false
@@ -346,6 +361,45 @@ describe('useRendererEffectIntentRouter', () => {
     expect(useReposStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/repo-a')
     expect(useReposStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/repo-b')
     expect(activateRepoSpy).toHaveBeenCalledWith('/tmp/repo-a')
+  })
+
+  test('theme menu intents update theme through the renderer store', async () => {
+    const setPref = vi.fn(async () => {})
+    useThemeStore.setState((state) => ({ ...state, setPref }))
+
+    await renderHookHost()
+
+    await act(async () => {
+      for (const listener of intentListeners) listener({ type: 'theme-pref-set-requested', pref: 'dark' })
+      await Promise.resolve()
+    })
+
+    expect(setPref).toHaveBeenCalledWith('dark')
+  })
+
+  test('language menu intents update i18n through the renderer store', async () => {
+    const setPref = vi.fn(async () => {})
+    useI18nStore.setState((state) => ({ ...state, setPref }))
+
+    await renderHookHost()
+
+    await act(async () => {
+      for (const listener of intentListeners) listener({ type: 'lang-pref-set-requested', pref: 'ko' })
+      await Promise.resolve()
+    })
+
+    expect(setPref).toHaveBeenCalledWith('ko')
+  })
+
+  test('clear recent intent clears server-backed recents through the renderer client', async () => {
+    await renderHookHost()
+
+    await act(async () => {
+      for (const listener of intentListeners) listener({ type: 'clear-recent-repos-requested' })
+      await Promise.resolve()
+    })
+
+    expect(appDataClientMocks.clearRecentRepos).toHaveBeenCalledTimes(1)
   })
 })
 

@@ -29,6 +29,11 @@
 - Treat `src/server/` as the application runtime boundary. New repo, terminal, session, sync, settings, and realtime business logic should go in `src/server/` or `src/shared/` first, then be consumed by `src/web/` and Electron.
 - Keep `src/main/` limited to Electron-native shell concerns: window lifecycle, preload bridging, menus, shortcuts, native dialogs, dock/badge/notifications, trusted renderer security policy, and embedded server lifecycle. Do not add repo, terminal, settings, or session business ownership back into `src/main/` unless the browser path cannot support it.
 - When a main-process feature needs app data, prefer reading/writing through the embedded server contract instead of introducing new main-owned state. Main should act as a native host and thin adapter, not as a parallel business runtime.
+- Treat settings as server-owned state by default. New settings writes should normally flow `menu/UI -> renderer -> server authoritative response -> native projection`; do not add new main-process settings write paths unless the capability is inherently native-only.
+- Keep main-process settings reads limited to native boot, renderer bootstrap seeding, and native-only capability coordination. If a new main-process settings read does not fit one of those buckets, prefer moving it back to the renderer/server path.
+- Keep native menu items intent-first. Menu actions should usually emit renderer effect intents and let the renderer/server own business mutations; reserve direct main-process actions for shell-only work such as native dialogs, OS integrations, or external link handling.
+- Keep native projection code one-way. `src/main/` may project server-authoritative prefs into Electron state (menu labels, theme, OS recent docs, shortcut registration state), but should not become a parallel source of truth for settings/session data.
+- Treat global shortcut coordination as the main exception: validation, OS registration, and registration-result persistence may stay in `src/main/`, but other settings should not follow that pattern without documenting why the browser path is insufficient.
 - Keep the architecture guard green with `bun run check:architecture`. The enforced boundaries are:
   - `src/main/**` must not import `src/web/**` or `src/server/**`.
   - `src/web/**` must not import `src/main/**`.

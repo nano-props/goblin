@@ -200,9 +200,9 @@ describe('preload goblinNative bridge', () => {
     expect(ipcRenderer.on).toHaveBeenCalledWith(RPC_EVENT_CHANNEL, expect.any(Function))
 
     const listener = ipcRenderer.on.mock.calls[0]?.[1] as ((event: unknown, payload: unknown) => void) | undefined
-    listener?.(null, { type: 'theme-changed' })
-    expect(cb1).toHaveBeenCalledWith({ type: 'theme-changed' })
-    expect(cb2).toHaveBeenCalledWith({ type: 'theme-changed' })
+    listener?.(null, { type: 'settings-write-error', message: 'failed' })
+    expect(cb1).toHaveBeenCalledWith({ type: 'settings-write-error', message: 'failed' })
+    expect(cb2).toHaveBeenCalledWith({ type: 'settings-write-error', message: 'failed' })
 
     off1()
     expect(ipcRenderer.off).not.toHaveBeenCalled()
@@ -224,10 +224,10 @@ describe('preload goblinNative bridge', () => {
     goblinNative.onEvent(cb2)
 
     const listener = ipcRenderer.on.mock.calls[0]?.[1] as ((event: unknown, payload: unknown) => void) | undefined
-    listener?.(null, { type: 'theme-changed' })
+    listener?.(null, { type: 'settings-write-error', message: 'failed' })
 
-    expect(cb1).toHaveBeenCalledWith({ type: 'theme-changed' })
-    expect(cb2).toHaveBeenCalledWith({ type: 'theme-changed' })
+    expect(cb1).toHaveBeenCalledWith({ type: 'settings-write-error', message: 'failed' })
+    expect(cb2).toHaveBeenCalledWith({ type: 'settings-write-error', message: 'failed' })
     expect(warn).toHaveBeenCalledWith('[ipc] goblin:event subscriber failed', expect.any(Error))
     expect((warn.mock.calls[0]?.[1] as Error | undefined)?.message).toBe('boom')
     warn.mockRestore()

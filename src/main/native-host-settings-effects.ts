@@ -132,12 +132,3 @@ export async function applyNativeHostShellProjection(
     })
   }
 }
-
-export async function applyNativeHostClearRecentReposState(): Promise<void> {
-  await applyNativeHostShellProjection(
-    {
-      recentRepos: { recentRepos: [] },
-    },
-    { clearRecentDocuments: true },
-  )
-}

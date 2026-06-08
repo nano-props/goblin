@@ -158,7 +158,6 @@ vi.mock('#/main/i18n/index.ts', () => ({
   applyLangPref: vi.fn(),
   getCurrentLang: vi.fn(() => 'en'),
   getDictionary: vi.fn(() => ({})),
-  getLangPref: vi.fn(async () => 'auto'),
   resolveLang: vi.fn((pref: string) => (pref === 'auto' ? 'en' : pref)),
   setCurrentLang: vi.fn(),
 }))
@@ -192,14 +191,10 @@ vi.mock('#/main/renderer-surface-events.ts', () => ({
 }))
 
 vi.mock('#/main/settings-server-client.ts', () => ({
-  setSettingsFetchInterval: vi.fn(),
   setSettingsGlobalShortcutState: vi.fn(async () => true),
   getSettingsPrefs: vi.fn(async () => settingsPrefs()),
   getSettingsSnapshot: vi.fn(),
-  saveSettingsSession: vi.fn(),
   updateSettingsPrefs: vi.fn(async (patch: Record<string, unknown>) => ({ ...settingsPrefs(), ...patch })),
-  addSettingsRecentRepo: vi.fn(),
-  clearSettingsRecentRepos: vi.fn(async () => true),
 }))
 
 vi.mock('#/system/github-cli.ts', () => ({
@@ -434,6 +429,13 @@ describe('main repo rpc cancellation', () => {
 
     expect(result).toEqual({ ok: true, data: undefined })
     expect(app.addRecentDocument).toHaveBeenCalledWith('/repo')
+  })
+
+  test('clears native recent documents without mutating server-owned recents', async () => {
+    const result = await invokeRpc('settings.clearNativeRecentDocuments')
+
+    expect(result).toEqual({ ok: true, data: undefined })
+    expect(app.clearRecentDocuments).toHaveBeenCalledTimes(1)
   })
 
   test('projects server-owned prefs into native shell state when the renderer updates them', async () => {

@@ -5,7 +5,6 @@ import { applyMainWindowChromeTheme } from '#/main/window.ts'
 import { allRegisteredSurfacesWithCapability } from '#/main/window-registry.ts'
 import { subscribeTheme } from '#/main/theme.ts'
 import { buildAppMenu } from '#/main/menu.ts'
-import { broadcastRpcEvent } from '#/main/renderer-surface-events.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 import { WINDOW_BACKGROUND_BY_COLOR_THEME } from '#/shared/theme-tokens.ts'
 import { RPC_ABORT_CHANNEL, RPC_CHANNEL } from '#/shared/ipc-channels.ts'
@@ -69,7 +68,6 @@ export function wireRpcIpc(): void {
     }
     applyMainWindowChromeTheme(state.resolved)
     buildAppMenu()
-    broadcastRpcEvent({ type: 'theme-changed', state })
   })
 }
 

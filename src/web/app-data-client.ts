@@ -15,6 +15,7 @@ import type {
   RepoSnapshot,
   ProbeResult,
   SettingsPrefs,
+  SettingsPrefsUpdateResponse,
   SettingsSnapshot,
   TerminalPref,
   TerminalAppState,
@@ -83,6 +84,10 @@ export async function getSettingsSnapshot(): Promise<SettingsSnapshot> {
 }
 
 export function resolveThemeStateFromSettings(settings: SettingsSnapshot): ThemeState {
+  return resolveThemeStateFromPrefs(settings)
+}
+
+function resolveThemeStateFromPrefs(settings: Pick<SettingsPrefs, 'theme' | 'colorTheme'>): ThemeState {
   const resolved =
     settings.theme === 'auto'
       ? window.matchMedia?.('(prefers-color-scheme: dark)').matches
@@ -96,8 +101,8 @@ export async function getThemeState(): Promise<ThemeState> {
   return resolveThemeStateFromSettings(await getSettingsSnapshot())
 }
 
-async function updateSettingsPrefsPatch(settings: Record<string, unknown>): Promise<void> {
-  const result = await fetchServerJson<{ ok: boolean; settings: SettingsPrefs }>('/api/settings/prefs', {
+async function updateSettingsPrefsPatch(settings: Record<string, unknown>): Promise<SettingsPrefsUpdateResponse> {
+  const result = await fetchServerJson<SettingsPrefsUpdateResponse>('/api/settings/prefs', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -105,23 +110,22 @@ async function updateSettingsPrefsPatch(settings: Record<string, unknown>): Prom
     body: JSON.stringify({ settings }),
   })
   const patch = pickNativeSettingsProjectionPatch(settings as Partial<SettingsPrefs>)
-  if (!patch || !canUseNativeRpcBridge()) return
+  if (!patch || !canUseNativeRpcBridge()) return result
   await invokeNativeRpcPath<void>('settings.applyShellProjection', {
     prefs: {
       patch,
       settings: nativeSettingsProjectionStateFromSettings(result.settings),
     },
   })
+  return result
 }
 
 export async function setThemePref(pref: ThemePref): Promise<ThemeState> {
-  await updateSettingsPrefsPatch({ theme: pref })
-  return await getThemeState()
+  return resolveThemeStateFromPrefs((await updateSettingsPrefsPatch({ theme: pref })).settings)
 }
 
 export async function setThemeColorTheme(colorTheme: ColorTheme): Promise<ThemeState> {
-  await updateSettingsPrefsPatch({ colorTheme })
-  return await getThemeState()
+  return resolveThemeStateFromPrefs((await updateSettingsPrefsPatch({ colorTheme })).settings)
 }
 
 export async function getI18nPayload(): Promise<I18nPayload> {
@@ -129,8 +133,8 @@ export async function getI18nPayload(): Promise<I18nPayload> {
 }
 
 export async function setI18nPref(pref: LangPref): Promise<I18nPayload> {
-  await updateSettingsPrefsPatch({ lang: pref })
-  return await getI18nPayload()
+  const result = await updateSettingsPrefsPatch({ lang: pref })
+  return result.i18n ?? (await getI18nPayload())
 }
 
 export async function getGitHubCliState(hosts?: string[]): Promise<GitHubCliState> {
@@ -209,6 +213,15 @@ export async function addRecentRepo(repo: RepoSessionEntry): Promise<void> {
   })
 }
 
+export async function clearRecentRepos(): Promise<void> {
+  await postServerJson('/api/settings/recent-repos/clear', {})
+  if (!canUseNativeRpcBridge()) return
+  await invokeNativeRpcPath<void>('settings.applyShellProjection', {
+    recentRepos: { recentRepos: [] },
+  })
+  await invokeNativeRpcPath<void>('settings.clearNativeRecentDocuments', undefined)
+}
+
 export async function saveSession(session: SettingsSnapshot['session']): Promise<void> {
   await postServerJson('/api/settings/session', { session })
 }
@@ -247,13 +260,13 @@ export async function setGlobalShortcut(accelerator: string): Promise<GlobalShor
 }
 
 export async function setPreferredTerminalApp(pref: TerminalPref): Promise<TerminalAppState> {
-  await updateSettingsPrefsPatch({ terminalApp: pref })
-  return (await getExternalAppsSnapshot()).terminal
+  const result = await updateSettingsPrefsPatch({ terminalApp: pref })
+  return result.externalApps?.terminal ?? (await getExternalAppsSnapshot()).terminal
 }
 
 export async function setPreferredEditorApp(pref: EditorPref): Promise<EditorAppState> {
-  await updateSettingsPrefsPatch({ editorApp: pref })
-  return (await getExternalAppsSnapshot()).editor
+  const result = await updateSettingsPrefsPatch({ editorApp: pref })
+  return result.externalApps?.editor ?? (await getExternalAppsSnapshot()).editor
 }
 
 export async function cloneRepository(input: {

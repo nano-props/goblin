@@ -90,7 +90,7 @@ export interface SessionState {
   selectedTerminalByWorktree?: Record<string, string>
 }
 
-export interface SettingsSnapshot extends Omit<SettingsPrefs, 'lang'> {
+export interface SettingsSnapshot extends SettingsPrefs {
   globalShortcutRegistered: boolean
   session: SessionState
   recentRepos: RepoSessionEntry[]
@@ -143,6 +143,13 @@ export interface I18nPayload {
   dict: Record<string, string>
 }
 
+export interface SettingsPrefsUpdateResponse {
+  ok: true
+  settings: SettingsPrefs
+  i18n?: I18nPayload
+  externalApps?: ExternalAppsSnapshot
+}
+
 export interface RepoSnapshot {
   branches: BranchSnapshotInfo[]
   current: string
@@ -184,7 +191,6 @@ export type RpcResponse =
   | { ok: false; error: { message: string; code?: string; name?: string } }
 
 export type RpcEvent =
-  | { type: 'theme-changed'; state: ThemeState }
   | { type: 'fetch-interval-changed'; sec: number }
   | { type: 'terminal-notifications-changed'; enabled: boolean }
   | { type: 'shortcuts-disabled-changed'; disabled: boolean }
@@ -289,6 +295,7 @@ export interface NativeRpcHandlers {
   settings: {
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
     applyShellProjection: (input: NativeShellProjection) => Promise<void>
+    clearNativeRecentDocuments: () => Promise<void>
   }
 }
 
@@ -347,6 +354,7 @@ export const RPC_PROCEDURE_SCHEMAS: NativeRpcProcedureSchemas = {
   settings: {
     setGlobalShortcut: v.object({ accelerator: v.string() }),
     applyShellProjection: NativeShellProjectionSchema,
+    clearNativeRecentDocuments: EmptyInput,
   },
 }
 

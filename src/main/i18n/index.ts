@@ -8,8 +8,8 @@
 
 import { app } from 'electron'
 import { DICTS, en, type DictKey } from '#/shared/i18n/dictionaries.ts'
-import { getSettingsPrefs, updateSettingsPrefs } from '#/main/settings-server-client.ts'
-import type { I18nPayload, Lang, LangPref } from '#/shared/rpc.ts'
+import { resolvePreferredLang } from '#/shared/i18n/resolve-lang.ts'
+import type { Lang, LangPref } from '#/shared/rpc.ts'
 
 let currentLang: Lang = 'en'
 
@@ -45,12 +45,7 @@ export function assertDictionaryParity(isDev: boolean): void {
  * Map the OS locale to a supported lang. Falls back to 'en'.
  */
 export function resolveLang(pref: LangPref): Lang {
-  if (pref === 'en' || pref === 'zh' || pref === 'ko' || pref === 'ja') return pref
-  const sys = (app.getLocale() || 'en').toLowerCase()
-  if (sys.startsWith('zh')) return 'zh'
-  if (sys.startsWith('ko')) return 'ko'
-  if (sys.startsWith('ja')) return 'ja'
-  return 'en'
+  return resolvePreferredLang(pref, app.getLocale())
 }
 
 export function setCurrentLang(lang: Lang): void {
@@ -74,17 +69,4 @@ export function t(key: DictKey, params?: Record<string, string | number>): strin
 
 export function getDictionary(): Record<DictKey, string> {
   return DICTS[currentLang]
-}
-
-export async function getLangPref(): Promise<LangPref> {
-  return (await getSettingsPrefs()).lang
-}
-
-export async function applyLangPref(pref: LangPref): Promise<I18nPayload | null> {
-  const currentPref = await getLangPref()
-  const nextPref = (await updateSettingsPrefs({ lang: pref })).lang
-  const lang = resolveLang(nextPref)
-  const changed = currentPref !== nextPref || currentLang !== lang
-  setCurrentLang(lang)
-  return changed ? { lang, pref: nextPref, dict: getDictionary() } : null
 }

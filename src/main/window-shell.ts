@@ -16,7 +16,7 @@ import {
   isTrustedAppUrlForWebContents,
   registerTrustedAppUrl,
 } from '#/main/ipc/trusted-webcontents.ts'
-import { getCurrentLang, getDictionary, getLangPref } from '#/main/i18n/index.ts'
+import { getCurrentLang, getDictionary } from '#/main/i18n/index.ts'
 import { getTheme } from '#/main/theme.ts'
 import { getEmbeddedServerRuntime } from '#/main/server-manager.ts'
 import { getSettingsSnapshot } from '#/main/settings-server-client.ts'
@@ -55,11 +55,10 @@ function buildRendererBootstrapPayload(
 }
 
 export async function createRendererWindowWebPreferences(): Promise<BrowserWindowConstructorOptions['webPreferences']> {
-  const langPref = await getLangPref()
   const settingsSnapshot = await getSettingsSnapshot()
   const initialSettings: InitialSettingsSnapshot = initialSettingsFromSnapshot(settingsSnapshot)
   const bootstrapPayload = Buffer.from(
-    JSON.stringify(buildRendererBootstrapPayload(langPref, initialSettings)),
+    JSON.stringify(buildRendererBootstrapPayload(settingsSnapshot.lang, initialSettings)),
   ).toString('base64')
   return {
     preload: PRELOAD_PATH,

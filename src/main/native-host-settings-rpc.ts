@@ -17,10 +17,14 @@ async function getRuntimeServerSettingsPrefs() {
 
 export function createNativeHostSettingsRpcHandlers(options: {
   addRecentDocument: (path: string) => void
+  clearRecentDocuments: () => void
 }): Pick<NativeRpcHandlers, 'settings'> {
   return {
     settings: {
       applyShellProjection: async (input) => await applyNativeHostShellProjection(input, { addRecentDocument: options.addRecentDocument }),
+      clearNativeRecentDocuments: async () => {
+        options.clearRecentDocuments()
+      },
       setGlobalShortcut: async ({ accelerator }) => {
         const parsed = parseGlobalShortcut(accelerator)
         const serverSettings = await getRuntimeServerSettingsPrefs()
