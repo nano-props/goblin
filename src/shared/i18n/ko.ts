@@ -467,6 +467,7 @@ export const ko: Record<DictKey, string> = {
   'error.vscode-not-installed': 'VS Code가 설치되어 있지 않습니다',
   'error.editor-not-installed': '에디터를 찾을 수 없습니다',
   'error.remote-editor-not-supported': '선택한 에디터는 원격 SSH 작업 영역을 열 수 없습니다',
+  'error.remote-terminal-not-supported': '선택한 터미널은 원격 SSH 작업 영역을 열 수 없습니다',
   'error.render-crash-title': '이 화면을 렌더링하는 중에 오류가 발생했습니다',
   'error.render-crash-unknown': '알 수 없는 렌더 오류.',
   'error.try-again': '다시 시도',

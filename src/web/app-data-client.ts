@@ -200,6 +200,10 @@ export async function openRemoteRepositoryEditor(repoId: string, worktreePath: s
   return await postServerJson('/api/remote/open-editor', { repoId, worktreePath })
 }
 
+export async function openRemoteRepositoryTerminal(repoId: string, worktreePath: string): Promise<ExecResult> {
+  return await postServerJson('/api/remote/open-terminal', { repoId, worktreePath })
+}
+
 export async function addRecentRepo(repo: RepoSessionEntry): Promise<void> {
   const result = await postServerJson<
     { repo: RepoSessionEntry },

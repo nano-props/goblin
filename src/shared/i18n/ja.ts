@@ -475,6 +475,7 @@ export const ja: Record<DictKey, string> = {
   'error.vscode-not-installed': 'VS Code がインストールされていません',
   'error.editor-not-installed': 'エディタが見つかりません',
   'error.remote-editor-not-supported': '選択したエディタはリモート SSH ワークスペースを開けません',
+  'error.remote-terminal-not-supported': '選択したターミナルはリモート SSH ワークスペースを開けません',
   'error.render-crash-title': 'このビューの描画中にエラーが発生しました',
   'error.render-crash-unknown': '不明な描画エラー。',
   'error.try-again': '再試行',

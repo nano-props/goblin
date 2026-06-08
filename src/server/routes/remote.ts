@@ -3,6 +3,7 @@ import {
   getServerRemotePathSuggestions,
   getServerSshHosts,
   openServerRemoteEditor,
+  openServerRemoteTerminal,
   resolveServerRemoteTarget,
   testServerRemoteRepository,
 } from '#/server/modules/remote.ts'
@@ -34,6 +35,12 @@ export function createRemoteRoutes() {
     const repoId = typeof body?.repoId === 'string' ? body.repoId : ''
     const worktreePath = typeof body?.worktreePath === 'string' ? body.worktreePath : ''
     return c.json(await openServerRemoteEditor({ repoId, worktreePath }, c.req.raw.signal))
+  })
+  app.post('/open-terminal', async (c) => {
+    const body = await c.req.json().catch(() => null)
+    const repoId = typeof body?.repoId === 'string' ? body.repoId : ''
+    const worktreePath = typeof body?.worktreePath === 'string' ? body.worktreePath : ''
+    return c.json(await openServerRemoteTerminal({ repoId, worktreePath }, c.req.raw.signal))
   })
   return app
 }

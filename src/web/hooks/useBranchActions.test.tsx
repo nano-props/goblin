@@ -15,7 +15,9 @@ const mocks = vi.hoisted(() => ({
   openRepositoryRemote: vi.fn(),
   openRepositoryTerminal: vi.fn(),
   openRemoteRepositoryEditor: vi.fn(),
+  openRemoteRepositoryTerminal: vi.fn(),
   showRepoDetailTab: vi.fn(),
+  showRepoBranchDetailTab: vi.fn(),
 }))
 
 vi.mock('#/web/app-shell-client.ts', () => ({
@@ -28,11 +30,13 @@ vi.mock('#/web/app-data-client.ts', () => ({
   openRepositoryRemote: mocks.openRepositoryRemote,
   openRepositoryTerminal: mocks.openRepositoryTerminal,
   openRemoteRepositoryEditor: mocks.openRemoteRepositoryEditor,
+  openRemoteRepositoryTerminal: mocks.openRemoteRepositoryTerminal,
 }))
 
 vi.mock('#/web/main-window-navigation.tsx', () => ({
   useMainWindowNavigation: () => ({
     showRepoDetailTab: mocks.showRepoDetailTab,
+    showRepoBranchDetailTab: mocks.showRepoBranchDetailTab,
   }),
 }))
 
@@ -50,7 +54,9 @@ describe('useBranchActions', () => {
     mocks.openRepositoryRemote.mockReset()
     mocks.openRepositoryTerminal.mockReset()
     mocks.openRemoteRepositoryEditor.mockReset()
+    mocks.openRemoteRepositoryTerminal.mockReset()
     mocks.showRepoDetailTab.mockReset()
+    mocks.showRepoBranchDetailTab.mockReset()
     reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
     container = document.createElement('div')
     document.body.appendChild(container)
@@ -127,7 +133,8 @@ describe('useBranchActions', () => {
     expect(mocks.openExternalUrl).not.toHaveBeenCalled()
   })
 
-  test('opens remote terminals in the Goblin terminal detail tab', async () => {
+  test('opens remote terminals through the remote terminal client without selecting the in-app terminal tab', async () => {
+    mocks.openRemoteRepositoryTerminal.mockResolvedValue({ ok: true, message: '' })
     const branch = createRepoBranch('feature/remote-terminal', { worktree: { path: '/srv/repo-feature' } })
     const target = normalizeRemoteTarget({
       alias: 'prod',
@@ -153,8 +160,33 @@ describe('useBranchActions', () => {
       await actions?.openTerminal?.()
     })
 
-    expect(mocks.showRepoDetailTab).toHaveBeenCalledWith(target!.id, 'terminal')
+    expect(mocks.openRemoteRepositoryTerminal).toHaveBeenCalledWith(target!.id, '/srv/repo-feature')
     expect(mocks.openRepositoryTerminal).not.toHaveBeenCalled()
+    expect(mocks.showRepoDetailTab).not.toHaveBeenCalled()
+    expect(mocks.showRepoBranchDetailTab).not.toHaveBeenCalled()
+  })
+
+  test('keeps local terminal actions on the external terminal route', async () => {
+    mocks.openRepositoryTerminal.mockResolvedValue({ ok: true, message: '' })
+    const branch = createRepoBranch('feature/local-terminal', { worktree: { path: '/tmp/repo-feature' } })
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [branch],
+    })
+
+    let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
+    root = createRoot(container)
+    await act(async () => {
+      root!.render(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
+    })
+
+    await act(async () => {
+      await actions?.openTerminal?.()
+    })
+
+    expect(mocks.openRepositoryTerminal).toHaveBeenCalledWith('/tmp/repo-feature')
+    expect(mocks.openRemoteRepositoryTerminal).not.toHaveBeenCalled()
+    expect(mocks.showRepoBranchDetailTab).not.toHaveBeenCalled()
   })
 
   test('opens remote editors through the remote editor client', async () => {

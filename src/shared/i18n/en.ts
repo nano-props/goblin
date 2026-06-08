@@ -475,6 +475,7 @@ export const en = {
   'error.vscode-not-installed': 'VS Code not installed',
   'error.editor-not-installed': 'No editor found',
   'error.remote-editor-not-supported': 'The selected editor cannot open remote SSH workspaces',
+  'error.remote-terminal-not-supported': 'The selected terminal cannot open remote SSH workspaces',
   'error.render-crash-title': 'Something broke while rendering this view',
   'error.render-crash-unknown': 'Unknown render error.',
   'error.try-again': 'Try again',

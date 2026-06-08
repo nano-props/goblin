@@ -8,9 +8,10 @@
 // 3. Add the new id to TerminalPref in shared/rpc.ts
 // 4. Add i18n keys for the settings picker
 
+import type { ExecResult } from '#/shared/git-types.ts'
 import type { ResolvedTerminalApp, TerminalAppAvailability, TerminalPref } from '#/shared/rpc.ts'
-import { isGhosttyInstalled, openInGhostty } from '#/system/ghostty.ts'
-import { isAppleTerminalInstalled, openInAppleTerminal } from '#/system/apple-terminal.ts'
+import { isGhosttyInstalled, openInGhostty, openRemoteInGhostty } from '#/system/ghostty.ts'
+import { isAppleTerminalInstalled, openInAppleTerminal, openRemoteInAppleTerminal } from '#/system/apple-terminal.ts'
 
 export interface TerminalBackend {
   /** Whether this terminal is available on the current system.
@@ -19,13 +20,15 @@ export interface TerminalBackend {
    *  it at registration time and cache the result. */
   isInstalled: () => boolean
   /** Open a directory in this terminal. */
-  open: (path: string) => Promise<{ ok: boolean; message: string }>
+  open: (path: string) => Promise<ExecResult>
+  /** Open a remote SSH workspace in this terminal. */
+  openRemote?: (alias: string, remotePath: string) => Promise<ExecResult>
 }
 
 /** Concrete terminal pref values (excludes 'auto'). */
 const backends: Record<ResolvedTerminalApp, TerminalBackend> = {
-  ghostty: { isInstalled: isGhosttyInstalled, open: openInGhostty },
-  terminal: { isInstalled: () => true, open: openInAppleTerminal },
+  ghostty: { isInstalled: isGhosttyInstalled, open: openInGhostty, openRemote: openRemoteInGhostty },
+  terminal: { isInstalled: () => true, open: openInAppleTerminal, openRemote: openRemoteInAppleTerminal },
 }
 
 /** Auto-detection priority — first installed backend wins. */
@@ -64,6 +67,26 @@ export async function openInPreferredTerminal(path: string, pref: TerminalPref):
   return resolved
     ? backends[resolved].open(path)
     : Promise.resolve({ ok: false, message: 'error.terminal-not-installed' })
+}
+
+export function openRemoteInTerminalBackend(
+  backend: TerminalBackend | null,
+  alias: string,
+  remotePath: string,
+): Promise<ExecResult> {
+  if (!backend) return Promise.resolve({ ok: false, message: 'error.terminal-not-installed' })
+  return backend.openRemote
+    ? backend.openRemote(alias, remotePath)
+    : Promise.resolve({ ok: false, message: 'error.remote-terminal-not-supported' })
+}
+
+export async function openRemoteInPreferredTerminal(
+  alias: string,
+  remotePath: string,
+  pref: TerminalPref,
+): Promise<ExecResult> {
+  const resolved = resolveTerminalApp(pref, await getTerminalAppAvailability())
+  return await openRemoteInTerminalBackend(resolved ? backends[resolved] : null, alias, remotePath)
 }
 
 export async function getResolvedTerminalApp(pref: TerminalPref): Promise<ResolvedTerminalApp | null> {
