@@ -1,4 +1,4 @@
-import { Loader2, Wrench } from 'lucide-react'
+import { Loader2, MoreHorizontal } from 'lucide-react'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { Button } from '#/web/components/ui/button.tsx'
@@ -17,7 +17,6 @@ import {
 } from '#/web/hooks/useBranchActionItems.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
-import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 interface Props {
   repo: BranchActionRepo
   branch: RepoBranchState
@@ -54,7 +53,6 @@ export function BranchActionsDropdown({
   onOpenChange?: (open: boolean) => void
 }) {
   const t = useT()
-  const compact = useIsCompactUi()
   const { pending: pendingAction, run } = useAsyncPending<BranchActionItem['id']>()
   const visiblePatchItems = patchItems.filter((item) => item.visible)
   const visibleMainItems = mainItems.filter((item) => item.visible)
@@ -80,8 +78,7 @@ export function BranchActionsDropdown({
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
         >
-          {busyAction ? <Loader2 size={16} className="animate-spin" /> : <Wrench className="size-4" />}
-          {!compact && t('action.menu')}
+          {busyAction ? <Loader2 size={16} className="animate-spin" /> : <MoreHorizontal className="size-4" />}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
