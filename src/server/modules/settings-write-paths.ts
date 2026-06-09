@@ -1,6 +1,5 @@
 import { publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
 import { buildServerExternalAppsSnapshot } from '#/server/modules/external-apps.ts'
-import { setServerGlobalShortcutRegistered } from '#/server/modules/settings.ts'
 import {
   addServerRecentRepo,
   clearServerRecentRepos,
@@ -8,6 +7,7 @@ import {
   setServerSessionState,
   updateServerSettingsPrefs,
 } from '#/server/modules/settings-source.ts'
+import type { ServerSettingsState } from '#/server/modules/settings-state.ts'
 import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
 import { toSafeSessionRepoEntry } from '#/shared/input-validation.ts'
 import type { SessionState, SettingsPrefsUpdateResponse } from '#/shared/rpc.ts'
@@ -39,8 +39,11 @@ export async function applyServerSettingsPrefsWrite(
   }
 }
 
-export function applyServerGlobalShortcutRegistrationWrite(body: unknown): { ok: true; registered: boolean } {
-  const registered = setServerGlobalShortcutRegistered((body as { registered?: unknown } | null)?.registered === true)
+export function applyServerGlobalShortcutRegistrationWrite(
+  body: unknown,
+  state: ServerSettingsState,
+): { ok: true; registered: boolean } {
+  const registered = (state.globalShortcutRegistered = (body as { registered?: unknown } | null)?.registered === true)
   publishSettingsInvalidation(['settings-snapshot'])
   return { ok: true, registered }
 }

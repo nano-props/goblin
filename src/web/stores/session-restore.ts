@@ -6,7 +6,7 @@
 import { create } from 'zustand'
 import type { SessionState } from '#/shared/rpc.ts'
 import { restorableSessionStateFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
-import { getSettingsSnapshot } from '#/web/app-data-client.ts'
+import { getSettingsSnapshot } from '#/web/settings-client.ts'
 import { DEFAULT_DETAIL_PANE_SIZES, DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 
 export const DEFAULT_RESTORABLE_SESSION_STATE: SessionState = {

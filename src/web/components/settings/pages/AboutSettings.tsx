@@ -2,7 +2,7 @@ import { ExternalLink, Hash, Tag } from 'lucide-react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { GitHubMark } from '#/web/components/GitHubMark.tsx'
 import { SettingsCard, SettingsListItem } from '#/web/components/settings/SettingsPrimitives.tsx'
-import { useAboutSettingsController } from '#/web/runtime-settings-about.ts'
+import { openProjectGitHub } from '#/web/app-shell-client.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { cn } from '#/web/lib/cn.ts'
 const appIconUrl = new URL('../../../../../assets/icon.png', import.meta.url).href
@@ -10,7 +10,6 @@ const appIconUrl = new URL('../../../../../assets/icon.png', import.meta.url).hr
 export function AboutSettings() {
   const t = useT()
   const commit = __BUILD_INFO__.commit
-  const { openProjectGitHub } = useAboutSettingsController()
 
   return (
     <SettingsCard as="ul">

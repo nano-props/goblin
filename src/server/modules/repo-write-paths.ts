@@ -1,22 +1,16 @@
 import { runServerCancellable, abortServerNetworkOp } from '#/server/common/network-ops.ts'
-import { getBackgroundSyncRepos as getRegisteredBackgroundSyncRepos, setBackgroundSyncRepos as setRegisteredBackgroundSyncRepos } from '#/server/modules/background-sync.ts'
 import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
-import { resolveRepoBackend } from '#/server/modules/repo-backend.ts'
+import { resolveRepoBackend, runWithRepoBackend } from '#/server/modules/repo-backend.ts'
+import { getServerSettingsPrefs } from '#/server/modules/settings-source.ts'
 import { cloneRepository as cloneGitRepository } from '#/system/git/clone.ts'
-import { type ExecResult, type PullRequestFetchMode, type WorktreeStatus } from '#/shared/git-types.ts'
-import { checkGitAvailable } from '#/system/git/helper.ts'
-import { isValidCwd, isValidRepoLocator } from '#/shared/input-validation.ts'
 import { openInPreferredEditor } from '#/system/editors.ts'
 import { openInPreferredTerminal } from '#/system/terminals.ts'
-import {
-  type CloneRepoResult,
-  type NetworkOpKind,
-  type ProbeResult,
-  type PullRequestEntry,
-  type RepoSnapshot,
-} from '#/shared/rpc.ts'
+import { type ExecResult } from '#/shared/git-types.ts'
+import { type NetworkOpKind } from '#/shared/rpc.ts'
+import { checkGitAvailable } from '#/system/git/helper.ts'
+import { isValidCwd, isValidRepoLocator } from '#/shared/input-validation.ts'
+import { type CloneRepoResult, type ProbeResult } from '#/shared/rpc.ts'
 import { constants as fsConstants, promises as fs } from 'node:fs'
-import { getServerSettingsPrefs } from '#/server/modules/settings-source.ts'
 
 type ProbeAvailability = { ok: true } | { ok: false; message: string }
 
@@ -108,53 +102,6 @@ function publishRepoSnapshotInvalidation(cwd: string, sourceToken?: string): voi
   publishRepoQueryInvalidation(repoSnapshotInvalidationEvent(cwd, sourceToken))
 }
 
-async function runWithRepoBackend<T>(
-  cwd: string,
-  task: (backend: Awaited<ReturnType<typeof resolveRepoBackend>>) => Promise<T>,
-): Promise<T> {
-  return await task(await resolveRepoBackend(cwd))
-}
-
-export async function probeRepository(cwd: string): Promise<ProbeResult> {
-  return await runWithRepoBackend(cwd, async (backend) => await backend.probe())
-}
-
-export async function cloneRepository(
-  operationId: string,
-  url: string,
-  parentPath: string,
-  directoryName: string,
-): Promise<CloneRepoResult> {
-  if (!isValidCloneOperationId(operationId)) return { ok: false, message: 'error.invalid-arguments' }
-  const repoUrl = typeof url === 'string' ? url.trim() : ''
-  const targetParent = typeof parentPath === 'string' ? parentPath.trim() : ''
-  const targetName = typeof directoryName === 'string' ? directoryName.trim() : ''
-  if (!isValidCloneUrl(repoUrl) || !isValidCloneDirectoryName(targetName)) {
-    return { ok: false, message: 'error.invalid-arguments' }
-  }
-  if (!isValidCwd(targetParent)) return { ok: false, message: 'error.invalid-path' }
-  const gitAvailable = await checkGitAvailable()
-  if (!gitAvailable.ok) return gitAvailable
-  const writable = await ensureWritableDirectory(targetParent)
-  if (!writable.ok) return writable
-  if (activeCloneControllers.has(operationId)) return { ok: false, message: 'error.network-op-in-progress' }
-  const ctrl = new AbortController()
-  activeCloneControllers.set(operationId, ctrl)
-  try {
-    return await cloneGitRepository(targetParent, targetName, repoUrl, ctrl.signal)
-  } finally {
-    if (activeCloneControllers.get(operationId) === ctrl) activeCloneControllers.delete(operationId)
-  }
-}
-
-export function abortCloneOperation(operationId: string): boolean {
-  if (!isValidCloneOperationId(operationId)) return false
-  const active = activeCloneControllers.get(operationId)
-  if (!active) return false
-  active.abort()
-  return true
-}
-
 async function publishSnapshotInvalidationAfterMutation(
   cwd: string,
   result: ExecResult,
@@ -205,34 +152,40 @@ async function runUserNetworkMutation(
   )
 }
 
-export async function getRepositorySnapshot(cwd: string, signal?: AbortSignal): Promise<RepoSnapshot | null> {
-  return signal?.aborted ? null : await runWithRepoBackend(cwd, async (backend) => await backend.getSnapshot(signal))
+export async function cloneRepository(
+  operationId: string,
+  url: string,
+  parentPath: string,
+  directoryName: string,
+): Promise<CloneRepoResult> {
+  if (!isValidCloneOperationId(operationId)) return { ok: false, message: 'error.invalid-arguments' }
+  const repoUrl = typeof url === 'string' ? url.trim() : ''
+  const targetParent = typeof parentPath === 'string' ? parentPath.trim() : ''
+  const targetName = typeof directoryName === 'string' ? directoryName.trim() : ''
+  if (!isValidCloneUrl(repoUrl) || !isValidCloneDirectoryName(targetName)) {
+    return { ok: false, message: 'error.invalid-arguments' }
+  }
+  if (!isValidCwd(targetParent)) return { ok: false, message: 'error.invalid-path' }
+  const gitAvailable = await checkGitAvailable()
+  if (!gitAvailable.ok) return gitAvailable
+  const writable = await ensureWritableDirectory(targetParent)
+  if (!writable.ok) return writable
+  if (activeCloneControllers.has(operationId)) return { ok: false, message: 'error.network-op-in-progress' }
+  const ctrl = new AbortController()
+  activeCloneControllers.set(operationId, ctrl)
+  try {
+    return await cloneGitRepository(targetParent, targetName, repoUrl, ctrl.signal)
+  } finally {
+    if (activeCloneControllers.get(operationId) === ctrl) activeCloneControllers.delete(operationId)
+  }
 }
 
-export async function getRepositoryStatus(cwd: string, signal?: AbortSignal): Promise<WorktreeStatus[]> {
-  return signal?.aborted ? [] : await runWithRepoBackend(cwd, async (backend) => await backend.getStatus(signal))
-}
-
-export async function getRepositoryPullRequests(
-  cwd: string,
-  branches?: string[],
-  options?: { mode?: PullRequestFetchMode; signal?: AbortSignal },
-): Promise<PullRequestEntry[] | null> {
-  if (branches !== undefined && !Array.isArray(branches)) return null
-  const mode: PullRequestFetchMode = options?.mode === 'summary' ? 'summary' : 'full'
-  const branchSet =
-    branches === undefined
-      ? undefined
-      : new Set(
-          branches.filter((branch): branch is string => {
-            return typeof branch === 'string' && branch.length > 0
-          }),
-        )
-  if (branchSet?.size === 0) return []
-  const branchNames = branchSet ? Array.from(branchSet) : undefined
-  const prs = await runWithRepoBackend(cwd, async (backend) => await backend.getPullRequests(branchNames, { mode, signal: options?.signal }))
-  if (!prs) return null
-  return prs
+export function abortCloneOperation(operationId: string): boolean {
+  if (!isValidCloneOperationId(operationId)) return false
+  const active = activeCloneControllers.get(operationId)
+  if (!active) return false
+  active.abort()
+  return true
 }
 
 export async function fetchRepository(
@@ -346,10 +299,6 @@ export async function removeRepositoryWorktree(
   })
 }
 
-export async function getRepositoryPatch(cwd: string, worktreePath: string, signal?: AbortSignal): Promise<ExecResult> {
-  return await runWithRepoBackend(cwd, async (backend) => await backend.getPatch(worktreePath, signal))
-}
-
 export async function openRepositoryRemote(cwd: string, branch?: string, signal?: AbortSignal): Promise<ExecResult> {
   const url = await runWithRepoBackend(cwd, async (backend) => await backend.getBrowserRemoteUrl(branch, signal))
   return url ? { ok: true, message: url } : { ok: false, message: 'error.no-remote-url' }
@@ -363,14 +312,6 @@ export async function openRepositoryTerminal(path: string): Promise<ExecResult> 
 export async function openRepositoryEditor(path: string): Promise<ExecResult> {
   const prefs = await getServerSettingsPrefs()
   return await openInPreferredEditor(path, prefs.editorApp)
-}
-
-export async function setBackgroundSyncRepos(repoIds: string[]): Promise<void> {
-  await setRegisteredBackgroundSyncRepos(repoIds)
-}
-
-export function getBackgroundSyncRepos(): string[] {
-  return getRegisteredBackgroundSyncRepos()
 }
 
 export function abortRepositoryOperation(cwd: string): boolean {

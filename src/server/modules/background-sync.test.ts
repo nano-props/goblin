@@ -11,7 +11,7 @@ vi.mock('#/server/common/network-ops.ts', () => ({
   abortBackgroundServerNetworkOp: mocks.abortBackgroundServerNetworkOp,
 }))
 
-vi.mock('#/server/modules/repo.ts', () => ({
+vi.mock('#/server/modules/repo-write-paths.ts', () => ({
   fetchRepository: mocks.fetchRepository,
 }))
 

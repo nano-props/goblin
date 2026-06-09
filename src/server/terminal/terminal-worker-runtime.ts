@@ -6,13 +6,13 @@ import type {
   TerminalWorkerRequest,
   TerminalWorkerSuccessMessage,
 } from '#/server/terminal/terminal-worker-protocol.ts'
-import type { TerminalService } from '#/server/terminal/terminal-service.ts'
+import type { TerminalFacade } from '#/server/terminal/terminal-facade.ts'
 import { serverLogger } from '#/server/logger.ts'
 
 const terminalWorkerRuntimeLogger = serverLogger.child({ module: 'terminal-worker-runtime' })
 
 export interface TerminalWorkerRuntimeOptions {
-  service: TerminalService
+  service: TerminalFacade
   emit(message: TerminalWorkerMessage): void
   exit(code: number): void
 }

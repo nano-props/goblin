@@ -12,7 +12,7 @@ import {
   getRemoteSshHosts,
   resolveRemoteRepositoryTarget,
   testRemoteRepositoryConnection,
-} from '#/web/app-data-client.ts'
+} from '#/web/remote-client.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { RemoteDiagnosticsPanel } from '#/web/components/RemoteDiagnosticsPanel.tsx'

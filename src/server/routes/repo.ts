@@ -1,4 +1,12 @@
 import { Hono } from 'hono'
+import { getBackgroundSyncRepos, setBackgroundSyncRepos } from '#/server/modules/background-sync.ts'
+import {
+  getRepositoryPatch,
+  getRepositoryPullRequests,
+  getRepositorySnapshot,
+  getRepositoryStatus,
+  probeRepository,
+} from '#/server/modules/repo-read-paths.ts'
 import {
   abortCloneOperation,
   abortRepositoryOperation,
@@ -7,20 +15,13 @@ import {
   createRepositoryWorktree,
   deleteRepositoryBranch,
   fetchRepository,
-  getBackgroundSyncRepos,
-  getRepositoryPatch,
-  getRepositoryPullRequests,
-  getRepositorySnapshot,
-  getRepositoryStatus,
   openRepositoryEditor,
   openRepositoryRemote,
   openRepositoryTerminal,
-  probeRepository,
-  removeRepositoryWorktree,
   pullRepositoryBranch,
   pushRepositoryBranch,
-  setBackgroundSyncRepos,
-} from '#/server/modules/repo.ts'
+  removeRepositoryWorktree,
+} from '#/server/modules/repo-write-paths.ts'
 import { getServerFetchIntervalSec } from '#/server/modules/settings-source.ts'
 
 export function createRepoRoutes() {

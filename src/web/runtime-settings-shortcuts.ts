@@ -1,9 +1,9 @@
-import { runSettingsControllerAction } from '#/web/runtime-settings-controller.ts'
 import {
   currentRuntimeSettingsSnapshot,
   readRuntimeShortcutSettings,
   useRuntimeSettingsSnapshot,
-} from '#/web/runtime-settings-snapshot.ts'
+} from '#/web/settings-read-projection.ts'
+import { runSettingsControllerAction } from '#/web/settings-write-paths.ts'
 import {
   setGlobalShortcutDisabledPreference,
   setGlobalShortcutPreference,

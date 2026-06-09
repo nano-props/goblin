@@ -14,6 +14,7 @@ import { createSettingsRoutes } from '#/server/routes/settings.ts'
 import { createTerminalRoutes } from '#/server/routes/terminal.ts'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import { getServerSettingsPrefs } from '#/server/modules/settings-source.ts'
+import { createServerSettingsState } from '#/server/modules/settings-state.ts'
 import { createRendererBootstrapSnapshot, toInitialServerSnapshot } from '#/shared/bootstrap-builders.ts'
 import { createRendererRuntimeSnapshot } from '#/shared/bootstrap-builders.ts'
 import { WEB_RENDERER_CAPABILITIES } from '#/shared/bootstrap.ts'
@@ -92,6 +93,7 @@ async function renderRendererIndexHtml(
 }
 
 export function createApp(options: ServerAppOptions): Hono {
+  const settingsState = createServerSettingsState()
   const app = new Hono()
   app.use(
     '/api/*',
@@ -106,7 +108,7 @@ export function createApp(options: ServerAppOptions): Hono {
   app.use('/api/remote/*', createInternalAuthMiddleware(options.internalSecret))
   app.use('/api/repo/*', createInternalAuthMiddleware(options.internalSecret))
   app.use('/api/terminal/*', createInternalAuthMiddleware(options.internalSecret))
-  app.route('/api/settings', createSettingsRoutes())
+  app.route('/api/settings', createSettingsRoutes(settingsState))
   app.route('/api/remote', createRemoteRoutes())
   app.route('/api/repo', createRepoRoutes())
   app.route('/api/terminal', createTerminalRoutes(options.terminalHost))

@@ -1,7 +1,7 @@
 import { toast } from 'sonner'
 import { CloneRepositoryDialog, type CloneRepositoryRequest } from '#/web/components/CloneRepositoryDialog.tsx'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
-import { cloneRepository as runCloneRepository } from '#/web/app-data-client.ts'
+import { cloneRepository as runCloneRepository } from '#/web/repo-client.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import type { CloneRepoResult } from '#/shared/rpc.ts'

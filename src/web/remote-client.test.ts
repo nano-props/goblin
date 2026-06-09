@@ -32,7 +32,7 @@ describe('remote client web helpers', () => {
       json: async () => ({ hosts: [{ alias: 'prod' }], hasInclude: true }),
     }))
     vi.stubGlobal('fetch', fetchMock)
-    const { getRemoteSshHosts } = await import('#/web/app-data-client.ts')
+    const { getRemoteSshHosts } = await import('#/web/remote-client.ts')
 
     await expect(getRemoteSshHosts()).resolves.toEqual({ hosts: [{ alias: 'prod' }], hasInclude: true })
     expect(fetchMock).toHaveBeenCalledWith(
@@ -61,7 +61,7 @@ describe('remote client web helpers', () => {
       }),
     }))
     vi.stubGlobal('fetch', fetchMock)
-    const { testRemoteRepositoryConnection } = await import('#/web/app-data-client.ts')
+    const { testRemoteRepositoryConnection } = await import('#/web/remote-client.ts')
 
     await expect(
       testRemoteRepositoryConnection({

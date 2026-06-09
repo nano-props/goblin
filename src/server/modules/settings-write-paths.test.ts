@@ -4,7 +4,6 @@ import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
 const mocks = vi.hoisted(() => ({
   publishSettingsInvalidation: vi.fn(),
   buildServerExternalAppsSnapshot: vi.fn(),
-  setServerGlobalShortcutRegistered: vi.fn(),
   addServerRecentRepo: vi.fn(),
   clearServerRecentRepos: vi.fn(),
   setServerFetchIntervalSec: vi.fn(),
@@ -19,10 +18,6 @@ vi.mock('#/server/modules/invalidation-broker.ts', () => ({
 
 vi.mock('#/server/modules/external-apps.ts', () => ({
   buildServerExternalAppsSnapshot: mocks.buildServerExternalAppsSnapshot,
-}))
-
-vi.mock('#/server/modules/settings.ts', () => ({
-  setServerGlobalShortcutRegistered: mocks.setServerGlobalShortcutRegistered,
 }))
 
 vi.mock('#/server/modules/settings-source.ts', () => ({

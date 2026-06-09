@@ -1,5 +1,5 @@
-import { runSettingsControllerAction } from '#/web/runtime-settings-controller.ts'
-import { readRuntimeLanSettings, useRuntimeSettingsSnapshot } from '#/web/runtime-settings-snapshot.ts'
+import { readRuntimeLanSettings, useRuntimeSettingsSnapshot } from '#/web/settings-read-projection.ts'
+import { runSettingsControllerAction } from '#/web/settings-write-paths.ts'
 import { setLanEnabledPreference } from '#/web/settings-write-paths.ts'
 
 export function useRuntimeLanSettings() {

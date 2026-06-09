@@ -1,6 +1,6 @@
 import { useExternalAppsQuery } from '#/web/settings-queries.ts'
-import { readRuntimeExternalAppSettings } from '#/web/runtime-settings-snapshot.ts'
-import { runSettingsControllerAction } from '#/web/runtime-settings-controller.ts'
+import { readRuntimeExternalAppSettings } from '#/web/settings-read-projection.ts'
+import { runSettingsControllerAction } from '#/web/settings-write-paths.ts'
 import { refreshExternalAppsDetection, setEditorAppPreference, setTerminalAppPreference } from '#/web/settings-write-paths.ts'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
 import type { EditorAppState, TerminalAppState } from '#/shared/rpc.ts'

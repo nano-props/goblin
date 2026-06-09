@@ -93,6 +93,13 @@ export async function resolveRemoteRepoTarget(repoId: string): Promise<RemoteRep
   return (await resolveSshRemoteTarget(parsed)).target
 }
 
+export async function runWithRepoBackend<T>(
+  cwd: string,
+  task: (backend: Awaited<ReturnType<typeof resolveRepoBackend>>) => Promise<T>,
+): Promise<T> {
+  return await task(await resolveRepoBackend(cwd))
+}
+
 export async function resolveRepoBackend(repoId: string): Promise<RepoBackend> {
   return isRemoteRepoId(repoId) ? await createRemoteRepoBackend(repoId) : createLocalRepoBackend(repoId)
 }

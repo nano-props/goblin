@@ -33,7 +33,7 @@ import {
   getRepositoryPullRequests,
   getRepositorySnapshot,
   getRepositoryStatus,
-} from '#/web/app-data-client.ts'
+} from '#/web/repo-client.ts'
 import type { RepoSnapshot } from '#/shared/rpc.ts'
 import type { RepoPullRequestReason } from '#/web/stores/repos/operations.ts'
 import type { RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'

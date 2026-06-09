@@ -8,21 +8,25 @@ import {
   SettingsRow,
   SettingsSelect,
 } from '#/web/components/settings/SettingsPrimitives.tsx'
+import { useRuntimeGeneralSettings } from '#/web/runtime-settings-general.ts'
 import { useGeneralSettingsController } from '#/web/runtime-settings-general.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { useRuntimeGeneralSettings } from '#/web/runtime-settings-general.ts'
+import { useThemeStore } from '#/web/stores/theme.ts'
+import { useI18nStore } from '#/web/stores/i18n.ts'
 import { COLOR_THEMES } from '#/shared/color-theme.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import type { LangPref, ThemePref } from '#/shared/rpc.ts'
+
 export function GeneralSettings() {
   const t = useT()
-  const {
-    themePref,
-    colorTheme,
-    langPref,
-    toggleDetailOnActionBarBlankClick,
-  } = useRuntimeGeneralSettings()
-  const { setThemePref, setColorTheme, setLangPref, setToggleDetailOnActionBarBlankClick } = useGeneralSettingsController()
+  const themePref = useThemeStore((s) => s.pref)
+  const colorTheme = useThemeStore((s) => s.colorTheme)
+  const setThemePref = useThemeStore((s) => s.setPref)
+  const setColorTheme = useThemeStore((s) => s.setColorTheme)
+  const langPref = useI18nStore((s) => s.pref)
+  const setLangPref = useI18nStore((s) => s.setPref)
+  const { toggleDetailOnActionBarBlankClick } = useRuntimeGeneralSettings()
+  const { setToggleDetailOnActionBarBlankClick } = useGeneralSettingsController()
   const appearanceOptions: { value: ThemePref; labelKey: string; icon: ReactNode }[] = [
     { value: 'auto', labelKey: 'settings.appearance.auto', icon: <Laptop className="size-4" /> },
     { value: 'light', labelKey: 'settings.appearance.light', icon: <Sun className="size-4" /> },

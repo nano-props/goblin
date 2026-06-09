@@ -12,7 +12,7 @@ import { useRuntimeExternalAppSettings } from '#/web/runtime-settings-external-a
 import { useRuntimeFetchSettings } from '#/web/runtime-settings-fetch.ts'
 import { useRuntimeGeneralSettings } from '#/web/runtime-settings-general.ts'
 import { useRuntimeLanSettings } from '#/web/runtime-settings-lan.ts'
-import { useRuntimeRecentRepos } from '#/web/runtime-settings-recent-repos.ts'
+import { useRuntimeRecentRepos } from '#/web/settings-read-projection.ts'
 import { useRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
@@ -104,28 +104,13 @@ describe('runtime settings hooks', () => {
     })
   })
 
-  test('combines theme, i18n, and settings snapshot into general runtime settings', async () => {
+  test('reads general runtime settings from the settings snapshot', async () => {
     mainWindowQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({
         toggleDetailOnActionBarBlankClick: true,
       }),
     )
-    const setThemePref = async () => {}
-    const setColorTheme = async () => {}
-    const setLangPref = async () => {}
-    useThemeStore.setState((state) => ({
-      ...state,
-      pref: 'dark',
-      colorTheme: 'github',
-      setPref: setThemePref,
-      setColorTheme,
-    }))
-    useI18nStore.setState((state) => ({
-      ...state,
-      pref: 'ja',
-      setPref: setLangPref,
-    }))
     let result: ReturnType<typeof useRuntimeGeneralSettings> | undefined
 
     function HookHost() {
@@ -136,13 +121,7 @@ describe('runtime settings hooks', () => {
     await renderWithMainWindowQueryClient(<HookHost />)
 
     expect(result).toMatchObject({
-      themePref: 'dark',
-      colorTheme: 'github',
-      langPref: 'ja',
       toggleDetailOnActionBarBlankClick: true,
-      setThemePref,
-      setColorTheme,
-      setLangPref,
     })
   })
 

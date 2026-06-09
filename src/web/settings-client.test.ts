@@ -63,7 +63,7 @@ function testBridge(overrides: Partial<RendererBridge> = {}): RendererBridge {
   }
 }
 
-describe('server-client web host bootstrap', () => {
+describe('settings-client', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.restoreAllMocks()
@@ -103,7 +103,7 @@ describe('server-client web host bootstrap', () => {
       })),
     )
 
-    const { getThemeState } = await import('#/web/app-data-client.ts')
+    const { getThemeState } = await import('#/web/settings-client.ts')
     await expect(getThemeState()).resolves.toEqual({ pref: 'auto', resolved: 'dark', colorTheme: 'default' })
   })
 
@@ -132,7 +132,7 @@ describe('server-client web host bootstrap', () => {
     }))
     vi.stubGlobal('fetch', fetchMock)
 
-    const { setThemePref } = await import('#/web/app-data-client.ts')
+    const { setThemePref } = await import('#/web/settings-client.ts')
     await expect(setThemePref('dark')).resolves.toEqual({ pref: 'dark', resolved: 'dark', colorTheme: 'github' })
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
@@ -145,82 +145,11 @@ describe('server-client web host bootstrap', () => {
     }))
     vi.stubGlobal('fetch', fetchMock)
 
-    const { getI18nSnapshot } = await import('#/web/app-data-client.ts')
+    const { getI18nSnapshot } = await import('#/web/settings-client.ts')
     await expect(getI18nSnapshot()).resolves.toEqual({ lang: 'ko', pref: 'auto', dict: { hello: '안녕' } })
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:32100/api/settings/i18n',
       expect.objectContaining({
-        headers: expect.objectContaining({ 'x-goblin-internal-secret': 'secret' }),
-      }),
-    )
-  })
-
-  test('opens repository remote through the native shell bridge when available', async () => {
-    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
-    window.open = vi.fn(() => null)
-    const bridgeModule = await import('#/web/renderer-bridge.ts')
-    const openExternalUrl = vi.fn(async () => ({ ok: true, message: 'https://github.com/acme/repo/tree/feature/test' }))
-    bridgeModule.setRendererBridgeForTests(
-      testBridge({
-        getBootstrap: () => ({
-          ...webBootstrap(),
-          initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
-        }),
-        shell: () => ({
-          openSettingsWindow: vi.fn(),
-          openExternalUrl,
-          openDirectoryDialog: vi.fn(),
-          consumeExternalOpenPaths: vi.fn(),
-          openInFinder: vi.fn(),
-        }),
-      }),
-    )
-    const fetchMock = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ ok: true, message: 'https://github.com/acme/repo/tree/feature/test' }),
-    }))
-    vi.stubGlobal('fetch', fetchMock)
-
-    const { openRepositoryRemote } = await import('#/web/app-data-client.ts')
-    await expect(openRepositoryRemote('/tmp/repo', 'feature/test')).resolves.toEqual({ ok: true, message: '' })
-    expect(openExternalUrl).toHaveBeenCalledWith({
-      url: 'https://github.com/acme/repo/tree/feature/test',
-      allowHttp: true,
-    })
-    expect(window.open).not.toHaveBeenCalled()
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:32100/api/repo/open-remote',
-      expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({ 'x-goblin-internal-secret': 'secret' }),
-        body: JSON.stringify({ cwd: '/tmp/repo', branch: 'feature/test' }),
-      }),
-    )
-  })
-
-  test('clones repositories through the embedded server when no Electron bridge exists', async () => {
-    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
-    const fetchMock = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ ok: true, message: 'ok', path: '/tmp/repo' }),
-    }))
-    vi.stubGlobal('fetch', fetchMock)
-
-    const { cloneRepository } = await import('#/web/app-data-client.ts')
-    const { hasNativeDirectoryPicker } = await import('#/web/app-shell-client.ts')
-    expect(hasNativeDirectoryPicker()).toBe(false)
-    await expect(
-      cloneRepository({
-        operationId: 'op_1',
-        url: 'https://example.com/repo.git',
-        parentPath: '/tmp',
-        directoryName: 'repo',
-      }),
-    ).resolves.toEqual({ ok: true, message: 'ok', path: '/tmp/repo' })
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:32100/api/repo/clone',
-      expect.objectContaining({
-        method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-internal-secret': 'secret' }),
       }),
     )
@@ -257,7 +186,7 @@ describe('server-client web host bootstrap', () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
 
-    const { setGlobalShortcut } = await import('#/web/app-data-client.ts')
+    const { setGlobalShortcut } = await import('#/web/settings-client.ts')
     await expect(setGlobalShortcut('CommandOrControl+Shift+K')).resolves.toEqual({
       accelerator: 'CommandOrControl+Shift+K',
       registered: true,
@@ -325,7 +254,7 @@ describe('server-client web host bootstrap', () => {
       })
     vi.stubGlobal('fetch', fetchMock)
 
-    const { setI18nPref } = await import('#/web/app-data-client.ts')
+    const { setI18nPref } = await import('#/web/settings-client.ts')
     await expect(setI18nPref('ja')).resolves.toEqual({ lang: 'ja', pref: 'ja', dict: { hello: 'こんにちは' } })
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(invokeRpc).toHaveBeenCalledWith(
@@ -387,7 +316,7 @@ describe('server-client web host bootstrap', () => {
     }))
     vi.stubGlobal('fetch', fetchMock)
 
-    const { addRecentRepo } = await import('#/web/app-data-client.ts')
+    const { addRecentRepo } = await import('#/web/settings-client.ts')
     await expect(addRecentRepo({ kind: 'local', id: '/tmp/../tmp/repo' })).resolves.toMatchObject({
       recentRepos: [{ kind: 'local', id: '/tmp/repo' }],
       addedRepo: { kind: 'local', id: '/tmp/repo' },
@@ -448,7 +377,7 @@ describe('server-client web host bootstrap', () => {
     }))
     vi.stubGlobal('fetch', fetchMock)
 
-    const { clearRecentRepos } = await import('#/web/app-data-client.ts')
+    const { clearRecentRepos } = await import('#/web/settings-client.ts')
     await expect(clearRecentRepos()).resolves.toBeUndefined()
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:32100/api/settings/recent-repos/clear',
@@ -513,7 +442,7 @@ describe('server-client web host bootstrap', () => {
     }))
     vi.stubGlobal('fetch', fetchMock)
 
-    const { setPreferredTerminalApp } = await import('#/web/app-data-client.ts')
+    const { setPreferredTerminalApp } = await import('#/web/settings-client.ts')
     await expect(setPreferredTerminalApp('ghostty')).resolves.toEqual({
       pref: 'ghostty',
       resolved: 'ghostty',
@@ -565,7 +494,7 @@ describe('server-client web host bootstrap', () => {
     }))
     vi.stubGlobal('fetch', fetchMock)
 
-    const { setPreferredEditorApp } = await import('#/web/app-data-client.ts')
+    const { setPreferredEditorApp } = await import('#/web/settings-client.ts')
     await expect(setPreferredEditorApp('cursor')).resolves.toEqual({
       pref: 'cursor',
       resolved: 'cursor',
@@ -614,7 +543,7 @@ describe('server-client web host bootstrap', () => {
     }))
     vi.stubGlobal('fetch', fetchMock)
 
-    const { addRecentRepo } = await import('#/web/app-data-client.ts')
+    const { addRecentRepo } = await import('#/web/settings-client.ts')
     await expect(addRecentRepo({ kind: 'local', id: '/bad\0repo' } as unknown as { kind: 'local'; id: string })).resolves.toMatchObject({
       recentRepos: [{ kind: 'local', id: '/existing' }],
       addedRepo: null,
@@ -627,75 +556,6 @@ describe('server-client web host bootstrap', () => {
             recentRepos: [{ kind: 'local', id: '/existing' }],
           },
         },
-      }),
-    )
-  })
-
-  test('opens terminal and editor through embedded server routes even when a native shell exists', async () => {
-    const openTerminal = vi.fn(async () => ({ ok: true, message: 'native-terminal' }))
-    const openEditor = vi.fn(async () => ({ ok: true, message: 'native-editor' }))
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-terminal' }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-editor' }) })
-    Object.defineProperty(globalThis, 'window', {
-      configurable: true,
-      value: {
-        __GOBLIN_BOOTSTRAP__: electronBootstrap({
-          initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
-        }),
-        goblinNative: {
-          runtime: {
-            kind: 'electron',
-            bridgeVersion: RENDERER_BRIDGE_VERSION,
-            capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
-          },
-          homeDir: '/Users/test',
-          invokeRpc: vi.fn(),
-          abortRpc: async () => true,
-          onEvent: () => () => {},
-          pathForFile: () => '',
-          shell: {
-            openSettingsWindow: vi.fn(),
-            openExternalUrl: vi.fn(),
-            openDirectoryDialog: vi.fn(),
-            consumeExternalOpenPaths: vi.fn(),
-            openInFinder: vi.fn(),
-            openTerminal,
-            openEditor,
-          },
-        },
-        location: {
-          href: 'http://127.0.0.1:32100/',
-          origin: 'http://127.0.0.1:32100',
-          search: '',
-        },
-        matchMedia: vi.fn(() => ({ matches: true })),
-      },
-    })
-    vi.stubGlobal('fetch', fetchMock)
-
-    const { openRepositoryEditor, openRepositoryTerminal } = await import('#/web/app-data-client.ts')
-    await expect(openRepositoryTerminal('/tmp/repo')).resolves.toEqual({ ok: true, message: 'server-terminal' })
-    await expect(openRepositoryEditor('/tmp/repo')).resolves.toEqual({ ok: true, message: 'server-editor' })
-    expect(openTerminal).not.toHaveBeenCalled()
-    expect(openEditor).not.toHaveBeenCalled()
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      1,
-      'http://127.0.0.1:32100/api/repo/open-terminal',
-      expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({ 'x-goblin-internal-secret': 'secret' }),
-        body: JSON.stringify({ path: '/tmp/repo' }),
-      }),
-    )
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      'http://127.0.0.1:32100/api/repo/open-editor',
-      expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({ 'x-goblin-internal-secret': 'secret' }),
-        body: JSON.stringify({ path: '/tmp/repo' }),
       }),
     )
   })

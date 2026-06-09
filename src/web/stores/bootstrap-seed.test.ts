@@ -90,7 +90,7 @@ describe('renderer bootstrap seeding', () => {
       pref: 'en',
       dict: Object.freeze({ hello: 'hello' }),
     })
-    vi.doMock('#/web/app-data-client.ts', () => ({
+    vi.doMock('#/web/settings-client.ts', () => ({
       getI18nSnapshot: vi.fn(async () => nextSnapshot),
       setI18nPref: vi.fn(async () => nextSnapshot),
     }))

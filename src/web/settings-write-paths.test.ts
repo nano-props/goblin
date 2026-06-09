@@ -50,7 +50,7 @@ const appDataClientMocks = vi.hoisted(() => ({
   setToggleDetailOnActionBarBlankClick: vi.fn(async () => {}),
 }))
 
-vi.mock('#/web/app-data-client.ts', () => ({
+vi.mock('#/web/settings-client.ts', () => ({
   addRecentRepo: appDataClientMocks.addRecentRepo,
   clearRecentRepos: appDataClientMocks.clearRecentRepos,
   refreshExternalAppsSnapshot: appDataClientMocks.refreshExternalAppsSnapshot,

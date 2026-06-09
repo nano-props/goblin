@@ -12,7 +12,7 @@ import {
   getGitHubCliState,
   getLanInfo,
   getSettingsSnapshot,
-} from '#/web/app-data-client.ts'
+} from '#/web/settings-client.ts'
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
 import { subscribeSettingsInvalidation } from '#/web/settings-invalidation-ingress.ts'
 import { DEFAULT_COLOR_THEME } from '#/shared/color-theme.ts'

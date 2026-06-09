@@ -6,8 +6,8 @@ import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import {
   abortRepositoryOperation,
   probeRepository,
-  resolveRemoteRepositoryTarget,
-} from '#/web/app-data-client.ts'
+} from '#/web/repo-client.ts'
+import { resolveRemoteRepositoryTarget } from '#/web/remote-client.ts'
 import { recordRecentRepo } from '#/web/settings-write-paths.ts'
 import type { OpenRepoResult, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
 import { nextActiveRepoIdAfterWorkspaceClose } from '#/web/open-workspace-state.ts'

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getRemotePathSuggestions } from '#/web/app-data-client.ts'
+import { getRemotePathSuggestions } from '#/web/remote-client.ts'
 import { isResolvableRemotePathInput } from '#/shared/remote-repo.ts'
 const REMOTE_PATH_SUGGESTIONS_DEBOUNCE_MS = 350
 

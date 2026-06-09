@@ -96,3 +96,11 @@ export function readRuntimeLanSettings(data: RuntimeSettingsSnapshot | undefined
     lanEnabled: data?.lanEnabled ?? fallback?.lanEnabled ?? false,
   }
 }
+
+export function getRuntimeRecentRepos() {
+  return currentRuntimeRecentReposState()?.recentRepos ?? []
+}
+
+export function useRuntimeRecentRepos() {
+  return useRuntimeRecentReposState()?.recentRepos ?? []
+}

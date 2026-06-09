@@ -21,6 +21,7 @@ Examples:
 - settings
 - repos
 - terminal
+- remote
 - realtime
 
 ### Horizontal: concern layers inside a feature
@@ -36,7 +37,7 @@ Use only the layers the feature needs.
 Typical files:
 
 - `src/server/routes/*`
-- `*-client.ts`
+- `src/web/*-client.ts` (feature-scoped, not global buckets)
 
 #### 2. Read layer
 
@@ -46,8 +47,9 @@ Typical files:
 
 Typical files:
 
-- `*-queries.ts`
-- `*-snapshot.ts`
+- `src/web/*-queries.ts`
+- `src/web/*-snapshot.ts`
+- `src/server/modules/*-read.ts` (server-side read projection when needed)
 - read-side selectors or projection readers
 
 #### 3. Write layer
@@ -55,10 +57,13 @@ Typical files:
 - Owns mutation orchestration.
 - Runs writes, follow-up refresh, invalidation, and local projection/cache updates.
 - This is the main place for write flow.
+- Server-side write paths own invalidation publishing.
+- Web-side write paths own query cache updates after server response.
 
 Typical files:
 
-- `*-write-paths.ts`
+- `src/server/modules/*-write-paths.ts`
+- `src/web/*-write-paths.ts`
 - focused mutation orchestration modules
 
 #### 4. Source layer
@@ -66,23 +71,25 @@ Typical files:
 - Talks to persistence, durable storage, or other authoritative systems.
 - Returns authoritative state after read/write operations.
 - Do not add this layer unless storage or authoritative source rules are distinct.
+- Keep domain policy (validation, business rules) out of this layer when it grows. Extract a policy/model helper or let the write layer own it.
 
 Typical files:
 
-- `*-source.ts`
+- `src/server/modules/*-source.ts`
 - storage adapters
 
 #### 5. Runtime facade layer
 
-- Optional layer for renderer-facing feature APIs.
-- Combines read models and UI-safe actions.
-- Use it when components benefit from a stable feature API.
-- This is not a default layer.
-- Do not use it as a catch-all for feature logic.
+- **Optional. Strictly scoped.**
+- Exists only when a component needs a **stable, combined read + write API** for a feature.
+- Must expose **both** read model projection and UI-safe actions.
+- If a file only exposes read, it belongs in the read layer.
+- If a file only exposes write, it belongs in the write layer or a local hook.
+- Do not use it as a catch-all for feature logic, thin action wrappers, or generic error handling.
 
 Typical files:
 
-- `runtime-*.ts`
+- `src/web/runtime-*.ts` (only when read + write are both present)
 
 ## Default flow
 
@@ -92,6 +99,24 @@ The default flow should look like this:
 - write: UI -> boundary/client -> write layer -> source layer -> invalidation/cache/projection update -> UI
 
 Do not mix read and write concerns unless the feature is still trivial.
+
+## Server-side layering
+
+Server-side features follow the same layering logic as the renderer side. Do not let route files accumulate business orchestration just because they are on the server.
+
+| Layer | Server responsibility | Typical files |
+|-------|----------------------|---------------|
+| Boundary | Parse HTTP input, call next layer, return JSON | `src/server/routes/*.ts` |
+| Read | Query authoritative state, return snapshots | `src/server/modules/*-read.ts` or direct source call for simple cases |
+| Write | Orchestrate mutations, publish invalidation, call source | `src/server/modules/*-write-paths.ts` |
+| Source | Persistence, external system calls, file I/O | `src/server/modules/*-source.ts` |
+
+Rules:
+
+- A route file should not exceed input validation + delegating to the next layer.
+- If a feature has complex mutations, extract `src/server/modules/<feature>-write-paths.ts`.
+- If a feature has multiple read paths shared by routes or other modules, extract `src/server/modules/<feature>-read.ts`.
+- Server-side read and write layers are **not** optional for features that already have them on the web side. Keep the server side symmetric.
 
 ## When not to split
 
@@ -134,6 +159,7 @@ Use those distinctions to decide ownership first, then choose the layer.
 - Name modules by feature first, then by layer role.
 - Prefer names that reveal responsibility in the flow.
 - Use the narrowest stable name that matches the file's job.
+- Do not create generic `controller`, `service`, or `manager` files that mix multiple concerns.
 
 Prefer:
 
@@ -141,7 +167,7 @@ Prefer:
 - `settings-queries.ts`
 - `settings-write-paths.ts`
 - `settings-source.ts`
-- `runtime-settings-github.ts`
+- `runtime-settings-external-apps.ts` (only if it exposes read + write)
 
 Avoid broad catch-all names like:
 
@@ -157,7 +183,7 @@ Use `service` or `controller` only when that term is the real stable boundary an
 - Add a separate read layer only when reads become shared or stateful enough to justify it.
 - Add a separate write layer once mutations need orchestration, invalidation, or cache updates.
 - Add a source layer only when persistence or authoritative storage logic becomes distinct.
-- Add a runtime facade only when the UI benefits from a stable feature-facing API.
+- Add a runtime facade **only** when the UI benefits from a stable feature-facing API that combines reads and writes.
 - Skip layers you do not need.
 
 ## Current repo examples
@@ -166,24 +192,34 @@ Use the current codebase as a guide, not as a rigid template.
 
 ### Settings
 
-- boundary: `src/server/routes/settings.ts`, `src/web/app-data-client.ts`
+- boundary: `src/server/routes/settings.ts`, `src/web/settings-client.ts`
 - read: `src/web/settings-queries.ts`
 - write: `src/server/modules/settings-write-paths.ts`, `src/web/settings-write-paths.ts`
 - source: `src/server/modules/settings-source.ts`
-- runtime facade: `src/web/runtime-settings-*.ts`
+- runtime facade: `src/web/runtime-settings-*.ts` (only files that combine read + write)
 
 This is a good example of a feature that has grown enough to justify explicit read and write layers.
 It also shows a feature where a separate source layer makes sense.
 
 ### Repos
 
-- boundary: repo HTTP routes and renderer transport entrypoints
-- write: `src/web/stores/repos/lifecycle-write-paths.ts`
+- boundary: `src/server/routes/repo.ts`, `src/web/repo-client.ts`
+- read: `src/web/stores/repos/refresh.ts` (read-side refresh orchestration)
+- write: `src/web/stores/repos/lifecycle-write-paths.ts`, `src/web/stores/repos/branch-actions.ts`
+- server write: `src/server/modules/repo-write-paths.ts` (to be extracted from `repo.ts`)
+- source: `src/server/modules/repo-backend.ts`
 - runtime projection/facade: `src/web/stores/repos/store.ts`, related repo store slices
 - restorable/runtime distinction: repo store types and lifecycle modules
 
 This is a good example of a feature that should stay feature-first, even when its runtime projection is store-heavy instead of query-heavy.
 It also shows that not every complex feature needs a separate runtime facade layer.
+
+### Terminal
+
+- boundary: `src/server/routes/terminal.ts`, `src/web/terminal.ts`
+- read: `src/web/terminal-session-queries.ts`
+- write: `src/server/terminal/terminal.ts` (session mutation orchestration)
+- source: `src/server/terminal/terminal-session-manager.ts`, `src/server/terminal/terminal-pty-runtime.ts`
 
 ### Smaller UI interactions
 
@@ -202,6 +238,8 @@ Refactor when one of these happens:
 - query files start patching mutation results directly in many places
 - UI components start owning feature mutation flow
 - a vague `service` or `controller` file becomes the catch-all for the feature
+- server route or module files mix read, write, and source concerns
+- a runtime facade file exposes only read or only write
 
 ## Rule of thumb
 

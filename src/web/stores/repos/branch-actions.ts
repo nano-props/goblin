@@ -34,7 +34,7 @@ import {
   pullRepositoryBranch,
   pushRepositoryBranch,
   removeRepositoryWorktree,
-} from '#/web/app-data-client.ts'
+} from '#/web/repo-client.ts'
 const BRANCH_NETWORK_OPERATION_KEY = 'branch-network-action'
 const BRANCH_ACTION_WAIT_TIMEOUT_MS = 30_000
 const BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE = 'error.branch-action-wait-timeout'

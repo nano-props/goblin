@@ -11,7 +11,7 @@ import {
 import { startResource } from '#/web/stores/repos/resources.ts'
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
 import { waitForRepoOperationsIdle } from '#/web/stores/repos/runtime.ts'
-import { fetchRepository } from '#/web/app-data-client.ts'
+import { fetchRepository } from '#/web/repo-client.ts'
 import type { RepoOperationReason } from '#/web/stores/repos/operations.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 import type { ExecResult } from '#/web/types.ts'

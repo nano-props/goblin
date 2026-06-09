@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { defaultSessionState } from '#/shared/settings-defaults.ts'
+import { createServerSettingsState } from '#/server/modules/settings-state.ts'
 
 const mocks = vi.hoisted(() => ({
   getServerSettingsPrefs: vi.fn(),
@@ -15,8 +16,6 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
 
 describe('server settings snapshot runtime state', () => {
   afterEach(async () => {
-    const mod = await import('#/server/modules/settings.ts')
-    mod.resetServerSettingsRuntimeForTests()
     vi.clearAllMocks()
     vi.resetModules()
   })
@@ -40,10 +39,11 @@ describe('server settings snapshot runtime state', () => {
     mocks.getServerSessionState.mockResolvedValue({ ...defaultSessionState(), detailCollapsed: false })
     mocks.getServerRecentRepos.mockResolvedValue([])
 
-    const mod = await import('#/server/modules/settings.ts')
-    mod.setServerGlobalShortcutRegistered(true)
+    const state = createServerSettingsState()
+    state.globalShortcutRegistered = true
 
-    await expect(mod.getSettingsSnapshot()).resolves.toMatchObject({
+    const snapshotMod = await import('#/server/modules/settings-snapshot.ts')
+    await expect(snapshotMod.getSettingsSnapshot(state)).resolves.toMatchObject({
       globalShortcut: 'Alt+G',
       globalShortcutRegistered: true,
     })

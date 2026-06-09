@@ -1,9 +1,9 @@
 import { describe, expect, test, vi } from 'vitest'
 import { TerminalWorkerRuntime } from '#/server/terminal/terminal-worker-runtime.ts'
-import type { TerminalService } from '#/server/terminal/terminal-service.ts'
+import type { TerminalFacade } from '#/server/terminal/terminal-facade.ts'
 import type { TerminalWorkerMessage } from '#/server/terminal/terminal-worker-protocol.ts'
 
-function createTerminalServiceStub(): TerminalService {
+function createTerminalFacadeStub(): TerminalFacade {
   return {
     registerSocket: vi.fn(),
     unregisterSocket: vi.fn(),
@@ -23,8 +23,8 @@ function createTerminalServiceStub(): TerminalService {
 }
 
 describe('terminal worker runtime', () => {
-  test('dispatches requests through the terminal service and emits responses', async () => {
-    const service = createTerminalServiceStub()
+  test('dispatches requests through the terminal facade and emits responses', async () => {
+    const service = createTerminalFacadeStub()
     const emitted: TerminalWorkerMessage[] = []
     const runtime = new TerminalWorkerRuntime({
       service,
@@ -51,7 +51,7 @@ describe('terminal worker runtime', () => {
   })
 
   test('proxies socket messages through the transport emitter', async () => {
-    const service = createTerminalServiceStub()
+    const service = createTerminalFacadeStub()
     const emitted: TerminalWorkerMessage[] = []
     const runtime = new TerminalWorkerRuntime({
       service,
@@ -78,8 +78,8 @@ describe('terminal worker runtime', () => {
     ])
   })
 
-  test('shuts down the terminal service and exits on shutdown messages', async () => {
-    const service = createTerminalServiceStub()
+  test('shuts down the terminal facade and exits on shutdown messages', async () => {
+    const service = createTerminalFacadeStub()
     const exit = vi.fn()
     const runtime = new TerminalWorkerRuntime({
       service,
@@ -93,8 +93,8 @@ describe('terminal worker runtime', () => {
     expect(exit).toHaveBeenCalledWith(0)
   })
 
-  test('emits failed responses when a terminal service action throws', async () => {
-    const service = createTerminalServiceStub()
+  test('emits failed responses when a terminal facade action throws', async () => {
+    const service = createTerminalFacadeStub()
     vi.mocked(service.write).mockImplementationOnce(() => {
       throw new Error('boom')
     })

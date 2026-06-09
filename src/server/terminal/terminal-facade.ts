@@ -19,7 +19,7 @@ import type { TerminalWorkerRequestInputs, TerminalWorkerResponseOutputs } from 
 
 type MaybePromise<T> = T | Promise<T>
 
-export interface TerminalService {
+export interface TerminalFacade {
   registerSocket(clientId: string, attachmentId: string, socket: ServerTerminalSocket): void
   unregisterSocket(clientId: string, attachmentId: string, socket: ServerTerminalSocket): void
   attach(clientId: string, input: TerminalWorkerRequestInputs['attach']): MaybePromise<TerminalWorkerResponseOutputs['attach']>
@@ -45,7 +45,7 @@ export interface TerminalService {
   shutdown(): void
 }
 
-export function createTerminalService(): TerminalService {
+export function createTerminalFacade(): TerminalFacade {
   return {
     registerSocket: registerTerminalSocket,
     unregisterSocket: unregisterTerminalSocket,

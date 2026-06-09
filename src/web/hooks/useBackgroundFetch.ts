@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
-import { setBackgroundSyncRepos } from '#/web/app-data-client.ts'
+import { setBackgroundSyncRepos } from '#/web/repo-client.ts'
 import type { RepoState, ReposStore } from '#/web/stores/repos/types.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { activeRepoFromStore } from '#/web/stores/repos/selector-state.ts'

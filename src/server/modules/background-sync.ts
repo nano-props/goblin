@@ -1,7 +1,7 @@
 import { Cron } from 'croner'
 import PQueue from 'p-queue'
 import { abortBackgroundServerNetworkOp } from '#/server/common/network-ops.ts'
-import { fetchRepository } from '#/server/modules/repo.ts'
+import { fetchRepository } from '#/server/modules/repo-write-paths.ts'
 import { serverLogger } from '#/server/logger.ts'
 import { getServerFetchIntervalSec, subscribeServerFetchInterval } from '#/server/modules/settings-source.ts'
 

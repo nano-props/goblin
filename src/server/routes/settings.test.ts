@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { createServerSettingsState } from '#/server/modules/settings-state.ts'
 
 const mocks = vi.hoisted(() => ({
   getServerExternalAppsSnapshot: vi.fn(),
@@ -21,7 +22,7 @@ vi.mock('#/server/modules/github-cli.ts', () => ({
   getServerGitHubCliState: mocks.getServerGitHubCliState,
 }))
 
-vi.mock('#/server/modules/settings.ts', () => ({
+vi.mock('#/server/modules/settings-snapshot.ts', () => ({
   getSettingsSnapshot: mocks.getSettingsSnapshot,
 }))
 
@@ -51,7 +52,7 @@ describe('settings routes', () => {
     })
 
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
-    const app = createSettingsRoutes()
+    const app = createSettingsRoutes(createServerSettingsState())
     const response = await app.request(
       new Request('http://127.0.0.1:32100/prefs', {
         method: 'POST',
@@ -90,7 +91,7 @@ describe('settings routes', () => {
     mocks.applyServerSessionWrite.mockResolvedValue({ ok: true, session })
 
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
-    const app = createSettingsRoutes()
+    const app = createSettingsRoutes(createServerSettingsState())
     const response = await app.request(
       new Request('http://127.0.0.1:32100/session', {
         method: 'POST',
@@ -111,7 +112,7 @@ describe('settings routes', () => {
     mocks.applyServerRecentRepoAddWrite.mockResolvedValue({ ok: true, recentRepos: [repo], addedRepo: repo })
     mocks.applyServerRecentRepoClearWrite.mockResolvedValue({ ok: true })
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
-    const app = createSettingsRoutes()
+    const app = createSettingsRoutes(createServerSettingsState())
 
     const addResponse = await app.request(
       new Request('http://127.0.0.1:32100/recent-repos/add', {

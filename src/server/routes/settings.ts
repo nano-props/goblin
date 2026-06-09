@@ -2,8 +2,9 @@ import { Hono } from 'hono'
 import { getServerExternalAppsSnapshot } from '#/server/modules/external-apps.ts'
 import { getServerGitHubCliState } from '#/server/modules/github-cli.ts'
 import { getServerI18nSnapshot } from '#/server/modules/i18n.ts'
-import { getSettingsSnapshot } from '#/server/modules/settings.ts'
+import { getSettingsSnapshot } from '#/server/modules/settings-snapshot.ts'
 import { getServerSettingsPrefs } from '#/server/modules/settings-source.ts'
+import type { ServerSettingsState } from '#/server/modules/settings-state.ts'
 import {
   applyServerFetchIntervalWrite,
   applyServerGlobalShortcutRegistrationWrite,
@@ -15,9 +16,9 @@ import {
 import { getLanUrls, isLanAddress } from '#/shared/lan-addresses.ts'
 import type { LanInfo } from '#/shared/rpc.ts'
 
-export function createSettingsRoutes() {
+export function createSettingsRoutes(settingsState: ServerSettingsState) {
   const app = new Hono()
-  app.get('/', async (c) => c.json(await getSettingsSnapshot()))
+  app.get('/', async (c) => c.json(await getSettingsSnapshot(settingsState)))
   app.get('/i18n', async (c) => c.json(await getServerI18nSnapshot(c.req.header('accept-language'))))
   app.get('/github-cli', async (c) => {
     const hosts = (c.req.queries('host') ?? []).filter((host): host is string => typeof host === 'string' && host.length > 0)
@@ -54,7 +55,7 @@ export function createSettingsRoutes() {
   })
   app.post('/global-shortcut-state', async (c) => {
     const body = await c.req.json().catch(() => null)
-    return c.json(applyServerGlobalShortcutRegistrationWrite(body))
+    return c.json(applyServerGlobalShortcutRegistrationWrite(body, settingsState))
   })
   app.post('/session', async (c) => {
     const body = await c.req.json().catch(() => null)

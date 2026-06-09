@@ -9,7 +9,7 @@ import {
   openRepositoryEditor,
   openRepositoryRemote,
   openRepositoryTerminal,
-} from '#/web/app-data-client.ts'
+} from '#/web/repo-client.ts'
 import {
   branchActionBusyItemId,
   type BranchActionRepo,
@@ -21,7 +21,16 @@ import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
 import { useRetainedDialogState } from '#/web/hooks/useRetainedDialogState.ts'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import { getBranchWorktreeState } from '#/web/stores/repos/worktree-state.ts'
+import {
+  deleteBranchNeedsForceConfirm,
+  dispatchRepoBranchAction,
+  dispatchRepoUiAction,
+  isPushProtected,
+  removeWorktreeNeedsForceConfirm,
+} from '#/web/stores/repos/branch-action-write-paths.ts'
+
 export type { BranchActionItemId } from '#/web/hooks/branch-action-state.ts'
+
 const SILENT_SUCCESS_OPS = new Set<BranchActionItemId>(['remote', 'terminal', 'editor'])
 type LocalBranchActionItemId = 'copyPatch' | 'remote' | 'terminal' | 'editor'
 
@@ -81,24 +90,21 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   const [removeAlsoUpstream, setRemoveAlsoUpstream] = useState(false)
   const hasUpstream = !!branch.tracking && !branch.trackingGone
 
+  function guardBusy(): boolean {
+    return branchActionBusy || hasPendingLocalAction()
+  }
+
   function runUiAction(
     op: LocalBranchActionItemId,
     fn: () => Promise<ExecResult>,
     options?: { handleResult?: (result: ExecResult) => boolean },
   ) {
-    if (branchActionBusy || hasPendingLocalAction()) return
+    if (guardBusy()) return
     const pending = runPendingLocalAction(op, async () => {
-      const token = repo.instanceToken
-      let result: ExecResult
-      try {
-        result = await fn()
-      } catch (err) {
-        result = { ok: false, message: err instanceof Error ? err.message : String(err) }
-      }
-      if (!result.ok && result.message === 'cancelled') return
-      if (options?.handleResult?.(result)) return
-      const skipSuccessToast = result.ok && SILENT_SUCCESS_OPS.has(op)
-      if (!skipSuccessToast) setLastResult(repo.id, result, token)
+      await dispatchRepoUiAction(repo.id, repo.instanceToken, op, fn, setLastResult, {
+        silentSuccessOps: SILENT_SUCCESS_OPS,
+        handleResult: options?.handleResult,
+      })
     })
     if (pending) return Promise.resolve(pending).then(() => undefined)
   }
@@ -107,18 +113,16 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
     action: Parameters<typeof runBranchAction>[1],
     options?: { deferResultMessages?: string[]; handleResult?: (result: ExecResult) => boolean },
   ) {
-    if (branchActionBusy || hasPendingLocalAction()) return
-    const result = await runBranchAction(repo.id, action, {
-      token: repo.instanceToken,
+    if (guardBusy()) return
+    await dispatchRepoBranchAction(repo.id, repo.instanceToken, action, runBranchAction, {
       deferResultMessages: options?.deferResultMessages,
+      handleResult: options?.handleResult,
     })
-    if (!result || (!result.ok && result.message === 'cancelled')) return
-    options?.handleResult?.(result)
   }
 
   function copyPatch() {
     if (!branch.worktree?.path) return
-    const worktreePath = branch.worktree?.path
+    const worktreePath = branch.worktree.path
     return runUiAction('copyPatch', async () => {
       const result = await getRepositoryPatch(repo.id, worktreePath)
       if (!result.ok) return { ok: false, message: result.message }
@@ -141,8 +145,8 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   }
 
   function push() {
-    if (branchActionBusy || hasPendingLocalAction()) return
-    if (PROTECTED_BRANCHES.has(branch.name)) {
+    if (guardBusy()) return
+    if (isPushProtected(branch.name)) {
       pushConfirm.openWith(branch.name)
       return
     }
@@ -151,7 +155,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
 
   function openTerminal() {
     if (!branch.worktree?.path) return
-    const worktreePath = branch.worktree?.path
+    const worktreePath = branch.worktree.path
     if (repo.remote.target) {
       return runUiAction('terminal', async () => {
         navigation.showRepoDetailTab(repo.id, 'terminal')
@@ -163,7 +167,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
 
   function openEditor() {
     if (!branch.worktree?.path) return
-    const worktreePath = branch.worktree?.path
+    const worktreePath = branch.worktree.path
     return runUiAction('editor', () => openRepositoryEditor(worktreePath))
   }
 
@@ -172,16 +176,16 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   }
 
   function requestDeleteBranch() {
-    if (branchActionBusy || hasPendingLocalAction()) return
+    if (guardBusy()) return
     setDeleteAlsoUpstream(false)
     deleteConfirm.openWith(branch.name)
   }
 
   function requestRemoveWorktree() {
-    if (branchActionBusy || hasPendingLocalAction() || !branch.worktree?.path) return
+    if (guardBusy() || !branch.worktree?.path) return
     setRemoveAlsoDeletes(!PROTECTED_BRANCHES.has(branch.name))
     setRemoveAlsoUpstream(false)
-    removeConfirm.openWith({ branch: branch.name, path: branch.worktree?.path })
+    removeConfirm.openWith({ branch: branch.name, path: branch.worktree.path })
   }
 
   function deleteBranch(target: string, force = false, alsoDeleteUpstream = false) {
@@ -190,7 +194,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
       {
         deferResultMessages: force ? [] : ['error.branch-not-fully-merged'],
         handleResult: (result) => {
-          if (!force && !result.ok && result.message === 'error.branch-not-fully-merged') {
+          if (deleteBranchNeedsForceConfirm(result, force)) {
             forceDeleteConfirm.openWith(target)
             return true
           }
@@ -218,12 +222,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
       {
         deferResultMessages: alsoDeleteBranch && !forceDeleteBranch ? ['error.cannot-remove-unpushed-worktree'] : [],
         handleResult: (result) => {
-          if (
-            !result.ok &&
-            result.message === 'error.cannot-remove-unpushed-worktree' &&
-            alsoDeleteBranch &&
-            !forceDeleteBranch
-          ) {
+          if (removeWorktreeNeedsForceConfirm(result, alsoDeleteBranch, forceDeleteBranch)) {
             forceRemoveConfirm.openWith(target)
             return true
           }

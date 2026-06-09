@@ -23,7 +23,7 @@ import {
   setSwapCloseShortcuts,
   setTerminalNotificationsEnabled,
   setToggleDetailOnActionBarBlankClick,
-} from '#/web/app-data-client.ts'
+} from '#/web/settings-client.ts'
 import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
 import {
   externalAppsQueryKey,
@@ -122,4 +122,13 @@ export async function setLanEnabledPreference(enabled: boolean): Promise<void> {
   await setLanEnabled(enabled)
   updateRuntimeSettingsSnapshotCache(mainWindowQueryClient, (current) => ({ ...current, lanEnabled: enabled }))
   void mainWindowQueryClient.invalidateQueries({ queryKey: lanInfoQueryKey() })
+}
+
+export async function runSettingsControllerAction<T>(label: string, task: () => Promise<T>): Promise<T | null> {
+  try {
+    return await task()
+  } catch (err) {
+    console.warn(`[settings] ${label} failed`, err)
+    return null
+  }
 }
