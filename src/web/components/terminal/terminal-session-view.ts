@@ -135,7 +135,6 @@ export class TerminalSessionView {
       macOptionIsMeta: true,
       rescaleOverlappingGlyphs: true,
       scrollOnUserInput: true,
-      smoothScrollDuration: 125,
       theme,
     })
     const fitAddon = new FitAddon()
@@ -440,9 +439,6 @@ function remeasureTerminal(term: XTermTerminal): void {
 
 function scrollTerminalToBottom(term: XTermTerminal | null): void {
   if (!term) return
-  // xterm.js core/browser sources accept an internal disableSmoothScroll flag,
-  // but the public Terminal wrapper and typings do not expose it, so stay on
-  // the supported public API here.
   term.scrollToBottom()
 }
 
