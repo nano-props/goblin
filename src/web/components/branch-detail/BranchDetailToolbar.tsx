@@ -1,5 +1,5 @@
 import { ChevronDown, Maximize2, Minimize2 } from 'lucide-react'
-import { useCallback, type KeyboardEvent } from 'react'
+import type { KeyboardEvent } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { DetailTab, RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
@@ -82,64 +82,55 @@ export function BranchDetailToolbar({
   const showPanelControls = behavior.detailFocusAllowed || behavior.detailCollapseAllowed
   const focusTogglePressed = behavior.detailFocusMode
 
-  const blankClickEnabled = behavior.detailCollapseAllowed && toggleDetailOnActionBarBlankClick
-  const handleToolbarBlankClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (!blankClickEnabled) return
-      const target = e.target as HTMLElement
-      // Only toggle when clicking truly blank space (not on any interactive element)
-      if (target.closest('button, a, input, select, textarea, [role="tab"], [role="button"], [data-interactive]')) return
-      toggleDetailCollapsed()
-    },
-    [blankClickEnabled, toggleDetailCollapsed],
-  )
-
   return (
-    <Toolbar variant="detail" onClick={handleToolbarBlankClick}>
-      <div className="flex min-w-0 flex-1 items-center gap-1">
-        <div className="flex shrink-0 gap-1" role="tablist" aria-label={t('tab.branch-detail')}>
-          {tabs.map((tab) => {
-            const selected = repo.ui.detailTab === tab.id
-            const visuallySelected = !collapsed && selected
-            return (
-              <Button
-                key={tab.id}
-                id={`${detailId}-${tab.id}-tab`}
-                type="button"
-                variant="ghost"
-                role="tab"
-                aria-selected={selected}
-                aria-expanded={selected ? !collapsed : undefined}
-                aria-controls={collapsed ? undefined : `${detailId}-${tab.id}-panel`}
-                tabIndex={selected ? 0 : -1}
-                onClick={() => {
-                  navigation.showRepoDetailTab(repo.id, tab.id)
-                  setDetailCollapsed(false)
-                }}
-                onKeyDown={(e) => handleTabKeyDown(e, tab.id)}
-                className={cn(
-                  'h-7 gap-1.5 px-2.5 text-sm font-normal',
-                  visuallySelected
-                    ? 'bg-selected text-selected-foreground'
-                    : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
-                )}
-              >
-                {t(tab.labelKey)}
-                {tab.id === 'changes' && detail.statusCount > 0 && (
-                  <Badge variant="attention" className="font-normal font-mono tabular-nums">
-                    {detail.statusCount}
-                  </Badge>
-                )}
-                {tab.id === 'terminal' && terminalCount > 0 && (
-                  <Badge variant="outline" className="font-normal font-mono tabular-nums text-muted-foreground">
-                    {terminalCount}
-                  </Badge>
-                )}
-              </Button>
-            )
-          })}
-        </div>
+    <Toolbar variant="detail">
+      <div className="flex shrink-0 gap-1" role="tablist" aria-label={t('tab.branch-detail')}>
+        {tabs.map((tab) => {
+          const selected = repo.ui.detailTab === tab.id
+          const visuallySelected = !collapsed && selected
+          return (
+            <Button
+              key={tab.id}
+              id={`${detailId}-${tab.id}-tab`}
+              type="button"
+              variant="ghost"
+              role="tab"
+              aria-selected={selected}
+              aria-expanded={selected ? !collapsed : undefined}
+              aria-controls={collapsed ? undefined : `${detailId}-${tab.id}-panel`}
+              tabIndex={selected ? 0 : -1}
+              onClick={() => {
+                navigation.showRepoDetailTab(repo.id, tab.id)
+                setDetailCollapsed(false)
+              }}
+              onKeyDown={(e) => handleTabKeyDown(e, tab.id)}
+              className={cn(
+                'h-7 gap-1.5 px-2.5 text-sm font-normal',
+                visuallySelected
+                  ? 'bg-selected text-selected-foreground'
+                  : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+              )}
+            >
+              {t(tab.labelKey)}
+              {tab.id === 'changes' && detail.statusCount > 0 && (
+                <Badge variant="attention" className="font-normal font-mono tabular-nums">
+                  {detail.statusCount}
+                </Badge>
+              )}
+              {tab.id === 'terminal' && terminalCount > 0 && (
+                <Badge variant="outline" className="font-normal font-mono tabular-nums text-muted-foreground">
+                  {terminalCount}
+                </Badge>
+              )}
+            </Button>
+          )
+        })}
       </div>
+      <div
+        aria-hidden="true"
+        className="min-w-2 flex-1 self-stretch"
+        onClick={behavior.detailCollapseAllowed && toggleDetailOnActionBarBlankClick ? toggleDetailCollapsed : undefined}
+      />
       <div className="flex shrink-0 items-center gap-1">
         {showBranchActions && (
           <BranchActionControls actions={branchActions} variant="menu" />
