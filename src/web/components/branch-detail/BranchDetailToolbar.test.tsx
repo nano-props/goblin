@@ -6,8 +6,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchDetailToolbar } from '#/web/components/branch-detail/BranchDetailToolbar.tsx'
 import { getSelectedBranchDetailPresentation } from '#/web/components/branch-detail/model.ts'
-import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
-import type { TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
+import { TerminalSessionContext, TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
+import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 import { MainWindowNavigationProvider, type MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import { emptyRendererBridgeBootstrap, setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
@@ -65,7 +65,7 @@ describe('BranchDetailToolbar', () => {
     expect(create).not.toHaveBeenCalled()
   })
 
-  test('shows the terminal count badge and does not create anything on click', async () => {
+  test('clicking the terminal tab with existing terminals only navigates', async () => {
     const create = vi.fn(async () => ({ ok: true as const, action: 'reused' as const, key: 'k', sessions: [] }))
     setRendererBridgeForTests(rendererBridgeWith({ create }))
     const showRepoDetailTab = vi.fn()
@@ -78,7 +78,7 @@ describe('BranchDetailToolbar', () => {
 
     expect(showRepoDetailTab).toHaveBeenCalledWith(REPO_ID, 'terminal')
     expect(create).not.toHaveBeenCalled()
-    expect(tab.textContent).toContain('2')
+    expect(tab.textContent).not.toContain('2')
   })
 
   test('does not show branch actions in the detail bar (actions moved to branch rows)', () => {
@@ -138,6 +138,24 @@ function renderToolbar(options: {
     snapshot: () => terminalSnapshot,
     subscribeSnapshot: () => () => {},
   }
+  const commandContext: TerminalSessionContextValue = {
+    createTerminal: vi.fn(async () => 'key'),
+    selectTerminal: vi.fn(),
+    scrollToBottom: vi.fn(),
+    scrollLines: vi.fn(),
+    clearBell: vi.fn(() => false),
+    closeTerminalAndDismissDetailIfLast: vi.fn(() => []),
+    attach: vi.fn(),
+    detach: vi.fn(),
+    restart: vi.fn(),
+    isTerminalFocusTarget: vi.fn(() => false),
+    findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+    findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+    clearSearch: vi.fn(),
+    writeInput: vi.fn(),
+    takeover: vi.fn(),
+    serialize: vi.fn(() => ''),
+  }
 
   container = document.createElement('div')
   document.body.appendChild(container)
@@ -147,17 +165,19 @@ function renderToolbar(options: {
     root!.render(
       <QueryClientProvider client={queryClient!}>
         <MainWindowNavigationProvider value={options.navigation}>
-          <TerminalSessionReadContext.Provider value={readContext}>
-            <BranchDetailToolbar
-              repo={repo}
-              detail={detail}
-              detailId="detail"
-              contentId="content"
-              collapsed={options.collapsed ?? false}
-              detailFocusMode={options.detailFocusMode ?? false}
-              layout={options.layout ?? DEFAULT_WORKSPACE_LAYOUT}
-            />
-          </TerminalSessionReadContext.Provider>
+          <TerminalSessionContext.Provider value={commandContext}>
+            <TerminalSessionReadContext.Provider value={readContext}>
+              <BranchDetailToolbar
+                repo={repo}
+                detail={detail}
+                detailId="detail"
+                contentId="content"
+                collapsed={options.collapsed ?? false}
+                detailFocusMode={options.detailFocusMode ?? false}
+                layout={options.layout ?? DEFAULT_WORKSPACE_LAYOUT}
+              />
+            </TerminalSessionReadContext.Provider>
+          </TerminalSessionContext.Provider>
         </MainWindowNavigationProvider>
       </QueryClientProvider>,
     )

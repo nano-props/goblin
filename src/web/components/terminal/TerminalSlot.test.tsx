@@ -14,10 +14,6 @@ vi.mock('#/web/stores/i18n.ts', () => ({
   useT: () => (key: string) => key,
 }))
 
-vi.mock('#/web/components/terminal/TerminalSwitcher.tsx', () => ({
-  TerminalSwitcher: () => <div data-testid="terminal-switcher" />,
-}))
-
 vi.mock('#/web/app-shell-client.ts', () => ({
   pathForDroppedFile: () => '',
 }))
@@ -116,15 +112,8 @@ describe('TerminalSlot', () => {
       const host = container.querySelector('.goblin-terminal-slot__host')
       expect(host?.getAttribute('aria-readonly')).toBe('true')
       expect(container.querySelector('.goblin-terminal-slot__mirror-overlay')).toBeTruthy()
-      const switcher = container.querySelector('[data-testid="terminal-switcher"]')
-      expect(switcher).toBeTruthy()
       const banner = container.querySelector('.goblin-terminal-slot__mirror-banner')
       expect(banner).toBeTruthy()
-      expect(
-        switcher && banner
-          ? Boolean(switcher.compareDocumentPosition(banner) & Node.DOCUMENT_POSITION_FOLLOWING)
-          : false,
-      ).toBe(true)
       const button = Array.from(container.querySelectorAll('button')).find(
         (node) => node.textContent === 'terminal.takeover',
       )

@@ -2,7 +2,6 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
   type DragEvent,
@@ -19,10 +18,8 @@ import { useT } from '#/web/stores/i18n.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-utils.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { useWorktreeTerminalSnapshot, useTerminalSnapshot } from '#/web/components/terminal/terminal-session-store.ts'
-import { TerminalSwitcher } from '#/web/components/terminal/TerminalSwitcher.tsx'
 import { MobileTerminalToolbar } from '#/web/components/terminal/mobile-terminal-toolbar.tsx'
 import { isMobileDevice } from '#/web/components/terminal/mobile-detection.ts'
-import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
 interface TerminalSlotProps {
   repoRoot: string
   branch: string
@@ -37,13 +34,9 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
   const [searchTerm, setSearchTerm] = useState('')
   const context = useTerminalSessionContext()
   const {
-    createTerminal,
-    selectTerminal,
     clearBell,
-    closeTerminalAndDismissDetailIfLast,
     attach,
     detach,
-    scrollToBottom,
     scrollLines,
     isTerminalFocusTarget,
     findNext,
@@ -53,14 +46,9 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
     takeover,
   } = context
   const terminalWorktreeKey = worktreeTerminalKey(repoRoot, worktreePath)
-  const base = useMemo<TerminalSessionBase>(
-    () => ({ repoRoot, branch, worktreePath }),
-    [branch, repoRoot, worktreePath],
-  )
   const worktreeSnapshot = useWorktreeTerminalSnapshot(terminalWorktreeKey)
   const descriptor = worktreeSnapshot.selectedDescriptor
   const key = descriptor?.key ?? null
-  const summaries = worktreeSnapshot.sessions
   const snapshot = useTerminalSnapshot(key)
   const hasSessions = worktreeSnapshot.count > 0
 
@@ -97,15 +85,6 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
     }
   }, [clearSearch, key])
 
-  const newTerminal = useCallback(() => {
-    void createTerminal(base)
-  }, [base, createTerminal])
-  const closeTerminalKey = useCallback(
-    (terminalKey: string) => {
-      closeTerminalAndDismissDetailIfLast(terminalKey, base)
-    },
-    [base, closeTerminalAndDismissDetailIfLast],
-  )
   const closeSearch = useCallback(() => {
     setSearchOpen(false)
     setSearchTerm('')
@@ -285,14 +264,6 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
             </Button>
           </div>
         )}
-        <TerminalSwitcher
-          worktreeTerminalKey={terminalWorktreeKey}
-          sessions={summaries}
-          onNew={newTerminal}
-          onSelect={selectTerminal}
-          onScrollToBottom={scrollToBottom}
-          onClose={closeTerminalKey}
-        />
         {isMobileDevice() && hasSessions && key && (
           <MobileTerminalToolbar
             onInput={(data) => writeInput(key, data)}

@@ -32,4 +32,10 @@ describe('compactTerminalTitle', () => {
   test('strips leading labels like devin before compacting the real title', () => {
     expect(compactTerminalTitle('devin: some real info')).toBe('some real info')
   })
+
+  test('strips ubuntu@VM host prefix before compacting the real title', () => {
+    expect(compactTerminalTitle('ubuntu@VM-0-12-ubuntu: dirname-a')).toBe('dirname-a')
+    expect(compactTerminalTitle('ubuntu@VM-0-12-ubuntu:~/projects/goblin')).toBe('goblin')
+    expect(compactTerminalTitle('ubuntu@VM-0-12-ubuntu:~/projects/goblin — npm run dev')).toBe('goblin · npm run dev')
+  })
 })

@@ -220,7 +220,7 @@ export function RepoTabStrip({
                           </Button>
                         </DropdownMenuTrigger>
                       </Tip>
-                      <DropdownMenuContent side="bottom" align="start" className="w-max">
+                      <DropdownMenuContent side="bottom" align="start" className="w-max max-h-[200px]">
                         {overflowRepos.map((repo) => (
                           <DropdownMenuItem
                             key={repo.id}

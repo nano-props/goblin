@@ -1,5 +1,6 @@
 import { ChevronDown, Maximize2, Minimize2 } from 'lucide-react'
 import type { KeyboardEvent } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { DetailTab, RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
@@ -11,10 +12,14 @@ import { detailTabNavigationKey, navigatedDetailTab, visibleDetailTabs } from '#
 import { cn } from '#/web/lib/cn.ts'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-utils.ts'
-import { useTerminalCount } from '#/web/components/terminal/terminal-session-store.ts'
+import { useWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-store.ts'
+import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
+import { TerminalSwitcherDropdown } from '#/web/components/terminal/TerminalSwitcherDropdown.tsx'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
+import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
 import type { BranchDetailRepo, SelectedBranchDetailPresentation } from '#/web/components/branch-detail/model.ts'
 import { useRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
+import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import {
   branchDetailToolbarStoreActionsEqual,
   branchDetailToolbarStoreActionsFromStore,
@@ -46,10 +51,41 @@ export function BranchDetailToolbar({
   )
   const navigation = useMainWindowNavigation()
   const { shortcutsDisabled, toggleDetailOnActionBarBlankClick } = useRuntimeShortcutSettings()
+  const compact = useIsCompactUi()
   const behavior = repoWorkspaceBehavior(layout, collapsed, detailFocusMode)
   const tabs = visibleDetailTabs(!!detail.branch?.worktree?.path)
   const terminalWorktreeKey = detail.branch?.worktree?.path ? worktreeTerminalKey(repo.id, detail.branch.worktree.path) : null
-  const terminalCount = useTerminalCount(terminalWorktreeKey)
+
+  const {
+    createTerminal,
+    selectTerminal,
+    scrollToBottom,
+    closeTerminalAndDismissDetailIfLast,
+  } = useTerminalSessionContext()
+
+  const worktreeSnapshot = useWorktreeTerminalSnapshot(terminalWorktreeKey)
+  const terminalSessions = worktreeSnapshot.sessions
+
+  const terminalBase = useMemo<TerminalSessionBase | null>(
+    () =>
+      detail.branch?.worktree?.path
+        ? { repoRoot: repo.id, branch: detail.branch.name, worktreePath: detail.branch.worktree.path }
+        : null,
+    [repo.id, detail.branch],
+  )
+
+  const handleNewTerminal = useCallback(() => {
+    if (!terminalBase) return
+    void createTerminal(terminalBase)
+  }, [createTerminal, terminalBase])
+
+  const handleCloseTerminal = useCallback(
+    (key: string) => {
+      if (!terminalBase) return
+      closeTerminalAndDismissDetailIfLast(key, terminalBase)
+    },
+    [closeTerminalAndDismissDetailIfLast, terminalBase],
+  )
 
   // No selected branch means there is no tab/action target; BranchDetailContent renders the empty state.
   if (!detail.branch) return null
@@ -107,16 +143,12 @@ export function BranchDetailToolbar({
               )}
             >
               {t(tab.labelKey)}
-              {tab.id === 'changes' && detail.statusCount > 0 && (
+              {tab.id === 'changes' && detail.statusCount > 0 && !compact && (
                 <Badge variant="attention" className="font-normal font-mono tabular-nums">
                   {detail.statusCount}
                 </Badge>
               )}
-              {tab.id === 'terminal' && terminalCount > 0 && (
-                <Badge variant="outline" className="font-normal font-mono tabular-nums text-muted-foreground">
-                  {terminalCount}
-                </Badge>
-              )}
+
             </Button>
           )
         })}
@@ -127,6 +159,19 @@ export function BranchDetailToolbar({
         onClick={behavior.detailCollapseAllowed && toggleDetailOnActionBarBlankClick ? toggleDetailCollapsed : undefined}
       />
       <div className="flex shrink-0 items-center gap-1">
+        {repo.ui.detailTab === 'terminal' && terminalWorktreeKey && (
+          <>
+            <TerminalSwitcherDropdown
+              worktreeTerminalKey={terminalWorktreeKey}
+              sessions={terminalSessions}
+              onNew={handleNewTerminal}
+              onSelect={selectTerminal}
+              onScrollToBottom={scrollToBottom}
+              onClose={handleCloseTerminal}
+            />
+            {layout === 'top-bottom' && <div className="mx-1 h-4 w-px bg-separator/70" aria-hidden="true" />}
+          </>
+        )}
         {behavior.detailFocusAllowed && (
           <Button
             variant="ghost"
