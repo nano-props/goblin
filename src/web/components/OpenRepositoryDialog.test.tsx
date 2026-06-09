@@ -154,6 +154,34 @@ describe('OpenRepositoryDialog', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
+  test('ignores an older submit result after the dialog is reopened', async () => {
+    const first = createDeferred<OpenRepoResult>()
+    const second = createDeferred<OpenRepoResult>()
+    const onClose = vi.fn()
+    const onOpen = vi.fn(() => (onOpen.mock.calls.length === 0 ? first.promise : second.promise))
+
+    render(<OpenRepositoryDialog open onClose={onClose} onOpen={onOpen} />)
+
+    setInputValue('#open-repo-path', '~/Developer/repo')
+    click('button[type="submit"]')
+
+    render(<OpenRepositoryDialog open={false} onClose={onClose} onOpen={onOpen} />)
+    render(<OpenRepositoryDialog open onClose={onClose} onOpen={onOpen} />)
+
+    first.resolve({ ok: true, id: '/Users/tester/Developer/repo' })
+    await flush()
+
+    expect(onClose).not.toHaveBeenCalled()
+    expect(button('button[type="submit"]').disabled).toBe(true)
+
+    setInputValue('#open-repo-path', '~/Developer/repo-next')
+    click('button[type="submit"]')
+    second.resolve({ ok: true, id: '/Users/tester/Developer/repo-next' })
+    await flush()
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
   test('clears a previous inline error after editing the path', async () => {
     const onClose = vi.fn()
     const onOpen = vi.fn<() => Promise<OpenRepoResult>>().mockRejectedValueOnce(new Error('boom'))
@@ -184,9 +212,11 @@ describe('OpenRepositoryDialog', () => {
 })
 
 function render(element: ReactNode) {
-  container = document.createElement('div')
-  document.body.append(container)
-  root = createRoot(container)
+  if (!container) {
+    container = document.createElement('div')
+    document.body.append(container)
+    root = createRoot(container)
+  }
   act(() => {
     root!.render(element)
   })

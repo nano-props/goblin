@@ -5,7 +5,7 @@ import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
-import { clearRecentRepos } from '#/web/app-data-client.ts'
+import { clearRecentRepoHistory } from '#/web/settings-write-paths.ts'
 import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
 import { consumeExternalOpenPaths } from '#/web/app-shell-client.ts'
 import { openRepoPaths } from '#/web/lib/open-repo-paths.ts'
@@ -102,7 +102,7 @@ export async function handleAppLevelRendererIntent(
       await useI18nStore.getState().setPref(plan.pref)
       return true
     case 'clear-recent-repos':
-      await clearRecentRepos()
+      await clearRecentRepoHistory()
       return true
     case 'ensure-recent-repo-open': {
       const result = await deps.ensureWorkspaceOpen(plan.entry)

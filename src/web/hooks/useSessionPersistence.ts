@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { saveSession } from '#/web/app-data-client.ts'
+import { persistSessionState } from '#/web/settings-write-paths.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { restorableWorkspaceStateFromStore } from '#/web/stores/repos/selector-state.ts'
 import { sessionStateFromRestorableWorkspaceState } from '#/web/restorable-workspace-state.ts'
@@ -49,7 +49,7 @@ export function useSessionPersistence() {
     if (lastSavedRef.current === serialized) return
     const save = () => {
       lastSavedRef.current = serialized
-      void saveSession(session).catch((err) => {
+      void persistSessionState(session).catch((err) => {
         lastSavedRef.current = null
         console.warn('[session] save failed', err)
       })

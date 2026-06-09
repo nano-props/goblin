@@ -1,28 +1,19 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
 
 const mocks = vi.hoisted(() => ({
-  publishSettingsInvalidation: vi.fn(),
-  buildServerExternalAppsSnapshot: vi.fn(),
   getServerExternalAppsSnapshot: vi.fn(),
   getServerGitHubCliState: vi.fn(),
   getSettingsSnapshot: vi.fn(),
-  setServerGlobalShortcutRegistered: vi.fn(),
-  addServerRecentRepo: vi.fn(),
-  clearServerRecentRepos: vi.fn(),
   getServerSettingsPrefs: vi.fn(),
-  setServerFetchIntervalSec: vi.fn(),
-  setServerSessionState: vi.fn(),
-  updateServerSettingsPrefs: vi.fn(),
-  settingsInvalidationScopesForPrefsPatch: vi.fn(),
-}))
-
-vi.mock('#/server/modules/invalidation-broker.ts', () => ({
-  publishSettingsInvalidation: mocks.publishSettingsInvalidation,
+  applyServerFetchIntervalWrite: vi.fn(),
+  applyServerGlobalShortcutRegistrationWrite: vi.fn(),
+  applyServerRecentRepoAddWrite: vi.fn(),
+  applyServerRecentRepoClearWrite: vi.fn(),
+  applyServerSessionWrite: vi.fn(),
+  applyServerSettingsPrefsWrite: vi.fn(),
 }))
 
 vi.mock('#/server/modules/external-apps.ts', () => ({
-  buildServerExternalAppsSnapshot: mocks.buildServerExternalAppsSnapshot,
   getServerExternalAppsSnapshot: mocks.getServerExternalAppsSnapshot,
 }))
 
@@ -32,51 +23,32 @@ vi.mock('#/server/modules/github-cli.ts', () => ({
 
 vi.mock('#/server/modules/settings.ts', () => ({
   getSettingsSnapshot: mocks.getSettingsSnapshot,
-  setServerGlobalShortcutRegistered: mocks.setServerGlobalShortcutRegistered,
 }))
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
-  addServerRecentRepo: mocks.addServerRecentRepo,
-  clearServerRecentRepos: mocks.clearServerRecentRepos,
   getServerSettingsPrefs: mocks.getServerSettingsPrefs,
-  setServerFetchIntervalSec: mocks.setServerFetchIntervalSec,
-  setServerSessionState: mocks.setServerSessionState,
-  updateServerSettingsPrefs: mocks.updateServerSettingsPrefs,
 }))
 
-vi.mock('#/shared/server-invalidation.ts', async () => {
-  const actual = await vi.importActual<typeof import('#/shared/server-invalidation.ts')>('#/shared/server-invalidation.ts')
-  return {
-    ...actual,
-    settingsInvalidationScopesForPrefsPatch: mocks.settingsInvalidationScopesForPrefsPatch,
-  }
-})
+vi.mock('#/server/modules/settings-write-paths.ts', () => ({
+  applyServerFetchIntervalWrite: mocks.applyServerFetchIntervalWrite,
+  applyServerGlobalShortcutRegistrationWrite: mocks.applyServerGlobalShortcutRegistrationWrite,
+  applyServerRecentRepoAddWrite: mocks.applyServerRecentRepoAddWrite,
+  applyServerRecentRepoClearWrite: mocks.applyServerRecentRepoClearWrite,
+  applyServerSessionWrite: mocks.applyServerSessionWrite,
+  applyServerSettingsPrefsWrite: mocks.applyServerSettingsPrefsWrite,
+}))
 
 describe('settings routes', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  test('returns authoritative i18n snapshot together with updated prefs for language writes', async () => {
-    const updatedSettings = {
-      lang: 'ja',
-      theme: 'auto',
-      colorTheme: 'macos',
-      fetchIntervalSec: 120,
-      terminalNotificationsEnabled: false,
-      shortcutsDisabled: false,
-      globalShortcutDisabled: false,
-      swapCloseShortcuts: false,
-      toggleDetailOnActionBarBlankClick: false,
-      globalShortcut: 'CommandOrControl+Shift+G',
-      terminalApp: 'auto',
-      editorApp: 'auto',
-      lanEnabled: false,
-    } as const
-    const i18nSnapshot = resolveI18nSnapshot('ja', 'ja-JP,ja;q=0.9,en;q=0.8')
-
-    mocks.updateServerSettingsPrefs.mockResolvedValue(updatedSettings)
-    mocks.settingsInvalidationScopesForPrefsPatch.mockReturnValue(['i18n'])
+  test('delegates prefs writes to the settings write-path application layer', async () => {
+    mocks.applyServerSettingsPrefsWrite.mockResolvedValue({
+      ok: true,
+      settings: { lang: 'ja' },
+      i18n: { lang: 'ja', pref: 'ja', dict: {} },
+    })
 
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
     const app = createSettingsRoutes()
@@ -93,69 +65,16 @@ describe('settings routes', () => {
 
     await expect(response.json()).resolves.toEqual({
       ok: true,
-      settings: updatedSettings,
-      i18n: i18nSnapshot,
+      settings: { lang: 'ja' },
+      i18n: { lang: 'ja', pref: 'ja', dict: {} },
     })
-    expect(mocks.publishSettingsInvalidation).toHaveBeenCalledWith(['i18n'])
-  })
-
-  test('returns authoritative external apps snapshot together with updated prefs for app writes', async () => {
-    const updatedSettings = {
-      lang: 'auto',
-      theme: 'auto',
-      colorTheme: 'macos',
-      fetchIntervalSec: 120,
-      terminalNotificationsEnabled: false,
-      shortcutsDisabled: false,
-      globalShortcutDisabled: false,
-      swapCloseShortcuts: false,
-      toggleDetailOnActionBarBlankClick: false,
-      globalShortcut: 'CommandOrControl+Shift+G',
-      terminalApp: 'ghostty',
-      editorApp: 'cursor',
-      lanEnabled: false,
-    } as const
-    const externalApps = {
-      terminal: {
-        pref: 'ghostty',
-        resolved: 'ghostty',
-        available: true,
-        appAvailability: { ghostty: true, terminal: false },
-        detectedAt: 1,
-      },
-      editor: {
-        pref: 'cursor',
-        resolved: 'cursor',
-        available: true,
-        appAvailability: { vscode: true, cursor: true, windsurf: false },
-        detectedAt: 1,
-      },
-    } as const
-
-    mocks.updateServerSettingsPrefs.mockResolvedValue(updatedSettings)
-    mocks.settingsInvalidationScopesForPrefsPatch.mockReturnValue(['external-apps', 'settings-snapshot'])
-    mocks.buildServerExternalAppsSnapshot.mockResolvedValue(externalApps)
-
-    const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
-    const app = createSettingsRoutes()
-    const response = await app.request(
-      new Request('http://127.0.0.1:32100/prefs', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ settings: { terminalApp: 'ghostty' } }),
-      }),
+    expect(mocks.applyServerSettingsPrefsWrite).toHaveBeenCalledWith(
+      { settings: { lang: 'ja' } },
+      { acceptLanguage: 'ja-JP,ja;q=0.9,en;q=0.8', signal: expect.any(AbortSignal) },
     )
-
-    await expect(response.json()).resolves.toEqual({
-      ok: true,
-      settings: updatedSettings,
-      externalApps,
-    })
-    expect(mocks.buildServerExternalAppsSnapshot).toHaveBeenCalledWith(updatedSettings, expect.any(AbortSignal))
-    expect(mocks.publishSettingsInvalidation).toHaveBeenCalledWith(['external-apps', 'settings-snapshot'])
   })
 
-  test('persists session state without publishing settings invalidation', async () => {
+  test('delegates session writes to the settings write-path application layer', async () => {
     const session = {
       openRepos: [],
       activeRepo: null,
@@ -168,8 +87,7 @@ describe('settings routes', () => {
       },
       selectedTerminalByWorktree: {},
     } as const
-
-    mocks.setServerSessionState.mockResolvedValue(session)
+    mocks.applyServerSessionWrite.mockResolvedValue({ ok: true, session })
 
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
     const app = createSettingsRoutes()
@@ -185,7 +103,38 @@ describe('settings routes', () => {
       ok: true,
       session,
     })
-    expect(mocks.setServerSessionState).toHaveBeenCalledWith(session)
-    expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
+    expect(mocks.applyServerSessionWrite).toHaveBeenCalledWith({ session })
+  })
+
+  test('delegates recent-repo writes to the settings write-path application layer', async () => {
+    const repo = { kind: 'local', id: '/tmp/repo-a' } as const
+    mocks.applyServerRecentRepoAddWrite.mockResolvedValue({ ok: true, recentRepos: [repo], addedRepo: repo })
+    mocks.applyServerRecentRepoClearWrite.mockResolvedValue({ ok: true })
+    const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
+    const app = createSettingsRoutes()
+
+    const addResponse = await app.request(
+      new Request('http://127.0.0.1:32100/recent-repos/add', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ repo }),
+      }),
+    )
+    await expect(addResponse.json()).resolves.toEqual({
+      ok: true,
+      recentRepos: [repo],
+      addedRepo: repo,
+    })
+    expect(mocks.applyServerRecentRepoAddWrite).toHaveBeenCalledWith({ repo })
+
+    const clearResponse = await app.request(
+      new Request('http://127.0.0.1:32100/recent-repos/clear', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      }),
+    )
+    await expect(clearResponse.json()).resolves.toEqual({ ok: true })
+    expect(mocks.applyServerRecentRepoClearWrite).toHaveBeenCalled()
   })
 })

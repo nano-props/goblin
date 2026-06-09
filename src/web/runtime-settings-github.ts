@@ -1,13 +1,16 @@
-import { useRefreshGitHubCliMutation } from '#/web/settings-queries.ts'
 import { runSettingsControllerAction } from '#/web/runtime-settings-controller.ts'
+import { refreshGitHubCliDetection } from '#/web/settings-write-paths.ts'
+import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
 
 export function useGitHubSettingsController(hosts?: string[]) {
-  const refreshGitHubCli = useRefreshGitHubCliMutation(hosts)
+  const { isPending: refreshingGitHubCli, run } = useAsyncPending<'refresh'>()
   return {
-    refreshingGitHubCli: refreshGitHubCli.isPending,
+    refreshingGitHubCli,
     async refreshGitHubCli(): Promise<void> {
-      await runSettingsControllerAction('GitHub CLI refresh', async () => {
-        await refreshGitHubCli.mutateAsync()
+      await run('refresh', async () => {
+        await runSettingsControllerAction('GitHub CLI refresh', async () => {
+          await refreshGitHubCliDetection(hosts)
+        })
       })
     },
   }

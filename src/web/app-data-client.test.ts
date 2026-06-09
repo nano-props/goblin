@@ -388,7 +388,10 @@ describe('server-client web host bootstrap', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const { addRecentRepo } = await import('#/web/app-data-client.ts')
-    await expect(addRecentRepo({ kind: 'local', id: '/tmp/../tmp/repo' })).resolves.toBeUndefined()
+    await expect(addRecentRepo({ kind: 'local', id: '/tmp/../tmp/repo' })).resolves.toMatchObject({
+      recentRepos: [{ kind: 'local', id: '/tmp/repo' }],
+      addedRepo: { kind: 'local', id: '/tmp/repo' },
+    })
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:32100/api/settings/recent-repos/add',
       expect.objectContaining({
@@ -612,7 +615,10 @@ describe('server-client web host bootstrap', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const { addRecentRepo } = await import('#/web/app-data-client.ts')
-    await expect(addRecentRepo({ kind: 'local', id: '/bad\0repo' } as unknown as { kind: 'local'; id: string })).resolves.toBeUndefined()
+    await expect(addRecentRepo({ kind: 'local', id: '/bad\0repo' } as unknown as { kind: 'local'; id: string })).resolves.toMatchObject({
+      recentRepos: [{ kind: 'local', id: '/existing' }],
+      addedRepo: null,
+    })
     expect(invokeRpc).toHaveBeenCalledWith(
       expect.objectContaining({
         path: 'settings.applyShellProjection',

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { DialogFooter } from '#/web/components/ui/dialog.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { DialogStatusRow } from '#/web/components/ui/dialog-status-row.tsx'
@@ -7,6 +7,7 @@ import { Field, FieldLabel } from '#/web/components/ui/field.tsx'
 import { Input } from '#/web/components/ui/input.tsx'
 import { tildify, untildify } from '#/web/lib/paths.ts'
 import { chooseLocalRepositoryPath, hasNativeDirectoryPicker } from '#/web/app-shell-client.ts'
+import { useLatestAsyncTask } from '#/web/hooks/useLatestAsyncTask.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { cn } from '#/web/lib/cn.ts'
@@ -21,9 +22,8 @@ export function OpenRepositoryDialog({ open, onClose, onOpen }: Props) {
   const t = useT()
   const compact = useIsCompactUi()
   const [path, setPath] = useState('')
-  const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const submitTokenRef = useRef(0)
+  const { pending, reset, runLatest } = useLatestAsyncTask()
 
   const trimmedPath = path.trim()
   const resolvedPath = untildify(trimmedPath)
@@ -34,10 +34,9 @@ export function OpenRepositoryDialog({ open, onClose, onOpen }: Props) {
   useEffect(() => {
     if (!open) return
     setPath('')
-    setPending(false)
+    reset()
     setError(null)
-    submitTokenRef.current = 0
-  }, [open])
+  }, [open, reset])
 
   async function choosePath() {
     if (pending || !canChoosePath) return
@@ -54,29 +53,18 @@ export function OpenRepositoryDialog({ open, onClose, onOpen }: Props) {
 
   async function handleSubmit() {
     if (!canSubmit) return
-    const token = submitTokenRef.current + 1
-    submitTokenRef.current = token
-    setPending(true)
     setError(null)
-    let result: OpenRepoResult
     try {
-      result = await onOpen(resolvedPath)
+      const result = await runLatest(() => onOpen(resolvedPath))
+      if (result.status === 'stale') return
+      if (result.value.ok) {
+        onClose()
+        return
+      }
+      setError(t(result.value.message))
     } catch (err) {
-      if (submitTokenRef.current !== token) return
-      submitTokenRef.current = 0
-      setPending(false)
       setError(err instanceof Error ? err.message : t('error.unknown'))
-      return
     }
-    if (submitTokenRef.current !== token) return
-    submitTokenRef.current = 0
-    if (result.ok) {
-      setPending(false)
-      onClose()
-      return
-    }
-    setPending(false)
-    setError(t(result.message))
   }
 
   return (

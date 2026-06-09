@@ -38,6 +38,8 @@ import { resolveApiBaseUrl } from '#/web/lib/websocket-url.ts'
 import { nativeSettingsProjectionStateFromSettings, pickNativeSettingsProjectionPatch } from '#/shared/native-shell-projection.ts'
 import { runtimeSettingsSnapshotFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
 
+type RecentReposUpdateResponse = { ok: boolean; addedRepo?: RepoSessionEntry | null } & RuntimeRecentReposState
+
 interface EmbeddedServerConfig {
   url: string
   secret: string
@@ -203,18 +205,20 @@ export async function testRemoteRepositoryConnection(
   return await postServerJson('/api/remote/test-repository', { target }, { signal })
 }
 
-export async function addRecentRepo(repo: RepoSessionEntry): Promise<void> {
-  const result = await postServerJson<
-    { repo: RepoSessionEntry },
-    ({ ok: boolean; addedRepo?: RepoSessionEntry | null } & RuntimeRecentReposState)
-  >('/api/settings/recent-repos/add', { repo })
-  if (!canUseNativeRpcBridge()) return
-  await invokeNativeRpcPath<void>('settings.applyShellProjection', {
-    recentRepos: {
-      recentRepos: result.recentRepos,
-      ...(result.addedRepo ? { addedRepo: result.addedRepo } : {}),
-    },
-  })
+export async function addRecentRepo(repo: RepoSessionEntry): Promise<RecentReposUpdateResponse> {
+  const result = await postServerJson<{ repo: RepoSessionEntry }, RecentReposUpdateResponse>(
+    '/api/settings/recent-repos/add',
+    { repo },
+  )
+  if (canUseNativeRpcBridge()) {
+    await invokeNativeRpcPath<void>('settings.applyShellProjection', {
+      recentRepos: {
+        recentRepos: result.recentRepos,
+        ...(result.addedRepo ? { addedRepo: result.addedRepo } : {}),
+      },
+    })
+  }
+  return result
 }
 
 export async function clearRecentRepos(): Promise<void> {
@@ -226,8 +230,12 @@ export async function clearRecentRepos(): Promise<void> {
   await invokeNativeRpcPath<void>('settings.clearNativeRecentDocuments', undefined)
 }
 
-export async function saveSession(session: SessionState): Promise<void> {
-  await postServerJson('/api/settings/session', { session })
+export async function saveSession(session: SessionState): Promise<SessionState> {
+  const result = await postServerJson<{ session: SessionState }, { ok: boolean; session: SessionState }>(
+    '/api/settings/session',
+    { session },
+  )
+  return result.session
 }
 
 export async function setSettingsFetchInterval(sec: number): Promise<number> {

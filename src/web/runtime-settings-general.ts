@@ -1,6 +1,6 @@
-import { useSetToggleDetailOnActionBarBlankClickMutation } from '#/web/settings-queries.ts'
-import { readRuntimeGeneralSettings, useRuntimeSettingsSnapshot } from '#/web/runtime-settings-snapshot.ts'
 import { runSettingsControllerAction } from '#/web/runtime-settings-controller.ts'
+import { readRuntimeGeneralSettings, useRuntimeSettingsSnapshot } from '#/web/runtime-settings-snapshot.ts'
+import { setToggleDetailOnActionBarBlankClickPreference } from '#/web/settings-write-paths.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
@@ -29,7 +29,6 @@ export function useGeneralSettingsController() {
   const setThemePref = useThemeStore((s) => s.setPref)
   const setColorTheme = useThemeStore((s) => s.setColorTheme)
   const setLangPref = useI18nStore((s) => s.setPref)
-  const setToggleDetailOnActionBarBlankClick = useSetToggleDetailOnActionBarBlankClickMutation()
   return {
     async setThemePref(pref: ThemePref): Promise<void> {
       await runSettingsControllerAction('appearance update', async () => {
@@ -48,7 +47,7 @@ export function useGeneralSettingsController() {
     },
     async setToggleDetailOnActionBarBlankClick(enabled: boolean): Promise<void> {
       await runSettingsControllerAction('action bar blank toggle update', async () => {
-        await setToggleDetailOnActionBarBlankClick.mutateAsync(enabled)
+        await setToggleDetailOnActionBarBlankClickPreference(enabled)
       })
     },
   }

@@ -7,10 +7,10 @@ import { useSessionPersistence } from '#/web/hooks/useSessionPersistence.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 
-const saveSessionMock = vi.fn(async (_session: unknown) => {})
+const persistSessionStateMock = vi.fn(async (_session: unknown) => {})
 
-vi.mock('#/web/app-data-client.ts', () => ({
-  saveSession: (session: unknown) => saveSessionMock(session),
+vi.mock('#/web/settings-write-paths.ts', () => ({
+  persistSessionState: (session: unknown) => persistSessionStateMock(session),
 }))
 
 let container: HTMLDivElement | null = null
@@ -19,7 +19,7 @@ let root: Root | null = null
 beforeEach(() => {
   ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
-  saveSessionMock.mockReset()
+  persistSessionStateMock.mockReset()
 })
 
 afterEach(() => {
@@ -52,7 +52,7 @@ describe('useSessionPersistence', () => {
 
     await render(<Harness />)
 
-    expect(saveSessionMock).toHaveBeenCalledWith(
+    expect(persistSessionStateMock).toHaveBeenCalledWith(
       expect.objectContaining({
         openRepos: [{ kind: 'local', id: '/tmp/repo' }],
         activeRepo: '/tmp/repo',

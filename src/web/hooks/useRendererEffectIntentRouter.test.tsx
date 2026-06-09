@@ -13,14 +13,14 @@ import { useI18nStore } from '#/web/stores/i18n.ts'
 import { createBranchSnapshot, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 
 const appDataClientMocks = vi.hoisted(() => ({
-  clearRecentRepos: vi.fn(async () => {}),
+  clearRecentRepoHistory: vi.fn(async () => {}),
 }))
 
-vi.mock('#/web/app-data-client.ts', async () => {
-  const actual = await vi.importActual<typeof import('#/web/app-data-client.ts')>('#/web/app-data-client.ts')
+vi.mock('#/web/settings-write-paths.ts', async () => {
+  const actual = await vi.importActual<typeof import('#/web/settings-write-paths.ts')>('#/web/settings-write-paths.ts')
   return {
     ...actual,
-    clearRecentRepos: appDataClientMocks.clearRecentRepos,
+    clearRecentRepoHistory: appDataClientMocks.clearRecentRepoHistory,
   }
 })
 
@@ -47,7 +47,7 @@ beforeEach(() => {
   activateRepoSpy.mockClear()
   closeRepoSpy.mockClear()
   showRepoBranchDetailTabSpy.mockClear()
-  appDataClientMocks.clearRecentRepos.mockClear()
+  appDataClientMocks.clearRecentRepoHistory.mockClear()
   consumeExternalOpenPathsSpy.mockReset()
   consumeExternalOpenPathsSpy.mockResolvedValue([])
   overlayOpen = false
@@ -399,7 +399,7 @@ describe('useRendererEffectIntentRouter', () => {
       await Promise.resolve()
     })
 
-    expect(appDataClientMocks.clearRecentRepos).toHaveBeenCalledTimes(1)
+    expect(appDataClientMocks.clearRecentRepoHistory).toHaveBeenCalledTimes(1)
   })
 })
 
