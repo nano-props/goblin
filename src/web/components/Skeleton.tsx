@@ -149,7 +149,7 @@ function RepoToolbarSkeleton({ focusMode = false, compact = false }: { focusMode
             <Bar w="44px" h="16px" />
             <Bar w="96px" h="11px" />
             <div data-testid="repo-toolbar-skeleton-focus-actions">
-              <Bar w="72px" h="24px" tone="strong" />
+              <Bar w={compact ? '24px' : '72px'} h="24px" tone="strong" />
             </div>
           </>
         ) : compact ? (
