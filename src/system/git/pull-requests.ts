@@ -450,17 +450,22 @@ function mapPullRequestsByBranch(prs: PullRequestInfo[]): Map<string, PullReques
   return byBranch
 }
 
+// gh api graphql --hostname doesn't need to run from a git repo — it uses
+// the globally-configured gh auth. Use a stable directory for gh commands
+// and keep the scopeId (local path or remote ID) for cache isolation only.
+const ghWorkingDirectory = process.cwd()
+
 async function fetchRepositoryPullRequestMap(
-  cwd: string,
+  scopeId: string,
   repo: GitHubRepoRef,
   mode: PullRequestFetchMode,
   signal?: AbortSignal,
 ): Promise<Map<string, PullRequestInfo> | null> {
   if (signal?.aborted) return null
-  const prs = await queryRepositoryPullRequests(cwd, repo, mode, signal)
+  const prs = await queryRepositoryPullRequests(ghWorkingDirectory, repo, mode, signal)
   if (!prs) return null
   const byBranch = mapPullRequestsByBranch(prs)
-  prCache.set(repoCacheKey(cwd, repo), {
+  prCache.set(repoCacheKey(scopeId, repo), {
     expiresAt: Date.now() + pullRequestCollectionCacheTtlMs(mode, byBranch.values()),
     mode,
     prs: byBranch,
@@ -469,16 +474,16 @@ async function fetchRepositoryPullRequestMap(
 }
 
 async function fetchSingleBranchPullRequestMap(
-  cwd: string,
+  scopeId: string,
   repo: GitHubRepoRef,
   branch: string,
   mode: PullRequestFetchMode,
   signal?: AbortSignal,
 ): Promise<Map<string, PullRequestInfo> | null> {
-  const prs = await queryPullRequests(cwd, repo, { headBranch: branch, limit: 20, mode, signal })
+  const prs = await queryPullRequests(ghWorkingDirectory, repo, { headBranch: branch, limit: 20, mode, signal })
   if (!prs) return null
   const byBranch = mapPullRequestsByBranch(prs)
-  cacheBranchPullRequest(cwd, repo, branch, mode, byBranch.get(branch) ?? null)
+  cacheBranchPullRequest(scopeId, repo, branch, mode, byBranch.get(branch) ?? null)
   return byBranch
 }
 
