@@ -82,7 +82,7 @@ describe('BranchDetailToolbar', () => {
     expect(tab.textContent).toContain('2')
   })
 
-  test('shows branch actions in the detail bar in top-bottom focus mode', () => {
+  test('does not show branch actions in the detail bar in top-bottom focus mode (actions moved to repo bar)', () => {
     renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({}),
@@ -104,8 +104,8 @@ describe('BranchDetailToolbar', () => {
       },
     })
 
-    expect(container?.querySelector('button[aria-label="action.menu"]')).not.toBeNull()
-    expect(container?.querySelector('[data-testid="branch-detail-toolbar-divider"]')).not.toBeNull()
+    expect(container?.querySelector('button[aria-label="action.menu"]')).toBeNull()
+    expect(container?.querySelector('[data-testid="branch-detail-toolbar-divider"]')).toBeNull()
   })
 
   test('does not show branch actions in the detail bar in top-bottom split mode', () => {

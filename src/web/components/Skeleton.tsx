@@ -93,7 +93,7 @@ export function BranchDetailSkeleton({
   detailFocusMode?: boolean
 }) {
   const behavior = repoWorkspaceBehavior(layout, collapsed, detailFocusMode)
-  const showBranchActions = layout === 'left-right' || behavior.mode === 'focus'
+  const showBranchActions = layout === 'left-right'
   const showPanelControls = behavior.detailFocusAllowed || behavior.detailCollapseAllowed
 
   return (
@@ -148,6 +148,9 @@ function RepoToolbarSkeleton({ focusMode = false, compact = false }: { focusMode
             <Bar w="120px" h="14px" tone="strong" />
             <Bar w="44px" h="16px" />
             <Bar w="96px" h="11px" />
+            <div data-testid="repo-toolbar-skeleton-focus-actions">
+              <Bar w="72px" h="24px" tone="strong" />
+            </div>
           </>
         ) : compact ? (
           <ToolbarPagerSkeleton />

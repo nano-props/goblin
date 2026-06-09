@@ -97,9 +97,11 @@ export function BranchDetail({
   const detail = getSelectedBranchDetailPresentation(repo)
   const contentId = `${detailId}-content`
 
+  const focusMode = layout === 'top-bottom' && detailFocusMode
+
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
-      {detail.branch ? (
+      {detail.branch && !focusMode ? (
         <BranchDetailWithActions
           key={`${repo.id}:${detail.branch.name}`}
           repo={repo}

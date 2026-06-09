@@ -78,7 +78,7 @@ export function BranchDetailToolbar({
         ? 'branch-detail.expand-title'
         : 'branch-detail.collapse-title',
   )
-  const showBranchActions = !!branchActions && (layout === 'left-right' || behavior.mode === 'focus')
+  const showBranchActions = !!branchActions && layout === 'left-right'
   const showPanelControls = behavior.detailFocusAllowed || behavior.detailCollapseAllowed
   const focusTogglePressed = behavior.detailFocusMode
 

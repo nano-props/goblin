@@ -7,6 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '#/web/components/ui/dropdown-menu.tsx'
+import { BranchActionControls } from '#/web/components/BranchActionControls.tsx'
 import { BranchSearchInput } from '#/web/components/repo-toolbar/BranchSearchInput.tsx'
 import { BranchViewModeControl } from '#/web/components/repo-toolbar/BranchViewModeControl.tsx'
 import { RepoToolbarActions } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
@@ -15,10 +16,13 @@ import { BranchSummaryInline } from '#/web/components/repo-workspace/BranchSumma
 import { Toolbar } from '#/web/components/Layout.tsx'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
+import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
+import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
 import { visibleBranches } from '#/web/stores/repos/branch-view-mode.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { BranchViewMode } from '#/web/stores/repos/types.ts'
+import type { BranchViewMode, RepoBranchState } from '#/web/stores/repos/types.ts'
+import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 
 interface Props {
@@ -102,7 +106,72 @@ function FocusBranchControls({ repoId }: Props) {
           <BranchSummaryInline repo={summaryRepo} branch={selectedBranchData} className="min-w-0 flex-1" />
         </>
       )}
+      {selectedBranchData && (
+        <FocusBranchActions repoId={repoId} branch={selectedBranchData} />
+      )}
     </div>
+  )
+}
+
+const FOCUS_BRANCH_ACTIONS_REPO_EQUAL = (a: BranchActionRepo | undefined, b: BranchActionRepo | undefined) =>
+  a === b ||
+  (!!a &&
+    !!b &&
+    a.id === b.id &&
+    a.instanceToken === b.instanceToken &&
+    a.data.currentBranch === b.data.currentBranch &&
+    a.data.status === b.data.status &&
+    a.data.worktreesByPath === b.data.worktreesByPath &&
+    a.operations.branchAction === b.operations.branchAction &&
+    a.remote.hasRemotes === b.remote.hasRemotes &&
+    a.remote.hasBrowserRemote === b.remote.hasBrowserRemote &&
+    a.remote.hasGitHubRemote === b.remote.hasGitHubRemote &&
+    a.remote.target === b.remote.target &&
+    a.remote.browserRemoteProvider === b.remote.browserRemoteProvider &&
+    a.remote.remoteProviders === b.remote.remoteProviders)
+
+function FocusBranchActions({ repoId, branch }: { repoId: string; branch: RepoBranchState }) {
+  const repo = useStoreWithEqualityFn(
+    useReposStore,
+    (s): BranchActionRepo | undefined => {
+      const repoState = s.repos[repoId]
+      if (!repoState) return undefined
+      return {
+        id: repoState.id,
+        instanceToken: repoState.instanceToken,
+        data: {
+          currentBranch: repoState.data.currentBranch,
+          status: repoState.data.status,
+          worktreesByPath: repoState.data.worktreesByPath,
+        },
+        operations: {
+          branchAction: repoState.operations.branchAction,
+        },
+        remote: {
+          hasRemotes: repoState.remote.hasRemotes,
+          hasBrowserRemote: repoState.remote.hasBrowserRemote,
+          hasGitHubRemote: repoState.remote.hasGitHubRemote,
+          target: repoState.remote.target,
+          browserRemoteProvider: repoState.remote.browserRemoteProvider,
+          remoteProviders: repoState.remote.remoteProviders,
+        },
+      }
+    },
+    FOCUS_BRANCH_ACTIONS_REPO_EQUAL,
+  )
+
+  // FocusBranchActions is only mounted when FocusBranchControls has a
+  // selectedBranchData branch, which implies repo exists in the store.
+  const actions = useBranchActionItems(repo!, branch)
+  useBranchActionShortcutRegistry(actions)
+
+  if (!repo) return null
+
+  return (
+    <>
+      {actions.dialogs}
+      <BranchActionControls actions={actions} variant="menu" />
+    </>
   )
 }
 
