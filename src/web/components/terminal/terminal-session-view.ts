@@ -43,6 +43,7 @@ export class TerminalSessionView {
   private disposeFontObserver: (() => void) | null = null
   private fitFlushTimer: number | null = null
   private fontFitTimer: number | null = null
+  private pinToBottomFrame: number | null = null
   private lastWidth = DEFAULT_PARKING_WIDTH
   private lastHeight = DEFAULT_PARKING_HEIGHT
   private host: HTMLElement | null = null
@@ -169,6 +170,7 @@ export class TerminalSessionView {
     if (!this.term) return
     if (this.term.cols === cols && this.term.rows === rows) return
     this.term.resize(cols, rows)
+    this.pinToBottomSoon()
   }
 
   serialize(): string {
@@ -180,7 +182,7 @@ export class TerminalSessionView {
   }
 
   scrollToBottom(): void {
-    this.term?.scrollToBottom()
+    scrollTerminalToBottom(this.term)
   }
 
   scrollLines(amount: number): void {
@@ -211,6 +213,7 @@ export class TerminalSessionView {
   fitNow(): void {
     if (!this.term || !this.fitAddon || !hasMeasurableBox(this.xtermHost)) return
     this.fitAddon.fit()
+    this.pinToBottomSoon()
   }
 
   destroyTerminal(): void {
@@ -222,6 +225,7 @@ export class TerminalSessionView {
     this.disposeFontObserver?.()
     this.disposeFontObserver = null
     this.cancelFontFit()
+    this.cancelPinToBottom()
     this.fitAddon = null
     this.searchAddon = null
     this.serializeAddon = null
@@ -367,12 +371,30 @@ export class TerminalSessionView {
     remeasureTerminal(term)
     this.fitAddon.fit()
     term.refresh(0, Math.max(0, term.rows - 1))
+    this.pinToBottomSoon()
   }
 
   private cancelFitFlush(): void {
     if (this.fitFlushTimer === null) return
     window.clearTimeout(this.fitFlushTimer)
     this.fitFlushTimer = null
+  }
+
+  private pinToBottomSoon(): void {
+    if (!this.term) return
+    // Product policy: after any local terminal resize/fit pass, always snap
+    // back to the live tail instead of preserving scroll position.
+    this.cancelPinToBottom()
+    this.pinToBottomFrame = requestAnimationFrame(() => {
+      this.pinToBottomFrame = null
+      scrollTerminalToBottom(this.term)
+    })
+  }
+
+  private cancelPinToBottom(): void {
+    if (this.pinToBottomFrame === null) return
+    cancelScheduledAnimationFrame(this.pinToBottomFrame)
+    this.pinToBottomFrame = null
   }
 
   private rememberHostSize(host: HTMLElement): void {
@@ -414,4 +436,17 @@ function remeasureTerminal(term: XTermTerminal): void {
   }
   internal._core?._charSizeService?.measure?.()
   internal._core?._renderService?.clear?.()
+}
+
+function scrollTerminalToBottom(term: XTermTerminal | null): void {
+  if (!term) return
+  // xterm.js core/browser sources accept an internal disableSmoothScroll flag,
+  // but the public Terminal wrapper and typings do not expose it, so stay on
+  // the supported public API here.
+  term.scrollToBottom()
+}
+
+function cancelScheduledAnimationFrame(frame: number): void {
+  if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame)
+  else clearTimeout(frame)
 }

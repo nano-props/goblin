@@ -59,6 +59,7 @@ const xtermMocks = vi.hoisted(() => {
     refresh = vi.fn()
     write = vi.fn()
     reset = vi.fn()
+    scrollToBottom = vi.fn()
     dispose = vi.fn()
     focus = vi.fn(() => this.textarea?.focus())
     customKeyEventHandler: ((event: KeyboardEvent) => boolean) | null = null

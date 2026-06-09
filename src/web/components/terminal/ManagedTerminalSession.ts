@@ -67,10 +67,7 @@ export class ManagedTerminalSession {
       if (this.runtime.canResize()) {
         this.view.fitSoon()
       } else {
-        const canonicalSize = this.runtime.currentCanonicalSize()
-        if (canonicalSize.cols > 0 && canonicalSize.rows > 0) {
-          this.view.resizeTo(canonicalSize.cols, canonicalSize.rows)
-        }
+        this.applyCanonicalSizeToView()
       }
     }
     this.start()
@@ -186,10 +183,7 @@ export class ManagedTerminalSession {
     if (this.runtime.handleOwnership(event)) {
       const isController = this.runtime.canResize()
       if (!isController) {
-        const size = this.runtime.currentCanonicalSize()
-        if (size.cols > 0 && size.rows > 0) {
-          this.view.resizeTo(size.cols, size.rows)
-        }
+        this.applyCanonicalSizeToView()
       } else if (!wasController && isController) {
         this.view.fitSoon()
       }
@@ -275,12 +269,7 @@ export class ManagedTerminalSession {
         cols: term.cols,
         rows: term.rows,
       })
-      if (!this.runtime.canResize()) {
-        const canonicalSize = this.runtime.currentCanonicalSize()
-        if (canonicalSize.cols > 0 && canonicalSize.rows > 0) {
-          this.view.resizeTo(canonicalSize.cols, canonicalSize.rows)
-        }
-      }
+      if (!this.runtime.canResize()) this.applyCanonicalSizeToView()
       await this.replayActiveView(
         token,
         term,
@@ -398,6 +387,11 @@ export class ManagedTerminalSession {
         if (ok && this.runtime.currentSessionId() === sessionId) this.runtime.acknowledgeResize(cols, rows)
       })
       .catch(() => {})
+  }
+
+  private applyCanonicalSizeToView(): void {
+    const { cols, rows } = this.runtime.currentCanonicalSize()
+    if (cols > 0 && rows > 0) this.view.resizeTo(cols, rows)
   }
 
   private cancelResizeFlush(): void {
