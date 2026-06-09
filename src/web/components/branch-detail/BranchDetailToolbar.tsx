@@ -1,5 +1,5 @@
 import { ChevronDown, Maximize2, Minimize2 } from 'lucide-react'
-import type { KeyboardEvent } from 'react'
+import { useCallback, type KeyboardEvent } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { DetailTab, RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
@@ -82,8 +82,20 @@ export function BranchDetailToolbar({
   const showPanelControls = behavior.detailFocusAllowed || behavior.detailCollapseAllowed
   const focusTogglePressed = behavior.detailFocusMode
 
+  const blankClickEnabled = behavior.detailCollapseAllowed && toggleDetailOnActionBarBlankClick
+  const handleToolbarBlankClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!blankClickEnabled) return
+      const target = e.target as HTMLElement
+      // Only toggle when clicking truly blank space (not on any interactive element)
+      if (target.closest('button, a, input, select, textarea, [role="tab"], [role="button"], [data-interactive]')) return
+      toggleDetailCollapsed()
+    },
+    [blankClickEnabled, toggleDetailCollapsed],
+  )
+
   return (
-    <Toolbar variant="detail">
+    <Toolbar variant="detail" onClick={handleToolbarBlankClick}>
       <div className="flex min-w-0 flex-1 items-center gap-1">
         <div className="flex shrink-0 gap-1" role="tablist" aria-label={t('tab.branch-detail')}>
           {tabs.map((tab) => {
@@ -128,11 +140,6 @@ export function BranchDetailToolbar({
           })}
         </div>
       </div>
-      <div
-        aria-hidden="true"
-        className="min-w-2 flex-1 self-stretch"
-        onClick={behavior.detailCollapseAllowed && toggleDetailOnActionBarBlankClick ? toggleDetailCollapsed : undefined}
-      />
       <div className="flex shrink-0 items-center gap-1">
         {showBranchActions && (
           <BranchActionControls actions={branchActions} variant="menu" />
