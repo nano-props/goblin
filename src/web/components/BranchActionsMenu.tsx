@@ -1,4 +1,4 @@
-import { Loader2, MoreVertical } from 'lucide-react'
+import { Loader2, Wrench } from 'lucide-react'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { Button } from '#/web/components/ui/button.tsx'
@@ -80,7 +80,7 @@ export function BranchActionsDropdown({
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
         >
-          {busyAction ? <Loader2 size={16} className="animate-spin" /> : <MoreVertical className="size-4" />}
+          {busyAction ? <Loader2 size={16} className="animate-spin" /> : <Wrench className="size-4" />}
           {!compact && t('action.menu')}
         </Button>
       </DropdownMenuTrigger>
