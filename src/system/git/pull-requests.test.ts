@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { PULL_REQUEST_TRANSIENT_CACHE_TTL_MS } from '#/shared/pull-request-state.ts'
 import {
   getBranchPullRequest,
   getBranchPullRequests,
@@ -81,6 +82,7 @@ function installGhGraphqlMock(handler: (payload: { variables?: Record<string, un
 }
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.restoreAllMocks()
 })
 
@@ -199,6 +201,31 @@ describe('branch pull request lookup', () => {
 })
 
 describe('getBranchPullRequests request coordination', () => {
+  test('re-fetches transient unknown merge-status branch results after the short cache ttl', async () => {
+    vi.useFakeTimers()
+    const repo = '/tmp/repo'
+    let mergeable: 'UNKNOWN' | 'MERGEABLE' = 'UNKNOWN'
+    installGhGraphqlMock(async () =>
+      graphqlPullRequests([
+        {
+          ...pullRequestNode(42, 'feature'),
+          mergeable,
+        },
+      ]),
+    )
+
+    const first = await getBranchPullRequests(repo, new Set(['feature']), { mode: 'full' })
+    const cached = await getBranchPullRequests(repo, new Set(['feature']), { mode: 'full' })
+    mergeable = 'MERGEABLE'
+    vi.advanceTimersByTime(PULL_REQUEST_TRANSIENT_CACHE_TTL_MS + 1)
+    const refreshed = await getBranchPullRequests(repo, new Set(['feature']), { mode: 'full' })
+
+    expect(first?.get('feature')?.mergeable).toBe('UNKNOWN')
+    expect(cached?.get('feature')?.mergeable).toBe('UNKNOWN')
+    expect(refreshed?.get('feature')?.mergeable).toBe('MERGEABLE')
+    expect(execaMock).toHaveBeenCalledTimes(2)
+  })
+
   test('does not let a signaled caller abort an unsignaled shared request', async () => {
     const repo = '/tmp/repo'
     const ctrl = new AbortController()

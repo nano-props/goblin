@@ -24,16 +24,11 @@ const mocks = vi.hoisted(() => ({
   isAncestor: vi.fn(),
   fetchAll: vi.fn(),
   getBackgroundSyncRepos: vi.fn(),
-  invalidateCachedRepoReadModel: vi.fn(),
   pullBranch: vi.fn(),
-  readCachedPullRequests: vi.fn(),
-  readCachedRepoSnapshot: vi.fn(),
   pushBranch: vi.fn(),
   removeWorktree: vi.fn(),
   runServerCancellable: vi.fn(),
   setBackgroundSyncRepos: vi.fn(),
-  writeCachedPullRequests: vi.fn(),
-  writeCachedRepoSnapshot: vi.fn(),
   publishRepoQueryInvalidation: vi.fn(),
 }))
 
@@ -113,14 +108,6 @@ vi.mock('#/server/common/network-ops.ts', () => ({
   abortServerNetworkOp: vi.fn(),
 }))
 
-vi.mock('#/server/modules/repo-read-model.ts', () => ({
-  invalidateCachedRepoReadModel: mocks.invalidateCachedRepoReadModel,
-  readCachedPullRequests: mocks.readCachedPullRequests,
-  readCachedRepoSnapshot: mocks.readCachedRepoSnapshot,
-  writeCachedPullRequests: mocks.writeCachedPullRequests,
-  writeCachedRepoSnapshot: mocks.writeCachedRepoSnapshot,
-}))
-
 vi.mock('#/server/modules/invalidation-broker.ts', () => ({
   publishRepoQueryInvalidation: mocks.publishRepoQueryInvalidation,
 }))
@@ -185,22 +172,8 @@ function pullRequest(number: number): PullRequestInfo {
   }
 }
 
-describe('getRepositorySnapshot read model', () => {
-  test('returns a cached snapshot without re-reading git state', async () => {
-    const cached = repoSnapshot('cached')
-    mocks.readCachedRepoSnapshot.mockResolvedValueOnce(cached)
-
-    const { getRepositorySnapshot } = await import('#/server/modules/repo.ts')
-    const result = await getRepositorySnapshot('/tmp/repo')
-
-    expect(result).toEqual(cached)
-    expect(mocks.getWorktrees).not.toHaveBeenCalled()
-    expect(mocks.writeCachedRepoSnapshot).not.toHaveBeenCalled()
-    expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
-  })
-
-  test('writes a snapshot after an uncached read', async () => {
-    mocks.readCachedRepoSnapshot.mockResolvedValueOnce(null)
+describe('getRepositorySnapshot', () => {
+  test('reads git state directly without publishing invalidation', async () => {
     mocks.getWorktrees.mockResolvedValueOnce([])
     const snapshot = repoSnapshot('fresh')
     mocks.getBranches.mockResolvedValueOnce(snapshot.branches)
@@ -211,43 +184,32 @@ describe('getRepositorySnapshot read model', () => {
     const result = await getRepositorySnapshot('/tmp/repo')
 
     expect(result).toEqual(snapshot)
-    expect(mocks.writeCachedRepoSnapshot).toHaveBeenCalledWith('/tmp/repo', snapshot)
     expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
   })
 })
 
-describe('getRepositoryPullRequests read model', () => {
-  test('returns cached pull requests for requested branches without refetching', async () => {
-    const cached: PullRequestEntry[] = [{ branch: 'feature/a', pullRequest: pullRequest(1) }]
-    mocks.readCachedPullRequests.mockResolvedValueOnce(cached)
-
+describe('getRepositoryPullRequests', () => {
+  test('reads pull requests directly from the backend', async () => {
+    const fresh: PullRequestEntry[] = [{ branch: 'feature/a', pullRequest: pullRequest(1) }]
+    mocks.getBranchPullRequests.mockResolvedValueOnce(new Map([['feature/a', pullRequest(1)]]))
     const { getRepositoryPullRequests } = await import('#/server/modules/repo.ts')
     const result = await getRepositoryPullRequests('/tmp/repo', ['feature/a'], { mode: 'full' })
 
-    expect(result).toEqual(cached)
-    expect(mocks.getBranchPullRequests).not.toHaveBeenCalled()
-    expect(mocks.writeCachedPullRequests).not.toHaveBeenCalled()
+    expect(result).toEqual(fresh)
     expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
   })
 
-  test('writes single-branch pull requests after an uncached read without publishing invalidation', async () => {
-    mocks.readCachedPullRequests.mockResolvedValueOnce(undefined)
+  test('returns single-branch pull requests without publishing invalidation', async () => {
     mocks.getBranchPullRequests.mockResolvedValueOnce(new Map([['feature/a', pullRequest(2)]]))
 
     const { getRepositoryPullRequests } = await import('#/server/modules/repo.ts')
     const result = await getRepositoryPullRequests('/tmp/repo', ['feature/a'], { mode: 'summary' })
 
     expect(result).toEqual([{ branch: 'feature/a', pullRequest: pullRequest(2) }])
-    expect(mocks.writeCachedPullRequests).toHaveBeenCalledWith(
-      '/tmp/repo',
-      [{ branch: 'feature/a', pullRequest: pullRequest(2) }],
-      { branches: ['feature/a'], mode: 'summary' },
-    )
     expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
   })
 
-  test('writes multi-branch pull requests after an uncached read without publishing invalidation', async () => {
-    mocks.readCachedPullRequests.mockResolvedValueOnce(undefined)
+  test('returns multi-branch pull requests without publishing invalidation', async () => {
     mocks.getBranchPullRequests.mockResolvedValueOnce(
       new Map([
         ['feature/a', pullRequest(3)],
@@ -288,7 +250,6 @@ describe('fetchRepository invalidation publishing', () => {
     const result = await fetchRepository('/tmp/repo', 'user')
 
     expect(result).toEqual({ ok: true, message: 'fetched' })
-    expect(mocks.invalidateCachedRepoReadModel).toHaveBeenCalledWith('/tmp/repo')
     expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(1, {
       repoId: '/tmp/repo',
       query: 'repo-snapshot',
@@ -320,7 +281,6 @@ describe('fetchRepository invalidation publishing', () => {
     expect(userResult).toEqual({ ok: true, message: 'fetched in background' })
     expect(mocks.runServerCancellable).toHaveBeenCalledTimes(1)
     expect(mocks.fetchAll).toHaveBeenCalledTimes(1)
-    expect(mocks.invalidateCachedRepoReadModel).toHaveBeenCalledTimes(1)
     expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledTimes(1)
     expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
       repoId: '/tmp/repo',
@@ -372,13 +332,12 @@ describe('repo mutation invalidation publishing', () => {
       async (repo: typeof import('#/server/modules/repo.ts')) =>
         repo.createRepositoryWorktree('/tmp/repo', '/tmp/repo-worktree', 'feature/a', 'main'),
     ],
-  ])('%s invalidates read-model after success', async (_name, run) => {
+  ])('%s publishes snapshot invalidation after success', async (_name, run) => {
     const repo = await import('#/server/modules/repo.ts')
 
     const result = await run(repo)
 
     expect(result).toEqual({ ok: true, message: 'ok' })
-    expect(mocks.invalidateCachedRepoReadModel).toHaveBeenCalledWith('/tmp/repo')
     expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
       repoId: '/tmp/repo',
       query: 'repo-snapshot',
@@ -423,13 +382,12 @@ describe('repo mutation invalidation publishing', () => {
       async (repo: typeof import('#/server/modules/repo.ts')) =>
         repo.createRepositoryWorktree('/tmp/repo', '/tmp/repo-worktree', 'feature/a', 'main'),
     ],
-  ])('%s does not invalidate read-model after failure', async (_name, setup, run) => {
+  ])('%s does not publish snapshot invalidation after failure', async (_name, setup, run) => {
     setup()
     const repo = await import('#/server/modules/repo.ts')
 
     await run(repo)
 
-    expect(mocks.invalidateCachedRepoReadModel).not.toHaveBeenCalled()
     expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
   })
 
@@ -440,17 +398,15 @@ describe('repo mutation invalidation publishing', () => {
 
     expect(result).toEqual({ ok: false, message: 'error.invalid-path' })
     expect(mocks.createWorktree).not.toHaveBeenCalled()
-    expect(mocks.invalidateCachedRepoReadModel).not.toHaveBeenCalled()
     expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
   })
 
-  test('deleteRepositoryBranch invalidates read-model after success', async () => {
+  test('deleteRepositoryBranch publishes snapshot invalidation after success', async () => {
     const { deleteRepositoryBranch } = await import('#/server/modules/repo.ts')
 
     const result = await deleteRepositoryBranch('/tmp/repo', 'feature/a')
 
     expect(result).toEqual({ ok: true, message: 'ok' })
-    expect(mocks.invalidateCachedRepoReadModel).toHaveBeenCalledWith('/tmp/repo')
     expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
       repoId: '/tmp/repo',
       query: 'repo-snapshot',
@@ -465,7 +421,6 @@ describe('repo mutation invalidation publishing', () => {
 
     expect(result).toEqual({ ok: false, message: 'error.cannot-delete-protected-branch' })
     expect(mocks.deleteBranch).not.toHaveBeenCalled()
-    expect(mocks.invalidateCachedRepoReadModel).not.toHaveBeenCalled()
     expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
   })
 
@@ -483,17 +438,16 @@ describe('repo mutation invalidation publishing', () => {
     expect(mocks.deleteBranch).toHaveBeenCalledWith('/tmp/repo', 'feature/a', { force: undefined, signal: undefined })
   })
 
-  test('deleteRepositoryBranch does not invalidate read-model after failure', async () => {
+  test('deleteRepositoryBranch does not publish snapshot invalidation after failure', async () => {
     mocks.deleteBranch.mockResolvedValueOnce({ ok: false, message: 'fatal: delete failed' })
     const { deleteRepositoryBranch } = await import('#/server/modules/repo.ts')
 
     await deleteRepositoryBranch('/tmp/repo', 'feature/a')
 
-    expect(mocks.invalidateCachedRepoReadModel).not.toHaveBeenCalled()
     expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
   })
 
-  test('removeRepositoryWorktree invalidates read-model after worktree removal success', async () => {
+  test('removeRepositoryWorktree publishes snapshot invalidation after worktree removal success', async () => {
     mocks.getWorktrees.mockResolvedValueOnce([
       { path: '/tmp/repo-worktree', branch: 'feature/a', isBare: false, isPrimary: false, isDirty: false, changeCount: 0 },
     ])
@@ -506,14 +460,13 @@ describe('repo mutation invalidation publishing', () => {
     })
 
     expect(result).toEqual({ ok: true, message: 'ok' })
-    expect(mocks.invalidateCachedRepoReadModel).toHaveBeenCalledWith('/tmp/repo')
     expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
       repoId: '/tmp/repo',
       query: 'repo-snapshot',
     })
   })
 
-  test('removeRepositoryWorktree invalidates read-model once after worktree and branch deletion success', async () => {
+  test('removeRepositoryWorktree publishes snapshot invalidation once after worktree and branch deletion success', async () => {
     mocks.getWorktrees.mockResolvedValueOnce([
       { path: '/tmp/repo-worktree', branch: 'feature/a', isBare: false, isPrimary: false, isDirty: false, changeCount: 0 },
     ])
@@ -526,7 +479,6 @@ describe('repo mutation invalidation publishing', () => {
     })
 
     expect(result).toEqual({ ok: true, message: 'ok' })
-    expect(mocks.invalidateCachedRepoReadModel).toHaveBeenCalledTimes(1)
     expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledTimes(1)
   })
 
@@ -547,7 +499,6 @@ describe('repo mutation invalidation publishing', () => {
     expect(result).toEqual({ ok: false, message: 'error.cannot-remove-unpushed-worktree' })
     expect(mocks.removeWorktree).not.toHaveBeenCalled()
     expect(mocks.deleteBranch).not.toHaveBeenCalled()
-    expect(mocks.invalidateCachedRepoReadModel).not.toHaveBeenCalled()
     expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
   })
 

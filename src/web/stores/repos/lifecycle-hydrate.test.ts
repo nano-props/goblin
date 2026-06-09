@@ -41,9 +41,6 @@ describe('repo session hydration', () => {
           data: {
             branches: [branchSnapshot('cached')],
             currentBranch: 'cached',
-            status: [],
-            statusLoaded: true,
-            worktreesByPath: {},
           },
           ui: {
             selectedBranch: 'cached',
@@ -93,9 +90,6 @@ describe('repo session hydration', () => {
           data: {
             branches: [branchSnapshot('cached')],
             currentBranch: 'cached',
-            status: [],
-            statusLoaded: true,
-            worktreesByPath: {},
           },
           ui: {
             selectedBranch: 'cached',

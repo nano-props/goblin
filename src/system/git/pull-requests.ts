@@ -5,11 +5,14 @@ import {
   resetGitHubCooldownStateForTests,
 } from '#/system/github/cooldown.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
+import {
+  PULL_REQUEST_CACHE_TTL_MS,
+  pullRequestCacheTtlMs,
+  pullRequestCollectionCacheTtlMs,
+} from '#/shared/pull-request-state.ts'
 import type { GitHubRepoRef, GraphqlRequestError } from '#/system/github/graphql.ts'
 import type { PullRequestFetchMode, PullRequestInfo } from '#/shared/git-types.ts'
 import { canQueryGitHubHost } from '#/system/github-cli.ts'
-
-const PR_CACHE_TTL_MS = 30_000
 
 interface PrCacheEntry {
   expiresAt: number
@@ -234,7 +237,11 @@ function cacheBranchPullRequest(
   mode: PullRequestFetchMode,
   pr: PullRequestInfo | null,
 ): void {
-  branchPrCache.set(branchCacheKey(cwd, repo, branch, mode), { expiresAt: Date.now() + PR_CACHE_TTL_MS, mode, pr })
+  branchPrCache.set(branchCacheKey(cwd, repo, branch, mode), {
+    expiresAt: Date.now() + pullRequestCacheTtlMs(mode, pr),
+    mode,
+    pr,
+  })
 }
 
 const PULL_REQUESTS_QUERY = `
@@ -399,7 +406,7 @@ async function queryPullRequests(
 function logGraphqlError(error: GraphqlRequestError): void {
   const key = `${error.host}:${error.operationName}:${error.code}:${error.status ?? 'unknown'}`
   const lastLoggedAt = loggedGraphqlErrors.get(key) ?? 0
-  if (Date.now() - lastLoggedAt < PR_CACHE_TTL_MS) return
+  if (Date.now() - lastLoggedAt < PULL_REQUEST_CACHE_TTL_MS) return
   loggedGraphqlErrors.set(key, Date.now())
   try {
     console.warn('[pull-requests]', formatGraphqlError(error))
@@ -453,7 +460,11 @@ async function fetchRepositoryPullRequestMap(
   const prs = await queryRepositoryPullRequests(cwd, repo, mode, signal)
   if (!prs) return null
   const byBranch = mapPullRequestsByBranch(prs)
-  prCache.set(repoCacheKey(cwd, repo), { expiresAt: Date.now() + PR_CACHE_TTL_MS, mode, prs: byBranch })
+  prCache.set(repoCacheKey(cwd, repo), {
+    expiresAt: Date.now() + pullRequestCollectionCacheTtlMs(mode, byBranch.values()),
+    mode,
+    prs: byBranch,
+  })
   return byBranch
 }
 
@@ -519,7 +530,7 @@ export async function getBranchPullRequestsForRepoRef(
       const key = repoCacheKey(scopeId, repo)
       const current = prCache.get(key)
       if (!current || !cacheFresh(current.expiresAt) || current.prs === null) {
-        prCache.set(key, { expiresAt: Date.now() + PR_CACHE_TTL_MS, mode, prs: null })
+        prCache.set(key, { expiresAt: Date.now() + PULL_REQUEST_CACHE_TTL_MS, mode, prs: null })
       }
     }
     throw err instanceof Error ? err : new Error(String(err))

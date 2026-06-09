@@ -2,13 +2,6 @@ import { runServerCancellable, abortServerNetworkOp } from '#/server/common/netw
 import { getBackgroundSyncRepos as getRegisteredBackgroundSyncRepos, setBackgroundSyncRepos as setRegisteredBackgroundSyncRepos } from '#/server/modules/background-sync.ts'
 import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
 import { resolveRepoBackend } from '#/server/modules/repo-backend.ts'
-import {
-  invalidateCachedRepoReadModel,
-  readCachedPullRequests,
-  readCachedRepoSnapshot,
-  writeCachedPullRequests,
-  writeCachedRepoSnapshot,
-} from '#/server/modules/repo-read-model.ts'
 import { cloneRepository as cloneGitRepository } from '#/system/git/clone.ts'
 import { type ExecResult, type PullRequestFetchMode, type WorktreeStatus } from '#/shared/git-types.ts'
 import { checkGitAvailable } from '#/system/git/helper.ts'
@@ -111,8 +104,7 @@ function repoSnapshotInvalidationEvent(cwd: string, sourceToken?: string) {
     : { repoId: cwd, query: 'repo-snapshot' as const }
 }
 
-async function invalidateRepoReadModelAndNotify(cwd: string, sourceToken?: string): Promise<void> {
-  await invalidateCachedRepoReadModel(cwd)
+function publishRepoSnapshotInvalidation(cwd: string, sourceToken?: string): void {
   publishRepoQueryInvalidation(repoSnapshotInvalidationEvent(cwd, sourceToken))
 }
 
@@ -163,13 +155,13 @@ export function abortCloneOperation(operationId: string): boolean {
   return true
 }
 
-async function invalidateRepoReadModelAfterMutation(
+async function publishSnapshotInvalidationAfterMutation(
   cwd: string,
   result: ExecResult,
   sourceToken?: string,
 ): Promise<ExecResult> {
   if (!result.ok) return result
-  await invalidateRepoReadModelAndNotify(cwd, sourceToken)
+  publishRepoSnapshotInvalidation(cwd, sourceToken)
   return result
 }
 
@@ -204,7 +196,7 @@ async function runUserNetworkMutation(
   sourceToken: string | undefined,
   task: (signal: AbortSignal | undefined) => Promise<ExecResult>,
 ): Promise<ExecResult> {
-  return await invalidateRepoReadModelAfterMutation(
+  return await publishSnapshotInvalidationAfterMutation(
     cwd,
     await runServerCancellable(cwd, 'user', async (networkSignal) => {
       return await withMergedAbortSignal([signal, networkSignal], task)
@@ -214,13 +206,7 @@ async function runUserNetworkMutation(
 }
 
 export async function getRepositorySnapshot(cwd: string, signal?: AbortSignal): Promise<RepoSnapshot | null> {
-  let snapshot: RepoSnapshot | null
-  const cached = await readCachedRepoSnapshot(cwd)
-  if (cached) return cached
-  snapshot = await runWithRepoBackend(cwd, async (backend) => await backend.getSnapshot(signal))
-  if (signal?.aborted || !snapshot) return null
-  await writeCachedRepoSnapshot(cwd, snapshot)
-  return snapshot
+  return signal?.aborted ? null : await runWithRepoBackend(cwd, async (backend) => await backend.getSnapshot(signal))
 }
 
 export async function getRepositoryStatus(cwd: string, signal?: AbortSignal): Promise<WorktreeStatus[]> {
@@ -244,12 +230,8 @@ export async function getRepositoryPullRequests(
         )
   if (branchSet?.size === 0) return []
   const branchNames = branchSet ? Array.from(branchSet) : undefined
-  const cached = await readCachedPullRequests(cwd, branchNames, mode)
-  if (cached) return cached
-  if (cached !== undefined) return []
   const prs = await runWithRepoBackend(cwd, async (backend) => await backend.getPullRequests(branchNames, { mode, signal: options?.signal }))
   if (!prs) return null
-  await writeCachedPullRequests(cwd, prs, { branches: branchNames, mode })
   return prs
 }
 
@@ -260,9 +242,7 @@ export async function fetchRepository(
 ): Promise<{ ok: boolean; message: string }> {
   async function runFetch(task: (signal: AbortSignal) => Promise<{ ok: boolean; message: string }>) {
     const result = await runServerCancellable(cwd, kind, task)
-    if (result.ok) {
-      await invalidateRepoReadModelAndNotify(cwd, sourceToken)
-    }
+    if (result.ok) publishRepoSnapshotInvalidation(cwd, sourceToken)
     return result
   }
   async function executeFetch(): Promise<{ ok: boolean; message: string }> {
@@ -291,7 +271,7 @@ export async function checkoutRepositoryBranch(
   sourceToken?: string,
 ): Promise<ExecResult> {
   return await runWithRepoBackend(cwd, async (backend) => {
-    return await invalidateRepoReadModelAfterMutation(cwd, await backend.checkout(branch, signal), sourceToken)
+    return await publishSnapshotInvalidationAfterMutation(cwd, await backend.checkout(branch, signal), sourceToken)
   })
 }
 
@@ -329,7 +309,7 @@ export async function createRepositoryWorktree(
   sourceToken?: string,
 ): Promise<ExecResult> {
   return await runWithRepoBackend(cwd, async (backend) => {
-    return await invalidateRepoReadModelAfterMutation(
+    return await publishSnapshotInvalidationAfterMutation(
       cwd,
       await backend.createWorktree(worktreePath, newBranch, baseBranch, signal),
       sourceToken,
@@ -345,7 +325,7 @@ export async function deleteRepositoryBranch(
   sourceToken?: string,
 ): Promise<ExecResult> {
   return await runWithRepoBackend(cwd, async (backend) => {
-    return await invalidateRepoReadModelAfterMutation(cwd, await backend.deleteBranch(branch, options, signal), sourceToken)
+    return await publishSnapshotInvalidationAfterMutation(cwd, await backend.deleteBranch(branch, options, signal), sourceToken)
   })
 }
 
@@ -362,7 +342,7 @@ export async function removeRepositoryWorktree(
   sourceToken?: string,
 ): Promise<ExecResult> {
   return await runWithRepoBackend(cwd, async (backend) => {
-    return await invalidateRepoReadModelAfterMutation(cwd, await backend.removeWorktree(input, signal), sourceToken)
+    return await publishSnapshotInvalidationAfterMutation(cwd, await backend.removeWorktree(input, signal), sourceToken)
   })
 }
 

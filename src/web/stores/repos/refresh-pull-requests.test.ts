@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { PULL_REQUEST_UNKNOWN_RETRY_DELAY_MS } from '#/shared/pull-request-state.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { replaceRepo } from '#/web/stores/repos/helpers.ts'
 import type { PullRequestInfo } from '#/web/types.ts'
@@ -13,6 +14,9 @@ import {
 } from '#/web/stores/repos/refresh-test-utils.ts'
 
 beforeEach(resetRefreshTest)
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 describe('refreshPullRequests', () => {
   test('snapshot records local-only remote capability and clears stale pull requests', async () => {
@@ -336,6 +340,44 @@ describe('refreshPullRequests', () => {
     ])
   })
 
+  test('snapshot refresh retries visible full lookup when merge status is still pending', async () => {
+    vi.useFakeTimers()
+    const token = seedRepo([branch('feature/a')])
+    const calls: Array<{ branches?: string[]; mode?: string }> = []
+    let fullCalls = 0
+    rpcHandlers['repo.snapshot'] = async () => ({
+      branches: [branch('feature/a')],
+      current: 'feature/a',
+    })
+    rpcHandlers['repo.pullRequests'] = async ({
+      branches,
+      options,
+    }: {
+      branches?: string[]
+      options?: { mode?: string }
+    }) => {
+      calls.push({ branches, mode: options?.mode })
+      if (options?.mode === 'summary') return [{ branch: 'feature/a', pullRequest: pullRequest(1) }]
+      fullCalls += 1
+      return [
+        {
+          branch: 'feature/a',
+          pullRequest: pullRequest(1, { mergeable: fullCalls === 1 ? 'UNKNOWN' : 'MERGEABLE' }),
+        },
+      ]
+    }
+
+    await useReposStore.getState().refreshSnapshot(REPO_ID, { token })
+    await vi.advanceTimersByTimeAsync(PULL_REQUEST_UNKNOWN_RETRY_DELAY_MS + 1)
+
+    expect(calls).toEqual([
+      { branches: ['feature/a'], mode: 'summary' },
+      { branches: ['feature/a'], mode: 'full' },
+      { branches: ['feature/a'], mode: 'full' },
+    ])
+    expect(useReposStore.getState().repos[REPO_ID]?.data.branches[0]?.pullRequest?.mergeable).toBe('MERGEABLE')
+  })
+
   test('snapshot refresh skips selected full lookup when status detail is not visible', async () => {
     const token = seedRepo([branch('feature/a', undefined, { worktree: { path: '/tmp/feature-a-worktree' } })])
     useReposStore.setState((s) => ({
@@ -513,6 +555,7 @@ describe('refreshPullRequests', () => {
     resolveSecond([{ branch: 'feature/a', pullRequest: fresh }])
     await second
 
-    expect(useReposStore.getState().repoCache[REPO_ID]?.data.branches[0]?.pullRequest).toEqual(fresh)
+    expect(useReposStore.getState().repoCache[REPO_ID]?.data.branches[0]).toMatchObject({ name: 'feature/a' })
+    expect(useReposStore.getState().repoCache[REPO_ID]?.data.branches[0]?.pullRequest).toBeUndefined()
   })
 })
