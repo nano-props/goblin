@@ -1,9 +1,15 @@
 import { useCallback, useMemo } from 'react'
+import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { createMainWindowNavigationActions } from '#/web/main-window-navigation-actions.ts'
 import { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import {
+  mainWindowNavigationStoreActionsEqual,
+  mainWindowNavigationStoreActionsFromStore,
+} from '#/web/stores/repos/selector-actions.ts'
+import { mainWindowWorkspaceStateEqual, mainWindowWorkspaceStateFromStore } from '#/web/stores/repos/selector-state.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 
 interface UseMainWindowShellStateOptions {
@@ -16,17 +22,16 @@ export function useMainWindowShellState({
   onRouteSettingsPageChange,
 }: UseMainWindowShellStateOptions) {
   const uiMode = useResponsiveUiMode()
-  const activeId = useReposStore((s) => s.activeId)
-  const sessionReady = useReposStore((s) => s.sessionReady)
-  const detailCollapsed = useReposStore((s) => s.detailCollapsed)
-  const detailFocusMode = useReposStore((s) => s.detailFocusMode)
-  const workspaceLayout = useReposStore((s) => s.workspaceLayout)
-  const order = useReposStore((s) => s.order)
-  const setActive = useReposStore((s) => s.setActive)
-  const closeRepo = useReposStore((s) => s.closeRepo)
-  const cycleActive = useReposStore((s) => s.cycleActive)
-  const selectBranch = useReposStore((s) => s.selectBranch)
-  const setDetailTab = useReposStore((s) => s.setDetailTab)
+  const { activeId, sessionReady, detailCollapsed, detailFocusMode, workspaceLayout, order } = useStoreWithEqualityFn(
+    useReposStore,
+    mainWindowWorkspaceStateFromStore,
+    mainWindowWorkspaceStateEqual,
+  )
+  const { setActive, closeRepo, cycleActive, selectBranch, setDetailTab } = useStoreWithEqualityFn(
+    useReposStore,
+    mainWindowNavigationStoreActionsFromStore,
+    mainWindowNavigationStoreActionsEqual,
+  )
   const overlays = useAppOverlays()
   const workspaceBehavior = repoWorkspaceBehavior(workspaceLayout, detailCollapsed, detailFocusMode)
   const visibleRepoId = activeId

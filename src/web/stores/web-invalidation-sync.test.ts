@@ -178,7 +178,7 @@ describe('web invalidation sync', () => {
     expect(useThemeStore.getState()).toMatchObject({ pref: 'auto', resolved: 'light', colorTheme: 'default' })
   })
 
-  test('session invalidation does not refetch settings or theme state', async () => {
+  test('unknown settings invalidation scopes are ignored', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
     const fetchMock = vi.fn(async () => ({
       ok: true,
@@ -186,9 +186,9 @@ describe('web invalidation sync', () => {
     }))
     vi.stubGlobal('fetch', fetchMock)
 
-    const { useSettingsStore } = await import('#/web/stores/settings.ts')
+    const { useSessionRestoreStore } = await import('#/web/stores/session-restore.ts')
     const { useThemeStore } = await import('#/web/stores/theme.ts')
-    await useSettingsStore.getState().hydrate()
+    await useSessionRestoreStore.getState().hydrate()
     await useThemeStore.getState().hydrate()
     const beforeInvalidationFetchCount = fetchMock.mock.calls.length
 
@@ -196,7 +196,7 @@ describe('web invalidation sync', () => {
     await flushAsyncWork()
 
     expect(fetchMock).toHaveBeenCalledTimes(beforeInvalidationFetchCount)
-    expect(useSettingsStore.getState().bootSessionSnapshot).toMatchObject({
+    expect(useSessionRestoreStore.getState().bootSessionSnapshot).toMatchObject({
       openRepos: [],
       activeRepo: null,
       workspaceLayout: 'top-bottom',

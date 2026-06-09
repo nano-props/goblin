@@ -8,24 +8,21 @@ import {
   SettingsRow,
   SettingsSelect,
 } from '#/web/components/settings/SettingsPrimitives.tsx'
-import { useSetToggleDetailOnActionBarBlankClickMutation, useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
-import { useThemeStore } from '#/web/stores/theme.ts'
-import { useI18nStore, useT } from '#/web/stores/i18n.ts'
+import { useGeneralSettingsController } from '#/web/runtime-settings-general.ts'
+import { useT } from '#/web/stores/i18n.ts'
+import { useRuntimeGeneralSettings } from '#/web/runtime-settings-general.ts'
 import { COLOR_THEMES } from '#/shared/color-theme.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import type { LangPref, ThemePref } from '#/shared/rpc.ts'
 export function GeneralSettings() {
   const t = useT()
-  const themePref = useThemeStore((s) => s.pref)
-  const setThemePref = useThemeStore((s) => s.setPref)
-  const colorTheme = useThemeStore((s) => s.colorTheme)
-  const setColorTheme = useThemeStore((s) => s.setColorTheme)
-  const langPref = useI18nStore((s) => s.pref)
-  const setLangPref = useI18nStore((s) => s.setPref)
-  const { data } = useSettingsSnapshotQuery()
-  if (!data) return null
-  const toggleDetailOnActionBarBlankClick = data.toggleDetailOnActionBarBlankClick
-  const setToggleDetailOnActionBarBlankClick = useSetToggleDetailOnActionBarBlankClickMutation()
+  const {
+    themePref,
+    colorTheme,
+    langPref,
+    toggleDetailOnActionBarBlankClick,
+  } = useRuntimeGeneralSettings()
+  const { setThemePref, setColorTheme, setLangPref, setToggleDetailOnActionBarBlankClick } = useGeneralSettingsController()
   const appearanceOptions: { value: ThemePref; labelKey: string; icon: ReactNode }[] = [
     { value: 'auto', labelKey: 'settings.appearance.auto', icon: <Laptop className="size-4" /> },
     { value: 'light', labelKey: 'settings.appearance.light', icon: <Sun className="size-4" /> },
@@ -42,10 +39,6 @@ export function GeneralSettings() {
     { value: 'ko', labelKey: 'settings.lang.ko', emoji: '🇰🇷' },
     { value: 'ja', labelKey: 'settings.lang.ja', emoji: '🇯🇵' },
   ]
-  const save = (fn: () => Promise<unknown>, label: string) => {
-    void fn().catch((err) => console.warn(`[settings] ${label} update failed`, err))
-  }
-
   return (
     <>
       <SettingsGroup label={t('settings.group.general')}>
@@ -58,7 +51,7 @@ export function GeneralSettings() {
                 id="settings-theme-preset"
                 value={colorTheme}
                 options={themePresetOptions.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
-                onChange={(v) => save(() => setColorTheme(v), 'theme preset')}
+                onChange={(v) => void setColorTheme(v)}
               />
             }
           />
@@ -70,7 +63,7 @@ export function GeneralSettings() {
                 id="settings-appearance"
                 value={themePref}
                 options={appearanceOptions.map((o) => ({ value: o.value, label: t(o.labelKey), icon: o.icon }))}
-                onChange={(v) => save(() => setThemePref(v), 'appearance')}
+                onChange={(v) => void setThemePref(v)}
               />
             }
           />
@@ -82,7 +75,7 @@ export function GeneralSettings() {
                 id="settings-language"
                 value={langPref}
                 options={langOptions.map((o) => ({ value: o.value, label: `${o.emoji} ${t(o.labelKey)}` }))}
-                onChange={(v) => save(() => setLangPref(v), 'language')}
+                onChange={(v) => void setLangPref(v)}
               />
             }
           />
@@ -94,9 +87,7 @@ export function GeneralSettings() {
               <Switch
                 id="settings-action-bar-blank-toggle"
                 checked={toggleDetailOnActionBarBlankClick}
-                onCheckedChange={(enabled) =>
-                  save(() => setToggleDetailOnActionBarBlankClick.mutateAsync(enabled), 'action bar blank toggle')
-                }
+                onCheckedChange={(enabled) => void setToggleDetailOnActionBarBlankClick(enabled)}
                 aria-label={t('settings.action-bar-blank-toggle')}
               />
             }

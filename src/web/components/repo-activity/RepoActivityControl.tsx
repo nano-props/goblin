@@ -42,7 +42,7 @@ function repoActivityControlRepoEqual(a: RepoState | undefined, b: RepoState | u
       a.operations.manualRefresh === b.operations.manualRefresh &&
       a.operations.branchAction === b.operations.branchAction &&
       a.availability === b.availability &&
-      a.cache === b.cache &&
+      a.projection === b.projection &&
       a.remote === b.remote)
   )
 }
@@ -207,15 +207,15 @@ function RepoCompletionIndicator({ completion, compact }: { completion: RepoComp
 function RepoCacheIndicator({ repo }: { repo: RepoState }) {
   const t = useT()
 
-  if (repo.cache.source !== 'cache') return null
+  if (repo.projection.source !== 'cache') return null
 
-  const time = repo.cache.savedAt ? new Date(repo.cache.savedAt).toLocaleString() : ''
-  const title = time ? t('tab.cached-title', { time }) : t('tab.cached')
+  const time = repo.projection.savedAt ? new Date(repo.projection.savedAt).toLocaleString() : ''
+  const title = time ? t('tab.projectiond-title', { time }) : t('tab.projectiond')
 
   return (
     <span className="flex items-center gap-1 text-xs text-muted-foreground" title={title} aria-label={title}>
       <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/70" />
-      {t('tab.cached')}
+      {t('tab.projectiond')}
     </span>
   )
 }

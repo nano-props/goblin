@@ -47,7 +47,7 @@ export function resetReposStore(): void {
   mainWindowQueryClient.clear()
   useReposStore.setState({
     repos: {},
-    repoCache: {},
+    restorableRepoCache: {},
     order: [],
     activeId: null,
     sessionReady: false,
@@ -302,7 +302,7 @@ export function seedRepoState(options: {
   }
   useReposStore.setState({
     repos: { [options.id]: repo },
-    repoCache: {},
+    restorableRepoCache: {},
     order: [options.id],
     activeId: options.id,
     sessionReady: true,

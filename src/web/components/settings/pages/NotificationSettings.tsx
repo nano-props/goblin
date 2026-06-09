@@ -3,20 +3,14 @@ import { toast } from 'sonner'
 import { Button } from '#/web/components/ui/button.tsx'
 import { Switch } from '#/web/components/ui/switch.tsx'
 import { SettingsGroup, SettingsList, SettingsRow } from '#/web/components/settings/SettingsPrimitives.tsx'
-import { useSetTerminalNotificationsEnabledMutation, useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
+import { useFetchSettingsController, useRuntimeFetchSettings } from '#/web/runtime-settings-fetch.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 export function NotificationSettings() {
   const t = useT()
-  const { data } = useSettingsSnapshotQuery()
-  if (!data) return null
-  const terminalNotificationsEnabled = data.terminalNotificationsEnabled
-  const setTerminalNotificationsEnabled = useSetTerminalNotificationsEnabledMutation()
+  const { terminalNotificationsEnabled } = useRuntimeFetchSettings()
+  const { setTerminalNotificationsEnabled } = useFetchSettingsController()
   const [testingTerminalNotification, setTestingTerminalNotification] = useState(false)
-
-  const save = (fn: () => Promise<unknown>, label: string) => {
-    void fn().catch((err) => console.warn(`[settings] ${label} update failed`, err))
-  }
 
   const testTerminalNotification = () => {
     if (testingTerminalNotification) return
@@ -54,9 +48,7 @@ export function NotificationSettings() {
             <Switch
               id="settings-terminal-notifications"
               checked={terminalNotificationsEnabled}
-              onCheckedChange={(enabled) =>
-                save(() => setTerminalNotificationsEnabled.mutateAsync(enabled), 'terminal notifications')
-              }
+              onCheckedChange={(enabled) => void setTerminalNotificationsEnabled(enabled)}
               aria-label={t('settings.terminal-notifications')}
             />
           }

@@ -1,35 +1,35 @@
 import type { SessionState } from '#/shared/rpc.ts'
-import type { PersistableWorkspaceUiState, ReposStore } from '#/web/stores/repos/types.ts'
+import type { RestorableWorkspaceState, ReposStore } from '#/web/stores/repos/types.ts'
 import { persistedOpenWorkspaceEntries } from '#/web/open-workspace-state.ts'
 import { persistedActiveRepoIdForSession, persistedSelectedTerminalByWorktreeForSession } from '#/web/session-persistence-state.ts'
 
-export function sessionStateFromPersistableWorkspaceUi(input: {
+export function sessionStateFromRestorableWorkspaceState(input: {
   repos: ReposStore['repos']
-  persistableWorkspaceUiState: PersistableWorkspaceUiState
+  restorableWorkspaceState: RestorableWorkspaceState
 }): SessionState {
-  const { repos, persistableWorkspaceUiState } = input
+  const { repos, restorableWorkspaceState } = input
   return {
-    openRepos: persistedOpenWorkspaceEntries(persistableWorkspaceUiState.order, repos),
-    activeRepo: persistedActiveRepoIdForSession(persistableWorkspaceUiState.activeId),
-    detailCollapsed: persistableWorkspaceUiState.detailCollapsed,
-    detailFocusMode: persistableWorkspaceUiState.detailFocusMode,
-    workspaceLayout: persistableWorkspaceUiState.workspaceLayout,
-    detailPaneSizes: persistableWorkspaceUiState.detailPaneSizes,
+    openRepos: persistedOpenWorkspaceEntries(restorableWorkspaceState.order, repos),
+    activeRepo: persistedActiveRepoIdForSession(restorableWorkspaceState.activeId),
+    detailCollapsed: restorableWorkspaceState.detailCollapsed,
+    detailFocusMode: restorableWorkspaceState.detailFocusMode,
+    workspaceLayout: restorableWorkspaceState.workspaceLayout,
+    detailPaneSizes: restorableWorkspaceState.detailPaneSizes,
     selectedTerminalByWorktree: persistedSelectedTerminalByWorktreeForSession(
-      persistableWorkspaceUiState.selectedTerminalByWorktree,
+      restorableWorkspaceState.selectedTerminalByWorktree,
       repos,
     ),
   }
 }
 
-/** Restores only the persistable workspace UI projection from SessionState.
+/** Restores only the restorable workspace UI projection from SessionState.
  *  It intentionally does not establish a live binding back to SessionState;
  *  subsequent updates flow through useSessionPersistence. */
-export function restoreWorkspaceUiFromSession(
+export function restoreRestorableWorkspaceStateFromSession(
   session: SessionState,
   activeId: string | null = session.activeRepo,
 ): Pick<
-  PersistableWorkspaceUiState,
+  RestorableWorkspaceState,
   'activeId' | 'detailCollapsed' | 'detailFocusMode' | 'workspaceLayout' | 'detailPaneSizes' | 'selectedTerminalByWorktree'
 > {
   return {

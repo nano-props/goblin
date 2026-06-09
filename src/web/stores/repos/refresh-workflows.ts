@@ -1,5 +1,5 @@
 import { appendRepoEvent, errorEvent, updateIfFresh } from '#/web/stores/repos/helpers.ts'
-import { persistRepoCache } from '#/web/stores/repos/persistence.ts'
+import { persistRestorableRepoSnapshot } from '#/web/stores/repos/persistence.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 import {
   PULL_REQUEST_UNKNOWN_RETRY_DELAY_MS,
@@ -75,7 +75,7 @@ export function runSnapshotSuccessWorkflow(
   },
 ): void {
   if (!options.isSnapshotCurrent()) return
-  persistRepoCache(set, get().repos[options.id], options.token)
+  persistRestorableRepoSnapshot(set, get().repos[options.id], options.token)
   void terminalBridge.pruneTerminals(options.id).catch((err) => {
     console.warn('[terminal] failed to prune repo sessions', err)
   })

@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { saveSession } from '#/web/app-data-client.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { sessionStateFromPersistableWorkspaceUi } from '#/web/workspace-ui-persistence-state.ts'
+import { restorableWorkspaceStateFromStore } from '#/web/stores/repos/selector-state.ts'
+import { sessionStateFromRestorableWorkspaceState } from '#/web/restorable-workspace-state.ts'
 const SESSION_SAVE_DEBOUNCE_MS = 200
 
 export function useSessionPersistence() {
@@ -19,12 +20,12 @@ export function useSessionPersistence() {
 
   useEffect(() => {
     // Renderer -> persistence only. Boot restore runs elsewhere first, and
-    // sessionReady gates this effect so we never overwrite persisted session
+    // sessionReady gates this effect so we never overwrite restorable session
     // state with an empty pre-bootstrap workspace.
     if (!sessionReady) return
-    const session = sessionStateFromPersistableWorkspaceUi({
+    const session = sessionStateFromRestorableWorkspaceState({
       repos,
-      persistableWorkspaceUiState: {
+      restorableWorkspaceState: restorableWorkspaceStateFromStore({
         order,
         activeId,
         detailCollapsed,
@@ -32,7 +33,7 @@ export function useSessionPersistence() {
         workspaceLayout,
         detailPaneSizes,
         selectedTerminalByWorktree,
-      },
+      }),
     })
     const serialized = JSON.stringify(session)
     const immediateKey = JSON.stringify({

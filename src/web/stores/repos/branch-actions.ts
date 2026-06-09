@@ -150,6 +150,14 @@ function syncNetworkFetchResourceState(
   })
 }
 
+function branchActionErrorFromResult(result: ExecResult): string | null {
+  return !result.ok && result.message !== 'cancelled' ? result.message : null
+}
+
+function branchActionErrorResult(message: string): ExecResult {
+  return { ok: false, message }
+}
+
 function shouldSuppressBranchActionResultMessage(result: ExecResult, options?: RunBranchActionOptions): boolean {
   if (result.message === 'cancelled') return true
   if (options?.deferResultMessages?.includes(result.message)) return true
@@ -281,9 +289,6 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
         if (message === 'cancelled') return
         get().setLastResult(id, { ok: false, message }, token, { action: branchActionEventAction(action) })
       }
-      const errorFromResult = (result: ExecResult) =>
-        !result.ok && result.message !== 'cancelled' ? result.message : null
-      const errorResult = (message: string): ExecResult => ({ ok: false, message })
       return await runWithRepoInvalidationSource('branch', async (sourceToken) => {
         const runActionTask = async (signal: AbortSignal, ctx: { setPhase: (phase: 'queued' | 'running') => void }) => {
           try {
@@ -315,8 +320,8 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
             task: runActionTask,
             queuedTimeoutMs: options?.waitTimeoutMs ?? BRANCH_ACTION_WAIT_TIMEOUT_MS,
             queuedTimeoutMessage: BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE,
-            errorFromResult,
-            errorResult,
+            errorFromResult: branchActionErrorFromResult,
+            errorResult: branchActionErrorResult,
             onResult: handleResult,
             onError: handleError,
           })
@@ -332,8 +337,8 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
           targets: [branchActionTarget(action)],
           busyResult: { ok: false, message: 'cancelled' },
           task: runActionTask,
-          errorFromResult,
-          errorResult,
+          errorFromResult: branchActionErrorFromResult,
+          errorResult: branchActionErrorResult,
           onResult: handleResult,
           onError: handleError,
         })

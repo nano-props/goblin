@@ -66,7 +66,7 @@ export interface RepoUiState {
   detailTab: DetailTab
 }
 
-export interface RepoCacheState {
+export interface RepoProjectionMeta {
   source: RepoDataSource
   savedAt: number | null
 }
@@ -93,7 +93,7 @@ export interface RepoRemoteState {
 
 export type RepoAvailabilityState = { phase: 'available' } | { phase: 'unavailable'; reason: string; checkedAt: number }
 
-export interface CachedRepoState {
+export interface RestorableRepoSnapshot {
   savedAt: number
   name: string
   data: Pick<RepoDataState, 'branches' | 'currentBranch'>
@@ -106,20 +106,31 @@ export interface RepoState {
   name: string
   /** Bumped on every fresh open so async writers can detect close-and-reopen. */
   instanceToken: number
+  /** Renderer-local projection of runtime-coherent repo truth. */
   data: RepoDataState
   resources: RepoResourcesState
   operations: RepoOperationsState
   ui: RepoUiState
-  cache: RepoCacheState
+  projection: RepoProjectionMeta
   remote: RepoRemoteState
   availability: RepoAvailabilityState
   events: RepoEvent[]
 }
 
-export interface PersistableWorkspaceUiState {
+export interface RuntimeCoherentRepoProjectionState {
+  /** Renderer-local projection of runtime-coherent repo state. */
+  repos: Record<string, RepoState>
+}
+
+export interface RestorableRepoCacheState {
+  /** Warm-start cache used only for restore. This is not runtime-coherent shared state. */
+  restorableRepoCache: Record<string, RestorableRepoSnapshot>
+}
+
+export interface RestorableWorkspaceState {
   /** Renderer workspace UI state that is serialized into SessionState for
-   *  next-launch restore. This is a persistence boundary, not a live
-   *  source-of-truth relationship with the settings/session store. */
+   *  next-launch restore. This is restorable state, not runtime-coherent
+   *  shared state. */
   /** Workspace tab order restored from SessionState.openRepos. */
   order: string[]
   /** Active workspace tab restored from SessionState.activeRepo. */
@@ -136,9 +147,9 @@ export interface PersistableWorkspaceUiState {
   selectedTerminalByWorktree: Record<string, string>
 }
 
-export interface WorkspaceFrontendUiState {
+export interface LocalWorkspaceState {
   /** Renderer-only workspace UI state that should never be serialized into
-   *  SessionState or treated as boot-restorable workspace state. */
+   *  SessionState or treated as restorable workspace state. */
   /** Hydration flag — true once boot session is restored, so we don't
    *  overwrite the saved session with an empty one before restore. */
   sessionReady: boolean
@@ -146,26 +157,17 @@ export interface WorkspaceFrontendUiState {
   branchSearchQueries: Record<string, string>
 }
 
-export interface ReposStore extends PersistableWorkspaceUiState, WorkspaceFrontendUiState {
-  repos: Record<string, RepoState>
-  repoCache: Record<string, CachedRepoState>
+export interface LocalWorkspaceActions {
+  setBranchSearchQuery: (id: string, query: string) => void
+}
 
-  /** Ensure a repo belongs to the open workspace set without implying
-   *  anything about the current active selection. */
-  ensureWorkspaceOpen: (path: string | RepoSessionEntry) => Promise<OpenRepoResult>
-  closeRepo: (id: string) => void
+export interface RestorableWorkspaceActions {
   setActive: (id: string) => void
   /** Reorder the tab strip so `fromId` lands at `toId`'s position, using
    *  the same shift semantics as dnd-kit's `arrayMove` (the rest of the
    *  list closes the gap; later items shift up if `from < to`, down if
    *  `from > to`). No-op if either id is unknown or they're identical. */
   reorderRepos: (fromId: string, toId: string) => void
-  setDetailTab: (id: string, tab: DetailTab) => void
-  dismissExitedTerminalDetail: (
-    id: string,
-    worktreePath: string,
-    options?: { affectVisibleWorkspace?: boolean },
-  ) => void
   setDetailCollapsed: (collapsed: boolean) => void
   toggleDetailCollapsed: () => void
   /** Update the persisted top-bottom focus-toggle preference. The effective
@@ -181,14 +183,22 @@ export interface ReposStore extends PersistableWorkspaceUiState, WorkspaceFronte
   setDetailPaneSizes: (sizes: WorkspaceDetailPaneSizes) => void
   resetLayout: () => void
   setSelectedTerminal: (worktreeTerminalKey: string, key: string | null) => void
-  setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
-  setBranchSearchQuery: (id: string, query: string) => void
-  selectBranch: (id: string, branch: string) => void
   cycleActive: (direction: 1 | -1) => void
-  checkoutSelectedInRepo: (id: string) => Promise<void>
-  /** Keyboard-driven checkout of the active repo's selected branch.
-   *  Centralizes the eligibility checks the keyboard hook used to do. */
-  checkoutSelected: () => Promise<void>
+}
+
+export interface RuntimeCoherentRepoProjectionActions {
+  /** Ensure a repo belongs to the open workspace set without implying
+   *  anything about the current active selection. */
+  ensureWorkspaceOpen: (path: string | RepoSessionEntry) => Promise<OpenRepoResult>
+  closeRepo: (id: string) => void
+  setDetailTab: (id: string, tab: DetailTab) => void
+  dismissExitedTerminalDetail: (
+    id: string,
+    worktreePath: string,
+    options?: { affectVisibleWorkspace?: boolean },
+  ) => void
+  setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
+  selectBranch: (id: string, branch: string) => void
   refreshSnapshot: (id: string, options?: { skipLogBackfill?: boolean; token?: number }) => Promise<void>
   refreshPullRequests: (
     id: string,
@@ -202,16 +212,6 @@ export interface ReposStore extends PersistableWorkspaceUiState, WorkspaceFronte
   refreshStatus: (id: string, options?: { token?: number }) => Promise<void>
   refreshCoreData: (id: string, options?: { token?: number }) => Promise<void>
   syncAndRefresh: (id: string, options?: { token?: number }) => Promise<void>
-  runBranchAction: (
-    id: string,
-    action: RepoBranchAction,
-    options?: RunBranchActionOptions,
-  ) => Promise<ExecResult | null>
-  /** Fire-and-forget submission for branch actions whose UI should close
-   *  immediately and let repo activity/toasts carry completion. This only
-   *  triggers submission; callers should not treat it as accepted/completed. */
-  submitBranchAction: (id: string, action: RepoBranchAction, options?: RunBranchActionOptions) => void
-
   setLastResult: (
     id: string,
     result: { ok: boolean; message: string },
@@ -225,6 +225,32 @@ export interface ReposStore extends PersistableWorkspaceUiState, WorkspaceFronte
    *  around forever. */
   clearFetchFailed: (id: string, token: number) => void
 }
+
+export interface RepoMutationActions {
+  checkoutSelectedInRepo: (id: string) => Promise<void>
+  /** Keyboard-driven checkout of the active repo's selected branch.
+   *  Centralizes the eligibility checks the keyboard hook used to do. */
+  checkoutSelected: () => Promise<void>
+  runBranchAction: (
+    id: string,
+    action: RepoBranchAction,
+    options?: RunBranchActionOptions,
+  ) => Promise<ExecResult | null>
+  /** Fire-and-forget submission for branch actions whose UI should close
+   *  immediately and let repo activity/toasts carry completion. This only
+   *  triggers submission; callers should not treat it as accepted/completed. */
+  submitBranchAction: (id: string, action: RepoBranchAction, options?: RunBranchActionOptions) => void
+}
+
+export interface ReposStore
+  extends RuntimeCoherentRepoProjectionState,
+    RestorableRepoCacheState,
+    RestorableWorkspaceState,
+    LocalWorkspaceState,
+    LocalWorkspaceActions,
+    RestorableWorkspaceActions,
+    RuntimeCoherentRepoProjectionActions,
+    RepoMutationActions {}
 
 export type ReposSet = StoreApi<ReposStore>['setState']
 export type ReposGet = StoreApi<ReposStore>['getState']

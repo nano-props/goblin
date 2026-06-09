@@ -13,50 +13,16 @@
 - Keep network git commands (`fetch`, `pull`, `push`) cancellable and coalesced per repo.
 - Avoid destructive git features in the app. If one is introduced, design safety, cancellation, and recovery explicitly first.
 
-## UI and copy
+## App-level design docs
 
-- English copy: Title Case for native menu items; sentence case for buttons, actions, headings, and help text; lowercase for status chips/badges such as `open`, `dirty`, `no upstream`.
-- Preserve official casing (`GitHub`, `VS Code`, `PR`) and raw git/status data (`M`, `A`, `??`, branch names, paths).
-- Prefer shadcn/ui primitives in `src/web/components/ui/`, adapted to app density, colors, and interaction states. For forms, reuse shared field primitives and keep spacing/layout stable.
-- Display home-relative paths with `~` via existing `tildify` helpers.
-
-## App architecture
-
-- Keep app-level overlays in `src/web/hooks/useAppOverlays.ts`. Reuse `useOverlayRegistry.ts` only as a small boolean registry; keep dialog presentation and payload-specific state in components/domain hooks, and wire new app overlays through `closeAllOverlays()` plus any shared gates like shortcut or drag/drop suppression.
-- Default to a single main `BrowserWindow` with in-app routing. Reuse `window-shell.ts`, `renderer-surface.ts`, and `window-registry.ts` for trusted renderer surfaces instead of inventing parallel window bootstrapping paths.
-- Parent native dialogs to the actual RPC caller window when possible, and keep chrome sizing/colors in the shared window-chrome helpers.
-- Only add auxiliary windows when the product genuinely needs a separate renderer surface. If an auxiliary window owns meaningful in-memory state, wire the close-time lifecycle flush path.
-- Treat `src/server/` as the application runtime boundary. New repo, terminal, session, sync, settings, and realtime business logic should go in `src/server/` or `src/shared/` first, then be consumed by `src/web/` and Electron.
-- Keep `src/main/` limited to Electron-native shell concerns: window lifecycle, preload bridging, menus, shortcuts, native dialogs, dock/badge/notifications, trusted renderer security policy, and embedded server lifecycle. Do not add repo, terminal, settings, or session business ownership back into `src/main/` unless the browser path cannot support it.
-- When a main-process feature needs app data, prefer reading/writing through the embedded server contract instead of introducing new main-owned state. Main should act as a native host and thin adapter, not as a parallel business runtime.
-- Treat settings as server-owned state by default. New settings writes should normally flow `menu/UI -> renderer -> server authoritative response -> native projection`; do not add new main-process settings write paths unless the capability is inherently native-only.
-- Keep main-process settings reads limited to native boot, renderer bootstrap seeding, and native-only capability coordination. If a new main-process settings read does not fit one of those buckets, prefer moving it back to the renderer/server path.
-- Keep native menu items intent-first. Menu actions should usually emit renderer effect intents and let the renderer/server own business mutations; reserve direct main-process actions for shell-only work such as native dialogs, OS integrations, or external link handling.
-- Keep native projection code one-way. `src/main/` may project server-authoritative prefs into Electron state (menu labels, theme, OS recent docs, shortcut registration state), but should not become a parallel source of truth for settings/session data.
-- Treat global shortcut coordination as the main exception: validation, OS registration, and registration-result persistence may stay in `src/main/`, but other settings should not follow that pattern without documenting why the browser path is insufficient.
+- Application-level design guidance lives under `docs/`:
+  - `docs/README.md` for the overview
+  - `docs/ui-copy.md` for UI and copy rules
+  - `docs/arch.md` for architecture
+  - `docs/state-sync.md` for state ownership and sync guidance
+  - `docs/renderer-model.md` for renderer model guidance
+  - `docs/realtime.md` for realtime guidance
 - Keep the architecture guard green with `bun run check:architecture`. The enforced boundaries are:
   - `src/main/**` must not import `src/web/**` or `src/server/**`.
   - `src/web/**` must not import `src/main/**`.
   - `src/server/**` and `src/shared/**` must not import `electron`.
-
-## Realtime and renderer model
-
-- Prefer WebSocket invalidation + targeted refetch for cross-window data; use streaming only for UX-critical continuous flows like terminal output. Document each new WebSocket path as invalidation or streaming and why refetch/polling is insufficient.
-- Treat the backend (embedded or standalone server mode) as the primary runtime. Design renderer behavior around the server contract first.
-- Treat Electron renderers as specialized browser clients, not a separate privileged app architecture. Prefer shared server-backed terminal/session/realtime paths across web and Electron.
-- Keep terminal identity semantics aligned across web and Electron:
-  - `clientId` = logical renderer client / session owner.
-  - `attachmentId` = specific renderer attachment under that client.
-  - Reconnect, mirror, and takeover should be described and implemented in client/attachment terms, not Electron-only window terms.
-- Prefer terminal/session/realtime fixes in the shared server-backed bridge or protocol layer. Add Electron-specific behavior only when the browser path cannot support it, and document the reason.
-
-## Server-first renderer architecture
-
-- Treat the embedded/server mode backend as the primary application runtime. Renderer behavior should be designed around the server contract first, then adapted for Electron convenience where needed.
-- Treat Electron renderers as specialized browser clients, not as a separate privileged app architecture. Prefer sharing the same server-backed terminal/session/realtime paths between web and Electron.
-- Keep client identity and attachment semantics aligned across web and Electron:
-  - `clientId` identifies the logical renderer client / session owner.
-  - `attachmentId` identifies a specific page/window attachment under that client.
-  - Reconnect, mirror, and takeover behavior should be explained and implemented in those terms, not in Electron-only window terms.
-- Prefer implementing terminal, realtime, and session lifecycle fixes in the shared server-backed bridge or protocol layer so web and Electron inherit the same behavior by default.
-- Only add Electron-specific terminal behavior when the browser path cannot support the requirement. When this happens, document why the divergence is necessary.

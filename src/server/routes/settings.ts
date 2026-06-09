@@ -73,7 +73,6 @@ export function createSettingsRoutes() {
   app.post('/session', async (c) => {
     const body = await c.req.json().catch(() => null)
     const session = await setServerSessionState(body?.session)
-    publishSettingsInvalidation(['session'])
     return c.json({ ok: true, session })
   })
   app.post('/recent-repos/add', async (c) => {

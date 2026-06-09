@@ -36,7 +36,7 @@ export function emptyRepo(id: string, name: string): RepoState {
       branchViewMode: 'all',
       detailTab: 'status',
     },
-    cache: {
+    projection: {
       source: 'fresh',
       savedAt: null,
     },

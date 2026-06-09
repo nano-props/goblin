@@ -113,7 +113,7 @@ function createRepo(input: {
       branchViewMode: 'all',
       detailTab: 'status',
     },
-    cache: { source: 'fresh', savedAt: null },
+    projection: { source: 'fresh', savedAt: null },
     remote: {
       remotes: [],
       remoteDetails: [],

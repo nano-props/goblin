@@ -2,7 +2,7 @@ import { LRUCache } from 'lru-cache'
 import * as v from 'valibot'
 import type { ReposSet } from '#/web/stores/repos/types.ts'
 import { selectedBranchForBranchSet } from '#/web/stores/repos/branch-view-mode.ts'
-import type { CachedRepoState, RepoState } from '#/web/stores/repos/types.ts'
+import type { RestorableRepoSnapshot, RepoState } from '#/web/stores/repos/types.ts'
 import { finishResourceSuccess } from '#/web/stores/repos/resources.ts'
 import { stripBranchWorktreeMetadata } from '#/web/stores/repos/worktree-state.ts'
 const MAX_CACHE_AGE_MS = 14 * 24 * 60 * 60 * 1000
@@ -29,7 +29,7 @@ const BranchSchema = v.object({
   mergedToDefault: v.optional(v.boolean()),
 })
 
-const CachedRepoSchema = v.object({
+const RestorableRepoSnapshotSchema = v.object({
   savedAt: FiniteNumber,
   name: v.string(),
   data: v.object({
@@ -47,67 +47,74 @@ function normalizeCachedDetailTab(tab: string): 'status' | 'changes' | 'terminal
   return tab === 'terminal' || tab === 'changes' ? tab : 'status'
 }
 
-function cachedBranches(branches: RepoState['data']['branches']): CachedRepoState['data']['branches'] {
+function cachedBranches(branches: RepoState['data']['branches']): RestorableRepoSnapshot['data']['branches'] {
   return stripBranchWorktreeMetadata(branches).map(({ pullRequest: _pullRequest, ...branch }) => branch)
 }
 
-export function hydrateCachedRepo(repo: RepoState, cached: CachedRepoState | undefined): RepoState {
-  if (!cached || isExpired(cached.savedAt)) return repo
+function restoreProjectionFromSnapshot(repo: RepoState, snapshot: RestorableRepoSnapshot): RepoState {
   const selectedBranch = selectedBranchForBranchSet({
-    branches: cached.data.branches,
-    currentBranch: cached.data.currentBranch,
-    selectedBranch: cached.ui.selectedBranch,
-    viewMode: cached.ui.branchViewMode,
+    branches: snapshot.data.branches,
+    currentBranch: snapshot.data.currentBranch,
+    selectedBranch: snapshot.ui.selectedBranch,
+    viewMode: snapshot.ui.branchViewMode,
   })
   const resources = {
     ...repo.resources,
     snapshot: { ...repo.resources.snapshot },
   }
-  if (cached.data.branches.length > 0) finishResourceSuccess(resources.snapshot, cached.savedAt)
-  const branches = cachedBranches(cached.data.branches)
+  if (snapshot.data.branches.length > 0) finishResourceSuccess(resources.snapshot, snapshot.savedAt)
+  const branches = cachedBranches(snapshot.data.branches)
   return {
     ...repo,
-    name: cached.name || repo.name,
+    name: snapshot.name || repo.name,
     data: {
       ...repo.data,
       branches,
-      currentBranch: cached.data.currentBranch,
+      currentBranch: snapshot.data.currentBranch,
     },
     resources,
     ui: {
       ...repo.ui,
       selectedBranch,
-      branchViewMode: cached.ui.branchViewMode,
-      detailTab: normalizeCachedDetailTab(cached.ui.detailTab),
+      branchViewMode: snapshot.ui.branchViewMode,
+      detailTab: normalizeCachedDetailTab(snapshot.ui.detailTab),
     },
-    cache: {
+    projection: {
       source: 'cache',
-      savedAt: cached.savedAt,
+      savedAt: snapshot.savedAt,
     },
   }
 }
 
-export function persistRepoCache(set: ReposSet, repo: RepoState | undefined, token: number): void {
+export function restoreRepoProjectionFromSnapshot(
+  repo: RepoState,
+  snapshot: RestorableRepoSnapshot | undefined,
+): RepoState {
+  if (!snapshot || isExpired(snapshot.savedAt)) return repo
+  return restoreProjectionFromSnapshot(repo, snapshot)
+}
+
+export function persistRestorableRepoSnapshot(set: ReposSet, repo: RepoState | undefined, token: number): void {
   if (!repo) return
   if (repo.instanceToken !== token) return
-  const entry = repoCacheEntry(repo)
+  const entry = restorableRepoSnapshotFromRepo(repo)
   if (!entry) return
   set((s) => {
     if (s.repos[repo.id]?.instanceToken !== token) return s
-    const repoCache = trimRepoCache({ ...s.repoCache, [repo.id]: entry })
-    return { repoCache }
+    const restorableRepoCache = trimRepoCache({ ...s.restorableRepoCache, [repo.id]: entry })
+    return { restorableRepoCache }
   })
 }
 
-export function normalizeRepoCache(value: unknown): Record<string, CachedRepoState> {
+export function normalizeRestorableRepoCache(value: unknown): Record<string, RestorableRepoSnapshot> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const entries = Object.entries(value as Record<string, unknown>)
-    .map(([id, raw]) => [id, normalizeRepoCacheEntry(raw)] as const)
-    .filter((entry): entry is readonly [string, CachedRepoState] => entry[1] !== null && !isExpired(entry[1].savedAt))
+    .map(([id, raw]) => [id, normalizeRestorableRepoSnapshotEntry(raw)] as const)
+    .filter((entry): entry is readonly [string, RestorableRepoSnapshot] => entry[1] !== null && !isExpired(entry[1].savedAt))
   return trimRepoCache(Object.fromEntries(entries))
 }
 
-function repoCacheEntry(repo: RepoState): CachedRepoState | null {
+function restorableRepoSnapshotFromRepo(repo: RepoState): RestorableRepoSnapshot | null {
   if (repo.data.branches.length === 0) return null
   return {
     savedAt: Date.now(),
@@ -124,8 +131,8 @@ function repoCacheEntry(repo: RepoState): CachedRepoState | null {
   }
 }
 
-function trimRepoCache(cache: Record<string, CachedRepoState>): Record<string, CachedRepoState> {
-  const lru = new LRUCache<string, CachedRepoState>({ max: MAX_REPOS })
+function trimRepoCache(cache: Record<string, RestorableRepoSnapshot>): Record<string, RestorableRepoSnapshot> {
+  const lru = new LRUCache<string, RestorableRepoSnapshot>({ max: MAX_REPOS })
   for (const [id, entry] of Object.entries(cache).sort(([, a], [, b]) => a.savedAt - b.savedAt)) {
     if (!isExpired(entry.savedAt)) lru.set(id, entry)
   }
@@ -136,19 +143,19 @@ function isExpired(savedAt: number): boolean {
   return Date.now() - savedAt > MAX_CACHE_AGE_MS
 }
 
-function normalizeRepoCacheEntry(value: unknown): CachedRepoState | null {
-  const parsed = v.safeParse(CachedRepoSchema, value)
+function normalizeRestorableRepoSnapshotEntry(value: unknown): RestorableRepoSnapshot | null {
+  const parsed = v.safeParse(RestorableRepoSnapshotSchema, value)
   if (!parsed.success) return null
-  const cached = parsed.output
+  const snapshot = parsed.output
   return {
-    ...cached,
+    ...snapshot,
     data: {
-      ...cached.data,
-      branches: cachedBranches(cached.data.branches),
+      ...snapshot.data,
+      branches: cachedBranches(snapshot.data.branches),
     },
     ui: {
-      ...cached.ui,
-      detailTab: normalizeCachedDetailTab(cached.ui.detailTab),
+      ...snapshot.ui,
+      detailTab: normalizeCachedDetailTab(snapshot.ui.detailTab),
     },
   }
 }

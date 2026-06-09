@@ -1,7 +1,7 @@
 import pLimit from 'p-limit'
 import { lastPathSegment } from '#/web/lib/paths.ts'
 import { emptyRepo } from '#/web/stores/repos/helpers.ts'
-import { hydrateCachedRepo } from '#/web/stores/repos/persistence.ts'
+import { restoreRepoProjectionFromSnapshot } from '#/web/stores/repos/persistence.ts'
 import { disposeRepoRuntime } from '#/web/stores/repos/runtime.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import {
@@ -42,6 +42,9 @@ interface InitialRepoRefresh {
   id: string
   token: number
 }
+
+type RuntimeRepoLifecycleActions = Pick<ReposStore, 'ensureWorkspaceOpen' | 'closeRepo'>
+type RestorableWorkspaceLifecycleActions = Pick<ReposStore, 'hydrateSession'>
 
 const SESSION_PROBE_CONCURRENCY = 4
 
@@ -105,7 +108,7 @@ function orderedInsert(order: string[], id: string, rankById?: ReadonlyMap<strin
 }
 
 function addResolvedRepo(
-  s: Pick<ReposStore, 'repos' | 'repoCache' | 'order'>,
+  s: Pick<ReposStore, 'repos' | 'restorableRepoCache' | 'order'>,
   resolvedRepo: ResolvedRepo,
   rankById?: ReadonlyMap<string, number>,
 ): Pick<ReposStore, 'repos' | 'order'> & { changed: boolean } {
@@ -138,7 +141,7 @@ function addResolvedRepo(
       changed: false,
     }
   }
-  const repo = hydrateCachedRepo(emptyRepo(id, name), s.repoCache[id])
+  const repo = restoreRepoProjectionFromSnapshot(emptyRepo(id, name), s.restorableRepoCache[id])
   if (resolvedRepo.target) repo.remote.target = resolvedRepo.target
   return {
     repos: { ...s.repos, [id]: repo },
@@ -148,15 +151,15 @@ function addResolvedRepo(
 }
 
 function addUnavailableRepo(
-  s: Pick<ReposStore, 'repos' | 'repoCache' | 'order'>,
+  s: Pick<ReposStore, 'repos' | 'restorableRepoCache' | 'order'>,
   id: string,
   reason: string,
   target?: RemoteRepoTarget,
   rankById?: ReadonlyMap<string, number>,
 ): Pick<ReposStore, 'repos' | 'order'> & { changed: boolean } {
   if (s.repos[id]) return { repos: s.repos, order: s.order, changed: false }
-  const cached = s.repoCache[id]
-  const repo = hydrateCachedRepo(emptyRepo(id, cached?.name || target?.displayName || lastPathSegment(id)), cached)
+  const cached = s.restorableRepoCache[id]
+  const repo = restoreRepoProjectionFromSnapshot(emptyRepo(id, cached?.name || target?.displayName || lastPathSegment(id)), cached)
   if (target) repo.remote.target = target
   repo.availability = { phase: 'unavailable', reason, checkedAt: Date.now() }
   return {
@@ -178,7 +181,7 @@ function refreshInitialRepoState(get: ReposGet, refresh: InitialRepoRefresh) {
 }
 
 function ensureWorkspaceOpen(
-  s: Pick<ReposStore, 'repos' | 'order' | 'repoCache'>,
+  s: Pick<ReposStore, 'repos' | 'order' | 'restorableRepoCache'>,
   repo: ResolvedRepo,
 ): {
   repos: ReposStore['repos']
@@ -190,7 +193,7 @@ function ensureWorkspaceOpen(
   return { repos, order, changed, id: repo.id }
 }
 
-export function createLifecycleActions(set: ReposSet, get: ReposGet) {
+function createRuntimeRepoLifecycleActions(set: ReposSet, get: ReposGet): RuntimeRepoLifecycleActions {
   return {
     async ensureWorkspaceOpen(pathOrEntry: string | RepoSessionEntry): Promise<OpenRepoResult> {
       const entry = sessionEntryFromInput(pathOrEntry)
@@ -240,7 +243,14 @@ export function createLifecycleActions(set: ReposSet, get: ReposGet) {
         return { repos, branchSearchQueries, selectedTerminalByWorktree, order, activeId }
       })
     },
+  }
+}
 
+function createRestorableWorkspaceLifecycleActions(
+  set: ReposSet,
+  get: ReposGet,
+): RestorableWorkspaceLifecycleActions {
+  return {
     async hydrateSession(openRepos: RepoSessionEntry[], activeRepo: string | null) {
       // Boot/session restore of workspace membership and active tab. This
       // reopens what SessionState described, but does not subscribe the repos
@@ -316,5 +326,12 @@ export function createLifecycleActions(set: ReposSet, get: ReposGet) {
         }
       })
     },
+  }
+}
+
+export function createLifecycleActions(set: ReposSet, get: ReposGet) {
+  return {
+    ...createRuntimeRepoLifecycleActions(set, get),
+    ...createRestorableWorkspaceLifecycleActions(set, get),
   }
 }

@@ -19,10 +19,8 @@ import {
 } from '#/web/components/settings/SettingsPrimitives.tsx'
 import {
   useExternalAppsQuery,
-  useRefreshExternalAppsMutation,
-  useSetEditorAppMutation,
-  useSetTerminalAppMutation,
 } from '#/web/settings-queries.ts'
+import { useExternalAppSettingsController } from '#/web/runtime-settings-external-apps.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import type { EditorPref, TerminalPref } from '#/shared/rpc.ts'
 import { cn } from '#/web/lib/cn.ts'
@@ -117,10 +115,7 @@ export function ExternalAppSettings() {
   const terminalAppAvailability = data.terminal.appAvailability
   const editorApp = data.editor.pref
   const editorAppAvailability = data.editor.appAvailability
-  const refreshExternalApps = useRefreshExternalAppsMutation()
-  const setTerminalApp = useSetTerminalAppMutation()
-  const setEditorApp = useSetEditorAppMutation()
-  const refreshing = refreshExternalApps.isPending
+  const { refreshExternalApps, refreshing, setTerminalApp, setEditorApp } = useExternalAppSettingsController()
   const terminalOptions: { value: TerminalPref; labelKey: string }[] = [
     { value: 'auto', labelKey: 'settings.terminal.auto' },
     { value: 'ghostty', labelKey: 'settings.terminal.ghostty' },
@@ -132,10 +127,6 @@ export function ExternalAppSettings() {
     { value: 'cursor', labelKey: 'settings.editor.cursor' },
     { value: 'windsurf', labelKey: 'settings.editor.windsurf' },
   ]
-  const save = (fn: () => Promise<unknown>, label: string) => {
-    void fn().catch((err) => console.warn(`[settings] ${label} update failed`, err))
-  }
-
   return (
     <>
       <SettingsGroup label={t('settings.group.apps')}>
@@ -148,7 +139,7 @@ export function ExternalAppSettings() {
                 id="settings-terminal"
                 value={terminalApp}
                 options={terminalOptions.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
-                onChange={(v) => save(() => setTerminalApp.mutateAsync(v), 'terminal')}
+                onChange={(v) => void setTerminalApp(v)}
               />
             }
           />
@@ -160,7 +151,7 @@ export function ExternalAppSettings() {
                 id="settings-editor"
                 value={editorApp}
                 options={editorOptions.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
-                onChange={(v) => save(() => setEditorApp.mutateAsync(v), 'editor')}
+                onChange={(v) => void setEditorApp(v)}
               />
             }
           />
@@ -177,9 +168,7 @@ export function ExternalAppSettings() {
             className="text-muted-foreground hover:text-foreground"
             onClick={() => {
               if (refreshing) return
-              void refreshExternalApps.mutateAsync().catch((err) => {
-                console.warn('[settings] external app refresh failed', err)
-              })
+              void refreshExternalApps()
             }}
             disabled={refreshing}
           >

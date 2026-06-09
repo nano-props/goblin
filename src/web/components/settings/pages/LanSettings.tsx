@@ -1,15 +1,15 @@
 import { SettingsGroup, SettingsList, SettingsRow } from '#/web/components/settings/SettingsPrimitives.tsx'
 import { Switch } from '#/web/components/ui/switch.tsx'
-import { useLanInfoQuery, useSetLanEnabledMutation, useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
+import { useLanInfoQuery } from '#/web/settings-queries.ts'
+import { useLanSettingsController, useRuntimeLanSettings } from '#/web/runtime-settings-lan.ts'
 import { useT } from '#/web/stores/i18n.ts'
 
 export function LanSettings() {
   const t = useT()
-  const { data: settings } = useSettingsSnapshotQuery()
+  const { lanEnabled } = useRuntimeLanSettings()
   const { data: lanInfo } = useLanInfoQuery()
-  const setLanEnabled = useSetLanEnabledMutation()
+  const { setLanEnabled } = useLanSettingsController()
 
-  const lanEnabled = settings?.lanEnabled ?? false
   const lanUrls = lanInfo?.lanUrls ?? []
   const qrCodes = lanInfo?.qrCodes ?? {}
 
@@ -25,11 +25,7 @@ export function LanSettings() {
               <Switch
                 id="settings-lan-enabled"
                 checked={lanEnabled}
-                onCheckedChange={(enabled) =>
-                  setLanEnabled
-                    .mutateAsync(enabled)
-                    .catch((err) => console.warn('[settings] lanEnabled update failed', err))
-                }
+                onCheckedChange={(enabled) => void setLanEnabled(enabled)}
                 aria-label={t('settings.lan.enabled')}
               />
             }

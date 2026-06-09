@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { normalizeWorkspaceSessionLayoutState } from '#/shared/workspace-layout.ts'
-import { restoreWorkspaceUiFromSession } from '#/web/workspace-ui-persistence-state.ts'
+import { restoreRestorableWorkspaceStateFromSession } from '#/web/restorable-workspace-state.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { useSettingsStore } from '#/web/stores/settings.ts'
+import { useSessionRestoreStore } from '#/web/stores/session-restore.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 export function useAppBootstrap() {
   const hydratedRef = useRef(false)
@@ -23,19 +23,19 @@ export function useAppBootstrap() {
       try {
         await Promise.all([
           useThemeStore.getState().hydrate(),
-          useSettingsStore.getState().hydrate(),
+          useSessionRestoreStore.getState().hydrate(),
           useI18nStore.getState().hydrate(),
         ])
-        const session = useSettingsStore.getState().consumeBootSessionSnapshot()
+        const session = useSessionRestoreStore.getState().consumeBootSessionSnapshot()
         const normalizedLayout = normalizeWorkspaceSessionLayoutState(session)
         const { hydrateSession, applySessionLayoutState, applySessionSelectedTerminalState } = useReposStore.getState()
         // Apply layout prefs before repo probing finishes so the first
         // restored paint uses the saved geometry. useSessionPersistence
         // still waits for sessionReady, so this cannot overwrite the
         // persisted session with a partially hydrated one.
-        const restoredWorkspaceUiState = restoreWorkspaceUiFromSession(session)
+        const restoredWorkspaceState = restoreRestorableWorkspaceStateFromSession(session)
         applySessionLayoutState(normalizedLayout)
-        applySessionSelectedTerminalState(restoredWorkspaceUiState.selectedTerminalByWorktree)
+        applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalByWorktree)
         await hydrateSession(session.openRepos, session.activeRepo)
       } catch (err) {
         console.warn('[bootstrap] failed', err)

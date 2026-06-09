@@ -11,6 +11,7 @@ import type {
   SettingsSnapshot,
   TerminalAppState,
   TerminalPref,
+  RuntimeSettingsSnapshot,
 } from '#/shared/rpc.ts'
 import {
   getExternalAppsSnapshot,
@@ -33,6 +34,7 @@ import {
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
 import { subscribeSettingsInvalidation } from '#/web/settings-invalidation-ingress.ts'
 import { DEFAULT_COLOR_THEME } from '#/shared/color-theme.ts'
+import { runtimeSettingsSnapshotFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
 import { DEFAULT_DETAIL_PANE_SIZES, DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 
 function initialSettingsSnapshot(): SettingsSnapshot | undefined {
@@ -173,12 +175,12 @@ export function useLanInfoQuery() {
   return useQuery(lanInfoQueryOptions())
 }
 
-function updateSettingsSnapshotCache(
+function updateRuntimeSettingsSnapshotCache(
   queryClient: ReturnType<typeof useQueryClient>,
-  update: (current: SettingsSnapshot) => SettingsSnapshot,
+  update: (current: RuntimeSettingsSnapshot) => RuntimeSettingsSnapshot,
 ) {
   queryClient.setQueryData(settingsSnapshotQueryKey(), (current: SettingsSnapshot | undefined) =>
-    current ? update(current) : current,
+    current ? { ...current, ...update(runtimeSettingsSnapshotFromSettingsSnapshot(current)) } : current,
   )
 }
 
@@ -221,7 +223,7 @@ export function useSetFetchIntervalMutation() {
   return useMutation({
     mutationFn: setSettingsFetchInterval,
     onSuccess(fetchIntervalSec) {
-      updateSettingsSnapshotCache(queryClient, (current) => ({ ...current, fetchIntervalSec }))
+      updateRuntimeSettingsSnapshotCache(queryClient, (current) => ({ ...current, fetchIntervalSec }))
     },
   })
 }
@@ -231,7 +233,7 @@ export function useSetTerminalNotificationsEnabledMutation() {
   return useMutation({
     mutationFn: setTerminalNotificationsEnabled,
     onSuccess(_value, enabled) {
-      updateSettingsSnapshotCache(queryClient, (current) => ({ ...current, terminalNotificationsEnabled: enabled }))
+      updateRuntimeSettingsSnapshotCache(queryClient, (current) => ({ ...current, terminalNotificationsEnabled: enabled }))
     },
   })
 }
@@ -241,7 +243,7 @@ export function useSetShortcutsDisabledMutation() {
   return useMutation({
     mutationFn: setShortcutsDisabled,
     onSuccess(_value, disabled) {
-      updateSettingsSnapshotCache(queryClient, (current) => ({ ...current, shortcutsDisabled: disabled }))
+      updateRuntimeSettingsSnapshotCache(queryClient, (current) => ({ ...current, shortcutsDisabled: disabled }))
     },
   })
 }
@@ -251,7 +253,7 @@ export function useSetGlobalShortcutDisabledMutation() {
   return useMutation({
     mutationFn: setGlobalShortcutDisabled,
     onSuccess(_value, disabled) {
-      updateSettingsSnapshotCache(queryClient, (current) => ({ ...current, globalShortcutDisabled: disabled }))
+      updateRuntimeSettingsSnapshotCache(queryClient, (current) => ({ ...current, globalShortcutDisabled: disabled }))
     },
   })
 }
@@ -261,7 +263,7 @@ export function useSetSwapCloseShortcutsMutation() {
   return useMutation({
     mutationFn: setSwapCloseShortcuts,
     onSuccess(_value, swapped) {
-      updateSettingsSnapshotCache(queryClient, (current) => ({ ...current, swapCloseShortcuts: swapped }))
+      updateRuntimeSettingsSnapshotCache(queryClient, (current) => ({ ...current, swapCloseShortcuts: swapped }))
     },
   })
 }
@@ -271,7 +273,7 @@ export function useSetToggleDetailOnActionBarBlankClickMutation() {
   return useMutation({
     mutationFn: setToggleDetailOnActionBarBlankClick,
     onSuccess(_value, enabled) {
-      updateSettingsSnapshotCache(queryClient, (current) => ({ ...current, toggleDetailOnActionBarBlankClick: enabled }))
+      updateRuntimeSettingsSnapshotCache(queryClient, (current) => ({ ...current, toggleDetailOnActionBarBlankClick: enabled }))
     },
   })
 }
@@ -281,7 +283,7 @@ export function useSetGlobalShortcutMutation() {
   return useMutation({
     mutationFn: setGlobalShortcut,
     onSuccess(state: GlobalShortcutState) {
-      updateSettingsSnapshotCache(queryClient, (current) => ({
+      updateRuntimeSettingsSnapshotCache(queryClient, (current) => ({
         ...current,
         globalShortcut: state.accelerator,
         globalShortcutRegistered: state.registered,
@@ -296,7 +298,7 @@ export function useSetTerminalAppMutation() {
     mutationFn: setPreferredTerminalApp,
     onSuccess(state: TerminalAppState) {
       updateExternalAppsCache(queryClient, (current) => ({ ...current, terminal: state }))
-      updateSettingsSnapshotCache(queryClient, (current) => ({ ...current, terminalApp: state.pref }))
+      updateRuntimeSettingsSnapshotCache(queryClient, (current) => ({ ...current, terminalApp: state.pref }))
     },
   })
 }
@@ -307,7 +309,7 @@ export function useSetEditorAppMutation() {
     mutationFn: setPreferredEditorApp,
     onSuccess(state: EditorAppState) {
       updateExternalAppsCache(queryClient, (current) => ({ ...current, editor: state }))
-      updateSettingsSnapshotCache(queryClient, (current) => ({ ...current, editorApp: state.pref }))
+      updateRuntimeSettingsSnapshotCache(queryClient, (current) => ({ ...current, editorApp: state.pref }))
     },
   })
 }
@@ -337,7 +339,7 @@ export function useSetLanEnabledMutation() {
   return useMutation({
     mutationFn: setLanEnabled,
     onSuccess(_value, enabled) {
-      updateSettingsSnapshotCache(queryClient, (current) => ({ ...current, lanEnabled: enabled }))
+      updateRuntimeSettingsSnapshotCache(queryClient, (current) => ({ ...current, lanEnabled: enabled }))
       void queryClient.invalidateQueries({ queryKey: lanInfoQueryKey() })
     },
   })

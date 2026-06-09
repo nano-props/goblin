@@ -4,14 +4,12 @@ import {
   SettingsRow,
   SettingsSelect,
 } from '#/web/components/settings/SettingsPrimitives.tsx'
-import { useSetFetchIntervalMutation, useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
+import { useFetchSettingsController, useRuntimeFetchSettings } from '#/web/runtime-settings-fetch.ts'
 import { useT } from '#/web/stores/i18n.ts'
 export function SyncSettings() {
   const t = useT()
-  const { data } = useSettingsSnapshotQuery()
-  if (!data) return null
-  const fetchInterval = data.fetchIntervalSec
-  const setFetchInterval = useSetFetchIntervalMutation()
+  const { fetchIntervalSec: fetchInterval } = useRuntimeFetchSettings()
+  const { setFetchInterval } = useFetchSettingsController()
   const intervalOptions: { value: number; labelKey: string }[] = [
     { value: 0, labelKey: 'settings.fetch.off' },
     { value: 30, labelKey: 'settings.fetch.30s' },
@@ -21,10 +19,6 @@ export function SyncSettings() {
     { value: 300, labelKey: 'settings.fetch.5m' },
     { value: 900, labelKey: 'settings.fetch.15m' },
   ]
-  const save = (fn: () => Promise<unknown>, label: string) => {
-    void fn().catch((err) => console.warn(`[settings] ${label} update failed`, err))
-  }
-
   return (
     <SettingsGroup label={t('settings.group.sync')}>
       <SettingsList>
@@ -37,7 +31,7 @@ export function SyncSettings() {
               id="settings-fetch"
               value={fetchInterval}
               options={intervalOptions.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
-              onChange={(v) => save(() => setFetchInterval.mutateAsync(v), 'fetch interval')}
+              onChange={(v) => void setFetchInterval(v)}
             />
           }
         />

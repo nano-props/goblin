@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { useAppBootstrap } from '#/web/hooks/useAppBootstrap.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { useSettingsStore } from '#/web/stores/settings.ts'
+import { useSessionRestoreStore } from '#/web/stores/session-restore.ts'
 import { resetReposStore } from '#/web/stores/repos/test-utils.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 
@@ -34,7 +34,7 @@ describe('useAppBootstrap', () => {
   test('canonicalizes boot session layout before applying it to the repos store', async () => {
     vi.spyOn(useThemeStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
-    vi.spyOn(useSettingsStore.getState(), 'hydrate').mockResolvedValue({
+    vi.spyOn(useSessionRestoreStore.getState(), 'hydrate').mockResolvedValue({
       openRepos: [{ kind: 'local', id: '/tmp/repo' }],
       activeRepo: '/tmp/repo',
       detailCollapsed: true,
@@ -43,7 +43,7 @@ describe('useAppBootstrap', () => {
       detailPaneSizes: { 'top-bottom': 55, 'left-right': 45 },
       selectedTerminalByWorktree: { '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2' },
     })
-    vi.spyOn(useSettingsStore.getState(), 'consumeBootSessionSnapshot').mockReturnValue({
+    vi.spyOn(useSessionRestoreStore.getState(), 'consumeBootSessionSnapshot').mockReturnValue({
       openRepos: [{ kind: 'local', id: '/tmp/repo' }],
       activeRepo: '/tmp/repo',
       detailCollapsed: true,

@@ -1,6 +1,6 @@
 import { isRepoQueryInvalidationEvent, type RepoQueryInvalidationEvent } from '#/shared/repo-query-invalidation.ts'
 
-export const SETTINGS_INVALIDATION_SCOPES = ['settings-snapshot', 'external-apps', 'i18n', 'session', 'theme'] as const
+export const SETTINGS_INVALIDATION_SCOPES = ['settings-snapshot', 'external-apps', 'i18n', 'theme'] as const
 
 export type SettingsInvalidationScope = (typeof SETTINGS_INVALIDATION_SCOPES)[number]
 
@@ -12,7 +12,7 @@ export interface SettingsInvalidationEvent {
 export type ServerInvalidationEvent = RepoQueryInvalidationEvent | SettingsInvalidationEvent
 
 export function isSettingsInvalidationScope(value: unknown): value is SettingsInvalidationScope {
-  return value === 'settings-snapshot' || value === 'external-apps' || value === 'i18n' || value === 'session' || value === 'theme'
+  return value === 'settings-snapshot' || value === 'external-apps' || value === 'i18n' || value === 'theme'
 }
 
 export function isSettingsInvalidationEvent(value: unknown): value is SettingsInvalidationEvent {

@@ -154,4 +154,38 @@ describe('settings routes', () => {
     expect(mocks.buildServerExternalAppsSnapshot).toHaveBeenCalledWith(updatedSettings, expect.any(AbortSignal))
     expect(mocks.publishSettingsInvalidation).toHaveBeenCalledWith(['external-apps', 'settings-snapshot'])
   })
+
+  test('persists session state without publishing settings invalidation', async () => {
+    const session = {
+      openRepos: [],
+      activeRepo: null,
+      detailCollapsed: true,
+      detailFocusMode: false,
+      workspaceLayout: 'top-bottom',
+      detailPaneSizes: {
+        'top-bottom': 40,
+        'left-right': 50,
+      },
+      selectedTerminalByWorktree: {},
+    } as const
+
+    mocks.setServerSessionState.mockResolvedValue(session)
+
+    const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
+    const app = createSettingsRoutes()
+    const response = await app.request(
+      new Request('http://127.0.0.1:32100/session', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ session }),
+      }),
+    )
+
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      session,
+    })
+    expect(mocks.setServerSessionState).toHaveBeenCalledWith(session)
+    expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
+  })
 })

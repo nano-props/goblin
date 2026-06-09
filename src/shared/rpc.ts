@@ -89,10 +89,16 @@ export interface SessionState {
   selectedTerminalByWorktree?: Record<string, string>
 }
 
-export interface SettingsSnapshot extends SettingsPrefs {
+export interface RuntimeSettingsSnapshot extends SettingsPrefs {
   globalShortcutRegistered: boolean
-  session: SessionState
+}
+
+export interface RuntimeRecentReposState {
   recentRepos: RepoSessionEntry[]
+}
+
+export interface SettingsSnapshot extends RuntimeSettingsSnapshot, RuntimeRecentReposState {
+  session: SessionState
 }
 
 export interface GlobalShortcutState {
@@ -200,7 +206,6 @@ export type RpcEvent =
   | { type: 'global-shortcut-disabled-changed'; disabled: boolean }
   | { type: 'swap-close-shortcuts-changed'; swapped: boolean }
   | { type: 'toggle-detail-on-action-bar-blank-click-changed'; enabled: boolean }
-  | { type: 'global-shortcut-changed'; state: GlobalShortcutState }
   | ({ type: 'terminal-app-changed' } & TerminalAppState)
   | ({ type: 'editor-app-changed' } & EditorAppState)
   | { type: 'github-cli-changed'; state: GitHubCliState }

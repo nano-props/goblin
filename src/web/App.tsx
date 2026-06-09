@@ -4,7 +4,7 @@
 //
 // Boots in this order:
 //   1. theme.hydrate()       — reads server-backed theme settings
-//   2. settings.hydrate()    — saved session bootstrap snapshot
+//   2. sessionRestore.hydrate() — saved restorable session snapshot
 //   3. repos.hydrateSession  — re-opens the repos that were open last run
 //
 // After hydration, side-effects run for the lifetime of the app:

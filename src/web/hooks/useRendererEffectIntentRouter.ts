@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { onRendererLocalEventType } from '#/web/local-events.ts'
 import { subscribeRendererEffectIntent } from '#/web/renderer-ingress.ts'
@@ -11,6 +12,10 @@ import {
 } from '#/web/hooks/renderer-effect-intent-handlers.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import {
+  rendererEffectIntentStoreActionsEqual,
+  rendererEffectIntentStoreActionsFromStore,
+} from '#/web/stores/repos/selector-actions.ts'
 
 interface RendererEffectIntentRouterOptions {
   navigation: MainWindowNavigationActions
@@ -36,12 +41,12 @@ export function useRendererEffectIntentRouter({
   // This hook is the single renderer-side subscription point for native effect
   // intents. Routing stays centralized here; intent-specific behavior lives in
   // the handler/plan helpers so components do not subscribe independently.
-  const ensureWorkspaceOpen = useReposStore((s) => s.ensureWorkspaceOpen)
-  const setDetailCollapsed = useReposStore((s) => s.setDetailCollapsed)
-  const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
-  const setWorkspaceLayout = useReposStore((s) => s.setWorkspaceLayout)
-  const toggleDetailCollapsed = useReposStore((s) => s.toggleDetailCollapsed)
-  const resetLayout = useReposStore((s) => s.resetLayout)
+  const { ensureWorkspaceOpen, setDetailCollapsed, setSelectedTerminal, setWorkspaceLayout, toggleDetailCollapsed, resetLayout } =
+    useStoreWithEqualityFn(
+      useReposStore,
+      rendererEffectIntentStoreActionsFromStore,
+      rendererEffectIntentStoreActionsEqual,
+    )
   const t = useT()
   const navigationRef = useRef(navigation)
   const currentRepoIdRef = useRef(currentRepoId)

@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'vitest'
 import { localRepoSessionEntry } from '#/shared/remote-repo.ts'
-import { restoreWorkspaceUiFromSession, sessionStateFromPersistableWorkspaceUi } from '#/web/workspace-ui-persistence-state.ts'
+import { restoreRestorableWorkspaceStateFromSession, sessionStateFromRestorableWorkspaceState } from '#/web/restorable-workspace-state.ts'
 import { createRepoBranch, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 
-describe('workspace-ui-persistence-state', () => {
-  test('maps persistable workspace ui state into SessionState', () => {
+describe('restorable-workspace-state', () => {
+  test('maps restorable workspace state into SessionState', () => {
     const repo = seedRepoState({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
@@ -13,9 +13,9 @@ describe('workspace-ui-persistence-state', () => {
     })
 
     expect(
-      sessionStateFromPersistableWorkspaceUi({
+      sessionStateFromRestorableWorkspaceState({
         repos: { [repo.id]: repo },
-        persistableWorkspaceUiState: {
+        restorableWorkspaceState: {
           order: [repo.id],
           activeId: repo.id,
           detailCollapsed: false,
@@ -40,9 +40,9 @@ describe('workspace-ui-persistence-state', () => {
     })
   })
 
-  test('restores workspace ui state from SessionState', () => {
+  test('restores restorable workspace state from SessionState', () => {
     expect(
-      restoreWorkspaceUiFromSession({
+      restoreRestorableWorkspaceStateFromSession({
         openRepos: [localRepoSessionEntry('/tmp/repo')],
         activeRepo: '/tmp/repo',
         detailCollapsed: true,

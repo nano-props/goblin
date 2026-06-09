@@ -1,7 +1,7 @@
 import type { NativeRpcHandlers } from '#/shared/rpc.ts'
 import { isReservedGlobalShortcut, parseGlobalShortcut } from '#/shared/accelerator.ts'
-import { getSettingsPrefs, updateSettingsPrefs } from '#/main/settings-server-client.ts'
-import { applyNativeHostShellProjection, broadcastNativeHostGlobalShortcutState } from '#/main/native-host-settings-effects.ts'
+import { getSettingsPrefs, setSettingsGlobalShortcutState, updateSettingsPrefs } from '#/main/settings-server-client.ts'
+import { applyNativeHostShellProjection } from '#/main/native-host-settings-effects.ts'
 import { isGlobalShortcutRegistered, replaceGlobalShortcut } from '#/main/shortcuts.ts'
 
 // Native-host settings RPC handlers: read/write server-owned settings, then
@@ -35,7 +35,7 @@ export function createNativeHostSettingsRpcHandlers(options: {
         if (!registered && !currentGlobalShortcutDisabled) return globalShortcutPayload(currentGlobalShortcut)
         const saved = (await updateSettingsPrefs({ globalShortcut: parsed })).globalShortcut
         const payload = globalShortcutPayload(saved)
-        await broadcastNativeHostGlobalShortcutState(payload.accelerator, payload.registered)
+        await setSettingsGlobalShortcutState(payload.registered)
         return payload
       },
     },

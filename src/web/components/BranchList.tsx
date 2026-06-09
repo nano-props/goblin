@@ -18,6 +18,7 @@ import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
+import { detailPanelStoreActionsEqual, detailPanelStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
 
 interface Props {
   repoId: string
@@ -61,7 +62,11 @@ function branchListRepoEqual(a: BranchListRepo | undefined, b: BranchListRepo | 
 
 export function BranchList({ repoId, showActions = true }: Props) {
   const t = useT()
-  const setDetailCollapsed = useReposStore((s) => s.setDetailCollapsed)
+  const { setDetailCollapsed } = useStoreWithEqualityFn(
+    useReposStore,
+    detailPanelStoreActionsFromStore,
+    detailPanelStoreActionsEqual,
+  )
   const navigation = useMainWindowNavigation()
   const selectedRef = useRef<HTMLLIElement | null>(null)
   const [openActionMenu, setOpenActionMenu] = useState<OpenActionMenu | null>(null)

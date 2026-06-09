@@ -97,10 +97,10 @@ describe('server invalidation source', () => {
     if (!secondSocket) throw new Error('missing reconnected invalidation socket')
 
     firstSocket.emitMessage(JSON.stringify({ type: 'settings-invalidated', scopes: ['theme'] }))
-    secondSocket.emitMessage(JSON.stringify({ type: 'settings-invalidated', scopes: ['session'] }))
+    secondSocket.emitMessage(JSON.stringify({ type: 'settings-invalidated', scopes: ['theme'] }))
 
     expect(listener).toHaveBeenCalledTimes(1)
-    expect(listener).toHaveBeenCalledWith({ type: 'settings-invalidated', scopes: ['session'] })
+    expect(listener).toHaveBeenCalledWith({ type: 'settings-invalidated', scopes: ['theme'] })
     dispose()
     resetServerInvalidationIngressForTests()
     vi.useRealTimers()

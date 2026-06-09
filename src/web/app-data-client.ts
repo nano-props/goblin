@@ -14,6 +14,9 @@ import type {
   PullRequestEntry,
   RepoSnapshot,
   ProbeResult,
+  RuntimeRecentReposState,
+  RuntimeSettingsSnapshot,
+  SessionState,
   SettingsPrefs,
   SettingsPrefsUpdateResponse,
   SettingsSnapshot,
@@ -33,6 +36,7 @@ import type {
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import { resolveApiBaseUrl } from '#/web/lib/websocket-url.ts'
 import { nativeSettingsProjectionStateFromSettings, pickNativeSettingsProjectionPatch } from '#/shared/native-shell-projection.ts'
+import { runtimeSettingsSnapshotFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
 
 interface EmbeddedServerConfig {
   url: string
@@ -83,7 +87,7 @@ export async function getSettingsSnapshot(): Promise<SettingsSnapshot> {
   return await fetchServerJson<SettingsSnapshot>('/api/settings')
 }
 
-export function resolveThemeStateFromSettings(settings: SettingsSnapshot): ThemeState {
+export function resolveThemeStateFromSettings(settings: RuntimeSettingsSnapshot): ThemeState {
   return resolveThemeStateFromPrefs(settings)
 }
 
@@ -98,7 +102,7 @@ function resolveThemeStateFromPrefs(settings: Pick<SettingsPrefs, 'theme' | 'col
 }
 
 export async function getThemeState(): Promise<ThemeState> {
-  return resolveThemeStateFromSettings(await getSettingsSnapshot())
+  return resolveThemeStateFromSettings(runtimeSettingsSnapshotFromSettingsSnapshot(await getSettingsSnapshot()))
 }
 
 async function updateSettingsPrefsPatch(settings: Record<string, unknown>): Promise<SettingsPrefsUpdateResponse> {
@@ -202,7 +206,7 @@ export async function testRemoteRepositoryConnection(
 export async function addRecentRepo(repo: RepoSessionEntry): Promise<void> {
   const result = await postServerJson<
     { repo: RepoSessionEntry },
-    { ok: boolean; recentRepos: RepoSessionEntry[]; addedRepo?: RepoSessionEntry | null }
+    ({ ok: boolean; addedRepo?: RepoSessionEntry | null } & RuntimeRecentReposState)
   >('/api/settings/recent-repos/add', { repo })
   if (!canUseNativeRpcBridge()) return
   await invokeNativeRpcPath<void>('settings.applyShellProjection', {
@@ -214,7 +218,7 @@ export async function addRecentRepo(repo: RepoSessionEntry): Promise<void> {
 }
 
 export async function clearRecentRepos(): Promise<void> {
-  await postServerJson('/api/settings/recent-repos/clear', {})
+  await postServerJson<{}, { ok: boolean }>('/api/settings/recent-repos/clear', {})
   if (!canUseNativeRpcBridge()) return
   await invokeNativeRpcPath<void>('settings.applyShellProjection', {
     recentRepos: { recentRepos: [] },
@@ -222,7 +226,7 @@ export async function clearRecentRepos(): Promise<void> {
   await invokeNativeRpcPath<void>('settings.clearNativeRecentDocuments', undefined)
 }
 
-export async function saveSession(session: SettingsSnapshot['session']): Promise<void> {
+export async function saveSession(session: SessionState): Promise<void> {
   await postServerJson('/api/settings/session', { session })
 }
 

@@ -6,7 +6,6 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { SettingsSurface } from '#/web/components/SettingsSurface.tsx'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
-import { useSettingsStore } from '#/web/stores/settings.ts'
 
 const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),

@@ -111,7 +111,7 @@ describe('refreshPullRequests', () => {
 
     await useReposStore.getState().refreshSnapshot(REPO_ID, { token })
 
-    const cached = useReposStore.getState().repoCache[REPO_ID]
+    const cached = useReposStore.getState().restorableRepoCache[REPO_ID]
     expect(cached?.name).toBe('repo')
     expect(cached?.data.currentBranch).toBe('feature/a')
     expect(cached?.data.branches.map((b) => b.name)).toEqual(['feature/a'])
@@ -549,13 +549,13 @@ describe('refreshPullRequests', () => {
     resolveFirst([])
     await first
 
-    expect(useReposStore.getState().repoCache[REPO_ID]).toBeUndefined()
+    expect(useReposStore.getState().restorableRepoCache[REPO_ID]).toBeUndefined()
 
     const fresh = pullRequest(2)
     resolveSecond([{ branch: 'feature/a', pullRequest: fresh }])
     await second
 
-    expect(useReposStore.getState().repoCache[REPO_ID]?.data.branches[0]).toMatchObject({ name: 'feature/a' })
-    expect(useReposStore.getState().repoCache[REPO_ID]?.data.branches[0]?.pullRequest).toBeUndefined()
+    expect(useReposStore.getState().restorableRepoCache[REPO_ID]?.data.branches[0]).toMatchObject({ name: 'feature/a' })
+    expect(useReposStore.getState().restorableRepoCache[REPO_ID]?.data.branches[0]?.pullRequest).toBeUndefined()
   })
 })

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
-import { useSettingsStore } from '#/web/stores/settings.ts'
+import { useSessionRestoreStore } from '#/web/stores/session-restore.ts'
 
 function installBridge(sessionOverrides: Record<string, unknown> = {}) {
   Object.defineProperty(globalThis, 'window', {
@@ -71,17 +71,17 @@ function installBridge(sessionOverrides: Record<string, unknown> = {}) {
   setRendererBridgeForTests(null)
 }
 
-describe('settings store boot session bridge', () => {
+describe('session restore store', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     installBridge()
-    useSettingsStore.setState({ bootSessionSnapshot: null })
+    useSessionRestoreStore.setState({ bootSessionSnapshot: null })
   })
 
   test('hydrate stores the saved session snapshot for bootstrap consumers', async () => {
-    await useSettingsStore.getState().hydrate()
+    await useSessionRestoreStore.getState().hydrate()
 
-    expect(useSettingsStore.getState().bootSessionSnapshot).toMatchObject({
+    expect(useSessionRestoreStore.getState().bootSessionSnapshot).toMatchObject({
       openRepos: [],
       activeRepo: null,
       workspaceLayout: 'top-bottom',
@@ -96,15 +96,15 @@ describe('settings store boot session bridge', () => {
       detailPaneSizes: { 'top-bottom': 0.5, 'left-right': 0.4 },
     })
 
-    await useSettingsStore.getState().hydrate()
+    await useSessionRestoreStore.getState().hydrate()
 
-    expect(useSettingsStore.getState().consumeBootSessionSnapshot()).toMatchObject({
+    expect(useSessionRestoreStore.getState().consumeBootSessionSnapshot()).toMatchObject({
       openRepos: [{ kind: 'local', id: '/tmp/repo' }],
       activeRepo: '/tmp/repo',
       workspaceLayout: 'left-right',
     })
-    expect(useSettingsStore.getState().bootSessionSnapshot).toBeNull()
-    expect(useSettingsStore.getState().consumeBootSessionSnapshot()).toMatchObject({
+    expect(useSessionRestoreStore.getState().bootSessionSnapshot).toBeNull()
+    expect(useSessionRestoreStore.getState().consumeBootSessionSnapshot()).toMatchObject({
       openRepos: [],
       activeRepo: null,
       workspaceLayout: 'top-bottom',

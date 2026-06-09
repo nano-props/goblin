@@ -1,6 +1,5 @@
 import { app } from 'electron'
 import { resolveLang, setCurrentLang } from '#/main/i18n/index.ts'
-import { broadcastRpcEvent } from '#/main/renderer-surface-events.ts'
 import { buildAppMenu } from '#/main/menu.ts'
 import { applyMenuRuntimeState } from '#/main/menu-state.ts'
 import { setSettingsGlobalShortcutState } from '#/main/settings-server-client.ts'
@@ -18,9 +17,8 @@ import type { NativeShellProjection, NativeSettingsProjectionPatch, NativeSettin
 //
 // Keep this module narrow: only retain effects that are actually shared across
 // multiple main-side call sites.
-export async function broadcastNativeHostGlobalShortcutState(accelerator: string, registered: boolean): Promise<void> {
+async function persistNativeHostGlobalShortcutState(registered: boolean): Promise<void> {
   await setSettingsGlobalShortcutState(registered)
-  broadcastRpcEvent({ type: 'global-shortcut-changed', state: { accelerator, registered } })
 }
 
 function menuStatePatchFromSettingsProjection(input: {
@@ -68,7 +66,7 @@ async function applyGlobalShortcutDisabledProjection(input: {
 }): Promise<void> {
   if (input.patch.globalShortcutDisabled === undefined) return
   const registered = syncGlobalShortcuts(input.settings.globalShortcutDisabled, input.settings.globalShortcut)
-  await broadcastNativeHostGlobalShortcutState(input.settings.globalShortcut, registered)
+  await persistNativeHostGlobalShortcutState(registered)
 }
 
 export async function applyNativeHostSettingsPrefsProjection(input: {

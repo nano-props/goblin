@@ -1,5 +1,6 @@
 import { ChevronDown, Maximize2, Minimize2 } from 'lucide-react'
 import type { KeyboardEvent } from 'react'
+import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { DetailTab, RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
@@ -15,7 +16,11 @@ import { useTerminalCount } from '#/web/components/terminal/terminal-session-sto
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import type { BranchDetailRepo, SelectedBranchDetailPresentation } from '#/web/components/branch-detail/model.ts'
 import type { BranchActionItemGroups } from '#/web/hooks/useBranchActionItems.ts'
-import { useRuntimeShortcutSettings } from '#/web/runtime-settings-hooks.ts'
+import { useRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
+import {
+  branchDetailToolbarStoreActionsEqual,
+  branchDetailToolbarStoreActionsFromStore,
+} from '#/web/stores/repos/selector-actions.ts'
 interface Props {
   repo: Pick<BranchDetailRepo, 'id' | 'ui'>
   detail: SelectedBranchDetailPresentation
@@ -38,9 +43,11 @@ export function BranchDetailToolbar({
   branchActions,
 }: Props) {
   const t = useT()
-  const setDetailCollapsed = useReposStore((s) => s.setDetailCollapsed)
-  const toggleDetailCollapsed = useReposStore((s) => s.toggleDetailCollapsed)
-  const toggleDetailFocusMode = useReposStore((s) => s.toggleDetailFocusMode)
+  const { setDetailCollapsed, toggleDetailCollapsed, toggleDetailFocusMode } = useStoreWithEqualityFn(
+    useReposStore,
+    branchDetailToolbarStoreActionsFromStore,
+    branchDetailToolbarStoreActionsEqual,
+  )
   const navigation = useMainWindowNavigation()
   const { shortcutsDisabled, toggleDetailOnActionBarBlankClick } = useRuntimeShortcutSettings()
   const behavior = repoWorkspaceBehavior(layout, collapsed, detailFocusMode)

@@ -1,7 +1,7 @@
 import { lastPathSegment } from '#/web/lib/paths.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 import type { TerminalBellEvent, TerminalDescriptor } from '#/web/components/terminal/types.ts'
-import { getRuntimeFetchSettings } from '#/web/runtime-settings-hooks.ts'
+import { getRuntimeFetchSettings } from '#/web/runtime-settings-fetch.ts'
 const BELL_NOTIFICATION_DEBOUNCE_MS = 5000
 
 export interface TerminalBellController {

@@ -1,6 +1,6 @@
 import { ShortcutSettings } from '#/web/components/settings/ShortcutSettings.tsx'
 import { SettingsCard, SettingsGroup, SettingsListItem } from '#/web/components/settings/SettingsPrimitives.tsx'
-import { useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
+import { useRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import {
   helpShortcutSections,
@@ -65,10 +65,7 @@ function ShortcutList({ sections }: { sections: HelpShortcutSection[] }) {
 
 export function KeyboardShortcutSettings() {
   const t = useT()
-  const { data } = useSettingsSnapshotQuery()
-  if (!data) return null
-  const globalShortcut = data.globalShortcut
-  const swapCloseShortcuts = data.swapCloseShortcuts
+  const { globalShortcut, swapCloseShortcuts } = useRuntimeShortcutSettings()
   return (
     <>
       <SettingsGroup label={t('settings.shortcuts')}>

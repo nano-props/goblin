@@ -1,0 +1,111 @@
+import { updateIfFresh } from '#/web/stores/repos/helpers.ts'
+import { runExclusiveOperation } from '#/web/stores/repos/operation-runner.ts'
+import {
+  applyFetchResourceError,
+  applyFetchResourceResult,
+  canRunRemoteFetchNow,
+  repoIfFresh,
+  resolveActionToken,
+  shouldAttemptFetch,
+} from '#/web/stores/repos/refresh-state.ts'
+import { startResource } from '#/web/stores/repos/resources.ts'
+import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
+import { waitForRepoOperationsIdle } from '#/web/stores/repos/runtime.ts'
+import { fetchRepository } from '#/web/app-data-client.ts'
+import type { RepoOperationReason } from '#/web/stores/repos/operations.ts'
+import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
+import type { ExecResult } from '#/web/types.ts'
+
+export function createRefreshSyncHelpers(set: ReposSet, get: ReposGet) {
+  async function runNetworkTask(
+    id: string,
+    task: (signal: AbortSignal) => Promise<ExecResult>,
+    options?: { token?: number; reason?: RepoOperationReason; priority?: number },
+  ): Promise<ExecResult | null> {
+    const resolved = resolveActionToken(get, id, options?.token)
+    if (!resolved) return null
+    const { repo: repoBefore, token } = resolved
+    if (!canRunRemoteFetchNow(repoBefore)) return { ok: false, message: 'error.network-op-in-progress' }
+    updateIfFresh(set, id, token, (r) => {
+      startResource(r.resources.fetch, { hasData: r.resources.fetch.loadedAt !== null })
+    })
+    return runExclusiveOperation({
+      set,
+      get,
+      id,
+      token,
+      lane: 'network',
+      priority: options?.priority ?? 50,
+      targets: [{ key: 'fetch', reason: options?.reason ?? 'network' }],
+      canStart: canStartRemoteFetch,
+      busyResult: { ok: false, message: 'error.network-op-in-progress' },
+      task,
+      errorFromResult: (result) => (!result.ok && result.message !== 'cancelled' ? result.message : null),
+      onResult: (result) => {
+        updateIfFresh(set, id, token, (r) => {
+          applyFetchResourceResult(r, result)
+        })
+      },
+      onError: (message) => {
+        updateIfFresh(set, id, token, (r) => {
+          applyFetchResourceError(r, message)
+        })
+      },
+      rethrow: true,
+    })
+  }
+
+  async function attemptFetch(
+    id: string,
+    token: number,
+    sourceToken?: string,
+  ): Promise<ExecResult | null> {
+    let repo = repoIfFresh(get, id, token)
+    if (!repo || !shouldAttemptFetch(repo, token)) return null
+    if (!canStartRemoteFetch(repo)) {
+      try {
+        await waitForRepoOperationsIdle(id, ['snapshot', 'status'])
+      } catch {
+        return null
+      }
+      repo = repoIfFresh(get, id, token)
+      if (!repo || repo.availability.phase === 'unavailable') return null
+      if (!canStartRemoteFetch(repo)) return null
+    }
+    try {
+      return await runNetworkTask(id, (signal) => fetchRepository(id, 'user', signal, sourceToken), {
+        token,
+        reason: 'user-fetch',
+        priority: 100,
+      })
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
+  function finalizeSyncFetchResult(id: string, token: number, fetchResult: ExecResult | null): void {
+    if (!fetchResult) return
+    if (fetchResult.ok) {
+      get().clearFetchFailed(id, token)
+      return
+    }
+    if (fetchResult.message !== 'cancelled') get().setLastResult(id, fetchResult, token)
+  }
+
+  async function runManualSyncPipeline(id: string, token: number, sourceToken: string): Promise<void> {
+    let fetchResult: ExecResult | null = null
+    const repoBeforeFetch = repoIfFresh(get, id, token)
+    if (!repoBeforeFetch) return
+    if (shouldAttemptFetch(repoBeforeFetch, token)) {
+      fetchResult = await attemptFetch(id, token, sourceToken)
+    }
+    if (repoIfFresh(get, id, token)) {
+      await get().refreshCoreData(id, { token })
+    }
+    finalizeSyncFetchResult(id, token, fetchResult)
+  }
+
+  return {
+    runManualSyncPipeline,
+  }
+}
