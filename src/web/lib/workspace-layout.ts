@@ -24,7 +24,7 @@ const REPO_WORKSPACE_BEHAVIOR = {
     prTooltipSide: 'right',
   },
   'left-right': {
-    branchListActionsVisible: false,
+    branchListActionsVisible: true,
     prTooltipSide: 'bottom',
   },
 } satisfies Record<

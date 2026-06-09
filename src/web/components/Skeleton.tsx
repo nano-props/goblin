@@ -93,7 +93,6 @@ export function BranchDetailSkeleton({
   detailFocusMode?: boolean
 }) {
   const behavior = repoWorkspaceBehavior(layout, collapsed, detailFocusMode)
-  const showBranchActions = layout === 'left-right'
   const showPanelControls = behavior.detailFocusAllowed || behavior.detailCollapseAllowed
 
   return (
@@ -114,14 +113,6 @@ export function BranchDetailSkeleton({
         </div>
         <div aria-hidden="true" className="min-w-2 flex-1 self-stretch" />
         <div className="flex shrink-0 items-center gap-1">
-          {showBranchActions && (
-            <div data-testid="branch-detail-skeleton-action">
-              <Bar w="72px" h="24px" tone="strong" />
-            </div>
-          )}
-          {showBranchActions && showPanelControls && (
-            <div aria-hidden="true" className="mx-1 h-4 border-l border-separator/70" />
-          )}
           {behavior.detailFocusAllowed && <Bar w="28px" h="28px" tone="strong" />}
           {behavior.detailCollapseAllowed && <Bar w="28px" h="28px" tone="strong" />}
         </div>

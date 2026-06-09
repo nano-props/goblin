@@ -41,7 +41,7 @@ export function BranchRow({
         isSelected ? 'bg-selected text-selected-foreground hover:bg-selected' : 'hover:bg-muted',
       )}
     >
-      <div className="pointer-events-none relative z-10 min-w-0 px-4 py-1.5">
+      <div className="pointer-events-none relative z-10 flex min-w-0 items-center px-4 py-1.5">
         <BranchSummaryInline repo={repo} branch={branch} selected={isSelected} />
       </div>
       {showActions && (

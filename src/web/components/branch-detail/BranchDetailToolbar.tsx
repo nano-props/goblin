@@ -6,7 +6,6 @@ import type { DetailTab, RepoWorkspaceLayout } from '#/web/stores/repos/types.ts
 import { useT } from '#/web/stores/i18n.ts'
 import { Badge } from '#/web/components/ui/badge.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
-import { BranchActionControls } from '#/web/components/BranchActionControls.tsx'
 import { Toolbar } from '#/web/components/Layout.tsx'
 import { detailTabNavigationKey, navigatedDetailTab, visibleDetailTabs } from '#/web/lib/detail-tabs.ts'
 import { cn } from '#/web/lib/cn.ts'
@@ -15,7 +14,6 @@ import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-
 import { useTerminalCount } from '#/web/components/terminal/terminal-session-store.ts'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import type { BranchDetailRepo, SelectedBranchDetailPresentation } from '#/web/components/branch-detail/model.ts'
-import type { BranchActionItemGroups } from '#/web/hooks/useBranchActionItems.ts'
 import { useRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import {
   branchDetailToolbarStoreActionsEqual,
@@ -29,7 +27,6 @@ interface Props {
   collapsed: boolean
   detailFocusMode: boolean
   layout: RepoWorkspaceLayout
-  branchActions?: BranchActionItemGroups
 }
 
 export function BranchDetailToolbar({
@@ -40,7 +37,6 @@ export function BranchDetailToolbar({
   collapsed,
   detailFocusMode,
   layout,
-  branchActions,
 }: Props) {
   const t = useT()
   const { setDetailCollapsed, toggleDetailCollapsed, toggleDetailFocusMode } = useStoreWithEqualityFn(
@@ -78,7 +74,6 @@ export function BranchDetailToolbar({
         ? 'branch-detail.expand-title'
         : 'branch-detail.collapse-title',
   )
-  const showBranchActions = !!branchActions && layout === 'left-right'
   const showPanelControls = behavior.detailFocusAllowed || behavior.detailCollapseAllowed
   const focusTogglePressed = behavior.detailFocusMode
 
@@ -132,12 +127,6 @@ export function BranchDetailToolbar({
         onClick={behavior.detailCollapseAllowed && toggleDetailOnActionBarBlankClick ? toggleDetailCollapsed : undefined}
       />
       <div className="flex shrink-0 items-center gap-1">
-        {showBranchActions && (
-          <BranchActionControls actions={branchActions} variant="menu" />
-        )}
-        {showBranchActions && showPanelControls && (
-          <div aria-hidden="true" data-testid="branch-detail-toolbar-divider" className="mx-1 h-4 border-l border-separator/70" />
-        )}
         {behavior.detailFocusAllowed && (
           <Button
             variant="ghost"

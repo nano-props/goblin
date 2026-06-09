@@ -13,7 +13,6 @@ import { emptyRendererBridgeBootstrap, setRendererBridgeForTests } from '#/web/r
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
-import type { BranchActionItemGroups } from '#/web/hooks/useBranchActionItems.ts'
 import type { RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
 
 const REPO_ID = '/tmp/gbl-branch-detail-toolbar-repo'
@@ -82,106 +81,13 @@ describe('BranchDetailToolbar', () => {
     expect(tab.textContent).toContain('2')
   })
 
-  test('does not show branch actions in the detail bar in top-bottom focus mode (actions moved to repo bar)', () => {
+  test('does not show branch actions in the detail bar (actions moved to branch rows)', () => {
     renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({}),
-      detailFocusMode: true,
-      branchActions: {
-        patchItems: [],
-        mainItems: [
-          {
-            id: 'checkout',
-            label: 'Checkout',
-            disabled: false,
-            visible: true,
-            icon: null,
-            onSelect: vi.fn(),
-          },
-        ],
-        destructiveItems: [],
-        dialogs: null,
-      },
     })
 
     expect(container?.querySelector('button[aria-label="action.menu"]')).toBeNull()
-    expect(container?.querySelector('[data-testid="branch-detail-toolbar-divider"]')).toBeNull()
-  })
-
-  test('does not show branch actions in the detail bar in top-bottom split mode', () => {
-    renderToolbar({
-      terminalCount: 0,
-      navigation: navigationWith({}),
-      branchActions: {
-        patchItems: [],
-        mainItems: [
-          {
-            id: 'pull',
-            label: 'Pull',
-            disabled: false,
-            visible: true,
-            icon: null,
-            onSelect: vi.fn(),
-          },
-        ],
-        destructiveItems: [],
-        dialogs: null,
-      },
-    })
-
-    expect(container?.querySelector('button[aria-label="action.menu"]')).toBeNull()
-  })
-
-  test('does not show branch actions in the detail bar when focus preference is on but detail is collapsed', () => {
-    renderToolbar({
-      terminalCount: 0,
-      navigation: navigationWith({}),
-      detailFocusMode: true,
-      collapsed: true,
-      branchActions: {
-        patchItems: [],
-        mainItems: [
-          {
-            id: 'checkout',
-            label: 'Checkout',
-            disabled: false,
-            visible: true,
-            icon: null,
-            onSelect: vi.fn(),
-          },
-        ],
-        destructiveItems: [],
-        dialogs: null,
-      },
-    })
-
-    expect(container?.querySelector('button[aria-label="action.menu"]')).toBeNull()
-    expect(container?.querySelector('[data-testid="branch-detail-toolbar-divider"]')).toBeNull()
-  })
-
-  test('does not show the divider when there are no panel controls beside branch actions', () => {
-    renderToolbar({
-      terminalCount: 0,
-      navigation: navigationWith({}),
-      layout: 'left-right',
-      branchActions: {
-        patchItems: [],
-        mainItems: [
-          {
-            id: 'checkout',
-            label: 'Checkout',
-            disabled: false,
-            visible: true,
-            icon: null,
-            onSelect: vi.fn(),
-          },
-        ],
-        destructiveItems: [],
-        dialogs: null,
-      },
-    })
-
-    expect(container?.querySelector('button[aria-label="action.menu"]')).not.toBeNull()
     expect(container?.querySelector('[data-testid="branch-detail-toolbar-divider"]')).toBeNull()
   })
 })
@@ -193,7 +99,6 @@ function renderToolbar(options: {
   detailFocusMode?: boolean
   collapsed?: boolean
   layout?: RepoWorkspaceLayout
-  branchActions?: BranchActionItemGroups
 }): HTMLButtonElement {
   const repo = seedRepoState({
     id: REPO_ID,
@@ -251,7 +156,6 @@ function renderToolbar(options: {
               collapsed={options.collapsed ?? false}
               detailFocusMode={options.detailFocusMode ?? false}
               layout={options.layout ?? DEFAULT_WORKSPACE_LAYOUT}
-              branchActions={options.branchActions}
             />
           </TerminalSessionReadContext.Provider>
         </MainWindowNavigationProvider>
