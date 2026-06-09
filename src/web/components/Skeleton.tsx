@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react'
-// Skeleton row used as a placeholder while a list loads. Each bar shows a
-// soft pulse via Tailwind animate-pulse so the user sees motion (not a
-// frozen list) during the IPC round-trip. We render a fixed number of rows
-// — the real list usually has dozens, so a half-dozen skeletons is enough
-// to fill the visible area without committing to an exact count.
+// Skeleton placeholders used while a list loads.  We keep the shapes
+// coarse — a few large blocks per row — rather than mirroring every
+// badge, icon, and label.  This matches the shadcn/ui Skeleton style
+// (animate-pulse + bg-muted) and avoids the "fine-grained flicker"
+// that comes from dozens of tiny bars pulsing in unison.
 
 import { cn } from '#/web/lib/cn.ts'
 import { Skeleton } from '#/web/components/ui/skeleton.tsx'
@@ -33,7 +33,7 @@ export function BranchListSkeleton({ rows = 6, showBranchActions = false }: Bran
   return (
     <SkeletonList
       rows={rows}
-      renderRow={(i) => <BranchListSkeletonRow key={i} index={i} showActions={showBranchActions} />}
+      renderRow={(i) => <BranchListSkeletonRow key={i} showActions={showBranchActions} />}
     />
   )
 }
@@ -100,15 +100,9 @@ export function BranchDetailSkeleton({
       <Toolbar variant="detail">
         <div className="flex min-w-0 flex-1 items-center gap-1">
           <div className="flex shrink-0 gap-1">
-            <div className="flex h-7 items-center px-2.5">
-              <Skeleton className="h-3.5 w-[42px]" />
-            </div>
-            <div className="flex h-7 items-center px-2.5">
-              <Skeleton className="h-3.5 w-[42px]" />
-            </div>
-            <div className="flex h-7 items-center px-2.5">
-              <Skeleton className="h-3.5 w-[42px]" />
-            </div>
+            <Skeleton className="h-7 w-20" />
+            <Skeleton className="h-7 w-24" />
+            <Skeleton className="h-7 w-20" />
           </div>
         </div>
         <div aria-hidden="true" className="min-w-2 flex-1 self-stretch" />
@@ -135,12 +129,10 @@ function RepoToolbarSkeleton({ focusMode = false, compact = false }: { focusMode
           <>
             <ToolbarPagerSkeleton />
             <div aria-hidden="true" className="mx-1 h-4 border-l border-separator/70" />
-            <Skeleton className="h-3.5 w-3.5 rounded-full" />
-            <Skeleton className="h-3.5 w-[120px]" />
-            <Skeleton className="h-4 w-11" />
-            <Skeleton className="h-[11px] w-24" />
+            <Skeleton className="h-4 w-4 rounded-full" />
+            <Skeleton className="h-4 w-40" />
             <div data-testid="repo-toolbar-skeleton-focus-actions">
-              <Skeleton className="h-6 w-6" />
+              <Skeleton className="h-7 w-7" />
             </div>
           </>
         ) : compact ? (
@@ -164,10 +156,10 @@ function RepoToolbarActionsSkeleton({ compact }: { compact: boolean }) {
   return (
     <div className="flex items-center gap-1">
       <div data-testid="repo-toolbar-skeleton-activity">
-        <Skeleton className={cn('h-7', compact ? 'w-7' : 'w-[66px]')} />
+        <Skeleton className={cn('h-7', compact ? 'w-7' : 'w-16')} />
       </div>
       <div data-testid="repo-toolbar-skeleton-create-worktree">
-        <Skeleton className={cn('h-7', compact ? 'w-7' : 'w-[118px]')} />
+        <Skeleton className={cn('h-7', compact ? 'w-7' : 'w-24')} />
       </div>
     </div>
   )
@@ -176,9 +168,9 @@ function RepoToolbarActionsSkeleton({ compact }: { compact: boolean }) {
 function ToolbarPagerSkeleton() {
   return (
     <div className="flex items-center gap-1" data-testid="repo-toolbar-skeleton-pager">
-      <Skeleton className="h-[11px] w-[34px]" />
-      <Skeleton className="h-6 w-6" />
-      <Skeleton className="h-6 w-6" />
+      <Skeleton className="h-4 w-10" />
+      <Skeleton className="h-7 w-7" />
+      <Skeleton className="h-7 w-7" />
     </div>
   )
 }
@@ -189,7 +181,7 @@ function ToolbarSearchSkeleton({ dataTestId }: { dataTestId?: string }) {
       className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-input bg-control shadow-xs"
       data-testid={dataTestId}
     >
-      <Skeleton className="h-3.5 w-3.5 rounded-full" />
+      <Skeleton className="h-4 w-4 rounded-full" />
     </div>
   )
 }
@@ -205,7 +197,7 @@ function ToolbarSegmentedControlSkeleton({
     <div className="flex shrink-0 rounded-md border border-input bg-control shadow-xs" data-testid={dataTestId}>
       {Array.from({ length: items }).map((_, i) => (
         <div key={i} className="flex h-7 w-7 items-center justify-center border-r border-input last:border-r-0">
-          <Skeleton className="h-3.5 w-3.5 rounded-full" />
+          <Skeleton className="h-4 w-4 rounded-full" />
         </div>
       ))}
     </div>
@@ -222,11 +214,7 @@ function SkeletonList({
   return <ul className="flex-1 divide-y divide-separator">{Array.from({ length: rows }).map((_, i) => renderRow(i))}</ul>
 }
 
-const nameWidthClasses = ['w-[30%]', 'w-[38%]', 'w-[26%]', 'w-[34%]']
-const badgeWidthClasses = ['w-[46px]', 'w-[54px]', 'w-[40px]', 'w-[48px]']
-const metaWidthClasses = ['w-[20%]', 'w-[16%]', 'w-[24%]', 'w-[18%]']
-
-function BranchListSkeletonRow({ index, showActions }: { index: number; showActions: boolean }) {
+function BranchListSkeletonRow({ showActions }: { showActions: boolean }) {
   return (
     <li
       className={cn(
@@ -234,21 +222,14 @@ function BranchListSkeletonRow({ index, showActions }: { index: number; showActi
         showActions ? 'grid-cols-[minmax(0,1fr)_auto]' : 'grid-cols-1',
       )}
     >
-      <div className="flex min-w-0 items-center gap-2 px-4 py-1.5">
-        <Skeleton className="h-3.5 w-3.5 rounded-full" />
-        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-          <Skeleton className={cn('h-3.5', nameWidthClasses[index % nameWidthClasses.length])} />
-          <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
-            <Skeleton className={cn('h-4', badgeWidthClasses[index % badgeWidthClasses.length])} />
-            <Skeleton className="h-[11px] w-[18px]" />
-            <Skeleton className={cn('h-[11px]', metaWidthClasses[index % metaWidthClasses.length])} />
-          </div>
-        </div>
+      <div className="flex min-w-0 items-center gap-3 px-4">
+        <Skeleton className="h-4 w-4 rounded-full" />
+        <Skeleton className="h-4 w-3/5" />
       </div>
       {showActions && (
-        <div className="flex shrink-0 items-center py-1.5 pr-4">
+        <div className="flex shrink-0 items-center pr-4">
           <div data-testid="branch-list-skeleton-action">
-            <Skeleton className="h-6 w-[58px]" />
+            <Skeleton className="h-7 w-16" />
           </div>
         </div>
       )}
@@ -258,9 +239,8 @@ function BranchListSkeletonRow({ index, showActions }: { index: number; showActi
 
 function StatusListSkeletonRow() {
   return (
-    <li className="grid grid-cols-[2ch_minmax(0,1fr)] items-center gap-3 px-1.5">
-      <Skeleton className="h-3.5 w-[2ch]" />
-      <Skeleton className="h-3.5 w-full" />
+    <li className="px-4 py-2.5">
+      <Skeleton className="h-4 w-full" />
     </li>
   )
 }
