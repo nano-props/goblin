@@ -49,12 +49,12 @@ describe('RepoWorkspaceSkeleton', () => {
     expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-pager"]')).toBeNull()
   })
 
-  test('moves branch actions into the detail toolbar for left-right mode', () => {
+  test('renders split workspace with list actions in left-right mode', () => {
     render(<RepoWorkspaceSkeleton showRepoToolbar layout="left-right" detailCollapsed={false} detailFocusMode={false} />)
 
     expect(container?.querySelectorAll('li')).toHaveLength(14)
-    expect(container?.querySelectorAll('[data-testid="branch-list-skeleton-action"]')).toHaveLength(0)
-    expect(container?.querySelector('[data-testid="branch-detail-skeleton-action"]')).not.toBeNull()
+    expect(container?.querySelectorAll('[data-testid="branch-list-skeleton-action"]')).toHaveLength(6)
+    expect(container?.querySelector('[data-testid="mock-split-pane"]')).not.toBeNull()
   })
 
   test('hides the branch pane entirely in top-bottom focus mode', () => {
@@ -62,7 +62,6 @@ describe('RepoWorkspaceSkeleton', () => {
 
     expect(container?.querySelectorAll('li')).toHaveLength(8)
     expect(container?.querySelectorAll('[data-testid="branch-list-skeleton-action"]')).toHaveLength(0)
-    expect(container?.querySelector('[data-testid="branch-detail-skeleton-action"]')).not.toBeNull()
     expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-pager"]')).not.toBeNull()
     expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-branch-view"]')).toBeNull()
   })

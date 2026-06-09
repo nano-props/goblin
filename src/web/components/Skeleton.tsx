@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react'
 // Skeleton row used as a placeholder while a list loads. Each bar shows a
-// shimmer sweep via CSS so the user sees motion (not a frozen list) during
-// the IPC round-trip. We render a fixed number of rows — the real list
-// usually has dozens, so a half-dozen skeletons is enough to fill the
-// visible area without committing to an exact count.
+// soft pulse via Tailwind animate-pulse so the user sees motion (not a
+// frozen list) during the IPC round-trip. We render a fixed number of rows
+// — the real list usually has dozens, so a half-dozen skeletons is enough
+// to fill the visible area without committing to an exact count.
 
 import { cn } from '#/web/lib/cn.ts'
+import { Skeleton } from '#/web/components/ui/skeleton.tsx'
 import { RepoWorkspace, RepoWorkspacePane, Toolbar } from '#/web/components/Layout.tsx'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 import { DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
@@ -93,28 +94,27 @@ export function BranchDetailSkeleton({
   detailFocusMode?: boolean
 }) {
   const behavior = repoWorkspaceBehavior(layout, collapsed, detailFocusMode)
-  const showPanelControls = behavior.detailFocusAllowed || behavior.detailCollapseAllowed
 
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
       <Toolbar variant="detail">
         <div className="flex min-w-0 flex-1 items-center gap-1">
           <div className="flex shrink-0 gap-1">
-            <div className="h-7 px-2.5 flex items-center">
-              <Bar w="42px" h="14px" tone="strong" />
+            <div className="flex h-7 items-center px-2.5">
+              <Skeleton className="h-3.5 w-[42px]" />
             </div>
-            <div className="h-7 px-2.5 flex items-center">
-              <Bar w="42px" h="14px" tone="strong" />
+            <div className="flex h-7 items-center px-2.5">
+              <Skeleton className="h-3.5 w-[42px]" />
             </div>
-            <div className="h-7 px-2.5 flex items-center">
-              <Bar w="42px" h="14px" tone="strong" />
+            <div className="flex h-7 items-center px-2.5">
+              <Skeleton className="h-3.5 w-[42px]" />
             </div>
           </div>
         </div>
         <div aria-hidden="true" className="min-w-2 flex-1 self-stretch" />
         <div className="flex shrink-0 items-center gap-1">
-          {behavior.detailFocusAllowed && <Bar w="28px" h="28px" tone="strong" />}
-          {behavior.detailCollapseAllowed && <Bar w="28px" h="28px" tone="strong" />}
+          {behavior.detailFocusAllowed && <Skeleton className="h-7 w-7" />}
+          {behavior.detailCollapseAllowed && <Skeleton className="h-7 w-7" />}
         </div>
       </Toolbar>
 
@@ -135,12 +135,12 @@ function RepoToolbarSkeleton({ focusMode = false, compact = false }: { focusMode
           <>
             <ToolbarPagerSkeleton />
             <div aria-hidden="true" className="mx-1 h-4 border-l border-separator/70" />
-            <Bar w="14px" h="14px" round />
-            <Bar w="120px" h="14px" tone="strong" />
-            <Bar w="44px" h="16px" />
-            <Bar w="96px" h="11px" />
+            <Skeleton className="h-3.5 w-3.5 rounded-full" />
+            <Skeleton className="h-3.5 w-[120px]" />
+            <Skeleton className="h-4 w-11" />
+            <Skeleton className="h-[11px] w-24" />
             <div data-testid="repo-toolbar-skeleton-focus-actions">
-              <Bar w="24px" h="24px" tone="strong" />
+              <Skeleton className="h-6 w-6" />
             </div>
           </>
         ) : compact ? (
@@ -164,10 +164,10 @@ function RepoToolbarActionsSkeleton({ compact }: { compact: boolean }) {
   return (
     <div className="flex items-center gap-1">
       <div data-testid="repo-toolbar-skeleton-activity">
-        <Bar w={compact ? '28px' : '66px'} h="28px" />
+        <Skeleton className={cn('h-7', compact ? 'w-7' : 'w-[66px]')} />
       </div>
       <div data-testid="repo-toolbar-skeleton-create-worktree">
-        <Bar w={compact ? '28px' : '118px'} h="28px" />
+        <Skeleton className={cn('h-7', compact ? 'w-7' : 'w-[118px]')} />
       </div>
     </div>
   )
@@ -176,9 +176,9 @@ function RepoToolbarActionsSkeleton({ compact }: { compact: boolean }) {
 function ToolbarPagerSkeleton() {
   return (
     <div className="flex items-center gap-1" data-testid="repo-toolbar-skeleton-pager">
-      <Bar w="34px" h="11px" />
-      <Bar w="24px" h="24px" />
-      <Bar w="24px" h="24px" />
+      <Skeleton className="h-[11px] w-[34px]" />
+      <Skeleton className="h-6 w-6" />
+      <Skeleton className="h-6 w-6" />
     </div>
   )
 }
@@ -189,7 +189,7 @@ function ToolbarSearchSkeleton({ dataTestId }: { dataTestId?: string }) {
       className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-input bg-control shadow-xs"
       data-testid={dataTestId}
     >
-      <Bar w="14px" h="14px" round />
+      <Skeleton className="h-3.5 w-3.5 rounded-full" />
     </div>
   )
 }
@@ -205,7 +205,7 @@ function ToolbarSegmentedControlSkeleton({
     <div className="flex shrink-0 rounded-md border border-input bg-control shadow-xs" data-testid={dataTestId}>
       {Array.from({ length: items }).map((_, i) => (
         <div key={i} className="flex h-7 w-7 items-center justify-center border-r border-input last:border-r-0">
-          <Bar w="14px" h="14px" round />
+          <Skeleton className="h-3.5 w-3.5 rounded-full" />
         </div>
       ))}
     </div>
@@ -222,11 +222,11 @@ function SkeletonList({
   return <ul className="flex-1 divide-y divide-separator">{Array.from({ length: rows }).map((_, i) => renderRow(i))}</ul>
 }
 
-function BranchListSkeletonRow({ index, showActions }: { index: number; showActions: boolean }) {
-  const nameWidths = ['30%', '38%', '26%', '34%']
-  const badgeWidths = ['46px', '54px', '40px', '48px']
-  const metaWidths = ['20%', '16%', '24%', '18%']
+const nameWidthClasses = ['w-[30%]', 'w-[38%]', 'w-[26%]', 'w-[34%]']
+const badgeWidthClasses = ['w-[46px]', 'w-[54px]', 'w-[40px]', 'w-[48px]']
+const metaWidthClasses = ['w-[20%]', 'w-[16%]', 'w-[24%]', 'w-[18%]']
 
+function BranchListSkeletonRow({ index, showActions }: { index: number; showActions: boolean }) {
   return (
     <li
       className={cn(
@@ -235,20 +235,20 @@ function BranchListSkeletonRow({ index, showActions }: { index: number; showActi
       )}
     >
       <div className="flex min-w-0 items-center gap-2 px-4 py-1.5">
-        <Bar w="14px" h="14px" round />
+        <Skeleton className="h-3.5 w-3.5 rounded-full" />
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-          <Bar w={nameWidths[index % nameWidths.length]} h="14px" tone="strong" />
+          <Skeleton className={cn('h-3.5', nameWidthClasses[index % nameWidthClasses.length])} />
           <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
-            <Bar w={badgeWidths[index % badgeWidths.length]} h="16px" />
-            <Bar w="18px" h="11px" />
-            <Bar w={metaWidths[index % metaWidths.length]} h="11px" />
+            <Skeleton className={cn('h-4', badgeWidthClasses[index % badgeWidthClasses.length])} />
+            <Skeleton className="h-[11px] w-[18px]" />
+            <Skeleton className={cn('h-[11px]', metaWidthClasses[index % metaWidthClasses.length])} />
           </div>
         </div>
       </div>
       {showActions && (
         <div className="flex shrink-0 items-center py-1.5 pr-4">
           <div data-testid="branch-list-skeleton-action">
-            <Bar w="58px" h="24px" />
+            <Skeleton className="h-6 w-[58px]" />
           </div>
         </div>
       )}
@@ -259,34 +259,8 @@ function BranchListSkeletonRow({ index, showActions }: { index: number; showActi
 function StatusListSkeletonRow() {
   return (
     <li className="grid grid-cols-[2ch_minmax(0,1fr)] items-center gap-3 px-1.5">
-      <Bar w="2ch" h="14px" />
-      <Bar w="100%" h="14px" />
+      <Skeleton className="h-3.5 w-[2ch]" />
+      <Skeleton className="h-3.5 w-full" />
     </li>
-  )
-}
-
-function Bar({
-  w,
-  h,
-  round,
-  className,
-  tone = 'default',
-}: {
-  w: string
-  h: string
-  round?: boolean
-  className?: string
-  tone?: 'default' | 'strong'
-}) {
-  return (
-    <span
-      className={cn(
-        'block',
-        tone === 'strong' ? 'skeleton-shimmer-strong' : 'skeleton-shimmer',
-        round ? 'rounded-full' : 'rounded',
-        className,
-      )}
-      style={{ width: w, height: h }}
-    />
   )
 }
