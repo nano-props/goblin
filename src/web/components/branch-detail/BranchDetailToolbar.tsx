@@ -155,7 +155,7 @@ export function BranchDetailToolbar({
       </div>
       <div
         aria-hidden="true"
-        className="min-w-2 flex-1 self-stretch"
+        className={cn('min-w-2 flex-1 self-stretch', compact && 'hidden')}
         onClick={behavior.detailCollapseAllowed && toggleDetailOnActionBarBlankClick ? toggleDetailCollapsed : undefined}
       />
       <div className="flex shrink-0 items-center gap-1">
