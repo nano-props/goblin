@@ -17,8 +17,9 @@
 
 - Application-level design guidance lives under `docs/`:
   - `docs/README.md` for the overview
-  - `docs/ui-copy.md` for UI and copy rules
+  - `docs/ui-conventions.md` for UI conventions
   - `docs/arch.md` for architecture
+  - `docs/layering.md` for feature layering rules
   - `docs/state-sync.md` for state ownership and sync guidance
   - `docs/renderer-model.md` for renderer model guidance
   - `docs/realtime.md` for realtime guidance

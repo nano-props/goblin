@@ -2,7 +2,7 @@
 
 Use these docs for app-level product and architecture decisions:
 
-- `ui-copy.md`: UI and copy rules
+- `ui-conventions.md`: UI and copy rules
 - `arch.md`: app shell and process ownership
 - `layering.md`: feature layering rules
 - `state-sync.md`: state ownership and sync model
