@@ -559,4 +559,31 @@ describe('settings-client', () => {
       }),
     )
   })
+
+  test('opens remote terminal through embedded server remote route', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, message: 'remote-terminal' }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { openRemoteRepositoryTerminal } = await import('#/web/remote-client.ts')
+
+    await expect(openRemoteRepositoryTerminal('ssh-config://prod/srv/repo', '/srv/repo-feature')).resolves.toEqual({
+      ok: true,
+      message: 'remote-terminal',
+    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:32100/api/remote/open-terminal',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'content-type': 'application/json',
+          'x-goblin-internal-secret': 'secret',
+        }),
+        body: JSON.stringify({ repoId: 'ssh-config://prod/srv/repo', worktreePath: '/srv/repo-feature' }),
+      }),
+    )
+  })
 })

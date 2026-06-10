@@ -95,6 +95,27 @@ describe('worktree state selectors', () => {
     })
   })
 
+  test('records detached worktrees from status entries without a branch', () => {
+    const next = applyStatusToWorktreeStates({}, [
+      {
+        path: '/tmp/repo-detached',
+        head: '0123456789abcdef',
+        isMain: false,
+        entries: [{ x: 'M', y: ' ', path: 'file.ts' }],
+      },
+    ])
+
+    expect(next['/tmp/repo-detached']).toMatchObject({
+      path: '/tmp/repo-detached',
+      head: '0123456789abcdef',
+      isDetached: true,
+      isMain: false,
+      isDirty: true,
+      changeCount: 1,
+    })
+    expect(next['/tmp/repo-detached']).not.toHaveProperty('branch')
+  })
+
   test('strips worktree metadata from branch state while preserving canonical state', () => {
     const snapshot = createBranchSnapshot('feature/a', {
       worktree: {

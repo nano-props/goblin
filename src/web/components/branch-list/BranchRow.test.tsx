@@ -15,6 +15,8 @@ vi.mock('#/web/stores/i18n.ts', () => ({
         return '有改动'
       case 'branches.worktree':
         return '工作树'
+      case 'branches.reorder-worktree':
+        return '重新排序工作树'
       case 'branches.default':
         return '默认'
       case 'branches.gone':
@@ -114,6 +116,107 @@ describe('BranchRow', () => {
     )
 
     expect(document.body.textContent).toContain('有改动')
+  })
+
+  test('shows the formatted worktree directory for linked branches', () => {
+    const repo = emptyRepo('/tmp/repo', 'repo')
+    const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
+
+    render(
+      <ul>
+        <BranchRow
+          repo={repo}
+          branch={branch}
+          selected={null}
+          onSelectBranch={vi.fn()}
+          onOpenBranchStatus={vi.fn()}
+          selectedRef={createRef<HTMLLIElement>()}
+          showActions={false}
+        />
+      </ul>,
+    )
+
+    expect(document.body.textContent).toContain('/tmp/worktree-a')
+  })
+
+  test('shows only the path for remote worktree directories', () => {
+    const repo = emptyRepo('ssh-config://prod/srv/repo', 'repo')
+    repo.remote.target = {
+      id: 'ssh-config://prod/srv/repo',
+      alias: 'prod',
+      host: '192.0.2.10',
+      user: 'tester',
+      port: 22,
+      remotePath: '/srv/repo',
+      displayName: 'prod:repo',
+    }
+    const branch = createRepoBranch('feature/a', { worktree: { path: '/srv/repo-feature' } })
+
+    render(
+      <ul>
+        <BranchRow
+          repo={repo}
+          branch={branch}
+          selected={null}
+          onSelectBranch={vi.fn()}
+          onOpenBranchStatus={vi.fn()}
+          selectedRef={createRef<HTMLLIElement>()}
+          showActions={false}
+        />
+      </ul>,
+    )
+
+    expect(document.body.textContent).toContain('/srv/repo-feature')
+    expect(document.body.textContent).not.toContain('tester@192.0.2.10')
+  })
+
+  test('does not add a directory line for branches without worktrees', () => {
+    const repo = emptyRepo('/tmp/repo', 'repo')
+    const branch = createRepoBranch('feature/plain')
+
+    render(
+      <ul>
+        <BranchRow
+          repo={repo}
+          branch={branch}
+          selected={null}
+          onSelectBranch={vi.fn()}
+          onOpenBranchStatus={vi.fn()}
+          selectedRef={createRef<HTMLLIElement>()}
+          showActions={false}
+        />
+      </ul>,
+    )
+
+    expect(document.body.textContent).not.toContain('没有工作树')
+    expect(document.body.textContent).not.toContain('no worktree')
+  })
+
+  test('renders an isolated drag handle when drag props are provided', () => {
+    const repo = emptyRepo('/tmp/repo', 'repo')
+    const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
+
+    render(
+      <ul>
+        <BranchRow
+          repo={repo}
+          branch={branch}
+          selected={null}
+          onSelectBranch={vi.fn()}
+          onOpenBranchStatus={vi.fn()}
+          selectedRef={createRef<HTMLLIElement>()}
+          showActions={false}
+          dragHandle={{
+            label: '重新排序工作树',
+            ref: vi.fn(),
+            props: {},
+          }}
+        />
+      </ul>,
+    )
+
+    const handle = document.querySelector('[aria-label="重新排序工作树"]')
+    expect(handle?.getAttribute('aria-label')).toBe('重新排序工作树')
   })
 })
 

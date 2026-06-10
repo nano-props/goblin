@@ -8,6 +8,17 @@ import { MainWindowNavigationProvider, type MainWindowNavigationActions } from '
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { resetReposStore, seedRepoState, createRepoBranch } from '#/web/stores/repos/test-utils.ts'
 
+vi.mock('#/web/runtime-settings-external-apps.ts', () => ({
+  useRuntimeExternalAppSettings: () => ({
+    terminalApp: 'auto',
+    resolvedTerminalApp: null,
+    terminalAvailable: true,
+    editorApp: 'vscode',
+    resolvedEditorApp: 'vscode',
+    editorAvailable: true,
+  }),
+}))
+
 const REPO_ID = '/tmp/gbl-repo-toolbar-repo'
 
 let container: HTMLDivElement | null = null

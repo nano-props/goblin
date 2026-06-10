@@ -1,4 +1,5 @@
 import { runServerCancellable, abortServerNetworkOp } from '#/server/common/network-ops.ts'
+import path from 'node:path'
 import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
 import { resolveRepoBackend, runWithRepoBackend } from '#/server/modules/repo-backend.ts'
 import { getServerSettingsPrefs } from '#/server/modules/settings-source.ts'
@@ -11,6 +12,7 @@ import { checkGitAvailable } from '#/system/git/helper.ts'
 import { isValidCwd, isValidRepoLocator } from '#/shared/input-validation.ts'
 import { type CloneRepoResult, type ProbeResult } from '#/shared/rpc.ts'
 import { constants as fsConstants, promises as fs } from 'node:fs'
+import { normalizeCreateWorktreeInput, type CreateWorktreeInput } from '#/shared/worktree-create.ts'
 
 type ProbeAvailability = { ok: true } | { ok: false; message: string }
 
@@ -255,19 +257,28 @@ export async function pushRepositoryBranch(
 
 export async function createRepositoryWorktree(
   cwd: string,
-  worktreePath: string,
-  newBranch: string,
-  baseBranch: string,
+  input: CreateWorktreeInput,
   signal?: AbortSignal,
   sourceToken?: string,
 ): Promise<ExecResult> {
+  if (!isValidRepoLocator(cwd)) return { ok: false, message: 'error.invalid-arguments' }
+  const normalized = normalizeCreateWorktreeInput(input)
+  if (!normalized) return { ok: false, message: 'error.invalid-arguments' }
+  if (!path.isAbsolute(normalized.worktreePath) || normalized.worktreePath.includes('\0')) {
+    return { ok: false, message: 'error.invalid-path' }
+  }
   return await runWithRepoBackend(cwd, async (backend) => {
     return await publishSnapshotInvalidationAfterMutation(
       cwd,
-      await backend.createWorktree(worktreePath, newBranch, baseBranch, signal),
+      await backend.createWorktree(normalized, signal),
       sourceToken,
     )
   })
+}
+
+export async function getRepositoryRemoteBranches(cwd: string, signal?: AbortSignal): Promise<string[]> {
+  if (!isValidRepoLocator(cwd)) return []
+  return await runWithRepoBackend(cwd, async (backend) => await backend.getRemoteBranches(signal))
 }
 
 export async function deleteRepositoryBranch(

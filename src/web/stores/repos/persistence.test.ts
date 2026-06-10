@@ -21,6 +21,7 @@ function cachedRepo(savedAt: number): RestorableRepoSnapshot {
       selectedBranch: null,
       branchViewMode: 'all',
       detailTab: 'status',
+      worktreePathOrder: [],
     },
   }
 }
@@ -84,6 +85,19 @@ describe('normalizeRestorableRepoCache', () => {
     expect(normalized.repo?.data.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
     expect(normalized.repo?.data.branches[0]?.pullRequest).toBeUndefined()
   })
+
+  test('normalizes missing and invalid worktree path order to an empty array', () => {
+    const now = Date.now()
+    const missing = cachedRepo(now) as any
+    delete missing.ui.worktreePathOrder
+    const invalid = cachedRepo(now) as any
+    invalid.ui.worktreePathOrder = [123, '/tmp/worktree-a']
+
+    const normalized = normalizeRestorableRepoCache({ missing, invalid })
+
+    expect(normalized.missing?.ui.worktreePathOrder).toEqual([])
+    expect(normalized.invalid).toBeUndefined()
+  })
 })
 
 describe('persistRestorableRepoSnapshot', () => {
@@ -135,6 +149,21 @@ describe('persistRestorableRepoSnapshot', () => {
     const cached = useReposStore.getState().restorableRepoCache['/repo']
     expect(cached?.data.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
     expect(cached?.data.branches[0]?.pullRequest).toBeUndefined()
+  })
+
+  test('persists worktree path order in repo cache', () => {
+    const repo = seedRepoState({
+      id: '/repo',
+      instanceToken: 1,
+      branches: [createRepoBranch('main', { worktree: { path: '/repo' } })],
+      currentBranch: 'main',
+      selectedBranch: 'main',
+      worktreePathOrder: ['/repo'],
+    })
+
+    persistRestorableRepoSnapshot(useReposStore.setState, repo, 1)
+
+    expect(useReposStore.getState().restorableRepoCache['/repo']?.ui.worktreePathOrder).toEqual(['/repo'])
   })
 })
 

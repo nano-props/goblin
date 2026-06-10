@@ -2,6 +2,8 @@ import { Hono } from 'hono'
 import {
   getServerRemotePathSuggestions,
   getServerSshHosts,
+  openServerRemoteEditor,
+  openServerRemoteTerminal,
   resolveServerRemoteTarget,
   testServerRemoteRepository,
 } from '#/server/modules/remote.ts'
@@ -27,6 +29,18 @@ export function createRemoteRoutes() {
     const body = await c.req.json().catch(() => null)
     const target = normalizeRemoteTarget(body?.target)
     return c.json(await testServerRemoteRepository(target ?? (body?.target as never), c.req.raw.signal))
+  })
+  app.post('/open-editor', async (c) => {
+    const body = await c.req.json().catch(() => null)
+    const repoId = typeof body?.repoId === 'string' ? body.repoId : ''
+    const worktreePath = typeof body?.worktreePath === 'string' ? body.worktreePath : ''
+    return c.json(await openServerRemoteEditor({ repoId, worktreePath }, c.req.raw.signal))
+  })
+  app.post('/open-terminal', async (c) => {
+    const body = await c.req.json().catch(() => null)
+    const repoId = typeof body?.repoId === 'string' ? body.repoId : ''
+    const worktreePath = typeof body?.worktreePath === 'string' ? body.worktreePath : ''
+    return c.json(await openServerRemoteTerminal({ repoId, worktreePath }, c.req.raw.signal))
   })
   return app
 }

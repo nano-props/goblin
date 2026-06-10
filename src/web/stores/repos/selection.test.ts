@@ -157,6 +157,43 @@ describe('setBranchViewMode', () => {
   })
 })
 
+describe('reorderWorktrees', () => {
+  test('moves worktree paths and persists repo cache', () => {
+    seedRepo({
+      selectedBranch: 'main',
+      branches: [
+        branch('main', { worktree: { path: '/repo' } }),
+        branch('feature/a', { worktree: { path: '/tmp/worktree-a' } }),
+        branch('feature/b', { worktree: { path: '/tmp/worktree-b' } }),
+        branch('feature/plain'),
+      ],
+    })
+
+    useReposStore.getState().reorderWorktrees(REPO_ID, '/tmp/worktree-b', '/repo')
+
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.worktreePathOrder).toEqual([
+      '/tmp/worktree-b',
+      '/repo',
+      '/tmp/worktree-a',
+    ])
+    expect(useReposStore.getState().restorableRepoCache[REPO_ID]?.ui.worktreePathOrder).toEqual([
+      '/tmp/worktree-b',
+      '/repo',
+      '/tmp/worktree-a',
+    ])
+  })
+
+  test('ignores stale worktree paths', () => {
+    seedRepo({ selectedBranch: 'main' })
+    const before = useReposStore.getState().repos[REPO_ID]
+
+    useReposStore.getState().reorderWorktrees(REPO_ID, '/missing', '/repo')
+
+    expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
+    expect(useReposStore.getState().restorableRepoCache[REPO_ID]).toBeUndefined()
+  })
+})
+
 describe('selectBranch', () => {
   test('refreshes pull request details locally', async () => {
     let resolve!: () => void
@@ -560,6 +597,7 @@ describe('setBranchSearchQuery', () => {
         selectedBranch: repo.ui.selectedBranch,
         branchViewMode: repo.ui.branchViewMode,
         detailTab: repo.ui.detailTab,
+        worktreePathOrder: repo.ui.worktreePathOrder,
       },
     }
     useReposStore.setState({ restorableRepoCache: { [REPO_ID]: cached } })

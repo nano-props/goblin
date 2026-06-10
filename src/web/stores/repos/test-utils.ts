@@ -195,6 +195,7 @@ export function installGoblinTestBridge(handlers: Record<string, RpcTestHandler>
         if (url.pathname === '/api/repo/probe') return call('repo.probe', body)
         if (url.pathname === '/api/repo/snapshot') return call('repo.snapshot', body)
         if (url.pathname === '/api/repo/status') return call('repo.status', body)
+        if (url.pathname === '/api/repo/remote-branches') return call('repo.remoteBranches', body)
         if (url.pathname === '/api/repo/pull-requests') return call('repo.pullRequests', body)
         if (url.pathname === '/api/repo/fetch') return call('repo.fetch', body)
         if (url.pathname === '/api/repo/clone') return call('repo.clone', body)
@@ -266,7 +267,9 @@ export function seedRepoState(options: {
   branchSnapshots?: BranchSnapshotInfo[]
   currentBranch?: string
   selectedBranch?: string | null
+  branchViewMode?: RepoState['ui']['branchViewMode']
   detailTab?: DetailTab
+  worktreePathOrder?: string[]
   instanceToken?: number
   status?: WorktreeStatus[]
   statusLoaded?: boolean
@@ -293,7 +296,9 @@ export function seedRepoState(options: {
     ui: {
       ...base.ui,
       selectedBranch: options.selectedBranch ?? base.ui.selectedBranch,
+      branchViewMode: options.branchViewMode ?? base.ui.branchViewMode,
       detailTab: options.detailTab ?? base.ui.detailTab,
+      worktreePathOrder: options.worktreePathOrder ?? base.ui.worktreePathOrder,
     },
     remote: {
       ...base.remote,

@@ -24,6 +24,7 @@ export interface BranchWorktreeSnapshot {
   path: string
   isPrimary?: boolean
   isLocked?: boolean
+  head?: string
   summary?: BranchWorktreeSnapshotSummary
 }
 
@@ -73,6 +74,7 @@ export type PullRequestFetchMode = 'summary' | 'full'
 export interface WorktreeInfo {
   path: string
   branch?: string
+  head?: string
   isBare: boolean
   isPrimary: boolean
   isDirty?: boolean
@@ -93,6 +95,7 @@ export interface StatusEntry {
 export interface WorktreeStatus {
   path: string
   branch?: string
+  head?: string
   isMain: boolean
   entries: StatusEntry[]
 }

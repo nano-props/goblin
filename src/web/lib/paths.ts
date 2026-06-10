@@ -58,3 +58,7 @@ export function formatRepoLocator(path: string, target?: RemoteRepoTarget): stri
 export function formatWorktreePath(path: string, target?: RemoteRepoTarget): string {
   return target ? remoteWorktreePathLabel(target, path) : tildify(path)
 }
+
+export function formatWorktreeListPath(path: string, target?: RemoteRepoTarget): string {
+  return target ? path : tildify(path)
+}

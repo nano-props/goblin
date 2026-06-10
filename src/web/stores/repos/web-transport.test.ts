@@ -60,6 +60,28 @@ describe('repo web transport helpers', () => {
     })
   })
 
+  test('create worktree posts object-shaped mode input in web host mode', async () => {
+    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => ({
+      ok: true,
+      json: async () => ({ ok: true, message: 'ok' }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { createRepositoryWorktree } = await import('#/web/repo-client.ts')
+
+    await expect(
+      createRepositoryWorktree('/tmp/repo', {
+        worktreePath: '/tmp/repo-feature',
+        mode: { kind: 'existingBranch', branch: 'feature/a' },
+      }),
+    ).resolves.toEqual({ ok: true, message: 'ok' })
+
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+      cwd: '/tmp/repo',
+      worktreePath: '/tmp/repo-feature',
+      mode: { kind: 'existingBranch', branch: 'feature/a' },
+    })
+  })
+
   test('open remote opens browser with server-provided URL in web host mode', async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,

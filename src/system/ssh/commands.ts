@@ -2,6 +2,7 @@ import path from 'node:path'
 import { execa, ExecaError } from 'execa'
 import { FIELD_SEP } from '#/system/git/parsers.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 
 const SSH_COMMAND_TIMEOUT_MS = 15_000
 const SSH_CONNECT_TIMEOUT_SEC = 10
@@ -29,7 +30,8 @@ export type RemoteCommandKind =
   | { type: 'gitPullCurrent'; path: string }
   | { type: 'gitFetchBranch'; path: string; remote: string; remoteBranch: string; branch: string }
   | { type: 'gitPush'; path: string; remote: string; branch: string; targetBranch: string; setUpstream: boolean }
-  | { type: 'gitWorktreeAdd'; path: string; worktreePath: string; newBranch: string; baseBranch: string }
+  | { type: 'gitRemoteBranches'; path: string }
+  | { type: 'gitWorktreeAdd'; path: string; input: CreateWorktreeInput }
   | { type: 'gitWorktreeRemove'; path: string; worktreePath: string }
   | { type: 'gitBranchDelete'; path: string; branch: string; force?: boolean }
   | { type: 'gitUpstream'; path: string; branch: string }
@@ -204,10 +206,10 @@ function scriptForCommand(command: RemoteCommandKind): string {
       ]
         .filter(Boolean)
         .join(' ')
+    case 'gitRemoteBranches':
+      return `git -C ${shellQuote(command.path)} for-each-ref ${shellQuote('--format=%(refname:short)')} refs/remotes/`
     case 'gitWorktreeAdd':
-      return `git -C ${shellQuote(command.path)} worktree add -b ${shellQuote(command.newBranch)} -- ${shellQuote(
-        command.worktreePath,
-      )} ${shellQuote(command.baseBranch)}`
+      return `git -C ${shellQuote(command.path)} worktree add ${remoteWorktreeAddArgs(command.input)}`
     case 'gitWorktreeRemove':
       return `git -C ${shellQuote(command.path)} worktree remove -- ${shellQuote(command.worktreePath)}`
     case 'gitBranchDelete':
@@ -232,4 +234,24 @@ function scriptForCommand(command: RemoteCommandKind): string {
 function shellQuote(value: string): string {
   if (value.includes('\0')) throw new Error(`Refusing to quote NUL-containing string for remote command: ${path.basename(value)}`)
   return `'${value.replace(/'/g, `'\\''`)}'`
+}
+
+function remoteWorktreeAddArgs(input: CreateWorktreeInput): string {
+  switch (input.mode.kind) {
+    case 'newBranch':
+      return ['-b', shellQuote(input.mode.newBranch), '--', shellQuote(input.worktreePath), shellQuote(input.mode.baseRef)].join(' ')
+    case 'existingBranch':
+      return ['--', shellQuote(input.worktreePath), shellQuote(input.mode.branch)].join(' ')
+    case 'trackRemoteBranch':
+      return [
+        '-b',
+        shellQuote(input.mode.localBranch),
+        '--track',
+        '--',
+        shellQuote(input.worktreePath),
+        shellQuote(input.mode.remoteRef),
+      ].join(' ')
+    case 'detached':
+      return ['--detach', '--', shellQuote(input.worktreePath), shellQuote(input.mode.ref)].join(' ')
+  }
 }

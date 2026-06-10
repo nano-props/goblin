@@ -192,7 +192,14 @@ describe('parseWorktrees', () => {
     const out = ['worktree /repo', 'HEAD abc123', 'branch refs/heads/main'].join('\n')
     const result = parseWorktrees(out)
     expect(result).toHaveLength(1)
-    expect(result[0]).toEqual({ path: '/repo', branch: 'main', isBare: false, isPrimary: true, isLocked: false })
+    expect(result[0]).toEqual({
+      path: '/repo',
+      branch: 'main',
+      head: 'abc123',
+      isBare: false,
+      isPrimary: true,
+      isLocked: false,
+    })
   })
 
   test('flags locked worktrees (with or without reason)', () => {
@@ -211,6 +218,7 @@ describe('parseWorktrees', () => {
     const [w] = parseWorktrees(out)
     expect(w?.path).toBe('/repo/wt-detached')
     expect(w?.branch).toBeUndefined()
+    expect(w?.head).toBe('abc123')
     expect(w?.isBare).toBe(false)
     expect(w?.isPrimary).toBe(true)
   })

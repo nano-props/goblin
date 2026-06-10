@@ -54,6 +54,8 @@ export interface RepoDataState {
 export interface RepoWorktreeState {
   path: string
   branch?: string
+  head?: string
+  isDetached?: boolean
   isMain: boolean
   isDirty?: boolean
   changeCount?: number
@@ -64,6 +66,7 @@ export interface RepoUiState {
   selectedBranch: string | null
   branchViewMode: BranchViewMode
   detailTab: DetailTab
+  worktreePathOrder: string[]
 }
 
 export interface RepoProjectionMeta {
@@ -97,7 +100,7 @@ export interface RestorableRepoSnapshot {
   savedAt: number
   name: string
   data: Pick<RepoDataState, 'branches' | 'currentBranch'>
-  ui: Pick<RepoUiState, 'selectedBranch' | 'branchViewMode' | 'detailTab'>
+  ui: Pick<RepoUiState, 'selectedBranch' | 'branchViewMode' | 'detailTab' | 'worktreePathOrder'>
 }
 
 export interface RepoState {
@@ -224,6 +227,7 @@ export interface RuntimeCoherentRepoProjectionActions {
    *  by an explicit refresh, so a stale badge doesn't follow the user
    *  around forever. */
   clearFetchFailed: (id: string, token: number) => void
+  reorderWorktrees: (id: string, fromPath: string, toPath: string) => void
 }
 
 export interface RepoMutationActions {

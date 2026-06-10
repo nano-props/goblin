@@ -195,8 +195,7 @@ describe('remote git helpers', () => {
 
     const result = await createRemoteWorktree(TARGET, {
       worktreePath: 'relative/path',
-      newBranch: 'feature/test',
-      baseBranch: 'main',
+      mode: { kind: 'newBranch', newBranch: 'feature/test', baseRef: 'main' },
       run: run as any,
     })
 

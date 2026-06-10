@@ -40,6 +40,7 @@ const RestorableRepoSnapshotSchema = v.object({
     selectedBranch: v.nullable(v.string()),
     branchViewMode: v.picklist(['all', 'worktrees', 'no-worktree']),
     detailTab: v.picklist(['status', 'changes', 'terminal']),
+    worktreePathOrder: v.optional(v.array(v.string()), []),
   }),
 })
 
@@ -78,6 +79,7 @@ function restoreProjectionFromSnapshot(repo: RepoState, snapshot: RestorableRepo
       selectedBranch,
       branchViewMode: snapshot.ui.branchViewMode,
       detailTab: normalizeCachedDetailTab(snapshot.ui.detailTab),
+      worktreePathOrder: snapshot.ui.worktreePathOrder,
     },
     projection: {
       source: 'cache',
@@ -127,6 +129,7 @@ function restorableRepoSnapshotFromRepo(repo: RepoState): RestorableRepoSnapshot
       selectedBranch: repo.ui.selectedBranch,
       branchViewMode: repo.ui.branchViewMode,
       detailTab: normalizeCachedDetailTab(repo.ui.detailTab),
+      worktreePathOrder: repo.ui.worktreePathOrder,
     },
   }
 }
@@ -156,6 +159,7 @@ function normalizeRestorableRepoSnapshotEntry(value: unknown): RestorableRepoSna
     ui: {
       ...snapshot.ui,
       detailTab: normalizeCachedDetailTab(snapshot.ui.detailTab),
+      worktreePathOrder: snapshot.ui.worktreePathOrder,
     },
   }
 }

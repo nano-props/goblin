@@ -40,6 +40,7 @@ export async function getWorkingStatus(cwd: string, options?: { signal?: AbortSi
         return {
           path: wt.path,
           branch: wt.branch,
+          head: wt.head,
           isMain: wt.isPrimary,
           entries,
         }

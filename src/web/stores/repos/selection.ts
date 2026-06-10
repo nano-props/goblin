@@ -1,5 +1,5 @@
 import { arrayMove } from '@dnd-kit/sortable'
-import { selectedBranchForViewMode } from '#/web/stores/repos/branch-view-mode.ts'
+import { normalizeWorktreePathOrder, selectedBranchForViewMode } from '#/web/stores/repos/branch-view-mode.ts'
 import { replaceRepo, replaceRepoState } from '#/web/stores/repos/helpers.ts'
 import { persistRestorableRepoSnapshot } from '#/web/stores/repos/persistence.ts'
 import {
@@ -54,7 +54,7 @@ type LocalWorkspaceSelectionActions = Pick<ReposStore, 'setBranchSearchQuery'>
 
 type RuntimeCoherentSelectionActions = Pick<
   ReposStore,
-  'setBranchViewMode' | 'setDetailTab' | 'dismissExitedTerminalDetail' | 'selectBranch'
+  'setBranchViewMode' | 'reorderWorktrees' | 'setDetailTab' | 'dismissExitedTerminalDetail' | 'selectBranch'
 >
 
 type RepoMutationSelectionActions = Pick<ReposStore, 'checkoutSelectedInRepo' | 'checkoutSelected'>
@@ -284,6 +284,32 @@ function createRuntimeCoherentSelectionActions(
           branch: selectedForPullRequest,
         })
       }
+    },
+
+    reorderWorktrees(id: string, fromPath: string, toPath: string) {
+      if (fromPath === toPath) return
+      let changed = false
+      let token: number | undefined
+      set((s) => {
+        const repo = s.repos[id]
+        if (!repo) return s
+        const currentPaths = repo.data.branches
+          .map((branch) => branch.worktree?.path)
+          .filter((path): path is string => !!path)
+        if (!currentPaths.includes(fromPath) || !currentPaths.includes(toPath)) return s
+        const order = normalizeWorktreePathOrder(repo.ui.worktreePathOrder, currentPaths)
+        const from = order.indexOf(fromPath)
+        const to = order.indexOf(toPath)
+        if (from === -1 || to === -1 || from === to) return s
+        const worktreePathOrder = arrayMove(order, from, to)
+        changed = true
+        token = repo.instanceToken
+        return replaceRepoState(s, repo, (r) => {
+          r.ui.worktreePathOrder = worktreePathOrder
+        })
+      })
+      const repo = get().repos[id]
+      if (changed && token !== undefined && repo) persistRestorableRepoSnapshot(set, repo, token)
     },
 
     setDetailTab(id: string, tab: DetailTab) {

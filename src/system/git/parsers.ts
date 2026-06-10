@@ -157,12 +157,15 @@ export function parseWorktrees(output: string): WorktreeInfo[] {
     const lines = block.split('\n').filter(Boolean)
     let path = ''
     let branch: string | undefined
+    let head: string | undefined
     let isBare = false
     let isLocked = false
 
     for (const line of lines) {
       if (line.startsWith('worktree ')) {
         path = line.slice('worktree '.length)
+      } else if (line.startsWith('HEAD ')) {
+        head = line.slice('HEAD '.length)
       } else if (line.startsWith('branch ')) {
         const ref = line.slice('branch '.length)
         branch = ref.replace(/^refs\/heads\//, '')
@@ -173,7 +176,7 @@ export function parseWorktrees(output: string): WorktreeInfo[] {
       }
     }
 
-    if (path) worktrees.push({ path, branch, isBare, isPrimary: worktrees.length === 0, isLocked })
+    if (path) worktrees.push({ path, branch, head, isBare, isPrimary: worktrees.length === 0, isLocked })
   }
 
   return worktrees

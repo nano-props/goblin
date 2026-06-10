@@ -112,6 +112,7 @@ function createRepo(input: {
       selectedBranch: null,
       branchViewMode: 'all',
       detailTab: 'status',
+      worktreePathOrder: [],
     },
     projection: { source: 'fresh', savedAt: null },
     remote: {
