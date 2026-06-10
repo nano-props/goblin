@@ -7,6 +7,7 @@ const config: Configuration = {
   directories: {
     output: 'release',
   },
+  npmRebuild: false,
   files: [
     'dist/server/**/*',
     // Keep these runtime-loaded TS sources in the asar. Main resolves `#/*`

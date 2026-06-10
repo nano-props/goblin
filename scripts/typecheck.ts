@@ -1,11 +1,16 @@
 #!/usr/bin/env bun
+import { existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import path from 'node:path'
 
 const repoRoot = path.resolve(import.meta.dirname, '..')
 const HEARTBEAT_MS = 3_000
 const PROJECTS = ['tsconfig.main.json', 'tsconfig.web.json', 'tsconfig.test.json'] as const
-const tscBin = path.join(repoRoot, 'node_modules', '.bin', process.platform === 'win32' ? 'tsc.cmd' : 'tsc')
+const tscBinCandidates =
+  process.platform === 'win32'
+    ? ['tsc.cmd', 'tsc.exe', 'tsc'].map((name) => path.join(repoRoot, 'node_modules', '.bin', name))
+    : [path.join(repoRoot, 'node_modules', '.bin', 'tsc')]
+const tscBin = tscBinCandidates.find((candidate) => existsSync(candidate)) ?? tscBinCandidates[0]
 const bunBin = process.execPath
 
 function runArchitectureCheck(): Promise<void> {

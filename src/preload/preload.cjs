@@ -23,6 +23,9 @@ const IPC = {
     sendTestNotification: 'goblin:terminal-send-test-notification',
     setBadge: 'goblin:terminal-set-badge',
   },
+  bootstrap: {
+    get: 'goblin:get-bootstrap',
+  },
 }
 
 // `ipcRenderer.invoke` rejects when the main handler throws. We log the
@@ -57,23 +60,24 @@ function rpcCall(request) {
     })
 }
 
-// `--goblin-bootstrap=...` is injected by main via
-// webPreferences.additionalArguments (see window-shell.ts).
-// `process.argv` is one of the few things sandbox-safe preloads can still
-// read, which is why we use it here instead of sync IPC.
-function safeParseBase64JsonArgument(prefix, label) {
-  const raw = process.argv.find((a) => a.startsWith(prefix))?.slice(prefix.length) ?? ''
-  if (!raw) return null
+// A short `--goblin-bootstrap-token=...` is injected by main via
+// webPreferences.additionalArguments (see window-shell.ts). Keep the actual
+// bootstrap payload off the renderer command line: Windows has a much lower
+// process command-line limit than macOS, and a full base64 payload can make
+// Chromium fail to launch the renderer process before page scripts run.
+function safeReadBootstrapArgument() {
+  const token = process.argv.find((a) => a.startsWith(BOOTSTRAP_TOKEN_PREFIX))?.slice(BOOTSTRAP_TOKEN_PREFIX.length) ?? ''
+  if (!token) return null
   try {
-    return JSON.parse(Buffer.from(raw, 'base64').toString('utf8'))
+    return ipcRenderer.sendSync(IPC.bootstrap.get, token)
   } catch (err) {
-    console.warn(`[preload] failed to parse ${label}`, err)
+    console.warn('[preload] failed to read bootstrap payload', err)
     return null
   }
 }
 
-const BOOTSTRAP_PREFIX = '--goblin-bootstrap='
-const bootstrap = safeParseBase64JsonArgument(BOOTSTRAP_PREFIX, 'bootstrap payload')
+const BOOTSTRAP_TOKEN_PREFIX = '--goblin-bootstrap-token='
+const bootstrap = safeReadBootstrapArgument()
 const runtime =
   isObject(bootstrap?.runtime) &&
   (bootstrap.runtime.kind === 'electron' || bootstrap.runtime.kind === 'web') &&

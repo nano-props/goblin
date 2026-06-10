@@ -59,7 +59,7 @@ function defaultRpcResult(path: string, input?: unknown) {
         pref: 'auto',
         resolved: null,
         available: false,
-        appAvailability: { ghostty: false, terminal: false },
+        appAvailability: { ghostty: false, terminal: false, windowsTerminal: false },
         detectedAt: 0,
       },
       editor: {

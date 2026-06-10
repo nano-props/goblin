@@ -16,7 +16,13 @@ const appDataClientMocks = vi.hoisted(() => ({
   addRecentRepo: vi.fn<() => Promise<AddRecentRepoResult>>(async () => ({ recentRepos: [], addedRepo: null })),
   clearRecentRepos: vi.fn(async () => {}),
   refreshExternalAppsSnapshot: vi.fn(async () => ({
-    terminal: { pref: 'auto', resolved: null, available: false, appAvailability: { ghostty: false, terminal: false }, detectedAt: 0 },
+    terminal: {
+      pref: 'auto',
+      resolved: null,
+      available: false,
+      appAvailability: { ghostty: false, terminal: false, windowsTerminal: false },
+      detectedAt: 0,
+    },
     editor: { pref: 'auto', resolved: null, available: false, appAvailability: { vscode: false, cursor: false, windsurf: false }, detectedAt: 0 },
   })),
   refreshGitHubCliState: vi.fn<() => Promise<GitHubCliState>>(async () => ({
@@ -40,7 +46,7 @@ const appDataClientMocks = vi.hoisted(() => ({
     pref,
     resolved: null,
     available: false,
-    appAvailability: { ghostty: false, terminal: false },
+    appAvailability: { ghostty: false, terminal: false, windowsTerminal: false },
     detectedAt: 0,
   })),
   setSettingsFetchInterval: vi.fn(async (sec) => sec),
@@ -77,7 +83,13 @@ describe('settings write paths', () => {
     appDataClientMocks.clearRecentRepos.mockResolvedValue(undefined)
     appDataClientMocks.refreshExternalAppsSnapshot.mockReset()
     appDataClientMocks.refreshExternalAppsSnapshot.mockResolvedValue({
-      terminal: { pref: 'auto', resolved: null, available: false, appAvailability: { ghostty: false, terminal: false }, detectedAt: 0 },
+      terminal: {
+        pref: 'auto',
+        resolved: null,
+        available: false,
+        appAvailability: { ghostty: false, terminal: false, windowsTerminal: false },
+        detectedAt: 0,
+      },
       editor: { pref: 'auto', resolved: null, available: false, appAvailability: { vscode: false, cursor: false, windsurf: false }, detectedAt: 0 },
     })
     appDataClientMocks.refreshGitHubCliState.mockReset()
@@ -103,7 +115,7 @@ describe('settings write paths', () => {
       pref,
       resolved: null,
       available: false,
-      appAvailability: { ghostty: false, terminal: false },
+      appAvailability: { ghostty: false, terminal: false, windowsTerminal: false },
       detectedAt: 0,
     }))
     appDataClientMocks.setSettingsFetchInterval.mockReset()
@@ -167,7 +179,13 @@ describe('settings write paths', () => {
   test('setTerminalAppPreference updates both external apps and runtime settings caches', async () => {
     mainWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     mainWindowQueryClient.setQueryData(externalAppsQueryKey(), {
-      terminal: { pref: 'auto', resolved: null, available: false, appAvailability: { ghostty: false, terminal: false }, detectedAt: 0 },
+      terminal: {
+        pref: 'auto',
+        resolved: null,
+        available: false,
+        appAvailability: { ghostty: false, terminal: false, windowsTerminal: false },
+        detectedAt: 0,
+      },
       editor: { pref: 'auto', resolved: null, available: false, appAvailability: { vscode: false, cursor: false, windsurf: false }, detectedAt: 0 },
     })
     const { setTerminalAppPreference } = await import('#/web/settings-write-paths.ts')

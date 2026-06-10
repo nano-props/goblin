@@ -10,10 +10,21 @@ import { TerminalSessionContext, TerminalSessionReadContext } from '#/web/compon
 import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 import { MainWindowNavigationProvider, type MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import { emptyRendererBridgeBootstrap, setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
 import type { RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
+
+const toastMocks = vi.hoisted(() => ({
+  error: vi.fn(),
+}))
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: toastMocks.error,
+  },
+}))
 
 const REPO_ID = '/tmp/gbl-branch-detail-toolbar-repo'
 const WORKTREE_PATH = '/tmp/gbl-branch-detail-toolbar-worktree'
@@ -37,6 +48,7 @@ afterEach(() => {
   root = null
   container = null
   queryClient = null
+  toastMocks.error.mockClear()
   setRendererBridgeForTests(null)
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
@@ -81,6 +93,60 @@ describe('BranchDetailToolbar', () => {
     expect(tab.textContent).not.toContain('2')
   })
 
+  test('clicking new terminal from the terminal toolbar creates a terminal and expands detail', async () => {
+    const createTerminal = vi.fn(async () => 'key')
+    const setDetailCollapsed = vi.spyOn(useReposStore.getState(), 'setDetailCollapsed')
+    renderToolbar({
+      terminalCount: 0,
+      navigation: navigationWith({}),
+      detailTab: 'terminal',
+      collapsed: true,
+      commandContext: { createTerminal },
+    })
+
+    const button = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
+      (node) => node.getAttribute('aria-label') === 'terminal.new',
+    )
+    expect(button).toBeDefined()
+
+    await act(async () => {
+      button?.click()
+      await flush()
+    })
+
+    expect(setDetailCollapsed).toHaveBeenCalledWith(false)
+    expect(createTerminal).toHaveBeenCalledWith({
+      repoRoot: REPO_ID,
+      branch: 'feature/worktree',
+      worktreePath: WORKTREE_PATH,
+    })
+  })
+
+  test('shows an error toast when new terminal creation fails', async () => {
+    const createTerminal = vi.fn(async () => {
+      throw new Error('error.terminal-create-failed')
+    })
+    renderToolbar({
+      terminalCount: 0,
+      navigation: navigationWith({}),
+      detailTab: 'terminal',
+      commandContext: { createTerminal },
+    })
+
+    const button = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
+      (node) => node.getAttribute('aria-label') === 'terminal.new',
+    )
+
+    await act(async () => {
+      button?.click()
+      await flush()
+    })
+
+    expect(toastMocks.error).toHaveBeenCalledWith('action.result-error', {
+      description: 'error.terminal-create-failed',
+    })
+  })
+
   test('does not show branch actions in the detail bar (actions moved to branch rows)', () => {
     renderToolbar({
       terminalCount: 0,
@@ -96,15 +162,17 @@ function renderToolbar(options: {
   terminalCount: number
   changeCount?: number
   navigation: MainWindowNavigationActions
+  detailTab?: 'status' | 'changes' | 'terminal'
   detailFocusMode?: boolean
   collapsed?: boolean
   layout?: RepoWorkspaceLayout
+  commandContext?: Partial<TerminalSessionContextValue>
 }): HTMLButtonElement {
   const repo = seedRepoState({
     id: REPO_ID,
     branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
     selectedBranch: 'feature/worktree',
-    detailTab: 'status',
+    detailTab: options.detailTab ?? 'status',
     status:
       options.changeCount && options.changeCount > 0
         ? [
@@ -155,6 +223,7 @@ function renderToolbar(options: {
     writeInput: vi.fn(),
     takeover: vi.fn(),
     serialize: vi.fn(() => ''),
+    ...options.commandContext,
   }
 
   container = document.createElement('div')

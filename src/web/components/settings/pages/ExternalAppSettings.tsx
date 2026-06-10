@@ -1,5 +1,5 @@
 import { type ComponentType } from 'react'
-import { RotateCw } from 'lucide-react'
+import { RotateCw, SquareTerminal } from 'lucide-react'
 import { Badge } from '#/web/components/ui/badge.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import {
@@ -44,6 +44,12 @@ const TERMINAL_APPS: ExternalToolItem[] = [
     Icon: AppleTerminalIcon,
     titleKey: 'settings.apps.tool.terminal.title',
     commandKey: 'settings.apps.tool.terminal.command',
+  },
+  {
+    id: 'windowsTerminal',
+    Icon: SquareTerminal,
+    titleKey: 'settings.apps.tool.windows-terminal.title',
+    commandKey: 'settings.apps.tool.windows-terminal.command',
   },
 ]
 
@@ -120,6 +126,7 @@ export function ExternalAppSettings() {
     { value: 'auto', labelKey: 'settings.terminal.auto' },
     { value: 'ghostty', labelKey: 'settings.terminal.ghostty' },
     { value: 'terminal', labelKey: 'settings.terminal.terminal' },
+    { value: 'windowsTerminal', labelKey: 'settings.terminal.windows-terminal' },
   ]
   const editorOptions: { value: EditorPref; labelKey: string }[] = [
     { value: 'auto', labelKey: 'settings.editor.auto' },
@@ -180,7 +187,7 @@ export function ExternalAppSettings() {
         <DetectionList
           items={TERMINAL_APPS.map((item) => ({
             ...item,
-            available: item.id === 'ghostty' ? terminalAppAvailability.ghostty : terminalAppAvailability.terminal,
+            available: terminalAppAvailability[item.id as keyof typeof terminalAppAvailability] ?? false,
           }))}
         />
       </SettingsGroup>

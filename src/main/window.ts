@@ -106,6 +106,12 @@ async function createMainWindow(): Promise<BrowserWindow> {
     autoHideMenuBar: process.platform !== 'darwin',
     webPreferences: await createRendererWindowWebPreferences(),
   })
+  win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    console.error(`[renderer] failed to load ${validatedURL}: ${errorCode} ${errorDescription}`)
+  })
+  win.webContents.on('render-process-gone', (_event, details) => {
+    console.error('[renderer] process gone', details)
+  })
   attachRendererSurfaceWindow(win, { logLabel: 'window', surface: MAIN_WINDOW_SURFACE })
   const { url } = createRendererEntryUrl({ routePath: '/' })
   allowRendererWindowEntryUrl(win, url.toString())

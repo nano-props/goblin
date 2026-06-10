@@ -220,7 +220,7 @@ export function notifyServerTerminalBell(_clientId: string, input: TerminalNotif
 export async function listServerTerminalSessions(clientId: string, repoRoot: string): Promise<TerminalSessionSummary[]> {
   if (!isValidTerminalClientId(clientId)) return []
   if (!isValidRepoLocator(repoRoot)) return []
-  return await manager.listSessions(repoRoot)
+  return await catalog.listSessions(repoRoot)
 }
 
 export async function getServerTerminalSessionSnapshot(

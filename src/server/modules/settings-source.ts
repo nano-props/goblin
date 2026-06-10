@@ -75,7 +75,9 @@ function normalizeColorTheme(value: unknown): ColorTheme {
 }
 
 function normalizeTerminalPref(value: unknown): TerminalPref {
-  return value === 'auto' || value === 'ghostty' || value === 'terminal' ? value : DEFAULT_TERMINAL_APP
+  return value === 'auto' || value === 'ghostty' || value === 'terminal' || value === 'windowsTerminal'
+    ? value
+    : DEFAULT_TERMINAL_APP
 }
 
 function normalizeEditorPref(value: unknown): EditorPref {

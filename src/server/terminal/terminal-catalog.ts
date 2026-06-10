@@ -95,7 +95,8 @@ class TerminalCatalog {
     if (!this.options.isValidTerminalId(terminalId)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidTerminalSize(cols, rows)) return { ok: false, message: 'error.invalid-arguments' }
 
-    const existingSessions = await this.options.manager.listSessions(input.repoRoot)
+    const sessionScope = terminalSessionScope(input.repoRoot)
+    const existingSessions = await this.options.manager.listSessions(sessionScope)
     const targetSessionKey = sessionKey(input.repoRoot, input.worktreePath, terminalId)
     const existingSession = existingSessions.find((session) => session.key === targetSessionKey)
     const action: TerminalCatalogAction = existingSession ? (existingSession.controller ? 'restored' : 'reused') : 'created'
@@ -120,15 +121,21 @@ class TerminalCatalog {
       ok: true,
       action: createResult.action,
       key: createResult.key,
-      sessions: await this.options.manager.listSessions(input.repoRoot),
+      sessions: await this.listSessions(input.repoRoot),
     }
+  }
+
+  async listSessions(repoRoot: string): Promise<TerminalSessionSummary[]> {
+    if (!isValidRepoLocator(repoRoot)) return []
+    return await this.options.manager.listSessions(terminalSessionScope(repoRoot))
   }
 
   async prune(clientId: string, repoRoot: string): Promise<{ pruned: number; remaining: number }> {
     if (!this.options.isValidClientId(clientId)) return { pruned: 0, remaining: 0 }
     if (!isValidRepoLocator(repoRoot)) return { pruned: 0, remaining: 0 }
 
-    const allSessions = await this.options.manager.listSessions(repoRoot)
+    const sessionScope = terminalSessionScope(repoRoot)
+    const allSessions = await this.options.manager.listSessions(sessionScope)
     if (isRemoteRepoId(repoRoot)) return { pruned: 0, remaining: allSessions.length }
 
     const worktrees = await getWorktrees(repoRoot, { includeStatus: false })
@@ -143,12 +150,12 @@ class TerminalCatalog {
       pruned += 1
     }
     if (pruned > 0) this.options.broadcastSessionsChanged(repoRoot)
-    const remaining = await this.options.manager.listSessions(repoRoot).then((sessions) => sessions.length)
+    const remaining = await this.options.manager.listSessions(sessionScope).then((sessions) => sessions.length)
     return { pruned, remaining }
   }
 
   async nextTerminalId(repoRoot: string, worktreePath: string): Promise<string> {
-    const sessions = await this.options.manager.listSessions(repoRoot)
+    const sessions = await this.options.manager.listSessions(terminalSessionScope(repoRoot))
     let maxIndex = 0
     for (const session of sessions) {
       const parsed = parseSessionKey(session.key)
@@ -266,6 +273,10 @@ function parseSessionKey(key: string): { repoRoot: string; worktreePath: string;
   const parts = key.split('\0')
   if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return null
   return { repoRoot: parts[0], worktreePath: parts[1], terminalId: parts[2] }
+}
+
+function terminalSessionScope(repoRoot: string): string {
+  return isRemoteRepoId(repoRoot) ? repoRoot : path.resolve(repoRoot)
 }
 
 export function createTerminalCatalog(options: TerminalCatalogOptions): TerminalCatalog {

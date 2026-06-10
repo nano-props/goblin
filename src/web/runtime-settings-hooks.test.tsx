@@ -131,7 +131,7 @@ describe('runtime settings hooks', () => {
         pref: 'ghostty',
         resolved: 'ghostty',
         available: true,
-        appAvailability: { ghostty: true, terminal: false },
+        appAvailability: { ghostty: true, terminal: false, windowsTerminal: false },
         detectedAt: 1,
       },
       editor: {

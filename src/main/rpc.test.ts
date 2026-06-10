@@ -168,11 +168,11 @@ vi.mock('#/main/menu-state.ts', () => ({
 
 vi.mock('#/system/terminals.ts', () => ({
   getResolvedTerminalApp: vi.fn(() => Promise.resolve(null)),
-  getTerminalActionAvailability: vi.fn(() => ({ ghostty: false, terminal: true })),
-  getTerminalAppAvailability: vi.fn(() => Promise.resolve({ ghostty: false, terminal: true })),
+  getTerminalActionAvailability: vi.fn(() => ({ ghostty: false, terminal: true, windowsTerminal: false })),
+  getTerminalAppAvailability: vi.fn(() => Promise.resolve({ ghostty: false, terminal: true, windowsTerminal: false })),
   openInPreferredTerminal: vi.fn(),
   resolveTerminalApp: vi.fn((_pref, availability) =>
-    availability.ghostty ? 'ghostty' : availability.terminal ? 'terminal' : null,
+    availability.ghostty ? 'ghostty' : availability.terminal ? 'terminal' : availability.windowsTerminal ? 'windowsTerminal' : null,
   ),
 }))
 

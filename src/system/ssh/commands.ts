@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { execa, ExecaError } from 'execa'
 import { FIELD_SEP } from '#/system/git/parsers.ts'
@@ -46,7 +47,7 @@ export interface RemoteCommandResult {
 }
 
 export interface RemoteCommandInvocation {
-  command: 'ssh'
+  command: string
   args: string[]
   script: string
 }
@@ -73,7 +74,7 @@ export function buildRemoteCommandInvocation(
   ]
   const destination = target.alias
   args.push('--', destination, `sh -lc ${shellQuote(script)}`)
-  return { command: 'ssh', args, script }
+  return { command: findExecutableOnPath('ssh') ?? 'ssh', args, script }
 }
 
 export function buildRemoteTerminalInvocation(
@@ -85,7 +86,7 @@ export function buildRemoteTerminalInvocation(
   const args = ['-tt', '-o', 'StrictHostKeyChecking=yes', '-o', `ConnectTimeout=${SSH_CONNECT_TIMEOUT_SEC}`]
   const destination = target.alias
   args.push('--', destination, `sh -lc ${shellQuote(script)}`)
-  return { command: 'ssh', args, script }
+  return { command: findExecutableOnPath('ssh') ?? 'ssh', args, script }
 }
 
 export async function runRemoteCommand(
@@ -232,4 +233,25 @@ function scriptForCommand(command: RemoteCommandKind): string {
 function shellQuote(value: string): string {
   if (value.includes('\0')) throw new Error(`Refusing to quote NUL-containing string for remote command: ${path.basename(value)}`)
   return `'${value.replace(/'/g, `'\\''`)}'`
+}
+
+function findExecutableOnPath(name: string): string | null {
+  const pathEnv = process.env.PATH || process.env.Path || process.env.path || ''
+  for (const dir of pathEnv.split(path.delimiter)) {
+    if (!dir) continue
+    for (const candidateName of executableNames(name)) {
+      const candidate = path.join(dir, candidateName)
+      if (existsSync(candidate)) return candidate
+    }
+  }
+  return null
+}
+
+function executableNames(name: string): string[] {
+  if (process.platform !== 'win32' || path.extname(name)) return [name]
+  const extensions = (process.env.PATHEXT || '.COM;.EXE;.BAT;.CMD')
+    .split(';')
+    .map((ext) => ext.trim().toLowerCase())
+    .filter(Boolean)
+  return [name, ...extensions.map((ext) => `${name}${ext}`)]
 }

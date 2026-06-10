@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { openInPreferredTerminal } from '#/system/terminals.ts'
 import { openInAppleTerminal, isAppleTerminalInstalled } from '#/system/apple-terminal.ts'
 import { isGhosttyInstalled, openInGhostty } from '#/system/ghostty.ts'
+import { isWindowsTerminalInstalled, openInWindowsTerminal } from '#/system/windows-terminal.ts'
 
 vi.mock('#/system/ghostty.ts', () => ({
   isGhosttyInstalled: vi.fn(() => false),
@@ -11,6 +12,11 @@ vi.mock('#/system/ghostty.ts', () => ({
 vi.mock('#/system/apple-terminal.ts', () => ({
   isAppleTerminalInstalled: vi.fn(async () => true),
   openInAppleTerminal: vi.fn(async (path: string) => ({ ok: true, message: path })),
+}))
+
+vi.mock('#/system/windows-terminal.ts', () => ({
+  isWindowsTerminalInstalled: vi.fn(() => false),
+  openInWindowsTerminal: vi.fn(async (path: string) => ({ ok: true, message: path })),
 }))
 
 describe('openInPreferredTerminal', () => {
@@ -99,5 +105,31 @@ describe('openInPreferredTerminal', () => {
     })
 
     expect(openInAppleTerminal).not.toHaveBeenCalled()
+  })
+
+  test('opens Windows Terminal explicitly on win32 when detection reports available', async () => {
+    setPlatform('win32')
+    vi.mocked(isWindowsTerminalInstalled).mockReturnValue(true)
+
+    await expect(openInPreferredTerminal('C:\\repo', 'windowsTerminal')).resolves.toEqual({
+      ok: true,
+      message: 'C:\\repo',
+    })
+
+    expect(openInWindowsTerminal).toHaveBeenCalledWith('C:\\repo')
+    expect(openInAppleTerminal).not.toHaveBeenCalled()
+    expect(openInGhostty).not.toHaveBeenCalled()
+  })
+
+  test('falls back to Windows Terminal in auto mode on win32', async () => {
+    setPlatform('win32')
+    vi.mocked(isWindowsTerminalInstalled).mockReturnValue(true)
+
+    await expect(openInPreferredTerminal('C:\\repo', 'auto')).resolves.toEqual({
+      ok: true,
+      message: 'C:\\repo',
+    })
+
+    expect(openInWindowsTerminal).toHaveBeenCalledWith('C:\\repo')
   })
 })
