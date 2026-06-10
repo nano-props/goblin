@@ -29,7 +29,7 @@ const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
   processName: 'terminal',
   canonicalTitle: null,
 }
-const ACTIVE_RENDER_CACHE_REFRESH_INTERVAL_MS = 250
+const ACTIVE_RENDER_CACHE_REFRESH_INTERVAL_MS = 1000
 
 function parseServerSessionKey(key: string): { repoRoot: string; worktreePath: string; terminalId: string } | null {
   const parts = key.split('\0')
@@ -123,9 +123,7 @@ export class TerminalSessionRegistry {
     const directSession = directKey ? this.sessions.get(directKey) : null
     if (directSession) {
       directSession.handleOutput(event)
-      return
     }
-    for (const session of this.sessions.values()) session.handleOutput(event)
   }
 
   handleServerTitle(event: { sessionId: string; canonicalTitle: string | null }): void {
@@ -133,12 +131,6 @@ export class TerminalSessionRegistry {
     const directSession = directKey ? this.sessions.get(directKey) : null
     if (directSession) {
       directSession.handleServerTitle(event.canonicalTitle)
-      return
-    }
-    for (const session of this.sessions.values()) {
-      if (session.currentSessionId() !== event.sessionId) continue
-      session.handleServerTitle(event.canonicalTitle)
-      break
     }
   }
 
@@ -151,12 +143,6 @@ export class TerminalSessionRegistry {
     }
     if (directKey && directSession && !directSession.currentSessionId()) {
       this.discardLocalSessionAndDismissDetailIfLast(directKey, directSession.descriptor)
-      return
-    }
-    for (const [key, session] of Array.from(this.sessions.entries())) {
-      if (!session.handleExit(event)) continue
-      this.discardLocalSessionAndDismissDetailIfLast(key, session.descriptor)
-      break
     }
   }
 
@@ -171,9 +157,7 @@ export class TerminalSessionRegistry {
     const directSession = directKey ? this.sessions.get(directKey) : null
     if (directSession) {
       directSession.handleOwnership(event)
-      return
     }
-    for (const session of this.sessions.values()) session.handleOwnership(event)
   }
 
   reconcileServerSessions(
@@ -318,7 +302,7 @@ export class TerminalSessionRegistry {
     const cached = this.worktreeSnapshotCache.get(worktreeTerminalKey)
     if (cached) return cached
     const sessions = this.sessionSummaries(worktreeTerminalKey)
-    const snapshot = {
+    const snapshot: WorktreeTerminalSnapshot = {
       worktreeTerminalKey,
       selectedDescriptor: this.selectedDescriptor(worktreeTerminalKey),
       sessions,
@@ -419,9 +403,15 @@ export class TerminalSessionRegistry {
   snapshot = (key: string): TerminalSnapshot => {
     const cached = this.snapshotCache.get(key)
     if (cached) return cached
-    const next = this.sessions.get(key)?.snapshot() ?? EMPTY_TERMINAL_SNAPSHOT
+    const session = this.sessions.get(key)
+    if (!session) return EMPTY_TERMINAL_SNAPSHOT
+    const next = session.snapshot()
     this.snapshotCache.set(key, next)
     return next
+  }
+
+  isKnownSession = (key: string): boolean => {
+    return this.sessions.has(key)
   }
 
   subscribeSnapshot = (key: string, listener: () => void): (() => void) => {
@@ -516,16 +506,20 @@ export class TerminalSessionRegistry {
     this.sessionKeyBySessionId.set(sessionId, key)
   }
 
-  private notifySession(key: string): void {
+  private notifySession(key: string, reason: 'metadata' | 'outputSummary' = 'metadata'): void {
     const session = this.sessions.get(key)
     this.syncSessionIdIndex(key, session?.currentSessionId() ?? null)
     if (session) {
       this.snapshotCache.set(key, session.snapshot())
       this.captureActiveRenderCache(key, session)
-    } else this.snapshotCache.delete(key)
+    } else {
+      this.snapshotCache.delete(key)
+    }
     this.notifySnapshot(key)
-    const worktreeTerminalKey = session?.descriptor.worktreeTerminalKey
-    if (worktreeTerminalKey) this.notifyWorktree(worktreeTerminalKey)
+    if (reason !== 'outputSummary') {
+      const worktreeTerminalKey = session?.descriptor.worktreeTerminalKey
+      if (worktreeTerminalKey) this.notifyWorktree(worktreeTerminalKey)
+    }
   }
 
   private removeSession(key: string, options: { dispose: boolean; closeSession?: boolean }): boolean {
@@ -595,7 +589,7 @@ export class TerminalSessionRegistry {
     }
     const session = new ManagedTerminalSession(
       descriptor,
-      () => this.notifySession(descriptor.key),
+      (reason) => this.notifySession(descriptor.key, reason),
       this.bellController.handleBell,
     )
     this.sessions.set(descriptor.key, session)
@@ -670,40 +664,14 @@ export class TerminalSessionRegistry {
 
   private upsertServerSnapshotCache(key: string, next: TerminalServerSnapshotCacheEntry): void {
     const current = this.serverSnapshotCache.get(key)
-    if (!current) {
-      this.serverSnapshotCache.set(key, next)
-      return
-    }
-    if (current.sessionId !== next.sessionId) {
-      this.serverSnapshotCache.set(key, next)
-      return
-    }
-    if (next.snapshotSeq > current.snapshotSeq) {
-      this.serverSnapshotCache.set(key, next)
-      return
-    }
-    if (next.snapshotSeq < current.snapshotSeq) return
-    if (next.updatedAt >= current.updatedAt) {
+    if (!current || current.snapshotSeq <= next.snapshotSeq) {
       this.serverSnapshotCache.set(key, next)
     }
   }
 
   private upsertLocalRenderCache(key: string, next: TerminalLocalRenderCacheEntry): void {
     const current = this.localRenderCache.get(key)
-    if (!current) {
-      this.localRenderCache.set(key, next)
-      return
-    }
-    if (current.sessionId !== next.sessionId) {
-      this.localRenderCache.set(key, next)
-      return
-    }
-    if (next.snapshotSeq > current.snapshotSeq) {
-      this.localRenderCache.set(key, next)
-      return
-    }
-    if (next.snapshotSeq < current.snapshotSeq) return
-    if (next.updatedAt >= current.updatedAt) {
+    if (!current || current.snapshotSeq <= next.snapshotSeq) {
       this.localRenderCache.set(key, next)
     }
   }

@@ -32,56 +32,6 @@
   padding: 24px;
 }
 
-.goblin-terminal-slot__host--mirror {
-  cursor: not-allowed;
-}
-
-.goblin-terminal-slot--mirror .goblin-managed-terminal-host {
-  opacity: 0.92;
-}
-
-.goblin-terminal-slot--mirror .goblin-managed-terminal-host .xterm-cursor-layer {
-  opacity: 0.18;
-}
-
-.goblin-terminal-slot__mirror-overlay {
-  position: absolute;
-  inset: var(--goblin-terminal-surface-inset);
-  z-index: 1;
-  border-radius: var(--goblin-terminal-float-radius);
-  background: color-mix(in srgb, var(--color-background) 6%, transparent);
-  pointer-events: none;
-}
-
-.goblin-terminal-slot__mirror-banner {
-  position: absolute;
-  right: var(--goblin-terminal-overlay-offset);
-  bottom: var(--goblin-terminal-overlay-offset);
-  z-index: 2;
-  display: flex;
-  width: auto;
-  max-width: calc(100% - 24px);
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--goblin-terminal-float-radius);
-  background: color-mix(in srgb, var(--color-popover) 96%, transparent);
-  padding: var(--goblin-terminal-float-padding);
-  box-shadow: var(--shadow-sm);
-  color: var(--color-muted-foreground);
-  font-size: 12px;
-}
-
-.goblin-terminal-slot__mirror-banner span {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 200px;
-}
-
 .goblin-terminal-progress {
   position: absolute;
   top: 0;
@@ -404,6 +354,80 @@
   color: var(--color-muted-foreground);
   font-size: 12px;
   font-weight: 500;
+}
+
+.goblin-terminal-slot__host--hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.goblin-terminal-slot__viewer-overlay {
+  position: absolute;
+  inset: var(--goblin-terminal-surface-inset);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--goblin-terminal-float-radius);
+  background: var(--color-background);
+  padding: 24px;
+}
+
+.goblin-terminal-slot__viewer-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 480px;
+  text-align: center;
+}
+
+.goblin-terminal-slot__viewer-badge {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted-foreground);
+  border: 1px solid var(--color-border);
+  border-radius: var(--goblin-terminal-control-radius);
+  padding: 2px 8px;
+}
+
+.goblin-terminal-slot__viewer-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.goblin-terminal-slot__viewer-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-foreground);
+  word-break: break-word;
+}
+
+.goblin-terminal-slot__viewer-process {
+  font-size: 14px;
+  color: var(--color-muted-foreground);
+}
+
+.goblin-terminal-slot__viewer-output {
+  width: 100%;
+  min-width: 0;
+  max-height: 120px;
+  overflow: auto;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-muted-foreground);
+  background: var(--color-muted);
+  border-radius: var(--goblin-terminal-control-radius);
+  padding: 8px 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .goblin-terminal-parking {

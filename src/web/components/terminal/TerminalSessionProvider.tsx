@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
+import pLimit from 'p-limit'
 import type { TerminalSessionSnapshot, TerminalSessionSummary } from '#/shared/terminal.ts'
 import '#/web/components/terminal/terminal-session.css'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -43,17 +44,20 @@ export function TerminalSessionProvider({ currentRepoId, children }: TerminalSes
 
   const loadMissingSnapshots = useCallback(
     async (serverSessions: TerminalSessionSummary[]): Promise<Map<string, TerminalSessionSnapshot>> => {
+      const limit = pLimit(3)
       const snapshotEntries = await Promise.all(
-        serverSessions.map(async (session) => {
-          if (registry.hasCachedServerSnapshot(session.key, session.sessionId)) return null
-          try {
-            const snapshot = await terminalBridge.getSessionSnapshot({ sessionId: session.sessionId })
-            return snapshot ? ([session.sessionId, snapshot] as const) : null
-          } catch (err) {
-            console.debug('[TerminalSessionProvider] failed to load terminal session snapshot:', err)
-            return null
-          }
-        }),
+        serverSessions.map((session) =>
+          limit(async () => {
+            if (registry.hasCachedServerSnapshot(session.key, session.sessionId)) return null
+            try {
+              const snapshot = await terminalBridge.getSessionSnapshot({ sessionId: session.sessionId })
+              return snapshot ? ([session.sessionId, snapshot] as const) : null
+            } catch (err) {
+              console.debug('[TerminalSessionProvider] failed to load terminal session snapshot:', err)
+              return null
+            }
+          }),
+        ),
       )
       return new Map(snapshotEntries.filter((entry) => entry !== null))
     },

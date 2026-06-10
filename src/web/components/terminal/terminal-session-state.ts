@@ -1,4 +1,5 @@
 import type { TerminalOutputEvent } from '#/shared/terminal.ts'
+import { stripTerminalControlSequences } from '#/web/components/terminal/terminal-session-utils.ts'
 import {
   createTerminalAttachmentSnapshot,
 } from '#/web/components/terminal/types.ts'
@@ -51,6 +52,9 @@ export class TerminalSessionState {
     searchResult: null,
     progressState: null,
   }
+  /** Viewer-mode output summary: last N characters of stripped terminal output. */
+  private outputSummary = ''
+  private readonly MAX_OUTPUT_SUMMARY_CHARS = 500
 
   getPhase(): TerminalPhase {
     return this.runtimeState.phase
@@ -92,6 +96,8 @@ export class TerminalSessionState {
     }
     if (this.transientViewState.searchResult) snapshot.search = this.transientViewState.searchResult
     if (this.transientViewState.progressState) snapshot.progress = this.transientViewState.progressState
+    const summary = this.outputSummary.trim()
+    if (summary) snapshot.outputSummary = summary
     return snapshot
   }
 
@@ -186,12 +192,26 @@ export class TerminalSessionState {
       this.replayBufferState.replayBoundarySeq !== null || this.replayBufferState.replayPendingOutput.length > 0
     const hadSearch = this.transientViewState.searchResult !== null
     const hadProgress = this.transientViewState.progressState !== null
-    const changed = hadReplay || hadSearch || hadProgress
+    const hadSummary = this.outputSummary.length > 0
+    const changed = hadReplay || hadSearch || hadProgress || hadSummary
     this.replayBufferState.replayBoundarySeq = null
     this.replayBufferState.replayPendingOutput = []
     this.transientViewState.searchResult = null
     this.transientViewState.progressState = null
+    this.outputSummary = ''
     return changed
+  }
+
+  getOutputSummary(): string | null {
+    const trimmed = this.outputSummary.trim()
+    return trimmed.length > 0 ? trimmed : null
+  }
+
+  appendOutputSummary(data: string): boolean {
+    const stripped = stripTerminalControlSequences(data)
+    if (!stripped) return false
+    this.outputSummary = (this.outputSummary + stripped).slice(-this.MAX_OUTPUT_SUMMARY_CHARS)
+    return true
   }
 
   setSearchResult(result: TerminalSearchResult | null): boolean {

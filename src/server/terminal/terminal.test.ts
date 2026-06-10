@@ -362,6 +362,7 @@ describe('server terminal sessions', () => {
       sessionId,
       cols: 100,
       rows: 30,
+      attachmentId: 'attachment_b',
     })
 
     expect(attachedAgain.ok).toBe(true)

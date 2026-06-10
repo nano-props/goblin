@@ -132,11 +132,12 @@ export class TerminalSessionRuntime {
     return this.state.resetTransientState()
   }
 
-  handleOutput(event: TerminalOutputEvent): { changed: boolean; output: string | null } {
-    if (event.sessionId !== this.ptySessionId) return { changed: false, output: null }
+  handleOutput(event: TerminalOutputEvent): { changed: boolean; output: string | null; summaryChanged: boolean } {
+    if (event.sessionId !== this.ptySessionId) return { changed: false, output: null, summaryChanged: false }
     const changed = this.state.setProcessName(event.processName)
-    if (this.state.captureReplayOutput(event)) return { changed, output: null }
-    return { changed, output: event.data }
+    if (this.state.captureReplayOutput(event)) return { changed, output: null, summaryChanged: false }
+    const summaryChanged = this.state.appendOutputSummary(event.data)
+    return { changed, output: event.data, summaryChanged }
   }
 
   handleOwnership(event: TerminalOwnershipViewModel): boolean {
@@ -159,7 +160,9 @@ export class TerminalSessionRuntime {
   }
 
   finishReplay(): TerminalOutputEvent[] {
-    return this.state.finishReplay()
+    const events = this.state.finishReplay()
+    for (const event of events) this.state.appendOutputSummary(event.data)
+    return events
   }
 
   acknowledgeResize(cols: number, rows: number): void {

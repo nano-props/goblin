@@ -108,12 +108,9 @@ describe('TerminalSlot', () => {
 
     try {
       expect(container.textContent).toContain('terminal.mirror-controlled')
-      expect(container.querySelector('.goblin-terminal-slot--mirror')).toBeTruthy()
       const host = container.querySelector('.goblin-terminal-slot__host')
       expect(host?.getAttribute('aria-readonly')).toBe('true')
-      expect(container.querySelector('.goblin-terminal-slot__mirror-overlay')).toBeTruthy()
-      const banner = container.querySelector('.goblin-terminal-slot__mirror-banner')
-      expect(banner).toBeTruthy()
+      expect(container.querySelector('.goblin-terminal-slot__viewer-overlay')).toBeTruthy()
       const button = Array.from(container.querySelectorAll('button')).find(
         (node) => node.textContent === 'terminal.takeover',
       )

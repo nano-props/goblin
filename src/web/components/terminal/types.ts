@@ -57,6 +57,8 @@ export interface TerminalSnapshot {
   attachment?: TerminalAttachmentSnapshot | null
   search?: TerminalSearchResult | null
   progress?: TerminalProgressState | null
+  /** Viewer-mode output summary: stripped recent terminal output. */
+  outputSummary?: string | null
 }
 
 export interface TerminalSearchResult {

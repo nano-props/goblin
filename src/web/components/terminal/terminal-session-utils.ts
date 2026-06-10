@@ -31,6 +31,13 @@ export function isTerminalDescriptorLive(repos: ReposStore['repos'], descriptor:
   return !!repo?.data.branches.some((branch) => branch.worktree?.path === descriptor.worktreePath)
 }
 
+export function stripTerminalControlSequences(value: string): string {
+  return value
+    .replace(/\x1b(?:[@-Z\-_]|\[[0-?]*[ -/]*[@-~])/g, '')
+    .replace(/\x1b\][^\x07]*\x07/g, '')
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '')
+}
+
 export function compactTerminalTitle(title: string): string {
   const normalized = normalizeTitle(title)
   if (!normalized) return ''

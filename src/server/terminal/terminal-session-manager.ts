@@ -102,8 +102,6 @@ export class TerminalSessionManager<TOwner extends string | number> {
     if (existing) {
       if (input.attachmentId) {
         registerTerminalAttachment(existing, input.attachmentId, size.cols, size.rows, input.attachmentConnected)
-      } else {
-        this.resizeSessionPty(existing, size.cols, size.rows)
       }
       return this.attachResult(existing)
     }
@@ -173,8 +171,6 @@ export class TerminalSessionManager<TOwner extends string | number> {
     if (attachmentId) {
       registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
       this.applyOwnershipEffect(session, attachTerminalAttachment(session, attachmentId))
-    } else {
-      this.resizeSessionPty(session, size.cols, size.rows)
     }
     return this.attachResult(session)
   }
@@ -192,10 +188,9 @@ export class TerminalSessionManager<TOwner extends string | number> {
     if (!size) return false
     const session = this.ownedSession(ownerId, sessionId)
     if (!session) return false
-    if (attachmentId) {
-      registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
-      if (session.controller?.attachmentId !== attachmentId) return false
-    }
+    if (!attachmentId) return false
+    registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
+    if (session.controller?.attachmentId !== attachmentId) return false
     return this.resizeSessionPty(session, size.cols, size.rows)
   }
 

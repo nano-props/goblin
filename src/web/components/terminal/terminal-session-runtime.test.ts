@@ -59,13 +59,16 @@ describe('TerminalSessionRuntime', () => {
     expect(runtime.handleOutput({ sessionId: 'session-1', data: 'old', seq: 1, processName: 'zsh' })).toEqual({
       changed: false,
       output: null,
+      summaryChanged: false,
     })
     expect(runtime.handleOutput({ sessionId: 'session-1', data: 'new', seq: 3, processName: 'bash' })).toEqual({
       changed: true,
       output: null,
+      summaryChanged: false,
     })
     expect(runtime.processName()).toBe('bash')
     expect(runtime.finishReplay()).toEqual([{ sessionId: 'session-1', data: 'new', seq: 3, processName: 'bash' }])
+    expect(runtime.snapshot().outputSummary).toBe('new')
 
     expect(
       runtime.handleOwnership({
@@ -156,6 +159,7 @@ describe('TerminalSessionRuntime', () => {
     expect(runtime.handleOutput({ sessionId: 'session-remote', data: 'tick', seq: 1, processName: 'node' })).toEqual({
       changed: false,
       output: 'tick',
+      summaryChanged: true,
     })
   })
 

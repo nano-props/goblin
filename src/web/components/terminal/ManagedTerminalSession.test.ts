@@ -834,7 +834,7 @@ describe('ManagedTerminalSession', () => {
       controllerStatus: 'connected', canTakeover: true })
   })
 
-  test('preloads hydrated snapshot before attaching a mirrored placeholder', async () => {
+  test('preloads hydrated snapshot before attaching as controller', async () => {
     terminalCalls.attach.mockResolvedValueOnce(attachResult('session-1', { replay: '', replaySeq: 0 }))
     const host = document.createElement('div')
     document.body.appendChild(host)
@@ -844,7 +844,7 @@ describe('ManagedTerminalSession', () => {
     session.hydrate({
       sessionId: 'session-remote',
       processName: 'node',
-      role: 'viewer',
+      role: 'controller',
       controllerStatus: 'connected',
       canonicalCols: 120,
       canonicalRows: 40,
@@ -989,6 +989,19 @@ describe('ManagedTerminalSession', () => {
     await flushUntil(() => terminalCalls.takeover.mock.calls.length > 0)
 
     expect(terminalCalls.takeover).toHaveBeenCalledWith({ sessionId: 'session-1', cols: 101, rows: 31 })
+    // Before authoritative ownership message arrives, role is still viewer
+    expect(session.snapshot().attachment).toMatchObject({ role: 'viewer',
+      controllerStatus: 'connected', canTakeover: true })
+
+    // Simulate authoritative server ownership event
+    session.handleOwnership({
+      sessionId: 'session-1',
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalCols: 101,
+      canonicalRows: 31,
+    })
+
     expect(session.snapshot().attachment).toMatchObject({ role: 'controller',
       controllerStatus: 'connected', canTakeover: false })
   })
@@ -1018,6 +1031,18 @@ describe('ManagedTerminalSession', () => {
 
     session.takeover()
     await flushUntil(() => terminalCalls.takeover.mock.calls.length > 0)
+
+    // Bridge response alone does not change ownership; only authoritative onOwnership does
+    expect(session.snapshot().attachment).toMatchObject({ role: 'viewer',
+      controllerStatus: 'connected', canTakeover: true })
+
+    session.handleOwnership({
+      sessionId: 'session-1',
+      role: 'unowned',
+      controllerStatus: 'none',
+      canonicalCols: 120,
+      canonicalRows: 40,
+    })
 
     expect(session.snapshot().attachment).toMatchObject({
       role: 'unowned',
@@ -1104,12 +1129,15 @@ describe('ManagedTerminalSession', () => {
     session.handleOutput({ sessionId: 'session-1', data: 'first', seq: 1, processName: 'zsh' })
     session.handleOutput({ sessionId: 'session-1', data: 'second', seq: 2, processName: 'zsh' })
 
-    expect(notify).toHaveBeenCalledTimes(2)
+    expect(notify).toHaveBeenCalledTimes(0)
     expect(xtermMocks.terminals[0]!.write).not.toHaveBeenCalled()
     await flushTerminalStart()
 
     expect(xtermMocks.terminals[0]!.write).toHaveBeenCalledTimes(1)
     expect(xtermMocks.terminals[0]!.write).toHaveBeenCalledWith('firstsecond')
+
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    expect(notify).toHaveBeenCalledTimes(1)
   })
 
   test('flushes matching terminal exits before the provider dismisses the session', async () => {
