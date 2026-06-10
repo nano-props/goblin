@@ -119,7 +119,7 @@ export function RepoWorkspacePane({ children }: PaneProps) {
 
 export function ScrollPane({ children }: ShellProps) {
   return (
-    <ScrollArea className="min-h-0 flex-1" viewportClassName="[&>div]:!block [&>div]:!min-w-0 [&>div]:!w-full">
+    <ScrollArea className="min-h-0 flex-1">
       {children}
     </ScrollArea>
   )

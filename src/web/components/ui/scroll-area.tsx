@@ -35,7 +35,14 @@ export const ScrollArea = forwardRef<ComponentRef<typeof ScrollAreaPrimitive.Roo
         className={cn('relative overflow-hidden flex flex-col', className)}
         {...props}
       >
-        <ScrollAreaPrimitive.Viewport ref={viewportRef} className={cn('flex-1 min-h-0 w-full', viewportClassName)}>
+        <ScrollAreaPrimitive.Viewport
+          ref={viewportRef}
+          className={cn(
+            'flex-1 min-h-0 w-full',
+            orientation !== 'horizontal' && '[&>div]:!block [&>div]:!min-w-0 [&>div]:!w-full',
+            viewportClassName,
+          )}
+        >
           {children}
         </ScrollAreaPrimitive.Viewport>
         {(orientation === 'vertical' || orientation === 'both') && (
