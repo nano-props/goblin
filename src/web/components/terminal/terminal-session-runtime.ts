@@ -136,7 +136,7 @@ export class TerminalSessionRuntime {
     if (event.sessionId !== this.ptySessionId) return { changed: false, output: null, summaryChanged: false }
     const changed = this.state.setProcessName(event.processName)
     if (this.state.captureReplayOutput(event)) return { changed, output: null, summaryChanged: false }
-    const summaryChanged = this.state.appendOutputSummary(event.data)
+    const summaryChanged = this.state.getCanResize() ? false : this.state.appendOutputSummary(event.data)
     return { changed, output: event.data, summaryChanged }
   }
 

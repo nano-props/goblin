@@ -44,8 +44,6 @@ export class TerminalSessionView {
   private fitFlushTimer: number | null = null
   private fontFitTimer: number | null = null
   private pinToBottomFrame: number | null = null
-  private lastWidth = DEFAULT_PARKING_WIDTH
-  private lastHeight = DEFAULT_PARKING_HEIGHT
   private host: HTMLElement | null = null
 
   constructor(handlers: {
@@ -63,7 +61,6 @@ export class TerminalSessionView {
     this.frame.appendChild(this.xtermHost)
     this.parkingElement = document.createElement('div')
     this.parkingElement.className = 'goblin-terminal-parking__item'
-    this.updateParkingSize()
     this.handlers = handlers
   }
 
@@ -78,7 +75,6 @@ export class TerminalSessionView {
 
   attach(host: HTMLElement): void {
     this.host = host
-    this.rememberHostSize(host)
     host.replaceChildren(this.frame)
     if (this.term) {
       this.installResizeObserver()
@@ -94,8 +90,6 @@ export class TerminalSessionView {
     if (this.host !== host) return
     this.host = null
     this.blurIfFocused()
-    this.rememberHostSize(host)
-    this.updateParkingSize()
     this.disconnectResizeObserver()
     this.cancelFitFlush()
     if (!this.parkingElement.parentElement) parkingRoot.appendChild(this.parkingElement)
@@ -367,7 +361,6 @@ export class TerminalSessionView {
 
   private fitForFontLoad(term: XTermTerminal): void {
     if (this.term !== term || !this.fitAddon || !hasMeasurableBox(this.xtermHost)) return
-    remeasureTerminal(term)
     this.fitAddon.fit()
     term.refresh(0, Math.max(0, term.rows - 1))
     this.pinToBottomSoon()
@@ -396,16 +389,6 @@ export class TerminalSessionView {
     this.pinToBottomFrame = null
   }
 
-  private rememberHostSize(host: HTMLElement): void {
-    const rect = host.getBoundingClientRect()
-    if (rect.width > 0) this.lastWidth = rect.width
-    if (rect.height > 0) this.lastHeight = rect.height
-  }
-
-  private updateParkingSize(): void {
-    this.parkingElement.style.width = `${this.lastWidth}px`
-    this.parkingElement.style.height = `${this.lastHeight}px`
-  }
 }
 
 function terminalSearchOptions(incremental?: boolean): ISearchOptions {
@@ -424,17 +407,6 @@ function blurElementIfFocused(element: HTMLElement): void {
 function hasMeasurableBox(element: HTMLElement): boolean {
   const rect = element.getBoundingClientRect()
   return rect.width > 0 && rect.height > 0
-}
-
-function remeasureTerminal(term: XTermTerminal): void {
-  const internal = term as XTermTerminal & {
-    _core?: {
-      _charSizeService?: { measure?: () => void }
-      _renderService?: { clear?: () => void }
-    }
-  }
-  internal._core?._charSizeService?.measure?.()
-  internal._core?._renderService?.clear?.()
 }
 
 function scrollTerminalToBottom(term: XTermTerminal | null): void {

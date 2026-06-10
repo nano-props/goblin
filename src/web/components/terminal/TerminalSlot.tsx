@@ -48,6 +48,7 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
     clearSearch,
     writeInput,
     takeover,
+    restart,
   } = context
   const terminalWorktreeKey = worktreeTerminalKey(repoRoot, worktreePath)
   const descriptor = useWorktreeTerminalSelectedDescriptor(terminalWorktreeKey)
@@ -190,8 +191,8 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
   const progress = snapshot.progress
   const attachment = snapshot.attachment
   const isController = hasSessions && snapshot.phase === 'open' && attachment?.role === 'controller'
-  const isViewer = hasSessions && snapshot.phase === 'open' && attachment?.role === 'viewer'
-  const isUnowned = hasSessions && snapshot.phase === 'open' && attachment?.role === 'unowned'
+  const isReadonly = hasSessions && snapshot.phase === 'open' && (attachment?.role === 'viewer' || attachment?.role === 'unowned')
+  const readonlyBadge = attachment?.role === 'viewer' ? t('terminal.mirror-controlled') : t('terminal.unowned')
   const progressVariant =
     progress?.state === 2 ? 'error' : progress?.state === 4 ? 'warning' : progress?.state === 3 ? 'indeterminate' : ''
 
@@ -224,7 +225,7 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
       )}
       <div
         ref={hostRef}
-        className={cn('goblin-terminal-slot__host', (isViewer || isUnowned) && 'goblin-terminal-slot__host--hidden')}
+        className={cn('goblin-terminal-slot__host', isReadonly && 'goblin-terminal-slot__host--hidden')}
         aria-readonly={(!isController && hasSessions) || undefined}
       >
         {!hasSessions && (
@@ -270,9 +271,9 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
           />
         )}
       </div>
-      {(isViewer || isUnowned) && (
+      {isReadonly && (
         <ViewerOverlay
-          badge={t(isViewer ? 'terminal.mirror-controlled' : 'terminal.unowned')}
+          badge={readonlyBadge}
           takeoverLabel={t('terminal.takeover')}
           snapshot={snapshot}
           takeoverKey={key}
@@ -285,8 +286,13 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
         </div>
       )}
       {hasSessions && snapshot.phase === 'error' && snapshot.message !== 'terminal.empty' && (
-        <div className="goblin-terminal-slot__status-overlay">
+        <div className="goblin-terminal-slot__status-overlay goblin-terminal-slot__status-overlay--error">
           <span>{t(snapshot.message ?? 'error.unknown')}</span>
+          {key && (
+            <Button type="button" size="sm" variant="ghost" onClick={() => restart(key)}>
+              {t('terminal.restart')}
+            </Button>
+          )}
         </div>
       )}
       {dragOver && (

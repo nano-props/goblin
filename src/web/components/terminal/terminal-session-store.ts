@@ -63,11 +63,6 @@ export function useTerminalSessionSummaries(worktreeTerminalKey: string | null):
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
 
-/** @deprecated Use {@link useWorktreeTerminalCount} instead. */
-export function useTerminalCount(worktreeTerminalKey: string | null): number {
-  return useWorktreeTerminalCount(worktreeTerminalKey)
-}
-
 export function useTerminalRepoSyncReady(repoRoot: string | null): boolean {
   const { repoSyncReady, subscribeRepoSync } = useTerminalSessionReadContext()
   const subscribe = useCallback(

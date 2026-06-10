@@ -579,29 +579,21 @@ describe('ManagedTerminalSession', () => {
 
     const term = xtermMocks.terminals[0]!
     const fitAddon = xtermMocks.fitAddons[0]!
-    term._core._charSizeService.measure.mockClear()
-    term._core._renderService.clear.mockClear()
     term.refresh.mockClear()
     fitAddon.fit.mockClear()
 
     mockFonts.resolveReady()
     await flushFontRefit()
 
-    expect(term._core._charSizeService.measure).toHaveBeenCalledTimes(1)
-    expect(term._core._renderService.clear).toHaveBeenCalledTimes(1)
     expect(fitAddon.fit).toHaveBeenCalledTimes(1)
     expect(term.refresh).toHaveBeenCalledWith(0, term.rows - 1)
 
-    term._core._charSizeService.measure.mockClear()
-    term._core._renderService.clear.mockClear()
     term.refresh.mockClear()
     fitAddon.fit.mockClear()
 
     mockFonts.emitLoadingDone()
     await flushFontRefit()
 
-    expect(term._core._charSizeService.measure).toHaveBeenCalledTimes(1)
-    expect(term._core._renderService.clear).toHaveBeenCalledTimes(1)
     expect(fitAddon.fit).toHaveBeenCalledTimes(1)
     expect(term.refresh).toHaveBeenCalledWith(0, term.rows - 1)
   })
@@ -1129,15 +1121,13 @@ describe('ManagedTerminalSession', () => {
     session.handleOutput({ sessionId: 'session-1', data: 'first', seq: 1, processName: 'zsh' })
     session.handleOutput({ sessionId: 'session-1', data: 'second', seq: 2, processName: 'zsh' })
 
+    // Controller mode: outputSummary is not accumulated, so no notify
     expect(notify).toHaveBeenCalledTimes(0)
     expect(xtermMocks.terminals[0]!.write).not.toHaveBeenCalled()
     await flushTerminalStart()
 
     expect(xtermMocks.terminals[0]!.write).toHaveBeenCalledTimes(1)
     expect(xtermMocks.terminals[0]!.write).toHaveBeenCalledWith('firstsecond')
-
-    await new Promise((resolve) => setTimeout(resolve, 150))
-    expect(notify).toHaveBeenCalledTimes(1)
   })
 
   test('flushes matching terminal exits before the provider dismisses the session', async () => {

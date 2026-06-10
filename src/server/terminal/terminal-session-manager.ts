@@ -67,7 +67,8 @@ interface TerminalSession<TOwner extends string | number> {
   disposables: Array<{ dispose: () => void }>
   render: TerminalRenderState
   processName: string
-  attachments: Map<string, TerminalAttachmentState>
+  attachmentId: string | null
+  attachment: TerminalAttachmentState | null
   controller: TerminalController | null
   allowImplicitAttachControl: boolean
 }
@@ -121,7 +122,8 @@ export class TerminalSessionManager<TOwner extends string | number> {
       disposables: [],
       render: createEmptyTerminalRenderState(),
       processName: '',
-      attachments: new Map(),
+      attachmentId: null,
+      attachment: null,
       controller: null,
       allowImplicitAttachControl: true,
     }
@@ -129,7 +131,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     this.sessionIdByOwnerKey.set(ownerKey, id)
     if (input.attachmentId) {
       registerTerminalAttachment(session, input.attachmentId, size.cols, size.rows, input.attachmentConnected ?? true)
-      session.controller = session.attachments.get(input.attachmentId)?.connected
+      session.controller = session.attachment?.connected
         ? { attachmentId: input.attachmentId, status: 'connected' }
         : null
     }

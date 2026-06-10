@@ -40,7 +40,7 @@ export class ManagedTerminalSession {
   private startToken = 0
   private resizeFlushTimer: number | null = null
   private outputFlushFrame: number | null = null
-  private summaryNotifyTimer: number | null = null
+
   private pendingResize: { cols: number; rows: number } | null = null
   private pendingOutput: string[] = []
   private hydratedSnapshot: { snapshot: string; snapshotSeq: number } | null = null
@@ -454,7 +454,6 @@ export class ManagedTerminalSession {
 
   private destroyActiveView(options?: { preserveTransientState?: boolean }): void {
     this.cancelResizeFlush()
-    this.cancelSummaryNotify()
     if (this.outputFlushFrame !== null) {
       cancelScheduledAnimationFrame(this.outputFlushFrame)
       this.outputFlushFrame = null
@@ -467,17 +466,7 @@ export class ManagedTerminalSession {
   }
 
   private scheduleSummaryNotify(): void {
-    if (this.summaryNotifyTimer !== null) return
-    this.summaryNotifyTimer = window.setTimeout(() => {
-      this.summaryNotifyTimer = null
-      this.notify('outputSummary')
-    }, 100)
-  }
-
-  private cancelSummaryNotify(): void {
-    if (this.summaryNotifyTimer === null) return
-    window.clearTimeout(this.summaryNotifyTimer)
-    this.summaryNotifyTimer = null
+    this.notify('outputSummary')
   }
 
   private currentStart(token: number, term: XTermTerminal): boolean {

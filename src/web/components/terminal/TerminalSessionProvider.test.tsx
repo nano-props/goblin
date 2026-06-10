@@ -6,7 +6,8 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessionProvider.tsx'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
-import { useTerminalCount, useTerminalSessionSummaries } from '#/web/components/terminal/terminal-session-store.ts'
+import { useWorktreeTerminalCount, useTerminalSessionSummaries } from '#/web/components/terminal/terminal-session-store.ts'
+import { RepoSyncTracker } from '#/web/components/terminal/repo-sync-tracker.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-utils.ts'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
@@ -39,11 +40,9 @@ const mockSessions = vi.hoisted(
       emitBell: (event: TerminalBellEvent) => void
       setSerializeValue: (value: string) => void
       hydrate: ReturnType<typeof vi.fn>
-      serialize: ReturnType<typeof vi.fn>
       handleOutput: ReturnType<typeof vi.fn>
       handleServerTitle: ReturnType<typeof vi.fn>
       handleOwnership: ReturnType<typeof vi.fn>
-      handleExit: ReturnType<typeof vi.fn>
     }>,
 )
 
@@ -55,10 +54,8 @@ vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
     private readonly handleOutputSpy = vi.fn()
     private readonly handleServerTitleSpy = vi.fn()
     private readonly handleOwnershipSpy = vi.fn()
-    private readonly handleExitSpy = vi.fn((event: TerminalExitEvent) => event.sessionId === this.descriptor.terminalId)
     private readonly hydrateSpy = vi.fn()
     private readonly detachSpy = vi.fn()
-    private readonly serializeSpy = vi.fn(() => this.serializeValue)
     private serializeValue = ''
     private sessionId: string | null = null
     private snapshotValue: TerminalSnapshot
@@ -80,11 +77,9 @@ vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
           this.serializeValue = value
         },
         hydrate: this.hydrateSpy,
-        serialize: this.serializeSpy,
         handleOutput: this.handleOutputSpy,
         handleServerTitle: this.handleServerTitleSpy,
         handleOwnership: this.handleOwnershipSpy,
-        handleExit: this.handleExitSpy,
       })
     }
 
@@ -127,7 +122,7 @@ vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
     takeover() {}
 
     serialize(): string {
-      return this.serializeSpy()
+      return this.serializeValue
     }
 
     currentSessionId(): string | null {
@@ -193,8 +188,8 @@ vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
       this.handleOwnershipSpy(event)
     }
 
-    handleExit(event: TerminalExitEvent): boolean {
-      return this.handleExitSpy(event)
+    handleExit(_event: TerminalExitEvent): boolean {
+      return true
     }
   }
 
@@ -961,7 +956,11 @@ describe('TerminalSessionProvider', () => {
       },
       order: [REPO_ID, SECOND_REPO_ID],
     }))
-    const { unmount } = await renderProviderWithProbe(worktreeTerminalKey(REPO_ID, WORKTREE_PATH), REPO_ID)
+    const { unmount } = await renderProviderWithProbe(
+      worktreeTerminalKey(REPO_ID, WORKTREE_PATH),
+      REPO_ID,
+      new RepoSyncTracker(0),
+    )
 
     try {
       await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
@@ -1257,7 +1256,7 @@ describe('TerminalSessionProvider', () => {
     }
   })
 
-  test('reuses cached server snapshots for the same session without refetching them', async () => {
+  test('refetches server snapshots on every sync and hydrates with latest', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -1294,6 +1293,11 @@ describe('TerminalSessionProvider', () => {
       if (!session) throw new Error('missing terminal mock session')
 
       getSessionSnapshotMock.mockClear()
+      getSessionSnapshotMock.mockResolvedValueOnce({
+        sessionId: 'server_session_live',
+        snapshot: 'server-snapshot-2',
+        snapshotSeq: 8,
+      })
 
       listSessionsMock.mockResolvedValue([
         {
@@ -1316,10 +1320,10 @@ describe('TerminalSessionProvider', () => {
       expect(getProbe().summaries).toEqual([
         expect.objectContaining({ terminalId: 'terminal-1' }),
       ])
-      expect(getSessionSnapshotMock).not.toHaveBeenCalled()
+      expect(getSessionSnapshotMock).toHaveBeenCalledTimes(1)
       expect(session.hydrate).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          snapshot: 'server-snapshot',
+          snapshot: 'server-snapshot-2',
         }),
       )
     } finally {
@@ -1327,7 +1331,7 @@ describe('TerminalSessionProvider', () => {
     }
   })
 
-  test('does not refetch session snapshots repeatedly once they are cached locally', async () => {
+  test('refetches server snapshots on every sync without local caching', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -1352,6 +1356,7 @@ describe('TerminalSessionProvider', () => {
       snapshotSeq: 7,
     })
     const { unmount } = await renderProvider()
+    getSessionSnapshotMock.mockClear()
 
     try {
       await act(async () => {
@@ -1361,18 +1366,30 @@ describe('TerminalSessionProvider', () => {
 
       expect(getSessionSnapshotMock).toHaveBeenCalledTimes(1)
       getSessionSnapshotMock.mockClear()
+      getSessionSnapshotMock.mockResolvedValueOnce({
+        sessionId: 'server_session_live',
+        snapshot: 'server-snapshot-2',
+        snapshotSeq: 8,
+      })
 
       await act(async () => {
         sessionsChangedHandler?.(REPO_ID)
         await Promise.resolve()
       })
-      expect(getSessionSnapshotMock).not.toHaveBeenCalled()
+      expect(getSessionSnapshotMock).toHaveBeenCalledTimes(1)
+
+      getSessionSnapshotMock.mockClear()
+      getSessionSnapshotMock.mockResolvedValueOnce({
+        sessionId: 'server_session_live',
+        snapshot: 'server-snapshot-3',
+        snapshotSeq: 9,
+      })
 
       await act(async () => {
         sessionsChangedHandler?.(REPO_ID)
         await Promise.resolve()
       })
-      expect(getSessionSnapshotMock).not.toHaveBeenCalled()
+      expect(getSessionSnapshotMock).toHaveBeenCalledTimes(1)
     } finally {
       await unmount()
     }
@@ -1430,7 +1447,7 @@ function CaptureGroupProbe({
 }) {
   const summaries = useTerminalSessionSummaries(worktreeTerminalKey)
   onProbe({
-    count: useTerminalCount(worktreeTerminalKey),
+    count: useWorktreeTerminalCount(worktreeTerminalKey),
     terminalIds: summaries.map((session) => session.terminalId),
     summaries: summaries.map((session) => ({
       key: session.key,
@@ -1473,7 +1490,11 @@ async function renderProvider(currentRepoId: string | null = REPO_ID): Promise<{
   }
 }
 
-async function renderProviderWithProbe(worktreeTerminalKey: string, currentRepoId: string | null = REPO_ID): Promise<{
+async function renderProviderWithProbe(
+  worktreeTerminalKey: string,
+  currentRepoId: string | null = REPO_ID,
+  syncTracker?: RepoSyncTracker,
+): Promise<{
   getContext: () => TerminalSessionContextValue
   getProbe: () => {
     count: number
@@ -1494,7 +1515,7 @@ async function renderProviderWithProbe(worktreeTerminalKey: string, currentRepoI
 
   await act(async () => {
     root.render(
-      <TerminalSessionProvider currentRepoId={currentRepoId}>
+      <TerminalSessionProvider currentRepoId={currentRepoId} syncTracker={syncTracker}>
         <CaptureContext onContext={(value) => (context = value)} />
         <CaptureGroupProbe worktreeTerminalKey={worktreeTerminalKey} onProbe={(value) => (probe = value)} />
       </TerminalSessionProvider>,
