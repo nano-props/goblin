@@ -222,6 +222,55 @@ describe('server terminal sessions', () => {
     unregisterTerminalSocket('client_1', 'attachment_a', socket)
   })
 
+  test('clears stale canonical title when the shell process name includes a path', async () => {
+    const socket = { send: vi.fn(), close: vi.fn() }
+    registerTerminalSocket('client_1', 'attachment_a', socket)
+    const sessionId = await createTerminalSession('client_1')
+
+    const attached = await attachServerTerminal('client_1', {
+      sessionId,
+      cols: 80,
+      rows: 24,
+    })
+
+    expect(attached.ok).toBe(true)
+    mockPtys[0]?.setProcess('devin')
+    mockPtys[0]?.emitData('\u001b]0;Devin — reviewing repo\u0007')
+    await vi.waitFor(async () => {
+      await expect(listServerTerminalSessions('client_1', '/repo')).resolves.toEqual([
+        expect.objectContaining({
+          sessionId,
+          processName: 'devin',
+          canonicalTitle: 'Devin — reviewing repo',
+        }),
+      ])
+    })
+
+    mockPtys[0]?.setProcess('/bin/bash')
+    mockPtys[0]?.emitData('$ ')
+    await vi.waitFor(async () => {
+      const titleMessages = socket.send.mock.calls
+        .map(([payload]) => JSON.parse(String(payload)))
+        .filter((message) => message.type === 'title')
+      expect(titleMessages.at(-1)).toMatchObject({
+        type: 'title',
+        event: {
+          sessionId,
+          canonicalTitle: null,
+        },
+      })
+      await expect(listServerTerminalSessions('client_1', '/repo')).resolves.toEqual([
+        expect.objectContaining({
+          sessionId,
+          processName: '/bin/bash',
+          canonicalTitle: null,
+        }),
+      ])
+    })
+
+    unregisterTerminalSocket('client_1', 'attachment_a', socket)
+  })
+
   test('broadcasts output and exit events to registered web terminal sockets', async () => {
     const socket = { send: vi.fn(), close: vi.fn() }
     registerTerminalSocket('client_1', 'attachment_a', socket)

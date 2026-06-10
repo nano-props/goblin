@@ -208,5 +208,6 @@ function normalizeTerminalTitle(title: string | null | undefined): string | null
 }
 
 function isShellProcessName(processName: string): boolean {
-  return /^(?:ba|z|fi|tc|c|k)?sh$|^nu$/.test(processName)
+  const base = processName.replace(/^.*[\\/]/, '')
+  return /^(?:ba|z|fi|tc|c|k)?sh$|^nu$/.test(base)
 }
