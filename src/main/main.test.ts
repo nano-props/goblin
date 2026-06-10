@@ -86,9 +86,7 @@ vi.mock('#/main/menu-state.ts', () => ({
 }))
 
 vi.mock('#/main/recent-repos.ts', () => ({
-  rebuildMenuWithRecentRepos: vi.fn((recentRepos) => {
-    mocks.buildAppMenu()
-  }),
+  syncRecentRepos: vi.fn(),
 }))
 
 vi.mock('#/main/i18n/index.ts', () => ({

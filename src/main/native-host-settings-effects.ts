@@ -1,7 +1,7 @@
 import { resolveLang, setCurrentLang } from '#/main/i18n/index.ts'
 import { buildAppMenu } from '#/main/menu.ts'
 import { applyMenuRuntimeState } from '#/main/menu-state.ts'
-import { rebuildMenuWithRecentRepos } from '#/main/recent-repos.ts'
+import { syncRecentRepos } from '#/main/recent-repos.ts'
 import { setSettingsGlobalShortcutState } from '#/main/settings-server-client.ts'
 import { syncGlobalShortcuts } from '#/main/shortcuts.ts'
 import { applyThemeSettingsProjection } from '#/main/theme.ts'
@@ -89,6 +89,7 @@ export async function applyNativeHostShellProjection(input: NativeShellProjectio
     })
   }
   if (input.recentRepos) {
-    rebuildMenuWithRecentRepos(input.recentRepos.recentRepos)
+    syncRecentRepos(input.recentRepos.recentRepos)
+    buildAppMenu()
   }
 }

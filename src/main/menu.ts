@@ -106,10 +106,16 @@ export function buildAppMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate(createAppMenuTemplate(readMenuState())))
 }
 
+export const platform = {
+  isMacOS(): boolean {
+    return process.platform === 'darwin'
+  },
+}
+
 function readMenuState(): AppMenuState {
   const runtimeState = readMenuRuntimeState()
   return {
-    isMac: process.platform === 'darwin',
+    isMac: platform.isMacOS(),
     name: app.name,
     recentRepos: runtimeState.recentRepos,
     shortcutsDisabled: runtimeState.shortcutsDisabled,

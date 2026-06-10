@@ -102,7 +102,7 @@ vi.mock('#/main/theme.ts', () => ({
 }))
 
 describe('app menu actions', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.resetModules()
     vi.clearAllMocks()
     mocks.template.length = 0
@@ -112,6 +112,8 @@ describe('app menu actions', () => {
     mocks.getFocusedWindow.mockReturnValue(null)
     mocks.focusedRegisteredSurface.mockReturnValue(null)
     mocks.activateMainWindow.mockResolvedValue(mocks.win)
+    const { platform } = await import('#/main/menu.ts')
+    vi.spyOn(platform, 'isMacOS').mockReturnValue(true)
   })
 
   test('activates the main window before sending an action when no window exists', async () => {
