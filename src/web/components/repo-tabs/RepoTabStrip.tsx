@@ -220,16 +220,18 @@ export function RepoTabStrip({
                           </Button>
                         </DropdownMenuTrigger>
                       </Tip>
-                      <DropdownMenuContent side="bottom" align="start" className="w-max max-h-[200px]">
-                        {overflowRepos.map((repo) => (
-                          <DropdownMenuItem
-                            key={repo.id}
-                            className="whitespace-nowrap"
-                            onSelect={() => onActivate(repo.id)}
-                          >
-                            <span className="truncate">{repo.name}</span>
-                          </DropdownMenuItem>
-                        ))}
+                      <DropdownMenuContent side="bottom" align="start" className="flex w-max flex-col !overflow-hidden">
+                        <ScrollArea className="max-h-[200px]" scrollbarMode="compact">
+                          {overflowRepos.map((repo) => (
+                            <DropdownMenuItem
+                              key={repo.id}
+                              className="whitespace-nowrap"
+                              onSelect={() => onActivate(repo.id)}
+                            >
+                              <span className="truncate">{repo.name}</span>
+                            </DropdownMenuItem>
+                          ))}
+                        </ScrollArea>
                         {overflowRepos.length > 0 && <DropdownMenuSeparator />}
                         <DropdownMenuItem className="whitespace-nowrap" onSelect={onOpenLocal}>
                           <FolderOpen />

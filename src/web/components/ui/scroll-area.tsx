@@ -32,10 +32,10 @@ export const ScrollArea = forwardRef<ComponentRef<typeof ScrollAreaPrimitive.Roo
         ref={ref}
         type={type}
         scrollHideDelay={scrollHideDelay}
-        className={cn('relative overflow-hidden', className)}
+        className={cn('relative overflow-hidden flex flex-col', className)}
         {...props}
       >
-        <ScrollAreaPrimitive.Viewport ref={viewportRef} className={cn('h-full w-full', viewportClassName)}>
+        <ScrollAreaPrimitive.Viewport ref={viewportRef} className={cn('flex-1 min-h-0 w-full', viewportClassName)}>
           {children}
         </ScrollAreaPrimitive.Viewport>
         {(orientation === 'vertical' || orientation === 'both') && (

@@ -7,6 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '#/web/components/ui/dropdown-menu.tsx'
+import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { Badge } from '#/web/components/ui/badge.tsx'
 import { cn } from '#/web/lib/cn.ts'
@@ -96,49 +97,47 @@ export function TerminalSwitcherDropdown({
         <DropdownMenu open={open} onOpenChange={setOpen}>
           <DropdownMenuTrigger asChild>{triggerButton}</DropdownMenuTrigger>
 
-          <DropdownMenuContent align="end" className="w-44 max-h-[200px]">
-            {sessions.map((session) => {
-              const fullTitle = session.fullTitle ?? session.title
-              return (
-                <div
-                  key={session.key}
-                  className="group relative flex items-center"
-                  data-selected={session.selected ? 'true' : undefined}
-                >
-                  <DropdownMenuItem
-                    className={cn(
-                      'min-w-0 flex-1 gap-2 pr-8',
-                      session.selected && 'bg-accent/40 text-accent-foreground',
-                    )}
-                    title={fullTitle}
-                    onSelect={() => handleSelect(session.key)}
-                    aria-label={fullTitle}
-                    aria-current={session.selected ? 'true' : undefined}
-                  >
-                    <TerminalIcon size={14} className="shrink-0 text-muted-foreground" />
-                    <span className="min-w-0 flex-1 truncate">{session.title}</span>
-                    {session.hasBell && (
-                      <>
-                        <span className="h-2 w-2 shrink-0 rounded-full bg-attention" aria-hidden="true" />
-                        <span className="sr-only">{t('terminal.bell-unread')}</span>
-                      </>
-                    )}
-                  </DropdownMenuItem>
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    className="absolute right-1 h-6 w-6 text-muted-foreground"
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onClick={(event) => handleClose(event, session.key)}
-                    title={t('terminal.close')}
-                    aria-label={t('terminal.close')}
-                  >
-                    <Trash2 size={14} />
-                  </Button>
-                </div>
-              )
-            })}
+          <DropdownMenuContent align="end" className="flex w-44 flex-col !overflow-hidden">
+            <ScrollArea className="max-h-[200px]" scrollbarMode="compact">
+              {sessions.map((session) => {
+                const fullTitle = session.fullTitle ?? session.title
+                return (
+                  <div key={session.key} className="group relative flex items-center">
+                    <DropdownMenuItem
+                      className={cn(
+                        'min-w-0 flex-1 gap-2 pr-8',
+                        session.selected && 'bg-accent/40 text-accent-foreground',
+                      )}
+                      title={fullTitle}
+                      onSelect={() => handleSelect(session.key)}
+                      aria-label={fullTitle}
+                      aria-current={session.selected ? 'true' : undefined}
+                    >
+                      <TerminalIcon size={14} className="shrink-0 text-muted-foreground" />
+                      <span className="min-w-0 flex-1 truncate">{session.title}</span>
+                      {session.hasBell && (
+                        <>
+                          <span className="h-2 w-2 shrink-0 rounded-full bg-attention" aria-hidden="true" />
+                          <span className="sr-only">{t('terminal.bell-unread')}</span>
+                        </>
+                      )}
+                    </DropdownMenuItem>
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="ghost"
+                      className="absolute right-1 h-6 w-6 text-muted-foreground"
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={(event) => handleClose(event, session.key)}
+                      title={t('terminal.close')}
+                      aria-label={t('terminal.close')}
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  </div>
+                )
+              })}
+            </ScrollArea>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="gap-2" onSelect={onNew}>
               <Plus size={14} />
