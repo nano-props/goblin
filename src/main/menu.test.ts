@@ -24,7 +24,6 @@ const mocks = vi.hoisted(() => {
   const win = { isDestroyed: () => false, webContents: { isDestroyed: () => false, send: vi.fn() } }
   return {
     appGetPath: vi.fn<(name: string) => string>((name: string) => (name === 'home' ? '/home/user' : '/data')),
-    clearRecentDocuments: vi.fn(),
     openHttpExternal: vi.fn(() => Promise.resolve(true)),
     readMenuRuntimeState: vi.fn<() => MockMenuRuntimeState>(() => defaultMenuRuntimeState()),
     template,
@@ -45,7 +44,6 @@ const mocks = vi.hoisted(() => {
 vi.mock('electron', () => ({
   app: {
     name: 'Goblin',
-    clearRecentDocuments: mocks.clearRecentDocuments,
     getPath: mocks.appGetPath,
   },
   BrowserWindow: {

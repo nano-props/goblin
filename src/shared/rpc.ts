@@ -303,7 +303,6 @@ export interface NativeRpcHandlers {
   settings: {
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
     applyShellProjection: (input: NativeShellProjection) => Promise<void>
-    clearNativeRecentDocuments: () => Promise<void>
   }
 }
 
@@ -362,7 +361,6 @@ export const RPC_PROCEDURE_SCHEMAS: NativeRpcProcedureSchemas = {
   settings: {
     setGlobalShortcut: v.object({ accelerator: v.string() }),
     applyShellProjection: NativeShellProjectionSchema,
-    clearNativeRecentDocuments: EmptyInput,
   },
 }
 

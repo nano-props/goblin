@@ -121,10 +121,7 @@ export async function addRecentRepo(repo: RepoSessionEntry): Promise<RecentRepos
   )
   if (canUseNativeRpcBridge()) {
     await invokeNativeRpcPath<void>('settings.applyShellProjection', {
-      recentRepos: {
-        recentRepos: result.recentRepos,
-        ...(result.addedRepo ? { addedRepo: result.addedRepo } : {}),
-      },
+      recentRepos: { recentRepos: result.recentRepos },
     })
   }
   return result
@@ -136,7 +133,6 @@ export async function clearRecentRepos(): Promise<void> {
   await invokeNativeRpcPath<void>('settings.applyShellProjection', {
     recentRepos: { recentRepos: [] },
   })
-  await invokeNativeRpcPath<void>('settings.clearNativeRecentDocuments', undefined)
 }
 
 export async function saveSession(session: SessionState): Promise<SessionState> {

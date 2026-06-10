@@ -422,20 +422,32 @@ describe('main repo rpc cancellation', () => {
     expect(aborted).toBe(false)
   })
 
-  test('projects recent repos into native shell state without mutating the embedded server', async () => {
+  test('projects recent repos into native shell state, syncing both menu and Dock recents', async () => {
     const repo = { kind: 'local' as const, id: '/repo' }
 
-    const result = await invokeRpc('settings.applyShellProjection', { recentRepos: { recentRepos: [repo], addedRepo: repo } })
-
-    expect(result).toEqual({ ok: true, data: undefined })
-    expect(app.addRecentDocument).toHaveBeenCalledWith('/repo')
-  })
-
-  test('clears native recent documents without mutating server-owned recents', async () => {
-    const result = await invokeRpc('settings.clearNativeRecentDocuments')
+    const result = await invokeRpc('settings.applyShellProjection', { recentRepos: { recentRepos: [repo] } })
 
     expect(result).toEqual({ ok: true, data: undefined })
     expect(app.clearRecentDocuments).toHaveBeenCalledTimes(1)
+    expect(app.addRecentDocument).toHaveBeenCalledWith('/repo')
+  })
+
+  test('skips remote repos when syncing Dock recent documents', async () => {
+    const localRepo = { kind: 'local' as const, id: '/repo' }
+    const remoteRepo = {
+      kind: 'remote' as const,
+      id: 'gh:owner/repo',
+      ref: { id: 'gh:owner/repo', alias: 'gh', remotePath: '/owner/repo', displayName: 'gh:repo' },
+    }
+
+    const result = await invokeRpc('settings.applyShellProjection', {
+      recentRepos: { recentRepos: [localRepo, remoteRepo] },
+    })
+
+    expect(result).toEqual({ ok: true, data: undefined })
+    expect(app.clearRecentDocuments).toHaveBeenCalledTimes(1)
+    expect(app.addRecentDocument).toHaveBeenCalledTimes(1)
+    expect(app.addRecentDocument).toHaveBeenCalledWith('/repo')
   })
 
   test('projects server-owned prefs into native shell state when the renderer updates them', async () => {

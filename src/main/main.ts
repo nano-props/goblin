@@ -5,6 +5,7 @@ import { initTheme } from '#/main/theme.ts'
 import { flushWindowState } from '#/main/window-state.ts'
 import { buildAppMenu } from '#/main/menu.ts'
 import { initializeMenuRuntimeState } from '#/main/menu-state.ts'
+import { rebuildMenuWithRecentRepos } from '#/main/recent-repos.ts'
 import { assertDictionaryParity, resolveLang, setCurrentLang } from '#/main/i18n/index.ts'
 import { wireRpcIpc } from '#/main/rpc.ts'
 import { wireShellBridgeIpc } from '#/main/shell-bridge.ts'
@@ -93,7 +94,6 @@ async function initializeMainProcess(): Promise<void> {
   await initTheme({ theme: settingsSnapshot.theme, colorTheme: settingsSnapshot.colorTheme })
   await initializeRuntimeState(settingsSnapshot)
   wireMainProcessIpc()
-  buildAppMenu()
   await syncInitialGlobalShortcutState(settingsSnapshot)
 }
 
@@ -114,12 +114,12 @@ async function initializeRuntimeState(settingsSnapshot: SettingsSnapshot): Promi
   // first frame.
   assertDictionaryParity(!app.isPackaged)
   initializeMenuRuntimeState({
-    recentRepos: settingsSnapshot.recentRepos,
     shortcutsDisabled: settingsSnapshot.shortcutsDisabled,
     swapCloseShortcuts: settingsSnapshot.swapCloseShortcuts,
     langPref: settingsSnapshot.lang,
     workspaceLayout: settingsSnapshot.session.workspaceLayout,
   })
+  rebuildMenuWithRecentRepos(settingsSnapshot.recentRepos)
   setCurrentLang(resolveLang(settingsSnapshot.lang))
 }
 

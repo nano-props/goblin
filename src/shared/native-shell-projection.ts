@@ -28,7 +28,6 @@ export interface NativeSettingsProjectionState {
 
 export interface NativeRecentReposProjection {
   recentRepos: RepoSessionEntry[]
-  addedRepo?: RepoSessionEntry
 }
 
 export interface NativeShellProjection {
@@ -69,7 +68,6 @@ export const NativeSettingsProjectionStateSchema = v.object({
 
 export const NativeRecentReposProjectionSchema = v.object({
   recentRepos: v.array(RepoSessionEntrySchema),
-  addedRepo: v.optional(RepoSessionEntrySchema),
 })
 
 export const NativeShellProjectionSchema = v.pipe(

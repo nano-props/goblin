@@ -278,7 +278,7 @@ describe('settings-client', () => {
     )
   })
 
-  test('projects recent repos through the native bridge using the server-authoritative added repo', async () => {
+  test('projects recent repos through the native bridge', async () => {
     const invokeRpc = vi.fn(async () => undefined)
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
@@ -335,14 +335,13 @@ describe('settings-client', () => {
         input: {
           recentRepos: {
             recentRepos: [{ kind: 'local', id: '/tmp/repo' }],
-            addedRepo: { kind: 'local', id: '/tmp/repo' },
           },
         },
       }),
     )
   })
 
-  test('clears recent repos through the embedded server and then clears native recent documents', async () => {
+  test('clears recent repos through the embedded server and syncs native state', async () => {
     const invokeRpc = vi.fn(async () => undefined)
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
@@ -386,17 +385,11 @@ describe('settings-client', () => {
         headers: expect.objectContaining({ 'x-goblin-internal-secret': 'secret' }),
       }),
     )
-    expect(invokeRpc).toHaveBeenNthCalledWith(
-      1,
+    expect(invokeRpc).toHaveBeenCalledTimes(1)
+    expect(invokeRpc).toHaveBeenCalledWith(
       expect.objectContaining({
         path: 'settings.applyShellProjection',
         input: { recentRepos: { recentRepos: [] } },
-      }),
-    )
-    expect(invokeRpc).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        path: 'settings.clearNativeRecentDocuments',
       }),
     )
   })

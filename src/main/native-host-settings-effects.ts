@@ -1,11 +1,10 @@
-import { app } from 'electron'
 import { resolveLang, setCurrentLang } from '#/main/i18n/index.ts'
 import { buildAppMenu } from '#/main/menu.ts'
 import { applyMenuRuntimeState } from '#/main/menu-state.ts'
+import { rebuildMenuWithRecentRepos } from '#/main/recent-repos.ts'
 import { setSettingsGlobalShortcutState } from '#/main/settings-server-client.ts'
 import { syncGlobalShortcuts } from '#/main/shortcuts.ts'
 import { applyThemeSettingsProjection } from '#/main/theme.ts'
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { NativeShellProjection, NativeSettingsProjectionPatch, NativeSettingsProjectionState } from '#/shared/rpc.ts'
 
 // Native-host application of server-owned settings changes.
@@ -82,51 +81,14 @@ export async function applyNativeHostSettingsPrefsProjection(input: {
   if (shouldRebuildMenu) buildAppMenu()
 }
 
-function syncRecentDocumentOnAdd(repo: RepoSessionEntry, addRecentDocument: (path: string) => void): void {
-  if (repo.kind !== 'local') return
-  addRecentDocument(repo.id)
-}
-
-function applyNativeHostRecentReposMenuState(recentRepos: RepoSessionEntry[]): void {
-  applyMenuRuntimeState({ recentRepos })
-  buildAppMenu()
-}
-
-function applyNativeHostRecentReposProjection(
-  recentRepos: RepoSessionEntry[],
-  options: {
-    addRecentDocument?: (path: string) => void
-    addedRepo?: RepoSessionEntry
-  } = {},
-): void {
-  if (options.addedRepo && options.addRecentDocument) syncRecentDocumentOnAdd(options.addedRepo, options.addRecentDocument)
-  applyNativeHostRecentReposMenuState(recentRepos)
-}
-
-function applyNativeShellProjectionOptions(options: {
-  clearRecentDocuments?: boolean
-}): void {
-  if (options.clearRecentDocuments) app.clearRecentDocuments()
-}
-
-export async function applyNativeHostShellProjection(
-  input: NativeShellProjection,
-  options: {
-    addRecentDocument?: (path: string) => void
-    clearRecentDocuments?: boolean
-  } = {},
-): Promise<void> {
+export async function applyNativeHostShellProjection(input: NativeShellProjection): Promise<void> {
   if (input.prefs) {
     await applyNativeHostSettingsPrefsProjection({
       patch: input.prefs.patch,
       settings: input.prefs.settings,
     })
   }
-  applyNativeShellProjectionOptions(options)
   if (input.recentRepos) {
-    applyNativeHostRecentReposProjection(input.recentRepos.recentRepos, {
-      addedRepo: input.recentRepos.addedRepo,
-      addRecentDocument: options.addRecentDocument,
-    })
+    rebuildMenuWithRecentRepos(input.recentRepos.recentRepos)
   }
 }
