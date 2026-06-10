@@ -126,7 +126,7 @@ function BranchActionButton({ item, measure = false }: { item: BranchActionItem;
     >
       {({ busy }) => (
         <>
-          {busy ? <Loader2 size={16} className="animate-spin" /> : item.icon}
+          {busy ? <Loader2 className="size-4 animate-spin" /> : item.icon}
           {item.label}
         </>
       )}

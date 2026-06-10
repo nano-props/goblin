@@ -78,7 +78,7 @@ export function BranchActionsDropdown({
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
         >
-          {busyAction ? <Loader2 size={16} className="animate-spin" /> : <MoreHorizontal className="size-4" />}
+          {busyAction ? <Loader2 className="size-4 animate-spin" /> : <MoreHorizontal className="size-4" />}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
