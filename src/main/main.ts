@@ -119,8 +119,8 @@ async function initializeRuntimeState(settingsSnapshot: SettingsSnapshot): Promi
     langPref: settingsSnapshot.lang,
     workspaceLayout: settingsSnapshot.session.workspaceLayout,
   })
-  rebuildMenuWithRecentRepos(settingsSnapshot.recentRepos)
   setCurrentLang(resolveLang(settingsSnapshot.lang))
+  rebuildMenuWithRecentRepos(settingsSnapshot.recentRepos)
 }
 
 function wireMainProcessIpc(): void {
