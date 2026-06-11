@@ -189,7 +189,7 @@ export function BranchDetailToolbar({
                   )}
                 >
                   {t(tab.labelKey)}
-                  {tab.id === 'changes' && detail.statusCount > 0 && !compact && (
+                  {tab.id === 'changes' && detail.statusCount > 0 && (
                     <Badge variant="attention" className="font-normal font-mono tabular-nums">
                       {detail.statusCount}
                     </Badge>
