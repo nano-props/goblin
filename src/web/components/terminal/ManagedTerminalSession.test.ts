@@ -193,7 +193,9 @@ const xtermMocks = vi.hoisted(() => {
     clearDecorations = vi.fn()
     clearActiveDecoration = vi.fn()
 
-    constructor(readonly options?: { highlightLimit?: number }) {
+    readonly options?: { highlightLimit?: number }
+    constructor(options?: { highlightLimit?: number }) {
+      this.options = options
       if (addonFailures.search) throw new Error('search addon failed')
       searchAddons.push(this)
     }
@@ -249,7 +251,9 @@ const xtermMocks = vi.hoisted(() => {
   class MockWebLinksAddon {
     term: MockTerminal | null = null
 
-    constructor(readonly handler?: (event: MouseEvent, uri: string) => void) {
+    readonly handler?: (event: MouseEvent, uri: string) => void
+    constructor(handler?: (event: MouseEvent, uri: string) => void) {
+      this.handler = handler
       if (addonFailures.webLinks) throw new Error('web links addon failed')
       webLinkAddons.push(this)
     }
@@ -334,7 +338,9 @@ class MockResizeObserver {
   observe = vi.fn()
   disconnect = vi.fn()
 
-  constructor(readonly cb: ResizeObserverCallback) {
+  readonly cb: ResizeObserverCallback
+  constructor(cb: ResizeObserverCallback) {
+    this.cb = cb
     MockResizeObserver.instances.push(this)
   }
 }

@@ -340,7 +340,7 @@ export function RepoTabStrip({
                       {dropdownRepos.map((repo) => (
                         <DropdownMenuItem
                           key={repo.id}
-                          className={cn('whitespace-nowrap', repo.id === activeId && 'bg-accent/40 text-accent-foreground')}
+                          className={cn('whitespace-nowrap', repo.id === activeId && 'bg-selected text-selected-foreground')}
                           onSelect={() => onActivate(repo.id)}
                           aria-current={repo.id === activeId ? 'true' : undefined}
                         >

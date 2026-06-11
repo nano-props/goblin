@@ -3,7 +3,10 @@ export class RepoSyncTracker {
   private readonly timestamps = new Map<string, number>()
   private readonly listeners = new Map<string, Set<() => void>>()
 
-  constructor(private readonly cooldownMs = 2000) {}
+  private readonly cooldownMs: number
+  constructor(cooldownMs = 2000) {
+    this.cooldownMs = cooldownMs
+  }
 
   isReady(repoRoot: string, instanceToken: number | undefined): boolean {
     return typeof instanceToken === 'number' && this.ready.get(repoRoot) === instanceToken

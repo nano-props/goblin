@@ -44,7 +44,10 @@ class RepoLane {
   private activeControllers = new Set<AbortController>()
   private queued: Array<QueuedRepoTask<unknown>> = []
 
-  constructor(private readonly concurrency: number) {}
+  private readonly concurrency: number
+  constructor(concurrency: number) {
+    this.concurrency = concurrency
+  }
 
   add<T>(task: (signal: AbortSignal) => Promise<T>, options?: RepoLaneOptions): Promise<T> {
     return new Promise<T>((resolve, reject) => {

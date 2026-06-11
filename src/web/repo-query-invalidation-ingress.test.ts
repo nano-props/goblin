@@ -5,7 +5,9 @@ class FakeWebSocket {
   static instances: FakeWebSocket[] = []
   private listeners = new Map<string, Set<(event: { data?: string }) => void>>()
 
-  constructor(public readonly url: string) {
+  public readonly url: string
+  constructor(url: string) {
+    this.url = url
     FakeWebSocket.instances.push(this)
   }
 

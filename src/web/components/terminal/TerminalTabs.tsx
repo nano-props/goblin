@@ -210,7 +210,7 @@ export function TerminalTabs({
               {sessions.map((session) => (
                 <div key={session.key} className="group relative flex items-center">
                   <DropdownMenuItem
-                    className={cn('min-w-0 flex-1 gap-2 pr-8', session.selected && 'bg-accent/40 text-accent-foreground')}
+                    className={cn('min-w-0 flex-1 gap-2 pr-8', session.selected && 'bg-selected text-selected-foreground')}
                     onSelect={() => handleSelect(session.key)}
                     aria-label={session.fullTitle ?? session.title}
                     aria-current={session.selected ? 'true' : undefined}

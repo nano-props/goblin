@@ -420,7 +420,10 @@ class BufferedTerminalSocket implements TerminalRealtimeSocket {
   private active = true
   private readonly buffer: Array<{ type: 'send'; payload: string } | { type: 'close'; code?: number; reason?: string }> = []
 
-  constructor(private readonly socket: TerminalRealtimeSocket) {}
+  private readonly socket: TerminalRealtimeSocket
+  constructor(socket: TerminalRealtimeSocket) {
+    this.socket = socket
+  }
 
   send(payload: string): void {
     if (!this.active) return

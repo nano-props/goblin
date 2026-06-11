@@ -1,5 +1,14 @@
 # Project Notes
 
+## TypeScript constraints
+
+The project runs in Node.js strip-only mode (no `tsc` emit). Do not use these unsupported TypeScript features:
+
+- Enum declarations
+- Namespaces with runtime code
+- Parameter properties (`constructor(private readonly x: T)`)
+- Import aliases (`import A = B`, `import A = require('B')`)
+
 ## Core conventions
 
 - Pin new package versions exactly in `package.json`; no range prefixes.
