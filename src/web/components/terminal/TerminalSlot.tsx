@@ -278,6 +278,7 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
           snapshot={snapshot}
           takeoverKey={key}
           onTakeover={takeover}
+          takeoverPending={snapshot.takeoverPending}
         />
       )}
       {hasSessions && snapshot.phase === 'opening' && (
@@ -310,9 +311,10 @@ interface ViewerOverlayProps {
   snapshot: ReturnType<typeof useTerminalSnapshot>
   takeoverKey: string | null
   onTakeover: (key: string) => void
+  takeoverPending?: boolean
 }
 
-function ViewerOverlay({ badge, takeoverLabel, snapshot, takeoverKey, onTakeover }: ViewerOverlayProps) {
+function ViewerOverlay({ badge, takeoverLabel, snapshot, takeoverKey, onTakeover, takeoverPending }: ViewerOverlayProps) {
   return (
     <div className="goblin-terminal-slot__viewer-overlay">
       <div className="goblin-terminal-slot__viewer-content">
@@ -331,9 +333,9 @@ function ViewerOverlay({ badge, takeoverLabel, snapshot, takeoverKey, onTakeover
           size="sm"
           variant="secondary"
           onClick={() => takeoverKey && onTakeover(takeoverKey)}
-          disabled={!takeoverKey}
+          disabled={!takeoverKey || takeoverPending}
         >
-          {takeoverLabel}
+          {takeoverPending ? `${takeoverLabel}…` : takeoverLabel}
         </Button>
       </div>
     </div>

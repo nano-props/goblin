@@ -188,7 +188,9 @@ export class ManagedTerminalSession {
 
   handleOwnership(event: TerminalOwnershipViewModel): void {
     const wasController = this.runtime.canResize()
-    if (this.runtime.handleOwnership(event)) {
+    const changed = this.runtime.handleOwnership(event)
+    const pendingCleared = this.runtime.clearTakeoverPending()
+    if (changed) {
       const isController = this.runtime.canResize()
       if (!isController) {
         if (this.view.currentTerminal()) {
@@ -200,6 +202,8 @@ export class ManagedTerminalSession {
         }
         if (this.view.isVisible()) this.view.focus()
       }
+    }
+    if (changed || pendingCleared) {
       this.notify('metadata')
     }
   }
@@ -225,7 +229,17 @@ export class ManagedTerminalSession {
       : this.runtime.currentCanonicalSize()
     // Ownership changes are applied exclusively via authoritative onOwnership realtime messages.
     // The bridge response is only used to trigger the server-side handoff.
-    void terminalBridge.takeover({ sessionId, cols: size.cols, rows: size.rows }).catch(() => {})
+    if (this.runtime.setTakeoverPending(true)) this.notify('metadata')
+    void terminalBridge
+      .takeover({ sessionId, cols: size.cols, rows: size.rows })
+      .catch(() => {})
+      .finally(() => {
+        // If the server response settles but we never received an ownership event,
+        // clear the pending state so the user can retry.
+        if (this.runtime.isTakeoverPending()) {
+          if (this.runtime.setTakeoverPending(false)) this.notify('metadata')
+        }
+      })
   }
 
   private start(): void {
@@ -360,8 +374,7 @@ export class ManagedTerminalSession {
     this.runtime.beginReplay(replaySeq)
     try {
       if (replayTruncated) term.reset()
-      if (replay) term.write(replay)
-      await waitForTerminalResponseFlush()
+      if (replay) await termWrite(term, replay)
     } finally {
       if (this.currentStart(token, term)) {
         for (const event of this.runtime.finishReplay()) this.queueOutput(event.data)
@@ -375,8 +388,7 @@ export class ManagedTerminalSession {
     this.runtime.beginReplay(hydratedSnapshot.snapshotSeq)
     try {
       term.reset()
-      if (hydratedSnapshot.snapshot) term.write(hydratedSnapshot.snapshot)
-      await waitForTerminalResponseFlush()
+      if (hydratedSnapshot.snapshot) await termWrite(term, hydratedSnapshot.snapshot)
       return this.currentStart(token, term)
     } finally {
       if (this.currentStart(token, term)) this.runtime.finishReplay()
@@ -530,9 +542,9 @@ function waitForTerminalLayout(): Promise<void> {
   return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
 }
 
-function waitForTerminalResponseFlush(): Promise<void> {
+function termWrite(term: XTermTerminal, data: string): Promise<void> {
   return new Promise((resolve) => {
-    setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve())), 0)
+    term.write(data, resolve)
   })
 }
 

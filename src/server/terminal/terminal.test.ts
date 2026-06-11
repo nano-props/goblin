@@ -451,7 +451,7 @@ describe('server terminal sessions', () => {
     if (!first.ok) return
 
     unregisterTerminalSocket('client_1', 'attachment_a', socketA)
-    await vi.advanceTimersByTimeAsync(3_000 + 1)
+    await vi.advanceTimersByTimeAsync(30_000 + 1)
 
     const socketB = { send: vi.fn(), close: vi.fn() }
     registerTerminalSocket('client_1', 'attachment_b', socketB)
@@ -625,7 +625,7 @@ describe('server terminal sessions', () => {
     expect(spawn).toHaveBeenCalledTimes(1)
 
     unregisterTerminalSocket('client_1', 'attachment_a', socket)
-    await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000 + 1)
+    await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000 + 1)
     await vi.runOnlyPendingTimersAsync()
     await Promise.resolve()
 

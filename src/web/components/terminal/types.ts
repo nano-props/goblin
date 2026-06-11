@@ -59,6 +59,8 @@ export interface TerminalSnapshot {
   progress?: TerminalProgressState | null
   /** Viewer-mode output summary: stripped recent terminal output. */
   outputSummary?: string | null
+  /** True while a takeover request has been sent but ownership has not yet been confirmed. */
+  takeoverPending?: boolean
 }
 
 export interface TerminalSearchResult {

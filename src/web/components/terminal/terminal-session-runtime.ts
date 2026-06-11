@@ -128,6 +128,18 @@ export class TerminalSessionRuntime {
     return this.state.setProgress(state, value)
   }
 
+  setTakeoverPending(value: boolean): boolean {
+    return this.state.setTakeoverPending(value)
+  }
+
+  clearTakeoverPending(): boolean {
+    return this.state.clearTakeoverPending()
+  }
+
+  isTakeoverPending(): boolean {
+    return this.state.isTakeoverPending()
+  }
+
   resetTransientState(): boolean {
     return this.state.resetTransientState()
   }

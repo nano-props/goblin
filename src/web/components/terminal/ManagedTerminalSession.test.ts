@@ -57,7 +57,9 @@ const xtermMocks = vi.hoisted(() => {
     element: HTMLDivElement | null = null
     modes = { applicationCursorKeysMode: false }
     refresh = vi.fn()
-    write = vi.fn()
+    write = vi.fn((_data: string, callback?: () => void) => {
+      if (callback) queueMicrotask(callback)
+    })
     reset = vi.fn()
     scrollToBottom = vi.fn()
     dispose = vi.fn()
@@ -849,7 +851,7 @@ describe('ManagedTerminalSession', () => {
 
     const term = xtermMocks.terminals[0]!
     expect(term.reset).toHaveBeenCalled()
-    expect(term.write).toHaveBeenNthCalledWith(1, 'hydrated-screen')
+    expect(term.write).toHaveBeenNthCalledWith(1, 'hydrated-screen', expect.any(Function))
     expect(terminalCalls.attach).toHaveBeenCalled()
   })
 
@@ -1103,7 +1105,7 @@ describe('ManagedTerminalSession', () => {
     await flushUntil(() => xtermMocks.terminals[0]?.write.mock.calls.some((call: unknown[]) => call[0] === 'tail'))
 
     expect(xtermMocks.terminals[0]!.reset).toHaveBeenCalledTimes(1)
-    expect(xtermMocks.terminals[0]!.write).toHaveBeenCalledWith('tail')
+    expect(xtermMocks.terminals[0]!.write).toHaveBeenCalledWith('tail', expect.any(Function))
   })
 
   test('batches terminal output writes on animation frames', async () => {

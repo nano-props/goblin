@@ -354,7 +354,7 @@ export class TerminalSessionRegistry {
       const serialized = session.serialize()
       const sessionId = session.currentSessionId()
       if (serialized && sessionId) {
-        this.reattachSnapshotCache.set(key, { sessionId, snapshot: serialized, snapshotSeq: Date.now() })
+        this.reattachSnapshotCache.set(key, { sessionId, snapshot: serialized, snapshotSeq: 0 })
       }
       session.detach(host, this.parkingRoot)
     }
