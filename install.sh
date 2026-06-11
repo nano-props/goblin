@@ -27,7 +27,7 @@ done
 # Go through bun to match `package.json`'s `build` script — the build
 # script itself shells out to `bun install` / `bun run ...`, so requiring
 # bun here keeps the toolchain assumption in one place.
-bun scripts/build.ts install "${EXTRA_ARGS[@]}"
+bun scripts/build.ts install "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}"
 
 if [ "$WAS_RUNNING" = true ]; then
   echo "Restarting $APP_NAME..."
