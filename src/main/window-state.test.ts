@@ -28,12 +28,12 @@ test('persists window bounds to window-state.json', async () => {
   vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
   const windowState = await import('#/main/window-state.ts')
 
-  await windowState.setWindowBounds({ x: 5, y: 6, width: 1200, height: 760 })
+  await windowState.setWindowBounds({ x: 5, y: 6, width: 900, height: 600 })
   const flushed = await windowState.flushWindowState()
 
   expect(flushed).toBe(true)
   const saved = JSON.parse(readFileSync(path.join(tmp, 'window-state.json'), 'utf-8')) as {
     windowBounds: { x: number; y: number; width: number; height: number }
   }
-  expect(saved.windowBounds).toEqual({ x: 5, y: 6, width: 1200, height: 760 })
+  expect(saved.windowBounds).toEqual({ x: 5, y: 6, width: 900, height: 600 })
 })

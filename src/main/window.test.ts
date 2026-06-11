@@ -38,7 +38,7 @@ const mocks = vi.hoisted(() => {
         show: vi.fn(),
         focus: vi.fn(),
         setTitleBarOverlay: state.setTitleBarOverlay,
-        getNormalBounds: () => ({ x: 0, y: 0, width: 1200, height: 760 }),
+        getNormalBounds: () => ({ x: 0, y: 0, width: 900, height: 600 }),
         loadURL: state.loadURL,
         on: state.windowOn,
       }

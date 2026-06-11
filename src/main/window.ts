@@ -21,7 +21,7 @@ import {
 import { getTheme } from '#/main/theme.ts'
 import { WINDOW_TOPBAR_HEIGHT_PX } from '#/shared/window-chrome.ts'
 
-const DEFAULT_BOUNDS: WindowBounds = { width: 1200, height: 760 }
+const DEFAULT_BOUNDS: WindowBounds = { width: 900, height: 600 }
 const MAIN_WINDOW_SURFACE = {
   windowKey: 'main',
   capabilities: {
