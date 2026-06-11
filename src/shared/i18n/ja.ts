@@ -321,8 +321,6 @@ export const ja: Record<DictKey, string> = {
   'terminal.sessions': 'ターミナル',
   'terminal.label': 'ターミナル',
   'terminal.new': '新しいターミナル',
-  'terminal.empty-title': 'ターミナルはまだありません',
-  'terminal.empty-hint': '⌘⏎でターミナルを開く/作成',
   'terminal.close': 'ターミナルを閉じる',
   'terminal.progress': 'ターミナル進行状況',
   'terminal.empty': '開いているターミナルはありません',

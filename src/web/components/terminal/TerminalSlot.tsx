@@ -8,8 +8,6 @@ import {
   type FocusEvent,
   type KeyboardEvent,
 } from 'react'
-import { TerminalSquare } from 'lucide-react'
-import { EmptyState } from '#/web/components/Layout.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { setTerminalFocused } from '#/web/terminal-focus.ts'
@@ -227,17 +225,7 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
         ref={hostRef}
         className={cn('goblin-terminal-slot__host', isReadonly && 'goblin-terminal-slot__host--hidden')}
         aria-readonly={(!isController && hasSessions) || undefined}
-      >
-        {!hasSessions && (
-          <div className="goblin-terminal-slot__empty">
-            <EmptyState
-              icon={<TerminalSquare size={18} />}
-              title={t('terminal.empty-title')}
-              body={t('terminal.empty-hint')}
-            />
-          </div>
-        )}
-      </div>
+      />
       <div className="goblin-terminal-float-group">
         {searchOpen && (
           <div className="goblin-terminal-slot__search">

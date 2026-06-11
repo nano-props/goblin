@@ -178,8 +178,7 @@ describe('TerminalSlot', () => {
     })
 
     try {
-      expect(container.textContent).toContain('terminal.empty-title')
-      expect(container.textContent).toContain('terminal.empty-hint')
+      expect(container.querySelector('.goblin-terminal-slot__empty')).toBeNull()
       repoReady = true
       await act(async () => {
         root.render(

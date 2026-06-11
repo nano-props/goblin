@@ -207,6 +207,7 @@ export function BranchDetailToolbar({
               detailId={detailId}
               responsiveCompact={compact}
               panelActive={repo.ui.detailTab === 'terminal'}
+              focusMode={detailFocusMode}
               focusRegistry={terminalTabFocusRegistry}
               emptyFocusKey={EMPTY_TERMINAL_TAB_FOCUS_KEY}
               onNew={handleNewTerminal}

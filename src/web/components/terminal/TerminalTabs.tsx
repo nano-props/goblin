@@ -22,6 +22,7 @@ interface TerminalTabsProps {
   detailId: string
   responsiveCompact?: boolean
   panelActive?: boolean
+  focusMode?: boolean
   focusRegistry?: FocusRegistry<string, HTMLButtonElement>
   emptyFocusKey?: string
   onNew: () => void
@@ -41,6 +42,7 @@ export function TerminalTabs({
   detailId,
   responsiveCompact,
   panelActive,
+  focusMode,
   focusRegistry: externalFocusRegistry,
   emptyFocusKey = EMPTY_TERMINAL_TAB_FOCUS_KEY,
   onNew,
@@ -194,6 +196,7 @@ export function TerminalTabs({
       <ToolbarTabStripBody>
         <TerminalTabTooltipLayer
           sessions={sessions}
+          focusMode={focusMode}
           role="tablist"
           aria-label={t('terminal.sessions')}
         >
@@ -254,6 +257,7 @@ export function TerminalTabs({
       <ToolbarTabStripBody scroll>
         <TerminalTabTooltipLayer
           sessions={sessions}
+          focusMode={focusMode}
           role="tablist"
           aria-label={t('terminal.sessions')}
         >
@@ -285,9 +289,10 @@ export function TerminalTabs({
 
 interface TerminalTabTooltipLayerProps extends ComponentPropsWithoutRef<'div'> {
   sessions: TerminalSessionSummary[]
+  focusMode?: boolean
 }
 
-function TerminalTabTooltipLayer({ sessions, children, ...props }: TerminalTabTooltipLayerProps) {
+function TerminalTabTooltipLayer({ sessions, focusMode, children, ...props }: TerminalTabTooltipLayerProps) {
   return (
     <DelegatedTooltipLayer
       items={sessions}
@@ -298,7 +303,7 @@ function TerminalTabTooltipLayer({ sessions, children, ...props }: TerminalTabTo
         const title = session.originalTitle ?? session.fullTitle ?? session.title
         return <div className="truncate text-xs font-semibold text-foreground">{title}</div>
       }}
-      placement="top-start"
+      placement={focusMode ? 'bottom-start' : 'top-start'}
       delayMs={DELEGATED_TOOLTIP_DEFAULTS.delayMs}
       tooltipClassName="px-3 py-2"
       asChild

@@ -322,8 +322,6 @@ export const en = {
   'terminal.sessions': 'Terminals',
   'terminal.label': 'Terminal',
   'terminal.new': 'New terminal',
-  'terminal.empty-title': 'No terminals yet',
-  'terminal.empty-hint': 'Press ⌘⏎ to open or create a terminal',
   'terminal.close': 'Close terminal',
   'terminal.progress': 'Terminal progress',
   'terminal.empty': 'No terminal open',
