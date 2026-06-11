@@ -35,6 +35,10 @@ export class TerminalWorkerRuntime {
       this.unregisterProxySocket(message.socketId, message.clientId, message.attachmentId)
       return
     }
+    if (message.type === 'socket-message') {
+      this.options.service.handleRealtimeMessage(message.clientId, message.attachmentId, message.payload)
+      return
+    }
     if (message.type === 'shutdown') {
       this.options.service.shutdown()
       this.options.exit(0)

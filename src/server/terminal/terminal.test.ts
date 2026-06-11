@@ -796,4 +796,35 @@ describe('server terminal sessions', () => {
     unregisterTerminalSocket('client_1', 'attachment_a', socketA)
   })
 
+  test('batches rapid writes into a single ordered pty write via the input queue', async () => {
+    const socket = { send: vi.fn(), close: vi.fn() }
+    registerTerminalSocket('client_1', 'attachment_a', socket)
+    const sessionId = await createTerminalSession('client_1', { cols: 80, rows: 24 })
+
+    const attach = await attachServerTerminal('client_1', {
+      sessionId,
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_a',
+    })
+    expect(attach.ok).toBe(true)
+
+    writeServerTerminal('client_1', { sessionId, data: 'c', attachmentId: 'attachment_a' })
+    writeServerTerminal('client_1', { sessionId, data: 'l', attachmentId: 'attachment_a' })
+    writeServerTerminal('client_1', { sessionId, data: 'e', attachmentId: 'attachment_a' })
+    writeServerTerminal('client_1', { sessionId, data: 'a', attachmentId: 'attachment_a' })
+    writeServerTerminal('client_1', { sessionId, data: 'r', attachmentId: 'attachment_a' })
+
+    // Flush is scheduled as a microtask, so pty.write has not been called yet.
+    expect(mockPtys[0]?.write).toHaveBeenCalledTimes(0)
+
+    await new Promise<void>((resolve) => queueMicrotask(resolve))
+
+    // All rapid writes are batched into a single ordered pty.write call.
+    expect(mockPtys[0]?.write).toHaveBeenCalledTimes(1)
+    expect(mockPtys[0]?.write).toHaveBeenCalledWith('clear')
+
+    unregisterTerminalSocket('client_1', 'attachment_a', socket)
+  })
+
 })

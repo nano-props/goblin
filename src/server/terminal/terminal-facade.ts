@@ -4,6 +4,7 @@ import {
   closeServerTerminal,
   createServerTerminal,
   getServerTerminalSessionSnapshot,
+  handleRealtimeServerMessage,
   listServerTerminalSessions,
   notifyServerTerminalBell,
   pruneServerTerminals,
@@ -42,6 +43,7 @@ export interface TerminalFacade {
     clientId: string,
     input: TerminalWorkerRequestInputs['session-snapshot'],
   ): MaybePromise<TerminalWorkerResponseOutputs['session-snapshot']>
+  handleRealtimeMessage(clientId: string, attachmentId: string, payload: string): void
   shutdown(): void
 }
 
@@ -64,6 +66,7 @@ export function createTerminalFacade(): TerminalFacade {
       return pruneServerTerminals(clientId, input.repoRoot)
     },
     getSessionSnapshot: getServerTerminalSessionSnapshot,
+    handleRealtimeMessage: handleRealtimeServerMessage,
     shutdown: closeAllServerTerminalSessions,
   }
 }

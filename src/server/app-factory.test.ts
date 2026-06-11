@@ -63,6 +63,7 @@ const terminalHostStub = {
   create: vi.fn(),
   prune: vi.fn(),
   getSessionSnapshot: vi.fn(),
+  handleRealtimeMessage: vi.fn(),
   shutdown: vi.fn(),
 } satisfies ServerTerminalHost
 

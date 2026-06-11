@@ -71,6 +71,10 @@ interface TerminalSession<TOwner extends string | number> {
   attachment: TerminalAttachmentState | null
   controller: TerminalController | null
   allowImplicitAttachControl: boolean
+  /** Input queue ensures ordered PTY writes even with multiple concurrent callers. */
+  inputQueue: string[]
+  /** True when a microtask flush has already been scheduled for this session. */
+  inputFlushScheduled: boolean
 }
 
 export interface TerminalEventSink<TOwner extends string | number> {
@@ -126,6 +130,8 @@ export class TerminalSessionManager<TOwner extends string | number> {
       attachment: null,
       controller: null,
       allowImplicitAttachControl: true,
+      inputQueue: [],
+      inputFlushScheduled: false,
     }
     this.sessionsById.set(id, session)
     this.sessionIdByOwnerKey.set(ownerKey, id)
@@ -148,13 +154,9 @@ export class TerminalSessionManager<TOwner extends string | number> {
     const session = this.ownedSession(ownerId, sessionId)
     if (!session?.pty) return false
     if (attachmentId && session.controller?.attachmentId !== attachmentId) return false
-    try {
-      session.pty.write(data)
-      return true
-    } catch (err) {
-      console.warn('[terminal] failed to write PTY', err)
-      return false
-    }
+    session.inputQueue.push(data)
+    this.scheduleInputFlush(session)
+    return true
   }
 
   attachSession(
@@ -403,6 +405,8 @@ export class TerminalSessionManager<TOwner extends string | number> {
     session.rows = rows
     resetTerminalRenderState(session.render)
     session.processName = ''
+    session.inputQueue = []
+    session.inputFlushScheduled = false
   }
 
   private spawnSessionPty(session: TerminalSession<TOwner>): TerminalAttachResult {
@@ -470,7 +474,28 @@ export class TerminalSessionManager<TOwner extends string | number> {
       }
     }
     session.pty = null
+    session.inputQueue = []
+    session.inputFlushScheduled = false
     disposeTerminalRenderState(session.render)
+  }
+
+  private scheduleInputFlush(session: TerminalSession<TOwner>): void {
+    if (session.inputFlushScheduled || session.inputQueue.length === 0 || !session.pty) return
+    session.inputFlushScheduled = true
+    queueMicrotask(() => {
+      session.inputFlushScheduled = false
+      this.drainInputQueue(session)
+    })
+  }
+
+  private drainInputQueue(session: TerminalSession<TOwner>): void {
+    if (session.inputQueue.length === 0 || !session.pty) return
+    const batch = session.inputQueue.splice(0).join('')
+    try {
+      session.pty.write(batch)
+    } catch (err) {
+      console.warn('[terminal] failed to write PTY', err)
+    }
   }
 
   private isValidOwnerId(ownerId: TOwner): boolean {

@@ -6,6 +6,7 @@ import {
   normalizeTerminalSessionSummaryList,
   resolveTerminalOwnership,
 } from '#/shared/terminal.ts'
+import type { TerminalClientMessage } from '#/shared/terminal.ts'
 import type {
   TerminalAttachInput,
   TerminalAttachResult,
@@ -98,6 +99,10 @@ export function createServerTerminalBridge(options: {
       reconnectTimer = null
       ensureSocket()
     }, 300)
+  }
+
+  function activeSocket(): WebSocket | null {
+    return socket?.readyState === WebSocket.OPEN ? socket : null
   }
 
   function ensureSocket() {
@@ -197,15 +202,35 @@ export function createServerTerminalBridge(options: {
       return fetchTerminalJson<TerminalAttachResult>('/api/terminal/restart', { ...input, attachmentId })
     },
     write(input) {
+      const ws = activeSocket()
+      if (ws) {
+        ws.send(encodeClientMessage({ type: 'write', sessionId: input.sessionId, data: input.data }))
+        return Promise.resolve(true)
+      }
       return fetchTerminalJson<TerminalMutationResult>('/api/terminal/write', { ...input, attachmentId })
     },
     resize(input) {
+      const ws = activeSocket()
+      if (ws) {
+        ws.send(encodeClientMessage({ type: 'resize', sessionId: input.sessionId, cols: input.cols, rows: input.rows }))
+        return Promise.resolve(true)
+      }
       return fetchTerminalJson<TerminalMutationResult>('/api/terminal/resize', { ...input, attachmentId })
     },
     takeover(input) {
+      const ws = activeSocket()
+      if (ws) {
+        ws.send(encodeClientMessage({ type: 'takeover', sessionId: input.sessionId, cols: input.cols, rows: input.rows }))
+        return Promise.resolve({ ok: true, sessionId: input.sessionId, controller: null, canonicalCols: input.cols, canonicalRows: input.rows } as TerminalTakeoverResult)
+      }
       return fetchTerminalJson<TerminalTakeoverResult>('/api/terminal/takeover', { ...input, attachmentId })
     },
     close(input) {
+      const ws = activeSocket()
+      if (ws) {
+        ws.send(encodeClientMessage({ type: 'close', sessionId: input.sessionId }))
+        return Promise.resolve(true)
+      }
       return fetchTerminalJson<TerminalMutationResult>('/api/terminal/close', input)
     },
     create(input) {
@@ -307,6 +332,10 @@ export function parseTerminalRealtimeMessage(data: unknown): TerminalRealtimeMes
     return normalizeTerminalRealtimeMessage(JSON.parse(data))
   } catch {}
   return null
+}
+
+function encodeClientMessage(message: TerminalClientMessage): string {
+  return JSON.stringify(message)
 }
 
 export function readOrCreateWebTerminalAttachmentId(): string {

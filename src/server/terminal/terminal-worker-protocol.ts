@@ -71,6 +71,13 @@ export type TerminalWorkerRequest =
       attachmentId: string
     }
   | {
+      type: 'socket-message'
+      socketId: string
+      clientId: string
+      attachmentId: string
+      payload: string
+    }
+  | {
       type: 'shutdown'
     }
 

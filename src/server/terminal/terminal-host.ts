@@ -65,5 +65,7 @@ export interface ServerTerminalHost {
   create(clientId: string, input: TerminalCreateInput): MaybePromise<TerminalCatalogMutationResult>
   prune(clientId: string, repoRoot: string): MaybePromise<{ pruned: number; remaining: number }>
   getSessionSnapshot(clientId: string, input: TerminalSessionSnapshotInput): MaybePromise<TerminalSessionSnapshot | null>
+  /** Handle an incoming realtime message from a client socket. */
+  handleRealtimeMessage(clientId: string, attachmentId: string, socket: ServerTerminalSocket, message: string): void
   shutdown(): void
 }

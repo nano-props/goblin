@@ -161,10 +161,19 @@ export type TerminalRealtimeMessage =
   | { type: 'ownership'; event: TerminalOwnershipEvent }
   | { type: 'sessions-changed'; repoRoot: string }
 
+/** Client → Server realtime messages over the bidirectional WebSocket. */
+export type TerminalClientMessage =
+  | { type: 'write'; sessionId: string; data: string }
+  | { type: 'resize'; sessionId: string; cols: number; rows: number }
+  | { type: 'takeover'; sessionId: string; cols: number; rows: number }
+  | { type: 'close'; sessionId: string }
+
 const MIN_TERMINAL_COLS = 1
 const MAX_TERMINAL_COLS = 500
 const MIN_TERMINAL_ROWS = 1
 const MAX_TERMINAL_ROWS = 300
+const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
+const TERMINAL_SESSION_ID_RE = /^[A-Za-z0-9_-]{16,64}$/
 const TERMINAL_ATTACHMENT_ID_RE = /^[A-Za-z0-9_-]{1,128}$/
 const TERMINAL_CONNECTED_CONTROLLER_STATUS_VALUES = ['connected', 'grace'] satisfies Exclude<TerminalControllerStatus, 'none'>[]
 const TerminalControllerSchema = v.object({
@@ -213,6 +222,30 @@ const TerminalRealtimeMessageSchema = v.variant('type', [
   v.object({ type: v.literal('sessions-changed'), repoRoot: v.string() }),
 ])
 
+const TerminalClientMessageSchema = v.variant('type', [
+  v.object({
+    type: v.literal('write'),
+    sessionId: v.pipe(v.string(), v.regex(TERMINAL_SESSION_ID_RE)),
+    data: v.pipe(v.string(), v.maxLength(MAX_TERMINAL_WRITE_CHARS)),
+  }),
+  v.object({
+    type: v.literal('resize'),
+    sessionId: v.pipe(v.string(), v.regex(TERMINAL_SESSION_ID_RE)),
+    cols: v.pipe(v.number(), v.integer(), v.minValue(MIN_TERMINAL_COLS), v.maxValue(MAX_TERMINAL_COLS)),
+    rows: v.pipe(v.number(), v.integer(), v.minValue(MIN_TERMINAL_ROWS), v.maxValue(MAX_TERMINAL_ROWS)),
+  }),
+  v.object({
+    type: v.literal('takeover'),
+    sessionId: v.pipe(v.string(), v.regex(TERMINAL_SESSION_ID_RE)),
+    cols: v.pipe(v.number(), v.integer(), v.minValue(MIN_TERMINAL_COLS), v.maxValue(MAX_TERMINAL_COLS)),
+    rows: v.pipe(v.number(), v.integer(), v.minValue(MIN_TERMINAL_ROWS), v.maxValue(MAX_TERMINAL_ROWS)),
+  }),
+  v.object({
+    type: v.literal('close'),
+    sessionId: v.pipe(v.string(), v.regex(TERMINAL_SESSION_ID_RE)),
+  }),
+])
+
 export function normalizeTerminalSize(cols: unknown, rows: unknown): { cols: number; rows: number } | null {
   if (typeof cols !== 'number' || typeof rows !== 'number' || !Number.isFinite(cols) || !Number.isFinite(rows)) {
     return null
@@ -256,6 +289,11 @@ export function normalizeTerminalSessionSnapshot(value: unknown): TerminalSessio
 
 export function normalizeTerminalRealtimeMessage(value: unknown): TerminalRealtimeMessage | null {
   const parsed = v.safeParse(TerminalRealtimeMessageSchema, value)
+  return parsed.success ? parsed.output : null
+}
+
+export function normalizeTerminalClientMessage(value: unknown): TerminalClientMessage | null {
+  const parsed = v.safeParse(TerminalClientMessageSchema, value)
   return parsed.success ? parsed.output : null
 }
 

@@ -43,6 +43,8 @@ export class ManagedTerminalSession {
 
   private pendingResize: { cols: number; rows: number } | null = null
   private pendingOutput: string[] = []
+  private pendingWriteBuffer = ''
+  private inputFlushScheduled = false
   private hydratedSnapshot: { snapshot: string; snapshotSeq: number } | null = null
   private disposed = false
 
@@ -118,6 +120,26 @@ export class ManagedTerminalSession {
   writeInput(data: string): void {
     const sessionId = this.runtime.currentSessionId()
     if (!sessionId || !this.runtime.canResize()) return
+    this.pendingWriteBuffer += data
+    this.scheduleInputFlush()
+  }
+
+  private scheduleInputFlush(): void {
+    if (this.disposed || this.inputFlushScheduled) return
+    this.inputFlushScheduled = true
+    queueMicrotask(() => {
+      this.inputFlushScheduled = false
+      this.flushInput()
+    })
+  }
+
+  private flushInput(): void {
+    if (this.disposed) return
+    const sessionId = this.runtime.currentSessionId()
+    if (!sessionId || !this.runtime.canResize()) return
+    const data = this.pendingWriteBuffer
+    this.pendingWriteBuffer = ''
+    if (!data) return
     void terminalBridge.write({ sessionId, data }).catch(() => {})
   }
 
@@ -472,6 +494,8 @@ export class ManagedTerminalSession {
     }
     this.pendingResize = null
     this.pendingOutput = []
+    this.pendingWriteBuffer = ''
+    this.inputFlushScheduled = false
     this.startToken += 1
     if (!options?.preserveTransientState) this.runtime.resetTransientState()
     this.view.destroyTerminal()

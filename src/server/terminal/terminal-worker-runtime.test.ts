@@ -18,6 +18,7 @@ function createTerminalFacadeStub(): TerminalFacade {
     create: vi.fn(async () => ({ ok: true as const, action: 'created' as const, key: '/repo\0/wt\0terminal-1', sessions: [] })),
     prune: vi.fn(async () => ({ pruned: 1, remaining: 0 })),
     getSessionSnapshot: vi.fn(async () => null),
+    handleRealtimeMessage: vi.fn(),
     shutdown: vi.fn(),
   }
 }
@@ -76,6 +77,29 @@ describe('terminal worker runtime', () => {
       { type: 'socket-send', socketId: 'socket_1', payload: 'hello' },
       { type: 'socket-close', socketId: 'socket_1', code: 1000, reason: 'done' },
     ])
+  })
+
+  test('forwards socket-message to the facade handleRealtimeMessage', async () => {
+    const service = createTerminalFacadeStub()
+    const runtime = new TerminalWorkerRuntime({
+      service,
+      emit: vi.fn(),
+      exit: vi.fn(),
+    })
+
+    await runtime.handleMessage({
+      type: 'socket-message',
+      socketId: 'socket_1',
+      clientId: 'client_1',
+      attachmentId: 'attachment_a',
+      payload: '{"type":"write","sessionId":"term_123","data":"hello"}',
+    })
+
+    expect(service.handleRealtimeMessage).toHaveBeenCalledWith(
+      'client_1',
+      'attachment_a',
+      '{"type":"write","sessionId":"term_123","data":"hello"}',
+    )
   })
 
   test('shuts down the terminal facade and exits on shutdown messages', async () => {

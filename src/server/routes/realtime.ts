@@ -47,6 +47,11 @@ export function createRealtimeRoutes({ internalSecret, terminalHost }: RealtimeR
         onOpen(_event, ws) {
           terminalHost.registerSocket(clientId, attachmentId, ws as ServerTerminalSocket)
         },
+        onMessage(event, ws) {
+          if (typeof event.data === 'string') {
+            terminalHost.handleRealtimeMessage(clientId, attachmentId, ws as ServerTerminalSocket, event.data)
+          }
+        },
         onClose(_event, ws) {
           terminalHost.unregisterSocket(clientId, attachmentId, ws as ServerTerminalSocket)
         },

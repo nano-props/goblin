@@ -12,8 +12,10 @@ import {
   isValidTerminalAttachmentId,
   isValidTerminalNotifyBellInput,
   isValidTerminalSize,
+  normalizeTerminalClientMessage,
   type TerminalAttachInput,
   type TerminalAttachResult,
+  type TerminalClientMessage,
   type TerminalMutationResult,
   type TerminalNotifyBellInput,
   type TerminalResizeInput,
@@ -234,6 +236,53 @@ export async function getServerTerminalSessionSnapshot(
   if (!isValidTerminalClientId(clientId)) return null
   if (!isValidTerminalSessionId(input?.sessionId)) return null
   return await manager.snapshotSession(input.sessionId)
+}
+
+export function handleRealtimeServerMessage(clientId: string, attachmentId: string, payload: string): void {
+  if (!isValidTerminalClientId(clientId) || !isValidTerminalAttachmentId(attachmentId)) return
+  let message: TerminalClientMessage | null = null
+  try {
+    message = normalizeTerminalClientMessage(JSON.parse(payload))
+  } catch {
+    return
+  }
+  if (!message) return
+  switch (message.type) {
+    case 'write': {
+      manager.writeSession(clientId, message.sessionId, message.data, attachmentId)
+      break
+    }
+    case 'resize': {
+      manager.resizeSession(
+        clientId,
+        message.sessionId,
+        message.cols,
+        message.rows,
+        attachmentId,
+        broker.attachmentIsConnected(clientId, attachmentId),
+      )
+      break
+    }
+    case 'takeover': {
+      const effect = manager.takeoverSession(
+        clientId,
+        message.sessionId,
+        message.cols,
+        message.rows,
+        attachmentId,
+        broker.attachmentIsConnected(clientId, attachmentId),
+      )
+      // Non-blocking: takeover result is not awaited; authoritative ownership is pushed via realtime.
+      void effect
+      break
+    }
+    case 'close': {
+      const repoRoot = manager.getSession(clientId, message.sessionId)?.scope
+      const closed = manager.closeOwnedSession(clientId, message.sessionId)
+      if (closed && repoRoot) broker.broadcastGlobal({ type: 'sessions-changed', repoRoot })
+      break
+    }
+  }
 }
 
 export function closeAllServerTerminalSessions(): void {

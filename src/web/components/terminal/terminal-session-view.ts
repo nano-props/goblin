@@ -18,7 +18,11 @@ import {
   terminalSearchDecorationsForCurrentDocument,
   terminalThemeForCurrentDocument,
 } from '#/web/components/terminal/terminal-theme.ts'
-import { isMacNavigatorPlatform, terminalInputForMacOptionArrow } from '#/web/components/terminal/terminal-keyboard.ts'
+import {
+  isMacNavigatorPlatform,
+  terminalInputForMacOptionArrow,
+  terminalInputForSafariShiftKey,
+} from '#/web/components/terminal/terminal-keyboard.ts'
 const DEFAULT_PARKING_WIDTH = 800
 const DEFAULT_PARKING_HEIGHT = 400
 const DEFAULT_TERMINAL_COLS = 80
@@ -230,18 +234,27 @@ export class TerminalSessionView {
     if (!this.frame.contains(this.xtermHost)) this.frame.appendChild(this.xtermHost)
   }
 
-  private installKeyboardHandlers(term: XTermTerminal, onMacOptionInput: (input: string) => void): void {
+  private installKeyboardHandlers(term: XTermTerminal, onInput: (input: string) => void): void {
     const isMac = isMacNavigatorPlatform(globalThis.navigator?.platform ?? '')
     term.attachCustomKeyEventHandler((event) => {
-      const input = terminalInputForMacOptionArrow(event, {
+      const optionInput = terminalInputForMacOptionArrow(event, {
         isMac,
         applicationCursorKeysMode: term.modes.applicationCursorKeysMode,
       })
-      if (!input) return true
-      event.preventDefault()
-      event.stopPropagation()
-      onMacOptionInput(input)
-      return false
+      if (optionInput) {
+        event.preventDefault()
+        event.stopPropagation()
+        onInput(optionInput)
+        return false
+      }
+      const safariShiftInput = terminalInputForSafariShiftKey(event)
+      if (safariShiftInput) {
+        event.preventDefault()
+        event.stopPropagation()
+        onInput(safariShiftInput)
+        return false
+      }
+      return true
     })
   }
 

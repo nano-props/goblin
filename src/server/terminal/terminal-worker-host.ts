@@ -67,6 +67,7 @@ export class WorkerBackedTerminalHost implements ServerTerminalHost {
   private readonly pending = new Map<string, PendingRequest<unknown>>()
   private readonly sockets = new Map<string, ServerTerminalSocket>()
   private readonly socketMeta = new Map<string, { clientId: string; attachmentId: string }>()
+  private socketIdBySocket = new WeakMap<ServerTerminalSocket, string>()
   private restartAttempts = 0
   private workerStartedAt = 0
   private restartTimer: WorkerTimerHandle | null = null
@@ -113,20 +114,18 @@ export class WorkerBackedTerminalHost implements ServerTerminalHost {
     const socketId = createSocketId()
     this.sockets.set(socketId, socket)
     this.socketMeta.set(socketId, { clientId, attachmentId })
+    this.socketIdBySocket.set(socket, socketId)
     worker.send?.({ type: 'socket-register', socketId, clientId, attachmentId })
   }
 
   unregisterSocket(clientId: string, attachmentId: string, socket: ServerTerminalSocket): void {
-    const entry = Array.from(this.sockets.entries()).find(
-      ([socketId, value]) =>
-        value === socket &&
-        this.socketMeta.get(socketId)?.clientId === clientId &&
-        this.socketMeta.get(socketId)?.attachmentId === attachmentId,
-    )
-    if (!entry) return
-    const [socketId] = entry
+    const socketId = this.socketIdBySocket.get(socket)
+    if (!socketId) return
+    const meta = this.socketMeta.get(socketId)
+    if (!meta || meta.clientId !== clientId || meta.attachmentId !== attachmentId) return
     this.sockets.delete(socketId)
     this.socketMeta.delete(socketId)
+    this.socketIdBySocket.delete(socket)
     this.worker?.send?.({ type: 'socket-unregister', socketId, clientId, attachmentId })
   }
 
@@ -174,6 +173,14 @@ export class WorkerBackedTerminalHost implements ServerTerminalHost {
     return this.request('session-snapshot', clientId, input)
   }
 
+  handleRealtimeMessage(clientId: string, attachmentId: string, socket: ServerTerminalSocket, message: string): void {
+    const socketId = this.socketIdBySocket.get(socket)
+    if (!socketId) return
+    const meta = this.socketMeta.get(socketId)
+    if (!meta || meta.clientId !== clientId || meta.attachmentId !== attachmentId) return
+    this.worker?.send?.({ type: 'socket-message', socketId, clientId, attachmentId, payload: message })
+  }
+
   shutdown(): void {
     this.shuttingDown = true
     this.clearRestartTimer()
@@ -187,6 +194,7 @@ export class WorkerBackedTerminalHost implements ServerTerminalHost {
     this.pending.clear()
     this.socketMeta.clear()
     this.sockets.clear()
+    this.socketIdBySocket = new WeakMap()
     worker?.send?.({ type: 'shutdown' })
     try {
       worker?.disconnect?.()
