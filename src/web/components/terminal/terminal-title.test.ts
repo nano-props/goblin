@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { compactTerminalTitle } from '#/web/components/terminal/terminal-session-utils.ts'
+import { compactTerminalProcessName, compactTerminalTitle } from '#/web/components/terminal/terminal-title.ts'
 
 describe('compactTerminalTitle', () => {
   test('prefers the trailing command segment from long terminal titles', () => {
@@ -37,5 +37,30 @@ describe('compactTerminalTitle', () => {
     expect(compactTerminalTitle('ubuntu@VM-0-12-ubuntu: dirname-a')).toBe('dirname-a')
     expect(compactTerminalTitle('ubuntu@VM-0-12-ubuntu:~/projects/goblin')).toBe('goblin')
     expect(compactTerminalTitle('ubuntu@VM-0-12-ubuntu:~/projects/goblin — npm run dev')).toBe('goblin · npm run dev')
+  })
+
+  test('handles nested terminal title wrappers from real remote sessions', () => {
+    expect(compactTerminalTitle('devin: ubuntu@VM-0-12-ubuntu:~/projects/goblin — npm run dev')).toBe(
+      'goblin · npm run dev',
+    )
+    expect(compactTerminalTitle('devin: user@prod:~/services/payments/api')).toBe('user@prod · api')
+  })
+
+  test('keeps readable short names for real ssh and command titles', () => {
+    expect(compactTerminalTitle('user@prod:~/services/payments/api — npm run dev')).toBe('user@prod · api · npm run dev')
+    expect(compactTerminalTitle('~/src/project-name — python manage.py shell')).toBe('project-name · python manage.py…')
+  })
+})
+
+describe('compactTerminalProcessName', () => {
+  test('compacts shell executable paths to their basename', () => {
+    expect(compactTerminalProcessName('/bin/bash')).toBe('bash')
+    expect(compactTerminalProcessName('/bin/zsh')).toBe('zsh')
+    expect(compactTerminalProcessName('/usr/bin/fish')).toBe('fish')
+  })
+
+  test('keeps plain process names unchanged', () => {
+    expect(compactTerminalProcessName('bash')).toBe('bash')
+    expect(compactTerminalProcessName('node')).toBe('node')
   })
 })

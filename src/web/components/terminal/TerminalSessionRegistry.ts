@@ -1,11 +1,9 @@
 import { setTerminalFocused } from '#/web/terminal-focus.ts'
 import { ManagedTerminalSession } from '#/web/components/terminal/ManagedTerminalSession.ts'
 import { createTerminalBellController } from '#/web/components/terminal/terminal-bell-controller.ts'
-import {
-  compactTerminalTitle,
-  terminalDescriptor,
-  worktreeTerminalKey,
-} from '#/web/components/terminal/terminal-session-utils.ts'
+import { terminalDescriptor } from '#/web/components/terminal/terminal-descriptor.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
+import { compactTerminalProcessName, compactTerminalTitle } from '#/web/components/terminal/terminal-title.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 import { readOrCreateWebTerminalAttachmentId } from '#/web/renderer-terminal-bridge.ts'
 import { resolveTerminalOwnership } from '#/shared/terminal.ts'
@@ -13,7 +11,7 @@ import type {
   TerminalSessionSnapshot,
   TerminalSessionSummary as ServerTerminalSessionSummary,
 } from '#/shared/terminal.ts'
-import { branchForTerminalWorktree } from '#/web/components/terminal/terminal-repo-utils.ts'
+import { branchForTerminalWorktree } from '#/web/components/terminal/terminal-repo-index.ts'
 import type {
   TerminalDescriptor,
   TerminalRepoIndex,
@@ -604,7 +602,8 @@ export class TerminalSessionRegistry {
 function summarizeTerminalTitle(snapshot: TerminalSnapshot, index: number): string {
   const canonicalTitle = typeof snapshot.canonicalTitle === 'string' ? snapshot.canonicalTitle.trim() : ''
   if (canonicalTitle) return compactTerminalTitle(canonicalTitle) || canonicalTitle
-  return snapshot.processName || `terminal ${index}`
+  const processName = compactTerminalProcessName(snapshot.processName)
+  return processName || `terminal ${index}`
 }
 
 function fullTerminalTitle(snapshot: TerminalSnapshot, index: number): string {

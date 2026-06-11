@@ -15,7 +15,7 @@ import { cn } from '#/web/lib/cn.ts'
 import { setTerminalFocused } from '#/web/terminal-focus.ts'
 import { pathForDroppedFile } from '#/web/app-shell-client.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-utils.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import {
   useWorktreeTerminalSelectedDescriptor,

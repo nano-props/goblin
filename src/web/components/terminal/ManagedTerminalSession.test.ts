@@ -699,6 +699,49 @@ describe('ManagedTerminalSession', () => {
     }
   })
 
+  test('reuses remembered Safari layout for empty Shift+symbol events on multi-layout keys', async () => {
+    const savedUserAgent = navigator.userAgent
+    Object.defineProperty(window.navigator, 'userAgent', {
+      configurable: true,
+      value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
+    })
+    try {
+      const host = document.createElement('div')
+      document.body.appendChild(host)
+      const session = new ManagedTerminalSession(descriptor, vi.fn())
+      hydrateManagedSession(session)
+      session.attach(host)
+      await flushTerminalStart()
+      await flushUntil(() => session.snapshot().phase === 'open')
+
+      const term = xtermMocks.terminals[0]!
+      expect(term.customKeyEventHandler).toBeTypeOf('function')
+
+      const learnLayoutEvent = new KeyboardEvent('keydown', {
+        key: '；',
+        code: 'Semicolon',
+        shiftKey: false,
+        cancelable: true,
+      })
+      expect(term.customKeyEventHandler?.(learnLayoutEvent)).toBe(true)
+
+      const brokenShiftEvent = new KeyboardEvent('keydown', {
+        key: '',
+        code: 'Semicolon',
+        shiftKey: true,
+        cancelable: true,
+      })
+      expect(term.customKeyEventHandler?.(brokenShiftEvent)).toBe(false)
+
+      await flushTerminalStart()
+
+      expect(terminalCalls.write).toHaveBeenCalledTimes(1)
+      expect(terminalCalls.write).toHaveBeenCalledWith({ sessionId: 'session-1', data: '：' })
+    } finally {
+      Object.defineProperty(window.navigator, 'userAgent', { configurable: true, value: savedUserAgent })
+    }
+  })
+
   test('does not intercept Shift+symbol on Chrome', async () => {
     const savedUserAgent = navigator.userAgent
     Object.defineProperty(window.navigator, 'userAgent', {

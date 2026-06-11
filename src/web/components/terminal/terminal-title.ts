@@ -1,64 +1,42 @@
-import type { ReposStore } from '#/web/stores/repos/types.ts'
-import type { TerminalDescriptor, TerminalSessionBase } from '#/web/components/terminal/types.ts'
-
-export function worktreeTerminalKey(repoRoot: string, worktreePath: string): string {
-  return `${repoRoot}\0${worktreePath}`
-}
-
-export function terminalSessionKey(repoRoot: string, worktreePath: string, terminalId: string): string {
-  return `${worktreeTerminalKey(repoRoot, worktreePath)}\0${terminalId}`
-}
-
-export function parseTerminalSessionKey(key: string): { repoRoot: string; worktreePath: string; terminalId: string } | null {
-  const parts = key.split('\0')
-  if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return null
-  return { repoRoot: parts[0], worktreePath: parts[1], terminalId: parts[2] }
-}
-
-export function terminalDescriptor(base: TerminalSessionBase, terminalId: string, index: number): TerminalDescriptor {
-  const terminalWorktreeKey = worktreeTerminalKey(base.repoRoot, base.worktreePath)
-  return {
-    ...base,
-    worktreeTerminalKey: terminalWorktreeKey,
-    terminalId,
-    index,
-    key: terminalSessionKey(base.repoRoot, base.worktreePath, terminalId),
-  }
-}
-
-export function isTerminalDescriptorLive(repos: ReposStore['repos'], descriptor: TerminalDescriptor): boolean {
-  const repo = repos[descriptor.repoRoot]
-  return !!repo?.data.branches.some((branch) => branch.worktree?.path === descriptor.worktreePath)
-}
-
-export function stripTerminalControlSequences(value: string): string {
-  return value
-    .replace(/\x1b(?:[@-Z\-_]|\[[0-?]*[ -/]*[@-~])/g, '')
-    .replace(/\x1b\][^\x07]*\x07/g, '')
-    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '')
-}
-
 export function compactTerminalTitle(title: string): string {
-  const normalized = normalizeTitle(title)
-  if (!normalized) return ''
-  const labelStripped = stripLeadingLabel(normalized)
-  if (labelStripped !== normalized) return compactTerminalTitle(labelStripped)
-  const ubuntuVmStripped = stripUbuntuVmPrefix(labelStripped)
-  if (ubuntuVmStripped !== labelStripped) return compactTerminalTitle(ubuntuVmStripped)
-  const split = splitTerminalTitle(normalized)
-  if (split) {
-    const context = compactContext(split.leading)
-    const main = compactMain(split.trailing)
-    return joinCompactTitle(context, main)
+  const workingTitle = preprocessTitle(title)
+  if (!workingTitle) return ''
+  return compactStructuredTitle(workingTitle) ?? compactSimpleTitle(workingTitle)
+}
+
+export function compactTerminalProcessName(processName: string): string {
+  const workingName = normalizeTitle(processName)
+  if (!workingName) return ''
+  return compactPath(workingName) ?? workingName
+}
+
+function preprocessTitle(title: string): string {
+  let workingTitle = normalizeTitle(title)
+  while (workingTitle) {
+    const nextTitle = stripUbuntuVmPrefix(stripLeadingLabel(workingTitle))
+    if (nextTitle === workingTitle) return workingTitle
+    workingTitle = normalizeTitle(nextTitle)
   }
-  const url = compactUrl(normalized)
+  return ''
+}
+
+function compactStructuredTitle(title: string): string | null {
+  const split = splitTerminalTitle(title)
+  if (!split) return null
+  const context = compactContext(split.leading)
+  const main = compactMain(split.trailing)
+  return joinCompactTitle(context, main)
+}
+
+function compactSimpleTitle(title: string): string {
+  const url = compactUrl(title)
   if (url) return truncateTitle(url)
-  if (/\s/.test(normalized) && !startsWithPathPrefix(normalized)) return compactCommand(normalized)
-  const hostPath = compactHostPath(normalized)
+  if (/\s/.test(title) && !startsWithPathPrefix(title)) return compactCommand(title)
+  const hostPath = compactHostPath(title)
   if (hostPath) return truncateTitle(hostPath)
-  const pathLike = compactPath(normalized)
+  const pathLike = compactPath(title)
   if (pathLike) return truncateTitle(pathLike)
-  return compactCommand(normalized)
+  return compactCommand(title)
 }
 
 function compactHostPath(value: string): string | null {

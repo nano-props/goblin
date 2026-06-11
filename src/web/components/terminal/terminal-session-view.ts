@@ -19,9 +19,9 @@ import {
   terminalThemeForCurrentDocument,
 } from '#/web/components/terminal/terminal-theme.ts'
 import {
+  SafariShiftKeyResolver,
   isMacNavigatorPlatform,
   terminalInputForMacOptionArrow,
-  terminalInputForSafariShiftKey,
 } from '#/web/components/terminal/terminal-keyboard.ts'
 const DEFAULT_PARKING_WIDTH = 800
 const DEFAULT_PARKING_HEIGHT = 400
@@ -49,6 +49,7 @@ export class TerminalSessionView {
   private fontFitTimer: number | null = null
   private pinToBottomFrame: number | null = null
   private host: HTMLElement | null = null
+  private readonly safariShiftKeyResolver = new SafariShiftKeyResolver()
 
   constructor(handlers: {
     onInput: (data: string) => void
@@ -223,6 +224,7 @@ export class TerminalSessionView {
     this.disposeFontObserver = null
     this.cancelFontFit()
     this.cancelPinToBottom()
+    this.safariShiftKeyResolver.reset()
     this.fitAddon = null
     this.searchAddon = null
     this.serializeAddon = null
@@ -236,6 +238,7 @@ export class TerminalSessionView {
 
   private installKeyboardHandlers(term: XTermTerminal, onInput: (input: string) => void): void {
     const isMac = isMacNavigatorPlatform(globalThis.navigator?.platform ?? '')
+    const safariShiftKeyResolver = this.safariShiftKeyResolver
     term.attachCustomKeyEventHandler((event) => {
       const optionInput = terminalInputForMacOptionArrow(event, {
         isMac,
@@ -247,7 +250,7 @@ export class TerminalSessionView {
         onInput(optionInput)
         return false
       }
-      const safariShiftInput = terminalInputForSafariShiftKey(event)
+      const safariShiftInput = safariShiftKeyResolver.inputForEvent(event)
       if (safariShiftInput) {
         event.preventDefault()
         event.stopPropagation()

@@ -8,7 +8,7 @@ import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessi
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { useWorktreeTerminalCount, useTerminalSessionSummaries } from '#/web/components/terminal/terminal-session-store.ts'
 import { RepoSyncTracker } from '#/web/components/terminal/repo-sync-tracker.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-utils.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { mainWindowQueryClient } from '#/web/main-window-queries.ts'

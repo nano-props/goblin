@@ -8,6 +8,8 @@ interface TerminalKeyEventLike {
   code?: string
 }
 
+type SafariShiftKeyPair = readonly [unshifted: string, shifted: string]
+
 const MAC_OPTION_ARROW_INPUT: Record<string, string> = {
   ArrowLeft: '\x1bb',
   ArrowRight: '\x1bf',
@@ -26,9 +28,10 @@ const MAC_OPTION_ARROW_INPUT: Record<string, string> = {
 // https://bugs.webkit.org/show_bug.cgi?id=182566
 //
 // Each code maps to one or more [unshifted, shifted] pairs so that different keyboard layouts
-// (US QWERTY, Chinese Simplified, etc.) are covered. When Safari reports a broken key we look up
-// the pair whose unshifted side matches event.key and return the corresponding shifted character.
-const SAFARI_SHIFT_KEY_PAIRS: Record<string, Array<[string, string]>> = {
+// (US QWERTY, Chinese Simplified, etc.) are covered. When Safari reports a broken Shift+symbol
+// key we either match the current event.key to one of the known layouts or reuse the most
+// recently observed layout for that physical key, then send the corresponding shifted character.
+const SAFARI_SHIFT_KEY_PAIRS: Record<string, ReadonlyArray<SafariShiftKeyPair>> = {
   Backquote: [['`', '~']],
   Digit1: [['1', '!']],
   Digit2: [['2', '@']],
@@ -86,29 +89,48 @@ export function terminalInputForMacOptionArrow(
   return MAC_OPTION_ARROW_INPUT[event.key] ?? null
 }
 
-export function terminalInputForSafariShiftKey(event: TerminalKeyEventLike): string | null {
-  if (typeof navigator === 'undefined') return null
-  if (!isSafariNavigator()) return null
-  if (event.type !== 'keydown') return null
-  if (!event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return null
-  const code = event.code
-  if (!code) return null
-  const pairs = SAFARI_SHIFT_KEY_PAIRS[code]
-  if (!pairs) return null
+export class SafariShiftKeyResolver {
+  private readonly layoutIndexByCode = new Map<string, number>()
 
-  // If key is already the expected shifted character for any known layout, let xterm.js handle it.
-  for (const [, shifted] of pairs) {
-    if (event.key === shifted) return null
+  // This remembered-layout heuristic is intentionally per-terminal and best-effort. If the user
+  // switches keyboard layouts and the first subsequent broken Shift+symbol event still reports an
+  // empty/Unidentified key, we may briefly reuse the previous layout until a reliable event
+  // updates the remembered mapping.
+  reset(): void {
+    this.layoutIndexByCode.clear()
   }
 
-  // key is empty, Unidentified, or one of the known unshifted characters — override.
-  if (!event.key || event.key === 'Unidentified') {
-    return pairs[0][1]
+  inputForEvent(event: TerminalKeyEventLike): string | null {
+    if (typeof navigator === 'undefined') return null
+    if (!isSafariNavigator()) return null
+    if (event.type !== 'keydown') return null
+    if (event.ctrlKey || event.altKey || event.metaKey) return null
+    const code = event.code
+    if (!code) return null
+    const pairs = SAFARI_SHIFT_KEY_PAIRS[code]
+    if (!pairs) return null
+
+    const layoutIndex = safariShiftLayoutIndexForKey(event.key, pairs, event.shiftKey ? 'either' : 'unshifted')
+    if (layoutIndex != null) this.layoutIndexByCode.set(code, layoutIndex)
+    if (!event.shiftKey) return null
+
+    if (layoutIndex != null) {
+      const [unshifted, shifted] = pairs[layoutIndex]
+      if (event.key === shifted) return null
+      if (event.key === unshifted) return shifted
+    }
+
+    // When Safari provides no usable key value, only fall back automatically for codes with a
+    // single known layout. For multi-layout keys, use the most recently confirmed layout for this
+    // physical key if we have one; otherwise stay hands-off and let xterm/browser behavior stand.
+    if (!event.key || event.key === 'Unidentified') {
+      const rememberedLayoutIndex = this.layoutIndexByCode.get(code)
+      if (rememberedLayoutIndex != null) return pairs[rememberedLayoutIndex]?.[1] ?? null
+      return pairs.length === 1 ? pairs[0][1] : null
+    }
+
+    return null
   }
-  for (const [unshifted, shifted] of pairs) {
-    if (event.key === unshifted) return shifted
-  }
-  return null
 }
 
 export function isMacNavigatorPlatform(platform: string): boolean {
@@ -123,4 +145,17 @@ function isSafariNavigator(): boolean {
   } catch {
     return false
   }
+}
+
+function safariShiftLayoutIndexForKey(
+  key: string,
+  pairs: ReadonlyArray<SafariShiftKeyPair>,
+  mode: 'unshifted' | 'either',
+): number | null {
+  if (!key || key === 'Unidentified') return null
+  for (const [index, [unshifted, shifted]] of pairs.entries()) {
+    if (key === unshifted) return index
+    if (mode === 'either' && key === shifted) return index
+  }
+  return null
 }
