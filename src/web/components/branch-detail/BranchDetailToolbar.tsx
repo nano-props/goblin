@@ -182,10 +182,10 @@ export function BranchDetailToolbar({
                   }}
                   onKeyDown={(e) => handleTabKeyDown(e, tabId)}
                   className={cn(
-                    'h-7 gap-1.5 px-2.5 text-sm font-normal',
+                    'h-7 gap-1.5 border px-2.5 text-sm font-normal',
                     visuallySelected
-                      ? 'bg-selected text-selected-foreground'
-                      : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+                      ? 'border-transparent bg-selected text-selected-foreground'
+                      : 'border-separator text-muted-foreground hover:bg-accent/50 hover:text-foreground',
                   )}
                 >
                   {t(tab.labelKey)}

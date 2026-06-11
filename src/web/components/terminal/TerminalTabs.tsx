@@ -133,7 +133,7 @@ export function TerminalTabs({
         ref={focusRegistry.setRef(emptyFocusKey)}
         type="button"
         variant="ghost"
-        className="h-7 px-2.5 text-sm font-normal"
+        className="h-7 border border-separator px-2.5 text-sm font-normal text-muted-foreground hover:bg-accent/50 hover:text-foreground"
         id={`${detailId}-terminal-tab`}
         onClick={onNew}
         aria-label={t('terminal.new')}
@@ -154,10 +154,10 @@ export function TerminalTabs({
         key={session.key}
         data-terminal-tab-tooltip-id={session.key}
         className={cn(
-          'group relative flex h-7 w-28 shrink-0 items-center gap-1 rounded-md px-2.5 text-sm transition-colors duration-100',
+          'group relative flex h-7 w-28 shrink-0 items-center gap-1 rounded-md border px-2.5 text-sm transition-colors duration-100',
           isActive
-            ? 'bg-selected text-selected-foreground'
-            : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+            ? 'border-transparent bg-selected text-selected-foreground'
+            : 'border-separator text-muted-foreground hover:bg-accent/50 hover:text-foreground',
         )}
       >
         <button
