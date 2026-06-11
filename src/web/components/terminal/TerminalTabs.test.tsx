@@ -223,6 +223,224 @@ describe('TerminalTabs', () => {
     expect(onNavigateOut).toHaveBeenNthCalledWith(2, 'first')
   })
 
+  test('scrolls the tab strip to the far right when a new terminal session is added', () => {
+    render(
+      <TerminalTabs
+        worktreeTerminalKey="/repo\0/repo/worktree"
+        detailId="detail"
+        sessions={[
+          session({ key: 't1', title: 'term-1' }),
+          session({ key: 't2', title: 'term-2', selected: false }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+      />,
+    )
+
+    const viewport = document.body.querySelector('[data-radix-scroll-area-viewport]')
+    if (!(viewport instanceof HTMLDivElement)) throw new Error('missing scroll viewport')
+
+    Object.defineProperty(viewport, 'scrollWidth', { value: 1000, writable: true, configurable: true })
+    Object.defineProperty(viewport, 'scrollLeft', { value: 0, writable: true, configurable: true })
+
+    rerender(
+      <TerminalTabs
+        worktreeTerminalKey="/repo\0/repo/worktree"
+        detailId="detail"
+        sessions={[
+          session({ key: 't1', title: 'term-1' }),
+          session({ key: 't2', title: 'term-2', selected: false }),
+          session({ key: 't3', title: 'term-3', selected: false }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+      />,
+    )
+
+    expect(viewport.scrollLeft).toBe(1000)
+  })
+
+  test('does not scroll on initial mount', () => {
+    render(
+      <TerminalTabs
+        worktreeTerminalKey="/repo\0/repo/worktree"
+        detailId="detail"
+        sessions={[
+          session({ key: 't1', title: 'term-1' }),
+          session({ key: 't2', title: 'term-2', selected: false }),
+          session({ key: 't3', title: 'term-3', selected: false }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+      />,
+    )
+
+    const viewport = document.body.querySelector('[data-radix-scroll-area-viewport]')
+    if (!(viewport instanceof HTMLDivElement)) throw new Error('missing scroll viewport')
+
+    Object.defineProperty(viewport, 'scrollWidth', { value: 1000, writable: true, configurable: true })
+    Object.defineProperty(viewport, 'scrollLeft', { value: 0, writable: true, configurable: true })
+
+    // Trigger a re-render with the same sessions to confirm the effect does not scroll.
+    rerender(
+      <TerminalTabs
+        worktreeTerminalKey="/repo\0/repo/worktree"
+        detailId="detail"
+        sessions={[
+          session({ key: 't1', title: 'term-1' }),
+          session({ key: 't2', title: 'term-2', selected: false }),
+          session({ key: 't3', title: 'term-3', selected: false }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+      />,
+    )
+
+    expect(viewport.scrollLeft).toBe(0)
+  })
+
+  test('does not scroll when the tab strip does not overflow horizontally', () => {
+    render(
+      <TerminalTabs
+        worktreeTerminalKey="/repo\0/repo/worktree"
+        detailId="detail"
+        sessions={[
+          session({ key: 't1', title: 'term-1' }),
+          session({ key: 't2', title: 'term-2', selected: false }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+      />,
+    )
+
+    const viewport = document.body.querySelector('[data-radix-scroll-area-viewport]')
+    if (!(viewport instanceof HTMLDivElement)) throw new Error('missing scroll viewport')
+
+    // Content fits within the viewport (no horizontal overflow).
+    Object.defineProperty(viewport, 'scrollWidth', { value: 400, writable: true, configurable: true })
+    Object.defineProperty(viewport, 'clientWidth', { value: 600, writable: true, configurable: true })
+    Object.defineProperty(viewport, 'scrollLeft', { value: 0, writable: true, configurable: true })
+
+    rerender(
+      <TerminalTabs
+        worktreeTerminalKey="/repo\0/repo/worktree"
+        detailId="detail"
+        sessions={[
+          session({ key: 't1', title: 'term-1' }),
+          session({ key: 't2', title: 'term-2', selected: false }),
+          session({ key: 't3', title: 'term-3', selected: false }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+      />,
+    )
+
+    expect(viewport.scrollLeft).toBe(0)
+  })
+
+  test('resets the inline scroll-behavior after a new session scroll settles', async () => {
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
+      cb(0)
+      return 0
+    })
+
+    render(
+      <TerminalTabs
+        worktreeTerminalKey="/repo\0/repo/worktree"
+        detailId="detail"
+        sessions={[
+          session({ key: 't1', title: 'term-1' }),
+          session({ key: 't2', title: 'term-2', selected: false }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+      />,
+    )
+
+    const viewport = document.body.querySelector('[data-radix-scroll-area-viewport]')
+    if (!(viewport instanceof HTMLDivElement)) throw new Error('missing scroll viewport')
+
+    Object.defineProperty(viewport, 'scrollWidth', { value: 1000, writable: true, configurable: true })
+    Object.defineProperty(viewport, 'clientWidth', { value: 600, writable: true, configurable: true })
+    Object.defineProperty(viewport, 'scrollLeft', { value: 0, writable: true, configurable: true })
+
+    rerender(
+      <TerminalTabs
+        worktreeTerminalKey="/repo\0/repo/worktree"
+        detailId="detail"
+        sessions={[
+          session({ key: 't1', title: 'term-1' }),
+          session({ key: 't2', title: 'term-2', selected: false }),
+          session({ key: 't3', title: 'term-3', selected: false }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+      />,
+    )
+
+    // After the rAF callback runs, the inline scroll-behavior should be cleared so that
+    // subsequent user-driven scrolls (e.g. dragging the scrollbar) are not animated.
+    expect(viewport.style.scrollBehavior).toBe('')
+    expect(viewport.scrollLeft).toBe(1000)
+  })
+
+  test('does not scroll when a terminal session is removed', () => {
+    render(
+      <TerminalTabs
+        worktreeTerminalKey="/repo\0/repo/worktree"
+        detailId="detail"
+        sessions={[
+          session({ key: 't1', title: 'term-1' }),
+          session({ key: 't2', title: 'term-2', selected: false }),
+          session({ key: 't3', title: 'term-3', selected: false }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+      />,
+    )
+
+    const viewport = document.body.querySelector('[data-radix-scroll-area-viewport]')
+    if (!(viewport instanceof HTMLDivElement)) throw new Error('missing scroll viewport')
+
+    Object.defineProperty(viewport, 'scrollWidth', { value: 1000, writable: true, configurable: true })
+    Object.defineProperty(viewport, 'scrollLeft', { value: 500, writable: true, configurable: true })
+
+    rerender(
+      <TerminalTabs
+        worktreeTerminalKey="/repo\0/repo/worktree"
+        detailId="detail"
+        sessions={[
+          session({ key: 't1', title: 'term-1' }),
+          session({ key: 't2', title: 'term-2', selected: false }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+      />,
+    )
+
+    expect(viewport.scrollLeft).toBe(500)
+  })
+
   test('restores the full tab strip after leaving compact mode', () => {
     rerender(
       <TerminalTabs
