@@ -320,6 +320,7 @@ export const en = {
   'terminal.search-next': 'Next',
   'terminal.search-close': 'Close',
   'terminal.sessions': 'Terminals',
+  'terminal.label': 'Terminal',
   'terminal.new': 'New terminal',
   'terminal.empty-title': 'No terminals yet',
   'terminal.empty-hint': 'Press ⌘⏎ to open or create a terminal',

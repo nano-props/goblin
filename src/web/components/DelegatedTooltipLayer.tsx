@@ -15,7 +15,7 @@ interface TooltipState<T> {
   rect: AnchorRect
 }
 
-type DelegatedTooltipPlacement = 'bottom-start' | 'left'
+type DelegatedTooltipPlacement = 'bottom-start' | 'left' | 'top-start'
 
 interface DelegatedTooltipLayerProps<T> extends ComponentPropsWithoutRef<'div'> {
   items: readonly T[]
@@ -44,6 +44,7 @@ export const DELEGATED_TOOLTIP_TRANSITIONS = {
   fade: 'opacity 100ms ease-out',
   slideBottomStart: 'left 150ms ease-out, opacity 100ms ease-out',
   slideLeft: 'top 150ms ease-out, opacity 100ms ease-out',
+  slideTopStart: 'left 150ms ease-out, opacity 100ms ease-out',
 } as const
 
 export function DelegatedTooltipLayer<T>({
@@ -300,7 +301,11 @@ function DelegatedTooltipPopup<T>({
 
   const position = tooltipPosition(tooltip.rect, size, { placement, maxWidth, margin, offset })
   const transition =
-    placement === 'left' ? DELEGATED_TOOLTIP_TRANSITIONS.slideLeft : DELEGATED_TOOLTIP_TRANSITIONS.slideBottomStart
+    placement === 'left'
+      ? DELEGATED_TOOLTIP_TRANSITIONS.slideLeft
+      : placement === 'top-start'
+        ? DELEGATED_TOOLTIP_TRANSITIONS.slideTopStart
+        : DELEGATED_TOOLTIP_TRANSITIONS.slideBottomStart
 
   return createPortal(
     <div
@@ -398,6 +403,12 @@ function tooltipPosition(
         Math.max(margin, window.innerHeight - margin - size.height),
       ),
       transform: 'translateX(-100%)',
+    }
+  }
+  if (placement === 'top-start') {
+    return {
+      left: clamp(rect.left, margin, Math.max(margin, window.innerWidth - margin - size.width)),
+      top: clamp(rect.top - offset - size.height, margin, Math.max(margin, window.innerHeight - margin - size.height)),
     }
   }
   return {

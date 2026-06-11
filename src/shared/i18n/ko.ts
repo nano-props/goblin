@@ -311,6 +311,7 @@ export const ko: Record<DictKey, string> = {
   'terminal.search-next': '다음',
   'terminal.search-close': '닫기',
   'terminal.sessions': '터미널',
+  'terminal.label': '터미널',
   'terminal.new': '새 터미널',
   'terminal.empty-title': '아직 터미널이 없습니다',
   'terminal.empty-hint': '⌘⏎로 터미널을 열거나 생성하세요',
