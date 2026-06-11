@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, useCallback, useState } from 'react'
 import { ChevronDown, Download, FolderOpen, Plus, Server } from 'lucide-react'
 import {
   DndContext,
@@ -270,6 +270,19 @@ export function RepoTabStrip({
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
   const focusRegistry = useFocusRegistry<string, HTMLButtonElement>()
 
+  const handleClose = useCallback(
+    (id: string) => {
+      const isActive = id === activeId
+      const idx = repos.findIndex((r) => r.id === id)
+      const nextId = repos[idx + 1]?.id ?? repos[idx - 1]?.id ?? null
+      onClose(id)
+      if (isActive && nextId) {
+        focusRegistry.focus(nextId)
+      }
+    },
+    [repos, activeId, onClose, focusRegistry],
+  )
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
     if (!over || active.id === over.id) return
@@ -324,7 +337,7 @@ export function RepoTabStrip({
               focusRegistry={focusRegistry}
               onHoverChange={setHoveredId}
               onActivate={onActivate}
-              onClose={onClose}
+              onClose={handleClose}
               onKeyboardNavigate={handleKeyboardNavigate}
               moreMenu={
                 <DropdownMenu>
@@ -364,7 +377,7 @@ export function RepoTabStrip({
               focusRegistry={focusRegistry}
               onHoverChange={setHoveredId}
               onActivate={onActivate}
-              onClose={onClose}
+              onClose={handleClose}
               onKeyboardNavigate={handleKeyboardNavigate}
               sensors={sensors}
               onDragEnd={handleDragEnd}

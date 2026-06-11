@@ -476,6 +476,8 @@ export class TerminalSessionRegistry {
     const session = this.sessions.get(key)
     if (!session) return false
     const worktreeTerminalKey = session.descriptor.worktreeTerminalKey
+    const closedIndex = session.descriptor.index
+    const wasSelected = this.selectedKeyByWorktree.get(worktreeTerminalKey) === key
     this.syncSessionIdIndex(key, null)
     this.sessions.delete(key)
     this.snapshotCache.delete(key)
@@ -483,12 +485,14 @@ export class TerminalSessionRegistry {
     this.notifySnapshot(key)
     this.bellController.remove(key)
     if (options.dispose) session.dispose({ closeSession: options.closeSession !== false })
-    if (this.selectedKeyByWorktree.get(worktreeTerminalKey) === key) {
-      const next = this.resolveSelectedTerminalKey(
-        worktreeTerminalKey,
-        this.preferredSelectedKeyByWorktree.get(worktreeTerminalKey) ?? null,
-      )
-      this.selectTerminalKey(worktreeTerminalKey, next, { notify: false })
+    if (wasSelected) {
+      const remaining = Array.from(this.sessions.values())
+        .filter((s) => s.descriptor.worktreeTerminalKey === worktreeTerminalKey)
+        .sort((a, b) => a.descriptor.index - b.descriptor.index)
+      const right = remaining.find((s) => s.descriptor.index > closedIndex)
+      const left = remaining.filter((s) => s.descriptor.index < closedIndex).pop()
+      const nextKey = right?.descriptor.key ?? left?.descriptor.key ?? null
+      this.selectTerminalKey(worktreeTerminalKey, nextKey, { notify: false })
     }
     this.notifyWorktree(worktreeTerminalKey)
     if (!this.hasSessionsForWorktree(worktreeTerminalKey)) {

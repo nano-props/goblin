@@ -74,9 +74,18 @@ export function TerminalTabs({
     (event: React.MouseEvent, key: string) => {
       event.preventDefault()
       event.stopPropagation()
+
+      const isActive = sessions.find((s) => s.key === key)?.selected ?? false
+      const idx = sessions.findIndex((s) => s.key === key)
+      const nextKey = sessions[idx + 1]?.key ?? sessions[idx - 1]?.key ?? null
+
       onClose(key)
+
+      if (isActive && nextKey) {
+        focusRegistry.focus(nextKey)
+      }
     },
-    [onClose],
+    [onClose, sessions, focusRegistry],
   )
 
   const handleTabKeyDown = useCallback(
