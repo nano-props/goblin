@@ -29,8 +29,12 @@ import {
 
 const TERMINAL_CLIENT_ID_RE = /^[A-Za-z0-9_-]{1,128}$/
 const TERMINAL_ID_RE = /^[A-Za-z0-9_-]{1,64}$/
-const TERMINAL_DETACHED_TTL_MS = 6 * 60 * 60 * 1000
-const TERMINAL_OWNERSHIP_GRACE_MS = 3_000
+// Intentionally long TTL: we want terminals to survive as long as possible in
+// the background so users can leave builds or long-running tasks unattended.
+// 24 hours gives a full day for the user to reconnect before sessions are
+// forcibly cleaned up.
+const TERMINAL_DETACHED_TTL_MS = 24 * 60 * 60 * 1000
+const TERMINAL_OWNERSHIP_GRACE_MS = 30_000
 
 const manager = new TerminalSessionManager<string>({
   onOutput(clientId, event) {
