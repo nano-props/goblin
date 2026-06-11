@@ -1,5 +1,5 @@
 import { Plus, X, ChevronDown } from 'lucide-react'
-import { useCallback, type ComponentPropsWithoutRef } from 'react'
+import { useCallback, useLayoutEffect, useRef, type ComponentPropsWithoutRef } from 'react'
 import { cn } from '#/web/lib/cn.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
@@ -56,6 +56,28 @@ export function TerminalTabs({
   const activeSession = sessions.find((s) => s.selected) ?? sessions[0]
   const internalFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()
   const focusRegistry = externalFocusRegistry ?? internalFocusRegistry
+  const viewportRef = useRef<HTMLDivElement>(null)
+  const prevSessionCountRef = useRef(sessions.length)
+
+  useLayoutEffect(() => {
+    if (sessions.length <= prevSessionCountRef.current) {
+      prevSessionCountRef.current = sessions.length
+      return
+    }
+    prevSessionCountRef.current = sessions.length
+    const viewport = viewportRef.current
+    if (!viewport) return
+    if (viewport.scrollWidth <= viewport.clientWidth) return
+    viewport.style.scrollBehavior = 'smooth'
+    viewport.scrollLeft = viewport.scrollWidth
+    // Reset scroll-behavior on the next frame so subsequent user-driven scrolls
+    // (e.g. dragging the scrollbar) are not animated, while the in-flight scroll
+    // initiated above still benefits from the smooth behavior.
+    const frame = requestAnimationFrame(() => {
+      viewport.style.scrollBehavior = ''
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [sessions.length])
 
   const handleSelect = useCallback(
     (key: string) => {
@@ -292,6 +314,7 @@ export function TerminalTabs({
       compact={showCollapsedTabs}
       compactContent={renderCompactTabsBody()}
       scrollContent={renderScrollableTabsBody()}
+      viewportRef={viewportRef}
     />
   )
 }

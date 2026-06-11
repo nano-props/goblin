@@ -1,4 +1,4 @@
-import type { ComponentPropsWithoutRef, ReactNode } from 'react'
+import type { ComponentPropsWithoutRef, ReactNode, Ref } from 'react'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { cn } from '#/web/lib/cn.ts'
 
@@ -6,6 +6,7 @@ interface ToolbarTabStripProps {
   compact: boolean
   compactContent: ReactNode
   scrollContent: ReactNode
+  viewportRef?: Ref<HTMLDivElement>
 }
 
 // Shared toolbar tab-strip shell:
@@ -14,7 +15,7 @@ interface ToolbarTabStripProps {
 // Shared toolbar tab-strip shell:
 // - compact mode keeps a single flex row in the toolbar height
 // - expanded mode owns the horizontal ScrollArea + compact scrollbar semantics
-export function ToolbarTabStrip({ compact, compactContent, scrollContent }: ToolbarTabStripProps) {
+export function ToolbarTabStrip({ compact, compactContent, scrollContent, viewportRef }: ToolbarTabStripProps) {
   if (compact) {
     return <div className="flex h-full min-w-0 flex-1 items-center">{compactContent}</div>
   }
@@ -25,6 +26,7 @@ export function ToolbarTabStrip({ compact, compactContent, scrollContent }: Tool
       scrollbarMode="compact"
       className="h-full min-w-0 flex-1"
       viewportClassName="[&>div]:h-full"
+      viewportRef={viewportRef}
     >
       {scrollContent}
     </ScrollArea>
