@@ -5,7 +5,7 @@
 //             Goblin.app into ~/Applications, closing any running instance
 //             first. macOS-only.
 //
-// Usage: ./scripts/build.ts [install|i]
+// Usage: ./scripts/build.ts [install|i] [--clean]
 import { $ } from 'bun'
 import { chmodSync, existsSync, mkdirSync, renameSync, rmSync } from 'node:fs'
 import os from 'node:os'
@@ -20,9 +20,15 @@ $.cwd(repoRoot)
 const APP_NAME = 'Goblin'
 const APP_ID = 'goblin.app'
 
-const { positionals } = parseArgs({ allowPositionals: true })
+const { positionals, values } = parseArgs({
+  allowPositionals: true,
+  options: {
+    clean: { type: 'boolean', default: false },
+  },
+})
 const mode = positionals[0]
 const shouldInstall = mode === 'install' || mode === 'i'
+const shouldClean = values.clean ?? false
 
 async function findBuiltApp(): Promise<string | null> {
   // mac dir target emits one directory per declared arch (`mac-arm64`,
@@ -37,6 +43,19 @@ async function findBuiltApp(): Promise<string | null> {
 // artifact if electron-builder fails partway through. A matching rm
 // after a successful install is run below.
 rmSync(path.join(repoRoot, 'release'), { recursive: true, force: true })
+
+if (shouldClean) {
+  const caches = [
+    path.join(os.homedir(), 'Library/Caches/electron'),
+    path.join(os.homedir(), 'Library/Caches/electron-builder'),
+  ]
+  for (const cacheDir of caches) {
+    if (existsSync(cacheDir)) {
+      rmSync(cacheDir, { recursive: true, force: true })
+      console.log(`Cleaned cache: ${cacheDir}`)
+    }
+  }
+}
 
 await $`bun install`
 if (process.platform === 'darwin') {
