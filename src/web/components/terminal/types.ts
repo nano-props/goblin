@@ -89,6 +89,7 @@ export interface TerminalSessionSummary {
   index: number
   title: string
   fullTitle?: string
+  originalTitle?: string | null
   phase: TerminalPhase
   selected: boolean
   hasBell: boolean

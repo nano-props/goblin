@@ -620,6 +620,7 @@ export const en = {
   'help.row.view-changes': 'Changes',
   'help.row.view-log': 'Log',
   'help.row.view-terminal': 'Terminal',
+  'help.row.view-terminal-numbered': 'Terminal {index}',
   'help.row.terminal-primary-action': 'Open or create terminal',
   'help.row.switch-detail-tab': 'Previous / next detail tab',
   'help.row.toggle-detail': 'Collapse / expand detail panel',

@@ -4,6 +4,7 @@ import {
   closeAllServerTerminalSessions,
   createServerTerminal,
   getServerTerminalSessionSnapshot,
+  handleRealtimeServerMessage,
   listServerTerminalSessions,
   attachServerTerminal,
   registerTerminalSocket,
@@ -302,6 +303,122 @@ describe('server terminal sessions', () => {
       event: { sessionId: expect.any(String) },
     })
 
+    unregisterTerminalSocket('client_1', 'attachment_a', socket)
+  })
+
+  test('sends attach response before flushing buffered output emitted during the attach request', async () => {
+    const socket = { send: vi.fn(), close: vi.fn() }
+    registerTerminalSocket('client_1', 'attachment_a', socket)
+    const sessionId = await createTerminalSession('client_1')
+    socket.send.mockClear()
+
+    handleRealtimeServerMessage(
+      'client_1',
+      'attachment_a',
+      socket,
+      JSON.stringify({
+        type: 'request',
+        requestId: 'req_attach',
+        action: 'attach',
+        input: { sessionId, cols: 80, rows: 24 },
+      }),
+    )
+    mockPtys[0]?.emitData('during-attach')
+
+    await vi.waitFor(() => {
+      expect(
+        socket.send.mock.calls.some(([payload]) => JSON.parse(String(payload)).type === 'response'),
+      ).toBe(true)
+      expect(
+        socket.send.mock.calls.some(([payload]) => JSON.parse(String(payload)).type === 'output'),
+      ).toBe(true)
+    })
+
+    const messages = socket.send.mock.calls.map(([payload]) => JSON.parse(String(payload)))
+    const responseIndex = messages.findIndex((message) => message.type === 'response')
+    const outputIndex = messages.findIndex((message) => message.type === 'output')
+    expect(responseIndex).toBeGreaterThanOrEqual(0)
+    expect(outputIndex).toBeGreaterThan(responseIndex)
+    expect(messages[responseIndex]).toMatchObject({
+      type: 'response',
+      requestId: 'req_attach',
+      ok: true,
+      action: 'attach',
+      payload: {
+        ok: true,
+        sessionId,
+      },
+    })
+    expect(messages[outputIndex]).toMatchObject({
+      type: 'output',
+      event: {
+        sessionId,
+        data: 'during-attach',
+        seq: 1,
+        processName: 'zsh',
+      },
+    })
+
+    unregisterTerminalSocket('client_1', 'attachment_a', socket)
+  })
+
+  test('drops buffered attach output when the socket disconnects before the paused request resumes', async () => {
+    const socket = {
+      send: vi.fn(() => {
+        throw new Error('socket closed')
+      }),
+      close: vi.fn(),
+    }
+    registerTerminalSocket('client_1', 'attachment_a', socket)
+    const sessionId = await createTerminalSession('client_1')
+    socket.send.mockClear()
+
+    handleRealtimeServerMessage(
+      'client_1',
+      'attachment_a',
+      socket,
+      JSON.stringify({
+        type: 'request',
+        requestId: 'req_attach_closed',
+        action: 'attach',
+        input: { sessionId, cols: 80, rows: 24 },
+      }),
+    )
+    mockPtys[0]?.emitData('during-attach')
+    unregisterTerminalSocket('client_1', 'attachment_a', socket)
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(socket.send).toHaveBeenCalledTimes(1)
+  })
+
+  test('deactivates the buffered socket when sending the attach response fails', async () => {
+    const socket = {
+      send: vi.fn(() => {
+        throw new Error('socket closed')
+      }),
+      close: vi.fn(),
+    }
+    registerTerminalSocket('client_1', 'attachment_a', socket)
+    const sessionId = await createTerminalSession('client_1')
+    socket.send.mockClear()
+
+    handleRealtimeServerMessage(
+      'client_1',
+      'attachment_a',
+      socket,
+      JSON.stringify({
+        type: 'request',
+        requestId: 'req_attach_send_fail',
+        action: 'attach',
+        input: { sessionId, cols: 80, rows: 24 },
+      }),
+    )
+    mockPtys[0]?.emitData('during-attach')
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(socket.send).toHaveBeenCalledTimes(1)
     unregisterTerminalSocket('client_1', 'attachment_a', socket)
   })
 

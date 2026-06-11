@@ -42,6 +42,11 @@ export interface HelpShortcutDefinition {
 export interface AcceleratorShortcutDefinition {
   accelerator: string
   labelKey: DictKey
+  labelParams?: Record<string, string | number>
+}
+
+export interface IndexedTerminalShortcutDefinition extends AcceleratorShortcutDefinition {
+  index: number
 }
 
 export interface RendererMenuCommandContext {
@@ -135,7 +140,6 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
   }),
   rendererMenuCommand('view-terminal', 'menu.view.terminal', { type: 'show-detail-tab-requested', tab: 'terminal' }, {
     helpLabelKey: 'help.row.view-terminal',
-    accelerator: 'CmdOrCtrl+3',
   }),
   rendererMenuCommand('view-terminal-primary-action', 'menu.view.terminal-primary-action', { type: 'terminal-primary-action-requested' }, {
     helpLabelKey: 'help.row.terminal-primary-action',
@@ -176,10 +180,11 @@ export const WINDOW_REPO_SHORTCUTS: AcceleratorShortcutDefinition[] = rendererMe
 export const VIEW_SHORTCUTS: AcceleratorShortcutDefinition[] = rendererMenuAcceleratorShortcuts([
   'view-status',
   'view-changes',
-  'view-terminal',
   'view-terminal-primary-action',
   'view-toggle-detail',
-])
+]).concat(terminalSelectionShortcuts())
+
+export const TERMINAL_SELECTION_SHORTCUTS: IndexedTerminalShortcutDefinition[] = terminalSelectionShortcuts()
 
 export const RENDERER_KEYBOARD_SHORTCUTS: RendererKeyboardShortcutDefinition[] = [
   ...RENDERER_NAVIGATION_SHORTCUTS,
@@ -292,4 +297,13 @@ function rendererMenuAcceleratorShortcuts(ids: RendererMenuCommandId[]): Acceler
     if (!accelerator || !command.helpLabelKey) throw new Error(`Renderer menu command ${id} is missing help shortcut metadata`)
     return { accelerator, labelKey: command.helpLabelKey }
   })
+}
+
+function terminalSelectionShortcuts(): IndexedTerminalShortcutDefinition[] {
+  return Array.from({ length: 7 }, (_, index) => ({
+    index: index + 1,
+    accelerator: `CmdOrCtrl+${index + 3}`,
+    labelKey: 'help.row.view-terminal-numbered',
+    labelParams: { index: index + 1 },
+  }))
 }

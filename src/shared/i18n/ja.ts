@@ -619,6 +619,7 @@ export const ja: Record<DictKey, string> = {
   'help.row.view-changes': '変更',
   'help.row.view-log': 'ログ',
   'help.row.view-terminal': 'ターミナル',
+  'help.row.view-terminal-numbered': 'ターミナル {index}',
   'help.row.terminal-primary-action': 'ターミナルを開く/作成',
   'help.row.switch-detail-tab': '前 / 次の詳細タブ',
   'help.row.toggle-detail': '詳細パネルを折りたたむ/展開',

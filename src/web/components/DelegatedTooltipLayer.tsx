@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentPropsWithoutRef, type ReactNode } from 'react'
+import { Slot } from 'radix-ui'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentPropsWithoutRef, type ReactNode, type Ref } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '#/web/lib/cn.ts'
 import { TOOLTIP_SURFACE_CLASS } from '#/web/components/ui/tooltip.tsx'
@@ -30,6 +31,7 @@ interface DelegatedTooltipLayerProps<T> extends ComponentPropsWithoutRef<'div'> 
   margin?: number
   offset?: number
   tooltipClassName?: string
+  asChild?: boolean
 }
 
 export const DELEGATED_TOOLTIP_DEFAULTS = {
@@ -60,6 +62,7 @@ export function DelegatedTooltipLayer<T>({
   margin = DELEGATED_TOOLTIP_DEFAULTS.margin,
   offset = DELEGATED_TOOLTIP_DEFAULTS.offset,
   tooltipClassName,
+  asChild = false,
   children,
   ...props
 }: DelegatedTooltipLayerProps<T>) {
@@ -74,9 +77,15 @@ export function DelegatedTooltipLayer<T>({
 
   return (
     <>
-      <div ref={rootRef} {...props}>
-        {children}
-      </div>
+      {asChild ? (
+        <Slot.Root ref={rootRef as Ref<HTMLElement>} {...props}>
+          {children}
+        </Slot.Root>
+      ) : (
+        <div ref={rootRef as Ref<HTMLDivElement>} {...props}>
+          {children}
+        </div>
+      )}
       {tooltip && (
         <DelegatedTooltipPopup
           tooltip={tooltip}
@@ -100,11 +109,11 @@ function useDelegatedTooltipStateMachine<T>(input: {
   delayMs: number
   graceMs: number
 }): {
-  rootRef: React.RefObject<HTMLDivElement | null>
+  rootRef: React.RefObject<HTMLElement | null>
   tooltip: TooltipState<T> | null
 } {
   const { items, selector, attributeName, getItemId, delayMs, graceMs } = input
-  const rootRef = useRef<HTMLDivElement | null>(null)
+  const rootRef = useRef<HTMLElement | null>(null)
   const activeItemIdRef = useRef<string | null>(null)
   const showTimerRef = useRef<number | null>(null)
   const graceTimerRef = useRef<number | null>(null)

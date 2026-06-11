@@ -610,6 +610,7 @@ export const ko: Record<DictKey, string> = {
   'help.row.view-changes': '변경 사항',
   'help.row.view-log': '커밋 로그',
   'help.row.view-terminal': '터미널',
+  'help.row.view-terminal-numbered': '터미널 {index}',
   'help.row.terminal-primary-action': '터미널 열기 또는 생성',
   'help.row.switch-detail-tab': '이전 / 다음 상세 탭',
   'help.row.toggle-detail': '세부 패널 접기/펼치기',

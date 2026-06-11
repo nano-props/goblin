@@ -77,13 +77,13 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
     return exhaustive
   }
 
-  function runSnapshotSuccessFlow(
+  async function runSnapshotSuccessFlow(
     id: string,
     token: number,
     snap: RepoSnapshot,
     isSnapshotCurrent: () => boolean,
     options?: { skipLogBackfill?: boolean },
-  ): void {
+  ): Promise<void> {
     const validBranches = new Set(snap.branches.map((b) => b.name))
     updateIfFresh(set, id, token, (r) => {
       applySnapshotToRepoProjection(r, snap, validBranches)
@@ -93,7 +93,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
     const worktreePaths = snap.branches
       .map((branch) => branch.worktree?.path)
       .filter((p): p is string => typeof p === 'string' && p.length > 0)
-    runSnapshotSuccessWorkflow(set, get, {
+    await runSnapshotSuccessWorkflow(set, get, {
       id,
       token,
       branchNames,
@@ -173,7 +173,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         targets: [{ key: 'snapshot', reason: 'snapshot' }],
         task: (signal) => getRepositorySnapshot(id, signal),
         errorFromResult: (snap) => (snap ? null : 'error.failed-read-repo'),
-        onResult: (snap, ctx) => {
+        onResult: async (snap, ctx) => {
           if (!snap) {
             updateIfFresh(set, id, token, (r) => {
               finishResourceError(r.resources.snapshot, 'error.failed-read-repo')
@@ -181,7 +181,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
             })
             return
           }
-          runSnapshotSuccessFlow(id, token, snap, ctx.isCurrent, { skipLogBackfill: options?.skipLogBackfill })
+          await runSnapshotSuccessFlow(id, token, snap, ctx.isCurrent, { skipLogBackfill: options?.skipLogBackfill })
         },
         onError: (message) => {
           updateIfFresh(set, id, token, (r) => {

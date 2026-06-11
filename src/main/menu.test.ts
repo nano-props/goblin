@@ -264,7 +264,7 @@ describe('app menu actions', () => {
     })
   })
 
-  test('wires changes and terminal detail accelerators from the view menu', async () => {
+  test('wires status, changes, and numbered terminal accelerators from the view menu', async () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
 
     buildAppMenu()
@@ -273,10 +273,22 @@ describe('app menu actions', () => {
     const statusItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.status')
     const changesItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.changes')
     const terminalItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.terminal')
+    const firstTerminalItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.terminal 1')
+    const lastTerminalItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.terminal 7')
 
     expect(statusItem?.accelerator).toBe('CmdOrCtrl+1')
     expect(changesItem?.accelerator).toBe('CmdOrCtrl+2')
-    expect(terminalItem?.accelerator).toBe('CmdOrCtrl+3')
+    expect(terminalItem?.accelerator).toBeUndefined()
+    expect(firstTerminalItem?.accelerator).toBe('CmdOrCtrl+3')
+    expect(lastTerminalItem?.accelerator).toBe('CmdOrCtrl+9')
+
+    firstTerminalItem.click()
+    await Promise.resolve()
+
+    expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, {
+      type: 'select-terminal-requested',
+      index: 1,
+    })
   })
 
   test('includes standard edit roles and full screen in the menu', async () => {

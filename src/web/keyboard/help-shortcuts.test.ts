@@ -10,6 +10,9 @@ describe('helpShortcutSections', () => {
     expect(nav?.find((row) => row.labelKey === 'help.row.next-repo')?.combos).toEqual([['⌘', ']']])
     expect(view?.find((row) => row.labelKey === 'help.row.terminal-primary-action')?.combos).toEqual([['⌘', '↩']])
     expect(app?.find((row) => row.labelKey === 'help.row.settings')?.combos).toEqual([['⌘', ',']])
+    expect(
+      view?.find((row) => row.labelKey === 'help.row.view-terminal-numbered' && row.labelParams?.index === 1)?.combos,
+    ).toEqual([['⌘', '3']])
   })
 
   test('formats accelerator-backed help rows for non-mac platforms', () => {

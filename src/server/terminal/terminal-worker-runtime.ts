@@ -36,7 +36,9 @@ export class TerminalWorkerRuntime {
       return
     }
     if (message.type === 'socket-message') {
-      this.options.service.handleRealtimeMessage(message.clientId, message.attachmentId, message.payload)
+      const socket = this.sockets.get(message.socketId)
+      if (!socket) return
+      this.options.service.handleRealtimeMessage(message.clientId, message.attachmentId, socket, message.payload)
       return
     }
     if (message.type === 'shutdown') {

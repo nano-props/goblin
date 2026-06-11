@@ -28,6 +28,7 @@ import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
 import { focusedRegisteredSurface } from '#/main/window-registry.ts'
 import { readMenuRuntimeState, setMenuWorkspaceLayout as setMenuWorkspaceLayoutState } from '#/main/menu-state.ts'
 import {
+  TERMINAL_SELECTION_SHORTCUTS,
   closeShortcutAccelerators,
   rendererMenuCommandById,
   resolveRendererMenuCommandAccelerator,
@@ -234,6 +235,11 @@ function createViewMenu(state: AppMenuState): MenuItemConstructorOptions {
       createRendererCommandMenuItem(state, 'view-status'),
       createRendererCommandMenuItem(state, 'view-changes'),
       createRendererCommandMenuItem(state, 'view-terminal'),
+      ...TERMINAL_SELECTION_SHORTCUTS.map(({ index, accelerator: shortcut }) => ({
+        label: `${t('menu.view.terminal')} ${index}`,
+        accelerator: accelerator(state, shortcut),
+        click: () => send({ type: 'select-terminal-requested', index }),
+      })),
       createRendererCommandMenuItem(state, 'view-terminal-primary-action'),
       createWorkspaceLayoutMenu(state.workspaceLayout),
       createRendererCommandMenuItem(state, 'view-toggle-detail'),

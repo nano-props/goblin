@@ -4,11 +4,13 @@ import { CSS } from '@dnd-kit/utilities'
 import { cn } from '#/web/lib/cn.ts'
 import { compositeFocusRing } from '#/web/components/ui/focus.ts'
 import type { RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
+import type { FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 interface RepoTabProps {
   repo: RepoTabSummary
   isActive: boolean
   showSeparator: boolean
+  focusRegistry?: FocusRegistry<string, HTMLButtonElement>
   onHoverChange: (id: string | null) => void
   onActivate: (id: string) => void
   onClose: (id: string) => void
@@ -21,6 +23,7 @@ export function RepoTab({
   repo,
   isActive,
   showSeparator,
+  focusRegistry,
   onHoverChange,
   onActivate,
   onClose,
@@ -38,6 +41,11 @@ export function RepoTab({
     transition,
   }
   const tabLabel = repo.unavailable ? `${repo.name} — ${unavailableLabel}` : repo.name
+  const setFocusRef = focusRegistry?.setRef(repo.id)
+  const setButtonRef = (node: HTMLButtonElement | null) => {
+    setActivatorNodeRef(node)
+    setFocusRef?.(node)
+  }
 
   return (
     <div
@@ -61,7 +69,7 @@ export function RepoTab({
         <span className="pointer-events-none absolute right-0 top-1/2 h-4 -translate-y-1/2 border-r border-separator" />
       )}
       <button
-        ref={setActivatorNodeRef}
+        ref={setButtonRef}
         type="button"
         data-repo-tab-id={repo.id}
         {...attributes}

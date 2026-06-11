@@ -62,7 +62,7 @@ async function refreshPullRequestSummaryAfterSnapshot(
   })
 }
 
-export function runSnapshotSuccessWorkflow(
+export async function runSnapshotSuccessWorkflow(
   set: ReposSet,
   get: ReposGet,
   options: {
@@ -73,7 +73,7 @@ export function runSnapshotSuccessWorkflow(
     isSnapshotCurrent: () => boolean
     skipLogBackfill?: boolean
   },
-): void {
+): Promise<void> {
   if (!options.isSnapshotCurrent()) return
   persistRestorableRepoSnapshot(set, get().repos[options.id], options.token)
   void terminalBridge.pruneTerminals(options.id).catch((err) => {

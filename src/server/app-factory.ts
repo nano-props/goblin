@@ -11,7 +11,6 @@ import { createRemoteRoutes } from '#/server/routes/remote.ts'
 import { createRealtimeRoutes } from '#/server/routes/realtime.ts'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
 import { createSettingsRoutes } from '#/server/routes/settings.ts'
-import { createTerminalRoutes } from '#/server/routes/terminal.ts'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import { getServerSettingsPrefs } from '#/server/modules/settings-source.ts'
 import { createServerSettingsState } from '#/server/modules/settings-state.ts'
@@ -107,11 +106,9 @@ export function createApp(options: ServerAppOptions): Hono {
   app.use('/api/settings/*', createInternalAuthMiddleware(options.internalSecret))
   app.use('/api/remote/*', createInternalAuthMiddleware(options.internalSecret))
   app.use('/api/repo/*', createInternalAuthMiddleware(options.internalSecret))
-  app.use('/api/terminal/*', createInternalAuthMiddleware(options.internalSecret))
   app.route('/api/settings', createSettingsRoutes(settingsState))
   app.route('/api/remote', createRemoteRoutes())
   app.route('/api/repo', createRepoRoutes())
-  app.route('/api/terminal', createTerminalRoutes(options.terminalHost))
   app.route('/ws', createRealtimeRoutes({ internalSecret: options.internalSecret, terminalHost: options.terminalHost }))
   app.get('/', async (c) => {
     try {

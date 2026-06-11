@@ -37,7 +37,7 @@ function ShortcutRow({ row }: { row: HelpShortcutRow }) {
   const t = useT()
   return (
     <SettingsListItem as="li" size="sm" className="border-t border-separator" separated={false}>
-      <span className="min-w-0 pr-2 text-[13px] leading-snug text-foreground">{t(row.labelKey)}</span>
+      <span className="min-w-0 pr-2 text-[13px] leading-snug text-foreground">{t(row.labelKey, row.labelParams)}</span>
       <KeyCombos combos={row.combos} />
     </SettingsListItem>
   )
@@ -54,7 +54,10 @@ function ShortcutList({ sections }: { sections: HelpShortcutSection[] }) {
           </div>
           <ul>
             {section.rows.map((row) => (
-              <ShortcutRow key={`${row.labelKey}:${row.combos.map((combo) => combo.join('+')).join('/')}`} row={row} />
+              <ShortcutRow
+                key={`${row.labelKey}:${JSON.stringify(row.labelParams ?? {})}:${row.combos.map((combo) => combo.join('+')).join('/')}`}
+                row={row}
+              />
             ))}
           </ul>
         </section>

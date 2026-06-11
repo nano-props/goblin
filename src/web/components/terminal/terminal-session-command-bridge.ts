@@ -6,6 +6,7 @@ import type {
 interface TerminalSessionCommandBridge {
   worktreeSnapshot: (worktreeTerminalKey: string) => WorktreeTerminalSnapshot
   createTerminal: (base: TerminalSessionBase) => Promise<string>
+  selectTerminal: (worktreeTerminalKey: string, key: string) => void
 }
 
 let bridge: TerminalSessionCommandBridge | null = null

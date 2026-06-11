@@ -6,8 +6,10 @@ import { resolveRemoteTarget } from '#/system/ssh/config.ts'
 import { buildRemoteTerminalInvocation } from '#/system/ssh/commands.ts'
 import { isRemoteRepoId, parseRemoteRepoId } from '#/shared/remote-repo.ts'
 import {
+  formatTerminalId,
   isValidTerminalAttachmentId,
   isValidTerminalSize,
+  parseTerminalIdIndex,
   type TerminalAttachResult,
   type TerminalCatalogAction,
   type TerminalCatalogMutationResult,
@@ -89,7 +91,7 @@ class TerminalCatalog {
     if (!isValidBranch(input.branch)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidCwd(input.worktreePath)) return { ok: false, message: 'error.invalid-arguments' }
 
-    const terminalId = input.terminalId ?? 'terminal-1'
+    const terminalId = input.terminalId ?? formatTerminalId(1)
     const cols = input.cols ?? 80
     const rows = input.rows ?? 24
     if (!this.options.isValidTerminalId(terminalId)) return { ok: false, message: 'error.invalid-arguments' }
@@ -153,12 +155,11 @@ class TerminalCatalog {
     for (const session of sessions) {
       const parsed = parseSessionKey(session.key)
       if (!parsed || parsed.repoRoot !== repoRoot || parsed.worktreePath !== worktreePath) continue
-      const match = /^terminal-(\d+)$/.exec(parsed.terminalId)
-      if (!match) continue
-      const index = Number.parseInt(match[1] ?? '', 10)
-      if (Number.isFinite(index) && index > maxIndex) maxIndex = index
+      const index = parseTerminalIdIndex(parsed.terminalId)
+      if (index === null) continue
+      if (index > maxIndex) maxIndex = index
     }
-    return `terminal-${maxIndex + 1}`
+    return formatTerminalId(maxIndex + 1)
   }
 
   private async ensureRemote(
@@ -259,7 +260,7 @@ function toEnsureResult(
 }
 
 function sessionKey(repoRoot: string, worktreePath: string, terminalId?: string): string {
-  return `${repoRoot}\0${worktreePath}\0${terminalId ?? 'terminal-1'}`
+  return `${repoRoot}\0${worktreePath}\0${terminalId ?? formatTerminalId(1)}`
 }
 
 function parseSessionKey(key: string): { repoRoot: string; worktreePath: string; terminalId: string } | null {

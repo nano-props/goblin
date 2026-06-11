@@ -1,7 +1,7 @@
 import { emitRendererLocalEvent } from '#/web/local-events.ts'
-import { resolveApiBaseUrl, resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
+import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
 import {
-  normalizeTerminalRealtimeMessage,
+  normalizeTerminalSocketServerMessage,
   normalizeTerminalSessionSnapshot,
   normalizeTerminalSessionSummaryList,
   resolveTerminalOwnership,
@@ -13,16 +13,19 @@ import type {
   TerminalCatalogMutationResult,
   TerminalCreateInput,
   TerminalExitEvent,
-  TerminalListSessionsInput,
   TerminalMutationResult,
   TerminalNotifyBellInput,
   TerminalOutputEvent,
-  TerminalRealtimeMessage,
   TerminalSessionSnapshot,
   TerminalSessionSnapshotInput,
   TerminalSessionSummary,
+  TerminalSocketRequestAction,
+  TerminalSocketRequestInputs,
+  TerminalSocketResponseOutputs,
+  TerminalSocketServerMessage,
   TerminalTakeoverResult,
   TerminalTitleEvent,
+  TerminalRestartInput,
 } from '#/shared/terminal.ts'
 import type { RendererTerminalBridge } from '#/web/renderer-bridge-types.ts'
 import type { TerminalOwnershipViewModel } from '#/web/components/terminal/types.ts'
@@ -43,6 +46,11 @@ export function createServerTerminalBridge(options: {
   sendTestNotification?: () => Promise<boolean>
   setBadge?: (count: number) => void
 }): RendererTerminalBridge {
+  type PendingSocketRequest = {
+    action: TerminalSocketRequestAction
+    resolve: (value: TerminalSocketResponseOutputs[TerminalSocketRequestAction]) => void
+    reject: (reason?: unknown) => void
+  }
   const outputSubscribers = new Set<(event: TerminalOutputEvent) => void>()
   const titleSubscribers = new Set<(event: TerminalTitleEvent) => void>()
   const exitSubscribers = new Set<(event: TerminalExitEvent) => void>()
@@ -56,8 +64,9 @@ export function createServerTerminalBridge(options: {
   let manualSocketClose = false
   let socketGeneration = 0
   let quitting = isAppQuitting()
+  const pendingSocketRequests = new Map<string, PendingSocketRequest>()
 
-  function hasSubscribers(): boolean {
+  function hasRealtimeSubscribers(): boolean {
     return (
       outputSubscribers.size > 0 ||
       titleSubscribers.size > 0 ||
@@ -67,22 +76,12 @@ export function createServerTerminalBridge(options: {
     )
   }
 
-  function isActiveSocket(currentSocket: WebSocket, generation: number): boolean {
-    return socket === currentSocket && socketGeneration === generation
+  function shouldKeepSocketOpen(): boolean {
+    return hasRealtimeSubscribers() || pendingSocketRequests.size > 0
   }
 
-  async function fetchTerminalJson<T>(path: string, body: object): Promise<T> {
-    const server = options.getServerConfig()
-    const response = await fetch(new URL(path, resolveApiBaseUrl(server.url)).toString(), {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-goblin-internal-secret': server.secret,
-      },
-      body: JSON.stringify({ clientId: server.clientId, ...body }),
-    })
-    if (!response.ok) throw new Error(`Server request failed: HTTP ${response.status}`)
-    return (await response.json()) as T
+  function isActiveSocket(currentSocket: WebSocket, generation: number): boolean {
+    return socket === currentSocket && socketGeneration === generation
   }
 
   function clearReconnectTimer() {
@@ -91,18 +90,20 @@ export function createServerTerminalBridge(options: {
     reconnectTimer = null
   }
 
+  function rejectPendingSocketRequests(message: string) {
+    const error = new Error(message)
+    for (const pending of pendingSocketRequests.values()) pending.reject(error)
+    pendingSocketRequests.clear()
+  }
+
   function scheduleReconnect() {
-    if (reconnectTimer !== null || !hasSubscribers() || quitting) {
+    if (reconnectTimer !== null || !hasRealtimeSubscribers() || quitting) {
       return
     }
     reconnectTimer = window.setTimeout(() => {
       reconnectTimer = null
       ensureSocket()
     }, 300)
-  }
-
-  function activeSocket(): WebSocket | null {
-    return socket?.readyState === WebSocket.OPEN ? socket : null
   }
 
   function ensureSocket() {
@@ -120,7 +121,7 @@ export function createServerTerminalBridge(options: {
     socket = currentSocket
     currentSocket.addEventListener('open', () => {
       if (!isActiveSocket(currentSocket, generation)) return
-      if (manualSocketClose && !hasSubscribers()) {
+      if (manualSocketClose && !shouldKeepSocketOpen()) {
         try {
           currentSocket.close()
         } catch {}
@@ -128,8 +129,12 @@ export function createServerTerminalBridge(options: {
     })
     currentSocket.addEventListener('message', (event) => {
       if (!isActiveSocket(currentSocket, generation)) return
-      const message = parseTerminalRealtimeMessage(event.data)
+      const message = parseTerminalSocketServerMessage(event.data)
       if (!message) return
+      if (message.type === 'response') {
+        settleSocketRequest(message)
+        return
+      }
       if (message.type === 'output') {
         for (const subscriber of outputSubscribers) subscriber(message.event)
       } else if (message.type === 'title') {
@@ -151,10 +156,11 @@ export function createServerTerminalBridge(options: {
     currentSocket.addEventListener('close', () => {
       if (!isActiveSocket(currentSocket, generation)) return
       const wasManual = manualSocketClose
+      rejectPendingSocketRequests('Terminal socket closed')
       socket = null
       manualSocketClose = false
       if (wasManual) {
-        if (hasSubscribers()) ensureSocket()
+        if (hasRealtimeSubscribers()) ensureSocket()
         return
       }
       scheduleReconnect()
@@ -167,8 +173,8 @@ export function createServerTerminalBridge(options: {
     })
   }
 
-  function maybeCloseSocket() {
-    if (hasSubscribers() || !socket) return
+  function closeSocketIfIdle() {
+    if (shouldKeepSocketOpen() || !socket) return
     manualSocketClose = true
     clearReconnectTimer()
     if (socket.readyState === WebSocket.CONNECTING) return
@@ -181,6 +187,7 @@ export function createServerTerminalBridge(options: {
     quitting = true
     manualSocketClose = true
     clearReconnectTimer()
+    rejectPendingSocketRequests('Terminal socket closed')
     const currentSocket = socket
     socket = null
     if (!currentSocket) return
@@ -192,68 +199,42 @@ export function createServerTerminalBridge(options: {
   return {
     attach(input) {
       ensureSocket()
-      return fetchTerminalJson<TerminalAttachResult>('/api/terminal/attach', {
-        ...(input satisfies TerminalAttachInput),
-        attachmentId,
-      })
+      return requestOverSocket('attach', input)
     },
     restart(input) {
       ensureSocket()
-      return fetchTerminalJson<TerminalAttachResult>('/api/terminal/restart', { ...input, attachmentId })
+      return requestOverSocket('restart', input)
     },
     write(input) {
-      const ws = activeSocket()
-      if (ws) {
-        ws.send(encodeClientMessage({ type: 'write', sessionId: input.sessionId, data: input.data }))
-        return Promise.resolve(true)
-      }
-      return fetchTerminalJson<TerminalMutationResult>('/api/terminal/write', { ...input, attachmentId })
+      return requestOverSocket('write', input).then((result) => result)
     },
     resize(input) {
-      const ws = activeSocket()
-      if (ws) {
-        ws.send(encodeClientMessage({ type: 'resize', sessionId: input.sessionId, cols: input.cols, rows: input.rows }))
-        return Promise.resolve(true)
-      }
-      return fetchTerminalJson<TerminalMutationResult>('/api/terminal/resize', { ...input, attachmentId })
+      return requestOverSocket('resize', input).then((result) => result)
     },
     takeover(input) {
-      const ws = activeSocket()
-      if (ws) {
-        ws.send(encodeClientMessage({ type: 'takeover', sessionId: input.sessionId, cols: input.cols, rows: input.rows }))
-        return Promise.resolve({ ok: true, sessionId: input.sessionId, controller: null, canonicalCols: input.cols, canonicalRows: input.rows } as TerminalTakeoverResult)
-      }
-      return fetchTerminalJson<TerminalTakeoverResult>('/api/terminal/takeover', { ...input, attachmentId })
+      return requestOverSocket('takeover', input)
     },
     close(input) {
-      const ws = activeSocket()
-      if (ws) {
-        ws.send(encodeClientMessage({ type: 'close', sessionId: input.sessionId }))
-        return Promise.resolve(true)
-      }
-      return fetchTerminalJson<TerminalMutationResult>('/api/terminal/close', input)
+      return requestOverSocket('close', input)
     },
     create(input) {
-      return fetchTerminalJson<TerminalCatalogMutationResult>('/api/terminal/create', {
-        ...(input satisfies TerminalCreateInput),
-        attachmentId,
-      })
+      return requestOverSocket('create', input satisfies TerminalCreateInput)
     },
     pruneTerminals(repoRoot) {
-      return fetchTerminalJson<{ pruned: number; remaining: number }>('/api/terminal/prune', { repoRoot })
+      return requestOverSocket('prune', { repoRoot })
     },
     listSessions(input) {
-      return fetchTerminalJson<unknown>('/api/terminal/list-sessions', input satisfies TerminalListSessionsInput).then((value) => {
+      return requestOverSocket('list-sessions', input).then((value) => {
         const sessions = normalizeTerminalSessionSummaryList(value)
-        if (!sessions) throw new Error('Server request failed: invalid terminal sessions response')
+        if (!sessions) throw new Error('Terminal socket response failed: invalid terminal sessions response')
         return sessions
       })
     },
     getSessionSnapshot(input) {
-      return fetchTerminalJson<unknown>('/api/terminal/session-snapshot', input satisfies TerminalSessionSnapshotInput).then((value) => {
+      return requestOverSocket('session-snapshot', input satisfies TerminalSessionSnapshotInput).then((value) => {
         if (value === null) return null
         const snapshot = normalizeTerminalSessionSnapshot(value)
-        if (!snapshot) throw new Error('Server request failed: invalid terminal session snapshot response')
+        if (!snapshot) throw new Error('Terminal socket response failed: invalid terminal session snapshot response')
         return snapshot
       })
     },
@@ -275,7 +256,7 @@ export function createServerTerminalBridge(options: {
       ensureSocket()
       return () => {
         outputSubscribers.delete(cb)
-        maybeCloseSocket()
+        closeSocketIfIdle()
       }
     },
     onTitle(cb) {
@@ -284,7 +265,7 @@ export function createServerTerminalBridge(options: {
       ensureSocket()
       return () => {
         titleSubscribers.delete(cb)
-        maybeCloseSocket()
+        closeSocketIfIdle()
       }
     },
     onExit(cb) {
@@ -293,7 +274,7 @@ export function createServerTerminalBridge(options: {
       ensureSocket()
       return () => {
         exitSubscribers.delete(cb)
-        maybeCloseSocket()
+        closeSocketIfIdle()
       }
     },
     onOwnership(cb) {
@@ -302,7 +283,7 @@ export function createServerTerminalBridge(options: {
       ensureSocket()
       return () => {
         ownershipSubscribers.delete(cb)
-        maybeCloseSocket()
+        closeSocketIfIdle()
       }
     },
     onSessionsChanged(cb) {
@@ -311,9 +292,109 @@ export function createServerTerminalBridge(options: {
       ensureSocket()
       return () => {
         sessionsChangedSubscribers.delete(cb)
-        maybeCloseSocket()
+        closeSocketIfIdle()
       }
     },
+  }
+
+  function settleSocketRequest(message: Extract<TerminalSocketServerMessage, { type: 'response' }>) {
+    const pending = pendingSocketRequests.get(message.requestId)
+    if (!pending || pending.action !== message.action) return
+    pendingSocketRequests.delete(message.requestId)
+    if (message.ok) pending.resolve(message.payload)
+    else pending.reject(new Error(message.error))
+    closeSocketIfIdle()
+  }
+
+  async function requestOverSocket(
+    action: 'attach',
+    input: TerminalAttachInput,
+  ): Promise<TerminalAttachResult>
+  async function requestOverSocket(
+    action: 'restart',
+    input: TerminalRestartInput,
+  ): Promise<TerminalAttachResult>
+  async function requestOverSocket(
+    action: 'create',
+    input: TerminalCreateInput,
+  ): Promise<TerminalCatalogMutationResult>
+  async function requestOverSocket(
+    action: 'prune',
+    input: { repoRoot: string },
+  ): Promise<{ pruned: number; remaining: number }>
+  async function requestOverSocket(
+    action: 'list-sessions',
+    input: { repoRoot: string },
+  ): Promise<TerminalSessionSummary[]>
+  async function requestOverSocket(
+    action: 'session-snapshot',
+    input: TerminalSessionSnapshotInput,
+  ): Promise<TerminalSessionSnapshot | null>
+  async function requestOverSocket(
+    action: 'write',
+    input: TerminalSocketRequestInputs['write'],
+  ): Promise<TerminalMutationResult>
+  async function requestOverSocket(
+    action: 'resize',
+    input: TerminalSocketRequestInputs['resize'],
+  ): Promise<TerminalMutationResult>
+  async function requestOverSocket(
+    action: 'takeover',
+    input: TerminalSocketRequestInputs['takeover'],
+  ): Promise<TerminalTakeoverResult>
+  async function requestOverSocket(
+    action: 'close',
+    input: TerminalSocketRequestInputs['close'],
+  ): Promise<TerminalMutationResult>
+  async function requestOverSocket<TAction extends TerminalSocketRequestAction>(
+    action: TAction,
+    input: TerminalSocketRequestInputs[TAction],
+  ): Promise<TerminalSocketResponseOutputs[TAction]> {
+    const ws = await waitForSocketOpen()
+    return await new Promise<TerminalSocketResponseOutputs[TAction]>((resolve, reject) => {
+      const requestId = createSocketRequestId()
+      pendingSocketRequests.set(requestId, {
+        action,
+        resolve: (value) => resolve(value as TerminalSocketResponseOutputs[TAction]),
+        reject,
+      })
+      try {
+        ws.send(
+          encodeClientMessage(
+            { type: 'request', requestId, action, input } as Extract<TerminalClientMessage, { action: TAction }>,
+          ),
+        )
+      } catch (error) {
+        pendingSocketRequests.delete(requestId)
+        closeSocketIfIdle()
+        reject(error)
+      }
+    })
+  }
+
+  function waitForSocketOpen(): Promise<WebSocket> {
+    if (typeof WebSocket === 'undefined') return Promise.reject(new Error('Terminal socket unavailable'))
+    ensureSocket()
+    const currentSocket = socket
+    if (!currentSocket) return Promise.reject(new Error('Terminal socket unavailable'))
+    if (currentSocket.readyState === WebSocket.OPEN) return Promise.resolve(currentSocket)
+    return new Promise<WebSocket>((resolve, reject) => {
+      const handleOpen = () => {
+        cleanup()
+        if (socket === currentSocket && currentSocket.readyState === WebSocket.OPEN) resolve(currentSocket)
+        else reject(new Error('Terminal socket replaced before open'))
+      }
+      const handleClose = () => {
+        cleanup()
+        reject(new Error('Terminal socket closed before open'))
+      }
+      const cleanup = () => {
+        currentSocket.removeEventListener?.('open', handleOpen)
+        currentSocket.removeEventListener?.('close', handleClose)
+      }
+      currentSocket.addEventListener('open', handleOpen)
+      currentSocket.addEventListener('close', handleClose)
+    })
   }
 }
 
@@ -326,16 +407,22 @@ export function createTerminalWebSocketUrl(baseUrl: string, secret: string, clie
   return httpUrl.toString()
 }
 
-export function parseTerminalRealtimeMessage(data: unknown): TerminalRealtimeMessage | null {
+export function parseTerminalSocketServerMessage(data: unknown): TerminalSocketServerMessage | null {
   if (typeof data !== 'string') return null
   try {
-    return normalizeTerminalRealtimeMessage(JSON.parse(data))
+    return normalizeTerminalSocketServerMessage(JSON.parse(data))
   } catch {}
   return null
 }
 
 function encodeClientMessage(message: TerminalClientMessage): string {
   return JSON.stringify(message)
+}
+
+function createSocketRequestId(): string {
+  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `request_${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
 }
 
 export function readOrCreateWebTerminalAttachmentId(): string {

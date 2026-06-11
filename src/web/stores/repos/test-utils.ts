@@ -3,8 +3,17 @@ import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
 import { emptyRepo } from '#/web/stores/repos/helpers.ts'
 import { disposeAllRepoRuntimes } from '#/web/stores/repos/runtime.ts'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { vi } from 'vitest'
 import { stripBranchWorktreeMetadata, worktreeStatesFromBranches } from '#/web/stores/repos/worktree-state.ts'
+import type {
+  TerminalAttachResult,
+  TerminalCatalogMutationResult,
+  TerminalMutationResult,
+  TerminalSessionSnapshot,
+  TerminalSessionSummary,
+  TerminalTakeoverResult,
+} from '#/shared/terminal.ts'
 import type { BranchSnapshotInfo, PullRequestInfo, WorktreeStatus } from '#/web/types.ts'
 import type { DetailTab, RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
 import {
@@ -13,6 +22,47 @@ import {
   DEFAULT_WORKSPACE_LAYOUT,
 } from '#/shared/workspace-layout.ts'
 export type RpcTestHandler = (input: any) => unknown
+
+interface TerminalBridgeTestOutputs {
+  'terminal.attach': TerminalAttachResult
+  'terminal.restart': TerminalAttachResult
+  'terminal.write': TerminalMutationResult
+  'terminal.resize': TerminalMutationResult
+  'terminal.takeover': TerminalTakeoverResult
+  'terminal.close': TerminalMutationResult
+  'terminal.create': TerminalCatalogMutationResult
+  'terminal.prune': { pruned: number; remaining: number }
+  'terminal.listSessions': TerminalSessionSummary[]
+  'terminal.getSessionSnapshot': TerminalSessionSnapshot | null
+  'terminal.notifyBell': TerminalMutationResult
+}
+
+function terminalHandlerNameForSocketAction(action: string): keyof TerminalBridgeTestOutputs | null {
+  switch (action) {
+    case 'attach':
+      return 'terminal.attach'
+    case 'restart':
+      return 'terminal.restart'
+    case 'write':
+      return 'terminal.write'
+    case 'resize':
+      return 'terminal.resize'
+    case 'takeover':
+      return 'terminal.takeover'
+    case 'close':
+      return 'terminal.close'
+    case 'create':
+      return 'terminal.create'
+    case 'prune':
+      return 'terminal.prune'
+    case 'list-sessions':
+      return 'terminal.listSessions'
+    case 'session-snapshot':
+      return 'terminal.getSessionSnapshot'
+    default:
+      return null
+  }
+}
 
 export function createBranchSnapshot(name: string, options: Partial<BranchSnapshotInfo> = {}): BranchSnapshotInfo {
   return {
@@ -138,6 +188,190 @@ export function installGoblinTestBridge(handlers: Record<string, RpcTestHandler>
       },
     },
   })
+  function callTerminalHandler(name: 'terminal.attach', payload: unknown): TerminalBridgeTestOutputs['terminal.attach']
+  function callTerminalHandler(name: 'terminal.restart', payload: unknown): TerminalBridgeTestOutputs['terminal.restart']
+  function callTerminalHandler(name: 'terminal.write', payload: unknown): TerminalBridgeTestOutputs['terminal.write']
+  function callTerminalHandler(name: 'terminal.resize', payload: unknown): TerminalBridgeTestOutputs['terminal.resize']
+  function callTerminalHandler(name: 'terminal.takeover', payload: unknown): TerminalBridgeTestOutputs['terminal.takeover']
+  function callTerminalHandler(name: 'terminal.close', payload: unknown): TerminalBridgeTestOutputs['terminal.close']
+  function callTerminalHandler(name: 'terminal.create', payload: unknown): TerminalBridgeTestOutputs['terminal.create']
+  function callTerminalHandler(name: 'terminal.prune', payload: unknown): TerminalBridgeTestOutputs['terminal.prune']
+  function callTerminalHandler(
+    name: 'terminal.listSessions',
+    payload: unknown,
+  ): TerminalBridgeTestOutputs['terminal.listSessions']
+  function callTerminalHandler(
+    name: 'terminal.getSessionSnapshot',
+    payload: unknown,
+  ): TerminalBridgeTestOutputs['terminal.getSessionSnapshot']
+  function callTerminalHandler(
+    name: 'terminal.notifyBell',
+    payload: unknown,
+  ): TerminalBridgeTestOutputs['terminal.notifyBell']
+  function callTerminalHandler(
+    name: keyof TerminalBridgeTestOutputs,
+    payload: unknown,
+  ): TerminalBridgeTestOutputs[keyof TerminalBridgeTestOutputs]
+  function callTerminalHandler(
+    name: keyof TerminalBridgeTestOutputs,
+    payload: unknown,
+  ): TerminalBridgeTestOutputs[keyof TerminalBridgeTestOutputs] {
+    const handler = handlers[name]
+    if (!handler) {
+      switch (name) {
+        case 'terminal.attach':
+        case 'terminal.restart':
+          return { ok: false, message: `unhandled ${name}` }
+        case 'terminal.write':
+        case 'terminal.resize':
+        case 'terminal.close':
+        case 'terminal.notifyBell':
+          return true satisfies TerminalMutationResult
+        case 'terminal.takeover':
+          return {
+            ok: true as const,
+            sessionId: 'session-1',
+            controller: { attachmentId: 'attachment_local', status: 'connected' as const },
+            canonicalCols: 80,
+            canonicalRows: 24,
+          }
+        case 'terminal.prune':
+          return { pruned: 0, remaining: 0 }
+        case 'terminal.listSessions':
+          return []
+        case 'terminal.getSessionSnapshot':
+          return null
+        case 'terminal.create': {
+          const terminalKind = (payload as { kind?: string } | undefined)?.kind
+          return {
+            ok: true,
+            action: terminalKind === 'primary' ? 'reused' : 'created',
+            key: terminalKind === 'primary' ? 'repo\0worktree\0terminal-1' : 'repo\0worktree\0terminal-2',
+            sessions: [],
+          }
+        }
+      }
+    }
+    return handler(payload) as TerminalBridgeTestOutputs[keyof TerminalBridgeTestOutputs]
+  }
+  class MockWebSocket {
+    static readonly CONNECTING = 0
+    static readonly OPEN = 1
+    static readonly CLOSING = 2
+    static readonly CLOSED = 3
+    readyState = MockWebSocket.CONNECTING
+    private readonly listeners = new Map<string, Set<(event: any) => void>>()
+
+    constructor(_url: string) {
+      queueMicrotask(() => {
+        if (this.readyState !== MockWebSocket.CONNECTING) return
+        this.readyState = MockWebSocket.OPEN
+        this.emit('open', {})
+      })
+    }
+
+    addEventListener(type: string, cb: (event: any) => void) {
+      let listeners = this.listeners.get(type)
+      if (!listeners) {
+        listeners = new Set()
+        this.listeners.set(type, listeners)
+      }
+      listeners.add(cb)
+    }
+
+    removeEventListener(type: string, cb: (event: any) => void) {
+      this.listeners.get(type)?.delete(cb)
+    }
+
+    send(data: string) {
+      let parsed: { type?: string; requestId?: string; action?: string; input?: unknown } | null = null
+      try {
+        parsed = JSON.parse(data)
+      } catch {
+        return
+      }
+      if (parsed?.type !== 'request' || !parsed.requestId || typeof parsed.action !== 'string') return
+      const handlerName = terminalHandlerNameForSocketAction(parsed.action)
+      if (!handlerName) return
+      Promise.resolve()
+        .then(() => callTerminalHandler(handlerName, parsed.input))
+        .then(
+          (payload) => {
+            this.emit('message', {
+              data: JSON.stringify({
+                type: 'response',
+                requestId: parsed?.requestId,
+                ok: true,
+                action: parsed?.action,
+                payload,
+              }),
+            })
+          },
+          (error) => {
+            this.emit('message', {
+              data: JSON.stringify({
+                type: 'response',
+                requestId: parsed?.requestId,
+                ok: false,
+                action: parsed?.action,
+                error: error instanceof Error ? error.message : String(error),
+              }),
+            })
+          },
+        )
+    }
+
+    close() {
+      this.readyState = MockWebSocket.CLOSED
+      this.emit('close', {})
+    }
+
+    private emit(type: string, event: any) {
+      for (const listener of this.listeners.get(type) ?? []) listener(event)
+    }
+  }
+  Object.defineProperty(globalThis, 'WebSocket', { configurable: true, value: MockWebSocket })
+  setRendererBridgeForTests({
+    kind: () => 'electron',
+    hasCapability: () => false,
+    getBootstrap: () => ({
+      runtime: { kind: 'electron', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [...ELECTRON_RENDERER_CAPABILITIES] },
+      homeDir: '/Users/test',
+      initialI18n: null,
+      initialSettings: null,
+      initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret', clientId: 'client_testterminal' },
+    }),
+    invokeRpc: async ({ path, input }: { path: string; input?: unknown }) => {
+      const handler = handlers[path]
+      if (!handler) throw new Error(`Unhandled RPC path: ${path}`)
+      return handler(input)
+    },
+    abortRpc: async () => false,
+    onRpcEvent: () => () => {},
+    onEffectIntent: () => () => {},
+    pathForFile: () => '',
+    shell: () => window.goblinNative.shell ?? null,
+    terminal: () => ({
+      attach: async (input) => callTerminalHandler('terminal.attach', input),
+      restart: async (input) => callTerminalHandler('terminal.restart', input),
+      write: async (input) => callTerminalHandler('terminal.write', input),
+      resize: async (input) => callTerminalHandler('terminal.resize', input),
+      takeover: async (input) => callTerminalHandler('terminal.takeover', input),
+      close: async (input) => callTerminalHandler('terminal.close', input),
+      create: async (input) => callTerminalHandler('terminal.create', input),
+      pruneTerminals: async (repoRoot) => callTerminalHandler('terminal.prune', { repoRoot }),
+      listSessions: async (input) => callTerminalHandler('terminal.listSessions', input),
+      getSessionSnapshot: async (input) => callTerminalHandler('terminal.getSessionSnapshot', input),
+      notifyBell: async (input) => callTerminalHandler('terminal.notifyBell', input),
+      sendTestNotification: async () => true,
+      setBadge: () => {},
+      onOutput: () => () => {},
+      onTitle: () => () => {},
+      onExit: () => () => {},
+      onOwnership: () => () => {},
+      onSessionsChanged: () => () => {},
+    }),
+  })
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: string | URL, init?: RequestInit) => {
@@ -147,28 +381,6 @@ export function installGoblinTestBridge(handlers: Record<string, RpcTestHandler>
       const call = (name: string, payload: unknown) => {
         const handler = handlers[name]
         if (!handler) {
-          if (name === 'terminal.attach' || name === 'terminal.restart') {
-            return { ok: false, message: `unhandled ${name}` }
-          }
-          if (
-            name === 'terminal.write' ||
-            name === 'terminal.resize' ||
-            name === 'terminal.takeover' ||
-            name === 'terminal.close' ||
-            name === 'terminal.prune' ||
-            name === 'terminal.notifyBell'
-          ) {
-            return true
-          }
-          if (name === 'terminal.create') {
-            const terminalKind = (payload as { kind?: string } | undefined)?.kind
-            return {
-              ok: true,
-              action: terminalKind === 'primary' ? 'reused' : 'created',
-              key: terminalKind === 'primary' ? 'repo\0worktree\0terminal-1' : 'repo\0worktree\0terminal-2',
-              sessions: [],
-            }
-          }
           throw new Error(`Unhandled server route: ${name}`)
         }
         return handler(payload)
@@ -211,15 +423,6 @@ export function installGoblinTestBridge(handlers: Record<string, RpcTestHandler>
         if (url.pathname === '/api/repo/open-editor') return call('repo.openEditor', body)
         if (url.pathname === '/api/repo/background-sync-repos') return call('repo.backgroundSyncRepos', body)
         if (url.pathname === '/api/repo/abort') return call('repo.abort', body)
-        if (url.pathname === '/api/terminal/attach') return call('terminal.attach', body)
-        if (url.pathname === '/api/terminal/restart') return call('terminal.restart', body)
-        if (url.pathname === '/api/terminal/write') return call('terminal.write', body)
-        if (url.pathname === '/api/terminal/resize') return call('terminal.resize', body)
-        if (url.pathname === '/api/terminal/takeover') return call('terminal.takeover', body)
-        if (url.pathname === '/api/terminal/close') return call('terminal.close', body)
-        if (url.pathname === '/api/terminal/create') return call('terminal.create', body)
-        if (url.pathname === '/api/terminal/prune') return call('terminal.prune', body)
-        if (url.pathname === '/api/terminal/notify-bell') return call('terminal.notifyBell', body)
         throw new Error(`Unhandled fetch URL: ${url.pathname}`)
       })()
       const abortError = () => {

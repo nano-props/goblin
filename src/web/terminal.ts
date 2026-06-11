@@ -19,60 +19,37 @@ import type {
   TerminalWriteInput,
 } from '#/shared/terminal.ts'
 import { getRendererBridge } from '#/web/renderer-bridge.ts'
+import type { RendererTerminalBridge } from '#/web/renderer-bridge-types.ts'
 import type { TerminalOwnershipViewModel } from '#/web/components/terminal/types.ts'
-export const terminalBridge = {
-  attach(input: TerminalAttachInput): Promise<TerminalAttachResult> {
-    return getRendererBridge().terminal().attach(input)
-  },
-  restart(input: TerminalRestartInput): Promise<TerminalAttachResult> {
-    return getRendererBridge().terminal().restart(input)
-  },
-  write(input: TerminalWriteInput): Promise<TerminalMutationResult> {
-    return getRendererBridge().terminal().write(input)
-  },
-  resize(input: TerminalResizeInput): Promise<TerminalMutationResult> {
-    return getRendererBridge().terminal().resize(input)
-  },
-  takeover(input: TerminalTakeoverInput): Promise<TerminalTakeoverResult> {
-    return getRendererBridge().terminal().takeover(input)
-  },
-  close(input: TerminalSessionInput): Promise<TerminalMutationResult> {
-    return getRendererBridge().terminal().close(input)
-  },
-  create(input: TerminalCreateInput): Promise<TerminalCatalogMutationResult> {
-    return getRendererBridge().terminal().create(input)
-  },
-  pruneTerminals(repoRoot: string): Promise<{ pruned: number; remaining: number }> {
-    return getRendererBridge().terminal().pruneTerminals(repoRoot)
-  },
-  listSessions(input: { repoRoot: string }): Promise<TerminalSessionSummary[]> {
-    return getRendererBridge().terminal().listSessions(input)
-  },
-  getSessionSnapshot(input: TerminalSessionSnapshotInput): Promise<TerminalSessionSnapshot | null> {
-    return getRendererBridge().terminal().getSessionSnapshot(input)
-  },
-  notifyBell(input: TerminalNotifyBellInput): Promise<TerminalMutationResult> {
-    return getRendererBridge().terminal().notifyBell(input)
-  },
-  sendTestNotification(): Promise<boolean> {
-    return getRendererBridge().terminal().sendTestNotification()
-  },
-  setBadge(count: number): void {
-    getRendererBridge().terminal().setBadge(count)
-  },
-  onOutput(cb: (event: TerminalOutputEvent) => void): () => void {
-    return getRendererBridge().terminal().onOutput(cb)
-  },
-  onTitle(cb: (event: TerminalTitleEvent) => void): () => void {
-    return getRendererBridge().terminal().onTitle(cb)
-  },
-  onExit(cb: (event: TerminalExitEvent) => void): () => void {
-    return getRendererBridge().terminal().onExit(cb)
-  },
-  onOwnership(cb: (event: TerminalOwnershipViewModel) => void): () => void {
-    return getRendererBridge().terminal().onOwnership(cb)
-  },
-  onSessionsChanged(cb: (repoRoot: string) => void): () => void {
-    return getRendererBridge().terminal().onSessionsChanged(cb)
-  },
+
+function getTerminalBridge(): RendererTerminalBridge {
+  return getRendererBridge().terminal()
+}
+
+function bindTerminalMethod<TKey extends keyof RendererTerminalBridge>(key: TKey): RendererTerminalBridge[TKey] {
+  return ((...args: Parameters<RendererTerminalBridge[TKey]>) => {
+    const method = getTerminalBridge()[key] as (...innerArgs: Parameters<RendererTerminalBridge[TKey]>) => ReturnType<RendererTerminalBridge[TKey]>
+    return method(...args)
+  }) as unknown as RendererTerminalBridge[TKey]
+}
+
+export const terminalBridge: RendererTerminalBridge = {
+  attach: bindTerminalMethod('attach'),
+  restart: bindTerminalMethod('restart'),
+  write: bindTerminalMethod('write'),
+  resize: bindTerminalMethod('resize'),
+  takeover: bindTerminalMethod('takeover'),
+  close: bindTerminalMethod('close'),
+  create: bindTerminalMethod('create'),
+  pruneTerminals: bindTerminalMethod('pruneTerminals'),
+  listSessions: bindTerminalMethod('listSessions'),
+  getSessionSnapshot: bindTerminalMethod('getSessionSnapshot'),
+  notifyBell: bindTerminalMethod('notifyBell'),
+  sendTestNotification: bindTerminalMethod('sendTestNotification'),
+  setBadge: bindTerminalMethod('setBadge'),
+  onOutput: bindTerminalMethod('onOutput'),
+  onTitle: bindTerminalMethod('onTitle'),
+  onExit: bindTerminalMethod('onExit'),
+  onOwnership: bindTerminalMethod('onOwnership'),
+  onSessionsChanged: bindTerminalMethod('onSessionsChanged'),
 }

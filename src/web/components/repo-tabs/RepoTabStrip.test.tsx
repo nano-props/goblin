@@ -60,6 +60,83 @@ describe('RepoTabStrip', () => {
     expect(tablist?.querySelector('[aria-label="More"]')).toBeNull()
     expect(document.body.querySelector('button[aria-label="More"]')).not.toBeNull()
   })
+
+  test('shows the active repo in the small-screen dropdown with selected styling', async () => {
+    render(
+      <RepoTabStrip
+        repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
+        activeId="/tmp/repo-a"
+        labels={labels}
+        onActivate={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+        onOpenLocal={() => {}}
+        onOpenRemote={() => {}}
+        onClone={() => {}}
+      />,
+    )
+
+    const trigger = document.body.querySelector('button[aria-label="More"]')
+    if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing more trigger')
+
+    await act(async () => {
+      trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+      trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
+      await Promise.resolve()
+    })
+
+    const selectedItem = [...document.body.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent?.includes('repo-a'))
+    expect(selectedItem?.getAttribute('aria-current')).toBe('true')
+  })
+
+  test('moves focus through the full tab strip with keyboard navigation on large screens', () => {
+    vi.stubGlobal('matchMedia', createMatchMedia(false))
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
+      cb(0)
+      return 0
+    })
+    const onActivate = vi.fn()
+
+    render(
+      <RepoTabStrip
+        repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b'), repo('repo-c', '/tmp/repo-c')]}
+        activeId="/tmp/repo-a"
+        labels={labels}
+        onActivate={onActivate}
+        onClose={() => {}}
+        onReorder={() => {}}
+        onOpenLocal={() => {}}
+        onOpenRemote={() => {}}
+        onClone={() => {}}
+      />,
+    )
+
+    const repoA = document.body.querySelector('[data-repo-tab-id="/tmp/repo-a"]')
+    const repoB = document.body.querySelector('[data-repo-tab-id="/tmp/repo-b"]')
+    const repoC = document.body.querySelector('[data-repo-tab-id="/tmp/repo-c"]')
+    if (!(repoA instanceof HTMLButtonElement) || !(repoB instanceof HTMLButtonElement) || !(repoC instanceof HTMLButtonElement)) {
+      throw new Error('missing repo tab buttons')
+    }
+
+    act(() => {
+      repoA.focus()
+      repoA.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    })
+    expect(onActivate).toHaveBeenNthCalledWith(1, '/tmp/repo-b')
+    expect(document.activeElement).toBe(repoB)
+
+    act(() => {
+      repoB.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }))
+    })
+    expect(onActivate).toHaveBeenNthCalledWith(2, '/tmp/repo-c')
+    expect(document.activeElement).toBe(repoC)
+
+    act(() => {
+      repoC.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }))
+    })
+    expect(onActivate).toHaveBeenNthCalledWith(3, '/tmp/repo-a')
+    expect(document.activeElement).toBe(repoA)
+  })
 })
 
 function render(element: React.ReactNode) {
@@ -88,4 +165,17 @@ const labels = {
   clone: 'Clone repository…',
   cloneShortcut: '⌘⇧O',
   unavailable: 'Unavailable',
+}
+
+function createMatchMedia(matches: boolean) {
+  return (query: string) => ({
+    matches: query === '(max-width: 639px)' ? matches : false,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  })
 }

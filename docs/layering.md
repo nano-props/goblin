@@ -216,7 +216,7 @@ It also shows that not every complex feature needs a separate runtime facade lay
 
 ### Terminal
 
-- boundary: `src/server/routes/terminal.ts`, `src/web/terminal.ts`
+- boundary: `src/server/routes/realtime.ts`, `src/web/terminal.ts`
 - read: `src/web/terminal-session-queries.ts`
 - write: `src/server/terminal/terminal.ts` (session mutation orchestration)
 - source: `src/server/terminal/terminal-session-manager.ts`, `src/server/terminal/terminal-pty-runtime.ts`

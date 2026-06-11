@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { runTerminalPrimaryActionCommand } from '#/web/commands/workspace-commands.ts'
+import { runSelectTerminalCommand, runTerminalPrimaryActionCommand } from '#/web/commands/workspace-commands.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -30,6 +30,7 @@ describe('workspace commands', () => {
     setTerminalSessionCommandBridge({
       worktreeSnapshot: () => ({ worktreeTerminalKey: `${REPO_ID}\0${WORKTREE_PATH}`, selectedDescriptor: null, sessions: [], count: 0 }),
       createTerminal,
+      selectTerminal: vi.fn(),
     })
     const navigation = navigationWith()
     const setDetailCollapsed = vi.fn((collapsed: boolean) => useReposStore.getState().setDetailCollapsed(collapsed))
@@ -72,6 +73,7 @@ describe('workspace commands', () => {
         count: 1,
       }),
       createTerminal,
+      selectTerminal: vi.fn(),
     })
     const navigation = navigationWith()
     const setDetailCollapsed = vi.fn((collapsed: boolean) => useReposStore.getState().setDetailCollapsed(collapsed))
@@ -80,6 +82,58 @@ describe('workspace commands', () => {
 
     expect(useReposStore.getState().repos[REPO_ID]?.ui.detailTab).toBe('terminal')
     expect(createTerminal).not.toHaveBeenCalled()
+  })
+
+  test('select terminal command matches the terminal number instead of the array position', () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      detailTab: 'status',
+    })
+    const selectTerminal = vi.fn()
+    setTerminalSessionCommandBridge({
+      worktreeSnapshot: () => ({
+        worktreeTerminalKey: `${REPO_ID}\0${WORKTREE_PATH}`,
+        selectedDescriptor: null,
+        sessions: [
+          {
+            key: 'terminal-2',
+            worktreeTerminalKey: `${REPO_ID}\0${WORKTREE_PATH}`,
+            terminalId: 'terminal-2',
+            index: 2,
+            title: 'terminal 2',
+            phase: 'open',
+            selected: true,
+            hasBell: false,
+          },
+          {
+            key: 'terminal-3',
+            worktreeTerminalKey: `${REPO_ID}\0${WORKTREE_PATH}`,
+            terminalId: 'terminal-3',
+            index: 3,
+            title: 'terminal 3',
+            phase: 'open',
+            selected: false,
+            hasBell: false,
+          },
+        ],
+        count: 2,
+      }),
+      createTerminal: vi.fn(async () => 'terminal-3'),
+      selectTerminal,
+    })
+    const navigation = navigationWith()
+    const setDetailCollapsed = vi.fn((collapsed: boolean) => useReposStore.getState().setDetailCollapsed(collapsed))
+
+    expect(runSelectTerminalCommand({ repoId: REPO_ID, index: 2, navigation, setDetailCollapsed })).toBe(true)
+    expect(runSelectTerminalCommand({ repoId: REPO_ID, index: 3, navigation, setDetailCollapsed })).toBe(true)
+
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.detailTab).toBe('terminal')
+    expect(selectTerminal.mock.calls).toEqual([
+      [`${REPO_ID}\0${WORKTREE_PATH}`, 'terminal-2'],
+      [`${REPO_ID}\0${WORKTREE_PATH}`, 'terminal-3'],
+    ])
   })
 })
 

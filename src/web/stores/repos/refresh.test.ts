@@ -791,8 +791,8 @@ describe('core refresh request ordering', () => {
 
   test('snapshot refresh prunes terminal sessions to current worktree paths', async () => {
     const token = seedRepo([branch('stale', undefined, { worktree: { path: '/tmp/stale-worktree' } })])
-    const calls: Array<{ repoRoot: string; clientId: string }> = []
-    rpcHandlers['terminal.prune'] = async (input: { repoRoot: string; clientId: string }) => {
+    const calls: Array<{ repoRoot: string }> = []
+    rpcHandlers['terminal.prune'] = async (input: { repoRoot: string }) => {
       calls.push(input)
       return { pruned: 1, remaining: 1 }
     }
@@ -810,7 +810,6 @@ describe('core refresh request ordering', () => {
     expect(calls).toEqual([
       expect.objectContaining({
         repoRoot: REPO_ID,
-        clientId: expect.any(String),
       }),
     ])
     const worktreesByPath = useReposStore.getState().repos[REPO_ID]?.data.worktreesByPath

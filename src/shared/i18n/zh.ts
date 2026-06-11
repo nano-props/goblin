@@ -593,6 +593,7 @@ export const zh: Record<DictKey, string> = {
   'help.row.view-changes': '变更',
   'help.row.view-log': '提交历史',
   'help.row.view-terminal': '终端',
+  'help.row.view-terminal-numbered': '终端 {index}',
   'help.row.terminal-primary-action': '打开或创建终端',
   'help.row.switch-detail-tab': '上一个 / 下一个详情标签',
   'help.row.toggle-detail': '展开/收起详情面板',

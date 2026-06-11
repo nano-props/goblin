@@ -113,6 +113,7 @@ export function TerminalSessionProvider({ currentRepoId, children, syncTracker: 
     setTerminalSessionCommandBridge({
       worktreeSnapshot: registry.worktreeSnapshot,
       createTerminal: registry.createTerminal,
+      selectTerminal: registry.selectTerminal,
     })
 
     return () => {

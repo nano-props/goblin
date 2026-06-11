@@ -43,7 +43,7 @@ export interface TerminalFacade {
     clientId: string,
     input: TerminalWorkerRequestInputs['session-snapshot'],
   ): MaybePromise<TerminalWorkerResponseOutputs['session-snapshot']>
-  handleRealtimeMessage(clientId: string, attachmentId: string, payload: string): void
+  handleRealtimeMessage(clientId: string, attachmentId: string, socket: ServerTerminalSocket, payload: string): void
   shutdown(): void
 }
 

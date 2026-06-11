@@ -24,6 +24,10 @@ import {
   type TerminalSessionSnapshotInput,
   type TerminalSessionSummary,
   type TerminalSessionInput,
+  type TerminalSocketRequestAction,
+  type TerminalSocketRequestInputs,
+  type TerminalSocketResponseOutputs,
+  type TerminalSocketResponseMessage,
   type TerminalTakeoverInput,
   type TerminalTakeoverResult,
   type TerminalWriteInput,
@@ -90,17 +94,68 @@ const catalog = createTerminalCatalog({
   },
   withSessionSnapshot,
 })
+const brokerSocketByRawSocket = new WeakMap<TerminalRealtimeSocket, BufferedTerminalSocket>()
+type MaybePromise<T> = T | Promise<T>
+type TerminalSuccessResponse<TAction extends TerminalSocketRequestAction = TerminalSocketRequestAction> = Extract<
+  TerminalSocketResponseMessage,
+  { type: 'response'; ok: true; action: TAction }
+>
+type TerminalFailureResponse = Extract<TerminalSocketResponseMessage, { type: 'response'; ok: false }>
+type RealtimeRequestHandlers = {
+  [TAction in TerminalSocketRequestAction]: (
+    clientId: string,
+    attachmentId: string,
+    input: TerminalSocketRequestInputs[TAction],
+  ) => MaybePromise<TerminalSocketResponseOutputs[TAction]>
+}
+const realtimeRequestHandlers = {
+  attach(clientId, attachmentId, input) {
+    return attachServerTerminal(clientId, { ...input, attachmentId })
+  },
+  restart(clientId, attachmentId, input) {
+    return restartServerTerminal(clientId, { ...input, attachmentId })
+  },
+  write(clientId, attachmentId, input) {
+    return writeServerTerminal(clientId, { ...input, attachmentId })
+  },
+  resize(clientId, attachmentId, input) {
+    return resizeServerTerminal(clientId, { ...input, attachmentId })
+  },
+  takeover(clientId, attachmentId, input) {
+    return takeoverServerTerminal(clientId, { ...input, attachmentId })
+  },
+  close(clientId, _attachmentId, input) {
+    return closeServerTerminal(clientId, input)
+  },
+  'list-sessions'(clientId, _attachmentId, input) {
+    return listServerTerminalSessions(clientId, input.repoRoot)
+  },
+  create(clientId, attachmentId, input) {
+    return createServerTerminal(clientId, { ...input, attachmentId })
+  },
+  prune(clientId, _attachmentId, input) {
+    return pruneServerTerminals(clientId, input.repoRoot)
+  },
+  'session-snapshot'(clientId, _attachmentId, input) {
+    return getServerTerminalSessionSnapshot(clientId, input)
+  },
+} satisfies RealtimeRequestHandlers
 
 export function registerTerminalSocket(clientId: string, attachmentId: string, socket: TerminalRealtimeSocket): void {
   if (!isValidTerminalClientId(clientId) || !isValidTerminalSocketAttachmentId(attachmentId)) {
     socket.close(1008, 'invalid client id')
     return
   }
-  broker.registerSocket(clientId, attachmentId, socket)
+  const bufferedSocket = new BufferedTerminalSocket(socket)
+  brokerSocketByRawSocket.set(socket, bufferedSocket)
+  broker.registerSocket(clientId, attachmentId, bufferedSocket)
 }
 
 export function unregisterTerminalSocket(clientId: string, attachmentId: string, socket: TerminalRealtimeSocket): void {
-  broker.unregisterSocket(clientId, attachmentId, socket)
+  const bufferedSocket = brokerSocketByRawSocket.get(socket) ?? socket
+  if (bufferedSocket instanceof BufferedTerminalSocket) bufferedSocket.deactivate()
+  broker.unregisterSocket(clientId, attachmentId, bufferedSocket)
+  brokerSocketByRawSocket.delete(socket)
 }
 
 export function isValidTerminalClientId(value: unknown): value is string {
@@ -238,7 +293,12 @@ export async function getServerTerminalSessionSnapshot(
   return await manager.snapshotSession(input.sessionId)
 }
 
-export function handleRealtimeServerMessage(clientId: string, attachmentId: string, payload: string): void {
+export function handleRealtimeServerMessage(
+  clientId: string,
+  attachmentId: string,
+  socket: TerminalRealtimeSocket,
+  payload: string,
+): void {
   if (!isValidTerminalClientId(clientId) || !isValidTerminalAttachmentId(attachmentId)) return
   let message: TerminalClientMessage | null = null
   try {
@@ -247,42 +307,9 @@ export function handleRealtimeServerMessage(clientId: string, attachmentId: stri
     return
   }
   if (!message) return
-  switch (message.type) {
-    case 'write': {
-      manager.writeSession(clientId, message.sessionId, message.data, attachmentId)
-      break
-    }
-    case 'resize': {
-      manager.resizeSession(
-        clientId,
-        message.sessionId,
-        message.cols,
-        message.rows,
-        attachmentId,
-        broker.attachmentIsConnected(clientId, attachmentId),
-      )
-      break
-    }
-    case 'takeover': {
-      const effect = manager.takeoverSession(
-        clientId,
-        message.sessionId,
-        message.cols,
-        message.rows,
-        attachmentId,
-        broker.attachmentIsConnected(clientId, attachmentId),
-      )
-      // Non-blocking: takeover result is not awaited; authoritative ownership is pushed via realtime.
-      void effect
-      break
-    }
-    case 'close': {
-      const repoRoot = manager.getSession(clientId, message.sessionId)?.scope
-      const closed = manager.closeOwnedSession(clientId, message.sessionId)
-      if (closed && repoRoot) broker.broadcastGlobal({ type: 'sessions-changed', repoRoot })
-      break
-    }
-  }
+  const bufferedSocket = brokerSocketByRawSocket.get(socket)
+  if (shouldPauseRealtimeRequest(message.action)) bufferedSocket?.pause()
+  void handleRealtimeRequestMessage(clientId, attachmentId, socket, bufferedSocket, message)
 }
 
 export function closeAllServerTerminalSessions(): void {
@@ -304,4 +331,158 @@ function isValidTerminalId(value: unknown): value is string {
 
 function isValidTerminalSocketAttachmentId(value: unknown): value is string {
   return typeof value === 'string' && isValidTerminalAttachmentId(value)
+}
+
+async function handleRealtimeRequestMessage(
+  clientId: string,
+  attachmentId: string,
+  socket: TerminalRealtimeSocket,
+  bufferedSocket: BufferedTerminalSocket | undefined,
+  message: TerminalClientMessage,
+): Promise<void> {
+  let response: TerminalSuccessResponse
+  try {
+    response = await dispatchRealtimeRequest(clientId, attachmentId, message)
+  } catch (error) {
+    if (!sendRealtimeResponse(socket, buildRealtimeFailureResponse(message.requestId, message.action, error))) {
+      bufferedSocket?.deactivate()
+    }
+    if (shouldPauseRealtimeRequest(message.action)) bufferedSocket?.resume()
+    return
+  }
+  if (!sendRealtimeResponse(socket, response)) {
+    bufferedSocket?.deactivate()
+  }
+  if (shouldPauseRealtimeRequest(message.action)) bufferedSocket?.resume()
+}
+
+function sendRealtimeResponse(socket: TerminalRealtimeSocket, message: TerminalSocketResponseMessage): boolean {
+  try {
+    socket.send(JSON.stringify(message))
+    return true
+  } catch {
+    return false
+  }
+}
+
+function buildRealtimeFailureResponse(
+  requestId: string,
+  action: TerminalSocketRequestAction,
+  error: unknown,
+): TerminalFailureResponse {
+  return {
+    type: 'response',
+    requestId,
+    ok: false,
+    action,
+    error: error instanceof Error ? error.message : String(error),
+  } as TerminalFailureResponse
+}
+
+function buildRealtimeSuccessResponse<TAction extends TerminalSocketRequestAction>(
+  requestId: string,
+  action: TAction,
+  payload: TerminalSocketResponseOutputs[TAction],
+): TerminalSuccessResponse<TAction> {
+  return {
+    type: 'response',
+    requestId,
+    ok: true,
+    action,
+    payload,
+  } as TerminalSuccessResponse<TAction>
+}
+
+async function dispatchRealtimeRequest(
+  clientId: string,
+  attachmentId: string,
+  message: TerminalClientMessage,
+): Promise<TerminalSuccessResponse> {
+  return await dispatchRealtimeRequestForAction(clientId, attachmentId, message as never)
+}
+
+async function dispatchRealtimeRequestForAction<TAction extends TerminalSocketRequestAction>(
+  clientId: string,
+  attachmentId: string,
+  message: Extract<TerminalClientMessage, { action: TAction }>,
+): Promise<TerminalSuccessResponse<TAction>> {
+  const handler = realtimeRequestHandlers[message.action] as RealtimeRequestHandlers[TAction]
+  const payload = await handler(clientId, attachmentId, message.input as TerminalSocketRequestInputs[TAction])
+  return buildRealtimeSuccessResponse(message.requestId, message.action, payload)
+}
+
+function shouldPauseRealtimeRequest(action: TerminalSocketRequestAction): boolean {
+  return action === 'attach' || action === 'restart'
+}
+
+class BufferedTerminalSocket implements TerminalRealtimeSocket {
+  private paused = 0
+  private active = true
+  private readonly buffer: Array<{ type: 'send'; payload: string } | { type: 'close'; code?: number; reason?: string }> = []
+
+  constructor(private readonly socket: TerminalRealtimeSocket) {}
+
+  send(payload: string): void {
+    if (!this.active) return
+    if (this.paused > 0) {
+      this.buffer.push({ type: 'send', payload })
+      return
+    }
+    this.sendNow(payload)
+  }
+
+  close(code?: number, reason?: string): void {
+    if (!this.active) return
+    if (this.paused > 0) {
+      this.buffer.push({ type: 'close', code, reason })
+      return
+    }
+    this.closeNow(code, reason)
+  }
+
+  pause(): void {
+    if (!this.active) return
+    this.paused += 1
+  }
+
+  resume(): void {
+    if (this.paused === 0 || !this.active) return
+    this.paused -= 1
+    if (this.paused > 0) return
+    this.flushBuffer()
+  }
+
+  deactivate(): void {
+    this.active = false
+    this.paused = 0
+    this.buffer.length = 0
+  }
+
+  private sendNow(payload: string): void {
+    try {
+      this.socket.send(payload)
+    } catch {
+      this.deactivate()
+    }
+  }
+
+  private closeNow(code?: number, reason?: string): void {
+    this.active = false
+    this.buffer.length = 0
+    try {
+      this.socket.close(code, reason)
+    } catch {}
+  }
+
+  private flushBuffer(): void {
+    for (const entry of this.buffer.splice(0)) {
+      if (!this.active) break
+      if (entry.type === 'send') {
+        this.sendNow(entry.payload)
+        continue
+      }
+      this.closeNow(entry.code, entry.reason)
+      break
+    }
+  }
 }

@@ -14,6 +14,7 @@ import {
 export interface HelpShortcutRow {
   combos: string[][]
   labelKey: DictKey
+  labelParams?: Record<string, string | number>
 }
 
 export interface HelpShortcutSection {
@@ -57,10 +58,14 @@ function helpRowFromKeyboardDefinition(shortcut: { combos: string[][]; labelKey:
   return { combos: shortcut.combos, labelKey: shortcut.labelKey }
 }
 
-function helpRowFromAccelerator(shortcut: { accelerator: string; labelKey: DictKey }, isMac: boolean): HelpShortcutRow {
+function helpRowFromAccelerator(
+  shortcut: { accelerator: string; labelKey: DictKey; labelParams?: Record<string, string | number> },
+  isMac: boolean,
+): HelpShortcutRow {
   return {
     combos: [acceleratorToKeyLabelsForHelp(shortcut.accelerator, isMac)],
     labelKey: shortcut.labelKey,
+    labelParams: shortcut.labelParams,
   }
 }
 

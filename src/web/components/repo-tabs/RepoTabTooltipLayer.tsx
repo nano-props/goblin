@@ -4,6 +4,7 @@ import { cn } from '#/web/lib/cn.ts'
 import { DelegatedTooltipLayer, DELEGATED_TOOLTIP_DEFAULTS } from '#/web/components/DelegatedTooltipLayer.tsx'
 import { formatRepoLocator } from '#/web/lib/paths.ts'
 import type { RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
+import { ToolbarTabList } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
 import { TOOLTIP_META_TEXT_CLASS, TOOLTIP_STACK_MD_CLASS, TOOLTIP_STACK_SM_CLASS } from '#/web/components/ui/tooltip.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 
@@ -31,9 +32,9 @@ export function RepoTabTooltipLayer({
       placement="bottom-start"
       maxWidth={DELEGATED_TOOLTIP_DEFAULTS.maxWidth}
       tooltipClassName="px-3 py-2"
-      {...props}
+      asChild
     >
-      {children}
+      <ToolbarTabList {...props}>{children}</ToolbarTabList>
     </DelegatedTooltipLayer>
   )
 }

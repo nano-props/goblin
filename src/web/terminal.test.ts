@@ -12,6 +12,7 @@ class MockWebSocket {
   static instances: MockWebSocket[] = []
   readonly url: string
   readyState = MockWebSocket.CONNECTING
+  sent: string[] = []
   private readonly listeners = new Map<string, Set<(event: any) => void>>()
 
   constructor(url: string) {
@@ -26,6 +27,14 @@ class MockWebSocket {
       this.listeners.set(type, listeners)
     }
     listeners.add(cb)
+  }
+
+  removeEventListener(type: string, cb: (event: any) => void) {
+    this.listeners.get(type)?.delete(cb)
+  }
+
+  send(data: string) {
+    this.sent.push(data)
   }
 
   close() {
@@ -112,141 +121,397 @@ describe('terminal web host bridge', () => {
     })
   })
 
-  test('opens terminals through embedded server routes in web host mode', async () => {
-    const fetchMock = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        ok: true,
-        sessionId: 'term_1234567890123456',
-        replay: '',
-        replaySeq: 0,
-        replayTruncated: false,
-        processName: 'zsh',
-        title: null,
-      }),
-    }))
+  test('attaches terminals through terminal websocket request-response in web host mode', async () => {
+    const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
     const { terminalBridge } = await import('#/web/terminal.ts')
 
     const dispose = terminalBridge.onOutput(() => {})
-    await expect(
-      terminalBridge.attach({
-        sessionId: 'term_1234567890123456',
-        cols: 100,
-        rows: 30,
-      }),
-    ).resolves.toMatchObject({ ok: true, processName: 'zsh' })
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:32100/api/terminal/attach',
-      expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({
-          'content-type': 'application/json',
-          'x-goblin-internal-secret': 'secret',
-        }),
-      }),
+    const socket = MockWebSocket.instances[0]
+    expect(socket?.url).toMatch(
+      /^ws:\/\/127\.0\.0\.1:32100\/ws\/terminal\?token=secret&clientId=client_sharedterminal&attachmentId=attachment_/,
     )
-    const firstCall = fetchMock.mock.calls.at(0) as [string, RequestInit] | undefined
-    const requestBody = JSON.parse(String(firstCall?.[1]?.body))
-    expect(requestBody).toMatchObject({
-      clientId: 'client_sharedterminal',
-      attachmentId: expect.stringMatching(/^attachment_/),
+    const attachPromise = terminalBridge.attach({
       sessionId: 'term_1234567890123456',
       cols: 100,
       rows: 30,
     })
-    expect(MockWebSocket.instances[0]?.url).toMatch(
-      /^ws:\/\/127\.0\.0\.1:32100\/ws\/terminal\?token=secret&clientId=client_sharedterminal&attachmentId=attachment_/,
+    socket?.emitOpen()
+    await Promise.resolve()
+    const request = socket?.sent.map((payload) => JSON.parse(payload)).find((message) => message.type === 'request')
+    expect(request).toMatchObject({
+      type: 'request',
+      action: 'attach',
+      input: {
+        sessionId: 'term_1234567890123456',
+        cols: 100,
+        rows: 30,
+      },
+    })
+    socket?.emitMessage(
+      JSON.stringify({
+        type: 'response',
+        requestId: request?.requestId,
+        ok: true,
+        action: 'attach',
+        payload: {
+          ok: true,
+          sessionId: 'term_1234567890123456',
+          replay: '',
+          replaySeq: 0,
+          replayTruncated: false,
+          processName: 'zsh',
+          canonicalTitle: null,
+          controller: null,
+          canonicalCols: 100,
+          canonicalRows: 30,
+        },
+      }),
     )
+
+    await expect(attachPromise).resolves.toMatchObject({ ok: true, processName: 'zsh' })
+    expect(fetchMock).not.toHaveBeenCalled()
     dispose()
   })
 
   test('prefers the bootstrap-provided shared terminal client id over localStorage state', async () => {
     window.localStorage.setItem('goblin:web-terminal-client-id', 'web_oldpersistedclient')
-    const fetchMock = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({
+    const { terminalBridge } = await import('#/web/terminal.ts')
+    const dispose = terminalBridge.onOutput(() => {})
+    const socket = MockWebSocket.instances[0]
+    const attachPromise = terminalBridge.attach({
+      sessionId: 'term_1234567890123456',
+      cols: 100,
+      rows: 30,
+    })
+    socket?.emitOpen()
+    await Promise.resolve()
+    const request = socket?.sent.map((payload) => JSON.parse(payload)).find((message) => message.type === 'request')
+    socket?.emitMessage(
+      JSON.stringify({
+        type: 'response',
+        requestId: request?.requestId,
         ok: true,
-        sessionId: 'term_1234567890123456',
-        replay: '',
-        replaySeq: 0,
-        replayTruncated: false,
-        processName: 'zsh',
-        title: null,
+        action: 'attach',
+        payload: {
+          ok: true,
+          sessionId: 'term_1234567890123456',
+          replay: '',
+          replaySeq: 0,
+          replayTruncated: false,
+          processName: 'zsh',
+          canonicalTitle: null,
+          controller: null,
+          canonicalCols: 100,
+          canonicalRows: 30,
+        },
       }),
-    }))
+    )
+
+    await attachPromise
+    expect(socket?.url).toContain('clientId=client_sharedterminal')
+    expect(window.localStorage.getItem('goblin:web-terminal-client-id')).toBe('web_oldpersistedclient')
+    dispose()
+  })
+
+  test('does not fall back to http when attach websocket cannot open', async () => {
+    const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
     const { terminalBridge } = await import('#/web/terminal.ts')
-
-    await terminalBridge.attach({
+    const dispose = terminalBridge.onOutput(() => {})
+    const socket = MockWebSocket.instances[0]
+    const attachPromise = terminalBridge.attach({
       sessionId: 'term_1234567890123456',
       cols: 100,
       rows: 30,
     })
 
-    const firstCall = fetchMock.mock.calls.at(0) as [string, RequestInit] | undefined
-    const requestBody = JSON.parse(String(firstCall?.[1]?.body))
-    expect(requestBody.clientId).toBe('client_sharedterminal')
-    expect(window.localStorage.getItem('goblin:web-terminal-client-id')).toBe('web_oldpersistedclient')
+    socket?.close()
+
+    await expect(attachPromise).rejects.toThrow('Terminal socket closed before open')
+    expect(fetchMock).not.toHaveBeenCalled()
+    dispose()
+  })
+
+  test('does not fall back to http when write websocket is unavailable', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const { terminalBridge } = await import('#/web/terminal.ts')
+    const dispose = terminalBridge.onOutput(() => {})
+    const socket = MockWebSocket.instances[0]
+    const writePromise = terminalBridge.write({
+      sessionId: 'term_1234567890123456',
+      data: 'pwd',
+    })
+
+    socket?.close()
+
+    await expect(writePromise).rejects.toThrow('Terminal socket closed before open')
+    expect(fetchMock).not.toHaveBeenCalled()
+    dispose()
   })
 
   test('includes the current attachment id when creating a terminal in web host mode', async () => {
-    const fetchMock = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const { terminalBridge } = await import('#/web/terminal.ts')
+    const dispose = terminalBridge.onOutput(() => {})
+    const socket = MockWebSocket.instances[0]
+
+    const createPromise = terminalBridge.create({
+      repoRoot: '/tmp/repo',
+      branch: 'feature',
+      worktreePath: '/tmp/repo',
+      kind: 'primary',
+    })
+    socket?.emitOpen()
+    await Promise.resolve()
+    const request = socket?.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'create')
+    expect(request).toMatchObject({
+      type: 'request',
+      action: 'create',
+      input: {
+        repoRoot: '/tmp/repo',
+        branch: 'feature',
+        worktreePath: '/tmp/repo',
+        kind: 'primary',
+      },
+    })
+    socket?.emitMessage(
+      JSON.stringify({
+        type: 'response',
+        requestId: request?.requestId,
         ok: true,
-        action: 'created',
-        key: '/tmp/repo\u0000/tmp/repo\u0000terminal-1',
-        sessions: [],
+        action: 'create',
+        payload: {
+          ok: true,
+          action: 'created',
+          key: '/tmp/repo\u0000/tmp/repo\u0000terminal-1',
+          sessions: [],
+        },
       }),
-    }))
+    )
+
+    await expect(createPromise).resolves.toMatchObject({
+      ok: true,
+      action: 'created',
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(socket?.url).toMatch(/^ws:\/\//)
+    dispose()
+  })
+
+  test('loads terminal session lists through websocket request-response and validates payloads', async () => {
+    const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
     const { terminalBridge } = await import('#/web/terminal.ts')
+    const dispose = terminalBridge.onOutput(() => {})
+    const socket = MockWebSocket.instances[0]
 
-    await terminalBridge.create({
+    const listPromise = terminalBridge.listSessions({ repoRoot: '/tmp/repo' })
+    socket?.emitOpen()
+    await Promise.resolve()
+    const request = socket?.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'list-sessions')
+    expect(request).toMatchObject({
+      type: 'request',
+      action: 'list-sessions',
+      input: {
+      repoRoot: '/tmp/repo',
+      },
+    })
+    socket?.emitMessage(
+      JSON.stringify({
+        type: 'response',
+        requestId: request?.requestId,
+        ok: true,
+        action: 'list-sessions',
+        payload: [{ sessionId: 'term_1', key: 123 }],
+      }),
+    )
+
+    await expect(listPromise).rejects.toThrow('invalid terminal sessions response')
+    expect(fetchMock).not.toHaveBeenCalled()
+    dispose()
+  })
+
+  test('loads terminal snapshots through websocket request-response and validates payloads', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const { terminalBridge } = await import('#/web/terminal.ts')
+    const dispose = terminalBridge.onOutput(() => {})
+    const socket = MockWebSocket.instances[0]
+
+    const snapshotPromise = terminalBridge.getSessionSnapshot({ sessionId: 'term_1234567890123456' })
+    socket?.emitOpen()
+    await Promise.resolve()
+    const request = socket?.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'session-snapshot')
+    expect(request).toMatchObject({
+      type: 'request',
+      action: 'session-snapshot',
+      input: {
+        sessionId: 'term_1234567890123456',
+      },
+    })
+    socket?.emitMessage(
+      JSON.stringify({
+        type: 'response',
+        requestId: request?.requestId,
+        ok: true,
+        action: 'session-snapshot',
+        payload: { sessionId: 'term_1', snapshotSeq: 'bad' },
+      }),
+    )
+
+    await expect(snapshotPromise).rejects.toThrow('invalid terminal session snapshot response')
+    expect(fetchMock).not.toHaveBeenCalled()
+    dispose()
+  })
+
+  test('does not fall back to http when create websocket cannot open', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const { terminalBridge } = await import('#/web/terminal.ts')
+    const dispose = terminalBridge.onOutput(() => {})
+    const socket = MockWebSocket.instances[0]
+    const createPromise = terminalBridge.create({
       repoRoot: '/tmp/repo',
       branch: 'feature',
       worktreePath: '/tmp/repo',
       kind: 'primary',
     })
 
-    const firstCall = fetchMock.mock.calls.at(0) as [string, RequestInit] | undefined
-    const requestBody = JSON.parse(String(firstCall?.[1]?.body))
-    expect(requestBody).toMatchObject({
-      clientId: 'client_sharedterminal',
-      attachmentId: expect.stringMatching(/^attachment_/),
+    socket?.close()
+
+    await expect(createPromise).rejects.toThrow('Terminal socket closed before open')
+    expect(fetchMock).not.toHaveBeenCalled()
+    dispose()
+  })
+
+  test('does not fall back to http when list websocket cannot open', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const { terminalBridge } = await import('#/web/terminal.ts')
+    const dispose = terminalBridge.onOutput(() => {})
+    const socket = MockWebSocket.instances[0]
+    const listPromise = terminalBridge.listSessions({ repoRoot: '/tmp/repo' })
+
+    socket?.close()
+
+    await expect(listPromise).rejects.toThrow('Terminal socket closed before open')
+    expect(fetchMock).not.toHaveBeenCalled()
+    dispose()
+  })
+
+  test('does not fall back to http when snapshot websocket cannot open', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const { terminalBridge } = await import('#/web/terminal.ts')
+    const dispose = terminalBridge.onOutput(() => {})
+    const socket = MockWebSocket.instances[0]
+    const snapshotPromise = terminalBridge.getSessionSnapshot({ sessionId: 'term_1234567890123456' })
+
+    socket?.close()
+
+    await expect(snapshotPromise).rejects.toThrow('Terminal socket closed before open')
+    expect(fetchMock).not.toHaveBeenCalled()
+    dispose()
+  })
+
+  test('does not fall back to http when prune websocket cannot open', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const { terminalBridge } = await import('#/web/terminal.ts')
+    const dispose = terminalBridge.onOutput(() => {})
+    const socket = MockWebSocket.instances[0]
+    const prunePromise = terminalBridge.pruneTerminals('/tmp/repo')
+
+    socket?.close()
+
+    await expect(prunePromise).rejects.toThrow('Terminal socket closed before open')
+    expect(fetchMock).not.toHaveBeenCalled()
+    dispose()
+  })
+
+  test('does not fall back to http when prune uses websocket request-response', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const { terminalBridge } = await import('#/web/terminal.ts')
+    const dispose = terminalBridge.onOutput(() => {})
+    const socket = MockWebSocket.instances[0]
+    const prunePromise = terminalBridge.pruneTerminals('/tmp/repo')
+    socket?.emitOpen()
+    await Promise.resolve()
+    const request = socket?.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'prune')
+    expect(request).toMatchObject({
+      type: 'request',
+      action: 'prune',
+      input: { repoRoot: '/tmp/repo' },
+    })
+    socket?.emitMessage(
+      JSON.stringify({
+        type: 'response',
+        requestId: request?.requestId,
+        ok: true,
+        action: 'prune',
+        payload: { pruned: 1, remaining: 2 },
+      }),
+    )
+
+    await expect(prunePromise).resolves.toEqual({ pruned: 1, remaining: 2 })
+    expect(fetchMock).not.toHaveBeenCalled()
+    dispose()
+  })
+
+  test('closes an idle terminal socket after a one-shot websocket request resolves without subscribers', async () => {
+    const { terminalBridge } = await import('#/web/terminal.ts')
+    const prunePromise = terminalBridge.pruneTerminals('/tmp/repo')
+    const socket = MockWebSocket.instances[0]
+    if (!socket) throw new Error('missing web terminal socket')
+
+    socket.emitOpen()
+    await Promise.resolve()
+    const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'prune')
+    socket.emitMessage(
+      JSON.stringify({
+        type: 'response',
+        requestId: request?.requestId,
+        ok: true,
+        action: 'prune',
+        payload: { pruned: 1, remaining: 0 },
+      }),
+    )
+
+    await expect(prunePromise).resolves.toEqual({ pruned: 1, remaining: 0 })
+    expect(socket.readyState).toBe(MockWebSocket.CLOSED)
+  })
+
+  test('does not fall back to http when create/list/snapshot/prune websocket payloads resolve successfully', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const { terminalBridge } = await import('#/web/terminal.ts')
+    const dispose = terminalBridge.onOutput(() => {})
+    const socket = MockWebSocket.instances[0]
+    const createPromise = terminalBridge.create({
       repoRoot: '/tmp/repo',
       branch: 'feature',
       worktreePath: '/tmp/repo',
       kind: 'primary',
     })
-  })
-
-  test('rejects invalid terminal session list payloads from the server', async () => {
-    const fetchMock = vi.fn(async () => ({
-      ok: true,
-      json: async () => [{ sessionId: 'term_1', key: 123 }],
-    }))
-    vi.stubGlobal('fetch', fetchMock)
-    const { terminalBridge } = await import('#/web/terminal.ts')
-
-    await expect(terminalBridge.listSessions({ repoRoot: '/tmp/repo' })).rejects.toThrow(
-      'invalid terminal sessions response',
+    socket?.emitOpen()
+    await Promise.resolve()
+    const createRequest = socket?.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'create')
+    socket?.emitMessage(
+      JSON.stringify({
+        type: 'response',
+        requestId: createRequest?.requestId,
+        ok: true,
+        action: 'create',
+        payload: { ok: true, action: 'created', key: 'key_1', sessions: [] },
+      }),
     )
-  })
-
-  test('rejects invalid terminal session snapshot payloads from the server', async () => {
-    const fetchMock = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ sessionId: 'term_1', snapshotSeq: 'bad' }),
-    }))
-    vi.stubGlobal('fetch', fetchMock)
-    const { terminalBridge } = await import('#/web/terminal.ts')
-
-    await expect(terminalBridge.getSessionSnapshot({ sessionId: 'term_1' })).rejects.toThrow(
-      'invalid terminal session snapshot response',
-    )
+    await expect(createPromise).resolves.toMatchObject({ ok: true, key: 'key_1' })
+    expect(fetchMock).not.toHaveBeenCalled()
+    dispose()
   })
 
   test('forwards terminal output, title, and exit events from the web socket', async () => {

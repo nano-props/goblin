@@ -15,8 +15,20 @@ import { DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
 import type { RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
 
+let compactUi = false
+
+vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
+  useIsCompactUi: () => compactUi,
+}))
+
+vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+  cb(0)
+  return 1
+}) as typeof requestAnimationFrame)
+
 const REPO_ID = '/tmp/gbl-branch-detail-toolbar-repo'
 const WORKTREE_PATH = '/tmp/gbl-branch-detail-toolbar-worktree'
+  compactUi = false
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
@@ -47,6 +59,7 @@ describe('BranchDetailToolbar', () => {
 
     const tabs = Array.from(c.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [])
     expect(tabs.map((tab) => tab.id)).toEqual(['detail-status-tab', 'detail-changes-tab'])
+    expect(c.querySelector('[aria-label="tab.branch-detail"]')?.className).toContain('h-full')
     expect(c.querySelector('#detail-changes-tab')?.textContent).toContain('3')
     // useT is mocked to return the i18n key, so we assert against the key here.
     expect(c.querySelector('#detail-terminal-tab')?.textContent).toContain('terminal.label')
@@ -132,6 +145,62 @@ describe('BranchDetailToolbar', () => {
 
     expect(c.querySelector('button[aria-label="action.menu"]')).toBeNull()
     expect(c.querySelector('[data-testid="branch-detail-toolbar-divider"]')).toBeNull()
+  })
+
+  test('keeps terminal focus when pressing End on the compact terminal tab', async () => {
+    compactUi = true
+    const showRepoDetailTab = vi.fn()
+    const { container: c } = renderToolbar({
+      terminalCount: 2,
+      detailTab: 'terminal',
+      navigation: navigationWith({ showRepoDetailTab }),
+    })
+
+    const terminalTab = c.querySelector<HTMLButtonElement>('#detail-terminal-tab')
+    expect(terminalTab).not.toBeNull()
+
+    act(() => {
+      terminalTab?.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }))
+    })
+    await flush()
+
+    expect(showRepoDetailTab).toHaveBeenCalledWith(REPO_ID, 'terminal')
+    expect(document.activeElement?.id).toBe('detail-terminal-tab')
+  })
+
+  test('moves focus across status, changes, and terminal tabs with keyboard navigation', async () => {
+    const showRepoDetailTab = vi.fn()
+    const { container: c } = renderToolbar({
+      terminalCount: 2,
+      navigation: navigationWith({ showRepoDetailTab }),
+    })
+
+    const statusTab = c.querySelector<HTMLButtonElement>('#detail-status-tab')
+    const changesTab = c.querySelector<HTMLButtonElement>('#detail-changes-tab')
+    const terminalTab = c.querySelector<HTMLButtonElement>('#detail-terminal-tab')
+    if (!statusTab || !changesTab || !terminalTab) throw new Error('missing branch detail tabs')
+
+    act(() => {
+      statusTab.focus()
+      statusTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    })
+    await flush()
+    expect(showRepoDetailTab).toHaveBeenNthCalledWith(1, REPO_ID, 'changes')
+    expect(document.activeElement).toBe(changesTab)
+
+    act(() => {
+      changesTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    })
+    await flush()
+    expect(showRepoDetailTab).toHaveBeenNthCalledWith(2, REPO_ID, 'terminal')
+    expect(document.activeElement).toBe(terminalTab)
+
+    act(() => {
+      terminalTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
+    })
+    await flush()
+    expect(showRepoDetailTab).toHaveBeenNthCalledWith(3, REPO_ID, 'changes')
+    expect(document.activeElement).toBe(changesTab)
   })
 })
 

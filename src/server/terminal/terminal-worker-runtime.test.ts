@@ -88,6 +88,13 @@ describe('terminal worker runtime', () => {
     })
 
     await runtime.handleMessage({
+      type: 'socket-register',
+      socketId: 'socket_1',
+      clientId: 'client_1',
+      attachmentId: 'attachment_a',
+    })
+
+    await runtime.handleMessage({
       type: 'socket-message',
       socketId: 'socket_1',
       clientId: 'client_1',
@@ -98,6 +105,7 @@ describe('terminal worker runtime', () => {
     expect(service.handleRealtimeMessage).toHaveBeenCalledWith(
       'client_1',
       'attachment_a',
+      expect.any(Object),
       '{"type":"write","sessionId":"term_123","data":"hello"}',
     )
   })
