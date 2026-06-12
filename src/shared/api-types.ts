@@ -324,10 +324,14 @@ export type NativeIpcPath = {
 const EmptyInput = v.optional(v.void())
 const FiniteNumber = v.pipe(v.number(), v.finite())
 const PortNumber = v.pipe(FiniteNumber, v.integer(), v.minValue(1), v.maxValue(65535))
-const CwdInput = v.object({ cwd: v.string() })
-const BranchInput = v.object({ cwd: v.string(), branch: v.string() })
 
-const RemoteTargetSchema = v.object({
+/** Primitive valibot schema for `{ cwd: string }`. */
+export const CwdInput = v.object({ cwd: v.string() })
+
+/** Primitive valibot schema for `{ cwd, branch }`. */
+export const BranchInput = v.object({ cwd: v.string(), branch: v.string() })
+
+export const RemoteTargetSchema = v.object({
   id: v.string(),
   alias: v.string(),
   host: v.string(),
@@ -337,12 +341,12 @@ const RemoteTargetSchema = v.object({
   displayName: v.string(),
 })
 
-const RemoteConnectionInputSchema = v.object({
+export const RemoteConnectionInputSchema = v.object({
   alias: v.string(),
   remotePath: v.string(),
 })
 
-const RemotePathSuggestionsInputSchema = v.object({
+export const RemotePathSuggestionsInputSchema = v.object({
   alias: v.string(),
   remotePath: v.string(),
   prefix: v.string(),

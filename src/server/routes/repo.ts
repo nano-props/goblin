@@ -1,4 +1,3 @@
-import { Hono } from 'hono'
 import { getBackgroundSyncRepos, setBackgroundSyncRepos } from '#/server/modules/background-sync.ts'
 import {
   getRepositoryPatch,
@@ -23,9 +22,11 @@ import {
   removeRepositoryWorktree,
 } from '#/server/modules/repo-write-paths.ts'
 import { getServerFetchIntervalSec } from '#/server/modules/settings-source.ts'
+import { createRouteApp, parseHttpInput } from '#/server/common/http-validate.ts'
+import { REPO_PROCEDURE_SCHEMAS } from '#/shared/http-schemas.ts'
 
 export function createRepoRoutes() {
-  const app = new Hono()
+  const app = createRouteApp()
   async function jsonOr<T>(run: () => Promise<T>, fallback: T, label: string) {
     try {
       return await run()
@@ -34,25 +35,21 @@ export function createRepoRoutes() {
       return fallback
     }
   }
+
   app.post('/probe', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const cwd = typeof body?.cwd === 'string' ? body.cwd : ''
+    const { cwd } = parseHttpInput(REPO_PROCEDURE_SCHEMAS.probe, await c.req.json().catch(() => null))
     return c.json(await jsonOr(() => probeRepository(cwd), { ok: false, message: 'error.failed-read-repo' }, 'probe'))
   })
   app.post('/snapshot', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const cwd = typeof body?.cwd === 'string' ? body.cwd : ''
+    const { cwd } = parseHttpInput(REPO_PROCEDURE_SCHEMAS.snapshot, await c.req.json().catch(() => null))
     return c.json(await jsonOr(() => getRepositorySnapshot(cwd, c.req.raw.signal), null, 'snapshot'))
   })
   app.post('/status', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const cwd = typeof body?.cwd === 'string' ? body.cwd : ''
+    const { cwd } = parseHttpInput(REPO_PROCEDURE_SCHEMAS.status, await c.req.json().catch(() => null))
     return c.json(await jsonOr(() => getRepositoryStatus(cwd, c.req.raw.signal), [], 'status'))
   })
   app.post('/patch', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const cwd = typeof body?.cwd === 'string' ? body.cwd : ''
-    const worktreePath = typeof body?.worktreePath === 'string' ? body.worktreePath : ''
+    const { cwd, worktreePath } = parseHttpInput(REPO_PROCEDURE_SCHEMAS.patch, await c.req.json().catch(() => null))
     return c.json(
       await jsonOr(
         () => getRepositoryPatch(cwd, worktreePath, c.req.raw.signal),
@@ -62,12 +59,11 @@ export function createRepoRoutes() {
     )
   })
   app.post('/pull-requests', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const cwd = typeof body?.cwd === 'string' ? body.cwd : ''
-    const branches = Array.isArray(body?.branches)
-      ? body.branches.filter((branch: unknown): branch is string => typeof branch === 'string')
-      : undefined
-    const mode = body?.options?.mode === 'summary' ? 'summary' : 'full'
+    const { cwd, branches, options } = parseHttpInput(
+      REPO_PROCEDURE_SCHEMAS.pullRequests,
+      await c.req.json().catch(() => null),
+    )
+    const mode = options?.mode === 'summary' ? 'summary' : 'full'
     return c.json(
       await jsonOr(
         () => getRepositoryPullRequests(cwd, branches, { mode, signal: c.req.raw.signal }),
@@ -77,24 +73,23 @@ export function createRepoRoutes() {
     )
   })
   app.post('/fetch', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const cwd = typeof body?.cwd === 'string' ? body.cwd : ''
-    const kind = body?.kind === 'background' ? 'background' : 'user'
-    const sourceToken = typeof body?.sourceToken === 'string' ? body.sourceToken : undefined
+    const { cwd, kind, sourceToken } = parseHttpInput(
+      REPO_PROCEDURE_SCHEMAS.fetch,
+      await c.req.json().catch(() => null),
+    )
     return c.json(
       await jsonOr(
-        () => fetchRepository(cwd, kind, sourceToken),
+        () => fetchRepository(cwd, kind ?? 'user', sourceToken),
         { ok: false, message: 'error.failed-read-repo' },
         'fetch',
       ),
     )
   })
   app.post('/clone', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const operationId = typeof body?.operationId === 'string' ? body.operationId : ''
-    const url = typeof body?.url === 'string' ? body.url : ''
-    const parentPath = typeof body?.parentPath === 'string' ? body.parentPath : ''
-    const directoryName = typeof body?.directoryName === 'string' ? body.directoryName : ''
+    const { operationId, url, parentPath, directoryName } = parseHttpInput(
+      REPO_PROCEDURE_SCHEMAS.clone,
+      await c.req.json().catch(() => null),
+    )
     return c.json(
       await jsonOr(
         () => cloneRepository(operationId, url, parentPath, directoryName),
@@ -104,15 +99,14 @@ export function createRepoRoutes() {
     )
   })
   app.post('/abort-clone', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const operationId = typeof body?.operationId === 'string' ? body.operationId : ''
+    const { operationId } = parseHttpInput(REPO_PROCEDURE_SCHEMAS.abortClone, await c.req.json().catch(() => null))
     return c.json(await jsonOr(async () => abortCloneOperation(operationId), false, 'abort-clone'))
   })
   app.post('/checkout', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const cwd = typeof body?.cwd === 'string' ? body.cwd : ''
-    const branch = typeof body?.branch === 'string' ? body.branch : ''
-    const sourceToken = typeof body?.sourceToken === 'string' ? body.sourceToken : undefined
+    const { cwd, branch, sourceToken } = parseHttpInput(
+      REPO_PROCEDURE_SCHEMAS.checkout,
+      await c.req.json().catch(() => null),
+    )
     return c.json(
       await jsonOr(
         () => checkoutRepositoryBranch(cwd, branch, c.req.raw.signal, sourceToken),
@@ -122,11 +116,10 @@ export function createRepoRoutes() {
     )
   })
   app.post('/pull', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const cwd = typeof body?.cwd === 'string' ? body.cwd : ''
-    const branch = typeof body?.branch === 'string' ? body.branch : ''
-    const worktreePath = typeof body?.worktreePath === 'string' ? body.worktreePath : undefined
-    const sourceToken = typeof body?.sourceToken === 'string' ? body.sourceToken : undefined
+    const { cwd, branch, worktreePath, sourceToken } = parseHttpInput(
+      REPO_PROCEDURE_SCHEMAS.pull,
+      await c.req.json().catch(() => null),
+    )
     return c.json(
       await jsonOr(
         () => pullRepositoryBranch(cwd, branch, worktreePath, c.req.raw.signal, sourceToken),
@@ -136,10 +129,10 @@ export function createRepoRoutes() {
     )
   })
   app.post('/push', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const cwd = typeof body?.cwd === 'string' ? body.cwd : ''
-    const branch = typeof body?.branch === 'string' ? body.branch : ''
-    const sourceToken = typeof body?.sourceToken === 'string' ? body.sourceToken : undefined
+    const { cwd, branch, sourceToken } = parseHttpInput(
+      REPO_PROCEDURE_SCHEMAS.push,
+      await c.req.json().catch(() => null),
+    )
     return c.json(
       await jsonOr(
         () => pushRepositoryBranch(cwd, branch, c.req.raw.signal, sourceToken),
@@ -149,12 +142,10 @@ export function createRepoRoutes() {
     )
   })
   app.post('/create-worktree', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const cwd = typeof body?.cwd === 'string' ? body.cwd : ''
-    const worktreePath = typeof body?.worktreePath === 'string' ? body.worktreePath : ''
-    const newBranch = typeof body?.newBranch === 'string' ? body.newBranch : ''
-    const baseBranch = typeof body?.baseBranch === 'string' ? body.baseBranch : ''
-    const sourceToken = typeof body?.sourceToken === 'string' ? body.sourceToken : undefined
+    const { cwd, worktreePath, newBranch, baseBranch, sourceToken } = parseHttpInput(
+      REPO_PROCEDURE_SCHEMAS.createWorktree,
+      await c.req.json().catch(() => null),
+    )
     return c.json(
       await jsonOr(
         () => createRepositoryWorktree(cwd, worktreePath, newBranch, baseBranch, c.req.raw.signal, sourceToken),
@@ -164,12 +155,10 @@ export function createRepoRoutes() {
     )
   })
   app.post('/delete-branch', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const cwd = typeof body?.cwd === 'string' ? body.cwd : ''
-    const branch = typeof body?.branch === 'string' ? body.branch : ''
-    const force = body?.force === true
-    const alsoDeleteUpstream = body?.alsoDeleteUpstream === true
-    const sourceToken = typeof body?.sourceToken === 'string' ? body.sourceToken : undefined
+    const { cwd, branch, force, alsoDeleteUpstream, sourceToken } = parseHttpInput(
+      REPO_PROCEDURE_SCHEMAS.deleteBranch,
+      await c.req.json().catch(() => null),
+    )
     return c.json(
       await jsonOr(
         () => deleteRepositoryBranch(cwd, branch, { force, alsoDeleteUpstream }, c.req.raw.signal, sourceToken),
@@ -179,14 +168,8 @@ export function createRepoRoutes() {
     )
   })
   app.post('/remove-worktree', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const cwd = typeof body?.cwd === 'string' ? body.cwd : ''
-    const branch = typeof body?.branch === 'string' ? body.branch : ''
-    const worktreePath = typeof body?.worktreePath === 'string' ? body.worktreePath : ''
-    const alsoDeleteBranch = body?.alsoDeleteBranch === true
-    const forceDeleteBranch = body?.forceDeleteBranch === true
-    const alsoDeleteUpstream = body?.alsoDeleteUpstream === true
-    const sourceToken = typeof body?.sourceToken === 'string' ? body.sourceToken : undefined
+    const { cwd, branch, worktreePath, alsoDeleteBranch, forceDeleteBranch, alsoDeleteUpstream, sourceToken } =
+      parseHttpInput(REPO_PROCEDURE_SCHEMAS.removeWorktree, await c.req.json().catch(() => null))
     return c.json(
       await jsonOr(
         () =>
@@ -202,9 +185,7 @@ export function createRepoRoutes() {
     )
   })
   app.post('/open-remote', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const cwd = typeof body?.cwd === 'string' ? body.cwd : ''
-    const branch = typeof body?.branch === 'string' ? body.branch : undefined
+    const { cwd, branch } = parseHttpInput(REPO_PROCEDURE_SCHEMAS.openRemote, await c.req.json().catch(() => null))
     return c.json(
       await jsonOr(
         () => openRepositoryRemote(cwd, branch, c.req.raw.signal),
@@ -214,8 +195,7 @@ export function createRepoRoutes() {
     )
   })
   app.post('/open-terminal', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const path = typeof body?.path === 'string' ? body.path : ''
+    const { path } = parseHttpInput(REPO_PROCEDURE_SCHEMAS.openTerminal, await c.req.json().catch(() => null))
     return c.json(
       await jsonOr(
         () => openRepositoryTerminal(path),
@@ -225,17 +205,13 @@ export function createRepoRoutes() {
     )
   })
   app.post('/open-editor', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const path = typeof body?.path === 'string' ? body.path : ''
+    const { path } = parseHttpInput(REPO_PROCEDURE_SCHEMAS.openEditor, await c.req.json().catch(() => null))
     return c.json(
       await jsonOr(() => openRepositoryEditor(path), { ok: false, message: 'error.failed-read-repo' }, 'open-editor'),
     )
   })
   app.post('/background-sync-repos', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const repoIds = Array.isArray(body?.repoIds)
-      ? body.repoIds.filter((repoId: unknown): repoId is string => typeof repoId === 'string' && repoId.length > 0)
-      : []
+    const { repoIds } = parseHttpInput(REPO_PROCEDURE_SCHEMAS.backgroundSyncRepos, await c.req.json().catch(() => null))
     return c.json(
       await jsonOr(
         async () => {
@@ -248,8 +224,7 @@ export function createRepoRoutes() {
     )
   })
   app.post('/abort', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const cwd = typeof body?.cwd === 'string' ? body.cwd : ''
+    const { cwd } = parseHttpInput(REPO_PROCEDURE_SCHEMAS.abort, await c.req.json().catch(() => null))
     return c.json(await jsonOr(async () => abortRepositoryOperation(cwd), false, 'abort'))
   })
   return app

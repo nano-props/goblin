@@ -138,4 +138,34 @@ describe('settings routes', () => {
     await expect(clearResponse.json()).resolves.toEqual({ ok: true })
     expect(mocks.applyServerRecentRepoClearWrite).toHaveBeenCalled()
   })
+
+  test('returns 400 BAD_REQUEST when the body is missing required fields', async () => {
+    const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
+    const app = createSettingsRoutes(createServerSettingsState())
+    const response = await app.request(
+      new Request('http://127.0.0.1:32100/fetch-interval', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      }),
+    )
+    expect(response.status).toBe(400)
+    const json = (await response.json()) as { ok: boolean; code: string }
+    expect(json.code).toBe('BAD_REQUEST')
+    expect(mocks.applyServerFetchIntervalWrite).not.toHaveBeenCalled()
+  })
+
+  test('returns 400 when global-shortcut-state body has wrong type for `registered`', async () => {
+    const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
+    const app = createSettingsRoutes(createServerSettingsState())
+    const response = await app.request(
+      new Request('http://127.0.0.1:32100/global-shortcut-state', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ registered: 'yes' }),
+      }),
+    )
+    expect(response.status).toBe(400)
+    expect(mocks.applyServerGlobalShortcutRegistrationWrite).not.toHaveBeenCalled()
+  })
 })
