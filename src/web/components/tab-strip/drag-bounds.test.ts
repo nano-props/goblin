@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import { createRestrictToTabStripBounds } from '#/web/components/tab-strip/drag-bounds.ts'
 
 describe('createRestrictToTabStripBounds', () => {
@@ -45,6 +45,41 @@ describe('createRestrictToTabStripBounds', () => {
 
     expect(result).toMatchObject({ x: 40, y: 0 })
   })
+
+  test('subtracts the flex gap before the right boundary action node', () => {
+    vi.stubGlobal(
+      'getComputedStyle',
+      vi.fn(() => ({ columnGap: '4px', gap: '4px' }) as CSSStyleDeclaration),
+    )
+    const parent = {} as HTMLElement
+    const modifier = createRestrictToTabStripBounds({
+      rightBoundaryRef: {
+        current: {
+          parentElement: parent,
+          getBoundingClientRect: () => rect({ left: 260, right: 292 }),
+        } as HTMLElement,
+      },
+    })
+    const result = modifier({
+      transform: { x: 500, y: 12, scaleX: 1, scaleY: 1 },
+      activeNodeRect: rect({ left: 100, right: 220 }),
+      draggingNodeRect: null,
+      containerNodeRect: rect({ left: 0, right: 300 }),
+      overlayNodeRect: null,
+      scrollableAncestors: [],
+      scrollableAncestorRects: [],
+      windowRect: rect({ left: 0, right: 1000 }),
+      active: null as never,
+      activatorEvent: null as never,
+      over: null,
+    })
+
+    expect(result).toMatchObject({ x: 36, y: 0 })
+  })
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 function rect({ left, right }: { left: number; right: number }): DOMRect {

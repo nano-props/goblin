@@ -121,7 +121,7 @@ describe('TerminalTabs', () => {
     expect(document.body.textContent).toContain('terminal.new')
   })
 
-  test('navigates out of the collapsed terminal tab instead of focusing hidden keyed tabs', () => {
+  test('collapsed terminal tab only navigates out on arrow keys', () => {
     const onNavigateOut = vi.fn()
     render(
       <TerminalTabs
@@ -145,12 +145,17 @@ describe('TerminalTabs', () => {
     if (!(tab instanceof HTMLButtonElement)) throw new Error('missing collapsed terminal tab')
 
     act(() => {
+      tab.focus()
       tab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
       tab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+      tab.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }))
       tab.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }))
     })
 
-    expect(onNavigateOut.mock.calls).toEqual([['prev'], ['next'], ['last']])
+    expect(onNavigateOut.mock.calls).toEqual([['prev'], ['next']])
+    expect(document.activeElement).toBe(tab)
+    expect(tab.getAttribute('aria-posinset')).toBeNull()
+    expect(tab.getAttribute('aria-setsize')).toBeNull()
   })
 
   test('keeps all terminal tabs visible in a horizontal scroll area when not in compact mode', () => {
@@ -173,6 +178,7 @@ describe('TerminalTabs', () => {
 
     const tablist = document.body.querySelector('[role="tablist"][aria-label="terminal.sessions"]')
     expect(tablist).not.toBeNull()
+    expect(tablist?.getAttribute('aria-orientation')).toBe('horizontal')
     expect(document.body.querySelector('button[aria-label="terminal.sessions"]')).toBeNull()
     expect(tablist?.className).toContain('h-full')
     expect(tablist?.parentElement?.className).toContain('w-max')
@@ -180,9 +186,39 @@ describe('TerminalTabs', () => {
       [...document.body.querySelectorAll('[data-terminal-tab-tooltip-id]')].every((tab) => tab.className.includes('w-28')),
     ).toBe(true)
     expect(document.body.querySelectorAll('[role="tab"]').length).toBe(3)
+    const firstTab = document.body.querySelector('#detail-terminal-tab')
+    expect(firstTab?.getAttribute('aria-posinset')).toBe('1')
+    expect(firstTab?.getAttribute('aria-setsize')).toBe('3')
   })
 
-  test('moves focus across the full terminal tab strip and navigates out at the edges', () => {
+  test('uses the full terminal title and unread state in the tab aria-label', () => {
+    render(
+      <TerminalTabs
+        worktreeTerminalKey="/repo\0/repo/worktree"
+        detailId="detail"
+        panelActive
+        sessions={[
+          session({
+            key: 't1',
+            selected: true,
+            hasBell: true,
+            originalTitle: '~/repo/worktree — npm run dev',
+          }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    const tab = document.body.querySelector('#detail-terminal-tab')
+    expect(tab?.getAttribute('aria-label')).toContain('~/repo/worktree — npm run dev')
+    expect(tab?.getAttribute('aria-label')).toContain('terminal.bell-unread')
+  })
+
+  test('moves focus across the full terminal tab strip and only navigates out at arrow-key edges', () => {
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
       cb(0)
       return 0
@@ -231,7 +267,42 @@ describe('TerminalTabs', () => {
       tab2.focus()
       tab2.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }))
     })
-    expect(onNavigateOut).toHaveBeenNthCalledWith(2, 'first')
+    expect(document.activeElement).toBe(tab1)
+
+    act(() => {
+      tab2.focus()
+      tab2.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }))
+    })
+    expect(document.activeElement).toBe(tab3)
+  })
+
+  test('keeps the selected terminal tab semantically selected even when the panel is inactive', () => {
+    render(
+      <TerminalTabs
+        worktreeTerminalKey="/repo\0/repo/worktree"
+        detailId="detail"
+        sessions={[
+          session({ key: 't1', title: 'term-1', selected: true }),
+          session({ key: 't2', title: 'term-2', selected: false, terminalId: 'terminal-2', index: 2 }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    const tab1 = document.body.querySelector('#detail-terminal-tab')
+    const tab2 = document.body.querySelector('#detail-terminal-tab-t2')
+    if (!(tab1 instanceof HTMLButtonElement) || !(tab2 instanceof HTMLButtonElement)) {
+      throw new Error('missing terminal tabs')
+    }
+
+    expect(tab1.getAttribute('aria-selected')).toBe('true')
+    expect(tab1.tabIndex).toBe(0)
+    expect(tab2.getAttribute('aria-selected')).toBe('false')
+    expect(tab2.tabIndex).toBe(-1)
   })
 
   test('scrolls the tab strip to the far right when a new terminal session is added', () => {

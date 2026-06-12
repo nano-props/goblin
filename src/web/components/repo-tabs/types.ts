@@ -10,7 +10,7 @@ export interface RepoTabSummary {
 
 export interface RepoTabStripLabels {
   repositories: string
-  close: string
+  closeWithName: (name: string) => string
   more: string
   dragToReorder: string
   open: string

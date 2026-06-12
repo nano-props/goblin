@@ -56,6 +56,7 @@ describe('RepoTabStrip', () => {
 
     const tablist = document.body.querySelector('[role="tablist"]')
     expect(tablist).not.toBeNull()
+    expect(tablist?.getAttribute('aria-orientation')).toBe('horizontal')
     expect(tablist?.querySelector('[role="tab"]')).not.toBeNull()
     expect(tablist?.querySelector('[aria-label="More"]')).toBeNull()
     expect(document.body.querySelector('button[aria-label="More"]')).not.toBeNull()
@@ -154,7 +155,7 @@ function repo(name: string, id: string): RepoTabSummary {
 
 const labels = {
   repositories: 'Repositories',
-  close: 'Close',
+  closeWithName: (name: string) => `Close ${name}`,
   more: 'More',
   dragToReorder: 'Drag to reorder',
   open: 'Open',

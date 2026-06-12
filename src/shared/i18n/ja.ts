@@ -82,6 +82,7 @@ export const ja: Record<DictKey, string> = {
   // ---- Repository tabs ---------------------------------------------------
   'repo-tabs.repos': 'リポジトリ',
   'repo-tabs.close': '閉じる',
+  'repo-tabs.close-named': '{name} を閉じる',
   'repo-tabs.more': 'その他のタブ',
   'repo-tabs.drag-to-reorder': 'ドラッグで並べ替え',
   'repo-tabs.open-local': 'ローカルリポジトリを開く…',
@@ -322,6 +323,7 @@ export const ja: Record<DictKey, string> = {
   'terminal.label': 'ターミナル',
   'terminal.new': '新しいターミナル',
   'terminal.close': 'ターミナルを閉じる',
+  'terminal.close-named': 'ターミナル {name} を閉じる',
   'terminal.progress': 'ターミナル進行状況',
   'terminal.empty': '開いているターミナルはありません',
   'terminal.drop-hint': 'ドロップしてパスを貼り付け',

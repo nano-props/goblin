@@ -164,7 +164,7 @@ describe('BranchDetailToolbar', () => {
     })
     await flush()
 
-    expect(showRepoDetailTab).toHaveBeenCalledWith(REPO_ID, 'terminal')
+    expect(showRepoDetailTab).not.toHaveBeenCalled()
     expect(document.activeElement?.id).toBe('detail-terminal-tab')
   })
 

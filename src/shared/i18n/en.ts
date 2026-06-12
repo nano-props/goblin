@@ -82,6 +82,7 @@ export const en = {
   // ---- Repository tabs ----------------------------------------------------
   'repo-tabs.repos': 'Repositories',
   'repo-tabs.close': 'Close',
+  'repo-tabs.close-named': 'Close {name}',
   'repo-tabs.more': 'More tabs',
   'repo-tabs.drag-to-reorder': 'Drag to reorder',
   'repo-tabs.open-local': 'Open local repository…',
@@ -323,6 +324,7 @@ export const en = {
   'terminal.label': 'Terminal',
   'terminal.new': 'New terminal',
   'terminal.close': 'Close terminal',
+  'terminal.close-named': 'Close terminal {name}',
   'terminal.progress': 'Terminal progress',
   'terminal.empty': 'No terminal open',
   'terminal.drop-hint': 'Drop to paste path',

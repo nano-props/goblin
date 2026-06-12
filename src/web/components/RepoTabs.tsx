@@ -76,7 +76,7 @@ export function RepoTabs({ currentRepoId, onOpenRepoPathDialog, onOpenRemote, on
       activeId={currentRepoId}
       labels={{
         repositories: t('repo-tabs.repos'),
-        close: t('repo-tabs.close'),
+        closeWithName: (name) => t('repo-tabs.close-named', { name }),
         more: t('repo-tabs.more'),
         dragToReorder: t('repo-tabs.drag-to-reorder'),
         open: t('topbar.open'),

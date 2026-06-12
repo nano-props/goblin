@@ -74,6 +74,7 @@ export const zh: Record<DictKey, string> = {
   // ---- Repository tabs ---------------------------------------------------
   'repo-tabs.repos': '仓库',
   'repo-tabs.close': '关闭',
+  'repo-tabs.close-named': '关闭 {name}',
   'repo-tabs.more': '其他标签',
   'repo-tabs.drag-to-reorder': '拖动以重新排序',
   'repo-tabs.open-local': '打开本地仓库…',
@@ -304,6 +305,7 @@ export const zh: Record<DictKey, string> = {
   'terminal.label': '终端',
   'terminal.new': '新终端',
   'terminal.close': '关闭终端',
+  'terminal.close-named': '关闭终端 {name}',
   'terminal.progress': '终端进度',
   'terminal.empty': '没有打开的终端',
   'terminal.drop-hint': '松手粘贴路径',

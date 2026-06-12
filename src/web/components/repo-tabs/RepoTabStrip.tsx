@@ -3,12 +3,13 @@ import { ChevronDown, Download, FolderOpen, Plus, Server } from 'lucide-react'
 import {
   DndContext,
   type DragEndEvent,
+  KeyboardSensor,
   PointerSensor,
   closestCenter,
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
-import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable'
+import { SortableContext, horizontalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { Button } from '#/web/components/ui/button.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
@@ -154,18 +155,20 @@ function CompactRepoTabs({
   return (
     <ToolbarTabStripBody>
       <RepoTabTooltipLayer repos={repos} role="tablist">
-        {repos.map((repo) => (
+        {repos.map((repo, index) => (
           <RepoTab
             key={repo.id}
             repo={repo}
             isActive={repo.id === activeId}
+            index={index}
+            total={repos.length}
             showSeparator={false}
             focusRegistry={focusRegistry}
             onHoverChange={onHoverChange}
             onActivate={onActivate}
             onClose={onClose}
             onKeyboardNavigate={onKeyboardNavigate}
-            closeLabel={labels.close}
+            closeLabel={labels.closeWithName}
             unavailableLabel={labels.unavailable}
           />
         ))}
@@ -214,6 +217,8 @@ function ScrollableRepoTabs({
                   key={repo.id}
                   repo={repo}
                   isActive={repo.id === activeId}
+                  index={index}
+                  total={repos.length}
                   focusRegistry={focusRegistry}
                   showSeparator={shouldShowInactiveSeparator({
                     leftId: repo.id,
@@ -225,7 +230,7 @@ function ScrollableRepoTabs({
                   onActivate={onActivate}
                   onClose={onClose}
                   onKeyboardNavigate={onKeyboardNavigate}
-                  closeLabel={labels.close}
+                  closeLabel={labels.closeWithName}
                   unavailableLabel={labels.unavailable}
                 />
               )
@@ -251,7 +256,10 @@ export function RepoTabStrip({
 }: RepoTabStripProps) {
   const isSmallScreen = useIsSmallScreen()
   const [hoveredId, setHoveredId] = useState<string | null>(null)
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
   const focusRegistry = useFocusRegistry<string, HTMLButtonElement>()
   const openMenuRef = useRef<HTMLDivElement>(null)
   const restrictToVisibleTabStrip = useMemo(

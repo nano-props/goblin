@@ -19,14 +19,16 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
-import { SortableContext, horizontalListSortingStrategy, sortableKeyboardCoordinates, useSortable } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
+import { SortableContext, horizontalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { DelegatedTooltipLayer, DELEGATED_TOOLTIP_DEFAULTS } from '#/web/components/DelegatedTooltipLayer.tsx'
 import { createRestrictToTabStripBounds } from '#/web/components/tab-strip/drag-bounds.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
 import { ToolbarTabList, ToolbarTabStrip, ToolbarTabStripBody } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
+import { ToolbarClosableTab } from '#/web/components/tab-strip/ToolbarClosableTab.tsx'
+import { toolbarTabButtonClassName, toolbarTabChromeClassName } from '#/web/components/tab-strip/tab-variants.ts'
 import { useFocusRegistry, type FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
+import { useSortableTab } from '#/web/components/tab-strip/useSortableTab.ts'
 
 interface TerminalTabsProps {
   worktreeTerminalKey: string
@@ -67,7 +69,7 @@ export function TerminalTabs({
 }: TerminalTabsProps) {
   const t = useT()
   const showCollapsedTabs = !!responsiveCompact
-  const activeSession = sessions.find((s) => s.selected) ?? sessions[0]
+  const selectedSession = sessions.find((s) => s.selected) ?? sessions[0]
   const internalFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()
   const focusRegistry = externalFocusRegistry ?? internalFocusRegistry
   const viewportRef = useRef<HTMLDivElement>(null)
@@ -143,17 +145,22 @@ export function TerminalTabs({
     (e: React.KeyboardEvent<HTMLButtonElement>, sessionKey: string) => {
       if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Home' && e.key !== 'End') return
       e.preventDefault()
-      if (showCollapsedTabs) {
-        if (e.key === 'Home') onNavigateOut?.('first')
-        else if (e.key === 'End') onNavigateOut?.('last')
-        else if (e.key === 'ArrowLeft') onNavigateOut?.('prev')
-        else onNavigateOut?.('next')
-        return
-      }
       const keys = sessions.map((s) => s.key)
       const idx = keys.indexOf(sessionKey)
+      if (showCollapsedTabs) {
+        if (e.key === 'ArrowLeft') onNavigateOut?.('prev')
+        else if (e.key === 'ArrowRight') onNavigateOut?.('next')
+        else focusRegistry.focus(sessionKey)
+        return
+      }
       if (e.key === 'Home') {
-        onNavigateOut?.('first')
+        const firstKey = keys[0]
+        if (firstKey) focusRegistry.focus(firstKey)
+        return
+      }
+      if (e.key === 'End') {
+        const lastKey = keys[keys.length - 1]
+        if (lastKey) focusRegistry.focus(lastKey)
         return
       }
       if (e.key === 'ArrowLeft' && idx === 0) {
@@ -167,9 +174,7 @@ export function TerminalTabs({
       const nextIdx =
         e.key === 'ArrowLeft'
           ? (idx - 1 + keys.length) % keys.length
-          : e.key === 'ArrowRight'
-            ? (idx + 1) % keys.length
-            : keys.length - 1
+          : (idx + 1) % keys.length
       const nextKey = keys[nextIdx]
       if (nextKey) {
         focusRegistry.focus(nextKey)
@@ -215,7 +220,7 @@ export function TerminalTabs({
     )
   }
 
-  if (!activeSession) return null
+  if (!selectedSession) return null
 
   function renderCompactTabsBody() {
     return (
@@ -227,8 +232,9 @@ export function TerminalTabs({
           aria-label={t('terminal.sessions')}
         >
           <TerminalTab
-            session={activeSession}
-            isActive={!!panelActive && activeSession.selected}
+            session={selectedSession}
+            isActive={!!panelActive && selectedSession.selected}
+            isSelected={selectedSession.selected}
             tabId={`${detailId}-terminal-tab`}
             focusRegistry={focusRegistry}
             onSelect={handleSelect}
@@ -271,8 +277,8 @@ export function TerminalTabs({
                     className="absolute right-1 h-6 w-6 text-muted-foreground"
                     onPointerDown={(event) => event.stopPropagation()}
                     onClick={(event) => handleClose(event, session.key)}
-                    title={t('terminal.close')}
-                    aria-label={t('terminal.close')}
+                    title={t('terminal.close-named', { name: session.title })}
+                    aria-label={t('terminal.close-named', { name: session.title })}
                   >
                     <X size={14} />
                   </Button>
@@ -306,6 +312,9 @@ export function TerminalTabs({
                   key={session.key}
                   session={session}
                   isActive={!!panelActive && session.selected}
+                  isSelected={session.selected}
+                  index={index}
+                  total={sessions.length}
                   tabId={index === 0 ? `${detailId}-terminal-tab` : `${detailId}-terminal-tab-${session.key}`}
                   focusRegistry={focusRegistry}
                   onSelect={handleSelect}
@@ -346,74 +355,116 @@ export function TerminalTabs({
 interface TerminalTabProps {
   session: TerminalSessionSummary
   isActive: boolean
+  isSelected: boolean
+  index?: number
+  total?: number
   tabId: string
   focusRegistry: FocusRegistry<string, HTMLButtonElement>
   onSelect: (key: string) => void
   onClose: (event: React.MouseEvent, key: string) => void
   onKeyDown: (e: React.KeyboardEvent<HTMLButtonElement>, sessionKey: string) => void
-  t: (key: string) => string
+  t: (key: string, params?: Record<string, string | number>) => string
 }
 
-function terminalTabChromeClassName(isActive: boolean, isDragging = false): string {
-  return cn(
-    'group relative flex h-7 w-28 shrink-0 items-center gap-1 rounded-md border px-2.5 text-sm transition-colors duration-100',
-    isActive
-      ? 'border-transparent bg-selected text-selected-foreground'
-      : 'border-separator text-muted-foreground hover:bg-accent/50 hover:text-foreground',
-    isDragging && 'z-10 cursor-grabbing',
-    isDragging && !isActive && 'bg-card text-foreground',
+interface TerminalTabChromeProps {
+  session: TerminalSessionSummary
+  isActive: boolean
+  isSelected: boolean
+  index?: number
+  total?: number
+  isDragging?: boolean
+  tabId: string
+  buttonRef: ((node: HTMLButtonElement | null) => void) | undefined
+  buttonProps?: ComponentPropsWithoutRef<'button'>
+  onSelect: (key: string) => void
+  onClose: (event: React.MouseEvent, key: string) => void
+  onKeyDown: (e: React.KeyboardEvent<HTMLButtonElement>, sessionKey: string) => void
+  t: (key: string, params?: Record<string, string | number>) => string
+}
+
+function TerminalTabChrome({
+  session,
+  isActive,
+  isSelected,
+  index,
+  total,
+  isDragging = false,
+  tabId,
+  buttonRef,
+  buttonProps,
+  onSelect,
+  onClose,
+  onKeyDown,
+  t,
+}: TerminalTabChromeProps) {
+  const terminalLabelBase = session.originalTitle ?? session.fullTitle ?? session.title
+  const terminalLabel = session.hasBell ? `${terminalLabelBase} — ${t('terminal.bell-unread')}` : terminalLabelBase
+  const collectionAria =
+    index !== undefined && total !== undefined
+      ? {
+          'aria-posinset': index + 1,
+          'aria-setsize': total,
+        }
+      : {}
+  return (
+    <ToolbarClosableTab
+      containerProps={{ 'data-terminal-tab-tooltip-id': session.key }}
+      containerClassName={toolbarTabChromeClassName({ variant: 'terminal', active: isActive, dragging: isDragging })}
+      buttonRef={buttonRef}
+      buttonProps={{
+        ...buttonProps,
+        role: 'tab',
+        id: tabId,
+        'aria-selected': isSelected,
+        'aria-label': terminalLabel,
+        ...collectionAria,
+        tabIndex: isSelected ? 0 : -1,
+        onClick: () => onSelect(session.key),
+        onKeyDown: (e) => onKeyDown(e, session.key),
+      }}
+      buttonClassName={toolbarTabButtonClassName('terminal')}
+      closeLabel={t('terminal.close-named', { name: session.title })}
+      closeVisible={isActive}
+      onClose={(e) => onClose(e, session.key)}
+    >
+      <span className="truncate">{session.title}</span>
+      {session.hasBell && (
+        <>
+          <span className="relative flex h-2 w-2 shrink-0">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-attention opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-attention" />
+          </span>
+          <span className="sr-only">{t('terminal.bell-unread')}</span>
+        </>
+      )}
+    </ToolbarClosableTab>
   )
 }
 
-function TerminalTab({ session, isActive, tabId, focusRegistry, onSelect, onClose, onKeyDown, t }: TerminalTabProps) {
+function TerminalTab({ session, isActive, isSelected, index, total, tabId, focusRegistry, onSelect, onClose, onKeyDown, t }: TerminalTabProps) {
   return (
-    <div
-      data-terminal-tab-tooltip-id={session.key}
-      className={terminalTabChromeClassName(isActive)}
-    >
-      <button
-        ref={focusRegistry.setRef(session.key)}
-        type="button"
-        role="tab"
-        id={tabId}
-        aria-selected={isActive}
-        tabIndex={isActive ? 0 : -1}
-        onClick={() => onSelect(session.key)}
-        onKeyDown={(e) => onKeyDown(e, session.key)}
-        className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-left text-inherit outline-none"
-      >
-        <span className="truncate">{session.title}</span>
-        {session.hasBell && (
-          <>
-            <span className="relative flex h-2 w-2 shrink-0">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-attention opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-attention" />
-            </span>
-            <span className="sr-only">{t('terminal.bell-unread')}</span>
-          </>
-        )}
-      </button>
-      <button
-        type="button"
-        tabIndex={-1}
-        aria-label={t('terminal.close')}
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => onClose(e, session.key)}
-        className={cn(
-          'cursor-pointer rounded border-0 bg-transparent p-0.5 text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-accent-foreground',
-          isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
-        )}
-        title={t('terminal.close')}
-      >
-        <X size={14} />
-      </button>
-    </div>
+    <TerminalTabChrome
+      session={session}
+      isActive={isActive}
+      isSelected={isSelected}
+      index={index}
+      total={total}
+      tabId={tabId}
+      buttonRef={focusRegistry.setRef(session.key)}
+      onSelect={onSelect}
+      onClose={onClose}
+      onKeyDown={onKeyDown}
+      t={t}
+    />
   )
 }
 
 function SortableTerminalTab({
   session,
   isActive,
+  isSelected,
+  index,
+  total,
   tabId,
   focusRegistry,
   onSelect,
@@ -421,72 +472,33 @@ function SortableTerminalTab({
   onKeyDown,
   t,
 }: TerminalTabProps) {
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
-    id: session.key,
-  })
-  const sortableOnKeyDown = listeners?.onKeyDown
-  const sortableListeners = { ...(listeners ?? {}) }
-  delete sortableListeners.onKeyDown
-  const chromeLikeTransform = transform ? { ...transform, y: 0, scaleX: 1, scaleY: 1 } : null
-  const style = {
-    transform: CSS.Transform.toString(chromeLikeTransform),
-    transition,
-  }
-  const setFocusRef = focusRegistry.setRef(session.key)
-  const setButtonRef = (node: HTMLButtonElement | null) => {
-    setActivatorNodeRef(node)
-    setFocusRef(node)
-  }
+  const sortable = useSortableTab(session.key, { onButtonRef: focusRegistry.setRef(session.key) })
 
   return (
     <div
-      ref={setNodeRef}
-      style={style}
-      data-terminal-tab-tooltip-id={session.key}
-      className={cn(terminalTabChromeClassName(isActive, isDragging), 'touch-none select-none')}
+      ref={sortable.setContainerRef}
+      style={sortable.style}
+      className="touch-none select-none"
     >
-      <button
-        ref={setButtonRef}
-        type="button"
-        {...attributes}
-        {...sortableListeners}
-        role="tab"
-        id={tabId}
-        aria-selected={isActive}
-        tabIndex={isActive ? 0 : -1}
-        onClick={() => onSelect(session.key)}
+      <TerminalTabChrome
+        session={session}
+        isActive={isActive}
+        isSelected={isSelected}
+        index={index}
+        total={total}
+        isDragging={sortable.isDragging}
+        tabId={tabId}
+        buttonRef={sortable.setButtonRef}
+        buttonProps={{ ...sortable.attributes, ...sortable.sortableListeners }}
+        onSelect={onSelect}
+        onClose={onClose}
         onKeyDown={(e) => {
-          sortableOnKeyDown?.(e)
-          if (e.defaultPrevented || isDragging) return
+          sortable.sortableOnKeyDown?.(e)
+          if (e.defaultPrevented || sortable.isDragging) return
           onKeyDown(e, session.key)
         }}
-        className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-left text-inherit outline-none"
-      >
-        <span className="truncate">{session.title}</span>
-        {session.hasBell && (
-          <>
-            <span className="relative flex h-2 w-2 shrink-0">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-attention opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-attention" />
-            </span>
-            <span className="sr-only">{t('terminal.bell-unread')}</span>
-          </>
-        )}
-      </button>
-      <button
-        type="button"
-        tabIndex={-1}
-        aria-label={t('terminal.close')}
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => onClose(e, session.key)}
-        className={cn(
-          'cursor-pointer rounded border-0 bg-transparent p-0.5 text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-accent-foreground',
-          isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
-        )}
-        title={t('terminal.close')}
-      >
-        <X size={14} />
-      </button>
+        t={t}
+      />
     </div>
   )
 }
@@ -512,7 +524,9 @@ function TerminalTabTooltipLayer({ sessions, focusMode, children, ...props }: Te
       tooltipClassName="px-3 py-2"
       asChild
     >
-      <ToolbarTabList {...props}>{children}</ToolbarTabList>
+      <ToolbarTabList aria-orientation={props.role === 'tablist' ? 'horizontal' : undefined} {...props}>
+        {children}
+      </ToolbarTabList>
     </DelegatedTooltipLayer>
   )
 }

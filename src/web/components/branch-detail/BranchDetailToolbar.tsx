@@ -165,7 +165,12 @@ export function BranchDetailToolbar({
   return (
     <Toolbar variant="detail">
       <div className="flex h-full min-w-0 items-center gap-1 overflow-hidden">
-        <div className="flex h-full shrink-0 items-center gap-1" role="tablist" aria-label={t('tab.branch-detail')}>
+        <div
+          className="flex h-full shrink-0 items-center gap-1"
+          role="tablist"
+          aria-label={t('tab.branch-detail')}
+          aria-orientation="horizontal"
+        >
           {tabs
             .filter((tab) => tab.id !== 'terminal')
             .map((tab) => {

@@ -75,6 +75,7 @@ export const ko: Record<DictKey, string> = {
   // ---- Repository tabs ---------------------------------------------------
   'repo-tabs.repos': '리포지토리',
   'repo-tabs.close': '닫기',
+  'repo-tabs.close-named': '{name} 닫기',
   'repo-tabs.more': '더 많은 탭',
   'repo-tabs.drag-to-reorder': '드래그하여 순서 변경',
   'repo-tabs.open-local': '로컬 리포지토리 열기…',
@@ -314,6 +315,7 @@ export const ko: Record<DictKey, string> = {
   'terminal.label': '터미널',
   'terminal.new': '새 터미널',
   'terminal.close': '터미널 닫기',
+  'terminal.close-named': '터미널 {name} 닫기',
   'terminal.progress': '터미널 진행률',
   'terminal.empty': '열린 터미널 없음',
   'terminal.drop-hint': '놓아서 경로 붙여넣기',

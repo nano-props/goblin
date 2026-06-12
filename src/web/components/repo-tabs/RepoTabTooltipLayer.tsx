@@ -34,7 +34,9 @@ export function RepoTabTooltipLayer({
       tooltipClassName="px-3 py-2"
       asChild
     >
-      <ToolbarTabList {...props}>{children}</ToolbarTabList>
+      <ToolbarTabList aria-orientation={props.role === 'tablist' ? 'horizontal' : undefined} {...props}>
+        {children}
+      </ToolbarTabList>
     </DelegatedTooltipLayer>
   )
 }
