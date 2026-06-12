@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { bodyLimit } from 'hono/body-limit'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { createInternalAuthMiddleware } from '#/server/common/auth.ts'
 import { createHealthRoutes } from '#/server/routes/health.ts'
@@ -28,6 +29,12 @@ export interface ServerAppOptions {
   internalSecret: string
   terminalHost: ServerTerminalHost
 }
+
+// Cap request bodies on the data endpoints at 1 MiB. The largest real
+// payload today is a settings patch (a few KB); 1 MiB leaves headroom
+// for future growth (PR lists, diff hunks) while preventing a hostile
+// client from pinning a worker with a multi-GB POST.
+const API_BODY_LIMIT_BYTES = 1 * 1024 * 1024
 
 const WEB_DIST_DIR = path.resolve(import.meta.dirname, '../../dist/web')
 const WEB_INDEX_HTML = path.join(WEB_DIST_DIR, 'index.html')
@@ -100,6 +107,13 @@ export function createApp(options: ServerAppOptions): Hono {
       origin: '*',
       allowHeaders: ['Content-Type', 'x-goblin-internal-secret'],
       allowMethods: ['GET', 'POST', 'OPTIONS'],
+    }),
+  )
+  app.use(
+    '/api/*',
+    bodyLimit({
+      maxSize: API_BODY_LIMIT_BYTES,
+      onError: (c) => c.json({ ok: false, code: 'PAYLOAD_TOO_LARGE', message: 'Request body too large' }, 413),
     }),
   )
   app.route(

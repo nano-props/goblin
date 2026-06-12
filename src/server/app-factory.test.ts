@@ -76,6 +76,55 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerSettingsPrefs: mocks.getServerSettingsPrefs,
 }))
 
+describe('server app body limit', () => {
+  test('rejects POST bodies over 1 MiB with a 413 JSON response', async () => {
+    const { createApp } = await import('#/server/app-factory.ts')
+    const app = createApp({
+      version: '0.1.0',
+      startedAt: Date.now(),
+      internalSecret: 'secret',
+      terminalHost: terminalHostStub,
+    })
+    const oversized = 'x'.repeat(2 * 1024 * 1024)
+    const response = await app.request(
+      new Request('http://127.0.0.1:32100/api/settings/session', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-goblin-internal-secret': 'secret',
+        },
+        body: JSON.stringify({ session: { blob: oversized } }),
+      }),
+    )
+    expect(response.status).toBe(413)
+    const json = (await response.json()) as { ok: boolean; code: string }
+    expect(json).toEqual({ ok: false, code: 'PAYLOAD_TOO_LARGE', message: 'Request body too large' })
+  })
+
+  test('accepts POST bodies under the limit and surfaces route errors normally', async () => {
+    const { createApp } = await import('#/server/app-factory.ts')
+    const app = createApp({
+      version: '0.1.0',
+      startedAt: Date.now(),
+      internalSecret: 'secret',
+      terminalHost: terminalHostStub,
+    })
+    // A small, well-formed body: validation will run after the body
+    // limit middleware, so we expect 400 (BAD_REQUEST) — not 413.
+    const response = await app.request(
+      new Request('http://127.0.0.1:32100/api/settings/session', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-goblin-internal-secret': 'secret',
+        },
+        body: JSON.stringify({}),
+      }),
+    )
+    expect(response.status).toBe(400)
+  })
+})
+
 describe('server app html bootstrap', () => {
   beforeEach(() => {
     vi.resetModules()
