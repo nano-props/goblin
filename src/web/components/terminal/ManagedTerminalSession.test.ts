@@ -351,6 +351,14 @@ class MockFontFaceSet {
   private readyDeferred = deferred<void>()
   ready = this.readyDeferred.promise
 
+  check(): boolean {
+    return false
+  }
+
+  load(): Promise<FontFace[]> {
+    return Promise.resolve([])
+  }
+
   reset(): void {
     this.loadingDoneHandlers.clear()
     this.handlerMap.clear()

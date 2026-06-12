@@ -143,10 +143,15 @@ function normalizeRestorableRepoSnapshotEntry(value: unknown): RestorableRepoSna
   if (!parsed.success) return null
   const snapshot = parsed.output
   return {
-    ...snapshot,
+    savedAt: snapshot.savedAt,
+    name: snapshot.name,
     data: {
       ...snapshot.data,
       branches: cachedBranches(snapshot.data.branches),
+    },
+    ui: {
+      selectedBranch: snapshot.ui.selectedBranch,
+      branchViewMode: snapshot.ui.branchViewMode,
     },
   }
 }

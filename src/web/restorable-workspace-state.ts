@@ -33,7 +33,16 @@ export function sessionStateFromRestorableWorkspaceState(input: {
 export function restoreRestorableWorkspaceStateFromSession(
   session: SessionState,
   activeId: string | null = session.activeRepo,
-) {
+): Pick<
+  RestorableWorkspaceState,
+  | 'activeId'
+  | 'detailCollapsed'
+  | 'detailFocusMode'
+  | 'workspaceLayout'
+  | 'detailPaneSizes'
+  | 'selectedTerminalByWorktree'
+  | 'detailTabByRepo'
+> {
   return {
     activeId,
     detailCollapsed: session.detailCollapsed,
