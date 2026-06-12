@@ -9,7 +9,7 @@
 import { app } from 'electron'
 import { DICTS, en, type DictKey } from '#/shared/i18n/dictionaries.ts'
 import { resolvePreferredLang } from '#/shared/i18n/resolve-lang.ts'
-import type { Lang, LangPref } from '#/shared/rpc.ts'
+import type { Lang, LangPref } from '#/shared/api-types.ts'
 
 let currentLang: Lang = 'en'
 

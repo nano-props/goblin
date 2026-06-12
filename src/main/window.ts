@@ -30,7 +30,7 @@ const DEFAULT_BOUNDS: WindowBounds = { width: 1100, height: 720 }
 const MAIN_WINDOW_SURFACE = {
   windowKey: 'main',
   capabilities: {
-    rpcBroadcast: true,
+    ipcBroadcast: true,
     themeSync: true,
   },
 } as const

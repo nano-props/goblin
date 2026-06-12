@@ -1,8 +1,8 @@
-import type { EditorPref, I18nSnapshot, TerminalPref } from '#/shared/rpc.ts'
+import type { EditorPref, I18nSnapshot, TerminalPref } from '#/shared/api-types.ts'
 
 export type RendererRuntimeKind = 'electron' | 'web'
 export type RendererNativeCapability =
-  | 'settings-rpc'
+  | 'settings-ipc'
   | 'open-settings-window'
   | 'open-external-url'
   | 'open-directory-dialog'
@@ -13,7 +13,7 @@ export type RendererNativeCapability =
 
 export const RENDERER_BRIDGE_VERSION = 1
 export const ELECTRON_RENDERER_CAPABILITIES = [
-  'settings-rpc',
+  'settings-ipc',
   'open-settings-window',
   'open-external-url',
   'open-directory-dialog',

@@ -83,7 +83,7 @@ vi.mock('#/main/menu-state.ts', () => ({
 }))
 
 vi.mock('#/main/renderer-surface-events.ts', () => ({
-  broadcastRpcEvent: vi.fn(),
+  broadcastIpcEvent: vi.fn(),
   sendRendererEffectIntent: mocks.sendRendererEffectIntent,
 }))
 

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { SettingsSnapshot } from '#/shared/rpc.ts'
+import type { SettingsSnapshot } from '#/shared/api-types.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
 const mocks = vi.hoisted(() => {
@@ -31,7 +31,7 @@ const mocks = vi.hoisted(() => {
     syncGlobalShortcuts: vi.fn(),
     enqueueExternalOpenPath: vi.fn(() => true),
     unregisterAppShortcuts: vi.fn(),
-    wireRpcIpc: vi.fn(),
+    wireIpc: vi.fn(),
     broadcastRendererEffectIntent: vi.fn(),
     wireShellBridgeIpc: vi.fn(),
     wireTerminalIpc: vi.fn(),
@@ -95,8 +95,8 @@ vi.mock('#/main/i18n/index.ts', () => ({
   setCurrentLang: mocks.setCurrentLang,
 }))
 
-vi.mock('#/main/rpc.ts', () => ({
-  wireRpcIpc: mocks.wireRpcIpc,
+vi.mock('#/main/ipc', () => ({
+  wireIpc: mocks.wireIpc,
 }))
 
 vi.mock('#/main/renderer-surface-events.ts', () => ({

@@ -6,7 +6,7 @@ import { sendRendererEffectIntent } from '#/main/renderer-surface-events.ts'
 import { isValidAbsolutePath } from '#/shared/input-validation.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 import { openHttpExternal, openHttpsExternal } from '#/main/external-url.ts'
-import type { SettingsPage } from '#/shared/rpc.ts'
+import type { SettingsPage } from '#/shared/api-types.ts'
 import {
   SHELL_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL,
   SHELL_OPEN_DIRECTORY_DIALOG_CHANNEL,

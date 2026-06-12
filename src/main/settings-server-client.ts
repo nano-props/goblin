@@ -1,4 +1,4 @@
-import type { SettingsPrefs, SettingsSnapshot } from '#/shared/rpc.ts'
+import type { SettingsPrefs, SettingsSnapshot } from '#/shared/api-types.ts'
 import { postEmbeddedServerJson, requestEmbeddedServerJson } from '#/shared/embedded-server-client.ts'
 import { getEmbeddedServerRuntime } from '#/main/server-manager.ts'
 

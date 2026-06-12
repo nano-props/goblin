@@ -1,5 +1,5 @@
 import { app, dialog } from 'electron'
-import type { SettingsSnapshot } from '#/shared/rpc.ts'
+import type { SettingsSnapshot } from '#/shared/api-types.ts'
 import { activateMainWindow } from '#/main/window.ts'
 import { initTheme } from '#/main/theme.ts'
 import { flushWindowState } from '#/main/window-state.ts'
@@ -7,7 +7,7 @@ import { buildAppMenu } from '#/main/menu.ts'
 import { initializeMenuRuntimeState } from '#/main/menu-state.ts'
 import { syncRecentRepos } from '#/main/recent-repos.ts'
 import { assertDictionaryParity, resolveLang, setCurrentLang } from '#/main/i18n/index.ts'
-import { wireRpcIpc } from '#/main/rpc.ts'
+import { wireIpc } from '#/main/ipc.ts'
 import { wireShellBridgeIpc } from '#/main/shell-bridge.ts'
 import { wireTerminalIpc } from '#/main/terminal.ts'
 import { syncGlobalShortcuts, unregisterAppShortcuts } from '#/main/shortcuts.ts'
@@ -125,7 +125,7 @@ async function initializeRuntimeState(settingsSnapshot: SettingsSnapshot): Promi
 }
 
 function wireMainProcessIpc(): void {
-  wireRpcIpc()
+  wireIpc()
   wireShellBridgeIpc()
   wireTerminalIpc()
 }

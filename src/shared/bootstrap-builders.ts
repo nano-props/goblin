@@ -7,7 +7,7 @@ import type {
   RendererRuntimeKind,
   RendererRuntimeSnapshot,
 } from '#/shared/bootstrap.ts'
-import type { I18nSnapshot } from '#/shared/rpc.ts'
+import type { I18nSnapshot } from '#/shared/api-types.ts'
 import { RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 
 interface RendererBootstrapSeed {

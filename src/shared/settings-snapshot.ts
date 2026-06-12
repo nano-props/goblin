@@ -5,7 +5,7 @@ import type {
   SessionState,
   SettingsPrefs,
   SettingsSnapshot,
-} from '#/shared/rpc.ts'
+} from '#/shared/api-types.ts'
 
 export function buildRuntimeSettingsSnapshot(input: {
   prefs: SettingsPrefs

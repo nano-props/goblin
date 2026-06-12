@@ -7,7 +7,7 @@
 import { nativeTheme } from 'electron'
 import { getSettingsPrefs } from '#/main/settings-server-client.ts'
 import { DEFAULT_COLOR_THEME } from '#/shared/settings-defaults.ts'
-import type { ResolvedTheme, ThemePref, ThemeState } from '#/shared/rpc.ts'
+import type { ResolvedTheme, ThemePref, ThemeState } from '#/shared/api-types.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 
 type Listener = (state: ThemeState) => void

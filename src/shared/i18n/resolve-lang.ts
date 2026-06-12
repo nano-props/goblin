@@ -1,4 +1,4 @@
-import type { Lang, LangPref } from '#/shared/rpc.ts'
+import type { Lang, LangPref } from '#/shared/api-types.ts'
 
 const SUPPORTED_LANGS = ['zh', 'ko', 'ja', 'en'] as const satisfies readonly Lang[]
 

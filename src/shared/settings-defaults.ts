@@ -9,7 +9,7 @@ import type {
   SettingsSnapshot,
   TerminalPref,
   ThemePref,
-} from '#/shared/rpc.ts'
+} from '#/shared/api-types.ts'
 import {
   DEFAULT_DETAIL_COLLAPSED,
   DEFAULT_DETAIL_FOCUS_MODE,

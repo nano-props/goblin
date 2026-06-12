@@ -28,7 +28,7 @@ import {
   toInitialServerSnapshot,
 } from '#/shared/bootstrap-builders.ts'
 import { buildI18nSnapshot } from '#/shared/i18n/snapshot.ts'
-import type { LangPref } from '#/shared/rpc.ts'
+import type { LangPref } from '#/shared/api-types.ts'
 import { WINDOW_BACKGROUND_BY_COLOR_THEME } from '#/shared/theme-tokens.ts'
 import { DEFAULT_COLOR_THEME, initialSettingsFromSnapshot } from '#/shared/settings-defaults.ts'
 

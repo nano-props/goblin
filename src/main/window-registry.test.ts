@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { RPC_EVENT_CHANNEL } from '#/shared/ipc-channels.ts'
+import { IPC_EVENT_CHANNEL } from '#/shared/ipc-channels.ts'
 
 const mocks = vi.hoisted(() => ({
   getFocusedWindow: vi.fn(() => null),
@@ -40,7 +40,7 @@ describe('window registry', () => {
     expect(registry.registeredRendererSurfaceByWebContentsId(main.webContents.id)).toEqual({
       windowKey: 'main',
       capabilities: {
-        rpcBroadcast: true,
+        ipcBroadcast: true,
         themeSync: true,
       },
     })
@@ -50,7 +50,7 @@ describe('window registry', () => {
     expect(registry.focusedRegisteredSurface()).toEqual({
       windowKey: 'main',
       capabilities: {
-        rpcBroadcast: true,
+        ipcBroadcast: true,
         themeSync: true,
       },
       webContentsId: main.webContents.id,
@@ -62,10 +62,10 @@ describe('window registry', () => {
     const registry = await import('#/main/window-registry.ts')
     const main = makeWindow()
 
-    registry.registerRendererWindowSurface(main, { windowKey: 'main', capabilities: { rpcBroadcast: true } })
-    registry.broadcastToSurfaceCapability('rpcBroadcast', RPC_EVENT_CHANNEL, [{ type: 'settings-write-error' }])
+    registry.registerRendererWindowSurface(main, { windowKey: 'main', capabilities: { ipcBroadcast: true } })
+    registry.broadcastToSurfaceCapability('ipcBroadcast', IPC_EVENT_CHANNEL, [{ type: 'settings-write-error' }])
 
-    expect(main.webContents.send).toHaveBeenCalledWith(RPC_EVENT_CHANNEL, { type: 'settings-write-error' })
+    expect(main.webContents.send).toHaveBeenCalledWith(IPC_EVENT_CHANNEL, { type: 'settings-write-error' })
   })
 
   test('filters surfaces by capability', async () => {
@@ -78,7 +78,7 @@ describe('window registry', () => {
       {
         windowKey: 'main',
         capabilities: {
-          rpcBroadcast: true,
+          ipcBroadcast: true,
           themeSync: true,
         },
         webContentsId: main.webContents.id,

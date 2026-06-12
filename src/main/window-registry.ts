@@ -8,7 +8,7 @@
 import { BrowserWindow, type BrowserWindow as BrowserWindowType } from 'electron'
 
 export interface RegisteredRendererSurfaceCapabilities {
-  rpcBroadcast: boolean
+  ipcBroadcast: boolean
   themeSync: boolean
 }
 
@@ -34,7 +34,7 @@ const surfacesByWebContentsId = new Map<number, RegisteredRendererSurface>()
 
 function defaultCapabilities(): RegisteredRendererSurfaceCapabilities {
   return {
-    rpcBroadcast: true,
+    ipcBroadcast: true,
     themeSync: true,
   }
 }

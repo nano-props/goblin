@@ -1,4 +1,4 @@
-import type { ResolvedTheme } from '#/shared/rpc.ts'
+import type { ResolvedTheme } from '#/shared/api-types.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 
 // Main needs a window background before renderer CSS loads. Keep these

@@ -1,5 +1,5 @@
 import { DEFAULT_WORKSPACE_LAYOUT, normalizeWorkspaceLayout, type WorkspaceLayout } from '#/shared/workspace-layout.ts'
-import type { LangPref } from '#/shared/rpc.ts'
+import type { LangPref } from '#/shared/api-types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 
 export interface MenuRuntimeState {
