@@ -8,7 +8,7 @@ export function toolbarTabChromeClassName(options: {
   active: boolean
   dragging?: boolean
   // Only meaningful for the 'terminal' variant: compact strips live in narrow
-  // toolbars where flex widths could overflow, so we pin the tab to w-28.
+  // toolbars where flex widths could overflow, so we pin the tab to w-32.
   compact?: boolean
 }): string {
   const { variant, active, dragging = false, compact = false } = options
@@ -18,8 +18,8 @@ export function toolbarTabChromeClassName(options: {
     variant === 'repo'
       ? 'flex h-8 min-w-36 max-w-56 touch-none gap-1.5 rounded-md border px-2 text-xs'
       : compact
-        ? 'flex h-7 w-28 gap-1 rounded-md border px-2.5 text-sm'
-        : 'flex h-7 min-w-28 max-w-44 gap-1 rounded-md border px-2.5 text-sm',
+        ? 'flex h-7 w-32 gap-1 rounded-md border px-2.5 text-sm'
+        : 'flex h-7 min-w-32 max-w-48 gap-1 rounded-md border px-2.5 text-sm',
     variant === 'repo'
       ? active
         ? 'border-input bg-card text-foreground'
