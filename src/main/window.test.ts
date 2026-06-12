@@ -8,11 +8,18 @@ const mocks = vi.hoisted(() => {
     webContentsOn: vi.fn(),
     setWindowOpenHandler: vi.fn(),
     windowOn: vi.fn(),
+    windowOnce: vi.fn(),
     loadURL: vi.fn(),
     openHttpExternal: vi.fn(() => Promise.resolve(true)),
     getSettingsSnapshot: vi.fn(),
     loadWindowState: vi.fn(() => Promise.resolve({ windowBounds: null })),
     setTitleBarOverlay: vi.fn(),
+    setBounds: vi.fn(),
+    setFullScreen: vi.fn(),
+    unmaximize: vi.fn(),
+    isFullScreen: vi.fn(() => false),
+    isMaximized: vi.fn(() => false),
+    isMinimized: vi.fn(() => false),
     getEmbeddedServerRuntime: vi.fn<() => { url: string; secret: string; clientId: string } | null>(() => ({
       url: 'http://127.0.0.1:32100/',
       secret: 'secret',
@@ -31,16 +38,21 @@ const mocks = vi.hoisted(() => {
         },
         isDestroyed: () => false,
         isVisible: () => true,
-        isMinimized: () => false,
-        isMaximized: () => false,
-        isFullScreen: () => false,
+        isMinimized: state.isMinimized,
+        isMaximized: state.isMaximized,
+        isFullScreen: state.isFullScreen,
         restore: vi.fn(),
         show: vi.fn(),
         focus: vi.fn(),
         setTitleBarOverlay: state.setTitleBarOverlay,
         getNormalBounds: () => ({ x: 0, y: 0, width: 900, height: 600 }),
+        getBounds: () => ({ x: 0, y: 0, width: 900, height: 600 }),
+        setBounds: state.setBounds,
+        setFullScreen: state.setFullScreen,
+        unmaximize: state.unmaximize,
         loadURL: state.loadURL,
         on: state.windowOn,
+        once: state.windowOnce,
       }
       state.windowOptions.push(options)
       state.windows.push(win)
@@ -246,5 +258,64 @@ describe('main window navigation boundaries', () => {
       symbolColor: '#ffffff',
       height: 40,
     })
+  })
+
+  test('opens a fresh window at the 1100x720 default when no bounds are saved', async () => {
+    const { getOrCreateMainWindow } = await import('#/main/window.ts')
+
+    await getOrCreateMainWindow()
+
+    expect(mocks.windowOptions[0]).toMatchObject({ width: 1100, height: 720 })
+  })
+
+  test('resetMainWindowToDefault recenters the window on its current display at default size', async () => {
+    const { getOrCreateMainWindow, resetMainWindowToDefault } = await import('#/main/window.ts')
+    await getOrCreateMainWindow()
+
+    resetMainWindowToDefault()
+
+    // workArea is 1440x900 in the mock; 1100x720 centered → x=170, y=90.
+    expect(mocks.setBounds).toHaveBeenCalledWith({ x: 170, y: 90, width: 1100, height: 720 }, true)
+  })
+
+  test('resetMainWindowToDefault unwinds maximize/minimize inline and centers at default size', async () => {
+    mocks.isMaximized.mockReturnValueOnce(true)
+    mocks.isMinimized.mockReturnValueOnce(true)
+
+    const { getOrCreateMainWindow, resetMainWindowToDefault } = await import('#/main/window.ts')
+    await getOrCreateMainWindow()
+
+    resetMainWindowToDefault()
+
+    expect(mocks.unmaximize).toHaveBeenCalled()
+    expect(mocks.setFullScreen).not.toHaveBeenCalled()
+    expect(mocks.setBounds).toHaveBeenCalledWith({ x: 170, y: 90, width: 1100, height: 720 }, true)
+  })
+
+  test('resetMainWindowToDefault defers the resize until macOS leaves fullscreen', async () => {
+    mocks.isFullScreen.mockReturnValueOnce(true)
+
+    const { getOrCreateMainWindow, resetMainWindowToDefault } = await import('#/main/window.ts')
+    await getOrCreateMainWindow()
+
+    resetMainWindowToDefault()
+
+    expect(mocks.setFullScreen).toHaveBeenCalledWith(false)
+    // Resize is held until the transition completes — firing setBounds
+    // mid-animation would be dropped on macOS.
+    expect(mocks.setBounds).not.toHaveBeenCalled()
+    const onceCall = mocks.windowOnce.mock.calls.find(([event]) => event === 'leave-full-screen')
+    expect(onceCall).toBeDefined()
+
+    onceCall![1]()
+    expect(mocks.setBounds).toHaveBeenCalledWith({ x: 170, y: 90, width: 1100, height: 720 }, true)
+  })
+
+  test('resetMainWindowToDefault is a no-op when no main window exists', async () => {
+    const { resetMainWindowToDefault } = await import('#/main/window.ts')
+
+    resetMainWindowToDefault()
+
+    expect(mocks.setBounds).not.toHaveBeenCalled()
   })
 })

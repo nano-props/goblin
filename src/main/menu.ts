@@ -16,7 +16,7 @@
 // rebuilds this menu on lang change).
 
 import { app, Menu, type MenuItemConstructorOptions } from 'electron'
-import { activateMainWindow, getMainWindow } from '#/main/window.ts'
+import { activateMainWindow, getMainWindow, resetMainWindowToDefault } from '#/main/window.ts'
 import { t } from '#/main/i18n/index.ts'
 import { sendRendererEffectIntent } from '#/main/renderer-surface-events.ts'
 import { getTheme } from '#/main/theme.ts'
@@ -280,7 +280,12 @@ function createWindowMenu(state: AppMenuState): MenuItemConstructorOptions {
       createRendererCommandMenuItem(state, 'window-next-repo'),
       createRendererCommandMenuItem(state, 'window-prev-repo'),
       separator(),
-      createRendererCommandMenuItem(state, 'window-reset-layout'),
+      createRendererCommandMenuItem(state, 'window-reset-layout', {
+        // Reset Layout also restores the window itself to its default
+        // size, so users have a one-click escape from an awkward
+        // drag-resize — not just from an awkward pane split.
+        beforeIntent: () => resetMainWindowToDefault(),
+      }),
       ...(state.isMac ? [separator(), { role: 'front' as const, label: t('menu.window.front') }] : []),
     ],
   }
@@ -336,6 +341,10 @@ function accelerator(state: AppMenuState, value: string): string | undefined {
 function createRendererCommandMenuItem(
   state: AppMenuState,
   id: Parameters<typeof rendererMenuCommandById>[0],
+  // `beforeIntent` runs a main-side side effect before the renderer
+  // intent is dispatched — for actions like Reset Layout that need to
+  // touch the Electron window itself, not just the renderer state.
+  options?: { beforeIntent?: () => void },
 ): MenuItemConstructorOptions {
   const command = rendererMenuCommandById(id)
   const context = menuCommandContext(state)
@@ -345,7 +354,10 @@ function createRendererCommandMenuItem(
     label: t(command.menuLabelKey),
     ...(resolvedAccelerator ? { accelerator: accelerator(state, resolvedAccelerator) } : {}),
     ...(resolvedEnabled !== undefined ? { enabled: resolvedEnabled } : {}),
-    click: () => send(resolveRendererMenuCommandIntent(command, context)),
+    click: () => {
+      options?.beforeIntent?.()
+      send(resolveRendererMenuCommandIntent(command, context))
+    },
   }
 }
 

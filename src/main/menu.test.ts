@@ -32,6 +32,7 @@ const mocks = vi.hoisted(() => {
     getFocusedWindow: vi.fn((): any => null),
     focusedRegisteredSurface: vi.fn((): any => null),
     getMainWindow: vi.fn((): any => null),
+    resetMainWindowToDefault: vi.fn(),
     sendRendererEffectIntent: vi.fn(),
     buildFromTemplate: vi.fn((nextTemplate: any[]) => {
       template.splice(0, template.length, ...nextTemplate)
@@ -64,6 +65,7 @@ vi.mock('electron', () => ({
 vi.mock('#/main/window.ts', () => ({
   activateMainWindow: mocks.activateMainWindow,
   getMainWindow: mocks.getMainWindow,
+  resetMainWindowToDefault: mocks.resetMainWindowToDefault,
 }))
 
 vi.mock('#/main/window-registry.ts', () => ({
@@ -327,6 +329,20 @@ describe('app menu actions', () => {
       'menu.window.zoom',
       undefined,
     ])
+  })
+
+  test('reset layout resets the main window and dispatches the workspace-layout intent', async () => {
+    mocks.getMainWindow.mockReturnValue(mocks.win)
+    const { buildAppMenu } = await import('#/main/menu.ts')
+    buildAppMenu()
+
+    clickMenuItem('menu.window', 'menu.window.reset-layout')
+    await Promise.resolve()
+
+    expect(mocks.resetMainWindowToDefault).toHaveBeenCalledTimes(1)
+    expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, {
+      type: 'workspace-layout-reset-requested',
+    })
   })
 
   test('routes clear recent through renderer intent', async () => {

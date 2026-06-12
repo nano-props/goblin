@@ -26,7 +26,7 @@ import {
 import { getTheme } from '#/main/theme.ts'
 import { WINDOW_TOPBAR_HEIGHT_PX } from '#/shared/window-chrome.ts'
 
-const DEFAULT_BOUNDS: WindowBounds = { width: 900, height: 600 }
+const DEFAULT_BOUNDS: WindowBounds = { width: 1100, height: 720 }
 const MAIN_WINDOW_SURFACE = {
   windowKey: 'main',
   capabilities: {
@@ -148,4 +148,38 @@ export function applyMainWindowChromeTheme(theme: 'light' | 'dark'): void {
   try {
     win.setTitleBarOverlay(overlay)
   } catch {}
+}
+
+/** Restore the main window to its default size, centered on the display
+ *  it currently lives on. On macOS, exiting fullscreen is an async system
+ *  animation — `setBounds` called against a still-transitioning window
+ *  is dropped, so we defer the resize to the `leave-full-screen` event
+ *  rather than firing it inline. Maximize/minimize unwinding is
+ *  synchronous everywhere we care about, so those run inline. The
+ *  existing resize/move listeners persist the new bounds. Wired to the
+ *  Window > Reset Layout menu item so users have a one-click escape from
+ *  an awkward drag-resize. */
+export function resetMainWindowToDefault(): void {
+  const win = getMainWindow()
+  if (!win || win.isDestroyed()) return
+  const applyDefault = () => {
+    if (win.isDestroyed()) return
+    // restore() before unmaximize(): on Windows a minimized-from-maximized
+    // window restores to maximized first, then needs unmaximize.
+    if (win.isMinimized()) win.restore()
+    if (win.isMaximized()) win.unmaximize()
+    const display = screen.getDisplayMatching(win.getBounds())
+    const wa = display.workArea
+    const width = Math.min(DEFAULT_BOUNDS.width, wa.width)
+    const height = Math.min(DEFAULT_BOUNDS.height, wa.height)
+    const x = wa.x + Math.max(0, Math.round((wa.width - width) / 2))
+    const y = wa.y + Math.max(0, Math.round((wa.height - height) / 2))
+    win.setBounds({ x, y, width, height }, true)
+  }
+  if (win.isFullScreen()) {
+    win.once('leave-full-screen', applyDefault)
+    win.setFullScreen(false)
+  } else {
+    applyDefault()
+  }
 }
