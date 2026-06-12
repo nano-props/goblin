@@ -1,6 +1,6 @@
-export const RPC_CHANNEL = 'goblin:rpc'
-export const RPC_ABORT_CHANNEL = 'goblin:rpc-abort'
-export const RPC_EVENT_CHANNEL = 'goblin:event'
+export const IPC_CHANNEL = 'goblin:ipc'
+export const IPC_ABORT_CHANNEL = 'goblin:ipc-abort'
+export const IPC_EVENT_CHANNEL = 'goblin:event'
 export const RENDERER_EFFECT_INTENT_CHANNEL = 'goblin:effect-intent'
 
 export const SHELL_OPEN_SETTINGS_WINDOW_CHANNEL = 'goblin:shell-open-settings-window'

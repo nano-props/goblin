@@ -1,10 +1,10 @@
-import type { NativeRpcHandlers } from '#/shared/rpc.ts'
+import type { NativeIpcHandlers } from '#/shared/api-types.ts'
 import { isReservedGlobalShortcut, parseGlobalShortcut } from '#/shared/accelerator.ts'
 import { getSettingsPrefs, setSettingsGlobalShortcutState, updateSettingsPrefs } from '#/main/settings-server-client.ts'
 import { applyNativeHostShellProjection } from '#/main/native-host-settings-effects.ts'
 import { isGlobalShortcutRegistered, replaceGlobalShortcut } from '#/main/shortcuts.ts'
 
-// Native-host settings RPC handlers: read/write server-owned settings, then
+// Native-host settings IPC handlers: read/write server-owned settings, then
 // apply the corresponding Electron-only effects when needed.
 function globalShortcutPayload(accelerator: string): { accelerator: string; registered: boolean } {
   return { accelerator, registered: isGlobalShortcutRegistered() }
@@ -14,7 +14,7 @@ async function getRuntimeServerSettingsPrefs() {
   return await getSettingsPrefs()
 }
 
-export function createNativeHostSettingsRpcHandlers(): Pick<NativeRpcHandlers, 'settings'> {
+export function createNativeHostSettingsIpcHandlers(): Pick<NativeIpcHandlers, 'settings'> {
   return {
     settings: {
       applyShellProjection: async (input) => await applyNativeHostShellProjection(input),

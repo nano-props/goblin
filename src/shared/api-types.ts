@@ -1,3 +1,8 @@
+// HTTP API response types and native bridge IPC types shared by
+// main, server, and renderer. Domain types live in their own
+// modules (#/shared/git-types.ts, #/shared/settings.ts, etc.);
+// this file aggregates what crosses process/transport boundaries.
+
 import * as v from 'valibot'
 import type {
   BranchSnapshotInfo,
@@ -159,6 +164,8 @@ export interface SettingsPrefsUpdateResponse {
 export interface RepoSnapshot {
   branches: BranchSnapshotInfo[]
   current: string
+  /** Short commit hash when HEAD is detached (no branch checked out). */
+  currentHEAD?: string
   remote?: RepoRemoteInfo
 }
 
@@ -186,19 +193,22 @@ export interface PullRequestFetchOptions {
 export type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 export { isRemoteRepoId, parseRemoteRepoId } from '#/shared/remote-repo.ts'
 
-export interface RpcRequest {
+/** Request envelope for the native Electron bridge IPC layer. */
+export interface IpcRequest {
   path: string
   input?: unknown
   requestId?: string
 }
 
-export type RpcResponse =
+/** Response envelope for the native Electron bridge IPC layer. */
+export type IpcResponse =
   | { ok: true; data: unknown }
   | { ok: false; error: { message: string; code?: string; name?: string } }
 
 export type I18nChangedEvent = { type: 'i18n-changed'; snapshot: I18nSnapshot }
 
-export type RpcEvent =
+/** Events pushed from the native Electron bridge to the renderer. */
+export type IpcEvent =
   | { type: 'fetch-interval-changed'; sec: number }
   | { type: 'terminal-notifications-changed'; enabled: boolean }
   | { type: 'shortcuts-disabled-changed'; disabled: boolean }
@@ -212,7 +222,7 @@ export type RpcEvent =
   | I18nChangedEvent
   | RepoQueryInvalidationEvent
 
-export interface AppRpcHandlers {
+export interface AppIpcHandlers {
   repo: {
     probe: (input: { cwd: string }) => Promise<ProbeResult>
     clone: (input: {
@@ -298,16 +308,16 @@ export interface AppRpcHandlers {
   }
 }
 
-export interface NativeRpcHandlers {
+export interface NativeIpcHandlers {
   settings: {
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
     applyShellProjection: (input: NativeShellProjection) => Promise<void>
   }
 }
 
-export type NativeBridgeHandlers = NativeRpcHandlers
+export type NativeBridgeHandlers = NativeIpcHandlers
 
-export type NativeRpcPath = {
+export type NativeIpcPath = {
   [NS in keyof NativeBridgeHandlers]: `${Extract<NS, string>}.${Extract<keyof NativeBridgeHandlers[NS], string>}`
 }[keyof NativeBridgeHandlers]
 
@@ -338,34 +348,35 @@ const RemotePathSuggestionsInputSchema = v.object({
   prefix: v.string(),
 })
 
-export type RpcErrorCode = 'FORBIDDEN' | 'BAD_REQUEST' | 'NOT_FOUND' | 'INTERNAL_SERVER_ERROR'
+export type IpcErrorCode = 'FORBIDDEN' | 'BAD_REQUEST' | 'NOT_FOUND' | 'INTERNAL_SERVER_ERROR'
 
-export class RpcError extends Error {
+/** Error type for the native Electron bridge IPC layer. */
+export class IpcError extends Error {
   readonly code: string
 
-  constructor(options: { code: RpcErrorCode | string; message: string }) {
+  constructor(options: { code: IpcErrorCode | string; message: string }) {
     super(options.message)
-    this.name = 'RpcError'
+    this.name = 'IpcError'
     this.code = options.code
   }
 }
 
 type ValibotSchema = Parameters<typeof v.safeParse>[0]
 
-type NativeRpcProcedureSchemas = {
-  [NS in keyof NativeRpcHandlers]: { [Proc in keyof NativeRpcHandlers[NS]]: ValibotSchema }
+type NativeIpcProcedureSchemas = {
+  [NS in keyof NativeIpcHandlers]: { [Proc in keyof NativeIpcHandlers[NS]]: ValibotSchema }
 }
 
-export const RPC_PROCEDURE_SCHEMAS: NativeRpcProcedureSchemas = {
+export const IPC_PROCEDURE_SCHEMAS: NativeIpcProcedureSchemas = {
   settings: {
     setGlobalShortcut: v.object({ accelerator: v.string() }),
     applyShellProjection: NativeShellProjectionSchema,
   },
 }
 
-function parseRpcInput<T>(schema: ValibotSchema, input: unknown): T {
+function parseIpcInput<T>(schema: ValibotSchema, input: unknown): T {
   const parsed = v.safeParse(schema, input)
-  if (!parsed.success) throw new RpcError({ code: 'BAD_REQUEST', message: 'Invalid RPC input' })
+  if (!parsed.success) throw new IpcError({ code: 'BAD_REQUEST', message: 'Invalid IPC input' })
   return parsed.output as T
 }
 
@@ -373,7 +384,7 @@ function createValidatedProcedure<TInput, TOutput>(
   schema: ValibotSchema,
   handler: (input: TInput) => Promise<TOutput> | TOutput,
 ): (input: unknown) => Promise<TOutput> {
-  return async (input: unknown) => await handler(parseRpcInput<TInput>(schema, input))
+  return async (input: unknown) => await handler(parseIpcInput<TInput>(schema, input))
 }
 
 function createValidatedNamespace<THandlers extends Record<string, (...args: never[]) => unknown>>(
@@ -397,17 +408,17 @@ function createValidatedNamespace<THandlers extends Record<string, (...args: nev
 export interface AppRouter {
   createCaller: () => {
     settings: {
-      [K in keyof NativeRpcHandlers['settings']]: (
+      [K in keyof NativeIpcHandlers['settings']]: (
         input: unknown,
-      ) => Promise<Awaited<ReturnType<NativeRpcHandlers['settings'][K]>>>
+      ) => Promise<Awaited<ReturnType<NativeIpcHandlers['settings'][K]>>>
     }
   }
 }
 
-export function createAppRouter(handlers: NativeRpcHandlers): AppRouter {
+export function createAppRouter(handlers: NativeIpcHandlers): AppRouter {
   return {
     createCaller: () => ({
-      settings: createValidatedNamespace(handlers.settings, RPC_PROCEDURE_SCHEMAS.settings),
+      settings: createValidatedNamespace(handlers.settings, IPC_PROCEDURE_SCHEMAS.settings),
     }),
   }
 }
