@@ -93,6 +93,7 @@ describe('repo selectors', () => {
         selectedTerminalByWorktree: {
           '/tmp/repo\0/tmp/repo': 'terminal-1',
         },
+        detailTabByRepo: {},
       }),
     ).toEqual({
       order: ['/tmp/repo'],

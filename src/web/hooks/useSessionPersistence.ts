@@ -13,6 +13,7 @@ export function useSessionPersistence() {
   const workspaceLayout = useReposStore((s) => s.workspaceLayout)
   const detailPaneSizes = useReposStore((s) => s.detailPaneSizes)
   const selectedTerminalByWorktree = useReposStore((s) => s.selectedTerminalByWorktree)
+  const detailTabByRepo = useReposStore((s) => s.detailTabByRepo)
   const sessionReady = useReposStore((s) => s.sessionReady)
   const repos = useReposStore((s) => s.repos)
   const lastSavedRef = useRef<string | null>(null)
@@ -33,6 +34,7 @@ export function useSessionPersistence() {
         workspaceLayout,
         detailPaneSizes,
         selectedTerminalByWorktree,
+        detailTabByRepo,
       }),
     })
     const serialized = JSON.stringify(session)

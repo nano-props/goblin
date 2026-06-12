@@ -48,6 +48,7 @@ export function restorableWorkspaceStateFromStore(
     | 'workspaceLayout'
     | 'detailPaneSizes'
     | 'selectedTerminalByWorktree'
+    | 'detailTabByRepo'
   >,
 ): RestorableWorkspaceState {
   return {
@@ -58,6 +59,7 @@ export function restorableWorkspaceStateFromStore(
     workspaceLayout: state.workspaceLayout,
     detailPaneSizes: state.detailPaneSizes,
     selectedTerminalByWorktree: state.selectedTerminalByWorktree,
+    detailTabByRepo: state.detailTabByRepo ?? {},
   }
 }
 
