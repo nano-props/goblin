@@ -33,17 +33,20 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
       //     using the cached projection (if any) and the entry's own
       //     metadata. For remote entries the host/port are not yet known
       //     (resolveRemoteRepositoryTarget hasn't run), so the placeholder
-      //     leaves `remote.target` undefined and only sets
-      //     `connectivity: 'connecting'`.
+      //     leaves `remote.target` undefined — that alone reads as
+      //     `deriveConnectivity(repo) === 'connecting'`.
       //   Phase 2 (async): probe each entry with bounded concurrency.
       //     Probe success → addResolvedRepo (which fills in the real
-      //     target, flips connectivity to 'connected', and kicks off the
-      //     initial refresh). Probe failure → addUnavailableRepo (which
-      //     flips connectivity to 'unreachable' and sets availability).
+      //     target and kicks off the initial refresh; connectivity
+      //     naturally reads as 'connected' once the target lands).
+      //     Probe failure → addUnavailableRepo (which flips availability
+      //     to 'unavailable'; connectivity reads as 'unreachable').
       //
-      // sessionReady flips on the FIRST tab landing so the boot skeleton
-      // is replaced by real content the moment any probe resolves, not
-      // after the slowest one times out.
+      // sessionReady flips as soon as the first placeholder lands —
+      // which means right after Phase 1 completes — so the boot skeleton
+      // gives way to a real workspace before any probe resolves. The
+      // per-repo body keeps showing its skeleton until its own snapshot
+      // resolves, but that's a per-repo concern.
       const rankById = new Map<string, number>()
       openRepos.forEach((entry, index) => {
         if (!rankById.has(entry.id)) rankById.set(entry.id, index)
@@ -140,6 +143,11 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
           }),
         ),
       )
+      // Defensive: ensure sessionReady is true once hydration has finished,
+      // even if openRepos was empty (so Phase 1 added nothing and the earlier
+      // sessionReady flip never ran). Without this, a session with no tabs
+      // would leave the boot skeleton up forever.
+      set((s) => (s.sessionReady ? s : { sessionReady: true }))
     },
   }
 }

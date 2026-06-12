@@ -138,7 +138,6 @@ function createRepo(input: {
       browserRemoteProvider: input.remote.hasGitHubRemote ? 'github' : undefined,
       remoteProviders: {},
       hasGitHubRemote: input.remote.hasGitHubRemote,
-      connectivity: 'connected',
       fetchFailed: false,
       fetchError: null,
     },

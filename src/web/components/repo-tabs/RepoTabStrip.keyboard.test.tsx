@@ -107,7 +107,7 @@ describe('RepoTabStrip keyboard dnd wiring', () => {
 })
 
 function repo(name: string, id: string): RepoTabSummary {
-  return { id, name, remoteDetails: [], connectivity: 'connected' }
+  return { id, name, remoteDetails: [] }
 }
 
 const labels = {

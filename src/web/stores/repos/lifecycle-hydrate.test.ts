@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { localRepoSessionEntry, normalizeRemoteTarget, remoteRepoSessionEntry } from '#/shared/remote-repo.ts'
+import { deriveConnectivity } from '#/web/stores/repos/helpers.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
 import {
@@ -123,7 +124,17 @@ describe('repo session hydration', () => {
     await flushIpc()
 
     await vi.waitFor(() => {
-      expect(useReposStore.getState().repos[REPO_A]?.remote.connectivity).toBe('connected')
+      // The probe resolution promotes REPO_A into the resolved branch:
+      // addResolvedRepo kicks off refreshInitialRepoState, which fires
+      // a core-data-changed intent. Until the (hanging) snapshot resolves,
+      // the cached branches stay rendered but the repo is now an active
+      // workspace member rather than a placeholder.
+      const repo = useReposStore.getState().repos[REPO_A]
+      expect(repo).toBeDefined()
+      expect(repo?.data.branches.map((b) => b.name)).toEqual(['cached'])
+      // Local repos read as 'connected' under deriveConnectivity; the
+      // meaningful invariant is just that the repo stays in the store.
+      expect(deriveConnectivity(repo!)).toBe('connected')
     })
 
     probes.get(REPO_B)?.({ ok: true, root: REPO_B, name: 'repo-b' })
@@ -142,6 +153,43 @@ describe('repo session hydration', () => {
 
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().activeId).toBe(REPO_A)
+  })
+
+  test('hydrateSession flips sessionReady even when openRepos is empty', async () => {
+    // Regression: a session with zero open tabs used to leave the boot
+    // skeleton up forever because sessionReady only flipped on the first
+    // placeholder landing, and Phase 1 with no entries is a no-op.
+    installGoblin()
+
+    await useReposStore.getState().hydrateSession([], null)
+
+    expect(useReposStore.getState().order).toEqual([])
+    expect(useReposStore.getState().activeId).toBeNull()
+    expect(useReposStore.getState().sessionReady).toBe(true)
+  })
+
+  test('hydrateSession promotes a remote repo to connected once the probe resolves', async () => {
+    const target = normalizeRemoteTarget({
+      alias: 'example',
+      host: 'example.com',
+      user: 'alice',
+      port: 22,
+      remotePath: '/srv/repo',
+    })
+    expect(target).not.toBeNull()
+    installGoblin({
+      probe: (path: string) => ({ ok: true, root: path, name: 'repo' }),
+    })
+
+    await useReposStore.getState().hydrateSession([remoteRepoSessionEntry(target!)], target!.id)
+
+    // The derived connectivity naturally reads as 'connected' once
+    // remote.target lands, with no explicit field write. addResolvedRepo
+    // is the only thing that sets remote.target, so this also confirms
+    // the probe chain ran end-to-end.
+    const repo = useReposStore.getState().repos[target!.id]
+    expect(repo?.remote.target).toEqual(target)
+    expect(deriveConnectivity(repo!)).toBe('connected')
   })
 
   test('hydrateSession restores unavailable repos as tabs', async () => {

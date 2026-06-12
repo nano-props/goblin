@@ -1,3 +1,4 @@
+import { deriveConnectivity } from '#/web/stores/repos/helpers.ts'
 import { resourceInitialLoading } from '#/web/stores/repos/resources.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 export interface RepoWorkspacePresentation {
@@ -14,7 +15,7 @@ export function getRepoWorkspacePresentation(repo: RepoState | undefined): RepoW
   // the skeleton instead of the empty state. Once cached data is
   // available the projection already shows stale branches and we drop
   // the skeleton.
-  const remoteConnecting = repo.remote.connectivity === 'connecting'
+  const remoteConnecting = deriveConnectivity(repo) === 'connecting'
   const hasLoadedSnapshot = repo.resources.snapshot.loadedAt !== null
   return {
     exists: true,

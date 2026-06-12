@@ -83,12 +83,6 @@ export interface RepoRemoteState {
   browserRemoteProvider?: BrowserRemoteProvider
   remoteProviders?: Record<string, BrowserRemoteProvider>
   hasGitHubRemote?: boolean
-  /** SSH/liveness state for the remote target. Set to 'connecting'
-   *  when a placeholder tab is rendered before the boot probe settles,
-   *  then to 'connected' on probe success and 'unreachable' on probe
-   *  failure. Unused (and meaningless) for local repos. Cleared on
-   *  close. */
-  connectivity: RepoConnectivity
   /** Sticky connectivity badge for background fetch failures. Unlike
    *  `resources.fetch.error`, this persists after the operation settles and
    *  is cleared by the next successful network operation. */

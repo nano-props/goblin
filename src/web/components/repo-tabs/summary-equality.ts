@@ -9,8 +9,7 @@ export function repoTabSummariesEqual(a: RepoTabSummary[], b: RepoTabSummary[]):
     if (
       x.id !== y.id ||
       x.name !== y.name ||
-      x.unavailable !== y.unavailable ||
-      x.connectivity !== y.connectivity
+      x.unavailable !== y.unavailable
     )
       return false
     if (

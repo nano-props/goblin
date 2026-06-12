@@ -122,7 +122,6 @@ export function addResolvedRepo(
           remote: {
             ...existing.remote,
             target: resolvedRepo.target,
-            connectivity: 'connected',
           },
         },
       },
@@ -131,10 +130,7 @@ export function addResolvedRepo(
     }
   }
   const repo = restoreRepoProjectionFromSnapshot(emptyRepo(id, name), s.restorableRepoCache[id])
-  if (resolvedRepo.target) {
-    repo.remote.target = resolvedRepo.target
-    repo.remote.connectivity = 'connected'
-  }
+  if (resolvedRepo.target) repo.remote.target = resolvedRepo.target
   return {
     repos: { ...s.repos, [id]: repo },
     order: orderedInsert(s.order, id, rankById),
@@ -149,7 +145,9 @@ export function addResolvedRepo(
  *     name/branches, then flips availability.
  *   - If a placeholder (from addConnectingRepo) is already there, promote
  *     it in place — preserves the cached projection, updates target if
- *     the probe produced one, and flips connectivity to 'unreachable'.
+ *     the probe produced one, and flips availability to 'unavailable'.
+ *     (The derived connectivity naturally reads as 'unreachable' once
+ *     availability is unavailable.)
  */
 export function addUnavailableRepo(
   s: Pick<ReposStore, 'repos' | 'restorableRepoCache' | 'order'>,
@@ -166,9 +164,7 @@ export function addUnavailableRepo(
         [id]: {
           ...existing,
           availability: { phase: 'unavailable', reason, checkedAt: Date.now() },
-          remote: target
-            ? { ...existing.remote, target, connectivity: 'unreachable' }
-            : { ...existing.remote, connectivity: 'unreachable' },
+          remote: target ? { ...existing.remote, target } : existing.remote,
         },
       },
       order: s.order,
@@ -181,7 +177,6 @@ export function addUnavailableRepo(
     cached,
   )
   if (target) repo.remote.target = target
-  repo.remote.connectivity = 'unreachable'
   repo.availability = { phase: 'unavailable', reason, checkedAt: Date.now() }
   return {
     repos: { ...s.repos, [id]: repo },
@@ -193,18 +188,18 @@ export function addUnavailableRepo(
 /**
  * Insert a placeholder tab for a session entry whose probe is still in
  * flight. The placeholder paints the cached branch projection (if any)
- * immediately and marks the remote as 'connecting' so the tab strip can
- * show a spinner without waiting for the SSH handshake. The probe
- * resolution then promotes it to 'connected' or 'unreachable' via
- * addResolvedRepo / addUnavailableRepo. No-op if the repo is already
- * in the store (so calling this twice for the same entry is safe).
+ * immediately; the derived connectivity naturally reads as 'connecting'
+ * because no remote target has been resolved yet. The probe resolution
+ * then promotes it to 'connected' or 'unreachable' via addResolvedRepo /
+ * addUnavailableRepo. No-op if the repo is already in the store (so
+ * calling this twice for the same entry is safe).
  *
  * Note: we intentionally do NOT set `remote.target` here. The ref only
  * carries alias/remotePath; host/user/port require `resolveRemoteRepositoryTarget`,
  * which hasn't run yet. Until the probe succeeds and addResolvedRepo
  * fills in the target, the placeholder lives in a "known alias,
- * unknown concrete host" state — `connectivity: 'connecting'` is the
- * signal callers should branch on rather than reading target fields.
+ * unknown concrete host" state — `deriveConnectivity(repo) === 'connecting'`
+ * is the signal callers should branch on rather than reading target fields.
  */
 export function addConnectingRepo(
   s: Pick<ReposStore, 'repos' | 'restorableRepoCache' | 'order'>,
@@ -216,9 +211,6 @@ export function addConnectingRepo(
   const cached = s.restorableRepoCache[id]
   const fallbackName = entry.kind === 'remote' ? entry.ref.displayName : lastPathSegment(id)
   const repo = restoreRepoProjectionFromSnapshot(emptyRepo(id, cached?.name || fallbackName), cached)
-  if (entry.kind === 'remote') {
-    repo.remote.connectivity = 'connecting'
-  }
   // 'refreshing' so the cached branches render with a stale indicator
   // (resourceInitialLoading would hide them).
   if (cached && cached.data.branches.length > 0) {

@@ -120,6 +120,33 @@ function createStages(): RemoteDiagnosticStage[] {
   }))
 }
 
+/** Build a fully-populated failure diagnostic for a target whose
+ *  resolution never even reached the SSH handshake — e.g. the alias
+ *  dropped out of ~/.ssh/config. Marks `ssh` as the failed stage and
+ *  every subsequent stage as skipped, so the rendered failure matches
+ *  the canonical stage ordering without callers having to mirror it. */
+export function makeUnresolvedTargetDiagnostic(
+  target: RemoteRepoTarget,
+  category: RemoteDiagnosticCategory,
+  message: string,
+): RemoteDiagnosticsResult {
+  const stages: RemoteDiagnosticStage[] = (['ssh', 'shell', 'git', 'path', 'repo'] as RemoteDiagnosticStageName[]).map(
+    (name) => ({
+      name,
+      label: name,
+      status: 'skipped',
+    }),
+  )
+  stages[0] = {
+    name: 'ssh',
+    label: 'ssh',
+    status: 'failed',
+    category,
+    message,
+  }
+  return { target, ok: false, category, message, stages }
+}
+
 function detailsFromResult(result: RemoteCommandResult): string | undefined {
   return (
     [result.stderr, result.stdout]

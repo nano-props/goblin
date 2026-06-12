@@ -1,5 +1,5 @@
 import { runRemoteCommand } from '#/system/ssh/commands.ts'
-import { testRemoteRepository } from '#/system/ssh/diagnostics.ts'
+import { makeUnresolvedTargetDiagnostic, testRemoteRepository } from '#/system/ssh/diagnostics.ts'
 import {
   listSshConfigHosts,
   resolveRemoteTarget as resolveSshRemoteTarget,
@@ -38,18 +38,36 @@ export async function getServerSshHosts(): Promise<SshConfigHostsResult> {
   return await listSshConfigHosts()
 }
 
+export type ResolveTargetResult =
+  | { target: RemoteRepoTarget }
+  // Error is an i18n key — callers (route layer / renderer) translate.
+  | { error: string }
+
 export async function resolveServerRemoteTarget(
   input: RemoteConnectionInput,
   signal?: AbortSignal,
-): Promise<ResolvedRemoteTarget> {
-  const needsHomeExpansion = input.remotePath.startsWith('~/')
-  const resolved = await resolveSshRemoteTarget(needsHomeExpansion ? { ...input, remotePath: '/' } : input, signal)
-  if (!needsHomeExpansion) return resolved
-  const normalized = normalizeRemoteTarget({
-    ...resolved.target,
-    remotePath: await expandRemotePathInput(resolved.target, input.remotePath, signal),
-  })
-  if (!normalized) throw new Error('repo-tabs.open-remote-home-unavailable')
+): Promise<ResolveTargetResult> {
+  let resolved: ResolvedRemoteTarget
+  try {
+    const needsHomeExpansion = input.remotePath.startsWith('~/')
+    resolved = await resolveSshRemoteTarget(
+      needsHomeExpansion ? { ...input, remotePath: '/' } : input,
+      signal,
+    )
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'error.failed-read-repo' }
+  }
+  if (!input.remotePath.startsWith('~/')) return resolved
+  let normalized: RemoteRepoTarget | null
+  try {
+    normalized = normalizeRemoteTarget({
+      ...resolved.target,
+      remotePath: await expandRemotePathInput(resolved.target, input.remotePath, signal),
+    })
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'error.failed-read-repo' }
+  }
+  if (!normalized) return { error: 'repo-tabs.open-remote-home-unavailable' }
   return { target: normalized }
 }
 
@@ -109,19 +127,13 @@ export async function testServerRemoteRepository(
   try {
     const resolved = await resolveTrackedRemoteTarget(normalized, signal)
     return await testRemoteRepository(resolved.target, { signal })
-  } catch {
-    return {
-      target: normalized,
-      ok: false,
-      category: 'config-changed',
-      message: 'config-changed',
-      stages: [
-        { name: 'ssh', label: 'ssh', status: 'failed', category: 'config-changed', message: 'config-changed' },
-        { name: 'shell', label: 'shell', status: 'skipped' },
-        { name: 'git', label: 'git', status: 'skipped' },
-        { name: 'path', label: 'path', status: 'skipped' },
-        { name: 'repo', label: 'repo', status: 'skipped' },
-      ],
-    }
+  } catch (err) {
+    // Translation key — renderer formats via i18n. We pass through the
+    // original message because resolveTrackedRemoteTarget already raises
+    // an i18n key (e.g. error.ssh-config-changed) or a real diagnostic
+    // category (e.g. unknown failures bubble up unchanged).
+    const message = err instanceof Error ? err.message : 'config-changed'
+    const category = message === 'error.ssh-config-changed' ? 'config-changed' : 'unknown'
+    return makeUnresolvedTargetDiagnostic(normalized, category, message)
   }
 }

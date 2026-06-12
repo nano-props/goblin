@@ -2,14 +2,10 @@ import { fetchServerJson, postServerJson } from '#/web/lib/server-fetch.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 import type { RemoteDiagnosticsResult, RemotePathSuggestionsInput, SshConfigHostsResult } from '#/shared/remote-repo.ts'
 
-/**
- * Server-side result for resolve-target: either a concrete target
- * (possibly wrapped in { target }) or a typed error when the alias is
- * missing from the current ~/.ssh/config. Throwing for the error case
- * is intentional — the caller (e.g. the Open Remote dialog) catches
- * and renders the message; the route layer must NOT 500 here.
- */
-type ResolveTargetResponse = { target: RemoteRepoTarget } | RemoteRepoTarget | { error: string }
+/** Server-side result for resolve-target: concrete target or an i18n
+ *  key (e.g. `error.ssh-config-changed`, `repo-tabs.open-remote-home-unavailable`).
+ *  Callers localize the error message via `t()`. */
+type ResolveTargetResponse = { target: RemoteRepoTarget } | { error: string }
 
 export class SshConfigChangedError extends Error {
   readonly code = 'ssh-config-changed'
@@ -27,10 +23,8 @@ export async function resolveRemoteRepositoryTarget(ref: {
     '/api/remote/resolve-target',
     ref,
   )
-  if ('error' in result) {
-    throw new SshConfigChangedError(result.error)
-  }
-  return 'target' in result ? result.target : result
+  if ('error' in result) throw new SshConfigChangedError(result.error)
+  return result.target
 }
 
 export async function getRemoteSshHosts(): Promise<SshConfigHostsResult> {

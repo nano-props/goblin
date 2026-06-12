@@ -156,7 +156,7 @@ function render(element: React.ReactNode) {
 }
 
 function repo(name: string, id: string): RepoTabSummary {
-  return { id, name, remoteDetails: [], connectivity: 'connected' }
+  return { id, name, remoteDetails: [] }
 }
 
 const labels = {

@@ -1,15 +1,11 @@
 import type { GitRemoteInfo } from '#/web/types.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
-import type { RepoConnectivity } from '#/web/stores/repos/types.ts'
 export interface RepoTabSummary {
   id: string
   name: string
   remoteDetails: GitRemoteInfo[]
   remoteTarget?: RemoteRepoTarget
   unavailable?: boolean
-  /** Live SSH liveness state for remote tabs. Drives the connecting
-   *  spinner; ignored for local tabs. */
-  connectivity: RepoConnectivity
 }
 
 export interface RepoTabStripLabels {

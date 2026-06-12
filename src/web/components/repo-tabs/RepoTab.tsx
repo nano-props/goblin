@@ -43,7 +43,11 @@ export function RepoTab({
   const tabLabel = repo.unavailable ? `${repo.name} — ${unavailableLabel}` : repo.name
   const sortable = useSortableTab(repo.id, { onButtonRef: focusRegistry?.setRef(repo.id) })
   const isRemote = isRemoteRepoId(repo.id)
-  const showConnecting = isRemote && repo.connectivity === 'connecting' && !repo.unavailable
+  // A remote tab is "connecting" when the placeholder has been inserted
+  // but the boot probe hasn't resolved a concrete target yet. Once
+  // remoteTarget lands (or availability flips to unavailable) the
+  // spinner disappears. Local tabs never show it.
+  const showConnecting = isRemote && !repo.unavailable && !repo.remoteTarget
   const connectingTitle = t('repo-tabs.connecting-title')
 
   return (
