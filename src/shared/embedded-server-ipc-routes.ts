@@ -4,6 +4,7 @@ export const EMBEDDED_SERVER_IPC_ROUTES = {
   'repo.abortClone': { route: '/api/repo/abort-clone', method: 'POST' },
   'repo.snapshot': { route: '/api/repo/snapshot', method: 'GET' },
   'repo.pullRequests': { route: '/api/repo/pull-requests', method: 'GET' },
+  'repo.composite': { route: '/api/repo/composite', method: 'GET' },
   'repo.status': { route: '/api/repo/status', method: 'GET' },
   'repo.patch': { route: '/api/repo/patch', method: 'GET' },
   'repo.checkout': { route: '/api/repo/checkout', method: 'POST' },

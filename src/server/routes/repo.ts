@@ -1,5 +1,6 @@
 import { getBackgroundSyncRepos, setBackgroundSyncRepos } from '#/server/modules/background-sync.ts'
 import {
+  getRepositoryComposite,
   getRepositoryPatch,
   getRepositoryPullRequests,
   getRepositorySnapshot,
@@ -66,6 +67,18 @@ export function createRepoRoutes() {
         null,
         'pull-requests',
       ),
+    )
+  })
+  app.get('/composite', async (c) => {
+    const { cwd, include, branches, mode } = parseHttpQuery(REPO_QUERY_SCHEMAS.composite, c)
+    const wants = (include ?? ['snapshot', 'status', 'pullRequests']) as ReadonlyArray<
+      'snapshot' | 'status' | 'pullRequests'
+    >
+    return c.json(
+      await getRepositoryComposite(cwd, wants, { branches, mode, signal: c.req.raw.signal }).catch((err) => {
+        console.warn('[server][repo] composite failed', err)
+        return { snapshot: null, status: [], pullRequests: null }
+      }),
     )
   })
   app.post('/fetch', async (c) => {

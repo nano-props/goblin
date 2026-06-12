@@ -90,6 +90,13 @@ export const REPO_QUERY_SCHEMAS = {
     branches: v.optional(v.array(v.string())),
     mode: v.optional(v.picklist(['summary', 'full'])),
   }),
+  // Composite read — picks which sub-reads to fold into one round trip.
+  composite: v.object({
+    cwd: v.string(),
+    include: v.optional(v.array(v.picklist(['snapshot', 'status', 'pullRequests']))),
+    branches: v.optional(v.array(v.string())),
+    mode: v.optional(v.picklist(['summary', 'full'])),
+  }),
 } as const
 
 // Settings writes are routed to `applyServer*Write` helpers that already do

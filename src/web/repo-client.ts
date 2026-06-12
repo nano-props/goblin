@@ -127,6 +127,38 @@ export async function getRepositoryPatch(cwd: string, worktreePath: string, sign
   return await getServerJson('/api/repo/patch', { cwd, worktreePath }, { signal })
 }
 
+export interface RepositoryComposite {
+  snapshot: RepoSnapshot | null
+  status: WorktreeStatus[]
+  pullRequests: PullRequestEntry[] | null
+}
+
+/**
+ * Fetch several repo read results in one round trip. The renderer's
+ * refresh flow collapses the three calls (snapshot + status + PRs)
+ * into a single network request.
+ */
+export async function getRepositoryComposite(
+  cwd: string,
+  options: {
+    include?: ReadonlyArray<'snapshot' | 'status' | 'pullRequests'>
+    branches?: string[]
+    mode?: PullRequestFetchMode
+    signal?: AbortSignal
+  } = {},
+): Promise<RepositoryComposite> {
+  return await getServerJson(
+    '/api/repo/composite',
+    {
+      cwd,
+      include: [...(options.include ?? ['snapshot', 'status', 'pullRequests'])],
+      branches: options.branches,
+      mode: options.mode,
+    },
+    { signal: options.signal },
+  )
+}
+
 export async function openRepositoryRemote(cwd: string, branch?: string): Promise<ExecResult> {
   const result = await postServerJson<{ cwd: string; branch?: string }, ExecResult>(
     '/api/repo/open-remote',

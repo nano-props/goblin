@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   getRepositoryStatus: vi.fn(),
   getRepositoryPatch: vi.fn(),
   getRepositoryPullRequests: vi.fn(),
+  getRepositoryComposite: vi.fn(),
   fetchRepository: vi.fn(),
   cloneRepository: vi.fn(),
   abortCloneOperation: vi.fn(),
@@ -36,6 +37,7 @@ vi.mock('#/server/modules/repo-read-paths.ts', () => ({
   getRepositoryStatus: mocks.getRepositoryStatus,
   getRepositoryPatch: mocks.getRepositoryPatch,
   getRepositoryPullRequests: mocks.getRepositoryPullRequests,
+  getRepositoryComposite: mocks.getRepositoryComposite,
 }))
 vi.mock('#/server/modules/repo-write-paths.ts', () => ({
   cloneRepository: mocks.cloneRepository,
@@ -110,6 +112,47 @@ describe('repo routes — GET query validation', () => {
       '/tmp/repo/.worktrees/feature',
       expect.any(AbortSignal),
     )
+  })
+})
+
+describe('repo routes — composite read', () => {
+  test('returns all three sections by default', async () => {
+    mocks.getRepositoryComposite.mockResolvedValue({
+      snapshot: { branches: [], current: 'main' },
+      status: [],
+      pullRequests: [],
+    })
+    const app = createRepoRoutes()
+    const response = await app.request(new Request('http://localhost/composite?cwd=/tmp/repo'))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      snapshot: { branches: [], current: 'main' },
+      status: [],
+      pullRequests: [],
+    })
+  })
+
+  test('forwards include, branches, and mode to the read function', async () => {
+    mocks.getRepositoryComposite.mockResolvedValue({ snapshot: null, status: [], pullRequests: null })
+    const app = createRepoRoutes()
+    await app.request(
+      new Request(
+        'http://localhost/composite?cwd=/tmp/repo&include=snapshot&include=status&branches=main&branches=feature&mode=summary',
+      ),
+    )
+    expect(mocks.getRepositoryComposite).toHaveBeenCalledWith('/tmp/repo', ['snapshot', 'status'], {
+      branches: ['main', 'feature'],
+      mode: 'summary',
+      signal: expect.any(AbortSignal),
+    })
+  })
+
+  test('returns 400 when include has an unknown value', async () => {
+    const app = createRepoRoutes()
+    const response = await app.request(new Request('http://localhost/composite?cwd=/tmp/repo&include=not-a-section'))
+    expect(response.status).toBe(400)
+    const json = (await response.json()) as { code: string }
+    expect(json.code).toBe('BAD_REQUEST')
   })
 })
 
