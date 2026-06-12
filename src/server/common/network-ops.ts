@@ -1,5 +1,5 @@
 import type { ExecResult } from '#/shared/git-types.ts'
-import type { NetworkOpKind } from '#/shared/rpc.ts'
+import type { NetworkOpKind } from '#/shared/api-types.ts'
 
 interface ActiveNetworkOp {
   ctrl: AbortController

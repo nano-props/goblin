@@ -1,5 +1,5 @@
 import { probeExternalApps } from '#/system/external-apps.ts'
-import type { ExternalAppsSnapshot, SettingsPrefs } from '#/shared/rpc.ts'
+import type { ExternalAppsSnapshot, SettingsPrefs } from '#/shared/api-types.ts'
 import { getServerSettingsPrefs } from '#/server/modules/settings-source.ts'
 
 export async function buildServerExternalAppsSnapshot(

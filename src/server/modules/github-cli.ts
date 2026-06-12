@@ -1,5 +1,5 @@
 import { probeGitHubCli } from '#/system/github-cli.ts'
-import type { GitHubCliState } from '#/shared/rpc.ts'
+import type { GitHubCliState } from '#/shared/api-types.ts'
 
 export async function getServerGitHubCliState(
   signal?: AbortSignal,

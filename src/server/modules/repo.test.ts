@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { PullRequestInfo } from '#/shared/git-types.ts'
-import type { PullRequestEntry, RepoSnapshot } from '#/shared/rpc.ts'
+import type { PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
 
 const mocks = vi.hoisted(() => ({
   checkGitAvailable: vi.fn(),

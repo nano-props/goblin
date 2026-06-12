@@ -5,7 +5,7 @@ import {
 } from '#/server/modules/settings-source.ts'
 import type { ServerSettingsState } from '#/server/modules/settings-state.ts'
 import { buildSettingsSnapshot } from '#/shared/settings-snapshot.ts'
-import type { SettingsSnapshot } from '#/shared/rpc.ts'
+import type { SettingsSnapshot } from '#/shared/api-types.ts'
 
 export async function getSettingsSnapshot(state: ServerSettingsState): Promise<SettingsSnapshot> {
   const serverSettings = await getServerSettingsPrefs()

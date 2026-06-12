@@ -14,7 +14,7 @@ import {
   applyServerSettingsPrefsWrite,
 } from '#/server/modules/settings-write-paths.ts'
 import { getLanUrls, isLanAddress } from '#/shared/lan-addresses.ts'
-import type { LanInfo } from '#/shared/rpc.ts'
+import type { LanInfo } from '#/shared/api-types.ts'
 
 export function createSettingsRoutes(settingsState: ServerSettingsState) {
   const app = new Hono()

@@ -1,6 +1,6 @@
 import { runWithRepoBackend } from '#/server/modules/repo-backend.ts'
 import { type ExecResult, type PullRequestFetchMode, type WorktreeStatus } from '#/shared/git-types.ts'
-import type { ProbeResult, PullRequestEntry, RepoSnapshot } from '#/shared/rpc.ts'
+import type { ProbeResult, PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
 
 export async function probeRepository(cwd: string): Promise<ProbeResult> {
   return await runWithRepoBackend(cwd, async (backend) => await backend.probe())

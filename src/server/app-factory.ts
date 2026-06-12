@@ -19,7 +19,7 @@ import { createRendererRuntimeSnapshot } from '#/shared/bootstrap-builders.ts'
 import { WEB_RENDERER_CAPABILITIES } from '#/shared/bootstrap.ts'
 import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
 import { initialSettingsFromSnapshot } from '#/shared/settings-defaults.ts'
-import type { LangPref } from '#/shared/rpc.ts'
+import type { LangPref } from '#/shared/api-types.ts'
 import type { RendererBootstrapSnapshot } from '#/shared/bootstrap.ts'
 
 export interface ServerAppOptions {

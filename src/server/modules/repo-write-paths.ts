@@ -6,10 +6,10 @@ import { cloneRepository as cloneGitRepository } from '#/system/git/clone.ts'
 import { openInPreferredEditor } from '#/system/editors.ts'
 import { openInPreferredTerminal } from '#/system/terminals.ts'
 import { type ExecResult } from '#/shared/git-types.ts'
-import { type NetworkOpKind } from '#/shared/rpc.ts'
+import { type NetworkOpKind } from '#/shared/api-types.ts'
 import { checkGitAvailable } from '#/system/git/helper.ts'
 import { isValidCwd, isValidRepoLocator } from '#/shared/input-validation.ts'
-import { type CloneRepoResult, type ProbeResult } from '#/shared/rpc.ts'
+import { type CloneRepoResult, type ProbeResult } from '#/shared/api-types.ts'
 import { constants as fsConstants, promises as fs } from 'node:fs'
 
 type ProbeAvailability = { ok: true } | { ok: false; message: string }

@@ -7,6 +7,7 @@ import {
   getBranches,
   getCurrentBranch,
   getDefaultBranch,
+  getHeadHash,
   getRepoName,
   getRepoRoot,
   getUpstream,
@@ -61,7 +62,7 @@ import {
   type PullRequestEntry,
   type RemoteRepoTarget,
   type RepoSnapshot,
-} from '#/shared/rpc.ts'
+} from '#/shared/api-types.ts'
 
 type ProbeAvailability = { ok: true } | { ok: false; message: string }
 
@@ -221,9 +222,11 @@ function createLocalRepoBackend(repoId: string): RepoBackend {
         if (signal?.aborted) return null
         const current = await getCurrentBranch(repoId, { signal })
         if (signal?.aborted) return null
+        const currentHEAD = current ? undefined : await getHeadHash(repoId, { signal })
+        if (signal?.aborted) return null
         const remote = await getRemoteInfo(repoId, signal)
         if (signal?.aborted) return null
-        return { branches, current, remote }
+        return { branches, current, currentHEAD, remote }
       } catch (err) {
         if (signal?.aborted) return null
         throw err

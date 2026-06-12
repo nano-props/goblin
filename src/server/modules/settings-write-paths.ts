@@ -10,7 +10,7 @@ import {
 import type { ServerSettingsState } from '#/server/modules/settings-state.ts'
 import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
 import { toSafeSessionRepoEntry } from '#/shared/input-validation.ts'
-import type { SessionState, SettingsPrefsUpdateResponse } from '#/shared/rpc.ts'
+import type { SessionState, SettingsPrefsUpdateResponse } from '#/shared/api-types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import { repoSessionEntryId } from '#/shared/remote-repo.ts'
 import { settingsInvalidationScopesForPrefsPatch } from '#/shared/server-invalidation.ts'
