@@ -5,9 +5,9 @@
 // in the main process and is reached via IPC.
 const { contextBridge, ipcRenderer, webUtils } = require('electron')
 const IPC = {
-  rpc: {
-    call: 'goblin:rpc',
-    abort: 'goblin:rpc-abort',
+  ipc: {
+    call: 'goblin:ipc',
+    abort: 'goblin:ipc-abort',
     event: 'goblin:event',
     effectIntent: 'goblin:effect-intent',
   },
@@ -40,19 +40,19 @@ function isObject(value) {
   return value !== null && typeof value === 'object'
 }
 
-function rpcCall(request) {
-  return safeInvoke(IPC.rpc.call, request)
+function ipcCall(request) {
+  return safeInvoke(IPC.ipc.call, request)
     .then((response) => {
-      if (!isObject(response) || typeof response.ok !== 'boolean') throw new Error('Malformed RPC response')
+      if (!isObject(response) || typeof response.ok !== 'boolean') throw new Error('Malformed IPC response')
       if (response.ok) return response.data
       const error = isObject(response.error) ? response.error : null
-      throw Object.assign(new Error(typeof error?.message === 'string' ? error.message : 'RPC request failed'), {
-        name: typeof error?.name === 'string' ? error.name : 'RpcError',
+      throw Object.assign(new Error(typeof error?.message === 'string' ? error.message : 'IPC request failed'), {
+        name: typeof error?.name === 'string' ? error.name : 'IpcError',
         code: typeof error?.code === 'string' ? error.code : undefined,
       })
     })
     .catch((err) => {
-      console.warn(`[rpc] ${request.path} failed`, err)
+      console.warn(`[ipc] ${request.path} failed`, err)
       throw err
     })
 }
@@ -92,15 +92,15 @@ const initialServer =
   (typeof bootstrap.server.clientId === 'undefined' || typeof bootstrap.server.clientId === 'string')
     ? bootstrap.server
     : null
-const rpcEventSubscribers = new Set()
-let rpcEventListener = null
+const ipcEventSubscribers = new Set()
+let ipcEventListener = null
 const effectIntentSubscribers = new Set()
 let effectIntentListener = null
 
-function ensureRpcEventListener() {
-  if (rpcEventListener) return
-  rpcEventListener = (_event, payload) => {
-    for (const cb of rpcEventSubscribers) {
+function ensureIpcEventListener() {
+  if (ipcEventListener) return
+  ipcEventListener = (_event, payload) => {
+    for (const cb of ipcEventSubscribers) {
       try {
         cb(payload)
       } catch (err) {
@@ -108,13 +108,13 @@ function ensureRpcEventListener() {
       }
     }
   }
-  ipcRenderer.on(IPC.rpc.event, rpcEventListener)
+  ipcRenderer.on(IPC.ipc.event, ipcEventListener)
 }
 
-function maybeDisposeRpcEventListener() {
-  if (rpcEventSubscribers.size > 0 || !rpcEventListener) return
-  ipcRenderer.off(IPC.rpc.event, rpcEventListener)
-  rpcEventListener = null
+function maybeDisposeIpcEventListener() {
+  if (ipcEventSubscribers.size > 0 || !ipcEventListener) return
+  ipcRenderer.off(IPC.ipc.event, ipcEventListener)
+  ipcEventListener = null
 }
 
 function ensureEffectIntentListener() {
@@ -128,12 +128,12 @@ function ensureEffectIntentListener() {
       }
     }
   }
-  ipcRenderer.on(IPC.rpc.effectIntent, effectIntentListener)
+  ipcRenderer.on(IPC.ipc.effectIntent, effectIntentListener)
 }
 
 function maybeDisposeEffectIntentListener() {
   if (effectIntentSubscribers.size > 0 || !effectIntentListener) return
-  ipcRenderer.off(IPC.rpc.effectIntent, effectIntentListener)
+  ipcRenderer.off(IPC.ipc.effectIntent, effectIntentListener)
   effectIntentListener = null
 }
 
@@ -143,8 +143,8 @@ contextBridge.exposeInMainWorld('goblinNative', {
   initialI18n,
   initialSettings,
   initialServer,
-  invokeRpc: ({ path, input, requestId }) => rpcCall({ path, input, requestId }),
-  abortRpc: (requestId) => safeInvoke(IPC.rpc.abort, { requestId }),
+  invokeIpc: ({ path, input, requestId }) => ipcCall({ path, input, requestId }),
+  abortIpc: (requestId) => safeInvoke(IPC.ipc.abort, { requestId }),
   pathForFile: (file) => webUtils.getPathForFile(file),
   shell: {
     openSettingsWindow: (input) => safeInvoke(IPC.shell.openSettingsWindow, input),
@@ -161,11 +161,11 @@ contextBridge.exposeInMainWorld('goblinNative', {
     },
   },
   onEvent: (cb) => {
-    rpcEventSubscribers.add(cb)
-    ensureRpcEventListener()
+    ipcEventSubscribers.add(cb)
+    ensureIpcEventListener()
     return () => {
-      rpcEventSubscribers.delete(cb)
-      maybeDisposeRpcEventListener()
+      ipcEventSubscribers.delete(cb)
+      maybeDisposeIpcEventListener()
     }
   },
   onIntent: (cb) => {
