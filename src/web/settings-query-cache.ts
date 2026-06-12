@@ -6,7 +6,7 @@ import type {
   RuntimeSettingsSnapshot,
   SessionState,
   SettingsSnapshot,
-} from '#/shared/rpc.ts'
+} from '#/shared/api-types.ts'
 import { runtimeSettingsSnapshotFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
 
 export function settingsSnapshotQueryKey() {

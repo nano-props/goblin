@@ -75,8 +75,8 @@ beforeEach(() => {
       },
       homeDir: '/Users/test',
       pathForFile: () => '',
-      invokeRpc: async () => null,
-      abortRpc: async () => true,
+      invokeIpc: async () => null,
+      abortIpc: async () => true,
       onEvent: () => () => {},
     },
   })

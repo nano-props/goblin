@@ -1,4 +1,4 @@
-import type { DetailTab } from '#/shared/rpc.ts'
+import type { DetailTab } from '#/shared/api-types.ts'
 
 export function persistedActiveRepoIdForSession(activeId: string | null): string | null {
   return activeId

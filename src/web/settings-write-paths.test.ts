@@ -10,7 +10,7 @@ import {
   settingsSnapshotQueryKey,
 } from '#/web/settings-query-cache.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { GitHubCliState } from '#/shared/rpc.ts'
+import type { GitHubCliState } from '#/shared/api-types.ts'
 
 type AddRecentRepoResult = {
   recentRepos: RepoSessionEntry[]

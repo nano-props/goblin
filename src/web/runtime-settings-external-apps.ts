@@ -7,8 +7,8 @@ import {
   setTerminalAppPreference,
 } from '#/web/settings-write-paths.ts'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
-import type { EditorAppState, TerminalAppState } from '#/shared/rpc.ts'
-import type { EditorPref, TerminalPref } from '#/shared/rpc.ts'
+import type { EditorAppState, TerminalAppState } from '#/shared/api-types.ts'
+import type { EditorPref, TerminalPref } from '#/shared/api-types.ts'
 
 export function useRuntimeExternalAppSettings() {
   const { data } = useExternalAppsQuery()

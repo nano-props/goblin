@@ -1,5 +1,5 @@
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
-import type { SettingsPage } from '#/shared/rpc.ts'
+import type { SettingsPage } from '#/shared/api-types.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import { getRendererBridge } from '#/web/renderer-bridge.ts'
 const PROJECT_GITHUB_URL = 'https://github.com/nano-props/goblin'
@@ -12,9 +12,9 @@ function nativeShell() {
   }
 }
 
-export function canUseNativeRpcBridge(): boolean {
+export function canUseNativeIpcBridge(): boolean {
   try {
-    return getRendererBridge().hasCapability('settings-rpc')
+    return getRendererBridge().hasCapability('settings-ipc')
   } catch {
     return false
   }
@@ -37,7 +37,7 @@ export function canOpenAppSettings(): boolean {
 }
 
 export function canUseGlobalShortcutSettings(): boolean {
-  return canUseNativeRpcBridge()
+  return canUseNativeIpcBridge()
 }
 
 export function homeDirectory(): string {

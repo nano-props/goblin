@@ -11,7 +11,7 @@ import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { joinPath, tildify, untildify } from '#/web/lib/paths.ts'
 import { cn } from '#/web/lib/cn.ts'
-import type { CloneRepoResult } from '#/shared/rpc.ts'
+import type { CloneRepoResult } from '#/shared/api-types.ts'
 export interface CloneRepositoryRequest {
   operationId: string
   url: string

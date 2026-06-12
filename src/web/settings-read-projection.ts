@@ -6,8 +6,8 @@ import type {
   RuntimeRecentReposState,
   RuntimeSettingsSnapshot,
   SettingsSnapshot,
-} from '#/shared/rpc.ts'
-import type { EditorPref, TerminalPref } from '#/shared/rpc.ts'
+} from '#/shared/api-types.ts'
+import type { EditorPref, TerminalPref } from '#/shared/api-types.ts'
 import {
   runtimeRecentReposStateFromSettingsSnapshot,
   runtimeSettingsSnapshotFromSettingsSnapshot,

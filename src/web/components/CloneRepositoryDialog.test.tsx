@@ -7,11 +7,11 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CloneRepositoryDialog } from '#/web/components/CloneRepositoryDialog.tsx'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
 import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import type { CloneRepoResult } from '#/shared/rpc.ts'
+import type { CloneRepoResult } from '#/shared/api-types.ts'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
-let rpcCalls: Array<{ path: string; input?: unknown }> = []
+let ipcCalls: Array<{ path: string; input?: unknown }> = []
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
 const fetchMock = vi.fn(async () => ({
@@ -21,7 +21,7 @@ const fetchMock = vi.fn(async () => ({
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
-  rpcCalls = []
+  ipcCalls = []
   setRendererBridgeForTests(null)
   fetchMock.mockClear()
   vi.stubGlobal('fetch', fetchMock)
@@ -44,12 +44,12 @@ beforeEach(() => {
     },
     homeDir: '/Users/tester',
     pathForFile: () => '',
-    invokeRpc: async (request: { path: string; input?: unknown }) => {
-      rpcCalls.push(request)
+    invokeIpc: async (request: { path: string; input?: unknown }) => {
+      ipcCalls.push(request)
       if (request.path === 'repo.abortClone') return { ok: true }
       return null
     },
-    abortRpc: async () => true,
+    abortIpc: async () => true,
     onEvent: () => () => {},
   }
 })

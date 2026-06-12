@@ -28,6 +28,7 @@ describe('restorable-workspace-state', () => {
           selectedTerminalByWorktree: {
             '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2',
           },
+          detailTabByRepo: {},
         },
       }),
     ).toEqual({

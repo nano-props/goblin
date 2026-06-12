@@ -1,4 +1,4 @@
-import type { SessionState } from '#/shared/rpc.ts'
+import type { SessionState } from '#/shared/api-types.ts'
 import type { RestorableWorkspaceState, ReposStore } from '#/web/stores/repos/types.ts'
 import { persistedOpenWorkspaceEntries } from '#/web/open-workspace-state.ts'
 import {

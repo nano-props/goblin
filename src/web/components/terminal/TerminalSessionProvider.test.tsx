@@ -320,8 +320,8 @@ beforeEach(() => {
       initialI18n: null,
       initialSettings: null,
       initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret', clientId: 'client_sharedterminal' },
-      invokeRpc: vi.fn(async () => []),
-      abortRpc: vi.fn(),
+      invokeIpc: vi.fn(async () => []),
+      abortIpc: vi.fn(),
       onEvent: vi.fn(() => () => {}),
       pathForFile: vi.fn(() => ''),
       terminal: {
@@ -411,7 +411,7 @@ beforeEach(() => {
   setRendererBridgeForTests({
     kind: () => 'electron',
     hasCapability: (capability) =>
-      capability === 'settings-rpc' ||
+      capability === 'settings-ipc' ||
       capability === 'open-settings-window' ||
       capability === 'open-external-url' ||
       capability === 'open-directory-dialog' ||
@@ -430,9 +430,9 @@ beforeEach(() => {
       initialSettings: null,
       initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret', clientId: 'client_sharedterminal' },
     }),
-    invokeRpc: vi.fn(async () => []),
-    abortRpc: vi.fn(async () => false),
-    onRpcEvent: vi.fn(() => () => {}),
+    invokeIpc: vi.fn(async () => []),
+    abortIpc: vi.fn(async () => false),
+    onIpcEvent: vi.fn(() => () => {}),
     onEffectIntent: vi.fn(() => () => {}),
     pathForFile: vi.fn(() => ''),
     shell: () => null,

@@ -17,7 +17,7 @@ function installBridge(sessionOverrides: Record<string, unknown> = {}) {
         initialI18n: null,
         initialSettings: null,
         initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
-        invokeRpc: vi.fn(({ path }: { path: string }) => {
+        invokeIpc: vi.fn(({ path }: { path: string }) => {
           if (path !== 'settings.get') throw new Error(`Unhandled RPC path: ${path}`)
           return {
             theme: 'auto',
@@ -46,7 +46,7 @@ function installBridge(sessionOverrides: Record<string, unknown> = {}) {
             recentRepos: [],
           }
         }),
-        abortRpc: () => Promise.resolve(false),
+        abortIpc: () => Promise.resolve(false),
         onEvent: () => () => {},
         pathForFile: () => '',
       },
@@ -64,7 +64,7 @@ function installBridge(sessionOverrides: Record<string, unknown> = {}) {
       if (url.pathname !== '/api/settings') throw new Error(`Unhandled fetch URL: ${url.pathname}`)
       return {
         ok: true,
-        json: async () => window.goblinNative.invokeRpc({ path: 'settings.get' }),
+        json: async () => window.goblinNative.invokeIpc({ path: 'settings.get' }),
       }
     }),
   )

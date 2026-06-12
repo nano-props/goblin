@@ -6,7 +6,7 @@
 
 import { create } from 'zustand'
 import { DEFAULT_COLOR_THEME, isColorTheme } from '#/shared/color-theme.ts'
-import type { ResolvedTheme, ThemePref, ThemeState } from '#/shared/rpc.ts'
+import type { ResolvedTheme, ThemePref, ThemeState } from '#/shared/api-types.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import { getThemeState, setThemeColorTheme, setThemePref } from '#/web/settings-client.ts'
 import { subscribeSettingsInvalidationRefetch } from '#/web/settings-invalidation-refetch.ts'

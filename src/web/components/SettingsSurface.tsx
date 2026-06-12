@@ -9,7 +9,7 @@ import { NotificationSettings } from '#/web/components/settings/pages/Notificati
 import { SshRemoteSettings } from '#/web/components/settings/pages/SshRemoteSettings.tsx'
 import { SyncSettings } from '#/web/components/settings/pages/SyncSettings.tsx'
 import { useT } from '#/web/stores/i18n.ts'
-import type { SettingsPage } from '#/shared/rpc.ts'
+import type { SettingsPage } from '#/shared/api-types.ts'
 interface SettingsSurfaceProps {
   page: SettingsPage
   onPageChange?: (page: SettingsPage) => void

@@ -50,9 +50,9 @@ function testBridge(overrides: Partial<RendererBridge> = {}): RendererBridge {
     kind: () => 'web',
     hasCapability: () => false,
     getBootstrap: () => electronBootstrap(),
-    invokeRpc: vi.fn(),
-    abortRpc: vi.fn(async () => false),
-    onRpcEvent: () => () => {},
+    invokeIpc: vi.fn(),
+    abortIpc: vi.fn(async () => false),
+    onIpcEvent: () => () => {},
     onEffectIntent: () => () => {},
     pathForFile: () => '',
     shell: () => null,
@@ -156,7 +156,7 @@ describe('settings-client', () => {
   })
 
   test('sets the global shortcut through the native bridge even when the embedded server is available', async () => {
-    const invokeRpc = vi.fn(async () => ({ accelerator: 'CommandOrControl+Shift+K', registered: true }))
+    const invokeIpc = vi.fn(async () => ({ accelerator: 'CommandOrControl+Shift+K', registered: true }))
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
@@ -170,8 +170,8 @@ describe('settings-client', () => {
             capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
           },
           homeDir: '/Users/test',
-          invokeRpc,
-          abortRpc: async () => true,
+          invokeIpc,
+          abortIpc: async () => true,
           onEvent: () => () => {},
           pathForFile: () => '',
         },
@@ -191,7 +191,7 @@ describe('settings-client', () => {
       accelerator: 'CommandOrControl+Shift+K',
       registered: true,
     })
-    expect(invokeRpc).toHaveBeenCalledWith(
+    expect(invokeIpc).toHaveBeenCalledWith(
       expect.objectContaining({
         path: 'settings.setGlobalShortcut',
         input: { accelerator: 'CommandOrControl+Shift+K' },
@@ -201,7 +201,7 @@ describe('settings-client', () => {
   })
 
   test('projects native prefs after updating language through the embedded server', async () => {
-    const invokeRpc = vi.fn(async () => undefined)
+    const invokeIpc = vi.fn(async () => undefined)
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
@@ -215,8 +215,8 @@ describe('settings-client', () => {
             capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
           },
           homeDir: '/Users/test',
-          invokeRpc,
-          abortRpc: async () => true,
+          invokeIpc,
+          abortIpc: async () => true,
           onEvent: () => () => {},
           pathForFile: () => '',
         },
@@ -255,7 +255,7 @@ describe('settings-client', () => {
     const { setI18nPref } = await import('#/web/settings-client.ts')
     await expect(setI18nPref('ja')).resolves.toEqual({ lang: 'ja', pref: 'ja', dict: { hello: 'こんにちは' } })
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(invokeRpc).toHaveBeenCalledWith(
+    expect(invokeIpc).toHaveBeenCalledWith(
       expect.objectContaining({
         path: 'settings.applyShellProjection',
         input: {
@@ -277,7 +277,7 @@ describe('settings-client', () => {
   })
 
   test('projects recent repos through the native bridge', async () => {
-    const invokeRpc = vi.fn(async () => undefined)
+    const invokeIpc = vi.fn(async () => undefined)
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
@@ -291,8 +291,8 @@ describe('settings-client', () => {
             capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
           },
           homeDir: '/Users/test',
-          invokeRpc,
-          abortRpc: async () => true,
+          invokeIpc,
+          abortIpc: async () => true,
           onEvent: () => () => {},
           pathForFile: () => '',
         },
@@ -327,7 +327,7 @@ describe('settings-client', () => {
         body: JSON.stringify({ repo: { kind: 'local', id: '/tmp/../tmp/repo' } }),
       }),
     )
-    expect(invokeRpc).toHaveBeenCalledWith(
+    expect(invokeIpc).toHaveBeenCalledWith(
       expect.objectContaining({
         path: 'settings.applyShellProjection',
         input: {
@@ -340,7 +340,7 @@ describe('settings-client', () => {
   })
 
   test('clears recent repos through the embedded server and syncs native state', async () => {
-    const invokeRpc = vi.fn(async () => undefined)
+    const invokeIpc = vi.fn(async () => undefined)
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
@@ -354,8 +354,8 @@ describe('settings-client', () => {
             capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
           },
           homeDir: '/Users/test',
-          invokeRpc,
-          abortRpc: async () => true,
+          invokeIpc,
+          abortIpc: async () => true,
           onEvent: () => () => {},
           onIntent: () => () => {},
           pathForFile: () => '',
@@ -383,8 +383,8 @@ describe('settings-client', () => {
         headers: expect.objectContaining({ 'x-goblin-internal-secret': 'secret' }),
       }),
     )
-    expect(invokeRpc).toHaveBeenCalledTimes(1)
-    expect(invokeRpc).toHaveBeenCalledWith(
+    expect(invokeIpc).toHaveBeenCalledTimes(1)
+    expect(invokeIpc).toHaveBeenCalledWith(
       expect.objectContaining({
         path: 'settings.applyShellProjection',
         input: { recentRepos: { recentRepos: [] } },
@@ -497,7 +497,7 @@ describe('settings-client', () => {
   })
 
   test('does not project an added recent repo when the embedded server rejects the candidate', async () => {
-    const invokeRpc = vi.fn(async () => undefined)
+    const invokeIpc = vi.fn(async () => undefined)
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
@@ -511,8 +511,8 @@ describe('settings-client', () => {
             capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
           },
           homeDir: '/Users/test',
-          invokeRpc,
-          abortRpc: async () => true,
+          invokeIpc,
+          abortIpc: async () => true,
           onEvent: () => () => {},
           pathForFile: () => '',
         },
@@ -541,7 +541,7 @@ describe('settings-client', () => {
       recentRepos: [{ kind: 'local', id: '/existing' }],
       addedRepo: null,
     })
-    expect(invokeRpc).toHaveBeenCalledWith(
+    expect(invokeIpc).toHaveBeenCalledWith(
       expect.objectContaining({
         path: 'settings.applyShellProjection',
         input: {

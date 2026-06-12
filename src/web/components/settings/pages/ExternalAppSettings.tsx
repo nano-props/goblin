@@ -20,7 +20,7 @@ import {
 import { useExternalAppsQuery } from '#/web/settings-queries.ts'
 import { useExternalAppSettingsController } from '#/web/runtime-settings-external-apps.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import type { EditorPref, TerminalPref } from '#/shared/rpc.ts'
+import type { EditorPref, TerminalPref } from '#/shared/api-types.ts'
 import { cn } from '#/web/lib/cn.ts'
 interface ExternalToolItem {
   id: string

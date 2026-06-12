@@ -12,7 +12,7 @@ const toastMocks = vi.hoisted(() => ({
   error: vi.fn(),
 }))
 
-function defaultRpcResult(path: string, input?: unknown) {
+function defaultIpcResult(path: string, input?: unknown) {
   if (path === 'githubCli.get' || path === 'githubCli.refresh') {
     const requestedHosts = (input as { hosts?: string[] } | undefined)?.hosts
     const hosts = (requestedHosts && requestedHosts.length > 0 ? requestedHosts : ['github.example.com']).reduce<
@@ -87,15 +87,15 @@ let root: Root | null = null
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
 const sendTestNotification = vi.fn(async () => true)
-const invokeRpc = vi.fn(async ({ path, input }: { path: string; input?: unknown }) => defaultRpcResult(path, input))
+const invokeIpc = vi.fn(async ({ path, input }: { path: string; input?: unknown }) => defaultIpcResult(path, input))
 const fetchMock = vi.fn(async (input: string | URL) => {
   const url = new URL(typeof input === 'string' ? input : input.toString())
   let result: unknown = null
-  if (url.pathname === '/api/settings/github-cli/refresh') result = defaultRpcResult('githubCli.refresh')
+  if (url.pathname === '/api/settings/github-cli/refresh') result = defaultIpcResult('githubCli.refresh')
   else if (url.pathname === '/api/settings/github-cli') {
-    result = defaultRpcResult('githubCli.get', { hosts: url.searchParams.getAll('host') })
-  } else if (url.pathname === '/api/settings') result = defaultRpcResult('settings.get')
-  else if (url.pathname === '/api/settings/external-apps') result = defaultRpcResult('externalApps.get')
+    result = defaultIpcResult('githubCli.get', { hosts: url.searchParams.getAll('host') })
+  } else if (url.pathname === '/api/settings') result = defaultIpcResult('settings.get')
+  else if (url.pathname === '/api/settings/external-apps') result = defaultIpcResult('externalApps.get')
   return {
     ok: true,
     json: async () => result,
@@ -108,9 +108,9 @@ beforeEach(() => {
   sendTestNotification.mockClear()
   toastMocks.success.mockClear()
   toastMocks.error.mockClear()
-  invokeRpc.mockClear()
-  invokeRpc.mockImplementation(async ({ path, input }: { path: string; input?: unknown }) =>
-    defaultRpcResult(path, input),
+  invokeIpc.mockClear()
+  invokeIpc.mockImplementation(async ({ path, input }: { path: string; input?: unknown }) =>
+    defaultIpcResult(path, input),
   )
   fetchMock.mockClear()
   vi.stubGlobal('fetch', fetchMock)
@@ -150,8 +150,8 @@ beforeEach(() => {
     },
     initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
     pathForFile: () => '',
-    invokeRpc,
-    abortRpc: async () => true,
+    invokeIpc,
+    abortIpc: async () => true,
     onEvent: () => () => {},
     terminal: {
       open: vi.fn(),
@@ -218,13 +218,13 @@ describe('SettingsSurface', () => {
       let result: unknown = null
       if (url.pathname === '/api/settings') {
         result = {
-          ...defaultRpcResult('settings.get'),
+          ...defaultIpcResult('settings.get'),
           terminalNotificationsEnabled: true,
         }
       } else if (url.pathname === '/api/settings/github-cli') {
-        result = defaultRpcResult('githubCli.get', { hosts: url.searchParams.getAll('host') })
+        result = defaultIpcResult('githubCli.get', { hosts: url.searchParams.getAll('host') })
       } else if (url.pathname === '/api/settings/external-apps') {
-        result = defaultRpcResult('externalApps.get')
+        result = defaultIpcResult('externalApps.get')
       }
       return {
         ok: true,
@@ -284,9 +284,9 @@ describe('SettingsSurface', () => {
       } else if (url.pathname === '/api/settings/github-cli') {
         result = { available: false, version: null, detectedAt: 0, hosts: {} }
       } else if (url.pathname === '/api/settings') {
-        result = defaultRpcResult('settings.get')
+        result = defaultIpcResult('settings.get')
       } else if (url.pathname === '/api/settings/external-apps') {
-        result = defaultRpcResult(init?.method === 'POST' ? 'externalApps.refresh' : 'externalApps.get')
+        result = defaultIpcResult(init?.method === 'POST' ? 'externalApps.refresh' : 'externalApps.get')
       }
       return {
         ok: true,

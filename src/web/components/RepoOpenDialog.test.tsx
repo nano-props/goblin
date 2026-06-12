@@ -24,8 +24,8 @@ beforeEach(() => {
     value: {
       homeDir: '/Users/tester',
       pathForFile: () => '',
-      invokeRpc: async (_request: { path: string; input?: unknown }) => null,
-      abortRpc: async () => true,
+      invokeIpc: async (_request: { path: string; input?: unknown }) => null,
+      abortIpc: async () => true,
       onEvent: () => () => {},
     },
   })

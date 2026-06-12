@@ -15,7 +15,7 @@ import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { COLOR_THEMES } from '#/shared/color-theme.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
-import type { LangPref, ThemePref } from '#/shared/rpc.ts'
+import type { LangPref, ThemePref } from '#/shared/api-types.ts'
 
 export function GeneralSettings() {
   const t = useT()

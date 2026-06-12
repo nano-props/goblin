@@ -7,7 +7,7 @@
 import i18next from 'i18next'
 import { initReactI18next, useTranslation } from 'react-i18next'
 import { create, type StoreApi } from 'zustand'
-import type { I18nSnapshot, Lang, LangPref } from '#/shared/rpc.ts'
+import type { I18nSnapshot, Lang, LangPref } from '#/shared/api-types.ts'
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
 import { getI18nSnapshot, setI18nPref } from '#/web/settings-client.ts'
 import { subscribeSettingsInvalidationRefetch } from '#/web/settings-invalidation-refetch.ts'

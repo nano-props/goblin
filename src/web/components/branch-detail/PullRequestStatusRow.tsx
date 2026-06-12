@@ -17,7 +17,7 @@ import {
   type Tone,
 } from '#/web/components/branch-detail/status-ui.tsx'
 import type { PullRequestInfo } from '#/shared/git-types.ts'
-import type { Lang } from '#/shared/rpc.ts'
+import type { Lang } from '#/shared/api-types.ts'
 type TFn = (key: string, params?: Record<string, string | number>) => string
 type TooltipSide = 'top' | 'right' | 'bottom' | 'left'
 

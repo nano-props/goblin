@@ -21,7 +21,7 @@ function testBridge(overrides: Partial<RendererBridge> = {}): RendererBridge {
   return {
     kind: () => 'web',
     hasCapability: (capability) => {
-      if (capability === 'settings-rpc') return typeof overrides.invokeRpc === 'function'
+      if (capability === 'settings-ipc') return typeof overrides.invokeIpc === 'function'
       if (capability === 'open-settings-window') return nativeShell?.openSettingsWindow !== undefined
       if (capability === 'open-external-url') return nativeShell?.openExternalUrl !== undefined
       if (capability === 'open-directory-dialog') return nativeShell?.openDirectoryDialog !== undefined
@@ -36,9 +36,9 @@ function testBridge(overrides: Partial<RendererBridge> = {}): RendererBridge {
       initialSettings: null,
       initialServer: null,
     }),
-    invokeRpc: vi.fn(),
-    abortRpc: vi.fn(async () => false),
-    onRpcEvent: () => () => {},
+    invokeIpc: vi.fn(),
+    abortIpc: vi.fn(async () => false),
+    onIpcEvent: () => () => {},
     onEffectIntent: () => () => {},
     pathForFile: () => '',
     shell: () => null,

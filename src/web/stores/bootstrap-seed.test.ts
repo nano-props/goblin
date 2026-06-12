@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { InitialSettingsSnapshot } from '#/shared/bootstrap.ts'
-import type { I18nSnapshot } from '#/shared/rpc.ts'
+import type { I18nSnapshot } from '#/shared/api-types.ts'
 function installBridge(
   overrides: {
     initialI18n?: I18nSnapshot | null
@@ -14,8 +14,8 @@ function installBridge(
         homeDir: '/Users/test',
         initialI18n: overrides.initialI18n ?? null,
         initialSettings: overrides.initialSettings ?? null,
-        invokeRpc: vi.fn(),
-        abortRpc: vi.fn(() => Promise.resolve(false)),
+        invokeIpc: vi.fn(),
+        abortIpc: vi.fn(() => Promise.resolve(false)),
         onEvent: vi.fn(() => () => {}),
         pathForFile: vi.fn(() => ''),
       },

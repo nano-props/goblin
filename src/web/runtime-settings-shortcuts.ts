@@ -10,7 +10,7 @@ import {
   setShortcutsDisabledPreference,
   setSwapCloseShortcutsPreference,
 } from '#/web/settings-write-paths.ts'
-import type { GlobalShortcutState } from '#/shared/rpc.ts'
+import type { GlobalShortcutState } from '#/shared/api-types.ts'
 
 export function getRuntimeShortcutSettings() {
   return readRuntimeShortcutSettings(currentRuntimeSettingsSnapshot())

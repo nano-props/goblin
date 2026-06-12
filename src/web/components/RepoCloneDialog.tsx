@@ -4,7 +4,7 @@ import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import { cloneRepository as runCloneRepository } from '#/web/repo-client.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import type { CloneRepoResult } from '#/shared/rpc.ts'
+import type { CloneRepoResult } from '#/shared/api-types.ts'
 interface RepoCloneDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void

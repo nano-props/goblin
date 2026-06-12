@@ -4,7 +4,7 @@ import { enUS } from 'date-fns/locale/en-US'
 import { ja } from 'date-fns/locale/ja'
 import { ko } from 'date-fns/locale/ko'
 import { zhCN } from 'date-fns/locale/zh-CN'
-import type { Lang } from '#/shared/rpc.ts'
+import type { Lang } from '#/shared/api-types.ts'
 const LOCALES: Record<Lang, Locale> = {
   en: enUS,
   zh: zhCN,

@@ -403,7 +403,7 @@ const terminalCalls = {
   notifyBell: vi.fn<(input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>>(),
   setBadge: vi.fn<Window['goblinNative']['terminal']['setBadge']>(),
 }
-const invokeRpc = vi.fn<Window['goblinNative']['invokeRpc']>()
+const invokeIpc = vi.fn<Window['goblinNative']['invokeIpc']>()
 const shellOpenExternalUrl = vi.fn<NonNullable<Window['goblinNative']['shell']>['openExternalUrl']>()
 const mockFonts = new MockFontFaceSet()
 
@@ -463,8 +463,8 @@ beforeEach(() => {
   Object.defineProperty(window, 'goblinNative', {
     configurable: true,
     value: {
-      invokeRpc: invokeRpc.mockResolvedValue({ ok: true }),
-      abortRpc: vi.fn(),
+      invokeIpc: invokeIpc.mockResolvedValue({ ok: true }),
+      abortIpc: vi.fn(),
       runtime: {
         kind: 'electron',
         bridgeVersion: RENDERER_BRIDGE_VERSION,
@@ -505,7 +505,7 @@ beforeEach(() => {
   setRendererBridgeForTests({
     kind: () => 'electron',
     hasCapability: (capability) =>
-      capability === 'settings-rpc' ||
+      capability === 'settings-ipc' ||
       capability === 'open-settings-window' ||
       capability === 'open-external-url' ||
       capability === 'open-directory-dialog' ||
@@ -524,9 +524,9 @@ beforeEach(() => {
       initialSettings: null,
       initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret', clientId: 'client_sharedterminal' },
     }),
-    invokeRpc,
-    abortRpc: vi.fn(async () => false),
-    onRpcEvent: vi.fn(() => () => {}),
+    invokeIpc,
+    abortIpc: vi.fn(async () => false),
+    onIpcEvent: vi.fn(() => () => {}),
     onEffectIntent: vi.fn(() => () => {}),
     pathForFile: vi.fn(() => ''),
     shell: () => window.goblinNative.shell ?? null,
@@ -801,7 +801,7 @@ describe('ManagedTerminalSession', () => {
     expect(shellOpenExternalUrl).toHaveBeenCalledWith({ url: 'https://example.com/path', allowHttp: true })
   })
 
-  test('does not send unsafe web links to the app rpc', async () => {
+  test('does not send unsafe web links to the app ipc', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const session = new ManagedTerminalSession(descriptor, vi.fn())

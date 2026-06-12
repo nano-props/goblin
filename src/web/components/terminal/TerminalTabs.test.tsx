@@ -24,8 +24,8 @@ beforeEach(() => {
   reactActEnvironment.goblinNative = {
     homeDir: '/Users/tester',
     pathForFile: () => '',
-    invokeRpc: async () => null,
-    abortRpc: async () => true,
+    invokeIpc: async () => null,
+    abortIpc: async () => true,
     onEvent: () => () => {},
   }
 })

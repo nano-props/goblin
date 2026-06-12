@@ -53,7 +53,7 @@ export function RepoToolbar({ repoId }: Props) {
 
 function FocusBranchControls({ repoId }: Props) {
   const navigation = useMainWindowNavigation()
-  const { branches, selectedBranch, selectedBranchData, summaryRepo } = useStoreWithEqualityFn(
+  const { branches, selectedBranch, selectedBranchData, summaryRepo, currentHEAD } = useStoreWithEqualityFn(
     useReposStore,
     (s) => {
       const repo = s.repos[repoId]
@@ -77,6 +77,7 @@ function FocusBranchControls({ repoId }: Props) {
               },
             }
           : null,
+        currentHEAD: repo?.data.currentHEAD,
       }
     },
     (a, b) =>
@@ -85,7 +86,8 @@ function FocusBranchControls({ repoId }: Props) {
       a.selectedBranchData === b.selectedBranchData &&
       a.summaryRepo?.data.currentBranch === b.summaryRepo?.data.currentBranch &&
       a.summaryRepo?.data.status === b.summaryRepo?.data.status &&
-      a.summaryRepo?.data.worktreesByPath === b.summaryRepo?.data.worktreesByPath,
+      a.summaryRepo?.data.worktreesByPath === b.summaryRepo?.data.worktreesByPath &&
+      a.currentHEAD === b.currentHEAD,
   )
 
   return (
@@ -95,6 +97,14 @@ function FocusBranchControls({ repoId }: Props) {
         <>
           <div aria-hidden="true" className="mx-1 h-4 border-l border-separator/70" />
           <BranchSummaryInline repo={summaryRepo} branch={selectedBranchData} className="min-w-0 flex-1" />
+        </>
+      )}
+      {currentHEAD && (
+        <>
+          <div aria-hidden="true" className="mx-1 h-4 border-l border-separator/70" />
+          <span className="shrink-0 font-mono text-xs text-muted-foreground">
+            HEAD at {currentHEAD}
+          </span>
         </>
       )}
       {selectedBranchData && <FocusBranchActions repoId={repoId} branch={selectedBranchData} />}

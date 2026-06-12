@@ -1,4 +1,4 @@
-import type { ResolvedEditorApp, ResolvedTerminalApp } from '#/shared/rpc.ts'
+import type { ResolvedEditorApp, ResolvedTerminalApp } from '#/shared/api-types.ts'
 import { Code2, Terminal } from 'lucide-react'
 import { AppleTerminalIcon } from '#/web/components/ExternalAppIcon/AppleTerminalIcon.tsx'
 import { CursorIcon } from '#/web/components/ExternalAppIcon/CursorIcon.tsx'

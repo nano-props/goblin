@@ -1,5 +1,5 @@
-import { canUseGlobalShortcutSettings, canUseNativeRpcBridge } from '#/web/app-shell-client.ts'
-import { invokeNativeRpcPath } from '#/web/native-host-client.ts'
+import { canUseGlobalShortcutSettings, canUseNativeIpcBridge } from '#/web/app-shell-client.ts'
+import { invokeNativeIpcPath } from '#/web/native-host-client.ts'
 import { fetchServerJson, postServerJson } from '#/web/lib/server-fetch.ts'
 import type {
   EditorAppState,
@@ -19,7 +19,7 @@ import type {
   TerminalPref,
   ThemePref,
   ThemeState,
-} from '#/shared/rpc.ts'
+} from '#/shared/api-types.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import {
   nativeSettingsProjectionStateFromSettings,
@@ -61,8 +61,8 @@ async function updateSettingsPrefsPatch(settings: Record<string, unknown>): Prom
     body: JSON.stringify({ settings }),
   })
   const patch = pickNativeSettingsProjectionPatch(settings as Partial<SettingsPrefs>)
-  if (!patch || !canUseNativeRpcBridge()) return result
-  await invokeNativeRpcPath<void>('settings.applyShellProjection', {
+  if (!patch || !canUseNativeIpcBridge()) return result
+  await invokeNativeIpcPath<void>('settings.applyShellProjection', {
     prefs: {
       patch,
       settings: nativeSettingsProjectionStateFromSettings(result.settings),
@@ -122,8 +122,8 @@ export async function addRecentRepo(repo: RepoSessionEntry): Promise<RecentRepos
     '/api/settings/recent-repos/add',
     { repo },
   )
-  if (canUseNativeRpcBridge()) {
-    await invokeNativeRpcPath<void>('settings.applyShellProjection', {
+  if (canUseNativeIpcBridge()) {
+    await invokeNativeIpcPath<void>('settings.applyShellProjection', {
       recentRepos: { recentRepos: result.recentRepos },
     })
   }
@@ -132,8 +132,8 @@ export async function addRecentRepo(repo: RepoSessionEntry): Promise<RecentRepos
 
 export async function clearRecentRepos(): Promise<void> {
   await postServerJson<{}, { ok: boolean }>('/api/settings/recent-repos/clear', {})
-  if (!canUseNativeRpcBridge()) return
-  await invokeNativeRpcPath<void>('settings.applyShellProjection', {
+  if (!canUseNativeIpcBridge()) return
+  await invokeNativeIpcPath<void>('settings.applyShellProjection', {
     recentRepos: { recentRepos: [] },
   })
 }
@@ -176,7 +176,7 @@ export async function setToggleDetailOnActionBarBlankClick(enabled: boolean): Pr
 
 export async function setGlobalShortcut(accelerator: string): Promise<GlobalShortcutState> {
   if (!canUseGlobalShortcutSettings()) throw new Error('Global shortcut unavailable')
-  return await invokeNativeRpcPath<GlobalShortcutState>('settings.setGlobalShortcut', { accelerator })
+  return await invokeNativeIpcPath<GlobalShortcutState>('settings.setGlobalShortcut', { accelerator })
 }
 
 export async function setPreferredTerminalApp(pref: TerminalPref): Promise<TerminalAppState> {

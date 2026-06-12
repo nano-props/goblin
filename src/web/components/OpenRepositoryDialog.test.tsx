@@ -10,13 +10,13 @@ import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
-let rpcCalls: Array<{ path: string; input?: unknown }> = []
+let ipcCalls: Array<{ path: string; input?: unknown }> = []
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 const testWindow = window as unknown as { goblinNative?: unknown }
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
-  rpcCalls = []
+  ipcCalls = []
   setRendererBridgeForTests(null)
   testWindow.goblinNative = {
     homeDir: '/Users/tester',
@@ -24,11 +24,11 @@ beforeEach(() => {
     shell: {
       openDirectoryDialog: async () => '/Users/tester/Developer/repo',
     },
-    invokeRpc: async (request: { path: string; input?: unknown }) => {
-      rpcCalls.push(request)
+    invokeIpc: async (request: { path: string; input?: unknown }) => {
+      ipcCalls.push(request)
       return null
     },
-    abortRpc: async () => true,
+    abortIpc: async () => true,
     onEvent: () => () => {},
   }
 })

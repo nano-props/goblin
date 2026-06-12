@@ -6,7 +6,7 @@ import type {
   SessionState,
   TerminalAppState,
   TerminalPref,
-} from '#/shared/rpc.ts'
+} from '#/shared/api-types.ts'
 import {
   addRecentRepo,
   clearRecentRepos,

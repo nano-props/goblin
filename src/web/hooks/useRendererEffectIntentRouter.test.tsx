@@ -26,7 +26,7 @@ vi.mock('#/web/settings-write-paths.ts', async () => {
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
-const rpcEventListeners = new Set<(event: { type: string; repoRoot?: string; key?: string }) => void>()
+const ipcEventListeners = new Set<(event: { type: string; repoRoot?: string; key?: string }) => void>()
 const intentListeners = new Set<(event: any) => void>()
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 const closeAllOverlays = vi.fn()
@@ -86,12 +86,12 @@ beforeEach(() => {
     configurable: true,
     value: {
       homeDir: '/Users/test',
-      invokeRpc: vi.fn(async () => null),
-      abortRpc: vi.fn(async () => true),
+      invokeIpc: vi.fn(async () => null),
+      abortIpc: vi.fn(async () => true),
       onEvent: vi.fn((cb: (event: { type: string; repoRoot?: string; key?: string }) => void) => {
-        rpcEventListeners.add(cb)
+        ipcEventListeners.add(cb)
         return () => {
-          rpcEventListeners.delete(cb)
+          ipcEventListeners.delete(cb)
         }
       }),
       onIntent: vi.fn((cb: (event: any) => void) => {
@@ -131,7 +131,7 @@ afterEach(() => {
   container?.remove()
   root = null
   container = null
-  rpcEventListeners.clear()
+  ipcEventListeners.clear()
   intentListeners.clear()
   setRendererBridgeForTests(null)
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false

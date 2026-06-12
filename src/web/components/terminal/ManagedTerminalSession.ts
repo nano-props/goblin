@@ -272,7 +272,7 @@ export class ManagedTerminalSession {
   private async startAsync(token: number): Promise<void> {
     try {
       const { term, preloaded } = await this.openPhase(token)
-      const result = await this.rpcPhase(token, term)
+      const result = await this.ipcPhase(token, term)
       await this.replayPhase(token, term, result, preloaded)
       this.finalizePhase(token, term)
     } catch (err) {
@@ -297,7 +297,7 @@ export class ManagedTerminalSession {
     return { term, preloaded }
   }
 
-  private async rpcPhase(token: number, term: XTermTerminal): Promise<TerminalAttachResultWithOwnership> {
+  private async ipcPhase(token: number, term: XTermTerminal): Promise<TerminalAttachResultWithOwnership> {
     const restart = this.runtime.consumeRestartFlag()
     const sessionId = restart ? this.runtime.restartingSessionId() : this.runtime.currentSessionId()
     if (!sessionId) {

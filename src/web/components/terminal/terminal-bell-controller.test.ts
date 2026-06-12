@@ -30,8 +30,8 @@ beforeEach(() => {
       initialI18n: null,
       initialSettings: null,
       initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret', clientId: 'client_sharedterminal' },
-      invokeRpc: vi.fn(),
-      abortRpc: vi.fn(),
+      invokeIpc: vi.fn(),
+      abortIpc: vi.fn(),
       onEvent: vi.fn(() => () => {}),
       pathForFile: vi.fn(() => ''),
       terminal: {
