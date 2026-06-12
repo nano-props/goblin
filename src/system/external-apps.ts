@@ -1,4 +1,4 @@
-import type { EditorAppState, EditorPref, TerminalAppState, TerminalPref } from '#/shared/rpc.ts'
+import type { EditorAppState, EditorPref, TerminalAppState, TerminalPref } from '#/shared/api-types.ts'
 import { getEditorAppAvailability, resolveEditorApp } from '#/system/editors.ts'
 import { getTerminalAppAvailability, resolveTerminalApp } from '#/system/terminals.ts'
 

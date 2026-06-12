@@ -1,6 +1,6 @@
 import { execa } from 'execa'
 import path from 'node:path'
-import type { GitHubCliHostState, GitHubCliState } from '#/shared/rpc.ts'
+import type { GitHubCliHostState, GitHubCliState } from '#/shared/api-types.ts'
 import { hasCommand } from '#/system/command.ts'
 
 const GITHUB_CLI_TIMEOUT_MS = 5_000

@@ -5,10 +5,10 @@
 // Adding a new editor:
 // 1. Create src/main/system/<name>.ts implementing EditorBackend
 // 2. Register it in the `backends` map below
-// 3. Add the new id to EditorPref in shared/rpc.ts
+// 3. Add the new id to EditorPref in shared/api-types.ts
 // 4. Add i18n keys for the settings picker and dependencies overlay
 
-import type { EditorAppAvailability, EditorPref, ResolvedEditorApp } from '#/shared/rpc.ts'
+import type { EditorAppAvailability, EditorPref, ResolvedEditorApp } from '#/shared/api-types.ts'
 import { isVSCodeInstalled, openInVSCode } from '#/system/vscode.ts'
 import { isCursorInstalled, openInCursor } from '#/system/cursor.ts'
 import { isWindsurfInstalled, openInWindsurf } from '#/system/windsurf.ts'

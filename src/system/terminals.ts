@@ -5,10 +5,10 @@
 // Adding a new terminal:
 // 1. Create src/main/system/<name>.ts implementing TerminalBackend
 // 2. Register it in the `backends` map below
-// 3. Add the new id to TerminalPref in shared/rpc.ts
+// 3. Add the new id to TerminalPref in shared/api-types.ts
 // 4. Add i18n keys for the settings picker
 
-import type { ResolvedTerminalApp, TerminalAppAvailability, TerminalPref } from '#/shared/rpc.ts'
+import type { ResolvedTerminalApp, TerminalAppAvailability, TerminalPref } from '#/shared/api-types.ts'
 import { isGhosttyInstalled, openInGhostty } from '#/system/ghostty.ts'
 import { isAppleTerminalInstalled, openInAppleTerminal } from '#/system/apple-terminal.ts'
 

@@ -40,6 +40,15 @@ export async function getCurrentBranch(cwd: string, options?: { signal?: AbortSi
   }
 }
 
+export async function getHeadHash(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
+  if (options?.signal?.aborted) return ''
+  try {
+    return await git(cwd, ['rev-parse', '--short', 'HEAD'], { signal: options?.signal })
+  } catch {
+    return ''
+  }
+}
+
 export async function getDefaultBranch(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
   try {
     const ref = await git(cwd, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], { signal: options?.signal })
