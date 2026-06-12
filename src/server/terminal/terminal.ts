@@ -77,7 +77,11 @@ const broker = new TerminalRealtimeBroker({
   },
   onAttachmentDisconnected(clientId, attachmentId) {
     manager.setAttachmentConnected(clientId, attachmentId, false)
-    connectionState.scheduleOwnershipRelease(clientId, attachmentId, () => broker.attachmentIsConnected(clientId, attachmentId) === true)
+    connectionState.scheduleOwnershipRelease(
+      clientId,
+      attachmentId,
+      () => broker.attachmentIsConnected(clientId, attachmentId) === true,
+    )
   },
   onClientDisconnected(clientId) {
     connectionState.scheduleClientDisconnect(clientId, () => broker.hasClientSockets(clientId))
@@ -166,7 +170,10 @@ export function isValidTerminalClientId(value: unknown): value is string {
   return typeof value === 'string' && TERMINAL_CLIENT_ID_RE.test(value)
 }
 
-export async function attachServerTerminal(clientId: string, input: TerminalAttachInput): Promise<TerminalAttachResult> {
+export async function attachServerTerminal(
+  clientId: string,
+  input: TerminalAttachInput,
+): Promise<TerminalAttachResult> {
   if (
     !isValidTerminalClientId(clientId) ||
     !isValidTerminalSessionId(input?.sessionId) ||
@@ -186,7 +193,10 @@ export async function attachServerTerminal(clientId: string, input: TerminalAtta
   return result.ok ? await withSessionSnapshot(result) : result
 }
 
-export async function restartServerTerminal(clientId: string, input: TerminalRestartInput): Promise<TerminalAttachResult> {
+export async function restartServerTerminal(
+  clientId: string,
+  input: TerminalRestartInput,
+): Promise<TerminalAttachResult> {
   if (
     !isValidTerminalClientId(clientId) ||
     !isValidTerminalSessionId(input?.sessionId) ||
@@ -253,8 +263,12 @@ export function resizeServerTerminal(clientId: string, input: TerminalResizeInpu
 
 export function closeServerTerminal(clientId: string, input: TerminalSessionInput): TerminalMutationResult {
   if (!isValidTerminalClientId(clientId)) return false
-  const repoRoot = isValidTerminalSessionId(input?.sessionId) ? manager.getSession(clientId, input.sessionId)?.scope : undefined
-  const closed = isValidTerminalSessionId(input?.sessionId) ? manager.closeOwnedSession(clientId, input.sessionId) : false
+  const repoRoot = isValidTerminalSessionId(input?.sessionId)
+    ? manager.getSession(clientId, input.sessionId)?.scope
+    : undefined
+  const closed = isValidTerminalSessionId(input?.sessionId)
+    ? manager.closeOwnedSession(clientId, input.sessionId)
+    : false
   if (closed && repoRoot) broker.broadcastGlobal({ type: 'sessions-changed', repoRoot })
   return closed
 }
@@ -282,7 +296,10 @@ export function notifyServerTerminalBell(_clientId: string, input: TerminalNotif
   return isValidTerminalNotifyBellInput(input)
 }
 
-export async function listServerTerminalSessions(clientId: string, repoRoot: string): Promise<TerminalSessionSummary[]> {
+export async function listServerTerminalSessions(
+  clientId: string,
+  repoRoot: string,
+): Promise<TerminalSessionSummary[]> {
   if (!isValidTerminalClientId(clientId)) return []
   if (!isValidRepoLocator(repoRoot)) return []
   return await manager.listSessions(repoRoot)
@@ -433,7 +450,9 @@ function shouldPauseRealtimeRequest(action: TerminalSocketRequestAction): boolea
 class BufferedTerminalSocket implements TerminalRealtimeSocket {
   private paused = 0
   private active = true
-  private readonly buffer: Array<{ type: 'send'; payload: string } | { type: 'close'; code?: number; reason?: string }> = []
+  private readonly buffer: Array<
+    { type: 'send'; payload: string } | { type: 'close'; code?: number; reason?: string }
+  > = []
 
   private readonly socket: TerminalRealtimeSocket
   constructor(socket: TerminalRealtimeSocket) {

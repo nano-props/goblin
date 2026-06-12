@@ -1,11 +1,7 @@
 import { forwardRef, type ComponentPropsWithoutRef, type ReactNode } from 'react'
 import { CopyButton } from '#/web/components/CopyButton.tsx'
 import { cn } from '#/web/lib/cn.ts'
-import {
-  STATUS_TONE_CHIP_CLASS,
-  STATUS_TONE_TEXT_CLASS,
-  type StatusTone,
-} from '#/web/components/ui/status-tones.ts'
+import { STATUS_TONE_CHIP_CLASS, STATUS_TONE_TEXT_CLASS, type StatusTone } from '#/web/components/ui/status-tones.ts'
 export type Tone = StatusTone
 export type StatusRowValueLayout = 'inline' | 'fill' | 'chips'
 
@@ -31,15 +27,7 @@ export const StatusChip = forwardRef<HTMLSpanElement, StatusChipProps>(function 
   ref,
 ) {
   return (
-    <span
-      ref={ref}
-      {...props}
-      className={cn(
-        STATUS_CHIP_CLASS,
-        STATUS_TONE_CHIP_CLASS[tone],
-        className,
-      )}
-    >
+    <span ref={ref} {...props} className={cn(STATUS_CHIP_CLASS, STATUS_TONE_CHIP_CLASS[tone], className)}>
       {children}
     </span>
   )

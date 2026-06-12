@@ -91,14 +91,20 @@ describe('RepoTabTooltipLayer', () => {
 
   test('uses the provided tablist element as the tooltip root without an extra wrapper', () => {
     render(
-      <RepoTabTooltipLayer repos={[repo('goblin', '/Users/tester/Developer/goblin', [])]} className="flex h-full" role="tablist">
+      <RepoTabTooltipLayer
+        repos={[repo('goblin', '/Users/tester/Developer/goblin', [])]}
+        className="flex h-full"
+        role="tablist"
+      >
         <div data-repo-tab-tooltip-id="/Users/tester/Developer/goblin">goblin</div>
       </RepoTabTooltipLayer>,
     )
 
     expect(container?.firstElementChild?.getAttribute('role')).toBe('tablist')
     expect(container?.firstElementChild?.className).toContain('h-full')
-    expect(container?.firstElementChild?.querySelector('[data-repo-tab-tooltip-id="/Users/tester/Developer/goblin"]')).not.toBeNull()
+    expect(
+      container?.firstElementChild?.querySelector('[data-repo-tab-tooltip-id="/Users/tester/Developer/goblin"]'),
+    ).not.toBeNull()
   })
 
   test('keeps the tooltip open when the same hovered item is updated in place', async () => {

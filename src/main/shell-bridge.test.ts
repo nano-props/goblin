@@ -8,19 +8,14 @@ import {
   SHELL_OPEN_SETTINGS_WINDOW_CHANNEL,
 } from '#/shared/ipc-channels.ts'
 
-const {
-  ipcHandlers,
-  browserWindowFromWebContents,
-  showOpenDialog,
-  sendRendererEffectIntent,
-  activateMainWindow,
-} = vi.hoisted(() => ({
-  ipcHandlers: new Map<string, (_event: unknown, input: any) => unknown>(),
-  browserWindowFromWebContents: vi.fn(),
-  showOpenDialog: vi.fn(),
-  sendRendererEffectIntent: vi.fn(),
-  activateMainWindow: vi.fn(),
-}))
+const { ipcHandlers, browserWindowFromWebContents, showOpenDialog, sendRendererEffectIntent, activateMainWindow } =
+  vi.hoisted(() => ({
+    ipcHandlers: new Map<string, (_event: unknown, input: any) => unknown>(),
+    browserWindowFromWebContents: vi.fn(),
+    showOpenDialog: vi.fn(),
+    sendRendererEffectIntent: vi.fn(),
+    activateMainWindow: vi.fn(),
+  }))
 
 vi.mock('electron', () => ({
   ipcMain: {

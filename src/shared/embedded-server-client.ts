@@ -45,6 +45,7 @@ export async function invokeEmbeddedServerRpc<T>(
 ): Promise<T> {
   const route = getEmbeddedServerRpcRoute(path)
   if (!route) throw new Error(`Unsupported embedded server route: ${path}`)
-  if (route.method === 'GET') return await requestEmbeddedServerJson<T>(runtime, route.route, { method: 'GET', signal: options?.signal })
+  if (route.method === 'GET')
+    return await requestEmbeddedServerJson<T>(runtime, route.route, { method: 'GET', signal: options?.signal })
   return await postEmbeddedServerJson<T>(runtime, route.route, input ?? {}, options)
 }

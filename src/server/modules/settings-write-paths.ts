@@ -26,7 +26,7 @@ export async function applyServerSettingsPrefsWrite(
   body: unknown,
   options: { acceptLanguage?: string; signal: AbortSignal },
 ): Promise<SettingsPrefsUpdateResponse> {
-  const patch = (((body as { settings?: unknown } | null)?.settings ?? {}) as Record<string, unknown>)
+  const patch = ((body as { settings?: unknown } | null)?.settings ?? {}) as Record<string, unknown>
   const settings = await updateServerSettingsPrefs(patch)
   publishSettingsInvalidation(settingsInvalidationScopesForPrefsPatch(patch))
   return {

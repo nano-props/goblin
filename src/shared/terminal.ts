@@ -253,7 +253,10 @@ const TERMINAL_SOCKET_ACTIONS = [
   'session-snapshot',
   'reorder',
 ] as const satisfies TerminalSocketRequestAction[]
-const TERMINAL_CONNECTED_CONTROLLER_STATUS_VALUES = ['connected', 'grace'] satisfies Exclude<TerminalControllerStatus, 'none'>[]
+const TERMINAL_CONNECTED_CONTROLLER_STATUS_VALUES = ['connected', 'grace'] satisfies Exclude<
+  TerminalControllerStatus,
+  'none'
+>[]
 const TerminalSessionIdSchema = v.pipe(v.string(), v.regex(TERMINAL_SESSION_ID_RE))
 const TerminalAttachmentIdSchema = v.pipe(v.string(), v.regex(TERMINAL_ATTACHMENT_ID_RE))
 const TerminalRequestIdSchema = v.pipe(v.string(), v.regex(TERMINAL_REQUEST_ID_RE))
@@ -457,10 +460,15 @@ export function isValidTerminalNotifyBellInput(value: unknown): value is Termina
   if (!value || typeof value !== 'object') return false
   const { title, body, key, repoRoot } = value as { title?: unknown; body?: unknown; key?: unknown; repoRoot?: unknown }
   return (
-    typeof title === 'string' && title.length > 0 && title.length <= 200 &&
-    typeof body === 'string' && body.length > 0 && body.length <= 500 &&
+    typeof title === 'string' &&
+    title.length > 0 &&
+    title.length <= 200 &&
+    typeof body === 'string' &&
+    body.length > 0 &&
+    body.length <= 500 &&
     (key === undefined || (typeof key === 'string' && key.length > 0)) &&
-    typeof repoRoot === 'string' && repoRoot.length > 0
+    typeof repoRoot === 'string' &&
+    repoRoot.length > 0
   )
 }
 
@@ -481,7 +489,7 @@ export function normalizeTerminalRealtimeMessage(value: unknown): TerminalRealti
 
 export function normalizeTerminalSocketServerMessage(value: unknown): TerminalSocketServerMessage | null {
   const parsed = v.safeParse(TerminalSocketServerMessageSchema, value)
-  return parsed.success ? parsed.output as TerminalSocketServerMessage : null
+  return parsed.success ? (parsed.output as TerminalSocketServerMessage) : null
 }
 
 export function normalizeTerminalClientMessage(value: unknown): TerminalClientMessage | null {

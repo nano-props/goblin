@@ -17,7 +17,11 @@ export const FIELD_SEP = '\x1f'
  * Fields, in order: refname:short, objectname:short, subject,
  * authordate:iso-strict, authorname, upstream:short, upstream:track.
  */
-export function parseBranches(output: string, currentBranch: string, worktrees: WorktreeInfo[] = []): BranchSnapshotInfo[] {
+export function parseBranches(
+  output: string,
+  currentBranch: string,
+  worktrees: WorktreeInfo[] = [],
+): BranchSnapshotInfo[] {
   if (!output) return []
 
   const worktreeMap = new Map<

@@ -29,7 +29,12 @@ export interface TerminalRenderState {
 }
 
 const headlessModule = ('default' in xtermHeadlessImport ? xtermHeadlessImport.default : xtermHeadlessImport) as {
-  Terminal: new (options?: { cols?: number; rows?: number; scrollback?: number; allowProposedApi?: boolean }) => HeadlessTerminalLike
+  Terminal: new (options?: {
+    cols?: number
+    rows?: number
+    scrollback?: number
+    allowProposedApi?: boolean
+  }) => HeadlessTerminalLike
 }
 const { Terminal: HeadlessTerminal } = headlessModule
 
@@ -59,13 +64,15 @@ export function bindTerminalRenderTitle(
   state: TerminalRenderState,
   onTitle: (canonicalTitle: string | null) => void,
 ): { dispose(): void } {
-  return state.model?.term.onTitleChange((title) => {
-    state.titleEventVersion += 1
-    const nextCanonicalTitle = normalizeTerminalTitle(title)
-    if (state.canonicalTitle === nextCanonicalTitle) return
-    state.canonicalTitle = nextCanonicalTitle
-    onTitle(nextCanonicalTitle)
-  }) ?? { dispose() {} }
+  return (
+    state.model?.term.onTitleChange((title) => {
+      state.titleEventVersion += 1
+      const nextCanonicalTitle = normalizeTerminalTitle(title)
+      if (state.canonicalTitle === nextCanonicalTitle) return
+      state.canonicalTitle = nextCanonicalTitle
+      onTitle(nextCanonicalTitle)
+    }) ?? { dispose() {} }
+  )
 }
 
 export function appendTerminalReplayData(state: TerminalRenderState, data: string): number {
@@ -186,8 +193,14 @@ function stripLeadingIncompleteAnsi(s: string): string {
     let i = 2
     while (i < s.length) {
       const c = s.charCodeAt(i)
-      if (c >= 0x30 && c <= 0x3f) { i++; continue }
-      if (c >= 0x20 && c <= 0x2f) { i++; continue }
+      if (c >= 0x30 && c <= 0x3f) {
+        i++
+        continue
+      }
+      if (c >= 0x20 && c <= 0x2f) {
+        i++
+        continue
+      }
       if (c >= 0x40 && c <= 0x7e) return s // complete CSI
       break // incomplete
     }

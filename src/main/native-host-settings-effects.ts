@@ -5,7 +5,11 @@ import { syncRecentRepos } from '#/main/recent-repos.ts'
 import { setSettingsGlobalShortcutState } from '#/main/settings-server-client.ts'
 import { syncGlobalShortcuts } from '#/main/shortcuts.ts'
 import { applyThemeSettingsProjection } from '#/main/theme.ts'
-import type { NativeShellProjection, NativeSettingsProjectionPatch, NativeSettingsProjectionState } from '#/shared/rpc.ts'
+import type {
+  NativeShellProjection,
+  NativeSettingsProjectionPatch,
+  NativeSettingsProjectionState,
+} from '#/shared/rpc.ts'
 
 // Native-host application of server-owned settings changes.
 //
@@ -35,7 +39,8 @@ function menuStatePatchFromSettingsProjection(input: {
   } = {}
   if (input.patch.lang !== undefined) menuStatePatch.langPref = input.settings.lang
   if (input.patch.shortcutsDisabled !== undefined) menuStatePatch.shortcutsDisabled = input.settings.shortcutsDisabled
-  if (input.patch.swapCloseShortcuts !== undefined) menuStatePatch.swapCloseShortcuts = input.settings.swapCloseShortcuts
+  if (input.patch.swapCloseShortcuts !== undefined)
+    menuStatePatch.swapCloseShortcuts = input.settings.swapCloseShortcuts
   return menuStatePatch
 }
 

@@ -1,9 +1,11 @@
-import {
-  runRemoteCommand,
-  type RemoteCommandKind,
-  type RemoteCommandResult,
-} from '#/system/ssh/commands.ts'
-import type { RemoteDiagnosticCategory, RemoteDiagnosticStage, RemoteDiagnosticStageName, RemoteDiagnosticsResult, RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import { runRemoteCommand, type RemoteCommandKind, type RemoteCommandResult } from '#/system/ssh/commands.ts'
+import type {
+  RemoteDiagnosticCategory,
+  RemoteDiagnosticStage,
+  RemoteDiagnosticStageName,
+  RemoteDiagnosticsResult,
+  RemoteRepoTarget,
+} from '#/shared/remote-repo.ts'
 
 type DiagnosticsRunner = (
   command: RemoteCommandKind,
@@ -65,7 +67,8 @@ export function classifySshFailure(result: RemoteCommandResult): RemoteDiagnosti
   if (result.message === 'cancelled') return 'cancelled'
   if (result.timedOut || result.message === 'timeout') return 'timeout'
   const text = `${result.stderr}\n${result.stdout}\n${result.message ?? ''}`.toLowerCase()
-  if (text.includes('host key verification failed') || text.includes('remote host identification has changed')) return 'host-key'
+  if (text.includes('host key verification failed') || text.includes('remote host identification has changed'))
+    return 'host-key'
   if (text.includes('permission denied') || text.includes('authentication failed')) return 'auth-failed'
   if (
     text.includes('kex_exchange_identification') ||
@@ -106,5 +109,10 @@ function createStages(): RemoteDiagnosticStage[] {
 }
 
 function detailsFromResult(result: RemoteCommandResult): string | undefined {
-  return [result.stderr, result.stdout].map((part) => part.trim()).filter(Boolean).join('\n') || undefined
+  return (
+    [result.stderr, result.stdout]
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join('\n') || undefined
+  )
 }

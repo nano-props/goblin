@@ -55,11 +55,7 @@ export function createRefreshSyncHelpers(set: ReposSet, get: ReposGet) {
     })
   }
 
-  async function attemptFetch(
-    id: string,
-    token: number,
-    sourceToken?: string,
-  ): Promise<ExecResult | null> {
+  async function attemptFetch(id: string, token: number, sourceToken?: string): Promise<ExecResult | null> {
     let repo = repoIfFresh(get, id, token)
     if (!repo || !shouldAttemptFetch(repo, token)) return null
     if (!canStartRemoteFetch(repo)) {

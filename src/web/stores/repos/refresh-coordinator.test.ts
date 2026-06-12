@@ -97,9 +97,7 @@ describe('repo refresh coordinator', () => {
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
     beginRepoInvalidationSource('repo_branch_1')
 
-    expect(
-      repoInvalidationRefreshDisposition({ sourceToken: 'repo_branch_1' }),
-    ).toBe('suppress')
+    expect(repoInvalidationRefreshDisposition({ sourceToken: 'repo_branch_1' })).toBe('suppress')
   })
 
   test('suppresses repo invalidations from a recently settled local source token', () => {
@@ -108,9 +106,7 @@ describe('repo refresh coordinator', () => {
     beginRepoInvalidationSource('repo_manual_1')
     settleRepoInvalidationSource('repo_manual_1')
 
-    expect(
-      repoInvalidationRefreshDisposition({ sourceToken: 'repo_manual_1' }),
-    ).toBe('suppress')
+    expect(repoInvalidationRefreshDisposition({ sourceToken: 'repo_manual_1' })).toBe('suppress')
   })
 
   test('refreshes repo invalidations from unrelated sources', () => {
@@ -118,9 +114,7 @@ describe('repo refresh coordinator', () => {
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
     beginRepoInvalidationSource('repo_manual_2')
 
-    expect(
-      repoInvalidationRefreshDisposition({ sourceToken: 'repo_manual_other' }),
-    ).toBe('refresh')
+    expect(repoInvalidationRefreshDisposition({ sourceToken: 'repo_manual_other' })).toBe('refresh')
   })
 
   test('does not change invalidation behavior when the coordinated core refresh throws', async () => {
@@ -133,8 +127,6 @@ describe('repo refresh coordinator', () => {
       runRepoRefreshIntent(get, { kind: 'core-data-changed', reason: 'branch-action', id: '/repo', token: 13 }),
     ).rejects.toThrow('boom')
 
-    expect(
-      repoInvalidationRefreshDisposition({}),
-    ).toBe('refresh')
+    expect(repoInvalidationRefreshDisposition({})).toBe('refresh')
   })
 })

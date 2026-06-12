@@ -15,10 +15,12 @@ describe('app lifecycle', () => {
 
   test('marks the app as quitting from the low-level native intent subscription', async () => {
     const listeners: Array<(event: { type: string }) => void> = []
-    ;(window.goblinNative.onIntent as ReturnType<typeof vi.fn>).mockImplementation((cb: (event: { type: string }) => void) => {
-      listeners.push(cb)
-      return () => {}
-    })
+    ;(window.goblinNative.onIntent as ReturnType<typeof vi.fn>).mockImplementation(
+      (cb: (event: { type: string }) => void) => {
+        listeners.push(cb)
+        return () => {}
+      },
+    )
     const { isAppQuitting, subscribeAppQuitting } = await import('#/web/app-lifecycle.ts')
     const onQuit = vi.fn()
     subscribeAppQuitting(onQuit)

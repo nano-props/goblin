@@ -147,7 +147,9 @@ function isAbortError(err: unknown): boolean {
 function ghErrorText(err: unknown): string {
   if (!err || typeof err !== 'object') return String(err)
   const parts = [
-    typeof (err as { shortMessage?: unknown }).shortMessage === 'string' ? (err as { shortMessage: string }).shortMessage : '',
+    typeof (err as { shortMessage?: unknown }).shortMessage === 'string'
+      ? (err as { shortMessage: string }).shortMessage
+      : '',
     typeof (err as { stderr?: unknown }).stderr === 'string' ? (err as { stderr: string }).stderr : '',
     typeof (err as { stdout?: unknown }).stdout === 'string' ? (err as { stdout: string }).stdout : '',
     err instanceof Error ? err.message : String(err),
@@ -239,9 +241,15 @@ async function ghGraphqlRequest<TData>(
     if (isAbortError(err)) {
       return {
         ok: false,
-        error: graphqlError(repo, operationName, 'TIMEOUT', err instanceof Error ? err.message : 'The operation was aborted.', {
-          retryable: true,
-        }),
+        error: graphqlError(
+          repo,
+          operationName,
+          'TIMEOUT',
+          err instanceof Error ? err.message : 'The operation was aborted.',
+          {
+            retryable: true,
+          },
+        ),
       }
     }
     const message = ghErrorText(err)

@@ -1,7 +1,10 @@
 import type { SessionState } from '#/shared/rpc.ts'
 import type { RestorableWorkspaceState, ReposStore } from '#/web/stores/repos/types.ts'
 import { persistedOpenWorkspaceEntries } from '#/web/open-workspace-state.ts'
-import { persistedActiveRepoIdForSession, persistedSelectedTerminalByWorktreeForSession } from '#/web/session-persistence-state.ts'
+import {
+  persistedActiveRepoIdForSession,
+  persistedSelectedTerminalByWorktreeForSession,
+} from '#/web/session-persistence-state.ts'
 
 export function sessionStateFromRestorableWorkspaceState(input: {
   repos: ReposStore['repos']
@@ -30,7 +33,12 @@ export function restoreRestorableWorkspaceStateFromSession(
   activeId: string | null = session.activeRepo,
 ): Pick<
   RestorableWorkspaceState,
-  'activeId' | 'detailCollapsed' | 'detailFocusMode' | 'workspaceLayout' | 'detailPaneSizes' | 'selectedTerminalByWorktree'
+  | 'activeId'
+  | 'detailCollapsed'
+  | 'detailFocusMode'
+  | 'workspaceLayout'
+  | 'detailPaneSizes'
+  | 'selectedTerminalByWorktree'
 > {
   return {
     activeId,

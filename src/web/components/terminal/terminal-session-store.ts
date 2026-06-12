@@ -1,6 +1,11 @@
 import { useCallback, useSyncExternalStore } from 'react'
 import { useTerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
-import type { WorktreeTerminalSnapshot, TerminalSnapshot, TerminalDescriptor, TerminalSessionSummary } from '#/web/components/terminal/types.ts'
+import type {
+  WorktreeTerminalSnapshot,
+  TerminalSnapshot,
+  TerminalDescriptor,
+  TerminalSessionSummary,
+} from '#/web/components/terminal/types.ts'
 
 const EMPTY_WORKTREE_TERMINAL_SNAPSHOT: WorktreeTerminalSnapshot = {
   worktreeTerminalKey: '',

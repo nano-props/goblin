@@ -84,7 +84,12 @@ function compactCommand(value: string): string {
 }
 
 function basename(value: string): string {
-  return value.replace(/[\\/]+$/, '').split(/[\\/]/).at(-1) || value
+  return (
+    value
+      .replace(/[\\/]+$/, '')
+      .split(/[\\/]/)
+      .at(-1) || value
+  )
 }
 
 function normalizeTitle(value: string): string {

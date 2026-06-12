@@ -3,10 +3,7 @@ import { emptyRepo } from '#/web/stores/repos/helpers.ts'
 import { restoreRepoProjectionFromSnapshot } from '#/web/stores/repos/persistence.ts'
 import { disposeRepoRuntime } from '#/web/stores/repos/runtime.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
-import {
-  abortRepositoryOperation,
-  probeRepository,
-} from '#/web/repo-client.ts'
+import { abortRepositoryOperation, probeRepository } from '#/web/repo-client.ts'
 import { resolveRemoteRepositoryTarget } from '#/web/remote-client.ts'
 import { recordRecentRepo } from '#/web/settings-write-paths.ts'
 import type { OpenRepoResult, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
@@ -150,7 +147,10 @@ export function addUnavailableRepo(
 ): Pick<ReposStore, 'repos' | 'order'> & { changed: boolean } {
   if (s.repos[id]) return { repos: s.repos, order: s.order, changed: false }
   const cached = s.restorableRepoCache[id]
-  const repo = restoreRepoProjectionFromSnapshot(emptyRepo(id, cached?.name || target?.displayName || lastPathSegment(id)), cached)
+  const repo = restoreRepoProjectionFromSnapshot(
+    emptyRepo(id, cached?.name || target?.displayName || lastPathSegment(id)),
+    cached,
+  )
   if (target) repo.remote.target = target
   repo.availability = { phase: 'unavailable', reason, checkedAt: Date.now() }
   return {
@@ -184,7 +184,10 @@ function applyWorkspaceOpen(
   return { repos, order, changed, id: repo.id }
 }
 
-export function createRuntimeRepoLifecycleActions(set: ReposSet, get: ReposGet): Pick<ReposStore, 'ensureWorkspaceOpen' | 'closeRepo'> {
+export function createRuntimeRepoLifecycleActions(
+  set: ReposSet,
+  get: ReposGet,
+): Pick<ReposStore, 'ensureWorkspaceOpen' | 'closeRepo'> {
   return {
     async ensureWorkspaceOpen(pathOrEntry: string | RepoSessionEntry): Promise<OpenRepoResult> {
       const entry = sessionEntryFromInput(pathOrEntry)

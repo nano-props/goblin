@@ -84,8 +84,7 @@ function findNextDueRepo(now: number): string | null {
     const repoId = state.repoIds[index]
     if (!repoId) continue
     const lastFetchAt = state.lastFetchAtByRepo[repoId]
-    const nextIntervalAt =
-      lastFetchAt === null || lastFetchAt === undefined ? now : lastFetchAt + state.intervalMs
+    const nextIntervalAt = lastFetchAt === null || lastFetchAt === undefined ? now : lastFetchAt + state.intervalMs
     const backoffUntil = state.backoffUntilByRepo[repoId] ?? null
     const nextEligibleAt = Math.max(nextIntervalAt, backoffUntil ?? 0)
     if (now >= nextEligibleAt) {
@@ -146,10 +145,7 @@ async function runScheduledFetch(generation: number): Promise<void> {
     const fetchDuration = Date.now() - fetchStart
     // Log slow fetchs for performance monitoring
     if (fetchDuration > 5000) {
-      backgroundSyncLogger.warn(
-        { repoId, fetchDuration, intervalMs: state.intervalMs },
-        'background fetch slow',
-      )
+      backgroundSyncLogger.warn({ repoId, fetchDuration, intervalMs: state.intervalMs }, 'background fetch slow')
     }
     if (result.ok) {
       clearRepoBackoff(repoId)

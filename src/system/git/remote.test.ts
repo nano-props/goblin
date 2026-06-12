@@ -36,7 +36,9 @@ describe('resolvePushTargetForRemotes', () => {
   const fork = remote('fork')
 
   test('prefers an existing upstream remote and branch', () => {
-    expect(resolvePushTargetForRemotes([origin, fork], { remote: 'fork', branch: 'topic/feature-test' }, 'feature/test')).toEqual({
+    expect(
+      resolvePushTargetForRemotes([origin, fork], { remote: 'fork', branch: 'topic/feature-test' }, 'feature/test'),
+    ).toEqual({
       remote: 'fork',
       branch: 'topic/feature-test',
       setUpstream: false,
@@ -74,7 +76,9 @@ describe('resolvePushTargetForRemotes', () => {
   })
 
   test('falls back when the configured upstream remote no longer exists', () => {
-    expect(resolvePushTargetForRemotes([origin], { remote: 'fork', branch: 'topic/feature-test' }, 'feature/test')).toEqual({
+    expect(
+      resolvePushTargetForRemotes([origin], { remote: 'fork', branch: 'topic/feature-test' }, 'feature/test'),
+    ).toEqual({
       remote: 'origin',
       branch: 'feature/test',
       setUpstream: true,

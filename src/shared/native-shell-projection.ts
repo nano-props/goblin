@@ -80,10 +80,15 @@ export const NativeShellProjectionSchema = v.pipe(
     ),
     recentRepos: v.optional(NativeRecentReposProjectionSchema),
   }),
-  v.check((input) => input.prefs !== undefined || input.recentRepos !== undefined, 'Missing native shell projection payload'),
+  v.check(
+    (input) => input.prefs !== undefined || input.recentRepos !== undefined,
+    'Missing native shell projection payload',
+  ),
 )
 
-export function pickNativeSettingsProjectionPatch(settings: Partial<SettingsPrefs>): NativeSettingsProjectionPatch | null {
+export function pickNativeSettingsProjectionPatch(
+  settings: Partial<SettingsPrefs>,
+): NativeSettingsProjectionPatch | null {
   const patch: NativeSettingsProjectionPatch = {}
   if (settings.lang !== undefined) patch.lang = settings.lang
   if (settings.theme !== undefined) patch.theme = settings.theme

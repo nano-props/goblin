@@ -35,7 +35,10 @@ function isDarwin(): boolean {
   return process.platform === 'darwin'
 }
 
-export function resolveTerminalApp(pref: TerminalPref, availability: TerminalAppAvailability): ResolvedTerminalApp | null {
+export function resolveTerminalApp(
+  pref: TerminalPref,
+  availability: TerminalAppAvailability,
+): ResolvedTerminalApp | null {
   if (pref !== 'auto') {
     return availability[pref] ? pref : null
   }
@@ -59,7 +62,10 @@ export async function getTerminalAppAvailability(signal?: AbortSignal): Promise<
 }
 
 /** Open `path` in the terminal selected by `pref`. */
-export async function openInPreferredTerminal(path: string, pref: TerminalPref): Promise<{ ok: boolean; message: string }> {
+export async function openInPreferredTerminal(
+  path: string,
+  pref: TerminalPref,
+): Promise<{ ok: boolean; message: string }> {
   const resolved = resolveTerminalApp(pref, await getTerminalAppAvailability())
   return resolved
     ? backends[resolved].open(path)

@@ -2,7 +2,12 @@ import { beforeEach, describe, expect, test } from 'vitest'
 import { replaceRepo } from '#/web/stores/repos/helpers.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { DetailTab, RepoState } from '#/web/stores/repos/types.ts'
-import { createRepoBranch as branch, installGoblinTestBridge, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
+import {
+  createRepoBranch as branch,
+  installGoblinTestBridge,
+  resetReposStore,
+  seedRepoState,
+} from '#/web/stores/repos/test-utils.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
 import { DEFAULT_DETAIL_PANE_SIZES } from '#/shared/workspace-layout.ts'
 const REPO_ID = '/tmp/gbl-selection-test-repo'

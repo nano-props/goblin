@@ -28,7 +28,12 @@ describe('workspace commands', () => {
     })
     const createTerminal = vi.fn(async () => 'terminal-1')
     setTerminalSessionCommandBridge({
-      worktreeSnapshot: () => ({ worktreeTerminalKey: `${REPO_ID}\0${WORKTREE_PATH}`, selectedDescriptor: null, sessions: [], count: 0 }),
+      worktreeSnapshot: () => ({
+        worktreeTerminalKey: `${REPO_ID}\0${WORKTREE_PATH}`,
+        selectedDescriptor: null,
+        sessions: [],
+        count: 0,
+      }),
       createTerminal,
       selectTerminal: vi.fn(),
     })

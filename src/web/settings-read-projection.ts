@@ -1,9 +1,17 @@
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
 import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
 import { externalAppsQueryKey, settingsSnapshotQueryKey, useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
-import type { ExternalAppsSnapshot, RuntimeRecentReposState, RuntimeSettingsSnapshot, SettingsSnapshot } from '#/shared/rpc.ts'
+import type {
+  ExternalAppsSnapshot,
+  RuntimeRecentReposState,
+  RuntimeSettingsSnapshot,
+  SettingsSnapshot,
+} from '#/shared/rpc.ts'
 import type { EditorPref, TerminalPref } from '#/shared/rpc.ts'
-import { runtimeRecentReposStateFromSettingsSnapshot, runtimeSettingsSnapshotFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
+import {
+  runtimeRecentReposStateFromSettingsSnapshot,
+  runtimeSettingsSnapshotFromSettingsSnapshot,
+} from '#/shared/settings-snapshot.ts'
 
 export function fallbackInitialSettings() {
   return getInitialBootstrap().initialSettings

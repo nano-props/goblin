@@ -10,7 +10,12 @@
 import { BrowserWindow, app, screen } from 'electron'
 import { loadWindowState, setWindowBounds, type WindowBounds } from '#/main/window-state.ts'
 import { attachRendererSurfaceWindow, detachRendererSurfaceWindow } from '#/main/renderer-surface.ts'
-import { defaultTitleBarStyle, macTrafficLightPosition, supportsTitleBarOverlay, titleBarOverlayForTheme } from '#/main/window-chrome.ts'
+import {
+  defaultTitleBarStyle,
+  macTrafficLightPosition,
+  supportsTitleBarOverlay,
+  titleBarOverlayForTheme,
+} from '#/main/window-chrome.ts'
 import { getMainWindow as getRegisteredMainWindow } from '#/main/window-registry.ts'
 import {
   allowRendererWindowEntryUrl,

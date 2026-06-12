@@ -5,7 +5,17 @@ import { useT } from '#/web/stores/i18n.ts'
 import { SETTINGS_PAGE_CONFIG, SETTINGS_PAGES } from '#/shared/settings-pages.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import { GitHubMark } from '#/web/components/GitHubMark.tsx'
-import { AppWindow, Bell, Globe, Info, Keyboard, Settings2, Shield, SlidersHorizontal, type LucideIcon } from 'lucide-react'
+import {
+  AppWindow,
+  Bell,
+  Globe,
+  Info,
+  Keyboard,
+  Settings2,
+  Shield,
+  SlidersHorizontal,
+  type LucideIcon,
+} from 'lucide-react'
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
 const SETTINGS_PAGE_ICONS = {
   general: Settings2,

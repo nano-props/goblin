@@ -12,10 +12,7 @@ import {
   startPullRequestResource,
 } from '#/web/stores/repos/resources.ts'
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
-import {
-  stripBranchWorktreeMetadata,
-  worktreeStatesFromBranches,
-} from '#/web/stores/repos/worktree-state.ts'
+import { stripBranchWorktreeMetadata, worktreeStatesFromBranches } from '#/web/stores/repos/worktree-state.ts'
 import { branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import type { RepoSnapshot } from '#/shared/rpc.ts'
 import type { RepoState, ReposGet } from '#/web/stores/repos/types.ts'
@@ -85,7 +82,11 @@ export function applySnapshotToRepoProjection(r: RepoState, snap: RepoSnapshot, 
   const branches = stripBranchWorktreeMetadata(branchesWithSnapshotWorktreeMetadata)
   r.data.branches = branches
   r.data.currentBranch = snap.current
-  r.data.worktreesByPath = worktreeStatesFromBranches(branchesWithSnapshotWorktreeMetadata, r.data.worktreesByPath, r.data.status)
+  r.data.worktreesByPath = worktreeStatesFromBranches(
+    branchesWithSnapshotWorktreeMetadata,
+    r.data.worktreesByPath,
+    r.data.status,
+  )
   r.resources.pullRequestsByBranch = Object.fromEntries(
     Object.entries(r.resources.pullRequestsByBranch).filter(([branch]) => validBranches.has(branch)),
   )
@@ -142,7 +143,8 @@ export function applyPullRequestEntries(
   for (const branch of r.data.branches) {
     const pullRequest = byBranch.get(branch.name)
     if (pullRequest) {
-      if (branchPullRequestBelongsToBranch(branch, pullRequest)) branch.pullRequest = mergePullRequest(branch, pullRequest, mode)
+      if (branchPullRequestBelongsToBranch(branch, pullRequest))
+        branch.pullRequest = mergePullRequest(branch, pullRequest, mode)
       else branch.pullRequest = undefined
       continue
     }
@@ -151,7 +153,12 @@ export function applyPullRequestEntries(
 }
 
 export function shouldAttemptFetch(repo: RepoState | null | undefined, token: number): boolean {
-  return !!repo && repo.instanceToken === token && repo.remote.hasRemotes === true && repo.availability.phase !== 'unavailable'
+  return (
+    !!repo &&
+    repo.instanceToken === token &&
+    repo.remote.hasRemotes === true &&
+    repo.availability.phase !== 'unavailable'
+  )
 }
 
 export function repoIfFresh(get: ReposGet, id: string, token: number): RepoState | null {
@@ -221,7 +228,9 @@ export function applyPullRequestRefreshStaleState(
   operationId: number,
 ): void {
   const existingBranches = existingBranchNames(r)
-  const currentBranches = branchNames.filter((branch) => r.operations.pullRequestsByBranch[branch]?.operationId === operationId)
+  const currentBranches = branchNames.filter(
+    (branch) => r.operations.pullRequestsByBranch[branch]?.operationId === operationId,
+  )
   finishPullRequestBranchResources(r, currentBranches, existingBranches, (resource) =>
     finishPullRequestResourceUnavailable(resource, mode),
   )

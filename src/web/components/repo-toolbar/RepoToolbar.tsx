@@ -41,11 +41,7 @@ export function RepoToolbar({ repoId }: Props) {
   return (
     <Toolbar variant="repo" className="justify-between gap-3">
       <div className="flex min-w-0 flex-1 items-center gap-2">
-        {focusMode ? (
-          <FocusBranchControls repoId={repoId} />
-        ) : (
-          <BranchFilterControls repoId={repoId} />
-        )}
+        {focusMode ? <FocusBranchControls repoId={repoId} /> : <BranchFilterControls repoId={repoId} />}
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <RepoToolbarActions repoId={repoId} />
@@ -94,21 +90,14 @@ function FocusBranchControls({ repoId }: Props) {
 
   return (
     <div className="flex min-w-0 items-center gap-2">
-      <BranchSelector
-        repoId={repoId}
-        branches={branches}
-        selectedBranch={selectedBranch}
-        navigation={navigation}
-      />
+      <BranchSelector repoId={repoId} branches={branches} selectedBranch={selectedBranch} navigation={navigation} />
       {selectedBranchData && summaryRepo && (
         <>
           <div aria-hidden="true" className="mx-1 h-4 border-l border-separator/70" />
           <BranchSummaryInline repo={summaryRepo} branch={selectedBranchData} className="min-w-0 flex-1" />
         </>
       )}
-      {selectedBranchData && (
-        <FocusBranchActions repoId={repoId} branch={selectedBranchData} />
-      )}
+      {selectedBranchData && <FocusBranchActions repoId={repoId} branch={selectedBranchData} />}
     </div>
   )
 }
@@ -232,7 +221,9 @@ function BranchSelector({
           aria-label={t('branches.switch')}
           title={t('branches.switch')}
         >
-          <span>{current} / {branches.length}</span>
+          <span>
+            {current} / {branches.length}
+          </span>
           <ChevronDown className="size-3" />
         </Button>
       </DropdownMenuTrigger>
@@ -244,9 +235,7 @@ function BranchSelector({
             disabled={branch.name === selectedBranch}
             onSelect={() => navigation.selectRepoBranch(repoId, branch.name)}
           >
-            <span className={branch.name === selectedBranch ? 'text-muted-foreground' : undefined}>
-              {branch.name}
-            </span>
+            <span className={branch.name === selectedBranch ? 'text-muted-foreground' : undefined}>{branch.name}</span>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

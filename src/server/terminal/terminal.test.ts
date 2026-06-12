@@ -56,11 +56,19 @@ vi.mock('node-pty', () => ({
       kill: pty.kill,
       onData: (cb: (data: string) => void) => {
         onData = cb
-        return { dispose: vi.fn(() => { if (onData === cb) onData = null }) }
+        return {
+          dispose: vi.fn(() => {
+            if (onData === cb) onData = null
+          }),
+        }
       },
       onExit: (cb: () => void) => {
         onExit = cb
-        return { dispose: vi.fn(() => { if (onExit === cb) onExit = null }) }
+        return {
+          dispose: vi.fn(() => {
+            if (onExit === cb) onExit = null
+          }),
+        }
       },
     }
   }),
@@ -318,11 +326,7 @@ describe('server terminal sessions', () => {
     const result = reorderServerTerminals('client_1', {
       repoRoot: '/repo',
       worktreePath: '/repo-linked',
-      orderedKeys: [
-        sessionsBefore[0]!.key,
-        sessionsBefore[1]!.key,
-        sessionsBefore[1]!.key,
-      ],
+      orderedKeys: [sessionsBefore[0]!.key, sessionsBefore[1]!.key, sessionsBefore[1]!.key],
     })
 
     expect(result).toBe(false)
@@ -349,12 +353,8 @@ describe('server terminal sessions', () => {
     mockPtys[0]?.emitData('during-attach')
 
     await vi.waitFor(() => {
-      expect(
-        socket.send.mock.calls.some(([payload]) => JSON.parse(String(payload)).type === 'response'),
-      ).toBe(true)
-      expect(
-        socket.send.mock.calls.some(([payload]) => JSON.parse(String(payload)).type === 'output'),
-      ).toBe(true)
+      expect(socket.send.mock.calls.some(([payload]) => JSON.parse(String(payload)).type === 'response')).toBe(true)
+      expect(socket.send.mock.calls.some(([payload]) => JSON.parse(String(payload)).type === 'output')).toBe(true)
     })
 
     const messages = socket.send.mock.calls.map(([payload]) => JSON.parse(String(payload)))
@@ -527,7 +527,6 @@ describe('server terminal sessions', () => {
     unregisterTerminalSocket('client_1', 'attachment_a', socket)
   })
 
-
   test('keeps sessions alive during the reconnect grace period and reuses them after a second attach', async () => {
     const socketA = { send: vi.fn(), close: vi.fn() }
     registerTerminalSocket('client_1', 'attachment_a', socketA)
@@ -643,17 +642,19 @@ describe('server terminal sessions', () => {
       }),
     ])
     expect(mockPtys[0]?.resize).toHaveBeenLastCalledWith(100, 30)
-    expect(socket.send.mock.calls.some(([payload]) => {
-      const parsed = JSON.parse(String(payload))
-      return (
-        parsed.type === 'ownership' &&
-        parsed.event.sessionId === sessionId &&
-        parsed.event.controller?.attachmentId === 'attachment_a' &&
-        parsed.event.controller?.status === 'connected' &&
-        parsed.event.cols === 100 &&
-        parsed.event.rows === 30
-      )
-    })).toBe(true)
+    expect(
+      socket.send.mock.calls.some(([payload]) => {
+        const parsed = JSON.parse(String(payload))
+        return (
+          parsed.type === 'ownership' &&
+          parsed.event.sessionId === sessionId &&
+          parsed.event.controller?.attachmentId === 'attachment_a' &&
+          parsed.event.controller?.status === 'connected' &&
+          parsed.event.cols === 100 &&
+          parsed.event.rows === 30
+        )
+      }),
+    ).toBe(true)
 
     unregisterTerminalSocket('client_1', 'attachment_a', socket)
   })
@@ -683,7 +684,12 @@ describe('server terminal sessions', () => {
 
   test('restarts an existing session by session id without creating a second terminal record', async () => {
     const sessionId = await createTerminalSession('client_1')
-    const attached = await attachServerTerminal('client_1', { sessionId, cols: 80, rows: 24, attachmentId: 'attachment_a' })
+    const attached = await attachServerTerminal('client_1', {
+      sessionId,
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_a',
+    })
     expect(attached.ok).toBe(true)
     expect(spawn).toHaveBeenCalledTimes(1)
 
@@ -735,16 +741,20 @@ describe('server terminal sessions', () => {
         snapshotSeq: expect.any(Number),
       }),
     )
-    expect(socketB.send.mock.calls.some(([payload]) => {
-      const parsed = JSON.parse(String(payload))
-      return parsed.type === 'sessions-changed' && parsed.repoRoot === '/repo'
-    })).toBe(true)
+    expect(
+      socketB.send.mock.calls.some(([payload]) => {
+        const parsed = JSON.parse(String(payload))
+        return parsed.type === 'sessions-changed' && parsed.repoRoot === '/repo'
+      }),
+    ).toBe(true)
 
     mockPtys[0]?.emitExit()
-    expect(socketB.send.mock.calls.some(([payload]) => {
-      const parsed = JSON.parse(String(payload))
-      return parsed.type === 'sessions-changed' && parsed.repoRoot === '/repo'
-    })).toBe(true)
+    expect(
+      socketB.send.mock.calls.some(([payload]) => {
+        const parsed = JSON.parse(String(payload))
+        return parsed.type === 'sessions-changed' && parsed.repoRoot === '/repo'
+      }),
+    ).toBe(true)
 
     unregisterTerminalSocket('client_1', 'attachment_a', socketA)
     unregisterTerminalSocket('client_2', 'attachment_b', socketB)
@@ -966,5 +976,4 @@ describe('server terminal sessions', () => {
 
     unregisterTerminalSocket('client_1', 'attachment_a', socket)
   })
-
 })

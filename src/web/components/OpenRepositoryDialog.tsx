@@ -115,7 +115,13 @@ export function OpenRepositoryDialog({ open, onClose, onOpen }: Props) {
         </Field>
 
         <DialogFooter className="pt-4">
-          <Button type="button" variant="outline" className={cn(compact && 'w-full')} disabled={pending} onClick={onClose}>
+          <Button
+            type="button"
+            variant="outline"
+            className={cn(compact && 'w-full')}
+            disabled={pending}
+            onClick={onClose}
+          >
             {t('dialog.cancel')}
           </Button>
           <Button type="submit" className={cn(compact && 'w-full')} disabled={!canSubmit}>

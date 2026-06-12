@@ -44,7 +44,11 @@ export function BranchSummaryInline({ repo, branch, selected = false, className 
   const worktreeState = getBranchWorktreeState(repo, branch)
   const worktreeDirty = worktreeState?.dirty ?? false
   const commitTime = formatRelativeTimeOrNull(branch.lastCommitDate, lang)
-  const commitMeta = commitTime ? (branch.lastCommitAuthor ? `${branch.lastCommitAuthor} · ${commitTime}` : commitTime) : null
+  const commitMeta = commitTime
+    ? branch.lastCommitAuthor
+      ? `${branch.lastCommitAuthor} · ${commitTime}`
+      : commitTime
+    : null
   const title = [
     branch.name,
     isCurrent ? t('branch-status.current') : null,
@@ -70,7 +74,12 @@ export function BranchSummaryInline({ repo, branch, selected = false, className 
         )}
       </span>
       <span className="flex min-w-0 items-center gap-2 overflow-hidden">
-        <span className={cn('shrink-0 truncate text-sm font-medium', selected ? 'text-selected-foreground' : 'text-foreground')}>
+        <span
+          className={cn(
+            'shrink-0 truncate text-sm font-medium',
+            selected ? 'text-selected-foreground' : 'text-foreground',
+          )}
+        >
           {branch.name}
         </span>
         <span
@@ -100,7 +109,11 @@ export function BranchSummaryInline({ repo, branch, selected = false, className 
             <Delta direction="ahead" count={branch.ahead} label={t('branch-status.sync.ahead', { n: branch.ahead })} />
           )}
           {branch.behind > 0 && (
-            <Delta direction="behind" count={branch.behind} label={t('branch-status.sync.behind', { n: branch.behind })} />
+            <Delta
+              direction="behind"
+              count={branch.behind}
+              label={t('branch-status.sync.behind', { n: branch.behind })}
+            />
           )}
           {commitMeta && (
             <span

@@ -110,7 +110,9 @@ export function normalizeRestorableRepoCache(value: unknown): Record<string, Res
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const entries = Object.entries(value as Record<string, unknown>)
     .map(([id, raw]) => [id, normalizeRestorableRepoSnapshotEntry(raw)] as const)
-    .filter((entry): entry is readonly [string, RestorableRepoSnapshot] => entry[1] !== null && !isExpired(entry[1].savedAt))
+    .filter(
+      (entry): entry is readonly [string, RestorableRepoSnapshot] => entry[1] !== null && !isExpired(entry[1].savedAt),
+    )
   return trimRepoCache(Object.fromEntries(entries))
 }
 

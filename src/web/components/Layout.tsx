@@ -118,11 +118,7 @@ export function RepoWorkspacePane({ children }: PaneProps) {
 }
 
 export function ScrollPane({ children }: ShellProps) {
-  return (
-    <ScrollArea className="min-h-0 flex-1">
-      {children}
-    </ScrollArea>
-  )
+  return <ScrollArea className="min-h-0 flex-1">{children}</ScrollArea>
 }
 
 export function EmptyState({ icon, title, body, tone = 'neutral' }: EmptyStateProps) {

@@ -142,7 +142,10 @@ function createMacAppMenu(state: AppMenuState): MenuItemConstructorOptions {
   return {
     label: state.name,
     submenu: [
-      { label: t('menu.app.about', { name: state.name }), click: () => send({ type: 'open-settings-requested', page: 'about' }) },
+      {
+        label: t('menu.app.about', { name: state.name }),
+        click: () => send({ type: 'open-settings-requested', page: 'about' }),
+      },
       separator(),
       createRendererCommandMenuItem(state, 'app-settings'),
       createAppearanceMenu(state.themePref),
@@ -330,7 +333,10 @@ function accelerator(state: AppMenuState, value: string): string | undefined {
   return state.shortcutsDisabled ? undefined : value
 }
 
-function createRendererCommandMenuItem(state: AppMenuState, id: Parameters<typeof rendererMenuCommandById>[0]): MenuItemConstructorOptions {
+function createRendererCommandMenuItem(
+  state: AppMenuState,
+  id: Parameters<typeof rendererMenuCommandById>[0],
+): MenuItemConstructorOptions {
   const command = rendererMenuCommandById(id)
   const context = menuCommandContext(state)
   const resolvedAccelerator = resolveRendererMenuCommandAccelerator(command, context)

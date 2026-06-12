@@ -26,7 +26,8 @@ function nextMenuRuntimeState(base: MenuRuntimeState, next: Partial<MenuRuntimeS
     shortcutsDisabled: next.shortcutsDisabled ?? base.shortcutsDisabled,
     swapCloseShortcuts: next.swapCloseShortcuts ?? base.swapCloseShortcuts,
     langPref: next.langPref ?? base.langPref,
-    workspaceLayout: next.workspaceLayout === undefined ? base.workspaceLayout : normalizeWorkspaceLayout(next.workspaceLayout),
+    workspaceLayout:
+      next.workspaceLayout === undefined ? base.workspaceLayout : normalizeWorkspaceLayout(next.workspaceLayout),
   }
 }
 

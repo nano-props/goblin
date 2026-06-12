@@ -6,11 +6,10 @@ import type {
   RuntimeCoherentRepoProjectionState,
 } from '#/web/stores/repos/types.ts'
 
-export interface MainWindowWorkspaceState
-  extends Pick<
-    ReposStore,
-    'activeId' | 'order' | 'detailCollapsed' | 'detailFocusMode' | 'workspaceLayout' | 'sessionReady'
-  > {}
+export interface MainWindowWorkspaceState extends Pick<
+  ReposStore,
+  'activeId' | 'order' | 'detailCollapsed' | 'detailFocusMode' | 'workspaceLayout' | 'sessionReady'
+> {}
 
 export interface MainWindowNavigationState extends Pick<ReposStore, 'activeId' | 'order'> {}
 
@@ -20,8 +19,10 @@ export interface KeyboardRuntimeState {
   searchQuery: string
 }
 
-export interface RestorableWorkspaceViewportState
-  extends Pick<ReposStore, 'activeId' | 'order' | 'detailCollapsed' | 'detailFocusMode' | 'workspaceLayout'> {}
+export interface RestorableWorkspaceViewportState extends Pick<
+  ReposStore,
+  'activeId' | 'order' | 'detailCollapsed' | 'detailFocusMode' | 'workspaceLayout'
+> {}
 
 export interface RestorableWorkspaceNavigationState extends Pick<ReposStore, 'activeId' | 'order'> {}
 
@@ -40,7 +41,13 @@ export function runtimeCoherentRepoProjectionStateFromStore(
 export function restorableWorkspaceStateFromStore(
   state: Pick<
     ReposStore,
-    'order' | 'activeId' | 'detailCollapsed' | 'detailFocusMode' | 'workspaceLayout' | 'detailPaneSizes' | 'selectedTerminalByWorktree'
+    | 'order'
+    | 'activeId'
+    | 'detailCollapsed'
+    | 'detailFocusMode'
+    | 'workspaceLayout'
+    | 'detailPaneSizes'
+    | 'selectedTerminalByWorktree'
   >,
 ): RestorableWorkspaceState {
   return {
@@ -101,7 +108,10 @@ export function localWorkspaceSearchStateFromStore(
 }
 
 export function mainWindowWorkspaceStateFromStore(
-  state: Pick<ReposStore, 'activeId' | 'order' | 'detailCollapsed' | 'detailFocusMode' | 'workspaceLayout' | 'sessionReady'>,
+  state: Pick<
+    ReposStore,
+    'activeId' | 'order' | 'detailCollapsed' | 'detailFocusMode' | 'workspaceLayout' | 'sessionReady'
+  >,
 ): MainWindowWorkspaceState {
   const restorable = restorableWorkspaceViewportStateFromStore(state)
   const local = localWorkspaceSessionStateFromStore({ sessionReady: state.sessionReady })
@@ -115,7 +125,9 @@ export function mainWindowWorkspaceStateFromStore(
   }
 }
 
-export function navigationWorkspaceStateFromStore(state: Pick<ReposStore, 'activeId' | 'order'>): MainWindowNavigationState {
+export function navigationWorkspaceStateFromStore(
+  state: Pick<ReposStore, 'activeId' | 'order'>,
+): MainWindowNavigationState {
   const restorable = restorableWorkspaceNavigationStateFromStore(state)
   return {
     activeId: restorable.activeId,
@@ -157,11 +169,11 @@ export function keyboardRuntimeStateFromStore(
     workspaceLayout: 'top-bottom',
   })
   const local = localWorkspaceSearchStateFromStore({ branchSearchQueries: state.branchSearchQueries })
-  const repo = currentRepoId ? runtimeCoherent.repos[currentRepoId] ?? null : null
+  const repo = currentRepoId ? (runtimeCoherent.repos[currentRepoId] ?? null) : null
   return {
     detailCollapsed: restorable.detailCollapsed,
     repo,
-    searchQuery: repo ? local.branchSearchQueries[repo.id] ?? '' : '',
+    searchQuery: repo ? (local.branchSearchQueries[repo.id] ?? '') : '',
   }
 }
 

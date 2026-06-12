@@ -243,7 +243,8 @@ export interface RepoMutationActions {
 }
 
 export interface ReposStore
-  extends RuntimeCoherentRepoProjectionState,
+  extends
+    RuntimeCoherentRepoProjectionState,
     RestorableRepoCacheState,
     RestorableWorkspaceState,
     LocalWorkspaceState,

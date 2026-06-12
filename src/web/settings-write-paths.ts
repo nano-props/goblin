@@ -58,7 +58,10 @@ export async function setFetchIntervalPreference(sec: number): Promise<number> {
 
 export async function setTerminalNotificationsEnabledPreference(enabled: boolean): Promise<void> {
   await setTerminalNotificationsEnabled(enabled)
-  updateRuntimeSettingsSnapshotCache(mainWindowQueryClient, (current) => ({ ...current, terminalNotificationsEnabled: enabled }))
+  updateRuntimeSettingsSnapshotCache(mainWindowQueryClient, (current) => ({
+    ...current,
+    terminalNotificationsEnabled: enabled,
+  }))
 }
 
 export async function setShortcutsDisabledPreference(disabled: boolean): Promise<void> {
@@ -68,7 +71,10 @@ export async function setShortcutsDisabledPreference(disabled: boolean): Promise
 
 export async function setGlobalShortcutDisabledPreference(disabled: boolean): Promise<void> {
   await setGlobalShortcutDisabled(disabled)
-  updateRuntimeSettingsSnapshotCache(mainWindowQueryClient, (current) => ({ ...current, globalShortcutDisabled: disabled }))
+  updateRuntimeSettingsSnapshotCache(mainWindowQueryClient, (current) => ({
+    ...current,
+    globalShortcutDisabled: disabled,
+  }))
 }
 
 export async function setSwapCloseShortcutsPreference(swapped: boolean): Promise<void> {

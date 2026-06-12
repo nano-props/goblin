@@ -23,8 +23,8 @@ export const EMBEDDED_SERVER_RPC_ROUTES = {
 
 export type EmbeddedServerRpcPath = keyof typeof EMBEDDED_SERVER_RPC_ROUTES
 
-export function getEmbeddedServerRpcRoute(path: string): (typeof EMBEDDED_SERVER_RPC_ROUTES)[EmbeddedServerRpcPath] | null {
-  return path in EMBEDDED_SERVER_RPC_ROUTES
-    ? EMBEDDED_SERVER_RPC_ROUTES[path as EmbeddedServerRpcPath]
-    : null
+export function getEmbeddedServerRpcRoute(
+  path: string,
+): (typeof EMBEDDED_SERVER_RPC_ROUTES)[EmbeddedServerRpcPath] | null {
+  return path in EMBEDDED_SERVER_RPC_ROUTES ? EMBEDDED_SERVER_RPC_ROUTES[path as EmbeddedServerRpcPath] : null
 }

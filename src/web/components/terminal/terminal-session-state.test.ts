@@ -5,7 +5,12 @@ describe('TerminalSessionState', () => {
   test('tracks snapshot and attachment state transitions', () => {
     const state = new TerminalSessionState()
 
-    expect(state.snapshot(null)).toEqual({ phase: 'opening', message: null, processName: 'terminal', canonicalTitle: null })
+    expect(state.snapshot(null)).toEqual({
+      phase: 'opening',
+      message: null,
+      processName: 'terminal',
+      canonicalTitle: null,
+    })
     expect(
       state.applyOpenResult({
         processName: 'zsh',

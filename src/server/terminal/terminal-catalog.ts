@@ -100,7 +100,11 @@ class TerminalCatalog {
     const existingSessions = await this.options.manager.listSessions(input.repoRoot)
     const targetSessionKey = sessionKey(input.repoRoot, input.worktreePath, terminalId)
     const existingSession = existingSessions.find((session) => session.key === targetSessionKey)
-    const action: TerminalCatalogAction = existingSession ? (existingSession.controller ? 'restored' : 'reused') : 'created'
+    const action: TerminalCatalogAction = existingSession
+      ? existingSession.controller
+        ? 'restored'
+        : 'reused'
+      : 'created'
 
     if (isRemoteRepoId(input.repoRoot)) {
       return await this.ensureRemote(clientId, input, { terminalId, cols, rows, targetSessionKey, action })
@@ -115,7 +119,8 @@ class TerminalCatalog {
 
     const createResult = await this.ensureOrRestore(clientId, {
       ...input,
-      terminalId: input.kind === 'primary' ? 'terminal-1' : await this.nextTerminalId(input.repoRoot, input.worktreePath),
+      terminalId:
+        input.kind === 'primary' ? 'terminal-1' : await this.nextTerminalId(input.repoRoot, input.worktreePath),
     })
     if (!createResult.ok) return { ok: false, message: createResult.message }
     return {

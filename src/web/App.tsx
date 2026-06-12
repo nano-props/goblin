@@ -49,10 +49,7 @@ interface AppProps {
   onRouteSettingsPageChange?: (page: SettingsPage | null) => void
 }
 
-export function App({
-  routeSettingsPage = null,
-  onRouteSettingsPageChange,
-}: AppProps) {
+export function App({ routeSettingsPage = null, onRouteSettingsPageChange }: AppProps) {
   const {
     overlays,
     sessionReady,

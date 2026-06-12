@@ -1,11 +1,5 @@
 import * as React from 'react'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '#/web/components/ui/dialog.tsx'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '#/web/components/ui/dialog.tsx'
 interface FormDialogProps extends Omit<React.ComponentProps<typeof DialogContent>, 'children' | 'title'> {
   open: boolean
   onOpenChange?: React.ComponentProps<typeof Dialog>['onOpenChange']

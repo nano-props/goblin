@@ -59,10 +59,7 @@ type RuntimeCoherentSelectionActions = Pick<
 
 type RepoMutationSelectionActions = Pick<ReposStore, 'checkoutSelectedInRepo' | 'checkoutSelected'>
 
-function createRestorableWorkspaceSelectionActions(
-  set: ReposSet,
-  get: ReposGet,
-): RestorableWorkspaceSelectionActions {
+function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet): RestorableWorkspaceSelectionActions {
   return {
     setActive(id: string) {
       set((s) => (s.repos[id] && s.activeId !== id ? { activeId: id } : s))
@@ -251,10 +248,7 @@ function createLocalWorkspaceSelectionActions(set: ReposSet): LocalWorkspaceSele
   }
 }
 
-function createRuntimeCoherentSelectionActions(
-  set: ReposSet,
-  get: ReposGet,
-): RuntimeCoherentSelectionActions {
+function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): RuntimeCoherentSelectionActions {
   return {
     setBranchViewMode(id: string, viewMode: BranchViewMode) {
       let changed = false

@@ -43,10 +43,7 @@ interface ToolbarTabStripBodyProps extends ComponentPropsWithoutRef<'div'> {
 // `scroll` adds the width contract required to create horizontal overflow inside ScrollArea.
 export function ToolbarTabStripBody({ scroll = false, className, ...props }: ToolbarTabStripBodyProps) {
   return (
-    <div
-      className={cn('flex h-full min-w-0 items-center gap-1', scroll && 'w-max min-w-full', className)}
-      {...props}
-    />
+    <div className={cn('flex h-full min-w-0 items-center gap-1', scroll && 'w-max min-w-full', className)} {...props} />
   )
 }
 

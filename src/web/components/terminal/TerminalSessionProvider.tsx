@@ -25,7 +25,11 @@ interface TerminalSessionProviderProps {
   syncTracker?: RepoSyncTracker
 }
 
-export function TerminalSessionProvider({ currentRepoId, children, syncTracker: syncTrackerProp }: TerminalSessionProviderProps) {
+export function TerminalSessionProvider({
+  currentRepoId,
+  children,
+  syncTracker: syncTrackerProp,
+}: TerminalSessionProviderProps) {
   const repoIndex = useStoreWithEqualityFn(useReposStore, (s) => repoIndexFromRepos(s.repos), repoIndexEqual)
   const currentRepoInstanceToken = currentRepoId ? (repoIndex[currentRepoId]?.instanceToken ?? null) : null
   const selectedTerminalByWorktree = useReposStore((s) => s.selectedTerminalByWorktree)

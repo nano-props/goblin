@@ -52,7 +52,12 @@ export class TerminalWorkerRuntime {
   private async handleRequest(message: TerminalWorkerActionRequest): Promise<void> {
     try {
       const payload = await this.dispatchRequest(message)
-      this.options.emit({ type: 'response', requestId: message.requestId, ok: true, payload } satisfies TerminalWorkerSuccessMessage)
+      this.options.emit({
+        type: 'response',
+        requestId: message.requestId,
+        ok: true,
+        payload,
+      } satisfies TerminalWorkerSuccessMessage)
     } catch (error) {
       terminalWorkerRuntimeLogger.warn(
         {

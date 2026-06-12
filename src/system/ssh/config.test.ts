@@ -36,14 +36,16 @@ describe('ssh config resolution', () => {
     const mod = await import('#/system/ssh/config.ts')
 
     expect(
-      mod.parseSshConfig([
-        'Host *',
-        '  User ignored',
-        'Host prod github-work',
-        '  HostName example.com',
-        '  User ubuntu',
-        '  Port 2222',
-      ].join('\n')),
+      mod.parseSshConfig(
+        [
+          'Host *',
+          '  User ignored',
+          'Host prod github-work',
+          '  HostName example.com',
+          '  User ubuntu',
+          '  Port 2222',
+        ].join('\n'),
+      ),
     ).toEqual({
       hasInclude: false,
       hosts: [
@@ -56,13 +58,7 @@ describe('ssh config resolution', () => {
   test('marks configs with Include directives so the UI can fall back to manual alias input', async () => {
     const mod = await import('#/system/ssh/config.ts')
 
-    expect(
-      mod.parseSshConfig([
-        'Include ~/.ssh/conf.d/*',
-        'Host prod',
-        '  HostName example.com',
-      ].join('\n')),
-    ).toEqual({
+    expect(mod.parseSshConfig(['Include ~/.ssh/conf.d/*', 'Host prod', '  HostName example.com'].join('\n'))).toEqual({
       hasInclude: true,
       hosts: [{ alias: 'prod', hostName: 'example.com' }],
     })
@@ -109,7 +105,10 @@ describe('ssh config resolution', () => {
   })
 
   test('uses the current ssh config as the source of truth for tracked targets', async () => {
-    writeFileSync(path.join(tmpHome, '.ssh', 'config'), 'Host prod\n  HostName changed.example.com\n  User ubuntu\n  Port 2222\n')
+    writeFileSync(
+      path.join(tmpHome, '.ssh', 'config'),
+      'Host prod\n  HostName changed.example.com\n  User ubuntu\n  Port 2222\n',
+    )
     execaMock.mockResolvedValue({ stdout: 'hostname changed.example.com\nuser ubuntu\nport 2222\n' })
     const mod = await import('#/system/ssh/config.ts')
 

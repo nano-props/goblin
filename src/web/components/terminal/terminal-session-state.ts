@@ -1,8 +1,6 @@
 import type { TerminalOutputEvent } from '#/shared/terminal.ts'
 import { stripTerminalControlSequences } from '#/web/components/terminal/terminal-output-text.ts'
-import {
-  createTerminalAttachmentSnapshot,
-} from '#/web/components/terminal/types.ts'
+import { createTerminalAttachmentSnapshot } from '#/web/components/terminal/types.ts'
 import type {
   TerminalPhase,
   TerminalProgressState,

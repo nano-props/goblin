@@ -404,7 +404,6 @@ export class TerminalSessionView {
     cancelScheduledAnimationFrame(this.pinToBottomFrame)
     this.pinToBottomFrame = null
   }
-
 }
 
 function terminalSearchOptions(incremental?: boolean): ISearchOptions {

@@ -44,20 +44,14 @@ export function updateRuntimeSettingsSnapshotCache(
   }))
 }
 
-export function updateRuntimeRecentReposStateCache(
-  queryClient: QueryClient,
-  next: RuntimeRecentReposState,
-): void {
+export function updateRuntimeRecentReposStateCache(queryClient: QueryClient, next: RuntimeRecentReposState): void {
   updateSettingsSnapshotCache(queryClient, (current) => ({
     ...current,
     recentRepos: next.recentRepos,
   }))
 }
 
-export function updateRestorableSessionStateCache(
-  queryClient: QueryClient,
-  session: SessionState,
-): void {
+export function updateRestorableSessionStateCache(queryClient: QueryClient, session: SessionState): void {
   updateSettingsSnapshotCache(queryClient, (current) => ({
     ...current,
     session,

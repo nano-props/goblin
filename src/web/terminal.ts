@@ -28,7 +28,9 @@ function getTerminalBridge(): RendererTerminalBridge {
 
 function bindTerminalMethod<TKey extends keyof RendererTerminalBridge>(key: TKey): RendererTerminalBridge[TKey] {
   return ((...args: Parameters<RendererTerminalBridge[TKey]>) => {
-    const method = getTerminalBridge()[key] as (...innerArgs: Parameters<RendererTerminalBridge[TKey]>) => ReturnType<RendererTerminalBridge[TKey]>
+    const method = getTerminalBridge()[key] as (
+      ...innerArgs: Parameters<RendererTerminalBridge[TKey]>
+    ) => ReturnType<RendererTerminalBridge[TKey]>
     return method(...args)
   }) as unknown as RendererTerminalBridge[TKey]
 }

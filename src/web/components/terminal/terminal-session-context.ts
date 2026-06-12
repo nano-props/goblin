@@ -1,8 +1,5 @@
 import { createContext, useContext } from 'react'
-import type {
-  TerminalSessionContextValue,
-  TerminalSessionReadContextValue,
-} from '#/web/components/terminal/types.ts'
+import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 export const TerminalSessionContext = createContext<TerminalSessionContextValue | null>(null)
 export const TerminalSessionReadContext = createContext<TerminalSessionReadContextValue | null>(null)
 

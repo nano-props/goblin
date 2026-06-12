@@ -44,13 +44,19 @@ export function branchActionItemIdFromKind(kind: RepoBranchActionKind): BranchAc
   }
 }
 
-export function branchActionBusyItemId(repo: Pick<BranchActionRepo, 'operations'>, branchName: string): BranchActionItemId | null {
+export function branchActionBusyItemId(
+  repo: Pick<BranchActionRepo, 'operations'>,
+  branchName: string,
+): BranchActionItemId | null {
   const action = repo.operations.branchAction
   if (action.phase === 'idle' || action.target !== branchName || !isBranchActionReason(action.reason)) return null
   return branchActionItemIdFromKind(branchActionKindFromReason(action.reason))
 }
 
-export function branchActionDisplayPhase(repo: Pick<BranchActionRepo, 'operations'>, branchName: string): 'queued' | 'running' | null {
+export function branchActionDisplayPhase(
+  repo: Pick<BranchActionRepo, 'operations'>,
+  branchName: string,
+): 'queued' | 'running' | null {
   const action = repo.operations.branchAction
   if (action.phase === 'idle' || action.target !== branchName) return null
   return action.phase

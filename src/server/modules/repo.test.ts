@@ -233,7 +233,9 @@ describe('fetchRepository invalidation publishing', () => {
     ['user', 'user'],
     ['background', 'background'],
   ])('%s sync fetches prune stale remote-tracking refs', async (_name, kind) => {
-    mocks.runServerCancellable.mockImplementationOnce(async (_cwd, _kind, task) => await task(new AbortController().signal))
+    mocks.runServerCancellable.mockImplementationOnce(
+      async (_cwd, _kind, task) => await task(new AbortController().signal),
+    )
     mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched' })
 
     const { fetchRepository } = await import('#/server/modules/repo-write-paths.ts')
@@ -318,15 +320,30 @@ describe('probeRepository path errors', () => {
     mocks.fsAccess.mockRejectedValueOnce({ code: 'EACCES' })
 
     const { probeRepository } = await import('#/server/modules/repo-read-paths.ts')
-    await expect(probeRepository('/tmp/private')).resolves.toEqual({ ok: false, message: 'error.path-permission-denied' })
+    await expect(probeRepository('/tmp/private')).resolves.toEqual({
+      ok: false,
+      message: 'error.path-permission-denied',
+    })
   })
 })
 
 describe('repo mutation invalidation publishing', () => {
   test.each([
-    ['checkoutRepositoryBranch', async (repo: typeof import('#/server/modules/repo-write-paths.ts')) => repo.checkoutRepositoryBranch('/tmp/repo', 'feature/a')],
-    ['pullRepositoryBranch', async (repo: typeof import('#/server/modules/repo-write-paths.ts')) => repo.pullRepositoryBranch('/tmp/repo', 'feature/a')],
-    ['pushRepositoryBranch', async (repo: typeof import('#/server/modules/repo-write-paths.ts')) => repo.pushRepositoryBranch('/tmp/repo', 'feature/a')],
+    [
+      'checkoutRepositoryBranch',
+      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
+        repo.checkoutRepositoryBranch('/tmp/repo', 'feature/a'),
+    ],
+    [
+      'pullRepositoryBranch',
+      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
+        repo.pullRepositoryBranch('/tmp/repo', 'feature/a'),
+    ],
+    [
+      'pushRepositoryBranch',
+      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
+        repo.pushRepositoryBranch('/tmp/repo', 'feature/a'),
+    ],
     [
       'createRepositoryWorktree',
       async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
@@ -345,36 +362,43 @@ describe('repo mutation invalidation publishing', () => {
   })
 
   test.each([
-    ['pullRepositoryBranch', async (repo: typeof import('#/server/modules/repo-write-paths.ts')) => repo.pullRepositoryBranch('/tmp/repo', 'feature/a')],
-    ['pushRepositoryBranch', async (repo: typeof import('#/server/modules/repo-write-paths.ts')) => repo.pushRepositoryBranch('/tmp/repo', 'feature/a')],
+    [
+      'pullRepositoryBranch',
+      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
+        repo.pullRepositoryBranch('/tmp/repo', 'feature/a'),
+    ],
+    [
+      'pushRepositoryBranch',
+      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
+        repo.pushRepositoryBranch('/tmp/repo', 'feature/a'),
+    ],
   ])('%s runs inside the repo network-op gate', async (_name, run) => {
     const repo = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await run(repo)
 
     expect(result).toEqual({ ok: true, message: 'ok' })
-    expect(mocks.runServerCancellable).toHaveBeenCalledWith(
-      '/tmp/repo',
-      'user',
-      expect.any(Function),
-    )
+    expect(mocks.runServerCancellable).toHaveBeenCalledWith('/tmp/repo', 'user', expect.any(Function))
   })
 
   test.each([
     [
       'checkoutRepositoryBranch',
       () => mocks.checkoutBranch.mockResolvedValueOnce({ ok: false, message: 'fatal: checkout failed' }),
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) => repo.checkoutRepositoryBranch('/tmp/repo', 'feature/a'),
+      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
+        repo.checkoutRepositoryBranch('/tmp/repo', 'feature/a'),
     ],
     [
       'pullRepositoryBranch',
       () => mocks.pullBranch.mockResolvedValueOnce({ ok: false, message: 'fatal: pull failed' }),
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) => repo.pullRepositoryBranch('/tmp/repo', 'feature/a'),
+      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
+        repo.pullRepositoryBranch('/tmp/repo', 'feature/a'),
     ],
     [
       'pushRepositoryBranch',
       () => mocks.pushBranch.mockResolvedValueOnce({ ok: false, message: 'fatal: push failed' }),
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) => repo.pushRepositoryBranch('/tmp/repo', 'feature/a'),
+      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
+        repo.pushRepositoryBranch('/tmp/repo', 'feature/a'),
     ],
     [
       'createRepositoryWorktree',
@@ -449,7 +473,14 @@ describe('repo mutation invalidation publishing', () => {
 
   test('removeRepositoryWorktree publishes snapshot invalidation after worktree removal success', async () => {
     mocks.getWorktrees.mockResolvedValueOnce([
-      { path: '/tmp/repo-worktree', branch: 'feature/a', isBare: false, isPrimary: false, isDirty: false, changeCount: 0 },
+      {
+        path: '/tmp/repo-worktree',
+        branch: 'feature/a',
+        isBare: false,
+        isPrimary: false,
+        isDirty: false,
+        changeCount: 0,
+      },
     ])
     const { removeRepositoryWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
@@ -468,7 +499,14 @@ describe('repo mutation invalidation publishing', () => {
 
   test('removeRepositoryWorktree publishes snapshot invalidation once after worktree and branch deletion success', async () => {
     mocks.getWorktrees.mockResolvedValueOnce([
-      { path: '/tmp/repo-worktree', branch: 'feature/a', isBare: false, isPrimary: false, isDirty: false, changeCount: 0 },
+      {
+        path: '/tmp/repo-worktree',
+        branch: 'feature/a',
+        isBare: false,
+        isPrimary: false,
+        isDirty: false,
+        changeCount: 0,
+      },
     ])
     const { removeRepositoryWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
@@ -484,7 +522,14 @@ describe('repo mutation invalidation publishing', () => {
 
   test('removeRepositoryWorktree refuses before removing when branch deletion would fail', async () => {
     mocks.getWorktrees.mockResolvedValueOnce([
-      { path: '/tmp/repo-worktree', branch: 'feature/a', isBare: false, isPrimary: false, isDirty: false, changeCount: 0 },
+      {
+        path: '/tmp/repo-worktree',
+        branch: 'feature/a',
+        isBare: false,
+        isPrimary: false,
+        isDirty: false,
+        changeCount: 0,
+      },
     ])
     mocks.isAncestor.mockResolvedValueOnce(false)
     mocks.getUpstream.mockResolvedValueOnce(null)
@@ -504,7 +549,14 @@ describe('repo mutation invalidation publishing', () => {
 
   test('removeRepositoryWorktree refuses locked worktrees before calling git remove', async () => {
     mocks.getWorktrees.mockResolvedValueOnce([
-      { path: '/tmp/repo-worktree', branch: 'feature/a', isBare: false, isPrimary: false, isDirty: false, isLocked: true },
+      {
+        path: '/tmp/repo-worktree',
+        branch: 'feature/a',
+        isBare: false,
+        isPrimary: false,
+        isDirty: false,
+        isLocked: true,
+      },
     ])
     const { removeRepositoryWorktree } = await import('#/server/modules/repo-write-paths.ts')
 

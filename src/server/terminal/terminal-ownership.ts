@@ -68,9 +68,7 @@ export function claimTerminalAttachmentControl(
 
 export function restartTerminalAttachmentControl(state: TerminalOwnershipState, attachmentId: string): void {
   state.controller =
-    state.attachmentId === attachmentId && state.attachment?.connected
-      ? { attachmentId, status: 'connected' }
-      : null
+    state.attachmentId === attachmentId && state.attachment?.connected ? { attachmentId, status: 'connected' } : null
   if (state.controller) state.allowImplicitAttachControl = false
 }
 

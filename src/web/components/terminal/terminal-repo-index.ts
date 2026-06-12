@@ -37,6 +37,10 @@ export function repoIndexEqual(a: TerminalRepoIndex, b: TerminalRepoIndex): bool
   return true
 }
 
-export function branchForTerminalWorktree(repoIndex: TerminalRepoIndex, repoRoot: string, worktreePath: string): string | null {
+export function branchForTerminalWorktree(
+  repoIndex: TerminalRepoIndex,
+  repoRoot: string,
+  worktreePath: string,
+): string | null {
   return repoIndex[repoRoot]?.branchByWorktreePath[worktreePath] ?? null
 }

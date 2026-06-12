@@ -293,7 +293,10 @@ describe('OpenRemoteRepositoryDialog', () => {
         const body =
           typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, any>) : {}
         if (url.pathname === '/api/remote/ssh-hosts') {
-          return { ok: true, json: async () => ({ hosts: [{ alias: 'prod', hostName: 'example.com' }], hasInclude: false }) }
+          return {
+            ok: true,
+            json: async () => ({ hosts: [{ alias: 'prod', hostName: 'example.com' }], hasInclude: false }),
+          }
         }
         if (url.pathname === '/api/remote/resolve-target') {
           return {
@@ -358,7 +361,10 @@ describe('OpenRemoteRepositoryDialog', () => {
         const body =
           typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, any>) : {}
         if (url.pathname === '/api/remote/ssh-hosts') {
-          return { ok: true, json: async () => ({ hosts: [{ alias: 'prod', hostName: 'example.com' }], hasInclude: false }) }
+          return {
+            ok: true,
+            json: async () => ({ hosts: [{ alias: 'prod', hostName: 'example.com' }], hasInclude: false }),
+          }
         }
         if (url.pathname === '/api/remote/resolve-target') {
           return {

@@ -45,12 +45,11 @@ export function resolveEditorApp(pref: EditorPref, availability: EditorAppAvaila
 
 /** Open `path` in the editor selected by `pref`.
  *  Returns null if no editor is available (auto mode, none installed). */
-export function openInPreferredEditor(
-  path: string,
-  pref: EditorPref,
-): Promise<{ ok: boolean; message: string }> {
+export function openInPreferredEditor(path: string, pref: EditorPref): Promise<{ ok: boolean; message: string }> {
   const resolved = resolveEditorApp(pref, getEditorAppAvailability())
-  return resolved ? backends[resolved].open(path) : Promise.resolve({ ok: false, message: 'error.editor-not-installed' })
+  return resolved
+    ? backends[resolved].open(path)
+    : Promise.resolve({ ok: false, message: 'error.editor-not-installed' })
 }
 
 export function getResolvedEditorApp(pref: EditorPref): ResolvedEditorApp | null {

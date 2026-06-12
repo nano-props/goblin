@@ -3,7 +3,9 @@ import { formatRelativeTime, formatRelativeTimeOrNull } from '#/web/lib/dates.ts
 
 describe('formatRelativeTime', () => {
   test('formats valid ISO dates relative to the base date', () => {
-    expect(formatRelativeTime('2026-06-05T10:00:00.000Z', 'en', new Date('2026-06-05T12:00:00.000Z'))).toBe('2 hours ago')
+    expect(formatRelativeTime('2026-06-05T10:00:00.000Z', 'en', new Date('2026-06-05T12:00:00.000Z'))).toBe(
+      '2 hours ago',
+    )
   })
 
   test('returns the original value for invalid dates', () => {

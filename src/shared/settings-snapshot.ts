@@ -29,9 +29,7 @@ export function buildRuntimeSettingsSnapshot(input: {
   }
 }
 
-export function buildRuntimeRecentReposState(input: {
-  recentRepos: RepoSessionEntry[]
-}): RuntimeRecentReposState {
+export function buildRuntimeRecentReposState(input: { recentRepos: RepoSessionEntry[] }): RuntimeRecentReposState {
   return {
     recentRepos: input.recentRepos,
   }
@@ -98,8 +96,6 @@ export function runtimeRecentReposStateFromSettingsSnapshot(
   }
 }
 
-export function restorableSessionStateFromSettingsSnapshot(
-  snapshot: Pick<SettingsSnapshot, 'session'>,
-): SessionState {
+export function restorableSessionStateFromSettingsSnapshot(snapshot: Pick<SettingsSnapshot, 'session'>): SessionState {
   return snapshot.session
 }

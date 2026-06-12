@@ -243,9 +243,9 @@ describe('preload goblinNative bridge', () => {
 
     expect(ipcRenderer.on).toHaveBeenCalledWith(RENDERER_EFFECT_INTENT_CHANNEL, expect.any(Function))
 
-    const intentListener = ipcRenderer.on.mock.calls.find(([channel]) => channel === RENDERER_EFFECT_INTENT_CHANNEL)?.[1] as
-      | ((event: unknown, payload: unknown) => void)
-      | undefined
+    const intentListener = ipcRenderer.on.mock.calls.find(
+      ([channel]) => channel === RENDERER_EFFECT_INTENT_CHANNEL,
+    )?.[1] as ((event: unknown, payload: unknown) => void) | undefined
     intentListener?.(null, { type: 'external-open-enqueued' })
     expect(cb1).toHaveBeenCalledWith({ type: 'external-open-enqueued' })
     expect(cb2).toHaveBeenCalledWith({ type: 'external-open-enqueued' })
@@ -256,5 +256,4 @@ describe('preload goblinNative bridge', () => {
     off2()
     expect(ipcRenderer.off).toHaveBeenCalledWith(RENDERER_EFFECT_INTENT_CHANNEL, intentListener)
   })
-
 })

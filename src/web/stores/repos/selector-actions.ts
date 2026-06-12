@@ -2,60 +2,83 @@ import type { ReposStore } from '#/web/stores/repos/types.ts'
 
 export interface LocalWorkspaceStoreActions extends Pick<ReposStore, 'setBranchSearchQuery'> {}
 
-export interface RestorableWorkspaceNavigationStoreActions extends Pick<ReposStore, 'setActive' | 'reorderRepos' | 'cycleActive'> {}
+export interface RestorableWorkspaceNavigationStoreActions extends Pick<
+  ReposStore,
+  'setActive' | 'reorderRepos' | 'cycleActive'
+> {}
 
 export interface RestorableWorkspaceViewportStoreActions extends Pick<ReposStore, 'setActive' | 'cycleActive'> {}
 
 export interface RestorableWorkspaceOrderStoreActions extends Pick<ReposStore, 'reorderRepos'> {}
 
-export interface RestorableWorkspaceLayoutStoreActions
-  extends Pick<
-    ReposStore,
-    'setDetailCollapsed' | 'toggleDetailCollapsed' | 'toggleDetailFocusMode' | 'setWorkspaceLayout' | 'resetLayout' | 'setSelectedTerminal'
-  > {}
+export interface RestorableWorkspaceLayoutStoreActions extends Pick<
+  ReposStore,
+  | 'setDetailCollapsed'
+  | 'toggleDetailCollapsed'
+  | 'toggleDetailFocusMode'
+  | 'setWorkspaceLayout'
+  | 'resetLayout'
+  | 'setSelectedTerminal'
+> {}
 
-export interface RestorableWorkspaceDetailVisibilityStoreActions
-  extends Pick<ReposStore, 'setDetailCollapsed' | 'toggleDetailCollapsed'> {}
+export interface RestorableWorkspaceDetailVisibilityStoreActions extends Pick<
+  ReposStore,
+  'setDetailCollapsed' | 'toggleDetailCollapsed'
+> {}
 
 export interface RestorableWorkspaceDetailFocusStoreActions extends Pick<ReposStore, 'toggleDetailFocusMode'> {}
 
-export interface RestorableWorkspaceLayoutPreferenceStoreActions
-  extends Pick<ReposStore, 'setWorkspaceLayout' | 'resetLayout' | 'setSelectedTerminal'> {}
+export interface RestorableWorkspaceLayoutPreferenceStoreActions extends Pick<
+  ReposStore,
+  'setWorkspaceLayout' | 'resetLayout' | 'setSelectedTerminal'
+> {}
 
 export interface RuntimeCoherentRepoOpenStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen'> {}
 
-export interface RuntimeCoherentRepoNavigationStoreActions extends Pick<ReposStore, 'closeRepo' | 'selectBranch' | 'setDetailTab'> {}
+export interface RuntimeCoherentRepoNavigationStoreActions extends Pick<
+  ReposStore,
+  'closeRepo' | 'selectBranch' | 'setDetailTab'
+> {}
 
-export interface RestorableWorkspaceStoreActions
-  extends Pick<
-    ReposStore,
-    | 'setActive'
-    | 'reorderRepos'
-    | 'cycleActive'
-    | 'setDetailCollapsed'
-    | 'toggleDetailCollapsed'
-    | 'toggleDetailFocusMode'
-    | 'setWorkspaceLayout'
-    | 'resetLayout'
-    | 'setSelectedTerminal'
-  > {}
+export interface RestorableWorkspaceStoreActions extends Pick<
+  ReposStore,
+  | 'setActive'
+  | 'reorderRepos'
+  | 'cycleActive'
+  | 'setDetailCollapsed'
+  | 'toggleDetailCollapsed'
+  | 'toggleDetailFocusMode'
+  | 'setWorkspaceLayout'
+  | 'resetLayout'
+  | 'setSelectedTerminal'
+> {}
 
-export interface RuntimeCoherentRepoProjectionStoreActions
-  extends Pick<ReposStore, 'ensureWorkspaceOpen' | 'closeRepo' | 'selectBranch' | 'setDetailTab'> {}
+export interface RuntimeCoherentRepoProjectionStoreActions extends Pick<
+  ReposStore,
+  'ensureWorkspaceOpen' | 'closeRepo' | 'selectBranch' | 'setDetailTab'
+> {}
 
-export interface MainWindowNavigationStoreActions
-  extends Pick<ReposStore, 'setActive' | 'closeRepo' | 'cycleActive' | 'selectBranch' | 'setDetailTab'> {}
+export interface MainWindowNavigationStoreActions extends Pick<
+  ReposStore,
+  'setActive' | 'closeRepo' | 'cycleActive' | 'selectBranch' | 'setDetailTab'
+> {}
 
 export interface RepoTabStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen' | 'reorderRepos'> {}
 
-export interface RendererEffectIntentStoreActions
-  extends Pick<
-    ReposStore,
-    'ensureWorkspaceOpen' | 'setDetailCollapsed' | 'setSelectedTerminal' | 'setWorkspaceLayout' | 'toggleDetailCollapsed' | 'resetLayout'
-  > {}
+export interface RendererEffectIntentStoreActions extends Pick<
+  ReposStore,
+  | 'ensureWorkspaceOpen'
+  | 'setDetailCollapsed'
+  | 'setSelectedTerminal'
+  | 'setWorkspaceLayout'
+  | 'toggleDetailCollapsed'
+  | 'resetLayout'
+> {}
 
-export interface BranchDetailToolbarStoreActions
-  extends Pick<ReposStore, 'setDetailCollapsed' | 'toggleDetailCollapsed' | 'toggleDetailFocusMode'> {}
+export interface BranchDetailToolbarStoreActions extends Pick<
+  ReposStore,
+  'setDetailCollapsed' | 'toggleDetailCollapsed' | 'toggleDetailFocusMode'
+> {}
 
 export interface DetailPanelStoreActions extends Pick<ReposStore, 'setDetailCollapsed'> {}
 
@@ -115,7 +138,12 @@ export function runtimeCoherentRepoNavigationStoreActionsFromStore(
 export function restorableWorkspaceLayoutStoreActionsFromStore(
   state: Pick<
     ReposStore,
-    'setDetailCollapsed' | 'toggleDetailCollapsed' | 'toggleDetailFocusMode' | 'setWorkspaceLayout' | 'resetLayout' | 'setSelectedTerminal'
+    | 'setDetailCollapsed'
+    | 'toggleDetailCollapsed'
+    | 'toggleDetailFocusMode'
+    | 'setWorkspaceLayout'
+    | 'resetLayout'
+    | 'setSelectedTerminal'
   >,
 ): RestorableWorkspaceLayoutStoreActions {
   return {
@@ -236,7 +264,12 @@ export function repoTabStoreActionsFromStore(
 export function rendererEffectIntentStoreActionsFromStore(
   state: Pick<
     ReposStore,
-    'ensureWorkspaceOpen' | 'setDetailCollapsed' | 'setSelectedTerminal' | 'setWorkspaceLayout' | 'toggleDetailCollapsed' | 'resetLayout'
+    | 'ensureWorkspaceOpen'
+    | 'setDetailCollapsed'
+    | 'setSelectedTerminal'
+    | 'setWorkspaceLayout'
+    | 'toggleDetailCollapsed'
+    | 'resetLayout'
   >,
 ): RendererEffectIntentStoreActions {
   const detailVisibility = restorableWorkspaceDetailVisibilityStoreActionsFromStore({
@@ -278,7 +311,9 @@ export function branchDetailToolbarStoreActionsFromStore(
   }
 }
 
-export function detailPanelStoreActionsFromStore(state: Pick<ReposStore, 'setDetailCollapsed'>): DetailPanelStoreActions {
+export function detailPanelStoreActionsFromStore(
+  state: Pick<ReposStore, 'setDetailCollapsed'>,
+): DetailPanelStoreActions {
   return {
     setDetailCollapsed: state.setDetailCollapsed,
   }

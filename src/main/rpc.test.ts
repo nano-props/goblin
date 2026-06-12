@@ -11,9 +11,7 @@ import { getBranchPullRequest, getBranchPullRequests } from '#/system/git/pull-r
 import { openHttpsExternal } from '#/main/external-url.ts'
 import { registerTrustedAppUrl, registerTrustedWebContents } from '#/main/ipc/trusted-webcontents.ts'
 import { wireRpcIpc } from '#/main/rpc.ts'
-import {
-  getSettingsPrefs,
-} from '#/main/settings-server-client.ts'
+import { getSettingsPrefs } from '#/main/settings-server-client.ts'
 import type { RpcResponse, SettingsPrefs } from '#/shared/rpc.ts'
 
 const ipcHandlers = new Map<string, (_event: unknown, input: any) => Promise<unknown>>()
@@ -305,10 +303,14 @@ describe('main repo rpc cancellation', () => {
   })
 
   test('rejects RPC calls from untrusted senders', async () => {
-    const result = await invokeRpc('settings.setGlobalShortcut', { accelerator: 'Alt+K' }, {
-      sender: { id: 99 },
-      senderFrame: { url: 'https://example.com/' },
-    })
+    const result = await invokeRpc(
+      'settings.setGlobalShortcut',
+      { accelerator: 'Alt+K' },
+      {
+        sender: { id: 99 },
+        senderFrame: { url: 'https://example.com/' },
+      },
+    )
 
     expect(result).toEqual({
       ok: false,
@@ -317,10 +319,14 @@ describe('main repo rpc cancellation', () => {
   })
 
   test('rejects RPC calls without a sender frame', async () => {
-    const result = await invokeRpc('settings.setGlobalShortcut', { accelerator: 'Alt+K' }, {
-      sender: trustedSender,
-      senderFrame: null,
-    })
+    const result = await invokeRpc(
+      'settings.setGlobalShortcut',
+      { accelerator: 'Alt+K' },
+      {
+        sender: trustedSender,
+        senderFrame: null,
+      },
+    )
 
     expect(result).toEqual({
       ok: false,

@@ -39,7 +39,9 @@ function defaultCapabilities(): RegisteredRendererSurfaceCapabilities {
   }
 }
 
-function resolveCapabilities(capabilities?: Partial<RegisteredRendererSurfaceCapabilities>): RegisteredRendererSurfaceCapabilities {
+function resolveCapabilities(
+  capabilities?: Partial<RegisteredRendererSurfaceCapabilities>,
+): RegisteredRendererSurfaceCapabilities {
   return { ...defaultCapabilities(), ...capabilities }
 }
 

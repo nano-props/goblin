@@ -4,7 +4,11 @@ import { isSafeBranchName } from '#/shared/refnames.ts'
 
 export type BranchDeletionNotMergedMessage = 'error.branch-not-fully-merged' | 'error.cannot-remove-unpushed-worktree'
 
-export function validateCreateWorktreeInput(worktreePath: string, newBranch: string, baseBranch: string): ExecResult | null {
+export function validateCreateWorktreeInput(
+  worktreePath: string,
+  newBranch: string,
+  baseBranch: string,
+): ExecResult | null {
   if (!path.isAbsolute(worktreePath) || worktreePath.includes('\0')) return { ok: false, message: 'error.invalid-path' }
   if (!isSafeBranchName(newBranch) || !isSafeBranchName(baseBranch)) {
     return { ok: false, message: 'error.invalid-arguments' }

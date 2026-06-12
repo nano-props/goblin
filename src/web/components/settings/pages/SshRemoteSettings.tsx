@@ -1,4 +1,9 @@
-import { SettingsCard, SettingsGroup, SettingsList, SettingsRow } from '#/web/components/settings/SettingsPrimitives.tsx'
+import {
+  SettingsCard,
+  SettingsGroup,
+  SettingsList,
+  SettingsRow,
+} from '#/web/components/settings/SettingsPrimitives.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 export function SshRemoteSettings() {
   const t = useT()

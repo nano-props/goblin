@@ -3,7 +3,11 @@ import { getRepoActivity, isRepoPrimaryRefreshBusy } from '#/web/components/repo
 import { seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { resetReposStore } from '#/web/stores/repos/test-utils.ts'
-import { markRepoOperationTargets, nextRepoOperationId, settleRepoOperationTargets } from '#/web/stores/repos/runtime.ts'
+import {
+  markRepoOperationTargets,
+  nextRepoOperationId,
+  settleRepoOperationTargets,
+} from '#/web/stores/repos/runtime.ts'
 
 const REPO_ID = '/tmp/gbl-repo-activity-model'
 

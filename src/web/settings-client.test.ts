@@ -228,30 +228,28 @@ describe('settings-client', () => {
         matchMedia: vi.fn(() => ({ matches: true })),
       },
     })
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
         ok: true,
-        json: async () => ({
-          ok: true,
-          settings: {
-            lang: 'ja',
-            theme: 'auto',
-            colorTheme: 'macos',
-            fetchIntervalSec: 120,
-            terminalNotificationsEnabled: false,
-            shortcutsDisabled: false,
-            globalShortcutDisabled: false,
-            swapCloseShortcuts: false,
-            toggleDetailOnActionBarBlankClick: false,
-            globalShortcut: 'CommandOrControl+Shift+G',
-            terminalApp: 'auto',
-            editorApp: 'auto',
-            lanEnabled: false,
-          },
-          i18n: { lang: 'ja', pref: 'ja', dict: { hello: 'こんにちは' } },
-        }),
-      })
+        settings: {
+          lang: 'ja',
+          theme: 'auto',
+          colorTheme: 'macos',
+          fetchIntervalSec: 120,
+          terminalNotificationsEnabled: false,
+          shortcutsDisabled: false,
+          globalShortcutDisabled: false,
+          swapCloseShortcuts: false,
+          toggleDetailOnActionBarBlankClick: false,
+          globalShortcut: 'CommandOrControl+Shift+G',
+          terminalApp: 'auto',
+          editorApp: 'auto',
+          lanEnabled: false,
+        },
+        i18n: { lang: 'ja', pref: 'ja', dict: { hello: 'こんにちは' } },
+      }),
+    })
     vi.stubGlobal('fetch', fetchMock)
 
     const { setI18nPref } = await import('#/web/settings-client.ts')
@@ -537,7 +535,9 @@ describe('settings-client', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const { addRecentRepo } = await import('#/web/settings-client.ts')
-    await expect(addRecentRepo({ kind: 'local', id: '/bad\0repo' } as unknown as { kind: 'local'; id: string })).resolves.toMatchObject({
+    await expect(
+      addRecentRepo({ kind: 'local', id: '/bad\0repo' } as unknown as { kind: 'local'; id: string }),
+    ).resolves.toMatchObject({
       recentRepos: [{ kind: 'local', id: '/existing' }],
       addedRepo: null,
     })

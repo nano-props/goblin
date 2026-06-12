@@ -10,7 +10,12 @@ interface Props {
 
 function DialogStatusRow({ message, tone = 'default', actionLabel, onAction }: Props) {
   return (
-    <div data-slot="dialog-status-row" aria-live="polite" aria-atomic="true" className="flex min-h-4 items-center gap-2 overflow-hidden">
+    <div
+      data-slot="dialog-status-row"
+      aria-live="polite"
+      aria-atomic="true"
+      className="flex min-h-4 items-center gap-2 overflow-hidden"
+    >
       <div
         data-slot="dialog-status-text"
         className={cn(

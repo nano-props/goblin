@@ -120,7 +120,10 @@ describe('TerminalTabs keyboard dnd wiring', () => {
     })
 
     expect(useSensorMock).toHaveBeenCalledWith(pointerSensorToken, { activationConstraint: { distance: 6 } })
-    expect(useSensorMock).toHaveBeenCalledWith(keyboardSensorToken, expect.objectContaining({ coordinateGetter: expect.any(Function) }))
+    expect(useSensorMock).toHaveBeenCalledWith(
+      keyboardSensorToken,
+      expect.objectContaining({ coordinateGetter: expect.any(Function) }),
+    )
 
     const tab = document.body.querySelector('#detail-terminal-tab')
     if (!(tab instanceof HTMLButtonElement)) throw new Error('missing terminal tab')

@@ -17,13 +17,14 @@ export interface SpawnTerminalPtyRuntimeInput {
   rows: number
 }
 
-export type SpawnTerminalPtyRuntimeResult =
-  | { ok: true; runtime: TerminalPtyRuntime }
-  | { ok: false; message: string }
+export type SpawnTerminalPtyRuntimeResult = { ok: true; runtime: TerminalPtyRuntime } | { ok: false; message: string }
 
 export function spawnTerminalPtyRuntime(input: SpawnTerminalPtyRuntimeInput): SpawnTerminalPtyRuntimeResult {
   try {
-    const shell = input.command || process.env.SHELL || (process.platform === 'win32' ? process.env.COMSPEC || 'cmd.exe' : '/bin/zsh')
+    const shell =
+      input.command ||
+      process.env.SHELL ||
+      (process.platform === 'win32' ? process.env.COMSPEC || 'cmd.exe' : '/bin/zsh')
     const args = input.args ?? (process.platform === 'win32' ? [] : ['-l'])
     const env = { ...process.env, TERM: 'xterm-256color' }
     const term = pty.spawn(shell, args, {

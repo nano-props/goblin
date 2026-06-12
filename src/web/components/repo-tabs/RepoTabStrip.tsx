@@ -262,10 +262,7 @@ export function RepoTabStrip({
   )
   const focusRegistry = useFocusRegistry<string, HTMLButtonElement>()
   const openMenuRef = useRef<HTMLDivElement>(null)
-  const restrictToVisibleTabStrip = useMemo(
-    () => createRestrictToTabStripBounds({ rightBoundaryRef: openMenuRef }),
-    [],
-  )
+  const restrictToVisibleTabStrip = useMemo(() => createRestrictToTabStripBounds({ rightBoundaryRef: openMenuRef }), [])
 
   const handleClose = useCallback(
     (id: string) => {
@@ -350,7 +347,10 @@ export function RepoTabStrip({
                       {dropdownRepos.map((repo) => (
                         <DropdownMenuItem
                           key={repo.id}
-                          className={cn('whitespace-nowrap', repo.id === activeId && 'bg-selected text-selected-foreground')}
+                          className={cn(
+                            'whitespace-nowrap',
+                            repo.id === activeId && 'bg-selected text-selected-foreground',
+                          )}
                           onSelect={() => onActivate(repo.id)}
                           aria-current={repo.id === activeId ? 'true' : undefined}
                         >
@@ -359,7 +359,12 @@ export function RepoTabStrip({
                       ))}
                     </ScrollArea>
                     {dropdownRepos.length > 0 && <DropdownMenuSeparator />}
-                    <OpenRepoMenuItems labels={labels} onOpenLocal={onOpenLocal} onOpenRemote={onOpenRemote} onClone={onClone} />
+                    <OpenRepoMenuItems
+                      labels={labels}
+                      onOpenLocal={onOpenLocal}
+                      onOpenRemote={onOpenRemote}
+                      onClone={onClone}
+                    />
                   </DropdownMenuContent>
                 </DropdownMenu>
               }

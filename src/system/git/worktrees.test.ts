@@ -7,7 +7,9 @@ vi.mock('#/system/git/helper.ts', async () => {
   const actual = await vi.importActual<typeof import('#/system/git/helper.ts')>('#/system/git/helper.ts')
   return {
     ...actual,
-    gitResultWithOptions: vi.fn((cwd: string, opts: unknown, ...args: string[]) => gitResultWithOptionsMock(cwd, opts, ...args)),
+    gitResultWithOptions: vi.fn((cwd: string, opts: unknown, ...args: string[]) =>
+      gitResultWithOptionsMock(cwd, opts, ...args),
+    ),
   }
 })
 

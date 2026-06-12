@@ -31,10 +31,7 @@ interface WorkspaceSkeletonProps {
 
 export function BranchListSkeleton({ rows = 6, showBranchActions = false }: BranchListSkeletonProps) {
   return (
-    <SkeletonList
-      rows={rows}
-      renderRow={(i) => <BranchListSkeletonRow key={i} showActions={showBranchActions} />}
-    />
+    <SkeletonList rows={rows} renderRow={(i) => <BranchListSkeletonRow key={i} showActions={showBranchActions} />} />
   )
 }
 
@@ -186,13 +183,7 @@ function ToolbarSearchSkeleton({ dataTestId }: { dataTestId?: string }) {
   )
 }
 
-function ToolbarSegmentedControlSkeleton({
-  items,
-  dataTestId,
-}: {
-  items: number
-  dataTestId?: string
-}) {
+function ToolbarSegmentedControlSkeleton({ items, dataTestId }: { items: number; dataTestId?: string }) {
   return (
     <div className="flex shrink-0 rounded-md border border-input bg-control shadow-xs" data-testid={dataTestId}>
       {Array.from({ length: items }).map((_, i) => (
@@ -204,24 +195,15 @@ function ToolbarSegmentedControlSkeleton({
   )
 }
 
-function SkeletonList({
-  rows,
-  renderRow,
-}: {
-  rows: number
-  renderRow: (index: number) => ReactNode
-}) {
-  return <ul className="flex-1 divide-y divide-separator">{Array.from({ length: rows }).map((_, i) => renderRow(i))}</ul>
+function SkeletonList({ rows, renderRow }: { rows: number; renderRow: (index: number) => ReactNode }) {
+  return (
+    <ul className="flex-1 divide-y divide-separator">{Array.from({ length: rows }).map((_, i) => renderRow(i))}</ul>
+  )
 }
 
 function BranchListSkeletonRow({ showActions }: { showActions: boolean }) {
   return (
-    <li
-      className={cn(
-        'grid min-h-9 items-stretch',
-        showActions ? 'grid-cols-[minmax(0,1fr)_auto]' : 'grid-cols-1',
-      )}
-    >
+    <li className={cn('grid min-h-9 items-stretch', showActions ? 'grid-cols-[minmax(0,1fr)_auto]' : 'grid-cols-1')}>
       <div className="flex min-w-0 items-center gap-3 px-4">
         <Skeleton className="h-4 w-4 rounded-full" />
         <Skeleton className="h-4 w-3/5" />

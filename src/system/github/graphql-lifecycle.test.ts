@@ -41,7 +41,14 @@ describe('graphqlRequestResult lifecycle', () => {
     const ctrl = new AbortController()
     ctrl.abort()
 
-    const result = await graphqlRequestResult('/tmp/repo', repo, 'query Test { viewer { login } }', {}, 'Test', ctrl.signal)
+    const result = await graphqlRequestResult(
+      '/tmp/repo',
+      repo,
+      'query Test { viewer { login } }',
+      {},
+      'Test',
+      ctrl.signal,
+    )
 
     expect(execaMock).not.toHaveBeenCalled()
     expect(result.ok).toBe(false)

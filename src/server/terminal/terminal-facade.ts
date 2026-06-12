@@ -17,19 +17,40 @@ import {
   writeServerTerminal,
 } from '#/server/terminal/terminal.ts'
 import type { ServerTerminalSocket } from '#/server/terminal/terminal-host.ts'
-import type { TerminalWorkerRequestInputs, TerminalWorkerResponseOutputs } from '#/server/terminal/terminal-worker-protocol.ts'
+import type {
+  TerminalWorkerRequestInputs,
+  TerminalWorkerResponseOutputs,
+} from '#/server/terminal/terminal-worker-protocol.ts'
 
 type MaybePromise<T> = T | Promise<T>
 
 export interface TerminalFacade {
   registerSocket(clientId: string, attachmentId: string, socket: ServerTerminalSocket): void
   unregisterSocket(clientId: string, attachmentId: string, socket: ServerTerminalSocket): void
-  attach(clientId: string, input: TerminalWorkerRequestInputs['attach']): MaybePromise<TerminalWorkerResponseOutputs['attach']>
-  restart(clientId: string, input: TerminalWorkerRequestInputs['restart']): MaybePromise<TerminalWorkerResponseOutputs['restart']>
-  write(clientId: string, input: TerminalWorkerRequestInputs['write']): MaybePromise<TerminalWorkerResponseOutputs['write']>
-  resize(clientId: string, input: TerminalWorkerRequestInputs['resize']): MaybePromise<TerminalWorkerResponseOutputs['resize']>
-  takeover(clientId: string, input: TerminalWorkerRequestInputs['takeover']): MaybePromise<TerminalWorkerResponseOutputs['takeover']>
-  close(clientId: string, input: TerminalWorkerRequestInputs['close']): MaybePromise<TerminalWorkerResponseOutputs['close']>
+  attach(
+    clientId: string,
+    input: TerminalWorkerRequestInputs['attach'],
+  ): MaybePromise<TerminalWorkerResponseOutputs['attach']>
+  restart(
+    clientId: string,
+    input: TerminalWorkerRequestInputs['restart'],
+  ): MaybePromise<TerminalWorkerResponseOutputs['restart']>
+  write(
+    clientId: string,
+    input: TerminalWorkerRequestInputs['write'],
+  ): MaybePromise<TerminalWorkerResponseOutputs['write']>
+  resize(
+    clientId: string,
+    input: TerminalWorkerRequestInputs['resize'],
+  ): MaybePromise<TerminalWorkerResponseOutputs['resize']>
+  takeover(
+    clientId: string,
+    input: TerminalWorkerRequestInputs['takeover'],
+  ): MaybePromise<TerminalWorkerResponseOutputs['takeover']>
+  close(
+    clientId: string,
+    input: TerminalWorkerRequestInputs['close'],
+  ): MaybePromise<TerminalWorkerResponseOutputs['close']>
   notifyBell(
     clientId: string,
     input: TerminalWorkerRequestInputs['notify-bell'],
@@ -38,13 +59,22 @@ export interface TerminalFacade {
     clientId: string,
     input: TerminalWorkerRequestInputs['list-sessions'],
   ): MaybePromise<TerminalWorkerResponseOutputs['list-sessions']>
-  create(clientId: string, input: TerminalWorkerRequestInputs['create']): MaybePromise<TerminalWorkerResponseOutputs['create']>
-  prune(clientId: string, input: TerminalWorkerRequestInputs['prune']): MaybePromise<TerminalWorkerResponseOutputs['prune']>
+  create(
+    clientId: string,
+    input: TerminalWorkerRequestInputs['create'],
+  ): MaybePromise<TerminalWorkerResponseOutputs['create']>
+  prune(
+    clientId: string,
+    input: TerminalWorkerRequestInputs['prune'],
+  ): MaybePromise<TerminalWorkerResponseOutputs['prune']>
   getSessionSnapshot(
     clientId: string,
     input: TerminalWorkerRequestInputs['session-snapshot'],
   ): MaybePromise<TerminalWorkerResponseOutputs['session-snapshot']>
-  reorder(clientId: string, input: TerminalWorkerRequestInputs['reorder']): MaybePromise<TerminalWorkerResponseOutputs['reorder']>
+  reorder(
+    clientId: string,
+    input: TerminalWorkerRequestInputs['reorder'],
+  ): MaybePromise<TerminalWorkerResponseOutputs['reorder']>
   handleRealtimeMessage(clientId: string, attachmentId: string, socket: ServerTerminalSocket, payload: string): void
   shutdown(): void
 }

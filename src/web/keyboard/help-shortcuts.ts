@@ -22,17 +22,26 @@ export interface HelpShortcutSection {
   rows: HelpShortcutRow[]
 }
 
-export function helpShortcutSections(globalShortcut: string, swapCloseShortcuts = false, isMac = inferIsMacPlatform()): HelpShortcutSection[] {
+export function helpShortcutSections(
+  globalShortcut: string,
+  swapCloseShortcuts = false,
+  isMac = inferIsMacPlatform(),
+): HelpShortcutSection[] {
   const { closeTab, closeWindow } = closeShortcutAccelerators(swapCloseShortcuts)
   return [
     {
       titleKey: 'help.section.nav',
-      rows: [...RENDERER_NAVIGATION_SHORTCUTS.map(helpRowFromKeyboardDefinition), ...WINDOW_REPO_SHORTCUTS.map((shortcut) => helpRowFromAccelerator(shortcut, isMac))],
+      rows: [
+        ...RENDERER_NAVIGATION_SHORTCUTS.map(helpRowFromKeyboardDefinition),
+        ...WINDOW_REPO_SHORTCUTS.map((shortcut) => helpRowFromAccelerator(shortcut, isMac)),
+      ],
     },
     {
       titleKey: 'help.section.branch-actions',
       rows: [
-        helpRowFromKeyboardDefinition(RENDERER_APP_SHORTCUTS.find((shortcut) => shortcut.action === 'checkout-selected')!),
+        helpRowFromKeyboardDefinition(
+          RENDERER_APP_SHORTCUTS.find((shortcut) => shortcut.action === 'checkout-selected')!,
+        ),
         ...BRANCH_ACTION_SHORTCUTS.map(helpRowFromKeyboardDefinition),
       ],
     },
@@ -47,8 +56,13 @@ export function helpShortcutSections(globalShortcut: string, swapCloseShortcuts 
         { combos: [acceleratorToKeyLabels(globalShortcut)], labelKey: 'help.row.activate-window' },
         { combos: [acceleratorToKeyLabelsForHelp(closeTab, isMac)], labelKey: 'help.row.close-repo' },
         { combos: [acceleratorToKeyLabelsForHelp(closeWindow, isMac)], labelKey: 'help.row.close-window' },
-        { combos: [acceleratorToKeyLabelsForHelp(isMac ? SETTINGS_SHORTCUT_MAC : SETTINGS_SHORTCUT_NON_MAC, isMac)], labelKey: 'help.row.settings' },
-        ...RENDERER_APP_SHORTCUTS.filter((shortcut) => shortcut.action !== 'checkout-selected').map(helpRowFromKeyboardDefinition),
+        {
+          combos: [acceleratorToKeyLabelsForHelp(isMac ? SETTINGS_SHORTCUT_MAC : SETTINGS_SHORTCUT_NON_MAC, isMac)],
+          labelKey: 'help.row.settings',
+        },
+        ...RENDERER_APP_SHORTCUTS.filter((shortcut) => shortcut.action !== 'checkout-selected').map(
+          helpRowFromKeyboardDefinition,
+        ),
       ],
     },
   ]

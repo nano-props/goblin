@@ -6,7 +6,10 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessionProvider.tsx'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
-import { useWorktreeTerminalCount, useTerminalSessionSummaries } from '#/web/components/terminal/terminal-session-store.ts'
+import {
+  useWorktreeTerminalCount,
+  useTerminalSessionSummaries,
+} from '#/web/components/terminal/terminal-session-store.ts'
 import { RepoSyncTracker } from '#/web/components/terminal/repo-sync-tracker.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
@@ -69,7 +72,12 @@ vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
       this.notify = _notify
       this.onBell = onBell
       this.sessionId = null
-      this.snapshotValue = { phase: 'open', message: null, processName: `terminal ${this.descriptor.index}`, canonicalTitle: null }
+      this.snapshotValue = {
+        phase: 'open',
+        message: null,
+        processName: `terminal ${this.descriptor.index}`,
+        canonicalTitle: null,
+      }
       mockSessions.push({
         descriptor,
         emitBell: (event) => this.onBell(this.descriptor, event),
@@ -214,8 +222,12 @@ let ownershipHandler:
     }) => void)
   | null = null
 let sessionsChangedHandler: ((repoRoot: string) => void) | null = null
-const listSessionsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<TerminalSessionSummary[]>>(async () => [])
-const getSessionSnapshotMock = vi.fn<(...args: Array<{ sessionId: string }>) => Promise<TerminalSessionSnapshot | null>>(async () => null)
+const listSessionsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<TerminalSessionSummary[]>>(
+  async () => [],
+)
+const getSessionSnapshotMock = vi.fn<
+  (...args: Array<{ sessionId: string }>) => Promise<TerminalSessionSnapshot | null>
+>(async () => null)
 const closeMock = vi.fn(async () => true)
 const createTerminalMock = vi.fn<(input: TerminalCreateInput) => Promise<TerminalCatalogMutationResult>>()
 let managedServerSessions: TerminalSessionSummary[] = []
@@ -359,16 +371,20 @@ beforeEach(() => {
           exitHandler = cb
           return () => {}
         }),
-        onOwnership: vi.fn((cb: (event: {
-          sessionId: string
-          role: 'controller' | 'viewer' | 'unowned'
-          controllerStatus: 'connected' | 'grace' | 'none'
-          canonicalCols: number
-          canonicalRows: number
-        }) => void) => {
-          ownershipHandler = cb
-          return () => {}
-        }),
+        onOwnership: vi.fn(
+          (
+            cb: (event: {
+              sessionId: string
+              role: 'controller' | 'viewer' | 'unowned'
+              controllerStatus: 'connected' | 'grace' | 'none'
+              canonicalCols: number
+              canonicalRows: number
+            }) => void,
+          ) => {
+            ownershipHandler = cb
+            return () => {}
+          },
+        ),
         onSessionsChanged: vi.fn((cb: (repoRoot: string) => void) => {
           sessionsChangedHandler = cb
           return () => {
@@ -453,16 +469,20 @@ beforeEach(() => {
         exitHandler = cb
         return () => {}
       }),
-      onOwnership: vi.fn((cb: (event: {
-        sessionId: string
-        role: 'controller' | 'viewer' | 'unowned'
-        controllerStatus: 'connected' | 'grace' | 'none'
-        canonicalCols: number
-        canonicalRows: number
-      }) => void) => {
-        ownershipHandler = cb
-        return () => {}
-      }),
+      onOwnership: vi.fn(
+        (
+          cb: (event: {
+            sessionId: string
+            role: 'controller' | 'viewer' | 'unowned'
+            controllerStatus: 'connected' | 'grace' | 'none'
+            canonicalCols: number
+            canonicalRows: number
+          }) => void,
+        ) => {
+          ownershipHandler = cb
+          return () => {}
+        },
+      ),
       onSessionsChanged: vi.fn((cb: (repoRoot: string) => void) => {
         sessionsChangedHandler = cb
         return () => {
@@ -493,8 +513,16 @@ describe('TerminalSessionProvider', () => {
       })
 
       expect(createTerminalMock).toHaveBeenCalledTimes(2)
-      expect(createTerminalMock).toHaveBeenNthCalledWith(1, { ...base, kind: 'primary', attachmentId: 'attachment_local' })
-      expect(createTerminalMock).toHaveBeenNthCalledWith(2, { ...base, kind: 'additional', attachmentId: 'attachment_local' })
+      expect(createTerminalMock).toHaveBeenNthCalledWith(1, {
+        ...base,
+        kind: 'primary',
+        attachmentId: 'attachment_local',
+      })
+      expect(createTerminalMock).toHaveBeenNthCalledWith(2, {
+        ...base,
+        kind: 'additional',
+        attachmentId: 'attachment_local',
+      })
       expect(getProbe().summaries.map((session) => [session.terminalId, session.selected, session.hasBell])).toEqual([
         ['terminal-1', false, false],
         ['terminal-2', true, false],
@@ -551,7 +579,11 @@ describe('TerminalSessionProvider', () => {
       if (!firstSession) throw new Error('missing terminal-1 mock session')
 
       await act(async () => {
-        firstSession.emitBell({ processName: 'zsh', canonicalTitle: '~/Developer/goblin — npm run dev', visible: false })
+        firstSession.emitBell({
+          processName: 'zsh',
+          canonicalTitle: '~/Developer/goblin — npm run dev',
+          visible: false,
+        })
       })
 
       expect(getProbe().summaries.map((session) => [session.terminalId, session.selected, session.hasBell])).toEqual([
@@ -795,7 +827,9 @@ describe('TerminalSessionProvider', () => {
         sessionsChangedHandler?.(REPO_ID)
         await Promise.resolve()
       })
-      expect(getProbe().summaries.map((session) => [session.terminalId, session.selected])).toEqual([['terminal-1', true]])
+      expect(getProbe().summaries.map((session) => [session.terminalId, session.selected])).toEqual([
+        ['terminal-1', true],
+      ])
 
       const base = { repoRoot: REPO_ID, branch: 'feature/worktree', worktreePath: WORKTREE_PATH }
       await act(async () => {
@@ -1054,10 +1088,7 @@ describe('TerminalSessionProvider', () => {
       })
 
       expect(createdKey.endsWith('\u0000terminal-3')).toBe(true)
-      expect(getProbe().summaries.map((session) => session.terminalId)).toEqual([
-        'terminal-2',
-        'terminal-3',
-      ])
+      expect(getProbe().summaries.map((session) => session.terminalId)).toEqual(['terminal-2', 'terminal-3'])
     } finally {
       await unmount()
     }
@@ -1331,9 +1362,7 @@ describe('TerminalSessionProvider', () => {
         await Promise.resolve()
       })
 
-      expect(getProbe().summaries).toEqual([
-        expect.objectContaining({ terminalId: 'terminal-1' }),
-      ])
+      expect(getProbe().summaries).toEqual([expect.objectContaining({ terminalId: 'terminal-1' })])
       expect(getSessionSnapshotMock).toHaveBeenCalledTimes(1)
       expect(session.hydrate).toHaveBeenLastCalledWith(
         expect.objectContaining({
@@ -1457,7 +1486,14 @@ function CaptureGroupProbe({
   onProbe: (value: {
     count: number
     terminalIds: string[]
-    summaries: Array<{ key: string; terminalId: string; selected: boolean; hasBell: boolean; title: string; phase: string }>
+    summaries: Array<{
+      key: string
+      terminalId: string
+      selected: boolean
+      hasBell: boolean
+      title: string
+      phase: string
+    }>
   }) => void
 }) {
   const summaries = useTerminalSessionSummaries(worktreeTerminalKey)
@@ -1514,7 +1550,14 @@ async function renderProviderWithProbe(
   getProbe: () => {
     count: number
     terminalIds: string[]
-    summaries: Array<{ key: string; terminalId: string; selected: boolean; hasBell: boolean; title: string; phase: string }>
+    summaries: Array<{
+      key: string
+      terminalId: string
+      selected: boolean
+      hasBell: boolean
+      title: string
+      phase: string
+    }>
   }
   unmount: () => Promise<void>
 }> {
@@ -1525,7 +1568,14 @@ async function renderProviderWithProbe(
   let probe: {
     count: number
     terminalIds: string[]
-    summaries: Array<{ key: string; terminalId: string; selected: boolean; hasBell: boolean; title: string; phase: string }>
+    summaries: Array<{
+      key: string
+      terminalId: string
+      selected: boolean
+      hasBell: boolean
+      title: string
+      phase: string
+    }>
   } | null = null
 
   await act(async () => {

@@ -138,9 +138,11 @@ export const zh: Record<DictKey, string> = {
   'repo-tabs.open-remote-diagnostics-copy-details': '复制详情',
   'repo-tabs.open-remote-connect-via-ssh': '通过系统 SSH 连接',
   'repo-tabs.open-remote-config-only-hint': 'Goblin 仅支持通过 ~/.ssh/config 中定义的别名打开 SSH 远程仓库。',
-  'repo-tabs.open-remote-include-manual-hint': '检测到 Include 指令，别名列表可能不完整。请输入 SSH 别名，下面的建议仅来自当前文件。',
+  'repo-tabs.open-remote-include-manual-hint':
+    '检测到 Include 指令，别名列表可能不完整。请输入 SSH 别名，下面的建议仅来自当前文件。',
   'repo-tabs.open-remote-config-required': '请先在 ~/.ssh/config 中添加一个具体的 Host 条目，再打开远程仓库。',
-  'repo-tabs.open-remote-config-drift-hint': 'Goblin 在每次打开和重连时都会重新读取 ~/.ssh/config。如果别名被删除或已无法解析，会直接标记为配置漂移。',
+  'repo-tabs.open-remote-config-drift-hint':
+    'Goblin 在每次打开和重连时都会重新读取 ~/.ssh/config。如果别名被删除或已无法解析，会直接标记为配置漂移。',
   'repo-tabs.open-remote-open-ssh-settings': '打开 SSH 设置',
   'repo-tabs.open-remote-ssh-config': 'SSH 配置',
   'repo-tabs.open-remote-manual': '手动输入',
@@ -158,11 +160,15 @@ export const zh: Record<DictKey, string> = {
   'repo-unavailable.title': '仓库路径不可用',
   'repo-unavailable.body': 'Goblin 无法把这个路径作为 Git 仓库读取。请恢复文件夹或重新创建 .git 后重试。',
   'repo-unavailable.remote-body': 'Goblin 无法重新连接这个 SSH 仓库。请检查 SSH 别名、网络连通性和远端路径后再试。',
-  'repo-unavailable.remote-connect-failed': 'Goblin 无法建立可用的 SSH 会话。请检查认证、主机连通性和主机密钥信任后再试。',
+  'repo-unavailable.remote-connect-failed':
+    'Goblin 无法建立可用的 SSH 会话。请检查认证、主机连通性和主机密钥信任后再试。',
   'repo-unavailable.remote-config-changed': '已保存的 SSH 别名无法再从当前 SSH 配置中解析。请检查别名设置后重新连接。',
-  'repo-unavailable.remote-home-unavailable': 'Goblin 无法解析这个 SSH 目标的远端主目录。请检查登录 shell 和 SSH 配置后再试。',
-  'repo-unavailable.remote-path-missing': 'Goblin 已连接到 SSH 目标，但保存的远端路径已不存在。请更新远端路径后重新连接。',
-  'repo-unavailable.remote-not-a-repo': 'Goblin 已连接到 SSH 目标，但保存的路径已不再是 Git 仓库。请检查路径或重新连接到其他仓库。',
+  'repo-unavailable.remote-home-unavailable':
+    'Goblin 无法解析这个 SSH 目标的远端主目录。请检查登录 shell 和 SSH 配置后再试。',
+  'repo-unavailable.remote-path-missing':
+    'Goblin 已连接到 SSH 目标，但保存的远端路径已不存在。请更新远端路径后重新连接。',
+  'repo-unavailable.remote-not-a-repo':
+    'Goblin 已连接到 SSH 目标，但保存的路径已不再是 Git 仓库。请检查路径或重新连接到其他仓库。',
   'repo-unavailable.path': '路径',
   'repo-unavailable.reason': '原因',
   'repo-unavailable.retry': '重新检测',

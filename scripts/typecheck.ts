@@ -23,9 +23,7 @@ function runArchitectureCheck(): Promise<void> {
         return
       }
       reject(
-        new Error(
-          `architecture boundary check failed with ${signal ? `signal ${signal}` : `exit code ${code ?? 1}`}`,
-        ),
+        new Error(`architecture boundary check failed with ${signal ? `signal ${signal}` : `exit code ${code ?? 1}`}`),
       )
     })
   })

@@ -1,5 +1,8 @@
 import { readRuntimeGeneralSettings, useRuntimeSettingsSnapshot } from '#/web/settings-read-projection.ts'
-import { runSettingsControllerAction, setToggleDetailOnActionBarBlankClickPreference } from '#/web/settings-write-paths.ts'
+import {
+  runSettingsControllerAction,
+  setToggleDetailOnActionBarBlankClickPreference,
+} from '#/web/settings-write-paths.ts'
 
 export function useRuntimeGeneralSettings() {
   const runtimeSettings = useRuntimeSettingsSnapshot()

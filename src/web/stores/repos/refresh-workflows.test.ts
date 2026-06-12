@@ -31,7 +31,9 @@ describe('repo refresh workflows', () => {
           branches?: string[],
           options?: { token?: number; mode?: string; clearMissing?: boolean },
         ) => {
-          calls.push(`prs:${id}:${branches?.join(',') ?? ''}:${options?.mode ?? ''}:${String(options?.clearMissing ?? false)}:${options?.token ?? ''}`)
+          calls.push(
+            `prs:${id}:${branches?.join(',') ?? ''}:${options?.mode ?? ''}:${String(options?.clearMissing ?? false)}:${options?.token ?? ''}`,
+          )
           return Promise.resolve()
         },
       }) as unknown as ReturnType<ReposGet>
@@ -46,10 +48,7 @@ describe('repo refresh workflows', () => {
     })
     await new Promise((resolve) => setTimeout(resolve, 0))
 
-    expect(calls).toEqual([
-      'prs:/repo:feature/a,feature/b:summary:true:2',
-      'prs:/repo:feature/a:full:false:2',
-    ])
+    expect(calls).toEqual(['prs:/repo:feature/a,feature/b:summary:true:2', 'prs:/repo:feature/a:full:false:2'])
   })
 
   test('snapshot success does not block pull request backfill on terminal prune completion', async () => {
@@ -100,10 +99,7 @@ describe('repo refresh workflows', () => {
       isSnapshotCurrent: () => true,
     })
     await vi.waitFor(() => {
-      expect(calls).toEqual([
-        'prs:/repo:feature/a,feature/b:summary',
-        'prs:/repo:feature/a:full',
-      ])
+      expect(calls).toEqual(['prs:/repo:feature/a,feature/b:summary', 'prs:/repo:feature/a:full'])
     })
 
     resolvePrune()

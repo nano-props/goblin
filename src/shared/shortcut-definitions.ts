@@ -70,7 +70,9 @@ export interface BranchActionShortcutDefinition {
   labelKey: DictKey
 }
 
-export interface RendererKeyboardShortcutDefinition<Action extends RendererKeyboardShortcutAction = RendererKeyboardShortcutAction> {
+export interface RendererKeyboardShortcutDefinition<
+  Action extends RendererKeyboardShortcutAction = RendererKeyboardShortcutAction,
+> {
   matches: KeyboardShortcutMatch[]
   action: Action
   combos: string[][]
@@ -106,62 +108,134 @@ export const CLOSE_WINDOW_SHORTCUT_DEFAULT = 'CmdOrCtrl+W'
 export const CLOSE_WINDOW_SHORTCUT_SWAPPED = 'CmdOrCtrl+Shift+W'
 
 export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
-  rendererMenuCommand('app-settings', 'menu.app.settings', { type: 'open-settings-requested', page: 'general' }, {
-    helpLabelKey: 'help.row.settings',
-    accelerator: () => SETTINGS_SHORTCUT_MAC,
+  rendererMenuCommand(
+    'app-settings',
+    'menu.app.settings',
+    { type: 'open-settings-requested', page: 'general' },
+    {
+      helpLabelKey: 'help.row.settings',
+      accelerator: () => SETTINGS_SHORTCUT_MAC,
+    },
+  ),
+  rendererMenuCommand(
+    'file-open-local-repo',
+    'menu.file.open-local-repo',
+    { type: 'open-repo-requested' },
+    {
+      helpLabelKey: 'help.row.open-local-repo',
+      accelerator: 'CmdOrCtrl+O',
+    },
+  ),
+  rendererMenuCommand('file-open-local-repo-path', 'menu.file.open-local-repo-path', {
+    type: 'open-repo-path-requested',
   }),
-  rendererMenuCommand('file-open-local-repo', 'menu.file.open-local-repo', { type: 'open-repo-requested' }, {
-    helpLabelKey: 'help.row.open-local-repo',
-    accelerator: 'CmdOrCtrl+O',
-  }),
-  rendererMenuCommand('file-open-local-repo-path', 'menu.file.open-local-repo-path', { type: 'open-repo-path-requested' }),
-  rendererMenuCommand('file-clone-repo', 'menu.file.clone-repo', { type: 'clone-repo-requested' }, {
-    helpLabelKey: 'help.row.clone-repo',
-    accelerator: 'CmdOrCtrl+Shift+O',
-  }),
-  rendererMenuCommand('file-open-remote-repo', 'menu.file.open-remote-repo', { type: 'open-remote-repo-requested' }, {
-    accelerator: 'CmdOrCtrl+Shift+R',
-  }),
-  rendererMenuCommand('file-close-tab', 'menu.file.close-tab', { type: 'close-repo-requested' }, {
-    helpLabelKey: 'help.row.close-repo',
-    accelerator: (context) => closeShortcutAccelerators(context.swapCloseShortcuts).closeTab,
-  }),
-  rendererMenuCommand('file-settings', 'menu.file.settings', { type: 'open-settings-requested', page: 'general' }, {
-    helpLabelKey: 'help.row.settings',
-    accelerator: () => SETTINGS_SHORTCUT_NON_MAC,
-  }),
-  rendererMenuCommand('view-status', 'menu.view.status', { type: 'show-detail-tab-requested', tab: 'status' }, {
-    helpLabelKey: 'help.row.view-status',
-    accelerator: 'CmdOrCtrl+1',
-  }),
-  rendererMenuCommand('view-changes', 'menu.view.changes', { type: 'show-detail-tab-requested', tab: 'changes' }, {
-    helpLabelKey: 'help.row.view-changes',
-    accelerator: 'CmdOrCtrl+2',
-  }),
-  rendererMenuCommand('view-terminal', 'menu.view.terminal', { type: 'show-detail-tab-requested', tab: 'terminal' }, {
-    helpLabelKey: 'help.row.view-terminal',
-  }),
-  rendererMenuCommand('view-terminal-primary-action', 'menu.view.terminal-primary-action', { type: 'terminal-primary-action-requested' }, {
-    helpLabelKey: 'help.row.terminal-primary-action',
-    accelerator: 'CmdOrCtrl+Enter',
-  }),
-  rendererMenuCommand('view-toggle-detail', 'menu.view.toggle-detail', { type: 'toggle-detail-requested' }, {
-    helpLabelKey: 'help.row.toggle-detail',
-    accelerator: 'CmdOrCtrl+J',
-    enabled: (context) => context.workspaceLayout === 'top-bottom',
-  }),
-  rendererMenuCommand('view-refresh', 'menu.view.refresh', { type: 'repo-refresh-requested' }, {
-    helpLabelKey: 'help.row.refresh',
-    accelerator: 'CmdOrCtrl+U',
-  }),
-  rendererMenuCommand('window-next-repo', 'menu.window.next-repo', { type: 'cycle-repo-requested', direction: 1 }, {
-    helpLabelKey: 'help.row.next-repo',
-    accelerator: 'CmdOrCtrl+]',
-  }),
-  rendererMenuCommand('window-prev-repo', 'menu.window.prev-repo', { type: 'cycle-repo-requested', direction: -1 }, {
-    helpLabelKey: 'help.row.prev-repo',
-    accelerator: 'CmdOrCtrl+[',
-  }),
+  rendererMenuCommand(
+    'file-clone-repo',
+    'menu.file.clone-repo',
+    { type: 'clone-repo-requested' },
+    {
+      helpLabelKey: 'help.row.clone-repo',
+      accelerator: 'CmdOrCtrl+Shift+O',
+    },
+  ),
+  rendererMenuCommand(
+    'file-open-remote-repo',
+    'menu.file.open-remote-repo',
+    { type: 'open-remote-repo-requested' },
+    {
+      accelerator: 'CmdOrCtrl+Shift+R',
+    },
+  ),
+  rendererMenuCommand(
+    'file-close-tab',
+    'menu.file.close-tab',
+    { type: 'close-repo-requested' },
+    {
+      helpLabelKey: 'help.row.close-repo',
+      accelerator: (context) => closeShortcutAccelerators(context.swapCloseShortcuts).closeTab,
+    },
+  ),
+  rendererMenuCommand(
+    'file-settings',
+    'menu.file.settings',
+    { type: 'open-settings-requested', page: 'general' },
+    {
+      helpLabelKey: 'help.row.settings',
+      accelerator: () => SETTINGS_SHORTCUT_NON_MAC,
+    },
+  ),
+  rendererMenuCommand(
+    'view-status',
+    'menu.view.status',
+    { type: 'show-detail-tab-requested', tab: 'status' },
+    {
+      helpLabelKey: 'help.row.view-status',
+      accelerator: 'CmdOrCtrl+1',
+    },
+  ),
+  rendererMenuCommand(
+    'view-changes',
+    'menu.view.changes',
+    { type: 'show-detail-tab-requested', tab: 'changes' },
+    {
+      helpLabelKey: 'help.row.view-changes',
+      accelerator: 'CmdOrCtrl+2',
+    },
+  ),
+  rendererMenuCommand(
+    'view-terminal',
+    'menu.view.terminal',
+    { type: 'show-detail-tab-requested', tab: 'terminal' },
+    {
+      helpLabelKey: 'help.row.view-terminal',
+    },
+  ),
+  rendererMenuCommand(
+    'view-terminal-primary-action',
+    'menu.view.terminal-primary-action',
+    { type: 'terminal-primary-action-requested' },
+    {
+      helpLabelKey: 'help.row.terminal-primary-action',
+      accelerator: 'CmdOrCtrl+Enter',
+    },
+  ),
+  rendererMenuCommand(
+    'view-toggle-detail',
+    'menu.view.toggle-detail',
+    { type: 'toggle-detail-requested' },
+    {
+      helpLabelKey: 'help.row.toggle-detail',
+      accelerator: 'CmdOrCtrl+J',
+      enabled: (context) => context.workspaceLayout === 'top-bottom',
+    },
+  ),
+  rendererMenuCommand(
+    'view-refresh',
+    'menu.view.refresh',
+    { type: 'repo-refresh-requested' },
+    {
+      helpLabelKey: 'help.row.refresh',
+      accelerator: 'CmdOrCtrl+U',
+    },
+  ),
+  rendererMenuCommand(
+    'window-next-repo',
+    'menu.window.next-repo',
+    { type: 'cycle-repo-requested', direction: 1 },
+    {
+      helpLabelKey: 'help.row.next-repo',
+      accelerator: 'CmdOrCtrl+]',
+    },
+  ),
+  rendererMenuCommand(
+    'window-prev-repo',
+    'menu.window.prev-repo',
+    { type: 'cycle-repo-requested', direction: -1 },
+    {
+      helpLabelKey: 'help.row.prev-repo',
+      accelerator: 'CmdOrCtrl+[',
+    },
+  ),
   rendererMenuCommand('window-reset-layout', 'menu.window.reset-layout', { type: 'workspace-layout-reset-requested' }),
   rendererMenuCommand('help-shortcuts', 'menu.help.shortcuts', { type: 'open-settings-requested', page: 'shortcuts' }),
 ]
@@ -280,7 +354,10 @@ function matchKeyboardShortcut<Action extends string>(
   return null
 }
 
-function keyboardShortcutMatch(match: KeyboardShortcutMatch, input: { key?: string; code?: string; shiftKey?: boolean }): boolean {
+function keyboardShortcutMatch(
+  match: KeyboardShortcutMatch,
+  input: { key?: string; code?: string; shiftKey?: boolean },
+): boolean {
   if (match.key !== undefined && input.key !== match.key) return false
   if (match.code !== undefined && input.code !== match.code) return false
   if (match.shiftKey !== undefined && input.shiftKey !== match.shiftKey) return false
@@ -294,7 +371,8 @@ function rendererMenuAcceleratorShortcuts(ids: RendererMenuCommandId[]): Acceler
       swapCloseShortcuts: false,
       workspaceLayout: 'top-bottom',
     })
-    if (!accelerator || !command.helpLabelKey) throw new Error(`Renderer menu command ${id} is missing help shortcut metadata`)
+    if (!accelerator || !command.helpLabelKey)
+      throw new Error(`Renderer menu command ${id} is missing help shortcut metadata`)
     return { accelerator, labelKey: command.helpLabelKey }
   })
 }

@@ -171,10 +171,7 @@ export function TerminalTabs({
         onNavigateOut?.('next')
         return
       }
-      const nextIdx =
-        e.key === 'ArrowLeft'
-          ? (idx - 1 + keys.length) % keys.length
-          : (idx + 1) % keys.length
+      const nextIdx = e.key === 'ArrowLeft' ? (idx - 1 + keys.length) % keys.length : (idx + 1) % keys.length
       const nextKey = keys[nextIdx]
       if (nextKey) {
         focusRegistry.focus(nextKey)
@@ -298,7 +295,12 @@ export function TerminalTabs({
 
   function renderScrollableTabsBody() {
     return (
-      <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVisibleTabStrip]} onDragEnd={handleDragEnd}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        modifiers={[restrictToVisibleTabStrip]}
+        onDragEnd={handleDragEnd}
+      >
         <ToolbarTabStripBody scroll>
           <SortableContext items={sortableIds} strategy={horizontalListSortingStrategy}>
             <TerminalTabTooltipLayer
@@ -441,7 +443,19 @@ function TerminalTabChrome({
   )
 }
 
-function TerminalTab({ session, isActive, isSelected, index, total, tabId, focusRegistry, onSelect, onClose, onKeyDown, t }: TerminalTabProps) {
+function TerminalTab({
+  session,
+  isActive,
+  isSelected,
+  index,
+  total,
+  tabId,
+  focusRegistry,
+  onSelect,
+  onClose,
+  onKeyDown,
+  t,
+}: TerminalTabProps) {
   return (
     <TerminalTabChrome
       session={session}
@@ -475,11 +489,7 @@ function SortableTerminalTab({
   const sortable = useSortableTab(session.key, { onButtonRef: focusRegistry.setRef(session.key) })
 
   return (
-    <div
-      ref={sortable.setContainerRef}
-      style={sortable.style}
-      className="touch-none select-none"
-    >
+    <div ref={sortable.setContainerRef} style={sortable.style} className="touch-none select-none">
       <TerminalTabChrome
         session={session}
         isActive={isActive}

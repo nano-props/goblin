@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import { restoreRepoProjectionFromSnapshot, normalizeRestorableRepoCache, persistRestorableRepoSnapshot } from '#/web/stores/repos/persistence.ts'
+import {
+  restoreRepoProjectionFromSnapshot,
+  normalizeRestorableRepoCache,
+  persistRestorableRepoSnapshot,
+} from '#/web/stores/repos/persistence.ts'
 import { emptyRepo } from '#/web/stores/repos/helpers.ts'
 import {
   createBranchSnapshot,

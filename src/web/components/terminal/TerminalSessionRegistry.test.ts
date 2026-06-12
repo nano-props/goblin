@@ -31,7 +31,18 @@ function makeRepoIndex(): TerminalRepoIndex {
   }
 }
 
-function makeServerSession(sessionId: string, terminalId: string, overrides: Partial<{ controller: { attachmentId: string; status: 'connected' | 'grace' }; processName: string; canonicalTitle: string | null; cols: number; rows: number; displayOrder: number }> = {}) {
+function makeServerSession(
+  sessionId: string,
+  terminalId: string,
+  overrides: Partial<{
+    controller: { attachmentId: string; status: 'connected' | 'grace' }
+    processName: string
+    canonicalTitle: string | null
+    cols: number
+    rows: number
+    displayOrder: number
+  }> = {},
+) {
   return {
     sessionId,
     key: `${REPO_ROOT}\0${WORKTREE_PATH}\0${terminalId}`,
@@ -226,7 +237,11 @@ describe('TerminalSessionRegistry', () => {
       // Second reconcile: terminal-1 removed, terminal-2 is controller
       registry.reconcileServerSessions(
         REPO_ROOT,
-        [makeServerSession('session-2', 'terminal-2', { controller: { attachmentId: 'attachment_local', status: 'connected' } })],
+        [
+          makeServerSession('session-2', 'terminal-2', {
+            controller: { attachmentId: 'attachment_local', status: 'connected' },
+          }),
+        ],
         'attachment_local',
         new Map(),
       )

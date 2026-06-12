@@ -104,12 +104,12 @@ Do not mix read and write concerns unless the feature is still trivial.
 
 Server-side features follow the same layering logic as the renderer side. Do not let route files accumulate business orchestration just because they are on the server.
 
-| Layer | Server responsibility | Typical files |
-|-------|----------------------|---------------|
-| Boundary | Parse HTTP input, call next layer, return JSON | `src/server/routes/*.ts` |
-| Read | Query authoritative state, return snapshots | `src/server/modules/*-read.ts` or direct source call for simple cases |
-| Write | Orchestrate mutations, publish invalidation, call source | `src/server/modules/*-write-paths.ts` |
-| Source | Persistence, external system calls, file I/O | `src/server/modules/*-source.ts` |
+| Layer    | Server responsibility                                    | Typical files                                                         |
+| -------- | -------------------------------------------------------- | --------------------------------------------------------------------- |
+| Boundary | Parse HTTP input, call next layer, return JSON           | `src/server/routes/*.ts`                                              |
+| Read     | Query authoritative state, return snapshots              | `src/server/modules/*-read.ts` or direct source call for simple cases |
+| Write    | Orchestrate mutations, publish invalidation, call source | `src/server/modules/*-write-paths.ts`                                 |
+| Source   | Persistence, external system calls, file I/O             | `src/server/modules/*-source.ts`                                      |
 
 Rules:
 

@@ -18,7 +18,8 @@ export function createRealtimeRoutes({ internalSecret, terminalHost }: RealtimeR
   })
   app.use('/terminal', async (c, next) => {
     if (c.req.query('token') !== internalSecret) return c.json({ ok: false, message: 'Unauthorized' }, 401)
-    if (!terminalHost.isValidClientId(c.req.query('clientId'))) return c.json({ ok: false, message: 'Invalid client id' }, 400)
+    if (!terminalHost.isValidClientId(c.req.query('clientId')))
+      return c.json({ ok: false, message: 'Invalid client id' }, 400)
     if (!c.req.query('attachmentId')) return c.json({ ok: false, message: 'Missing attachment id' }, 400)
     await next()
   })

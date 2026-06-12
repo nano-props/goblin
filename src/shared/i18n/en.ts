@@ -148,17 +148,21 @@ export const en = {
   'repo-tabs.open-remote-config-only-hint': 'Goblin only opens SSH remotes from aliases defined in ~/.ssh/config.',
   'repo-tabs.open-remote-include-manual-hint':
     'An Include directive was detected, so the alias list may be incomplete. Enter an SSH alias manually; suggestions only come from the current file.',
-  'repo-tabs.open-remote-config-required': 'Add a concrete Host entry to ~/.ssh/config before opening a remote repository.',
-  'repo-tabs.open-remote-config-drift-hint': 'Goblin follows ~/.ssh/config on every open and reconnect. If the alias is removed or can no longer be resolved, the repo is marked as config drifted.',
+  'repo-tabs.open-remote-config-required':
+    'Add a concrete Host entry to ~/.ssh/config before opening a remote repository.',
+  'repo-tabs.open-remote-config-drift-hint':
+    'Goblin follows ~/.ssh/config on every open and reconnect. If the alias is removed or can no longer be resolved, the repo is marked as config drifted.',
   'repo-tabs.open-remote-open-ssh-settings': 'Open SSH settings',
   'repo-tabs.open-remote-ssh-config': 'SSH Config',
   'repo-tabs.open-remote-manual': 'Manual',
   'repo-tabs.open-remote-no-ssh-hosts': 'No SSH hosts found in ~/.ssh/config',
-  'repo-tabs.open-remote-no-ssh-hosts-help': 'Add a concrete Host block such as `Host my-server` and reopen this dialog.',
+  'repo-tabs.open-remote-no-ssh-hosts-help':
+    'Add a concrete Host block such as `Host my-server` and reopen this dialog.',
   'repo-tabs.open-remote-path-preview': 'Will open {path}',
   'repo-tabs.open-remote-path-preview-expanded': 'Will open {input}\nExpands to {expanded}',
   'repo-tabs.open-remote-diagnostics-idle-detail': 'Run a connection test to verify the target.',
-  'repo-tabs.open-remote-private-key-hint': 'Uses system SSH. Ensure your key is added to ssh-agent or specify the path.',
+  'repo-tabs.open-remote-private-key-hint':
+    'Uses system SSH. Ensure your key is added to ssh-agent or specify the path.',
   'repo-tabs.open-remote-port-error': 'Invalid port',
   'repo-tabs.open-remote-path-required': 'Path required',
   'repo-tabs.open-remote-path-absolute': 'Path must start with / or ~/',
@@ -505,7 +509,8 @@ export const en = {
   'settings.github.login-hint': 'Use `gh auth login` for GitHub.com, or specify `--hostname` for GitHub Enterprise.',
   'settings.github.login-example': 'gh auth login\n\ngh auth login --hostname github.example.com',
   'settings.github.detected-hosts': 'Detected hosts',
-  'settings.github.detected-hosts-hint': 'Only GitHub or GitHub Enterprise hosts used by your currently opened repositories are checked here.',
+  'settings.github.detected-hosts-hint':
+    'Only GitHub or GitHub Enterprise hosts used by your currently opened repositories are checked here.',
   'settings.github.no-hosts': 'No GitHub hosts are currently signed in through gh.',
   'settings.github.host-status': 'Host status',
   'settings.github.auth-signed-in': 'signed in',
@@ -571,8 +576,7 @@ export const en = {
   'settings.fetch.5m': '5 min',
   'settings.fetch.15m': '15 min',
   'settings.ssh.title': 'SSH',
-  'settings.ssh.body':
-    'Use Host aliases from ~/.ssh/config to open remote repositories.',
+  'settings.ssh.body': 'Use Host aliases from ~/.ssh/config to open remote repositories.',
   'settings.ssh.config-file-label': 'Configuration file',
   'settings.ssh.config-file-hint': 'Goblin reads SSH aliases from this file.',
   'settings.ssh.path-format-label': 'Path format',

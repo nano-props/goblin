@@ -1,19 +1,11 @@
 import { appendRepoEvent, errorEvent, updateIfFresh } from '#/web/stores/repos/helpers.ts'
-import {
-  isRepoUnavailableReason,
-  markRepoUnavailable,
-} from '#/web/stores/repos/availability.ts'
+import { isRepoUnavailableReason, markRepoUnavailable } from '#/web/stores/repos/availability.ts'
 import { runExclusiveOperation, runLatestOperation } from '#/web/stores/repos/operation-runner.ts'
 import { persistRestorableRepoSnapshot } from '#/web/stores/repos/persistence.ts'
 import { runLatestResourceOperation } from '#/web/stores/repos/resource-runner.ts'
 import { applyStatusToWorktreeStates } from '#/web/stores/repos/worktree-state.ts'
-import {
-  pruneRepoBranchPullRequestOperations,
-} from '#/web/stores/repos/runtime.ts'
-import {
-  runCoreDataRefreshWorkflow,
-  runSnapshotSuccessWorkflow,
-} from '#/web/stores/repos/refresh-workflows.ts'
+import { pruneRepoBranchPullRequestOperations } from '#/web/stores/repos/runtime.ts'
+import { runCoreDataRefreshWorkflow, runSnapshotSuccessWorkflow } from '#/web/stores/repos/refresh-workflows.ts'
 import {
   applyPullRequestRefreshErrorState,
   applyPullRequestRefreshStaleState,
@@ -25,15 +17,8 @@ import {
 } from '#/web/stores/repos/refresh-state.ts'
 import { createRefreshSyncHelpers } from '#/web/stores/repos/refresh-sync.ts'
 import { runWithRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
-import {
-  finishResourceError,
-  startResource,
-} from '#/web/stores/repos/resources.ts'
-import {
-  getRepositoryPullRequests,
-  getRepositorySnapshot,
-  getRepositoryStatus,
-} from '#/web/repo-client.ts'
+import { finishResourceError, startResource } from '#/web/stores/repos/resources.ts'
+import { getRepositoryPullRequests, getRepositorySnapshot, getRepositoryStatus } from '#/web/repo-client.ts'
 import type { RepoSnapshot } from '#/shared/rpc.ts'
 import type { RepoPullRequestReason } from '#/web/stores/repos/operations.ts'
 import type { RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
@@ -46,14 +31,12 @@ function resolvePullRequestRefreshRequest(
     mode?: PullRequestFetchMode
     clearMissing?: boolean
   },
-):
-  | {
-      branchNames: string[]
-      requested: Set<string>
-      mode: PullRequestFetchMode
-      clearMissing: boolean
-    }
-  | null {
+): {
+  branchNames: string[]
+  requested: Set<string>
+  mode: PullRequestFetchMode
+  clearMissing: boolean
+} | null {
   if (repo.availability.phase === 'unavailable') return null
   const mode = options?.mode ?? 'full'
   const clearMissing = options?.clearMissing ?? mode === 'full'
@@ -298,7 +281,10 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         priority: 100,
         targets: [{ key: 'manualRefresh', reason: 'manual-refresh' }],
         task: async () =>
-          await runWithRepoInvalidationSource('manual', async (sourceToken) => await runManualSyncPipeline(id, token, sourceToken)),
+          await runWithRepoInvalidationSource(
+            'manual',
+            async (sourceToken) => await runManualSyncPipeline(id, token, sourceToken),
+          ),
       })
     },
   }

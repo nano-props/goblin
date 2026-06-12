@@ -157,7 +157,10 @@ export function repoRemoteInfoForRemotes(remotes: GitRemoteInfo[]): RepoRemoteIn
   }
 }
 
-export function getBrowserRemoteUrlForRemotes(remotes: GitRemoteInfo[], upstream?: UpstreamParts | null): string | null {
+export function getBrowserRemoteUrlForRemotes(
+  remotes: GitRemoteInfo[],
+  upstream?: UpstreamParts | null,
+): string | null {
   return pickBrowserRemote(remotes, upstream)?.url ?? null
 }
 
@@ -226,11 +229,7 @@ export function resolvePushTargetForRemotes(
   return { remote, branch, setUpstream: true }
 }
 
-async function resolvePushTarget(
-  cwd: string,
-  branch: string,
-  signal?: AbortSignal,
-): Promise<PushTarget | ExecResult> {
+async function resolvePushTarget(cwd: string, branch: string, signal?: AbortSignal): Promise<PushTarget | ExecResult> {
   const [remotes, upstream] = await Promise.all([getRemotes(cwd, signal), getUpstreamParts(cwd, branch, signal)])
   return resolvePushTargetForRemotes(remotes, upstream, branch)
 }
@@ -252,14 +251,7 @@ export async function fetchAll(cwd: string, signal?: AbortSignal): Promise<ExecR
   if (remotes?.length === 0) return { ok: true, message: '' }
   const remote = resolveFetchRemoteForRemotes(remotes ?? [], upstream)
   if (!remote) return { ok: true, message: '' }
-  return gitResultWithOptions(
-    cwd,
-    { timeoutMs: NETWORK_TIMEOUT_MS, signal },
-    'fetch',
-    '--prune',
-    '--',
-    remote,
-  )
+  return gitResultWithOptions(cwd, { timeoutMs: NETWORK_TIMEOUT_MS, signal }, 'fetch', '--prune', '--', remote)
 }
 
 export async function pullBranch(

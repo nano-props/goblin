@@ -14,7 +14,10 @@ interface TerminalBrokerOptions {
 export class TerminalRealtimeBroker {
   private readonly options: TerminalBrokerOptions
   private readonly socketsByClientId = new Map<string, Set<TerminalRealtimeSocket>>()
-  private readonly socketMetaBySocket = new WeakMap<TerminalRealtimeSocket, { clientId: string; attachmentId: string }>()
+  private readonly socketMetaBySocket = new WeakMap<
+    TerminalRealtimeSocket,
+    { clientId: string; attachmentId: string }
+  >()
   private readonly socketCountByAttachmentKey = new Map<string, number>()
 
   constructor(options: TerminalBrokerOptions) {

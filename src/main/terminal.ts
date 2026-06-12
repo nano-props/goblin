@@ -4,7 +4,11 @@ import { broadcastRendererEffectIntent } from '#/main/renderer-surface-events.ts
 import { activateMainWindow } from '#/main/window.ts'
 import { t } from '#/main/i18n/index.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
-import { isValidTerminalNotifyBellInput, type TerminalMutationResult, type TerminalNotifyBellInput } from '#/shared/terminal.ts'
+import {
+  isValidTerminalNotifyBellInput,
+  type TerminalMutationResult,
+  type TerminalNotifyBellInput,
+} from '#/shared/terminal.ts'
 import {
   TERMINAL_NOTIFY_BELL_CHANNEL,
   TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL,
@@ -89,7 +93,12 @@ async function notifyTerminalBell(webContents: WebContents, input: TerminalNotif
 // resort: in practice one of the two events always fires, but it prevents the
 // IPC call from hanging indefinitely if neither does.
 //
-function showNotificationWithResult(title: string, body: string, repoRoot: string | null, key?: string): Promise<boolean> {
+function showNotificationWithResult(
+  title: string,
+  body: string,
+  repoRoot: string | null,
+  key?: string,
+): Promise<boolean> {
   return new Promise((resolve) => {
     const notif = new Notification({ title, body })
     let settled = false

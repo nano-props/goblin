@@ -1,6 +1,12 @@
 import path from 'node:path'
 import { isSafeBranchName } from '#/shared/refnames.ts'
-import { isRemoteRepoId, normalizeRemoteRepoRef, normalizeRepoSessionEntry, parseRemoteRepoId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
+import {
+  isRemoteRepoId,
+  normalizeRemoteRepoRef,
+  normalizeRepoSessionEntry,
+  parseRemoteRepoId,
+  type RepoSessionEntry,
+} from '#/shared/remote-repo.ts'
 
 export const MAX_IPC_PATH_LENGTH = 4096
 export const MAX_IPC_BRANCH_LENGTH = 1024

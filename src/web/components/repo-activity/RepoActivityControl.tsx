@@ -8,7 +8,11 @@ import { Tip } from '#/web/components/Tip.tsx'
 import { AsyncButton } from '#/web/components/AsyncButton.tsx'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import type { RepoActivity, RepoCompletion } from '#/web/components/repo-activity/model.ts'
-import { getRepoActivity, getRepoActivityControlView, isRepoPrimaryRefreshBusy } from '#/web/components/repo-activity/model.ts'
+import {
+  getRepoActivity,
+  getRepoActivityControlView,
+  isRepoPrimaryRefreshBusy,
+} from '#/web/components/repo-activity/model.ts'
 import { useVisibleLoadingValue } from '#/web/hooks/useLoadingVisibility.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { cn } from '#/web/lib/cn.ts'
@@ -115,7 +119,15 @@ function useRepoCompletion(repoId: string): RepoCompletion | null {
   return completion
 }
 
-function RepoRefreshButton({ repo, manualSyncBusy, compact }: { repo: RepoState; manualSyncBusy: boolean; compact: boolean }) {
+function RepoRefreshButton({
+  repo,
+  manualSyncBusy,
+  compact,
+}: {
+  repo: RepoState
+  manualSyncBusy: boolean
+  compact: boolean
+}) {
   const t = useT()
   const label = t('action.refresh')
 

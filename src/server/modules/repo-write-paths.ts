@@ -278,7 +278,11 @@ export async function deleteRepositoryBranch(
   sourceToken?: string,
 ): Promise<ExecResult> {
   return await runWithRepoBackend(cwd, async (backend) => {
-    return await publishSnapshotInvalidationAfterMutation(cwd, await backend.deleteBranch(branch, options, signal), sourceToken)
+    return await publishSnapshotInvalidationAfterMutation(
+      cwd,
+      await backend.deleteBranch(branch, options, signal),
+      sourceToken,
+    )
   })
 }
 

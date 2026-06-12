@@ -19,10 +19,7 @@ type RestorableWorkspaceLifecycleActions = Pick<ReposStore, 'hydrateSession'>
 
 const SESSION_PROBE_CONCURRENCY = 4
 
-function createRestorableWorkspaceLifecycleActions(
-  set: ReposSet,
-  get: ReposGet,
-): RestorableWorkspaceLifecycleActions {
+function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet): RestorableWorkspaceLifecycleActions {
   return {
     async hydrateSession(openRepos: RepoSessionEntry[], activeRepo: string | null) {
       // Boot/session restore of workspace membership and active tab. This

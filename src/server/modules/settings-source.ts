@@ -67,7 +67,9 @@ function normalizeThemePref(value: unknown): ThemePref {
 }
 
 function normalizeLangPref(value: unknown): LangPref {
-  return value === 'auto' || value === 'en' || value === 'zh' || value === 'ko' || value === 'ja' ? value : DEFAULT_LANG_PREF
+  return value === 'auto' || value === 'en' || value === 'zh' || value === 'ko' || value === 'ja'
+    ? value
+    : DEFAULT_LANG_PREF
 }
 
 function normalizeColorTheme(value: unknown): ColorTheme {
@@ -143,7 +145,9 @@ function normalizeSession(value: unknown): SessionState {
   if (!value || typeof value !== 'object') return defaultSession()
   const partial = value as Partial<SessionState> & { activeTerminalByGroup?: unknown }
   const openRepos = Array.isArray(partial.openRepos)
-    ? dedupeRepoEntries(partial.openRepos.map(toSafeSessionRepoEntry).filter((entry): entry is RepoSessionEntry => entry !== null))
+    ? dedupeRepoEntries(
+        partial.openRepos.map(toSafeSessionRepoEntry).filter((entry): entry is RepoSessionEntry => entry !== null),
+      )
     : []
   const activeRepo = toSafeRepoLocator(partial.activeRepo)
   const workspaceLayout = normalizeWorkspaceLayout(partial.workspaceLayout)
@@ -166,10 +170,9 @@ function normalizeSession(value: unknown): SessionState {
 
 function normalizeRecentRepos(value: unknown): RepoSessionEntry[] {
   if (!Array.isArray(value)) return []
-  return dedupeRepoEntries(value.map(toSafeSessionRepoEntry).filter((entry): entry is RepoSessionEntry => entry !== null)).slice(
-    0,
-    MAX_RECENT_REPOS,
-  )
+  return dedupeRepoEntries(
+    value.map(toSafeSessionRepoEntry).filter((entry): entry is RepoSessionEntry => entry !== null),
+  ).slice(0, MAX_RECENT_REPOS)
 }
 
 async function readServerSettingsFile(): Promise<ServerSettingsData | null> {
@@ -254,7 +257,8 @@ export async function updateServerSettingsPrefs(patch: ServerSettingsPrefsPatch)
     patch.terminalNotificationsEnabled === undefined
       ? data.terminalNotificationsEnabled
       : normalizeTerminalNotificationsEnabled(patch.terminalNotificationsEnabled)
-  const nextShortcutsDisabled = patch.shortcutsDisabled === undefined ? data.shortcutsDisabled : patch.shortcutsDisabled === true
+  const nextShortcutsDisabled =
+    patch.shortcutsDisabled === undefined ? data.shortcutsDisabled : patch.shortcutsDisabled === true
   const nextGlobalShortcutDisabled =
     patch.globalShortcutDisabled === undefined ? data.globalShortcutDisabled : patch.globalShortcutDisabled === true
   const nextSwapCloseShortcuts =

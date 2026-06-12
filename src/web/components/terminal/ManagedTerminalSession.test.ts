@@ -643,7 +643,7 @@ describe('ManagedTerminalSession', () => {
       const host = document.createElement('div')
       document.body.appendChild(host)
       const session = new ManagedTerminalSession(descriptor, vi.fn())
-    hydrateManagedSession(session)
+      hydrateManagedSession(session)
 
       session.attach(host)
       await flushTerminalStart()
@@ -675,7 +675,8 @@ describe('ManagedTerminalSession', () => {
     const savedUserAgent = navigator.userAgent
     Object.defineProperty(window.navigator, 'userAgent', {
       configurable: true,
-      value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
+      value:
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
     })
     try {
       const host = document.createElement('div')
@@ -711,7 +712,8 @@ describe('ManagedTerminalSession', () => {
     const savedUserAgent = navigator.userAgent
     Object.defineProperty(window.navigator, 'userAgent', {
       configurable: true,
-      value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
+      value:
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
     })
     try {
       const host = document.createElement('div')
@@ -754,7 +756,8 @@ describe('ManagedTerminalSession', () => {
     const savedUserAgent = navigator.userAgent
     Object.defineProperty(window.navigator, 'userAgent', {
       configurable: true,
-      value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      value:
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
     })
     try {
       const host = document.createElement('div')
@@ -869,7 +872,12 @@ describe('ManagedTerminalSession', () => {
     session.attach(host)
     await flushTerminalStart()
 
-    expect(session.snapshot()).toEqual({ phase: 'error', message: 'error.spawn-failed', processName: 'zsh', canonicalTitle: null })
+    expect(session.snapshot()).toEqual({
+      phase: 'error',
+      message: 'error.spawn-failed',
+      processName: 'zsh',
+      canonicalTitle: null,
+    })
   })
 
   test('continues after terminal write failures', async () => {
@@ -974,8 +982,11 @@ describe('ManagedTerminalSession', () => {
 
     expect(terminalCalls.write).not.toHaveBeenCalled()
     expect(terminalCalls.resize).not.toHaveBeenCalled()
-    expect(session.snapshot().attachment).toMatchObject({ role: 'viewer',
-      controllerStatus: 'connected', canTakeover: true })
+    expect(session.snapshot().attachment).toMatchObject({
+      role: 'viewer',
+      controllerStatus: 'connected',
+      canTakeover: true,
+    })
   })
 
   test('preloads hydrated snapshot before attaching as controller', async () => {
@@ -1096,8 +1107,11 @@ describe('ManagedTerminalSession', () => {
     await flushTerminalStart()
 
     expect(terminalCalls.write).not.toHaveBeenCalled()
-    expect(session.snapshot().attachment).toMatchObject({ role: 'viewer',
-      controllerStatus: 'connected', canTakeover: true })
+    expect(session.snapshot().attachment).toMatchObject({
+      role: 'viewer',
+      controllerStatus: 'connected',
+      canTakeover: true,
+    })
     expect(notify).not.toHaveBeenCalled()
   })
 
@@ -1126,16 +1140,22 @@ describe('ManagedTerminalSession', () => {
 
     xtermMocks.terminals[0]!.resize(101, 31)
     await flushResizeDebounce()
-    expect(session.snapshot().attachment).toMatchObject({ role: 'viewer',
-      controllerStatus: 'connected', canTakeover: true })
+    expect(session.snapshot().attachment).toMatchObject({
+      role: 'viewer',
+      controllerStatus: 'connected',
+      canTakeover: true,
+    })
 
     session.takeover()
     await flushUntil(() => terminalCalls.takeover.mock.calls.length > 0)
 
     expect(terminalCalls.takeover).toHaveBeenCalledWith({ sessionId: 'session-1', cols: 101, rows: 31 })
     // Before authoritative ownership message arrives, role is still viewer
-    expect(session.snapshot().attachment).toMatchObject({ role: 'viewer',
-      controllerStatus: 'connected', canTakeover: true })
+    expect(session.snapshot().attachment).toMatchObject({
+      role: 'viewer',
+      controllerStatus: 'connected',
+      canTakeover: true,
+    })
 
     // Simulate authoritative server ownership event
     session.handleOwnership({
@@ -1146,8 +1166,11 @@ describe('ManagedTerminalSession', () => {
       canonicalRows: 31,
     })
 
-    expect(session.snapshot().attachment).toMatchObject({ role: 'controller',
-      controllerStatus: 'connected', canTakeover: false })
+    expect(session.snapshot().attachment).toMatchObject({
+      role: 'controller',
+      controllerStatus: 'connected',
+      canTakeover: false,
+    })
   })
 
   test('takeover applies authoritative server ownership instead of optimistic local control', async () => {
@@ -1177,8 +1200,11 @@ describe('ManagedTerminalSession', () => {
     await flushUntil(() => terminalCalls.takeover.mock.calls.length > 0)
 
     // Bridge response alone does not change ownership; only authoritative onOwnership does
-    expect(session.snapshot().attachment).toMatchObject({ role: 'viewer',
-      controllerStatus: 'connected', canTakeover: true })
+    expect(session.snapshot().attachment).toMatchObject({
+      role: 'viewer',
+      controllerStatus: 'connected',
+      canTakeover: true,
+    })
 
     session.handleOwnership({
       sessionId: 'session-1',

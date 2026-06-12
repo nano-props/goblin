@@ -32,12 +32,7 @@ function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
           <div className="text-sm font-semibold text-foreground">{t('error.render-crash-title')}</div>
           <div className="text-xs leading-relaxed text-muted-foreground">{message}</div>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={resetErrorBoundary}
-          className="h-8 px-3"
-        >
+        <Button type="button" variant="outline" onClick={resetErrorBoundary} className="h-8 px-3">
           <RefreshCw className="size-3" />
           {t('error.try-again')}
         </Button>

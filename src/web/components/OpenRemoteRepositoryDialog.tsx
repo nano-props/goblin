@@ -277,7 +277,13 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
         />
 
         <DialogFooter className="gap-2 pt-2">
-          <Button type="button" variant="outline" className={cn(compact && 'w-full')} disabled={pending} onClick={handleCancel}>
+          <Button
+            type="button"
+            variant="outline"
+            className={cn(compact && 'w-full')}
+            disabled={pending}
+            onClick={handleCancel}
+          >
             {t('dialog.cancel')}
           </Button>
           <Button
@@ -289,7 +295,11 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
           >
             {t('repo-tabs.open-remote-test-connection')}
           </Button>
-          <Button type="submit" className={cn('min-w-28', compact && 'w-full min-w-0')} disabled={!canSubmit || pending}>
+          <Button
+            type="submit"
+            className={cn('min-w-28', compact && 'w-full min-w-0')}
+            disabled={!canSubmit || pending}
+          >
             {t('repo-tabs.open-remote-confirm')}
           </Button>
         </DialogFooter>

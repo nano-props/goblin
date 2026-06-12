@@ -28,9 +28,7 @@ export function titleBarOverlayForTheme(
   // black. Otherwise Win/Linux caption buttons render over a visibly
   // different band when the user switches to non-default color themes.
   const color = WINDOW_BACKGROUND_BY_COLOR_THEME[colorTheme][theme]
-  return theme === 'dark'
-    ? { color, symbolColor: '#ffffff', height }
-    : { color, symbolColor: '#000000', height }
+  return theme === 'dark' ? { color, symbolColor: '#ffffff', height } : { color, symbolColor: '#000000', height }
 }
 
 export function macTrafficLightPosition(topInset: number): { x: number; y: number } | undefined {

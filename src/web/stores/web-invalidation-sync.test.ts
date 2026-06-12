@@ -103,9 +103,7 @@ async function waitUntil(assertion: () => void, attempts = 20): Promise<void> {
   throw lastError
 }
 
-function settingsSnapshotResponse(
-  overrides: Record<string, unknown> & { colorTheme?: string } = {},
-) {
+function settingsSnapshotResponse(overrides: Record<string, unknown> & { colorTheme?: string } = {}) {
   return {
     ...defaultSettingsSnapshot({ globalShortcut: 'CommandOrControl+Shift+G' }),
     colorTheme: 'default',

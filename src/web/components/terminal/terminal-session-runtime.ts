@@ -194,5 +194,4 @@ export class TerminalSessionRuntime {
     this.replacingPtySessionId = null
     return sessionId
   }
-
 }

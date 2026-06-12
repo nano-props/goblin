@@ -37,10 +37,14 @@ export function disconnectAllInvalidationSockets(): void {
 }
 
 export function publishRepoQueryInvalidation(event: Omit<RepoQueryInvalidationEvent, 'type'>): void {
-  publishInvalidationPayload(JSON.stringify({ type: 'repo-query-invalidated', ...event } satisfies RepoQueryInvalidationEvent))
+  publishInvalidationPayload(
+    JSON.stringify({ type: 'repo-query-invalidated', ...event } satisfies RepoQueryInvalidationEvent),
+  )
 }
 
 export function publishSettingsInvalidation(scopes: SettingsInvalidationScope[]): void {
   if (scopes.length === 0) return
-  publishInvalidationPayload(JSON.stringify({ type: 'settings-invalidated', scopes } satisfies SettingsInvalidationEvent))
+  publishInvalidationPayload(
+    JSON.stringify({ type: 'settings-invalidated', scopes } satisfies SettingsInvalidationEvent),
+  )
 }

@@ -85,7 +85,11 @@ describe('terminal bell controller', () => {
     )
     const controller = createTerminalBellController(notify, vi.fn())
 
-    controller.handleBell(descriptor, { processName: 'zsh', canonicalTitle: '~/Developer/goblin — npm run dev', visible: false })
+    controller.handleBell(descriptor, {
+      processName: 'zsh',
+      canonicalTitle: '~/Developer/goblin — npm run dev',
+      visible: false,
+    })
     await Promise.resolve()
 
     expect(window.goblinNative.terminal.notifyBell).toHaveBeenCalledWith({

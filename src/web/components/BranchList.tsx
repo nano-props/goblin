@@ -135,7 +135,11 @@ export function BranchList({ repoId, showActions = true }: Props) {
   })
   useEffect(() => {
     if (!openActionMenu) return
-    if (openActionMenu.repoId !== repoId || !showActions || !branches.some((branch) => branch.name === openActionMenu.branch)) {
+    if (
+      openActionMenu.repoId !== repoId ||
+      !showActions ||
+      !branches.some((branch) => branch.name === openActionMenu.branch)
+    ) {
       setOpenActionMenu(null)
     }
   }, [openActionMenu, branches, repoId, showActions])

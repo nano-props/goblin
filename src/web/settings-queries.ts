@@ -1,18 +1,8 @@
 import { useEffect } from 'react'
 import QRCode from 'qrcode'
 import { queryOptions, useQuery, useQueryClient } from '@tanstack/react-query'
-import type {
-  ExternalAppsSnapshot,
-  GitHubCliState,
-  LanInfo,
-  SettingsSnapshot,
-} from '#/shared/rpc.ts'
-import {
-  getExternalAppsSnapshot,
-  getGitHubCliState,
-  getLanInfo,
-  getSettingsSnapshot,
-} from '#/web/settings-client.ts'
+import type { ExternalAppsSnapshot, GitHubCliState, LanInfo, SettingsSnapshot } from '#/shared/rpc.ts'
+import { getExternalAppsSnapshot, getGitHubCliState, getLanInfo, getSettingsSnapshot } from '#/web/settings-client.ts'
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
 import { subscribeSettingsInvalidation } from '#/web/settings-invalidation-ingress.ts'
 import { DEFAULT_COLOR_THEME } from '#/shared/color-theme.ts'
@@ -76,7 +66,12 @@ function initialGitHubCliState(): GitHubCliState {
   }
 }
 
-export { externalAppsQueryKey, githubCliQueryKey, lanInfoQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
+export {
+  externalAppsQueryKey,
+  githubCliQueryKey,
+  lanInfoQueryKey,
+  settingsSnapshotQueryKey,
+} from '#/web/settings-query-cache.ts'
 
 export function settingsSnapshotQueryOptions() {
   return queryOptions<SettingsSnapshot>({

@@ -27,35 +27,42 @@ async function requestSettingsJson<T>(
 }
 
 export async function getSettingsSnapshot(): Promise<SettingsSnapshot> {
-  return await requestSettingsJson<SettingsSnapshot>('/api/settings', undefined, 'Embedded server rejected settings snapshot request')
+  return await requestSettingsJson<SettingsSnapshot>(
+    '/api/settings',
+    undefined,
+    'Embedded server rejected settings snapshot request',
+  )
 }
 
 export async function updateSettingsPrefs(settings: SettingsPrefsPatch): Promise<SettingsPrefs> {
   const runtime = requireEmbeddedServerRuntime()
-  const json = await postEmbeddedServerJson<{ settings?: SettingsPrefs }>(runtime, '/api/settings/prefs', { settings }).catch(
-    (error) => {
-      throw new Error(`Embedded server rejected settings update${error instanceof Error ? `: ${error.message}` : ''}`)
-    },
-  )
+  const json = await postEmbeddedServerJson<{ settings?: SettingsPrefs }>(runtime, '/api/settings/prefs', {
+    settings,
+  }).catch((error) => {
+    throw new Error(`Embedded server rejected settings update${error instanceof Error ? `: ${error.message}` : ''}`)
+  })
   if (!json?.settings) throw new Error('Embedded server returned an invalid settings payload')
   return json.settings
 }
 
 export async function getSettingsPrefs(): Promise<SettingsPrefs> {
-  return await requestSettingsJson<SettingsPrefs>('/api/settings/prefs', undefined, 'Embedded server rejected settings prefs request')
+  return await requestSettingsJson<SettingsPrefs>(
+    '/api/settings/prefs',
+    undefined,
+    'Embedded server rejected settings prefs request',
+  )
 }
 
 export async function setSettingsGlobalShortcutState(registered: boolean): Promise<boolean> {
   const runtime = requireEmbeddedServerRuntime()
-  const json = await postEmbeddedServerJson<{ registered?: unknown }>(
-    runtime,
-    '/api/settings/global-shortcut-state',
-    { registered },
-  ).catch((error) => {
+  const json = await postEmbeddedServerJson<{ registered?: unknown }>(runtime, '/api/settings/global-shortcut-state', {
+    registered,
+  }).catch((error) => {
     throw new Error(
       `Embedded server rejected global shortcut state update${error instanceof Error ? `: ${error.message}` : ''}`,
     )
   })
-  if (typeof json?.registered !== 'boolean') throw new Error('Embedded server returned an invalid global shortcut state')
+  if (typeof json?.registered !== 'boolean')
+    throw new Error('Embedded server returned an invalid global shortcut state')
   return json.registered
 }

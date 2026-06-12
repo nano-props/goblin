@@ -390,10 +390,19 @@ describe('refreshPullRequests', () => {
     }))
     const calls: Array<{ branches?: string[]; mode?: string }> = []
     rpcHandlers['repo.snapshot'] = async () => ({
-      branches: [branch('feature/a', undefined, { worktree: { path: '/tmp/feature-a-worktree' } }), branch('feature/b')],
+      branches: [
+        branch('feature/a', undefined, { worktree: { path: '/tmp/feature-a-worktree' } }),
+        branch('feature/b'),
+      ],
       current: 'feature/a',
     })
-    rpcHandlers['repo.pullRequests'] = async ({ branches, options }: { branches?: string[]; options?: { mode?: string } }) => {
+    rpcHandlers['repo.pullRequests'] = async ({
+      branches,
+      options,
+    }: {
+      branches?: string[]
+      options?: { mode?: string }
+    }) => {
       calls.push({ branches, mode: options?.mode })
       return []
     }

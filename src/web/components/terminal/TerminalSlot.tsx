@@ -189,7 +189,8 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
   const progress = snapshot.progress
   const attachment = snapshot.attachment
   const isController = hasSessions && snapshot.phase === 'open' && attachment?.role === 'controller'
-  const isReadonly = hasSessions && snapshot.phase === 'open' && (attachment?.role === 'viewer' || attachment?.role === 'unowned')
+  const isReadonly =
+    hasSessions && snapshot.phase === 'open' && (attachment?.role === 'viewer' || attachment?.role === 'unowned')
   const readonlyBadge = attachment?.role === 'viewer' ? t('terminal.mirror-controlled') : t('terminal.unowned')
   const progressVariant =
     progress?.state === 2 ? 'error' : progress?.state === 4 ? 'warning' : progress?.state === 3 ? 'indeterminate' : ''
@@ -302,7 +303,14 @@ interface ViewerOverlayProps {
   takeoverPending?: boolean
 }
 
-function ViewerOverlay({ badge, takeoverLabel, snapshot, takeoverKey, onTakeover, takeoverPending }: ViewerOverlayProps) {
+function ViewerOverlay({
+  badge,
+  takeoverLabel,
+  snapshot,
+  takeoverKey,
+  onTakeover,
+  takeoverPending,
+}: ViewerOverlayProps) {
   return (
     <div className="goblin-terminal-slot__viewer-overlay">
       <div className="goblin-terminal-slot__viewer-content">
@@ -313,9 +321,7 @@ function ViewerOverlay({ badge, takeoverLabel, snapshot, takeoverKey, onTakeover
             <span className="goblin-terminal-slot__viewer-title">{snapshot.canonicalTitle}</span>
           )}
         </div>
-        {snapshot.outputSummary && (
-          <pre className="goblin-terminal-slot__viewer-output">{snapshot.outputSummary}</pre>
-        )}
+        {snapshot.outputSummary && <pre className="goblin-terminal-slot__viewer-output">{snapshot.outputSummary}</pre>}
         <Button
           type="button"
           size="sm"

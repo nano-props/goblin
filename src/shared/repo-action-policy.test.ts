@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'vitest'
-import { validateBranchDeletionPolicy, validateCreateWorktreeInput, validateRemovableWorktreeState } from '#/shared/repo-action-policy.ts'
+import {
+  validateBranchDeletionPolicy,
+  validateCreateWorktreeInput,
+  validateRemovableWorktreeState,
+} from '#/shared/repo-action-policy.ts'
 
 describe('validateCreateWorktreeInput', () => {
   test('accepts an absolute path with safe branch names', () => {
@@ -24,7 +28,13 @@ describe('validateCreateWorktreeInput', () => {
 describe('validateRemovableWorktreeState', () => {
   test('accepts a clean unlocked worktree', () => {
     expect(
-      validateRemovableWorktreeState({ path: '/tmp/repo-feature', branch: 'feature/test', isBare: false, isPrimary: false, isDirty: false }),
+      validateRemovableWorktreeState({
+        path: '/tmp/repo-feature',
+        branch: 'feature/test',
+        isBare: false,
+        isPrimary: false,
+        isDirty: false,
+      }),
     ).toBeNull()
   })
 
@@ -46,13 +56,24 @@ describe('validateRemovableWorktreeState', () => {
 
   test('rejects dirty or unreadable worktrees', () => {
     expect(
-      validateRemovableWorktreeState({ path: '/tmp/repo-feature', branch: 'feature/test', isBare: false, isPrimary: false, isDirty: true }),
+      validateRemovableWorktreeState({
+        path: '/tmp/repo-feature',
+        branch: 'feature/test',
+        isBare: false,
+        isPrimary: false,
+        isDirty: true,
+      }),
     ).toEqual({
       ok: false,
       message: 'error.cannot-remove-dirty-worktree',
     })
     expect(
-      validateRemovableWorktreeState({ path: '/tmp/repo-feature', branch: 'feature/test', isBare: false, isPrimary: false }),
+      validateRemovableWorktreeState({
+        path: '/tmp/repo-feature',
+        branch: 'feature/test',
+        isBare: false,
+        isPrimary: false,
+      }),
     ).toEqual({
       ok: false,
       message: 'error.cannot-remove-dirty-worktree',

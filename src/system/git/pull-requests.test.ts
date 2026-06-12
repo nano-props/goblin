@@ -77,8 +77,12 @@ function graphqlPullRequests(nodes: unknown[]) {
   })
 }
 
-function installGhGraphqlMock(handler: (payload: { variables?: Record<string, unknown> }) => string | Promise<string>): void {
-  execaMock.mockImplementation(async (_cmd, _args, options) => ({ stdout: await handler(JSON.parse(String(options?.input))) }))
+function installGhGraphqlMock(
+  handler: (payload: { variables?: Record<string, unknown> }) => string | Promise<string>,
+): void {
+  execaMock.mockImplementation(async (_cmd, _args, options) => ({
+    stdout: await handler(JSON.parse(String(options?.input))),
+  }))
 }
 
 afterEach(() => {
@@ -120,9 +124,21 @@ describe('pull request normalization', () => {
 
 describe('pull request selection', () => {
   test('prefers open over merged over closed', () => {
-    const merged = { number: 1, title: 'Merged', url: 'https://example.com/1', state: 'merged' as const, isDraft: false }
+    const merged = {
+      number: 1,
+      title: 'Merged',
+      url: 'https://example.com/1',
+      state: 'merged' as const,
+      isDraft: false,
+    }
     const open = { number: 2, title: 'Open', url: 'https://example.com/2', state: 'open' as const, isDraft: false }
-    const closed = { number: 3, title: 'Closed', url: 'https://example.com/3', state: 'closed' as const, isDraft: false }
+    const closed = {
+      number: 3,
+      title: 'Closed',
+      url: 'https://example.com/3',
+      state: 'closed' as const,
+      isDraft: false,
+    }
 
     expect(pickPullRequest(merged, open)).toBe(open)
     expect(pickPullRequest(open, closed)).toBe(open)
@@ -155,7 +171,9 @@ describe('branch pull request lookup', () => {
     installGhGraphqlMock(async (body) => {
       const variables = (body.variables ?? {}) as { owner?: string; repo?: string; headRefName?: string }
       queriedRepos.push(variables)
-      return graphqlPullRequests([pullRequestNode(variables.headRefName === 'feature' ? 42 : 7, variables.headRefName ?? '')])
+      return graphqlPullRequests([
+        pullRequestNode(variables.headRefName === 'feature' ? 42 : 7, variables.headRefName ?? ''),
+      ])
     })
 
     const upstreamBranch = await getBranchPullRequests(repo, new Set(['feature']), { mode: 'summary' })

@@ -122,7 +122,7 @@ export async function handleWorkspaceRendererIntent(
 ): Promise<boolean> {
   // Workspace intents are route-aware and may be gated by overlays, shortcut
   // suppression, or terminal focus before they execute.
-  const currentRepo = deps.currentRepoId ? useReposStore.getState().repos[deps.currentRepoId] ?? null : null
+  const currentRepo = deps.currentRepoId ? (useReposStore.getState().repos[deps.currentRepoId] ?? null) : null
   const plan = createWorkspaceIntentPlan(event, {
     overlayBlocked: deps.isOverlayOpen() || isShortcutBlockingLayerOpen(),
     workspaceShortcutSuppressed: deps.isWorkspaceShortcutSuppressed(),

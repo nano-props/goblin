@@ -1,7 +1,15 @@
 import { DEFAULT_GLOBAL_SHORTCUT } from '#/shared/accelerator.ts'
 import { DEFAULT_COLOR_THEME, type ColorTheme } from '#/shared/color-theme.ts'
 import type { InitialSettingsSnapshot } from '#/shared/bootstrap.ts'
-import type { EditorPref, LangPref, SessionState, SettingsPrefs, SettingsSnapshot, TerminalPref, ThemePref } from '#/shared/rpc.ts'
+import type {
+  EditorPref,
+  LangPref,
+  SessionState,
+  SettingsPrefs,
+  SettingsSnapshot,
+  TerminalPref,
+  ThemePref,
+} from '#/shared/rpc.ts'
 import {
   DEFAULT_DETAIL_COLLAPSED,
   DEFAULT_DETAIL_FOCUS_MODE,
@@ -51,7 +59,7 @@ export function defaultSettingsPrefs(overrides: Partial<SettingsPrefs> = {}): Se
     terminalApp: overrides.terminalApp ?? DEFAULT_TERMINAL_APP,
     editorApp: overrides.editorApp ?? DEFAULT_EDITOR_APP,
     lanEnabled: overrides.lanEnabled ?? DEFAULT_LAN_ENABLED,
- }
+  }
 }
 
 export function defaultSettingsSnapshot(overrides: Partial<SettingsSnapshot> = {}): SettingsSnapshot {
@@ -64,20 +72,22 @@ export function defaultSettingsSnapshot(overrides: Partial<SettingsSnapshot> = {
   }
 }
 
-export function initialSettingsFromSnapshot(snapshot: Pick<
-  SettingsSnapshot,
-  | 'fetchIntervalSec'
-  | 'terminalNotificationsEnabled'
-  | 'shortcutsDisabled'
-  | 'globalShortcutDisabled'
-  | 'swapCloseShortcuts'
-  | 'toggleDetailOnActionBarBlankClick'
-  | 'globalShortcut'
-  | 'globalShortcutRegistered'
-  | 'terminalApp'
-  | 'editorApp'
-  | 'lanEnabled'
->): InitialSettingsSnapshot {
+export function initialSettingsFromSnapshot(
+  snapshot: Pick<
+    SettingsSnapshot,
+    | 'fetchIntervalSec'
+    | 'terminalNotificationsEnabled'
+    | 'shortcutsDisabled'
+    | 'globalShortcutDisabled'
+    | 'swapCloseShortcuts'
+    | 'toggleDetailOnActionBarBlankClick'
+    | 'globalShortcut'
+    | 'globalShortcutRegistered'
+    | 'terminalApp'
+    | 'editorApp'
+    | 'lanEnabled'
+  >,
+): InitialSettingsSnapshot {
   return {
     fetchIntervalSec: snapshot.fetchIntervalSec,
     terminalNotificationsEnabled: snapshot.terminalNotificationsEnabled,
@@ -93,7 +103,9 @@ export function initialSettingsFromSnapshot(snapshot: Pick<
   }
 }
 
-export function defaultInitialSettingsSnapshot(overrides: Partial<InitialSettingsSnapshot> = {}): InitialSettingsSnapshot {
+export function defaultInitialSettingsSnapshot(
+  overrides: Partial<InitialSettingsSnapshot> = {},
+): InitialSettingsSnapshot {
   return initialSettingsFromSnapshot(defaultSettingsSnapshot(overrides))
 }
 

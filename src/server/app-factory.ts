@@ -102,7 +102,10 @@ export function createApp(options: ServerAppOptions): Hono {
       allowMethods: ['GET', 'POST', 'OPTIONS'],
     }),
   )
-  app.route('/api', createHealthRoutes({ version: options.version, startedAt: options.startedAt, terminalHost: options.terminalHost }))
+  app.route(
+    '/api',
+    createHealthRoutes({ version: options.version, startedAt: options.startedAt, terminalHost: options.terminalHost }),
+  )
   app.use('/api/settings/*', createInternalAuthMiddleware(options.internalSecret))
   app.use('/api/remote/*', createInternalAuthMiddleware(options.internalSecret))
   app.use('/api/repo/*', createInternalAuthMiddleware(options.internalSecret))

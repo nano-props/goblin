@@ -2,14 +2,14 @@ import { Check, Circle, GitPullRequest, X } from 'lucide-react'
 import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { CopyButton } from '#/web/components/CopyButton.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
-import { TOOLTIP_META_TEXT_CLASS, TOOLTIP_STACK_MD_CLASS, TOOLTIP_STACK_SM_CLASS } from '#/web/components/ui/tooltip.tsx'
+import {
+  TOOLTIP_META_TEXT_CLASS,
+  TOOLTIP_STACK_MD_CLASS,
+  TOOLTIP_STACK_SM_CLASS,
+} from '#/web/components/ui/tooltip.tsx'
 import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
 import { cn } from '#/web/lib/cn.ts'
-import {
-  prChipTone,
-  visiblePrHealthSignals,
-  type PrHealthSignal,
-} from '#/web/components/branch-detail/pr-status.ts'
+import { prChipTone, visiblePrHealthSignals, type PrHealthSignal } from '#/web/components/branch-detail/pr-status.ts'
 import {
   STATUS_INLINE_GROUP_CLASS,
   StatusChip,
@@ -122,8 +122,7 @@ function PullRequestValue({
   const tooltipAlign = tooltipSide === 'bottom' ? 'center' : 'end'
   // Radix Tooltip exposes the available-width var; the fallback keeps the
   // CSS valid if the implementation ever stops providing it.
-  const tooltipContentClass =
-    `max-w-[min(24rem,calc(100vw-2rem),var(--radix-tooltip-content-available-width,calc(100vw-2rem)))] ${TOOLTIP_STACK_MD_CLASS}`
+  const tooltipContentClass = `max-w-[min(24rem,calc(100vw-2rem),var(--radix-tooltip-content-available-width,calc(100vw-2rem)))] ${TOOLTIP_STACK_MD_CLASS}`
   return (
     <div className={STATUS_INLINE_GROUP_CLASS}>
       <Tip

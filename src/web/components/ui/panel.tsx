@@ -20,7 +20,12 @@ function Panel<T extends ElementType = 'div'>({ as, className, ...props }: Panel
 }
 
 function PanelHeader({ className, ...props }: ComponentPropsWithoutRef<'div'>) {
-  return <div className={cn('flex items-center justify-between border-b border-border/60 px-3 py-2', className)} {...props} />
+  return (
+    <div
+      className={cn('flex items-center justify-between border-b border-border/60 px-3 py-2', className)}
+      {...props}
+    />
+  )
 }
 
 function PanelBody({ className, ...props }: ComponentPropsWithoutRef<'div'>) {

@@ -253,7 +253,9 @@ describe('app menu actions', () => {
     buildAppMenu()
 
     const viewMenu = mocks.template.find((entry) => entry.label === 'menu.view')
-    const terminalPrimaryItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.terminal-primary-action')
+    const terminalPrimaryItem = viewMenu?.submenu?.find(
+      (entry: any) => entry.label === 'menu.view.terminal-primary-action',
+    )
     expect(terminalPrimaryItem?.accelerator).toBe('CmdOrCtrl+Enter')
 
     terminalPrimaryItem.click()

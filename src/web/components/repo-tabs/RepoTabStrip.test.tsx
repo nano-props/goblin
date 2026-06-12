@@ -86,7 +86,9 @@ describe('RepoTabStrip', () => {
       await Promise.resolve()
     })
 
-    const selectedItem = [...document.body.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent?.includes('repo-a'))
+    const selectedItem = [...document.body.querySelectorAll('[role="menuitem"]')].find((item) =>
+      item.textContent?.includes('repo-a'),
+    )
     expect(selectedItem?.getAttribute('aria-current')).toBe('true')
   })
 
@@ -115,7 +117,11 @@ describe('RepoTabStrip', () => {
     const repoA = document.body.querySelector('[data-repo-tab-id="/tmp/repo-a"]')
     const repoB = document.body.querySelector('[data-repo-tab-id="/tmp/repo-b"]')
     const repoC = document.body.querySelector('[data-repo-tab-id="/tmp/repo-c"]')
-    if (!(repoA instanceof HTMLButtonElement) || !(repoB instanceof HTMLButtonElement) || !(repoC instanceof HTMLButtonElement)) {
+    if (
+      !(repoA instanceof HTMLButtonElement) ||
+      !(repoB instanceof HTMLButtonElement) ||
+      !(repoC instanceof HTMLButtonElement)
+    ) {
       throw new Error('missing repo tab buttons')
     }
 

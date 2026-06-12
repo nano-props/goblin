@@ -126,7 +126,9 @@ export const useReposStore = create<ReposStore>()(
       partialize: (state): PersistedReposStore => ({ restorableRepoCache: state.restorableRepoCache }),
       merge: (persisted, current) => ({
         ...current,
-        restorableRepoCache: normalizeRestorableRepoCache((persisted as RawPersistedReposStore | null)?.restorableRepoCache),
+        restorableRepoCache: normalizeRestorableRepoCache(
+          (persisted as RawPersistedReposStore | null)?.restorableRepoCache,
+        ),
       }),
     },
   ),

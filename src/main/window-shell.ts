@@ -22,7 +22,11 @@ import { getEmbeddedServerRuntime } from '#/main/server-manager.ts'
 import { getSettingsSnapshot } from '#/main/settings-server-client.ts'
 import type { InitialSettingsSnapshot, RendererBootstrapPayload } from '#/shared/bootstrap.ts'
 import { ELECTRON_RENDERER_CAPABILITIES } from '#/shared/bootstrap.ts'
-import { createRendererBootstrapPayload, createRendererRuntimeSnapshot, toInitialServerSnapshot } from '#/shared/bootstrap-builders.ts'
+import {
+  createRendererBootstrapPayload,
+  createRendererRuntimeSnapshot,
+  toInitialServerSnapshot,
+} from '#/shared/bootstrap-builders.ts'
 import { buildI18nSnapshot } from '#/shared/i18n/snapshot.ts'
 import type { LangPref } from '#/shared/rpc.ts'
 import { WINDOW_BACKGROUND_BY_COLOR_THEME } from '#/shared/theme-tokens.ts'

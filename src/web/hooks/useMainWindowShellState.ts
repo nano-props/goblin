@@ -62,16 +62,7 @@ export function useMainWindowShellState({
         setDetailTab,
         onOpenSettings: openSettings,
       }),
-    [
-      activeId,
-      closeRepo,
-      cycleActive,
-      openSettings,
-      order,
-      selectBranch,
-      setActive,
-      setDetailTab,
-    ],
+    [activeId, closeRepo, cycleActive, openSettings, order, selectBranch, setActive, setDetailTab],
   )
 
   return {

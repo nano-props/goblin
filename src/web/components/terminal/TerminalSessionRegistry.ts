@@ -285,23 +285,22 @@ export class TerminalSessionRegistry {
 
   private sessionSummaries(worktreeTerminalKey: string): TerminalSessionSummary[] {
     const selectedKey = this.selectedKeyByWorktree.get(worktreeTerminalKey) ?? null
-    return this.sortedSessionsForWorktree(worktreeTerminalKey)
-      .map((session) => {
-        const snapshot = this.snapshotCache.get(session.descriptor.key) ?? session.snapshot()
-        this.snapshotCache.set(session.descriptor.key, snapshot)
-        return {
-          key: session.descriptor.key,
-          worktreeTerminalKey,
-          terminalId: session.descriptor.terminalId,
-          index: session.descriptor.index,
-          title: summarizeTerminalTitle(snapshot, session.descriptor.index),
-          fullTitle: fullTerminalTitle(snapshot, session.descriptor.index),
-          originalTitle: terminalOriginalTitle(snapshot),
-          phase: snapshot.phase,
-          selected: session.descriptor.key === selectedKey,
-          hasBell: this.bellController.hasBell(session.descriptor.key),
-        }
-      })
+    return this.sortedSessionsForWorktree(worktreeTerminalKey).map((session) => {
+      const snapshot = this.snapshotCache.get(session.descriptor.key) ?? session.snapshot()
+      this.snapshotCache.set(session.descriptor.key, snapshot)
+      return {
+        key: session.descriptor.key,
+        worktreeTerminalKey,
+        terminalId: session.descriptor.terminalId,
+        index: session.descriptor.index,
+        title: summarizeTerminalTitle(snapshot, session.descriptor.index),
+        fullTitle: fullTerminalTitle(snapshot, session.descriptor.index),
+        originalTitle: terminalOriginalTitle(snapshot),
+        phase: snapshot.phase,
+        selected: session.descriptor.key === selectedKey,
+        hasBell: this.bellController.hasBell(session.descriptor.key),
+      }
+    })
   }
 
   subscribeWorktree = (worktreeTerminalKey: string, listener: () => void): (() => void) => {
@@ -509,7 +508,9 @@ export class TerminalSessionRegistry {
     const session = this.sessions.get(key)
     if (!session) return false
     const worktreeTerminalKey = session.descriptor.worktreeTerminalKey
-    const orderedKeysBeforeRemoval = this.sortedSessionsForWorktree(worktreeTerminalKey).map((item) => item.descriptor.key)
+    const orderedKeysBeforeRemoval = this.sortedSessionsForWorktree(worktreeTerminalKey).map(
+      (item) => item.descriptor.key,
+    )
     const closedOrderIndex = orderedKeysBeforeRemoval.indexOf(key)
     const wasSelected = this.selectedKeyByWorktree.get(worktreeTerminalKey) === key
     this.syncSessionIdIndex(key, null)

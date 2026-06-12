@@ -209,7 +209,12 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
         <DialogStatusRow message={error ?? ''} tone="danger" />
 
         <DialogFooter className="gap-2 pt-2">
-          <Button type="button" variant="outline" className={cn(compact && 'w-full')} onClick={() => void handleCancel()}>
+          <Button
+            type="button"
+            variant="outline"
+            className={cn(compact && 'w-full')}
+            onClick={() => void handleCancel()}
+          >
             {t('dialog.cancel')}
           </Button>
           <Button type="submit" className={cn('min-w-28', compact && 'w-full min-w-0')} disabled={!canSubmit}>

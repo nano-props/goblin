@@ -41,12 +41,18 @@ export function useRendererEffectIntentRouter({
   // This hook is the single renderer-side subscription point for native effect
   // intents. Routing stays centralized here; intent-specific behavior lives in
   // the handler/plan helpers so components do not subscribe independently.
-  const { ensureWorkspaceOpen, setDetailCollapsed, setSelectedTerminal, setWorkspaceLayout, toggleDetailCollapsed, resetLayout } =
-    useStoreWithEqualityFn(
-      useReposStore,
-      rendererEffectIntentStoreActionsFromStore,
-      rendererEffectIntentStoreActionsEqual,
-    )
+  const {
+    ensureWorkspaceOpen,
+    setDetailCollapsed,
+    setSelectedTerminal,
+    setWorkspaceLayout,
+    toggleDetailCollapsed,
+    resetLayout,
+  } = useStoreWithEqualityFn(
+    useReposStore,
+    rendererEffectIntentStoreActionsFromStore,
+    rendererEffectIntentStoreActionsEqual,
+  )
   const t = useT()
   const navigationRef = useRef(navigation)
   const currentRepoIdRef = useRef(currentRepoId)

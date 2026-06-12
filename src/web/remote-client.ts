@@ -1,10 +1,6 @@
 import { fetchServerJson, postServerJson } from '#/web/lib/server-fetch.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
-import type {
-  RemoteDiagnosticsResult,
-  RemotePathSuggestionsInput,
-  SshConfigHostsResult,
-} from '#/shared/remote-repo.ts'
+import type { RemoteDiagnosticsResult, RemotePathSuggestionsInput, SshConfigHostsResult } from '#/shared/remote-repo.ts'
 
 export async function resolveRemoteRepositoryTarget(ref: {
   alias: string

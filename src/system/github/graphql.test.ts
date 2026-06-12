@@ -141,7 +141,9 @@ describe('graphqlRequestResult transport', () => {
   })
 
   test('classifies CLI rate limits', async () => {
-    execaMock.mockRejectedValueOnce(Object.assign(new Error('rate limited'), { stderr: 'gh: API rate limit exceeded (HTTP 403)' }))
+    execaMock.mockRejectedValueOnce(
+      Object.assign(new Error('rate limited'), { stderr: 'gh: API rate limit exceeded (HTTP 403)' }),
+    )
 
     const result = await graphqlRequestResult('/tmp/repo', repo, 'query Test { viewer { login } }', {}, 'Test')
 
@@ -200,6 +202,8 @@ describe('graphqlRequestResult transport', () => {
       status: 401,
     }
 
-    expect(formatGraphqlError(error)).toBe('Test failed on github.com: UNAUTHORIZED HTTP 401 (non-retryable) - Bad credentials')
+    expect(formatGraphqlError(error)).toBe(
+      'Test failed on github.com: UNAUTHORIZED HTTP 401 (non-retryable) - Bad credentials',
+    )
   })
 })

@@ -133,9 +133,17 @@ describe('repo query invalidation source', () => {
     const dispose = subscribeRepoQueryInvalidation(listener)
 
     expect(FakeWebSocket.instances).toHaveLength(1)
-    FakeWebSocket.instances[0]?.emitMessage({ type: 'repo-query-invalidated', repoId: '/tmp/repo', query: 'repo-snapshot' })
+    FakeWebSocket.instances[0]?.emitMessage({
+      type: 'repo-query-invalidated',
+      repoId: '/tmp/repo',
+      query: 'repo-snapshot',
+    })
 
-    expect(listener).toHaveBeenCalledWith({ type: 'repo-query-invalidated', repoId: '/tmp/repo', query: 'repo-snapshot' })
+    expect(listener).toHaveBeenCalledWith({
+      type: 'repo-query-invalidated',
+      repoId: '/tmp/repo',
+      query: 'repo-snapshot',
+    })
     dispose()
   })
 

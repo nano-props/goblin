@@ -35,10 +35,7 @@ import type {
   SshConfigHostsResult,
 } from '#/shared/remote-repo.ts'
 import type { RepoQueryInvalidationEvent } from '#/shared/repo-query-invalidation.ts'
-import {
-  NativeShellProjectionSchema,
-  type NativeShellProjection,
-} from '#/shared/native-shell-projection.ts'
+import { NativeShellProjectionSchema, type NativeShellProjection } from '#/shared/native-shell-projection.ts'
 import { RemoteAbsolutePathSchema } from '#/shared/remote-repo-schema.ts'
 
 export type { WorkspaceLayout } from '#/shared/workspace-layout.ts'

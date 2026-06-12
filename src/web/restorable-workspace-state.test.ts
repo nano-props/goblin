@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'vitest'
 import { localRepoSessionEntry } from '#/shared/remote-repo.ts'
-import { restoreRestorableWorkspaceStateFromSession, sessionStateFromRestorableWorkspaceState } from '#/web/restorable-workspace-state.ts'
+import {
+  restoreRestorableWorkspaceStateFromSession,
+  sessionStateFromRestorableWorkspaceState,
+} from '#/web/restorable-workspace-state.ts'
 import { createRepoBranch, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 
 describe('restorable-workspace-state', () => {

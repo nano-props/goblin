@@ -2,7 +2,11 @@ import { Loader2 } from 'lucide-react'
 import { AsyncButton } from '#/web/components/AsyncButton.tsx'
 import { BranchActionsDropdown } from '#/web/components/BranchActionsMenu.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
-import { type BranchActionItem, type BranchActionItemGroups, visibleBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
+import {
+  type BranchActionItem,
+  type BranchActionItemGroups,
+  visibleBranchActionItems,
+} from '#/web/hooks/useBranchActionItems.ts'
 import { useOverflowCollapse } from '#/web/hooks/useOverflowCollapse.ts'
 import { cn } from '#/web/lib/cn.ts'
 type BranchActionControlsVariant = 'bar' | 'menu' | 'auto'

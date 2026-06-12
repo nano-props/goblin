@@ -13,14 +13,30 @@ import {
   isAncestor,
   isGitRepo,
 } from '#/system/git/branches.ts'
-import { fetchAll, getBrowserRemoteUrl, getRemoteInfo, pickPreferredRemote, pullBranch, pushBranch } from '#/system/git/remote.ts'
+import {
+  fetchAll,
+  getBrowserRemoteUrl,
+  getRemoteInfo,
+  pickPreferredRemote,
+  pullBranch,
+  pushBranch,
+} from '#/system/git/remote.ts'
 import { getWorkingStatus } from '#/system/git/status.ts'
 import { createWorktree, getWorktrees, removeWorktree } from '#/system/git/worktrees.ts'
 import { getWorktreePatch } from '#/system/git/patch.ts'
-import { type ExecResult, type PullRequestFetchMode, type PullRequestInfo, type WorktreeStatus } from '#/shared/git-types.ts'
+import {
+  type ExecResult,
+  type PullRequestFetchMode,
+  type PullRequestInfo,
+  type WorktreeStatus,
+} from '#/shared/git-types.ts'
 import { resolveKnownWorktree, resolveRemovableWorktree } from '#/shared/worktree-guards.ts'
 import { isValidCwd } from '#/shared/input-validation.ts'
-import { validateBranchDeletionPolicy, validateCreateWorktreeInput, validateRemovableWorktreeState } from '#/shared/repo-action-policy.ts'
+import {
+  validateBranchDeletionPolicy,
+  validateCreateWorktreeInput,
+  validateRemovableWorktreeState,
+} from '#/shared/repo-action-policy.ts'
 import { resolveRemoteTarget as resolveSshRemoteTarget } from '#/system/ssh/config.ts'
 import { testRemoteRepository } from '#/system/ssh/diagnostics.ts'
 import {
@@ -137,7 +153,10 @@ function createLocalRepoBackend(repoId: string): RepoBackend {
 
   async function validateBranchDeletion(
     branch: string,
-    options?: { force?: boolean; notMergedMessage?: 'error.branch-not-fully-merged' | 'error.cannot-remove-unpushed-worktree' },
+    options?: {
+      force?: boolean
+      notMergedMessage?: 'error.branch-not-fully-merged' | 'error.cannot-remove-unpushed-worktree'
+    },
     signal?: AbortSignal,
     ignoredWorktreePath?: string,
   ): Promise<ExecResult | null> {
@@ -358,7 +377,9 @@ async function createRemoteRepoBackend(repoId: string): Promise<RepoBackend> {
   }
 }
 
-function preferredGitHubRepoRef(remotes: Array<{ name: string; fetchUrl: string; pushUrl: string }>): GitHubRepoRef | null {
+function preferredGitHubRepoRef(
+  remotes: Array<{ name: string; fetchUrl: string; pushUrl: string }>,
+): GitHubRepoRef | null {
   const githubRemotes = remotes
     .map((remote) => ({ name: remote.name, repo: parseGitHubRemoteUrl(remote.fetchUrl) }))
     .filter((remote): remote is { name: string; repo: GitHubRepoRef } => remote.repo !== null)
@@ -375,9 +396,7 @@ function normalizeRequestedBranches(branches?: string[]): ReadonlySet<string> | 
   )
 }
 
-function pullRequestEntries(
-  prs: Map<string, PullRequestInfo> | null,
-): PullRequestEntry[] | null {
+function pullRequestEntries(prs: Map<string, PullRequestInfo> | null): PullRequestEntry[] | null {
   return prs ? Array.from(prs, ([branch, pullRequest]) => ({ branch, pullRequest })) : null
 }
 

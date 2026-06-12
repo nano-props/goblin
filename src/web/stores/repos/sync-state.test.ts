@@ -29,7 +29,12 @@ function repo(overrides: RepoOverrides = {}): RepoState {
     )
   }
   if (overrides.snapshotBusy) {
-    markRepoOperationTargets(base.id, nextRepoOperationId(base.id), [{ key: 'snapshot', reason: 'snapshot' }], 'running')
+    markRepoOperationTargets(
+      base.id,
+      nextRepoOperationId(base.id),
+      [{ key: 'snapshot', reason: 'snapshot' }],
+      'running',
+    )
   }
   if (overrides.statusBusy) {
     markRepoOperationTargets(base.id, nextRepoOperationId(base.id), [{ key: 'status', reason: 'status' }], 'running')

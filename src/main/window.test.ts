@@ -180,7 +180,9 @@ describe('main window navigation boundaries', () => {
     const bootstrapArg = mocks.windowOptions[0]?.webPreferences?.additionalArguments?.find((arg: string) =>
       arg.startsWith('--goblin-bootstrap='),
     )
-    const payload = JSON.parse(Buffer.from(String(bootstrapArg).slice('--goblin-bootstrap='.length), 'base64').toString('utf8'))
+    const payload = JSON.parse(
+      Buffer.from(String(bootstrapArg).slice('--goblin-bootstrap='.length), 'base64').toString('utf8'),
+    )
     expect(payload.server).toMatchObject({
       url: 'http://127.0.0.1:5173/',
       secret: expect.any(String),
@@ -197,7 +199,9 @@ describe('main window navigation boundaries', () => {
     const bootstrapArg = mocks.windowOptions[0]?.webPreferences?.additionalArguments?.find((arg: string) =>
       arg.startsWith('--goblin-bootstrap='),
     )
-    const payload = JSON.parse(Buffer.from(String(bootstrapArg).slice('--goblin-bootstrap='.length), 'base64').toString('utf8'))
+    const payload = JSON.parse(
+      Buffer.from(String(bootstrapArg).slice('--goblin-bootstrap='.length), 'base64').toString('utf8'),
+    )
     expect(payload.i18n).toMatchObject({ pref: 'ja' })
   })
 

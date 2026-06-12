@@ -1,7 +1,10 @@
 import { describe, expect, test } from 'vitest'
 import { branchPullRequestBelongsToBranch, type BranchSnapshotInfo, type PullRequestInfo } from '#/shared/git-types.ts'
 
-function branch(name: string, options: Partial<BranchSnapshotInfo> = {}): Pick<BranchSnapshotInfo, 'name' | 'isDefault'> {
+function branch(
+  name: string,
+  options: Partial<BranchSnapshotInfo> = {},
+): Pick<BranchSnapshotInfo, 'name' | 'isDefault'> {
   return { name, ...options }
 }
 

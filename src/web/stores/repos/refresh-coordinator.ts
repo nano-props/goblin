@@ -1,5 +1,8 @@
 import type { RepoQueryInvalidationEvent } from '#/shared/repo-query-invalidation.ts'
-import { shouldSuppressRepoInvalidationSource, resetRepoInvalidationSourceState } from '#/web/stores/repos/invalidation-sources.ts'
+import {
+  shouldSuppressRepoInvalidationSource,
+  resetRepoInvalidationSourceState,
+} from '#/web/stores/repos/invalidation-sources.ts'
 import type { ReposGet } from '#/web/stores/repos/types.ts'
 
 interface RepoRefreshIntentBase {

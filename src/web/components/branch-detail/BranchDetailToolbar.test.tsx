@@ -6,8 +6,17 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchDetailToolbar } from '#/web/components/branch-detail/BranchDetailToolbar.tsx'
 import { getSelectedBranchDetailPresentation } from '#/web/components/branch-detail/model.ts'
-import { TerminalSessionContext, TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
-import type { TerminalSessionContextValue, TerminalSessionReadContextValue, TerminalSessionSummary, TerminalDescriptor, WorktreeTerminalSnapshot } from '#/web/components/terminal/types.ts'
+import {
+  TerminalSessionContext,
+  TerminalSessionReadContext,
+} from '#/web/components/terminal/terminal-session-context.ts'
+import type {
+  TerminalSessionContextValue,
+  TerminalSessionReadContextValue,
+  TerminalSessionSummary,
+  TerminalDescriptor,
+  WorktreeTerminalSnapshot,
+} from '#/web/components/terminal/types.ts'
 import { MainWindowNavigationProvider, type MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import { emptyRendererBridgeBootstrap, setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
@@ -28,7 +37,7 @@ vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
 
 const REPO_ID = '/tmp/gbl-branch-detail-toolbar-repo'
 const WORKTREE_PATH = '/tmp/gbl-branch-detail-toolbar-worktree'
-  compactUi = false
+compactUi = false
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null

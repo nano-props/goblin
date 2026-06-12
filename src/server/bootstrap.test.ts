@@ -62,9 +62,14 @@ describe('bootstrap server shutdown', () => {
     const socket = { once: vi.fn(), destroy: vi.fn() }
     const client = { close: vi.fn(), terminate: vi.fn() }
     mocks.websocketClients.add(client)
-    mocks.serverOn.mockImplementation((event: string, handler: (value: { once: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> }) => void) => {
-      if (event === 'connection') handler(socket)
-    })
+    mocks.serverOn.mockImplementation(
+      (
+        event: string,
+        handler: (value: { once: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> }) => void,
+      ) => {
+        if (event === 'connection') handler(socket)
+      },
+    )
     mocks.closeHttpServer.mockImplementation(() => {})
     mocks.websocketClose.mockImplementation(() => {})
     const exit = vi.fn()

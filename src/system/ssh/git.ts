@@ -18,8 +18,20 @@ import {
   type RemoteCommandKind,
   type RemoteCommandResult,
 } from '#/system/ssh/commands.ts'
-import { type BranchSnapshotInfo, type ExecResult, type GitRemoteInfo, type LogEntry, type RepoRemoteInfo, type WorktreeInfo, type WorktreeStatus } from '#/shared/git-types.ts'
-import { validateBranchDeletionPolicy, validateCreateWorktreeInput, validateRemovableWorktreeState } from '#/shared/repo-action-policy.ts'
+import {
+  type BranchSnapshotInfo,
+  type ExecResult,
+  type GitRemoteInfo,
+  type LogEntry,
+  type RepoRemoteInfo,
+  type WorktreeInfo,
+  type WorktreeStatus,
+} from '#/shared/git-types.ts'
+import {
+  validateBranchDeletionPolicy,
+  validateCreateWorktreeInput,
+  validateRemovableWorktreeState,
+} from '#/shared/repo-action-policy.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 
@@ -158,7 +170,9 @@ export async function fetchRemoteRepository(
   if (options.signal?.aborted) return { ok: false, message: 'cancelled' }
   const [remotes, upstream] = await Promise.all([
     getRemoteRemotes(target, { signal: options.signal, run }),
-    currentBranch ? getRemoteUpstreamParts(target, currentBranch, { signal: options.signal, run }) : Promise.resolve(null),
+    currentBranch
+      ? getRemoteUpstreamParts(target, currentBranch, { signal: options.signal, run })
+      : Promise.resolve(null),
   ])
   if (options.signal?.aborted) return { ok: false, message: 'cancelled' }
   if (remotes.length === 0) return { ok: true, message: '' }
@@ -180,11 +194,10 @@ export async function checkoutRemoteBranch(
   if (!isSafeBranchName(branch)) return { ok: false, message: 'error.invalid-arguments' }
   if (worktreePath && !isValidRemotePath(worktreePath)) return { ok: false, message: 'error.invalid-path' }
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
-  const result = await run(
-    { type: 'gitCheckout', path: worktreePath ?? target.remotePath, branch },
-    target,
-    { signal: options.signal, timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS },
-  )
+  const result = await run({ type: 'gitCheckout', path: worktreePath ?? target.remotePath, branch }, target, {
+    signal: options.signal,
+    timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS,
+  })
   return remoteExecResult(result)
 }
 
@@ -226,7 +239,13 @@ export async function pullRemoteBranch(
     return { ok: false, message: 'error.pull-no-remote' }
   }
   const result = await run(
-    { type: 'gitFetchBranch', path: target.remotePath, remote: targetParts.remote, remoteBranch: targetParts.branch, branch },
+    {
+      type: 'gitFetchBranch',
+      path: target.remotePath,
+      remote: targetParts.remote,
+      remoteBranch: targetParts.branch,
+      branch,
+    },
     target,
     { signal: options.signal, timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS },
   )
@@ -296,12 +315,7 @@ export async function removeRemoteWorktree(
   if (!listResult.ok) return remoteExecResult(listResult)
   const worktrees = parseWorktrees(listResult.stdout)
 
-  const resolved = resolveRemoteRemovableWorktree(
-    worktrees,
-    input.branch,
-    input.worktreePath,
-    target.remotePath,
-  )
+  const resolved = resolveRemoteRemovableWorktree(worktrees, input.branch, input.worktreePath, target.remotePath)
   if ('ok' in resolved) return resolved
 
   const status = await run({ type: 'gitStatus', path: resolved.path }, target, { signal: input.signal })
@@ -326,7 +340,9 @@ export async function removeRemoteWorktree(
     const validation = validateBranchDeletionPolicy({
       branch: input.branch,
       currentBranch,
-      isCheckedOutElsewhere: worktrees.some((worktree) => worktree.branch === input.branch && worktree.path !== resolved.path),
+      isCheckedOutElsewhere: worktrees.some(
+        (worktree) => worktree.branch === input.branch && worktree.path !== resolved.path,
+      ),
       force: shouldForceDeleteBranch,
       mergedToCurrent: mergeFacts.mergedToCurrent,
       mergedToUpstream: mergeFacts.mergedToUpstream,
@@ -371,7 +387,9 @@ export async function deleteRemoteBranch(
   const validation = validateBranchDeletionPolicy({
     branch: input.branch,
     currentBranch: snapshot?.current,
-    isCheckedOutElsewhere: !!snapshot?.branches.some((branchInfo) => branchInfo.name === input.branch && branchInfo.worktree),
+    isCheckedOutElsewhere: !!snapshot?.branches.some(
+      (branchInfo) => branchInfo.name === input.branch && branchInfo.worktree,
+    ),
     force: shouldForce,
     mergedToCurrent: mergeFacts.mergedToCurrent,
     mergedToUpstream: mergeFacts.mergedToUpstream,

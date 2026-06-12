@@ -3,10 +3,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { resetRepoRefreshCoordinatorState } from '#/web/stores/repos/refresh-coordinator.ts'
-import {
-  beginRepoInvalidationSource,
-  settleRepoInvalidationSource,
-} from '#/web/stores/repos/invalidation-sources.ts'
+import { beginRepoInvalidationSource, settleRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
 
 const listeners = new Set<(event: any) => void>()
@@ -98,7 +95,12 @@ describe('useRepoStoreInvalidationRefresh', () => {
 
     await act(async () => {
       for (const listener of listeners)
-        listener({ type: 'repo-query-invalidated', repoId: '/tmp/repo', query: 'repo-snapshot', sourceToken: 'repo_branch_1' })
+        listener({
+          type: 'repo-query-invalidated',
+          repoId: '/tmp/repo',
+          query: 'repo-snapshot',
+          sourceToken: 'repo_branch_1',
+        })
     })
 
     expect(storeState.refreshCoreData).not.toHaveBeenCalled()
@@ -114,7 +116,12 @@ describe('useRepoStoreInvalidationRefresh', () => {
 
     await act(async () => {
       for (const listener of listeners)
-        listener({ type: 'repo-query-invalidated', repoId: '/tmp/repo', query: 'repo-snapshot', sourceToken: 'repo_manual_1' })
+        listener({
+          type: 'repo-query-invalidated',
+          repoId: '/tmp/repo',
+          query: 'repo-snapshot',
+          sourceToken: 'repo_manual_1',
+        })
     })
 
     expect(storeState.refreshCoreData).not.toHaveBeenCalled()
@@ -129,7 +136,12 @@ describe('useRepoStoreInvalidationRefresh', () => {
 
     await act(async () => {
       for (const listener of listeners)
-        listener({ type: 'repo-query-invalidated', repoId: '/tmp/repo', query: 'repo-snapshot', sourceToken: 'repo_manual_other' })
+        listener({
+          type: 'repo-query-invalidated',
+          repoId: '/tmp/repo',
+          query: 'repo-snapshot',
+          sourceToken: 'repo_manual_other',
+        })
     })
 
     expect(storeState.refreshCoreData).toHaveBeenCalledWith('/tmp/repo', { token: 7 })

@@ -57,10 +57,7 @@ export type WorkspaceIntentPlan =
   | { kind: 'terminal-primary-action'; repoId: string }
   | { kind: 'toggle-detail'; repoId: string }
 
-export type ExternalOpenDrainKickPlan =
-  | { kind: 'ignore' }
-  | { kind: 'schedule-rerun' }
-  | { kind: 'start-drain' }
+export type ExternalOpenDrainKickPlan = { kind: 'ignore' } | { kind: 'schedule-rerun' } | { kind: 'start-drain' }
 
 interface AppLevelIntentPlanContext {
   overlayBlocked: boolean
@@ -139,7 +136,8 @@ export function createWorkspaceIntentPlan(
     case 'cycle-repo-requested':
       return context.workspaceShortcutSuppressed ? { kind: 'noop' } : { kind: 'cycle-repo', direction: event.direction }
     case 'repo-refresh-requested':
-      if (context.workspaceShortcutSuppressed || context.terminalFocused || !context.currentRepo) return { kind: 'noop' }
+      if (context.workspaceShortcutSuppressed || context.terminalFocused || !context.currentRepo)
+        return { kind: 'noop' }
       return { kind: 'refresh-repo', repoId: context.currentRepo.id, token: context.currentRepo.instanceToken }
     case 'show-detail-tab-requested':
       if (context.workspaceShortcutSuppressed || !context.currentRepoId) return { kind: 'noop' }

@@ -89,7 +89,10 @@ describe('RepoTabStrip keyboard dnd wiring', () => {
     })
 
     expect(useSensorMock).toHaveBeenCalledWith(pointerSensorToken, { activationConstraint: { distance: 6 } })
-    expect(useSensorMock).toHaveBeenCalledWith(keyboardSensorToken, expect.objectContaining({ coordinateGetter: expect.any(Function) }))
+    expect(useSensorMock).toHaveBeenCalledWith(
+      keyboardSensorToken,
+      expect.objectContaining({ coordinateGetter: expect.any(Function) }),
+    )
 
     const tab = document.body.querySelector('[data-repo-tab-id="/tmp/repo-a"]')
     if (!(tab instanceof HTMLButtonElement)) throw new Error('missing repo tab')

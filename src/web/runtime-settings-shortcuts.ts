@@ -38,7 +38,10 @@ export function useShortcutSettingsController() {
       })
     },
     async setGlobalShortcut(accelerator: string): Promise<GlobalShortcutState | null> {
-      return await runSettingsControllerAction('global shortcut update', async () => await setGlobalShortcutPreference(accelerator))
+      return await runSettingsControllerAction(
+        'global shortcut update',
+        async () => await setGlobalShortcutPreference(accelerator),
+      )
     },
   }
 }

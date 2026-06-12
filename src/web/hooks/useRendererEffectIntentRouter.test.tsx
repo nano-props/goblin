@@ -111,8 +111,8 @@ beforeEach(() => {
         resize: vi.fn(),
         takeover: vi.fn(),
         close: vi.fn(),
-          create: vi.fn(),
-          pruneTerminals: vi.fn(),
+        create: vi.fn(),
+        pruneTerminals: vi.fn(),
         notifyBell: vi.fn(),
         sendTestNotification: vi.fn(),
         setBadge: vi.fn(),
@@ -238,8 +238,7 @@ describe('useRendererEffectIntentRouter', () => {
     await renderHookHost()
 
     await act(async () => {
-      for (const listener of intentListeners)
-        listener({ type: 'close-repo-requested' })
+      for (const listener of intentListeners) listener({ type: 'close-repo-requested' })
       await Promise.resolve()
     })
 
@@ -279,8 +278,7 @@ describe('useRendererEffectIntentRouter', () => {
     await renderHookHost()
 
     await act(async () => {
-      for (const listener of intentListeners)
-        listener({ type: 'close-repo-requested' })
+      for (const listener of intentListeners) listener({ type: 'close-repo-requested' })
       await Promise.resolve()
     })
 

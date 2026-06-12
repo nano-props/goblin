@@ -246,9 +246,7 @@ export class ManagedTerminalSession {
     const sessionId = this.runtime.currentSessionId()
     if (!sessionId) return
     const term = this.view.currentTerminal()
-    const size = term
-      ? { cols: term.cols, rows: term.rows }
-      : this.runtime.currentCanonicalSize()
+    const size = term ? { cols: term.cols, rows: term.rows } : this.runtime.currentCanonicalSize()
     // Ownership changes are applied exclusively via authoritative onOwnership realtime messages.
     // The bridge response is only used to trigger the server-side handoff.
     if (this.runtime.setTakeoverPending(true)) this.notify('metadata')

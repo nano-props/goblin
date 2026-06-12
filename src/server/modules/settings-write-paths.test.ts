@@ -29,7 +29,9 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
 }))
 
 vi.mock('#/shared/server-invalidation.ts', async () => {
-  const actual = await vi.importActual<typeof import('#/shared/server-invalidation.ts')>('#/shared/server-invalidation.ts')
+  const actual = await vi.importActual<typeof import('#/shared/server-invalidation.ts')>(
+    '#/shared/server-invalidation.ts',
+  )
   return {
     ...actual,
     settingsInvalidationScopesForPrefsPatch: mocks.settingsInvalidationScopesForPrefsPatch,

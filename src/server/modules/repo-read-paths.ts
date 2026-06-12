@@ -31,7 +31,10 @@ export async function getRepositoryPullRequests(
         )
   if (branchSet?.size === 0) return []
   const branchNames = branchSet ? Array.from(branchSet) : undefined
-  const prs = await runWithRepoBackend(cwd, async (backend) => await backend.getPullRequests(branchNames, { mode, signal: options?.signal }))
+  const prs = await runWithRepoBackend(
+    cwd,
+    async (backend) => await backend.getPullRequests(branchNames, { mode, signal: options?.signal }),
+  )
   if (!prs) return null
   return prs
 }

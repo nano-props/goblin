@@ -47,7 +47,9 @@ describe('compactTerminalTitle', () => {
   })
 
   test('keeps readable short names for real ssh and command titles', () => {
-    expect(compactTerminalTitle('user@prod:~/services/payments/api — npm run dev')).toBe('user@prod · api · npm run dev')
+    expect(compactTerminalTitle('user@prod:~/services/payments/api — npm run dev')).toBe(
+      'user@prod · api · npm run dev',
+    )
     expect(compactTerminalTitle('~/src/project-name — python manage.py shell')).toBe('project-name · python manage.py…')
   })
 })

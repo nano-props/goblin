@@ -17,9 +17,7 @@ import {
   SettingsList,
   SettingsRow,
 } from '#/web/components/settings/SettingsPrimitives.tsx'
-import {
-  useExternalAppsQuery,
-} from '#/web/settings-queries.ts'
+import { useExternalAppsQuery } from '#/web/settings-queries.ts'
 import { useExternalAppSettingsController } from '#/web/runtime-settings-external-apps.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import type { EditorPref, TerminalPref } from '#/shared/rpc.ts'

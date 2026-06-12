@@ -834,5 +834,4 @@ describe('core refresh request ordering', () => {
 
     expect(warnSpy).toHaveBeenCalledWith('[terminal] failed to prune repo sessions', err)
   })
-
 })

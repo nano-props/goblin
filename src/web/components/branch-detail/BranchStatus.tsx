@@ -1,4 +1,14 @@
-import { ArrowDown, ArrowUp, Check, FolderTree, GitBranch, GitCommitHorizontal, GitMerge, RadioTower, RefreshCw } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowUp,
+  Check,
+  FolderTree,
+  GitBranch,
+  GitCommitHorizontal,
+  GitMerge,
+  RadioTower,
+  RefreshCw,
+} from 'lucide-react'
 import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { PullRequestStatusRow } from '#/web/components/branch-detail/PullRequestStatusRow.tsx'
@@ -83,7 +93,11 @@ export function BranchStatus({ detail, layout }: Props) {
   const mergeKnown = branch.isDefault || branch.mergedToDefault !== undefined
   const showMerged = !branch.isDefault
   const commitTime = formatRelativeTimeOrNull(branch.lastCommitDate, lang)
-  const commitMeta = commitTime ? (branch.lastCommitAuthor ? `${branch.lastCommitAuthor} · ${commitTime}` : commitTime) : null
+  const commitMeta = commitTime
+    ? branch.lastCommitAuthor
+      ? `${branch.lastCommitAuthor} · ${commitTime}`
+      : commitTime
+    : null
   const mergeLabel = !mergeKnown
     ? t('branch-status.merge-unknown')
     : branch.mergedToDefault || branch.isDefault
@@ -195,11 +209,17 @@ export function BranchStatus({ detail, layout }: Props) {
                 {branch.lastCommitHash}
               </span>
             ) : null}
-            <span className="min-w-0 truncate leading-tight text-foreground/95" title={branch.lastCommitMessage || undefined}>
+            <span
+              className="min-w-0 truncate leading-tight text-foreground/95"
+              title={branch.lastCommitMessage || undefined}
+            >
               {branch.lastCommitMessage || '—'}
             </span>
             {commitMeta && (
-              <span className="shrink-0 whitespace-nowrap text-xs leading-tight text-muted-foreground/85" title={commitMeta}>
+              <span
+                className="shrink-0 whitespace-nowrap text-xs leading-tight text-muted-foreground/85"
+                title={commitMeta}
+              >
                 {commitMeta}
               </span>
             )}

@@ -167,13 +167,25 @@ export function useKeyboard({
         }
         case 'next-branch': {
           if (overlayOpen || !repo) break
-          if (moveSelection({ repo, searchQuery: keyboardState.searchQuery, selectBranch: state.selectBranch }, 1, navigation))
+          if (
+            moveSelection(
+              { repo, searchQuery: keyboardState.searchQuery, selectBranch: state.selectBranch },
+              1,
+              navigation,
+            )
+          )
             e.preventDefault()
           break
         }
         case 'prev-branch': {
           if (overlayOpen || !repo) break
-          if (moveSelection({ repo, searchQuery: keyboardState.searchQuery, selectBranch: state.selectBranch }, -1, navigation))
+          if (
+            moveSelection(
+              { repo, searchQuery: keyboardState.searchQuery, selectBranch: state.selectBranch },
+              -1,
+              navigation,
+            )
+          )
             e.preventDefault()
           break
         }

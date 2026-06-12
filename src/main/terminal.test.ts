@@ -149,7 +149,7 @@ describe('terminal IPC', () => {
     ).resolves.toBe(true)
     expect(flashFrame).toHaveBeenCalledWith(true)
   })
- 
+
   test('sends the dock badge count through the trusted ipc sender only', async () => {
     const { app } = await import('electron')
     invoke(TERMINAL_SET_BADGE_CHANNEL, 2)

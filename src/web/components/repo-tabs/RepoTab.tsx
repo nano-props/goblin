@@ -2,7 +2,11 @@ import { AlertCircle, FolderGit2, Server } from 'lucide-react'
 import type { RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
 import type { FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { ToolbarClosableTab } from '#/web/components/tab-strip/ToolbarClosableTab.tsx'
-import { toolbarTabButtonClassName, toolbarTabChromeClassName, toolbarTabIconClassName } from '#/web/components/tab-strip/tab-variants.ts'
+import {
+  toolbarTabButtonClassName,
+  toolbarTabChromeClassName,
+  toolbarTabIconClassName,
+} from '#/web/components/tab-strip/tab-variants.ts'
 import { useSortableTab } from '#/web/components/tab-strip/useSortableTab.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 interface RepoTabProps {
@@ -48,7 +52,11 @@ export function RepoTab({
         onPointerEnter: () => onHoverChange(repo.id),
         onPointerLeave: () => onHoverChange(null),
       }}
-      containerClassName={toolbarTabChromeClassName({ variant: 'repo', active: isActive, dragging: sortable.isDragging })}
+      containerClassName={toolbarTabChromeClassName({
+        variant: 'repo',
+        active: isActive,
+        dragging: sortable.isDragging,
+      })}
       overlay={
         showSeparator ? (
           <span className="pointer-events-none absolute right-0 top-1/2 h-4 -translate-y-1/2 border-r border-separator" />

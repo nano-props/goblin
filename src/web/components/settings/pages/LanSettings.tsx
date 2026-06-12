@@ -41,7 +41,13 @@ export function LanSettings() {
               <div key={url} className="flex flex-col items-center gap-2">
                 <code className="text-sm text-muted-foreground">{url}</code>
                 {qrCodes[url] && (
-                  <img src={qrCodes[url]} alt={`QR code for ${url}`} width={180} height={180} className="rounded border" />
+                  <img
+                    src={qrCodes[url]}
+                    alt={`QR code for ${url}`}
+                    width={180}
+                    height={180}
+                    className="rounded border"
+                  />
                 )}
               </div>
             ))}

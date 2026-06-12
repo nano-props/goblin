@@ -24,9 +24,7 @@ import {
 import type { RepoEventAction, RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 import type { ExecResult } from '#/web/types.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
-import {
-  runWithRepoInvalidationSource,
-} from '#/web/stores/repos/invalidation-sources.ts'
+import { runWithRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
 import {
   checkoutRepositoryBranch,
   createRepositoryWorktree,
@@ -207,7 +205,14 @@ function runBranchActionRpc(
     case 'push':
       return pushRepositoryBranch(repoId, action.branch, signal, sourceToken)
     case 'createWorktree':
-      return createRepositoryWorktree(repoId, action.worktreePath, action.newBranch, action.baseBranch, signal, sourceToken)
+      return createRepositoryWorktree(
+        repoId,
+        action.worktreePath,
+        action.newBranch,
+        action.baseBranch,
+        signal,
+        sourceToken,
+      )
     case 'deleteBranch':
       return deleteRepositoryBranch(
         repoId,

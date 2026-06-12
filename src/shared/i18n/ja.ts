@@ -148,18 +148,21 @@ export const ja: Record<DictKey, string> = {
   'repo-tabs.open-remote-config-only-hint': 'Goblin は ~/.ssh/config に定義された別名からのみ SSH リモートを開きます。',
   'repo-tabs.open-remote-include-manual-hint':
     'Include ディレクティブが見つかったため、別名一覧は不完全な可能性があります。SSH エイリアスを手動で入力してください。候補は現在のファイルだけを元にしています。',
-  'repo-tabs.open-remote-config-required': '~/.ssh/config に具体的な Host エントリを追加してからリモートリポジトリを開いてください。',
+  'repo-tabs.open-remote-config-required':
+    '~/.ssh/config に具体的な Host エントリを追加してからリモートリポジトリを開いてください。',
   'repo-tabs.open-remote-config-drift-hint':
     'Goblin は接続のたびに ~/.ssh/config を再解決します。別名が削除されたり解決できなくなった場合は設定ドリフトとして扱います。',
   'repo-tabs.open-remote-open-ssh-settings': 'SSH 設定を開く',
   'repo-tabs.open-remote-ssh-config': 'SSH 設定',
   'repo-tabs.open-remote-manual': '手動入力',
   'repo-tabs.open-remote-no-ssh-hosts': '~/.ssh/config に SSH ホストが見つかりません',
-  'repo-tabs.open-remote-no-ssh-hosts-help': '`Host my-server` のような具体的な Host ブロックを追加してから、このダイアログを開き直してください。',
+  'repo-tabs.open-remote-no-ssh-hosts-help':
+    '`Host my-server` のような具体的な Host ブロックを追加してから、このダイアログを開き直してください。',
   'repo-tabs.open-remote-path-preview': '{path} を開きます',
   'repo-tabs.open-remote-path-preview-expanded': '{input} を開きます\n展開後のパス: {expanded}',
   'repo-tabs.open-remote-diagnostics-idle-detail': '接続テストを実行してこのターゲットを確認してください。',
-  'repo-tabs.open-remote-private-key-hint': 'システム SSH を使用します。鍵が ssh-agent に追加されていることを確認するか、鍵のパスを指定してください。',
+  'repo-tabs.open-remote-private-key-hint':
+    'システム SSH を使用します。鍵が ssh-agent に追加されていることを確認するか、鍵のパスを指定してください。',
   'repo-tabs.open-remote-port-error': '無効なポート',
   'repo-tabs.open-remote-path-required': 'パスを入力してください',
   'repo-tabs.open-remote-path-absolute': 'パスは / または ~/ で始まる必要があります',
@@ -489,7 +492,8 @@ export const ja: Record<DictKey, string> = {
   'settings.terminal-notifications-test-body': 'この通知が届いていれば、通知は正常に機能しています。',
   'settings.terminal-notifications-test-sent': 'テスト通知を送信しました',
   'settings.terminal-notifications-test-failed': 'テスト通知を表示できません',
-  'settings.terminal-notifications-test-failed-hint': 'システム設定 → 通知 → Goblin を開き、通知が許可されているか確認してください。',
+  'settings.terminal-notifications-test-failed-hint':
+    'システム設定 → 通知 → Goblin を開き、通知が許可されているか確認してください。',
   'settings.group.general': '一般',
   'settings.github.title': 'GitHub',
   'settings.github.body': 'Goblin は GitHub へのアクセスに GitHub CLI (`gh`) を使用します。',
@@ -504,7 +508,8 @@ export const ja: Record<DictKey, string> = {
   'settings.github.login-hint': 'GitHub.com は `gh auth login`、GitHub Enterprise は `--hostname` を追加して使います。',
   'settings.github.login-example': 'gh auth login\n\ngh auth login --hostname github.example.com',
   'settings.github.detected-hosts': '検出された hosts',
-  'settings.github.detected-hosts-hint': 'ここでは、現在開いているリポジトリで実際に使われている GitHub / GitHub Enterprise hosts だけを確認します。',
+  'settings.github.detected-hosts-hint':
+    'ここでは、現在開いているリポジトリで実際に使われている GitHub / GitHub Enterprise hosts だけを確認します。',
   'settings.github.no-hosts': '現在 gh でログイン済みの GitHub host はありません。',
   'settings.github.host-status': 'Host 状態',
   'settings.github.auth-signed-in': 'ログイン済み',
@@ -570,8 +575,7 @@ export const ja: Record<DictKey, string> = {
   'settings.fetch.5m': '5 分',
   'settings.fetch.15m': '15 分',
   'settings.ssh.title': 'SSH',
-  'settings.ssh.body':
-    '~/.ssh/config の Host 別名でリモートリポジトリを開きます。',
+  'settings.ssh.body': '~/.ssh/config の Host 別名でリモートリポジトリを開きます。',
   'settings.ssh.config-file-label': '設定ファイル',
   'settings.ssh.config-file-hint': 'Goblin はこのファイルから SSH 別名を読み取ります。',
   'settings.ssh.path-format-label': 'パス形式',

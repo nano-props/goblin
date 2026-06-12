@@ -48,7 +48,12 @@ describe('RepoToolbar', () => {
       id: REPO_ID,
       branches: [
         createRepoBranch('main'),
-        createRepoBranch('feature/a', { ahead: 2, behind: 1, lastCommitAuthor: 'alice', lastCommitDate: '2026-06-07T10:00:00.000Z' }),
+        createRepoBranch('feature/a', {
+          ahead: 2,
+          behind: 1,
+          lastCommitAuthor: 'alice',
+          lastCommitDate: '2026-06-07T10:00:00.000Z',
+        }),
         createRepoBranch('feature/b'),
       ],
       currentBranch: 'main',

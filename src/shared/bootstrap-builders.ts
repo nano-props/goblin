@@ -39,7 +39,9 @@ export function toInitialServerSnapshot(
     | null
     | undefined,
 ): InitialServerSnapshot | null {
-  return server ? { url: server.url, secret: server.secret, ...(server.clientId ? { clientId: server.clientId } : {}) } : null
+  return server
+    ? { url: server.url, secret: server.secret, ...(server.clientId ? { clientId: server.clientId } : {}) }
+    : null
 }
 
 export function createRendererBootstrapPayload(seed: RendererBootstrapSeed): RendererBootstrapPayload {

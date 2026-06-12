@@ -138,20 +138,24 @@ export const ko: Record<DictKey, string> = {
   'repo-tabs.open-remote-diagnostics-copy-ssh-command': 'SSH 명령 복사',
   'repo-tabs.open-remote-diagnostics-copy-details': '세부 정보 복사',
   'repo-tabs.open-remote-connect-via-ssh': '시스템 SSH 로 연결',
-  'repo-tabs.open-remote-config-only-hint': 'Goblin 은 ~/.ssh/config 에 정의된 별칭으로만 SSH 원격 리포지토리를 엽니다.',
+  'repo-tabs.open-remote-config-only-hint':
+    'Goblin 은 ~/.ssh/config 에 정의된 별칭으로만 SSH 원격 리포지토리를 엽니다.',
   'repo-tabs.open-remote-include-manual-hint':
     'Include 지시어가 감지되어 별칭 목록이 불완전할 수 있습니다. SSH 별칭을 직접 입력하세요. 제안은 현재 파일 기준입니다.',
   'repo-tabs.open-remote-config-required': '~/.ssh/config 에 구체적인 Host 항목을 추가한 뒤 원격 리포지토리를 여세요.',
-  'repo-tabs.open-remote-config-drift-hint': 'Goblin 은 매번 ~/.ssh/config 를 다시 읽습니다. 별칭이 삭제되었거나 더 이상 해석되지 않으면 설정 표류로 표시합니다.',
+  'repo-tabs.open-remote-config-drift-hint':
+    'Goblin 은 매번 ~/.ssh/config 를 다시 읽습니다. 별칭이 삭제되었거나 더 이상 해석되지 않으면 설정 표류로 표시합니다.',
   'repo-tabs.open-remote-open-ssh-settings': 'SSH 설정 열기',
   'repo-tabs.open-remote-ssh-config': 'SSH 설정',
   'repo-tabs.open-remote-manual': '수동 입력',
   'repo-tabs.open-remote-no-ssh-hosts': '~/.ssh/config 에서 SSH 호스트를 찾을 수 없음',
-  'repo-tabs.open-remote-no-ssh-hosts-help': '`Host my-server` 같은 구체적인 Host 블록을 추가한 뒤 이 대화상자를 다시 여세요.',
+  'repo-tabs.open-remote-no-ssh-hosts-help':
+    '`Host my-server` 같은 구체적인 Host 블록을 추가한 뒤 이 대화상자를 다시 여세요.',
   'repo-tabs.open-remote-path-preview': '{path} 를 엽니다',
   'repo-tabs.open-remote-path-preview-expanded': '{input} 를 엽니다\n확장 경로: {expanded}',
   'repo-tabs.open-remote-diagnostics-idle-detail': '연결 테스트를 실행해 이 대상을 확인하세요.',
-  'repo-tabs.open-remote-private-key-hint': '시스템 SSH 를 사용합니다. 키가 ssh-agent 에 추가되었는지 확인하거나 경로를 직접 지정하세요.',
+  'repo-tabs.open-remote-private-key-hint':
+    '시스템 SSH 를 사용합니다. 키가 ssh-agent 에 추가되었는지 확인하거나 경로를 직접 지정하세요.',
   'repo-tabs.open-remote-port-error': '잘못된 포트',
   'repo-tabs.open-remote-path-required': '경로가 필요합니다',
   'repo-tabs.open-remote-path-absolute': '경로는 / 또는 ~/로 시작해야 합니다',
@@ -481,7 +485,8 @@ export const ko: Record<DictKey, string> = {
   'settings.terminal-notifications-test-body': '이 알림이 보이면 알림이 정상적으로 작동하고 있습니다.',
   'settings.terminal-notifications-test-sent': '테스트 알림을 보냈습니다',
   'settings.terminal-notifications-test-failed': '테스트 알림을 표시할 수 없습니다',
-  'settings.terminal-notifications-test-failed-hint': '시스템 설정 → 알림 → Goblin으로 이동하여 알림이 허용되어 있는지 확인하세요.',
+  'settings.terminal-notifications-test-failed-hint':
+    '시스템 설정 → 알림 → Goblin으로 이동하여 알림이 허용되어 있는지 확인하세요.',
   'settings.group.general': '일반',
   'settings.github.title': 'GitHub',
   'settings.github.body': 'Goblin은 GitHub 접근에 GitHub CLI (`gh`)를 사용합니다.',
@@ -496,7 +501,8 @@ export const ko: Record<DictKey, string> = {
   'settings.github.login-hint': 'GitHub.com은 `gh auth login`, GitHub Enterprise는 `--hostname`을 추가해 사용하세요.',
   'settings.github.login-example': 'gh auth login\n\ngh auth login --hostname github.example.com',
   'settings.github.detected-hosts': '감지된 hosts',
-  'settings.github.detected-hosts-hint': '여기서는 현재 열려 있는 저장소가 실제로 사용하는 GitHub / GitHub Enterprise hosts만 확인합니다.',
+  'settings.github.detected-hosts-hint':
+    '여기서는 현재 열려 있는 저장소가 실제로 사용하는 GitHub / GitHub Enterprise hosts만 확인합니다.',
   'settings.github.no-hosts': '현재 gh에 로그인된 GitHub host가 없습니다.',
   'settings.github.host-status': 'Host 상태',
   'settings.github.auth-signed-in': '로그인됨',

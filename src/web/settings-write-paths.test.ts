@@ -3,7 +3,12 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { defaultSettingsSnapshot, defaultSessionState } from '#/shared/settings-defaults.ts'
 import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
-import { externalAppsQueryKey, githubCliQueryKey, lanInfoQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
+import {
+  externalAppsQueryKey,
+  githubCliQueryKey,
+  lanInfoQueryKey,
+  settingsSnapshotQueryKey,
+} from '#/web/settings-query-cache.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { GitHubCliState } from '#/shared/rpc.ts'
 
@@ -16,8 +21,20 @@ const appDataClientMocks = vi.hoisted(() => ({
   addRecentRepo: vi.fn<() => Promise<AddRecentRepoResult>>(async () => ({ recentRepos: [], addedRepo: null })),
   clearRecentRepos: vi.fn(async () => {}),
   refreshExternalAppsSnapshot: vi.fn(async () => ({
-    terminal: { pref: 'auto', resolved: null, available: false, appAvailability: { ghostty: false, terminal: false }, detectedAt: 0 },
-    editor: { pref: 'auto', resolved: null, available: false, appAvailability: { vscode: false, cursor: false, windsurf: false }, detectedAt: 0 },
+    terminal: {
+      pref: 'auto',
+      resolved: null,
+      available: false,
+      appAvailability: { ghostty: false, terminal: false },
+      detectedAt: 0,
+    },
+    editor: {
+      pref: 'auto',
+      resolved: null,
+      available: false,
+      appAvailability: { vscode: false, cursor: false, windsurf: false },
+      detectedAt: 0,
+    },
   })),
   refreshGitHubCliState: vi.fn<() => Promise<GitHubCliState>>(async () => ({
     available: false,
@@ -77,11 +94,28 @@ describe('settings write paths', () => {
     appDataClientMocks.clearRecentRepos.mockResolvedValue(undefined)
     appDataClientMocks.refreshExternalAppsSnapshot.mockReset()
     appDataClientMocks.refreshExternalAppsSnapshot.mockResolvedValue({
-      terminal: { pref: 'auto', resolved: null, available: false, appAvailability: { ghostty: false, terminal: false }, detectedAt: 0 },
-      editor: { pref: 'auto', resolved: null, available: false, appAvailability: { vscode: false, cursor: false, windsurf: false }, detectedAt: 0 },
+      terminal: {
+        pref: 'auto',
+        resolved: null,
+        available: false,
+        appAvailability: { ghostty: false, terminal: false },
+        detectedAt: 0,
+      },
+      editor: {
+        pref: 'auto',
+        resolved: null,
+        available: false,
+        appAvailability: { vscode: false, cursor: false, windsurf: false },
+        detectedAt: 0,
+      },
     })
     appDataClientMocks.refreshGitHubCliState.mockReset()
-    appDataClientMocks.refreshGitHubCliState.mockResolvedValue({ available: false, version: null, detectedAt: 0, hosts: {} })
+    appDataClientMocks.refreshGitHubCliState.mockResolvedValue({
+      available: false,
+      version: null,
+      detectedAt: 0,
+      hosts: {},
+    })
     appDataClientMocks.saveSession.mockReset()
     appDataClientMocks.saveSession.mockImplementation(async (session) => session)
     appDataClientMocks.setGlobalShortcut.mockReset()
@@ -167,8 +201,20 @@ describe('settings write paths', () => {
   test('setTerminalAppPreference updates both external apps and runtime settings caches', async () => {
     mainWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     mainWindowQueryClient.setQueryData(externalAppsQueryKey(), {
-      terminal: { pref: 'auto', resolved: null, available: false, appAvailability: { ghostty: false, terminal: false }, detectedAt: 0 },
-      editor: { pref: 'auto', resolved: null, available: false, appAvailability: { vscode: false, cursor: false, windsurf: false }, detectedAt: 0 },
+      terminal: {
+        pref: 'auto',
+        resolved: null,
+        available: false,
+        appAvailability: { ghostty: false, terminal: false },
+        detectedAt: 0,
+      },
+      editor: {
+        pref: 'auto',
+        resolved: null,
+        available: false,
+        appAvailability: { vscode: false, cursor: false, windsurf: false },
+        detectedAt: 0,
+      },
     })
     const { setTerminalAppPreference } = await import('#/web/settings-write-paths.ts')
 

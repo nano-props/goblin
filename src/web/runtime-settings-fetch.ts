@@ -1,4 +1,8 @@
-import { currentRuntimeSettingsSnapshot, readRuntimeFetchSettings, useRuntimeSettingsSnapshot } from '#/web/settings-read-projection.ts'
+import {
+  currentRuntimeSettingsSnapshot,
+  readRuntimeFetchSettings,
+  useRuntimeSettingsSnapshot,
+} from '#/web/settings-read-projection.ts'
 import { runSettingsControllerAction } from '#/web/settings-write-paths.ts'
 import { setFetchIntervalPreference, setTerminalNotificationsEnabledPreference } from '#/web/settings-write-paths.ts'
 
