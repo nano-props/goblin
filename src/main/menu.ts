@@ -28,7 +28,6 @@ import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
 import { focusedRegisteredSurface } from '#/main/window-registry.ts'
 import { readMenuRuntimeState, setMenuWorkspaceLayout as setMenuWorkspaceLayoutState } from '#/main/menu-state.ts'
 import {
-  TERMINAL_SELECTION_SHORTCUTS,
   closeShortcutAccelerators,
   rendererMenuCommandById,
   resolveRendererMenuCommandAccelerator,
@@ -237,13 +236,11 @@ function createViewMenu(state: AppMenuState): MenuItemConstructorOptions {
     submenu: [
       createRendererCommandMenuItem(state, 'view-status'),
       createRendererCommandMenuItem(state, 'view-changes'),
+      // Single Terminal entry. Clicking it mirrors what happens when the
+      // user clicks the first terminal tab on the page: open the terminal
+      // tab, focus the first existing session, or create one when the
+      // worktree has no terminals yet.
       createRendererCommandMenuItem(state, 'view-terminal'),
-      ...TERMINAL_SELECTION_SHORTCUTS.map(({ index, accelerator: shortcut }) => ({
-        label: `${t('menu.view.terminal')} ${index}`,
-        accelerator: accelerator(state, shortcut),
-        click: () => send({ type: 'select-terminal-requested', index }),
-      })),
-      createRendererCommandMenuItem(state, 'view-terminal-primary-action'),
       createWorkspaceLayoutMenu(state.workspaceLayout),
       createRendererCommandMenuItem(state, 'view-toggle-detail'),
       ...(state.isMac ? [] : [separator(), createAppearanceMenu(state.themePref), createLanguageMenu(state.langPref)]),

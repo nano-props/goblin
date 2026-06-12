@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest'
 import {
-  TERMINAL_SELECTION_SHORTCUTS,
   closeShortcutAccelerators,
   matchBranchActionShortcut,
   matchRendererKeyboardShortcut,
@@ -67,15 +66,12 @@ describe('shortcut definitions', () => {
     ).toBe(false)
   })
 
-  test('defines indexed terminal selection shortcuts in the shared shortcut model', () => {
-    expect(TERMINAL_SELECTION_SHORTCUTS).toEqual([
-      { index: 1, accelerator: 'CmdOrCtrl+3', labelKey: 'help.row.view-terminal-numbered', labelParams: { index: 1 } },
-      { index: 2, accelerator: 'CmdOrCtrl+4', labelKey: 'help.row.view-terminal-numbered', labelParams: { index: 2 } },
-      { index: 3, accelerator: 'CmdOrCtrl+5', labelKey: 'help.row.view-terminal-numbered', labelParams: { index: 3 } },
-      { index: 4, accelerator: 'CmdOrCtrl+6', labelKey: 'help.row.view-terminal-numbered', labelParams: { index: 4 } },
-      { index: 5, accelerator: 'CmdOrCtrl+7', labelKey: 'help.row.view-terminal-numbered', labelParams: { index: 5 } },
-      { index: 6, accelerator: 'CmdOrCtrl+8', labelKey: 'help.row.view-terminal-numbered', labelParams: { index: 6 } },
-      { index: 7, accelerator: 'CmdOrCtrl+9', labelKey: 'help.row.view-terminal-numbered', labelParams: { index: 7 } },
-    ])
+  test('defines the terminal primary action as the single terminal shortcut', () => {
+    const command = rendererMenuCommandById('view-terminal')
+    expect(command.menuLabelKey).toBe('menu.view.terminal')
+    expect(command.intent).toEqual({ type: 'terminal-primary-action-requested' })
+    expect(
+      resolveRendererMenuCommandAccelerator(command, { swapCloseShortcuts: false, workspaceLayout: 'top-bottom' }),
+    ).toBe('CmdOrCtrl+Enter')
   })
 })

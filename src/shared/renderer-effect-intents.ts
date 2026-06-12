@@ -13,7 +13,6 @@ export type RendererEffectIntent =
   | { type: 'cycle-repo-requested'; direction: 1 | -1 }
   | { type: 'repo-refresh-requested' }
   | { type: 'show-detail-tab-requested'; tab: 'status' | 'changes' | 'terminal' }
-  | { type: 'select-terminal-requested'; index: number }
   | { type: 'terminal-primary-action-requested' }
   | { type: 'toggle-detail-requested' }
   | { type: 'workspace-layout-set-requested'; layout: WorkspaceLayout }
@@ -41,7 +40,6 @@ export function isRendererEffectIntent(event: unknown): event is RendererEffectI
     type === 'cycle-repo-requested' ||
     type === 'repo-refresh-requested' ||
     type === 'show-detail-tab-requested' ||
-    type === 'select-terminal-requested' ||
     type === 'terminal-primary-action-requested' ||
     type === 'toggle-detail-requested' ||
     type === 'workspace-layout-set-requested' ||

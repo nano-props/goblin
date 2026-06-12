@@ -10,7 +10,6 @@ import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
 import { consumeExternalOpenPaths } from '#/web/app-shell-client.ts'
 import { openRepoPaths } from '#/web/lib/open-repo-paths.ts'
 import {
-  runSelectTerminalCommand,
   runShowDetailTabCommand,
   runTerminalPrimaryActionCommand,
   runToggleDetailCommand,
@@ -171,14 +170,6 @@ export async function handleWorkspaceRendererIntent(
       runShowDetailTabCommand({
         repoId: plan.repoId,
         tab: plan.tab,
-        navigation: deps.navigation,
-        setDetailCollapsed: deps.setDetailCollapsed,
-      })
-      return true
-    case 'select-terminal':
-      runSelectTerminalCommand({
-        repoId: plan.repoId,
-        index: plan.index,
         navigation: deps.navigation,
         setDetailCollapsed: deps.setDetailCollapsed,
       })

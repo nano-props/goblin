@@ -249,26 +249,7 @@ describe('app menu actions', () => {
     expect(closeWindowItem?.accelerator).toBe('CmdOrCtrl+W')
   })
 
-  test('wires the terminal primary action accelerator from the view menu', async () => {
-    const { buildAppMenu } = await import('#/main/menu.ts')
-
-    buildAppMenu()
-
-    const viewMenu = mocks.template.find((entry) => entry.label === 'menu.view')
-    const terminalPrimaryItem = viewMenu?.submenu?.find(
-      (entry: any) => entry.label === 'menu.view.terminal-primary-action',
-    )
-    expect(terminalPrimaryItem?.accelerator).toBe('CmdOrCtrl+Enter')
-
-    terminalPrimaryItem.click()
-    await Promise.resolve()
-
-    expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, {
-      type: 'terminal-primary-action-requested',
-    })
-  })
-
-  test('wires status, changes, and numbered terminal accelerators from the view menu', async () => {
+  test('wires the terminal accelerator from the view menu and removes the numbered terminal entries', async () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
 
     buildAppMenu()
@@ -277,21 +258,22 @@ describe('app menu actions', () => {
     const statusItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.status')
     const changesItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.changes')
     const terminalItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.terminal')
-    const firstTerminalItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.terminal 1')
-    const lastTerminalItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.terminal 7')
+    const firstNumberedItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.terminal 1')
+    const lastNumberedItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.terminal 7')
+    const oldPrimaryItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.terminal-primary-action')
 
     expect(statusItem?.accelerator).toBe('CmdOrCtrl+1')
     expect(changesItem?.accelerator).toBe('CmdOrCtrl+2')
-    expect(terminalItem?.accelerator).toBeUndefined()
-    expect(firstTerminalItem?.accelerator).toBe('CmdOrCtrl+3')
-    expect(lastTerminalItem?.accelerator).toBe('CmdOrCtrl+9')
+    expect(terminalItem?.accelerator).toBe('CmdOrCtrl+Enter')
+    expect(firstNumberedItem).toBeUndefined()
+    expect(lastNumberedItem).toBeUndefined()
+    expect(oldPrimaryItem).toBeUndefined()
 
-    firstTerminalItem.click()
+    terminalItem.click()
     await Promise.resolve()
 
     expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, {
-      type: 'select-terminal-requested',
-      index: 1,
+      type: 'terminal-primary-action-requested',
     })
   })
 

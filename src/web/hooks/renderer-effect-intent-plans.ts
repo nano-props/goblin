@@ -16,7 +16,6 @@ type WorkspaceRendererIntent = Extract<
   | { type: 'cycle-repo-requested' }
   | { type: 'repo-refresh-requested' }
   | { type: 'show-detail-tab-requested' }
-  | { type: 'select-terminal-requested' }
   | { type: 'terminal-primary-action-requested' }
   | { type: 'toggle-detail-requested' }
 >
@@ -53,7 +52,6 @@ export type WorkspaceIntentPlan =
   | { kind: 'cycle-repo'; direction: 1 | -1 }
   | { kind: 'refresh-repo'; repoId: string; token: number }
   | { kind: 'show-detail-tab'; repoId: string; tab: DetailTab }
-  | { kind: 'select-terminal'; repoId: string; index: number }
   | { kind: 'terminal-primary-action'; repoId: string }
   | { kind: 'toggle-detail'; repoId: string }
 
@@ -142,9 +140,6 @@ export function createWorkspaceIntentPlan(
     case 'show-detail-tab-requested':
       if (context.workspaceShortcutSuppressed || !context.currentRepoId) return { kind: 'noop' }
       return { kind: 'show-detail-tab', repoId: context.currentRepoId, tab: event.tab }
-    case 'select-terminal-requested':
-      if (context.workspaceShortcutSuppressed || !context.currentRepoId) return { kind: 'noop' }
-      return { kind: 'select-terminal', repoId: context.currentRepoId, index: event.index }
     case 'terminal-primary-action-requested':
       if (context.workspaceShortcutSuppressed || !context.currentRepoId) return { kind: 'noop' }
       return { kind: 'terminal-primary-action', repoId: context.currentRepoId }
@@ -173,7 +168,6 @@ function isWorkspaceRendererIntent(event: RendererEffectIntent): event is Worksp
     event.type === 'cycle-repo-requested' ||
     event.type === 'repo-refresh-requested' ||
     event.type === 'show-detail-tab-requested' ||
-    event.type === 'select-terminal-requested' ||
     event.type === 'terminal-primary-action-requested' ||
     event.type === 'toggle-detail-requested'
   )
