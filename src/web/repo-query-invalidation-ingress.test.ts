@@ -70,8 +70,8 @@ describe('repo query invalidation source', () => {
         homeDir: '',
         initialI18n: null,
         initialSettings: null,
-        invokeRpc: vi.fn(),
-        abortRpc: vi.fn(),
+        invokeIpc: vi.fn(),
+        abortIpc: vi.fn(),
         onEvent: vi.fn(() => () => {}),
         pathForFile: vi.fn(() => ''),
         terminal: {

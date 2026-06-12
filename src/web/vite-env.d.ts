@@ -6,7 +6,7 @@ import type {
   InitialSettingsSnapshot,
   RendererBootstrapSnapshot,
 } from '#/shared/bootstrap.ts'
-import type { I18nSnapshot, RpcEvent, RpcRequest, SettingsPage } from '#/shared/rpc.ts'
+import type { I18nSnapshot, IpcEvent, IpcRequest, SettingsPage } from '#/shared/api-types.ts'
 import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import type { TerminalMutationResult, TerminalNotifyBellInput } from '#/shared/terminal.ts'
@@ -17,9 +17,9 @@ interface GoblinNativeBridge {
   initialI18n: I18nSnapshot | null
   initialSettings: InitialSettingsSnapshot | null
   initialServer: InitialServerSnapshot | null
-  invokeRpc: (request: RpcRequest) => Promise<unknown>
-  abortRpc: (requestId: string) => Promise<boolean>
-  onEvent: (cb: (event: RpcEvent) => void) => () => void
+  invokeIpc: (request: IpcRequest) => Promise<unknown>
+  abortIpc: (requestId: string) => Promise<boolean>
+  onEvent: (cb: (event: IpcEvent) => void) => () => void
   onIntent?: (cb: (event: RendererEffectIntent) => void) => () => void
   pathForFile: (file: File) => string
   shell?: {

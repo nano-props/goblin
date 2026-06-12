@@ -1,19 +1,19 @@
-import type { NativeRpcPath, RpcRequest } from '#/shared/rpc.ts'
+import type { NativeIpcPath, IpcRequest } from '#/shared/api-types.ts'
 import { getRendererBridge } from '#/web/renderer-bridge.ts'
 
 let nextNativeRequestId = 1
 
 function createNativeRequestId(): string {
-  return `rpc_${Date.now().toString(36)}_${nextNativeRequestId++}`
+  return `ipc_${Date.now().toString(36)}_${nextNativeRequestId++}`
 }
 
 function abortNativeRequest(requestId: string): void {
   try {
-    void Promise.resolve(getRendererBridge().abortRpc(requestId)).catch(() => {})
+    void Promise.resolve(getRendererBridge().abortIpc(requestId)).catch(() => {})
   } catch {}
 }
 
-async function invokeNativeRpc(request: RpcRequest, signal?: AbortSignal): Promise<unknown> {
+async function invokeNativeIpc(request: IpcRequest, signal?: AbortSignal): Promise<unknown> {
   const requestId = request.requestId ?? createNativeRequestId()
   let aborted = false
   let cleanupAbort = () => {}
@@ -34,7 +34,7 @@ async function invokeNativeRpc(request: RpcRequest, signal?: AbortSignal): Promi
   cleanupAbort = () => signal?.removeEventListener('abort', abort)
 
   try {
-    return await Promise.race([Promise.resolve(getRendererBridge().invokeRpc({ ...request, requestId })), abortPromise])
+    return await Promise.race([Promise.resolve(getRendererBridge().invokeIpc({ ...request, requestId })), abortPromise])
   } catch (cause) {
     throw cause instanceof Error ? cause : new Error(String(cause))
   } finally {
@@ -42,10 +42,10 @@ async function invokeNativeRpc(request: RpcRequest, signal?: AbortSignal): Promi
   }
 }
 
-export async function invokeNativeRpcPath<TOutput>(
-  path: NativeRpcPath,
+export async function invokeNativeIpcPath<TOutput>(
+  path: NativeIpcPath,
   input: unknown,
   signal?: AbortSignal,
 ): Promise<TOutput> {
-  return (await invokeNativeRpc({ path, input, requestId: createNativeRequestId() }, signal)) as TOutput
+  return (await invokeNativeIpc({ path, input, requestId: createNativeRequestId() }, signal)) as TOutput
 }

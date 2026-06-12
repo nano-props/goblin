@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { RpcEvent } from '#/shared/rpc.ts'
+import type { IpcEvent } from '#/shared/api-types.ts'
 import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
 
@@ -12,7 +12,7 @@ describe('renderer ingress', () => {
 
   test('subscribes to typed native host events through the renderer bridge', async () => {
     const off = vi.fn()
-    const onEvent = vi.fn((cb: (event: RpcEvent) => void) => {
+    const onEvent = vi.fn((cb: (event: IpcEvent) => void) => {
       cb({ type: 'settings-write-error', message: 'failed' })
       cb({ type: 'terminal-notifications-changed', enabled: true })
       return off
@@ -27,8 +27,8 @@ describe('renderer ingress', () => {
             capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
           },
           homeDir: '/Users/test',
-          invokeRpc: vi.fn(),
-          abortRpc: vi.fn(async () => false),
+          invokeIpc: vi.fn(),
+          abortIpc: vi.fn(async () => false),
           onEvent,
           pathForFile: () => '',
         },
@@ -67,8 +67,8 @@ describe('renderer ingress', () => {
             capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
           },
           homeDir: '/Users/test',
-          invokeRpc: vi.fn(),
-          abortRpc: vi.fn(async () => false),
+          invokeIpc: vi.fn(),
+          abortIpc: vi.fn(async () => false),
           onEvent: vi.fn(() => () => {}),
           onIntent,
           pathForFile: () => '',

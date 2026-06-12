@@ -13,12 +13,12 @@ function installBridge(calls: Array<{ path: string; input?: unknown }>, result =
           capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
         },
         homeDir: '/Users/test',
-        invokeRpc: ({ path, input }: { path: string; input?: unknown }) => {
+        invokeIpc: ({ path, input }: { path: string; input?: unknown }) => {
           calls.push({ path, input })
           return result
         },
-        abortRpc: (requestId: string) => {
-          calls.push({ path: 'goblin:rpc-abort', input: { requestId } })
+        abortIpc: (requestId: string) => {
+          calls.push({ path: 'goblin:ipc-abort', input: { requestId } })
           return Promise.resolve(false)
         },
         onEvent: () => () => {},
@@ -44,9 +44,9 @@ describe('native host client', () => {
   test('aborts native RPC requests over Electron IPC', async () => {
     const calls: Array<{ path: string; input?: unknown }> = []
     installBridge(calls)
-    const { invokeNativeRpcPath } = await import('#/web/native-host-client.ts')
+    const { invokeNativeIpcPath } = await import('#/web/native-host-client.ts')
     const ctrl = new AbortController()
-    const promise = invokeNativeRpcPath(
+    const promise = invokeNativeIpcPath(
       'settings.setGlobalShortcut',
       { accelerator: 'CommandOrControl+Shift+K' },
       ctrl.signal,
@@ -59,6 +59,6 @@ describe('native host client', () => {
       path: 'settings.setGlobalShortcut',
       input: { accelerator: 'CommandOrControl+Shift+K' },
     })
-    expect(calls).toContainEqual({ path: 'goblin:rpc-abort', input: { requestId: expect.any(String) } })
+    expect(calls).toContainEqual({ path: 'goblin:ipc-abort', input: { requestId: expect.any(String) } })
   })
 })

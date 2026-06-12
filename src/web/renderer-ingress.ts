@@ -1,18 +1,18 @@
-import type { RpcEvent } from '#/shared/rpc.ts'
+import type { IpcEvent } from '#/shared/api-types.ts'
 import { isRendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
 import type { RendererEffectIntent, RendererEffectIntentType } from '#/shared/renderer-effect-intents.ts'
 import { getRendererBridge } from '#/web/renderer-bridge.ts'
 
 // Native-host ingress for Electron renderers. Keep this separate from server
 // ingress modules so browser- and Electron-owned downlinks stay explicit.
-type NativeHostEventType = RpcEvent['type']
+type NativeHostEventType = IpcEvent['type']
 
 export function subscribeNativeHostEventType<TType extends NativeHostEventType>(
   type: TType,
-  cb: (event: Extract<RpcEvent, { type: TType }>) => void,
+  cb: (event: Extract<IpcEvent, { type: TType }>) => void,
 ): () => void {
-  return getRendererBridge().onRpcEvent((event) => {
-    if (event.type === type) cb(event as Extract<RpcEvent, { type: TType }>)
+  return getRendererBridge().onIpcEvent((event) => {
+    if (event.type === type) cb(event as Extract<IpcEvent, { type: TType }>)
   })
 }
 

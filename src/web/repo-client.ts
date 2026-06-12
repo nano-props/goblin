@@ -1,8 +1,8 @@
 import { openExternalUrl } from '#/web/app-shell-client.ts'
 import { postServerJson } from '#/web/lib/server-fetch.ts'
-import type { CloneRepoResult, PullRequestEntry, RepoSnapshot } from '#/shared/rpc.ts'
+import type { CloneRepoResult, PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
 import type { ExecResult, PullRequestFetchMode, WorktreeStatus } from '#/shared/git-types.ts'
-import type { ProbeResult } from '#/shared/rpc.ts'
+import type { ProbeResult } from '#/shared/api-types.ts'
 
 export async function probeRepository(cwd: string): Promise<ProbeResult> {
   return await postServerJson('/api/repo/probe', { cwd })

@@ -1,5 +1,5 @@
 import type { RendererBootstrapSnapshot, RendererNativeCapability, RendererRuntimeKind } from '#/shared/bootstrap.ts'
-import type { RpcEvent, RpcRequest, SettingsPage } from '#/shared/rpc.ts'
+import type { IpcEvent, IpcRequest, SettingsPage } from '#/shared/api-types.ts'
 import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import type {
@@ -59,9 +59,9 @@ export interface RendererBridge {
   kind(): RendererRuntimeKind
   hasCapability(capability: RendererNativeCapability): boolean
   getBootstrap(): RendererBootstrapSnapshot
-  invokeRpc(request: RpcRequest): Promise<unknown>
-  abortRpc(requestId: string): Promise<boolean>
-  onRpcEvent(cb: (event: RpcEvent) => void): () => void
+  invokeIpc(request: IpcRequest): Promise<unknown>
+  abortIpc(requestId: string): Promise<boolean>
+  onIpcEvent(cb: (event: IpcEvent) => void): () => void
   onEffectIntent(cb: (event: RendererEffectIntent) => void): () => void
   pathForFile(file: File): string
   shell(): RendererShellBridge | null

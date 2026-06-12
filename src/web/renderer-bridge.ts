@@ -79,17 +79,17 @@ function electronBridge(): RendererBridge {
         initialServer: bridge?.initialServer ?? bootstrap.initialServer ?? null,
       }
     },
-    invokeRpc(request) {
+    invokeIpc(request) {
       const bridge = readNativeBridge()
       if (!bridge) throw new Error('Goblin bridge is unavailable')
-      return bridge.invokeRpc(request)
+      return bridge.invokeIpc(request)
     },
-    abortRpc(requestId) {
+    abortIpc(requestId) {
       const bridge = readNativeBridge()
       if (!bridge) throw new Error('Goblin bridge is unavailable')
-      return bridge.abortRpc(requestId)
+      return bridge.abortIpc(requestId)
     },
-    onRpcEvent(cb) {
+    onIpcEvent(cb) {
       const bridge = readNativeBridge()
       if (!bridge) throw new Error('Goblin bridge is unavailable')
       return bridge.onEvent(cb)
@@ -135,13 +135,13 @@ function webBridge(): RendererBridge {
     getBootstrap() {
       return bootstrap
     },
-    async invokeRpc() {
+    async invokeIpc() {
       throw new Error('Web renderer RPC bridge is unavailable')
     },
-    async abortRpc() {
+    async abortIpc() {
       return false
     },
-    onRpcEvent() {
+    onIpcEvent() {
       return () => {}
     },
     onEffectIntent() {
