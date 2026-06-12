@@ -181,6 +181,7 @@ if (!options.skipTypecheck) {
 // Renderer bundle MUST exist before electron-builder packs it (the
 // `files` glob in electron-builder.ts expects `dist/web/`).
 await $`bun run build:web`
+await $`bun run build:preload`
 await $`bun run build:server`
 const webDist = path.join(repoRoot, 'dist/web')
 for (const artifact of [path.join(webDist, 'index.html'), path.join(webDist, 'boot.js')]) {
@@ -188,6 +189,11 @@ for (const artifact of [path.join(webDist, 'index.html'), path.join(webDist, 'bo
     console.error(`Error: web build artifact missing: ${artifact}`)
     process.exit(1)
   }
+}
+const preloadManifest = path.join(repoRoot, 'dist/preload/manifest.json')
+if (!existsSync(preloadManifest)) {
+  console.error(`Error: preload build artifact missing: ${preloadManifest}`)
+  process.exit(1)
 }
 const serverDistEntry = path.join(repoRoot, 'dist/server/main.js')
 if (!existsSync(serverDistEntry)) {

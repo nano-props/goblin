@@ -13,6 +13,7 @@
     "dev": "bun scripts/dev.ts",
     "start": "bun run build:web && electron .",
     "build": "bun scripts/build.ts",
+    "build:preload": "bun scripts/build-preload.ts",
     "build:web": "vite build",
     "build:server": "bun build ./src/server/entrypoints/main.ts ./src/server/entrypoints/terminal-worker.ts --outdir ./dist/server --target node --external node-pty",
     "start:server": "node scripts/start-server.ts",

@@ -8,6 +8,7 @@
 //   window-registry.ts / renderer-surface.ts.
 
 import { app, type BrowserWindow, type BrowserWindowConstructorOptions } from 'electron'
+import { readFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { openHttpExternal } from '#/main/external-url.ts'
@@ -34,7 +35,9 @@ import { DEFAULT_COLOR_THEME, initialSettingsFromSnapshot } from '#/shared/setti
 
 const webDevUrl = process.env.GOBLIN_WEB_DEV_URL?.trim()
 const WEB_DIST_DIR = path.join(app.getAppPath(), 'dist/web')
-const PRELOAD_PATH = path.join(app.getAppPath(), 'src/preload/preload.cjs')
+const PRELOAD_SOURCE_PATH = path.join(app.getAppPath(), 'src/preload/preload.cjs')
+const PRELOAD_DIST_DIR = path.join(app.getAppPath(), 'dist/preload')
+const PRELOAD_MANIFEST_PATH = path.join(PRELOAD_DIST_DIR, 'manifest.json')
 
 export function windowCanvasBackground(): string {
   const { resolved, colorTheme } = getTheme()
@@ -62,13 +65,22 @@ export async function createRendererWindowWebPreferences(): Promise<BrowserWindo
     JSON.stringify(buildRendererBootstrapPayload(settingsSnapshot.lang, initialSettings)),
   ).toString('base64')
   return {
-    preload: PRELOAD_PATH,
+    preload: resolvePreloadPath(),
     contextIsolation: true,
     nodeIntegration: false,
     sandbox: true,
     webSecurity: true,
     additionalArguments: [`--goblin-bootstrap=${bootstrapPayload}`],
   }
+}
+
+function resolvePreloadPath(): string {
+  if (!app.isPackaged) return PRELOAD_SOURCE_PATH
+  const manifest = JSON.parse(readFileSync(PRELOAD_MANIFEST_PATH, 'utf8')) as { file?: unknown }
+  if (typeof manifest.file !== 'string' || manifest.file.length === 0) {
+    throw new Error('Packaged preload manifest is invalid')
+  }
+  return path.join(PRELOAD_DIST_DIR, manifest.file)
 }
 
 interface RendererEntryUrlOptions {

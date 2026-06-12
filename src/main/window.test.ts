@@ -3,6 +3,7 @@ import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
 const mocks = vi.hoisted(() => {
   const state = {
+    isPackaged: false,
     windows: [] as any[],
     windowOptions: [] as any[],
     webContentsOn: vi.fn(),
@@ -25,6 +26,7 @@ const mocks = vi.hoisted(() => {
       secret: 'secret',
       clientId: 'client_sharedterminal',
     })),
+    readFileSync: vi.fn(() => JSON.stringify({ file: 'preload-0.1.0-testhash.cjs' })),
   }
   const BrowserWindow = Object.assign(
     vi.fn(function BrowserWindow(options: any) {
@@ -67,6 +69,9 @@ const mocks = vi.hoisted(() => {
 
 vi.mock('electron', () => ({
   app: {
+    get isPackaged() {
+      return mocks.isPackaged
+    },
     getAppPath: () => '/app',
     getPath: () => '/home/user',
     whenReady: () => Promise.resolve(),
@@ -77,6 +82,10 @@ vi.mock('electron', () => ({
   screen: {
     getDisplayMatching: () => ({ workArea: { x: 0, y: 0, width: 1440, height: 900 } }),
   },
+}))
+
+vi.mock('node:fs', () => ({
+  readFileSync: mocks.readFileSync,
 }))
 
 vi.mock('#/main/window-state.ts', () => ({
@@ -110,8 +119,11 @@ describe('main window navigation boundaries', () => {
     vi.resetModules()
     vi.clearAllMocks()
     delete process.env.GOBLIN_WEB_DEV_URL
+    mocks.isPackaged = false
     mocks.windows.length = 0
     mocks.windowOptions.length = 0
+    mocks.readFileSync.mockReset()
+    mocks.readFileSync.mockReturnValue(JSON.stringify({ file: 'preload-0.1.0-testhash.cjs' }))
     mocks.getSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
     mocks.loadWindowState.mockReturnValue(Promise.resolve({ windowBounds: null }))
   })
@@ -181,6 +193,24 @@ describe('main window navigation boundaries', () => {
     await getOrCreateMainWindow()
 
     expect(mocks.loadURL).toHaveBeenCalledWith('http://127.0.0.1:5173/?theme=light&colorTheme=macos')
+  })
+
+  test('uses the source preload path while unpackaged', async () => {
+    const { getOrCreateMainWindow } = await import('#/main/window.ts')
+
+    await getOrCreateMainWindow()
+
+    expect(mocks.windowOptions[0]?.webPreferences?.preload).toBe('/app/src/preload/preload.cjs')
+  })
+
+  test('uses the hashed preload artifact from the packaged manifest', async () => {
+    mocks.isPackaged = true
+    const { getOrCreateMainWindow } = await import('#/main/window.ts')
+
+    await getOrCreateMainWindow()
+
+    expect(mocks.readFileSync).toHaveBeenCalledWith('/app/dist/preload/manifest.json', 'utf8')
+    expect(mocks.windowOptions[0]?.webPreferences?.preload).toBe('/app/dist/preload/preload-0.1.0-testhash.cjs')
   })
 
   test('uses the renderer dev server origin in bootstrap server config during development', async () => {
