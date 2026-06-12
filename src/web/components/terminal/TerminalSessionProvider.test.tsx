@@ -949,7 +949,7 @@ describe('TerminalSessionProvider', () => {
       },
       order: [REPO_ID, SECOND_REPO_ID],
     }))
-    const { unmount } = await renderProviderWithProbe(worktreeTerminalKey(REPO_ID, WORKTREE_PATH), REPO_ID)
+    const { unmount } = await renderProviderWithProbe(worktreeTerminalKey(REPO_ID, WORKTREE_PATH))
 
     try {
       await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
@@ -998,7 +998,6 @@ describe('TerminalSessionProvider', () => {
     }))
     const { unmount } = await renderProviderWithProbe(
       worktreeTerminalKey(REPO_ID, WORKTREE_PATH),
-      REPO_ID,
       new RepoSyncTracker(0),
     )
 
@@ -1022,7 +1021,7 @@ describe('TerminalSessionProvider', () => {
       selectedBranch: 'feature/worktree',
       detailTab: 'terminal',
     })
-    const { unmount } = await renderProviderWithProbe(worktreeTerminalKey(REPO_ID, WORKTREE_PATH), REPO_ID)
+    const { unmount } = await renderProviderWithProbe(worktreeTerminalKey(REPO_ID, WORKTREE_PATH))
 
     try {
       await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
@@ -1512,7 +1511,7 @@ function CaptureGroupProbe({
   return null
 }
 
-async function renderProvider(currentRepoId: string | null = REPO_ID): Promise<{
+async function renderProvider(): Promise<{
   getContext: () => TerminalSessionContextValue
   unmount: () => Promise<void>
 }> {
@@ -1523,7 +1522,7 @@ async function renderProvider(currentRepoId: string | null = REPO_ID): Promise<{
 
   await act(async () => {
     root.render(
-      <TerminalSessionProvider currentRepoId={currentRepoId}>
+      <TerminalSessionProvider>
         <CaptureContext onContext={(value) => (context = value)} />
       </TerminalSessionProvider>,
     )
@@ -1543,7 +1542,6 @@ async function renderProvider(currentRepoId: string | null = REPO_ID): Promise<{
 
 async function renderProviderWithProbe(
   worktreeTerminalKey: string,
-  currentRepoId: string | null = REPO_ID,
   syncTracker?: RepoSyncTracker,
 ): Promise<{
   getContext: () => TerminalSessionContextValue
@@ -1580,7 +1578,7 @@ async function renderProviderWithProbe(
 
   await act(async () => {
     root.render(
-      <TerminalSessionProvider currentRepoId={currentRepoId} syncTracker={syncTracker}>
+      <TerminalSessionProvider syncTracker={syncTracker}>
         <CaptureContext onContext={(value) => (context = value)} />
         <CaptureGroupProbe worktreeTerminalKey={worktreeTerminalKey} onProbe={(value) => (probe = value)} />
       </TerminalSessionProvider>,

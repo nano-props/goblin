@@ -19,18 +19,21 @@ import { RepoSyncTracker } from '#/web/components/terminal/repo-sync-tracker.ts'
 import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 
 interface TerminalSessionProviderProps {
-  currentRepoId: string | null
   children: ReactNode
   /** @internal For tests only. */
   syncTracker?: RepoSyncTracker
 }
 
 export function TerminalSessionProvider({
-  currentRepoId,
   children,
   syncTracker: syncTrackerProp,
 }: TerminalSessionProviderProps) {
   const repoIndex = useStoreWithEqualityFn(useReposStore, (s) => repoIndexFromRepos(s.repos), repoIndexEqual)
+  // The provider lives at the router root (above the per-route App), so it
+  // reads the active repo directly from the repos store rather than via a
+  // prop. This keeps the terminal session registry, parking root, and
+  // xterm views alive across settings → workspace round-trips.
+  const currentRepoId = useReposStore((s) => s.activeId)
   const currentRepoInstanceToken = currentRepoId ? (repoIndex[currentRepoId]?.instanceToken ?? null) : null
   const selectedTerminalByWorktree = useReposStore((s) => s.selectedTerminalByWorktree)
   const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
