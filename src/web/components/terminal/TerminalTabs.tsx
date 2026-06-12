@@ -1,5 +1,5 @@
 import { Plus, X, ChevronDown } from 'lucide-react'
-import { useCallback, useLayoutEffect, useRef, type ComponentPropsWithoutRef } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, type ComponentPropsWithoutRef } from 'react'
 import { cn } from '#/web/lib/cn.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
@@ -10,6 +10,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '#/web/components/ui/dropdown-menu.tsx'
+import {
+  DndContext,
+  type DragEndEvent,
+  type Modifier,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { DelegatedTooltipLayer, DELEGATED_TOOLTIP_DEFAULTS } from '#/web/components/DelegatedTooltipLayer.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
@@ -29,12 +40,34 @@ interface TerminalTabsProps {
   onSelect: (worktreeTerminalKey: string, key: string) => void
   onScrollToBottom: (key: string) => void
   onClose: (key: string) => void
+  onReorder: (worktreeTerminalKey: string, orderedKeys: string[]) => void
   onNavigateOut?: (direction: 'prev' | 'next' | 'first' | 'last') => void
 }
 
 export const EMPTY_TERMINAL_TAB_FOCUS_KEY = '__terminal-empty__'
 
 const TERMINAL_TAB_TOOLTIP_SELECTOR = '[data-terminal-tab-tooltip-id]'
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max)
+}
+
+const restrictToVisibleTabStrip: Modifier = ({
+  activeNodeRect,
+  containerNodeRect,
+  draggingNodeRect,
+  scrollableAncestorRects,
+  transform,
+  windowRect,
+}) => {
+  const horizontalTransform = { ...transform, y: 0 }
+  const draggableRect = draggingNodeRect ?? activeNodeRect
+  const bounds = scrollableAncestorRects[0] ?? containerNodeRect ?? windowRect
+  if (!draggableRect || !bounds) return horizontalTransform
+  const minX = bounds.left - draggableRect.left
+  const maxX = bounds.right - draggableRect.right
+  return { ...horizontalTransform, x: clamp(horizontalTransform.x, minX, maxX) }
+}
 
 export function TerminalTabs({
   worktreeTerminalKey,
@@ -49,6 +82,7 @@ export function TerminalTabs({
   onSelect,
   onScrollToBottom,
   onClose,
+  onReorder,
   onNavigateOut,
 }: TerminalTabsProps) {
   const t = useT()
@@ -78,6 +112,13 @@ export function TerminalTabs({
     })
     return () => cancelAnimationFrame(frame)
   }, [sessions.length])
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+
+  // Must be called unconditionally so the hook order stays stable across renders
+  // (e.g. when sessions goes from 0 → 1 or back, which would otherwise bypass the
+  // helper below and trigger React's "Rendered more hooks than during the previous render").
+  const sortableIds = useMemo(() => sessions.map((s) => s.key), [sessions])
 
   const handleSelect = useCallback(
     (key: string) => {
@@ -149,6 +190,26 @@ export function TerminalTabs({
     [focusRegistry, onNavigateOut, sessions, showCollapsedTabs],
   )
 
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event
+      if (!over) return
+      const activeId = String(active.id)
+      const overId = String(over.id)
+      if (activeId === overId) return
+      const oldIndex = sessions.findIndex((s) => s.key === activeId)
+      const newIndex = sessions.findIndex((s) => s.key === overId)
+      if (oldIndex === -1 || newIndex === -1) return
+      const next = arrayMove(
+        sessions.map((s) => s.key),
+        oldIndex,
+        newIndex,
+      )
+      onReorder(worktreeTerminalKey, next)
+    },
+    [sessions, onReorder, worktreeTerminalKey],
+  )
+
   if (sessions.length === 0) {
     return (
       <Button
@@ -168,60 +229,6 @@ export function TerminalTabs({
 
   if (!activeSession) return null
 
-  function renderTab(session: TerminalSessionSummary, index: number) {
-    const isActive = panelActive && session.selected
-    const tabId = showCollapsedTabs || index === 0 ? `${detailId}-terminal-tab` : `${detailId}-terminal-tab-${session.key}`
-    return (
-      <div
-        key={session.key}
-        data-terminal-tab-tooltip-id={session.key}
-        className={cn(
-          'group relative flex h-7 w-28 shrink-0 items-center gap-1 rounded-md border px-2.5 text-sm transition-colors duration-100',
-          isActive
-            ? 'border-transparent bg-selected text-selected-foreground'
-            : 'border-separator text-muted-foreground hover:bg-accent/50 hover:text-foreground',
-        )}
-      >
-        <button
-          ref={focusRegistry.setRef(session.key)}
-          type="button"
-          role="tab"
-          id={tabId}
-          aria-selected={isActive}
-          tabIndex={isActive ? 0 : -1}
-          onClick={() => handleSelect(session.key)}
-          onKeyDown={(e) => handleTabKeyDown(e, session.key)}
-          className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-left text-inherit outline-none"
-        >
-          <span className="truncate">{session.title}</span>
-          {session.hasBell && (
-            <>
-              <span className="relative flex h-2 w-2 shrink-0">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-attention opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-attention" />
-              </span>
-              <span className="sr-only">{t('terminal.bell-unread')}</span>
-            </>
-          )}
-        </button>
-        <button
-          type="button"
-          tabIndex={-1}
-          aria-label={t('terminal.close')}
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => handleClose(e, session.key)}
-          className={cn(
-            'cursor-pointer rounded border-0 bg-transparent p-0.5 text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-accent-foreground',
-            isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
-          )}
-          title={t('terminal.close')}
-        >
-          <X size={14} />
-        </button>
-      </div>
-    )
-  }
-
   function renderCompactTabsBody() {
     return (
       <ToolbarTabStripBody>
@@ -231,7 +238,16 @@ export function TerminalTabs({
           role="tablist"
           aria-label={t('terminal.sessions')}
         >
-          {renderTab(activeSession, 0)}
+          <TerminalTab
+            session={activeSession}
+            isActive={!!panelActive && activeSession.selected}
+            tabId={`${detailId}-terminal-tab`}
+            focusRegistry={focusRegistry}
+            onSelect={handleSelect}
+            onClose={handleClose}
+            onKeyDown={handleTabKeyDown}
+            t={t}
+          />
         </TerminalTabTooltipLayer>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -244,7 +260,10 @@ export function TerminalTabs({
               {sessions.map((session) => (
                 <div key={session.key} className="group relative flex items-center">
                   <DropdownMenuItem
-                    className={cn('min-w-0 flex-1 gap-2 pr-8', session.selected && 'bg-selected text-selected-foreground')}
+                    className={cn(
+                      'min-w-0 flex-1 gap-2 pr-8',
+                      session.selected && 'bg-selected text-selected-foreground',
+                    )}
                     onSelect={() => handleSelect(session.key)}
                     aria-label={session.fullTitle ?? session.title}
                     aria-current={session.selected ? 'true' : undefined}
@@ -285,27 +304,48 @@ export function TerminalTabs({
 
   function renderScrollableTabsBody() {
     return (
-      <ToolbarTabStripBody scroll>
-        <TerminalTabTooltipLayer
-          sessions={sessions}
-          focusMode={focusMode}
-          role="tablist"
-          aria-label={t('terminal.sessions')}
-        >
-          {sessions.map((session, index) => renderTab(session, index))}
-        </TerminalTabTooltipLayer>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 shrink-0"
-          onClick={onNew}
-          aria-label={t('terminal.new')}
-          title={t('terminal.new')}
-        >
-          <Plus size={14} />
-        </Button>
-      </ToolbarTabStripBody>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        modifiers={[restrictToVisibleTabStrip]}
+        onDragEnd={handleDragEnd}
+      >
+        <ToolbarTabStripBody scroll>
+          <SortableContext items={sortableIds} strategy={horizontalListSortingStrategy}>
+            <TerminalTabTooltipLayer
+              sessions={sessions}
+              focusMode={focusMode}
+              role="tablist"
+              aria-label={t('terminal.sessions')}
+            >
+              {sessions.map((session, index) => (
+                <SortableTerminalTab
+                  key={session.key}
+                  session={session}
+                  isActive={!!panelActive && session.selected}
+                  tabId={index === 0 ? `${detailId}-terminal-tab` : `${detailId}-terminal-tab-${session.key}`}
+                  focusRegistry={focusRegistry}
+                  onSelect={handleSelect}
+                  onClose={handleClose}
+                  onKeyDown={handleTabKeyDown}
+                  t={t}
+                />
+              ))}
+            </TerminalTabTooltipLayer>
+          </SortableContext>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0"
+            onClick={onNew}
+            aria-label={t('terminal.new')}
+            title={t('terminal.new')}
+          >
+            <Plus size={14} />
+          </Button>
+        </ToolbarTabStripBody>
+      </DndContext>
     )
   }
 
@@ -316,6 +356,151 @@ export function TerminalTabs({
       scrollContent={renderScrollableTabsBody()}
       viewportRef={viewportRef}
     />
+  )
+}
+
+interface TerminalTabProps {
+  session: TerminalSessionSummary
+  isActive: boolean
+  tabId: string
+  focusRegistry: FocusRegistry<string, HTMLButtonElement>
+  onSelect: (key: string) => void
+  onClose: (event: React.MouseEvent, key: string) => void
+  onKeyDown: (e: React.KeyboardEvent<HTMLButtonElement>, sessionKey: string) => void
+  t: (key: string) => string
+}
+
+function TerminalTab({ session, isActive, tabId, focusRegistry, onSelect, onClose, onKeyDown, t }: TerminalTabProps) {
+  return (
+    <div
+      data-terminal-tab-tooltip-id={session.key}
+      className={cn(
+        'group relative flex h-7 w-28 shrink-0 items-center gap-1 rounded-md border px-2.5 text-sm transition-colors duration-100',
+        isActive
+          ? 'border-transparent bg-selected text-selected-foreground'
+          : 'border-separator text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+      )}
+    >
+      <button
+        ref={focusRegistry.setRef(session.key)}
+        type="button"
+        role="tab"
+        id={tabId}
+        aria-selected={isActive}
+        tabIndex={isActive ? 0 : -1}
+        onClick={() => onSelect(session.key)}
+        onKeyDown={(e) => onKeyDown(e, session.key)}
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-left text-inherit outline-none"
+      >
+        <span className="truncate">{session.title}</span>
+        {session.hasBell && (
+          <>
+            <span className="relative flex h-2 w-2 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-attention opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-attention" />
+            </span>
+            <span className="sr-only">{t('terminal.bell-unread')}</span>
+          </>
+        )}
+      </button>
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label={t('terminal.close')}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => onClose(e, session.key)}
+        className={cn(
+          'cursor-pointer rounded border-0 bg-transparent p-0.5 text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-accent-foreground',
+          isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
+        )}
+        title={t('terminal.close')}
+      >
+        <X size={14} />
+      </button>
+    </div>
+  )
+}
+
+function SortableTerminalTab({
+  session,
+  isActive,
+  tabId,
+  focusRegistry,
+  onSelect,
+  onClose,
+  onKeyDown,
+  t,
+}: TerminalTabProps) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
+    id: session.key,
+  })
+  const sortableListeners = listeners ?? {}
+  const chromeLikeTransform = transform ? { ...transform, y: 0, scaleX: 1, scaleY: 1 } : null
+  const style = {
+    transform: CSS.Transform.toString(chromeLikeTransform),
+    transition,
+  }
+  const setFocusRef = focusRegistry.setRef(session.key)
+  const setButtonRef = (node: HTMLButtonElement | null) => {
+    setActivatorNodeRef(node)
+    setFocusRef(node)
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      data-terminal-tab-tooltip-id={session.key}
+      className={cn(
+        'group relative flex h-7 w-28 shrink-0 touch-none select-none items-center gap-1 rounded-md border px-2.5 text-sm transition-colors duration-100',
+        isActive
+          ? 'border-transparent bg-selected text-selected-foreground'
+          : 'border-separator text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+        isDragging && 'z-10 cursor-grabbing bg-card text-foreground',
+      )}
+    >
+      <button
+        ref={setButtonRef}
+        type="button"
+        {...attributes}
+        {...sortableListeners}
+        role="tab"
+        id={tabId}
+        aria-selected={isActive}
+        tabIndex={isActive ? 0 : -1}
+        onClick={() => onSelect(session.key)}
+        onKeyDown={(e) => {
+          if (isDragging) return
+          onKeyDown(e, session.key)
+        }}
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-left text-inherit outline-none"
+      >
+        <span className="truncate">{session.title}</span>
+        {session.hasBell && (
+          <>
+            <span className="relative flex h-2 w-2 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-attention opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-attention" />
+            </span>
+            <span className="sr-only">{t('terminal.bell-unread')}</span>
+          </>
+        )}
+      </button>
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label={t('terminal.close')}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => onClose(e, session.key)}
+        className={cn(
+          'cursor-pointer rounded border-0 bg-transparent p-0.5 text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-accent-foreground',
+          isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
+        )}
+        title={t('terminal.close')}
+      >
+        <X size={14} />
+      </button>
+    </div>
   )
 }
 
@@ -343,4 +528,12 @@ function TerminalTabTooltipLayer({ sessions, focusMode, children, ...props }: Te
       <ToolbarTabList {...props}>{children}</ToolbarTabList>
     </DelegatedTooltipLayer>
   )
+}
+
+function arrayMove<T>(array: T[], from: number, to: number): T[] {
+  const result = array.slice()
+  const [removed] = result.splice(from, 1)
+  if (removed === undefined) return result
+  result.splice(to, 0, removed)
+  return result
 }

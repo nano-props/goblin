@@ -71,6 +71,8 @@ interface TerminalSession<TOwner extends string | number> {
   attachment: TerminalAttachmentState | null
   controller: TerminalController | null
   allowImplicitAttachControl: boolean
+  /** Display order within the worktree for tab strip sorting. */
+  displayOrder: number
   /** Input queue ensures ordered PTY writes even with multiple concurrent callers. */
   inputQueue: string[]
   /** True when a microtask flush has already been scheduled for this session. */
@@ -130,6 +132,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
       attachment: null,
       controller: null,
       allowImplicitAttachControl: true,
+      displayOrder: this.nextDisplayOrder(input.scope, parseWorktreePathFromKey(input.key) ?? input.key),
       inputQueue: [],
       inputFlushScheduled: false,
     }
@@ -314,10 +317,40 @@ export class TerminalSessionManager<TOwner extends string | number> {
           canonicalTitle: session.render.canonicalTitle,
           cols: session.cols,
           rows: session.rows,
+          displayOrder: session.displayOrder,
         })
       }
     }
+    sessions.sort((a, b) => a.displayOrder - b.displayOrder)
     return sessions
+  }
+
+  reorderSessions(scope: string, worktreePath: string, orderedKeys: string[]): boolean {
+    const worktreePrefix = `${scope}\0${worktreePath}\0`
+    const sessionsInWorktree = Array.from(this.sessionsById.values()).filter(
+      (s) => s.scope === scope && s.key.startsWith(worktreePrefix),
+    )
+    const keySet = new Set(sessionsInWorktree.map((s) => s.key))
+    if (orderedKeys.length !== sessionsInWorktree.length) return false
+    if (!orderedKeys.every((k) => keySet.has(k))) return false
+    const sessionByKey = new Map<string, TerminalSession<TOwner>>()
+    for (const s of sessionsInWorktree) sessionByKey.set(s.key, s)
+    for (let i = 0; i < orderedKeys.length; i++) {
+      const session = sessionByKey.get(orderedKeys[i])
+      if (session) session.displayOrder = i
+    }
+    return true
+  }
+
+  private nextDisplayOrder(scope: string, worktreePath: string): number {
+    const worktreePrefix = `${scope}\0${worktreePath}\0`
+    let max = -1
+    for (const session of this.sessionsById.values()) {
+      if (session.scope === scope && session.key.startsWith(worktreePrefix)) {
+        if (session.displayOrder > max) max = session.displayOrder
+      }
+    }
+    return max + 1
   }
 
   private ownedSession(ownerId: TOwner, sessionId: string): TerminalSession<TOwner> | undefined {
@@ -501,7 +534,6 @@ export class TerminalSessionManager<TOwner extends string | number> {
   private isValidOwnerId(ownerId: TOwner): boolean {
     return (typeof ownerId === 'number' && Number.isSafeInteger(ownerId) && ownerId > 0) || (typeof ownerId === 'string' && ownerId.length > 0)
   }
-
 }
 
 export function isValidTerminalSessionId(value: unknown): value is string {
@@ -529,4 +561,9 @@ function createSessionId(): string {
 function terminalPruneKey(key: string): string {
   const parts = key.split('\0')
   return parts.length >= 2 ? `${parts[0]}\0${parts[1]}` : key
+}
+
+function parseWorktreePathFromKey(key: string): string | null {
+  const parts = key.split('\0')
+  return parts.length >= 3 ? parts[1]! : null
 }

@@ -16,6 +16,7 @@ import type {
   TerminalMutationResult,
   TerminalNotifyBellInput,
   TerminalOutputEvent,
+  TerminalReorderInput,
   TerminalSessionSnapshot,
   TerminalSessionSnapshotInput,
   TerminalSessionSummary,
@@ -238,6 +239,9 @@ export function createServerTerminalBridge(options: {
         return snapshot
       })
     },
+    reorder(input) {
+      return requestOverSocket('reorder', input satisfies TerminalReorderInput)
+    },
     notifyBell(input) {
       if (options.notifyBell) return options.notifyBell(input)
       return showBrowserNotification(input.title, input.body, () => {
@@ -345,6 +349,10 @@ export function createServerTerminalBridge(options: {
   async function requestOverSocket(
     action: 'close',
     input: TerminalSocketRequestInputs['close'],
+  ): Promise<TerminalMutationResult>
+  async function requestOverSocket(
+    action: 'reorder',
+    input: TerminalSocketRequestInputs['reorder'],
   ): Promise<TerminalMutationResult>
   async function requestOverSocket<TAction extends TerminalSocketRequestAction>(
     action: TAction,

@@ -62,6 +62,7 @@ export function BranchDetailToolbar({
     selectTerminal,
     scrollToBottom,
     closeTerminalAndDismissDetailIfLast,
+    reorderSessions,
   } = useTerminalSessionContext()
 
   const worktreeSnapshot = useWorktreeTerminalSnapshot(terminalWorktreeKey)
@@ -114,6 +115,13 @@ export function BranchDetailToolbar({
       closeTerminalAndDismissDetailIfLast(key, terminalBase)
     },
     [closeTerminalAndDismissDetailIfLast, terminalBase],
+  )
+
+  const handleReorderTerminals = useCallback(
+    (worktreeKey: string, orderedKeys: string[]) => {
+      void reorderSessions(worktreeKey, orderedKeys)
+    },
+    [reorderSessions],
   )
 
   // No selected branch means there is no tab/action target; BranchDetailContent renders the empty state.
@@ -214,6 +222,7 @@ export function BranchDetailToolbar({
               onSelect={handleSelectTerminal}
               onScrollToBottom={handleScrollToBottom}
               onClose={handleCloseTerminal}
+              onReorder={handleReorderTerminals}
               onNavigateOut={(direction) => {
                 if (direction === 'first' || direction === 'next') {
                   navigation.showRepoDetailTab(repo.id, 'status')

@@ -34,6 +34,7 @@ interface TerminalBridgeTestOutputs {
   'terminal.prune': { pruned: number; remaining: number }
   'terminal.listSessions': TerminalSessionSummary[]
   'terminal.getSessionSnapshot': TerminalSessionSnapshot | null
+  'terminal.reorder': TerminalMutationResult
   'terminal.notifyBell': TerminalMutationResult
 }
 
@@ -59,6 +60,8 @@ function terminalHandlerNameForSocketAction(action: string): keyof TerminalBridg
       return 'terminal.listSessions'
     case 'session-snapshot':
       return 'terminal.getSessionSnapshot'
+    case 'reorder':
+      return 'terminal.reorder'
     default:
       return null
   }
@@ -209,6 +212,10 @@ export function installGoblinTestBridge(handlers: Record<string, RpcTestHandler>
     payload: unknown,
   ): TerminalBridgeTestOutputs['terminal.notifyBell']
   function callTerminalHandler(
+    name: 'terminal.reorder',
+    payload: unknown,
+  ): TerminalBridgeTestOutputs['terminal.reorder']
+  function callTerminalHandler(
     name: keyof TerminalBridgeTestOutputs,
     payload: unknown,
   ): TerminalBridgeTestOutputs[keyof TerminalBridgeTestOutputs]
@@ -225,6 +232,7 @@ export function installGoblinTestBridge(handlers: Record<string, RpcTestHandler>
         case 'terminal.write':
         case 'terminal.resize':
         case 'terminal.close':
+        case 'terminal.reorder':
         case 'terminal.notifyBell':
           return true satisfies TerminalMutationResult
         case 'terminal.takeover':
@@ -362,6 +370,7 @@ export function installGoblinTestBridge(handlers: Record<string, RpcTestHandler>
       pruneTerminals: async (repoRoot) => callTerminalHandler('terminal.prune', { repoRoot }),
       listSessions: async (input) => callTerminalHandler('terminal.listSessions', input),
       getSessionSnapshot: async (input) => callTerminalHandler('terminal.getSessionSnapshot', input),
+      reorder: async (input) => callTerminalHandler('terminal.reorder', input),
       notifyBell: async (input) => callTerminalHandler('terminal.notifyBell', input),
       sendTestNotification: async () => true,
       setBadge: () => {},

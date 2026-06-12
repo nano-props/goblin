@@ -283,6 +283,7 @@ beforeEach(() => {
         canonicalTitle: null,
         cols: 80,
         rows: 24,
+        displayOrder: 1,
       },
     ]
     return { ok: true, action: 'created', key, sessions: managedServerSessions }
@@ -436,6 +437,7 @@ beforeEach(() => {
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       listSessions: listSessionsMock,
       getSessionSnapshot: getSessionSnapshotMock,
+      reorder: vi.fn(async () => true),
       notifyBell: window.goblinNative.terminal.notifyBell,
       sendTestNotification: vi.fn(async () => true),
       setBadge: window.goblinNative.terminal.setBadge,
@@ -718,6 +720,7 @@ describe('TerminalSessionProvider', () => {
         canonicalTitle: null,
         cols: 120,
         rows: 40,
+        displayOrder: 1,
       },
     ])
     getSessionSnapshotMock.mockResolvedValue({
@@ -780,6 +783,7 @@ describe('TerminalSessionProvider', () => {
         canonicalTitle: null,
         cols: 80,
         rows: 24,
+        displayOrder: 1,
       },
     ]
     listSessionsMock.mockImplementation(async () => managedServerSessions)
@@ -839,6 +843,7 @@ describe('TerminalSessionProvider', () => {
         canonicalTitle: null,
         cols: 80,
         rows: 24,
+        displayOrder: 1,
       },
       {
         sessionId: 'server_session_2',
@@ -849,6 +854,7 @@ describe('TerminalSessionProvider', () => {
         canonicalTitle: null,
         cols: 80,
         rows: 24,
+        displayOrder: 1,
       },
     ]
     listSessionsMock.mockImplementation(async () => managedServerSessions)
@@ -1026,6 +1032,7 @@ describe('TerminalSessionProvider', () => {
         canonicalTitle: null,
         cols: 100,
         rows: 30,
+        displayOrder: 1,
       },
     ])
     const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
@@ -1073,6 +1080,7 @@ describe('TerminalSessionProvider', () => {
         canonicalTitle: null,
         cols: 100,
         rows: 30,
+        displayOrder: 1,
       },
     ])
     const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
@@ -1102,6 +1110,7 @@ describe('TerminalSessionProvider', () => {
           canonicalTitle: null,
           cols: 100,
           rows: 30,
+          displayOrder: 1,
         },
       ])
       getSessionSnapshotMock.mockClear()
@@ -1140,6 +1149,7 @@ describe('TerminalSessionProvider', () => {
         canonicalTitle: null,
         cols: 100,
         rows: 30,
+        displayOrder: 1,
       },
     ])
     const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
@@ -1204,6 +1214,7 @@ describe('TerminalSessionProvider', () => {
         canonicalTitle: null,
         cols: 100,
         rows: 30,
+        displayOrder: 1,
       },
     ])
     getSessionSnapshotMock.mockResolvedValueOnce({
@@ -1238,6 +1249,7 @@ describe('TerminalSessionProvider', () => {
           canonicalTitle: null,
           cols: 100,
           rows: 30,
+          displayOrder: 1,
         },
       ])
 
@@ -1273,6 +1285,7 @@ describe('TerminalSessionProvider', () => {
         canonicalTitle: null,
         cols: 100,
         rows: 30,
+        displayOrder: 1,
       },
     ])
     getSessionSnapshotMock.mockResolvedValueOnce({
@@ -1309,6 +1322,7 @@ describe('TerminalSessionProvider', () => {
           canonicalTitle: null,
           cols: 100,
           rows: 30,
+          displayOrder: 1,
         },
       ])
 
@@ -1348,6 +1362,7 @@ describe('TerminalSessionProvider', () => {
         canonicalTitle: null,
         cols: 100,
         rows: 30,
+        displayOrder: 1,
       },
     ])
     getSessionSnapshotMock.mockResolvedValueOnce({

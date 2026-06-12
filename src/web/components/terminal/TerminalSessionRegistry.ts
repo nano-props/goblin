@@ -52,6 +52,7 @@ export class TerminalSessionRegistry {
   private readonly worktreeSnapshotCache = new Map<string, WorktreeTerminalSnapshot>()
   private readonly worktreeListeners = new Map<string, Set<() => void>>()
   private readonly snapshotListeners = new Map<string, Set<() => void>>()
+  private readonly displayOrderByKey = new Map<string, number>()
   private readonly bellController = createTerminalBellController(
     (key) => {
       if (key) {
@@ -189,6 +190,7 @@ export class TerminalSessionRegistry {
       if (serverSession.controller?.attachmentId === attachmentId) {
         controllerKeyByWorktree.set(terminalWorktreeKey, descriptor.key)
       }
+      this.displayOrderByKey.set(descriptor.key, serverSession.displayOrder)
     }
 
     for (const key of localKeys) {
@@ -285,7 +287,11 @@ export class TerminalSessionRegistry {
     const selectedKey = this.selectedKeyByWorktree.get(worktreeTerminalKey) ?? null
     return Array.from(this.sessions.values())
       .filter((session) => session.descriptor.worktreeTerminalKey === worktreeTerminalKey)
-      .sort((a, b) => a.descriptor.index - b.descriptor.index)
+      .sort((a, b) => {
+        const orderA = this.displayOrderByKey.get(a.descriptor.key)!
+        const orderB = this.displayOrderByKey.get(b.descriptor.key)!
+        return orderA - orderB
+      })
       .map((session) => {
         const snapshot = this.snapshotCache.get(session.descriptor.key) ?? session.snapshot()
         this.snapshotCache.set(session.descriptor.key, snapshot)
@@ -403,6 +409,38 @@ export class TerminalSessionRegistry {
     return this.sessions.get(key)?.serialize() ?? ''
   }
 
+  reorderSessions = async (scope: string, orderedKeys: string[]): Promise<boolean> => {
+    if (orderedKeys.length === 0) return true
+    let parsed: { repoRoot: string; worktreePath: string; terminalId: string } | null = null
+    for (const key of orderedKeys) {
+      const item = parseServerSessionKey(key)
+      if (!item) return false
+      if (worktreeTerminalKey(item.repoRoot, item.worktreePath) !== scope) return false
+      if (!parsed) parsed = item
+    }
+    if (!parsed) return false
+    // Snapshot current order so we can roll back if the server rejects the reorder.
+    const previousOrder = new Map<string, number | undefined>()
+    for (const key of orderedKeys) previousOrder.set(key, this.displayOrderByKey.get(key))
+    for (let i = 0; i < orderedKeys.length; i++) {
+      this.displayOrderByKey.set(orderedKeys[i], i)
+    }
+    this.notifyWorktree(scope)
+    const result = await terminalBridge.reorder({
+      repoRoot: parsed.repoRoot,
+      worktreePath: parsed.worktreePath,
+      orderedKeys,
+    })
+    if (!result) {
+      for (const [key, order] of previousOrder) {
+        if (order === undefined) this.displayOrderByKey.delete(key)
+        else this.displayOrderByKey.set(key, order)
+      }
+      this.notifyWorktree(scope)
+    }
+    return result
+  }
+
   private notifyWorktree(worktreeTerminalKey: string): void {
     this.worktreeSnapshotCache.delete(worktreeTerminalKey)
     const listeners = this.worktreeListeners.get(worktreeTerminalKey)
@@ -482,6 +520,7 @@ export class TerminalSessionRegistry {
     this.sessions.delete(key)
     this.snapshotCache.delete(key)
     this.reattachSnapshotCache.delete(key)
+    this.displayOrderByKey.delete(key)
     this.notifySnapshot(key)
     this.bellController.remove(key)
     if (options.dispose) session.dispose({ closeSession: options.closeSession !== false })
@@ -605,7 +644,6 @@ export class TerminalSessionRegistry {
         .sort((a, b) => a.descriptor.index - b.descriptor.index)[0]?.descriptor.key ?? null
     )
   }
-
 }
 
 function summarizeTerminalTitle(snapshot: TerminalSnapshot, index: number): string {

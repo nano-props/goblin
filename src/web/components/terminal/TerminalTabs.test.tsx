@@ -53,6 +53,7 @@ describe('TerminalTabs', () => {
         onSelect={() => {}}
         onScrollToBottom={() => {}}
         onClose={() => {}}
+        onReorder={() => {}}
       />,
     )
 
@@ -96,6 +97,7 @@ describe('TerminalTabs', () => {
         onSelect={() => {}}
         onScrollToBottom={() => {}}
         onClose={() => {}}
+        onReorder={() => {}}
       />,
     )
 
@@ -128,6 +130,7 @@ describe('TerminalTabs', () => {
         onSelect={() => {}}
         onScrollToBottom={() => {}}
         onClose={() => {}}
+        onReorder={() => {}}
         onNavigateOut={onNavigateOut}
       />,
     )
@@ -158,6 +161,7 @@ describe('TerminalTabs', () => {
         onSelect={() => {}}
         onScrollToBottom={() => {}}
         onClose={() => {}}
+        onReorder={() => {}}
       />,
     )
 
@@ -192,6 +196,7 @@ describe('TerminalTabs', () => {
         onSelect={() => {}}
         onScrollToBottom={() => {}}
         onClose={() => {}}
+        onReorder={() => {}}
         onNavigateOut={onNavigateOut}
       />,
     )
@@ -236,6 +241,7 @@ describe('TerminalTabs', () => {
         onSelect={() => {}}
         onScrollToBottom={() => {}}
         onClose={() => {}}
+        onReorder={() => {}}
       />,
     )
 
@@ -258,6 +264,7 @@ describe('TerminalTabs', () => {
         onSelect={() => {}}
         onScrollToBottom={() => {}}
         onClose={() => {}}
+        onReorder={() => {}}
       />,
     )
 
@@ -278,6 +285,7 @@ describe('TerminalTabs', () => {
         onSelect={() => {}}
         onScrollToBottom={() => {}}
         onClose={() => {}}
+        onReorder={() => {}}
       />,
     )
 
@@ -301,6 +309,7 @@ describe('TerminalTabs', () => {
         onSelect={() => {}}
         onScrollToBottom={() => {}}
         onClose={() => {}}
+        onReorder={() => {}}
       />,
     )
 
@@ -320,6 +329,7 @@ describe('TerminalTabs', () => {
         onSelect={() => {}}
         onScrollToBottom={() => {}}
         onClose={() => {}}
+        onReorder={() => {}}
       />,
     )
 
@@ -344,6 +354,7 @@ describe('TerminalTabs', () => {
         onSelect={() => {}}
         onScrollToBottom={() => {}}
         onClose={() => {}}
+        onReorder={() => {}}
       />,
     )
 
@@ -368,6 +379,7 @@ describe('TerminalTabs', () => {
         onSelect={() => {}}
         onScrollToBottom={() => {}}
         onClose={() => {}}
+        onReorder={() => {}}
       />,
     )
 
@@ -391,6 +403,7 @@ describe('TerminalTabs', () => {
         onSelect={() => {}}
         onScrollToBottom={() => {}}
         onClose={() => {}}
+        onReorder={() => {}}
       />,
     )
 
@@ -414,6 +427,7 @@ describe('TerminalTabs', () => {
         onSelect={() => {}}
         onScrollToBottom={() => {}}
         onClose={() => {}}
+        onReorder={() => {}}
       />,
     )
 
@@ -435,6 +449,7 @@ describe('TerminalTabs', () => {
         onSelect={() => {}}
         onScrollToBottom={() => {}}
         onClose={() => {}}
+        onReorder={() => {}}
       />,
     )
 
@@ -455,6 +470,7 @@ describe('TerminalTabs', () => {
         onSelect={() => {}}
         onScrollToBottom={() => {}}
         onClose={() => {}}
+        onReorder={() => {}}
       />,
     )
 
@@ -473,6 +489,7 @@ describe('TerminalTabs', () => {
         onSelect={() => {}}
         onScrollToBottom={() => {}}
         onClose={() => {}}
+        onReorder={() => {}}
       />,
     )
 

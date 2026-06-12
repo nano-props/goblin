@@ -44,6 +44,7 @@ export const terminalBridge: RendererTerminalBridge = {
   pruneTerminals: bindTerminalMethod('pruneTerminals'),
   listSessions: bindTerminalMethod('listSessions'),
   getSessionSnapshot: bindTerminalMethod('getSessionSnapshot'),
+  reorder: bindTerminalMethod('reorder'),
   notifyBell: bindTerminalMethod('notifyBell'),
   sendTestNotification: bindTerminalMethod('sendTestNotification'),
   setBadge: bindTerminalMethod('setBadge'),
