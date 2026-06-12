@@ -2,7 +2,7 @@
 // Download Electron zip from npmmirror to the local Electron cache.
 // Usage: ./scripts/download-electron-cache.ts [--clean]
 import { $ } from 'bun'
-import { rmSync } from 'node:fs'
+import { existsSync, rmSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
@@ -43,8 +43,15 @@ if (values.clean) {
   console.log('Cleaning Electron caches...')
   rmSync(path.join(os.homedir(), 'Library/Caches/electron'), { recursive: true, force: true })
   rmSync(path.join(os.homedir(), 'Library/Caches/electron-builder'), { recursive: true, force: true })
-} else {
-  rmSync(zipPath, { force: true })
+} else if (existsSync(zipPath)) {
+  // Idempotent: skip re-download when the zip already exists. Note that
+  // electron-builder itself uses a SHA1-hashed subdirectory under
+  // ~/Library/Caches/electron and does NOT read this flat path; this script
+  // exists as a manual warm-up, not as an electron-builder shortcut.
+  const sizeMB = (Bun.file(zipPath).size / 1024 / 1024).toFixed(1)
+  console.log(`Electron cache already populated (${sizeMB} MB), skipping download.`)
+  console.log(`Path: ${zipPath}`)
+  process.exit(0)
 }
 
 console.log(`Creating cache dir: ${cacheDir}`)
