@@ -29,7 +29,15 @@ const DEFAULT_TERMINAL_COLS = 80
 const DEFAULT_TERMINAL_ROWS = 24
 const RESIZE_DEBOUNCE_MS = 80
 const FONT_REMEASURE_DEBOUNCE_MS = 80
+const TERMINAL_FONT_SIZE = 14
 const TERMINAL_FONT_FAMILY = "'Goblin Mono', monospace"
+
+export function preloadTerminalFont(): Promise<void> {
+  if (!document.fonts) return Promise.resolve()
+  const spec = `${TERMINAL_FONT_SIZE}px ${TERMINAL_FONT_FAMILY}`
+  if (document.fonts.check(spec)) return Promise.resolve()
+  return document.fonts.load(spec).then(() => {}).catch(() => {})
+}
 
 export class TerminalSessionView {
   private readonly frame: HTMLDivElement
@@ -127,7 +135,7 @@ export class TerminalSessionView {
       cursorBlink: true,
       cursorStyle: 'bar',
       fontFamily: TERMINAL_FONT_FAMILY,
-      fontSize: 14,
+      fontSize: TERMINAL_FONT_SIZE,
       lineHeight: 1.35,
       minimumContrastRatio: 4.5,
       scrollback: 10_000,

@@ -13,7 +13,7 @@ import { terminalBridge } from '#/web/terminal.ts'
 import { setTerminalFocused } from '#/web/terminal-focus.ts'
 import { openExternalUrl } from '#/web/app-shell-client.ts'
 import { TerminalSessionRuntime } from '#/web/components/terminal/terminal-session-runtime.ts'
-import { TerminalSessionView } from '#/web/components/terminal/terminal-session-view.ts'
+import { TerminalSessionView, preloadTerminalFont } from '#/web/components/terminal/terminal-session-view.ts'
 import { readOrCreateWebTerminalAttachmentId } from '#/web/renderer-terminal-bridge.ts'
 import type {
   TerminalBellEvent,
@@ -286,6 +286,7 @@ export class ManagedTerminalSession {
 
   private async openPhase(token: number): Promise<{ term: XTermTerminal; preloaded: boolean }> {
     if (this.disposed || this.startToken !== token || this.view.currentTerminal()) throw new StartCancelledError()
+    await preloadTerminalFont()
     const term = this.view.openTerminal((input) => this.writeInput(input))
     const preloaded = await this.preloadHydratedSnapshot(token, term)
     await waitForTerminalLayout()
