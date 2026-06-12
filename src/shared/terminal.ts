@@ -106,6 +106,12 @@ export interface TerminalListSessionsInput {
   repoRoot: string
 }
 
+export interface TerminalReorderInput {
+  repoRoot: string
+  worktreePath: string
+  orderedKeys: string[]
+}
+
 export interface TerminalSessionSummary {
   sessionId: string
   key: string
@@ -116,6 +122,7 @@ export interface TerminalSessionSummary {
   canonicalTitle: string | null
   cols: number
   rows: number
+  displayOrder: number
 }
 
 export interface TerminalSessionSnapshotInput {
@@ -172,6 +179,7 @@ export interface TerminalSocketRequestInputs {
   create: TerminalCreateInput
   prune: { repoRoot: string }
   'session-snapshot': TerminalSessionSnapshotInput
+  reorder: TerminalReorderInput
 }
 
 export interface TerminalSocketResponseOutputs {
@@ -185,6 +193,7 @@ export interface TerminalSocketResponseOutputs {
   create: TerminalCatalogMutationResult
   prune: { pruned: number; remaining: number }
   'session-snapshot': TerminalSessionSnapshot | null
+  reorder: TerminalMutationResult
 }
 
 export type TerminalSocketRequestAction = keyof TerminalSocketRequestInputs
@@ -242,6 +251,7 @@ const TERMINAL_SOCKET_ACTIONS = [
   'create',
   'prune',
   'session-snapshot',
+  'reorder',
 ] as const satisfies TerminalSocketRequestAction[]
 const TERMINAL_CONNECTED_CONTROLLER_STATUS_VALUES = ['connected', 'grace'] satisfies Exclude<TerminalControllerStatus, 'none'>[]
 const TerminalSessionIdSchema = v.pipe(v.string(), v.regex(TERMINAL_SESSION_ID_RE))
@@ -285,6 +295,11 @@ const TerminalCreateInputSchema = v.object({
 const TerminalPruneInputSchema = v.object({
   repoRoot: v.string(),
 })
+const TerminalReorderInputSchema = v.object({
+  repoRoot: v.string(),
+  worktreePath: v.string(),
+  orderedKeys: v.array(v.string()),
+})
 const TerminalSessionSnapshotInputSchema = v.object({
   sessionId: TerminalSessionIdSchema,
 })
@@ -297,6 +312,7 @@ const TerminalSessionSummarySchema = v.object({
   canonicalTitle: v.nullable(v.string()),
   cols: v.number(),
   rows: v.number(),
+  displayOrder: v.number(),
 })
 const TerminalSessionSnapshotSchema = v.object({
   sessionId: v.string(),
@@ -408,6 +424,12 @@ const TerminalClientMessageSchema = v.variant('type', [
     requestId: TerminalRequestIdSchema,
     action: v.literal('session-snapshot'),
     input: TerminalSessionSnapshotInputSchema,
+  }),
+  v.object({
+    type: v.literal('request'),
+    requestId: TerminalRequestIdSchema,
+    action: v.literal('reorder'),
+    input: TerminalReorderInputSchema,
   }),
 ])
 

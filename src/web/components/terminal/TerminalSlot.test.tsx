@@ -85,6 +85,7 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput: vi.fn(),
       takeover,
+      reorderSessions: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
@@ -156,6 +157,7 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput: vi.fn(),
       takeover: vi.fn(),
+      reorderSessions: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {

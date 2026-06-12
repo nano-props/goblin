@@ -173,6 +173,7 @@ describe('renderer bootstrap', () => {
         pruneTerminals: async () => ({ pruned: 0, remaining: 0 }),
         listSessions: async () => [],
         getSessionSnapshot: async () => null,
+        reorder: async () => false,
         notifyBell: async () => false,
         sendTestNotification: async () => false,
         setBadge: () => {},

@@ -31,7 +31,7 @@ function makeRepoIndex(): TerminalRepoIndex {
   }
 }
 
-function makeServerSession(sessionId: string, terminalId: string, overrides: Partial<{ controller: { attachmentId: string; status: 'connected' | 'grace' }; processName: string; canonicalTitle: string | null; cols: number; rows: number }> = {}) {
+function makeServerSession(sessionId: string, terminalId: string, overrides: Partial<{ controller: { attachmentId: string; status: 'connected' | 'grace' }; processName: string; canonicalTitle: string | null; cols: number; rows: number; displayOrder: number }> = {}) {
   return {
     sessionId,
     key: `${REPO_ROOT}\0${WORKTREE_PATH}\0${terminalId}`,
@@ -41,6 +41,7 @@ function makeServerSession(sessionId: string, terminalId: string, overrides: Par
     canonicalTitle: overrides.canonicalTitle ?? null,
     cols: overrides.cols ?? 80,
     rows: overrides.rows ?? 24,
+    displayOrder: overrides.displayOrder ?? 1,
   }
 }
 

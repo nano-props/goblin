@@ -18,6 +18,7 @@ function createTerminalFacadeStub(): TerminalFacade {
     create: vi.fn(async () => ({ ok: true as const, action: 'created' as const, key: '/repo\0/wt\0terminal-1', sessions: [] })),
     prune: vi.fn(async () => ({ pruned: 1, remaining: 0 })),
     getSessionSnapshot: vi.fn(async () => null),
+    reorder: vi.fn(() => true),
     handleRealtimeMessage: vi.fn(),
     shutdown: vi.fn(),
   }

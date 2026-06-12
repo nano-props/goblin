@@ -171,6 +171,7 @@ export function TerminalSessionProvider({ currentRepoId, children, syncTracker: 
       clearSearch: registry.clearSearch,
       writeInput: registry.writeInput,
       takeover: registry.takeover,
+      reorderSessions: registry.reorderSessions,
       serialize: registry.serialize,
     }),
     [registry],

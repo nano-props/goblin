@@ -18,6 +18,7 @@ import {
   type TerminalClientMessage,
   type TerminalMutationResult,
   type TerminalNotifyBellInput,
+  type TerminalReorderInput,
   type TerminalResizeInput,
   type TerminalRestartInput,
   type TerminalSessionSnapshot,
@@ -138,6 +139,9 @@ const realtimeRequestHandlers = {
   },
   'session-snapshot'(clientId, _attachmentId, input) {
     return getServerTerminalSessionSnapshot(clientId, input)
+  },
+  reorder(clientId, _attachmentId, input) {
+    return reorderServerTerminals(clientId, input)
   },
 } satisfies RealtimeRequestHandlers
 
@@ -291,6 +295,17 @@ export async function getServerTerminalSessionSnapshot(
   if (!isValidTerminalClientId(clientId)) return null
   if (!isValidTerminalSessionId(input?.sessionId)) return null
   return await manager.snapshotSession(input.sessionId)
+}
+
+export function reorderServerTerminals(clientId: string, input: TerminalReorderInput): TerminalMutationResult {
+  if (!isValidTerminalClientId(clientId)) return false
+  if (!isValidRepoLocator(input?.repoRoot)) return false
+  if (typeof input?.worktreePath !== 'string' || input.worktreePath.length === 0) return false
+  if (!Array.isArray(input?.orderedKeys)) return false
+  if (!input.orderedKeys.every((k) => typeof k === 'string' && k.length > 0)) return false
+  const reordered = manager.reorderSessions(input.repoRoot, input.worktreePath, input.orderedKeys)
+  if (reordered) broker.broadcastGlobal({ type: 'sessions-changed', repoRoot: input.repoRoot })
+  return reordered
 }
 
 export function handleRealtimeServerMessage(

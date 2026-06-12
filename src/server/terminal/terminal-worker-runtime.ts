@@ -96,6 +96,8 @@ export class TerminalWorkerRuntime {
         return await this.options.service.prune(message.clientId, message.input)
       case 'session-snapshot':
         return await this.options.service.getSessionSnapshot(message.clientId, message.input)
+      case 'reorder':
+        return await this.options.service.reorder(message.clientId, message.input)
     }
   }
 

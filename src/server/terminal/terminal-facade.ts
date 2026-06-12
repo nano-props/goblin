@@ -9,6 +9,7 @@ import {
   notifyServerTerminalBell,
   pruneServerTerminals,
   registerTerminalSocket,
+  reorderServerTerminals,
   restartServerTerminal,
   resizeServerTerminal,
   takeoverServerTerminal,
@@ -43,6 +44,7 @@ export interface TerminalFacade {
     clientId: string,
     input: TerminalWorkerRequestInputs['session-snapshot'],
   ): MaybePromise<TerminalWorkerResponseOutputs['session-snapshot']>
+  reorder(clientId: string, input: TerminalWorkerRequestInputs['reorder']): MaybePromise<TerminalWorkerResponseOutputs['reorder']>
   handleRealtimeMessage(clientId: string, attachmentId: string, socket: ServerTerminalSocket, payload: string): void
   shutdown(): void
 }
@@ -66,6 +68,7 @@ export function createTerminalFacade(): TerminalFacade {
       return pruneServerTerminals(clientId, input.repoRoot)
     },
     getSessionSnapshot: getServerTerminalSessionSnapshot,
+    reorder: reorderServerTerminals,
     handleRealtimeMessage: handleRealtimeServerMessage,
     shutdown: closeAllServerTerminalSessions,
   }
