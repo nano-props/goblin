@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { replaceRepo } from '#/web/stores/repos/helpers.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { markRepoOperationTargets, repoOperation } from '#/web/stores/repos/runtime.ts'
-import { branch, REPO_ID, resetRefreshTest, rpcHandlers, seedRepo } from '#/web/stores/repos/refresh-test-utils.ts'
+import { branch, REPO_ID, resetRefreshTest, ipcHandlers, seedRepo } from '#/web/stores/repos/refresh-test-utils.ts'
 import { seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
 import type { LogEntry, WorktreeStatus } from '#/web/types.ts'
@@ -46,15 +46,15 @@ describe('remote fetch timestamps', () => {
     let fetchCount = 0
     let snapshotCount = 0
     let statusCount = 0
-    rpcHandlers['repo.fetch'] = async () => {
+    ipcHandlers['repo.fetch'] = async () => {
       fetchCount += 1
       return { ok: true, message: 'ok' }
     }
-    rpcHandlers['repo.snapshot'] = async () => {
+    ipcHandlers['repo.snapshot'] = async () => {
       snapshotCount += 1
       return { branches: [branch('feature/a')], current: 'feature/a' }
     }
-    rpcHandlers['repo.status'] = async () => {
+    ipcHandlers['repo.status'] = async () => {
       statusCount += 1
       return []
     }
@@ -78,11 +78,11 @@ describe('remote fetch timestamps', () => {
   test('manual sync ignores stale fetch results after repo reopen', async () => {
     let resolveFetch!: (value: { ok: true; message: string }) => void
     const token = seedRepo([branch('feature/a')], 1)
-    rpcHandlers['repo.fetch'] = () =>
+    ipcHandlers['repo.fetch'] = () =>
       new Promise<{ ok: true; message: string }>((resolve) => {
         resolveFetch = resolve
       })
-    rpcHandlers['repo.snapshot'] = async () => ({
+    ipcHandlers['repo.snapshot'] = async () => ({
       branches: [branch('feature/reopened')],
       current: 'feature/reopened',
     })
@@ -101,7 +101,7 @@ describe('remote fetch timestamps', () => {
   test('network operations expose repo-level fetch busy state', async () => {
     const token = seedRepo([branch('feature/a')])
     let resolveNetwork!: (value: { ok: true; message: string }) => void
-    rpcHandlers['repo.fetch'] = () =>
+    ipcHandlers['repo.fetch'] = () =>
       new Promise<{ ok: true; message: string }>((resolve) => {
         resolveNetwork = resolve
       })
@@ -121,8 +121,8 @@ describe('remote fetch timestamps', () => {
   test('manual sync records failed fetch results and still refreshes local state', async () => {
     const token = seedRepo([branch('feature/a')])
     let snapshotCount = 0
-    rpcHandlers['repo.fetch'] = async () => ({ ok: false, message: 'fatal: rejected' })
-    rpcHandlers['repo.snapshot'] = async () => {
+    ipcHandlers['repo.fetch'] = async () => ({ ok: false, message: 'fatal: rejected' })
+    ipcHandlers['repo.snapshot'] = async () => {
       snapshotCount += 1
       return { branches: [branch('feature/a')], current: 'feature/a' }
     }
@@ -140,19 +140,19 @@ describe('remote fetch timestamps', () => {
     let snapshotCount = 0
     let statusCount = 0
     const pullRequestCalls: Array<{ branches?: string[]; mode?: string }> = []
-    rpcHandlers['repo.fetch'] = async () => {
+    ipcHandlers['repo.fetch'] = async () => {
       fetchCount += 1
       return { ok: true, message: 'ok' }
     }
-    rpcHandlers['repo.snapshot'] = async () => {
+    ipcHandlers['repo.snapshot'] = async () => {
       snapshotCount += 1
       return { branches: [branch('feature/a'), branch('feature/b')], current: 'feature/a' }
     }
-    rpcHandlers['repo.status'] = async () => {
+    ipcHandlers['repo.status'] = async () => {
       statusCount += 1
       return []
     }
-    rpcHandlers['repo.pullRequests'] = async ({
+    ipcHandlers['repo.pullRequests'] = async ({
       branches,
       options,
     }: {
@@ -177,7 +177,7 @@ describe('remote fetch timestamps', () => {
 
   test('manual sync records thrown fetch failures instead of rejecting', async () => {
     const token = seedRepo([branch('feature/a')])
-    rpcHandlers['repo.fetch'] = async () => {
+    ipcHandlers['repo.fetch'] = async () => {
       throw new Error('network down')
     }
 
@@ -191,7 +191,7 @@ describe('remote fetch timestamps', () => {
   test('branch network actions expose branch and fetch operation state', async () => {
     const token = seedRepo([branch('feature/a')])
     let resolvePull!: (value: { ok: true; message: string }) => void
-    rpcHandlers['repo.pull'] = () =>
+    ipcHandlers['repo.pull'] = () =>
       new Promise<{ ok: true; message: string }>((resolve) => {
         resolvePull = resolve
       })
@@ -215,11 +215,11 @@ describe('remote fetch timestamps', () => {
     const token = seedRepo([branch('feature/a')])
     let resolveCheckout!: (value: { ok: true; message: string }) => void
     let snapshotCount = 0
-    rpcHandlers['repo.checkout'] = () =>
+    ipcHandlers['repo.checkout'] = () =>
       new Promise<{ ok: true; message: string }>((resolve) => {
         resolveCheckout = resolve
       })
-    rpcHandlers['repo.snapshot'] = async () => {
+    ipcHandlers['repo.snapshot'] = async () => {
       snapshotCount += 1
       return { branches: [branch('feature/a')], current: 'feature/a' }
     }
@@ -242,8 +242,8 @@ describe('remote fetch timestamps', () => {
   test('create worktree runs through branch operation state and refreshes only after success', async () => {
     const token = seedRepo([branch('main')])
     let snapshotCount = 0
-    rpcHandlers['repo.createWorktree'] = async () => ({ ok: true, message: 'ok' })
-    rpcHandlers['repo.snapshot'] = async () => {
+    ipcHandlers['repo.createWorktree'] = async () => ({ ok: true, message: 'ok' })
+    ipcHandlers['repo.snapshot'] = async () => {
       snapshotCount += 1
       return { branches: [branch('main'), branch('feature/a')], current: 'main' }
     }
@@ -269,8 +269,8 @@ describe('remote fetch timestamps', () => {
   test('create worktree failure does not refresh when requested by command caller', async () => {
     const token = seedRepo([branch('main')])
     let snapshotCount = 0
-    rpcHandlers['repo.createWorktree'] = async () => ({ ok: false, message: 'error.invalid-path' })
-    rpcHandlers['repo.snapshot'] = async () => {
+    ipcHandlers['repo.createWorktree'] = async () => ({ ok: false, message: 'error.invalid-path' })
+    ipcHandlers['repo.snapshot'] = async () => {
       snapshotCount += 1
       return { branches: [branch('main'), branch('feature/a')], current: 'main' }
     }
@@ -293,8 +293,8 @@ describe('remote fetch timestamps', () => {
   test('deferred branch action results skip toast and refresh until caller confirms follow-up', async () => {
     const token = seedRepo([branch('feature/a')])
     let snapshotCount = 0
-    rpcHandlers['repo.deleteBranch'] = async () => ({ ok: false, message: 'error.branch-not-fully-merged' })
-    rpcHandlers['repo.snapshot'] = async () => {
+    ipcHandlers['repo.deleteBranch'] = async () => ({ ok: false, message: 'error.branch-not-fully-merged' })
+    ipcHandlers['repo.snapshot'] = async () => {
       snapshotCount += 1
       return { branches: [branch('feature/a')], current: 'feature/a' }
     }
@@ -317,8 +317,8 @@ describe('remote fetch timestamps', () => {
   test('branch action failures refresh by default', async () => {
     const token = seedRepo([branch('feature/a')])
     let snapshotCount = 0
-    rpcHandlers['repo.checkout'] = async () => ({ ok: false, message: 'error.checkout-failed' })
-    rpcHandlers['repo.snapshot'] = async () => {
+    ipcHandlers['repo.checkout'] = async () => ({ ok: false, message: 'error.checkout-failed' })
+    ipcHandlers['repo.snapshot'] = async () => {
       snapshotCount += 1
       return { branches: [branch('feature/a')], current: 'feature/a' }
     }
@@ -342,7 +342,7 @@ describe('remote fetch timestamps', () => {
       repo.remote.fetchFailed = true
       repo.remote.fetchError = 'previous failure'
     })
-    rpcHandlers['repo.pull'] = async () => ({ ok: false, message: 'fatal: rejected' })
+    ipcHandlers['repo.pull'] = async () => ({ ok: false, message: 'fatal: rejected' })
 
     await useReposStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' }, { token })
 
@@ -364,7 +364,7 @@ describe('remote fetch timestamps', () => {
   test('remove worktree delegates terminal cleanup to the main process action', async () => {
     const token = seedRepo([branch('feature/a', undefined, { worktree: { path: '/tmp/worktree-a' } })])
     const calls: string[] = []
-    rpcHandlers['repo.removeWorktree'] = async () => {
+    ipcHandlers['repo.removeWorktree'] = async () => {
       calls.push('removeWorktree')
       return { ok: true, message: 'ok' }
     }
@@ -389,11 +389,11 @@ describe('core refresh request ordering', () => {
   test('refreshCoreData refreshes snapshot and status', async () => {
     const token = seedRepo([branch('old')])
     const calls: string[] = []
-    rpcHandlers['repo.snapshot'] = async () => {
+    ipcHandlers['repo.snapshot'] = async () => {
       calls.push('snapshot')
       return { branches: [branch('main')], current: 'main' }
     }
-    rpcHandlers['repo.status'] = async () => {
+    ipcHandlers['repo.status'] = async () => {
       calls.push('status')
       return []
     }
@@ -406,11 +406,11 @@ describe('core refresh request ordering', () => {
   test('refreshCoreData stops after snapshot when the repo is reopened', async () => {
     const token = seedRepo([branch('old')], 1)
     let statusCalls = 0
-    rpcHandlers['repo.snapshot'] = async () => {
+    ipcHandlers['repo.snapshot'] = async () => {
       seedRepo([branch('reopened')], 2)
       return { branches: [branch('stale')], current: 'stale' }
     }
-    rpcHandlers['repo.status'] = async () => {
+    ipcHandlers['repo.status'] = async () => {
       statusCalls += 1
       return []
     }
@@ -426,10 +426,10 @@ describe('core refresh request ordering', () => {
   test('refreshCoreData marks deleted or non-git paths unavailable and skips follow-up reads', async () => {
     const token = seedRepo([branch('main')])
     let statusCalls = 0
-    rpcHandlers['repo.snapshot'] = async () => {
+    ipcHandlers['repo.snapshot'] = async () => {
       throw new Error('error.not-git-repo')
     }
-    rpcHandlers['repo.status'] = async () => {
+    ipcHandlers['repo.status'] = async () => {
       statusCalls += 1
       return []
     }
@@ -447,7 +447,7 @@ describe('core refresh request ordering', () => {
     updateRepoForTest((repo) => {
       repo.availability = { phase: 'unavailable', reason: 'error.path-not-found', checkedAt: Date.now() }
     })
-    rpcHandlers['repo.snapshot'] = async () => ({ branches: [branch('main')], current: 'main' })
+    ipcHandlers['repo.snapshot'] = async () => ({ branches: [branch('main')], current: 'main' })
 
     await useReposStore.getState().refreshSnapshot(REPO_ID, { token })
 
@@ -459,8 +459,8 @@ describe('core refresh request ordering', () => {
 
   test('refreshCoreData stops after status when the repo is reopened', async () => {
     const token = seedRepo([branch('main')], 1)
-    rpcHandlers['repo.snapshot'] = async () => ({ branches: [branch('main')], current: 'main' })
-    rpcHandlers['repo.status'] = async () => {
+    ipcHandlers['repo.snapshot'] = async () => ({ branches: [branch('main')], current: 'main' })
+    ipcHandlers['repo.status'] = async () => {
       seedRepo([branch('reopened')], 2)
       return []
     }
@@ -477,7 +477,7 @@ describe('core refresh request ordering', () => {
     let callCount = 0
     let resolveFirst!: (value: WorktreeStatus[]) => void
     let resolveSecond!: (value: WorktreeStatus[]) => void
-    rpcHandlers['repo.status'] = () => {
+    ipcHandlers['repo.status'] = () => {
       callCount += 1
       return new Promise<WorktreeStatus[]>((resolve) => {
         if (callCount === 1) resolveFirst = resolve
@@ -528,7 +528,7 @@ describe('core refresh request ordering', () => {
         },
       }),
     ])
-    rpcHandlers['repo.status'] = async () => [
+    ipcHandlers['repo.status'] = async () => [
       { path: '/tmp/worktree-cleaned', branch: 'feature/cleaned', isMain: false, entries: [] },
       {
         path: '/tmp/worktree-dirty',
@@ -577,7 +577,7 @@ describe('core refresh request ordering', () => {
       repo.data.status = [{ path: '/tmp/worktree-a', branch: 'feature/a', isMain: false, entries: [] }]
       repo.data.statusLoaded = true
     })
-    rpcHandlers['repo.snapshot'] = async () => ({
+    ipcHandlers['repo.snapshot'] = async () => ({
       branches: [
         branch('feature/a', undefined, {
           worktree: {
@@ -602,7 +602,7 @@ describe('core refresh request ordering', () => {
 
   test('snapshot refresh stores worktree state outside branch state', async () => {
     const token = seedRepo([branch('feature/a')])
-    rpcHandlers['repo.snapshot'] = async () => ({
+    ipcHandlers['repo.snapshot'] = async () => ({
       branches: [
         branch('feature/a', undefined, {
           worktree: {
@@ -631,7 +631,7 @@ describe('core refresh request ordering', () => {
     const token = seedRepo([branch('feature/a')])
     let resolveStatus!: (value: WorktreeStatus[]) => void
     const status: WorktreeStatus[] = [{ path: '/tmp/gbl-test-repo', branch: 'feature/a', isMain: true, entries: [] }]
-    rpcHandlers['repo.status'] = () =>
+    ipcHandlers['repo.status'] = () =>
       new Promise<WorktreeStatus[]>((resolve) => {
         resolveStatus = resolve
       })
@@ -656,7 +656,7 @@ describe('core refresh request ordering', () => {
       stale: false,
     })
 
-    rpcHandlers['repo.status'] = async () => {
+    ipcHandlers['repo.status'] = async () => {
       throw new Error('status failed')
     }
 
@@ -673,7 +673,7 @@ describe('core refresh request ordering', () => {
   test('marks read operations as queued before scheduler starts them', async () => {
     const token = seedRepo([branch('feature/a')])
     const resolvers: Array<(value: WorktreeStatus[]) => void> = []
-    rpcHandlers['repo.status'] = () =>
+    ipcHandlers['repo.status'] = () =>
       new Promise<WorktreeStatus[]>((resolve) => {
         resolvers.push(resolve)
       })
@@ -700,8 +700,8 @@ describe('core refresh request ordering', () => {
   test('closing a repo cancels active and queued repo operations', async () => {
     const token = seedRepo([branch('feature/a')])
     let callCount = 0
-    rpcHandlers['repo.abort'] = async () => ({ ok: true, message: 'ok' })
-    rpcHandlers['repo.status'] = () => {
+    ipcHandlers['repo.abort'] = async () => ({ ok: true, message: 'ok' })
+    ipcHandlers['repo.status'] = () => {
       callCount += 1
       return new Promise<WorktreeStatus[]>(() => {})
     }
@@ -719,7 +719,7 @@ describe('core refresh request ordering', () => {
   test('drops older queued status refreshes before they start', async () => {
     const token = seedRepo([branch('feature/a')])
     const resolvers: Array<(value: WorktreeStatus[]) => void> = []
-    rpcHandlers['repo.status'] = () =>
+    ipcHandlers['repo.status'] = () =>
       new Promise<WorktreeStatus[]>((resolve) => {
         resolvers.push(resolve)
       })
@@ -754,7 +754,7 @@ describe('core refresh request ordering', () => {
     let callCount = 0
     let resolveFirst!: (value: { branches: ReturnType<typeof branch>[]; current: string }) => void
     let resolveSecond!: (value: { branches: ReturnType<typeof branch>[]; current: string }) => void
-    rpcHandlers['repo.snapshot'] = () => {
+    ipcHandlers['repo.snapshot'] = () => {
       callCount += 1
       return new Promise<{ branches: ReturnType<typeof branch>[]; current: string }>((resolve) => {
         if (callCount === 1) resolveFirst = resolve
@@ -780,7 +780,7 @@ describe('core refresh request ordering', () => {
       repo.ui.selectedBranch = 'feature/a'
       repo.ui.detailTab = 'terminal'
     })
-    rpcHandlers['repo.snapshot'] = async () => ({ branches: [branch('feature/a')], current: 'feature/a' })
+    ipcHandlers['repo.snapshot'] = async () => ({ branches: [branch('feature/a')], current: 'feature/a' })
 
     await useReposStore.getState().refreshSnapshot(REPO_ID, { token })
 
@@ -792,11 +792,11 @@ describe('core refresh request ordering', () => {
   test('snapshot refresh prunes terminal sessions to current worktree paths', async () => {
     const token = seedRepo([branch('stale', undefined, { worktree: { path: '/tmp/stale-worktree' } })])
     const calls: Array<{ repoRoot: string }> = []
-    rpcHandlers['terminal.prune'] = async (input: { repoRoot: string }) => {
+    ipcHandlers['terminal.prune'] = async (input: { repoRoot: string }) => {
       calls.push(input)
       return { pruned: 1, remaining: 1 }
     }
-    rpcHandlers['repo.snapshot'] = async () => ({
+    ipcHandlers['repo.snapshot'] = async () => ({
       branches: [
         branch('main', undefined, { worktree: { path: '/repo' } }),
         branch('feature/a', undefined, { worktree: { path: '/tmp/worktree-a' } }),
@@ -821,10 +821,10 @@ describe('core refresh request ordering', () => {
     const token = seedRepo([branch('stale', undefined, { worktree: { path: '/tmp/stale-worktree' } })])
     const err = new Error('prune failed')
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    rpcHandlers['terminal.prune'] = async () => {
+    ipcHandlers['terminal.prune'] = async () => {
       throw err
     }
-    rpcHandlers['repo.snapshot'] = async () => ({
+    ipcHandlers['repo.snapshot'] = async () => ({
       branches: [branch('main', undefined, { worktree: { path: '/repo' } })],
       current: 'main',
     })

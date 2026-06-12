@@ -11,7 +11,7 @@ import {
 import type { BranchSnapshotInfo } from '#/web/types.ts'
 import { DEFAULT_DETAIL_PANE_SIZES } from '#/shared/workspace-layout.ts'
 const REPO_ID = '/tmp/gbl-selection-test-repo'
-const rpcHandlers: Record<string, (input: any) => unknown> = {}
+const ipcHandlers: Record<string, (input: any) => unknown> = {}
 
 function seedRepo(options: {
   selectedBranch?: string | null
@@ -66,11 +66,11 @@ function stubRefreshActions(
 }
 
 beforeEach(() => {
-  for (const key of Object.keys(rpcHandlers)) delete rpcHandlers[key]
+  for (const key of Object.keys(ipcHandlers)) delete ipcHandlers[key]
   resetReposStore()
-  installGoblinTestBridge(rpcHandlers)
-  rpcHandlers['repo.pullRequests'] = async () => []
-  rpcHandlers['repo.status'] = async () => []
+  installGoblinTestBridge(ipcHandlers)
+  ipcHandlers['repo.pullRequests'] = async () => []
+  ipcHandlers['repo.status'] = async () => []
 })
 
 describe('setBranchViewMode', () => {
@@ -128,7 +128,7 @@ describe('setBranchViewMode', () => {
 
   test('refreshes pull request details when the selected branch changes', async () => {
     const calls: Array<{ branches?: string[]; mode?: string }> = []
-    rpcHandlers['repo.pullRequests'] = async ({
+    ipcHandlers['repo.pullRequests'] = async ({
       branches,
       options,
     }: {
@@ -165,7 +165,7 @@ describe('selectBranch', () => {
   test('refreshes pull request details locally', async () => {
     let resolve!: () => void
     const calls: Array<{ branches?: string[]; mode?: string }> = []
-    rpcHandlers['repo.pullRequests'] = ({ branches, options }: { branches?: string[]; options?: { mode?: string } }) =>
+    ipcHandlers['repo.pullRequests'] = ({ branches, options }: { branches?: string[]; options?: { mode?: string } }) =>
       new Promise<[]>((r) => {
         calls.push({ branches, mode: options?.mode })
         resolve = () => r([])
@@ -202,7 +202,7 @@ describe('selectBranch', () => {
 
   test('ignores a branch that is not in the current snapshot', () => {
     let calls = 0
-    rpcHandlers['repo.pullRequests'] = async () => {
+    ipcHandlers['repo.pullRequests'] = async () => {
       calls += 1
       return []
     }
@@ -217,7 +217,7 @@ describe('selectBranch', () => {
 
   test('does not refresh when selecting the already-selected branch', () => {
     let calls = 0
-    rpcHandlers['repo.pullRequests'] = async () => {
+    ipcHandlers['repo.pullRequests'] = async () => {
       calls += 1
       return []
     }
@@ -286,7 +286,7 @@ describe('setDetailTab', () => {
 
   test('refreshes pull request details when switching to status', async () => {
     const calls: string[][] = []
-    rpcHandlers['repo.pullRequests'] = async ({ branches }: { branches?: string[] }) => {
+    ipcHandlers['repo.pullRequests'] = async ({ branches }: { branches?: string[] }) => {
       calls.push(branches ?? [])
       return []
     }
@@ -316,7 +316,7 @@ describe('setDetailTab', () => {
 
   test('dismissing the active exited terminal detail falls back to status and collapses the pane', async () => {
     let refreshedBranches: string[] | undefined
-    rpcHandlers['repo.pullRequests'] = async ({ branches }: { branches: string[] }) => {
+    ipcHandlers['repo.pullRequests'] = async ({ branches }: { branches: string[] }) => {
       refreshedBranches = branches
       return []
     }

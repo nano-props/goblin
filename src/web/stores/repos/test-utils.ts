@@ -21,7 +21,7 @@ import {
   DEFAULT_DETAIL_PANE_SIZES,
   DEFAULT_WORKSPACE_LAYOUT,
 } from '#/shared/workspace-layout.ts'
-export type RpcTestHandler = (input: any) => unknown
+export type IpcTestHandler = (input: any) => unknown
 
 interface TerminalBridgeTestOutputs {
   'terminal.attach': TerminalAttachResult
@@ -113,7 +113,7 @@ export function resetReposStore(): void {
   })
 }
 
-export function installGoblinTestBridge(handlers: Record<string, RpcTestHandler>): void {
+export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>): void {
   const shellOpenExternalUrl = handlers['shell.openExternalUrl'] ?? handlers['app.openExternalUrl']
   const shellOpenDirectoryDialog = handlers['shell.openDirectoryDialog'] ?? handlers['repo.openDialog']
   const shellConsumeExternalOpenPaths =
@@ -133,12 +133,12 @@ export function installGoblinTestBridge(handlers: Record<string, RpcTestHandler>
         initialI18n: null,
         initialSettings: null,
         initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
-        invokeRpc: ({ path, input }: { path: string; input?: unknown }) => {
+        invokeIpc: ({ path, input }: { path: string; input?: unknown }) => {
           const handler = handlers[path]
           if (!handler) throw new Error(`Unhandled RPC path: ${path}`)
           return handler(input)
         },
-        abortRpc: () => Promise.resolve(false),
+        abortIpc: () => Promise.resolve(false),
         onEvent: () => () => {},
         pathForFile: () => '',
         shell: {
@@ -359,13 +359,13 @@ export function installGoblinTestBridge(handlers: Record<string, RpcTestHandler>
       initialSettings: null,
       initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret', clientId: 'client_testterminal' },
     }),
-    invokeRpc: async ({ path, input }: { path: string; input?: unknown }) => {
+    invokeIpc: async ({ path, input }: { path: string; input?: unknown }) => {
       const handler = handlers[path]
       if (!handler) throw new Error(`Unhandled RPC path: ${path}`)
       return handler(input)
     },
-    abortRpc: async () => false,
-    onRpcEvent: () => () => {},
+    abortIpc: async () => false,
+    onIpcEvent: () => () => {},
     onEffectIntent: () => () => {},
     pathForFile: () => '',
     shell: () => window.goblinNative.shell ?? null,

@@ -5,10 +5,10 @@ import {
   installGoblinTestBridge,
   resetReposStore,
   seedRepoState,
-  type RpcTestHandler,
+  type IpcTestHandler,
 } from '#/web/stores/repos/test-utils.ts'
 export const REPO_ID = '/tmp/gbl-test-repo'
-export const rpcHandlers: Record<string, RpcTestHandler> = {}
+export const ipcHandlers: Record<string, IpcTestHandler> = {}
 export const pullRequest = createPullRequest
 
 export function branch(
@@ -44,19 +44,19 @@ export function seedRepo(branches: BranchSnapshotInfo[], instanceToken = 1): num
 }
 
 export function resetRefreshTest(): void {
-  for (const key of Object.keys(rpcHandlers)) delete rpcHandlers[key]
+  for (const key of Object.keys(ipcHandlers)) delete ipcHandlers[key]
   resetReposStore()
-  installGoblinTestBridge(rpcHandlers)
-  rpcHandlers['repo.abort'] = async () => false
-  rpcHandlers['repo.fetch'] = async () => ({ ok: true, message: 'ok' })
-  rpcHandlers['repo.snapshot'] = async () => ({ branches: [], current: '' })
-  rpcHandlers['repo.pullRequests'] = async () => []
-  rpcHandlers['repo.status'] = async () => []
-  rpcHandlers['terminal.create'] = async (input: { kind?: string }) => ({
+  installGoblinTestBridge(ipcHandlers)
+  ipcHandlers['repo.abort'] = async () => false
+  ipcHandlers['repo.fetch'] = async () => ({ ok: true, message: 'ok' })
+  ipcHandlers['repo.snapshot'] = async () => ({ branches: [], current: '' })
+  ipcHandlers['repo.pullRequests'] = async () => []
+  ipcHandlers['repo.status'] = async () => []
+  ipcHandlers['terminal.create'] = async (input: { kind?: string }) => ({
     ok: true,
     action: input?.kind === 'primary' ? 'reused' : 'created',
     key: input?.kind === 'primary' ? 'repo\0worktree\0terminal-1' : 'repo\0worktree\0terminal-2',
     sessions: [],
   })
-  rpcHandlers['terminal.prune'] = async () => ({ pruned: 0, remaining: 0 })
+  ipcHandlers['terminal.prune'] = async () => ({ pruned: 0, remaining: 0 })
 }

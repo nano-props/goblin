@@ -9,7 +9,7 @@ import {
   pullRequestWithHealth,
   REPO_ID,
   resetRefreshTest,
-  rpcHandlers,
+  ipcHandlers,
   seedRepo,
 } from '#/web/stores/repos/refresh-test-utils.ts'
 
@@ -31,7 +31,7 @@ describe('refreshPullRequests', () => {
         }),
       },
     }))
-    rpcHandlers['repo.snapshot'] = async () => ({
+    ipcHandlers['repo.snapshot'] = async () => ({
       branches: [branch('feature/a')],
       current: 'feature/a',
       remote: {
@@ -71,7 +71,7 @@ describe('refreshPullRequests', () => {
         }),
       },
     }))
-    rpcHandlers['repo.pullRequests'] = async () => {
+    ipcHandlers['repo.pullRequests'] = async () => {
       callCount += 1
       return []
     }
@@ -94,7 +94,7 @@ describe('refreshPullRequests', () => {
         }),
       },
     }))
-    rpcHandlers['repo.pullRequests'] = async () => {
+    ipcHandlers['repo.pullRequests'] = async () => {
       callCount += 1
       return []
     }
@@ -107,7 +107,7 @@ describe('refreshPullRequests', () => {
 
   test('snapshot refresh writes a durable repo cache entry', async () => {
     const token = seedRepo([])
-    rpcHandlers['repo.snapshot'] = async () => ({ branches: [branch('feature/a')], current: 'feature/a' })
+    ipcHandlers['repo.snapshot'] = async () => ({ branches: [branch('feature/a')], current: 'feature/a' })
 
     await useReposStore.getState().refreshSnapshot(REPO_ID, { token })
 
@@ -123,7 +123,7 @@ describe('refreshPullRequests', () => {
     const fresh = pullRequest(2)
     const token = seedRepo([branch('feature/a'), branch('feature/b', stale)])
     let mode: string | undefined
-    rpcHandlers['repo.pullRequests'] = async ({ options }: { options?: { mode?: string } }) => {
+    ipcHandlers['repo.pullRequests'] = async ({ options }: { options?: { mode?: string } }) => {
       mode = options?.mode
       return [{ branch: 'feature/a', pullRequest: fresh }]
     }
@@ -140,7 +140,7 @@ describe('refreshPullRequests', () => {
   test('does not attach reverse pull requests to the default branch', async () => {
     const reverse = pullRequest(1, { baseRefName: 'feature/a', headRefName: 'master' })
     const token = seedRepo([branch('master', reverse, { isDefault: true })])
-    rpcHandlers['repo.pullRequests'] = async () => [{ branch: 'master', pullRequest: reverse }]
+    ipcHandlers['repo.pullRequests'] = async () => [{ branch: 'master', pullRequest: reverse }]
 
     await useReposStore.getState().refreshPullRequests(REPO_ID, ['master'], { token })
 
@@ -151,7 +151,7 @@ describe('refreshPullRequests', () => {
     const existing = pullRequest(1, { headRefName: 'master', baseRefName: 'master' })
     const reverse = pullRequest(2, { headRefName: 'master', baseRefName: 'feature/a' })
     const token = seedRepo([branch('master', existing, { isDefault: true })])
-    rpcHandlers['repo.pullRequests'] = async () => [{ branch: 'master', pullRequest: reverse }]
+    ipcHandlers['repo.pullRequests'] = async () => [{ branch: 'master', pullRequest: reverse }]
 
     await useReposStore
       .getState()
@@ -163,7 +163,7 @@ describe('refreshPullRequests', () => {
   test('keeps existing pull requests when summary lookup omits a requested branch', async () => {
     const existing = pullRequest(1)
     const token = seedRepo([branch('feature/a', existing)])
-    rpcHandlers['repo.pullRequests'] = async () => []
+    ipcHandlers['repo.pullRequests'] = async () => []
 
     await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { token, mode: 'summary' })
 
@@ -175,7 +175,7 @@ describe('refreshPullRequests', () => {
   test('summary lookup can explicitly clear missing requested pull requests', async () => {
     const existing = pullRequest(1)
     const token = seedRepo([branch('feature/a', existing)])
-    rpcHandlers['repo.pullRequests'] = async () => []
+    ipcHandlers['repo.pullRequests'] = async () => []
 
     await useReposStore
       .getState()
@@ -189,7 +189,7 @@ describe('refreshPullRequests', () => {
     const existing = pullRequestWithHealth(1)
     const summary = pullRequest(1)
     const token = seedRepo([branch('feature/a', existing)])
-    rpcHandlers['repo.pullRequests'] = async () => [{ branch: 'feature/a', pullRequest: summary }]
+    ipcHandlers['repo.pullRequests'] = async () => [{ branch: 'feature/a', pullRequest: summary }]
 
     await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { token, mode: 'summary' })
 
@@ -204,7 +204,7 @@ describe('refreshPullRequests', () => {
   test('full backfill can avoid clearing omitted branches', async () => {
     const existing = pullRequest(1)
     const token = seedRepo([branch('feature/a'), branch('feature/b', existing)])
-    rpcHandlers['repo.pullRequests'] = async () => []
+    ipcHandlers['repo.pullRequests'] = async () => []
 
     await useReposStore
       .getState()
@@ -216,7 +216,7 @@ describe('refreshPullRequests', () => {
   test('does not let stale responses write into a reopened repo instance', async () => {
     let resolve!: (value: { branch: string; pullRequest: PullRequestInfo }[]) => void
     const token = seedRepo([branch('feature/a')], 1)
-    rpcHandlers['repo.pullRequests'] = () =>
+    ipcHandlers['repo.pullRequests'] = () =>
       new Promise<{ branch: string; pullRequest: PullRequestInfo }[]>((r) => {
         resolve = r
       })
@@ -235,7 +235,7 @@ describe('refreshPullRequests', () => {
   test('preserves existing pull requests when lookup is unavailable', async () => {
     const existing = pullRequest(1)
     const token = seedRepo([branch('feature/a', existing)])
-    rpcHandlers['repo.pullRequests'] = async () => null
+    ipcHandlers['repo.pullRequests'] = async () => null
 
     await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { token })
 
@@ -250,8 +250,8 @@ describe('refreshPullRequests', () => {
     const existing = pullRequest(1)
     const token = seedRepo([branch('feature/a', existing)])
     let resolvePullRequests!: (value: null) => void
-    rpcHandlers['repo.snapshot'] = async () => ({ branches: [branch('feature/a')], current: 'feature/a' })
-    rpcHandlers['repo.pullRequests'] = () =>
+    ipcHandlers['repo.snapshot'] = async () => ({ branches: [branch('feature/a')], current: 'feature/a' })
+    ipcHandlers['repo.pullRequests'] = () =>
       new Promise<null>((resolve) => {
         resolvePullRequests = resolve
       })
@@ -270,11 +270,11 @@ describe('refreshPullRequests', () => {
     const staleSelected = pullRequest(1, { headRefName: 'feature/a', baseRefName: 'main' })
     const staleOther = pullRequest(2, { headRefName: 'feature/b', baseRefName: 'main' })
     const token = seedRepo([branch('feature/a', staleSelected), branch('feature/b', staleOther)])
-    rpcHandlers['repo.snapshot'] = async () => ({
+    ipcHandlers['repo.snapshot'] = async () => ({
       branches: [branch('feature/a'), branch('feature/b')],
       current: 'feature/a',
     })
-    rpcHandlers['repo.pullRequests'] = async () => []
+    ipcHandlers['repo.pullRequests'] = async () => []
 
     await useReposStore.getState().refreshSnapshot(REPO_ID, { token })
     await new Promise((resolve) => setTimeout(resolve, 0))
@@ -286,7 +286,7 @@ describe('refreshPullRequests', () => {
 
   test('records pull request refresh failures as repo events', async () => {
     const token = seedRepo([branch('feature/a', pullRequest(1))])
-    rpcHandlers['repo.pullRequests'] = async () => {
+    ipcHandlers['repo.pullRequests'] = async () => {
       throw new Error('github unavailable')
     }
 
@@ -312,11 +312,11 @@ describe('refreshPullRequests', () => {
   test('snapshot refresh performs summary lookup then selected full lookup for visible detail', async () => {
     const token = seedRepo([branch('feature/a')])
     const calls: Array<{ branches?: string[]; mode?: string; loadingAtStart?: boolean }> = []
-    rpcHandlers['repo.snapshot'] = async () => ({
+    ipcHandlers['repo.snapshot'] = async () => ({
       branches: [branch('feature/a'), branch('feature/b')],
       current: 'feature/a',
     })
-    rpcHandlers['repo.pullRequests'] = async ({
+    ipcHandlers['repo.pullRequests'] = async ({
       branches,
       options,
     }: {
@@ -345,11 +345,11 @@ describe('refreshPullRequests', () => {
     const token = seedRepo([branch('feature/a')])
     const calls: Array<{ branches?: string[]; mode?: string }> = []
     let fullCalls = 0
-    rpcHandlers['repo.snapshot'] = async () => ({
+    ipcHandlers['repo.snapshot'] = async () => ({
       branches: [branch('feature/a')],
       current: 'feature/a',
     })
-    rpcHandlers['repo.pullRequests'] = async ({
+    ipcHandlers['repo.pullRequests'] = async ({
       branches,
       options,
     }: {
@@ -389,14 +389,14 @@ describe('refreshPullRequests', () => {
       },
     }))
     const calls: Array<{ branches?: string[]; mode?: string }> = []
-    rpcHandlers['repo.snapshot'] = async () => ({
+    ipcHandlers['repo.snapshot'] = async () => ({
       branches: [
         branch('feature/a', undefined, { worktree: { path: '/tmp/feature-a-worktree' } }),
         branch('feature/b'),
       ],
       current: 'feature/a',
     })
-    rpcHandlers['repo.pullRequests'] = async ({
+    ipcHandlers['repo.pullRequests'] = async ({
       branches,
       options,
     }: {
@@ -416,11 +416,11 @@ describe('refreshPullRequests', () => {
   test('snapshot refresh stops pull request backfill after the first refresh error', async () => {
     const token = seedRepo([branch('feature/a')])
     const calls: Array<{ branches?: string[]; mode?: string }> = []
-    rpcHandlers['repo.snapshot'] = async () => ({
+    ipcHandlers['repo.snapshot'] = async () => ({
       branches: [branch('feature/a'), branch('feature/b')],
       current: 'feature/a',
     })
-    rpcHandlers['repo.pullRequests'] = async ({
+    ipcHandlers['repo.pullRequests'] = async ({
       branches,
       options,
     }: {
@@ -442,11 +442,11 @@ describe('refreshPullRequests', () => {
 
   test('snapshot refresh unavailable pull request lookups do not enqueue repo error events', async () => {
     const token = seedRepo([branch('feature/a')])
-    rpcHandlers['repo.snapshot'] = async () => ({
+    ipcHandlers['repo.snapshot'] = async () => ({
       branches: [branch('feature/a'), branch('feature/b')],
       current: 'feature/a',
     })
-    rpcHandlers['repo.pullRequests'] = async () => null
+    ipcHandlers['repo.pullRequests'] = async () => null
 
     await useReposStore.getState().refreshSnapshot(REPO_ID, { token })
     await new Promise((resolve) => setTimeout(resolve, 0))
@@ -460,7 +460,7 @@ describe('refreshPullRequests', () => {
     let resolveFirst!: (value: { branch: string; pullRequest: PullRequestInfo }[]) => void
     let resolveSecond!: (value: { branch: string; pullRequest: PullRequestInfo }[]) => void
     let callCount = 0
-    rpcHandlers['repo.pullRequests'] = () => {
+    ipcHandlers['repo.pullRequests'] = () => {
       callCount += 1
       return new Promise<{ branch: string; pullRequest: PullRequestInfo }[]>((resolve) => {
         if (callCount === 1) resolveFirst = resolve
@@ -490,7 +490,7 @@ describe('refreshPullRequests', () => {
     let resolveFirst!: (value: { branch: string; pullRequest: PullRequestInfo }[]) => void
     let resolveSecond!: (value: { branch: string; pullRequest: PullRequestInfo }[]) => void
     let callCount = 0
-    rpcHandlers['repo.pullRequests'] = () => {
+    ipcHandlers['repo.pullRequests'] = () => {
       callCount += 1
       return new Promise<{ branch: string; pullRequest: PullRequestInfo }[]>((resolve) => {
         if (callCount === 1) resolveFirst = resolve
@@ -515,7 +515,7 @@ describe('refreshPullRequests', () => {
   test('does not recreate branch resources for branches removed before lookup completion', async () => {
     const token = seedRepo([branch('feature/a'), branch('feature/b')])
     let resolve!: (value: { branch: string; pullRequest: PullRequestInfo }[]) => void
-    rpcHandlers['repo.pullRequests'] = () =>
+    ipcHandlers['repo.pullRequests'] = () =>
       new Promise<{ branch: string; pullRequest: PullRequestInfo }[]>((r) => {
         resolve = r
       })
@@ -544,7 +544,7 @@ describe('refreshPullRequests', () => {
     let callCount = 0
     let resolveFirst!: (value: { branch: string; pullRequest: PullRequestInfo }[]) => void
     let resolveSecond!: (value: { branch: string; pullRequest: PullRequestInfo }[]) => void
-    rpcHandlers['repo.pullRequests'] = () => {
+    ipcHandlers['repo.pullRequests'] = () => {
       callCount += 1
       return new Promise<{ branch: string; pullRequest: PullRequestInfo }[]>((resolve) => {
         if (callCount === 1) resolveFirst = resolve

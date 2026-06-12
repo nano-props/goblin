@@ -9,7 +9,7 @@ import type {
 } from '#/web/types.ts'
 import type { RemoteRepoTarget, RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspaceDetailPaneSizes, WorkspaceLayout } from '#/shared/workspace-layout.ts'
-import type { SessionState, DetailTab } from '#/shared/rpc.ts'
+import type { SessionState, DetailTab } from '#/shared/api-types.ts'
 export type { DetailTab }
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/repos/branch-action-types.ts'
 import type { RepoOperationsState } from '#/web/stores/repos/operations.ts'
@@ -46,6 +46,7 @@ export type OpenRepoResult = { ok: true; id: string } | { ok: false; message: st
 export interface RepoDataState {
   branches: RepoBranchState[]
   currentBranch: string
+  currentHEAD?: string
   status: WorktreeStatus[]
   statusLoaded: boolean
   worktreesByPath: Record<string, RepoWorktreeState>
@@ -145,6 +146,8 @@ export interface RestorableWorkspaceState {
   detailPaneSizes: WorkspaceDetailPaneSizes
   /** Per worktree terminal selection restored from SessionState.selectedTerminalByWorktree. */
   selectedTerminalByWorktree: Record<string, string>
+  /** Per-repo detail tab selection, restored alongside detailCollapsed. */
+  detailTabByRepo: Record<string, DetailTab>
 }
 
 export interface LocalWorkspaceState {

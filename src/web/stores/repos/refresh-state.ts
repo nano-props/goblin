@@ -14,7 +14,7 @@ import {
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
 import { stripBranchWorktreeMetadata, worktreeStatesFromBranches } from '#/web/stores/repos/worktree-state.ts'
 import { branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
-import type { RepoSnapshot } from '#/shared/rpc.ts'
+import type { RepoSnapshot } from '#/shared/api-types.ts'
 import type { RepoState, ReposGet } from '#/web/stores/repos/types.ts'
 import type { ExecResult, PullRequestFetchMode, PullRequestInfo } from '#/web/types.ts'
 
@@ -82,6 +82,7 @@ export function applySnapshotToRepoProjection(r: RepoState, snap: RepoSnapshot, 
   const branches = stripBranchWorktreeMetadata(branchesWithSnapshotWorktreeMetadata)
   r.data.branches = branches
   r.data.currentBranch = snap.current
+  r.data.currentHEAD = snap.currentHEAD
   r.data.worktreesByPath = worktreeStatesFromBranches(
     branchesWithSnapshotWorktreeMetadata,
     r.data.worktreesByPath,

@@ -4,7 +4,7 @@ export const REPO_A = '/tmp/gbl-lifecycle-a'
 export const REPO_B = '/tmp/gbl-lifecycle-b'
 export const branchSnapshot = createBranchSnapshot
 
-export async function flushRpc(): Promise<void> {
+export async function flushIpc(): Promise<void> {
   for (let i = 0; i < 5; i += 1) await Promise.resolve()
 }
 

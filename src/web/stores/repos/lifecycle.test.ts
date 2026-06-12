@@ -4,7 +4,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
 import {
   branchSnapshot,
-  flushRpc,
+  flushIpc,
   installGoblin,
   REPO_A,
   REPO_B,
@@ -108,7 +108,7 @@ describe('repo lifecycle', () => {
     const secondToken = useReposStore.getState().repos[REPO_A]?.instanceToken
 
     snapshotResolvers[1]?.({ branches: [branchSnapshot('fresh')], current: 'fresh' })
-    await flushRpc()
+    await flushIpc()
 
     expect(secondToken).not.toBe(firstToken)
     await vi.waitFor(() => {
@@ -116,7 +116,7 @@ describe('repo lifecycle', () => {
     })
 
     snapshotResolvers[0]?.({ branches: [branchSnapshot('stale')], current: 'stale' })
-    await flushRpc()
+    await flushIpc()
 
     expect(useReposStore.getState().repos[REPO_A]?.data.currentBranch).toBe('fresh')
   })

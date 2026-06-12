@@ -191,7 +191,7 @@ function waitForBranchActionIdle(
     })
 }
 
-function runBranchActionRpc(
+function runBranchActionIpc(
   action: RepoBranchAction,
   repoId: string,
   signal?: AbortSignal,
@@ -309,7 +309,7 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
           }
           throwIfStale(get, id, token)
           ctx.setPhase('running')
-          return runBranchActionRpc(action, id, signal, sourceToken)
+          return runBranchActionIpc(action, id, signal, sourceToken)
         }
 
         if (network) {

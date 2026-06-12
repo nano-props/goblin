@@ -4,7 +4,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
 import {
   branchSnapshot,
-  flushRpc,
+  flushIpc,
   installGoblin,
   REPO_A,
   REPO_B,
@@ -68,7 +68,7 @@ describe('repo session hydration', () => {
     expect(cachedRepo?.projection.savedAt).toBe(savedAt)
 
     resolveSnapshot({ branches: [branchSnapshot('fresh')], current: 'fresh' })
-    await flushRpc()
+    await flushIpc()
 
     await vi.waitFor(() => {
       const freshRepo = useReposStore.getState().repos[REPO_A]
@@ -113,7 +113,7 @@ describe('repo session hydration', () => {
       expect(probes.size).toBe(2)
     })
     probes.get(REPO_A)?.({ ok: true, root: REPO_A, name: 'repo-a' })
-    await flushRpc()
+    await flushIpc()
 
     await vi.waitFor(() => {
       const cachedRepo = useReposStore.getState().repos[REPO_A]

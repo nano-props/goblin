@@ -520,13 +520,13 @@ describe('runBranchAction', () => {
     ],
   ] satisfies Array<[string, RepoBranchAction, string]>)(
     'waits for core refresh reads before running queued %s actions',
-    async (_label, action, rpcPath) => {
+    async (_label, action, ipcPath) => {
       let actionCalls = 0
       let statusCalls = 0
       let resolveStatus!: (value: never[]) => void
       let resolveAction!: (value: { ok: true; message: string }) => void
       installGoblinTestBridge({
-        [rpcPath]: () => {
+        [ipcPath]: () => {
           actionCalls += 1
           return new Promise((resolve) => {
             resolveAction = () => resolve({ ok: true, message: 'ok' })
