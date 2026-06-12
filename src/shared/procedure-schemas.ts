@@ -1,10 +1,11 @@
-// HTTP procedure input schemas. Routes call `parseHttpInput` (see
-// `#/server/common/http-validate.ts`) with one of these to validate the
-// JSON body before delegating to the application layer.
+// Procedure input schemas shared between the HTTP route layer and the
+// native bridge IPC layer. Each transport validates payloads with
+// `parseHttpInput` (see `#/server/common/http-validate.ts`) or
+// `parseIpcInput` (see `#/shared/api-types.ts`) using the schemas
+// declared here, so the request contract is defined once.
 //
-// Schemas are kept colocated here so the route file only contains wiring,
-// and so the renderer (which already shares `api-types.ts` with the IPC
-// layer) can read the same shapes when it adopts valibot parsers.
+// Primitive reusable schemas (CwdInput, BranchInput, Remote*Schema)
+// live in `#/shared/api-types.ts` next to the IPC types they describe.
 
 import * as v from 'valibot'
 import {
@@ -14,6 +15,7 @@ import {
   RemotePathSuggestionsInputSchema,
   RemoteTargetSchema,
 } from '#/shared/api-types.ts'
+import { NativeShellProjectionSchema } from '#/shared/native-shell-projection.ts'
 
 const SourceToken = v.optional(v.string())
 const StringArray = v.array(v.string())
@@ -103,3 +105,12 @@ export const SETTINGS_PATCH_SCHEMAS = {
 export const GITHUB_CLI_REFRESH_SCHEMA = v.object({
   hosts: v.optional(StringArray),
 })
+
+// Native bridge IPC procedures — Electron shell operations that bypass
+// the HTTP server entirely. Handlers live in `main/ipc.ts`.
+export const NATIVE_IPC_PROCEDURE_SCHEMAS = {
+  settings: {
+    setGlobalShortcut: v.object({ accelerator: v.string() }),
+    applyShellProjection: NativeShellProjectionSchema,
+  },
+} as const

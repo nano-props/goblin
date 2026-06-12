@@ -23,7 +23,7 @@ import {
 } from '#/server/modules/repo-write-paths.ts'
 import { getServerFetchIntervalSec } from '#/server/modules/settings-source.ts'
 import { createRouteApp, parseHttpInput } from '#/server/common/http-validate.ts'
-import { REPO_PROCEDURE_SCHEMAS } from '#/shared/http-schemas.ts'
+import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 
 export function createRepoRoutes() {
   const app = createRouteApp()

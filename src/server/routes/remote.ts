@@ -5,7 +5,7 @@ import {
   testServerRemoteRepository,
 } from '#/server/modules/remote.ts'
 import { createRouteApp, parseHttpInput } from '#/server/common/http-validate.ts'
-import { REMOTE_PROCEDURE_SCHEMAS } from '#/shared/http-schemas.ts'
+import { REMOTE_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 
 export function createRemoteRoutes() {
   const app = createRouteApp()

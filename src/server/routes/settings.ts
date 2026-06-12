@@ -15,7 +15,11 @@ import {
 import { getLanUrls, isLanAddress } from '#/shared/lan-addresses.ts'
 import type { LanInfo } from '#/shared/api-types.ts'
 import { createRouteApp, parseHttpInput } from '#/server/common/http-validate.ts'
-import { GITHUB_CLI_REFRESH_SCHEMA, SETTINGS_PATCH_SCHEMAS, SETTINGS_PROCEDURE_SCHEMAS } from '#/shared/http-schemas.ts'
+import {
+  GITHUB_CLI_REFRESH_SCHEMA,
+  SETTINGS_PATCH_SCHEMAS,
+  SETTINGS_PROCEDURE_SCHEMAS,
+} from '#/shared/procedure-schemas.ts'
 
 export function createSettingsRoutes(settingsState: ServerSettingsState) {
   const app = createRouteApp()
