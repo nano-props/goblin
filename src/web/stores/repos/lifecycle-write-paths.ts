@@ -122,6 +122,7 @@ export function addResolvedRepo(
           remote: {
             ...existing.remote,
             target: resolvedRepo.target,
+            connectivity: 'connected',
           },
         },
       },
@@ -130,7 +131,10 @@ export function addResolvedRepo(
     }
   }
   const repo = restoreRepoProjectionFromSnapshot(emptyRepo(id, name), s.restorableRepoCache[id])
-  if (resolvedRepo.target) repo.remote.target = resolvedRepo.target
+  if (resolvedRepo.target) {
+    repo.remote.target = resolvedRepo.target
+    repo.remote.connectivity = 'connected'
+  }
   return {
     repos: { ...s.repos, [id]: repo },
     order: orderedInsert(s.order, id, rankById),
@@ -138,6 +142,15 @@ export function addResolvedRepo(
   }
 }
 
+/**
+ * Mark a repo as unavailable. Two paths:
+ *   - If the repo isn't in the store yet, insert it (e.g. ensureWorkspaceOpen
+ *     got a probe failure back). Uses the restorable cache for any cached
+ *     name/branches, then flips availability.
+ *   - If a placeholder (from addConnectingRepo) is already there, promote
+ *     it in place — preserves the cached projection, updates target if
+ *     the probe produced one, and flips connectivity to 'unreachable'.
+ */
 export function addUnavailableRepo(
   s: Pick<ReposStore, 'repos' | 'restorableRepoCache' | 'order'>,
   id: string,
@@ -145,18 +158,77 @@ export function addUnavailableRepo(
   target?: RemoteRepoTarget,
   rankById?: ReadonlyMap<string, number>,
 ): Pick<ReposStore, 'repos' | 'order'> & { changed: boolean } {
-  if (s.repos[id]) return { repos: s.repos, order: s.order, changed: false }
+  const existing = s.repos[id]
+  if (existing) {
+    return {
+      repos: {
+        ...s.repos,
+        [id]: {
+          ...existing,
+          availability: { phase: 'unavailable', reason, checkedAt: Date.now() },
+          remote: target
+            ? { ...existing.remote, target, connectivity: 'unreachable' }
+            : { ...existing.remote, connectivity: 'unreachable' },
+        },
+      },
+      order: s.order,
+      changed: true,
+    }
+  }
   const cached = s.restorableRepoCache[id]
   const repo = restoreRepoProjectionFromSnapshot(
     emptyRepo(id, cached?.name || target?.displayName || lastPathSegment(id)),
     cached,
   )
   if (target) repo.remote.target = target
+  repo.remote.connectivity = 'unreachable'
   repo.availability = { phase: 'unavailable', reason, checkedAt: Date.now() }
   return {
     repos: { ...s.repos, [id]: repo },
     order: s.order.includes(id) ? s.order : orderedInsert(s.order, id, rankById),
     changed: true,
+  }
+}
+
+/**
+ * Insert a placeholder tab for a session entry whose probe is still in
+ * flight. The placeholder paints the cached branch projection (if any)
+ * immediately and marks the remote as 'connecting' so the tab strip can
+ * show a spinner without waiting for the SSH handshake. The probe
+ * resolution then promotes it to 'connected' or 'unreachable' via
+ * addResolvedRepo / addUnavailableRepo. No-op if the repo is already
+ * in the store (so calling this twice for the same entry is safe).
+ *
+ * Note: we intentionally do NOT set `remote.target` here. The ref only
+ * carries alias/remotePath; host/user/port require `resolveRemoteRepositoryTarget`,
+ * which hasn't run yet. Until the probe succeeds and addResolvedRepo
+ * fills in the target, the placeholder lives in a "known alias,
+ * unknown concrete host" state — `connectivity: 'connecting'` is the
+ * signal callers should branch on rather than reading target fields.
+ */
+export function addConnectingRepo(
+  s: Pick<ReposStore, 'repos' | 'restorableRepoCache' | 'order'>,
+  entry: RepoSessionEntry,
+  rankById?: ReadonlyMap<string, number>,
+): Pick<ReposStore, 'repos' | 'order'> & { changed: boolean; id: string } {
+  const id = entry.id
+  if (s.repos[id]) return { repos: s.repos, order: s.order, changed: false, id }
+  const cached = s.restorableRepoCache[id]
+  const fallbackName = entry.kind === 'remote' ? entry.ref.displayName : lastPathSegment(id)
+  const repo = restoreRepoProjectionFromSnapshot(emptyRepo(id, cached?.name || fallbackName), cached)
+  if (entry.kind === 'remote') {
+    repo.remote.connectivity = 'connecting'
+  }
+  // 'refreshing' so the cached branches render with a stale indicator
+  // (resourceInitialLoading would hide them).
+  if (cached && cached.data.branches.length > 0) {
+    repo.resources.snapshot = { ...repo.resources.snapshot, phase: 'refreshing', error: null, stale: true }
+  }
+  return {
+    repos: { ...s.repos, [id]: repo },
+    order: orderedInsert(s.order, id, rankById),
+    changed: true,
+    id,
   }
 }
 

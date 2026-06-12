@@ -10,15 +10,19 @@ import type {
 type DiagnosticsRunner = (
   command: RemoteCommandKind,
   target: RemoteRepoTarget,
-  options?: { signal?: AbortSignal },
+  options?: { signal?: AbortSignal; timeoutMs?: number },
 ) => Promise<RemoteCommandResult>
 
 export async function testRemoteRepository(
   target: RemoteRepoTarget,
-  options: { signal?: AbortSignal; run?: DiagnosticsRunner } = {},
+  options: { signal?: AbortSignal; run?: DiagnosticsRunner; timeoutMs?: number } = {},
 ): Promise<RemoteDiagnosticsResult> {
   const run: DiagnosticsRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const stages = createStages()
+  // No default timeout: the boot-probe caller passes SSH_BOOT_PROBE_TIMEOUT_MS,
+  // the manual diagnostic in OpenRemoteRepositoryDialog leaves it unset so
+  // runRemoteCommand falls back to the full SSH_COMMAND_TIMEOUT_MS.
+  const runOptions = { signal: options.signal, timeoutMs: options.timeoutMs }
   const fail = (
     index: number,
     category: RemoteDiagnosticCategory,
@@ -42,22 +46,30 @@ export async function testRemoteRepository(
     }
   }
 
-  const shell = await run({ type: 'checkShell' }, target, { signal: options.signal })
+  // Stage 0/1: ssh handshake + shell sanity ("ok" marker). One ssh
+  // invocation covers both: any successful ssh call proves stage 0,
+  // and the checkShell script prints 'ok' on stdout to mark stage 1.
+  // These two have to be sequential because the shell check rides on
+  // top of the ssh connection.
+  const shell = await run({ type: 'checkShell' }, target, runOptions)
   if (!shell.ok) return fail(0, classifySshFailure(shell), shell)
   stages[0] = { ...stages[0]!, status: 'passed' }
   if (shell.stdout.trim() !== 'ok') return fail(1, 'shell-failed', { ...shell, message: 'shell-failed' })
   stages[1] = { ...stages[1]!, status: 'passed' }
 
-  const git = await run({ type: 'checkGit' }, target, { signal: options.signal })
-  if (!git.ok) return fail(2, classifyCommandFailure(git, 'git-missing'), git)
+  // Stages 2/3/4 are independent of each other (each is its own ssh
+  // invocation, multiplexed over the ControlMaster socket). Run them
+  // in parallel and merge per-stage status.
+  const [gitResult, pathResult, repoResult] = await Promise.all([
+    run({ type: 'checkGit' }, target, runOptions),
+    run({ type: 'testDirectory', path: target.remotePath }, target, runOptions),
+    run({ type: 'revParseTopLevel', path: target.remotePath }, target, runOptions),
+  ])
+  if (!gitResult.ok) return fail(2, classifyCommandFailure(gitResult, 'git-missing'), gitResult)
   stages[2] = { ...stages[2]!, status: 'passed' }
-
-  const path = await run({ type: 'testDirectory', path: target.remotePath }, target, { signal: options.signal })
-  if (!path.ok) return fail(3, classifyCommandFailure(path, 'path-missing'), path)
+  if (!pathResult.ok) return fail(3, classifyCommandFailure(pathResult, 'path-missing'), pathResult)
   stages[3] = { ...stages[3]!, status: 'passed' }
-
-  const repo = await run({ type: 'revParseTopLevel', path: target.remotePath }, target, { signal: options.signal })
-  if (!repo.ok) return fail(4, classifyCommandFailure(repo, 'not-a-repo'), repo)
+  if (!repoResult.ok) return fail(4, classifyCommandFailure(repoResult, 'not-a-repo'), repoResult)
   stages[4] = { ...stages[4]!, status: 'passed' }
 
   return { target, ok: true, stages }

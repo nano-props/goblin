@@ -1,6 +1,7 @@
 import pLimit from 'p-limit'
 import type { ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
 import {
+  addConnectingRepo,
   addResolvedRepo,
   addUnavailableRepo,
   createRuntimeRepoLifecycleActions,
@@ -25,20 +26,74 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
       // Boot/session restore of workspace membership and active tab. This
       // reopens what SessionState described, but does not subscribe the repos
       // store to future session writes from persistence.
-      // Probe in parallel; entries that are no longer git repos (folder
-      // moved/deleted, external drive not mounted) are restored as unavailable
-      // tabs so the user's workspace shape stays intact.
+      //
+      // The flow is split into two phases so the tab strip never sits
+      // empty on a slow SSH network:
+      //   Phase 1 (synchronous): paint a placeholder tab for every entry
+      //     using the cached projection (if any) and the entry's own
+      //     metadata. For remote entries the host/port are not yet known
+      //     (resolveRemoteRepositoryTarget hasn't run), so the placeholder
+      //     leaves `remote.target` undefined and only sets
+      //     `connectivity: 'connecting'`.
+      //   Phase 2 (async): probe each entry with bounded concurrency.
+      //     Probe success → addResolvedRepo (which fills in the real
+      //     target, flips connectivity to 'connected', and kicks off the
+      //     initial refresh). Probe failure → addUnavailableRepo (which
+      //     flips connectivity to 'unreachable' and sets availability).
+      //
+      // sessionReady flips on the FIRST tab landing so the boot skeleton
+      // is replaced by real content the moment any probe resolves, not
+      // after the slowest one times out.
       const rankById = new Map<string, number>()
+      openRepos.forEach((entry, index) => {
+        if (!rankById.has(entry.id)) rankById.set(entry.id, index)
+      })
+
       let managedActiveId: string | null = null
+      set((s) => {
+        let nextActiveId: string | null = s.activeId
+        let nextRepos = s.repos
+        let nextOrder = s.order
+        let changed = false
+        for (const entry of openRepos) {
+          const result = addConnectingRepo({ repos: nextRepos, restorableRepoCache: s.restorableRepoCache, order: nextOrder }, entry, rankById)
+          if (!result.changed) continue
+          changed = true
+          nextRepos = result.repos
+          nextOrder = result.order
+          nextActiveId = activeRepoIdAfterWorkspaceHydration(
+            nextActiveId,
+            nextRepos,
+            nextOrder,
+            activeRepo,
+            managedActiveId,
+          )
+          if (s.activeId === null || s.activeId === managedActiveId) managedActiveId = nextActiveId
+        }
+        if (!changed) return s
+        return { repos: nextRepos, order: nextOrder, activeId: nextActiveId }
+      })
+
+      // Flip sessionReady as soon as any tab has been added. The repo
+      // body will keep showing its per-repo skeleton until the snapshot
+      // resolves, but the boot skeleton (shown only when no activeId)
+      // gives way to a real workspace immediately.
+      set((s) => {
+        if (s.sessionReady) return s
+        if (s.order.length === 0) return s
+        const activeId = activeRepoIdAfterWorkspaceHydration(s.activeId, s.repos, s.order, activeRepo, managedActiveId)
+        if (s.activeId === null || s.activeId === managedActiveId) managedActiveId = activeId
+        return { activeId, sessionReady: true }
+      })
+
       const limitProbe = pLimit(SESSION_PROBE_CONCURRENCY)
       await Promise.all(
-        openRepos.map((entry, index) =>
+        openRepos.map((entry) =>
           limitProbe(async () => {
             const probe = await resolveRepoPath(entry, (err) => {
               console.warn(`[session] probe failed for ${repoSessionEntryId(entry)}:`, err)
             })
             if (!probe.repo) {
-              if (!rankById.has(probe.input)) rankById.set(probe.input, index)
               set((s) => {
                 const { repos, order } = addUnavailableRepo(
                   s,
@@ -62,7 +117,6 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
             }
 
             const resolvedRepo = probe.repo
-            if (!rankById.has(resolvedRepo.id)) rankById.set(resolvedRepo.id, index)
             let initialRefresh: InitialRepoRefresh | null = null
             set((s) => {
               const { repos, order } = addResolvedRepo(s, resolvedRepo, rankById)
@@ -86,15 +140,6 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
           }),
         ),
       )
-
-      set((s) => {
-        const activeId = activeRepoIdAfterWorkspaceHydration(s.activeId, s.repos, s.order, activeRepo, managedActiveId)
-        if (s.activeId === null || s.activeId === managedActiveId) managedActiveId = activeId
-        return {
-          activeId,
-          sessionReady: true,
-        }
-      })
     },
   }
 }

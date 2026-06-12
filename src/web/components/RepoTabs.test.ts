@@ -9,6 +9,7 @@ describe('repoTabSummariesEqual', () => {
         id: 'ssh-config://example/srv%2Frepo',
         name: 'repo',
         remoteDetails: [],
+        connectivity: 'connected',
         remoteTarget: {
           id: 'ssh-config://example/srv%2Frepo',
           alias: 'example',
@@ -25,6 +26,7 @@ describe('repoTabSummariesEqual', () => {
         id: 'ssh-config://example/srv%2Frepo',
         name: 'repo',
         remoteDetails: [],
+        connectivity: 'connected',
         remoteTarget: {
           id: 'ssh-config://example/srv%2Frepo',
           alias: 'example',

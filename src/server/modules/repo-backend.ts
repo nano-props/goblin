@@ -40,6 +40,7 @@ import {
 } from '#/shared/repo-action-policy.ts'
 import { resolveRemoteTarget as resolveSshRemoteTarget } from '#/system/ssh/config.ts'
 import { testRemoteRepository } from '#/system/ssh/diagnostics.ts'
+import { SSH_BOOT_PROBE_TIMEOUT_MS } from '#/system/ssh/commands.ts'
 import {
   checkoutRemoteBranch,
   createRemoteWorktree,
@@ -325,7 +326,7 @@ async function createRemoteRepoBackend(repoId: string): Promise<RepoBackend> {
     id: repoId,
     kind: 'remote',
     async probe() {
-      const result = await testRemoteRepository(target)
+      const result = await testRemoteRepository(target, { timeoutMs: SSH_BOOT_PROBE_TIMEOUT_MS })
       if (!result.ok) return { ok: false, message: result.message || 'error.failed-read-repo' }
       return { ok: true, root: target.id, name: target.displayName }
     },

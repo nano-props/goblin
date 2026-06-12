@@ -42,6 +42,7 @@ export function emptyRepo(id: string, name: string): RepoState {
       browserRemoteProvider: undefined,
       remoteProviders: {},
       hasGitHubRemote: false,
+      connectivity: 'connected',
       fetchFailed: false,
       fetchError: null,
     },

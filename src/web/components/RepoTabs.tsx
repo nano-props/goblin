@@ -48,6 +48,7 @@ export function RepoTabs({ currentRepoId, onOpenRepoPathDialog, onOpenRemote, on
                 remoteDetails: r.remote.remoteDetails ?? [],
                 remoteTarget: r.remote.target,
                 unavailable: r.availability.phase === 'unavailable',
+                connectivity: r.remote.connectivity,
               }
             : null
         })

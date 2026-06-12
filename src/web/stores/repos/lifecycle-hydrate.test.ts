@@ -109,17 +109,21 @@ describe('repo session hydration', () => {
     const work = useReposStore
       .getState()
       .hydrateSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry(REPO_B)], REPO_A)
-    await vi.waitFor(() => {
-      expect(probes.size).toBe(2)
-    })
-    probes.get(REPO_A)?.({ ok: true, root: REPO_A, name: 'repo-a' })
-    await flushIpc()
-
+    // Placeholder tabs are inserted synchronously before any probe runs,
+    // so REPO_A's cached projection is visible immediately.
     await vi.waitFor(() => {
       const cachedRepo = useReposStore.getState().repos[REPO_A]
       expect(cachedRepo?.projection.source).toBe('cache')
       expect(useReposStore.getState().activeId).toBe(REPO_A)
-      expect(useReposStore.getState().sessionReady).toBe(false)
+      expect(useReposStore.getState().sessionReady).toBe(true)
+    })
+
+    // Slow probe on REPO_B shouldn't block sessionReady or REPO_A's view.
+    probes.get(REPO_A)?.({ ok: true, root: REPO_A, name: 'repo-a' })
+    await flushIpc()
+
+    await vi.waitFor(() => {
+      expect(useReposStore.getState().repos[REPO_A]?.remote.connectivity).toBe('connected')
     })
 
     probes.get(REPO_B)?.({ ok: true, root: REPO_B, name: 'repo-b' })
