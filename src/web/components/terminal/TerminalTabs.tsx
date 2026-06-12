@@ -115,6 +115,11 @@ export function TerminalTabs({
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
+  // Must be called unconditionally so the hook order stays stable across renders
+  // (e.g. when sessions goes from 0 → 1 or back, which would otherwise bypass the
+  // helper below and trigger React's "Rendered more hooks than during the previous render").
+  const sortableIds = useMemo(() => sessions.map((s) => s.key), [sessions])
+
   const handleSelect = useCallback(
     (key: string) => {
       const session = sessions.find((s) => s.key === key)
@@ -298,7 +303,6 @@ export function TerminalTabs({
   }
 
   function renderScrollableTabsBody() {
-    const ids = useMemo(() => sessions.map((s) => s.key), [sessions])
     return (
       <DndContext
         sensors={sensors}
@@ -307,7 +311,7 @@ export function TerminalTabs({
         onDragEnd={handleDragEnd}
       >
         <ToolbarTabStripBody scroll>
-          <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
+          <SortableContext items={sortableIds} strategy={horizontalListSortingStrategy}>
             <TerminalTabTooltipLayer
               sessions={sessions}
               focusMode={focusMode}
