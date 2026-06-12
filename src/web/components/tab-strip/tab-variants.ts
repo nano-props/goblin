@@ -7,8 +7,9 @@ export function toolbarTabChromeClassName(options: {
   variant: ToolbarTabVariant
   active: boolean
   dragging?: boolean
-  // Only meaningful for the 'terminal' variant: compact strips live in narrow
-  // toolbars where flex widths could overflow, so we pin the tab to w-32.
+  // Only meaningful for the 'terminal' variant: terminal tabs use a fixed width
+  // so PTY-driven title changes don't shift neighbouring tabs; compact strips
+  // live in narrow toolbars and pin one step tighter.
   compact?: boolean
 }): string {
   const { variant, active, dragging = false, compact = false } = options
@@ -19,7 +20,7 @@ export function toolbarTabChromeClassName(options: {
       ? 'flex h-8 min-w-36 max-w-56 touch-none gap-1.5 rounded-md border px-2 text-xs'
       : compact
         ? 'flex h-7 w-32 gap-1 rounded-md border px-2.5 text-sm'
-        : 'flex h-7 min-w-32 max-w-48 gap-1 rounded-md border px-2.5 text-sm',
+        : 'flex h-7 w-36 gap-1 rounded-md border px-2.5 text-sm',
     variant === 'repo'
       ? active
         ? 'border-input bg-card text-foreground'
