@@ -6,6 +6,7 @@ import {
   getServerTerminalSessionSnapshot,
   handleRealtimeServerMessage,
   listServerTerminalSessions,
+  reorderServerTerminals,
   attachServerTerminal,
   registerTerminalSocket,
   restartServerTerminal,
@@ -304,6 +305,28 @@ describe('server terminal sessions', () => {
     })
 
     unregisterTerminalSocket('client_1', 'attachment_a', socket)
+  })
+
+  test('rejects terminal reorder requests with duplicate keys', async () => {
+    await createTerminalSession('client_1')
+    await createTerminalSession('client_1')
+    await createTerminalSession('client_1')
+
+    const sessionsBefore = await listServerTerminalSessions('client_1', '/repo')
+    expect(sessionsBefore).toHaveLength(3)
+
+    const result = reorderServerTerminals('client_1', {
+      repoRoot: '/repo',
+      worktreePath: '/repo-linked',
+      orderedKeys: [
+        sessionsBefore[0]!.key,
+        sessionsBefore[1]!.key,
+        sessionsBefore[1]!.key,
+      ],
+    })
+
+    expect(result).toBe(false)
+    await expect(listServerTerminalSessions('client_1', '/repo')).resolves.toEqual(sessionsBefore)
   })
 
   test('sends attach response before flushing buffered output emitted during the attach request', async () => {

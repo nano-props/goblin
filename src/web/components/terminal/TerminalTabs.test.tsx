@@ -14,6 +14,10 @@ const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENV
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   vi.useFakeTimers()
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+    configurable: true,
+    value: vi.fn(),
+  })
   reactActEnvironment.goblinNative = {
     homeDir: '/Users/tester',
     pathForFile: () => '',
@@ -32,6 +36,7 @@ afterEach(() => {
   container = null
   document.body.innerHTML = ''
   delete reactActEnvironment.goblinNative
+  delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView
   vi.useRealTimers()
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
@@ -42,6 +47,7 @@ describe('TerminalTabs', () => {
       <TerminalTabs
         worktreeTerminalKey="/repo\0/repo/worktree"
         detailId="detail"
+        panelActive
         sessions={[
           session({
             key: 't1',

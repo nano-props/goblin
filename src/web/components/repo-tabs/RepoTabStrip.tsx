@@ -1,9 +1,8 @@
-import { type ReactNode, useCallback, useState } from 'react'
+import { type ReactNode, type Ref, useCallback, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Download, FolderOpen, Plus, Server } from 'lucide-react'
 import {
   DndContext,
   type DragEndEvent,
-  type Modifier,
   PointerSensor,
   closestCenter,
   useSensor,
@@ -15,6 +14,7 @@ import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { ToolbarTabStrip, ToolbarTabStripBody } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
+import { createRestrictToTabStripBounds } from '#/web/components/tab-strip/drag-bounds.ts'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,26 +28,6 @@ import { RepoTab } from '#/web/components/repo-tabs/RepoTab.tsx'
 import { RepoTabTooltipLayer } from '#/web/components/repo-tabs/RepoTabTooltipLayer.tsx'
 import { useFocusRegistry, type FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import type { RepoTabStripLabels, RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max)
-}
-
-const restrictToVisibleTabStrip: Modifier = ({
-  activeNodeRect,
-  containerNodeRect,
-  draggingNodeRect,
-  scrollableAncestorRects,
-  transform,
-  windowRect,
-}) => {
-  const horizontalTransform = { ...transform, y: 0 }
-  const draggableRect = draggingNodeRect ?? activeNodeRect
-  const bounds = scrollableAncestorRects[0] ?? containerNodeRect ?? windowRect
-  if (!draggableRect || !bounds) return horizontalTransform
-  const minX = bounds.left - draggableRect.left
-  const maxX = bounds.right - draggableRect.right
-  return { ...horizontalTransform, x: clamp(horizontalTransform.x, minX, maxX) }
-}
 
 function shouldShowInactiveSeparator({
   leftId,
@@ -110,12 +90,14 @@ interface RepoTabsContentProps {
 function RepoTabEdgeAction({
   children,
   showSeparator = false,
+  actionRef,
 }: {
   children: ReactNode
   showSeparator?: boolean
+  actionRef?: Ref<HTMLDivElement>
 }) {
   return (
-    <div className="relative flex h-8 shrink-0 items-center pl-1">
+    <div ref={actionRef} className="relative flex h-8 shrink-0 items-center pl-1">
       {showSeparator && (
         <span
           aria-hidden="true"
@@ -205,10 +187,12 @@ function ScrollableRepoTabs({
   focusRegistry,
   sensors,
   onDragEnd,
+  restrictToVisibleTabStrip,
   openMenu,
 }: RepoTabsContentProps & {
   sensors: ReturnType<typeof useSensors>
   onDragEnd: (event: DragEndEvent) => void
+  restrictToVisibleTabStrip: ReturnType<typeof createRestrictToTabStripBounds>
   openMenu: ReactNode
 }) {
   const ids = repos.map((repo) => repo.id)
@@ -269,6 +253,11 @@ export function RepoTabStrip({
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
   const focusRegistry = useFocusRegistry<string, HTMLButtonElement>()
+  const openMenuRef = useRef<HTMLDivElement>(null)
+  const restrictToVisibleTabStrip = useMemo(
+    () => createRestrictToTabStripBounds({ rightBoundaryRef: openMenuRef }),
+    [],
+  )
 
   const handleClose = useCallback(
     (id: string) => {
@@ -305,7 +294,7 @@ export function RepoTabStrip({
   const dropdownRepos = isSmallScreen ? repos : []
 
   const openMenu = (
-    <RepoTabEdgeAction showSeparator={showOpenSeparator}>
+    <RepoTabEdgeAction actionRef={openMenuRef} showSeparator={showOpenSeparator}>
       <DropdownMenu>
         <Tip label={labels.open}>
           <DropdownMenuTrigger asChild>
@@ -381,6 +370,7 @@ export function RepoTabStrip({
               onKeyboardNavigate={handleKeyboardNavigate}
               sensors={sensors}
               onDragEnd={handleDragEnd}
+              restrictToVisibleTabStrip={restrictToVisibleTabStrip}
               openMenu={openMenu}
             />
           }

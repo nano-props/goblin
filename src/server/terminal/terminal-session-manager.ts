@@ -331,7 +331,9 @@ export class TerminalSessionManager<TOwner extends string | number> {
       (s) => s.scope === scope && s.key.startsWith(worktreePrefix),
     )
     const keySet = new Set(sessionsInWorktree.map((s) => s.key))
+    const orderedKeySet = new Set(orderedKeys)
     if (orderedKeys.length !== sessionsInWorktree.length) return false
+    if (orderedKeySet.size !== orderedKeys.length) return false
     if (!orderedKeys.every((k) => keySet.has(k))) return false
     const sessionByKey = new Map<string, TerminalSession<TOwner>>()
     for (const s of sessionsInWorktree) sessionByKey.set(s.key, s)

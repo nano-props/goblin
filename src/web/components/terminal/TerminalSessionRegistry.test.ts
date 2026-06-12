@@ -232,6 +232,30 @@ describe('TerminalSessionRegistry', () => {
       )
       expect(registry.worktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalId).toBe('terminal-2')
     })
+
+    test('closing the active terminal selects the adjacent tab in display order', () => {
+      registry.setRepoIndex(makeRepoIndex())
+
+      registry.reconcileServerSessions(
+        REPO_ROOT,
+        [
+          makeServerSession('session-1', 'terminal-1', { displayOrder: 1 }),
+          makeServerSession('session-2', 'terminal-2', { displayOrder: 0 }),
+          makeServerSession('session-3', 'terminal-3', { displayOrder: 2 }),
+        ],
+        'attachment_local',
+        new Map(),
+      )
+
+      const snapshot = registry.worktreeSnapshot(WORKTREE_KEY)
+      const activeKey = snapshot.sessions.find((session) => session.terminalId === 'terminal-2')?.key
+      if (!activeKey) throw new Error('missing terminal-2')
+
+      registry.selectTerminal(WORKTREE_KEY, activeKey)
+      ;(registry as any).removeSession(activeKey, { dispose: false, closeSession: false })
+
+      expect(registry.worktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalId).toBe('terminal-1')
+    })
   })
 
   describe('snapshot cache', () => {

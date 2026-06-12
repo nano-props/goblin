@@ -285,13 +285,7 @@ export class TerminalSessionRegistry {
 
   private sessionSummaries(worktreeTerminalKey: string): TerminalSessionSummary[] {
     const selectedKey = this.selectedKeyByWorktree.get(worktreeTerminalKey) ?? null
-    return Array.from(this.sessions.values())
-      .filter((session) => session.descriptor.worktreeTerminalKey === worktreeTerminalKey)
-      .sort((a, b) => {
-        const orderA = this.displayOrderByKey.get(a.descriptor.key)!
-        const orderB = this.displayOrderByKey.get(b.descriptor.key)!
-        return orderA - orderB
-      })
+    return this.sortedSessionsForWorktree(worktreeTerminalKey)
       .map((session) => {
         const snapshot = this.snapshotCache.get(session.descriptor.key) ?? session.snapshot()
         this.snapshotCache.set(session.descriptor.key, snapshot)
@@ -411,6 +405,7 @@ export class TerminalSessionRegistry {
 
   reorderSessions = async (scope: string, orderedKeys: string[]): Promise<boolean> => {
     if (orderedKeys.length === 0) return true
+    if (new Set(orderedKeys).size !== orderedKeys.length) return false
     let parsed: { repoRoot: string; worktreePath: string; terminalId: string } | null = null
     for (const key of orderedKeys) {
       const item = parseServerSessionKey(key)
@@ -514,7 +509,8 @@ export class TerminalSessionRegistry {
     const session = this.sessions.get(key)
     if (!session) return false
     const worktreeTerminalKey = session.descriptor.worktreeTerminalKey
-    const closedIndex = session.descriptor.index
+    const orderedKeysBeforeRemoval = this.sortedSessionsForWorktree(worktreeTerminalKey).map((item) => item.descriptor.key)
+    const closedOrderIndex = orderedKeysBeforeRemoval.indexOf(key)
     const wasSelected = this.selectedKeyByWorktree.get(worktreeTerminalKey) === key
     this.syncSessionIdIndex(key, null)
     this.sessions.delete(key)
@@ -525,11 +521,9 @@ export class TerminalSessionRegistry {
     this.bellController.remove(key)
     if (options.dispose) session.dispose({ closeSession: options.closeSession !== false })
     if (wasSelected) {
-      const remaining = Array.from(this.sessions.values())
-        .filter((s) => s.descriptor.worktreeTerminalKey === worktreeTerminalKey)
-        .sort((a, b) => a.descriptor.index - b.descriptor.index)
-      const right = remaining.find((s) => s.descriptor.index > closedIndex)
-      const left = remaining.filter((s) => s.descriptor.index < closedIndex).pop()
+      const remaining = this.sortedSessionsForWorktree(worktreeTerminalKey)
+      const right = closedOrderIndex >= 0 ? remaining[closedOrderIndex] : null
+      const left = closedOrderIndex >= 1 ? remaining[closedOrderIndex - 1] : null
       const nextKey = right?.descriptor.key ?? left?.descriptor.key ?? null
       this.selectTerminalKey(worktreeTerminalKey, nextKey, { notify: false })
     }
@@ -629,6 +623,16 @@ export class TerminalSessionRegistry {
     return this.sessions.get(key)?.descriptor.worktreeTerminalKey === worktreeTerminalKey
   }
 
+  private sortedSessionsForWorktree(worktreeTerminalKey: string): ManagedTerminalSession[] {
+    return Array.from(this.sessions.values())
+      .filter((session) => session.descriptor.worktreeTerminalKey === worktreeTerminalKey)
+      .sort((a, b) => {
+        const orderA = this.displayOrderByKey.get(a.descriptor.key) ?? a.descriptor.index - 1
+        const orderB = this.displayOrderByKey.get(b.descriptor.key) ?? b.descriptor.index - 1
+        return orderA - orderB || a.descriptor.index - b.descriptor.index
+      })
+  }
+
   private resolveSelectedTerminalKey(
     worktreeTerminalKey: string,
     preferredKey: string | null,
@@ -638,11 +642,7 @@ export class TerminalSessionRegistry {
     if (preferredKey && this.isSelectedKeyValid(worktreeTerminalKey, preferredKey)) return preferredKey
     if (currentKey && this.isSelectedKeyValid(worktreeTerminalKey, currentKey)) return currentKey
     if (controllerKey && this.isSelectedKeyValid(worktreeTerminalKey, controllerKey)) return controllerKey
-    return (
-      Array.from(this.sessions.values())
-        .filter((candidate) => candidate.descriptor.worktreeTerminalKey === worktreeTerminalKey)
-        .sort((a, b) => a.descriptor.index - b.descriptor.index)[0]?.descriptor.key ?? null
-    )
+    return this.sortedSessionsForWorktree(worktreeTerminalKey)[0]?.descriptor.key ?? null
   }
 }
 

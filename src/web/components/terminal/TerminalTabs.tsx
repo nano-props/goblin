@@ -13,15 +13,16 @@ import {
 import {
   DndContext,
   type DragEndEvent,
-  type Modifier,
+  KeyboardSensor,
   PointerSensor,
   closestCenter,
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
-import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
+import { SortableContext, horizontalListSortingStrategy, sortableKeyboardCoordinates, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { DelegatedTooltipLayer, DELEGATED_TOOLTIP_DEFAULTS } from '#/web/components/DelegatedTooltipLayer.tsx'
+import { createRestrictToTabStripBounds } from '#/web/components/tab-strip/drag-bounds.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
 import { ToolbarTabList, ToolbarTabStrip, ToolbarTabStripBody } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
@@ -48,27 +49,6 @@ export const EMPTY_TERMINAL_TAB_FOCUS_KEY = '__terminal-empty__'
 
 const TERMINAL_TAB_TOOLTIP_SELECTOR = '[data-terminal-tab-tooltip-id]'
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max)
-}
-
-const restrictToVisibleTabStrip: Modifier = ({
-  activeNodeRect,
-  containerNodeRect,
-  draggingNodeRect,
-  scrollableAncestorRects,
-  transform,
-  windowRect,
-}) => {
-  const horizontalTransform = { ...transform, y: 0 }
-  const draggableRect = draggingNodeRect ?? activeNodeRect
-  const bounds = scrollableAncestorRects[0] ?? containerNodeRect ?? windowRect
-  if (!draggableRect || !bounds) return horizontalTransform
-  const minX = bounds.left - draggableRect.left
-  const maxX = bounds.right - draggableRect.right
-  return { ...horizontalTransform, x: clamp(horizontalTransform.x, minX, maxX) }
-}
-
 export function TerminalTabs({
   worktreeTerminalKey,
   sessions,
@@ -92,6 +72,7 @@ export function TerminalTabs({
   const focusRegistry = externalFocusRegistry ?? internalFocusRegistry
   const viewportRef = useRef<HTMLDivElement>(null)
   const prevSessionCountRef = useRef(sessions.length)
+  const newButtonRef = useRef<HTMLButtonElement>(null)
 
   useLayoutEffect(() => {
     if (sessions.length <= prevSessionCountRef.current) {
@@ -113,7 +94,14 @@ export function TerminalTabs({
     return () => cancelAnimationFrame(frame)
   }, [sessions.length])
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+  const restrictToVisibleTabStrip = useMemo(
+    () => createRestrictToTabStripBounds({ rightBoundaryRef: newButtonRef }),
+    [],
+  )
 
   // Must be called unconditionally so the hook order stays stable across renders
   // (e.g. when sessions goes from 0 → 1 or back, which would otherwise bypass the
@@ -304,12 +292,7 @@ export function TerminalTabs({
 
   function renderScrollableTabsBody() {
     return (
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        modifiers={[restrictToVisibleTabStrip]}
-        onDragEnd={handleDragEnd}
-      >
+      <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVisibleTabStrip]} onDragEnd={handleDragEnd}>
         <ToolbarTabStripBody scroll>
           <SortableContext items={sortableIds} strategy={horizontalListSortingStrategy}>
             <TerminalTabTooltipLayer
@@ -334,6 +317,7 @@ export function TerminalTabs({
             </TerminalTabTooltipLayer>
           </SortableContext>
           <Button
+            ref={newButtonRef}
             type="button"
             variant="ghost"
             size="icon"
@@ -370,16 +354,22 @@ interface TerminalTabProps {
   t: (key: string) => string
 }
 
+function terminalTabChromeClassName(isActive: boolean, isDragging = false): string {
+  return cn(
+    'group relative flex h-7 w-28 shrink-0 items-center gap-1 rounded-md border px-2.5 text-sm transition-colors duration-100',
+    isActive
+      ? 'border-transparent bg-selected text-selected-foreground'
+      : 'border-separator text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+    isDragging && 'z-10 cursor-grabbing',
+    isDragging && !isActive && 'bg-card text-foreground',
+  )
+}
+
 function TerminalTab({ session, isActive, tabId, focusRegistry, onSelect, onClose, onKeyDown, t }: TerminalTabProps) {
   return (
     <div
       data-terminal-tab-tooltip-id={session.key}
-      className={cn(
-        'group relative flex h-7 w-28 shrink-0 items-center gap-1 rounded-md border px-2.5 text-sm transition-colors duration-100',
-        isActive
-          ? 'border-transparent bg-selected text-selected-foreground'
-          : 'border-separator text-muted-foreground hover:bg-accent/50 hover:text-foreground',
-      )}
+      className={terminalTabChromeClassName(isActive)}
     >
       <button
         ref={focusRegistry.setRef(session.key)}
@@ -434,7 +424,9 @@ function SortableTerminalTab({
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: session.key,
   })
-  const sortableListeners = listeners ?? {}
+  const sortableOnKeyDown = listeners?.onKeyDown
+  const sortableListeners = { ...(listeners ?? {}) }
+  delete sortableListeners.onKeyDown
   const chromeLikeTransform = transform ? { ...transform, y: 0, scaleX: 1, scaleY: 1 } : null
   const style = {
     transform: CSS.Transform.toString(chromeLikeTransform),
@@ -451,13 +443,7 @@ function SortableTerminalTab({
       ref={setNodeRef}
       style={style}
       data-terminal-tab-tooltip-id={session.key}
-      className={cn(
-        'group relative flex h-7 w-28 shrink-0 touch-none select-none items-center gap-1 rounded-md border px-2.5 text-sm transition-colors duration-100',
-        isActive
-          ? 'border-transparent bg-selected text-selected-foreground'
-          : 'border-separator text-muted-foreground hover:bg-accent/50 hover:text-foreground',
-        isDragging && 'z-10 cursor-grabbing bg-card text-foreground',
-      )}
+      className={cn(terminalTabChromeClassName(isActive, isDragging), 'touch-none select-none')}
     >
       <button
         ref={setButtonRef}
@@ -470,7 +456,8 @@ function SortableTerminalTab({
         tabIndex={isActive ? 0 : -1}
         onClick={() => onSelect(session.key)}
         onKeyDown={(e) => {
-          if (isDragging) return
+          sortableOnKeyDown?.(e)
+          if (e.defaultPrevented || isDragging) return
           onKeyDown(e, session.key)
         }}
         className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-left text-inherit outline-none"
