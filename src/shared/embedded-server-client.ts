@@ -1,4 +1,4 @@
-import { getEmbeddedServerRpcRoute, type EmbeddedServerRpcPath } from '#/shared/embedded-server-rpc-routes.ts'
+import { getEmbeddedServerIpcRoute, type EmbeddedServerIpcPath } from '#/shared/embedded-server-ipc-routes.ts'
 
 export interface EmbeddedServerRuntime {
   url: string
@@ -37,13 +37,13 @@ export async function postEmbeddedServerJson<T>(
   })
 }
 
-export async function invokeEmbeddedServerRpc<T>(
+export async function invokeEmbeddedServerIpc<T>(
   runtime: EmbeddedServerRuntime,
-  path: EmbeddedServerRpcPath,
+  path: EmbeddedServerIpcPath,
   input?: object,
   options?: { signal?: AbortSignal },
 ): Promise<T> {
-  const route = getEmbeddedServerRpcRoute(path)
+  const route = getEmbeddedServerIpcRoute(path)
   if (!route) throw new Error(`Unsupported embedded server route: ${path}`)
   if (route.method === 'GET')
     return await requestEmbeddedServerJson<T>(runtime, route.route, { method: 'GET', signal: options?.signal })
