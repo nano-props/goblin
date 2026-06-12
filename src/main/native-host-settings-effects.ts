@@ -9,7 +9,7 @@ import type {
   NativeShellProjection,
   NativeSettingsProjectionPatch,
   NativeSettingsProjectionState,
-} from '#/shared/rpc.ts'
+} from '#/shared/api-types.ts'
 
 // Native-host application of server-owned settings changes.
 //

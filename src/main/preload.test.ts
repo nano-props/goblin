@@ -6,9 +6,9 @@ import type { RendererBootstrapPayload } from '#/shared/bootstrap.ts'
 import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import {
   RENDERER_EFFECT_INTENT_CHANNEL,
-  RPC_ABORT_CHANNEL,
-  RPC_CHANNEL,
-  RPC_EVENT_CHANNEL,
+  IPC_ABORT_CHANNEL,
+  IPC_CHANNEL,
+  IPC_EVENT_CHANNEL,
   SHELL_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL,
   SHELL_OPEN_DIRECTORY_DIALOG_CHANNEL,
   SHELL_OPEN_EXTERNAL_URL_CHANNEL,
@@ -117,25 +117,25 @@ describe('preload goblinNative bridge', () => {
     warn.mockRestore()
   })
 
-  test('forwards RPC request ids to the main process', async () => {
+  test('forwards IPC request ids to the main process', async () => {
     const { goblinNative, invocations } = loadPreload()
 
-    await goblinNative.invokeRpc({ path: 'repo.status', input: { cwd: '/repo' }, requestId: 'rpc_test_1' })
+    await goblinNative.invokeIpc({ path: 'repo.status', input: { cwd: '/repo' }, requestId: 'ipc_test_1' })
 
     expect(invocations[0]).toEqual({
-      channel: RPC_CHANNEL,
-      args: [{ path: 'repo.status', input: { cwd: '/repo' }, requestId: 'rpc_test_1' }],
+      channel: IPC_CHANNEL,
+      args: [{ path: 'repo.status', input: { cwd: '/repo' }, requestId: 'ipc_test_1' }],
     })
   })
 
-  test('uses a transport control channel for RPC aborts', async () => {
+  test('uses a transport control channel for IPC aborts', async () => {
     const { goblinNative, invocations } = loadPreload()
 
-    await goblinNative.abortRpc('rpc_test_1')
+    await goblinNative.abortIpc('ipc_test_1')
 
     expect(invocations[0]).toEqual({
-      channel: RPC_ABORT_CHANNEL,
-      args: [{ requestId: 'rpc_test_1' }],
+      channel: IPC_ABORT_CHANNEL,
+      args: [{ requestId: 'ipc_test_1' }],
     })
   })
 
@@ -173,17 +173,17 @@ describe('preload goblinNative bridge', () => {
     expect(sends).toContainEqual({ channel: TERMINAL_SET_BADGE_CHANNEL, args: [2] })
   })
 
-  test('logs failed RPC calls with the request path', async () => {
+  test('logs failed IPC calls with the request path', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const { goblinNative } = loadPreload({
       invoke: () => Promise.resolve({ ok: false, error: { message: 'boom' } }),
     })
 
     await expect(
-      goblinNative.invokeRpc({ path: 'repo.status', input: { cwd: '/repo' }, requestId: 'rpc_test_1' }),
+      goblinNative.invokeIpc({ path: 'repo.status', input: { cwd: '/repo' }, requestId: 'ipc_test_1' }),
     ).rejects.toThrow('boom')
 
-    expect(warn.mock.calls[0]?.[0]).toBe('[rpc] repo.status failed')
+    expect(warn.mock.calls[0]?.[0]).toBe('[ipc] repo.status failed')
     expect((warn.mock.calls[0]?.[1] as Error | undefined)?.message).toBe('boom')
     warn.mockRestore()
   })
@@ -197,7 +197,7 @@ describe('preload goblinNative bridge', () => {
     const off2 = goblinNative.onEvent(cb2)
 
     expect(ipcRenderer.on).toHaveBeenCalledTimes(1)
-    expect(ipcRenderer.on).toHaveBeenCalledWith(RPC_EVENT_CHANNEL, expect.any(Function))
+    expect(ipcRenderer.on).toHaveBeenCalledWith(IPC_EVENT_CHANNEL, expect.any(Function))
 
     const listener = ipcRenderer.on.mock.calls[0]?.[1] as ((event: unknown, payload: unknown) => void) | undefined
     listener?.(null, { type: 'settings-write-error', message: 'failed' })
@@ -209,7 +209,7 @@ describe('preload goblinNative bridge', () => {
 
     off2()
     expect(ipcRenderer.off).toHaveBeenCalledTimes(1)
-    expect(ipcRenderer.off).toHaveBeenCalledWith(RPC_EVENT_CHANNEL, listener)
+    expect(ipcRenderer.off).toHaveBeenCalledWith(IPC_EVENT_CHANNEL, listener)
   })
 
   test('continues delivering goblin:event when one subscriber throws', () => {
