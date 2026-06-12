@@ -15,9 +15,22 @@ import {
   RemoteTargetSchema,
 } from '#/shared/api-types.ts'
 import { NativeShellProjectionSchema } from '#/shared/native-shell-projection.ts'
+import { isRemoteRepoId, parseRemoteRepoId } from '#/shared/remote-repo.ts'
 
 const SourceToken = v.optional(v.string())
 const StringArray = v.array(v.string())
+
+const RemoteRepoRefSchema = v.object({
+  id: v.string(),
+  alias: v.string(),
+  remotePath: v.string(),
+  displayName: v.string(),
+})
+
+const RepoSessionEntrySchema = v.variant('kind', [
+  v.object({ kind: v.literal('local'), id: v.string() }),
+  v.object({ kind: v.literal('remote'), id: v.string(), ref: RemoteRepoRefSchema }),
+])
 
 export const REPO_PROCEDURE_SCHEMAS = {
   // Action endpoints — POST with a JSON body.
@@ -99,20 +112,63 @@ export const REPO_QUERY_SCHEMAS = {
   }),
 } as const
 
-// Settings writes are routed to `applyServer*Write` helpers that already do
-// deep validation; we only enforce that the body is a JSON object so a
-// missing/garbled payload is rejected at the perimeter.
+// Schemas for the settings write paths. Each shape matches the typed
+// input contract documented on `applyServer*Write` in
+// `#/server/modules/settings-write-paths.ts` — the route layer
+// validates with these, then passes the parsed object directly to the
+// module layer.
+import {
+  DEFAULT_DETAIL_COLLAPSED,
+  DEFAULT_DETAIL_FOCUS_MODE,
+  DEFAULT_DETAIL_PANE_SIZES,
+  DEFAULT_WORKSPACE_LAYOUT,
+  WORKSPACE_LAYOUTS,
+  type WorkspaceLayout,
+} from '#/shared/workspace-layout.ts'
+
+const SessionStateSchema = v.object({
+  openRepos: v.array(RepoSessionEntrySchema),
+  activeRepo: v.nullable(v.string()),
+  detailCollapsed: v.boolean(),
+  detailFocusMode: v.boolean(),
+  workspaceLayout: v.picklist<readonly WorkspaceLayout[]>(WORKSPACE_LAYOUTS),
+  detailPaneSizes: v.object({
+    'top-bottom': v.number(),
+    'left-right': v.number(),
+  }),
+  selectedTerminalByWorktree: v.optional(v.record(v.string(), v.string())),
+  detailTabByRepo: v.optional(v.record(v.string(), v.picklist(['status', 'changes', 'terminal']))),
+})
+const SessionStateSchemaWithDefaults = v.object({
+  openRepos: v.array(RepoSessionEntrySchema),
+  activeRepo: v.nullable(v.string()),
+  detailCollapsed: v.optional(v.boolean(), DEFAULT_DETAIL_COLLAPSED),
+  detailFocusMode: v.optional(v.boolean(), DEFAULT_DETAIL_FOCUS_MODE),
+  workspaceLayout: v.optional(v.picklist<readonly WorkspaceLayout[]>(WORKSPACE_LAYOUTS), DEFAULT_WORKSPACE_LAYOUT),
+  detailPaneSizes: v.optional(
+    v.object({
+      'top-bottom': v.number(),
+      'left-right': v.number(),
+    }),
+    DEFAULT_DETAIL_PANE_SIZES,
+  ),
+  selectedTerminalByWorktree: v.optional(v.record(v.string(), v.string())),
+  detailTabByRepo: v.optional(v.record(v.string(), v.picklist(['status', 'changes', 'terminal']))),
+})
+
 export const SETTINGS_PROCEDURE_SCHEMAS = {
   fetchInterval: v.object({ sec: v.number() }),
   globalShortcutState: v.object({ registered: v.boolean() }),
-  recentReposAdd: v.object({ repo: v.record(v.string(), v.unknown()) }),
+  recentReposAdd: v.object({ repo: RepoSessionEntrySchema }),
 } as const
 
-// Schemas whose body is a permissive object — used where the underlying
-// write-path accepts a loose patch and validates fields internally.
+// `prefs` accepts a permissive patch — the underlying
+// `updateServerSettingsPrefs` does field-level validation (and
+// ignores unknown keys), so we only enforce that the body is an
+// object at the perimeter.
 export const SETTINGS_PATCH_SCHEMAS = {
   prefs: v.object({ settings: v.record(v.string(), v.unknown()) }),
-  session: v.object({ session: v.record(v.string(), v.unknown()) }),
+  session: v.object({ session: SessionStateSchemaWithDefaults }),
 } as const
 
 export const GITHUB_CLI_REFRESH_SCHEMA = v.object({
