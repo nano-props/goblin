@@ -101,6 +101,16 @@ describe('repo lifecycle', () => {
         new Promise<{ branches: BranchSnapshotInfo[]; current: string }>((resolve) => {
           snapshotResolvers.push(resolve)
         }),
+      // `refreshCoreData` now goes through the composite endpoint, so
+      // forward every snapshot resolver into the composite handler too.
+      composite: () =>
+        new Promise<{
+          snapshot: { branches: BranchSnapshotInfo[]; current: string }
+          status: never[]
+          pullRequests: null
+        }>((resolve) => {
+          snapshotResolvers.push((value) => resolve({ snapshot: value, status: [], pullRequests: null }))
+        }),
     })
 
     const first = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)

@@ -50,13 +50,18 @@ describe('remote fetch timestamps', () => {
       fetchCount += 1
       return { ok: true, message: 'ok' }
     }
-    ipcHandlers['repo.snapshot'] = async () => {
+    // Composite folds snapshot + status into one round trip, but for
+    // assertions each side still counts as 1 (semantic: it was
+    // refreshed). Standalone handlers are kept for tests that exercise
+    // the post-write single-resource path.
+    ipcHandlers['repo.composite'] = async () => {
       snapshotCount += 1
-      return { branches: [branch('feature/a')], current: 'feature/a' }
-    }
-    ipcHandlers['repo.status'] = async () => {
       statusCount += 1
-      return []
+      return {
+        snapshot: { branches: [branch('feature/a')], current: 'feature/a' },
+        status: [],
+        pullRequests: null,
+      }
     }
 
     await useReposStore.getState().syncAndRefresh(REPO_ID, { token: 1 })
@@ -126,6 +131,10 @@ describe('remote fetch timestamps', () => {
       snapshotCount += 1
       return { branches: [branch('feature/a')], current: 'feature/a' }
     }
+    ipcHandlers['repo.composite'] = async () => {
+      snapshotCount += 1
+      return { snapshot: { branches: [branch('feature/a')], current: 'feature/a' }, status: [], pullRequests: null }
+    }
 
     await useReposStore.getState().syncAndRefresh(REPO_ID, { token })
 
@@ -151,6 +160,15 @@ describe('remote fetch timestamps', () => {
     ipcHandlers['repo.status'] = async () => {
       statusCount += 1
       return []
+    }
+    ipcHandlers['repo.composite'] = async () => {
+      snapshotCount += 1
+      statusCount += 1
+      return {
+        snapshot: { branches: [branch('feature/a'), branch('feature/b')], current: 'feature/a' },
+        status: [],
+        pullRequests: null,
+      }
     }
     ipcHandlers['repo.pullRequests'] = async ({ branches, mode }: { branches?: string[]; mode?: string }) => {
       pullRequestCalls.push({ branches, mode: mode })
@@ -217,6 +235,12 @@ describe('remote fetch timestamps', () => {
       snapshotCount += 1
       return { branches: [branch('feature/a')], current: 'feature/a' }
     }
+    // Post-write branch action refresh goes through composite in
+    // `runCoreDataRefreshWorkflow` now.
+    ipcHandlers['repo.composite'] = async () => {
+      snapshotCount += 1
+      return { snapshot: { branches: [branch('feature/a')], current: 'feature/a' }, status: [], pullRequests: null }
+    }
 
     const work = useReposStore.getState().runBranchAction(REPO_ID, { kind: 'checkout', branch: 'feature/a' }, { token })
 
@@ -240,6 +264,14 @@ describe('remote fetch timestamps', () => {
     ipcHandlers['repo.snapshot'] = async () => {
       snapshotCount += 1
       return { branches: [branch('main'), branch('feature/a')], current: 'main' }
+    }
+    ipcHandlers['repo.composite'] = async () => {
+      snapshotCount += 1
+      return {
+        snapshot: { branches: [branch('main'), branch('feature/a')], current: 'main' },
+        status: [],
+        pullRequests: null,
+      }
     }
 
     const result = await useReposStore.getState().runBranchAction(
@@ -316,6 +348,10 @@ describe('remote fetch timestamps', () => {
       snapshotCount += 1
       return { branches: [branch('feature/a')], current: 'feature/a' }
     }
+    ipcHandlers['repo.composite'] = async () => {
+      snapshotCount += 1
+      return { snapshot: { branches: [branch('feature/a')], current: 'feature/a' }, status: [], pullRequests: null }
+    }
 
     const result = await useReposStore
       .getState()
@@ -380,33 +416,29 @@ describe('remote fetch timestamps', () => {
 })
 
 describe('core refresh request ordering', () => {
-  test('refreshCoreData refreshes snapshot and status', async () => {
+  test('refreshCoreData refreshes snapshot and status via the composite endpoint', async () => {
     const token = seedRepo([branch('old')])
-    const calls: string[] = []
-    ipcHandlers['repo.snapshot'] = async () => {
-      calls.push('snapshot')
-      return { branches: [branch('main')], current: 'main' }
-    }
-    ipcHandlers['repo.status'] = async () => {
-      calls.push('status')
-      return []
+    let compositeCalls = 0
+    ipcHandlers['repo.composite'] = async () => {
+      compositeCalls += 1
+      return { snapshot: { branches: [branch('main')], current: 'main' }, status: [], pullRequests: null }
     }
 
     await useReposStore.getState().refreshCoreData(REPO_ID, { token })
 
-    expect(calls).toEqual(['snapshot', 'status'])
+    expect(compositeCalls).toBe(1)
+    const repo = useReposStore.getState().repos[REPO_ID]
+    expect(repo?.data.branches.map((b) => b.name)).toEqual(['main'])
   })
 
-  test('refreshCoreData stops after snapshot when the repo is reopened', async () => {
+  test('refreshCoreData drops stale results when the repo is reopened during a composite read', async () => {
     const token = seedRepo([branch('old')], 1)
-    let statusCalls = 0
-    ipcHandlers['repo.snapshot'] = async () => {
+    ipcHandlers['repo.composite'] = async () => {
+      // Reopen the repo while the composite is in flight. With the new
+      // atomic flow the snapshot result is stale and should be dropped
+      // (the new instance keeps its own data).
       seedRepo([branch('reopened')], 2)
-      return { branches: [branch('stale')], current: 'stale' }
-    }
-    ipcHandlers['repo.status'] = async () => {
-      statusCalls += 1
-      return []
+      return { snapshot: { branches: [branch('stale')], current: 'stale' }, status: [], pullRequests: null }
     }
 
     await useReposStore.getState().refreshCoreData(REPO_ID, { token })
@@ -414,26 +446,22 @@ describe('core refresh request ordering', () => {
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.instanceToken).toBe(2)
     expect(repo?.data.branches.map((b) => b.name)).toEqual(['reopened'])
-    expect(statusCalls).toBe(0)
   })
 
   test('refreshCoreData marks deleted or non-git paths unavailable and skips follow-up reads', async () => {
     const token = seedRepo([branch('main')])
-    let statusCalls = 0
-    ipcHandlers['repo.snapshot'] = async () => {
+    let compositeCalls = 0
+    ipcHandlers['repo.composite'] = async () => {
+      compositeCalls += 1
       throw new Error('error.not-git-repo')
-    }
-    ipcHandlers['repo.status'] = async () => {
-      statusCalls += 1
-      return []
     }
 
     await useReposStore.getState().refreshCoreData(REPO_ID, { token })
 
+    expect(compositeCalls).toBe(1)
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.availability).toMatchObject({ phase: 'unavailable', reason: 'error.not-git-repo' })
     expect(repo?.resources.snapshot.error).toBe('error.not-git-repo')
-    expect(statusCalls).toBe(0)
   })
 
   test('refreshSnapshot restores an unavailable repo when the path is a git repo again', async () => {
@@ -451,12 +479,13 @@ describe('core refresh request ordering', () => {
     expect(repo?.resources.snapshot.error).toBeNull()
   })
 
-  test('refreshCoreData stops after status when the repo is reopened', async () => {
+  test('refreshCoreData drops status when the repo is reopened before the composite settles', async () => {
     const token = seedRepo([branch('main')], 1)
-    ipcHandlers['repo.snapshot'] = async () => ({ branches: [branch('main')], current: 'main' })
-    ipcHandlers['repo.status'] = async () => {
+    ipcHandlers['repo.composite'] = async () => {
+      // Composite returns valid snapshot, but the repo is reopened
+      // before the apply step. Both branches get dropped.
       seedRepo([branch('reopened')], 2)
-      return []
+      return { snapshot: { branches: [branch('main')], current: 'main' }, status: [], pullRequests: null }
     }
 
     await useReposStore.getState().refreshCoreData(REPO_ID, { token })

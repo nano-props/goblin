@@ -106,9 +106,8 @@ async function runSnapshotVisibleDetailBackfill(
 }
 
 export async function runCoreDataRefreshWorkflow(get: ReposGet, options: { id: string; token: number }): Promise<void> {
-  await get().refreshSnapshot(options.id, { skipLogBackfill: true, token: options.token })
+  await get().refreshSnapshotAndStatus(options.id, { skipLogBackfill: true, token: options.token })
   const after = get().repos[options.id]
   if (!after || after.instanceToken !== options.token) return
   if (after.availability.phase === 'unavailable') return
-  await get().refreshStatus(options.id, { token: options.token })
 }

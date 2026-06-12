@@ -29,6 +29,14 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
       calls.status.push(cwd)
       return []
     },
+    // The composite endpoint folds snapshot + status into one round trip.
+    // Existing lifecycle assertions count both as separate calls, so the
+    // mock increments both buckets when a composite hits the bridge.
+    'repo.composite': ({ cwd }: { cwd: string }) => {
+      calls.snapshot.push(cwd)
+      calls.status.push(cwd)
+      return { snapshot: { branches: [], current: '' }, status: [], pullRequests: null }
+    },
     'repo.abort': async () => undefined,
     'remote.resolveTarget': ({ alias, remotePath }: { alias: string; remotePath: string }) => {
       calls.resolveTarget.push({ alias, remotePath })
@@ -53,6 +61,7 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
   for (const [key, handler] of Object.entries(overrides)) {
     if (key === 'probe') handlers['repo.probe'] = ({ cwd }: { cwd: string }) => handler(cwd)
     else if (key === 'snapshot') handlers['repo.snapshot'] = ({ cwd }: { cwd: string }) => handler(cwd)
+    else if (key === 'composite') handlers['repo.composite'] = handler
     else handlers[key] = handler
   }
   installGoblinTestBridge(handlers)

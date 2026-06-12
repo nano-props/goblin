@@ -52,6 +52,14 @@ export function resetRefreshTest(): void {
   ipcHandlers['repo.snapshot'] = async () => ({ branches: [], current: '' })
   ipcHandlers['repo.pullRequests'] = async () => []
   ipcHandlers['repo.status'] = async () => []
+  // Composite read defaults to empty so the new `refreshCoreData` flow
+  // works out of the box. Tests that care about the response set the
+  // handler explicitly.
+  ipcHandlers['repo.composite'] = async () => ({
+    snapshot: { branches: [], current: '' },
+    status: [],
+    pullRequests: null,
+  })
   ipcHandlers['terminal.create'] = async (input: { kind?: string }) => ({
     ok: true,
     action: input?.kind === 'primary' ? 'reused' : 'created',

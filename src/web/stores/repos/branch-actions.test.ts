@@ -47,21 +47,26 @@ function setSelectionForTest(selectedBranch: string, branchViewMode: BranchViewM
 }
 
 function installSuccessfulCreateWorktreeBridge(options?: { onSnapshot?: () => void }) {
+  const snapshot = {
+    branches: [
+      createBranchSnapshot('feature/a'),
+      createBranchSnapshot('feature/b'),
+      createBranchSnapshot('feature/new', { worktree: { path: '/tmp/gbl-branch-actions-test-worktree' } }),
+    ],
+    current: 'feature/a',
+  }
   installGoblinTestBridge({
     'repo.createWorktree': async () => ({ ok: true, message: 'ok' }),
     'repo.snapshot': async () => {
       options?.onSnapshot?.()
-      return {
-        branches: [
-          createBranchSnapshot('feature/a'),
-          createBranchSnapshot('feature/b'),
-          createBranchSnapshot('feature/new', { worktree: { path: '/tmp/gbl-branch-actions-test-worktree' } }),
-        ],
-        current: 'feature/a',
-      }
+      return snapshot
     },
     'repo.status': async () => [],
     'repo.pullRequests': async () => [],
+    'repo.composite': async () => {
+      options?.onSnapshot?.()
+      return { snapshot, status: [], pullRequests: null }
+    },
   })
 }
 
@@ -761,6 +766,17 @@ describe('runBranchAction', () => {
         }),
       'repo.status': async () => [],
       'repo.pullRequests': async () => [],
+      // Post-write refresh now goes through the composite endpoint, so
+      // its handler must mirror the snapshot contract for this test.
+      'repo.composite': () =>
+        new Promise((resolve) => {
+          resolveSnapshot = () =>
+            resolve({
+              snapshot: { branches: [createBranchSnapshot('feature/stale')], current: 'feature/stale' },
+              status: [],
+              pullRequests: null,
+            })
+        }),
     })
 
     const work = useReposStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
