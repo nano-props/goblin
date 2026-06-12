@@ -143,8 +143,40 @@ describe('repo routes — composite read', () => {
     expect(mocks.getRepositoryComposite).toHaveBeenCalledWith('/tmp/repo', ['snapshot', 'status'], {
       branches: ['main', 'feature'],
       mode: 'summary',
+      timeoutMs: undefined,
       signal: expect.any(AbortSignal),
     })
+  })
+
+  test('forwards timeoutMs to the read function when provided', async () => {
+    mocks.getRepositoryComposite.mockResolvedValue({ snapshot: null, status: [], pullRequests: null })
+    const app = createRepoRoutes()
+    await app.request(
+      new Request('http://localhost/composite?cwd=/tmp/repo&include=snapshot&include=status&timeoutMs=2500'),
+    )
+    expect(mocks.getRepositoryComposite).toHaveBeenCalledWith(
+      '/tmp/repo',
+      ['snapshot', 'status'],
+      expect.objectContaining({ timeoutMs: 2500 }),
+    )
+  })
+
+  test('returns 400 when timeoutMs is non-numeric', async () => {
+    const app = createRepoRoutes()
+    const response = await app.request(
+      new Request('http://localhost/composite?cwd=/tmp/repo&include=snapshot&include=status&timeoutMs=soon'),
+    )
+    expect(response.status).toBe(400)
+    const json = (await response.json()) as { code: string }
+    expect(json.code).toBe('BAD_REQUEST')
+  })
+
+  test('returns 400 when timeoutMs is negative', async () => {
+    const app = createRepoRoutes()
+    const response = await app.request(
+      new Request('http://localhost/composite?cwd=/tmp/repo&include=snapshot&include=status&timeoutMs=-1'),
+    )
+    expect(response.status).toBe(400)
   })
 
   test('returns 400 when include has an unknown value', async () => {

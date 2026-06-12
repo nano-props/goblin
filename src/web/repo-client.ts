@@ -145,6 +145,8 @@ export async function getRepositoryComposite(
     branches?: string[]
     mode?: PullRequestFetchMode
     signal?: AbortSignal
+    /** Per-section timeout in ms forwarded to the server. `0` disables. */
+    timeoutMs?: number
   } = {},
 ): Promise<RepositoryComposite> {
   return await getServerJson(
@@ -154,6 +156,7 @@ export async function getRepositoryComposite(
       include: [...(options.include ?? ['snapshot', 'status', 'pullRequests'])],
       branches: options.branches,
       mode: options.mode,
+      timeoutMs: options.timeoutMs,
     },
     { signal: options.signal },
   )

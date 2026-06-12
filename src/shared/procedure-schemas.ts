@@ -109,6 +109,20 @@ export const REPO_QUERY_SCHEMAS = {
     include: v.optional(v.array(v.picklist(['snapshot', 'status', 'pullRequests']))),
     branches: v.optional(v.array(v.string())),
     mode: v.optional(v.picklist(['summary', 'full'])),
+    // Per-section timeout in ms; non-integer / non-finite / negative
+    // values are clamped on the server side, so the perimeter only
+    // has to reject non-numbers. Coerce the query string to a number
+    // before validating — `parseHttpQuery` always materialises
+    // values as strings.
+    timeoutMs: v.optional(
+      v.pipe(
+        v.union([v.number(), v.pipe(v.string(), v.transform(Number))]),
+        v.number(),
+        v.integer(),
+        v.minValue(0),
+        v.maxValue(600_000),
+      ),
+    ),
   }),
 } as const
 

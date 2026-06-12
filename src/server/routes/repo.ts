@@ -70,12 +70,17 @@ export function createRepoRoutes() {
     )
   })
   app.get('/composite', async (c) => {
-    const { cwd, include, branches, mode } = parseHttpQuery(REPO_QUERY_SCHEMAS.composite, c)
+    const { cwd, include, branches, mode, timeoutMs } = parseHttpQuery(REPO_QUERY_SCHEMAS.composite, c)
     const wants = (include ?? ['snapshot', 'status', 'pullRequests']) as ReadonlyArray<
       'snapshot' | 'status' | 'pullRequests'
     >
     return c.json(
-      await getRepositoryComposite(cwd, wants, { branches, mode, signal: c.req.raw.signal }).catch((err) => {
+      await getRepositoryComposite(cwd, wants, {
+        branches,
+        mode,
+        signal: c.req.raw.signal,
+        timeoutMs,
+      }).catch((err) => {
         console.warn('[server][repo] composite failed', err)
         return { snapshot: null, status: [], pullRequests: null }
       }),
