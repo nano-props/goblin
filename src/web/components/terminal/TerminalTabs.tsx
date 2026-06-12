@@ -238,6 +238,7 @@ export function TerminalTabs({
             onClose={handleClose}
             onKeyDown={handleTabKeyDown}
             t={t}
+            compact={showCollapsedTabs}
           />
         </TerminalTabTooltipLayer>
         <DropdownMenu>
@@ -323,6 +324,7 @@ export function TerminalTabs({
                   onClose={handleClose}
                   onKeyDown={handleTabKeyDown}
                   t={t}
+                  compact={showCollapsedTabs}
                 />
               ))}
             </TerminalTabTooltipLayer>
@@ -366,6 +368,7 @@ interface TerminalTabProps {
   onClose: (event: React.MouseEvent, key: string) => void
   onKeyDown: (e: React.KeyboardEvent<HTMLButtonElement>, sessionKey: string) => void
   t: (key: string, params?: Record<string, string | number>) => string
+  compact?: boolean
 }
 
 interface TerminalTabChromeProps {
@@ -382,6 +385,7 @@ interface TerminalTabChromeProps {
   onClose: (event: React.MouseEvent, key: string) => void
   onKeyDown: (e: React.KeyboardEvent<HTMLButtonElement>, sessionKey: string) => void
   t: (key: string, params?: Record<string, string | number>) => string
+  compact?: boolean
 }
 
 function TerminalTabChrome({
@@ -398,6 +402,7 @@ function TerminalTabChrome({
   onClose,
   onKeyDown,
   t,
+  compact = false,
 }: TerminalTabChromeProps) {
   const terminalLabelBase = session.originalTitle ?? session.fullTitle ?? session.title
   const terminalLabel = session.hasBell ? `${terminalLabelBase} — ${t('terminal.bell-unread')}` : terminalLabelBase
@@ -411,7 +416,12 @@ function TerminalTabChrome({
   return (
     <ToolbarClosableTab
       containerProps={{ 'data-terminal-tab-tooltip-id': session.key }}
-      containerClassName={toolbarTabChromeClassName({ variant: 'terminal', active: isActive, dragging: isDragging })}
+      containerClassName={toolbarTabChromeClassName({
+        variant: 'terminal',
+        active: isActive,
+        dragging: isDragging,
+        compact,
+      })}
       buttonRef={buttonRef}
       buttonProps={{
         ...buttonProps,
@@ -455,6 +465,7 @@ function TerminalTab({
   onClose,
   onKeyDown,
   t,
+  compact,
 }: TerminalTabProps) {
   return (
     <TerminalTabChrome
@@ -469,6 +480,7 @@ function TerminalTab({
       onClose={onClose}
       onKeyDown={onKeyDown}
       t={t}
+      compact={compact}
     />
   )
 }
@@ -485,6 +497,7 @@ function SortableTerminalTab({
   onClose,
   onKeyDown,
   t,
+  compact,
 }: TerminalTabProps) {
   const sortable = useSortableTab(session.key, { onButtonRef: focusRegistry.setRef(session.key) })
 
@@ -508,6 +521,7 @@ function SortableTerminalTab({
           onKeyDown(e, session.key)
         }}
         t={t}
+        compact={compact}
       />
     </div>
   )

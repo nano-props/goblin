@@ -188,8 +188,8 @@ describe('TerminalTabs', () => {
     expect(tablist?.className).toContain('h-full')
     expect(tablist?.parentElement?.className).toContain('w-max')
     expect(
-      [...document.body.querySelectorAll('[data-terminal-tab-tooltip-id]')].every((tab) =>
-        tab.className.includes('w-28'),
+      [...document.body.querySelectorAll('[data-terminal-tab-tooltip-id]')].every(
+        (tab) => tab.className.includes('min-w-28') && tab.className.includes('max-w-44'),
       ),
     ).toBe(true)
     expect(document.body.querySelectorAll('[role="tab"]').length).toBe(3)
@@ -548,7 +548,9 @@ describe('TerminalTabs', () => {
     )
 
     expect(document.body.querySelectorAll('[role="tab"]').length).toBe(1)
+    // Compact mode pins the tab to a fixed width to avoid overflowing narrow toolbars.
     expect(document.body.querySelector('[data-terminal-tab-tooltip-id]')?.className).toContain('w-28')
+    expect(document.body.querySelector('[data-terminal-tab-tooltip-id]')?.className).not.toContain('max-w-44')
 
     rerender(
       <TerminalTabs

@@ -7,14 +7,19 @@ export function toolbarTabChromeClassName(options: {
   variant: ToolbarTabVariant
   active: boolean
   dragging?: boolean
+  // Only meaningful for the 'terminal' variant: compact strips live in narrow
+  // toolbars where flex widths could overflow, so we pin the tab to w-28.
+  compact?: boolean
 }): string {
-  const { variant, active, dragging = false } = options
+  const { variant, active, dragging = false, compact = false } = options
   return cn(
     'group relative shrink-0 select-none items-center transition-colors duration-100',
     compositeFocusRing,
     variant === 'repo'
       ? 'flex h-8 min-w-36 max-w-56 touch-none gap-1.5 rounded-md border px-2 text-xs'
-      : 'flex h-7 w-28 gap-1 rounded-md border px-2.5 text-sm',
+      : compact
+        ? 'flex h-7 w-28 gap-1 rounded-md border px-2.5 text-sm'
+        : 'flex h-7 min-w-28 max-w-44 gap-1 rounded-md border px-2.5 text-sm',
     variant === 'repo'
       ? active
         ? 'border-input bg-card text-foreground'
