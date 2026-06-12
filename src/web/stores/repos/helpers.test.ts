@@ -12,7 +12,7 @@ describe('deriveConnectivity', () => {
 
   test('a remote placeholder with no target reads as connecting', () => {
     const repo = emptyRepo(REMOTE_ID, 'remote')
-    // addConnectingRepo doesn't set remote.target; availability stays available.
+    // insertPlaceholderRepo doesn't set remote.target; availability stays available.
     expect(repo.remote.target).toBeUndefined()
     expect(deriveConnectivity(repo)).toBe('connecting')
   })

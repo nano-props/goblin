@@ -143,7 +143,7 @@ export function addResolvedRepo(
  *   - If the repo isn't in the store yet, insert it (e.g. ensureWorkspaceOpen
  *     got a probe failure back). Uses the restorable cache for any cached
  *     name/branches, then flips availability.
- *   - If a placeholder (from addConnectingRepo) is already there, promote
+ *   - If a placeholder (from insertPlaceholderRepo) is already there, promote
  *     it in place — preserves the cached projection, updates target if
  *     the probe produced one, and flips availability to 'unavailable'.
  *     (The derived connectivity naturally reads as 'unreachable' once
@@ -201,7 +201,7 @@ export function addUnavailableRepo(
  * unknown concrete host" state — `deriveConnectivity(repo) === 'connecting'`
  * is the signal callers should branch on rather than reading target fields.
  */
-export function addConnectingRepo(
+export function insertPlaceholderRepo(
   s: Pick<ReposStore, 'repos' | 'restorableRepoCache' | 'order'>,
   entry: RepoSessionEntry,
   rankById?: ReadonlyMap<string, number>,

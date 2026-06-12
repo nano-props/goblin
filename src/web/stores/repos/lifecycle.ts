@@ -1,7 +1,7 @@
 import pLimit from 'p-limit'
 import type { ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
 import {
-  addConnectingRepo,
+  insertPlaceholderRepo,
   addResolvedRepo,
   addUnavailableRepo,
   createRuntimeRepoLifecycleActions,
@@ -59,7 +59,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         let nextOrder = s.order
         let changed = false
         for (const entry of openRepos) {
-          const result = addConnectingRepo({ repos: nextRepos, restorableRepoCache: s.restorableRepoCache, order: nextOrder }, entry, rankById)
+          const result = insertPlaceholderRepo({ repos: nextRepos, restorableRepoCache: s.restorableRepoCache, order: nextOrder }, entry, rankById)
           if (!result.changed) continue
           changed = true
           nextRepos = result.repos
@@ -77,13 +77,15 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         return { repos: nextRepos, order: nextOrder, activeId: nextActiveId }
       })
 
-      // Flip sessionReady as soon as any tab has been added. The repo
-      // body will keep showing its per-repo skeleton until the snapshot
-      // resolves, but the boot skeleton (shown only when no activeId)
-      // gives way to a real workspace immediately.
+      // Flip sessionReady unconditionally once Phase 1 has finished.
+      // With tabs, the boot skeleton (shown only when no activeId) gives
+      // way to a real workspace immediately — the per-repo body keeps
+      // showing its own skeleton until each snapshot resolves. With no
+      // tabs (openRepos was empty), there's nothing else to compute but
+      // we still need to clear the boot skeleton, so just flip the flag.
       set((s) => {
         if (s.sessionReady) return s
-        if (s.order.length === 0) return s
+        if (s.order.length === 0) return { sessionReady: true }
         const activeId = activeRepoIdAfterWorkspaceHydration(s.activeId, s.repos, s.order, activeRepo, managedActiveId)
         if (s.activeId === null || s.activeId === managedActiveId) managedActiveId = activeId
         return { activeId, sessionReady: true }
@@ -143,11 +145,6 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
           }),
         ),
       )
-      // Defensive: ensure sessionReady is true once hydration has finished,
-      // even if openRepos was empty (so Phase 1 added nothing and the earlier
-      // sessionReady flip never ran). Without this, a session with no tabs
-      // would leave the boot skeleton up forever.
-      set((s) => (s.sessionReady ? s : { sessionReady: true }))
     },
   }
 }

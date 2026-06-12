@@ -7,14 +7,6 @@ import type { RemoteDiagnosticsResult, RemotePathSuggestionsInput, SshConfigHost
  *  Callers localize the error message via `t()`. */
 type ResolveTargetResponse = { target: RemoteRepoTarget } | { error: string }
 
-export class SshConfigChangedError extends Error {
-  readonly code = 'ssh-config-changed'
-  constructor(message = 'error.ssh-config-changed') {
-    super(message)
-    this.name = 'SshConfigChangedError'
-  }
-}
-
 export async function resolveRemoteRepositoryTarget(ref: {
   alias: string
   remotePath: string
@@ -23,7 +15,7 @@ export async function resolveRemoteRepositoryTarget(ref: {
     '/api/remote/resolve-target',
     ref,
   )
-  if ('error' in result) throw new SshConfigChangedError(result.error)
+  if ('error' in result) throw new Error(result.error)
   return result.target
 }
 

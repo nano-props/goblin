@@ -72,7 +72,6 @@ export interface RepoProjectionMeta {
   savedAt: number | null
 }
 
-export type RepoConnectivity = 'connecting' | 'connected' | 'unreachable'
 
 export interface RepoRemoteState {
   target?: RemoteRepoTarget

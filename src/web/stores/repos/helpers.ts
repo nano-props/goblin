@@ -3,7 +3,6 @@ import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import { emptyRepoOperations } from '#/web/stores/repos/operations.ts'
 import { emptyRepoResources } from '#/web/stores/repos/resources.ts'
 import type {
-  RepoConnectivity,
   RepoEvent,
   RepoResultEventOptions,
   RepoState,
@@ -68,7 +67,13 @@ export function emptyRepo(id: string, name: string): RepoState {
  *   - `connected`:   remote repo with a resolved target that's still
  *     reachable; also the default for local repos
  *   - `unreachable`: remote repo whose last probe / check failed
+ *
+ * Co-located with `deriveConnectivity` (the only meaningful producer)
+ * rather than the general `types.ts` to keep the connectivity domain
+ * in one place.
  */
+export type RepoConnectivity = 'connecting' | 'connected' | 'unreachable'
+
 export function deriveConnectivity(repo: RepoState): RepoConnectivity {
   if (!isRemoteRepoId(repo.id)) return 'connected'
   if (repo.availability.phase === 'unavailable') return 'unreachable'
