@@ -9,11 +9,11 @@ import type {
 } from '#/web/types.ts'
 import type { RemoteRepoTarget, RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspaceDetailPaneSizes, WorkspaceLayout } from '#/shared/workspace-layout.ts'
-import type { SessionState } from '#/shared/rpc.ts'
+import type { SessionState, DetailTab } from '#/shared/rpc.ts'
+export type { DetailTab }
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/repos/branch-action-types.ts'
 import type { RepoOperationsState } from '#/web/stores/repos/operations.ts'
 import type { RepoResourcesState } from '#/web/stores/repos/resources.ts'
-export type DetailTab = 'status' | 'changes' | 'terminal'
 export type BranchViewMode = 'all' | 'worktrees' | 'no-worktree'
 export type RepoWorkspaceLayout = WorkspaceLayout
 export type RepoDataSource = 'cache' | 'fresh'
@@ -97,7 +97,7 @@ export interface RestorableRepoSnapshot {
   savedAt: number
   name: string
   data: Pick<RepoDataState, 'branches' | 'currentBranch'>
-  ui: Pick<RepoUiState, 'selectedBranch' | 'branchViewMode' | 'detailTab'>
+  ui: Pick<RepoUiState, 'selectedBranch' | 'branchViewMode'>
 }
 
 export interface RepoState {
@@ -179,6 +179,7 @@ export interface RestorableWorkspaceActions {
     layout: Pick<SessionState, 'workspaceLayout' | 'detailCollapsed' | 'detailFocusMode' | 'detailPaneSizes'>,
   ) => void
   applySessionSelectedTerminalState: (selectedTerminalByWorktree: Record<string, string>) => void
+  applySessionDetailTabByRepo: (detailTabByRepo: Record<string, DetailTab>) => void
   setDetailPaneSize: (layout: RepoWorkspaceLayout, size: number) => void
   setDetailPaneSizes: (sizes: WorkspaceDetailPaneSizes) => void
   resetLayout: () => void

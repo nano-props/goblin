@@ -4,6 +4,7 @@ import { persistedOpenWorkspaceEntries } from '#/web/open-workspace-state.ts'
 import {
   persistedActiveRepoIdForSession,
   persistedSelectedTerminalByWorktreeForSession,
+  persistedDetailTabByRepoForSession,
 } from '#/web/session-persistence-state.ts'
 
 export function sessionStateFromRestorableWorkspaceState(input: {
@@ -22,6 +23,7 @@ export function sessionStateFromRestorableWorkspaceState(input: {
       restorableWorkspaceState.selectedTerminalByWorktree,
       repos,
     ),
+    detailTabByRepo: persistedDetailTabByRepoForSession(repos, restorableWorkspaceState.order),
   }
 }
 
@@ -31,15 +33,7 @@ export function sessionStateFromRestorableWorkspaceState(input: {
 export function restoreRestorableWorkspaceStateFromSession(
   session: SessionState,
   activeId: string | null = session.activeRepo,
-): Pick<
-  RestorableWorkspaceState,
-  | 'activeId'
-  | 'detailCollapsed'
-  | 'detailFocusMode'
-  | 'workspaceLayout'
-  | 'detailPaneSizes'
-  | 'selectedTerminalByWorktree'
-> {
+) {
   return {
     activeId,
     detailCollapsed: session.detailCollapsed,
@@ -47,5 +41,6 @@ export function restoreRestorableWorkspaceStateFromSession(
     workspaceLayout: session.workspaceLayout,
     detailPaneSizes: session.detailPaneSizes,
     selectedTerminalByWorktree: session.selectedTerminalByWorktree ?? {},
+    detailTabByRepo: session.detailTabByRepo ?? {},
   }
 }

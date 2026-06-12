@@ -1,5 +1,19 @@
+import type { DetailTab } from '#/shared/rpc.ts'
+
 export function persistedActiveRepoIdForSession(activeId: string | null): string | null {
   return activeId
+}
+
+export function persistedDetailTabByRepoForSession(
+  repos: Record<string, { ui: { detailTab: DetailTab } } | undefined>,
+  order: string[],
+): Record<string, DetailTab> {
+  const tabs: Record<string, DetailTab> = {}
+  for (const id of order) {
+    const repo = repos[id]
+    if (repo) tabs[id] = repo.ui.detailTab
+  }
+  return tabs
 }
 
 export function persistedSelectedTerminalByWorktreeForSession(

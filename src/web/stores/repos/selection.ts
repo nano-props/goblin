@@ -44,6 +44,7 @@ type RestorableWorkspaceSelectionActions = Pick<
   | 'setWorkspaceLayout'
   | 'applySessionLayoutState'
   | 'applySessionSelectedTerminalState'
+  | 'applySessionDetailTabByRepo'
   | 'setDetailPaneSize'
   | 'setDetailPaneSizes'
   | 'resetLayout'
@@ -170,6 +171,26 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
           return s
         }
         return { selectedTerminalByWorktree: { ...selectedTerminalByWorktree } }
+      })
+    },
+
+    applySessionDetailTabByRepo(detailTabByRepo: Record<string, DetailTab>) {
+      // One-shot boot/session restore of per-repo detail tab selection.
+      // Applied after hydrateSession so repos already exist.
+      set((s) => {
+        let changed = false
+        const repos = { ...s.repos }
+        for (const [id, tab] of Object.entries(detailTabByRepo)) {
+          const repo = repos[id]
+          if (!repo) continue
+          const nextTab = detailTabForSelection(repo, tab)
+          if (repo.ui.detailTab === nextTab) continue
+          changed = true
+          repos[id] = replaceRepo(repo, (r) => {
+            r.ui.detailTab = nextTab
+          })
+        }
+        return changed ? { repos } : s
       })
     },
 

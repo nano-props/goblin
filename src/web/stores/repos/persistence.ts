@@ -39,13 +39,8 @@ const RestorableRepoSnapshotSchema = v.object({
   ui: v.object({
     selectedBranch: v.nullable(v.string()),
     branchViewMode: v.picklist(['all', 'worktrees', 'no-worktree']),
-    detailTab: v.picklist(['status', 'changes', 'terminal']),
   }),
 })
-
-function normalizeCachedDetailTab(tab: string): 'status' | 'changes' | 'terminal' {
-  return tab === 'terminal' || tab === 'changes' ? tab : 'status'
-}
 
 function cachedBranches(branches: RepoState['data']['branches']): RestorableRepoSnapshot['data']['branches'] {
   return stripBranchWorktreeMetadata(branches).map(({ pullRequest: _pullRequest, ...branch }) => branch)
@@ -77,7 +72,6 @@ function restoreProjectionFromSnapshot(repo: RepoState, snapshot: RestorableRepo
       ...repo.ui,
       selectedBranch,
       branchViewMode: snapshot.ui.branchViewMode,
-      detailTab: normalizeCachedDetailTab(snapshot.ui.detailTab),
     },
     projection: {
       source: 'cache',
@@ -128,7 +122,6 @@ function restorableRepoSnapshotFromRepo(repo: RepoState): RestorableRepoSnapshot
     ui: {
       selectedBranch: repo.ui.selectedBranch,
       branchViewMode: repo.ui.branchViewMode,
-      detailTab: normalizeCachedDetailTab(repo.ui.detailTab),
     },
   }
 }
@@ -154,10 +147,6 @@ function normalizeRestorableRepoSnapshotEntry(value: unknown): RestorableRepoSna
     data: {
       ...snapshot.data,
       branches: cachedBranches(snapshot.data.branches),
-    },
-    ui: {
-      ...snapshot.ui,
-      detailTab: normalizeCachedDetailTab(snapshot.ui.detailTab),
     },
   }
 }

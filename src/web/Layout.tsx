@@ -1,4 +1,4 @@
-import { createContext, useMemo } from 'react'
+import { useMemo } from 'react'
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
@@ -22,17 +22,12 @@ import { useSettingsWriteErrorToast } from '#/web/hooks/useSettingsWriteErrorToa
 import { useSettingsQueryInvalidationSync } from '#/web/settings-queries.ts'
 import { createMainWindowNavigationActions } from '#/web/main-window-navigation-actions.ts'
 import { MainWindowNavigationProvider } from '#/web/main-window-navigation.tsx'
+import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
   mainWindowNavigationStoreActionsEqual,
   mainWindowNavigationStoreActionsFromStore,
 } from '#/web/stores/repos/selector-actions.ts'
-
-export const LayoutOverlayActions = createContext<{
-  openRepoPathDialog: () => void
-  openCloneRepo: () => void
-  openRemoteRepo: () => void
-} | null>(null)
 
 export function Layout() {
   const navigate = useNavigate()

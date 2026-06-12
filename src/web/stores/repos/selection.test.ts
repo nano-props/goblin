@@ -158,7 +158,6 @@ describe('setBranchViewMode', () => {
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.selectedBranch).toBe('feature/plain')
     expect(repo?.ui.detailTab).toBe('status')
-    expect(useReposStore.getState().restorableRepoCache[REPO_ID]?.ui.detailTab).toBe('status')
   })
 })
 
@@ -238,7 +237,6 @@ describe('selectBranch', () => {
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.selectedBranch).toBe('feature/plain')
     expect(repo?.ui.detailTab).toBe('status')
-    expect(useReposStore.getState().restorableRepoCache[REPO_ID]?.ui.detailTab).toBe('status')
   })
 })
 
@@ -248,7 +246,7 @@ describe('setDetailTab', () => {
 
     useReposStore.getState().setDetailTab(REPO_ID, 'terminal')
 
-    expect(useReposStore.getState().restorableRepoCache[REPO_ID]?.ui.detailTab).toBe('terminal')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.detailTab).toBe('terminal')
   })
 
   test('does not refresh when reselecting the current tab', () => {
@@ -265,7 +263,6 @@ describe('setDetailTab', () => {
     await flushAsyncWork()
 
     expect(useReposStore.getState().repos[REPO_ID]?.ui.detailTab).toBe('changes')
-    expect(useReposStore.getState().restorableRepoCache[REPO_ID]?.ui.detailTab).toBe('changes')
   })
 
   test('passes the current repo token to detail tab refreshes', () => {
@@ -317,14 +314,6 @@ describe('setDetailTab', () => {
     expect(useReposStore.getState().repos[REPO_ID]?.ui.detailTab).toBe('status')
   })
 
-  test('persists terminal as a cached detail tab', () => {
-    seedRepo({ selectedBranch: 'feature/worktree', detailTab: 'status' })
-
-    useReposStore.getState().setDetailTab(REPO_ID, 'terminal')
-
-    expect(useReposStore.getState().restorableRepoCache[REPO_ID]?.ui.detailTab).toBe('terminal')
-  })
-
   test('dismissing the active exited terminal detail falls back to status and collapses the pane', async () => {
     let refreshedBranches: string[] | undefined
     rpcHandlers['repo.pullRequests'] = async ({ branches }: { branches: string[] }) => {
@@ -340,7 +329,6 @@ describe('setDetailTab', () => {
 
     expect(useReposStore.getState().repos[REPO_ID]?.ui.detailTab).toBe('status')
     expect(useReposStore.getState().detailCollapsed).toBe(true)
-    expect(useReposStore.getState().restorableRepoCache[REPO_ID]?.ui.detailTab).toBe('status')
     await flushAsyncWork()
     expect(refreshedBranches).toEqual(['feature/worktree'])
   })

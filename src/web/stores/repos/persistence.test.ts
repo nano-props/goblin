@@ -24,7 +24,6 @@ function cachedRepo(savedAt: number): RestorableRepoSnapshot {
     ui: {
       selectedBranch: null,
       branchViewMode: 'all',
-      detailTab: 'status',
     },
   }
 }
@@ -56,26 +55,6 @@ describe('normalizeRestorableRepoCache', () => {
     })
 
     expect(Object.keys(normalized)).toEqual(['fresh'])
-  })
-
-  test('does not restore terminal detail tabs from cache', () => {
-    const now = Date.now()
-    const raw = cachedRepo(now) as any
-    raw.ui.detailTab = 'terminal'
-
-    const normalized = normalizeRestorableRepoCache({ repo: raw })
-
-    expect(normalized.repo?.ui.detailTab).toBe('terminal')
-  })
-
-  test('restores the changes detail tab from cache', () => {
-    const now = Date.now()
-    const raw = cachedRepo(now) as any
-    raw.ui.detailTab = 'changes'
-
-    const normalized = normalizeRestorableRepoCache({ repo: raw })
-
-    expect(normalized.repo?.ui.detailTab).toBe('changes')
   })
 
   test('normalizes cached branch worktree references while dropping dynamic metadata', () => {

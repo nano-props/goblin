@@ -45,7 +45,6 @@ describe('repo session hydration', () => {
           ui: {
             selectedBranch: 'cached',
             branchViewMode: 'all',
-            detailTab: 'status',
           },
         },
       },
@@ -94,7 +93,6 @@ describe('repo session hydration', () => {
           ui: {
             selectedBranch: 'cached',
             branchViewMode: 'all',
-            detailTab: 'status',
           },
         },
       },

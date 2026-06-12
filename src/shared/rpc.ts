@@ -74,6 +74,8 @@ export interface ThemeState {
   colorTheme: ColorTheme
 }
 
+export type DetailTab = 'status' | 'changes' | 'terminal'
+
 export interface SessionState {
   /** Repo entries that were open, in tab order. */
   openRepos: RepoSessionEntry[]
@@ -84,6 +86,8 @@ export interface SessionState {
   workspaceLayout: WorkspaceLayout
   detailPaneSizes: WorkspaceDetailPaneSizes
   selectedTerminalByWorktree?: Record<string, string>
+  /** Per-repo detail tab selection, restored alongside detailCollapsed. */
+  detailTabByRepo?: Record<string, DetailTab>
 }
 
 export interface RuntimeSettingsSnapshot extends SettingsPrefs {
