@@ -56,16 +56,10 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerFetchIntervalSec: mocks.getServerFetchIntervalSec,
 }))
 
-describe('repo routes — input validation', () => {
-  test('returns 400 BAD_REQUEST when the body is missing required fields', async () => {
+describe('repo routes — GET query validation', () => {
+  test('returns 400 when the query is missing required fields', async () => {
     const app = createRepoRoutes()
-    const response = await app.request(
-      new Request('http://localhost/probe', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: '{}',
-      }),
-    )
+    const response = await app.request(new Request('http://localhost/probe'))
     expect(response.status).toBe(400)
     const json = (await response.json()) as { ok: boolean; code: string; message: string }
     expect(json).toMatchObject({ ok: false, code: 'BAD_REQUEST' })
@@ -73,19 +67,54 @@ describe('repo routes — input validation', () => {
     expect(mocks.probeRepository).not.toHaveBeenCalled()
   })
 
-  test('returns 400 when the body is not a JSON object', async () => {
+  test('returns 400 for invalid picklist values in the query (e.g. pull-requests mode)', async () => {
     const app = createRepoRoutes()
-    const response = await app.request(
-      new Request('http://localhost/probe', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify('not-an-object'),
-      }),
-    )
+    const response = await app.request(new Request('http://localhost/pull-requests?cwd=/tmp/repo&mode=not-a-mode'))
     expect(response.status).toBe(400)
+    const json = (await response.json()) as { ok: boolean; code: string }
+    expect(json.code).toBe('BAD_REQUEST')
+    expect(mocks.getRepositoryPullRequests).not.toHaveBeenCalled()
   })
 
-  test('returns 400 for invalid picklist values (e.g. fetch kind)', async () => {
+  test('passes a valid query through to the module layer', async () => {
+    mocks.probeRepository.mockResolvedValue({ ok: true, root: '/tmp/repo', name: 'repo' })
+    const app = createRepoRoutes()
+    const response = await app.request(new Request('http://localhost/probe?cwd=/tmp/repo'))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ ok: true, root: '/tmp/repo', name: 'repo' })
+    expect(mocks.probeRepository).toHaveBeenCalledWith('/tmp/repo')
+  })
+
+  test('passes repeated query keys as arrays (e.g. branches)', async () => {
+    mocks.getRepositoryPullRequests.mockResolvedValue([])
+    const app = createRepoRoutes()
+    const response = await app.request(
+      new Request('http://localhost/pull-requests?cwd=/tmp/repo&branches=main&branches=feature'),
+    )
+    expect(response.status).toBe(200)
+    expect(mocks.getRepositoryPullRequests).toHaveBeenCalledWith('/tmp/repo', ['main', 'feature'], {
+      mode: 'full',
+      signal: expect.any(AbortSignal),
+    })
+  })
+
+  test('passes patch query through to getRepositoryPatch', async () => {
+    mocks.getRepositoryPatch.mockResolvedValue({ ok: true, message: 'diff --git a b' })
+    const app = createRepoRoutes()
+    const response = await app.request(
+      new Request('http://localhost/patch?cwd=/tmp/repo&worktreePath=/tmp/repo/.worktrees%2Ffeature'),
+    )
+    expect(response.status).toBe(200)
+    expect(mocks.getRepositoryPatch).toHaveBeenCalledWith(
+      '/tmp/repo',
+      '/tmp/repo/.worktrees/feature',
+      expect.any(AbortSignal),
+    )
+  })
+})
+
+describe('repo routes — POST body validation (action endpoints)', () => {
+  test('returns 400 for invalid picklist values in fetch body', async () => {
     const app = createRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/fetch', {
@@ -100,25 +129,10 @@ describe('repo routes — input validation', () => {
     expect(mocks.fetchRepository).not.toHaveBeenCalled()
   })
 
-  test('passes a valid body through to the module layer', async () => {
-    mocks.probeRepository.mockResolvedValue({ ok: true, root: '/tmp/repo', name: 'repo' })
+  test('returns 400 when the POST body is empty', async () => {
     const app = createRepoRoutes()
     const response = await app.request(
-      new Request('http://localhost/probe', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo' }),
-      }),
-    )
-    expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ ok: true, root: '/tmp/repo', name: 'repo' })
-    expect(mocks.probeRepository).toHaveBeenCalledWith('/tmp/repo')
-  })
-
-  test('returns 400 when the body is empty', async () => {
-    const app = createRepoRoutes()
-    const response = await app.request(
-      new Request('http://localhost/probe', {
+      new Request('http://localhost/fetch', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: '',
@@ -127,10 +141,10 @@ describe('repo routes — input validation', () => {
     expect(response.status).toBe(400)
   })
 
-  test('returns 400 when the body is malformed JSON', async () => {
+  test('returns 400 when the POST body is malformed JSON', async () => {
     const app = createRepoRoutes()
     const response = await app.request(
-      new Request('http://localhost/probe', {
+      new Request('http://localhost/fetch', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: '{not json',
@@ -138,9 +152,7 @@ describe('repo routes — input validation', () => {
     )
     expect(response.status).toBe(400)
   })
-})
 
-describe('repo routes — body parsing', () => {
   test('clone route forwards operationId/url/parentPath/directoryName', async () => {
     mocks.cloneRepository.mockResolvedValue({ ok: true, message: 'ok', path: '/tmp/repo' })
     const app = createRepoRoutes()

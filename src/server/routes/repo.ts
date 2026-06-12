@@ -22,8 +22,8 @@ import {
   removeRepositoryWorktree,
 } from '#/server/modules/repo-write-paths.ts'
 import { getServerFetchIntervalSec } from '#/server/modules/settings-source.ts'
-import { createRouteApp, parseHttpInput } from '#/server/common/http-validate.ts'
-import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
+import { createRouteApp, parseHttpInput, parseHttpQuery } from '#/server/common/http-validate.ts'
+import { REPO_PROCEDURE_SCHEMAS, REPO_QUERY_SCHEMAS } from '#/shared/procedure-schemas.ts'
 
 export function createRepoRoutes() {
   const app = createRouteApp()
@@ -36,20 +36,20 @@ export function createRepoRoutes() {
     }
   }
 
-  app.post('/probe', async (c) => {
-    const { cwd } = parseHttpInput(REPO_PROCEDURE_SCHEMAS.probe, await c.req.json().catch(() => null))
+  app.get('/probe', async (c) => {
+    const { cwd } = parseHttpQuery(REPO_QUERY_SCHEMAS.probe, c)
     return c.json(await jsonOr(() => probeRepository(cwd), { ok: false, message: 'error.failed-read-repo' }, 'probe'))
   })
-  app.post('/snapshot', async (c) => {
-    const { cwd } = parseHttpInput(REPO_PROCEDURE_SCHEMAS.snapshot, await c.req.json().catch(() => null))
+  app.get('/snapshot', async (c) => {
+    const { cwd } = parseHttpQuery(REPO_QUERY_SCHEMAS.snapshot, c)
     return c.json(await jsonOr(() => getRepositorySnapshot(cwd, c.req.raw.signal), null, 'snapshot'))
   })
-  app.post('/status', async (c) => {
-    const { cwd } = parseHttpInput(REPO_PROCEDURE_SCHEMAS.status, await c.req.json().catch(() => null))
+  app.get('/status', async (c) => {
+    const { cwd } = parseHttpQuery(REPO_QUERY_SCHEMAS.status, c)
     return c.json(await jsonOr(() => getRepositoryStatus(cwd, c.req.raw.signal), [], 'status'))
   })
-  app.post('/patch', async (c) => {
-    const { cwd, worktreePath } = parseHttpInput(REPO_PROCEDURE_SCHEMAS.patch, await c.req.json().catch(() => null))
+  app.get('/patch', async (c) => {
+    const { cwd, worktreePath } = parseHttpQuery(REPO_QUERY_SCHEMAS.patch, c)
     return c.json(
       await jsonOr(
         () => getRepositoryPatch(cwd, worktreePath, c.req.raw.signal),
@@ -58,15 +58,11 @@ export function createRepoRoutes() {
       ),
     )
   })
-  app.post('/pull-requests', async (c) => {
-    const { cwd, branches, options } = parseHttpInput(
-      REPO_PROCEDURE_SCHEMAS.pullRequests,
-      await c.req.json().catch(() => null),
-    )
-    const mode = options?.mode === 'summary' ? 'summary' : 'full'
+  app.get('/pull-requests', async (c) => {
+    const { cwd, branches, mode } = parseHttpQuery(REPO_QUERY_SCHEMAS.pullRequests, c)
     return c.json(
       await jsonOr(
-        () => getRepositoryPullRequests(cwd, branches, { mode, signal: c.req.raw.signal }),
+        () => getRepositoryPullRequests(cwd, branches, { mode: mode ?? 'full', signal: c.req.raw.signal }),
         null,
         'pull-requests',
       ),

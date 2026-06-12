@@ -123,8 +123,8 @@ describe('refreshPullRequests', () => {
     const fresh = pullRequest(2)
     const token = seedRepo([branch('feature/a'), branch('feature/b', stale)])
     let mode: string | undefined
-    ipcHandlers['repo.pullRequests'] = async ({ options }: { options?: { mode?: string } }) => {
-      mode = options?.mode
+    ipcHandlers['repo.pullRequests'] = async ({ mode: receivedMode }: { mode?: string }) => {
+      mode = receivedMode
       return [{ branch: 'feature/a', pullRequest: fresh }]
     }
 
@@ -316,16 +316,10 @@ describe('refreshPullRequests', () => {
       branches: [branch('feature/a'), branch('feature/b')],
       current: 'feature/a',
     })
-    ipcHandlers['repo.pullRequests'] = async ({
-      branches,
-      options,
-    }: {
-      branches?: string[]
-      options?: { mode?: string }
-    }) => {
+    ipcHandlers['repo.pullRequests'] = async ({ branches, mode }: { branches?: string[]; mode?: string }) => {
       calls.push({
         branches,
-        mode: options?.mode,
+        mode: mode,
         loadingAtStart: useReposStore.getState().repos[REPO_ID]?.resources.pullRequests.phase !== 'idle',
       })
       return []
@@ -349,15 +343,9 @@ describe('refreshPullRequests', () => {
       branches: [branch('feature/a')],
       current: 'feature/a',
     })
-    ipcHandlers['repo.pullRequests'] = async ({
-      branches,
-      options,
-    }: {
-      branches?: string[]
-      options?: { mode?: string }
-    }) => {
-      calls.push({ branches, mode: options?.mode })
-      if (options?.mode === 'summary') return [{ branch: 'feature/a', pullRequest: pullRequest(1) }]
+    ipcHandlers['repo.pullRequests'] = async ({ branches, mode }: { branches?: string[]; mode?: string }) => {
+      calls.push({ branches, mode: mode })
+      if (mode === 'summary') return [{ branch: 'feature/a', pullRequest: pullRequest(1) }]
       fullCalls += 1
       return [
         {
@@ -396,14 +384,8 @@ describe('refreshPullRequests', () => {
       ],
       current: 'feature/a',
     })
-    ipcHandlers['repo.pullRequests'] = async ({
-      branches,
-      options,
-    }: {
-      branches?: string[]
-      options?: { mode?: string }
-    }) => {
-      calls.push({ branches, mode: options?.mode })
+    ipcHandlers['repo.pullRequests'] = async ({ branches, mode }: { branches?: string[]; mode?: string }) => {
+      calls.push({ branches, mode: mode })
       return []
     }
 
@@ -420,14 +402,8 @@ describe('refreshPullRequests', () => {
       branches: [branch('feature/a'), branch('feature/b')],
       current: 'feature/a',
     })
-    ipcHandlers['repo.pullRequests'] = async ({
-      branches,
-      options,
-    }: {
-      branches?: string[]
-      options?: { mode?: string }
-    }) => {
-      calls.push({ branches, mode: options?.mode })
+    ipcHandlers['repo.pullRequests'] = async ({ branches, mode }: { branches?: string[]; mode?: string }) => {
+      calls.push({ branches, mode: mode })
       throw new Error('GitHub CLI is not signed in to github.com')
     }
 

@@ -152,14 +152,8 @@ describe('remote fetch timestamps', () => {
       statusCount += 1
       return []
     }
-    ipcHandlers['repo.pullRequests'] = async ({
-      branches,
-      options,
-    }: {
-      branches?: string[]
-      options?: { mode?: string }
-    }) => {
-      pullRequestCalls.push({ branches, mode: options?.mode })
+    ipcHandlers['repo.pullRequests'] = async ({ branches, mode }: { branches?: string[]; mode?: string }) => {
+      pullRequestCalls.push({ branches, mode: mode })
       return []
     }
 

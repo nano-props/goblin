@@ -16,6 +16,18 @@ export function parseHttpInput<T>(schema: v.GenericSchema<unknown, T>, input: un
   return parsed.output as T
 }
 
+export function parseHttpQuery<T>(schema: v.GenericSchema<unknown, T>, c: { req: { url: string } }): T {
+  const params = new URL(c.req.url).searchParams
+  const obj: Record<string, string | string[]> = {}
+  for (const key of new Set(params.keys())) {
+    const values = params.getAll(key)
+    obj[key] = values.length > 1 ? values : values[0]!
+  }
+  const parsed = v.safeParse(schema, obj)
+  if (!parsed.success) throw new IpcError({ code: 'BAD_REQUEST', message: formatHttpValidationError(parsed.issues) })
+  return parsed.output as T
+}
+
 function formatHttpValidationError(issues: ReadonlyArray<v.BaseIssue<unknown>>): string {
   return issues
     .map((issue) => {

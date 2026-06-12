@@ -128,14 +128,8 @@ describe('setBranchViewMode', () => {
 
   test('refreshes pull request details when the selected branch changes', async () => {
     const calls: Array<{ branches?: string[]; mode?: string }> = []
-    ipcHandlers['repo.pullRequests'] = async ({
-      branches,
-      options,
-    }: {
-      branches?: string[]
-      options?: { mode?: string }
-    }) => {
-      calls.push({ branches, mode: options?.mode })
+    ipcHandlers['repo.pullRequests'] = async ({ branches, mode }: { branches?: string[]; mode?: string }) => {
+      calls.push({ branches, mode: mode })
       return []
     }
     seedRepo({ selectedBranch: 'feature/plain' })
@@ -165,9 +159,9 @@ describe('selectBranch', () => {
   test('refreshes pull request details locally', async () => {
     let resolve!: () => void
     const calls: Array<{ branches?: string[]; mode?: string }> = []
-    ipcHandlers['repo.pullRequests'] = ({ branches, options }: { branches?: string[]; options?: { mode?: string } }) =>
+    ipcHandlers['repo.pullRequests'] = ({ branches, mode }: { branches?: string[]; mode?: string }) =>
       new Promise<[]>((r) => {
-        calls.push({ branches, mode: options?.mode })
+        calls.push({ branches, mode })
         resolve = () => r([])
       })
     seedRepo({ selectedBranch: 'feature/plain' })

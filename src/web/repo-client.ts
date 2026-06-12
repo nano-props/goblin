@@ -1,11 +1,11 @@
 import { openExternalUrl } from '#/web/app-shell-client.ts'
-import { postServerJson } from '#/web/lib/server-fetch.ts'
+import { getServerJson, postServerJson } from '#/web/lib/server-fetch.ts'
 import type { CloneRepoResult, PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
 import type { ExecResult, PullRequestFetchMode, WorktreeStatus } from '#/shared/git-types.ts'
 import type { ProbeResult } from '#/shared/api-types.ts'
 
 export async function probeRepository(cwd: string): Promise<ProbeResult> {
-  return await postServerJson('/api/repo/probe', { cwd })
+  return await getServerJson('/api/repo/probe', { cwd })
 }
 
 export async function cloneRepository(input: {
@@ -22,11 +22,11 @@ export async function abortCloneOperation(operationId: string): Promise<boolean>
 }
 
 export async function getRepositorySnapshot(cwd: string, signal?: AbortSignal): Promise<RepoSnapshot | null> {
-  return await postServerJson('/api/repo/snapshot', { cwd }, { signal })
+  return await getServerJson('/api/repo/snapshot', { cwd }, { signal })
 }
 
 export async function getRepositoryStatus(cwd: string, signal?: AbortSignal): Promise<WorktreeStatus[]> {
-  return await postServerJson('/api/repo/status', { cwd }, { signal })
+  return await getServerJson('/api/repo/status', { cwd }, { signal })
 }
 
 export async function getRepositoryPullRequests(
@@ -35,7 +35,7 @@ export async function getRepositoryPullRequests(
   options?: { mode?: PullRequestFetchMode },
   signal?: AbortSignal,
 ): Promise<PullRequestEntry[] | null> {
-  return await postServerJson('/api/repo/pull-requests', { cwd, branches, options }, { signal })
+  return await getServerJson('/api/repo/pull-requests', { cwd, branches, mode: options?.mode }, { signal })
 }
 
 export async function abortRepositoryOperation(cwd: string): Promise<boolean> {
@@ -124,7 +124,7 @@ export async function removeRepositoryWorktree(
 }
 
 export async function getRepositoryPatch(cwd: string, worktreePath: string, signal?: AbortSignal): Promise<ExecResult> {
-  return await postServerJson('/api/repo/patch', { cwd, worktreePath }, { signal })
+  return await getServerJson('/api/repo/patch', { cwd, worktreePath }, { signal })
 }
 
 export async function openRepositoryRemote(cwd: string, branch?: string): Promise<ExecResult> {

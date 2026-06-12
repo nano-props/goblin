@@ -10,7 +10,6 @@
 import * as v from 'valibot'
 import {
   CwdInput,
-  BranchInput,
   RemoteConnectionInputSchema,
   RemotePathSuggestionsInputSchema,
   RemoteTargetSchema,
@@ -21,15 +20,7 @@ const SourceToken = v.optional(v.string())
 const StringArray = v.array(v.string())
 
 export const REPO_PROCEDURE_SCHEMAS = {
-  probe: CwdInput,
-  snapshot: CwdInput,
-  status: CwdInput,
-  patch: v.object({ cwd: v.string(), worktreePath: v.string() }),
-  pullRequests: v.object({
-    cwd: v.string(),
-    branches: v.optional(StringArray),
-    options: v.optional(v.object({ mode: v.optional(v.picklist(['summary', 'full'])) })),
-  }),
+  // Action endpoints — POST with a JSON body.
   fetch: v.object({
     cwd: v.string(),
     kind: v.optional(v.picklist(['user', 'background'])),
@@ -84,6 +75,21 @@ export const REMOTE_PROCEDURE_SCHEMAS = {
   resolveTarget: RemoteConnectionInputSchema,
   pathSuggestions: RemotePathSuggestionsInputSchema,
   testRepository: v.object({ target: RemoteTargetSchema }),
+} as const
+
+// Query-string schemas for the GET repo read endpoints. `parseHttpQuery`
+// flattens the URLSearchParams into a `{ key: string | string[] }` object
+// before validating, so multi-value keys (e.g. `branches`) accept arrays.
+export const REPO_QUERY_SCHEMAS = {
+  probe: v.object({ cwd: v.string() }),
+  snapshot: v.object({ cwd: v.string() }),
+  status: v.object({ cwd: v.string() }),
+  patch: v.object({ cwd: v.string(), worktreePath: v.string() }),
+  pullRequests: v.object({
+    cwd: v.string(),
+    branches: v.optional(v.array(v.string())),
+    mode: v.optional(v.picklist(['summary', 'full'])),
+  }),
 } as const
 
 // Settings writes are routed to `applyServer*Write` helpers that already do
