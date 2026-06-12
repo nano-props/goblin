@@ -1,6 +1,12 @@
 import { describe, expect, test, vi } from 'vitest'
-import { getBrowserRemoteUrl, resolveFetchRemoteForRemotes, resolvePushTargetForRemotes } from '#/system/git/remote.ts'
-import type { GitRemoteInfo } from '#/shared/git-types.ts'
+import {
+  branchUrlForBrowserRemote,
+  getBranchUrlForRemotes,
+  getBrowserRemoteUrl,
+  resolveFetchRemoteForRemotes,
+  resolvePushTargetForRemotes,
+} from '#/system/git/remote.ts'
+import type { BrowserRemoteProvider, GitRemoteInfo } from '#/shared/git-types.ts'
 
 const gitMock = vi.hoisted(() => vi.fn())
 
@@ -12,8 +18,16 @@ vi.mock('#/system/git/helper.ts', async () => {
   }
 })
 
+function remote(name: string, fetchUrl = `git@github.com:acme/${name}.git`): GitRemoteInfo {
+  return { name, fetchUrl, pushUrl: fetchUrl }
+}
+
+function browserRemote(url: string, provider: BrowserRemoteProvider) {
+  return { url, provider }
+}
+
 describe('getBrowserRemoteUrl', () => {
-  test('returns a branch external target URL when a branch is provided', async () => {
+  test('returns the branch URL on the remote when a branch is provided', async () => {
     gitMock.mockImplementation(async (_cwd: string, args: string[]) => {
       if (args[0] === 'remote' && args[1] === '-v') {
         return 'origin\tgit@github.com:acme/project.git (fetch)\norigin\tgit@github.com:acme/project.git (push)'
@@ -26,8 +40,86 @@ describe('getBrowserRemoteUrl', () => {
     })
 
     await expect(getBrowserRemoteUrl('/tmp/repo', { branch: 'feature/test' })).resolves.toBe(
-      'https://github.com/acme/project/pull/new/feature/test',
+      'https://github.com/acme/project/tree/feature/test',
     )
+  })
+
+  test('returns the repo URL when no branch is provided', async () => {
+    gitMock.mockImplementation(async (_cwd: string, args: string[]) => {
+      if (args[0] === 'remote' && args[1] === '-v') {
+        return 'origin\tgit@github.com:acme/project.git (fetch)\norigin\tgit@github.com:acme/project.git (push)'
+      }
+      throw new Error(`Unexpected git call: ${args.join(' ')}`)
+    })
+
+    await expect(getBrowserRemoteUrl('/tmp/repo')).resolves.toBe('https://github.com/acme/project')
+  })
+
+  test('returns the GitLab branch URL when the remote is GitLab', async () => {
+    gitMock.mockImplementation(async (_cwd: string, args: string[]) => {
+      if (args[0] === 'remote' && args[1] === '-v') {
+        return 'origin\tgit@gitlab.com:acme/project.git (fetch)\norigin\tgit@gitlab.com:acme/project.git (push)'
+      }
+      if (args[0] === 'config' && args[1] === '--get' && args[2] === 'branch.feature/test.remote') return 'origin'
+      if (args[0] === 'config' && args[1] === '--get' && args[2] === 'branch.feature/test.merge') {
+        return 'refs/heads/feature/test'
+      }
+      throw new Error(`Unexpected git call: ${args.join(' ')}`)
+    })
+
+    await expect(getBrowserRemoteUrl('/tmp/repo', { branch: 'feature/test' })).resolves.toBe(
+      'https://gitlab.com/acme/project/-/tree/feature/test',
+    )
+  })
+})
+
+describe('branchUrlForBrowserRemote', () => {
+  test('returns null when the remote is null', () => {
+    expect(branchUrlForBrowserRemote(null, 'main')).toBeNull()
+  })
+
+  test('returns the GitHub branch URL', () => {
+    expect(branchUrlForBrowserRemote(browserRemote('https://github.com/acme/project', 'github'), 'main')).toBe(
+      'https://github.com/acme/project/tree/main',
+    )
+  })
+
+  test('encodes each GitHub branch path segment individually', () => {
+    expect(
+      branchUrlForBrowserRemote(browserRemote('https://github.com/acme/project', 'github'), 'feature/with space'),
+    ).toBe('https://github.com/acme/project/tree/feature/with%20space')
+  })
+
+  test('returns the GitLab branch URL', () => {
+    expect(branchUrlForBrowserRemote(browserRemote('https://gitlab.com/acme/project', 'gitlab'), 'feature/test')).toBe(
+      'https://gitlab.com/acme/project/-/tree/feature/test',
+    )
+  })
+
+  test('returns null for unsupported providers', () => {
+    expect(branchUrlForBrowserRemote(browserRemote('https://bitbucket.org/acme/project', 'external'), 'main')).toBeNull()
+  })
+})
+
+describe('getBranchUrlForRemotes', () => {
+  test('returns the branch URL for the preferred remote', () => {
+    expect(getBranchUrlForRemotes([remote('origin', 'git@github.com:acme/project.git')], 'feature/test')).toBe(
+      'https://github.com/acme/project/tree/feature/test',
+    )
+  })
+
+  test('prefers the configured upstream remote when present', () => {
+    expect(
+      getBranchUrlForRemotes(
+        [remote('origin', 'git@github.com:acme/origin.git'), remote('fork', 'git@github.com:acme/fork.git')],
+        'topic',
+        { remote: 'fork', branch: 'topic' },
+      ),
+    ).toBe('https://github.com/acme/fork/tree/topic')
+  })
+
+  test('returns null when no remotes are configured', () => {
+    expect(getBranchUrlForRemotes([], 'main')).toBeNull()
   })
 })
 
@@ -106,11 +198,3 @@ describe('resolveFetchRemoteForRemotes', () => {
     expect(resolveFetchRemoteForRemotes([], null)).toBeNull()
   })
 })
-
-function remote(name: string): GitRemoteInfo {
-  return {
-    name,
-    fetchUrl: `git@github.com:acme/${name}.git`,
-    pushUrl: `git@github.com:acme/${name}.git`,
-  }
-}

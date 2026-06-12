@@ -25,21 +25,7 @@ export async function getBrowserRemoteUrl(
   options?: { branch?: string; signal?: AbortSignal },
 ): Promise<string | null> {
   const remote = await getBrowserRemote(cwd, options)
-  return options?.branch ? newPullRequestUrlForBrowserRemote(remote, options.branch) : (remote?.url ?? null)
-}
-
-export async function getNewPullRequestUrl(
-  cwd: string,
-  branch: string,
-  options?: { signal?: AbortSignal },
-): Promise<string | null> {
-  const remote = await getBrowserRemote(cwd, { branch, signal: options?.signal })
-  // `/pull/new/{branch}` redirects to the existing open PR if one is
-  // associated with the branch; otherwise it lands on GitHub's "create
-  // pull request" page pre-populated with that branch as the head. This
-  // single URL covers both intents the user has when opening the branch's
-  // remote page — see an existing PR, or start one.
-  return newPullRequestUrlForBrowserRemote(remote, branch)
+  return options?.branch ? branchUrlForBrowserRemote(remote, options.branch) : (remote?.url ?? null)
 }
 
 async function hasRemote(cwd: string, remote: string, signal?: AbortSignal): Promise<boolean> {
@@ -168,23 +154,23 @@ export function resolveFetchRemoteForRemotes(remotes: GitRemoteInfo[], upstream?
   return pickPreferredRemote(remotes, upstream)?.name ?? null
 }
 
-export function newPullRequestUrlForBrowserRemote(remote: BrowserRemote | null, branch: string): string | null {
+// Constructs the web URL for a branch on GitHub or GitLab. Returns null for
+// unsupported providers so the caller can surface an error rather than emit
+// a guessed URL that would 404.
+export function branchUrlForBrowserRemote(remote: BrowserRemote | null, branch: string): string | null {
   if (!remote) return null
-  if (remote.provider === 'gitlab') {
-    const params = new URLSearchParams({ 'merge_request[source_branch]': branch })
-    return `${remote.url}/-/merge_requests/new?${params.toString()}`
-  }
-  if (remote.provider !== 'github') return null
   const encoded = branch.split('/').map(encodeURIComponent).join('/')
-  return `${remote.url}/pull/new/${encoded}`
+  if (remote.provider === 'github') return `${remote.url}/tree/${encoded}`
+  if (remote.provider === 'gitlab') return `${remote.url}/-/tree/${encoded}`
+  return null
 }
 
-export function getNewPullRequestUrlForRemotes(
+export function getBranchUrlForRemotes(
   remotes: GitRemoteInfo[],
   branch: string,
   upstream?: UpstreamParts | null,
 ): string | null {
-  return newPullRequestUrlForBrowserRemote(pickBrowserRemote(remotes, upstream), branch)
+  return branchUrlForBrowserRemote(pickBrowserRemote(remotes, upstream), branch)
 }
 
 export async function getUpstreamParts(

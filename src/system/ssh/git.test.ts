@@ -23,7 +23,7 @@ const TARGET = normalizeRemoteTarget({
 })!
 
 describe('remote git helpers', () => {
-  test('builds browser and pull request URLs from remote verbose output', async () => {
+  test('builds browser URLs from remote verbose output', async () => {
     const run = async (command: { type: string }) => {
       switch (command.type) {
         case 'gitRemoteVerbose':
@@ -41,7 +41,7 @@ describe('remote git helpers', () => {
       'https://github.com/acme/project',
     )
     await expect(getRemoteBrowserUrl(TARGET, 'feature/test', { run: run as any })).resolves.toBe(
-      'https://github.com/acme/project/pull/new/feature/test',
+      'https://github.com/acme/project/tree/feature/test',
     )
   })
 

@@ -2,8 +2,8 @@ import path from 'node:path'
 import { parseBranches, parseLog, parseStatus, parseWorktrees } from '#/system/git/parsers.ts'
 import { markDefaultBranch, prioritizeDefaultBranch } from '#/system/git/branches.ts'
 import {
+  getBranchUrlForRemotes,
   getBrowserRemoteUrlForRemotes,
-  getNewPullRequestUrlForRemotes,
   parseRemoteVerbose,
   repoRemoteInfoForRemotes,
   resolveFetchRemoteForRemotes,
@@ -415,7 +415,7 @@ export async function getRemoteBrowserUrl(
   ])
   if (options.signal?.aborted) return null
   return branch
-    ? getNewPullRequestUrlForRemotes(remoteInfo.remotes, branch, upstream)
+    ? getBranchUrlForRemotes(remoteInfo.remotes, branch, upstream)
     : getBrowserRemoteUrlForRemotes(remoteInfo.remotes, upstream)
 }
 

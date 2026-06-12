@@ -6,7 +6,7 @@ import { createWorktree, getWorktrees } from '#/system/git/worktrees.ts'
 import { getWorkingStatus } from '#/system/git/status.ts'
 import { getWorktreePatch } from '#/system/git/patch.ts'
 import { resolveKnownWorktree, resolveRemovableWorktree } from '#/shared/worktree-guards.ts'
-import { getBrowserRemoteUrl, getNewPullRequestUrl, pullBranch } from '#/system/git/remote.ts'
+import { getBrowserRemoteUrl, pullBranch } from '#/system/git/remote.ts'
 import { getBranchPullRequest, getBranchPullRequests } from '#/system/git/pull-requests.ts'
 import { openHttpsExternal } from '#/main/external-url.ts'
 import { registerTrustedAppUrl, registerTrustedWebContents } from '#/main/ipc/trusted-webcontents.ts'
@@ -98,7 +98,6 @@ vi.mock('#/system/git/helper.ts', () => ({
 vi.mock('#/system/git/remote.ts', () => ({
   fetchAll: vi.fn(),
   getBrowserRemoteUrl: vi.fn(),
-  getNewPullRequestUrl: vi.fn(),
   getRemoteInfo: vi.fn(),
   pullBranch: vi.fn(),
   pushBranch: vi.fn(),
