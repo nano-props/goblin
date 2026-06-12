@@ -192,9 +192,7 @@ export type RpcResponse =
   | { ok: true; data: unknown }
   | { ok: false; error: { message: string; code?: string; name?: string } }
 
-export type I18nChangedEvent =
-  | { type: 'i18n-changed'; snapshot: I18nSnapshot; payload?: never }
-  | { type: 'i18n-changed'; payload: I18nSnapshot; snapshot?: never }
+export type I18nChangedEvent = { type: 'i18n-changed'; snapshot: I18nSnapshot }
 
 export type RpcEvent =
   | { type: 'fetch-interval-changed'; sec: number }

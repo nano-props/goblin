@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { DICTS } from '#/shared/i18n/dictionaries.ts'
 import { buildI18nSnapshot, resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
-import type { RpcEvent } from '#/shared/rpc.ts'
 
 describe('i18n snapshot helpers', () => {
   test('builds writable snapshots instead of returning shared dictionary references', () => {
@@ -21,14 +20,5 @@ describe('i18n snapshot helpers', () => {
       lang: 'ja',
       pref: 'auto',
     })
-  })
-
-  test('supports both legacy payload and current snapshot rpc event fields', () => {
-    const snapshot = buildI18nSnapshot({ lang: 'ja', pref: 'ja' })
-    const legacyEvent = { type: 'i18n-changed', payload: snapshot } satisfies RpcEvent
-    const currentEvent = { type: 'i18n-changed', snapshot } satisfies RpcEvent
-
-    expect(legacyEvent.type).toBe('i18n-changed')
-    expect(currentEvent.type).toBe('i18n-changed')
   })
 })
