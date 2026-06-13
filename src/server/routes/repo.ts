@@ -23,7 +23,7 @@ import {
   removeRepositoryWorktree,
 } from '#/server/modules/repo-write-paths.ts'
 import { getServerFetchIntervalSec } from '#/server/modules/settings-source.ts'
-import { createRouteApp, parseHttpInput, parseHttpQuery } from '#/server/common/http-validate.ts'
+import { createRouteApp, parseHttpBody, parseHttpQuery } from '#/server/common/http-validate.ts'
 import { REPO_PROCEDURE_SCHEMAS, REPO_QUERY_SCHEMAS } from '#/shared/procedure-schemas.ts'
 
 export function createRepoRoutes() {
@@ -87,10 +87,7 @@ export function createRepoRoutes() {
     )
   })
   app.post('/fetch', async (c) => {
-    const { cwd, kind, sourceToken } = parseHttpInput(
-      REPO_PROCEDURE_SCHEMAS.fetch,
-      await c.req.json().catch(() => null),
-    )
+    const { cwd, kind, sourceToken } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fetch, c)
     return c.json(
       await jsonOr(
         () => fetchRepository(cwd, kind ?? 'user', sourceToken),
@@ -100,10 +97,7 @@ export function createRepoRoutes() {
     )
   })
   app.post('/clone', async (c) => {
-    const { operationId, url, parentPath, directoryName } = parseHttpInput(
-      REPO_PROCEDURE_SCHEMAS.clone,
-      await c.req.json().catch(() => null),
-    )
+    const { operationId, url, parentPath, directoryName } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.clone, c)
     return c.json(
       await jsonOr(
         () => cloneRepository(operationId, url, parentPath, directoryName),
@@ -113,14 +107,11 @@ export function createRepoRoutes() {
     )
   })
   app.post('/abort-clone', async (c) => {
-    const { operationId } = parseHttpInput(REPO_PROCEDURE_SCHEMAS.abortClone, await c.req.json().catch(() => null))
+    const { operationId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.abortClone, c)
     return c.json(await jsonOr(async () => abortCloneOperation(operationId), false, 'abort-clone'))
   })
   app.post('/checkout', async (c) => {
-    const { cwd, branch, sourceToken } = parseHttpInput(
-      REPO_PROCEDURE_SCHEMAS.checkout,
-      await c.req.json().catch(() => null),
-    )
+    const { cwd, branch, sourceToken } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.checkout, c)
     return c.json(
       await jsonOr(
         () => checkoutRepositoryBranch(cwd, branch, c.req.raw.signal, sourceToken),
@@ -130,10 +121,7 @@ export function createRepoRoutes() {
     )
   })
   app.post('/pull', async (c) => {
-    const { cwd, branch, worktreePath, sourceToken } = parseHttpInput(
-      REPO_PROCEDURE_SCHEMAS.pull,
-      await c.req.json().catch(() => null),
-    )
+    const { cwd, branch, worktreePath, sourceToken } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.pull, c)
     return c.json(
       await jsonOr(
         () => pullRepositoryBranch(cwd, branch, worktreePath, c.req.raw.signal, sourceToken),
@@ -143,10 +131,7 @@ export function createRepoRoutes() {
     )
   })
   app.post('/push', async (c) => {
-    const { cwd, branch, sourceToken } = parseHttpInput(
-      REPO_PROCEDURE_SCHEMAS.push,
-      await c.req.json().catch(() => null),
-    )
+    const { cwd, branch, sourceToken } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.push, c)
     return c.json(
       await jsonOr(
         () => pushRepositoryBranch(cwd, branch, c.req.raw.signal, sourceToken),
@@ -156,9 +141,9 @@ export function createRepoRoutes() {
     )
   })
   app.post('/create-worktree', async (c) => {
-    const { cwd, worktreePath, newBranch, baseBranch, sourceToken } = parseHttpInput(
+    const { cwd, worktreePath, newBranch, baseBranch, sourceToken } = await parseHttpBody(
       REPO_PROCEDURE_SCHEMAS.createWorktree,
-      await c.req.json().catch(() => null),
+      c,
     )
     return c.json(
       await jsonOr(
@@ -169,9 +154,9 @@ export function createRepoRoutes() {
     )
   })
   app.post('/delete-branch', async (c) => {
-    const { cwd, branch, force, alsoDeleteUpstream, sourceToken } = parseHttpInput(
+    const { cwd, branch, force, alsoDeleteUpstream, sourceToken } = await parseHttpBody(
       REPO_PROCEDURE_SCHEMAS.deleteBranch,
-      await c.req.json().catch(() => null),
+      c,
     )
     return c.json(
       await jsonOr(
@@ -183,7 +168,7 @@ export function createRepoRoutes() {
   })
   app.post('/remove-worktree', async (c) => {
     const { cwd, branch, worktreePath, alsoDeleteBranch, forceDeleteBranch, alsoDeleteUpstream, sourceToken } =
-      parseHttpInput(REPO_PROCEDURE_SCHEMAS.removeWorktree, await c.req.json().catch(() => null))
+      await parseHttpBody(REPO_PROCEDURE_SCHEMAS.removeWorktree, c)
     return c.json(
       await jsonOr(
         () =>
@@ -199,7 +184,7 @@ export function createRepoRoutes() {
     )
   })
   app.post('/open-remote', async (c) => {
-    const { cwd, branch } = parseHttpInput(REPO_PROCEDURE_SCHEMAS.openRemote, await c.req.json().catch(() => null))
+    const { cwd, branch } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openRemote, c)
     return c.json(
       await jsonOr(
         () => openRepositoryRemote(cwd, branch, c.req.raw.signal),
@@ -209,7 +194,7 @@ export function createRepoRoutes() {
     )
   })
   app.post('/open-terminal', async (c) => {
-    const { path } = parseHttpInput(REPO_PROCEDURE_SCHEMAS.openTerminal, await c.req.json().catch(() => null))
+    const { path } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openTerminal, c)
     return c.json(
       await jsonOr(
         () => openRepositoryTerminal(path),
@@ -219,13 +204,13 @@ export function createRepoRoutes() {
     )
   })
   app.post('/open-editor', async (c) => {
-    const { path } = parseHttpInput(REPO_PROCEDURE_SCHEMAS.openEditor, await c.req.json().catch(() => null))
+    const { path } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openEditor, c)
     return c.json(
       await jsonOr(() => openRepositoryEditor(path), { ok: false, message: 'error.failed-read-repo' }, 'open-editor'),
     )
   })
   app.post('/background-sync-repos', async (c) => {
-    const { repoIds } = parseHttpInput(REPO_PROCEDURE_SCHEMAS.backgroundSyncRepos, await c.req.json().catch(() => null))
+    const { repoIds } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.backgroundSyncRepos, c)
     return c.json(
       await jsonOr(
         async () => {
@@ -238,7 +223,7 @@ export function createRepoRoutes() {
     )
   })
   app.post('/abort', async (c) => {
-    const { cwd } = parseHttpInput(REPO_PROCEDURE_SCHEMAS.abort, await c.req.json().catch(() => null))
+    const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.abort, c)
     return c.json(await jsonOr(async () => abortRepositoryOperation(cwd), false, 'abort'))
   })
   return app

@@ -16,6 +16,28 @@ export function parseHttpInput<T>(schema: v.GenericSchema<unknown, T>, input: un
   return parsed.output as T
 }
 
+/**
+ * Read the request body as JSON and validate it in one call. On
+ * either failure (malformed JSON, shape mismatch) an `IpcError` is
+ * thrown that `createRouteApp`'s `onError` converts into a 400 JSON
+ * response. Empty bodies are passed through as `undefined` so the
+ * schema decides whether the route accepts them.
+ */
+export async function parseHttpBody<T>(
+  schema: v.GenericSchema<unknown, T>,
+  c: { req: { text(): Promise<string> } },
+): Promise<T> {
+  const raw = await c.req.text()
+  if (raw.trim() === '') return parseHttpInput(schema, undefined)
+  let parsedJson: unknown
+  try {
+    parsedJson = JSON.parse(raw)
+  } catch {
+    throw new IpcError({ code: 'BAD_REQUEST', message: 'Request body is not valid JSON' })
+  }
+  return parseHttpInput(schema, parsedJson)
+}
+
 export function parseHttpQuery<T>(schema: v.GenericSchema<unknown, T>, c: { req: { url: string } }): T {
   const params = new URL(c.req.url).searchParams
   const obj: Record<string, string | string[]> = {}

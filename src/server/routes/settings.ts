@@ -14,7 +14,7 @@ import {
 } from '#/server/modules/settings-write-paths.ts'
 import { getLanUrls, isLanAddress } from '#/shared/lan-addresses.ts'
 import type { LanInfo } from '#/shared/api-types.ts'
-import { createRouteApp, parseHttpInput } from '#/server/common/http-validate.ts'
+import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import {
   GITHUB_CLI_REFRESH_SCHEMA,
   SETTINGS_PATCH_SCHEMAS,
@@ -32,8 +32,7 @@ export function createSettingsRoutes(settingsState: ServerSettingsState) {
     return c.json(await getServerGitHubCliState(c.req.raw.signal, hosts))
   })
   app.post('/github-cli/refresh', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const parsed = parseHttpInput(GITHUB_CLI_REFRESH_SCHEMA, body)
+    const parsed = await parseHttpBody(GITHUB_CLI_REFRESH_SCHEMA, c)
     return c.json(await getServerGitHubCliState(c.req.raw.signal, parsed.hosts, { force: true }))
   })
   app.get('/external-apps', async (c) => c.json(await getServerExternalAppsSnapshot(c.req.raw.signal)))
@@ -46,13 +45,11 @@ export function createSettingsRoutes(settingsState: ServerSettingsState) {
     return c.json({ host, port, lanUrls } satisfies LanInfo)
   })
   app.post('/fetch-interval', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const { sec } = parseHttpInput(SETTINGS_PROCEDURE_SCHEMAS.fetchInterval, body)
+    const { sec } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.fetchInterval, c)
     return c.json(await applyServerFetchIntervalWrite({ sec }))
   })
   app.post('/prefs', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const { settings } = parseHttpInput(SETTINGS_PATCH_SCHEMAS.prefs, body)
+    const { settings } = await parseHttpBody(SETTINGS_PATCH_SCHEMAS.prefs, c)
     return c.json(
       await applyServerSettingsPrefsWrite(
         { settings },
@@ -64,18 +61,15 @@ export function createSettingsRoutes(settingsState: ServerSettingsState) {
     )
   })
   app.post('/global-shortcut-state', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const { registered } = parseHttpInput(SETTINGS_PROCEDURE_SCHEMAS.globalShortcutState, body)
+    const { registered } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.globalShortcutState, c)
     return c.json(applyServerGlobalShortcutRegistrationWrite({ registered }, settingsState))
   })
   app.post('/session', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const { session } = parseHttpInput(SETTINGS_PATCH_SCHEMAS.session, body)
+    const { session } = await parseHttpBody(SETTINGS_PATCH_SCHEMAS.session, c)
     return c.json(await applyServerSessionWrite({ session }))
   })
   app.post('/recent-repos/add', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const { repo } = parseHttpInput(SETTINGS_PROCEDURE_SCHEMAS.recentReposAdd, body)
+    const { repo } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.recentReposAdd, c)
     return c.json(await applyServerRecentRepoAddWrite({ repo }))
   })
   app.post('/recent-repos/clear', async (c) => c.json(await applyServerRecentRepoClearWrite()))
