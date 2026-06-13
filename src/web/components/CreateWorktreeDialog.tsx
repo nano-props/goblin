@@ -201,13 +201,13 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
       description={t('action.create-worktree-hint')}
     >
       <form
-        className="space-y-0"
+        className="space-y-3"
         onSubmit={(e) => {
           e.preventDefault()
           handleSubmit()
         }}
       >
-        <Field>
+        <Field className="gap-2">
           <FieldLabel>{t('action.create-worktree-mode-label')}</FieldLabel>
           <ToggleGroup
             type="single"
@@ -242,12 +242,12 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
 
         {mode === 'newBranch' && (
           <>
-            <Field data-invalid={baseError ? true : undefined}>
+            <Field className="gap-2" data-invalid={baseError ? true : undefined}>
               <FieldLabel htmlFor="cwt-base">{t('action.create-worktree-base-label')}</FieldLabel>
               <Select value={base} onValueChange={setBase}>
                 <SelectTrigger
                   id="cwt-base"
-                  className="w-full"
+                  className="h-10 w-full text-sm"
                   aria-invalid={!!baseError}
                   aria-describedby={baseError ? 'cwt-base-error' : undefined}
                 >
@@ -275,11 +275,12 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
               </FieldError>
             </Field>
 
-            <Field data-invalid={branchError ? true : undefined}>
+            <Field className="gap-2" data-invalid={branchError ? true : undefined}>
               <FieldLabel htmlFor="cwt-branch">{t('action.create-worktree-branch-label')}</FieldLabel>
               <Input
                 id="cwt-branch"
                 autoFocus
+                className="h-10 text-sm"
                 value={branch}
                 onChange={(e) => setBranch(e.target.value)}
                 placeholder={t('action.create-worktree-branch-placeholder')}
@@ -294,12 +295,12 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
         )}
 
         {mode === 'existingBranch' && (
-          <Field data-invalid={existingBranchError ? true : undefined}>
+          <Field className="gap-2" data-invalid={existingBranchError ? true : undefined}>
             <FieldLabel htmlFor="cwt-existing-branch">{t('action.create-worktree-existing-label')}</FieldLabel>
             <Select value={existingBranch} onValueChange={setExistingBranch}>
               <SelectTrigger
                 id="cwt-existing-branch"
-                className="w-full"
+                className="h-10 w-full text-sm"
                 aria-invalid={!!existingBranchError}
                 aria-describedby={existingBranchError ? 'cwt-existing-branch-error' : undefined}
               >
@@ -321,7 +322,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
 
         {mode === 'trackRemoteBranch' && (
           <>
-            <Field>
+            <Field className="gap-2">
               <FieldLabel htmlFor="cwt-remote-ref">{t('action.create-worktree-remote-label')}</FieldLabel>
               <Select
                 value={selectedRemoteRef}
@@ -331,7 +332,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
                 }}
                 disabled={remoteBranches.length === 0}
               >
-                <SelectTrigger id="cwt-remote-ref" className="w-full">
+                <SelectTrigger id="cwt-remote-ref" className="h-10 w-full text-sm">
                   <SelectValue placeholder={t('action.create-worktree-remote-placeholder')} />
                 </SelectTrigger>
                 <SelectContent>
@@ -351,10 +352,11 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
               </FieldDescription>
             </Field>
 
-            <Field data-invalid={localBranchError ? true : undefined}>
+            <Field className="gap-2" data-invalid={localBranchError ? true : undefined}>
               <FieldLabel htmlFor="cwt-local-branch">{t('action.create-worktree-local-branch-label')}</FieldLabel>
               <Input
                 id="cwt-local-branch"
+                className="h-10 text-sm"
                 value={localBranch}
                 onChange={(e) => setLocalBranch(e.target.value)}
                 placeholder={derivedLocalBranch || t('action.create-worktree-local-branch-placeholder')}
@@ -368,7 +370,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
           </>
         )}
 
-        <Field>
+        <Field className="gap-2">
           <FieldLabel htmlFor="cwt-path">{t('action.create-worktree-path-label')}</FieldLabel>
           <Input
             id="cwt-path"
@@ -377,7 +379,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
             onChange={(e) => setWorktreePath(e.target.value)}
             placeholder={displayDefaultPath}
             aria-describedby="cwt-path-hint"
-            className="font-mono text-xs"
+            className="h-10 font-mono text-sm"
             list={pathSuggestions.length > 0 ? 'create-worktree-path-suggestions' : undefined}
           />
           {pathSuggestions.length > 0 && (
@@ -396,11 +398,11 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
             {!pathName ? t('action.create-worktree-path-disabled-hint') : effectivePath ? displayEffectivePath : ''}
           </FieldDescription>
         </Field>
-        <DialogFooter className="pt-4">
+        <DialogFooter className="gap-2 pt-2">
           <Button type="button" variant="outline" className={cn(compact && 'w-full')} onClick={onClose}>
             {t('dialog.cancel')}
           </Button>
-          <Button type="submit" className={cn(compact && 'w-full')} disabled={!canSubmit}>
+          <Button type="submit" className={cn('min-w-28', compact && 'w-full min-w-0')} disabled={!canSubmit}>
             {t('action.create-worktree-confirm')}
           </Button>
         </DialogFooter>
