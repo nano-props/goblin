@@ -23,38 +23,19 @@ export async function testRemoteRepository(
   // the manual diagnostic in OpenRemoteRepositoryDialog leaves it unset so
   // runRemoteCommand falls back to the full SSH_COMMAND_TIMEOUT_MS.
   const runOptions = { signal: options.signal, timeoutMs: options.timeoutMs }
-  const fail = (
-    index: number,
-    category: RemoteDiagnosticCategory,
-    result: RemoteCommandResult,
-  ): RemoteDiagnosticsResult => {
-    stages[index] = {
-      ...stages[index]!,
-      status: 'failed',
-      category,
-      message: category,
-      details: detailsFromResult(result),
-    }
-    for (let i = index + 1; i < stages.length; i += 1) stages[i] = { ...stages[i]!, status: 'skipped' }
-    return {
-      target,
-      ok: false,
-      category,
-      message: category,
-      details: detailsFromResult(result),
-      stages,
-    }
-  }
 
   // Stage 0/1: ssh handshake + shell sanity ("ok" marker). One ssh
   // invocation covers both: any successful ssh call proves stage 0,
   // and the checkShell script prints 'ok' on stdout to mark stage 1.
   // These two have to be sequential because the shell check rides on
-  // top of the ssh connection.
+  // top of the ssh connection — and the stage is sequential, so a
+  // failure here genuinely skips every downstream stage.
   const shell = await run({ type: 'checkShell' }, target, runOptions)
-  if (!shell.ok) return fail(0, classifySshFailure(shell), shell)
+  if (!shell.ok) return failDiagnosticAt(target, stages, 0, classifySshFailure(shell), shell)
   stages[0] = { ...stages[0]!, status: 'passed' }
-  if (shell.stdout.trim() !== 'ok') return fail(1, 'shell-failed', { ...shell, message: 'shell-failed' })
+  if (shell.stdout.trim() !== 'ok') {
+    return failDiagnosticAt(target, stages, 1, 'shell-failed', { ...shell, message: 'shell-failed' })
+  }
   stages[1] = { ...stages[1]!, status: 'passed' }
 
   // Stages 2/3/4 are independent of each other (each is its own ssh
@@ -139,6 +120,32 @@ function createStages(): RemoteDiagnosticStage[] {
     label: name,
     status: 'pending',
   }))
+}
+
+/** Mark `stages[failedIndex]` as failed with the given category and
+ *  every later stage as 'skipped' (the stages before have already
+ *  passed, so they keep their passed status). Used by the sequential
+ *  stage 0/1 path, where a failure genuinely hasn't run anything
+ *  downstream yet. The parallel stage 2/3/4 path uses a different
+ *  shape that records the actual outcome of every stage that ran —
+ *  see the Promise.all block above. */
+function failDiagnosticAt(
+  target: RemoteRepoTarget,
+  stages: RemoteDiagnosticStage[],
+  failedIndex: number,
+  category: RemoteDiagnosticCategory,
+  result: RemoteCommandResult,
+): RemoteDiagnosticsResult {
+  const details = detailsFromResult(result)
+  stages[failedIndex] = {
+    ...stages[failedIndex]!,
+    status: 'failed',
+    category,
+    message: category,
+    details,
+  }
+  for (let i = failedIndex + 1; i < stages.length; i += 1) stages[i] = { ...stages[i]!, status: 'skipped' }
+  return { target, ok: false, category, message: category, details, stages }
 }
 
 /** Build a fully-populated failure diagnostic for a target whose
