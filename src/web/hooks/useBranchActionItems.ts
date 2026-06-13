@@ -94,6 +94,12 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
     if (resolvedTerminalApp === 'terminal') return t('settings.terminal.terminal')
     return t('settings.terminal.windows-terminal')
   })()
+  const editorActionLabelText = (() => {
+    if (isRemoteRepo || !resolvedEditorApp) return t('worktrees.open-in-editor-label')
+    if (resolvedEditorApp === 'vscode') return t('settings.editor.vscode')
+    if (resolvedEditorApp === 'cursor') return t('settings.editor.cursor')
+    return t('settings.editor.windsurf')
+  })()
 
   const patchItems: BranchActionItem[] = capabilities.canCopyPatch
     ? [
@@ -160,7 +166,7 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
       ? [
           {
             id: 'editor' as const,
-            label: t('worktrees.open-in-editor-label'),
+            label: editorActionLabelText,
             disabled,
             busy: busy('editor'),
             visible: true,
