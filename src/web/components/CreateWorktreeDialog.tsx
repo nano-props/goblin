@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#
 import { Button } from '#/web/components/ui/button.tsx'
 import { FormDialog } from '#/web/components/ui/form-dialog.tsx'
 import { Field, FieldDescription, FieldError, FieldLabel } from '#/web/components/ui/field.tsx'
+import { AnimateHeight } from '#/web/components/ui/animate-height.tsx'
 import { Input } from '#/web/components/ui/input.tsx'
 import { ToggleGroup, ToggleGroupItem } from '#/web/components/ui/toggle-group.tsx'
 import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.ts'
@@ -145,7 +146,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
       ? !branchValidation.ok
         ? t('action.create-worktree-branch-invalid')
         : branchExists && branchExistingWorktree
-          ? t('action.create-worktree-has-worktree', { branch: branchTrimmed, path: branchExistingWorktree.path })
+          ? t('action.create-worktree-has-worktree', { branch: branchTrimmed })
           : branchExists
             ? t('action.create-worktree-branch-exists')
             : ''
@@ -155,7 +156,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
       ? !existingBranchExists
         ? t('action.create-worktree-existing-missing')
         : existingBranchWorktree
-          ? t('action.create-worktree-has-worktree', { branch: existingBranch, path: existingBranchWorktree.path })
+          ? t('action.create-worktree-has-worktree', { branch: existingBranch })
           : ''
       : ''
   const localBranchError =
@@ -163,7 +164,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
       ? !localBranchValidation.ok
         ? t('action.create-worktree-branch-invalid')
         : trackLocalBranchExists && trackLocalBranchWorktree
-          ? t('action.create-worktree-has-worktree', { branch: trackLocalBranch, path: trackLocalBranchWorktree.path })
+          ? t('action.create-worktree-has-worktree', { branch: trackLocalBranch })
           : trackLocalBranchExists
             ? t('action.create-worktree-local-branch-exists')
             : ''
@@ -253,140 +254,140 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
           </ToggleGroup>
         </Field>
 
-        {mode === 'newBranch' && (
-          <>
-            <Field className="gap-2" data-invalid={baseError ? true : undefined}>
-              <FieldLabel htmlFor="cwt-base">{t('action.create-worktree-base-label')}</FieldLabel>
-              <Select value={base} onValueChange={setBase}>
-                <SelectTrigger
-                  id="cwt-base"
-                  className="h-10 w-full text-sm"
-                  aria-invalid={!!baseError}
-                  aria-describedby="cwt-base-error"
-                >
-                  <SelectValue placeholder={t('action.create-worktree-base-placeholder')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {repo.data.branches.map((b) => (
-                    // textValue is the typeahead string (also what Radix
-                    // echoes into the trigger via SelectValue). We pass
-                    // just the branch name so the trigger shows "main"
-                    // instead of "main current" once selected.
-                    <SelectItem key={b.name} value={b.name} textValue={b.name}>
-                      <span className="truncate">{b.name}</span>
-                      {b.name === repo.data.currentBranch && (
-                        <span className="ml-2 text-xs text-muted-foreground">
-                          {t('action.create-worktree-base-current')}
-                        </span>
-                      )}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FieldError id="cwt-base-error" reserveHeight aria-live="polite" aria-atomic="true">
-                {baseError}
-              </FieldError>
-            </Field>
+        <AnimateHeight>
+          <div className="space-y-3">
+            {mode === 'newBranch' && (
+              <>
+                <Field className="gap-2" data-invalid={baseError ? true : undefined}>
+                  <FieldLabel htmlFor="cwt-base">{t('action.create-worktree-base-label')}</FieldLabel>
+                  <Select value={base} onValueChange={setBase}>
+                    <SelectTrigger
+                      id="cwt-base"
+                      className="h-10 w-full text-sm"
+                      aria-invalid={!!baseError}
+                      aria-describedby="cwt-base-error"
+                    >
+                      <SelectValue placeholder={t('action.create-worktree-base-placeholder')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {repo.data.branches.map((b) => (
+                        <SelectItem key={b.name} value={b.name} textValue={b.name}>
+                          <span className="truncate">{b.name}</span>
+                          {b.name === repo.data.currentBranch && (
+                            <span className="ml-2 text-xs text-muted-foreground">
+                              {t('action.create-worktree-base-current')}
+                            </span>
+                          )}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldError id="cwt-base-error" reserveHeight aria-live="polite" aria-atomic="true">
+                    {baseError}
+                  </FieldError>
+                </Field>
 
-            <Field className="gap-2" data-invalid={branchError ? true : undefined}>
-              <FieldLabel htmlFor="cwt-branch">{t('action.create-worktree-branch-label')}</FieldLabel>
-              <Input
-                id="cwt-branch"
-                autoFocus
-                className="h-10 text-sm"
-                value={branch}
-                onChange={(e) => setBranch(e.target.value)}
-                placeholder={t('action.create-worktree-branch-placeholder')}
-                aria-invalid={!!branchError}
-                aria-describedby="cwt-branch-error"
-              />
-              <FieldError id="cwt-branch-error" reserveHeight aria-live="polite" aria-atomic="true">
-                {branchError}
-              </FieldError>
-            </Field>
-          </>
-        )}
+                <Field className="gap-2" data-invalid={branchError ? true : undefined}>
+                  <FieldLabel htmlFor="cwt-branch">{t('action.create-worktree-branch-label')}</FieldLabel>
+                  <Input
+                    id="cwt-branch"
+                    autoFocus
+                    className="h-10 text-sm"
+                    value={branch}
+                    onChange={(e) => setBranch(e.target.value)}
+                    placeholder={t('action.create-worktree-branch-placeholder')}
+                    aria-invalid={!!branchError}
+                    aria-describedby="cwt-branch-error"
+                  />
+                  <FieldError id="cwt-branch-error" reserveHeight aria-live="polite" aria-atomic="true">
+                    {branchError}
+                  </FieldError>
+                </Field>
+              </>
+            )}
 
-        {mode === 'existingBranch' && (
-          <Field className="gap-2" data-invalid={existingBranchError ? true : undefined}>
-            <FieldLabel htmlFor="cwt-existing-branch">{t('action.create-worktree-existing-label')}</FieldLabel>
-            <Select value={existingBranch} onValueChange={setExistingBranch}>
-              <SelectTrigger
-                id="cwt-existing-branch"
-                className="h-10 w-full text-sm"
-                aria-invalid={!!existingBranchError}
-                aria-describedby="cwt-existing-branch-error"
-              >
-                <SelectValue placeholder={t('action.create-worktree-existing-placeholder')} />
-              </SelectTrigger>
-              <SelectContent>
-                {repo.data.branches.map((b) => (
-                  <SelectItem key={b.name} value={b.name} textValue={b.name}>
-                    <span className="truncate">{b.name}</span>
-                    {b.worktree && (
-                      <span className="ml-1 text-[10px] text-muted-foreground/60">
-                        {tildify(b.worktree.path)}
-                      </span>
-                    )}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FieldError id="cwt-existing-branch-error" reserveHeight aria-live="polite" aria-atomic="true">
-              {existingBranchError}
-            </FieldError>
-          </Field>
-        )}
+            {mode === 'existingBranch' && (
+              <Field className="gap-2" data-invalid={existingBranchError ? true : undefined}>
+                <FieldLabel htmlFor="cwt-existing-branch">{t('action.create-worktree-existing-label')}</FieldLabel>
+                <Select value={existingBranch} onValueChange={setExistingBranch}>
+                  <SelectTrigger
+                    id="cwt-existing-branch"
+                    className="h-10 w-full text-sm"
+                    aria-invalid={!!existingBranchError}
+                    aria-describedby="cwt-existing-branch-error"
+                  >
+                    <SelectValue placeholder={t('action.create-worktree-existing-placeholder')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {repo.data.branches.map((b) => (
+                      <SelectItem key={b.name} value={b.name} textValue={b.name}>
+                        <span className="truncate">{b.name}</span>
+                        {b.worktree && (
+                          <span className="ml-1 text-[10px] text-muted-foreground/60">
+                            {tildify(b.worktree.path)}
+                          </span>
+                        )}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldError id="cwt-existing-branch-error" reserveHeight aria-live="polite" aria-atomic="true">
+                  {existingBranchError}
+                </FieldError>
+              </Field>
+            )}
 
-        {mode === 'trackRemoteBranch' && (
-          <>
-            <Field className="gap-2">
-              <FieldLabel htmlFor="cwt-remote-ref">{t('action.create-worktree-remote-label')}</FieldLabel>
-              <Select
-                value={selectedRemoteRef}
-                onValueChange={(next) => {
-                  setRemoteRef(next)
-                  setLocalBranch('')
-                }}
-                disabled={remoteBranches.length === 0}
-              >
-                <SelectTrigger id="cwt-remote-ref" className="h-10 w-full text-sm">
-                  <SelectValue placeholder={t('action.create-worktree-remote-placeholder')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {remoteBranches.map((ref) => (
-                    <SelectItem key={ref} value={ref} textValue={ref}>
-                      <span className="truncate">{ref}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FieldDescription reserveHeight aria-live="polite" aria-atomic="true">
-                {remoteBranchesLoading
-                  ? t('action.create-worktree-remote-loading')
-                  : remoteBranches.length === 0
-                    ? t('action.create-worktree-remote-empty')
-                    : ''}
-              </FieldDescription>
-            </Field>
+            {mode === 'trackRemoteBranch' && (
+              <>
+                <Field className="gap-2">
+                  <FieldLabel htmlFor="cwt-remote-ref">{t('action.create-worktree-remote-label')}</FieldLabel>
+                  <Select
+                    value={selectedRemoteRef}
+                    onValueChange={(next) => {
+                      setRemoteRef(next)
+                      setLocalBranch('')
+                    }}
+                    disabled={remoteBranches.length === 0}
+                  >
+                    <SelectTrigger id="cwt-remote-ref" className="h-10 w-full text-sm">
+                      <SelectValue placeholder={t('action.create-worktree-remote-placeholder')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {remoteBranches.map((ref) => (
+                        <SelectItem key={ref} value={ref} textValue={ref}>
+                          <span className="truncate">{ref}</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldDescription reserveHeight aria-live="polite" aria-atomic="true">
+                    {remoteBranchesLoading
+                      ? t('action.create-worktree-remote-loading')
+                      : remoteBranches.length === 0
+                        ? t('action.create-worktree-remote-empty')
+                        : ''}
+                  </FieldDescription>
+                </Field>
 
-            <Field className="gap-2" data-invalid={localBranchError ? true : undefined}>
-              <FieldLabel htmlFor="cwt-local-branch">{t('action.create-worktree-local-branch-label')}</FieldLabel>
-              <Input
-                id="cwt-local-branch"
-                className="h-10 text-sm"
-                value={localBranch}
-                onChange={(e) => setLocalBranch(e.target.value)}
-                placeholder={derivedLocalBranch || t('action.create-worktree-local-branch-placeholder')}
-                aria-invalid={!!localBranchError}
-                aria-describedby="cwt-local-branch-error"
-              />
-              <FieldError id="cwt-local-branch-error" reserveHeight aria-live="polite" aria-atomic="true">
-                {localBranchError}
-              </FieldError>
-            </Field>
-          </>
-        )}
+                <Field className="gap-2" data-invalid={localBranchError ? true : undefined}>
+                  <FieldLabel htmlFor="cwt-local-branch">{t('action.create-worktree-local-branch-label')}</FieldLabel>
+                  <Input
+                    id="cwt-local-branch"
+                    className="h-10 text-sm"
+                    value={localBranch}
+                    onChange={(e) => setLocalBranch(e.target.value)}
+                    placeholder={derivedLocalBranch || t('action.create-worktree-local-branch-placeholder')}
+                    aria-invalid={!!localBranchError}
+                    aria-describedby="cwt-local-branch-error"
+                  />
+                  <FieldError id="cwt-local-branch-error" reserveHeight aria-live="polite" aria-atomic="true">
+                    {localBranchError}
+                  </FieldError>
+                </Field>
+              </>
+            )}
+          </div>
+        </AnimateHeight>
 
         <Field className="gap-2">
           <FieldLabel htmlFor="cwt-path">{t('action.create-worktree-path-label')}</FieldLabel>
