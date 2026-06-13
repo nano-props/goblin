@@ -1,4 +1,4 @@
-import { type ComponentType } from 'react'
+import { useMemo, type ComponentType } from 'react'
 import { RotateCw, SquareTerminal } from 'lucide-react'
 import { Badge } from '#/web/components/ui/badge.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
@@ -30,7 +30,7 @@ interface ExternalToolItem {
   detail?: string | null
 }
 
-const TERMINAL_APPS: ExternalToolItem[] = [
+const ALL_TERMINAL_APPS: ExternalToolItem[] = [
   {
     id: 'ghostty',
     Icon: GhosttyIcon,
@@ -50,6 +50,33 @@ const TERMINAL_APPS: ExternalToolItem[] = [
     commandKey: 'settings.apps.tool.windows-terminal.command',
   },
 ]
+
+const ALL_TERMINAL_OPTIONS: { value: TerminalPref; labelKey: string }[] = [
+  { value: 'auto', labelKey: 'settings.terminal.auto' },
+  { value: 'ghostty', labelKey: 'settings.terminal.ghostty' },
+  { value: 'terminal', labelKey: 'settings.terminal.terminal' },
+  { value: 'windowsTerminal', labelKey: 'settings.terminal.windows-terminal' },
+]
+
+/**
+ * Windows Terminal is the only platform-restricted entry. The data lives in
+ * the shared array above so the i18n bundle stays single-source, but the UI
+ * is filtered at render time so macOS / Linux users never see a row that
+ * is permanently "not detected" or a dropdown option that can only fail.
+ */
+const PLATFORM_TERMINAL_IDS: Record<NodeJS.Platform, ReadonlySet<string>> = {
+  win32: new Set(['ghostty', 'terminal', 'windowsTerminal']),
+  darwin: new Set(['ghostty', 'terminal']),
+  linux: new Set(['ghostty', 'terminal']),
+  aix: new Set(['ghostty', 'terminal']),
+  android: new Set(['ghostty', 'terminal']),
+  cygwin: new Set(['ghostty', 'terminal']),
+  freebsd: new Set(['ghostty', 'terminal']),
+  haiku: new Set(['ghostty', 'terminal']),
+  netbsd: new Set(['ghostty', 'terminal']),
+  openbsd: new Set(['ghostty', 'terminal']),
+  sunos: new Set(['ghostty', 'terminal']),
+}
 
 const EDITOR_APPS: ExternalToolItem[] = [
   {
@@ -120,12 +147,15 @@ export function ExternalAppSettings() {
   const editorApp = data.editor.pref
   const editorAppAvailability = data.editor.appAvailability
   const { refreshExternalApps, refreshing, setTerminalApp, setEditorApp } = useExternalAppSettingsController()
-  const terminalOptions: { value: TerminalPref; labelKey: string }[] = [
-    { value: 'auto', labelKey: 'settings.terminal.auto' },
-    { value: 'ghostty', labelKey: 'settings.terminal.ghostty' },
-    { value: 'terminal', labelKey: 'settings.terminal.terminal' },
-    { value: 'windowsTerminal', labelKey: 'settings.terminal.windows-terminal' },
-  ]
+  const visibleTerminalIds = PLATFORM_TERMINAL_IDS[process.platform] ?? PLATFORM_TERMINAL_IDS.darwin
+  const terminalApps = useMemo(
+    () => ALL_TERMINAL_APPS.filter((item) => visibleTerminalIds.has(item.id)),
+    [visibleTerminalIds],
+  )
+  const terminalOptions = useMemo(
+    () => ALL_TERMINAL_OPTIONS.filter((opt) => opt.value === 'auto' || visibleTerminalIds.has(opt.value)),
+    [visibleTerminalIds],
+  )
   const editorOptions: { value: EditorPref; labelKey: string }[] = [
     { value: 'auto', labelKey: 'settings.editor.auto' },
     { value: 'vscode', labelKey: 'settings.editor.vscode' },
@@ -183,7 +213,7 @@ export function ExternalAppSettings() {
         }
       >
         <DetectionList
-          items={TERMINAL_APPS.map((item) => ({
+          items={terminalApps.map((item) => ({
             ...item,
             available: terminalAppAvailability[item.id as keyof typeof terminalAppAvailability] ?? false,
           }))}

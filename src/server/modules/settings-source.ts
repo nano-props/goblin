@@ -77,9 +77,13 @@ function normalizeColorTheme(value: unknown): ColorTheme {
 }
 
 function normalizeTerminalPref(value: unknown): TerminalPref {
-  return value === 'auto' || value === 'ghostty' || value === 'terminal' || value === 'windowsTerminal'
-    ? value
-    : DEFAULT_TERMINAL_APP
+  // `windowsTerminal` is a win32-only option. If a synced settings.json
+  // hands us this value on macOS or Linux, fall back to the default rather
+  // than persisting an unreachable preference. (On win32 we accept it
+  // so the user can explicitly pick Windows Terminal.)
+  if (value === 'auto' || value === 'ghostty' || value === 'terminal') return value
+  if (value === 'windowsTerminal') return process.platform === 'win32' ? value : DEFAULT_TERMINAL_APP
+  return DEFAULT_TERMINAL_APP
 }
 
 function normalizeEditorPref(value: unknown): EditorPref {

@@ -28,11 +28,32 @@ export interface TerminalBackend {
   openRemote?: (alias: string, remotePath: string) => Promise<ExecResult>
 }
 
+const NOT_INSTALLED_BACKEND: TerminalBackend = {
+  isInstalled: () => false,
+  open: async () => ({ ok: false, message: 'error.terminal-not-installed' }),
+}
+
+/**
+ * Look up the Windows Terminal backend at call time, not at module load.
+ *
+ * Why: the backend map is shared with tests that flip `process.platform`
+ * via `Object.defineProperty` (e.g. `terminals.test.ts`). If we resolved
+ * the platform at import time, a test that does `setPlatform('win32')`
+ * after the module is loaded would still see the darwin-time stub.
+ * Computing on each call makes both the real app and the test
+ * platforms honest.
+ */
+function windowsTerminalBackend(): TerminalBackend {
+  return process.platform === 'win32'
+    ? { isInstalled: isWindowsTerminalInstalled, open: openInWindowsTerminal }
+    : NOT_INSTALLED_BACKEND
+}
+
 /** Concrete terminal pref values (excludes 'auto'). */
-const backends: Record<ResolvedTerminalApp, TerminalBackend> = {
-  ghostty: { isInstalled: isGhosttyInstalled, open: openInGhostty, openRemote: openRemoteInGhostty },
-  terminal: { isInstalled: () => true, open: openInAppleTerminal, openRemote: openRemoteInAppleTerminal },
-  windowsTerminal: { isInstalled: isWindowsTerminalInstalled, open: openInWindowsTerminal },
+const backends: Record<ResolvedTerminalApp, () => TerminalBackend> = {
+  ghostty: () => ({ isInstalled: isGhosttyInstalled, open: openInGhostty, openRemote: openRemoteInGhostty }),
+  terminal: () => ({ isInstalled: () => true, open: openInAppleTerminal, openRemote: openRemoteInAppleTerminal }),
+  windowsTerminal: () => windowsTerminalBackend(),
 }
 
 /** Auto-detection priority — first installed backend wins. */
@@ -64,7 +85,7 @@ export async function getTerminalAppAvailability(signal?: AbortSignal): Promise<
     return {
       ghostty: false,
       terminal: false,
-      windowsTerminal: backends.windowsTerminal.isInstalled(),
+      windowsTerminal: backends.windowsTerminal().isInstalled(),
     }
   }
   if (!isDarwin()) {
@@ -75,7 +96,7 @@ export async function getTerminalAppAvailability(signal?: AbortSignal): Promise<
     }
   }
   return {
-    ghostty: backends.ghostty.isInstalled(),
+    ghostty: backends.ghostty().isInstalled(),
     terminal: await isAppleTerminalInstalled(signal),
     windowsTerminal: false,
   }
@@ -85,7 +106,7 @@ export async function getTerminalAppAvailability(signal?: AbortSignal): Promise<
 export async function openInPreferredTerminal(path: string, pref: TerminalPref): Promise<ExecResult> {
   const resolved = resolveTerminalApp(pref, await getTerminalAppAvailability())
   return resolved
-    ? backends[resolved].open(path)
+    ? backends[resolved]().open(path)
     : Promise.resolve({ ok: false, message: 'error.terminal-not-installed' })
 }
 
