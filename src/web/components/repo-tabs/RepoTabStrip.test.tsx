@@ -94,9 +94,17 @@ describe('RepoTabStrip', () => {
 
   test('moves focus through the full tab strip with keyboard navigation on large screens', () => {
     vi.stubGlobal('matchMedia', createMatchMedia(false))
-    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
-      cb(0)
-      return 0
+    // Define rAF as a writable property so a prior test in the same worker
+    // that installed a non-writable descriptor (via `defineProperty` without
+    // `writable: true`) does not turn this `vi.spyOn` into "The property
+    // 'requestAnimationFrame' is not defined on the object".
+    Object.defineProperty(window, 'requestAnimationFrame', {
+      configurable: true,
+      writable: true,
+      value: (cb: FrameRequestCallback) => {
+        cb(0)
+        return 0
+      },
     })
     const onActivate = vi.fn()
 

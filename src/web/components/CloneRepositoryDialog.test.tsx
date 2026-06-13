@@ -36,22 +36,31 @@ beforeEach(() => {
     initialSettings: null,
     initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
   }
-  testWindow.goblinNative = {
-    runtime: {
-      kind: 'electron',
-      bridgeVersion: RENDERER_BRIDGE_VERSION,
-      capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+  // Use `defineProperty` with `writable: true` so a previous test that
+  // installed a read-only descriptor (via `defineProperty` without writable)
+  // doesn't leave this assignment throwing `Cannot assign to read only
+  // property 'goblinNative'`. All such property writes should opt into the
+  // same shape so cross-test isolation stays predictable.
+  Object.defineProperty(window, 'goblinNative', {
+    configurable: true,
+    writable: true,
+    value: {
+      runtime: {
+        kind: 'electron',
+        bridgeVersion: RENDERER_BRIDGE_VERSION,
+        capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+      },
+      homeDir: '/Users/tester',
+      pathForFile: () => '',
+      invokeIpc: async (request: { path: string; input?: unknown }) => {
+        ipcCalls.push(request)
+        if (request.path === 'repo.abortClone') return { ok: true }
+        return null
+      },
+      abortIpc: async () => true,
+      onEvent: () => () => {},
     },
-    homeDir: '/Users/tester',
-    pathForFile: () => '',
-    invokeIpc: async (request: { path: string; input?: unknown }) => {
-      ipcCalls.push(request)
-      if (request.path === 'repo.abortClone') return { ok: true }
-      return null
-    },
-    abortIpc: async () => true,
-    onEvent: () => () => {},
-  }
+  })
 })
 
 afterEach(() => {
