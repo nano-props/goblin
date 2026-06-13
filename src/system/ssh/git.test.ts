@@ -5,6 +5,7 @@ import {
   deleteRemoteBranch,
   getRemoteBrowserUrl,
   getRemoteSnapshot,
+  getRemoteTrackingBranches,
   pullRemoteBranch,
   fetchRemoteRepository,
   pushRemoteBranch,
@@ -367,6 +368,23 @@ describe('remote git helpers', () => {
       timeoutMs: 180_000,
     })
     expect(run).not.toHaveBeenCalledWith({ type: 'gitFetchAll', path: '/srv/repo' }, TARGET, expect.anything())
+  })
+
+  test('getRemoteTrackingBranches filters */HEAD and malformed refs', async () => {
+    const run = vi.fn(async () =>
+      okRemoteResult(
+        ['origin/HEAD', 'origin/main', 'origin/feature/auth', 'origin/feature/ui', 'not-a-valid-ref-line'].join('\n'),
+      ),
+    )
+    const refs = await getRemoteTrackingBranches(TARGET, { run })
+    expect(run).toHaveBeenCalledWith({ type: 'gitRemoteBranches', path: '/srv/repo' }, TARGET, { signal: undefined })
+    expect(refs).toEqual(['origin/main', 'origin/feature/auth', 'origin/feature/ui'])
+  })
+
+  test('getRemoteTrackingBranches returns [] when the remote command fails', async () => {
+    const run = vi.fn(async () => ({ ok: false, stdout: '', stderr: 'ssh: connection refused' }))
+    const refs = await getRemoteTrackingBranches(TARGET, { run })
+    expect(refs).toEqual([])
   })
 })
 

@@ -264,7 +264,7 @@ export async function createRepositoryWorktree(
   if (!isValidRepoLocator(cwd)) return { ok: false, message: 'error.invalid-arguments' }
   const normalized = normalizeCreateWorktreeInput(input)
   if (!normalized) return { ok: false, message: 'error.invalid-arguments' }
-  if (!path.isAbsolute(normalized.worktreePath) || normalized.worktreePath.includes('\0')) {
+  if (!path.isAbsolute(normalized.worktreePath) || /[\0-\x1f\x7f]/.test(normalized.worktreePath)) {
     return { ok: false, message: 'error.invalid-path' }
   }
   return await runWithRepoBackend(cwd, async (backend) => {

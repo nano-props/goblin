@@ -10,7 +10,6 @@ import {
 } from '#/system/ssh/config.ts'
 import { getServerSettingsPrefs } from '#/server/modules/settings-source.ts'
 import {
-  isAbsoluteRemotePath,
   isHomeRelativeRemotePath,
   isRemoteRepoId,
   isResolvableRemotePathInput,
@@ -23,6 +22,7 @@ import {
   type ResolvedRemoteTarget,
   type SshConfigHostsResult,
 } from '#/shared/remote-repo.ts'
+import { isSafeRemoteAbsolutePath } from '#/system/remote-shell.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 
 async function resolveRemoteHomeDirectory(target: RemoteRepoTarget, signal?: AbortSignal): Promise<string> {
@@ -58,10 +58,7 @@ export async function resolveServerRemoteTarget(
   const needsHomeExpansion = input.remotePath.startsWith('~/')
   let resolved: ResolvedRemoteTarget
   try {
-    resolved = await resolveSshRemoteTarget(
-      needsHomeExpansion ? { ...input, remotePath: '/' } : input,
-      signal,
-    )
+    resolved = await resolveSshRemoteTarget(needsHomeExpansion ? { ...input, remotePath: '/' } : input, signal)
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'error.failed-read-repo' }
   }
@@ -151,8 +148,8 @@ export async function openServerRemoteEditor(
   input: { repoId: string; worktreePath: string },
   signal?: AbortSignal,
 ): Promise<ExecResult> {
-  if (!isRemoteRepoId(input.repoId) || !isAbsoluteRemotePath(input.worktreePath)) {
-    return { ok: false, message: 'error.invalid-arguments' }
+  if (!isRemoteRepoId(input.repoId) || !isSafeRemoteAbsolutePath(input.worktreePath)) {
+    return { ok: false, message: 'error.invalid-path' }
   }
   const ref = parseRemoteRepoId(input.repoId)
   if (!ref) return { ok: false, message: 'error.invalid-arguments' }
@@ -172,8 +169,8 @@ export async function openServerRemoteTerminal(
   input: { repoId: string; worktreePath: string },
   signal?: AbortSignal,
 ): Promise<ExecResult> {
-  if (!isRemoteRepoId(input.repoId) || !isAbsoluteRemotePath(input.worktreePath)) {
-    return { ok: false, message: 'error.invalid-arguments' }
+  if (!isRemoteRepoId(input.repoId) || !isSafeRemoteAbsolutePath(input.worktreePath)) {
+    return { ok: false, message: 'error.invalid-path' }
   }
   const ref = parseRemoteRepoId(input.repoId)
   if (!ref) return { ok: false, message: 'error.invalid-arguments' }

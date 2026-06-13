@@ -6,11 +6,16 @@ import { createRoot, type Root } from 'react-dom/client'
 import { act } from 'react'
 import { useBranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { openBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
+import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import { createPullRequest, createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 
 const mocks = vi.hoisted(() => ({
   openExternalUrl: vi.fn(),
   openRepositoryRemote: vi.fn(),
+  openRepositoryEditor: vi.fn(),
+  openRepositoryTerminal: vi.fn(),
+  openRemoteRepositoryEditor: vi.fn(),
+  openRemoteRepositoryTerminal: vi.fn(),
 }))
 
 vi.mock('#/web/app-shell-client.ts', () => ({
@@ -19,15 +24,14 @@ vi.mock('#/web/app-shell-client.ts', () => ({
 
 vi.mock('#/web/repo-client.ts', () => ({
   getRepositoryPatch: vi.fn(),
-  openRepositoryEditor: vi.fn(),
+  openRepositoryEditor: mocks.openRepositoryEditor,
   openRepositoryRemote: mocks.openRepositoryRemote,
-  openRepositoryTerminal: vi.fn(),
+  openRepositoryTerminal: mocks.openRepositoryTerminal,
 }))
 
-vi.mock('#/web/main-window-navigation.tsx', () => ({
-  useMainWindowNavigation: () => ({
-    showRepoDetailTab: vi.fn(),
-  }),
+vi.mock('#/web/remote-client.ts', () => ({
+  openRemoteRepositoryEditor: mocks.openRemoteRepositoryEditor,
+  openRemoteRepositoryTerminal: mocks.openRemoteRepositoryTerminal,
 }))
 
 const REPO_ID = '/tmp/gbl-use-branch-actions-test-repo'
@@ -115,6 +119,106 @@ describe('useBranchActions', () => {
 
     expect(mocks.openRepositoryRemote).toHaveBeenCalledWith(REPO_ID, 'feature/no-pr')
     expect(mocks.openExternalUrl).not.toHaveBeenCalled()
+  })
+
+  test('openTerminal routes to the remote IPC for remote repos', async () => {
+    const target = normalizeRemoteTarget({
+      alias: 'example',
+      host: 'example.com',
+      user: 'alice',
+      port: 22,
+      remotePath: '/srv/repo',
+    })
+    expect(target).not.toBeNull()
+    const branch = createRepoBranch('feature/remote', { worktree: { path: '/srv/repo-feature' } })
+    const repo = seedRepoState({
+      id: target!.id,
+      branches: [branch],
+      remote: {
+        target: target!,
+        remotes: ['origin'],
+        hasRemotes: true,
+        hasBrowserRemote: true,
+        browserRemoteProvider: 'github',
+        remoteProviders: { origin: 'github' },
+        hasGitHubRemote: true,
+      },
+    })
+    mocks.openRemoteRepositoryTerminal.mockResolvedValue({ ok: true, message: '' })
+
+    let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
+    root = createRoot(container)
+    await act(async () => {
+      root!.render(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
+    })
+
+    await act(async () => {
+      await actions?.openTerminal?.()
+    })
+
+    expect(mocks.openRemoteRepositoryTerminal).toHaveBeenCalledWith(target!.id, '/srv/repo-feature')
+    expect(mocks.openRepositoryTerminal).not.toHaveBeenCalled()
+  })
+
+  test('openEditor routes to the remote IPC for remote repos', async () => {
+    const target = normalizeRemoteTarget({
+      alias: 'example',
+      host: 'example.com',
+      user: 'alice',
+      port: 22,
+      remotePath: '/srv/repo',
+    })
+    expect(target).not.toBeNull()
+    const branch = createRepoBranch('feature/remote', { worktree: { path: '/srv/repo-feature' } })
+    const repo = seedRepoState({
+      id: target!.id,
+      branches: [branch],
+      remote: {
+        target: target!,
+        remotes: ['origin'],
+        hasRemotes: true,
+        hasBrowserRemote: true,
+        browserRemoteProvider: 'github',
+        remoteProviders: { origin: 'github' },
+        hasGitHubRemote: true,
+      },
+    })
+    mocks.openRemoteRepositoryEditor.mockResolvedValue({ ok: true, message: '' })
+
+    let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
+    root = createRoot(container)
+    await act(async () => {
+      root!.render(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
+    })
+
+    await act(async () => {
+      await actions?.openEditor?.()
+    })
+
+    expect(mocks.openRemoteRepositoryEditor).toHaveBeenCalledWith(target!.id, '/srv/repo-feature')
+    expect(mocks.openRepositoryEditor).not.toHaveBeenCalled()
+  })
+
+  test('openTerminal keeps the local IPC for non-remote repos', async () => {
+    const branch = createRepoBranch('feature/local', { worktree: { path: '/tmp/local-feature' } })
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [branch],
+    })
+    mocks.openRepositoryTerminal.mockResolvedValue({ ok: true, message: '' })
+
+    let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
+    root = createRoot(container)
+    await act(async () => {
+      root!.render(<BranchActionsHarness repo={repo} onReady={(value) => (actions = value)} />)
+    })
+
+    await act(async () => {
+      await actions?.openTerminal?.()
+    })
+
+    expect(mocks.openRepositoryTerminal).toHaveBeenCalledWith('/tmp/local-feature')
+    expect(mocks.openRemoteRepositoryTerminal).not.toHaveBeenCalled()
   })
 })
 
