@@ -70,3 +70,17 @@ export function t(key: DictKey, params?: Record<string, string | number>): strin
 export function getDictionary(): Record<DictKey, string> {
   return DICTS[currentLang]
 }
+
+/**
+ * Platform-aware i18n key for the "Open Data Folder" menu label and
+ * error dialog. macOS users see "Finder", Windows users see "Explorer",
+ * and other platforms get the generic fallback label.
+ */
+export function openDataFolderMenuKey():
+  | 'menu.file.open-data-folder.mac'
+  | 'menu.file.open-data-folder.win'
+  | 'menu.file.open-data-folder' {
+  if (process.platform === 'darwin') return 'menu.file.open-data-folder.mac'
+  if (process.platform === 'win32') return 'menu.file.open-data-folder.win'
+  return 'menu.file.open-data-folder'
+}

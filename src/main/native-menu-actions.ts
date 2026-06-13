@@ -1,6 +1,6 @@
 import { app, dialog, shell } from 'electron'
 import { promises as fs } from 'node:fs'
-import { t } from '#/main/i18n/index.ts'
+import { openDataFolderMenuKey, t } from '#/main/i18n/index.ts'
 import { getEmbeddedServerUrl } from '#/main/window-shell.ts'
 import { openHttpExternal } from '#/main/external-url.ts'
 
@@ -33,18 +33,4 @@ function reportOpenDataFolderError(err: unknown): void {
   // entry the user just clicked. macOS users see "Finder" in the
   // title, Windows users see "Explorer".
   dialog.showErrorBox(t(openDataFolderMenuKey()), message)
-}
-
-/**
- * Mirror of menu.ts's helper — kept here too so the error dialog
- * doesn't drift from the menu label. Both functions return the same
- * i18n key for a given host.
- */
-function openDataFolderMenuKey():
-  | 'menu.file.open-data-folder.mac'
-  | 'menu.file.open-data-folder.win'
-  | 'menu.file.open-data-folder' {
-  if (process.platform === 'darwin') return 'menu.file.open-data-folder.mac'
-  if (process.platform === 'win32') return 'menu.file.open-data-folder.win'
-  return 'menu.file.open-data-folder'
 }

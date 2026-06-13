@@ -17,7 +17,7 @@
 
 import { app, Menu, type MenuItemConstructorOptions } from 'electron'
 import { activateMainWindow, getMainWindow, resetMainWindowToDefault } from '#/main/window.ts'
-import { t } from '#/main/i18n/index.ts'
+import { openDataFolderMenuKey, t } from '#/main/i18n/index.ts'
 import { sendRendererEffectIntent } from '#/main/renderer-surface-events.ts'
 import { getTheme } from '#/main/theme.ts'
 import { normalizeWorkspaceLayout, type WorkspaceLayout } from '#/shared/workspace-layout.ts'
@@ -383,20 +383,4 @@ async function openWebVersionFromMenu(): Promise<void> {
 
 async function openDataFolder(): Promise<void> {
   await runOpenDataFolder()
-}
-
-/**
- * Pick the right i18n key for the File → Open Data Folder menu item
- * based on the host platform. The variant keys live next to the base
- * key in each i18n bundle so translators can adapt the OS-specific
- * copy. Linux and other Unix-y platforms fall through to the generic
- * "Open Data Folder" label — `shell.openPath` works fine there.
- */
-function openDataFolderMenuKey():
-  | 'menu.file.open-data-folder.mac'
-  | 'menu.file.open-data-folder.win'
-  | 'menu.file.open-data-folder' {
-  if (process.platform === 'darwin') return 'menu.file.open-data-folder.mac'
-  if (process.platform === 'win32') return 'menu.file.open-data-folder.win'
-  return 'menu.file.open-data-folder'
 }
