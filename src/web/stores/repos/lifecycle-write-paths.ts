@@ -271,13 +271,6 @@ export function refreshInitialRepoState(get: ReposGet, refresh: InitialRepoRefre
   })
 }
 
-function applyWorkspaceOpen(
-  s: Pick<ReposStore, 'repos' | 'order' | 'restorableRepoCache'>,
-  repo: ResolvedRepo,
-): Pick<ReposStore, 'repos' | 'order'> & { changed: boolean; id: string } {
-  return addResolvedRepo(s, repo)
-}
-
 export function createRuntimeRepoLifecycleActions(
   set: ReposSet,
   get: ReposGet,
@@ -296,7 +289,7 @@ export function createRuntimeRepoLifecycleActions(
       })
 
       set((s) => {
-        const { repos, order, changed } = applyWorkspaceOpen(s, repo)
+        const { repos, order, changed } = addResolvedRepo(s, repo)
         // Only kick off an initial refresh when the resolved probe
         // actually changed the store (new repo, or existing placeholder
         // got a new target). A matching target is a no-op set and the
