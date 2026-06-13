@@ -354,10 +354,15 @@ const BOOTSTRAP_CHANNEL = 'goblin:get-bootstrap'
  * path the preload uses: extract the token from the additionalArguments
  * injected by `createRendererWindowWebPreferences`, then call the
  * `ipcMain.on(BOOTSTRAP_CHANNEL)` handler the window-shell module
- * registered at import time.
+ * exposes via `registerBootstrapIpc()`. Registering must happen
+ * explicitly — see the comment on `registerBootstrapIpc` — so this
+ * helper does the registration up front.
  */
 async function readBootstrapPayload(): Promise<Record<string, unknown>> {
   const { ipcMain } = await import('electron')
+  const { registerBootstrapIpc, resetBootstrapIpcForTests } = await import('#/main/window-shell.ts')
+  resetBootstrapIpcForTests()
+  registerBootstrapIpc()
   const tokenArg = mocks.windowOptions[0]?.webPreferences?.additionalArguments?.find((arg: string) =>
     arg.startsWith(BOOTSTRAP_TOKEN_PREFIX),
   )

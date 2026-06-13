@@ -35,7 +35,9 @@ export const ja: Record<DictKey, string> = {
   'menu.file.no-recent': '最近使ったリポジトリはありません',
   'menu.file.clear-recent': 'メニューを消去',
   'menu.file.open-in-browser': 'ブラウザで開く',
-  'menu.file.open-data-folder': 'Finderでデータフォルダを開く',
+  'menu.file.open-data-folder': 'データフォルダを開く',
+  'menu.file.open-data-folder.mac': 'Finderでデータフォルダを開く',
+  'menu.file.open-data-folder.win': 'エクスプローラーでデータフォルダを開く',
   'menu.file.close-window': 'ウィンドウを閉じる',
   'menu.file.close-tab': 'タブを閉じる',
   'menu.file.settings': '設定…',
@@ -510,8 +512,11 @@ export const ja: Record<DictKey, string> = {
   'settings.terminal-notifications-test-body': 'この通知が届いていれば、通知は正常に機能しています。',
   'settings.terminal-notifications-test-sent': 'テスト通知を送信しました',
   'settings.terminal-notifications-test-failed': 'テスト通知を表示できません',
-  'settings.terminal-notifications-test-failed-hint':
+  'settings.terminal-notifications-test-failed-hint': 'システム設定で Goblin の通知を許可してください。',
+  'settings.terminal-notifications-test-failed-hint.mac':
     'システム設定 → 通知 → Goblin を開き、通知が許可されているか確認してください。',
+  'settings.terminal-notifications-test-failed-hint.win':
+    '設定 → システム → 通知 → Goblin を開き、通知が許可されているか確認してください。',
   'settings.group.general': '一般',
   'settings.github.title': 'GitHub',
   'settings.github.body': 'Goblin は GitHub へのアクセスに GitHub CLI (`gh`) を使用します。',

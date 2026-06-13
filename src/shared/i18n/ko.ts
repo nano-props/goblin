@@ -32,7 +32,9 @@ export const ko: Record<DictKey, string> = {
   'menu.file.no-recent': '최근 리포지토리 없음',
   'menu.file.clear-recent': '메뉴 지우기',
   'menu.file.open-in-browser': '브라우저에서 열기',
-  'menu.file.open-data-folder': 'Finder에서 데이터 폴더 열기',
+  'menu.file.open-data-folder': '데이터 폴더 열기',
+  'menu.file.open-data-folder.mac': 'Finder에서 데이터 폴더 열기',
+  'menu.file.open-data-folder.win': 'Explorer에서 데이터 폴더 열기',
   'menu.file.close-window': '창 닫기',
   'menu.file.close-tab': '탭 닫기',
   'menu.file.settings': '설정…',
@@ -503,8 +505,11 @@ export const ko: Record<DictKey, string> = {
   'settings.terminal-notifications-test-body': '이 알림이 보이면 알림이 정상적으로 작동하고 있습니다.',
   'settings.terminal-notifications-test-sent': '테스트 알림을 보냈습니다',
   'settings.terminal-notifications-test-failed': '테스트 알림을 표시할 수 없습니다',
-  'settings.terminal-notifications-test-failed-hint':
+  'settings.terminal-notifications-test-failed-hint': '시스템 설정에서 Goblin 알림을 허용하세요.',
+  'settings.terminal-notifications-test-failed-hint.mac':
     '시스템 설정 → 알림 → Goblin으로 이동하여 알림이 허용되어 있는지 확인하세요.',
+  'settings.terminal-notifications-test-failed-hint.win':
+    '설정 → 시스템 → 알림 → Goblin으로 이동하여 알림이 허용되어 있는지 확인하세요.',
   'settings.group.general': '일반',
   'settings.github.title': 'GitHub',
   'settings.github.body': 'Goblin은 GitHub 접근에 GitHub CLI (`gh`)를 사용합니다.',

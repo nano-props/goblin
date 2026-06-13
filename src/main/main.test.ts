@@ -62,6 +62,15 @@ vi.mock('electron', () => ({
   dialog: {
     showErrorBox: vi.fn(),
   },
+  // wireMainProcessIpc() registers the renderer-bootstrap handler via
+  // registerBootstrapIpc(); the test never reads from it but the
+  // call must not throw, so we expose a no-op ipcMain.
+  ipcMain: {
+    on: vi.fn(),
+    handle: vi.fn(),
+    removeHandler: vi.fn(),
+    removeAllListeners: vi.fn(),
+  },
 }))
 
 vi.mock('#/main/window.ts', () => ({

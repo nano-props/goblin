@@ -35,7 +35,12 @@ export const en = {
   'menu.file.no-recent': 'No Recent Repositories',
   'menu.file.clear-recent': 'Clear Menu',
   'menu.file.open-in-browser': 'Open in Browser',
-  'menu.file.open-data-folder': 'Open Data Folder in Finder',
+  'menu.file.open-data-folder': 'Open Data Folder',
+  // Platform variants picked at menu-build time in the main process
+  // (where `process.platform` is the source of truth — the renderer is
+  // sandboxed and only sees `bootstrap.platform`).
+  'menu.file.open-data-folder.mac': 'Open Data Folder in Finder',
+  'menu.file.open-data-folder.win': 'Open Data Folder in Explorer',
   'menu.file.close-window': 'Close Window',
   'menu.file.close-tab': 'Close Tab',
   'menu.file.settings': 'Settings…',
@@ -511,8 +516,15 @@ export const en = {
   'settings.terminal-notifications-test-body': 'Notifications are working correctly.',
   'settings.terminal-notifications-test-sent': 'Test notification sent',
   'settings.terminal-notifications-test-failed': 'Unable to show test notification',
-  'settings.terminal-notifications-test-failed-hint':
+  'settings.terminal-notifications-test-failed-hint': 'Allow notifications for Goblin in your system settings.',
+  // Platform variants picked at render time in the renderer using
+  // bootstrap.platform. macOS notifications live under
+  // System Settings → Notifications; Windows under Settings →
+  // System → Notifications.
+  'settings.terminal-notifications-test-failed-hint.mac':
     'Go to System Settings → Notifications → Goblin and make sure notifications are allowed.',
+  'settings.terminal-notifications-test-failed-hint.win':
+    'Open Settings → System → Notifications → Goblin and make sure notifications are allowed.',
   'settings.group.general': 'General',
   'settings.github.title': 'GitHub',
   'settings.github.body': 'Goblin uses GitHub CLI (`gh`) for GitHub access.',

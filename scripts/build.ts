@@ -262,10 +262,7 @@ function planWindows(): PlatformPlan {
       // electron-builder / @electron/get cache Electron downloads under
       // %LOCALAPPDATA%\electron-builder\Cache on Windows.
       const localAppData = process.env.LOCALAPPDATA?.trim() || path.join(os.homedir(), 'AppData', 'Local')
-      return [
-        path.join(localAppData, 'electron-builder', 'Cache'),
-        path.join(localAppData, 'electron', 'Cache'),
-      ]
+      return [path.join(localAppData, 'electron-builder', 'Cache'), path.join(localAppData, 'electron', 'Cache')]
     },
   }
 }
