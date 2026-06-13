@@ -1,5 +1,6 @@
 import { runRemoteCommand } from '#/system/ssh/commands.ts'
 import { makeUnresolvedTargetDiagnostic, testRemoteRepository } from '#/system/ssh/diagnostics.ts'
+import { REMOTE_DIAGNOSTIC_CATEGORIES, type RemoteDiagnosticCategory } from '#/shared/remote-repo.ts'
 import {
   listSshConfigHosts,
   resolveRemoteTarget as resolveSshRemoteTarget,
@@ -47,9 +48,9 @@ export async function resolveServerRemoteTarget(
   input: RemoteConnectionInput,
   signal?: AbortSignal,
 ): Promise<ResolveTargetResult> {
+  const needsHomeExpansion = input.remotePath.startsWith('~/')
   let resolved: ResolvedRemoteTarget
   try {
-    const needsHomeExpansion = input.remotePath.startsWith('~/')
     resolved = await resolveSshRemoteTarget(
       needsHomeExpansion ? { ...input, remotePath: '/' } : input,
       signal,
@@ -57,7 +58,7 @@ export async function resolveServerRemoteTarget(
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'error.failed-read-repo' }
   }
-  if (!input.remotePath.startsWith('~/')) return resolved
+  if (!needsHomeExpansion) return resolved
   let normalized: RemoteRepoTarget | null
   try {
     normalized = normalizeRemoteTarget({
@@ -128,12 +129,20 @@ export async function testServerRemoteRepository(
     const resolved = await resolveTrackedRemoteTarget(normalized, signal)
     return await testRemoteRepository(resolved.target, { signal })
   } catch (err) {
-    // Translation key — renderer formats via i18n. We pass through the
-    // original message because resolveTrackedRemoteTarget already raises
-    // an i18n key (e.g. error.ssh-config-changed) or a real diagnostic
-    // category (e.g. unknown failures bubble up unchanged).
-    const message = err instanceof Error ? err.message : 'config-changed'
-    const category = message === 'error.ssh-config-changed' ? 'config-changed' : 'unknown'
-    return makeUnresolvedTargetDiagnostic(normalized, category, message)
+    // Translation key — renderer formats via i18n. resolveTrackedRemoteTarget
+    // raises either an i18n key (e.g. error.ssh-config-changed) or a real
+    // diagnostic category. Anything else falls back to 'unknown'.
+    const message = err instanceof Error ? err.message : 'error.ssh-config-changed'
+    return makeUnresolvedTargetDiagnostic(normalized, classifyResolutionFailure(message), message)
   }
+}
+
+function classifyResolutionFailure(message: string): RemoteDiagnosticCategory {
+  if (isRemoteDiagnosticCategory(message)) return message as RemoteDiagnosticCategory
+  if (message === 'error.ssh-config-changed') return 'config-changed'
+  return 'unknown'
+}
+
+function isRemoteDiagnosticCategory(value: string): boolean {
+  return (REMOTE_DIAGNOSTIC_CATEGORIES as readonly string[]).includes(value)
 }

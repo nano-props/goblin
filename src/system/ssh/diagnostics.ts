@@ -59,18 +59,39 @@ export async function testRemoteRepository(
 
   // Stages 2/3/4 are independent of each other (each is its own ssh
   // invocation, multiplexed over the ControlMaster socket). Run them
-  // in parallel and merge per-stage status.
+  // in parallel and merge per-stage status. The first failure in
+  // execution order wins as the primary diagnostic, but we still
+  // record the actual outcome of every stage we ran — earlier code
+  // marked downstream stages as 'skipped' even though they had
+  // already returned, which lost useful diagnostic detail.
   const [gitResult, pathResult, repoResult] = await Promise.all([
     run({ type: 'checkGit' }, target, runOptions),
     run({ type: 'testDirectory', path: target.remotePath }, target, runOptions),
     run({ type: 'revParseTopLevel', path: target.remotePath }, target, runOptions),
   ])
-  if (!gitResult.ok) return fail(2, classifyCommandFailure(gitResult, 'git-missing'), gitResult)
-  stages[2] = { ...stages[2]!, status: 'passed' }
-  if (!pathResult.ok) return fail(3, classifyCommandFailure(pathResult, 'path-missing'), pathResult)
-  stages[3] = { ...stages[3]!, status: 'passed' }
-  if (!repoResult.ok) return fail(4, classifyCommandFailure(repoResult, 'not-a-repo'), repoResult)
-  stages[4] = { ...stages[4]!, status: 'passed' }
+  const stageResults: Array<{ result: RemoteCommandResult; fallback: RemoteDiagnosticCategory }> = [
+    { result: gitResult, fallback: 'git-missing' },
+    { result: pathResult, fallback: 'path-missing' },
+    { result: repoResult, fallback: 'not-a-repo' },
+  ]
+  let primary: { index: number; category: RemoteDiagnosticCategory; result: RemoteCommandResult } | null = null
+  for (let i = 0; i < stageResults.length; i += 1) {
+    const { result, fallback } = stageResults[i]!
+    if (!result.ok) {
+      const category = classifyCommandFailure(result, fallback)
+      stages[2 + i] = {
+        ...stages[2 + i]!,
+        status: 'failed',
+        category,
+        message: category,
+        details: detailsFromResult(result),
+      }
+      if (!primary) primary = { index: 2 + i, category, result }
+    } else {
+      stages[2 + i] = { ...stages[2 + i]!, status: 'passed' }
+    }
+  }
+  if (primary) return { target, ok: false, category: primary.category, message: primary.category, details: detailsFromResult(primary.result), stages }
 
   return { target, ok: true, stages }
 }

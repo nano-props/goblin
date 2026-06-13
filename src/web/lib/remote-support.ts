@@ -1,4 +1,8 @@
-import type { RemoteDiagnosticsResult, RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import {
+  REMOTE_DIAGNOSTIC_CATEGORIES,
+  type RemoteDiagnosticsResult,
+  type RemoteRepoTarget,
+} from '#/shared/remote-repo.ts'
 const SSH_SETTINGS_REASONS = new Set([
   'error.ssh-config-changed',
   'repo-tabs.open-remote-home-unavailable',
@@ -7,20 +11,7 @@ const SSH_SETTINGS_REASONS = new Set([
   'config-changed',
 ])
 
-const REMOTE_DIAGNOSTIC_REASONS = new Set([
-  'auth-failed',
-  'host-key',
-  'unreachable',
-  'handshake-failed',
-  'shell-failed',
-  'git-missing',
-  'path-missing',
-  'not-a-repo',
-  'timeout',
-  'cancelled',
-  'config-changed',
-  'unknown',
-])
+const REMOTE_DIAGNOSTIC_REASONS = new Set<string>(REMOTE_DIAGNOSTIC_CATEGORIES)
 
 function reasonTranslationKey(reason: string): string {
   return REMOTE_DIAGNOSTIC_REASONS.has(reason) ? `repo-tabs.open-remote-diagnostics-category-${reason}` : reason

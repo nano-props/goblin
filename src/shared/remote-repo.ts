@@ -55,6 +55,25 @@ export type RemoteDiagnosticCategory =
   | 'config-changed'
   | 'unknown'
 
+/** Runtime mirror of {@link RemoteDiagnosticCategory}. Use this to
+ *  check whether an arbitrary string is a known category before
+ *  casting — e.g. when reconstructing diagnostics from an
+ *  upstream-passed error message. */
+export const REMOTE_DIAGNOSTIC_CATEGORIES: readonly RemoteDiagnosticCategory[] = [
+  'auth-failed',
+  'host-key',
+  'unreachable',
+  'handshake-failed',
+  'shell-failed',
+  'git-missing',
+  'path-missing',
+  'not-a-repo',
+  'timeout',
+  'cancelled',
+  'config-changed',
+  'unknown',
+]
+
 export interface RemoteDiagnosticStage {
   name: RemoteDiagnosticStageName
   label: string

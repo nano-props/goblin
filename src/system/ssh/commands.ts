@@ -8,7 +8,11 @@ import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 
 const SSH_COMMAND_TIMEOUT_MS = 15_000
 const SSH_CONNECT_TIMEOUT_SEC = 10
-export const SSH_BOOT_PROBE_TIMEOUT_MS = 5_000
+/** Boot-probe timeout for the placeholder-tab hydrate path. Shorter than
+ *  SSH_COMMAND_TIMEOUT_MS so slow networks get a fast "connecting"→"unreachable"
+ *  transition, but long enough to ride out a VPN reconnect or a sleeping
+ *  laptop's first SSH handshake on the ControlMaster. */
+export const SSH_BOOT_PROBE_TIMEOUT_MS = 10_000
 // One multiplexed socket per (alias, host, port, user) tuple, kept well
 // under the macOS Unix-domain-socket 104-byte path limit. Using
 // `os.tmpdir() + '%C'` (40 hex chars + ssh's random suffix) blows past
