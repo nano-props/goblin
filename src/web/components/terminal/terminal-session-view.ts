@@ -219,6 +219,12 @@ export class TerminalSessionView {
   fitNow(): void {
     if (!this.term || !this.fitAddon || !hasMeasurableBox(this.xtermHost)) return
     this.fitAddon.fit()
+    // Force a redraw across every visible row. xterm.js paints once at the
+    // 80×24 size from openTerminal(); fitAddon.fit() then resizes the buffer
+    // to the real host size. In narrow hosts the resize occasionally leaves a
+    // stale cursor cell at the top-left, which surfaces as a reverse-video
+    // block before any shell output arrives. refresh() clears it.
+    this.term.refresh(0, Math.max(0, this.term.rows - 1))
     this.pinToBottomSoon()
   }
 
