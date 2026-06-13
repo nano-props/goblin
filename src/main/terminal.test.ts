@@ -8,18 +8,14 @@ import {
   TERMINAL_SET_BADGE_CHANNEL,
 } from '#/shared/ipc-channels.ts'
 
-const ipcHandlers = new Map<string, (_event: unknown, input: any) => unknown>()
-
-// showNotificationWithResult() races 'show' vs 'failed' events rather than
-// treating show() as a synchronous success. The mock must honour the same
-// contract: register listeners via once(), then fire the right event inside
-// show() so the promise resolves synchronously in tests.
-//
-// vi.hoisted() ensures this is evaluated before vi.mock() factory functions,
-// which are hoisted to the top of the file by vitest's transformer.
-const { mockNotificationEmitting } = vi.hoisted(() => ({
-  mockNotificationEmitting(emitEvent: 'show' | 'failed') {
-    return function MockNotification(this: { show: ReturnType<typeof vi.fn>; once: ReturnType<typeof vi.fn> }) {
+// `ipcHandlers` is captured by the electron mock factory below, which is
+// hoisted to the top of the file by vitest's transformer. Hoist the
+// storage too so the factory can write to it before the surrounding
+// module body has run.
+const { ipcHandlers, mockNotificationEmitting } = vi.hoisted(() => {
+  const ipcHandlers = new Map<string, (_event: unknown, input: unknown) => unknown>()
+  const mockNotificationEmitting = (emitEvent: 'show' | 'failed') =>
+    function MockNotification(this: { show: ReturnType<typeof vi.fn>; once: ReturnType<typeof vi.fn> }) {
       const listeners = new Map<string, () => void>()
       this.once = vi.fn((event: string, cb: () => void) => {
         listeners.set(event, cb)
@@ -28,15 +24,15 @@ const { mockNotificationEmitting } = vi.hoisted(() => ({
         listeners.get(emitEvent)?.()
       })
     }
-  },
-}))
+  return { ipcHandlers, mockNotificationEmitting }
+})
 
 vi.mock('electron', () => ({
   ipcMain: {
-    handle: vi.fn((channel: string, handler: (_event: unknown, input: any) => unknown) => {
+    handle: vi.fn((channel: string, handler: (_event: unknown, input: unknown) => unknown) => {
       ipcHandlers.set(channel, handler)
     }),
-    on: vi.fn((channel: string, handler: (_event: unknown, input: any) => unknown) => {
+    on: vi.fn((channel: string, handler: (_event: unknown, input: unknown) => unknown) => {
       ipcHandlers.set(channel, handler)
     }),
   },
