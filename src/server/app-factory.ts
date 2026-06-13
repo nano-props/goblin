@@ -143,54 +143,25 @@ export function createApp(options: ServerAppOptions): Hono {
   app.route('/api/remote', createRemoteRoutes())
   app.route('/api/repo', createRepoRoutes())
   app.route('/ws', createRealtimeRoutes({ internalSecret: options.internalSecret, terminalHost: options.terminalHost }))
-  app.get('/', async (c) => {
-    try {
-      return c.html(
-        await renderRendererIndexHtml(c.req.url, options.internalSecret, c.req.header('accept-language') ?? null),
-      )
-    } catch {
-      return c.text('Not Found', 404)
-    }
-  })
-  app.get('/index.html', async (c) => {
-    try {
-      return c.html(
-        await renderRendererIndexHtml(c.req.url, options.internalSecret, c.req.header('accept-language') ?? null),
-      )
-    } catch {
-      return c.text('Not Found', 404)
-    }
-  })
-  app.get('/settings', async (c) => {
-    try {
-      return c.html(
-        await renderRendererIndexHtml(c.req.url, options.internalSecret, c.req.header('accept-language') ?? null),
-      )
-    } catch {
-      return c.text('Not Found', 404)
-    }
-  })
-  app.get('/settings/*', async (c) => {
-    try {
-      return c.html(
-        await renderRendererIndexHtml(c.req.url, options.internalSecret, c.req.header('accept-language') ?? null),
-      )
-    } catch {
-      return c.text('Not Found', 404)
-    }
-  })
   app.use('/*', serveStatic({ root: WEB_DIST_DIR }))
+  // SPA fallback: any GET that wasn't handled by an earlier route
+  // (and isn't an /api/* or /ws/* request — those fall through to
+  // the JSON notFound below) gets the rendered index.html so the
+  // React app can take over routing. Replaces five separate
+  // explicit handlers (\`/\`, \`/index.html\`, \`/settings\`,
+  // \`/settings/*\`, the previous catch-all) with one.
+  app.get('*', async (c, next) => {
+    if (c.req.path.startsWith('/api/') || c.req.path.startsWith('/ws/')) return next()
+    try {
+      return c.html(
+        await renderRendererIndexHtml(c.req.url, options.internalSecret, c.req.header('accept-language') ?? null),
+      )
+    } catch {
+      return c.text('Not Found', 404)
+    }
+  })
   app.notFound((c) =>
     c.json({ ok: false, code: 'NOT_FOUND', message: `No route for ${c.req.method} ${c.req.path}` }, 404),
   )
-  app.get('*', async (c) => {
-    try {
-      return c.html(
-        await renderRendererIndexHtml(c.req.url, options.internalSecret, c.req.header('accept-language') ?? null),
-      )
-    } catch {
-      return c.text('Not Found', 404)
-    }
-  })
   return app
 }

@@ -5,6 +5,7 @@ import {
   registerInvalidationSocket,
   unregisterInvalidationSocket,
 } from '#/server/modules/invalidation-broker.ts'
+import { safeEqualString } from '#/server/common/timing-safe.ts'
 import type { ServerTerminalHost, ServerTerminalSocket } from '#/server/terminal/terminal-host.ts'
 
 interface RealtimeRouteOptions {
@@ -12,16 +13,26 @@ interface RealtimeRouteOptions {
   terminalHost: ServerTerminalHost
 }
 
+// Cap each terminal WS message at 1 MiB. Real terminal input is
+// a keystroke or a paste; 1 MiB covers the largest legitimate
+// paste while preventing a hostile client from streaming an
+// unbounded buffer through the worker.
+const TERMINAL_WS_MESSAGE_LIMIT_BYTES = 1 * 1024 * 1024
+
 // Server-authoritative realtime only. Native-host renderer effect intents stay
 // on Electron IPC so the server does not become a broker for local shell APIs.
 export function createRealtimeRoutes({ internalSecret, terminalHost }: RealtimeRouteOptions) {
   const app = new Hono()
   app.use('/invalidation', async (c, next) => {
-    if (c.req.query('token') !== internalSecret) return c.json({ ok: false, message: 'Unauthorized' }, 401)
+    if (!safeEqualString(c.req.query('token') ?? '', internalSecret)) {
+      return c.json({ ok: false, message: 'Unauthorized' }, 401)
+    }
     await next()
   })
   app.use('/terminal', async (c, next) => {
-    if (c.req.query('token') !== internalSecret) return c.json({ ok: false, message: 'Unauthorized' }, 401)
+    if (!safeEqualString(c.req.query('token') ?? '', internalSecret)) {
+      return c.json({ ok: false, message: 'Unauthorized' }, 401)
+    }
     if (!terminalHost.isValidClientId(c.req.query('clientId')))
       return c.json({ ok: false, message: 'Invalid client id' }, 400)
     if (!c.req.query('attachmentId')) return c.json({ ok: false, message: 'Missing attachment id' }, 400)
@@ -64,6 +75,12 @@ export function createRealtimeRoutes({ internalSecret, terminalHost }: RealtimeR
         },
         onMessage(event, ws) {
           if (typeof event.data === 'string') {
+            if (event.data.length > TERMINAL_WS_MESSAGE_LIMIT_BYTES) {
+              try {
+                ws.close(1009, 'message too large')
+              } catch {}
+              return
+            }
             terminalHost.handleRealtimeMessage(clientId, attachmentId, ws as ServerTerminalSocket, event.data)
           }
         },

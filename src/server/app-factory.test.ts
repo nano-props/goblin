@@ -197,4 +197,37 @@ describe('server app html bootstrap', () => {
       expect(html).toContain('<base href="http://127.0.0.1:32100/">')
     }
   })
+
+  test('serves renderer html for arbitrary deep-link paths (SPA fallback)', async () => {
+    const { createApp } = await import('#/server/app-factory.ts')
+    const app = createApp({
+      version: '0.1.0',
+      startedAt: Date.now(),
+      internalSecret: 'secret',
+      terminalHost: terminalHostStub,
+    })
+    for (const path of ['/', '/repos/abc123', '/repos/abc123/changes']) {
+      const response = await app.request(new Request(`http://127.0.0.1:32100${path}`))
+      const html = await response.text()
+      expect(response.status).toBe(200)
+      expect(html).toContain('<script id="goblin-bootstrap" type="application/json">')
+    }
+  })
+
+  test('returns JSON 404 (not the SPA shell) for unknown /api paths', async () => {
+    const { createApp } = await import('#/server/app-factory.ts')
+    const app = createApp({
+      version: '0.1.0',
+      startedAt: Date.now(),
+      internalSecret: 'secret',
+      terminalHost: terminalHostStub,
+    })
+    const response = await app.request(new Request('http://127.0.0.1:32100/api/unknown'))
+    expect(response.status).toBe(404)
+    const json = (await response.json()) as { ok: false; code: string }
+    expect(json).toEqual({ ok: false, code: 'NOT_FOUND', message: expect.any(String) })
+    // Make sure the catch-all didn't accidentally serve the HTML
+    // shell (it would contain the bootstrap script).
+    expect(response.headers.get('content-type')).toMatch(/application\/json/)
+  })
 })
