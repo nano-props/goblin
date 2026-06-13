@@ -1,29 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import {
-  validateBranchDeletionPolicy,
-  validateCreateWorktreeInput,
-  validateRemovableWorktreeState,
-} from '#/shared/repo-action-policy.ts'
-
-describe('validateCreateWorktreeInput', () => {
-  test('accepts an absolute path with safe branch names', () => {
-    expect(validateCreateWorktreeInput('/tmp/repo-feature', 'feature/test', 'main')).toBeNull()
-  })
-
-  test('rejects a relative path', () => {
-    expect(validateCreateWorktreeInput('relative/path', 'feature/test', 'main')).toEqual({
-      ok: false,
-      message: 'error.invalid-path',
-    })
-  })
-
-  test('rejects invalid branch names', () => {
-    expect(validateCreateWorktreeInput('/tmp/repo-feature', '-bad', 'main')).toEqual({
-      ok: false,
-      message: 'error.invalid-arguments',
-    })
-  })
-})
+import { validateBranchDeletionPolicy, validateRemovableWorktreeState } from '#/shared/repo-action-policy.ts'
 
 describe('validateRemovableWorktreeState', () => {
   test('accepts a clean unlocked worktree', () => {

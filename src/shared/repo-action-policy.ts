@@ -1,20 +1,12 @@
-import path from 'node:path'
+// Single source of truth for the policy-style guards that gate destructive
+// repo actions. Callers pass already-validated primitives (branch name,
+// current branch, worktree metadata) and these helpers return either
+// null (allowed) or an `ExecResult` shape the IPC layer can hand back to
+// the renderer without translation.
+
 import { PROTECTED_BRANCHES, type ExecResult, type WorktreeInfo } from '#/shared/git-types.ts'
-import { isSafeBranchName } from '#/shared/refnames.ts'
 
 export type BranchDeletionNotMergedMessage = 'error.branch-not-fully-merged' | 'error.cannot-remove-unpushed-worktree'
-
-export function validateCreateWorktreeInput(
-  worktreePath: string,
-  newBranch: string,
-  baseBranch: string,
-): ExecResult | null {
-  if (!path.isAbsolute(worktreePath) || worktreePath.includes('\0')) return { ok: false, message: 'error.invalid-path' }
-  if (!isSafeBranchName(newBranch) || !isSafeBranchName(baseBranch)) {
-    return { ok: false, message: 'error.invalid-arguments' }
-  }
-  return null
-}
 
 export function validateRemovableWorktreeState(worktree: WorktreeInfo): ExecResult | null {
   if (worktree.isLocked === true) return { ok: false, message: 'error.cannot-remove-locked-worktree' }
