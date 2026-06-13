@@ -24,7 +24,7 @@ function createRepo(
 ) {
   const repo = emptyRepo(id, 'repo')
   repo.instanceToken = id === '/repo-a' ? 1 : 2
-  repo.ui.detailTab = options.detailTab ?? 'status'
+  repo.ui.preferredDetailTab = options.detailTab ?? 'status'
   repo.availability.phase = options.availability ?? 'available'
   repo.resources.status.phase = options.statusPhase ?? 'idle'
   return repo

@@ -511,6 +511,7 @@ describe('TerminalSessionProvider', () => {
     try {
       const base = { repoRoot: REPO_ID, branch: 'feature/worktree', worktreePath: WORKTREE_PATH }
       await act(async () => {
+        useReposStore.getState().setDetailTab(REPO_ID, 'terminal')
         await getContext().createTerminal(base)
         await getContext().createTerminal(base)
       })
@@ -536,18 +537,23 @@ describe('TerminalSessionProvider', () => {
       })
 
       expect(closeMock).not.toHaveBeenCalled()
-      expect(useReposStore.getState().repos[REPO_ID]?.ui.detailTab).toBe('terminal')
+      expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredDetailTab).toBe('terminal')
       expect(useReposStore.getState().detailCollapsed).toBe(false)
       expect(getProbe().summaries.map((session) => [session.terminalId, session.selected, session.hasBell])).toEqual([
         ['terminal-1', true, false],
       ])
 
+      // With the derived-value pattern, the store never re-projects the
+      // preferred tab when terminal sessions go to zero. The user's intent
+      // is preserved; `useEffectiveDetailTab` resolves the rendered tab
+      // at read time (covered by `detail-tabs.test.ts` and
+      // `useEffectiveDetailTab.test.tsx`).
       await act(async () => {
         exitHandler?.({ sessionId: 'terminal-1' })
       })
 
       expect(closeMock).not.toHaveBeenCalled()
-      expect(useReposStore.getState().repos[REPO_ID]?.ui.detailTab).toBe('status')
+      expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredDetailTab).toBe('terminal')
       expect(useReposStore.getState().detailCollapsed).toBe(false)
     } finally {
       await unmount()
@@ -941,7 +947,7 @@ describe('TerminalSessionProvider', () => {
       ui: {
         ...firstRepo.ui,
         selectedBranch: 'feature/other',
-        detailTab: 'terminal',
+        preferredDetailTab: 'terminal',
       },
     } satisfies typeof firstRepo
     useReposStore.setState((state) => ({
@@ -988,7 +994,7 @@ describe('TerminalSessionProvider', () => {
       ui: {
         ...firstRepo.ui,
         selectedBranch: 'feature/other',
-        detailTab: 'terminal',
+        preferredDetailTab: 'terminal',
       },
     } satisfies typeof firstRepo
     useReposStore.setState((state) => ({

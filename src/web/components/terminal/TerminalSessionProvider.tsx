@@ -34,7 +34,6 @@ export function TerminalSessionProvider({ children, syncTracker: syncTrackerProp
   const currentRepoInstanceToken = currentRepoId ? (repoIndex[currentRepoId]?.instanceToken ?? null) : null
   const selectedTerminalByWorktree = useReposStore((s) => s.selectedTerminalByWorktree)
   const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
-  const dismissExitedTerminalDetail = useReposStore((s) => s.dismissExitedTerminalDetail)
   const parkingRootRef = useRef<HTMLDivElement | null>(null)
   const currentRepoIdRef = useRef(currentRepoId)
   currentRepoIdRef.current = currentRepoId
@@ -46,11 +45,7 @@ export function TerminalSessionProvider({ children, syncTracker: syncTrackerProp
 
   const registryRef = useRef<TerminalSessionRegistry | null>(null)
   if (!registryRef.current) {
-    registryRef.current = new TerminalSessionRegistry(
-      () => currentRepoIdRef.current,
-      setSelectedTerminal,
-      (repoRoot, worktreePath) => dismissExitedTerminalDetail(repoRoot, worktreePath),
-    )
+    registryRef.current = new TerminalSessionRegistry(() => currentRepoIdRef.current, setSelectedTerminal)
   }
   const registry = registryRef.current
 
@@ -165,7 +160,7 @@ export function TerminalSessionProvider({ children, syncTracker: syncTrackerProp
       scrollToBottom: registry.scrollToBottom,
       scrollLines: registry.scrollLines,
       clearBell: registry.clearBell,
-      closeTerminalAndDismissDetailIfLast: registry.closeTerminalAndDismissDetailIfLast,
+      closeTerminalByDescriptor: registry.closeTerminalByDescriptor,
       attach: registry.attach,
       detach: registry.detach,
       restart: registry.restart,

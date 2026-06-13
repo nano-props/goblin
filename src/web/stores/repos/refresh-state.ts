@@ -107,9 +107,6 @@ export function applySnapshotToRepoProjection(r: RepoState, snap: RepoSnapshot, 
     }
   }
   markRepoAvailable(r)
-  if (r.ui.detailTab === 'terminal' && !branches.some((branch) => branch.name === selected && branch.worktree?.path)) {
-    r.ui.detailTab = 'status'
-  }
   r.projection.source = 'fresh'
   r.projection.savedAt = null
   finishResourceSuccess(r.resources.snapshot)

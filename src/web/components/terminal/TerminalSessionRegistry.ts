@@ -68,7 +68,6 @@ export class TerminalSessionRegistry {
   constructor(
     private readonly getCurrentRepoId: () => string | null,
     private readonly onSelectedWorktreeChange: (worktreeTerminalKey: string, key: string | null) => void = () => {},
-    private readonly onWorktreeEmpty: (repoRoot: string, worktreePath: string) => void = () => {},
   ) {}
 
   setRepoIndex(repoIndex: TerminalRepoIndex): void {
@@ -332,7 +331,7 @@ export class TerminalSessionRegistry {
     this.sessions.get(key)?.scrollLines(amount)
   }
 
-  closeTerminalAndDismissDetailIfLast = (key: string, base: TerminalSessionBase): void => {
+  closeTerminalByDescriptor = (key: string, base: TerminalSessionBase): void => {
     const session = this.sessions.get(key)
     if (!session || session.descriptor.worktreeTerminalKey !== worktreeTerminalKey(base.repoRoot, base.worktreePath))
       return
@@ -532,17 +531,7 @@ export class TerminalSessionRegistry {
       this.selectTerminalKey(worktreeTerminalKey, nextKey, { notify: false })
     }
     this.notifyWorktree(worktreeTerminalKey)
-    if (!this.hasSessionsForWorktree(worktreeTerminalKey)) {
-      this.onWorktreeEmpty(session.descriptor.repoRoot, session.descriptor.worktreePath)
-    }
     return true
-  }
-
-  private hasSessionsForWorktree(worktreeTerminalKey: string): boolean {
-    for (const s of this.sessions.values()) {
-      if (s.descriptor.worktreeTerminalKey === worktreeTerminalKey) return true
-    }
-    return false
   }
 
   private closeTerminal(key: string): void {

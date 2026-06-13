@@ -5,13 +5,13 @@ export function persistedActiveRepoIdForSession(activeId: string | null): string
 }
 
 export function persistedDetailTabByRepoForSession(
-  repos: Record<string, { ui: { detailTab: DetailTab } } | undefined>,
+  repos: Record<string, { ui: { preferredDetailTab: DetailTab } } | undefined>,
   order: string[],
 ): Record<string, DetailTab> {
   const tabs: Record<string, DetailTab> = {}
   for (const id of order) {
     const repo = repos[id]
-    if (repo) tabs[id] = repo.ui.detailTab
+    if (repo) tabs[id] = repo.ui.preferredDetailTab
   }
   return tabs
 }

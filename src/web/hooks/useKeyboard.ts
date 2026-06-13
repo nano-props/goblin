@@ -195,9 +195,15 @@ export function useKeyboard({
           e.preventDefault()
           const selected = repo.data.branches.find((branch) => branch.name === repo.ui.selectedBranch)
           // Global shortcuts do not own tab focus; a missing branch is treated as "no worktree".
+          // Navigates from the user's preferred tab — `useEffectiveDetailTab` resolves the
+          // actual rendered tab at read time.
           navigation.showRepoDetailTab(
             repo.id,
-            adjacentDetailTab(repo.ui.detailTab, action === 'next-detail-tab' ? 1 : -1, !!selected?.worktree?.path),
+            adjacentDetailTab(
+              repo.ui.preferredDetailTab,
+              action === 'next-detail-tab' ? 1 : -1,
+              !!selected?.worktree?.path,
+            ),
           )
           break
         }

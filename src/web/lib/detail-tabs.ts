@@ -20,6 +20,35 @@ export function detailTabForWorktree(tab: DetailTab, hasWorktree: boolean): Deta
   return tab
 }
 
+/**
+ * Resolve the detail tab the UI should actually render.
+ *
+ * The repos store holds the user's *preferred* tab (the persisted intent).
+ * Whether that preference is renderable depends on two pieces of
+ * runtime truth owned by other layers:
+ *  - `hasWorktree` for the selected branch (repo data)
+ *  - `terminalSessionCount` + `terminalSyncReady` from the
+ *    TerminalSessionRegistry (live terminal context)
+ *
+ * `syncReady` lets us avoid briefly flashing `status → terminal → status`
+ * during boot: until the registry confirms the worktree truth, a
+ * `terminal` preference is preserved. Once the first sync settles, an
+ * empty worktree dismisses the `terminal` preference.
+ *
+ * Pure function so it can be unit-tested without React.
+ */
+export function computeEffectiveDetailTab(
+  preferred: DetailTab,
+  hasWorktree: boolean,
+  terminalSessionCount: number,
+  terminalSyncReady: boolean,
+): DetailTab {
+  if (!hasWorktree) return detailTabForWorktree(preferred, hasWorktree)
+  if (preferred !== 'terminal') return preferred
+  if (!terminalSyncReady) return 'terminal'
+  return terminalSessionCount > 0 ? 'terminal' : 'status'
+}
+
 export function detailTabNavigationKey(key: string): DetailTabNavigationKey | null {
   return key === 'ArrowRight' || key === 'ArrowLeft' || key === 'Home' || key === 'End' ? key : null
 }

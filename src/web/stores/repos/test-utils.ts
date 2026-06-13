@@ -549,7 +549,7 @@ export function seedRepoState(options: {
     ui: {
       ...base.ui,
       selectedBranch: options.selectedBranch ?? base.ui.selectedBranch,
-      detailTab: options.detailTab ?? base.ui.detailTab,
+      preferredDetailTab: options.detailTab ?? base.ui.preferredDetailTab,
     },
     remote: {
       ...base.remote,

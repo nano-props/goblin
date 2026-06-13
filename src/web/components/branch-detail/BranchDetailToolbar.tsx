@@ -22,12 +22,13 @@ import type { BranchDetailRepo, SelectedBranchDetailPresentation } from '#/web/c
 import { useRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
+import { useEffectiveDetailTab } from '#/web/components/branch-detail/useEffectiveDetailTab.ts'
 import {
   branchDetailToolbarStoreActionsEqual,
   branchDetailToolbarStoreActionsFromStore,
 } from '#/web/stores/repos/selector-actions.ts'
 interface Props {
-  repo: Pick<BranchDetailRepo, 'id' | 'ui'>
+  repo: Pick<BranchDetailRepo, 'id' | 'ui' | 'data'>
   detail: SelectedBranchDetailPresentation
   detailId: string
   contentId: string
@@ -47,12 +48,13 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
   const { shortcutsDisabled, toggleDetailOnActionBarBlankClick } = useRuntimeShortcutSettings()
   const compact = useIsCompactUi()
   const behavior = repoWorkspaceBehavior(layout, collapsed, detailFocusMode)
+  const effectiveTab = useEffectiveDetailTab(repo)
   const tabs = visibleDetailTabs(!!detail.branch?.worktree?.path)
   const terminalWorktreeKey = detail.branch?.worktree?.path
     ? worktreeTerminalKey(repo.id, detail.branch.worktree.path)
     : null
 
-  const { createTerminal, selectTerminal, scrollToBottom, closeTerminalAndDismissDetailIfLast, reorderSessions } =
+  const { createTerminal, selectTerminal, scrollToBottom, closeTerminalByDescriptor, reorderSessions } =
     useTerminalSessionContext()
 
   const worktreeSnapshot = useWorktreeTerminalSnapshot(terminalWorktreeKey)
@@ -68,47 +70,51 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
     [repo.id, detail.branch],
   )
 
-  const handleNewTerminal = useCallback(() => {
-    if (!terminalBase) return
-    if (repo.ui.detailTab !== 'terminal') {
+  // Shared "enter the terminal tab" effect for any terminal-targeting action:
+  // set the user's preferred tab to terminal (when not already there) and
+  // uncollapse the pane. Callers add their own follow-up command
+  // (create/select/scroll). Whether the terminal tab is *renderable*
+  // (worktree + sessions) is decided at read time by
+  // `useEffectiveDetailTab` — we only assert user intent here.
+  const enterTerminalTab = useCallback(() => {
+    if (repo.ui.preferredDetailTab !== 'terminal') {
       navigation.showRepoDetailTab(repo.id, 'terminal')
     }
     setDetailCollapsed(false)
+  }, [navigation, repo.id, repo.ui.preferredDetailTab, setDetailCollapsed])
+
+  const handleNewTerminal = useCallback(() => {
+    if (!terminalBase) return
+    enterTerminalTab()
     void createTerminal(terminalBase).catch((err) => {
       console.warn('[terminal] failed to create terminal', err)
       const message = err instanceof Error ? err.message : 'error.terminal-create-failed'
       toast.error(t('action.result-error'), { description: t(message) })
     })
-  }, [createTerminal, terminalBase, navigation, repo.id, repo.ui.detailTab, setDetailCollapsed, t])
+  }, [createTerminal, terminalBase, enterTerminalTab, t])
 
   const handleSelectTerminal = useCallback(
     (worktreeKey: string, key: string) => {
-      if (repo.ui.detailTab !== 'terminal') {
-        navigation.showRepoDetailTab(repo.id, 'terminal')
-      }
-      setDetailCollapsed(false)
+      enterTerminalTab()
       selectTerminal(worktreeKey, key)
     },
-    [repo.ui.detailTab, repo.id, navigation, selectTerminal, setDetailCollapsed],
+    [enterTerminalTab, selectTerminal],
   )
 
   const handleScrollToBottom = useCallback(
     (key: string) => {
-      if (repo.ui.detailTab !== 'terminal') {
-        navigation.showRepoDetailTab(repo.id, 'terminal')
-      }
-      setDetailCollapsed(false)
+      enterTerminalTab()
       scrollToBottom(key)
     },
-    [repo.ui.detailTab, repo.id, navigation, scrollToBottom, setDetailCollapsed],
+    [enterTerminalTab, scrollToBottom],
   )
 
   const handleCloseTerminal = useCallback(
     (key: string) => {
       if (!terminalBase) return
-      closeTerminalAndDismissDetailIfLast(key, terminalBase)
+      closeTerminalByDescriptor(key, terminalBase)
     },
-    [closeTerminalAndDismissDetailIfLast, terminalBase],
+    [closeTerminalByDescriptor, terminalBase],
   )
 
   const handleReorderTerminals = useCallback(
@@ -169,7 +175,7 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
             .filter((tab) => tab.id !== 'terminal')
             .map((tab) => {
               const tabId = tab.id === 'status' ? 'status' : 'changes'
-              const selected = repo.ui.detailTab === tab.id
+              const selected = effectiveTab === tab.id
               const visuallySelected = !collapsed && selected
               return (
                 <Button
@@ -213,7 +219,7 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
               sessions={terminalSessions}
               detailId={detailId}
               responsiveCompact={compact}
-              panelActive={repo.ui.detailTab === 'terminal'}
+              panelActive={effectiveTab === 'terminal'}
               focusMode={detailFocusMode}
               focusRegistry={terminalTabFocusRegistry}
               emptyFocusKey={EMPTY_TERMINAL_TAB_FOCUS_KEY}

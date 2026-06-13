@@ -21,16 +21,7 @@ import type {
   ReposStore,
 } from '#/web/stores/repos/types.ts'
 import type { WorkspaceDetailPaneSizes } from '#/shared/workspace-layout.ts'
-import type { RepoState } from '#/web/stores/repos/types.ts'
-import { detailTabForWorktree } from '#/web/lib/detail-tabs.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
-function branchHasWorktree(repo: RepoState, branchName: string | null): boolean {
-  return !!branchName && repo.data.branches.some((branch) => branch.name === branchName && !!branch.worktree?.path)
-}
-
-function detailTabForSelection(repo: RepoState, tab: DetailTab, selectedBranch = repo.ui.selectedBranch): DetailTab {
-  return detailTabForWorktree(tab, branchHasWorktree(repo, selectedBranch))
-}
 
 type RestorableWorkspaceSelectionActions = Pick<
   ReposStore,
@@ -55,7 +46,7 @@ type LocalWorkspaceSelectionActions = Pick<ReposStore, 'setBranchSearchQuery'>
 
 type RuntimeCoherentSelectionActions = Pick<
   ReposStore,
-  'setBranchViewMode' | 'setDetailTab' | 'dismissExitedTerminalDetail' | 'selectBranch'
+  'setBranchViewMode' | 'setDetailTab' | 'selectBranch'
 >
 
 type RepoMutationSelectionActions = Pick<ReposStore, 'checkoutSelectedInRepo' | 'checkoutSelected'>
@@ -175,19 +166,21 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
     },
 
     applySessionDetailTabByRepo(detailTabByRepo: Record<string, DetailTab>) {
-      // One-shot boot/session restore of per-repo detail tab selection.
-      // Applied after hydrateSession so repos already exist.
+      // One-shot boot/session restore of per-repo user-preferred detail tab.
+      // The store does not project against terminal session count or
+      // worktree presence — `useEffectiveDetailTab` handles that at read
+      // time, which keeps the restored preference intact even if a
+      // worktree later confirms zero sessions.
       set((s) => {
         let changed = false
         const repos = { ...s.repos }
         for (const [id, tab] of Object.entries(detailTabByRepo)) {
           const repo = repos[id]
           if (!repo) continue
-          const nextTab = detailTabForSelection(repo, tab)
-          if (repo.ui.detailTab === nextTab) continue
+          if (repo.ui.preferredDetailTab === tab) continue
           changed = true
           repos[id] = replaceRepo(repo, (r) => {
-            r.ui.detailTab = nextTab
+            r.ui.preferredDetailTab = tab
           })
         }
         return changed ? { repos } : s
@@ -270,6 +263,21 @@ function createLocalWorkspaceSelectionActions(set: ReposSet): LocalWorkspaceSele
 }
 
 function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): RuntimeCoherentSelectionActions {
+  // Shared post-write effects for actions that may have updated detailTab/branch:
+  // persist the warm-restore snapshot and refresh the visible branch's pull
+  // request. Centralized so every selection-changing action stays consistent.
+  function afterSelectionChange(id: string, token: number, branchForPullRequest: string | null): void {
+    const repo = get().repos[id]
+    if (!repo) return
+    persistRestorableRepoSnapshot(set, repo, token)
+    void runRepoRefreshIntent(get, {
+      kind: 'visible-pull-request-changed',
+      id,
+      token,
+      branch: branchForPullRequest,
+    })
+  }
+
   return {
     setBranchViewMode(id: string, viewMode: BranchViewMode) {
       let changed = false
@@ -286,82 +294,32 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         return replaceRepoState(s, repo, (r) => {
           r.ui.branchViewMode = viewMode
           r.ui.selectedBranch = selectedBranch
-          r.ui.detailTab = detailTabForSelection(repo, r.ui.detailTab, selectedBranch)
         })
       })
-      const repo = get().repos[id]
-      if (changed && token !== undefined && repo) persistRestorableRepoSnapshot(set, repo, token)
-      if (changed && token !== undefined && repo) {
-        void runRepoRefreshIntent(get, {
-          kind: 'visible-pull-request-changed',
-          id,
-          token,
-          branch: selectedForPullRequest,
-        })
-      }
+      if (changed && token !== undefined) afterSelectionChange(id, token, selectedForPullRequest)
     },
 
     setDetailTab(id: string, tab: DetailTab) {
+      // Persists the user's preferred tab verbatim. The store does *not*
+      // project against worktree presence or terminal session count — the UI
+      // computes the effective tab from this preference + live terminal
+      // runtime via `computeEffectiveDetailTab`. This preserves user intent
+      // across session restore, branch switches, and the transient zero-
+      // session window between handleNewTerminal and createTerminal.
       let changed = false
       let token: number | undefined
       set((s) => {
         const repo = s.repos[id]
-        if (!repo) return s
-        const nextTab = detailTabForSelection(repo, tab)
-        if (repo.ui.detailTab === nextTab) return s
+        if (!repo || repo.ui.preferredDetailTab === tab) return s
         changed = true
         token = repo.instanceToken
         return replaceRepoState(s, repo, (r) => {
-          r.ui.detailTab = nextTab
+          r.ui.preferredDetailTab = tab
         })
       })
+      if (!changed || token === undefined) return
       const repo = get().repos[id]
-      if (changed && token !== undefined && repo) persistRestorableRepoSnapshot(set, repo, token)
-      if (changed && token !== undefined && repo) {
-        void runRepoRefreshIntent(get, {
-          kind: 'visible-pull-request-changed',
-          id,
-          token,
-          branch: repo.ui.detailTab === 'status' ? repo.ui.selectedBranch : null,
-        })
-      }
-    },
-
-    dismissExitedTerminalDetail(id: string, worktreePath: string, options?: { affectVisibleWorkspace?: boolean }) {
-      let changed = false
-      let token: number | undefined
-      const affectVisibleWorkspace = options?.affectVisibleWorkspace === true
-      set((s) => {
-        const repo = s.repos[id]
-        if (!repo || repo.ui.detailTab !== 'terminal') return s
-        const branch = repo.data.branches.find((branch) => branch.name === repo.ui.selectedBranch)
-        if (branch?.worktree?.path !== worktreePath) return s
-        changed = true
-        token = repo.instanceToken
-        const nextRepo = replaceRepo(repo, (r) => {
-          r.ui.detailTab = 'status'
-        })
-        const detailCollapsed = affectVisibleWorkspace
-          ? effectiveDetailCollapsed(s.workspaceLayout, true)
-          : s.detailCollapsed
-        if (nextRepo === repo && detailCollapsed === s.detailCollapsed) return s
-        if (nextRepo === repo) return { detailCollapsed }
-        return {
-          // Terminal exits in background repos should not surprise the active workspace layout.
-          detailCollapsed,
-          repos: { ...s.repos, [id]: nextRepo },
-        }
-      })
-      const repo = get().repos[id]
-      if (changed && token !== undefined && repo) persistRestorableRepoSnapshot(set, repo, token)
-      if (changed && token !== undefined && repo) {
-        void runRepoRefreshIntent(get, {
-          kind: 'visible-pull-request-changed',
-          id,
-          token,
-          branch: repo.ui.selectedBranch,
-        })
-      }
+      afterSelectionChange(id, token, repo?.ui.preferredDetailTab === 'status' ? repo.ui.selectedBranch : null)
     },
 
     selectBranch(id: string, branch: string) {
@@ -376,19 +334,9 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         token = repo.instanceToken
         return replaceRepoState(s, repo, (r) => {
           r.ui.selectedBranch = branch
-          r.ui.detailTab = detailTabForSelection(repo, r.ui.detailTab, branch)
         })
       })
-      const repo = get().repos[id]
-      if (changed && token !== undefined && repo) persistRestorableRepoSnapshot(set, repo, token)
-      if (changed && token !== undefined && repo) {
-        void runRepoRefreshIntent(get, {
-          kind: 'visible-pull-request-changed',
-          id,
-          token,
-          branch,
-        })
-      }
+      if (changed && token !== undefined) afterSelectionChange(id, token, branch)
     },
   }
 }
