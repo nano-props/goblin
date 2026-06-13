@@ -15,6 +15,7 @@ import {
   createRepositoryWorktree,
   deleteRepositoryBranch,
   fetchRepository,
+  getRepositoryRemoteBranches,
   openRepositoryEditor,
   openRepositoryRemote,
   openRepositoryTerminal,
@@ -54,6 +55,10 @@ export function createRepoRoutes() {
   app.get('/status', async (c) => {
     const { cwd } = parseHttpQuery(REPO_QUERY_SCHEMAS.status, c)
     return c.json(await jsonOr(() => getRepositoryStatus(cwd, c.req.raw.signal), [], 'status'))
+  })
+  app.post('/remote-branches', async (c) => {
+    const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.getRemoteBranches, c)
+    return c.json(await jsonOr(() => getRepositoryRemoteBranches(cwd, c.req.raw.signal), [], 'remote-branches'))
   })
   app.get('/patch', async (c) => {
     const { cwd, worktreePath } = parseHttpQuery(REPO_QUERY_SCHEMAS.patch, c)
@@ -135,13 +140,16 @@ export function createRepoRoutes() {
     )
   })
   app.post('/create-worktree', async (c) => {
-    const { cwd, worktreePath, newBranch, baseBranch, sourceToken } = await parseHttpBody(
-      REPO_PROCEDURE_SCHEMAS.createWorktree,
-      c,
-    )
+    const { cwd, worktreePath, mode, sourceToken } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.createWorktree, c)
     return c.json(
       await jsonOr(
-        () => createRepositoryWorktree(cwd, worktreePath, newBranch, baseBranch, c.req.raw.signal, sourceToken),
+        () =>
+          createRepositoryWorktree(
+            cwd,
+            { worktreePath, mode },
+            c.req.raw.signal,
+            sourceToken,
+          ),
         READ_REPO_ERROR,
         'create-worktree',
       ),
