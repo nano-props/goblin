@@ -80,6 +80,14 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
   const pullRequest =
     branch.pullRequest && branchPullRequestBelongsToBranch(branch, branch.pullRequest) ? branch.pullRequest : undefined
   const remoteIcon = pullRequest ? GitPullRequest : browserRemoteIcon(branchBrowserRemoteProvider(repo, branch))
+  const isRemoteRepo = !!repo.remote.target
+  // For remote repos the SSH invocation runs on the user's machine, so we
+  // don't need the local terminal/editor to be installed — the menu item
+  // stays visible regardless of `terminalAvailable` / `editorAvailable`.
+  const showTerminalAction = capabilities.canOpenTerminal && (isRemoteRepo || terminalAvailable)
+  const showEditorAction = capabilities.canOpenEditor && (isRemoteRepo || editorAvailable)
+  const terminalIconPref = isRemoteRepo ? 'auto' : (resolvedTerminalApp ?? terminalApp)
+  const editorIconPref = isRemoteRepo ? 'auto' : (resolvedEditorApp ?? editorApp)
 
   const patchItems: BranchActionItem[] = capabilities.canCopyPatch
     ? [
@@ -128,7 +136,7 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
       icon: createElement(ArrowUp),
       onSelect: actions.push,
     },
-    ...(capabilities.canOpenTerminal && terminalAvailable
+    ...(showTerminalAction
       ? [
           {
             id: 'terminal' as const,
@@ -137,12 +145,12 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
             busy: busy('terminal'),
             visible: true,
             shortcut: 'G',
-            icon: createElement(TerminalAppIcon, { pref: resolvedTerminalApp ?? terminalApp }),
+            icon: createElement(TerminalAppIcon, { pref: terminalIconPref }),
             onSelect: actions.openTerminal,
           },
         ]
       : []),
-    ...(capabilities.canOpenEditor && editorAvailable
+    ...(showEditorAction
       ? [
           {
             id: 'editor' as const,
@@ -151,7 +159,7 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
             busy: busy('editor'),
             visible: true,
             shortcut: 'V',
-            icon: createElement(EditorAppIcon, { pref: resolvedEditorApp ?? editorApp }),
+            icon: createElement(EditorAppIcon, { pref: editorIconPref }),
             onSelect: actions.openEditor,
           },
         ]

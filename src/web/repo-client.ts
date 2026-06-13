@@ -3,6 +3,7 @@ import { getServerJson, postServerJson } from '#/web/lib/server-fetch.ts'
 import type { CloneRepoResult, PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
 import type { ExecResult, PullRequestFetchMode, WorktreeStatus } from '#/shared/git-types.ts'
 import type { ProbeResult } from '#/shared/api-types.ts'
+import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 
 export async function probeRepository(cwd: string): Promise<ProbeResult> {
   return await getServerJson('/api/repo/probe', { cwd })
@@ -27,6 +28,10 @@ export async function getRepositorySnapshot(cwd: string, signal?: AbortSignal): 
 
 export async function getRepositoryStatus(cwd: string, signal?: AbortSignal): Promise<WorktreeStatus[]> {
   return await getServerJson('/api/repo/status', { cwd }, { signal })
+}
+
+export async function getRepositoryRemoteBranches(cwd: string, signal?: AbortSignal): Promise<string[]> {
+  return await postServerJson('/api/repo/remote-branches', { cwd }, { signal })
 }
 
 export async function getRepositoryPullRequests(
@@ -81,17 +86,11 @@ export async function pushRepositoryBranch(
 
 export async function createRepositoryWorktree(
   cwd: string,
-  worktreePath: string,
-  newBranch: string,
-  baseBranch: string,
+  input: CreateWorktreeInput,
   signal?: AbortSignal,
   sourceToken?: string,
 ): Promise<ExecResult> {
-  return await postServerJson(
-    '/api/repo/create-worktree',
-    { cwd, worktreePath, newBranch, baseBranch, sourceToken },
-    { signal },
-  )
+  return await postServerJson('/api/repo/create-worktree', { cwd, ...input, sourceToken }, { signal })
 }
 
 export async function deleteRepositoryBranch(

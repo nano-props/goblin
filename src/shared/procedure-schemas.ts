@@ -109,6 +109,8 @@ export const REMOTE_PROCEDURE_SCHEMAS = {
   resolveTarget: RemoteConnectionInputSchema,
   pathSuggestions: RemotePathSuggestionsInputSchema,
   testRepository: v.object({ target: RemoteTargetSchema }),
+  openEditor: v.object({ repoId: v.string(), worktreePath: v.string() }),
+  openTerminal: v.object({ repoId: v.string(), worktreePath: v.string() }),
 } as const
 
 // Query-string schemas for the GET repo read endpoints. `parseHttpQuery`

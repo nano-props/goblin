@@ -33,6 +33,7 @@ import {
   pushRepositoryBranch,
   removeRepositoryWorktree,
 } from '#/web/repo-client.ts'
+import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 const BRANCH_NETWORK_OPERATION_KEY = 'branch-network-action'
 const BRANCH_ACTION_WAIT_TIMEOUT_MS = 30_000
 const BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE = 'error.branch-action-wait-timeout'
@@ -68,9 +69,22 @@ function branchActionOperationTarget(action: RepoBranchAction): string | null {
     case 'removeWorktree':
       return action.branch
     case 'createWorktree':
-      return action.newBranch
+      return createWorktreeTargetBranch(action.input)
   }
   const exhaustive: never = action
+  return exhaustive
+}
+
+function createWorktreeTargetBranch(input: CreateWorktreeInput): string {
+  switch (input.mode.kind) {
+    case 'newBranch':
+      return input.mode.newBranch
+    case 'existingBranch':
+      return input.mode.branch
+    case 'trackRemoteBranch':
+      return input.mode.localBranch
+  }
+  const exhaustive: never = input.mode
   return exhaustive
 }
 
@@ -82,7 +96,11 @@ function branchActionEventAction(action: RepoBranchAction): RepoEventAction {
     case 'deleteBranch':
       return { kind: action.kind, branch: action.branch }
     case 'createWorktree':
-      return { kind: action.kind, branch: action.newBranch, worktreePath: action.worktreePath }
+      return {
+        kind: action.kind,
+        branch: createWorktreeTargetBranch(action.input),
+        worktreePath: action.input.worktreePath,
+      }
     case 'removeWorktree':
       return {
         kind: action.kind,
@@ -205,14 +223,7 @@ function runBranchActionIpc(
     case 'push':
       return pushRepositoryBranch(repoId, action.branch, signal, sourceToken)
     case 'createWorktree':
-      return createRepositoryWorktree(
-        repoId,
-        action.worktreePath,
-        action.newBranch,
-        action.baseBranch,
-        signal,
-        sourceToken,
-      )
+      return createRepositoryWorktree(repoId, action.input, signal, sourceToken)
     case 'deleteBranch':
       return deleteRepositoryBranch(
         repoId,
