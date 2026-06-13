@@ -73,6 +73,7 @@ vi.mock('#/main/window-registry.ts', () => ({
 }))
 
 vi.mock('#/main/i18n/index.ts', () => ({
+  openDataFolderMenuKey: vi.fn(() => 'menu.file.open-data-folder.mac'),
   t: vi.fn((key: string) => key),
 }))
 
