@@ -50,9 +50,19 @@ export interface RendererRuntimeSnapshot {
   capabilities: readonly RendererNativeCapability[]
 }
 
+/**
+ * The host platform the renderer is running on. Exposed in the bootstrap
+ * payload so renderer code can branch on OS without reaching for
+ * `process.platform` (the renderer is sandboxed and does not have
+ * `process` at runtime). 'web' is the fallback when no host platform is
+ * available, e.g. the renderer is running outside Electron.
+ */
+export type RendererPlatform = NodeJS.Platform | 'web'
+
 export interface RendererBootstrapPayload {
   runtime: RendererRuntimeSnapshot
   homeDir: string
+  platform: RendererPlatform
   i18n: I18nSnapshot
   settings: InitialSettingsSnapshot
   server: InitialServerSnapshot | null
@@ -61,6 +71,7 @@ export interface RendererBootstrapPayload {
 export interface RendererBootstrapSnapshot {
   runtime: RendererRuntimeSnapshot
   homeDir: string
+  platform: RendererPlatform
   initialI18n: I18nSnapshot | null
   initialSettings: InitialSettingsSnapshot | null
   initialServer: InitialServerSnapshot | null

@@ -70,6 +70,7 @@ function webBootstrap(overrides: Partial<RendererBootstrapSnapshot> = {}): Rende
   return {
     runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
     homeDir: '',
+    platform: 'web',
     initialI18n: null,
     initialSettings: null,
     initialServer: null,

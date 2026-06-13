@@ -84,6 +84,7 @@ function buildRendererBootstrapPayload(
   return createRendererBootstrapPayload({
     runtime: createRendererRuntimeSnapshot('electron', ELECTRON_RENDERER_CAPABILITIES),
     homeDir: os.homedir(),
+    platform: process.platform,
     i18n: buildI18nSnapshot({ lang: getCurrentLang(), pref: langPref }),
     settings: initialSettings,
     server: toInitialServerSnapshot(runtime ? { ...runtime, url: webDevUrl || runtime.url } : null),

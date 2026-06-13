@@ -1,9 +1,15 @@
-import type { RendererBootstrapSnapshot, RendererRuntimeSnapshot } from '#/shared/bootstrap.ts'
+import type { RendererBootstrapSnapshot, RendererPlatform, RendererRuntimeSnapshot } from '#/shared/bootstrap.ts'
 import { RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 
+/**
+ * Web-hosted renderers have no host OS, so we fall back to a sentinel
+ * 'web' platform. Settings pages branch on this to hide OS-specific
+ * entries (e.g. Windows Terminal) in the browser preview build.
+ */
 const EMPTY_BOOTSTRAP: RendererBootstrapSnapshot = {
   runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
   homeDir: '',
+  platform: 'web',
   initialI18n: null,
   initialSettings: null,
   initialServer: null,
@@ -20,12 +26,37 @@ function isRendererRuntimeSnapshot(value: unknown): value is RendererRuntimeSnap
   )
 }
 
+function isRendererPlatform(value: unknown): value is RendererPlatform {
+  if (typeof value !== 'string') return false
+  // Mirror the union in shared/bootstrap.ts. Kept as a runtime allowlist
+  // so a stale or hand-edited bootstrap.json can't slip an arbitrary
+  // value past the type check.
+  return (
+    value === 'aix' ||
+    value === 'android' ||
+    value === 'cygwin' ||
+    value === 'darwin' ||
+    value === 'freebsd' ||
+    value === 'haiku' ||
+    value === 'linux' ||
+    value === 'netbsd' ||
+    value === 'openbsd' ||
+    value === 'sunos' ||
+    value === 'win32' ||
+    value === 'web'
+  )
+}
+
 function isRendererBootstrapSnapshot(value: unknown): value is RendererBootstrapSnapshot {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<RendererBootstrapSnapshot>
   return (
     isRendererRuntimeSnapshot(candidate.runtime) &&
     typeof candidate.homeDir === 'string' &&
+    // `platform` is optional in the input shape so legacy hand-written
+    // bootstrap scripts (and existing tests) keep working. The reader
+    // path in renderer-bridge.ts fills in the 'web' default before
+    // exposing the snapshot to the rest of the app.
     'initialI18n' in candidate &&
     'initialSettings' in candidate &&
     'initialServer' in candidate

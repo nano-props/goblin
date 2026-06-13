@@ -1,4 +1,4 @@
-import { useMemo, type ComponentType } from 'react'
+import { type ComponentType } from 'react'
 import { RotateCw, SquareTerminal } from 'lucide-react'
 import { Badge } from '#/web/components/ui/badge.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
@@ -17,6 +17,7 @@ import {
   SettingsList,
   SettingsRow,
 } from '#/web/components/settings/SettingsPrimitives.tsx'
+import { getInitialBootstrap } from '#/web/bootstrap.ts'
 import { useExternalAppsQuery } from '#/web/settings-queries.ts'
 import { useExternalAppSettingsController } from '#/web/runtime-settings-external-apps.ts'
 import { useT } from '#/web/stores/i18n.ts'
@@ -59,12 +60,15 @@ const ALL_TERMINAL_OPTIONS: { value: TerminalPref; labelKey: string }[] = [
 ]
 
 /**
- * Windows Terminal is the only platform-restricted entry. The data lives in
- * the shared array above so the i18n bundle stays single-source, but the UI
- * is filtered at render time so macOS / Linux users never see a row that
- * is permanently "not detected" or a dropdown option that can only fail.
+ * Windows Terminal is the only platform-restricted entry. The data lives
+ * in the shared array above so the i18n bundle stays single-source, but
+ * the UI is filtered at render time so macOS / Linux users never see a
+ * row that is permanently "not detected" or a dropdown option that can
+ * only fail. Mirrors the union in `shared/bootstrap.ts`; add new
+ * platforms here when they get a Windows-Terminal-shaped backend.
  */
-const PLATFORM_TERMINAL_IDS: Record<NodeJS.Platform, ReadonlySet<string>> = {
+type BootstrapPlatform = ReturnType<typeof getInitialBootstrap>['platform']
+const PLATFORM_TERMINAL_IDS: Record<BootstrapPlatform, ReadonlySet<string>> = {
   win32: new Set(['ghostty', 'terminal', 'windowsTerminal']),
   darwin: new Set(['ghostty', 'terminal']),
   linux: new Set(['ghostty', 'terminal']),
@@ -76,6 +80,9 @@ const PLATFORM_TERMINAL_IDS: Record<NodeJS.Platform, ReadonlySet<string>> = {
   netbsd: new Set(['ghostty', 'terminal']),
   openbsd: new Set(['ghostty', 'terminal']),
   sunos: new Set(['ghostty', 'terminal']),
+  // Web-hosted renderers (the dev preview) have no real terminal; hide
+  // every OS-specific entry.
+  web: new Set<string>(),
 }
 
 const EDITOR_APPS: ExternalToolItem[] = [
@@ -147,14 +154,13 @@ export function ExternalAppSettings() {
   const editorApp = data.editor.pref
   const editorAppAvailability = data.editor.appAvailability
   const { refreshExternalApps, refreshing, setTerminalApp, setEditorApp } = useExternalAppSettingsController()
-  const visibleTerminalIds = PLATFORM_TERMINAL_IDS[process.platform] ?? PLATFORM_TERMINAL_IDS.darwin
-  const terminalApps = useMemo(
-    () => ALL_TERMINAL_APPS.filter((item) => visibleTerminalIds.has(item.id)),
-    [visibleTerminalIds],
-  )
-  const terminalOptions = useMemo(
-    () => ALL_TERMINAL_OPTIONS.filter((opt) => opt.value === 'auto' || visibleTerminalIds.has(opt.value)),
-    [visibleTerminalIds],
+  // Read the platform from the bootstrap snapshot, not `process.platform`:
+  // the renderer is sandboxed and does not have `process` at runtime, so
+  // the only reliable source is what main handed us through the preload.
+  const visibleTerminalIds = PLATFORM_TERMINAL_IDS[getInitialBootstrap().platform]
+  const terminalApps = ALL_TERMINAL_APPS.filter((item) => visibleTerminalIds.has(item.id))
+  const terminalOptions = ALL_TERMINAL_OPTIONS.filter(
+    (opt) => opt.value === 'auto' || visibleTerminalIds.has(opt.value),
   )
   const editorOptions: { value: EditorPref; labelKey: string }[] = [
     { value: 'auto', labelKey: 'settings.editor.auto' },

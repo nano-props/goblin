@@ -4,6 +4,7 @@ import type {
   RendererBootstrapPayload,
   RendererBootstrapSnapshot,
   RendererNativeCapability,
+  RendererPlatform,
   RendererRuntimeKind,
   RendererRuntimeSnapshot,
 } from '#/shared/bootstrap.ts'
@@ -13,6 +14,7 @@ import { RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 interface RendererBootstrapSeed {
   runtime: RendererRuntimeSnapshot
   homeDir: string
+  platform: RendererPlatform
   i18n: I18nSnapshot
   settings: InitialSettingsSnapshot
   server: InitialServerSnapshot | null
@@ -48,6 +50,7 @@ export function createRendererBootstrapPayload(seed: RendererBootstrapSeed): Ren
   return {
     runtime: seed.runtime,
     homeDir: seed.homeDir,
+    platform: seed.platform,
     i18n: seed.i18n,
     settings: seed.settings,
     server: seed.server,
@@ -58,6 +61,7 @@ export function createRendererBootstrapSnapshot(seed: RendererBootstrapSeed): Re
   return {
     runtime: seed.runtime,
     homeDir: seed.homeDir,
+    platform: seed.platform,
     initialI18n: seed.i18n,
     initialSettings: seed.settings,
     initialServer: seed.server,

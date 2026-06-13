@@ -1,5 +1,5 @@
 import { ELECTRON_RENDERER_CAPABILITIES } from '#/shared/bootstrap.ts'
-import type { RendererBootstrapSnapshot, RendererNativeCapability } from '#/shared/bootstrap.ts'
+import type { RendererBootstrapSnapshot, RendererNativeCapability, RendererPlatform } from '#/shared/bootstrap.ts'
 import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
 import { readNativeBridge } from '#/web/native-bridge.ts'
 import {
@@ -65,6 +65,16 @@ function electronBridge(): RendererBridge {
     getBootstrap() {
       const bridge = readNativeBridge()
       const bootstrap = readWebBootstrap(readOrCreateWebTerminalClientId)
+      // Older preloads (or a test mock) may not surface `platform`. Default
+      // to 'electron' when the native bridge is present, since the only
+      // path that goes through this branch is the Electron renderer's
+      // preload. A web-hosted renderer never reaches this code.
+      const platform: RendererPlatform =
+        typeof bridge?.platform === 'string'
+          ? (bridge.platform as RendererPlatform)
+          : bridge
+            ? 'electron'
+            : bootstrap.platform
       return {
         runtime:
           bridge?.runtime &&
@@ -74,6 +84,7 @@ function electronBridge(): RendererBridge {
             ? bridge.runtime
             : bootstrap.runtime,
         homeDir: typeof bridge?.homeDir === 'string' ? bridge.homeDir : bootstrap.homeDir,
+        platform,
         initialI18n: bridge?.initialI18n ?? bootstrap.initialI18n ?? null,
         initialSettings: bridge?.initialSettings ?? bootstrap.initialSettings ?? null,
         initialServer: bridge?.initialServer ?? bootstrap.initialServer ?? null,
