@@ -3,17 +3,12 @@ import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { DetailTab } from '#/web/stores/repos/types.ts'
 
-export const HEURISTIC_REPO_STATUS_REFRESH_TTL_MS = 10_000
-
 interface ActiveRepoStatusSnapshot {
   id: string
   token: number
   detailTab: DetailTab
   availability: 'available' | 'unavailable'
-  statusLoaded: boolean
   statusPhase: 'idle' | 'loading' | 'refreshing'
-  statusLoadedAt: number | null
-  statusStale: boolean
 }
 
 function activeRepoStatusSnapshotEqual(
@@ -28,28 +23,22 @@ function activeRepoStatusSnapshotEqual(
       a.token === b.token &&
       a.detailTab === b.detailTab &&
       a.availability === b.availability &&
-      a.statusLoaded === b.statusLoaded &&
-      a.statusPhase === b.statusPhase &&
-      a.statusLoadedAt === b.statusLoadedAt &&
-      a.statusStale === b.statusStale)
+      a.statusPhase === b.statusPhase)
   )
 }
 
-export function shouldHeuristicallyRefreshRepoStatus(
-  repo: Pick<
-    ActiveRepoStatusSnapshot,
-    'availability' | 'statusLoaded' | 'statusPhase' | 'statusLoadedAt' | 'statusStale'
-  >,
-  now: number = Date.now(),
-): boolean {
-  if (repo.availability !== 'available') return false
-  if (repo.statusPhase !== 'idle') return false
-  if (repo.statusStale) return true
-  if (!repo.statusLoaded || repo.statusLoadedAt === null) return false
-  return now - repo.statusLoadedAt >= HEURISTIC_REPO_STATUS_REFRESH_TTL_MS
+// Basic gate: don't kick off a refresh for an unavailable repo, and don't
+// double-fire while a previous refresh is still in flight. Concurrency is
+// the only thing the gate protects against; rate limiting is intentionally
+// not implemented here. The IPC round trip + server-side `git status` cost
+// acts as a natural throttle, and the user opening a status-like tab or
+// switching repos is an explicit "I want fresh data" signal — we shouldn't
+// second-guess it.
+export function isRepoStatusRefreshable(repo: ActiveRepoStatusSnapshot): boolean {
+  return repo.availability === 'available' && repo.statusPhase === 'idle'
 }
 
-export function useHeuristicRepoStatusRefresh() {
+export function useRepoStatusRefresh() {
   const activeRepo = useStoreWithEqualityFn(
     useReposStore,
     (state): ActiveRepoStatusSnapshot | null => {
@@ -61,10 +50,7 @@ export function useHeuristicRepoStatusRefresh() {
         token: repo.instanceToken,
         detailTab: repo.ui.detailTab,
         availability: repo.availability.phase,
-        statusLoaded: repo.data.statusLoaded,
         statusPhase: repo.resources.status.phase,
-        statusLoadedAt: repo.resources.status.loadedAt,
-        statusStale: repo.resources.status.stale,
       }
     },
     activeRepoStatusSnapshotEqual,
@@ -86,7 +72,7 @@ export function useHeuristicRepoStatusRefresh() {
     previousActiveRepoId.current = nextActiveRepoId
     previousDetailTab.current = nextDetailTab
     if (!activeRepo || (!activeRepoChanged && !openedStatusLikeTab)) return
-    if (!shouldHeuristicallyRefreshRepoStatus(activeRepo)) return
+    if (!isRepoStatusRefreshable(activeRepo)) return
     void useReposStore.getState().refreshStatus(activeRepo.id, { token: activeRepo.token })
   }, [activeRepo])
 }

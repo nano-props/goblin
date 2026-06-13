@@ -12,7 +12,7 @@ import { Toaster } from '#/web/components/ui/sonner.tsx'
 import { useAppBootstrap } from '#/web/hooks/useAppBootstrap.ts'
 import { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
 import { useBackgroundFetch } from '#/web/hooks/useBackgroundFetch.ts'
-import { useHeuristicRepoStatusRefresh } from '#/web/hooks/useHeuristicRepoStatusRefresh.ts'
+import { useRepoStatusRefresh } from '#/web/hooks/useRepoStatusRefresh.ts'
 import { useKeyboard } from '#/web/hooks/useKeyboard.ts'
 import { useRendererEffectIntentRouter } from '#/web/hooks/useRendererEffectIntentRouter.ts'
 import { useRepoDrop } from '#/web/hooks/useRepoDrop.ts'
@@ -38,7 +38,7 @@ export function Layout() {
   useSessionPersistence()
   useSettingsWriteErrorToast()
   useBackgroundFetch()
-  useHeuristicRepoStatusRefresh()
+  useRepoStatusRefresh()
   useRepoStoreInvalidationRefresh()
   useSettingsQueryInvalidationSync()
 
