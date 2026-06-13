@@ -66,15 +66,15 @@ function electronBridge(): RendererBridge {
     getBootstrap() {
       const bridge = readNativeBridge()
       const bootstrap = readWebBootstrap(readOrCreateWebTerminalClientId)
-      // Older preloads (or a test mock) may not surface `platform`. Default
-      // to 'darwin' when the native bridge is present, since the only
-      // path that goes through this branch is an Electron renderer with an
-      // old preload that was built before the platform field was added.
-      // (Goblin was macOS-only before that, so 'darwin' is the safe
-      // fallback.)
+      // Older preloads (or a test mock) may not surface `platform`. Fall
+      // back to 'web' — the only contract we can honestly honour when
+      // the host platform is unknown. The previous 'darwin' default
+      // predated Windows/Linux support and would have shown the macOS
+      // Settings UI on a Windows install that happened to be running
+      // an out-of-date preload.
       let platform: RendererPlatform = bootstrap.platform
       if (bridge) {
-        platform = isRendererPlatform(bridge.platform) ? bridge.platform : 'darwin'
+        platform = isRendererPlatform(bridge.platform) ? bridge.platform : 'web'
       }
       return {
         runtime:

@@ -132,7 +132,11 @@ describe('openInWindowsTerminal', () => {
       process.env.PATHEXT = '.EXE'
       process.env.LOCALAPPDATA = dir
 
-      const result = await openInWindowsTerminal(process.cwd())
+      // Use the same temp dir we already created — guaranteed
+      // absolute + isDirectory(), with no dependency on the test
+      // runner's CWD (which can vary across sandbox / symlink layouts).
+      const target = dir
+      const result = await openInWindowsTerminal(target)
       expect(result).toEqual({ ok: false, message: 'error.terminal-not-installed' })
       expect(execaMock).not.toHaveBeenCalled()
     })
@@ -147,7 +151,10 @@ describe('openInWindowsTerminal', () => {
       const unref = vi.fn()
       execaMock.mockReturnValue({ unref } as any)
 
-      const target = process.cwd()
+      // Open the temp dir we already set up — absolute + isDirectory()
+      // are guaranteed, and the assertion below checks the exact string
+      // we passed in.
+      const target = dir
       const result = await openInWindowsTerminal(target)
 
       expect(execaMock).toHaveBeenCalledWith(
@@ -171,18 +178,22 @@ describe('openInWindowsTerminal', () => {
         throw new Error('permission denied')
       })
 
-      const result = await openInWindowsTerminal(process.cwd())
+      const result = await openInWindowsTerminal(dir)
       expect(result).toEqual({ ok: false, message: 'permission denied' })
     })
   })
 })
 
-// Sanity: a real os.tmpdir() entry is a directory, so we use it to drive
-// the absolute + isDirectory check without mocking statSync.
+// Sanity: an os.tmpdir() entry is an absolute directory, so we use it
+// to drive the absolute + isDirectory check without mocking statSync.
+// Previously this block asserted on process.cwd(), which is the bun
+// test runner's CWD — its exact path / whether it's a symlink varies
+// between macOS sandboxes, Linux runners, and Windows CI, so we
+// switched to os.tmpdir() which is stable across hosts.
 describe('os.tmpdir() round-trip', () => {
-  test('process.cwd() is an absolute directory on every platform', () => {
-    expect(path.isAbsolute(process.cwd())).toBe(true)
-    expect(statSync(process.cwd()).isDirectory()).toBe(true)
+  test('os.tmpdir() is an absolute directory on every platform', () => {
+    expect(path.isAbsolute(os.tmpdir())).toBe(true)
+    expect(statSync(os.tmpdir()).isDirectory()).toBe(true)
   })
 })
 

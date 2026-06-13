@@ -3,6 +3,7 @@ import type { SettingsSnapshot } from '#/shared/api-types.ts'
 import { activateMainWindow } from '#/main/window.ts'
 import { initTheme } from '#/main/theme.ts'
 import { flushWindowState } from '#/main/window-state.ts'
+import { registerBootstrapIpc } from '#/main/window-shell.ts'
 import { buildAppMenu } from '#/main/menu.ts'
 import { initializeMenuRuntimeState } from '#/main/menu-state.ts'
 import { syncRecentRepos } from '#/main/recent-repos.ts'
@@ -128,6 +129,11 @@ function wireMainProcessIpc(): void {
   wireIpc()
   wireShellBridgeIpc()
   wireTerminalIpc()
+  // Bootstrap handler must be registered once, before the first
+  // BrowserWindow is created — the preload synchronously reads its
+  // bootstrap token during startup, and a missing handler makes the
+  // preload fall back to defaults.
+  registerBootstrapIpc()
 }
 
 async function syncInitialGlobalShortcutState(settingsSnapshot: SettingsSnapshot): Promise<void> {

@@ -183,7 +183,10 @@ function createFileMenu(state: AppMenuState): MenuItemConstructorOptions {
           },
       separator(),
       { label: t('menu.file.open-in-browser'), click: () => void openWebVersionFromMenu() },
-      { label: t('menu.file.open-data-folder'), click: () => void openDataFolder() },
+      // Pick the OS-specific copy so Windows users see "in Explorer"
+      // instead of the macOS-only "in Finder". Falls back to the generic
+      // label on other platforms.
+      { label: t(openDataFolderMenuKey()), click: () => void openDataFolder() },
       ...(state.isMac
         ? []
         : [
@@ -380,4 +383,20 @@ async function openWebVersionFromMenu(): Promise<void> {
 
 async function openDataFolder(): Promise<void> {
   await runOpenDataFolder()
+}
+
+/**
+ * Pick the right i18n key for the File → Open Data Folder menu item
+ * based on the host platform. The variant keys live next to the base
+ * key in each i18n bundle so translators can adapt the OS-specific
+ * copy. Linux and other Unix-y platforms fall through to the generic
+ * "Open Data Folder" label — `shell.openPath` works fine there.
+ */
+function openDataFolderMenuKey():
+  | 'menu.file.open-data-folder.mac'
+  | 'menu.file.open-data-folder.win'
+  | 'menu.file.open-data-folder' {
+  if (process.platform === 'darwin') return 'menu.file.open-data-folder.mac'
+  if (process.platform === 'win32') return 'menu.file.open-data-folder.win'
+  return 'menu.file.open-data-folder'
 }

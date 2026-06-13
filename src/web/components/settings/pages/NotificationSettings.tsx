@@ -6,11 +6,17 @@ import { SettingsGroup, SettingsList, SettingsRow } from '#/web/components/setti
 import { useFetchSettingsController, useRuntimeFetchSettings } from '#/web/runtime-settings-fetch.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { terminalBridge } from '#/web/terminal.ts'
+import { getInitialBootstrap } from '#/web/bootstrap.ts'
 export function NotificationSettings() {
   const t = useT()
   const { terminalNotificationsEnabled } = useRuntimeFetchSettings()
   const { setTerminalNotificationsEnabled } = useFetchSettingsController()
   const [testingTerminalNotification, setTestingTerminalNotification] = useState(false)
+  // Pick the OS-specific hint at render time so the settings UI doesn't
+  // hand a Windows user a macOS-flavored "System Settings → Notifications"
+  // path. The renderer doesn't have `process.platform`; the bootstrap
+  // payload main hands us carries the host platform.
+  const hintKey = notificationsHintKey()
 
   const testTerminalNotification = () => {
     if (testingTerminalNotification) return
@@ -22,14 +28,14 @@ export function NotificationSettings() {
           toast.success(t('settings.terminal-notifications-test-sent'))
         } else {
           toast.error(t('settings.terminal-notifications-test-failed'), {
-            description: t('settings.terminal-notifications-test-failed-hint'),
+            description: t(hintKey),
           })
         }
       })
       .catch((err) => {
         console.warn('[settings] terminal notification test failed', err)
         toast.error(t('settings.terminal-notifications-test-failed'), {
-          description: t('settings.terminal-notifications-test-failed-hint'),
+          description: t(hintKey),
         })
       })
       .finally(() => {
@@ -74,4 +80,20 @@ export function NotificationSettings() {
       </SettingsList>
     </SettingsGroup>
   )
+}
+
+/**
+ * Pick the OS-specific i18n key for the notification permission hint.
+ * Mirrors the variant keys added in shared/i18n/*.ts. The generic key
+ * is used on Linux / other Unix-y platforms and on the dev-server
+ * preview ('web'), where the OS notification paths don't apply.
+ */
+function notificationsHintKey():
+  | 'settings.terminal-notifications-test-failed-hint.mac'
+  | 'settings.terminal-notifications-test-failed-hint.win'
+  | 'settings.terminal-notifications-test-failed-hint' {
+  const platform = getInitialBootstrap().platform
+  if (platform === 'darwin') return 'settings.terminal-notifications-test-failed-hint.mac'
+  if (platform === 'win32') return 'settings.terminal-notifications-test-failed-hint.win'
+  return 'settings.terminal-notifications-test-failed-hint'
 }

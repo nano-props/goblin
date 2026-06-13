@@ -102,18 +102,10 @@ try {
 
   if (isMac) {
     // Two dmgs (arm64 + x64) per electron-builder.ts mac.target config.
-    var artifactSrcs = await findAll(
-      `release/${APP_NAME}-${version}-*.dmg`,
-      `${APP_NAME} .dmg`,
-      2,
-    )
+    var artifactSrcs = await findAll(`release/${APP_NAME}-${version}-*.dmg`, `${APP_NAME} .dmg`, 2)
   } else {
     // Two NSIS installers (x64 + arm64) per electron-builder.ts win.target config.
-    var artifactSrcs = await findAll(
-      `release/${APP_NAME}-${version}-*.exe`,
-      `${APP_NAME} .exe`,
-      2,
-    )
+    var artifactSrcs = await findAll(`release/${APP_NAME}-${version}-*.exe`, `${APP_NAME} .exe`, 2)
   }
   const artifacts = artifactSrcs.map((src) => {
     const dest = path.join(stash, path.basename(src))

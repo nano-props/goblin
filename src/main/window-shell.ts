@@ -63,13 +63,36 @@ function evictBootstrap(token: string): void {
   }
 }
 
-ipcMain.on(BOOTSTRAP_CHANNEL, (event, token: unknown) => {
-  if (typeof token !== 'string') {
-    event.returnValue = null
-    return
-  }
-  event.returnValue = rendererBootstraps.get(token) ?? null
-})
+/**
+ * Register the renderer-bootstrap IPC handler.
+ *
+ * Why explicit: previously this was wired as a side effect of importing
+ * the module, which meant the handler got re-registered on every import
+ * (vitest reload, hot reload, anything that re-evaluated the module
+ * graph). `ipcMain.on` does not replace a prior handler, so a duplicate
+ * registration meant the preload's first sendSync would hit whichever
+ * handler fired first — in practice the most recent one, but in some
+ * reload orders it was the stale one returning a payload from an
+ * already-evicted token. Call this exactly once from the main
+ * bootstrap.
+ */
+let bootstrapHandlerRegistered = false
+export function registerBootstrapIpc(): void {
+  if (bootstrapHandlerRegistered) return
+  bootstrapHandlerRegistered = true
+  ipcMain.on(BOOTSTRAP_CHANNEL, (event, token: unknown) => {
+    if (typeof token !== 'string') {
+      event.returnValue = null
+      return
+    }
+    event.returnValue = rendererBootstraps.get(token) ?? null
+  })
+}
+
+/** Test-only: reset registration flag so each test starts clean. */
+export function resetBootstrapIpcForTests(): void {
+  bootstrapHandlerRegistered = false
+}
 
 export function windowCanvasBackground(): string {
   const { resolved, colorTheme } = getTheme()
