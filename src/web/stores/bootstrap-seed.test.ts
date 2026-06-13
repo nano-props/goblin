@@ -12,7 +12,8 @@ function installBridge(
     value: {
       goblinNative: {
         homeDir: '/Users/test',
-platform: 'darwin',        initialI18n: overrides.initialI18n ?? null,
+        platform: 'darwin',
+        initialI18n: overrides.initialI18n ?? null,
         initialSettings: overrides.initialSettings ?? null,
         invokeIpc: vi.fn(),
         abortIpc: vi.fn(() => Promise.resolve(false)),
