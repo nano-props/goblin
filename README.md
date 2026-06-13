@@ -14,13 +14,30 @@ One workspace for Git branches and worktrees.
 - Local and SSH repos.
 - Built for branch flow.
 
-## Build & install (macOS)
+## Build & install
+
+### macOS
 
 ```sh
 ./install.sh
 ```
 
 Builds a host-architecture `.app` and installs it to `~/Applications`.
+
+### Windows
+
+```powershell
+.\install.ps1
+```
+
+Builds an unpacked Windows app directory and installs it to
+`%LOCALAPPDATA%\Programs\Goblin[-arm64]`. The PowerShell script is the
+direct counterpart of `install.sh` — same flags, same env vars, same
+defaults.
+
+To build an NSIS installer (`Goblin-<version>-<arch>.exe`) instead of
+the unpacked dir, run `bun run build` (no `install` positional). The
+NSIS installer is what `scripts/publish.ts` ships to GitHub releases.
 
 ## Run server mode
 

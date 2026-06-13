@@ -1,9 +1,15 @@
 #!/usr/bin/env bun
 // Build and package Goblin.
-//   default → Goblin.app under release/mac*/ (via electron-builder mac dmg+dir)
-//   install → builds the `dir` target only (no dmg packaging) and moves
-//             Goblin.app into ~/Applications, closing any running instance
-//             first. macOS-only.
+//
+//   default → Goblin.app under release/mac*/ (mac) or NSIS installer
+//             under release/win-unpacked/ + release/*.exe (win).
+//   install → builds the unpacked dir target only and:
+//             - mac: moves Goblin.app into ~/Applications, closing any
+//               running instance first.
+//             - win: moves the unpacked dir into %LOCALAPPDATA%\Programs
+//               (the default NSIS per-user install path). The NSIS .exe
+//               is *not* produced in install mode — install is the
+//               "fast rebuild and put it on this machine" hot path.
 //
 // Usage: ./scripts/build.ts [install|i] [--clean]
 import { $ } from 'bun'
@@ -22,7 +28,8 @@ const APP_ID = 'goblin.app'
 
 // Tunable behaviour. CLI flags win; env vars fill the gap so shell/CI can
 // set them once. Install-mode defaults are tuned for a fast rebuild
-// (`install.sh` is the hot path; `bun run build` keeps upstream behaviour).
+// (`install.sh` / `install.ps1` is the hot path; `bun run build` keeps
+// upstream behaviour).
 const shouldInstallMode = (mode: string) => mode === 'install' || mode === 'i'
 const truthy = (v: string | undefined) => v === '1' || v === 'true'
 
@@ -127,26 +134,161 @@ if (shouldInstall) {
   )
 }
 
-async function findBuiltApp(): Promise<string | null> {
-  // mac dir target emits one directory per declared arch (`mac-arm64`,
-  // `mac` for x64). Pick the one matching the host so `install` puts the
-  // right binary in ~/Applications.
-  const hostDir = process.arch === 'arm64' ? 'mac-arm64' : 'mac'
-  const candidate = path.join(repoRoot, 'release', hostDir, `${APP_NAME}.app`)
-  return existsSync(candidate) ? candidate : null
+interface PlatformPlan {
+  /** electron-builder's --platform / target arguments for `install` mode. */
+  installArgs: string[]
+  /** electron-builder's --platform / target arguments for full release mode. */
+  releaseArgsByArch: Record<'arm64' | 'x64', string[]>
+  /** Resolver from `release/<dir>` to the unpacked-app path for this platform. */
+  findBuiltApp(hostArch: 'arm64' | 'x64'): string | null
+  /** Where `install` mode places the unpacked app. */
+  installDestination(hostArch: 'arm64' | 'x64'): string
+  /** What install mode does after copying — signing, registry registration, etc. */
+  postInstall(destPath: string): Promise<void>
+  /** Pre-build native-prebuild sanity check. */
+  verifyPrebuilds(hostArch: 'arm64' | 'x64'): void
+  /** Cache directories cleaned by --clean. */
+  cacheDirs(): string[]
 }
 
-// Clear any prior build output so `findBuiltApp` can't pick up a stale
-// artifact if electron-builder fails partway through. A matching rm
-// after a successful install is run below.
+function planDarwin(): PlatformPlan {
+  return {
+    // `dir` target skips dmg packaging — faster, and `install` only needs
+    // the .app.
+    installArgs: ['--mac', 'dir', process.arch === 'arm64' ? '--arm64' : '--x64'],
+    releaseArgsByArch: {
+      arm64: ['--mac', 'dmg', '--arm64'],
+      x64: ['--mac', 'dmg', '--x64'],
+    },
+    findBuiltApp(hostArch) {
+      // mac dir target emits one directory per declared arch
+      // (`mac-arm64`, `mac` for x64). Pick the one matching the host so
+      // `install` puts the right binary in ~/Applications.
+      const hostDir = hostArch === 'arm64' ? 'mac-arm64' : 'mac'
+      const candidate = path.join(repoRoot, 'release', hostDir, `${APP_NAME}.app`)
+      return existsSync(candidate) ? candidate : null
+    },
+    installDestination(hostArch) {
+      const appsDir = path.join(os.homedir(), 'Applications')
+      mkdirSync(appsDir, { recursive: true })
+      return path.join(appsDir, `${APP_NAME}.app`)
+    },
+    async postInstall(destPath) {
+      // electron-builder's ad-hoc signature (identity: null) uses the
+      // Electron binary identifier and does not bind Info.plist. macOS
+      // Notification Center identifies apps by the code-signing
+      // identifier, not CFBundleIdentifier, so without re-signing the
+      // app appears as "Electron" in notification settings and the
+      // NSUserNotificationAlertStyle plist key has no effect.
+      // Re-signing with --identifier forces the correct bundle ID and
+      // binds the Info.plist so notifications work and Goblin appears
+      // in System Settings.
+      console.log('Re-signing with correct bundle identifier...')
+      await $`codesign --force --deep --sign - --identifier ${APP_ID} ${destPath}`
+      console.log('Re-signed.')
+    },
+    verifyPrebuilds(hostArch) {
+      // node-pty ships `spawn-helper` as a separate executable on macOS
+      // that Electron forks; if it's missing or non-executable, every
+      // terminal spawn fails at runtime. Verify here so a fresh checkout
+      // without `bun install` artifacts fails fast instead of producing
+      // a .app that crashes on first terminal use.
+      const arches = shouldInstall ? [hostArch] : (['arm64', 'x64'] as const)
+      const helpers = arches.map((arch) =>
+        path.join(repoRoot, 'node_modules/node-pty/prebuilds', `darwin-${arch}`, 'spawn-helper'),
+      )
+      const missing = helpers.filter((helper) => !existsSync(helper))
+      if (missing.length > 0) {
+        console.error(`Error: missing node-pty darwin spawn-helper(s): ${missing.join(', ')}`)
+        process.exit(1)
+      }
+      for (const helper of helpers) chmodSync(helper, 0o755)
+    },
+    cacheDirs() {
+      return [
+        path.join(os.homedir(), 'Library/Caches/electron'),
+        path.join(os.homedir(), 'Library/Caches/electron-builder'),
+      ]
+    },
+  }
+}
+
+function planWindows(): PlatformPlan {
+  return {
+    // `dir` target skips the NSIS .exe build — faster, and `install` only
+    // needs the unpacked directory.
+    installArgs: ['--win', 'dir', process.arch === 'arm64' ? '--arm64' : '--x64'],
+    releaseArgsByArch: {
+      arm64: ['--win', 'nsis', '--arm64'],
+      x64: ['--win', 'nsis', '--x64'],
+    },
+    findBuiltApp(hostArch) {
+      // win dir target emits `win-unpacked/` containing Goblin.exe and
+      // the unpacked asar.
+      const hostDir = hostArch === 'arm64' ? 'win-arm64-unpacked' : 'win-unpacked'
+      const candidate = path.join(repoRoot, 'release', hostDir)
+      return existsSync(candidate) ? candidate : null
+    },
+    installDestination(hostArch) {
+      // Default NSIS per-user install path. Matches what the NSIS
+      // installer would produce if the user ran the .exe with default
+      // options, so swapping install mode for the installer is seamless.
+      const localAppData = process.env.LOCALAPPDATA?.trim() || path.join(os.homedir(), 'AppData', 'Local')
+      const hostDir = hostArch === 'arm64' ? 'Goblin-arm64' : 'Goblin'
+      return path.join(localAppData, 'Programs', hostDir)
+    },
+    async postInstall(_destPath) {
+      // No signing configured for Windows yet — the unsigned installer
+      // builds rely on the user explicitly trusting the binary. Signing
+      // can be added here once a code-signing certificate is wired up.
+    },
+    verifyPrebuilds(hostArch) {
+      // On Windows the native binding lives in `pty.node` (conpty.node
+      // and the rest of the conpty.dll sibling files are also required).
+      // electron-builder's `asarUnpack` glob handles this at packaging
+      // time; here we just confirm the per-arch prebuild directory
+      // shipped something node-pty can load.
+      const arches = shouldInstall ? [hostArch] : (['arm64', 'x64'] as const)
+      for (const arch of arches) {
+        const prebuildDir = path.join(repoRoot, 'node_modules', 'node-pty', 'prebuilds', `win32-${arch}`)
+        const binding = path.join(prebuildDir, 'pty.node')
+        if (!existsSync(binding)) {
+          console.error(`Error: missing node-pty Windows prebuild: ${binding}`)
+          process.exit(1)
+        }
+      }
+    },
+    cacheDirs() {
+      // electron-builder / @electron/get cache Electron downloads under
+      // %LOCALAPPDATA%\electron-builder\Cache on Windows.
+      const localAppData = process.env.LOCALAPPDATA?.trim() || path.join(os.homedir(), 'AppData', 'Local')
+      return [
+        path.join(localAppData, 'electron-builder', 'Cache'),
+        path.join(localAppData, 'electron', 'Cache'),
+      ]
+    },
+  }
+}
+
+function pickPlan(): PlatformPlan {
+  if (process.platform === 'darwin') return planDarwin()
+  if (process.platform === 'win32') return planWindows()
+  console.error(
+    `Error: Goblin's build script does not yet support ${process.platform}. ` +
+      `Run on macOS for the .dmg/.app or on Windows for the NSIS installer.`,
+  )
+  process.exit(1)
+}
+
+const plan = pickPlan()
+
+// Clear any prior build output so the findBuiltApp resolver can't pick
+// up a stale artifact if electron-builder fails partway through. A
+// matching rm after a successful install is run below.
 rmSync(path.join(repoRoot, 'release'), { recursive: true, force: true })
 
 if (shouldClean) {
-  const caches = [
-    path.join(os.homedir(), 'Library/Caches/electron'),
-    path.join(os.homedir(), 'Library/Caches/electron-builder'),
-  ]
-  for (const cacheDir of caches) {
+  for (const cacheDir of plan.cacheDirs()) {
     if (existsSync(cacheDir)) {
       rmSync(cacheDir, { recursive: true, force: true })
       console.log(`Cleaned cache: ${cacheDir}`)
@@ -161,20 +303,9 @@ if (options.electronMirror) process.env.ELECTRON_MIRROR = options.electronMirror
 if (options.binariesMirror) process.env.ELECTRON_BUILDER_BINARIES_MIRROR = options.binariesMirror
 
 await $`bun install`
-if (process.platform === 'darwin') {
-  const ptySpawnHelperArches = shouldInstall ? [process.arch] : ['arm64', 'x64']
-  const ptySpawnHelpers = ptySpawnHelperArches.map((arch) =>
-    path.join(repoRoot, 'node_modules/node-pty/prebuilds', `darwin-${arch}`, 'spawn-helper'),
-  )
-  const missingPtySpawnHelpers = ptySpawnHelpers.filter((helper) => !existsSync(helper))
-  if (missingPtySpawnHelpers.length > 0) {
-    console.error(`Error: missing node-pty darwin spawn-helper(s): ${missingPtySpawnHelpers.join(', ')}`)
-    process.exit(1)
-  }
-  for (const helper of ptySpawnHelpers) {
-    chmodSync(helper, 0o755)
-  }
-}
+
+plan.verifyPrebuilds(process.arch === 'arm64' ? 'arm64' : 'x64')
+
 if (!options.skipTypecheck) {
   await $`bun run typecheck`
 }
@@ -205,17 +336,14 @@ if (!existsSync(terminalWorkerDistEntry)) {
   console.error(`Error: server build artifact missing: ${terminalWorkerDistEntry}`)
   process.exit(1)
 }
-// `dir` target skips dmg packaging — faster, and `install` only needs the .app.
-// In install mode we also pin to the host arch so we don't waste time
-// cross-building the other architecture's binaries when we're going to
-// throw them away.
-const archFlag = process.arch === 'arm64' ? '--arm64' : '--x64'
-const builderArgs = shouldInstall ? ['--mac', 'dir', archFlag] : ['--mac']
+
 // Skip @electron/rebuild when native prebuilds are already in place
-// (bun install fetched them and build.ts chmod'd spawn-helper above). On
-// macOS this saves ~4 minutes by avoiding a no-op rebuild that still
-// re-verifies prebuilds over the network.
-if (options.skipRebuild) builderArgs.push('--config.npmRebuild=false')
+// (bun install fetched them and the plan verified them above). Saves a
+// few minutes by avoiding a no-op rebuild that still re-verifies
+// prebuilds over the network.
+function appendRebuildFlag(args: string[]): string[] {
+  return options.skipRebuild ? [...args, '--config.npmRebuild=false'] : args
+}
 
 if (options.prewarm) {
   // Opt-in only. Useful as a manual warm-up before a known-offline build;
@@ -230,51 +358,41 @@ if (options.prewarm) {
 }
 
 if (shouldInstall) {
-  await $`bun run build:electron -- ${builderArgs}`
-} else {
+  await $`bun run build:electron -- ${appendRebuildFlag(plan.installArgs)}`
+} else if (process.platform === 'darwin') {
   // Build each arch serially to avoid proper-lockfile races in dmg-builder
   // when electron-builder parallelises multiple macOS architectures.
-  for (const arch of ['arm64', 'x64']) {
-    await $`bun run build:electron -- --mac dmg --${arch} ${options.skipRebuild ? '--config.npmRebuild=false' : ''}`
+  for (const arch of ['arm64', 'x64'] as const) {
+    await $`bun run build:electron -- ${appendRebuildFlag(plan.releaseArgsByArch[arch])}`
+  }
+} else {
+  // Windows: NSIS for each arch. electron-builder doesn't run multiple
+  // Windows targets in parallel, but for safety we still go serially.
+  for (const arch of ['arm64', 'x64'] as const) {
+    await $`bun run build:electron -- ${appendRebuildFlag(plan.releaseArgsByArch[arch])}`
   }
 }
 
-const srcApp = await findBuiltApp()
+const hostArch: 'arm64' | 'x64' = process.arch === 'arm64' ? 'arm64' : 'x64'
+const srcApp = plan.findBuiltApp(hostArch)
 if (!srcApp) {
-  console.error(`Error: could not find built ${APP_NAME}.app under release/`)
+  console.error(`Error: could not find built ${APP_NAME} app under release/`)
   process.exit(1)
 }
 console.log(`Built: ${path.relative(repoRoot, srcApp)}`)
 
 if (shouldInstall) {
-  if (process.platform !== 'darwin') {
-    console.error('install mode is macOS-only')
-    process.exit(1)
-  }
-
-  console.log(`Installing ${APP_NAME}.app to ~/Applications...`)
-
-  // Close a running Goblin.app before replacing it. Relative path because
-  // scripts/ sits outside src/ and isn't covered by the `#/` alias.
+  // Close any running instance before replacing it. close-app.ts is
+  // a no-op on non-darwin, so this is effectively mac-only today, but
+  // we still call it unconditionally for symmetry.
   await closeRunningApp()
 
-  const appsDir = path.join(os.homedir(), 'Applications')
-  mkdirSync(appsDir, { recursive: true })
-  const destApp = path.join(appsDir, `${APP_NAME}.app`)
+  const destApp = plan.installDestination(hostArch)
   rmSync(destApp, { recursive: true, force: true })
   renameSync(srcApp, destApp)
   console.log(`Installed: ${destApp}`)
 
-  // electron-builder's ad-hoc signature (identity: null) uses the Electron
-  // binary identifier and does not bind Info.plist. macOS Notification Center
-  // identifies apps by the code-signing identifier, not CFBundleIdentifier, so
-  // without re-signing the app appears as "Electron" in notification settings
-  // and the NSUserNotificationAlertStyle plist key has no effect.
-  // Re-signing with --identifier forces the correct bundle ID and binds the
-  // Info.plist so notifications work and Goblin appears in System Settings.
-  console.log('Re-signing with correct bundle identifier...')
-  await $`codesign --force --deep --sign - --identifier ${APP_ID} ${destApp}`
-  console.log('Re-signed.')
+  await plan.postInstall(destApp)
 
   rmSync(path.join(repoRoot, 'release'), { recursive: true, force: true })
   console.log('Done.')

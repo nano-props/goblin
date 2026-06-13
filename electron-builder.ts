@@ -3,6 +3,13 @@ import type { Configuration } from 'electron-builder'
 const config: Configuration = {
   appId: 'goblin.app',
   productName: 'Goblin',
+  // Top-level icon is consumed by the mac build (`assets/icon-mac-1024.png`,
+  // a 1024x1024 PNG as macOS expects). electron-builder falls back to this
+  // for the Windows build too if `win.icon` isn't set, but Windows strongly
+  // prefers a multi-resolution `.ico` (16/32/48/64/256 etc.). Until we ship
+  // `assets/icon.ico`, Windows installers will use the same 1024x1024 PNG
+  // embedded into the NSIS installer — functional but visually sub-optimal
+  // in the taskbar / installer dialog.
   icon: 'assets/icon-mac-1024.png',
   directories: {
     output: 'release',
@@ -23,6 +30,25 @@ const config: Configuration = {
     '!**/*.map',
   ],
   asarUnpack: ['node_modules/node-pty/prebuilds/**/*'],
+  win: {
+    // NSIS installer is the standard "install for current user" path. The
+    // oneClick / perMachine toggles below match what most modern Electron
+    // apps ship. code signing is intentionally left unset — distribute
+    // unsigned builds behind a documented `xattr -dr com.apple.quarantine`
+    // equivalent on Windows (right-click → More → Properties → Unblock, or
+    // `Unblock-File` in PowerShell).
+    target: [{ target: 'nsis', arch: ['x64', 'arm64'] }],
+    // Force arch into the filename. NSIS's default omits the suffix on
+    // x64, which would make `Goblin-0.1.0.exe` and
+    // `Goblin-0.1.0-arm64.exe` sort next to each other with no hint
+    // of which is which.
+    artifactName: '${productName}-${version}-${arch}.${ext}',
+  },
+  nsis: {
+    oneClick: false,
+    perMachine: false,
+    allowToChangeInstallationDirectory: true,
+  },
   mac: {
     category: 'public.app-category.developer-tools',
     extendInfo: {
