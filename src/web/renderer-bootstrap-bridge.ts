@@ -47,6 +47,8 @@ function isRendererPlatform(value: unknown): value is RendererPlatform {
   )
 }
 
+export { isRendererPlatform }
+
 function isRendererBootstrapSnapshot(value: unknown): value is RendererBootstrapSnapshot {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<RendererBootstrapSnapshot>
