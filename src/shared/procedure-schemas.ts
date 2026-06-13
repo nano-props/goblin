@@ -20,6 +20,23 @@ import { isRemoteRepoId, parseRemoteRepoId } from '#/shared/remote-repo.ts'
 const SourceToken = v.optional(v.string())
 const StringArray = v.array(v.string())
 
+/**
+ * Wrap an array schema for query-string parameters so that
+ * `parseHttpQuery` can handle both single values (a lone
+ * `?branches=main`) and multi-value arrays (`?branches=a&branches=b`)
+ * transparently. `parseHttpQuery` collapses `URLSearchParams` entries
+ * with a single value into a plain string; without this wrapper the
+ * valibot `array()` validator would reject the string.
+ *
+ * Usage: `branches: v.optional(qArray(v.string()))`
+ */
+function qArray<TItem extends v.GenericSchema>(item: TItem) {
+  return v.pipe(
+    v.union([v.array(item), item] as const),
+    v.transform((input: unknown) => (Array.isArray(input) ? input : [input])),
+  ) as v.GenericSchema<unknown, Array<v.InferOutput<TItem>>>
+}
+
 const RemoteRepoRefSchema = v.object({
   id: v.string(),
   alias: v.string(),
@@ -100,14 +117,14 @@ export const REPO_QUERY_SCHEMAS = {
   patch: v.object({ cwd: v.string(), worktreePath: v.string() }),
   pullRequests: v.object({
     cwd: v.string(),
-    branches: v.optional(v.array(v.string())),
+    branches: v.optional(qArray(v.string())),
     mode: v.optional(v.picklist(['summary', 'full'])),
   }),
   // Composite read — picks which sub-reads to fold into one round trip.
   composite: v.object({
     cwd: v.string(),
-    include: v.optional(v.array(v.picklist(['snapshot', 'status', 'pullRequests']))),
-    branches: v.optional(v.array(v.string())),
+    include: v.optional(qArray(v.picklist(['snapshot', 'status', 'pullRequests']))),
+    branches: v.optional(qArray(v.string())),
     mode: v.optional(v.picklist(['summary', 'full'])),
     // Per-section timeout in ms; non-integer / non-finite / negative
     // values are clamped on the server side, so the perimeter only

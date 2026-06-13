@@ -199,6 +199,6 @@ describe('repo lifecycle', () => {
       .ensureWorkspaceOpen(remoteRepoSessionEntry(newTarget!))
     expect(second).toEqual({ ok: true, id: newTarget!.id })
     expect(useReposStore.getState().repos[newTarget!.id]?.remote.target).toEqual(newTarget)
-    expect(calls.snapshot).toEqual([newTarget!.id])
+    expect(calls.composite).toEqual([newTarget!.id])
   })
 })
