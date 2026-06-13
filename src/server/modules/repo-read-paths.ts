@@ -81,8 +81,12 @@ function composeSectionSignal(
   signal: AbortSignal
   cancel: () => void
 } {
+  // Fast path: no caller signal and no timeout — return a fresh,
+  // never-aborting signal so downstream code can treat the
+  // return value uniformly without `as unknown as AbortSignal`
+  // casts or `signal?.aborted` short-circuits everywhere.
   if (!callerSignal && (!timeoutMs || timeoutMs <= 0)) {
-    return { signal: undefined as unknown as AbortSignal, cancel: () => {} }
+    return { signal: new AbortController().signal, cancel: () => {} }
   }
   const controller = new AbortController()
   let timer: ReturnType<typeof setTimeout> | undefined

@@ -117,7 +117,6 @@ export const REPO_QUERY_SCHEMAS = {
     timeoutMs: v.optional(
       v.pipe(
         v.union([v.number(), v.pipe(v.string(), v.transform(Number))]),
-        v.number(),
         v.integer(),
         v.minValue(0),
         v.maxValue(600_000),

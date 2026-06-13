@@ -3,7 +3,7 @@ import { Hono } from 'hono'
 import { applyApiSecurityHeaders, buildCorsOriginPredicate } from '#/server/common/http-harden.ts'
 
 describe('applyApiSecurityHeaders', () => {
-  test('sets Cache-Control, X-Content-Type-Options, Vary on every /api response', async () => {
+  test('sets Cache-Control and X-Content-Type-Options on every /api response', async () => {
     const app = new Hono()
     app.use('/api/*', applyApiSecurityHeaders())
     app.get('/api/ping', (c) => c.json({ ok: true }))
@@ -11,7 +11,8 @@ describe('applyApiSecurityHeaders', () => {
     const response = await app.request('http://localhost/api/ping')
     expect(response.headers.get('Cache-Control')).toBe('no-store')
     expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff')
-    expect(response.headers.get('Vary')).toBe('Origin')
+    // `Vary: Origin` is set by Hono's `cors()` middleware, not here.
+    // Verified separately in the cors integration in app-factory.test.ts.
   })
 
   test('does not override a handler-supplied Cache-Control header', async () => {

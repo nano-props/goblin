@@ -10,13 +10,15 @@ import type { MiddlewareHandler } from 'hono'
  *   proxy or service worker.
  * - `X-Content-Type-Options: nosniff` — blocks browsers / fetch
  *   clients from guessing a response type that wasn't advertised.
- * - `Vary: Origin` — needed so CORS-aware caches don't serve a
- *   preflighted response to a different origin.
+ *
+ * `Vary: Origin` is *not* in this map: Hono's `cors()` middleware
+ * already sets it on every `/api/*` response (and adds
+ * `Access-Control-Request-Headers` on preflight). Listing it
+ * twice would just look like double-management.
  */
 const API_RESPONSE_HEADERS: Readonly<Record<string, string>> = {
   'Cache-Control': 'no-store',
   'X-Content-Type-Options': 'nosniff',
-  Vary: 'Origin',
 }
 
 export function applyApiSecurityHeaders(): MiddlewareHandler {

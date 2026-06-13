@@ -71,6 +71,12 @@ export function createRepoRoutes() {
   })
   app.get('/composite', async (c) => {
     const { cwd, include, branches, mode, timeoutMs } = parseHttpQuery(REPO_QUERY_SCHEMAS.composite, c)
+    // `include` is a `string[]` per the schema; `parseHttpQuery`
+    // materialises it from `searchParams.getAll('include')`, so the
+    // wire format is repeated keys:
+    //   `?include=snapshot&include=status`
+    // Comma-separated values (`?include=snapshot,status`) are not
+    // supported — the renderer always sends repeated keys.
     const wants = (include ?? ['snapshot', 'status', 'pullRequests']) as ReadonlyArray<
       'snapshot' | 'status' | 'pullRequests'
     >

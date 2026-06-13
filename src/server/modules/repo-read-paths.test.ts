@@ -125,12 +125,13 @@ describe('getRepositoryComposite timeout', () => {
     const promise = getRepositoryComposite('/tmp/repo', ['status'], { timeoutMs: 0 })
     // Give the microtask queue a chance to wire up.
     await Promise.resolve()
-    expect(observedSignal).toBeUndefined()
-    // The promise stays pending until the abort fires; resolve the
-    // wait by aborting the caller signal (which is the only abort
-    // path that should exist when timeoutMs=0).
-    // No assertion can wait "forever" — so we race against a 100ms
-    // timeout to make sure it never resolves on its own.
+    // A fresh, never-aborting signal is still wired through to the
+    // backend (so the backend code path is uniform) — just one
+    // that will never fire on its own.
+    expect(observedSignal).toBeDefined()
+    expect(observedSignal?.aborted).toBe(false)
+    // No assertion can wait "forever" — race against a 100ms timeout
+    // to make sure the promise never resolves on its own.
     const result = await Promise.race([
       promise,
       new Promise<'still-pending'>((resolve) => setTimeout(() => resolve('still-pending'), 100)),
