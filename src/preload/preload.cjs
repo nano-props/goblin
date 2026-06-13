@@ -87,6 +87,30 @@ const runtime =
     ? bootstrap.runtime
     : { kind: 'electron', bridgeVersion: 1, capabilities: [] }
 const homeDir = typeof bootstrap?.homeDir === 'string' ? bootstrap.homeDir : ''
+/**
+ * Host platform. The renderer is sandboxed and does not have `process`
+ * at runtime, so we surface the platform from the bootstrap payload main
+ * hands us. The list mirrors NodeJS.Platform plus 'web' (used when the
+ * renderer runs outside Electron, e.g. the dev server).
+ */
+const KNOWN_RENDERER_PLATFORMS = new Set([
+  'aix',
+  'android',
+  'cygwin',
+  'darwin',
+  'freebsd',
+  'haiku',
+  'linux',
+  'netbsd',
+  'openbsd',
+  'sunos',
+  'win32',
+  'web',
+])
+const platform =
+  typeof bootstrap?.platform === 'string' && KNOWN_RENDERER_PLATFORMS.has(bootstrap.platform)
+    ? bootstrap.platform
+    : 'web'
 const initialI18n = isObject(bootstrap?.i18n) ? bootstrap.i18n : null
 const initialSettings = isObject(bootstrap?.settings) ? bootstrap.settings : null
 const initialServer =
@@ -144,6 +168,7 @@ function maybeDisposeEffectIntentListener() {
 contextBridge.exposeInMainWorld('goblinNative', {
   runtime,
   homeDir,
+  platform,
   initialI18n,
   initialSettings,
   initialServer,

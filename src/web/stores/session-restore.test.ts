@@ -8,13 +8,13 @@ function installBridge(sessionOverrides: Record<string, unknown> = {}) {
     value: {
       __GOBLIN_BOOTSTRAP__: {
         homeDir: '/Users/test',
-        initialI18n: null,
+platform: 'darwin',        initialI18n: null,
         initialSettings: null,
         initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
       },
       goblinNative: {
         homeDir: '/Users/test',
-        initialI18n: null,
+platform: 'darwin',        initialI18n: null,
         initialSettings: null,
         initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
         invokeIpc: vi.fn(({ path }: { path: string }) => {

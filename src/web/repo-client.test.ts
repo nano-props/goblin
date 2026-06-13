@@ -8,6 +8,7 @@ function webBootstrap(overrides: Partial<RendererBootstrapSnapshot> = {}): Rende
   return {
     runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
     homeDir: '',
+    platform: 'web',
     initialI18n: null,
     initialSettings: null,
     initialServer: null,
@@ -23,6 +24,7 @@ function electronBootstrap(overrides: Partial<RendererBootstrapSnapshot> = {}): 
       capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
     },
     homeDir: '/Users/test',
+    platform: 'darwin',
     initialI18n: null,
     initialSettings: null,
     initialServer: null,
@@ -161,6 +163,7 @@ describe('repo-client', () => {
             capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
           },
           homeDir: '/Users/test',
+          platform: 'darwin',
           invokeIpc: vi.fn(),
           abortIpc: async () => true,
           onEvent: () => () => {},

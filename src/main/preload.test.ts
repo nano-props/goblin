@@ -27,6 +27,7 @@ function defaultBootstrapPayload(): RendererBootstrapPayload {
       capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
     },
     homeDir: '/home/test',
+    platform: 'darwin',
     i18n: { lang: 'en', pref: 'ja', dict: { hello: 'world' } },
     settings: {
       fetchIntervalSec: 120,

@@ -7,6 +7,7 @@ function webBootstrap(overrides: Partial<RendererBootstrapSnapshot> = {}): Rende
   return {
     runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
     homeDir: '',
+    platform: 'web',
     initialI18n: null,
     initialSettings: null,
     initialServer: null,
@@ -22,6 +23,7 @@ function electronBootstrap(overrides: Partial<RendererBootstrapSnapshot> = {}): 
       capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
     },
     homeDir: '/Users/test',
+    platform: 'darwin',
     initialI18n: null,
     initialSettings: null,
     initialServer: null,
@@ -62,6 +64,7 @@ describe('renderer bootstrap', () => {
         goblinNative: {
           runtime: bootstrap.runtime,
           homeDir: bootstrap.homeDir,
+          platform: bootstrap.platform,
           initialI18n: bootstrap.initialI18n,
           initialSettings: bootstrap.initialSettings,
           initialServer: bootstrap.initialServer,
@@ -78,6 +81,7 @@ describe('renderer bootstrap', () => {
     expect(getInitialBootstrap()).toEqual({
       runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
       homeDir: '',
+      platform: 'web',
       initialI18n: null,
       initialSettings: null,
       initialServer: null,
@@ -89,6 +93,7 @@ describe('renderer bootstrap', () => {
     expect(getInitialBootstrap()).toEqual({
       runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
       homeDir: '',
+      platform: 'web',
       initialI18n: null,
       initialSettings: null,
       initialServer: null,
@@ -104,6 +109,7 @@ describe('renderer bootstrap', () => {
             capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
           },
           homeDir: '/Users/later',
+          platform: 'darwin',
           initialI18n: null,
           initialSettings: null,
           initialServer: null,
@@ -137,6 +143,7 @@ describe('renderer bootstrap', () => {
         capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
       },
       homeDir: '/Users/later',
+      platform: 'darwin',
       initialI18n: null,
       initialSettings: null,
       initialServer: null,
@@ -244,6 +251,7 @@ describe('renderer bootstrap', () => {
     expect(getInitialBootstrap()).toEqual({
       runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
       homeDir: '',
+      platform: 'web',
       initialI18n: null,
       initialSettings: null,
       initialServer: {

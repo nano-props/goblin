@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 import type {
+  RendererPlatform,
   RendererRuntimeSnapshot,
   InitialServerSnapshot,
   InitialSettingsSnapshot,
@@ -14,6 +15,13 @@ import type { TerminalMutationResult, TerminalNotifyBellInput } from '#/shared/t
 interface GoblinNativeBridge {
   runtime: RendererRuntimeSnapshot
   homeDir: string
+  /**
+   * Host platform the renderer is running on. Mirrors `process.platform`
+   * for the Electron main process; the renderer is sandboxed and does
+   * not have `process` available, so the preload surfaces this from the
+   * bootstrap payload. Defaults to 'web' for the dev server preview.
+   */
+  platform: RendererPlatform
   initialI18n: I18nSnapshot | null
   initialSettings: InitialSettingsSnapshot | null
   initialServer: InitialServerSnapshot | null

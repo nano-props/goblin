@@ -65,6 +65,7 @@ function buildWebBootstrap(
   return createRendererBootstrapSnapshot({
     runtime: createRendererRuntimeSnapshot('web', WEB_RENDERER_CAPABILITIES),
     homeDir: os.homedir(),
+    platform: 'web',
     i18n: resolveI18nSnapshot(langPref, acceptLanguageHeader),
     settings: initialSettingsFromSnapshot({
       ...settings,
