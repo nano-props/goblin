@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { openInPreferredTerminal } from '#/system/terminals.ts'
-import { openInAppleTerminal, isAppleTerminalInstalled } from '#/system/apple-terminal.ts'
-import { isGhosttyInstalled, openInGhostty } from '#/system/ghostty.ts'
+import { openInPreferredTerminal, openRemoteInPreferredTerminal } from '#/system/terminals.ts'
+import { openInAppleTerminal, openRemoteInAppleTerminal, isAppleTerminalInstalled } from '#/system/apple-terminal.ts'
+import { isGhosttyInstalled, openInGhostty, openRemoteInGhostty } from '#/system/ghostty.ts'
 import { isWindowsTerminalInstalled, openInWindowsTerminal } from '#/system/windows-terminal.ts'
 
 vi.mock('#/system/ghostty.ts', () => ({
@@ -133,5 +133,77 @@ describe('openInPreferredTerminal', () => {
     })
 
     expect(openInWindowsTerminal).toHaveBeenCalledWith('C:\\repo')
+  })
+})
+
+describe('openRemoteInPreferredTerminal', () => {
+  const originalPlatform = process.platform
+
+  function setPlatform(platform: NodeJS.Platform) {
+    Object.defineProperty(process, 'platform', { value: platform })
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    setPlatform('darwin')
+  })
+
+  afterEach(() => {
+    setPlatform(originalPlatform)
+  })
+
+  test('opens the SSH session in Ghostty when chosen explicitly', async () => {
+    vi.mocked(isGhosttyInstalled).mockReturnValue(true)
+    vi.mocked(isAppleTerminalInstalled).mockResolvedValue(true)
+
+    await expect(openRemoteInPreferredTerminal('prod', '/srv/repo', 'ghostty')).resolves.toEqual({
+      ok: true,
+      message: 'prod:/srv/repo',
+    })
+    expect(openRemoteInGhostty).toHaveBeenCalledWith('prod', '/srv/repo')
+    expect(openRemoteInAppleTerminal).not.toHaveBeenCalled()
+  })
+
+  test('opens the SSH session in Apple Terminal when chosen explicitly', async () => {
+    vi.mocked(isAppleTerminalInstalled).mockResolvedValue(true)
+
+    await expect(openRemoteInPreferredTerminal('prod', '/srv/repo', 'terminal')).resolves.toEqual({
+      ok: true,
+      message: 'prod:/srv/repo',
+    })
+    expect(openRemoteInAppleTerminal).toHaveBeenCalledWith('prod', '/srv/repo')
+  })
+
+  test('prefers Ghostty for remote in auto mode when installed', async () => {
+    vi.mocked(isGhosttyInstalled).mockReturnValue(true)
+    vi.mocked(isAppleTerminalInstalled).mockResolvedValue(true)
+
+    await openRemoteInPreferredTerminal('prod', '/srv/repo', 'auto')
+
+    expect(openRemoteInGhostty).toHaveBeenCalledWith('prod', '/srv/repo')
+    expect(openRemoteInAppleTerminal).not.toHaveBeenCalled()
+  })
+
+  test('returns error.terminal-not-installed when nothing resolves', async () => {
+    vi.mocked(isGhosttyInstalled).mockReturnValue(false)
+    vi.mocked(isAppleTerminalInstalled).mockResolvedValue(false)
+
+    await expect(openRemoteInPreferredTerminal('prod', '/srv/repo', 'auto')).resolves.toEqual({
+      ok: false,
+      message: 'error.terminal-not-installed',
+    })
+    expect(openRemoteInGhostty).not.toHaveBeenCalled()
+    expect(openRemoteInAppleTerminal).not.toHaveBeenCalled()
+  })
+
+  test('returns error.remote-terminal-not-supported when the resolved backend has no openRemote', async () => {
+    setPlatform('win32')
+    vi.mocked(isWindowsTerminalInstalled).mockReturnValue(true)
+
+    await expect(openRemoteInPreferredTerminal('prod', '/srv/repo', 'windowsTerminal')).resolves.toEqual({
+      ok: false,
+      message: 'error.remote-terminal-not-supported',
+    })
+    expect(openInWindowsTerminal).not.toHaveBeenCalled()
   })
 })
