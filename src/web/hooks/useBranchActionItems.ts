@@ -88,6 +88,12 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
   const showEditorAction = capabilities.canOpenEditor && (isRemoteRepo || editorAvailable)
   const terminalIconPref = isRemoteRepo ? 'auto' : (resolvedTerminalApp ?? terminalApp)
   const editorIconPref = isRemoteRepo ? 'auto' : (resolvedEditorApp ?? editorApp)
+  const terminalActionLabelText = (() => {
+    if (isRemoteRepo || !resolvedTerminalApp) return t('worktrees.open-in-terminal-label')
+    if (resolvedTerminalApp === 'ghostty') return t('settings.terminal.ghostty')
+    if (resolvedTerminalApp === 'terminal') return t('settings.terminal.terminal')
+    return t('settings.terminal.windows-terminal')
+  })()
 
   const patchItems: BranchActionItem[] = capabilities.canCopyPatch
     ? [
@@ -140,7 +146,7 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
       ? [
           {
             id: 'terminal' as const,
-            label: t('worktrees.open-in-terminal-label'),
+            label: terminalActionLabelText,
             disabled,
             busy: busy('terminal'),
             visible: true,
