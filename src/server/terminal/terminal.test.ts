@@ -676,8 +676,14 @@ describe('server terminal sessions', () => {
     expect(spawn).toHaveBeenCalledTimes(1)
     if (!first.ok || !attachedAgain.ok) return
     expect(attachedAgain.sessionId).toBe(first.sessionId)
+    // The size change triggers queueTerminalRenderClearAndResize, which wipes
+    // the headless's visible area before the re-paint arrives. The "hello"
+    // that was emitted before the re-attach is therefore gone from the
+    // snapshot — zsh's SIGWINCH re-paint (which would replace the wiped
+    // cells) is not simulated by this test, so the snapshot is just the
+    // wiped visible area.
     expect(attachedAgain.snapshot).toContain('\u001b[?1049h')
-    expect(attachedAgain.snapshot).toContain('hello')
+    expect(attachedAgain.snapshot).not.toContain('hello')
     expect(attachedAgain.snapshotSeq).toBe(1)
     expect(mockPtys[0]?.resize).toHaveBeenCalledWith(100, 30)
 
@@ -1092,6 +1098,86 @@ describe('server terminal sessions', () => {
     // All rapid writes are batched into a single ordered pty.write call.
     expect(mockPtys[0]?.write).toHaveBeenCalledTimes(1)
     expect(mockPtys[0]?.write).toHaveBeenCalledWith('clear')
+
+    unregisterTerminalSocket('client_1', 'attachment_a', socket)
+  })
+
+  test('resize does not duplicate the visible prompt in the next snapshot (SIGWINCH re-paint lands on a wiped headless)', async () => {
+    const socket = { send: vi.fn(), close: vi.fn() }
+    registerTerminalSocket('client_1', 'attachment_a', socket)
+    const sessionId = await createTerminalSession('client_1', { cols: 80, rows: 24 })
+
+    const attach = await attachServerTerminal('client_1', {
+      sessionId,
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_a',
+    })
+    expect(attach.ok).toBe(true)
+
+    // Shell prints its initial prompt and the user types a command at 80x24.
+    mockPtys[0]?.emitData('user@host ~ % ls -la\n')
+    // Drain the headless's write chain for the initial output so the
+    // headless is in a known state.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+    const beforeResize = await getServerTerminalSessionSnapshot('client_1', { sessionId })
+    expect(beforeResize).toBeTruthy()
+    expect(beforeResize?.snapshot).toContain('ls -la')
+
+    // Resize the PTY. In production:
+    //   1. queueTerminalRenderClearAndResize queues a wipe+resize step
+    //   2. pty.resize sends SIGWINCH
+    //   3. zsh re-paints asynchronously, onData queues a write step
+    //   4. The client calls getServerTerminalSessionSnapshot which awaits
+    //      the chain and serializes
+    // The two bugs we want to catch:
+    //   (A) The chain step in (1) does not wait for the headless write
+    //       callback, so the snapshot in (4) reads the headless before
+    //       the wipe has actually been applied.
+    //   (B) snapshotSeq is captured before the chain awaits, so the
+    //       re-paint's seq is set after the snapshot's seq — the client
+    //       dedup boundary is set too low and the live re-paint event is
+    //       re-applied on top of the snapshot's content, duplicating the
+    //       prompt.
+    expect(
+      resizeServerTerminal('client_1', {
+        sessionId,
+        cols: 200,
+        rows: 60,
+        attachmentId: 'attachment_a',
+      }),
+    ).toBe(true)
+    // The re-paint arrives via onData synchronously in the mock.
+    mockPtys[0]?.emitData('\x1b[2J\x1b[Huser@host ~ % ')
+
+    // Only one tick of drain: in production the snapshot is taken right
+    // after the attach response is built, which awaits the chain once.
+    // A correct fix should make the snapshot reflect the wiped +
+    // re-painted headless with no leftover "ls -la" content.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+    const afterResize = await getServerTerminalSessionSnapshot('client_1', { sessionId })
+    expect(afterResize).toBeTruthy()
+    const snap = afterResize!.snapshot
+
+    // The re-painted prompt must be present.
+    expect(snap).toContain('user@host ~ %')
+
+    // The original "ls -la" command line must NOT appear in the visible
+    // area. Without the wipe callback + seq-timing fix, "ls -la"
+    // survives in the headless's cells (the chain resolves before the
+    // `\e[2J` write is applied to the headless) and the re-paint's
+    // `\e[2J` is processed on top of the OLD content, leaving a
+    // duplicated prompt in the snapshot.
+    expect(snap).not.toContain('ls -la')
+
+    // The snapshot's seq must be at or after the re-paint's seq so the
+    // client's dedup boundary swallows the live `output` event for the
+    // re-paint. The re-paint was the second `appendTerminalReplayData`
+    // call, so its seq is 2; the snapshot must therefore report seq >= 2.
+    expect(afterResize!.snapshotSeq).toBeGreaterThanOrEqual(2)
 
     unregisterTerminalSocket('client_1', 'attachment_a', socket)
   })

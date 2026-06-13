@@ -28,7 +28,7 @@ import {
   createTerminalRenderModel,
   disposeTerminalRenderState,
   maybeClearCanonicalTitleOnShellReturn,
-  queueTerminalRenderResize,
+  queueTerminalRenderClearAndResize,
   queueTerminalRenderWrite,
   resetTerminalRenderState,
   snapshotTerminalRenderState,
@@ -376,10 +376,10 @@ export class TerminalSessionManager<TOwner extends string | number> {
     if (!session.pty) return false
     if (session.cols === cols && session.rows === rows) return true
     try {
+      queueTerminalRenderClearAndResize(session.render, cols, rows)
       session.pty.resize(cols, rows)
       session.cols = cols
       session.rows = rows
-      queueTerminalRenderResize(session.render, cols, rows)
       this.emitOwnership(session)
       return true
     } catch (err) {

@@ -1,5 +1,14 @@
-import { describe, expect, test } from 'vitest'
-import { createEmptyTerminalRenderState, appendTerminalReplayData } from '#/server/terminal/terminal-render-state.ts'
+import { describe, expect, test, vi } from 'vitest'
+import {
+  appendTerminalReplayData,
+  createEmptyTerminalRenderState,
+  createTerminalRenderModel,
+  queueTerminalRenderClearAndResize,
+  queueTerminalRenderResize,
+  snapshotTerminalRenderState,
+  type HeadlessTerminalLike,
+  type TerminalRenderState,
+} from '#/server/terminal/terminal-render-state.ts'
 
 describe('terminal-render-state', () => {
   describe('appendTerminalReplayData', () => {
@@ -82,6 +91,153 @@ describe('terminal-render-state', () => {
       // \x1b[0m is 4 chars
       const afterReset = state.buffer.slice(4)
       expect(afterReset.startsWith('second-line')).toBe(true)
+    })
+  })
+
+  describe('queueTerminalRenderClearAndResize', () => {
+    function makeStateWithMock(): {
+      state: TerminalRenderState
+      term: HeadlessTerminalLike
+      events: string[]
+    } {
+      const events: string[] = []
+      const term: HeadlessTerminalLike = {
+        write: vi.fn((data: string, cb?: () => void) => {
+          events.push(`write:${JSON.stringify(data)}`)
+          cb?.()
+        }),
+        resize: vi.fn((cols: number, rows: number) => {
+          events.push(`resize:${cols}x${rows}`)
+        }),
+        loadAddon: vi.fn(),
+        onTitleChange: vi.fn(() => ({ dispose() {} })),
+        dispose: vi.fn(),
+      }
+      const state = createEmptyTerminalRenderState()
+      state.model = createTerminalRenderModel(80, 24)
+      state.model!.term = term
+      return { state, term, events }
+    }
+
+    test('writes CSI 2J then resizes the headless, in that order', async () => {
+      const { state, term } = makeStateWithMock()
+      queueTerminalRenderClearAndResize(state, 100, 30)
+      await state.model!.chain
+      const writeOrder = (term.write as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]
+      const resizeOrder = (term.resize as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]
+      expect(writeOrder).toBeLessThan(resizeOrder)
+      // write is called with (data, callback) so the chain step resolves only
+      // after the headless has actually applied the wipe.
+      expect((term.write as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toBe('\x1b[2J')
+      expect(typeof (term.write as ReturnType<typeof vi.fn>).mock.calls[0]?.[1]).toBe('function')
+      expect((term.resize as ReturnType<typeof vi.fn>).mock.calls[0]).toEqual([100, 30])
+    })
+
+    test('runs the wipe-then-resize in a single chain step (not split across ticks)', async () => {
+      const { state, events } = makeStateWithMock()
+      queueTerminalRenderClearAndResize(state, 100, 30)
+      await state.model!.chain
+      // The write is invoked synchronously inside the .then() with a
+      // callback. The mock calls the callback immediately, so resize runs
+      // before the chain step resolves.
+      expect(events).toEqual(['write:"\\u001b[2J"', 'resize:100x30'])
+    })
+
+    test('runs after prior queued writes (chain is ordered)', async () => {
+      const { state, events } = makeStateWithMock()
+      // Pretend a prior write was queued (but never awaited)
+      state.model!.chain = state.model!.chain.then(() => {
+        events.push('prior-write')
+      })
+      queueTerminalRenderClearAndResize(state, 100, 30)
+      await state.model!.chain
+      expect(events).toEqual(['prior-write', 'write:"\\u001b[2J"', 'resize:100x30'])
+    })
+
+    test('runs before a write queued after it (re-paint sees new size)', async () => {
+      const { state, events } = makeStateWithMock()
+      queueTerminalRenderClearAndResize(state, 100, 30)
+      // Simulate the PTY.onData re-paint arriving via the chain after SIGWINCH
+      state.model!.chain = state.model!.chain.then(
+        () =>
+          new Promise<void>((resolve) => {
+            state.model!.term.write('\x1b[H% ', () => {
+              events.push('repaint-written')
+              resolve()
+            })
+          }),
+      )
+      await state.model!.chain
+      const clearIdx = events.indexOf('write:"\\u001b[2J"')
+      const resizeIdx = events.indexOf('resize:100x30')
+      const repaintIdx = events.indexOf('repaint-written')
+      expect(clearIdx).toBeGreaterThanOrEqual(0)
+      expect(resizeIdx).toBeGreaterThan(clearIdx)
+      expect(repaintIdx).toBeGreaterThan(resizeIdx)
+    })
+
+    test('is a no-op when no model is bound', () => {
+      const state = createEmptyTerminalRenderState()
+      expect(() => queueTerminalRenderClearAndResize(state, 100, 30)).not.toThrow()
+    })
+
+    test('uses the captured model even if the state is rebound before the chain settles', async () => {
+      const original = makeStateWithMock()
+      queueTerminalRenderClearAndResize(original.state, 100, 30)
+      const capturedChain = original.state.model!.chain
+      // Simulate a session restart: rebind state.model to a new model
+      const replacement = makeStateWithMock()
+      original.state.model = replacement.state.model
+      await capturedChain
+      const origWrite = original.term.write as ReturnType<typeof vi.fn>
+      const replWrite = replacement.term.write as ReturnType<typeof vi.fn>
+      expect(origWrite).toHaveBeenCalledWith('\x1b[2J', expect.any(Function))
+      expect(replWrite).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('queueTerminalRenderResize (regression)', () => {
+    test('still resizes without erasing (legacy semantics preserved)', async () => {
+      const term: HeadlessTerminalLike = {
+        write: vi.fn(),
+        resize: vi.fn(),
+        loadAddon: vi.fn(),
+        onTitleChange: vi.fn(() => ({ dispose() {} })),
+        dispose: vi.fn(),
+      }
+      const state = createEmptyTerminalRenderState()
+      state.model = createTerminalRenderModel(80, 24)
+      state.model!.term = term
+      queueTerminalRenderResize(state, 100, 30)
+      await state.model!.chain
+      expect(term.write).not.toHaveBeenCalled()
+      expect(term.resize).toHaveBeenCalledWith(100, 30)
+    })
+  })
+
+  describe('snapshotTerminalRenderState (seq timing)', () => {
+    test('captures snapshotSeq AFTER the chain drains, so a write queued during the await is reflected in the seq', async () => {
+      // Simulate the production timing:
+      //   1. snapshotTerminalRenderState starts
+      //   2. await chain is pending
+      //   3. while awaiting, appendTerminalReplayData fires and bumps the seq
+      //   4. chain resolves, snapshot reads the new seq
+      // The seq in the returned snapshot must reflect the appended data,
+      // otherwise the client's dedup boundary is set too low and the same
+      // data is sent again as a live `output` event, producing a
+      // duplicated prompt on re-attach.
+      const state = createEmptyTerminalRenderState()
+      state.model = createTerminalRenderModel(80, 24)
+      const realChain = state.model.chain
+      const snapshotPromise = snapshotTerminalRenderState('session-1', state)
+      // While the snapshot is awaiting the chain, simulate a write whose
+      // seq gets bumped. This mirrors pty.onData firing during the
+      // production attach flow.
+      state.sequence += 1
+      await realChain
+      const snapshot = await snapshotPromise
+      expect(snapshot).toBeTruthy()
+      expect(snapshot!.snapshotSeq).toBe(1)
     })
   })
 })

@@ -112,17 +112,70 @@ export function queueTerminalRenderResize(state: TerminalRenderState, cols: numb
     })
 }
 
+/**
+ * Erase the headless's visible area, then resize to the new dimensions, in a
+ * single chain step.
+ *
+ * Why combine: the headless lives at whatever size it was last resized to.
+ * When the PTY is resized, the shell receives SIGWINCH and re-paints the
+ * prompt at the new dimensions; the re-paint reaches the headless via
+ * PTY.onData. If the headless is still at the old size when the re-paint
+ * arrives, the re-paint is processed (and possibly wrapped/truncated) at
+ * the old size, and a subsequent deferred headless resize reflows the
+ * buffer — letting the original prompt cells survive into the snapshot
+ * alongside the re-painted prompt. The client then sees a duplicated line.
+ *
+ * Erasing the visible area with `\e[2J` first (xterm's default
+ * `scrollOnEraseInDisplay: false` keeps scrollback intact) removes the
+ * cells that would otherwise be reflowed into the new visible area, and
+ * putting the erase and the resize in the same chain step guarantees the
+ * shell's re-paint lands on a clean, correctly-sized headless.
+ *
+ * The write callback is used so the chain step does not resolve until xterm
+ * has actually applied the `\e[2J` to the headless. Without the callback,
+ * the step would resolve as soon as JavaScript returns from `term.write`,
+ * but the xterm.js WriteBuffer would still have the write pending — leaving
+ * any subsequent snapshot that awaits this chain reading the pre-wipe
+ * buffer.
+ */
+export function queueTerminalRenderClearAndResize(
+  state: TerminalRenderState,
+  cols: number,
+  rows: number,
+): void {
+  const model = state.model
+  if (!model) return
+  model.chain = model.chain
+    .catch(() => {})
+    .then(
+      () =>
+        new Promise<void>((resolve) => {
+          model.term.write('\x1b[2J', () => {
+            model.term.resize(cols, rows)
+            resolve()
+          })
+        }),
+    )
+}
+
 export async function snapshotTerminalRenderState(
   sessionId: string,
   state: TerminalRenderState,
 ): Promise<TerminalSessionSnapshot | null> {
   if (!state.model) return null
-  const snapshotSeq = state.sequence
   const chain = state.model.chain
   try {
     await chain
   } catch {}
   if (!state.model) return null
+  // Read the seq *after* the chain has drained. Any data whose write was
+  // queued by appendTerminalReplayData during the await is included in the
+  // serialized snapshot below, so the seq we return must reflect that
+  // inclusion — otherwise the client's dedup boundary would be set too low
+  // and the live `output` event for the same data would be re-applied to
+  // the xterm, producing a visible duplicate of the prompt (or any other
+  // re-paint) on re-attach.
+  const snapshotSeq = state.sequence
   return {
     sessionId,
     snapshot: state.model.serializeAddon.serialize({ excludeAltBuffer: false }),
