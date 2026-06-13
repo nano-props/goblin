@@ -4,12 +4,8 @@ const config: Configuration = {
   appId: 'goblin.app',
   productName: 'Goblin',
   // Top-level icon is consumed by the mac build (`assets/icon-mac-1024.png`,
-  // a 1024x1024 PNG as macOS expects). electron-builder falls back to this
-  // for the Windows build too if `win.icon` isn't set, but Windows strongly
-  // prefers a multi-resolution `.ico` (16/32/48/64/256 etc.). Until we ship
-  // `assets/icon.ico`, Windows installers will use the same 1024x1024 PNG
-  // embedded into the NSIS installer — functional but visually sub-optimal
-  // in the taskbar / installer dialog.
+  // a 1024x1024 PNG as macOS expects). The Windows build uses the
+  // multi-resolution `assets/icon.ico` (16/32/48/256 frames).
   icon: 'assets/icon-mac-1024.png',
   directories: {
     output: 'release',
@@ -31,6 +27,9 @@ const config: Configuration = {
   ],
   asarUnpack: ['node_modules/node-pty/prebuilds/**/*'],
   win: {
+    // Windows requires a multi-resolution .ico for proper taskbar and
+    // file explorer rendering (16/32/48/256 frames embedded).
+    icon: 'assets/icon.ico',
     // NSIS installer is the standard "install for current user" path. The
     // oneClick / perMachine toggles below match what most modern Electron
     // apps ship. code signing is intentionally left unset — distribute
