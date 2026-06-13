@@ -26,9 +26,8 @@ describe('repo session hydration', () => {
     expect(useReposStore.getState().activeId).toBe(REPO_B)
     expect(useReposStore.getState().sessionReady).toBe(true)
     expect(calls.recent).toEqual([])
-    expect(calls.snapshot).toEqual([REPO_A, REPO_B])
     await vi.waitFor(() => {
-      expect(calls.status).toEqual([REPO_A, REPO_B])
+      expect(calls.composite).toEqual([REPO_A, REPO_B])
     })
   })
 

@@ -24,9 +24,8 @@ describe('repo lifecycle', () => {
     expect(useReposStore.getState().order).toEqual([REPO_A])
     expect(useReposStore.getState().activeId).toBe(REPO_A)
     expect(calls.recent).toEqual([{ kind: 'local', id: REPO_A }])
-    expect(calls.snapshot).toEqual([REPO_A])
     await vi.waitFor(() => {
-      expect(calls.status).toEqual([REPO_A])
+      expect(calls.composite).toEqual([REPO_A])
     })
   })
 
@@ -40,9 +39,8 @@ describe('repo lifecycle', () => {
     expect(result).toEqual({ ok: true, id: REPO_B })
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().activeId).toBe(REPO_A)
-    expect(calls.snapshot).toEqual([REPO_A, REPO_B])
     await vi.waitFor(() => {
-      expect(calls.status).toEqual([REPO_A, REPO_B])
+      expect(calls.composite).toEqual([REPO_A, REPO_B])
     })
   })
 
@@ -55,9 +53,8 @@ describe('repo lifecycle', () => {
 
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().activeId).toBe(REPO_A)
-    expect(calls.snapshot).toEqual([REPO_A, REPO_B])
     await vi.waitFor(() => {
-      expect(calls.status).toEqual([REPO_A, REPO_B])
+      expect(calls.composite).toEqual([REPO_A, REPO_B])
     })
   })
 
@@ -89,9 +86,8 @@ describe('repo lifecycle', () => {
 
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().activeId).toBe(REPO_A)
-    expect(calls.snapshot).toEqual([REPO_A, REPO_B])
     await vi.waitFor(() => {
-      expect(calls.status).toEqual([REPO_A, REPO_B])
+      expect(calls.composite).toEqual([REPO_A, REPO_B])
     })
   })
   test('initial refresh results from a closed repo instance do not overwrite a reopened repo', async () => {

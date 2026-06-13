@@ -13,6 +13,7 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
     recent: [] as RepoSessionEntry[],
     snapshot: [] as string[],
     status: [] as string[],
+    composite: [] as string[],
     resolveTarget: [] as Array<{ alias: string; remotePath: string }>,
   }
   const handlers: Record<string, (input: any) => unknown> = {
@@ -29,12 +30,12 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
       calls.status.push(cwd)
       return []
     },
-    // The composite endpoint folds snapshot + status into one round trip.
-    // Existing lifecycle assertions count both as separate calls, so the
-    // mock increments both buckets when a composite hits the bridge.
+    // The composite endpoint folds snapshot + status into one round
+    // trip, so it lives in its own bucket — the old approach of
+    // pushing into both `snapshot` and `status` hid the fact that
+    // `refreshCoreData` now hits the bridge once, not twice.
     'repo.composite': ({ cwd }: { cwd: string }) => {
-      calls.snapshot.push(cwd)
-      calls.status.push(cwd)
+      calls.composite.push(cwd)
       return { snapshot: { branches: [], current: '' }, status: [], pullRequests: null }
     },
     'repo.abort': async () => undefined,
