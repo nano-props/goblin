@@ -20,7 +20,7 @@ function installBridge(sessionOverrides: Record<string, unknown> = {}) {
         initialSettings: null,
         initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
         invokeIpc: vi.fn(({ path }: { path: string }) => {
-          if (path !== 'settings.get') throw new Error(`Unhandled RPC path: ${path}`)
+          if (path !== 'settings.get') throw new Error(`Unhandled IPC path: ${path}`)
           return {
             theme: 'auto',
             colorTheme: 'default',

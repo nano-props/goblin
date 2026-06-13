@@ -3,7 +3,7 @@
 //
 // Shortcuts that are also wired through the application menu (⌘O,
 // ⌘W, ⌘1/⌘2/⌘3, ⌘[ , ⌘]) are handled by Electron's accelerator system
-// and forwarded as typed RPC events. We only handle the "no
+// and forwarded as typed IPC events. We only handle the "no
 // modifier" keys here (j/k/arrows/p/P/g/v/G/?/Enter/Esc) so we don't fight the menu.
 //
 // Modal awareness: when an overlay/dialog/menu is open every shortcut

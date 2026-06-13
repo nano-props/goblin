@@ -42,7 +42,7 @@ describe('native host client', () => {
     setRendererBridgeForTests(null)
   })
 
-  test('aborts native RPC requests over Electron IPC', async () => {
+  test('aborts native IPC requests', async () => {
     const calls: Array<{ path: string; input?: unknown }> = []
     installBridge(calls)
     const { invokeNativeIpcPath } = await import('#/web/native-host-client.ts')

@@ -4,7 +4,7 @@
 //      which element has focus — e.g. ⌘O always opens a repo.
 //
 // Renderer-driven actions (Open / Close Tab / Switch Tab / Refresh /
-// Toggle View) are dispatched as typed RPC events so the
+// Toggle View) are dispatched as typed IPC events so the
 // renderer can run them in its existing store/state, instead of
 // duplicating that logic in main.
 // A small number of truly native menu actions (for example open data
