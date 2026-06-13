@@ -6,6 +6,7 @@ import {
   unregisterInvalidationSocket,
 } from '#/server/modules/invalidation-broker.ts'
 import { safeEqualString } from '#/server/common/timing-safe.ts'
+import { errorJson } from '#/server/common/responses.ts'
 import type { ServerTerminalHost, ServerTerminalSocket } from '#/server/terminal/terminal-host.ts'
 
 interface RealtimeRouteOptions {
@@ -25,17 +26,18 @@ export function createRealtimeRoutes({ internalSecret, terminalHost }: RealtimeR
   const app = new Hono()
   app.use('/invalidation', async (c, next) => {
     if (!safeEqualString(c.req.query('token') ?? '', internalSecret)) {
-      return c.json({ ok: false, message: 'Unauthorized' }, 401)
+      return errorJson(c, 'FORBIDDEN', 'Unauthorized')
     }
     await next()
   })
   app.use('/terminal', async (c, next) => {
     if (!safeEqualString(c.req.query('token') ?? '', internalSecret)) {
-      return c.json({ ok: false, message: 'Unauthorized' }, 401)
+      return errorJson(c, 'FORBIDDEN', 'Unauthorized')
     }
-    if (!terminalHost.isValidClientId(c.req.query('clientId')))
-      return c.json({ ok: false, message: 'Invalid client id' }, 400)
-    if (!c.req.query('attachmentId')) return c.json({ ok: false, message: 'Missing attachment id' }, 400)
+    if (!terminalHost.isValidClientId(c.req.query('clientId'))) {
+      return errorJson(c, 'BAD_REQUEST', 'Invalid client id')
+    }
+    if (!c.req.query('attachmentId')) return errorJson(c, 'BAD_REQUEST', 'Missing attachment id')
     await next()
   })
   app.get(

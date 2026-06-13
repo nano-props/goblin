@@ -1,6 +1,7 @@
 import * as v from 'valibot'
 import { Hono } from 'hono'
 import { IpcError } from '#/shared/api-types.ts'
+import { errorJson } from '#/server/common/responses.ts'
 
 /**
  * Parse a request body against a valibot schema. Throws `IpcError` with
@@ -59,13 +60,6 @@ function formatHttpValidationError(issues: ReadonlyArray<v.BaseIssue<unknown>>):
     .join('; ')
 }
 
-const HTTP_STATUS_BY_IPC_CODE = {
-  BAD_REQUEST: 400,
-  FORBIDDEN: 401,
-  NOT_FOUND: 404,
-  INTERNAL_SERVER_ERROR: 500,
-} as const satisfies Record<string, number>
-
 /**
  * Create a Hono sub-app that converts `IpcError` thrown from any handler
  * (e.g. via `parseHttpInput`) into a JSON response with the right HTTP
@@ -75,12 +69,9 @@ const HTTP_STATUS_BY_IPC_CODE = {
 export function createRouteApp(): Hono {
   const app = new Hono()
   app.onError((err, c) => {
-    if (err instanceof IpcError) {
-      const status = HTTP_STATUS_BY_IPC_CODE[err.code as keyof typeof HTTP_STATUS_BY_IPC_CODE] ?? 400
-      return c.json({ ok: false, code: err.code, message: err.message }, status)
-    }
+    if (err instanceof IpcError) return errorJson(c, err.code, err.message)
     console.error('[server] unhandled error', err)
-    return c.json({ ok: false, code: 'INTERNAL_SERVER_ERROR', message: 'Internal server error' }, 500)
+    return errorJson(c, 'INTERNAL_SERVER_ERROR', 'Internal server error')
   })
   return app
 }

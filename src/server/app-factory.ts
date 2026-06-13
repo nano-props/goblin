@@ -9,6 +9,7 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { createInternalAuthMiddleware } from '#/server/common/auth.ts'
 import { applyApiSecurityHeaders, buildCorsOriginPredicate } from '#/server/common/http-harden.ts'
 import { accessLog } from '#/server/common/access-log.ts'
+import { errorJson } from '#/server/common/responses.ts'
 import { createHealthRoutes } from '#/server/routes/health.ts'
 import { createRemoteRoutes } from '#/server/routes/remote.ts'
 import { createRealtimeRoutes } from '#/server/routes/realtime.ts'
@@ -129,7 +130,7 @@ export function createApp(options: ServerAppOptions): Hono {
     '/api/*',
     bodyLimit({
       maxSize: API_BODY_LIMIT_BYTES,
-      onError: (c) => c.json({ ok: false, code: 'PAYLOAD_TOO_LARGE', message: 'Request body too large' }, 413),
+      onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
     }),
   )
   app.route(
@@ -160,8 +161,6 @@ export function createApp(options: ServerAppOptions): Hono {
       return c.text('Not Found', 404)
     }
   })
-  app.notFound((c) =>
-    c.json({ ok: false, code: 'NOT_FOUND', message: `No route for ${c.req.method} ${c.req.path}` }, 404),
-  )
+  app.notFound((c) => errorJson(c, 'NOT_FOUND', `No route for ${c.req.method} ${c.req.path}`))
   return app
 }

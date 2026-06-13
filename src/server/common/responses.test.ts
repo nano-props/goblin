@@ -46,6 +46,14 @@ describe('errorJson', () => {
     const res = await app.request('http://localhost/x')
     expect(res.status).toBe(429)
   })
+
+  test('accepts transport-only codes (e.g. PAYLOAD_TOO_LARGE)', async () => {
+    const app = new Hono()
+    app.get('/x', (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'too big'))
+    const res = await app.request('http://localhost/x')
+    expect(res.status).toBe(413)
+    expect(await res.json()).toEqual({ ok: false, code: 'PAYLOAD_TOO_LARGE', message: 'too big' })
+  })
 })
 
 describe('readJsonBody', () => {

@@ -49,8 +49,9 @@ describe('createRealtimeRoutes — auth middleware', () => {
     const app = createRealtimeRoutes({ internalSecret: 'secret', terminalHost: host })
     const res = await app.request('http://localhost/invalidation')
     expect(res.status).toBe(401)
-    const json = (await res.json()) as { ok: false; message: string }
+    const json = (await res.json()) as { ok: false; code: string; message: string }
     expect(json.message).toBe('Unauthorized')
+    expect(json.code).toBe('FORBIDDEN')
   })
 
   test('rejects /invalidation with a wrong token', async () => {
