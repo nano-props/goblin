@@ -133,6 +133,14 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
             let initialRefresh: InitialRepoRefresh | null = null
             set((s) => {
               const { repos, order } = addResolvedRepo(s, resolvedRepo, rankById)
+              // Hydration always kicks off an initial refresh: even
+              // when the resolved probe matches the existing target
+              // (or returns no target at all, for a local probe), the
+              // user expects fresh data on boot, not a stale cached
+              // projection that may be minutes old. The wasteful
+              // refresh fix lives in ensureWorkspaceOpen, where the
+              // "open an already-open repo" use case is just a focus
+              // action.
               const repo = repos[resolvedRepo.id]
               if (repo) initialRefresh = { id: repo.id, token: repo.instanceToken }
               const activeId = activeRepoIdAfterWorkspaceHydration(

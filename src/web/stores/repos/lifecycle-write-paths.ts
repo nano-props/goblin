@@ -6,7 +6,7 @@ import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import { abortRepositoryOperation, probeRepository } from '#/web/repo-client.ts'
 import { resolveRemoteRepositoryTarget } from '#/web/remote-client.ts'
 import { recordRecentRepo } from '#/web/settings-write-paths.ts'
-import type { OpenRepoResult, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
+import type { OpenRepoResult, ReposGet, ReposSet, RepoState, ReposStore } from '#/web/stores/repos/types.ts'
 import { nextActiveRepoIdAfterWorkspaceClose } from '#/web/open-workspace-state.ts'
 import {
   isRemoteRepoId,
@@ -95,47 +95,98 @@ function orderedInsert(order: string[], id: string, rankById?: ReadonlyMap<strin
   return next
 }
 
+/** Build a fresh repo by layering the restorable cache on top of an
+ *  empty shell. `nameHints` is consulted in order; the first non-empty
+ *  hint wins, then the cached name, then the last path segment of the
+ *  id. The caller mutates the result (e.g. sets `remote.target`,
+ *  flips availability) before returning it from `upsertRepo.create`. */
+function buildNewRepo(
+  s: Pick<ReposStore, 'restorableRepoCache'>,
+  id: string,
+  nameHints: ReadonlyArray<string | undefined | null>,
+): RepoState {
+  const cached = s.restorableRepoCache[id]
+  const hint = nameHints.find((value): value is string => !!value)
+  const name = hint ?? cached?.name ?? lastPathSegment(id)
+  return restoreRepoProjectionFromSnapshot(emptyRepo(id, name), cached)
+}
+
+function remoteTargetsEqual(a: RemoteRepoTarget | undefined, b: RemoteRepoTarget | undefined): boolean {
+  if (!a || !b) return false
+  return (
+    a.alias === b.alias &&
+    a.host === b.host &&
+    a.user === b.user &&
+    a.port === b.port &&
+    a.remotePath === b.remotePath
+  )
+}
+
+/** Upsert a repo by id, centralising the "if it exists, mutate; if
+ *  not, create + insert" pattern shared by addResolvedRepo,
+ *  addUnavailableRepo, and insertPlaceholderRepo.
+ *  - `create` runs when the id is new and returns the new repo.
+ *  - `update`, when provided, runs against the existing repo and
+ *    returns the updated state, or `null` to signal "no change". The
+ *    returned `changed` is true exactly when the produced state
+ *    differs from the input state — true for new repos, true for
+ *    any in-place update that returns a non-null value, false when
+ *    the existing repo was preserved (no-op or update returned null). */
+function upsertRepo(
+  s: Pick<ReposStore, 'repos' | 'restorableRepoCache' | 'order'>,
+  id: string,
+  options: {
+    rankById?: ReadonlyMap<string, number>
+    create: () => RepoState
+    update?: (existing: RepoState) => RepoState | null
+  },
+): Pick<ReposStore, 'repos' | 'order'> & { changed: boolean; id: string } {
+  const existing = s.repos[id]
+  if (existing) {
+    if (!options.update) return { repos: s.repos, order: s.order, changed: false, id }
+    const updated = options.update(existing)
+    if (!updated) return { repos: s.repos, order: s.order, changed: false, id }
+    return {
+      repos: { ...s.repos, [id]: updated },
+      order: s.order,
+      changed: true,
+      id,
+    }
+  }
+  return {
+    repos: { ...s.repos, [id]: options.create() },
+    order: orderedInsert(s.order, id, options.rankById),
+    changed: true,
+    id,
+  }
+}
+
 export function addResolvedRepo(
   s: Pick<ReposStore, 'repos' | 'restorableRepoCache' | 'order'>,
   resolvedRepo: ResolvedRepo,
   rankById?: ReadonlyMap<string, number>,
-): Pick<ReposStore, 'repos' | 'order'> & { changed: boolean } {
-  const { id, name } = resolvedRepo
-  const existing = s.repos[id]
-  if (existing) {
-    if (
-      !resolvedRepo.target ||
-      (existing.remote.target &&
-        existing.remote.target.alias === resolvedRepo.target.alias &&
-        existing.remote.target.host === resolvedRepo.target.host &&
-        existing.remote.target.user === resolvedRepo.target.user &&
-        existing.remote.target.port === resolvedRepo.target.port &&
-        existing.remote.target.remotePath === resolvedRepo.target.remotePath)
-    ) {
-      return { repos: s.repos, order: s.order, changed: false }
-    }
-    return {
-      repos: {
-        ...s.repos,
-        [id]: {
-          ...existing,
-          remote: {
-            ...existing.remote,
-            target: resolvedRepo.target,
-          },
-        },
-      },
-      order: s.order,
-      changed: false,
-    }
-  }
-  const repo = restoreRepoProjectionFromSnapshot(emptyRepo(id, name), s.restorableRepoCache[id])
-  if (resolvedRepo.target) repo.remote.target = resolvedRepo.target
-  return {
-    repos: { ...s.repos, [id]: repo },
-    order: orderedInsert(s.order, id, rankById),
-    changed: true,
-  }
+): Pick<ReposStore, 'repos' | 'order'> & { changed: boolean; id: string } {
+  return upsertRepo(s, resolvedRepo.id, {
+    rankById,
+    create: () => {
+      const repo = buildNewRepo(s, resolvedRepo.id, [resolvedRepo.name])
+      if (resolvedRepo.target) repo.remote.target = resolvedRepo.target
+      return repo
+    },
+    update: (existing) => {
+      // No target means the probe couldn't pin down a concrete host;
+      // the existing target (placeholder or stale) stays as-is, but
+      // the placeholder → resolved transition is still represented
+      // by the absence of a change. A matching target is also a no-op
+      // — the resolved probe reaffirmed what we already had.
+      if (!resolvedRepo.target) return null
+      if (remoteTargetsEqual(existing.remote.target, resolvedRepo.target)) return null
+      return {
+        ...existing,
+        remote: { ...existing.remote, target: resolvedRepo.target },
+      }
+    },
+  })
 }
 
 /**
@@ -155,34 +206,21 @@ export function addUnavailableRepo(
   reason: string,
   target?: RemoteRepoTarget,
   rankById?: ReadonlyMap<string, number>,
-): Pick<ReposStore, 'repos' | 'order'> & { changed: boolean } {
-  const existing = s.repos[id]
-  if (existing) {
-    return {
-      repos: {
-        ...s.repos,
-        [id]: {
-          ...existing,
-          availability: { phase: 'unavailable', reason, checkedAt: Date.now() },
-          remote: target ? { ...existing.remote, target } : existing.remote,
-        },
-      },
-      order: s.order,
-      changed: true,
-    }
-  }
-  const cached = s.restorableRepoCache[id]
-  const repo = restoreRepoProjectionFromSnapshot(
-    emptyRepo(id, cached?.name || target?.displayName || lastPathSegment(id)),
-    cached,
-  )
-  if (target) repo.remote.target = target
-  repo.availability = { phase: 'unavailable', reason, checkedAt: Date.now() }
-  return {
-    repos: { ...s.repos, [id]: repo },
-    order: s.order.includes(id) ? s.order : orderedInsert(s.order, id, rankById),
-    changed: true,
-  }
+): Pick<ReposStore, 'repos' | 'order'> & { changed: boolean; id: string } {
+  return upsertRepo(s, id, {
+    rankById,
+    create: () => {
+      const repo = buildNewRepo(s, id, [target?.displayName])
+      if (target) repo.remote.target = target
+      repo.availability = { phase: 'unavailable', reason, checkedAt: Date.now() }
+      return repo
+    },
+    update: (existing) => ({
+      ...existing,
+      availability: { phase: 'unavailable', reason, checkedAt: Date.now() },
+      remote: target ? { ...existing.remote, target } : existing.remote,
+    }),
+  })
 }
 
 /**
@@ -206,22 +244,20 @@ export function insertPlaceholderRepo(
   entry: RepoSessionEntry,
   rankById?: ReadonlyMap<string, number>,
 ): Pick<ReposStore, 'repos' | 'order'> & { changed: boolean; id: string } {
-  const id = entry.id
-  if (s.repos[id]) return { repos: s.repos, order: s.order, changed: false, id }
-  const cached = s.restorableRepoCache[id]
-  const fallbackName = entry.kind === 'remote' ? entry.ref.displayName : lastPathSegment(id)
-  const repo = restoreRepoProjectionFromSnapshot(emptyRepo(id, cached?.name || fallbackName), cached)
-  // 'refreshing' so the cached branches render with a stale indicator
-  // (resourceInitialLoading would hide them).
-  if (cached && cached.data.branches.length > 0) {
-    repo.resources.snapshot = { ...repo.resources.snapshot, phase: 'refreshing', error: null, stale: true }
-  }
-  return {
-    repos: { ...s.repos, [id]: repo },
-    order: orderedInsert(s.order, id, rankById),
-    changed: true,
-    id,
-  }
+  return upsertRepo(s, entry.id, {
+    rankById,
+    create: () => {
+      const fallbackName = entry.kind === 'remote' ? entry.ref.displayName : null
+      const repo = buildNewRepo(s, entry.id, [fallbackName])
+      // 'refreshing' so the cached branches render with a stale indicator
+      // (resourceInitialLoading would hide them).
+      const cached = s.restorableRepoCache[entry.id]
+      if (cached && cached.data.branches.length > 0) {
+        repo.resources.snapshot = { ...repo.resources.snapshot, phase: 'refreshing', error: null, stale: true }
+      }
+      return repo
+    },
+  })
 }
 
 export function refreshInitialRepoState(get: ReposGet, refresh: InitialRepoRefresh) {
@@ -238,14 +274,8 @@ export function refreshInitialRepoState(get: ReposGet, refresh: InitialRepoRefre
 function applyWorkspaceOpen(
   s: Pick<ReposStore, 'repos' | 'order' | 'restorableRepoCache'>,
   repo: ResolvedRepo,
-): {
-  repos: ReposStore['repos']
-  order: string[]
-  changed: boolean
-  id: string
-} {
-  const { repos, order, changed } = addResolvedRepo(s, repo)
-  return { repos, order, changed, id: repo.id }
+): Pick<ReposStore, 'repos' | 'order'> & { changed: boolean; id: string } {
+  return addResolvedRepo(s, repo)
 }
 
 export function createRuntimeRepoLifecycleActions(
@@ -266,10 +296,13 @@ export function createRuntimeRepoLifecycleActions(
       })
 
       set((s) => {
-        const existingRepo = s.repos[id]
         const { repos, order, changed } = applyWorkspaceOpen(s, repo)
-        const repoToRefresh = changed ? repos[id] : existingRepo
-        if (repoToRefresh) initialRefresh = { id, token: repoToRefresh.instanceToken }
+        // Only kick off an initial refresh when the resolved probe
+        // actually changed the store (new repo, or existing placeholder
+        // got a new target). A matching target is a no-op set and the
+        // cached data is already coherent — re-running the snapshot/
+        // status pipeline would just duplicate the in-flight work.
+        if (changed) initialRefresh = { id, token: repos[id]!.instanceToken }
         return changed ? { repos, order } : s
       })
 

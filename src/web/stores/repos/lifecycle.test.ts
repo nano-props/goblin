@@ -73,21 +73,25 @@ describe('repo lifecycle', () => {
     expect(useReposStore.getState().activeId).toBe(REPO_A)
   })
 
-  test('ensureWorkspaceOpen plus setActive locally refreshes an already-open repo', async () => {
+  test('ensureWorkspaceOpen does not re-refresh an already-open repo with unchanged target', async () => {
     const calls = installGoblin()
 
     const first = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
     if (first.ok) useReposStore.getState().setActive(first.id)
     const second = await useReposStore.getState().ensureWorkspaceOpen(REPO_B)
     if (second.ok) useReposStore.getState().setActive(second.id)
+    // Opening REPO_A again is a focus action: the repo is already
+    // resolved and its data is coherent, so we skip the snapshot/status
+    // pipeline. (hydrateSession still always refreshes on boot — see
+    // the lifecycle-hydrate test for the cached-then-fresh contract.)
     const third = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
     if (third.ok) useReposStore.getState().setActive(third.id)
 
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().activeId).toBe(REPO_A)
-    expect(calls.snapshot).toEqual([REPO_A, REPO_B, REPO_A])
+    expect(calls.snapshot).toEqual([REPO_A, REPO_B])
     await vi.waitFor(() => {
-      expect(calls.status).toEqual([REPO_A, REPO_B, REPO_A])
+      expect(calls.status).toEqual([REPO_A, REPO_B])
     })
   })
   test('initial refresh results from a closed repo instance do not overwrite a reopened repo', async () => {
@@ -139,5 +143,56 @@ describe('repo lifecycle', () => {
     expect(result).toEqual({ ok: true, id: target!.id })
     expect(useReposStore.getState().repos[target!.id]?.remote.target).toEqual(target)
     expect(calls.recent).toEqual([remoteRepoSessionEntry(target!)])
+  })
+
+  test('ensureWorkspaceOpen refreshes when a remote target changes between opens', async () => {
+    const oldTarget = normalizeRemoteTarget({
+      alias: 'example',
+      host: 'example.com',
+      user: 'alice',
+      port: 22,
+      remotePath: '/srv/repo',
+    })
+    const newTarget = normalizeRemoteTarget({
+      alias: 'example',
+      host: 'example.org',
+      user: 'alice',
+      port: 22,
+      remotePath: '/srv/repo',
+    })
+    expect(oldTarget).not.toBeNull()
+    expect(newTarget).not.toBeNull()
+
+    // The default IPC mock hardcodes the host by alias, so a same-alias
+    // re-open would never see a target change. Override resolveTarget
+    // to return oldTarget on the first call and newTarget on the second.
+    let resolveCalls = 0
+    installGoblin({
+      probe: (cwd: string) => ({ ok: true, root: cwd, name: 'repo' }),
+      'remote.resolveTarget': () => {
+        resolveCalls += 1
+        return { target: resolveCalls === 1 ? oldTarget : newTarget }
+      },
+    })
+
+    const first = await useReposStore
+      .getState()
+      .ensureWorkspaceOpen(remoteRepoSessionEntry(oldTarget!))
+    expect(first).toEqual({ ok: true, id: oldTarget!.id })
+    expect(useReposStore.getState().repos[oldTarget!.id]?.remote.target).toEqual(oldTarget)
+
+    // Second open with a different SSH host. The target update must
+    // trigger a refresh — the previous build returned `changed: false`
+    // for the in-place update, so this assertion would have failed.
+    const calls = installGoblin({
+      probe: (cwd: string) => ({ ok: true, root: cwd, name: 'repo' }),
+      'remote.resolveTarget': () => ({ target: newTarget }),
+    })
+    const second = await useReposStore
+      .getState()
+      .ensureWorkspaceOpen(remoteRepoSessionEntry(newTarget!))
+    expect(second).toEqual({ ok: true, id: newTarget!.id })
+    expect(useReposStore.getState().repos[newTarget!.id]?.remote.target).toEqual(newTarget)
+    expect(calls.snapshot).toEqual([newTarget!.id])
   })
 })
