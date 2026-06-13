@@ -137,7 +137,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
         invokeIpc: ({ path, input }: { path: string; input?: unknown }) => {
           const handler = handlers[path]
-          if (!handler) throw new Error(`Unhandled RPC path: ${path}`)
+          if (!handler) throw new Error(`Unhandled IPC path: ${path}`)
           return handler(input)
         },
         abortIpc: () => Promise.resolve(false),
@@ -364,7 +364,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     }),
     invokeIpc: async ({ path, input }: { path: string; input?: unknown }) => {
       const handler = handlers[path]
-      if (!handler) throw new Error(`Unhandled RPC path: ${path}`)
+      if (!handler) throw new Error(`Unhandled IPC path: ${path}`)
       return handler(input)
     },
     abortIpc: async () => false,

@@ -148,7 +148,7 @@ function webBridge(): RendererBridge {
       return bootstrap
     },
     async invokeIpc() {
-      throw new Error('Web renderer RPC bridge is unavailable')
+      throw new Error('Web renderer IPC bridge is unavailable')
     },
     async abortIpc() {
       return false

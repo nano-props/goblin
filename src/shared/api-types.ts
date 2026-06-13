@@ -42,7 +42,7 @@ import type {
 import type { RepoQueryInvalidationEvent } from '#/shared/repo-query-invalidation.ts'
 import { type NativeShellProjection } from '#/shared/native-shell-projection.ts'
 import { RemoteAbsolutePathSchema } from '#/shared/remote-repo-schema.ts'
-import type { CreateWorktreeRpcInput } from '#/shared/worktree-create.ts'
+import type { CreateWorktreeIpcInput } from '#/shared/worktree-create.ts'
 
 export type { WorkspaceLayout } from '#/shared/workspace-layout.ts'
 export type { SettingsPage } from '#/shared/settings-pages.ts'
@@ -256,7 +256,7 @@ export interface AppIpcHandlers {
       forceDeleteBranch?: boolean
       alsoDeleteUpstream?: boolean
     }) => Promise<ExecResult>
-    createWorktree: (input: CreateWorktreeRpcInput) => Promise<ExecResult>
+    createWorktree: (input: CreateWorktreeIpcInput) => Promise<ExecResult>
     remoteBranches: (input: { cwd: string }) => Promise<string[]>
     pull: (input: { cwd: string; branch: string; worktreePath?: string }) => Promise<ExecResult>
     push: (input: { cwd: string; branch: string }) => Promise<ExecResult>
@@ -312,11 +312,9 @@ export interface NativeIpcHandlers {
   }
 }
 
-export type NativeBridgeHandlers = NativeIpcHandlers
-
 export type NativeIpcPath = {
-  [NS in keyof NativeBridgeHandlers]: `${Extract<NS, string>}.${Extract<keyof NativeBridgeHandlers[NS], string>}`
-}[keyof NativeBridgeHandlers]
+  [NS in keyof NativeIpcHandlers]: `${Extract<NS, string>}.${Extract<keyof NativeIpcHandlers[NS], string>}`
+}[keyof NativeIpcHandlers]
 
 const EmptyInput = v.optional(v.void())
 const FiniteNumber = v.pipe(v.number(), v.finite())
