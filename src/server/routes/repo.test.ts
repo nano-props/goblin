@@ -186,6 +186,18 @@ describe('repo routes — composite read', () => {
     const json = (await response.json()) as { code: string }
     expect(json.code).toBe('BAD_REQUEST')
   })
+
+  test('soft-fails to the default envelope when the read function rejects', async () => {
+    // Mirrors the existing jsonOr behaviour for /snapshot, /status,
+    // and /pull-requests: a backend failure on the composite
+    // endpoint returns the empty default rather than a 5xx, so
+    // the renderer can keep rendering whatever it already has.
+    mocks.getRepositoryComposite.mockRejectedValue(new Error('backend exploded'))
+    const app = createRepoRoutes()
+    const response = await app.request(new Request('http://localhost/composite?cwd=/tmp/repo'))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ snapshot: null, status: [], pullRequests: null })
+  })
 })
 
 describe('repo routes — POST body validation (action endpoints)', () => {

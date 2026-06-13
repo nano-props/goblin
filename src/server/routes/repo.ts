@@ -81,15 +81,17 @@ export function createRepoRoutes() {
       'snapshot' | 'status' | 'pullRequests'
     >
     return c.json(
-      await getRepositoryComposite(cwd, wants, {
-        branches,
-        mode,
-        signal: c.req.raw.signal,
-        timeoutMs,
-      }).catch((err) => {
-        console.warn('[server][repo] composite failed', err)
-        return { snapshot: null, status: [], pullRequests: null }
-      }),
+      await jsonOr(
+        () =>
+          getRepositoryComposite(cwd, wants, {
+            branches,
+            mode,
+            signal: c.req.raw.signal,
+            timeoutMs,
+          }),
+        { snapshot: null, status: [], pullRequests: null },
+        'composite',
+      ),
     )
   })
   app.post('/fetch', async (c) => {
