@@ -414,6 +414,7 @@ export const zh: Record<DictKey, string> = {
   'action.create-worktree-path-disabled-hint': '选择分支或远程引用后自动填充路径。',
   'action.create-worktree-base-current': '当前',
   'action.create-worktree-confirm': '创建工作树',
+  'action.create-worktree-has-worktree': '分支 "{branch}" 已在工作树 {path} 中检出',
   'action.menu': '操作',
   'action.refresh': '同步',
   'action.refresh-title': 'git branch · git status · git log',

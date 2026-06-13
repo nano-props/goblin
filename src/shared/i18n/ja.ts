@@ -432,6 +432,7 @@ export const ja: Record<DictKey, string> = {
   'action.create-worktree-path-disabled-hint': 'ブランチまたはリモート参照を選ぶとパスが自動入力されます。',
   'action.create-worktree-base-current': '現在',
   'action.create-worktree-confirm': 'ワークツリーを作成',
+  'action.create-worktree-has-worktree': 'ブランチ "{branch}" は {path} のワークツリーですでにチェックアウト済み',
   'action.menu': '操作',
   'action.refresh': '同期',
   'action.refresh-title': 'git branch · git status · git log',

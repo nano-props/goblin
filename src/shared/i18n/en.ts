@@ -434,6 +434,7 @@ export const en = {
   'action.create-worktree-path-disabled-hint': 'Choose a branch or remote ref to auto-fill the path.',
   'action.create-worktree-base-current': 'current',
   'action.create-worktree-confirm': 'Create worktree',
+  'action.create-worktree-has-worktree': 'Branch "{branch}" is already checked out in worktree at {path}',
   'action.menu': 'Actions',
   'action.refresh': 'Sync',
   'action.refresh-title': 'git branch · git status · git log',

@@ -106,6 +106,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
   const remoteTarget = repo.remote.target
   const localBranchNames = repo.data.branches.map((b) => b.name)
   const hasLocalBranch = (name: string) => localBranchNames.includes(name)
+  const branchWorktree = (name: string) => repo.data.branches.find((b) => b.name === name)?.worktree
 
   const branchTrimmed = branch.trim()
   const selectedRemoteRef = remoteRef || remoteBranches[0] || ''
@@ -134,26 +135,38 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
   const branchExists = branchTrimmed ? hasLocalBranch(branchTrimmed) : false
   const trackLocalBranchExists = trackLocalBranch ? hasLocalBranch(trackLocalBranch) : false
 
+  const existingBranchWorktree = existingBranch && existingBranchExists ? branchWorktree(existingBranch) : undefined
+  const branchExistingWorktree = branchTrimmed && branchExists ? branchWorktree(branchTrimmed) : undefined
+  const trackLocalBranchWorktree = trackLocalBranch && trackLocalBranchExists ? branchWorktree(trackLocalBranch) : undefined
+
   const baseError = mode === 'newBranch' && base && !baseExists ? t('action.create-worktree-base-missing') : ''
   const branchError =
     mode === 'newBranch' && branchTrimmed
       ? !branchValidation.ok
         ? t('action.create-worktree-branch-invalid')
-        : branchExists
-          ? t('action.create-worktree-branch-exists')
-          : ''
+        : branchExists && branchExistingWorktree
+          ? t('action.create-worktree-has-worktree', { branch: branchTrimmed, path: branchExistingWorktree.path })
+          : branchExists
+            ? t('action.create-worktree-branch-exists')
+            : ''
       : ''
   const existingBranchError =
-    mode === 'existingBranch' && existingBranch && !existingBranchExists
-      ? t('action.create-worktree-existing-missing')
+    mode === 'existingBranch' && existingBranch
+      ? !existingBranchExists
+        ? t('action.create-worktree-existing-missing')
+        : existingBranchWorktree
+          ? t('action.create-worktree-has-worktree', { branch: existingBranch, path: existingBranchWorktree.path })
+          : ''
       : ''
   const localBranchError =
     mode === 'trackRemoteBranch' && trackLocalBranch
       ? !localBranchValidation.ok
         ? t('action.create-worktree-branch-invalid')
-        : trackLocalBranchExists
-          ? t('action.create-worktree-local-branch-exists')
-          : ''
+        : trackLocalBranchExists && trackLocalBranchWorktree
+          ? t('action.create-worktree-has-worktree', { branch: trackLocalBranch, path: trackLocalBranchWorktree.path })
+          : trackLocalBranchExists
+            ? t('action.create-worktree-local-branch-exists')
+            : ''
       : ''
 
   const branchActionBusy = repo.operations.branchAction.phase !== 'idle'
@@ -169,7 +182,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
           ? { worktreePath: effectivePath, mode: { kind: 'newBranch', newBranch: branchTrimmed, baseRef: base } }
           : null
       case 'existingBranch':
-        return existingBranch && existingBranchExists
+        return existingBranch && existingBranchExists && !existingBranchError
           ? { worktreePath: effectivePath, mode: { kind: 'existingBranch', branch: existingBranch } }
           : null
       case 'trackRemoteBranch':
@@ -249,7 +262,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
                   id="cwt-base"
                   className="h-10 w-full text-sm"
                   aria-invalid={!!baseError}
-                  aria-describedby={baseError ? 'cwt-base-error' : undefined}
+                  aria-describedby="cwt-base-error"
                 >
                   <SelectValue placeholder={t('action.create-worktree-base-placeholder')} />
                 </SelectTrigger>
@@ -285,7 +298,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
                 onChange={(e) => setBranch(e.target.value)}
                 placeholder={t('action.create-worktree-branch-placeholder')}
                 aria-invalid={!!branchError}
-                aria-describedby={branchError ? 'cwt-branch-error' : undefined}
+                aria-describedby="cwt-branch-error"
               />
               <FieldError id="cwt-branch-error" reserveHeight aria-live="polite" aria-atomic="true">
                 {branchError}
@@ -302,7 +315,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
                 id="cwt-existing-branch"
                 className="h-10 w-full text-sm"
                 aria-invalid={!!existingBranchError}
-                aria-describedby={existingBranchError ? 'cwt-existing-branch-error' : undefined}
+                aria-describedby="cwt-existing-branch-error"
               >
                 <SelectValue placeholder={t('action.create-worktree-existing-placeholder')} />
               </SelectTrigger>
@@ -310,6 +323,11 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
                 {repo.data.branches.map((b) => (
                   <SelectItem key={b.name} value={b.name} textValue={b.name}>
                     <span className="truncate">{b.name}</span>
+                    {b.worktree && (
+                      <span className="ml-1 text-[10px] text-muted-foreground/60">
+                        {tildify(b.worktree.path)}
+                      </span>
+                    )}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -361,7 +379,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
                 onChange={(e) => setLocalBranch(e.target.value)}
                 placeholder={derivedLocalBranch || t('action.create-worktree-local-branch-placeholder')}
                 aria-invalid={!!localBranchError}
-                aria-describedby={localBranchError ? 'cwt-local-branch-error' : undefined}
+                aria-describedby="cwt-local-branch-error"
               />
               <FieldError id="cwt-local-branch-error" reserveHeight aria-live="polite" aria-atomic="true">
                 {localBranchError}

@@ -425,6 +425,7 @@ export const ko: Record<DictKey, string> = {
   'action.create-worktree-path-disabled-hint': '브랜치나 원격 참조를 선택하면 경로가 자동 채워집니다.',
   'action.create-worktree-base-current': '현재',
   'action.create-worktree-confirm': '워크트리 만들기',
+  'action.create-worktree-has-worktree': '브랜치 "{branch}"이(가) {path} 워크트리에서 이미 체크아웃됨',
   'action.menu': '작업',
   'action.refresh': '동기화',
   'action.refresh-title': 'git branch · git status · git log',
