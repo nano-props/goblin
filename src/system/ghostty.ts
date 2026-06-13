@@ -2,6 +2,7 @@ import { execa } from 'execa'
 import { existsSync, statSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { buildRemoteTerminalInvocation } from '#/system/remote-terminal.ts'
 
 const GHOSTTY_BUNDLE_ID = 'com.mitchellh.ghostty'
 const APPLE_SCRIPT_TIMEOUT_MS = 5_000
@@ -93,6 +94,65 @@ export async function openInGhostty(p: string): Promise<{ ok: boolean; message: 
     child.unref()
     await child
     return { ok: true, message: p }
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+function openRemoteInRunningGhostty(commandText: string): Promise<boolean> {
+  const script = `
+    on run argv
+      set commandText to item 1 of argv
+      tell application "System Events"
+        set ghosttyIsRunning to exists (first process whose bundle identifier is "${GHOSTTY_BUNDLE_ID}")
+      end tell
+      if not ghosttyIsRunning then return "not-running"
+      tell application id "${GHOSTTY_BUNDLE_ID}"
+        set win to new window with configuration {}
+        set term to terminal 1 of selected tab of win
+        input text commandText to term
+        send key "enter" to term
+      end tell
+      return "opened"
+    end run
+  `
+  return execa('/usr/bin/osascript', ['-e', script, commandText], {
+    timeout: APPLE_SCRIPT_TIMEOUT_MS,
+    forceKillAfterDelay: 500,
+  }).then(({ stdout }) => stdout.trim() === 'opened')
+}
+
+/** Open an SSH session in a new Ghostty window.
+ *
+ *  Mirrors `openInGhostty`: when Ghostty is already running, drive the
+ *  scripting dictionary to open a window in the existing instance; on
+ *  cold start, `open -na Ghostty.app --args -e ssh ...` so Ghostty
+ *  itself spawns the SSH session. */
+export async function openRemoteInGhostty(
+  alias: string,
+  remotePath: string,
+): Promise<{ ok: boolean; message: string }> {
+  const invocation = buildRemoteTerminalInvocation(alias, remotePath)
+  if (!invocation) return { ok: false, message: 'error.invalid-arguments' }
+  if (!isGhosttyInstalled()) return { ok: false, message: 'error.ghostty-not-installed' }
+
+  try {
+    if (await openRemoteInRunningGhostty(invocation.shellCommand)) return { ok: true, message: remotePath }
+  } catch (err) {
+    console.warn('[ghostty] AppleScript remote open failed, falling back to launch', err)
+  }
+
+  try {
+    const child = execa('open', ['-na', 'Ghostty.app', '--args', '-e', invocation.command, ...invocation.args], {
+      detached: true,
+      stdio: 'ignore',
+      cleanup: false,
+      timeout: OPEN_TIMEOUT_MS,
+      forceKillAfterDelay: 500,
+    })
+    child.unref()
+    await child
+    return { ok: true, message: remotePath }
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : String(err) }
   }
