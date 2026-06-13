@@ -24,10 +24,7 @@ interface TerminalSessionProviderProps {
   syncTracker?: RepoSyncTracker
 }
 
-export function TerminalSessionProvider({
-  children,
-  syncTracker: syncTrackerProp,
-}: TerminalSessionProviderProps) {
+export function TerminalSessionProvider({ children, syncTracker: syncTrackerProp }: TerminalSessionProviderProps) {
   const repoIndex = useStoreWithEqualityFn(useReposStore, (s) => repoIndexFromRepos(s.repos), repoIndexEqual)
   // The provider lives at the router root (above the per-route App), so it
   // reads the active repo directly from the repos store rather than via a

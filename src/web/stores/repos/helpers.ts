@@ -2,13 +2,7 @@ import { produce, type Draft } from 'immer'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import { emptyRepoOperations } from '#/web/stores/repos/operations.ts'
 import { emptyRepoResources } from '#/web/stores/repos/resources.ts'
-import type {
-  RepoEvent,
-  RepoResultEventOptions,
-  RepoState,
-  ReposSet,
-  ReposStore,
-} from '#/web/stores/repos/types.ts'
+import type { RepoEvent, RepoResultEventOptions, RepoState, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
 
 let nextInstanceToken = 1
 let nextEventId = 1

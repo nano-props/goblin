@@ -51,10 +51,7 @@ export async function resolveServerRemoteTarget(
   const needsHomeExpansion = input.remotePath.startsWith('~/')
   let resolved: ResolvedRemoteTarget
   try {
-    resolved = await resolveSshRemoteTarget(
-      needsHomeExpansion ? { ...input, remotePath: '/' } : input,
-      signal,
-    )
+    resolved = await resolveSshRemoteTarget(needsHomeExpansion ? { ...input, remotePath: '/' } : input, signal)
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'error.failed-read-repo' }
   }

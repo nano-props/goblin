@@ -66,7 +66,8 @@ function ipcCall(request) {
 // process command-line limit than macOS, and a full base64 payload can make
 // Chromium fail to launch the renderer process before page scripts run.
 function safeReadBootstrapArgument() {
-  const token = process.argv.find((a) => a.startsWith(BOOTSTRAP_TOKEN_PREFIX))?.slice(BOOTSTRAP_TOKEN_PREFIX.length) ?? ''
+  const token =
+    process.argv.find((a) => a.startsWith(BOOTSTRAP_TOKEN_PREFIX))?.slice(BOOTSTRAP_TOKEN_PREFIX.length) ?? ''
   if (!token) return null
   try {
     return ipcRenderer.sendSync(IPC.bootstrap.get, token)

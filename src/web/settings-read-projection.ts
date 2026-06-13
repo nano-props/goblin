@@ -82,7 +82,11 @@ export function readRuntimeExternalAppSettings(data: ExternalAppsSnapshot | unde
     terminalApp: data?.terminal.pref ?? fallback?.terminalApp ?? ('auto' as TerminalPref),
     resolvedTerminalApp: data?.terminal.resolved ?? null,
     terminalAvailable: data?.terminal.available ?? false,
-    terminalAppAvailability: data?.terminal.appAvailability ?? { ghostty: false, terminal: false, windowsTerminal: false },
+    terminalAppAvailability: data?.terminal.appAvailability ?? {
+      ghostty: false,
+      terminal: false,
+      windowsTerminal: false,
+    },
     editorApp: data?.editor.pref ?? fallback?.editorApp ?? ('auto' as EditorPref),
     resolvedEditorApp: data?.editor.resolved ?? null,
     editorAvailable: data?.editor.available ?? false,

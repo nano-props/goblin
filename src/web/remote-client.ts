@@ -11,10 +11,7 @@ export async function resolveRemoteRepositoryTarget(ref: {
   alias: string
   remotePath: string
 }): Promise<RemoteRepoTarget> {
-  const result = await postServerJson<typeof ref, ResolveTargetResponse>(
-    '/api/remote/resolve-target',
-    ref,
-  )
+  const result = await postServerJson<typeof ref, ResolveTargetResponse>('/api/remote/resolve-target', ref)
   if ('error' in result) throw new Error(result.error)
   return result.target
 }

@@ -181,9 +181,7 @@ describe('repo lifecycle', () => {
       },
     })
 
-    const first = await useReposStore
-      .getState()
-      .ensureWorkspaceOpen(remoteRepoSessionEntry(oldTarget!))
+    const first = await useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(oldTarget!))
     expect(first).toEqual({ ok: true, id: oldTarget!.id })
     expect(useReposStore.getState().repos[oldTarget!.id]?.remote.target).toEqual(oldTarget)
 
@@ -194,9 +192,7 @@ describe('repo lifecycle', () => {
       probe: (cwd: string) => ({ ok: true, root: cwd, name: 'repo' }),
       'remote.resolveTarget': () => ({ target: newTarget }),
     })
-    const second = await useReposStore
-      .getState()
-      .ensureWorkspaceOpen(remoteRepoSessionEntry(newTarget!))
+    const second = await useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(newTarget!))
     expect(second).toEqual({ ok: true, id: newTarget!.id })
     expect(useReposStore.getState().repos[newTarget!.id]?.remote.target).toEqual(newTarget)
     expect(calls.composite).toEqual([newTarget!.id])

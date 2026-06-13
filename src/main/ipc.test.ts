@@ -169,7 +169,13 @@ vi.mock('#/system/terminals.ts', () => ({
   getTerminalAppAvailability: vi.fn(() => Promise.resolve({ ghostty: false, terminal: true, windowsTerminal: false })),
   openInPreferredTerminal: vi.fn(),
   resolveTerminalApp: vi.fn((_pref, availability) =>
-    availability.ghostty ? 'ghostty' : availability.terminal ? 'terminal' : availability.windowsTerminal ? 'windowsTerminal' : null,
+    availability.ghostty
+      ? 'ghostty'
+      : availability.terminal
+        ? 'terminal'
+        : availability.windowsTerminal
+          ? 'windowsTerminal'
+          : null,
   ),
 }))
 

@@ -102,9 +102,7 @@ function FocusBranchControls({ repoId }: Props) {
       {currentHEAD && (
         <>
           <div aria-hidden="true" className="mx-1 h-4 border-l border-separator/70" />
-          <span className="shrink-0 font-mono text-xs text-muted-foreground">
-            HEAD at {currentHEAD}
-          </span>
+          <span className="shrink-0 font-mono text-xs text-muted-foreground">HEAD at {currentHEAD}</span>
         </>
       )}
       {selectedBranchData && <FocusBranchActions repoId={repoId} branch={selectedBranchData} />}
