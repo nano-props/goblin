@@ -529,6 +529,12 @@ describe('server terminal sessions', () => {
     mockPtys[0]?.emitData('during-attach')
     unregisterTerminalSocket('client_1', 'attachment_a', socket)
 
+    // Wait for: the xterm WriteBuffer to process the buffered write
+    // (macrotask), the snapshot's chain loop to drain (microtask), and
+    // the response send to fail. A single setTimeout(0) is not always
+    // enough; multiple ticks of drain handle the macrotask + microtask
+    // interleaving.
+    await new Promise((resolve) => setTimeout(resolve, 0))
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(socket.send).toHaveBeenCalledTimes(1)
@@ -558,6 +564,7 @@ describe('server terminal sessions', () => {
     )
     mockPtys[0]?.emitData('during-attach')
 
+    await new Promise((resolve) => setTimeout(resolve, 0))
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(socket.send).toHaveBeenCalledTimes(1)

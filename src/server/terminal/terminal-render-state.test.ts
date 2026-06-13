@@ -215,7 +215,43 @@ describe('terminal-render-state', () => {
     })
   })
 
-  describe('snapshotTerminalRenderState (seq timing)', () => {
+  describe('snapshotTerminalRenderState (chain reference loop)', () => {
+    test('waits for chain steps appended AFTER the initial await started', async () => {
+      // In production, the SIGWINCH re-paint arrives via pty.onData on a
+      // later tick than the chain reference the snapshot captured. Without
+      // the re-check loop, the await resolves as soon as the prior step
+      // (the wipe+resize) finishes, the snapshot is taken without the
+      // re-paint, and the client later writes the re-paint's live `output`
+      // event on top of the wiped cells — producing the visible
+      // duplicate of the prompt.
+      const state = createEmptyTerminalRenderState()
+      state.model = createTerminalRenderModel(80, 24)
+      // First, drain a write so the initial chain step resolves.
+      await state.model.chain
+      // Now queue a step that will resolve quickly, then BEFORE it
+      // resolves queue another step on top of the chain. The snapshot
+      // must see both.
+      const realHeadless = state.model.term
+      state.model.chain = state.model.chain
+        .catch(() => {})
+        .then(() => new Promise<void>((resolve) => realHeadless.write('first', resolve)))
+      const firstStepChain = state.model.chain
+      // The second step is appended AFTER the snapshot's await started.
+      // queueMicrotask fires after the current task but before the next
+      // macrotask — the snapshot's await on firstStepChain is already
+      // pending, so this append must be observed by the loop.
+      queueMicrotask(() => {
+        state.model!.chain = firstStepChain
+          .then(() => new Promise<void>((resolve) => realHeadless.write('second', resolve)))
+      })
+      const snapshot = await snapshotTerminalRenderState('session-1', state)
+      expect(snapshot).toBeTruthy()
+      // The headless has both writes applied by the time the snapshot
+      // serializes (the loop re-awaited the second chain).
+      expect(snapshot!.snapshot).toContain('first')
+      expect(snapshot!.snapshot).toContain('second')
+    })
+
     test('captures snapshotSeq AFTER the chain drains, so a write queued during the await is reflected in the seq', async () => {
       // Simulate the production timing:
       //   1. snapshotTerminalRenderState starts

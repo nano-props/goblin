@@ -163,18 +163,36 @@ export async function snapshotTerminalRenderState(
   state: TerminalRenderState,
 ): Promise<TerminalSessionSnapshot | null> {
   if (!state.model) return null
-  const chain = state.model.chain
-  try {
-    await chain
-  } catch {}
-  if (!state.model) return null
-  // Read the seq *after* the chain has drained. Any data whose write was
-  // queued by appendTerminalReplayData during the await is included in the
-  // serialized snapshot below, so the seq we return must reflect that
-  // inclusion — otherwise the client's dedup boundary would be set too low
-  // and the live `output` event for the same data would be re-applied to
-  // the xterm, producing a visible duplicate of the prompt (or any other
-  // re-paint) on re-attach.
+  // The headless's chain is a manually-chained promise: each
+  // appendTerminalReplayData / queueTerminalRenderWrite reassigns
+  // `state.model.chain` to a new promise that includes the new step. If a
+  // re-paint from SIGWINCH arrives *while* this snapshot is awaiting the
+  // current chain reference, that new step is appended to a *new* chain
+  // promise — the await on the old reference resolves without ever
+  // observing it. The serialized snapshot would then miss the re-paint,
+  // and the snapshotSeq would be one (or more) behind the re-paint's
+  // actual seq, so the client's dedup boundary swallows the re-paint
+  // *as if* it were new content and re-applies it on top of the
+  // snapshot's blank cells, producing the visible duplicate.
+  //
+  // Loop on the chain reference: each time the await returns we check
+  // whether `state.model.chain` is still the same promise; if it isn't,
+  // a new step landed during the await and we have to wait again.
+  // JavaScript is single-threaded so the check itself is race-free —
+  // no new step can be appended between the await returning and the
+  // reference comparison on the next line.
+  let chainRef: Promise<void> = state.model.chain
+  while (true) {
+    try {
+      await chainRef
+    } catch {}
+    if (!state.model) return null
+    if (state.model.chain === chainRef) break
+    chainRef = state.model.chain
+  }
+  // Read the seq *after* the chain has fully drained, so any seq set by
+  // a re-paint whose write was drained by the loop above is reflected
+  // in the boundary the client uses.
   const snapshotSeq = state.sequence
   return {
     sessionId,
