@@ -69,7 +69,7 @@ describe('buildCorsOriginPredicate', () => {
   })
 })
 
-describe('buildCorsOriginPredicate with a LAN bind host', () => {
+describe('buildCorsOriginPredicate with a specific LAN bind host', () => {
   const predicate = buildCorsOriginPredicate('192.168.1.5', 32100)
 
   test('allows the bind host on the same port', () => {
@@ -81,9 +81,27 @@ describe('buildCorsOriginPredicate with a LAN bind host', () => {
   })
 
   test('rejects other LAN hosts on the same port', () => {
-    // The bind host is the only LAN allow entry — the operator
-    // is responsible for choosing a specific bind address when
-    // they want to expose the server on a particular network.
+    // A specific bind address is the only LAN allow entry — the
+    // operator is responsible for choosing a specific bind address
+    // when they want to expose the server on a particular network.
     expect(predicate('http://192.168.1.6:32100')).toBe(false)
+  })
+})
+
+describe('buildCorsOriginPredicate with a wildcard bind host', () => {
+  const predicate = buildCorsOriginPredicate('0.0.0.0', 32100)
+
+  test('allows loopback on the same port', () => {
+    expect(predicate('http://localhost:32100')).toBe(true)
+    expect(predicate('http://127.0.0.1:32100')).toBe(true)
+  })
+
+  test('allows any LAN host on the same port — wildcard bind is explicit cross-network access', () => {
+    expect(predicate('http://192.168.1.5:32100')).toBe(true)
+    expect(predicate('http://10.0.0.7:32100')).toBe(true)
+  })
+
+  test('still rejects a different port', () => {
+    expect(predicate('http://192.168.1.5:8080')).toBe(false)
   })
 })

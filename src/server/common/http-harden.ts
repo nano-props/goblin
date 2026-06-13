@@ -33,16 +33,24 @@ export function applyApiSecurityHeaders(): MiddlewareHandler {
 
 /**
  * Build a CORS origin predicate from the server's actual bind
- * address. The desktop app's only realistic cross-origin scenario
- * is a browser tab pointing at the same machine, so the policy is
- * "same port, loopback or matching bind host" — anything else is
- * rejected.
+ * address. The server supports two deployment shapes:
+ *
+ * 1. Loopback-only (default `127.0.0.1`) — only same-machine
+ *    browsers should be able to call the API.
+ * 2. LAN / public (`0.0.0.0` or a specific interface address) —
+ *    the operator has explicitly asked for cross-network access,
+ *    so we should not gatekeep by hostname.
+ *
+ * The port is the strongest signal we have that "this is the same
+ * app"; the host is then either loopback, the bind host, or
+ * anything (when bound to the wildcard).
  */
 export function buildCorsOriginPredicate(
   serverHost: string,
   serverPort: number,
 ): (origin: string | undefined) => boolean {
   const portStr = String(serverPort)
+  const wildcardBind = serverHost === '0.0.0.0' || serverHost === '::'
   return (origin) => {
     // Electron IPC and same-origin fetches don't set an Origin header.
     if (!origin) return true
@@ -53,14 +61,11 @@ export function buildCorsOriginPredicate(
       return false
     }
     if (parsed.port !== portStr) return false
+    if (wildcardBind) return true
     // URL#hostname keeps the brackets on IPv6 literals ([::1]); strip
     // them so the loopback and bind-host comparisons stay symmetric.
     const host = parsed.hostname.replace(/^\[|\]$/g, '')
     if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return true
-    // When the server is bound to a specific LAN address, allow the
-    // same address. When bound to 0.0.0.0, the loopback check above
-    // is the only allow path — non-loopback LAN clients have to hit
-    // the server via its real LAN IP, which we can't enumerate.
     return host === serverHost
   }
 }
