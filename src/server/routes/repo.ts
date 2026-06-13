@@ -26,6 +26,12 @@ import { getServerFetchIntervalSec } from '#/server/modules/settings-source.ts'
 import { createRouteApp, parseHttpBody, parseHttpQuery } from '#/server/common/http-validate.ts'
 import { REPO_PROCEDURE_SCHEMAS, REPO_QUERY_SCHEMAS } from '#/shared/procedure-schemas.ts'
 
+// Soft-fail envelope returned by `jsonOr` for every repo action that
+// doesn't have a more specific success shape. Keep this in one place
+// so the renderer sees a stable contract — `err.message` is the
+// human-readable i18n key, `err.ok === false` is the branch.
+const READ_REPO_ERROR = { ok: false as const, message: 'error.failed-read-repo' }
+
 export function createRepoRoutes() {
   const app = createRouteApp()
   async function jsonOr<T>(run: () => Promise<T>, fallback: T, label: string) {
@@ -39,7 +45,7 @@ export function createRepoRoutes() {
 
   app.get('/probe', async (c) => {
     const { cwd } = parseHttpQuery(REPO_QUERY_SCHEMAS.probe, c)
-    return c.json(await jsonOr(() => probeRepository(cwd), { ok: false, message: 'error.failed-read-repo' }, 'probe'))
+    return c.json(await jsonOr(() => probeRepository(cwd), READ_REPO_ERROR, 'probe'))
   })
   app.get('/snapshot', async (c) => {
     const { cwd } = parseHttpQuery(REPO_QUERY_SCHEMAS.snapshot, c)
@@ -51,13 +57,7 @@ export function createRepoRoutes() {
   })
   app.get('/patch', async (c) => {
     const { cwd, worktreePath } = parseHttpQuery(REPO_QUERY_SCHEMAS.patch, c)
-    return c.json(
-      await jsonOr(
-        () => getRepositoryPatch(cwd, worktreePath, c.req.raw.signal),
-        { ok: false, message: 'error.failed-read-repo' },
-        'patch',
-      ),
-    )
+    return c.json(await jsonOr(() => getRepositoryPatch(cwd, worktreePath, c.req.raw.signal), READ_REPO_ERROR, 'patch'))
   })
   app.get('/pull-requests', async (c) => {
     const { cwd, branches, mode } = parseHttpQuery(REPO_QUERY_SCHEMAS.pullRequests, c)
@@ -96,22 +96,12 @@ export function createRepoRoutes() {
   })
   app.post('/fetch', async (c) => {
     const { cwd, kind, sourceToken } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fetch, c)
-    return c.json(
-      await jsonOr(
-        () => fetchRepository(cwd, kind ?? 'user', sourceToken),
-        { ok: false, message: 'error.failed-read-repo' },
-        'fetch',
-      ),
-    )
+    return c.json(await jsonOr(() => fetchRepository(cwd, kind ?? 'user', sourceToken), READ_REPO_ERROR, 'fetch'))
   })
   app.post('/clone', async (c) => {
     const { operationId, url, parentPath, directoryName } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.clone, c)
     return c.json(
-      await jsonOr(
-        () => cloneRepository(operationId, url, parentPath, directoryName),
-        { ok: false, message: 'error.failed-read-repo' },
-        'clone',
-      ),
+      await jsonOr(() => cloneRepository(operationId, url, parentPath, directoryName), READ_REPO_ERROR, 'clone'),
     )
   })
   app.post('/abort-clone', async (c) => {
@@ -123,7 +113,7 @@ export function createRepoRoutes() {
     return c.json(
       await jsonOr(
         () => checkoutRepositoryBranch(cwd, branch, c.req.raw.signal, sourceToken),
-        { ok: false, message: 'error.failed-read-repo' },
+        READ_REPO_ERROR,
         'checkout',
       ),
     )
@@ -133,7 +123,7 @@ export function createRepoRoutes() {
     return c.json(
       await jsonOr(
         () => pullRepositoryBranch(cwd, branch, worktreePath, c.req.raw.signal, sourceToken),
-        { ok: false, message: 'error.failed-read-repo' },
+        READ_REPO_ERROR,
         'pull',
       ),
     )
@@ -141,11 +131,7 @@ export function createRepoRoutes() {
   app.post('/push', async (c) => {
     const { cwd, branch, sourceToken } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.push, c)
     return c.json(
-      await jsonOr(
-        () => pushRepositoryBranch(cwd, branch, c.req.raw.signal, sourceToken),
-        { ok: false, message: 'error.failed-read-repo' },
-        'push',
-      ),
+      await jsonOr(() => pushRepositoryBranch(cwd, branch, c.req.raw.signal, sourceToken), READ_REPO_ERROR, 'push'),
     )
   })
   app.post('/create-worktree', async (c) => {
@@ -156,7 +142,7 @@ export function createRepoRoutes() {
     return c.json(
       await jsonOr(
         () => createRepositoryWorktree(cwd, worktreePath, newBranch, baseBranch, c.req.raw.signal, sourceToken),
-        { ok: false, message: 'error.failed-read-repo' },
+        READ_REPO_ERROR,
         'create-worktree',
       ),
     )
@@ -169,7 +155,7 @@ export function createRepoRoutes() {
     return c.json(
       await jsonOr(
         () => deleteRepositoryBranch(cwd, branch, { force, alsoDeleteUpstream }, c.req.raw.signal, sourceToken),
-        { ok: false, message: 'error.failed-read-repo' },
+        READ_REPO_ERROR,
         'delete-branch',
       ),
     )
@@ -186,7 +172,7 @@ export function createRepoRoutes() {
             c.req.raw.signal,
             sourceToken,
           ),
-        { ok: false, message: 'error.failed-read-repo' },
+        READ_REPO_ERROR,
         'remove-worktree',
       ),
     )
@@ -194,28 +180,16 @@ export function createRepoRoutes() {
   app.post('/open-remote', async (c) => {
     const { cwd, branch } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openRemote, c)
     return c.json(
-      await jsonOr(
-        () => openRepositoryRemote(cwd, branch, c.req.raw.signal),
-        { ok: false, message: 'error.failed-read-repo' },
-        'open-remote',
-      ),
+      await jsonOr(() => openRepositoryRemote(cwd, branch, c.req.raw.signal), READ_REPO_ERROR, 'open-remote'),
     )
   })
   app.post('/open-terminal', async (c) => {
     const { path } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openTerminal, c)
-    return c.json(
-      await jsonOr(
-        () => openRepositoryTerminal(path),
-        { ok: false, message: 'error.failed-read-repo' },
-        'open-terminal',
-      ),
-    )
+    return c.json(await jsonOr(() => openRepositoryTerminal(path), READ_REPO_ERROR, 'open-terminal'))
   })
   app.post('/open-editor', async (c) => {
     const { path } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openEditor, c)
-    return c.json(
-      await jsonOr(() => openRepositoryEditor(path), { ok: false, message: 'error.failed-read-repo' }, 'open-editor'),
-    )
+    return c.json(await jsonOr(() => openRepositoryEditor(path), READ_REPO_ERROR, 'open-editor'))
   })
   app.post('/background-sync-repos', async (c) => {
     const { repoIds } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.backgroundSyncRepos, c)
