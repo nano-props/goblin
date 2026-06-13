@@ -31,13 +31,21 @@ export function AnimateHeight({
 
     const h = inner.scrollHeight
     if (Math.abs(h - targetRef.current) > 0.5) {
+      outer.style.overflow = 'hidden'
       outer.style.height = `${h}px`
       targetRef.current = h
+      outer.addEventListener(
+        'transitionend',
+        () => {
+          outer.style.overflow = ''
+        },
+        { once: true },
+      )
     }
   })
 
   return (
-    <div ref={outerRef} style={{ overflow: 'hidden' }}>
+    <div ref={outerRef}>
       <div ref={innerRef}>{children}</div>
     </div>
   )
