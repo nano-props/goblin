@@ -6,12 +6,7 @@ export function repoTabSummariesEqual(a: RepoTabSummary[], b: RepoTabSummary[]):
   for (let i = 0; i < a.length; i++) {
     const x = a[i]!
     const y = b[i]!
-    if (
-      x.id !== y.id ||
-      x.name !== y.name ||
-      x.unavailable !== y.unavailable
-    )
-      return false
+    if (x.id !== y.id || x.name !== y.name || x.unavailable !== y.unavailable) return false
     if (
       x.remoteTarget?.id !== y.remoteTarget?.id ||
       x.remoteTarget?.alias !== y.remoteTarget?.alias ||

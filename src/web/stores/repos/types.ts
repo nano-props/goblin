@@ -72,7 +72,6 @@ export interface RepoProjectionMeta {
   savedAt: number | null
 }
 
-
 export interface RepoRemoteState {
   target?: RemoteRepoTarget
   remotes?: string[]
