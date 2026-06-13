@@ -133,6 +133,10 @@ export function createApp(options: ServerAppOptions): Hono {
       onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
     }),
   )
+  // Health check endpoints ( /api/health, /api/hi, etc.) are intentionally
+  // left without auth middleware — they expose only non-sensitive informational
+  // data (version, uptime). External access control is expected to be handled
+  // by a gateway / reverse proxy when the server is bound to a LAN address.
   app.route(
     '/api',
     createHealthRoutes({ version: options.version, startedAt: options.startedAt, terminalHost: options.terminalHost }),
