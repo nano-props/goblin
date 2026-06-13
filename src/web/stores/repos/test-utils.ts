@@ -124,14 +124,14 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     value: {
       __GOBLIN_BOOTSTRAP__: {
         homeDir: '/Users/test',
-        platform: 'darwin',
+        platform: 'web',
         initialI18n: null,
         initialSettings: null,
         initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
       },
       goblinNative: {
         homeDir: '/Users/test',
-        platform: 'darwin',
+        platform: 'web',
         initialI18n: null,
         initialSettings: null,
         initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
@@ -357,7 +357,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
       },
       homeDir: '/Users/test',
-      platform: 'darwin',
+      platform: 'web',
       initialI18n: null,
       initialSettings: null,
       initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret', clientId: 'client_testterminal' },

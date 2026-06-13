@@ -520,7 +520,7 @@ beforeEach(() => {
         capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
       },
       homeDir: '/home',
-      platform: 'darwin',
+      platform: 'web',
       initialI18n: null,
       initialSettings: null,
       initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret', clientId: 'client_sharedterminal' },

@@ -57,7 +57,7 @@ describe('repo query invalidation source', () => {
       __GOBLIN_BOOTSTRAP__: {
         runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
         homeDir: '',
-        platform: 'darwin',
+        platform: 'web',
         initialI18n: null,
         initialSettings: null,
         initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
@@ -69,7 +69,7 @@ describe('repo query invalidation source', () => {
           capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
         },
         homeDir: '',
-        platform: 'darwin',
+        platform: 'web',
         initialI18n: null,
         initialSettings: null,
         invokeIpc: vi.fn(),
@@ -119,7 +119,7 @@ describe('repo query invalidation source', () => {
       __GOBLIN_BOOTSTRAP__: {
         runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
         homeDir: '',
-        platform: 'darwin',
+        platform: 'web',
         initialI18n: null,
         initialSettings: null,
         initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
@@ -155,7 +155,7 @@ describe('repo query invalidation source', () => {
       __GOBLIN_BOOTSTRAP__: {
         runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
         homeDir: '',
-        platform: 'darwin',
+        platform: 'web',
         initialI18n: null,
         initialSettings: null,
         initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },

@@ -8,14 +8,14 @@ function installBridge(sessionOverrides: Record<string, unknown> = {}) {
     value: {
       __GOBLIN_BOOTSTRAP__: {
         homeDir: '/Users/test',
-        platform: 'darwin',
+        platform: 'web',
         initialI18n: null,
         initialSettings: null,
         initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
       },
       goblinNative: {
         homeDir: '/Users/test',
-        platform: 'darwin',
+        platform: 'web',
         initialI18n: null,
         initialSettings: null,
         initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
