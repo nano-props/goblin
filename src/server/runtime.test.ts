@@ -55,6 +55,8 @@ describe('server runtime', () => {
       version: '0.1.0',
       startedAt: 1,
       internalSecret: 'secret',
+      serverHost: '127.0.0.1',
+      serverPort: 32100,
       terminalHost,
     })
 
@@ -63,6 +65,8 @@ describe('server runtime', () => {
       version: '0.1.0',
       startedAt: 1,
       internalSecret: 'secret',
+      serverHost: '127.0.0.1',
+      serverPort: 32100,
       terminalHost,
     })
   })
@@ -74,6 +78,8 @@ describe('server runtime', () => {
       version: '0.1.0',
       startedAt: 1,
       internalSecret: 'secret',
+      serverHost: '127.0.0.1',
+      serverPort: 32100,
       terminalWorkerEntry: '/tmp/entrypoints/terminal-worker.ts',
     })
 
@@ -87,6 +93,8 @@ describe('server runtime', () => {
       version: '0.1.0',
       startedAt: 1,
       internalSecret: 'secret',
+      serverHost: '127.0.0.1',
+      serverPort: 32100,
       terminalHost: runtime.terminalHost,
     })
   })
@@ -107,6 +115,8 @@ describe('server runtime', () => {
       version: '0.1.0',
       startedAt: 1,
       internalSecret: 'secret',
+      serverHost: '127.0.0.1',
+      serverPort: 32100,
       terminalHost,
     })
 

@@ -7,6 +7,8 @@ import { cors } from 'hono/cors'
 import { bodyLimit } from 'hono/body-limit'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { createInternalAuthMiddleware } from '#/server/common/auth.ts'
+import { applyApiSecurityHeaders, buildCorsOriginPredicate } from '#/server/common/http-harden.ts'
+import { accessLog } from '#/server/common/access-log.ts'
 import { createHealthRoutes } from '#/server/routes/health.ts'
 import { createRemoteRoutes } from '#/server/routes/remote.ts'
 import { createRealtimeRoutes } from '#/server/routes/realtime.ts'
@@ -28,6 +30,15 @@ export interface ServerAppOptions {
   startedAt: number
   internalSecret: string
   terminalHost: ServerTerminalHost
+  /**
+   * The actual host the server is listening on. Used by the CORS
+   * origin predicate to allow same-machine browsers. Defaults to
+   * `127.0.0.1`, matching the default bind in
+   * `#/server/bootstrap.ts`.
+   */
+  serverHost?: string
+  /** The actual port the server is listening on. */
+  serverPort?: number
 }
 
 // Cap request bodies on the data endpoints at 1 MiB. The largest real
@@ -101,14 +112,19 @@ async function renderRendererIndexHtml(
 export function createApp(options: ServerAppOptions): Hono {
   const settingsState = createServerSettingsState()
   const app = new Hono()
+  app.use('*', accessLog())
+  const serverHost = options.serverHost ?? '127.0.0.1'
+  const serverPort = options.serverPort ?? 32100
   app.use(
     '/api/*',
     cors({
-      origin: '*',
+      origin: (origin: string, _c) => (buildCorsOriginPredicate(serverHost, serverPort)(origin) ? origin : ''),
       allowHeaders: ['Content-Type', 'x-goblin-internal-secret'],
       allowMethods: ['GET', 'POST', 'OPTIONS'],
+      credentials: false,
     }),
   )
+  app.use('/api/*', applyApiSecurityHeaders())
   app.use(
     '/api/*',
     bodyLimit({
@@ -164,6 +180,9 @@ export function createApp(options: ServerAppOptions): Hono {
     }
   })
   app.use('/*', serveStatic({ root: WEB_DIST_DIR }))
+  app.notFound((c) =>
+    c.json({ ok: false, code: 'NOT_FOUND', message: `No route for ${c.req.method} ${c.req.path}` }, 404),
+  )
   app.get('*', async (c) => {
     try {
       return c.html(

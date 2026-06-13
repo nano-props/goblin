@@ -1,6 +1,10 @@
 import { Hono } from 'hono'
 import { upgradeWebSocket } from '@hono/node-server'
-import { registerInvalidationSocket, unregisterInvalidationSocket } from '#/server/modules/invalidation-broker.ts'
+import {
+  InvalidationSocketLimitError,
+  registerInvalidationSocket,
+  unregisterInvalidationSocket,
+} from '#/server/modules/invalidation-broker.ts'
 import type { ServerTerminalHost, ServerTerminalSocket } from '#/server/terminal/terminal-host.ts'
 
 interface RealtimeRouteOptions {
@@ -28,7 +32,17 @@ export function createRealtimeRoutes({ internalSecret, terminalHost }: RealtimeR
     upgradeWebSocket(() => {
       return {
         onOpen(_event, ws) {
-          registerInvalidationSocket(ws)
+          try {
+            registerInvalidationSocket(ws)
+          } catch (err) {
+            if (err instanceof InvalidationSocketLimitError) {
+              try {
+                ws.close(1013, 'subscriber limit reached')
+              } catch {}
+              return
+            }
+            throw err
+          }
         },
         onClose(_event, ws) {
           unregisterInvalidationSocket(ws)
