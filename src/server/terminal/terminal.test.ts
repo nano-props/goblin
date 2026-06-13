@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { spawn } from 'node-pty'
+import path from 'node:path'
+import { getWorktrees } from '#/system/git/worktrees.ts'
+import { resolveRemoteTarget } from '#/system/ssh/config.ts'
 import {
   closeAllServerTerminalSessions,
   createServerTerminal,
@@ -18,6 +21,20 @@ import {
 
 vi.mock('#/system/git/worktrees.ts', () => ({
   getWorktrees: vi.fn(async () => [{ path: '/repo-linked', branch: 'feature', isBare: false, isPrimary: false }]),
+}))
+
+vi.mock('#/system/ssh/config.ts', () => ({
+  resolveRemoteTarget: vi.fn(async () => ({
+    target: {
+      id: 'ssh-config://prod/srv/repo',
+      alias: 'prod',
+      host: 'example.test',
+      user: 'deploy',
+      port: 22,
+      remotePath: '/srv/repo',
+      displayName: 'prod:repo',
+    },
+  })),
 }))
 
 interface MockPty {
@@ -136,6 +153,58 @@ describe('server terminal sessions', () => {
     ])
 
     unregisterTerminalSocket('client_1', 'attachment_a', socket)
+  })
+
+  test('returns created terminal sessions for Windows forward-slash repository paths', async () => {
+    vi.mocked(getWorktrees).mockResolvedValueOnce([
+      { path: 'C:/Users/example/repo', branch: 'feature', isBare: false, isPrimary: true },
+    ])
+
+    const result = await createServerTerminal('client_1', {
+      repoRoot: 'C:/Users/example/repo',
+      branch: 'feature',
+      worktreePath: 'C:/Users/example/repo',
+      kind: 'primary',
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_a',
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.sessions).toEqual([
+      expect.objectContaining({
+        key: 'C:/Users/example/repo\0C:/Users/example/repo\0terminal-1',
+      }),
+    ])
+    await expect(listServerTerminalSessions('client_1', 'C:/Users/example/repo')).resolves.toEqual(result.sessions)
+  })
+
+  test('returns created terminal sessions for SSH remote repositories', async () => {
+    const result = await createServerTerminal('client_1', {
+      repoRoot: 'ssh-config://prod/srv/repo',
+      branch: 'feature',
+      worktreePath: '/srv/repo',
+      kind: 'primary',
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_a',
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(resolveRemoteTarget).toHaveBeenCalledWith({ alias: 'prod', remotePath: '/srv/repo' })
+    expect(spawn).toHaveBeenCalledWith(
+      expect.stringMatching(/ssh(?:\.exe)?$/i),
+      expect.arrayContaining(['-tt', '--', 'prod']),
+      expect.objectContaining({ cwd: process.cwd() }),
+    )
+    expect(result.sessions).toEqual([
+      expect.objectContaining({
+        key: 'ssh-config://prod/srv/repo\0/srv/repo\0terminal-1',
+      }),
+    ])
+    await expect(listServerTerminalSessions('client_1', 'ssh-config://prod/srv/repo')).resolves.toEqual(result.sessions)
   })
 
   test('clears stale canonical title when the foreground process returns to the shell without a new title', async () => {
@@ -727,7 +796,7 @@ describe('server terminal sessions', () => {
       expect.objectContaining({
         sessionId: expect.any(String),
         key: '/repo\u0000/repo-linked\u0000terminal-1',
-        cwd: '/repo-linked',
+        cwd: path.resolve('/repo-linked'),
         processName: 'zsh',
         cols: 80,
         rows: 24,

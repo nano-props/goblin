@@ -237,6 +237,9 @@ export class TerminalSessionRegistry {
     if (!result.ok) {
       throw new Error(result.message)
     }
+    if (!result.sessions.some((session) => session.key === result.key)) {
+      throw new Error('error.terminal-create-failed')
+    }
     this.setPreferredSelectedTerminalKey(terminalWorktreeKey, result.key)
     this.reconcileServerSessions(
       base.repoRoot,

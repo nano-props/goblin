@@ -1470,6 +1470,36 @@ describe('TerminalSessionProvider', () => {
       await unmount()
     }
   })
+
+  test('rejects terminal creation when the server omits the created session from the response', async () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      detailTab: 'terminal',
+    })
+    createTerminalMock.mockResolvedValueOnce({
+      ok: true,
+      action: 'created',
+      key: `${REPO_ID}\u0000${WORKTREE_PATH}\u0000terminal-1`,
+      sessions: [],
+    })
+    const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
+    const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
+
+    try {
+      await expect(
+        getContext().createTerminal({
+          repoRoot: REPO_ID,
+          branch: 'feature/worktree',
+          worktreePath: WORKTREE_PATH,
+        }),
+      ).rejects.toThrow('error.terminal-create-failed')
+      expect(getProbe()).toMatchObject({ count: 0, terminalIds: [] })
+    } finally {
+      await unmount()
+    }
+  })
 })
 
 function CaptureContext({ onContext }: { onContext: (value: TerminalSessionContextValue) => void }) {

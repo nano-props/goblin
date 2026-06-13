@@ -19,6 +19,7 @@ import type {
 } from '#/web/components/terminal/types.ts'
 import { MainWindowNavigationProvider, type MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import { emptyRendererBridgeBootstrap, setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
@@ -34,6 +35,16 @@ vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
   cb(0)
   return 1
 }) as typeof requestAnimationFrame)
+
+const toastMocks = vi.hoisted(() => ({
+  error: vi.fn(),
+}))
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: toastMocks.error,
+  },
+}))
 
 const REPO_ID = '/tmp/gbl-branch-detail-toolbar-repo'
 const WORKTREE_PATH = '/tmp/gbl-branch-detail-toolbar-worktree'
@@ -58,6 +69,7 @@ afterEach(() => {
   root = null
   container = null
   queryClient = null
+  toastMocks.error.mockClear()
   setRendererBridgeForTests(null)
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
@@ -88,6 +100,24 @@ describe('BranchDetailToolbar', () => {
 
     expect(showRepoDetailTab).toHaveBeenCalledWith(REPO_ID, 'terminal')
     expect(mocks.createTerminal).toHaveBeenCalledTimes(1)
+  })
+
+  test('shows an error toast when new terminal creation fails', async () => {
+    const { terminalTab, mocks } = renderToolbar({
+      terminalCount: 0,
+      detailTab: 'terminal',
+      navigation: navigationWith({}),
+    })
+    mocks.createTerminal.mockRejectedValueOnce(new Error('error.terminal-create-failed'))
+
+    act(() => {
+      terminalTab.click()
+    })
+    await flush()
+
+    expect(toastMocks.error).toHaveBeenCalledWith('action.result-error', {
+      description: 'error.terminal-create-failed',
+    })
   })
 
   test('clicking a selected session tab when not in terminal panel navigates to terminal', async () => {

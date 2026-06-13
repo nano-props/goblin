@@ -7,8 +7,9 @@
 // - It does NOT own surface identity/capabilities; that lives in
 //   window-registry.ts / renderer-surface.ts.
 
-import { app, type BrowserWindow, type BrowserWindowConstructorOptions } from 'electron'
+import { app, ipcMain, type BrowserWindow, type BrowserWindowConstructorOptions } from 'electron'
 import { readFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import os from 'node:os'
 import path from 'node:path'
 import { openHttpExternal } from '#/main/external-url.ts'
@@ -38,6 +39,17 @@ const WEB_DIST_DIR = path.join(app.getAppPath(), 'dist/web')
 const PRELOAD_SOURCE_PATH = path.join(app.getAppPath(), 'src/preload/preload.cjs')
 const PRELOAD_DIST_DIR = path.join(app.getAppPath(), 'dist/preload')
 const PRELOAD_MANIFEST_PATH = path.join(PRELOAD_DIST_DIR, 'manifest.json')
+const BOOTSTRAP_CHANNEL = 'goblin:get-bootstrap'
+const BOOTSTRAP_TOKEN_PREFIX = '--goblin-bootstrap-token='
+const rendererBootstraps = new Map<string, RendererBootstrapPayload>()
+
+ipcMain.on(BOOTSTRAP_CHANNEL, (event, token: unknown) => {
+  if (typeof token !== 'string') {
+    event.returnValue = null
+    return
+  }
+  event.returnValue = rendererBootstraps.get(token) ?? null
+})
 
 export function windowCanvasBackground(): string {
   const { resolved, colorTheme } = getTheme()
@@ -61,16 +73,15 @@ function buildRendererBootstrapPayload(
 export async function createRendererWindowWebPreferences(): Promise<BrowserWindowConstructorOptions['webPreferences']> {
   const settingsSnapshot = await getSettingsSnapshot()
   const initialSettings: InitialSettingsSnapshot = initialSettingsFromSnapshot(settingsSnapshot)
-  const bootstrapPayload = Buffer.from(
-    JSON.stringify(buildRendererBootstrapPayload(settingsSnapshot.lang, initialSettings)),
-  ).toString('base64')
+  const bootstrapToken = randomUUID()
+  rendererBootstraps.set(bootstrapToken, buildRendererBootstrapPayload(settingsSnapshot.lang, initialSettings))
   return {
     preload: resolvePreloadPath(),
     contextIsolation: true,
     nodeIntegration: false,
     sandbox: true,
     webSecurity: true,
-    additionalArguments: [`--goblin-bootstrap=${bootstrapPayload}`],
+    additionalArguments: [`${BOOTSTRAP_TOKEN_PREFIX}${bootstrapToken}`],
   }
 }
 

@@ -44,7 +44,7 @@ function initialExternalAppsSnapshot(): ExternalAppsSnapshot | undefined {
       pref: initialSettings.terminalApp,
       resolved: null,
       available: false,
-      appAvailability: { ghostty: false, terminal: false },
+      appAvailability: { ghostty: false, terminal: false, windowsTerminal: false },
       detectedAt: 0,
     },
     editor: {

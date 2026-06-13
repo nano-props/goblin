@@ -1,6 +1,7 @@
 import { ArrowUp, Maximize2, Minimize2, Minus } from 'lucide-react'
 import type { KeyboardEvent } from 'react'
 import { useCallback, useMemo } from 'react'
+import { toast } from 'sonner'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { DetailTab, RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
@@ -73,8 +74,12 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
       navigation.showRepoDetailTab(repo.id, 'terminal')
     }
     setDetailCollapsed(false)
-    void createTerminal(terminalBase)
-  }, [createTerminal, terminalBase, navigation, repo.id, repo.ui.detailTab, setDetailCollapsed])
+    void createTerminal(terminalBase).catch((err) => {
+      console.warn('[terminal] failed to create terminal', err)
+      const message = err instanceof Error ? err.message : 'error.terminal-create-failed'
+      toast.error(t('action.result-error'), { description: t(message) })
+    })
+  }, [createTerminal, terminalBase, navigation, repo.id, repo.ui.detailTab, setDetailCollapsed, t])
 
   const handleSelectTerminal = useCallback(
     (worktreeKey: string, key: string) => {

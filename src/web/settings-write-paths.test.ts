@@ -25,7 +25,7 @@ const appDataClientMocks = vi.hoisted(() => ({
       pref: 'auto',
       resolved: null,
       available: false,
-      appAvailability: { ghostty: false, terminal: false },
+      appAvailability: { ghostty: false, terminal: false, windowsTerminal: false },
       detectedAt: 0,
     },
     editor: {
@@ -57,7 +57,7 @@ const appDataClientMocks = vi.hoisted(() => ({
     pref,
     resolved: null,
     available: false,
-    appAvailability: { ghostty: false, terminal: false },
+    appAvailability: { ghostty: false, terminal: false, windowsTerminal: false },
     detectedAt: 0,
   })),
   setSettingsFetchInterval: vi.fn(async (sec) => sec),
@@ -98,7 +98,7 @@ describe('settings write paths', () => {
         pref: 'auto',
         resolved: null,
         available: false,
-        appAvailability: { ghostty: false, terminal: false },
+        appAvailability: { ghostty: false, terminal: false, windowsTerminal: false },
         detectedAt: 0,
       },
       editor: {
@@ -137,7 +137,7 @@ describe('settings write paths', () => {
       pref,
       resolved: null,
       available: false,
-      appAvailability: { ghostty: false, terminal: false },
+      appAvailability: { ghostty: false, terminal: false, windowsTerminal: false },
       detectedAt: 0,
     }))
     appDataClientMocks.setSettingsFetchInterval.mockReset()
@@ -205,7 +205,7 @@ describe('settings write paths', () => {
         pref: 'auto',
         resolved: null,
         available: false,
-        appAvailability: { ghostty: false, terminal: false },
+        appAvailability: { ghostty: false, terminal: false, windowsTerminal: false },
         detectedAt: 0,
       },
       editor: {
