@@ -39,6 +39,7 @@ export interface RendererServerTerminalConfig {
 }
 
 const WEB_TERMINAL_ATTACHMENT_ID_STORAGE_KEY = 'goblin:web-terminal-attachment-id'
+const TERMINAL_REQUEST_TIMEOUT_MS = 30_000
 
 export function createServerTerminalBridge(options: {
   getServerConfig: () => RendererServerTerminalConfig
@@ -51,6 +52,7 @@ export function createServerTerminalBridge(options: {
     action: TerminalSocketRequestAction
     resolve: (value: TerminalSocketResponseOutputs[TerminalSocketRequestAction]) => void
     reject: (reason?: unknown) => void
+    timeout: ReturnType<typeof setTimeout>
   }
   const outputSubscribers = new Set<(event: TerminalOutputEvent) => void>()
   const titleSubscribers = new Set<(event: TerminalTitleEvent) => void>()
@@ -91,7 +93,10 @@ export function createServerTerminalBridge(options: {
 
   function rejectPendingSocketRequests(message: string) {
     const error = new Error(message)
-    for (const pending of pendingSocketRequests.values()) pending.reject(error)
+    for (const pending of pendingSocketRequests.values()) {
+      clearTimeout(pending.timeout)
+      pending.reject(error)
+    }
     pendingSocketRequests.clear()
   }
 
@@ -154,22 +159,24 @@ export function createServerTerminalBridge(options: {
     })
     currentSocket.addEventListener('close', () => {
       if (!isActiveSocket(currentSocket, generation)) return
-      const wasManual = manualSocketClose
-      rejectPendingSocketRequests('Terminal socket closed')
-      socket = null
-      manualSocketClose = false
-      if (wasManual) {
-        if (hasRealtimeSubscribers()) ensureSocket()
-        return
-      }
-      scheduleReconnect()
+      handleSocketDisconnection('Terminal socket closed')
     })
     currentSocket.addEventListener('error', () => {
       if (!isActiveSocket(currentSocket, generation)) return
-      try {
-        currentSocket.close()
-      } catch {}
+      handleSocketDisconnection('Terminal socket error')
     })
+  }
+
+  function handleSocketDisconnection(reason: string) {
+    const wasManual = manualSocketClose
+    rejectPendingSocketRequests(reason)
+    socket = null
+    manualSocketClose = false
+    if (wasManual) {
+      if (hasRealtimeSubscribers()) ensureSocket()
+      return
+    }
+    scheduleReconnect()
   }
 
   function closeSocketIfIdle() {
@@ -303,6 +310,7 @@ export function createServerTerminalBridge(options: {
     const pending = pendingSocketRequests.get(message.requestId)
     if (!pending || pending.action !== message.action) return
     pendingSocketRequests.delete(message.requestId)
+    clearTimeout(pending.timeout)
     if (message.ok) pending.resolve(message.payload)
     else pending.reject(new Error(message.error))
     closeSocketIfIdle()
@@ -350,10 +358,18 @@ export function createServerTerminalBridge(options: {
     const ws = await waitForSocketOpen()
     return await new Promise<TerminalSocketResponseOutputs[TAction]>((resolve, reject) => {
       const requestId = createSocketRequestId()
+      const timeout = setTimeout(() => {
+        const pending = pendingSocketRequests.get(requestId)
+        if (!pending) return
+        pendingSocketRequests.delete(requestId)
+        clearTimeout(pending.timeout)
+        reject(new Error('Terminal request timed out'))
+      }, TERMINAL_REQUEST_TIMEOUT_MS)
       pendingSocketRequests.set(requestId, {
         action,
         resolve: (value) => resolve(value as TerminalSocketResponseOutputs[TAction]),
         reject,
+        timeout,
       })
       try {
         ws.send(
@@ -363,6 +379,7 @@ export function createServerTerminalBridge(options: {
           >),
         )
       } catch (error) {
+        clearTimeout(timeout)
         pendingSocketRequests.delete(requestId)
         closeSocketIfIdle()
         reject(error)

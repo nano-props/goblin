@@ -18,16 +18,27 @@ function requireEmbeddedServer(): EmbeddedServerConfig {
   return server
 }
 
-export async function fetchServerJson<T>(path: string, init?: RequestInit): Promise<T> {
+export async function fetchServerJson<T>(path: string | URL, init?: RequestInit): Promise<T> {
   const server = requireEmbeddedServer()
-  const response = await fetch(new URL(path, resolveApiBaseUrl(server.url)).toString(), {
-    ...init,
-    headers: {
-      'x-goblin-internal-secret': server.secret,
-      ...(init?.headers ?? {}),
-    },
-  })
-  if (!response.ok) throw new Error(`Server request failed: HTTP ${response.status}`)
+  const url = typeof path === 'string' ? new URL(path, resolveApiBaseUrl(server.url)).toString() : path.toString()
+  const { headers: extraHeaders, ...rest } = init ?? {}
+  const headers: Record<string, string> = {
+    'x-goblin-internal-secret': server.secret,
+  }
+  if (extraHeaders) {
+    new Headers(extraHeaders).forEach((value, key) => {
+      headers[key] = value
+    })
+  }
+  const response = await fetch(url, { ...rest, headers })
+  if (!response.ok) {
+    let detail = `HTTP ${response.status}`
+    try {
+      const body = (await response.json()) as { message?: string; code?: string } | undefined
+      if (body?.message) detail = `${body.code ?? response.status}: ${body.message}`
+    } catch {}
+    throw new Error(`Server request failed (${detail})`)
+  }
   return (await response.json()) as T
 }
 
@@ -66,7 +77,7 @@ export async function getServerJson<TParams extends Record<string, QueryParamVal
       appendQueryParam(url, key, value)
     }
   }
-  return await fetchServerJson<TOutput>(url.pathname + url.search, {
+  return await fetchServerJson<TOutput>(url, {
     method: 'GET',
     signal: options?.signal,
   })
