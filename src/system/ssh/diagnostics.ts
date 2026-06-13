@@ -72,7 +72,15 @@ export async function testRemoteRepository(
       stages[2 + i] = { ...stages[2 + i]!, status: 'passed' }
     }
   }
-  if (primary) return { target, ok: false, category: primary.category, message: primary.category, details: detailsFromResult(primary.result), stages }
+  if (primary)
+    return {
+      target,
+      ok: false,
+      category: primary.category,
+      message: primary.category,
+      details: detailsFromResult(primary.result),
+      stages,
+    }
 
   return { target, ok: true, stages }
 }

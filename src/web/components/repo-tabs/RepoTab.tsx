@@ -110,11 +110,7 @@ export function RepoTab({
       )}
       <span className="truncate font-medium">{repo.name}</span>
       {showConnecting && (
-        <span
-          className="shrink-0 text-muted-foreground"
-          aria-label={connectingTitle}
-          title={connectingTitle}
-        >
+        <span className="shrink-0 text-muted-foreground" aria-label={connectingTitle} title={connectingTitle}>
           <Loader2 size={12} className="animate-spin" aria-hidden />
         </span>
       )}

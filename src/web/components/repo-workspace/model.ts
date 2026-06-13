@@ -19,7 +19,6 @@ export function getRepoWorkspacePresentation(repo: RepoState | undefined): RepoW
   const hasLoadedSnapshot = repo.resources.snapshot.loadedAt !== null
   return {
     exists: true,
-    initialLoading:
-      resourceInitialLoading(repo.resources.snapshot) || (remoteConnecting && !hasLoadedSnapshot),
+    initialLoading: resourceInitialLoading(repo.resources.snapshot) || (remoteConnecting && !hasLoadedSnapshot),
   }
 }

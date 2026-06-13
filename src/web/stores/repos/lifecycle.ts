@@ -59,7 +59,11 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         let nextOrder = s.order
         let changed = false
         for (const entry of openRepos) {
-          const result = insertPlaceholderRepo({ repos: nextRepos, restorableRepoCache: s.restorableRepoCache, order: nextOrder }, entry, rankById)
+          const result = insertPlaceholderRepo(
+            { repos: nextRepos, restorableRepoCache: s.restorableRepoCache, order: nextOrder },
+            entry,
+            rankById,
+          )
           if (!result.changed) continue
           changed = true
           nextRepos = result.repos

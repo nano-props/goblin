@@ -97,7 +97,9 @@ describe('branchUrlForBrowserRemote', () => {
   })
 
   test('returns null for unsupported providers', () => {
-    expect(branchUrlForBrowserRemote(browserRemote('https://bitbucket.org/acme/project', 'external'), 'main')).toBeNull()
+    expect(
+      branchUrlForBrowserRemote(browserRemote('https://bitbucket.org/acme/project', 'external'), 'main'),
+    ).toBeNull()
   })
 })
 

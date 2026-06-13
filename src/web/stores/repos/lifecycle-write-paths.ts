@@ -114,11 +114,7 @@ function buildNewRepo(
 function remoteTargetsEqual(a: RemoteRepoTarget | undefined, b: RemoteRepoTarget | undefined): boolean {
   if (!a || !b) return false
   return (
-    a.alias === b.alias &&
-    a.host === b.host &&
-    a.user === b.user &&
-    a.port === b.port &&
-    a.remotePath === b.remotePath
+    a.alias === b.alias && a.host === b.host && a.user === b.user && a.port === b.port && a.remotePath === b.remotePath
   )
 }
 

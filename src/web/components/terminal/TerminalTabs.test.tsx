@@ -190,9 +190,7 @@ describe('TerminalTabs', () => {
     expect(
       [...document.body.querySelectorAll('[data-terminal-tab-tooltip-id]')].every(
         (tab) =>
-          tab.className.includes('w-36') &&
-          !tab.className.includes('min-w-') &&
-          !tab.className.includes('max-w-'),
+          tab.className.includes('w-36') && !tab.className.includes('min-w-') && !tab.className.includes('max-w-'),
       ),
     ).toBe(true)
     expect(document.body.querySelectorAll('[role="tab"]').length).toBe(3)

@@ -363,8 +363,9 @@ async function readBootstrapPayload(): Promise<Record<string, unknown>> {
   )
   if (!tokenArg) throw new Error(`no ${BOOTSTRAP_TOKEN_PREFIX}* arg found in additionalArguments`)
   const token = tokenArg.slice(BOOTSTRAP_TOKEN_PREFIX.length)
-  const handler = vi.mocked(ipcMain.on).mock.calls
-    .map(([channel, fn]) => (channel === BOOTSTRAP_CHANNEL ? fn : null))
+  const handler = vi
+    .mocked(ipcMain.on)
+    .mock.calls.map(([channel, fn]) => (channel === BOOTSTRAP_CHANNEL ? fn : null))
     .find((fn): fn is (event: { returnValue: unknown }, token: string) => void => fn !== undefined)
   if (!handler) throw new Error(`no handler registered for ${BOOTSTRAP_CHANNEL}`)
   const event = { returnValue: undefined as unknown }

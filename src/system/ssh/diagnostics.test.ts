@@ -48,10 +48,18 @@ describe('testRemoteRepository parallel stages', () => {
     run.mockImplementation(async (command) => {
       if (command.type === 'checkShell') return okShell
       if (command.type === 'checkGit') {
-        return { ok: false, stdout: '', stderr: 'git: command not found', message: 'Command failed with exit code 127', timedOut: false }
+        return {
+          ok: false,
+          stdout: '',
+          stderr: 'git: command not found',
+          message: 'Command failed with exit code 127',
+          timedOut: false,
+        }
       }
-      if (command.type === 'testDirectory') return { ok: true, stdout: 'dir', stderr: '', message: 'ok', timedOut: false }
-      if (command.type === 'revParseTopLevel') return { ok: true, stdout: '/srv/repo', stderr: '', message: 'ok', timedOut: false }
+      if (command.type === 'testDirectory')
+        return { ok: true, stdout: 'dir', stderr: '', message: 'ok', timedOut: false }
+      if (command.type === 'revParseTopLevel')
+        return { ok: true, stdout: '/srv/repo', stderr: '', message: 'ok', timedOut: false }
       return { ok: false, stdout: '', stderr: '', message: 'unexpected command', timedOut: false }
     })
 
