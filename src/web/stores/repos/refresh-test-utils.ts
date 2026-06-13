@@ -49,6 +49,12 @@ export function resetRefreshTest(): void {
   installGoblinTestBridge(ipcHandlers)
   ipcHandlers['repo.abort'] = async () => false
   ipcHandlers['repo.fetch'] = async () => ({ ok: true, message: 'ok' })
+  // `repo.snapshot`, `repo.status`, and `repo.pullRequests` are no
+  // longer called by the `refreshCoreData` flow (it goes through
+  // `repo.composite` instead), but `branch-actions` and a few other
+  // tests still drive these individual procedures directly, so the
+  // defaults are kept here. Tests that want a different response
+  // shape can override the handler after `installRefreshTestBridge`.
   ipcHandlers['repo.snapshot'] = async () => ({ branches: [], current: '' })
   ipcHandlers['repo.pullRequests'] = async () => []
   ipcHandlers['repo.status'] = async () => []
