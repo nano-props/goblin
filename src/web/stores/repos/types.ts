@@ -204,6 +204,7 @@ export interface RuntimeCoherentRepoProjectionActions {
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
   selectBranch: (id: string, branch: string) => void
   refreshSnapshot: (id: string, options?: { skipLogBackfill?: boolean; token?: number }) => Promise<void>
+  refreshSnapshotAndStatus: (id: string, options?: { skipLogBackfill?: boolean; token?: number }) => Promise<void>
   refreshPullRequests: (
     id: string,
     branches?: string[],

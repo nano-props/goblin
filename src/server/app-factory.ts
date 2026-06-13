@@ -4,8 +4,12 @@ import os from 'node:os'
 import path from 'node:path'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { bodyLimit } from 'hono/body-limit'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { createInternalAuthMiddleware } from '#/server/common/auth.ts'
+import { applyApiSecurityHeaders, buildCorsOriginPredicate } from '#/server/common/http-harden.ts'
+import { accessLog } from '#/server/common/access-log.ts'
+import { errorJson } from '#/server/common/responses.ts'
 import { createHealthRoutes } from '#/server/routes/health.ts'
 import { createRemoteRoutes } from '#/server/routes/remote.ts'
 import { createRealtimeRoutes } from '#/server/routes/realtime.ts'
@@ -27,7 +31,22 @@ export interface ServerAppOptions {
   startedAt: number
   internalSecret: string
   terminalHost: ServerTerminalHost
+  /**
+   * The actual host the server is listening on. Used by the CORS
+   * origin predicate to allow same-machine browsers. Defaults to
+   * `127.0.0.1`, matching the default bind in
+   * `#/server/bootstrap.ts`.
+   */
+  serverHost?: string
+  /** The actual port the server is listening on. */
+  serverPort?: number
 }
+
+// Cap request bodies on the data endpoints at 1 MiB. The largest real
+// payload today is a settings patch (a few KB); 1 MiB leaves headroom
+// for future growth (PR lists, diff hunks) while preventing a hostile
+// client from pinning a worker with a multi-GB POST.
+const API_BODY_LIMIT_BYTES = 1 * 1024 * 1024
 
 const WEB_DIST_DIR = path.resolve(import.meta.dirname, '../../dist/web')
 const WEB_INDEX_HTML = path.join(WEB_DIST_DIR, 'index.html')
@@ -94,12 +113,24 @@ async function renderRendererIndexHtml(
 export function createApp(options: ServerAppOptions): Hono {
   const settingsState = createServerSettingsState()
   const app = new Hono()
+  app.use('*', accessLog())
+  const serverHost = options.serverHost ?? '127.0.0.1'
+  const serverPort = options.serverPort ?? 32100
   app.use(
     '/api/*',
     cors({
-      origin: '*',
+      origin: (origin: string, _c) => (buildCorsOriginPredicate(serverHost, serverPort)(origin) ? origin : ''),
       allowHeaders: ['Content-Type', 'x-goblin-internal-secret'],
       allowMethods: ['GET', 'POST', 'OPTIONS'],
+      credentials: false,
+    }),
+  )
+  app.use('/api/*', applyApiSecurityHeaders())
+  app.use(
+    '/api/*',
+    bodyLimit({
+      maxSize: API_BODY_LIMIT_BYTES,
+      onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
     }),
   )
   app.route(
@@ -113,44 +144,15 @@ export function createApp(options: ServerAppOptions): Hono {
   app.route('/api/remote', createRemoteRoutes())
   app.route('/api/repo', createRepoRoutes())
   app.route('/ws', createRealtimeRoutes({ internalSecret: options.internalSecret, terminalHost: options.terminalHost }))
-  app.get('/', async (c) => {
-    try {
-      return c.html(
-        await renderRendererIndexHtml(c.req.url, options.internalSecret, c.req.header('accept-language') ?? null),
-      )
-    } catch {
-      return c.text('Not Found', 404)
-    }
-  })
-  app.get('/index.html', async (c) => {
-    try {
-      return c.html(
-        await renderRendererIndexHtml(c.req.url, options.internalSecret, c.req.header('accept-language') ?? null),
-      )
-    } catch {
-      return c.text('Not Found', 404)
-    }
-  })
-  app.get('/settings', async (c) => {
-    try {
-      return c.html(
-        await renderRendererIndexHtml(c.req.url, options.internalSecret, c.req.header('accept-language') ?? null),
-      )
-    } catch {
-      return c.text('Not Found', 404)
-    }
-  })
-  app.get('/settings/*', async (c) => {
-    try {
-      return c.html(
-        await renderRendererIndexHtml(c.req.url, options.internalSecret, c.req.header('accept-language') ?? null),
-      )
-    } catch {
-      return c.text('Not Found', 404)
-    }
-  })
   app.use('/*', serveStatic({ root: WEB_DIST_DIR }))
-  app.get('*', async (c) => {
+  // SPA fallback: any GET that wasn't handled by an earlier route
+  // (and isn't an /api/* or /ws/* request — those fall through to
+  // the JSON notFound below) gets the rendered index.html so the
+  // React app can take over routing. Replaces five separate
+  // explicit handlers (\`/\`, \`/index.html\`, \`/settings\`,
+  // \`/settings/*\`, the previous catch-all) with one.
+  app.get('*', async (c, next) => {
+    if (c.req.path.startsWith('/api/') || c.req.path.startsWith('/ws/')) return next()
     try {
       return c.html(
         await renderRendererIndexHtml(c.req.url, options.internalSecret, c.req.header('accept-language') ?? null),
@@ -159,5 +161,6 @@ export function createApp(options: ServerAppOptions): Hono {
       return c.text('Not Found', 404)
     }
   })
+  app.notFound((c) => errorJson(c, 'NOT_FOUND', `No route for ${c.req.method} ${c.req.path}`))
   return app
 }

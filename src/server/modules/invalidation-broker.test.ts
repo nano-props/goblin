@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   disconnectAllInvalidationSockets,
+  InvalidationSocketLimitError,
+  MAX_INVALIDATION_SOCKETS,
   publishRepoQueryInvalidation,
   registerInvalidationSocket,
+  unregisterInvalidationSocket,
 } from '#/server/modules/invalidation-broker.ts'
 
 describe('invalidation broker', () => {
@@ -23,5 +26,21 @@ describe('invalidation broker', () => {
     expect(second.close).toHaveBeenCalledWith(1001, 'server shutting down')
     expect(first.send).not.toHaveBeenCalled()
     expect(second.send).not.toHaveBeenCalled()
+  })
+
+  test('rejects the (N+1)th subscriber to prevent socket floods', () => {
+    for (let i = 0; i < MAX_INVALIDATION_SOCKETS; i += 1) {
+      registerInvalidationSocket({ send: vi.fn(), close: vi.fn() })
+    }
+    const overflow = { send: vi.fn(), close: vi.fn() }
+    expect(() => registerInvalidationSocket(overflow)).toThrow(InvalidationSocketLimitError)
+  })
+
+  test('frees a slot when a subscriber disconnects', () => {
+    const sockets = Array.from({ length: MAX_INVALIDATION_SOCKETS }, () => ({ send: vi.fn(), close: vi.fn() }))
+    for (const s of sockets) registerInvalidationSocket(s)
+    unregisterInvalidationSocket(sockets[0]!)
+    // The freed slot is available again.
+    expect(() => registerInvalidationSocket({ send: vi.fn(), close: vi.fn() })).not.toThrow()
   })
 })

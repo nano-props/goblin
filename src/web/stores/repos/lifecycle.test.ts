@@ -24,9 +24,8 @@ describe('repo lifecycle', () => {
     expect(useReposStore.getState().order).toEqual([REPO_A])
     expect(useReposStore.getState().activeId).toBe(REPO_A)
     expect(calls.recent).toEqual([{ kind: 'local', id: REPO_A }])
-    expect(calls.snapshot).toEqual([REPO_A])
     await vi.waitFor(() => {
-      expect(calls.status).toEqual([REPO_A])
+      expect(calls.composite).toEqual([REPO_A])
     })
   })
 
@@ -40,9 +39,8 @@ describe('repo lifecycle', () => {
     expect(result).toEqual({ ok: true, id: REPO_B })
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().activeId).toBe(REPO_A)
-    expect(calls.snapshot).toEqual([REPO_A, REPO_B])
     await vi.waitFor(() => {
-      expect(calls.status).toEqual([REPO_A, REPO_B])
+      expect(calls.composite).toEqual([REPO_A, REPO_B])
     })
   })
 
@@ -55,9 +53,8 @@ describe('repo lifecycle', () => {
 
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().activeId).toBe(REPO_A)
-    expect(calls.snapshot).toEqual([REPO_A, REPO_B])
     await vi.waitFor(() => {
-      expect(calls.status).toEqual([REPO_A, REPO_B])
+      expect(calls.composite).toEqual([REPO_A, REPO_B])
     })
   })
 
@@ -89,9 +86,8 @@ describe('repo lifecycle', () => {
 
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().activeId).toBe(REPO_A)
-    expect(calls.snapshot).toEqual([REPO_A, REPO_B])
     await vi.waitFor(() => {
-      expect(calls.status).toEqual([REPO_A, REPO_B])
+      expect(calls.composite).toEqual([REPO_A, REPO_B])
     })
   })
   test('initial refresh results from a closed repo instance do not overwrite a reopened repo', async () => {
@@ -100,6 +96,16 @@ describe('repo lifecycle', () => {
       snapshot: () =>
         new Promise<{ branches: BranchSnapshotInfo[]; current: string }>((resolve) => {
           snapshotResolvers.push(resolve)
+        }),
+      // `refreshCoreData` now goes through the composite endpoint, so
+      // forward every snapshot resolver into the composite handler too.
+      composite: () =>
+        new Promise<{
+          snapshot: { branches: BranchSnapshotInfo[]; current: string }
+          status: never[]
+          pullRequests: null
+        }>((resolve) => {
+          snapshotResolvers.push((value) => resolve({ snapshot: value, status: [], pullRequests: null }))
         }),
     })
 

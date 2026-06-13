@@ -41,6 +41,8 @@ export function bootstrapServer(options: BootstrapServerOptions = {}): Bootstrap
     startedAt,
     internalSecret: process.env.GOBLIN_SERVER_INTERNAL_SECRET?.trim() || '',
     terminalWorkerEntry,
+    serverHost: hostname,
+    serverPort: port,
   })
   const websocket = new WebSocketServer({ noServer: true })
   const server = serve({

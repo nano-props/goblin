@@ -1,4 +1,3 @@
-import { Hono } from 'hono'
 import { getServerExternalAppsSnapshot } from '#/server/modules/external-apps.ts'
 import { getServerGitHubCliState } from '#/server/modules/github-cli.ts'
 import { getServerI18nSnapshot } from '#/server/modules/i18n.ts'
@@ -15,9 +14,15 @@ import {
 } from '#/server/modules/settings-write-paths.ts'
 import { getLanUrls, isLanAddress } from '#/shared/lan-addresses.ts'
 import type { LanInfo } from '#/shared/api-types.ts'
+import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
+import {
+  GITHUB_CLI_REFRESH_SCHEMA,
+  SETTINGS_PATCH_SCHEMAS,
+  SETTINGS_PROCEDURE_SCHEMAS,
+} from '#/shared/procedure-schemas.ts'
 
 export function createSettingsRoutes(settingsState: ServerSettingsState) {
-  const app = new Hono()
+  const app = createRouteApp()
   app.get('/', async (c) => c.json(await getSettingsSnapshot(settingsState)))
   app.get('/i18n', async (c) => c.json(await getServerI18nSnapshot(c.req.header('accept-language'))))
   app.get('/github-cli', async (c) => {
@@ -27,11 +32,8 @@ export function createSettingsRoutes(settingsState: ServerSettingsState) {
     return c.json(await getServerGitHubCliState(c.req.raw.signal, hosts))
   })
   app.post('/github-cli/refresh', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    const hosts = Array.isArray(body?.hosts)
-      ? body.hosts.filter((host: unknown): host is string => typeof host === 'string' && host.length > 0)
-      : undefined
-    return c.json(await getServerGitHubCliState(c.req.raw.signal, hosts, { force: true }))
+    const parsed = await parseHttpBody(GITHUB_CLI_REFRESH_SCHEMA, c)
+    return c.json(await getServerGitHubCliState(c.req.raw.signal, parsed.hosts, { force: true }))
   })
   app.get('/external-apps', async (c) => c.json(await getServerExternalAppsSnapshot(c.req.raw.signal)))
   app.post('/external-apps/refresh', async (c) => c.json(await getServerExternalAppsSnapshot(c.req.raw.signal)))
@@ -43,29 +45,32 @@ export function createSettingsRoutes(settingsState: ServerSettingsState) {
     return c.json({ host, port, lanUrls } satisfies LanInfo)
   })
   app.post('/fetch-interval', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    return c.json(await applyServerFetchIntervalWrite(body))
+    const { sec } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.fetchInterval, c)
+    return c.json(await applyServerFetchIntervalWrite({ sec }))
   })
   app.post('/prefs', async (c) => {
-    const body = await c.req.json().catch(() => null)
+    const { settings } = await parseHttpBody(SETTINGS_PATCH_SCHEMAS.prefs, c)
     return c.json(
-      await applyServerSettingsPrefsWrite(body, {
-        acceptLanguage: c.req.header('accept-language'),
-        signal: c.req.raw.signal,
-      }),
+      await applyServerSettingsPrefsWrite(
+        { settings },
+        {
+          acceptLanguage: c.req.header('accept-language'),
+          signal: c.req.raw.signal,
+        },
+      ),
     )
   })
   app.post('/global-shortcut-state', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    return c.json(applyServerGlobalShortcutRegistrationWrite(body, settingsState))
+    const { registered } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.globalShortcutState, c)
+    return c.json(applyServerGlobalShortcutRegistrationWrite({ registered }, settingsState))
   })
   app.post('/session', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    return c.json(await applyServerSessionWrite(body))
+    const { session } = await parseHttpBody(SETTINGS_PATCH_SCHEMAS.session, c)
+    return c.json(await applyServerSessionWrite({ session }))
   })
   app.post('/recent-repos/add', async (c) => {
-    const body = await c.req.json().catch(() => null)
-    return c.json(await applyServerRecentRepoAddWrite(body))
+    const { repo } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.recentReposAdd, c)
+    return c.json(await applyServerRecentRepoAddWrite({ repo }))
   })
   app.post('/recent-repos/clear', async (c) => c.json(await applyServerRecentRepoClearWrite()))
   return app

@@ -6,6 +6,21 @@ interface InvalidationSocket {
   close(code?: number, reason?: string): unknown
 }
 
+// Cap the number of concurrent invalidation subscribers. Each open
+// socket ties up a file descriptor and a broker send, so a hostile
+// client that keeps opening /ws/invalidation connections can DoS the
+// server without this. 32 is generous for a desktop app (one tab + a
+// few background subscriptions is the realistic max) and small
+// enough that a flood is rejected before it costs anything.
+export const MAX_INVALIDATION_SOCKETS = 32
+
+export class InvalidationSocketLimitError extends Error {
+  constructor() {
+    super(`Too many invalidation subscribers (max ${MAX_INVALIDATION_SOCKETS})`)
+    this.name = 'InvalidationSocketLimitError'
+  }
+}
+
 const sockets = new Set<InvalidationSocket>()
 
 function publishInvalidationPayload(payload: string): void {
@@ -20,6 +35,9 @@ function publishInvalidationPayload(payload: string): void {
 }
 
 export function registerInvalidationSocket(ws: InvalidationSocket): void {
+  if (sockets.size >= MAX_INVALIDATION_SOCKETS) {
+    throw new InvalidationSocketLimitError()
+  }
   sockets.add(ws)
 }
 

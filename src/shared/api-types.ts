@@ -40,7 +40,7 @@ import type {
   SshConfigHostsResult,
 } from '#/shared/remote-repo.ts'
 import type { RepoQueryInvalidationEvent } from '#/shared/repo-query-invalidation.ts'
-import { NativeShellProjectionSchema, type NativeShellProjection } from '#/shared/native-shell-projection.ts'
+import { type NativeShellProjection } from '#/shared/native-shell-projection.ts'
 import { RemoteAbsolutePathSchema } from '#/shared/remote-repo-schema.ts'
 
 export type { WorkspaceLayout } from '#/shared/workspace-layout.ts'
@@ -324,10 +324,14 @@ export type NativeIpcPath = {
 const EmptyInput = v.optional(v.void())
 const FiniteNumber = v.pipe(v.number(), v.finite())
 const PortNumber = v.pipe(FiniteNumber, v.integer(), v.minValue(1), v.maxValue(65535))
-const CwdInput = v.object({ cwd: v.string() })
-const BranchInput = v.object({ cwd: v.string(), branch: v.string() })
 
-const RemoteTargetSchema = v.object({
+/** Primitive valibot schema for `{ cwd: string }`. */
+export const CwdInput = v.object({ cwd: v.string() })
+
+/** Primitive valibot schema for `{ cwd, branch }`. */
+export const BranchInput = v.object({ cwd: v.string(), branch: v.string() })
+
+export const RemoteTargetSchema = v.object({
   id: v.string(),
   alias: v.string(),
   host: v.string(),
@@ -337,12 +341,12 @@ const RemoteTargetSchema = v.object({
   displayName: v.string(),
 })
 
-const RemoteConnectionInputSchema = v.object({
+export const RemoteConnectionInputSchema = v.object({
   alias: v.string(),
   remotePath: v.string(),
 })
 
-const RemotePathSuggestionsInputSchema = v.object({
+export const RemotePathSuggestionsInputSchema = v.object({
   alias: v.string(),
   remotePath: v.string(),
   prefix: v.string(),
@@ -362,17 +366,6 @@ export class IpcError extends Error {
 }
 
 type ValibotSchema = Parameters<typeof v.safeParse>[0]
-
-type NativeIpcProcedureSchemas = {
-  [NS in keyof NativeIpcHandlers]: { [Proc in keyof NativeIpcHandlers[NS]]: ValibotSchema }
-}
-
-export const IPC_PROCEDURE_SCHEMAS: NativeIpcProcedureSchemas = {
-  settings: {
-    setGlobalShortcut: v.object({ accelerator: v.string() }),
-    applyShellProjection: NativeShellProjectionSchema,
-  },
-}
 
 function parseIpcInput<T>(schema: ValibotSchema, input: unknown): T {
   const parsed = v.safeParse(schema, input)
@@ -415,10 +408,14 @@ export interface AppRouter {
   }
 }
 
-export function createAppRouter(handlers: NativeIpcHandlers): AppRouter {
+type NativeIpcProcedureSchemas = {
+  [NS in keyof NativeIpcHandlers]: { [Proc in keyof NativeIpcHandlers[NS]]: ValibotSchema }
+}
+
+export function createAppRouter(handlers: NativeIpcHandlers, schemas: NativeIpcProcedureSchemas): AppRouter {
   return {
     createCaller: () => ({
-      settings: createValidatedNamespace(handlers.settings, IPC_PROCEDURE_SCHEMAS.settings),
+      settings: createValidatedNamespace(handlers.settings, schemas.settings),
     }),
   }
 }

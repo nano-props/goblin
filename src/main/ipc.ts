@@ -1,6 +1,13 @@
 import { ipcMain } from 'electron'
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { IpcError, createAppRouter, type NativeIpcHandlers, type IpcRequest, type IpcResponse } from '#/shared/api-types.ts'
+import {
+  IpcError,
+  createAppRouter,
+  type NativeIpcHandlers,
+  type IpcRequest,
+  type IpcResponse,
+} from '#/shared/api-types.ts'
+import { NATIVE_IPC_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import { applyMainWindowChromeTheme } from '#/main/window.ts'
 import { allRegisteredSurfacesWithCapability } from '#/main/window-registry.ts'
 import { subscribeTheme } from '#/main/theme.ts'
@@ -24,7 +31,7 @@ export function wireIpc(): void {
   if (wired) return
   wired = true
 
-  const router = createAppRouter(createNativeIpcHandlers())
+  const router = createAppRouter(createNativeIpcHandlers(), NATIVE_IPC_PROCEDURE_SCHEMAS)
 
   ipcMain.handle(IPC_ABORT_CHANNEL, async (event, input: unknown): Promise<boolean> => {
     try {

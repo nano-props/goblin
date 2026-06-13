@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import type { SessionState } from '#/shared/api-types.ts'
 import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
 
 const mocks = vi.hoisted(() => ({
@@ -129,7 +130,7 @@ describe('settings write paths', () => {
   })
 
   test('persists session state without publishing settings invalidation', async () => {
-    const session = {
+    const session: SessionState = {
       openRepos: [],
       activeRepo: null,
       detailCollapsed: true,
@@ -140,8 +141,9 @@ describe('settings write paths', () => {
         'left-right': 50,
       },
       selectedTerminalByWorktree: {},
-    } as const
+    }
     mocks.setServerSessionState.mockResolvedValue(session)
+    mocks.setServerSessionState.mockResolvedValue(session as SessionState)
     const { applyServerSessionWrite } = await import('#/server/modules/settings-write-paths.ts')
 
     await expect(applyServerSessionWrite({ session })).resolves.toEqual({
@@ -163,5 +165,25 @@ describe('settings write paths', () => {
       addedRepo: repo,
     })
     expect(mocks.publishSettingsInvalidation).toHaveBeenCalledWith(['settings-snapshot'])
+  })
+
+  test('schema rejects malformed fetch interval at the perimeter', async () => {
+    const { SETTINGS_PROCEDURE_SCHEMAS } = await import('#/shared/procedure-schemas.ts')
+    const { parseHttpInput } = await import('#/server/common/http-validate.ts')
+    expect(() => parseHttpInput(SETTINGS_PROCEDURE_SCHEMAS.fetchInterval, { sec: '5m' })).toThrow()
+  })
+
+  test('schema accepts well-formed session state via the perimeter', async () => {
+    const { SETTINGS_PATCH_SCHEMAS } = await import('#/shared/procedure-schemas.ts')
+    const { parseHttpInput } = await import('#/server/common/http-validate.ts')
+    const parsed = parseHttpInput(SETTINGS_PATCH_SCHEMAS.session, {
+      session: {
+        openRepos: [],
+        activeRepo: null,
+      },
+    })
+    // Defaults fill in the omitted keys.
+    expect(parsed.session.detailCollapsed).toBe(true)
+    expect(parsed.session.workspaceLayout).toBe('top-bottom')
   })
 })

@@ -18,7 +18,12 @@ import {
 import { createRefreshSyncHelpers } from '#/web/stores/repos/refresh-sync.ts'
 import { runWithRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
 import { finishResourceError, startResource } from '#/web/stores/repos/resources.ts'
-import { getRepositoryPullRequests, getRepositorySnapshot, getRepositoryStatus } from '#/web/repo-client.ts'
+import {
+  getRepositoryPullRequests,
+  getRepositorySnapshot,
+  getRepositoryStatus,
+  getRepositoryComposite,
+} from '#/web/repo-client.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 import type { RepoPullRequestReason } from '#/web/stores/repos/operations.ts'
 import type { RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
@@ -261,6 +266,71 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       if (!resolved) return
       const { token } = resolved
       await runCoreDataRefreshWorkflow(get, { id, token })
+    },
+
+    /**
+     * Combined snapshot + status refresh backed by the
+     * `GET /api/repo/composite?include=snapshot,status` endpoint. Saves
+     * a round trip on initial repo load by folding the two reads into
+     * one. Pull requests are still fetched separately (different lane,
+     * different retry semantics, different priority).
+     */
+    async refreshSnapshotAndStatus(id: string, options?: { skipLogBackfill?: boolean; token?: number }) {
+      const resolved = resolveActionToken(get, id, options?.token)
+      if (!resolved) return
+      const { token } = resolved
+      updateIfFresh(set, id, token, (r) => {
+        startResource(r.resources.snapshot, { hasData: r.data.branches.length > 0 })
+        startResource(r.resources.status, { hasData: r.data.statusLoaded || r.data.status.length > 0 })
+      })
+      await runLatestOperation({
+        set,
+        get,
+        id,
+        token,
+        lane: 'read',
+        operationKey: 'snapshot+status',
+        priority: 50,
+        targets: [
+          { key: 'snapshot', reason: 'snapshot' },
+          { key: 'status', reason: 'status' },
+        ],
+        task: (signal) => getRepositoryComposite(id, { include: ['snapshot', 'status'], signal }),
+        errorFromResult: (result) => {
+          // null on either side means soft-fail; treat as snapshot error
+          // (status is allowed to be empty).
+          return result.snapshot === null ? 'error.failed-read-repo' : null
+        },
+        onResult: async (result, ctx) => {
+          // Apply status first (leaf, no follow-up).
+          updateIfFresh(set, id, token, (r) => {
+            r.data.status = result.status
+            r.data.statusLoaded = true
+            r.data.worktreesByPath = applyStatusToWorktreeStates(r.data.worktreesByPath, result.status)
+          })
+          if (result.status.length > 0 && ctx.isCurrent()) {
+            persistRestorableRepoSnapshot(set, get().repos[id], token)
+          }
+          if (result.snapshot === null) {
+            updateIfFresh(set, id, token, (r) => {
+              finishResourceError(r.resources.snapshot, 'error.failed-read-repo')
+              r.events = appendRepoEvent(r.events, errorEvent('error.failed-read-repo'))
+            })
+            return
+          }
+          await runSnapshotSuccessFlow(id, token, result.snapshot, ctx.isCurrent, {
+            skipLogBackfill: options?.skipLogBackfill,
+          })
+        },
+        onError: (message) => {
+          updateIfFresh(set, id, token, (r) => {
+            if (isRepoUnavailableReason(message)) markRepoUnavailable(r, message)
+            finishResourceError(r.resources.snapshot, message)
+            finishResourceError(r.resources.status, message)
+            r.events = appendRepoEvent(r.events, errorEvent(message))
+          })
+        },
+      })
     },
 
     /** Unified sync pipeline — local and remote repos follow the same path.

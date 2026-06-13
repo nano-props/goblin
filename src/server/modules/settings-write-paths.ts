@@ -15,18 +15,44 @@ import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import { repoSessionEntryId } from '#/shared/remote-repo.ts'
 import { settingsInvalidationScopesForPrefsPatch } from '#/shared/server-invalidation.ts'
 
-export async function applyServerFetchIntervalWrite(body: unknown): Promise<{ ok: true; fetchIntervalSec: number }> {
-  const sec = typeof (body as { sec?: unknown } | null)?.sec === 'number' ? (body as { sec: number }).sec : 0
-  const fetchIntervalSec = await setServerFetchIntervalSec(sec)
+/**
+ * Typed inputs for the settings write paths. The shape is validated at
+ * the route perimeter with the valibot schemas in
+ * `#/shared/procedure-schemas.ts` (SETTINGS_PROCEDURE_SCHEMAS /
+ * SETTINGS_PATCH_SCHEMAS). These types are the boundary contract the
+ * modules can rely on — the route layer guarantees well-formed
+ * payloads, so the modules no longer need defensive `body as ...`
+ * casting.
+ */
+export interface ApplyServerFetchIntervalInput {
+  sec: number
+}
+export interface ApplyServerSettingsPrefsInput {
+  settings: Record<string, unknown>
+}
+export interface ApplyServerGlobalShortcutRegistrationInput {
+  registered: boolean
+}
+export interface ApplyServerSessionInput {
+  session: SessionState
+}
+export interface ApplyServerRecentRepoAddInput {
+  repo: RepoSessionEntry
+}
+
+export async function applyServerFetchIntervalWrite(
+  input: ApplyServerFetchIntervalInput,
+): Promise<{ ok: true; fetchIntervalSec: number }> {
+  const fetchIntervalSec = await setServerFetchIntervalSec(input.sec)
   publishSettingsInvalidation(['settings-snapshot'])
   return { ok: true, fetchIntervalSec }
 }
 
 export async function applyServerSettingsPrefsWrite(
-  body: unknown,
+  input: ApplyServerSettingsPrefsInput,
   options: { acceptLanguage?: string; signal: AbortSignal },
 ): Promise<SettingsPrefsUpdateResponse> {
-  const patch = ((body as { settings?: unknown } | null)?.settings ?? {}) as Record<string, unknown>
+  const patch = input.settings
   const settings = await updateServerSettingsPrefs(patch)
   publishSettingsInvalidation(settingsInvalidationScopesForPrefsPatch(patch))
   return {
@@ -40,24 +66,29 @@ export async function applyServerSettingsPrefsWrite(
 }
 
 export function applyServerGlobalShortcutRegistrationWrite(
-  body: unknown,
+  input: ApplyServerGlobalShortcutRegistrationInput,
   state: ServerSettingsState,
 ): { ok: true; registered: boolean } {
-  const registered = (state.globalShortcutRegistered = (body as { registered?: unknown } | null)?.registered === true)
+  const registered = (state.globalShortcutRegistered = input.registered)
   publishSettingsInvalidation(['settings-snapshot'])
   return { ok: true, registered }
 }
 
-export async function applyServerSessionWrite(body: unknown): Promise<{ ok: true; session: SessionState }> {
-  const session = await setServerSessionState((body as { session?: SessionState } | null)?.session as SessionState)
+export async function applyServerSessionWrite(
+  input: ApplyServerSessionInput,
+): Promise<{ ok: true; session: SessionState }> {
+  const session = await setServerSessionState(input.session)
   return { ok: true, session }
 }
 
 export async function applyServerRecentRepoAddWrite(
-  body: unknown,
+  input: ApplyServerRecentRepoAddInput,
 ): Promise<{ ok: true; recentRepos: RepoSessionEntry[]; addedRepo: RepoSessionEntry | null }> {
-  const requestedRepo = toSafeSessionRepoEntry((body as { repo?: unknown } | null)?.repo)
-  const recentRepos = await addServerRecentRepo((body as { repo?: unknown } | null)?.repo as RepoSessionEntry)
+  // The route schema has already confirmed the shape; re-run
+  // `toSafeSessionRepoEntry` as a defence in depth check in case the
+  // shape ever loosens.
+  const requestedRepo = toSafeSessionRepoEntry(input.repo)
+  const recentRepos = await addServerRecentRepo(input.repo)
   const addedRepo =
     requestedRepo && recentRepos.length > 0 && repoSessionEntryId(recentRepos[0]) === repoSessionEntryId(requestedRepo)
       ? recentRepos[0]

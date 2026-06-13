@@ -26,9 +26,8 @@ describe('repo session hydration', () => {
     expect(useReposStore.getState().activeId).toBe(REPO_B)
     expect(useReposStore.getState().sessionReady).toBe(true)
     expect(calls.recent).toEqual([])
-    expect(calls.snapshot).toEqual([REPO_A, REPO_B])
     await vi.waitFor(() => {
-      expect(calls.status).toEqual([REPO_A, REPO_B])
+      expect(calls.composite).toEqual([REPO_A, REPO_B])
     })
   })
 
@@ -55,6 +54,16 @@ describe('repo session hydration', () => {
       snapshot: () =>
         new Promise<{ branches: BranchSnapshotInfo[]; current: string }>((resolve) => {
           resolveSnapshot = resolve
+        }),
+      // `refreshCoreData` now goes through the composite endpoint.
+      // The test drives both reads via this single resolver.
+      composite: () =>
+        new Promise<{
+          snapshot: { branches: BranchSnapshotInfo[]; current: string }
+          status: never[]
+          pullRequests: null
+        }>((resolve) => {
+          resolveSnapshot = (value) => resolve({ snapshot: value, status: [], pullRequests: null })
         }),
     })
 
@@ -105,6 +114,15 @@ describe('repo session hydration', () => {
           probes.set(path, resolve)
         }),
       snapshot: () => new Promise<{ branches: BranchSnapshotInfo[]; current: string }>(() => {}),
+      // Composite endpoint must mirror the snapshot handler for tests
+      // that hold the read in-flight forever — the projection stays as
+      // 'cache' until the promise settles.
+      composite: () =>
+        new Promise<{
+          snapshot: { branches: BranchSnapshotInfo[]; current: string }
+          status: never[]
+          pullRequests: null
+        }>(() => {}),
     })
 
     const work = useReposStore
