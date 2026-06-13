@@ -13,7 +13,8 @@
 //
 // Usage: ./scripts/build.ts [install|i] [--clean]
 import { $ } from 'bun'
-import { chmodSync, existsSync, mkdirSync, renameSync, rmSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
@@ -186,6 +187,23 @@ function planDarwin(): PlatformPlan {
       console.log('Re-signing with correct bundle identifier...')
       await $`codesign --force --deep --sign - --identifier ${APP_ID} ${destPath}`
       console.log('Re-signed.')
+
+      // electron-builder 26.15.2 embeds a SHA-256 hash of app.asar in
+      // Info.plist under ElectronAsarIntegrity, but the hash it writes
+      // disagrees with what `shasum -a 256` actually produces for the
+      // file on disk. Electron validates this hash at startup — on
+      // mismatch the app exits silently (exit 0, no window, no crash
+      // report). Fix the hash after the build so the app can start.
+      const asarPath = path.join(destPath, 'Contents', 'Resources', 'app.asar')
+      const asarHash = createHash('sha256').update(readFileSync(asarPath)).digest('hex')
+      const integrityJson = JSON.stringify({
+        [`Resources/app.asar`]: { algorithm: 'SHA256', hash: asarHash },
+      })
+      const plistPath = path.join(destPath, 'Contents', 'Info.plist')
+      console.log('Fixing ElectronAsarIntegrity hash in Info.plist...')
+      await $`plutil -replace ElectronAsarIntegrity -json ${integrityJson} ${plistPath}`
+      await $`codesign --force --deep --sign - --identifier ${APP_ID} ${destPath}`
+      console.log('Hash fixed and re-signed.')
     },
     verifyPrebuilds(hostArch) {
       // node-pty ships `spawn-helper` as a separate executable on macOS
