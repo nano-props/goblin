@@ -2,15 +2,21 @@ import { fetchServerJson, postServerJson } from '#/web/lib/server-fetch.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 import type { RemoteDiagnosticsResult, RemotePathSuggestionsInput, SshConfigHostsResult } from '#/shared/remote-repo.ts'
 
+/** Server-side result for resolve-target: concrete target or an i18n
+ *  key (e.g. `error.ssh-config-changed`, `repo-tabs.open-remote-home-unavailable`).
+ *  Callers localize the error message via `t()`. */
+type ResolveTargetResponse = { target: RemoteRepoTarget } | { error: string }
+
 export async function resolveRemoteRepositoryTarget(ref: {
   alias: string
   remotePath: string
 }): Promise<RemoteRepoTarget> {
-  const result = await postServerJson<typeof ref, RemoteRepoTarget | { target: RemoteRepoTarget }>(
+  const result = await postServerJson<typeof ref, ResolveTargetResponse>(
     '/api/remote/resolve-target',
     ref,
   )
-  return 'target' in result ? result.target : result
+  if ('error' in result) throw new Error(result.error)
+  return result.target
 }
 
 export async function getRemoteSshHosts(): Promise<SshConfigHostsResult> {

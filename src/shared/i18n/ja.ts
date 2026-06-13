@@ -167,6 +167,7 @@ export const ja: Record<DictKey, string> = {
   'repo-tabs.open-remote-path-absolute': 'パスは / または ~/ で始まる必要があります',
   'repo-tabs.open-remote-home-unavailable': 'リモートのホームディレクトリを解決できませんでした',
   'repo-tabs.tooltip.no-remotes': 'リモートなし',
+  'repo-tabs.connecting-title': 'SSH に接続中…',
   'repo-unavailable.title': 'リポジトリパスを利用できません',
   'repo-unavailable.body':
     'Goblin はこのパスを Git リポジトリとして読み取れません。フォルダを復元するか .git を作り直してから再試行してください。',

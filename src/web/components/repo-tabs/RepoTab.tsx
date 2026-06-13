@@ -1,4 +1,4 @@
-import { AlertCircle, FolderGit2, Server } from 'lucide-react'
+import { AlertCircle, FolderGit2, Loader2, Server } from 'lucide-react'
 import type { RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
 import type { FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { ToolbarClosableTab } from '#/web/components/tab-strip/ToolbarClosableTab.tsx'
@@ -8,6 +8,7 @@ import {
   toolbarTabIconClassName,
 } from '#/web/components/tab-strip/tab-variants.ts'
 import { useSortableTab } from '#/web/components/tab-strip/useSortableTab.ts'
+import { useT } from '#/web/stores/i18n.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 interface RepoTabProps {
   repo: RepoTabSummary
@@ -38,8 +39,16 @@ export function RepoTab({
   closeLabel,
   unavailableLabel,
 }: RepoTabProps) {
+  const t = useT()
   const tabLabel = repo.unavailable ? `${repo.name} — ${unavailableLabel}` : repo.name
   const sortable = useSortableTab(repo.id, { onButtonRef: focusRegistry?.setRef(repo.id) })
+  const isRemote = isRemoteRepoId(repo.id)
+  // A remote tab shows the "connecting" spinner whenever it has no
+  // resolved target — not just at boot, but any time a probe is in
+  // flight or has yet to produce a target (e.g. re-probe after
+  // reconnection). Local tabs never show it.
+  const showConnecting = isRemote && !repo.unavailable && !repo.remoteTarget
+  const connectingTitle = t('repo-tabs.connecting-title')
 
   return (
     <ToolbarClosableTab
@@ -65,6 +74,7 @@ export function RepoTab({
       buttonRef={sortable.setButtonRef}
       buttonProps={{
         'data-repo-tab-id': repo.id,
+        'data-repo-tab-connecting': showConnecting ? 'true' : undefined,
         ...sortable.attributes,
         ...sortable.sortableListeners,
         role: 'tab',
@@ -93,12 +103,21 @@ export function RepoTab({
         onClose(repo.id)
       }}
     >
-      {isRemoteRepoId(repo.id) ? (
+      {isRemote ? (
         <Server size={13} className={toolbarTabIconClassName(isActive)} />
       ) : (
         <FolderGit2 size={13} className={toolbarTabIconClassName(isActive)} />
       )}
       <span className="truncate font-medium">{repo.name}</span>
+      {showConnecting && (
+        <span
+          className="shrink-0 text-muted-foreground"
+          aria-label={connectingTitle}
+          title={connectingTitle}
+        >
+          <Loader2 size={12} className="animate-spin" aria-hidden />
+        </span>
+      )}
       {repo.unavailable && <AlertCircle size={12} className="shrink-0 text-warning" aria-hidden />}
     </ToolbarClosableTab>
   )

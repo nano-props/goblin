@@ -1,5 +1,9 @@
-import { describe, expect, test } from 'vitest'
-import { classifySshFailure } from '#/system/ssh/diagnostics.ts'
+import { describe, expect, test, vi } from 'vitest'
+import { classifySshFailure, testRemoteRepository } from '#/system/ssh/diagnostics.ts'
+import type { RemoteCommandKind, RemoteCommandResult } from '#/system/ssh/commands.ts'
+import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+
+const okShell: RemoteCommandResult = { ok: true, stdout: 'ok', stderr: '', message: 'ok', timedOut: false }
 
 describe('classifySshFailure', () => {
   test('classifies connection reset during ssh handshake as handshake failure', () => {
@@ -25,5 +29,41 @@ describe('classifySshFailure', () => {
         timedOut: false,
       }),
     ).toBe('shell-failed')
+  })
+})
+
+describe('testRemoteRepository parallel stages', () => {
+  const target: RemoteRepoTarget = {
+    id: 'ssh-config://example/srv%2Frepo',
+    alias: 'example',
+    host: 'example.local',
+    user: 'me',
+    port: 22,
+    remotePath: '/srv/repo',
+    displayName: 'example:repo',
+  }
+
+  test('records actual stage outcomes instead of marking them skipped after a parallel failure', async () => {
+    const run = vi.fn<(command: RemoteCommandKind) => Promise<RemoteCommandResult>>()
+    run.mockImplementation(async (command) => {
+      if (command.type === 'checkShell') return okShell
+      if (command.type === 'checkGit') {
+        return { ok: false, stdout: '', stderr: 'git: command not found', message: 'Command failed with exit code 127', timedOut: false }
+      }
+      if (command.type === 'testDirectory') return { ok: true, stdout: 'dir', stderr: '', message: 'ok', timedOut: false }
+      if (command.type === 'revParseTopLevel') return { ok: true, stdout: '/srv/repo', stderr: '', message: 'ok', timedOut: false }
+      return { ok: false, stdout: '', stderr: '', message: 'unexpected command', timedOut: false }
+    })
+
+    const result = await testRemoteRepository(target, { run })
+
+    expect(result.ok).toBe(false)
+    expect(result.category).toBe('git-missing')
+    const git = result.stages.find((s) => s.name === 'git')!
+    const path = result.stages.find((s) => s.name === 'path')!
+    const repo = result.stages.find((s) => s.name === 'repo')!
+    expect(git.status).toBe('failed')
+    expect(path.status).toBe('passed')
+    expect(repo.status).toBe('passed')
   })
 })

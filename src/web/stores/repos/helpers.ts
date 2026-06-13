@@ -1,7 +1,14 @@
 import { produce, type Draft } from 'immer'
+import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import { emptyRepoOperations } from '#/web/stores/repos/operations.ts'
 import { emptyRepoResources } from '#/web/stores/repos/resources.ts'
-import type { RepoEvent, RepoResultEventOptions, RepoState, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
+import type {
+  RepoEvent,
+  RepoResultEventOptions,
+  RepoState,
+  ReposSet,
+  ReposStore,
+} from '#/web/stores/repos/types.ts'
 
 let nextInstanceToken = 1
 let nextEventId = 1
@@ -48,6 +55,30 @@ export function emptyRepo(id: string, name: string): RepoState {
     availability: { phase: 'available' },
     events: [],
   }
+}
+
+/**
+ * Live SSH liveness state for remote repos. Derived — never stored —
+ * from `isRemoteRepoId(id)` + `remote.target` presence + `availability.phase`,
+ * so all three transitions (placeholder → connected / unreachable) fall
+ * out of the existing state mutations without a separate write.
+ *   - `connecting`:  remote repo whose concrete target hasn't been
+ *     resolved yet (boot probe in flight)
+ *   - `connected`:   remote repo with a resolved target that's still
+ *     reachable; also the default for local repos
+ *   - `unreachable`: remote repo whose last probe / check failed
+ *
+ * Co-located with `deriveConnectivity` (the only meaningful producer)
+ * rather than the general `types.ts` to keep the connectivity domain
+ * in one place.
+ */
+export type RepoConnectivity = 'connecting' | 'connected' | 'unreachable'
+
+export function deriveConnectivity(repo: RepoState): RepoConnectivity {
+  if (!isRemoteRepoId(repo.id)) return 'connected'
+  if (repo.availability.phase === 'unavailable') return 'unreachable'
+  if (!repo.remote.target) return 'connecting'
+  return 'connected'
 }
 
 export function resultEvent(result: { ok: boolean; message: string }, options?: RepoResultEventOptions): RepoEvent {

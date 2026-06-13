@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto'
+import { mkdir } from 'node:fs/promises'
+import os from 'node:os'
 import path from 'node:path'
 import { execa, ExecaError } from 'execa'
 import { FIELD_SEP } from '#/system/git/parsers.ts'
@@ -5,6 +8,38 @@ import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 
 const SSH_COMMAND_TIMEOUT_MS = 15_000
 const SSH_CONNECT_TIMEOUT_SEC = 10
+/** Boot-probe timeout for the placeholder-tab hydrate path. Shorter than
+ *  SSH_COMMAND_TIMEOUT_MS so slow networks get a fast "connecting"→"unreachable"
+ *  transition, but long enough to ride out a VPN reconnect or a sleeping
+ *  laptop's first SSH handshake on the ControlMaster. */
+export const SSH_BOOT_PROBE_TIMEOUT_MS = 10_000
+// One multiplexed socket per (alias, host, port, user) tuple, kept well
+// under the macOS Unix-domain-socket 104-byte path limit. Using
+// `os.tmpdir() + '%C'` (40 hex chars + ssh's random suffix) blows past
+// that limit on typical macOS temp dirs, which manifests as every ssh
+// call failing with "unix_listener: path ... too long for Unix domain
+// socket" before the SSH handshake even starts. A short first-16-hex
+// of a SHA-256 over the target tuple gives us plenty of room to spare
+// while still being effectively unique per Goblin host.
+const SSH_CONTROL_DIR = path.join(os.homedir(), '.goblin', 'ssh')
+const SSH_CONTROL_PERSIST_SEC = 600
+
+function controlPathFor(target: RemoteRepoTarget): string {
+  const key = `${target.alias}|${target.host}|${target.port}|${target.user}`
+  const hash = createHash('sha256').update(key).digest('hex').slice(0, 16)
+  return path.join(SSH_CONTROL_DIR, hash)
+}
+
+let controlDirReady: Promise<void> | null = null
+function ensureControlDir(): Promise<void> {
+  if (!controlDirReady) {
+    controlDirReady = mkdir(SSH_CONTROL_DIR, { recursive: true }).then(
+      () => undefined,
+      () => undefined,
+    )
+  }
+  return controlDirReady
+}
 export const REMOTE_SNAPSHOT_CURRENT_MARKER = '__GOBLIN_REMOTE_CURRENT__'
 export const REMOTE_SNAPSHOT_DEFAULT_MARKER = '__GOBLIN_REMOTE_DEFAULT__'
 export const REMOTE_SNAPSHOT_BRANCHES_MARKER = '__GOBLIN_REMOTE_BRANCHES__'
@@ -70,6 +105,12 @@ export function buildRemoteCommandInvocation(
     'StrictHostKeyChecking=yes',
     '-o',
     `ConnectTimeout=${SSH_CONNECT_TIMEOUT_SEC}`,
+    '-o',
+    `ControlPath=${controlPathFor(target)}`,
+    '-o',
+    `ControlMaster=auto`,
+    '-o',
+    `ControlPersist=${SSH_CONTROL_PERSIST_SEC}`,
   ]
   const destination = target.alias
   args.push('--', destination, `sh -lc ${shellQuote(script)}`)
@@ -82,7 +123,19 @@ export function buildRemoteTerminalInvocation(
   _size: { cols: number; rows: number },
 ): RemoteCommandInvocation {
   const script = `cd ${shellQuote(remotePath)} && exec "\${SHELL:-/bin/sh}" -l`
-  const args = ['-tt', '-o', 'StrictHostKeyChecking=yes', '-o', `ConnectTimeout=${SSH_CONNECT_TIMEOUT_SEC}`]
+  const args = [
+    '-tt',
+    '-o',
+    'StrictHostKeyChecking=yes',
+    '-o',
+    `ConnectTimeout=${SSH_CONNECT_TIMEOUT_SEC}`,
+    '-o',
+    `ControlPath=${controlPathFor(target)}`,
+    '-o',
+    `ControlMaster=auto`,
+    '-o',
+    `ControlPersist=${SSH_CONTROL_PERSIST_SEC}`,
+  ]
   const destination = target.alias
   args.push('--', destination, `sh -lc ${shellQuote(script)}`)
   return { command: 'ssh', args, script }
@@ -95,6 +148,10 @@ export async function runRemoteCommand(
 ): Promise<RemoteCommandResult> {
   if (options?.signal?.aborted) return { ok: false, stdout: '', stderr: '', message: 'cancelled' }
   const invocation = buildRemoteCommandInvocation(target, command)
+  // Ensure the ControlMaster socket directory exists. ssh will refuse to
+  // create a control socket in a missing directory, which on a fresh
+  // install manifests as every probe failing before the handshake.
+  await ensureControlDir()
   try {
     const { stdout, stderr } = await execa(invocation.command, invocation.args, {
       timeout: options?.timeoutMs ?? SSH_COMMAND_TIMEOUT_MS,
