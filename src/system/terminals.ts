@@ -11,6 +11,7 @@
 import type { ResolvedTerminalApp, TerminalAppAvailability, TerminalPref } from '#/shared/api-types.ts'
 import { isGhosttyInstalled, openInGhostty } from '#/system/ghostty.ts'
 import { isAppleTerminalInstalled, openInAppleTerminal } from '#/system/apple-terminal.ts'
+import { isWindowsTerminalInstalled, openInWindowsTerminal } from '#/system/windows-terminal.ts'
 
 export interface TerminalBackend {
   /** Whether this terminal is available on the current system.
@@ -26,13 +27,18 @@ export interface TerminalBackend {
 const backends: Record<ResolvedTerminalApp, TerminalBackend> = {
   ghostty: { isInstalled: isGhosttyInstalled, open: openInGhostty },
   terminal: { isInstalled: () => true, open: openInAppleTerminal },
+  windowsTerminal: { isInstalled: isWindowsTerminalInstalled, open: openInWindowsTerminal },
 }
 
 /** Auto-detection priority — first installed backend wins. */
-const AUTO_PRIORITY: ResolvedTerminalApp[] = ['ghostty', 'terminal']
+const AUTO_PRIORITY: ResolvedTerminalApp[] = ['ghostty', 'terminal', 'windowsTerminal']
 
 function isDarwin(): boolean {
   return process.platform === 'darwin'
+}
+
+function isWindows(): boolean {
+  return process.platform === 'win32'
 }
 
 export function resolveTerminalApp(
@@ -49,15 +55,24 @@ export function resolveTerminalApp(
 }
 
 export async function getTerminalAppAvailability(signal?: AbortSignal): Promise<TerminalAppAvailability> {
+  if (isWindows()) {
+    return {
+      ghostty: false,
+      terminal: false,
+      windowsTerminal: backends.windowsTerminal.isInstalled(),
+    }
+  }
   if (!isDarwin()) {
     return {
       ghostty: false,
       terminal: false,
+      windowsTerminal: false,
     }
   }
   return {
     ghostty: backends.ghostty.isInstalled(),
     terminal: await isAppleTerminalInstalled(signal),
+    windowsTerminal: false,
   }
 }
 
