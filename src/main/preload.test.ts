@@ -19,8 +19,8 @@ import {
   TERMINAL_SET_BADGE_CHANNEL,
 } from '#/shared/ipc-channels.ts'
 
-function defaultArgv() {
-  const bootstrap: RendererBootstrapPayload = {
+function defaultBootstrapPayload(): RendererBootstrapPayload {
+  return {
     runtime: {
       kind: 'electron',
       bridgeVersion: RENDERER_BRIDGE_VERSION,
@@ -43,15 +43,32 @@ function defaultArgv() {
     },
     server: null,
   }
-  return ['--goblin-bootstrap=' + Buffer.from(JSON.stringify(bootstrap)).toString('base64')]
+}
+
+const BOOTSTRAP_TOKEN_PREFIX = '--goblin-bootstrap-token='
+const BOOTSTRAP_CHANNEL = 'goblin:get-bootstrap'
+
+function defaultArgv() {
+  return [BOOTSTRAP_TOKEN_PREFIX + 'test-bootstrap-token']
 }
 
 function loadPreload(
-  options: { invoke?: (channel: string, ...args: unknown[]) => Promise<unknown>; argv?: string[] } = {},
+  options: {
+    invoke?: (channel: string, ...args: unknown[]) => Promise<unknown>
+    argv?: string[]
+    /** Per-token payload table. Tokens not present in this map resolve to `null`,
+     *  matching how the main process answers for unknown tokens. */
+    bootstrap?: Map<string, RendererBootstrapPayload | null>
+    /** When set, the bootstrap `sendSync` throws this error instead of
+     *  returning a payload. */
+    sendSyncError?: Error
+  } = {},
 ) {
   const exposed: Record<string, any> = {}
   const invocations: Array<{ channel: string; args: unknown[] }> = []
   const sends: Array<{ channel: string; args: unknown[] }> = []
+  const syncCalls: Array<{ channel: string; args: unknown[] }> = []
+  const bootstrap = options.bootstrap ?? new Map([['test-bootstrap-token', defaultBootstrapPayload()]])
   const ipcRenderer = {
     invoke: vi.fn((channel: string, ...args: unknown[]) => {
       invocations.push({ channel, args })
@@ -59,6 +76,13 @@ function loadPreload(
     }),
     send: vi.fn((channel: string, ...args: unknown[]) => {
       sends.push({ channel, args })
+    }),
+    sendSync: vi.fn((channel: string, ...args: unknown[]) => {
+      syncCalls.push({ channel, args })
+      if (options.sendSyncError) throw options.sendSyncError
+      if (channel !== BOOTSTRAP_CHANNEL) return null
+      const token = args[0] as string
+      return bootstrap.has(token) ? (bootstrap.get(token) ?? null) : null
     }),
     on: vi.fn(),
     off: vi.fn(),
@@ -84,7 +108,7 @@ function loadPreload(
     },
   }
   vm.runInNewContext(code, sandbox, { filename: 'preload.cjs' })
-  return { goblinNative: exposed.goblinNative, invocations, sends, ipcRenderer }
+  return { goblinNative: exposed.goblinNative, invocations, sends, syncCalls, ipcRenderer }
 }
 
 describe('preload goblinNative bridge', () => {
@@ -105,15 +129,31 @@ describe('preload goblinNative bridge', () => {
     })
   })
 
-  test('falls back cleanly when the bootstrap payload is malformed', () => {
+  test('falls back cleanly when the bootstrap token is unknown', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const { goblinNative } = loadPreload({ argv: ['--goblin-bootstrap=***not-base64***'] })
+    const { goblinNative, syncCalls } = loadPreload({
+      argv: [BOOTSTRAP_TOKEN_PREFIX + 'unregistered-token'],
+      bootstrap: new Map(),
+    })
 
     expect(goblinNative.homeDir).toBe('')
     expect(goblinNative.initialI18n).toBeNull()
     expect(goblinNative.initialSettings).toBeNull()
-    expect(warn.mock.calls[0]?.[0]).toBe('[preload] failed to parse bootstrap payload')
-    expect((warn.mock.calls[0]?.[1] as { name?: string } | undefined)?.name).toBe('SyntaxError')
+    expect(syncCalls[0]).toEqual({ channel: BOOTSTRAP_CHANNEL, args: ['unregistered-token'] })
+    expect(warn).not.toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  test('falls back cleanly when the bootstrap sendSync throws', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { goblinNative } = loadPreload({
+      sendSyncError: new Error('ipc exploded'),
+    })
+
+    expect(goblinNative.homeDir).toBe('')
+    expect(goblinNative.initialI18n).toBeNull()
+    expect(warn.mock.calls[0]?.[0]).toBe('[preload] failed to read bootstrap payload')
+    expect((warn.mock.calls[0]?.[1] as Error | undefined)?.message).toBe('ipc exploded')
     warn.mockRestore()
   })
 

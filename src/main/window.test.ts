@@ -79,6 +79,12 @@ vi.mock('electron', () => ({
     focus: vi.fn(),
   },
   BrowserWindow: mocks.BrowserWindow,
+  ipcMain: {
+    on: vi.fn(),
+    handle: vi.fn(),
+    removeHandler: vi.fn(),
+    removeAllListeners: vi.fn(),
+  },
   screen: {
     getDisplayMatching: () => ({ workArea: { x: 0, y: 0, width: 1440, height: 900 } }),
   },
@@ -219,12 +225,7 @@ describe('main window navigation boundaries', () => {
 
     await getOrCreateMainWindow()
 
-    const bootstrapArg = mocks.windowOptions[0]?.webPreferences?.additionalArguments?.find((arg: string) =>
-      arg.startsWith('--goblin-bootstrap='),
-    )
-    const payload = JSON.parse(
-      Buffer.from(String(bootstrapArg).slice('--goblin-bootstrap='.length), 'base64').toString('utf8'),
-    )
+    const payload = await readBootstrapPayload()
     expect(payload.server).toMatchObject({
       url: 'http://127.0.0.1:5173/',
       secret: expect.any(String),
@@ -238,12 +239,7 @@ describe('main window navigation boundaries', () => {
 
     await getOrCreateMainWindow()
 
-    const bootstrapArg = mocks.windowOptions[0]?.webPreferences?.additionalArguments?.find((arg: string) =>
-      arg.startsWith('--goblin-bootstrap='),
-    )
-    const payload = JSON.parse(
-      Buffer.from(String(bootstrapArg).slice('--goblin-bootstrap='.length), 'base64').toString('utf8'),
-    )
+    const payload = await readBootstrapPayload()
     expect(payload.i18n).toMatchObject({ pref: 'ja' })
   })
 
@@ -349,3 +345,30 @@ describe('main window navigation boundaries', () => {
     expect(mocks.setBounds).not.toHaveBeenCalled()
   })
 })
+
+const BOOTSTRAP_TOKEN_PREFIX = '--goblin-bootstrap-token='
+const BOOTSTRAP_CHANNEL = 'goblin:get-bootstrap'
+
+/**
+ * Recover the renderer bootstrap payload by replaying the same IPC
+ * path the preload uses: extract the token from the additionalArguments
+ * injected by `createRendererWindowWebPreferences`, then call the
+ * `ipcMain.on(BOOTSTRAP_CHANNEL)` handler the window-shell module
+ * registered at import time.
+ */
+async function readBootstrapPayload(): Promise<Record<string, unknown>> {
+  const { ipcMain } = await import('electron')
+  const tokenArg = mocks.windowOptions[0]?.webPreferences?.additionalArguments?.find((arg: string) =>
+    arg.startsWith(BOOTSTRAP_TOKEN_PREFIX),
+  )
+  if (!tokenArg) throw new Error(`no ${BOOTSTRAP_TOKEN_PREFIX}* arg found in additionalArguments`)
+  const token = tokenArg.slice(BOOTSTRAP_TOKEN_PREFIX.length)
+  const handler = vi.mocked(ipcMain.on).mock.calls
+    .map(([channel, fn]) => (channel === BOOTSTRAP_CHANNEL ? fn : null))
+    .find((fn): fn is (event: { returnValue: unknown }, token: string) => void => fn !== undefined)
+  if (!handler) throw new Error(`no handler registered for ${BOOTSTRAP_CHANNEL}`)
+  const event = { returnValue: undefined as unknown }
+  handler(event, token)
+  if (!event.returnValue) throw new Error(`bootstrap token ${token} was not registered`)
+  return event.returnValue as Record<string, unknown>
+}

@@ -41,7 +41,27 @@ const PRELOAD_DIST_DIR = path.join(app.getAppPath(), 'dist/preload')
 const PRELOAD_MANIFEST_PATH = path.join(PRELOAD_DIST_DIR, 'manifest.json')
 const BOOTSTRAP_CHANNEL = 'goblin:get-bootstrap'
 const BOOTSTRAP_TOKEN_PREFIX = '--goblin-bootstrap-token='
+/**
+ * How long a bootstrap payload stays reachable for a freshly-spawned
+ * renderer. The preload reads the payload synchronously at startup, so the
+ * practical minimum is the time it takes Chromium to spawn the renderer
+ * process — a few seconds. We hold the entry for 60 s as a safety margin
+ * (slow CI machines, antivirus hooks, etc.) and then evict it. Without
+ * this, every createRendererWindowWebPreferences() call would leak the
+ * full bootstrap JSON forever.
+ */
+const BOOTSTRAP_TTL_MS = 60_000
 const rendererBootstraps = new Map<string, RendererBootstrapPayload>()
+const rendererBootstrapTimers = new Map<string, NodeJS.Timeout>()
+
+function evictBootstrap(token: string): void {
+  rendererBootstraps.delete(token)
+  const timer = rendererBootstrapTimers.get(token)
+  if (timer) {
+    clearTimeout(timer)
+    rendererBootstrapTimers.delete(token)
+  }
+}
 
 ipcMain.on(BOOTSTRAP_CHANNEL, (event, token: unknown) => {
   if (typeof token !== 'string') {
@@ -74,7 +94,12 @@ export async function createRendererWindowWebPreferences(): Promise<BrowserWindo
   const settingsSnapshot = await getSettingsSnapshot()
   const initialSettings: InitialSettingsSnapshot = initialSettingsFromSnapshot(settingsSnapshot)
   const bootstrapToken = randomUUID()
-  rendererBootstraps.set(bootstrapToken, buildRendererBootstrapPayload(settingsSnapshot.lang, initialSettings))
+  const payload = buildRendererBootstrapPayload(settingsSnapshot.lang, initialSettings)
+  rendererBootstraps.set(bootstrapToken, payload)
+  rendererBootstrapTimers.set(
+    bootstrapToken,
+    setTimeout(() => evictBootstrap(bootstrapToken), BOOTSTRAP_TTL_MS),
+  )
   return {
     preload: resolvePreloadPath(),
     contextIsolation: true,

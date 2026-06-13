@@ -155,30 +155,40 @@ describe('server terminal sessions', () => {
     unregisterTerminalSocket('client_1', 'attachment_a', socket)
   })
 
-  test('returns created terminal sessions for Windows forward-slash repository paths', async () => {
-    vi.mocked(getWorktrees).mockResolvedValueOnce([
-      { path: 'C:/Users/example/repo', branch: 'feature', isBare: false, isPrimary: true },
-    ])
+  // Path.isAbsolute's behaviour for `C:/...` is platform-specific: it returns
+  // true on win32, false on every other platform. The forward-slash Windows
+  // shape only really exists on win32, so the catalog path through it is
+  // only exercised there. We still want CI to cover the SSH branch, so the
+  // Windows case is gated to win32.
+  test.skipIf(process.platform !== 'win32')(
+    'returns created terminal sessions for Windows forward-slash repository paths',
+    async () => {
+      vi.mocked(getWorktrees).mockResolvedValueOnce([
+        { path: 'C:/Users/example/repo', branch: 'feature', isBare: false, isPrimary: true },
+      ])
 
-    const result = await createServerTerminal('client_1', {
-      repoRoot: 'C:/Users/example/repo',
-      branch: 'feature',
-      worktreePath: 'C:/Users/example/repo',
-      kind: 'primary',
-      cols: 80,
-      rows: 24,
-      attachmentId: 'attachment_a',
-    })
+      const result = await createServerTerminal('client_1', {
+        repoRoot: 'C:/Users/example/repo',
+        branch: 'feature',
+        worktreePath: 'C:/Users/example/repo',
+        kind: 'primary',
+        cols: 80,
+        rows: 24,
+        attachmentId: 'attachment_a',
+      })
 
-    expect(result.ok).toBe(true)
-    if (!result.ok) return
-    expect(result.sessions).toEqual([
-      expect.objectContaining({
-        key: 'C:/Users/example/repo\0C:/Users/example/repo\0terminal-1',
-      }),
-    ])
-    await expect(listServerTerminalSessions('client_1', 'C:/Users/example/repo')).resolves.toEqual(result.sessions)
-  })
+      expect(result.ok).toBe(true)
+      if (!result.ok) return
+      expect(result.sessions).toEqual([
+        expect.objectContaining({
+          key: 'C:/Users/example/repo\0C:/Users/example/repo\0terminal-1',
+        }),
+      ])
+      await expect(listServerTerminalSessions('client_1', 'C:/Users/example/repo')).resolves.toEqual(
+        result.sessions,
+      )
+    },
+  )
 
   test('returns created terminal sessions for SSH remote repositories', async () => {
     const result = await createServerTerminal('client_1', {
