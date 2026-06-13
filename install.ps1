@@ -7,9 +7,6 @@
 # Usage:
 #   .\install.ps1 [options]
 #
-# Skip-* / prewarm toggles accept env vars of the same name (1 = on, 0 = off):
-#   SKIP_TYPECHECK, SKIP_REBUILD, PREWARM
-#
 # Mirror env vars take a URL; leave unset/empty to disable a mirror:
 #   ELECTRON_MIRROR, ELECTRON_BUILDER_BINARIES_MIRROR
 #   -Npmmirror sets both to the npmmirror defaults.
@@ -22,7 +19,6 @@ $AppName = 'Goblin'
 
 $SkipTypecheck = if ($env:SKIP_TYPECHECK) { $env:SKIP_TYPECHECK } else { '1' }
 $SkipRebuild   = if ($env:SKIP_REBUILD)   { $env:SKIP_REBUILD }   else { '1' }
-$Prewarm       = if ($env:PREWARM)        { $env:PREWARM }        else { '0' }
 $NpmMirrorElectron  = if ($env:NPM_MIRROR_ELECTRON)  { $env:NPM_MIRROR_ELECTRON }  else { 'https://npmmirror.com/mirrors/electron/' }
 $NpmMirrorBinaries = if ($env:NPM_MIRROR_BINARIES) { $env:NPM_MIRROR_BINARIES } else { 'https://npmmirror.com/mirrors/electron-builder-binaries/' }
 
@@ -34,7 +30,7 @@ Fast-reinstall Goblin into %LOCALAPPDATA%\Programs\Goblin[-arm64].
 Defaults enable the skip-rebuild + skip-typecheck fast path but do NOT
 touch mirrors — pass -Npmmirror (or set ELECTRON_MIRROR /
 ELECTRON_BUILDER_BINARIES_MIRROR) when GitHub is unreachable. Pass
--NoFast to run the full typecheck + rebuild pipeline.
+-Full to run the full typecheck + rebuild pipeline.
 
   -Clean                Clear electron / electron-builder caches before building.
   -Npmmirror            Route electron + electron-builder-binaries downloads
@@ -42,16 +38,8 @@ ELECTRON_BUILDER_BINARIES_MIRROR) when GitHub is unreachable. Pass
                         ELECTRON_MIRROR and ELECTRON_BUILDER_BINARIES_MIRROR).
   -Mirror <URL>         Electron download mirror (overrides -Npmmirror).
   -BinariesMirror <URL> electron-builder-binaries mirror (overrides -Npmmirror).
-  -SkipTypecheck        Skip bun run typecheck (default on).
-  -KeepTypecheck        Force-run typecheck.
-  -SkipRebuild          Skip @electron/rebuild (default on).
-  -KeepRebuild          Force-run @electron/rebuild.
-  -Prewarm              Pre-download Electron to %LOCALAPPDATA%\electron\Cache.
-  -NoPrewarm            Skip the prewarm step (default).
-  -NoFast               Disable skip-* fast-path defaults (full pipeline).
-
-Skip-* / prewarm toggles accept env vars (1 = on, 0 = off):
-  SKIP_TYPECHECK, SKIP_REBUILD, PREWARM
+  -Full                 Force-run typecheck + @electron/rebuild (disable the
+                        skip-* fast-path defaults).
 
 Mirror env vars take a URL; leave unset/empty to disable:
   ELECTRON_MIRROR, ELECTRON_BUILDER_BINARIES_MIRROR
@@ -63,7 +51,7 @@ $Npmmirror = $false
 $Mirror = $null
 $BinariesMirror = $null
 $Clean = $false
-$NoFast = $false
+$Full = $false
 
 $i = 0
 while ($i -lt $args.Count) {
@@ -72,13 +60,7 @@ while ($i -lt $args.Count) {
     '-Npmmirror'    { $Npmmirror = $true }
     '-Mirror'       { $i++; $Mirror = $args[$i] }
     '-BinariesMirror' { $i++; $BinariesMirror = $args[$i] }
-    '-SkipTypecheck'{ $SkipTypecheck = '1' }
-    '-KeepTypecheck'{ $SkipTypecheck = '0' }
-    '-SkipRebuild'  { $SkipRebuild = '1' }
-    '-KeepRebuild'  { $SkipRebuild = '0' }
-    '-Prewarm'      { $Prewarm = '1' }
-    '-NoPrewarm'    { $Prewarm = '0' }
-    '-NoFast'       { $NoFast = $true }
+    '-Full'         { $Full = $true }
     '-h'            { Show-Usage; exit 0 }
     '--help'        { Show-Usage; exit 0 }
     default         { Write-Error "Unknown arg: $($args[$i])`n$(Show-Usage)"; exit 2 }
@@ -93,15 +75,13 @@ if ($Npmmirror) {
 if ($Mirror)        { $env:ELECTRON_MIRROR = $Mirror }
 if ($BinariesMirror){ $env:ELECTRON_BUILDER_BINARIES_MIRROR = $BinariesMirror }
 
-if ($NoFast) {
+if ($Full) {
   $SkipTypecheck = '0'
   $SkipRebuild   = '0'
-  $Prewarm       = '0'
 }
 
 $env:SKIP_TYPECHECK = $SkipTypecheck
 $env:SKIP_REBUILD   = $SkipRebuild
-$env:PREWARM        = $Prewarm
 
 if ($Clean) { $ExtraArgs += '--clean' }
 
