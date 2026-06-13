@@ -32,7 +32,7 @@ function testBridge(overrides: Partial<RendererBridge> = {}): RendererBridge {
     getBootstrap: () => ({
       runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
       homeDir: '/Users/test',
-      platform: 'darwin',
+      platform: 'web',
       initialI18n: null,
       initialSettings: null,
       initialServer: null,

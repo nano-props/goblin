@@ -13,7 +13,7 @@ function installBridge(calls: Array<{ path: string; input?: unknown }>, result =
           capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
         },
         homeDir: '/Users/test',
-        platform: 'darwin',
+        platform: 'web',
         invokeIpc: ({ path, input }: { path: string; input?: unknown }) => {
           calls.push({ path, input })
           return result
