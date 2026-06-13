@@ -6,11 +6,13 @@ import { isGhosttyInstalled, openInGhostty } from '#/system/ghostty.ts'
 vi.mock('#/system/ghostty.ts', () => ({
   isGhosttyInstalled: vi.fn(() => false),
   openInGhostty: vi.fn(async (path: string) => ({ ok: true, message: path })),
+  openRemoteInGhostty: vi.fn(async (alias: string, path: string) => ({ ok: true, message: `${alias}:${path}` })),
 }))
 
 vi.mock('#/system/apple-terminal.ts', () => ({
   isAppleTerminalInstalled: vi.fn(async () => true),
   openInAppleTerminal: vi.fn(async (path: string) => ({ ok: true, message: path })),
+  openRemoteInAppleTerminal: vi.fn(async (alias: string, path: string) => ({ ok: true, message: `${alias}:${path}` })),
 }))
 
 describe('openInPreferredTerminal', () => {

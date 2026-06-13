@@ -438,6 +438,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           for (const [k, v] of url.searchParams.entries()) payload[k] = v
           return call('repo.status', payload)
         }
+        if (url.pathname === '/api/repo/remote-branches') return call('repo.remoteBranches', body)
         if (url.pathname === '/api/repo/pull-requests') {
           const payload: Record<string, unknown> = { branches: url.searchParams.getAll('branches') }
           for (const [k, v] of url.searchParams.entries()) {

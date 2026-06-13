@@ -69,6 +69,10 @@ vi.mock('#/system/git/remote.ts', () => ({
   pushBranch: mocks.pushBranch,
 }))
 
+vi.mock('#/system/git/remote-refs.ts', () => ({
+  getRemoteTrackingBranches: vi.fn(async () => ['origin/main', 'origin/feature/a']),
+}))
+
 vi.mock('#/system/git/status.ts', () => ({
   getWorkingStatus: vi.fn(),
 }))
@@ -347,7 +351,10 @@ describe('repo mutation invalidation publishing', () => {
     [
       'createRepositoryWorktree',
       async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
-        repo.createRepositoryWorktree('/tmp/repo', '/tmp/repo-worktree', 'feature/a', 'main'),
+        repo.createRepositoryWorktree('/tmp/repo', {
+          worktreePath: '/tmp/repo-worktree',
+          mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+        }),
     ],
   ])('%s publishes snapshot invalidation after success', async (_name, run) => {
     const repo = await import('#/server/modules/repo-write-paths.ts')
@@ -404,7 +411,10 @@ describe('repo mutation invalidation publishing', () => {
       'createRepositoryWorktree',
       () => mocks.createWorktree.mockResolvedValueOnce({ ok: false, message: 'fatal: worktree failed' }),
       async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
-        repo.createRepositoryWorktree('/tmp/repo', '/tmp/repo-worktree', 'feature/a', 'main'),
+        repo.createRepositoryWorktree('/tmp/repo', {
+          worktreePath: '/tmp/repo-worktree',
+          mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+        }),
     ],
   ])('%s does not publish snapshot invalidation after failure', async (_name, setup, run) => {
     setup()
@@ -418,11 +428,27 @@ describe('repo mutation invalidation publishing', () => {
   test('createRepositoryWorktree rejects non-absolute paths before calling git', async () => {
     const { createRepositoryWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await createRepositoryWorktree('/tmp/repo', 'relative/path', 'feature/a', 'main')
+    const result = await createRepositoryWorktree('/tmp/repo', {
+      worktreePath: 'relative/path',
+      mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+    })
 
     expect(result).toEqual({ ok: false, message: 'error.invalid-path' })
     expect(mocks.createWorktree).not.toHaveBeenCalled()
     expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
+  })
+
+  test('createRepositoryWorktree rejects malformed mode input', async () => {
+    const { createRepositoryWorktree } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await createRepositoryWorktree('/tmp/repo', {
+      worktreePath: '/tmp/repo-worktree',
+      // @ts-expect-error — exercise the runtime normalization path
+      mode: { kind: 'unknown' },
+    })
+
+    expect(result).toEqual({ ok: false, message: 'error.invalid-arguments' })
+    expect(mocks.createWorktree).not.toHaveBeenCalled()
   })
 
   test('deleteRepositoryBranch publishes snapshot invalidation after success', async () => {

@@ -11,6 +11,7 @@ export const EMBEDDED_SERVER_IPC_ROUTES = {
   'repo.deleteBranch': { route: '/api/repo/delete-branch', method: 'POST' },
   'repo.removeWorktree': { route: '/api/repo/remove-worktree', method: 'POST' },
   'repo.createWorktree': { route: '/api/repo/create-worktree', method: 'POST' },
+  'repo.remoteBranches': { route: '/api/repo/remote-branches', method: 'POST' },
   'repo.pull': { route: '/api/repo/pull', method: 'POST' },
   'repo.push': { route: '/api/repo/push', method: 'POST' },
   'repo.fetch': { route: '/api/repo/fetch', method: 'POST' },
@@ -20,6 +21,8 @@ export const EMBEDDED_SERVER_IPC_ROUTES = {
   'remote.resolveTarget': { route: '/api/remote/resolve-target', method: 'POST' },
   'remote.listPathSuggestions': { route: '/api/remote/path-suggestions', method: 'POST' },
   'remote.testRepository': { route: '/api/remote/test-repository', method: 'POST' },
+  'remote.openEditor': { route: '/api/remote/open-editor', method: 'POST' },
+  'remote.openTerminal': { route: '/api/remote/open-terminal', method: 'POST' },
 } as const
 
 export type EmbeddedServerIpcPath = keyof typeof EMBEDDED_SERVER_IPC_ROUTES

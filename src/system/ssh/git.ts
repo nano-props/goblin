@@ -27,13 +27,14 @@ import {
   type WorktreeInfo,
   type WorktreeStatus,
 } from '#/shared/git-types.ts'
-import {
-  validateBranchDeletionPolicy,
-  validateCreateWorktreeInput,
-  validateRemovableWorktreeState,
-} from '#/shared/repo-action-policy.ts'
+import { validateBranchDeletionPolicy, validateRemovableWorktreeState } from '#/shared/repo-action-policy.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
+import {
+  normalizeCreateWorktreeInput,
+  parseRemoteTrackingRefs,
+  type CreateWorktreeInput,
+} from '#/shared/worktree-create.ts'
 
 type RemoteGitRunner = (
   command: RemoteCommandKind,
@@ -279,23 +280,31 @@ export async function pushRemoteBranch(
 
 export async function createRemoteWorktree(
   target: RemoteRepoTarget,
-  input: { worktreePath: string; newBranch: string; baseBranch: string; signal?: AbortSignal; run?: RemoteGitRunner },
+  input: CreateWorktreeInput & { signal?: AbortSignal; run?: RemoteGitRunner },
 ): Promise<ExecResult> {
-  const invalid = validateCreateWorktreeInput(input.worktreePath, input.newBranch, input.baseBranch)
-  if (invalid) return invalid
+  const normalized = normalizeCreateWorktreeInput(input)
+  if (!normalized) return { ok: false, message: 'error.invalid-arguments' }
+  if (!isValidRemotePath(normalized.worktreePath)) return { ok: false, message: 'error.invalid-path' }
   const run: RemoteGitRunner = input.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const result = await run(
     {
       type: 'gitWorktreeAdd',
       path: target.remotePath,
-      worktreePath: input.worktreePath,
-      newBranch: input.newBranch,
-      baseBranch: input.baseBranch,
+      input: normalized,
     },
     target,
     { signal: input.signal, timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS },
   )
   return remoteExecResult(result)
+}
+
+export async function getRemoteTrackingBranches(
+  target: RemoteRepoTarget,
+  options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
+): Promise<string[]> {
+  const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
+  const result = await run({ type: 'gitRemoteBranches', path: target.remotePath }, target, { signal: options.signal })
+  return result.ok ? parseRemoteTrackingRefs(result.stdout) : []
 }
 
 export async function removeRemoteWorktree(

@@ -9,9 +9,10 @@
 // 4. Add i18n keys for the settings picker and dependencies overlay
 
 import type { EditorAppAvailability, EditorPref, ResolvedEditorApp } from '#/shared/api-types.ts'
-import { isVSCodeInstalled, openInVSCode } from '#/system/vscode.ts'
-import { isCursorInstalled, openInCursor } from '#/system/cursor.ts'
-import { isWindsurfInstalled, openInWindsurf } from '#/system/windsurf.ts'
+import type { ExecResult } from '#/shared/git-types.ts'
+import { isVSCodeInstalled, openInVSCode, openRemoteInVSCode } from '#/system/vscode.ts'
+import { isCursorInstalled, openInCursor, openRemoteInCursor } from '#/system/cursor.ts'
+import { isWindsurfInstalled, openInWindsurf, openRemoteInWindsurf } from '#/system/windsurf.ts'
 
 export interface EditorBackend {
   /** Whether this editor is available on the current system.
@@ -20,14 +21,18 @@ export interface EditorBackend {
    *  registration time and cache the result. */
   isInstalled: () => boolean
   /** Open a directory in this editor. */
-  open: (path: string) => Promise<{ ok: boolean; message: string }>
+  open: (path: string) => Promise<ExecResult>
+  /** Open a remote SSH workspace in this editor. Optional: a backend
+   *  without support returns `error.remote-editor-not-supported` from
+   *  `openRemoteInPreferredEditor`. */
+  openRemote?: (alias: string, remotePath: string) => Promise<ExecResult>
 }
 
 /** Concrete editor pref values (excludes 'auto'). */
 const backends: Record<ResolvedEditorApp, EditorBackend> = {
-  vscode: { isInstalled: isVSCodeInstalled, open: openInVSCode },
-  cursor: { isInstalled: isCursorInstalled, open: openInCursor },
-  windsurf: { isInstalled: isWindsurfInstalled, open: openInWindsurf },
+  vscode: { isInstalled: isVSCodeInstalled, open: openInVSCode, openRemote: openRemoteInVSCode },
+  cursor: { isInstalled: isCursorInstalled, open: openInCursor, openRemote: openRemoteInCursor },
+  windsurf: { isInstalled: isWindsurfInstalled, open: openInWindsurf, openRemote: openRemoteInWindsurf },
 }
 
 /** Auto-detection priority — first installed editor wins. */
@@ -45,11 +50,20 @@ export function resolveEditorApp(pref: EditorPref, availability: EditorAppAvaila
 
 /** Open `path` in the editor selected by `pref`.
  *  Returns null if no editor is available (auto mode, none installed). */
-export function openInPreferredEditor(path: string, pref: EditorPref): Promise<{ ok: boolean; message: string }> {
+export function openInPreferredEditor(path: string, pref: EditorPref): Promise<ExecResult> {
   const resolved = resolveEditorApp(pref, getEditorAppAvailability())
   return resolved
     ? backends[resolved].open(path)
     : Promise.resolve({ ok: false, message: 'error.editor-not-installed' })
+}
+
+export function openRemoteInPreferredEditor(alias: string, remotePath: string, pref: EditorPref): Promise<ExecResult> {
+  const resolved = resolveEditorApp(pref, getEditorAppAvailability())
+  if (!resolved) return Promise.resolve({ ok: false, message: 'error.editor-not-installed' })
+  const openRemote = backends[resolved].openRemote
+  return openRemote
+    ? openRemote(alias, remotePath)
+    : Promise.resolve({ ok: false, message: 'error.remote-editor-not-supported' })
 }
 
 export function getResolvedEditorApp(pref: EditorPref): ResolvedEditorApp | null {

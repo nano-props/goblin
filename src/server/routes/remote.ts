@@ -1,6 +1,8 @@
 import {
   getServerRemotePathSuggestions,
   getServerSshHosts,
+  openServerRemoteEditor,
+  openServerRemoteTerminal,
   resolveServerRemoteTarget,
   testServerRemoteRepository,
 } from '#/server/modules/remote.ts'
@@ -21,6 +23,14 @@ export function createRemoteRoutes() {
   app.post('/test-repository', async (c) => {
     const { target } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.testRepository, c)
     return c.json(await testServerRemoteRepository(target, c.req.raw.signal))
+  })
+  app.post('/open-editor', async (c) => {
+    const { repoId, worktreePath } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.openEditor, c)
+    return c.json(await openServerRemoteEditor({ repoId, worktreePath }, c.req.raw.signal))
+  })
+  app.post('/open-terminal', async (c) => {
+    const { repoId, worktreePath } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.openTerminal, c)
+    return c.json(await openServerRemoteTerminal({ repoId, worktreePath }, c.req.raw.signal))
   })
   return app
 }

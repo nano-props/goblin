@@ -10,6 +10,7 @@ import {
   openRepositoryRemote,
   openRepositoryTerminal,
 } from '#/web/repo-client.ts'
+import { openRemoteRepositoryEditor, openRemoteRepositoryTerminal } from '#/web/remote-client.ts'
 import {
   branchActionBusyItemId,
   type BranchActionRepo,
@@ -19,7 +20,6 @@ import {
 import { openBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
 import { useRetainedDialogState } from '#/web/hooks/useRetainedDialogState.ts'
-import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import { getBranchWorktreeState } from '#/web/stores/repos/worktree-state.ts'
 import {
   deleteBranchNeedsForceConfirm,
@@ -64,13 +64,12 @@ export function getBranchActionCapabilities(repo: BranchActionRepo, branch: Repo
     canPull: !!branch.tracking,
     canPush: repo.remote.hasRemotes === true,
     canOpenRemote: repo.remote.hasBrowserRemote === true || repo.remote.hasGitHubRemote === true,
-    canOpenTerminal: !!branch.worktree?.path && !repo.remote.target,
-    canOpenEditor: !!branch.worktree?.path && !repo.remote.target,
+    canOpenTerminal: !!branch.worktree?.path,
+    canOpenEditor: !!branch.worktree?.path,
   }
 }
 
 export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState) {
-  const navigation = useMainWindowNavigation()
   const setLastResult = useReposStore((s) => s.setLastResult)
   const runBranchAction = useReposStore((s) => s.runBranchAction)
   const branchActionBusy = isBranchActionBlocked(repo)
@@ -157,10 +156,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
     if (!branch.worktree?.path) return
     const worktreePath = branch.worktree.path
     if (repo.remote.target) {
-      return runUiAction('terminal', async () => {
-        navigation.showRepoDetailTab(repo.id, 'terminal')
-        return { ok: true, message: '' }
-      })
+      return runUiAction('terminal', () => openRemoteRepositoryTerminal(repo.id, worktreePath))
     }
     return runUiAction('terminal', () => openRepositoryTerminal(worktreePath))
   }
@@ -168,6 +164,9 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   function openEditor() {
     if (!branch.worktree?.path) return
     const worktreePath = branch.worktree.path
+    if (repo.remote.target) {
+      return runUiAction('editor', () => openRemoteRepositoryEditor(repo.id, worktreePath))
+    }
     return runUiAction('editor', () => openRepositoryEditor(worktreePath))
   }
 

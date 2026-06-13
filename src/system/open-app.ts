@@ -10,6 +10,7 @@ import { execa } from 'execa'
 import { existsSync, statSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { isSafeRemoteAbsolutePath, isSafeRemoteAlias } from '#/system/remote-shell.ts'
 
 const OPEN_TIMEOUT_MS = 10_000
 
@@ -65,5 +66,39 @@ export function openByAppCli(appName: string, cliName: string, dir: string): Pro
       return { ok: false, message }
     }
     return { ok: true, message: dir }
+  })
+}
+
+/** Open a remote SSH workspace in a VS Code-family editor.
+ *
+ *  The editor CLIs accept `--remote ssh-remote+<alias> <path>`, where
+ *  `<path>` is interpreted as a path on the remote host. The alias and
+ *  path are passed as argv so they don't go through a shell — the safety
+ *  checks in `remote-shell` only stop obviously malicious input from
+ *  reaching the editor's own argument parser. */
+export function openRemoteByAppCli(
+  appName: string,
+  cliName: string,
+  alias: string,
+  remotePath: string,
+): Promise<{ ok: boolean; message: string }> {
+  if (!isSafeRemoteAlias(alias) || !isSafeRemoteAbsolutePath(remotePath)) {
+    return Promise.resolve({ ok: false, message: 'error.invalid-arguments' })
+  }
+
+  const cli = resolveAppCli(appName, cliName)
+  if (!cli) return Promise.resolve({ ok: false, message: 'error.editor-not-installed' })
+
+  return execa(cli, ['--remote', `ssh-remote+${alias}`, remotePath], {
+    timeout: OPEN_TIMEOUT_MS,
+    forceKillAfterDelay: 500,
+    reject: false,
+  }).then((result) => {
+    if (result.failed) {
+      const message =
+        result.stderr?.trim() || result.shortMessage || result.message || 'error.remote-editor-not-supported'
+      return { ok: false, message }
+    }
+    return { ok: true, message: remotePath }
   })
 }

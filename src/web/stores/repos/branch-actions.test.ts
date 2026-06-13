@@ -155,7 +155,7 @@ describe('branch action capabilities', () => {
     })
   })
 
-  test('disables external editor and terminal actions for remote worktrees', () => {
+  test('allows terminal and editor actions for remote worktrees', () => {
     const branch = createRepoBranch('feature/remote', { worktree: { path: '/srv/repo-feature' } })
     const target = normalizeRemoteTarget({
       alias: 'example',
@@ -180,8 +180,8 @@ describe('branch action capabilities', () => {
     })
 
     expect(getBranchActionCapabilities(useReposStore.getState().repos[target!.id]!, branch)).toMatchObject({
-      canOpenTerminal: false,
-      canOpenEditor: false,
+      canOpenTerminal: true,
+      canOpenEditor: true,
     })
   })
 
@@ -506,9 +506,10 @@ describe('runBranchAction', () => {
       'createWorktree',
       {
         kind: 'createWorktree',
-        worktreePath: '/tmp/gbl-branch-actions-test-worktree',
-        newBranch: 'feature/new',
-        baseBranch: 'feature/a',
+        input: {
+          worktreePath: '/tmp/gbl-branch-actions-test-worktree',
+          mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'feature/a' },
+        },
       },
       'repo.createWorktree',
     ],
@@ -577,9 +578,10 @@ describe('runBranchAction', () => {
 
     const work = useReposStore.getState().runBranchAction(REPO_ID, {
       kind: 'createWorktree',
-      worktreePath: '/tmp/gbl-branch-actions-test-worktree',
-      newBranch: 'feature/new',
-      baseBranch: 'feature/a',
+      input: {
+        worktreePath: '/tmp/gbl-branch-actions-test-worktree',
+        mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'feature/a' },
+      },
     })
     const running = useReposStore.getState().repos[REPO_ID]
 
@@ -617,9 +619,10 @@ describe('runBranchAction', () => {
 
     useReposStore.getState().submitBranchAction(REPO_ID, {
       kind: 'createWorktree',
-      worktreePath: '/tmp/gbl-branch-actions-test-worktree',
-      newBranch: 'feature/new',
-      baseBranch: 'feature/a',
+      input: {
+        worktreePath: '/tmp/gbl-branch-actions-test-worktree',
+        mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'feature/a' },
+      },
     })
 
     expect(useReposStore.getState().repos[REPO_ID]?.operations.branchAction).toMatchObject({
@@ -641,9 +644,10 @@ describe('runBranchAction', () => {
       REPO_ID,
       {
         kind: 'createWorktree',
-        worktreePath: '/tmp/gbl-branch-actions-test-worktree',
-        newBranch: 'feature/new',
-        baseBranch: 'feature/a',
+        input: {
+          worktreePath: '/tmp/gbl-branch-actions-test-worktree',
+          mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'feature/a' },
+        },
       },
       { token: 1, refreshOnError: false },
     )
@@ -667,9 +671,10 @@ describe('runBranchAction', () => {
       REPO_ID,
       {
         kind: 'createWorktree',
-        worktreePath: '/tmp/gbl-branch-actions-test-worktree',
-        newBranch: 'feature/new',
-        baseBranch: 'feature/a',
+        input: {
+          worktreePath: '/tmp/gbl-branch-actions-test-worktree',
+          mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'feature/a' },
+        },
       },
       { token: 1 },
     )
@@ -687,9 +692,10 @@ describe('runBranchAction', () => {
       REPO_ID,
       {
         kind: 'createWorktree',
-        worktreePath: '/tmp/gbl-branch-actions-test-worktree',
-        newBranch: 'feature/new',
-        baseBranch: 'feature/a',
+        input: {
+          worktreePath: '/tmp/gbl-branch-actions-test-worktree',
+          mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'feature/a' },
+        },
       },
       { token: 1 },
     )
@@ -712,9 +718,10 @@ describe('runBranchAction', () => {
       REPO_ID,
       {
         kind: 'createWorktree',
-        worktreePath: '/tmp/gbl-branch-actions-test-worktree',
-        newBranch: 'feature/new',
-        baseBranch: 'feature/a',
+        input: {
+          worktreePath: '/tmp/gbl-branch-actions-test-worktree',
+          mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'feature/a' },
+        },
       },
       { token: 1, refreshOnError: false },
     )
@@ -742,9 +749,10 @@ describe('runBranchAction', () => {
       REPO_ID,
       {
         kind: 'createWorktree',
-        worktreePath: '/tmp/gbl-branch-actions-test-worktree',
-        newBranch: 'feature/new',
-        baseBranch: 'feature/a',
+        input: {
+          worktreePath: '/tmp/gbl-branch-actions-test-worktree',
+          mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'feature/a' },
+        },
       },
       { token: 1 },
     )

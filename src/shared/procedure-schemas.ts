@@ -74,10 +74,14 @@ export const REPO_PROCEDURE_SCHEMAS = {
   createWorktree: v.object({
     cwd: v.string(),
     worktreePath: v.string(),
-    newBranch: v.string(),
-    baseBranch: v.string(),
+    mode: v.variant('kind', [
+      v.object({ kind: v.literal('newBranch'), newBranch: v.string(), baseRef: v.string() }),
+      v.object({ kind: v.literal('existingBranch'), branch: v.string() }),
+      v.object({ kind: v.literal('trackRemoteBranch'), remoteRef: v.string(), localBranch: v.string() }),
+    ]),
     sourceToken: SourceToken,
   }),
+  getRemoteBranches: CwdInput,
   deleteBranch: v.object({
     cwd: v.string(),
     branch: v.string(),
@@ -105,6 +109,8 @@ export const REMOTE_PROCEDURE_SCHEMAS = {
   resolveTarget: RemoteConnectionInputSchema,
   pathSuggestions: RemotePathSuggestionsInputSchema,
   testRepository: v.object({ target: RemoteTargetSchema }),
+  openEditor: v.object({ repoId: v.string(), worktreePath: v.string() }),
+  openTerminal: v.object({ repoId: v.string(), worktreePath: v.string() }),
 } as const
 
 // Query-string schemas for the GET repo read endpoints. `parseHttpQuery`

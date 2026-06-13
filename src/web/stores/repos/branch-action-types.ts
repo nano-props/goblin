@@ -1,8 +1,10 @@
+import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
+
 export type RepoBranchAction =
   | { kind: 'checkout'; branch: string }
   | { kind: 'pull'; branch: string; worktreePath?: string }
   | { kind: 'push'; branch: string }
-  | { kind: 'createWorktree'; worktreePath: string; newBranch: string; baseBranch: string }
+  | { kind: 'createWorktree'; input: CreateWorktreeInput }
   | { kind: 'deleteBranch'; branch: string; force?: boolean; alsoDeleteUpstream?: boolean }
   | {
       kind: 'removeWorktree'

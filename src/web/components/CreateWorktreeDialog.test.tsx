@@ -18,6 +18,7 @@ beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   testWindow.goblinNative = {
     homeDir: '/Users/tester',
+    initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
     pathForFile: () => '',
     invokeIpc: async () => null,
     abortIpc: async () => true,
@@ -38,13 +39,13 @@ afterEach(() => {
 })
 
 describe('CreateWorktreeDialog', () => {
-  test('focuses the new branch input when opened', () => {
+  test('focuses the new branch input when opened in newBranch mode', () => {
     render(<CreateWorktreeDialog open repo={createRepo()} onClose={vi.fn()} onCreate={vi.fn(async () => {})} />)
 
     expect(document.activeElement).toBe(input('#cwt-branch'))
   })
 
-  test('closes immediately after submitting create', () => {
+  test('submits a newBranch request and closes', () => {
     const deferred = createDeferred<void>()
     const onClose = vi.fn()
     const onCreate = vi.fn(() => deferred.promise)
@@ -55,30 +56,36 @@ describe('CreateWorktreeDialog', () => {
     click('button[type="submit"]')
 
     expect(onCreate).toHaveBeenCalledWith({
-      worktreePath: '/tmp/goblin-repo-feature-new',
-      newBranch: 'feature/new',
-      baseBranch: 'main',
+      input: {
+        worktreePath: '/tmp/goblin-repo-feature-new',
+        mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'main' },
+      },
     })
     expect(onClose).toHaveBeenCalledTimes(1)
     deferred.resolve()
   })
 
-  test('closes immediately even when create resolves with a failure result later', async () => {
+  test('switches to existingBranch mode and submits a checkout', () => {
     const onClose = vi.fn()
-    const deferred = createDeferred<void>()
-    const onCreate = vi.fn(() => deferred.promise)
+    const onCreate = vi.fn(async () => {})
 
     render(<CreateWorktreeDialog open repo={createRepo()} onClose={onClose} onCreate={onCreate} />)
 
-    setInputValue('#cwt-branch', 'feature/new')
+    clickModeButton('existing')
+    // After switching to existingBranch, base resets to current branch
+    // ("main") and the submit button stays disabled until that branch
+    // is verified to exist in the repo's snapshot (it does).
+    expect(button('button[type="submit"]').disabled).toBe(false)
     click('button[type="submit"]')
-    expect(onClose).toHaveBeenCalledTimes(1)
-
-    deferred.resolve()
-    await flush()
+    expect(onCreate).toHaveBeenCalledWith({
+      input: {
+        worktreePath: '/tmp/goblin-repo-main',
+        mode: { kind: 'existingBranch', branch: 'main' },
+      },
+    })
   })
 
-  test('allows home-relative remote worktree paths', async () => {
+  test('keeps home-relative remote worktree paths in the submitted payload', () => {
     const onClose = vi.fn()
     const onCreate = vi.fn(async () => {})
 
@@ -87,14 +94,13 @@ describe('CreateWorktreeDialog', () => {
     setInputValue('#cwt-branch', 'feature/new')
     setInputValue('#cwt-path', '~/trees/repo-feature-new')
     click('button[type="submit"]')
-    await flush()
 
     expect(onCreate).toHaveBeenCalledWith({
-      worktreePath: '~/trees/repo-feature-new',
-      newBranch: 'feature/new',
-      baseBranch: 'main',
+      input: {
+        worktreePath: '~/trees/repo-feature-new',
+        mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'main' },
+      },
     })
-    expect(onClose).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -162,12 +168,19 @@ function button(selector: string): HTMLButtonElement {
   return element
 }
 
-function buttonByText(text: string): HTMLButtonElement {
-  const element = [...document.body.querySelectorAll('button')].find(
-    (candidate) => candidate.textContent?.trim() === text,
+function clickModeButton(label: string): void {
+  // The ToggleGroup items render an inline SVG icon alongside the label,
+  // so textContent matches aren't stable. The Radix primitive also doesn't
+  // forward `value` as a DOM attribute. Walk the rendered buttons and
+  // match the visible label substring (this test runs with the default zh
+  // dictionary so labels like "现有" / "Existing" both work).
+  const element = [...document.body.querySelectorAll('button')].find((candidate) =>
+    candidate.textContent?.toLowerCase().includes(label.toLowerCase()),
   )
-  if (!(element instanceof HTMLButtonElement)) throw new Error(`Missing button text: ${text}`)
-  return element
+  if (!(element instanceof HTMLButtonElement)) throw new Error(`Missing mode button: ${label}`)
+  act(() => {
+    element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  })
 }
 
 function setInputValue(selector: string, value: string) {
@@ -184,12 +197,6 @@ function click(selector: string) {
   const element = button(selector)
   act(() => {
     element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  })
-}
-
-async function flush() {
-  await act(async () => {
-    await Promise.resolve()
   })
 }
 
