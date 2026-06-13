@@ -223,7 +223,7 @@ export interface RuntimeCoherentRepoProjectionActions {
     options?: RepoResultEventOptions,
   ) => void
   clearEvents: (id: string, eventIds: number[]) => void
-  hydrateSession: (openRepos: RepoSessionEntry[], activeRepo: string | null) => Promise<void>
+  hydrateSession: (openRepos: RepoSessionEntry[], activeRepo: string | null, signal?: AbortSignal) => Promise<void>
   /** Clear the fetchFailed flag — called by manual fetch success and
    *  by an explicit refresh, so a stale badge doesn't follow the user
    *  around forever. */

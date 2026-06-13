@@ -297,4 +297,39 @@ describe('repo session hydration', () => {
 
     expect(calls.resolveTarget).toEqual([{ alias: 'example', remotePath: '/srv/repo' }])
   })
+
+  test('hydrateSession stops processing probes when the signal is already aborted', async () => {
+    let probeCalls = 0
+    const pending: Array<() => void> = []
+    installGoblin({
+      probe: (path: string) => {
+        probeCalls += 1
+        return new Promise<{ ok: true; root: string; name: string }>((resolve) => {
+          pending.push(() => resolve({ ok: true, root: path, name: path.split('/').at(-1) ?? path }))
+        })
+      },
+    })
+    const controller = new AbortController()
+    controller.abort()
+
+    await useReposStore
+      .getState()
+      .hydrateSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry(REPO_B)], REPO_A, controller.signal)
+
+    // Phase 1 (placeholder insertion) is synchronous and runs before
+    // any probe check, so the placeholders and sessionReady are intact.
+    expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
+    expect(useReposStore.getState().sessionReady).toBe(true)
+    // But the probe handler was never invoked because the abort check
+    // fires before resolveRepoPath is called.
+    expect(probeCalls).toBe(0)
+
+    // The still-pending probe should not affect the store when it
+    // eventually resolves — hydrateSession already returned, so the
+    // resolved target should not be applied.
+    pending.splice(0).forEach((resolve) => resolve())
+    await flushIpc()
+    expect(useReposStore.getState().repos[REPO_A]?.remote.target).toBeUndefined()
+    expect(useReposStore.getState().repos[REPO_B]?.remote.target).toBeUndefined()
+  })
 })

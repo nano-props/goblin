@@ -22,7 +22,7 @@ const SESSION_PROBE_CONCURRENCY = 4
 
 function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet): RestorableWorkspaceLifecycleActions {
   return {
-    async hydrateSession(openRepos: RepoSessionEntry[], activeRepo: string | null) {
+    async hydrateSession(openRepos: RepoSessionEntry[], activeRepo: string | null, signal?: AbortSignal) {
       // Boot/session restore of workspace membership and active tab. This
       // reopens what SessionState described, but does not subscribe the repos
       // store to future session writes from persistence.
@@ -95,9 +95,17 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
       await Promise.all(
         openRepos.map((entry) =>
           limitProbe(async () => {
+            // Respect the abort signal: if the caller (e.g. the boot
+            // effect) unmounted, skip starting the probe and don't
+            // apply its result. In-flight network calls can't be
+            // cancelled through JS, but we don't process their results
+            // and we don't keep the store from converging to its Phase 1
+            // state.
+            if (signal?.aborted) return
             const probe = await resolveRepoPath(entry, (err) => {
               console.warn(`[session] probe failed for ${repoSessionEntryId(entry)}:`, err)
             })
+            if (signal?.aborted) return
             if (!probe.repo) {
               set((s) => {
                 const { repos, order } = addUnavailableRepo(
