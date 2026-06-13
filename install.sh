@@ -3,12 +3,12 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 APP_NAME=Goblin
-DEST="$HOME/Applications"
 BINARY_PATH_FRAGMENT="/$APP_NAME.app/Contents/MacOS/"
 WAS_RUNNING=false
 if pgrep -f "$BINARY_PATH_FRAGMENT" > /dev/null; then
   WAS_RUNNING=true
 fi
+export WAS_RUNNING
 
 # Defaults tuned for a fast reinstall. Override via env (handy for CI) or the
 # CLI flags below. `bun run build` (no `install` positional) keeps upstream
@@ -76,10 +76,8 @@ export ELECTRON_MIRROR ELECTRON_BUILDER_BINARIES_MIRROR
 
 # Go through bun to match `package.json`'s `build` script — the build
 # script itself shells out to `bun install` / `bun run ...`, so requiring
-# bun here keeps the toolchain assumption in one place.
+# bun here keeps the toolchain assumption in one place. The post-install
+# restart (when WAS_RUNNING=1) happens inside build.ts via
+# scripts/close-app.ts, which knows the real install destination for
+# the host architecture.
 bun scripts/build.ts install ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
-
-if [ "$WAS_RUNNING" = true ]; then
-  echo "Restarting $APP_NAME..."
-  open "$DEST/$APP_NAME.app"
-fi

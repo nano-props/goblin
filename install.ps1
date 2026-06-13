@@ -17,6 +17,12 @@ Set-Location $ScriptDir
 
 $AppName = 'Goblin'
 
+# Detect whether Goblin is already running so we can restart it after the
+# install. closeRunningApp() inside build.ts will close it before the
+# rename; launchInstalledApp() restarts the fresh binary afterwards.
+$WasRunning = [bool](Get-Process -Name $AppName -ErrorAction SilentlyContinue)
+$env:WAS_RUNNING = if ($WasRunning) { '1' } else { '0' }
+
 $SkipTypecheck = if ($env:SKIP_TYPECHECK) { $env:SKIP_TYPECHECK } else { '1' }
 $SkipRebuild   = if ($env:SKIP_REBUILD)   { $env:SKIP_REBUILD }   else { '1' }
 $NpmMirrorElectron  = if ($env:NPM_MIRROR_ELECTRON)  { $env:NPM_MIRROR_ELECTRON }  else { 'https://npmmirror.com/mirrors/electron/' }
@@ -87,12 +93,7 @@ if ($Clean) { $ExtraArgs += '--clean' }
 
 # Go through bun to match package.json's build script — the build script
 # itself shells out to bun install / bun run ..., so requiring bun here
-# keeps the toolchain assumption in one place.
+# keeps the toolchain assumption in one place. The post-install restart
+# (when WAS_RUNNING=1) happens inside build.ts via scripts/close-app.ts,
+# which knows the real install destination for the host architecture.
 bun scripts/build.ts install @ExtraArgs
-
-# Restart a previously-running Goblin.exe if one was open when we
-# started. closeRunningApp() inside build.ts already closed it before
-# the rename; launching the fresh binary mirrors the macOS install.sh
-# behaviour (which `open`s the new .app).
-Write-Host "Restarting $AppName..."
-Start-Process -FilePath (Join-Path (Join-Path $env:LOCALAPPDATA 'Programs') $AppName) -ErrorAction SilentlyContinue
