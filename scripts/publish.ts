@@ -1,7 +1,18 @@
 #!/usr/bin/env bun
-// Publish a GitHub release for Goblin. Builds macOS (.dmg for arm64 and x64),
-// tags the current commit with the package.json version, and uploads every
-// artifact via `gh release create`.
+// Publish a GitHub release for Goblin. Builds the host platform's
+// packaged artifacts (.dmg + .zip on macOS, NSIS installer on Windows),
+// tags the current commit with the package.json version, and uploads
+// every artifact via `gh release create`.
+//
+// macOS: 2 .dmg files (arm64 + x64) per electron-builder.ts mac.target.
+// Windows: 2 NSIS installers (x64 + arm64) per electron-builder.ts
+// win.target.
+//
+// Cross-platform publishing (publishing macOS artifacts from a
+// Windows host or vice versa) is not supported — each host can only
+// build the artifacts it produces locally. Run this script from a
+// macOS host for the .dmg release, from a Windows host for the
+// NSIS release.
 //
 // Usage: ./scripts/publish.ts [--dry-run] [--proxy http://127.0.0.1:7890]
 import { $ } from 'bun'
@@ -45,8 +56,10 @@ if (!/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(version)) {
 }
 const tag = `v${version}`
 
-if (process.platform !== 'darwin') {
-  console.error('Error: publish currently builds macOS artifacts and must run on macOS.')
+if (process.platform !== 'darwin' && process.platform !== 'win32') {
+  console.error(
+    `Error: publish builds host-platform artifacts and is only supported on macOS or Windows (got ${process.platform}).`,
+  )
   process.exit(1)
 }
 
@@ -75,18 +88,34 @@ async function findAll(pattern: string, what: string, expected: number): Promise
 }
 
 // Stash artifacts outside `release/` between builds — `scripts/build.ts`
-// wipes `release/` on every invocation. Today there's only one build
-// step, so the stash isn't strictly needed; keeping the pattern means
-// adding a Windows build later won't require restructuring.
+// wipes `release/` on every invocation. Today each publish run is a
+// single platform build, so the stash isn't strictly needed; keeping
+// the pattern means chaining multiple platforms later (CI matrix)
+// won't require restructuring.
 const stash = mkdtempSync(path.join(os.tmpdir(), 'gbl-publish-'))
 
 try {
-  console.log(`Building ${tag} (macOS) ...`)
+  const isMac = process.platform === 'darwin'
+  const hostLabel = isMac ? 'macOS' : 'Windows'
+  console.log(`Building ${tag} (${hostLabel}) ...`)
   await $`bun scripts/build.ts`
 
-  // Two dmgs (arm64 + x64) per electron-builder.ts mac.target config.
-  const dmgSrcs = await findAll(`release/${APP_NAME}-${version}-*.dmg`, `${APP_NAME} .dmg`, 2)
-  const dmgs = dmgSrcs.map((src) => {
+  if (isMac) {
+    // Two dmgs (arm64 + x64) per electron-builder.ts mac.target config.
+    var artifactSrcs = await findAll(
+      `release/${APP_NAME}-${version}-*.dmg`,
+      `${APP_NAME} .dmg`,
+      2,
+    )
+  } else {
+    // Two NSIS installers (x64 + arm64) per electron-builder.ts win.target config.
+    var artifactSrcs = await findAll(
+      `release/${APP_NAME}-${version}-*.exe`,
+      `${APP_NAME} .exe`,
+      2,
+    )
+  }
+  const artifacts = artifactSrcs.map((src) => {
     const dest = path.join(stash, path.basename(src))
     renameSync(src, dest)
     return dest
@@ -95,13 +124,13 @@ try {
   if (isDryRun) {
     await $`rm -rf release`
     mkdirSync(path.join(repoRoot, 'release'), { recursive: true })
-    const artifacts = dmgs.map((src) => {
+    const restored = artifacts.map((src) => {
       const dest = path.join(repoRoot, 'release', path.basename(src))
       renameSync(src, dest)
       return dest
     })
     console.log('Dry run complete. Artifacts:')
-    for (const artifact of artifacts) {
+    for (const artifact of restored) {
       console.log(`- ${path.relative(repoRoot, artifact)}`)
     }
   } else {
@@ -111,20 +140,31 @@ try {
       await $`git push origin ${tag}`
       pushedTag = true
 
-      // Builds are unsigned. Without these notes Gatekeeper will block the
-      // download and users will assume the app is broken.
-      const notes = [
-        `Unsigned builds.`,
-        ``,
-        `**macOS** — after installing, run:`,
-        '```sh',
-        `xattr -dr com.apple.quarantine /Applications/${APP_NAME}.app`,
-        '```',
-        `Or right-click the app → **Open** → **Open**.`,
-      ].join('\n')
+      // Builds are unsigned. Without these notes macOS Gatekeeper /
+      // Windows SmartScreen will block the download and users will
+      // assume the app is broken.
+      const notes = isMac
+        ? [
+            `Unsigned builds.`,
+            ``,
+            `**macOS** — after installing, run:`,
+            '```sh',
+            `xattr -dr com.apple.quarantine /Applications/${APP_NAME}.app`,
+            '```',
+            `Or right-click the app → **Open** → **Open**.`,
+          ].join('\n')
+        : [
+            `Unsigned builds.`,
+            ``,
+            `**Windows** — SmartScreen will block the unsigned installer. Either:`,
+            '1. Right-click the .exe → **Properties** → check **Unblock** → **OK**, then double-click to run.',
+            '2. Or from PowerShell: `Unblock-File Goblin-<version>-<arch>.exe` before running it.',
+            ``,
+            `Goblin installs per-user into %LOCALAPPDATA%\\Programs\\Goblin[-arm64] — no admin rights required.`,
+          ].join('\n')
 
       console.log(`Creating GitHub release ${tag} ...`)
-      await $`gh release create ${tag} ${dmgs} --title ${tag} --notes ${notes}`
+      await $`gh release create ${tag} ${artifacts} --title ${tag} --notes ${notes}`
     } catch (err) {
       // If any post-tag step fails, roll back the tag so the next attempt
       // isn't blocked by "tag already exists" and upstream history doesn't

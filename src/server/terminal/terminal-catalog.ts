@@ -99,7 +99,17 @@ class TerminalCatalog {
 
     const sessionScope = terminalSessionScope(input.repoRoot)
     const existingSessions = await this.options.manager.listSessions(sessionScope)
-    const targetSessionKey = sessionKey(input.repoRoot, input.worktreePath, terminalId)
+    // Build the target session key from the same form the manager uses to
+    // scope listSessions — without this normalization, on Windows a
+    // forward-slash path like "C:/Users/foo" never matches a session
+    // keyed by its resolved "C:\Users\foo" form, so the existing-session
+    // lookup falls through and every reopen lands in the 'created'
+    // branch instead of 'restored'/'reused'.
+    const targetSessionKey = sessionKey(
+      terminalSessionScope(input.repoRoot),
+      isRemoteRepoId(input.repoRoot) ? input.worktreePath : path.resolve(input.worktreePath),
+      terminalId,
+    )
     const existingSession = existingSessions.find((session) => session.key === targetSessionKey)
     const action: TerminalCatalogAction = existingSession
       ? existingSession.controller
@@ -162,11 +172,15 @@ class TerminalCatalog {
   }
 
   async nextTerminalId(repoRoot: string, worktreePath: string): Promise<string> {
-    const sessions = await this.options.manager.listSessions(terminalSessionScope(repoRoot))
+    // Compare against the canonical form so a forward-slash Windows path
+    // matches the resolved back-slash form used as the session key prefix.
+    const scopedRepoRoot = terminalSessionScope(repoRoot)
+    const scopedWorktreePath = isRemoteRepoId(repoRoot) ? worktreePath : path.resolve(worktreePath)
+    const sessions = await this.options.manager.listSessions(scopedRepoRoot)
     let maxIndex = 0
     for (const session of sessions) {
       const parsed = parseSessionKey(session.key)
-      if (!parsed || parsed.repoRoot !== repoRoot || parsed.worktreePath !== worktreePath) continue
+      if (!parsed || parsed.repoRoot !== scopedRepoRoot || parsed.worktreePath !== scopedWorktreePath) continue
       const index = parseTerminalIdIndex(parsed.terminalId)
       if (index === null) continue
       if (index > maxIndex) maxIndex = index

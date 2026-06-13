@@ -60,26 +60,40 @@ const ALL_TERMINAL_OPTIONS: { value: TerminalPref; labelKey: string }[] = [
 ]
 
 /**
- * Windows Terminal is the only platform-restricted entry. The data lives
- * in the shared array above so the i18n bundle stays single-source, but
- * the UI is filtered at render time so macOS / Linux users never see a
- * row that is permanently "not detected" or a dropdown option that can
- * only fail. Mirrors the union in `shared/bootstrap.ts`; add new
+ * Per-platform visibility for terminal entries.
+ *
+ * - `terminal` is the macOS Terminal.app backend (`openInAppleTerminal`).
+ *   On Windows/Linux/other the backend is unreachable, so we hide it from
+ *   the picker rather than offer a row that can only fail.
+ * - `windowsTerminal` is win32-only — `windows-terminal.ts` hard-checks
+ *   `process.platform === 'win32'`, so cygwin (which reports `'cygwin'`)
+ *   and other Windows-like environments don't get it either.
+ * - `ghostty` is cross-platform. Detection is currently best-effort on
+ *   macOS only; on Linux/Windows the row simply shows "not detected" if
+ *   Ghostty isn't installed.
+ *
+ * The data lives in the shared array above so the i18n bundle stays
+ * single-source; this map just filters which entries are visible per
+ * host platform. Mirrors the union in `shared/bootstrap.ts`; add new
  * platforms here when they get a Windows-Terminal-shaped backend.
  */
 type BootstrapPlatform = ReturnType<typeof getInitialBootstrap>['platform']
 const PLATFORM_TERMINAL_IDS: Record<BootstrapPlatform, ReadonlySet<string>> = {
-  win32: new Set(['ghostty', 'terminal', 'windowsTerminal']),
+  win32: new Set(['windowsTerminal']),
   darwin: new Set(['ghostty', 'terminal']),
-  linux: new Set(['ghostty', 'terminal']),
-  aix: new Set(['ghostty', 'terminal']),
-  android: new Set(['ghostty', 'terminal']),
-  cygwin: new Set(['ghostty', 'terminal']),
-  freebsd: new Set(['ghostty', 'terminal']),
-  haiku: new Set(['ghostty', 'terminal']),
-  netbsd: new Set(['ghostty', 'terminal']),
-  openbsd: new Set(['ghostty', 'terminal']),
-  sunos: new Set(['ghostty', 'terminal']),
+  // Non-darwin, non-win32 Unix-y platforms: only Ghostty, which is the
+  // only cross-platform terminal backend we ship. cygwin reports
+  // `'cygwin'` not `'win32'`, so Windows Terminal's platform guard would
+  // reject it anyway.
+  linux: new Set(['ghostty']),
+  aix: new Set(['ghostty']),
+  android: new Set(['ghostty']),
+  cygwin: new Set(['ghostty']),
+  freebsd: new Set(['ghostty']),
+  haiku: new Set(['ghostty']),
+  netbsd: new Set(['ghostty']),
+  openbsd: new Set(['ghostty']),
+  sunos: new Set(['ghostty']),
   // Web-hosted renderers (the dev preview) have no real terminal; hide
   // every OS-specific entry.
   web: new Set<string>(),

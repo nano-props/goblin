@@ -155,11 +155,16 @@ describe('server terminal sessions', () => {
     unregisterTerminalSocket('client_1', 'attachment_a', socket)
   })
 
-  // Path.isAbsolute's behaviour for `C:/...` is platform-specific: it returns
+// Path.isAbsolute's behaviour for `C:/...` is platform-specific: it returns
   // true on win32, false on every other platform. The forward-slash Windows
   // shape only really exists on win32, so the catalog path through it is
   // only exercised there. We still want CI to cover the SSH branch, so the
   // Windows case is gated to win32.
+  //
+  // The expected key uses backslashes because the catalog normalizes both
+  // the scope and the worktree path through path.resolve() at the entry —
+  // otherwise a forward-slash input would never match the back-slash form
+  // already stored on the manager.
   test.skipIf(process.platform !== 'win32')(
     'returns created terminal sessions for Windows forward-slash repository paths',
     async () => {
@@ -181,7 +186,7 @@ describe('server terminal sessions', () => {
       if (!result.ok) return
       expect(result.sessions).toEqual([
         expect.objectContaining({
-          key: 'C:/Users/example/repo\0C:/Users/example/repo\0terminal-1',
+          key: 'C:\\Users\\example\\repo\0C:\\Users\\example\\repo\0terminal-1',
         }),
       ])
       await expect(listServerTerminalSessions('client_1', 'C:/Users/example/repo')).resolves.toEqual(
@@ -215,6 +220,43 @@ describe('server terminal sessions', () => {
       }),
     ])
     await expect(listServerTerminalSessions('client_1', 'ssh-config://prod/srv/repo')).resolves.toEqual(result.sessions)
+  })
+
+  // Regression: re-opening the same repo root must report 'reused' or
+  // 'restored' rather than 'created'. The catalog normalizes the path
+  // for both the manager scope and the session key; without that
+  // normalization, callers that mix forward- and back-slash Windows
+  // paths (or relative vs absolute) would never match an existing
+  // session and would spawn a fresh pty every time.
+  test('reuses the existing terminal when reopening the same repo root', async () => {
+    const first = await createServerTerminal('client_1', {
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'primary',
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_a',
+    })
+    expect(first.ok).toBe(true)
+    if (!first.ok) return
+    expect(first.action).toBe('created')
+
+    // Same repo/worktree, second open — should be 'reused' (no controller
+    // on the original session yet).
+    const second = await createServerTerminal('client_1', {
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'primary',
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_a',
+    })
+    expect(second.ok).toBe(true)
+    if (!second.ok) return
+    expect(second.action).toBe('reused')
+    expect(second.key).toBe(first.key)
   })
 
   test('clears stale canonical title when the foreground process returns to the shell without a new title', async () => {
