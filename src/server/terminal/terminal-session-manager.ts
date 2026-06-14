@@ -24,7 +24,6 @@ import {
 import {
   appendOutput,
   createEmptyTerminalRenderState,
-  resizeRender,
   resetRender,
   takeSnapshot,
   type TerminalRenderState,
@@ -121,7 +120,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
       rows: size.rows,
       pty: null,
       disposables: [],
-      render: createEmptyTerminalRenderState(size.cols, size.rows),
+      render: createEmptyTerminalRenderState(),
       processName: '',
       attachmentId: null,
       attachment: null,
@@ -369,11 +368,20 @@ export class TerminalSessionManager<TOwner extends string | number> {
     if (id) this.closeSession(id)
   }
 
+  // Sends SIGWINCH to the child PTY. The shell responds by re-painting
+  // its current frame at the new dimensions, and the re-paint bytes
+  // arrive through the regular `onData` path → `appendOutput` →
+  // `session.render.buffer`. If a client attaches between this call
+  // and the re-paint, the snapshot it receives was laid out for the
+  // old size; the live `output` event carrying the re-paint corrects
+  // the visible state as soon as it streams in. This is acceptable
+  // because the window is short (a few hundred ms for typical shells)
+  // and a single terminal state is always the result of decoding the
+  // concatenated stream.
   private resizeSessionPty(session: TerminalSession<TOwner>, cols: number, rows: number): boolean {
     if (!session.pty) return false
     if (session.cols === cols && session.rows === rows) return true
     try {
-      resizeRender(session.render, cols, rows)
       session.pty.resize(cols, rows)
       session.cols = cols
       session.rows = rows
@@ -401,7 +409,6 @@ export class TerminalSessionManager<TOwner extends string | number> {
       sessionId: session.id,
       replay: session.render.buffer,
       replaySeq: session.render.sequence,
-      replayTruncated: session.render.bufferTruncated,
       processName: session.processName,
       canonicalTitle: session.render.title,
       controller: cloneTerminalController(session.controller),
@@ -435,7 +442,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     this.disposeSessionResources(session)
     session.cols = cols
     session.rows = rows
-    resetRender(session.render, cols, rows)
+    resetRender(session.render)
     session.processName = ''
     session.inputQueue = []
     session.inputFlushScheduled = false
@@ -459,8 +466,10 @@ export class TerminalSessionManager<TOwner extends string | number> {
     // the same title on every chunk. The render state only mutates
     // `title` when the captured OSC value differs from the previous
     // one, so a reference comparison is sufficient as a "did the title
-    // just change?" signal.
-    let lastBroadcastTitle: string | null | undefined = undefined
+    // just change?" signal. Initialized to `null` (matching the initial
+    // render state) so the first chunk does not broadcast a spurious
+    // `canonicalTitle: null` event before the shell has set anything.
+    let lastBroadcastTitle: string | null = session.render.title
     session.disposables.push(
       session.pty.onData((data) => {
         const seq = appendOutput(session.render, data)

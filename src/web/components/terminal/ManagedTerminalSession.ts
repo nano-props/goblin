@@ -338,13 +338,7 @@ export class ManagedTerminalSession {
         this.queueResize(term.cols, term.rows)
       }
     }
-    await this.replayActiveView(
-      token,
-      term,
-      result.snapshot ?? result.replay,
-      result.snapshotSeq ?? result.replaySeq,
-      preloaded || !!result.snapshot ? true : result.replayTruncated,
-    )
+    await this.replayActiveView(token, term, result.snapshot ?? result.replay, result.snapshotSeq ?? result.replaySeq)
     this.guardStart(token, term)
   }
 
@@ -390,11 +384,10 @@ export class ManagedTerminalSession {
     term: XTermTerminal,
     replay: string,
     replaySeq: number,
-    replayTruncated: boolean,
   ): Promise<void> {
     this.runtime.beginReplay(replaySeq)
     try {
-      if (replayTruncated) term.reset()
+      term.reset()
       if (replay) await termWrite(term, replay)
     } finally {
       if (this.currentStart(token, term)) {

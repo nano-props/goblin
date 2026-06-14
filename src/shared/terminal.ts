@@ -52,9 +52,8 @@ export type TerminalAttachResult =
       sessionId: string
       replay: string
       replaySeq: number
-      replayTruncated: boolean
       processName: string
-      /** Server-canonical terminal title from the headless session model. */
+      /** Server-canonical terminal title parsed from the OSC 0/2 stream. */
       canonicalTitle: string | null
       snapshot?: string
       snapshotSeq?: number
@@ -118,7 +117,7 @@ export interface TerminalSessionSummary {
   cwd: string
   controller: TerminalController | null
   processName: string
-  /** Server-canonical terminal title from the headless session model. */
+  /** Server-canonical terminal title parsed from the OSC 0/2 stream. */
   canonicalTitle: string | null
   cols: number
   rows: number
@@ -146,7 +145,7 @@ export interface TerminalOutputEvent {
 
 export interface TerminalTitleEvent {
   sessionId: string
-  /** Server-canonical terminal title from the headless session model. */
+  /** Server-canonical terminal title parsed from the OSC 0/2 stream. */
   canonicalTitle: string | null
 }
 

@@ -1,14 +1,12 @@
-// Per-session render state. Owns the raw output stream the server replays
-// to a newly-attached client, plus a sequence counter for client-side
-// dedup. The buffer is the single source of truth — there is no headless
-// xterm or serialization layer here, the client writes the replay into
-// its own local xterm and that is what the user sees.
+// Per-session replay state. Owns the raw PTY output stream the server
+// replays to a newly-attached client, plus a sequence counter for
+// client-side dedup. The buffer is the single source of truth — the
+// client writes the replay verbatim into its own local xterm and that
+// is what the user sees.
 
 const MAX_BUFFER_CHARS = 16 * 1024 * 1024
 
 export interface TerminalRenderState {
-  cols: number
-  rows: number
   sequence: number
   /** Concatenated raw PTY output. The client writes this verbatim into its xterm on attach. */
   buffer: string
@@ -18,13 +16,8 @@ export interface TerminalRenderState {
   title: string | null
 }
 
-export function createEmptyTerminalRenderState(cols: number, rows: number): TerminalRenderState {
-  return { cols, rows, sequence: 0, buffer: '', bufferTruncated: false, title: null }
-}
-
-export function resizeRender(state: TerminalRenderState, cols: number, rows: number): void {
-  state.cols = cols
-  state.rows = rows
+export function createEmptyTerminalRenderState(): TerminalRenderState {
+  return { sequence: 0, buffer: '', bufferTruncated: false, title: null }
 }
 
 export function appendOutput(state: TerminalRenderState, data: string): number {
@@ -57,9 +50,7 @@ export function takeSnapshot(state: TerminalRenderState): RenderSnapshot | null 
   }
 }
 
-export function resetRender(state: TerminalRenderState, cols: number, rows: number): void {
-  state.cols = cols
-  state.rows = rows
+export function resetRender(state: TerminalRenderState): void {
   state.sequence = 0
   state.buffer = ''
   state.bufferTruncated = false
@@ -69,6 +60,16 @@ export function resetRender(state: TerminalRenderState, cols: number, rows: numb
 // Pull a tail slice off `buffer` that is safe to use as a replay
 // starting point. Strips split surrogate pairs and incomplete ANSI
 // sequences at the boundary so the client can resume cleanly.
+//
+// Theoretical edge case: if the 16 MB tail consists of a single
+// incomplete escape sequence with no newline and no terminator byte
+// in the [0x40, 0x7E] range (e.g. a misbehaving program emitting 16 MB
+// of `\x1b[` with no parameters and no final byte), the strip step
+// would discard the leading incomplete sequence and the line-boundary
+// search would find nothing, so the returned tail would be just the
+// `\x1b[0m` reset prefix. In practice this is not reachable because
+// real programs mix text with escape sequences; we accept the corner
+// case rather than add the complexity of a streaming parser.
 function safeTail(buffer: string, maxChars: number): string {
   let tail = buffer.slice(buffer.length - maxChars)
   if (tail.length === 0) return tail
@@ -117,6 +118,13 @@ function stripLeadingIncompleteAnsi(s: string): string {
 // last title seen in this chunk. Returns `undefined` if no title sequence
 // was present (caller can skip the assignment in that case); an empty
 // captured string maps to `null` (clear the title).
+//
+// BEL-terminated only: shells like zsh and bash emit `\x1b]0;title\x07`,
+// and tmux/screen default to BEL as well. The xterm spec also allows
+// ST-terminated sequences (`\x1b]0;title\x1b\\`) but those are rare in
+// practice; if a tool starts emitting them the title will silently stop
+// updating. Cross-chunk OSC reassembly is also not performed — a title
+// split across two PTY writes will be dropped.
 function extractTitle(data: string): string | null | undefined {
   let title: string | null | undefined
   for (const m of data.matchAll(/\x1b\][02];([^\x07\x1b]*)\x07/g)) {
