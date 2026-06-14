@@ -298,7 +298,14 @@ describe('app menu actions', () => {
 
     const viewMenu = mocks.template.find((entry) => entry.label === 'menu.view')
     const fullScreenItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.toggle-full-screen')
-    expect(fullScreenItem?.role).toBe('togglefullscreen')
+    // On macOS AppKit injects its own "Enter Full Screen" entry into the
+    // View menu, so we deliberately skip our own role-based one to avoid a
+    // duplicate. On Windows / Linux we still need to add it manually.
+    if (process.platform === 'darwin') {
+      expect(fullScreenItem).toBeUndefined()
+    } else {
+      expect(fullScreenItem?.role).toBe('togglefullscreen')
+    }
   })
 
   test('puts native window management items before repo navigation', async () => {
