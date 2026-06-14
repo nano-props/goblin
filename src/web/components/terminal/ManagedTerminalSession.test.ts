@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { ManagedTerminalSession } from '#/web/components/terminal/ManagedTerminalSession.ts'
 import { installTerminalThemeStyles } from '#/web/components/terminal/terminal-theme-test-utils.ts'
@@ -418,6 +418,12 @@ const descriptor = {
 }
 
 beforeEach(() => {
+  // Use fake timers so debounce waits (RESIZE_DEBOUNCE_MS = 80, FONT_REMEASURE_DEBOUNCE_MS = 80)
+  // and the rAF chain fire deterministically when helpers advance the clock, instead of
+  // burning real wall time on every test.
+  vi.useFakeTimers({
+    toFake: ['setTimeout', 'setInterval', 'requestAnimationFrame', 'cancelAnimationFrame'],
+  })
   xtermMocks.terminals.length = 0
   xtermMocks.fitAddons.length = 0
   xtermMocks.searchAddons.length = 0
@@ -444,6 +450,14 @@ beforeEach(() => {
   Object.defineProperty(globalThis, 'requestAnimationFrame', {
     configurable: true,
     value: (cb: FrameRequestCallback) => window.setTimeout(() => cb(performance.now()), 0),
+  })
+  // The rAF mock hands out setTimeout handles, so cancelAnimationFrame must
+  // clear them via clearTimeout. The real cancelAnimationFrame in jsdom would
+  // fail to recognize a setTimeout handle; routing through clearTimeout keeps
+  // the session's `cancelScheduledAnimationFrame` working under fake timers.
+  Object.defineProperty(globalThis, 'cancelAnimationFrame', {
+    configurable: true,
+    value: (handle: number) => window.clearTimeout(handle),
   })
   window.sessionStorage.setItem('goblin:web-terminal-attachment-id', 'attachment_local')
   HTMLElement.prototype.getBoundingClientRect = vi.fn(
@@ -1641,24 +1655,31 @@ function optionArrow(key: string): KeyboardEvent {
 }
 
 async function flushTerminalStart(): Promise<void> {
-  for (let i = 0; i < 8; i += 1) await new Promise((resolve) => setTimeout(resolve, 0))
+  // Drain any queued rAF/macrotask chains. runAllTimersAsync fires every pending
+  // fake timer (including timers scheduled by other timer callbacks), then
+  // awaits their resulting microtasks. This is what collapses the wall-time
+  // cost of "wait for the rAF chain to settle" into microseconds.
+  await vi.runAllTimersAsync()
 }
 
 async function flushResizeDebounce(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 100))
-  await Promise.resolve()
+  // RESIZE_DEBOUNCE_MS in the source is 80. Advance past it.
+  await vi.advanceTimersByTimeAsync(100)
 }
 
 async function flushFontRefit(): Promise<void> {
-  await Promise.resolve()
-  await new Promise((resolve) => setTimeout(resolve, 100))
-  await Promise.resolve()
+  // FONT_REMEASURE_DEBOUNCE_MS in the source is 80. Advance past it.
+  await vi.advanceTimersByTimeAsync(100)
 }
 
 async function flushUntil(predicate: () => boolean): Promise<void> {
   for (let i = 0; i < 20; i += 1) {
     if (predicate()) return
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await vi.runAllTimersAsync()
   }
   throw new Error('condition was not met')
 }
+
+afterEach(() => {
+  vi.useRealTimers()
+})

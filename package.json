@@ -26,6 +26,7 @@
     "format:check": "prettier --check .",
     "publish": "bun scripts/publish.ts",
     "count-lines": "bun scripts/count-lines.ts",
+    "postinstall": "bun scripts/fix-noisy-sourcemaps.cjs",
     "clean": "rm -rf dist release"
   },
   "devDependencies": {
