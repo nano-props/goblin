@@ -17,7 +17,7 @@ import {
 } from '#/web/stores/repos/refresh-state.ts'
 import { createRefreshSyncHelpers } from '#/web/stores/repos/refresh-sync.ts'
 import { runWithRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
-import { finishResourceError, startResource } from '#/web/stores/repos/resources.ts'
+import { finishResourceError, finishResourceSuccess, startResource } from '#/web/stores/repos/resources.ts'
 import {
   getRepositoryPullRequests,
   getRepositorySnapshot,
@@ -307,6 +307,13 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
             r.data.status = result.status
             r.data.statusLoaded = true
             r.data.worktreesByPath = applyStatusToWorktreeStates(r.data.worktreesByPath, result.status)
+            // The composite started the status resource above but, unlike
+            // snapshot which has a dedicated success flow that calls
+            // finishResourceSuccess, status has no follow-up path. Without
+            // this reset, the resource stays in 'loading'/'refreshing'
+            // forever, blocking useRepoStatusRefresh's gate from firing
+            // on the next status/changes tab open.
+            finishResourceSuccess(r.resources.status)
           })
           if (result.status.length > 0 && ctx.isCurrent()) {
             persistRestorableRepoSnapshot(set, get().repos[id], token)
