@@ -35,12 +35,8 @@ export function appendOutput(state: TerminalRenderState, data: string): number {
     state.bufferTruncated = true
   }
   const newTitle = extractTitle(data)
-  if (newTitle !== null) state.title = newTitle
+  if (newTitle !== undefined && newTitle !== state.title) state.title = newTitle
   return state.sequence
-}
-
-export function setTitle(state: TerminalRenderState, title: string | null): void {
-  state.title = title
 }
 
 export interface RenderSnapshot {
@@ -118,11 +114,14 @@ function stripLeadingIncompleteAnsi(s: string): string {
 
 // OSC 0 is the "set window title" sequence the shell uses for the tab title.
 // The shell may also use OSC 2 — we treat both the same way: keep the
-// last title seen in this chunk.
-function extractTitle(data: string): string | null {
+// last title seen in this chunk. Returns `undefined` if no title sequence
+// was present (caller can skip the assignment in that case); an empty
+// captured string maps to `null` (clear the title).
+function extractTitle(data: string): string | null | undefined {
   let title: string | null | undefined
   for (const m of data.matchAll(/\x1b\][02];([^\x07\x1b]*)\x07/g)) {
-    title = m[1] ?? null
+    const captured = m[1] ?? null
+    title = captured === '' ? null : captured
   }
-  return title === undefined ? null : title
+  return title
 }

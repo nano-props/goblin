@@ -26,7 +26,6 @@ import {
   createEmptyTerminalRenderState,
   resizeRender,
   resetRender,
-  setTitle,
   takeSnapshot,
   type TerminalRenderState,
 } from '#/server/terminal/terminal-render-state.ts'
@@ -456,17 +455,19 @@ export class TerminalSessionManager<TOwner extends string | number> {
     }
     session.pty = spawnResult.runtime
     session.processName = session.pty.processName()
+    // Track the last broadcast title so we don't spam the client with
+    // the same title on every chunk. The render state only mutates
+    // `title` when the captured OSC value differs from the previous
+    // one, so a reference comparison is sufficient as a "did the title
+    // just change?" signal.
+    let lastBroadcastTitle: string | null | undefined = undefined
     session.disposables.push(
       session.pty.onData((data) => {
         const seq = appendOutput(session.render, data)
-        const previousProcessName = session.processName
         const processName = session.pty?.processName() ?? 'terminal'
         session.processName = processName
-        // If the title changed in this chunk, broadcast it. We don't
-        // need the headless's onTitleChange listener for this — the
-        // OSC 0 sequence is in the data we just buffered, and we
-        // already extracted it into state.title via appendOutput.
-        if (session.render.title !== null) {
+        if (session.render.title !== lastBroadcastTitle) {
+          lastBroadcastTitle = session.render.title
           this.sink.onTitle?.(session.ownerId, {
             sessionId: session.id,
             canonicalTitle: session.render.title,

@@ -4,7 +4,6 @@ import {
   createEmptyTerminalRenderState,
   resizeRender,
   resetRender,
-  setTitle,
   takeSnapshot,
   type TerminalRenderState,
 } from '#/server/terminal/terminal-render-state.ts'
@@ -102,6 +101,20 @@ describe('terminal-render-state', () => {
       expect(state.title).toBe('second title')
     })
 
+    test('treats OSC 2 the same as OSC 0', () => {
+      const state = createEmptyTerminalRenderState(80, 24)
+      appendOutput(state, '\x1b]2;icon title\x07')
+      expect(state.title).toBe('icon title')
+    })
+
+    test('clears the title when the shell emits an empty OSC string', () => {
+      const state = createEmptyTerminalRenderState(80, 24)
+      appendOutput(state, '\x1b]0;a title\x07')
+      expect(state.title).toBe('a title')
+      appendOutput(state, '\x1b]0;\x07')
+      expect(state.title).toBeNull()
+    })
+
     test('leaves the title null when no OSC 0 sequence is present', () => {
       const state = createEmptyTerminalRenderState(80, 24)
       appendOutput(state, 'plain text output')
@@ -117,19 +130,6 @@ describe('terminal-render-state', () => {
       expect(state.cols).toBe(200)
       expect(state.rows).toBe(60)
       expect(state.buffer).toBe('history')
-    })
-  })
-
-  describe('setTitle', () => {
-    test('overrides the title without changing the buffer or sequence', () => {
-      const state = createEmptyTerminalRenderState(80, 24)
-      appendOutput(state, 'x')
-      const beforeSeq = state.sequence
-      const beforeBuffer = state.buffer
-      setTitle(state, 'manual title')
-      expect(state.title).toBe('manual title')
-      expect(state.sequence).toBe(beforeSeq)
-      expect(state.buffer).toBe(beforeBuffer)
     })
   })
 

@@ -691,7 +691,7 @@ describe('server terminal sessions', () => {
     mockPtys[0]?.emitData('\x1b]0;~/Developer/goblin — npm run dev\x07')
     mockPtys[0]?.emitData('user@host ~ % ls\n')
     await new Promise((resolve) => setTimeout(resolve, 0))
-    await expect(getServerTerminalSessionSnapshot('client_2', { sessionId: result.sessionId })).resolves.toEqual(
+    await expect(getServerTerminalSessionSnapshot('client_2', { sessionId: result.sessionId })).toEqual(
       expect.objectContaining({
         sessionId: result.sessionId,
         snapshot: expect.any(String),

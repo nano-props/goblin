@@ -305,13 +305,13 @@ export async function listServerTerminalSessions(
   return await catalog.listSessions(repoRoot)
 }
 
-export async function getServerTerminalSessionSnapshot(
+export function getServerTerminalSessionSnapshot(
   clientId: string,
   input: TerminalSessionSnapshotInput,
-): Promise<TerminalSessionSnapshot | null> {
+): TerminalSessionSnapshot | null {
   if (!isValidTerminalClientId(clientId)) return null
   if (!isValidTerminalSessionId(input?.sessionId)) return null
-  return await manager.snapshotSession(input.sessionId)
+  return manager.snapshotSession(input.sessionId)
 }
 
 export function reorderServerTerminals(clientId: string, input: TerminalReorderInput): TerminalMutationResult {
