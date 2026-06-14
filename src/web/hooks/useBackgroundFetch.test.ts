@@ -127,7 +127,7 @@ function createRepo(input: {
     ui: {
       selectedBranch: null,
       branchViewMode: 'all',
-      detailTab: 'status',
+      preferredDetailTab: 'status',
     },
     projection: { source: 'fresh', savedAt: null },
     remote: {

@@ -48,7 +48,7 @@ export function useRepoStatusRefresh() {
       return {
         id: repo.id,
         token: repo.instanceToken,
-        detailTab: repo.ui.detailTab,
+        detailTab: repo.ui.preferredDetailTab,
         availability: repo.availability.phase,
         statusPhase: repo.resources.status.phase,
       }

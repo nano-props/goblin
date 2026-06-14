@@ -64,7 +64,12 @@ export interface RepoWorktreeState {
 export interface RepoUiState {
   selectedBranch: string | null
   branchViewMode: BranchViewMode
-  detailTab: DetailTab
+  /** The user-preferred detail tab. This is the persisted intent; what the
+   *  user actually sees is `computeEffectiveDetailTab(preferred, hasWorktree,
+   *  terminalSessionCount, terminalSyncReady)` evaluated at read time. The
+   *  store never adjusts this on snapshot/branch changes — the derived value
+   *  handles those cases, preserving the user's preference across them. */
+  preferredDetailTab: DetailTab
 }
 
 export interface RepoProjectionMeta {
@@ -195,12 +200,11 @@ export interface RuntimeCoherentRepoProjectionActions {
    *  anything about the current active selection. */
   ensureWorkspaceOpen: (path: string | RepoSessionEntry) => Promise<OpenRepoResult>
   closeRepo: (id: string) => void
+  /** Updates the user-preferred detail tab. The store does not project
+   *  against terminal session count or worktree presence — the UI computes
+   *  the effective tab via `computeEffectiveDetailTab` at read time, which
+   *  preserves user intent across session restore and branch switches. */
   setDetailTab: (id: string, tab: DetailTab) => void
-  dismissExitedTerminalDetail: (
-    id: string,
-    worktreePath: string,
-    options?: { affectVisibleWorkspace?: boolean },
-  ) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
   selectBranch: (id: string, branch: string) => void
   refreshSnapshot: (id: string, options?: { skipLogBackfill?: boolean; token?: number }) => Promise<void>

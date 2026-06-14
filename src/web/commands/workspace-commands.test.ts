@@ -43,7 +43,7 @@ describe('workspace commands', () => {
 
     await runTerminalPrimaryActionCommand({ repoId: REPO_ID, navigation, setDetailCollapsed })
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.detailTab).toBe('terminal')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredDetailTab).toBe('terminal')
     expect(useReposStore.getState().detailCollapsed).toBe(false)
     expect(createTerminal).toHaveBeenCalledWith({
       repoRoot: REPO_ID,
@@ -97,7 +97,7 @@ describe('workspace commands', () => {
 
     await runTerminalPrimaryActionCommand({ repoId: REPO_ID, navigation, setDetailCollapsed })
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.detailTab).toBe('terminal')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredDetailTab).toBe('terminal')
     expect(createTerminal).not.toHaveBeenCalled()
     expect(selectTerminal).toHaveBeenCalledWith(WORKTREE_KEY, 'terminal-1')
   })

@@ -1,15 +1,14 @@
 import { FolderTree } from 'lucide-react'
-import { useEffect, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
 import { useT } from '#/web/stores/i18n.ts'
 import type { DetailTab, RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import { StatusListSkeleton } from '#/web/components/Skeleton.tsx'
 import { StatusList } from '#/web/components/StatusList.tsx'
 import { BranchStatus } from '#/web/components/branch-detail/BranchStatus.tsx'
 import { TerminalSlot } from '#/web/components/terminal/TerminalSlot.tsx'
 import type { BranchDetailRepo, SelectedBranchDetailPresentation } from '#/web/components/branch-detail/model.ts'
-import { detailTabForWorktree } from '#/web/lib/detail-tabs.ts'
+import { useEffectiveDetailTab } from '#/web/components/branch-detail/useEffectiveDetailTab.ts'
 interface Props {
   repo: Pick<BranchDetailRepo, 'id' | 'data' | 'ui'> & {
     data: BranchDetailRepo['data'] & Pick<BranchDetailRepo['data'], 'statusLoaded'>
@@ -29,24 +28,23 @@ interface TabPanelProps {
 
 type BranchDetailBranch = NonNullable<SelectedBranchDetailPresentation['branch']>
 
+// Pure view: the renderable tab is derived from the repos store's
+// user-preferred tab and the live terminal session truth via
+// `useEffectiveDetailTab`. The store never re-projects on snapshot
+// refresh, branch switch, or session restore; this component is read-only.
 export function BranchDetailContent({ repo, detail, detailId, contentId, layout }: Props) {
   const t = useT()
-  const setDetailTab = useReposStore((s) => s.setDetailTab)
+  const effectiveTab = useEffectiveDetailTab(repo)
   const { branch } = detail
-  useEffect(() => {
-    if (!branch) return
-    const nextTab = detailTabForWorktree(repo.ui.detailTab, !!branch.worktree?.path)
-    if (nextTab !== repo.ui.detailTab) setDetailTab(repo.id, nextTab)
-  }, [branch, repo.id, repo.ui.detailTab, setDetailTab])
   if (!branch)
     return <EmptyState title={t(repo.data.branches.length === 0 ? 'branches.empty' : 'branches.filter-empty')} />
 
   return (
     <div id={contentId} className="flex min-h-0 flex-1 flex-col">
-      {repo.ui.detailTab === 'status' && (
+      {effectiveTab === 'status' && (
         <BranchStatusTab detailId={detailId} detail={detail} layout={layout} busy={detail.loading.pullRequests} />
       )}
-      {repo.ui.detailTab === 'changes' && (
+      {effectiveTab === 'changes' && (
         <BranchChangesTab
           detailId={detailId}
           repo={repo}
@@ -57,7 +55,7 @@ export function BranchDetailContent({ repo, detail, detailId, contentId, layout 
           statusStale={detail.stale.status}
         />
       )}
-      {repo.ui.detailTab === 'terminal' && branch.worktree?.path && (
+      {effectiveTab === 'terminal' && branch.worktree?.path && (
         <BranchTerminalTab detailId={detailId} repoId={repo.id} branch={branch} />
       )}
     </div>

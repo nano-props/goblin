@@ -33,7 +33,7 @@ function branchDetailRepoEqual(a: BranchDetailRepo | undefined, b: BranchDetailR
       a.data.statusLoaded === b.data.statusLoaded &&
       a.data.worktreesByPath === b.data.worktreesByPath &&
       a.ui.selectedBranch === b.ui.selectedBranch &&
-      a.ui.detailTab === b.ui.detailTab &&
+      a.ui.preferredDetailTab === b.ui.preferredDetailTab &&
       a.resources.status === b.resources.status &&
       a.resources.pullRequests === b.resources.pullRequests &&
       a.operations.branchAction === b.operations.branchAction &&
@@ -70,7 +70,7 @@ export function BranchDetail({
             },
             ui: {
               selectedBranch: repo.ui.selectedBranch,
-              detailTab: repo.ui.detailTab,
+              preferredDetailTab: repo.ui.preferredDetailTab,
             },
             resources: {
               status: repo.resources.status,

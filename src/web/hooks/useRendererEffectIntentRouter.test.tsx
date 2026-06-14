@@ -159,7 +159,7 @@ describe('useRendererEffectIntentRouter', () => {
     expect(closeAllOverlays).toHaveBeenCalledTimes(1)
     const state = useReposStore.getState()
     expect(state.activeId).toBe(repo.id)
-    expect(state.repos[repo.id]?.ui.detailTab).toBe('terminal')
+    expect(state.repos[repo.id]?.ui.preferredDetailTab).toBe('terminal')
     expect(state.detailCollapsed).toBe(false)
   })
 
@@ -187,7 +187,7 @@ describe('useRendererEffectIntentRouter', () => {
     const state = useReposStore.getState()
     expect(showRepoBranchDetailTabSpy).toHaveBeenCalledWith(repo.id, 'feature/test', 'terminal')
     expect(state.repos[repo.id]?.ui.selectedBranch).toBe('feature/test')
-    expect(state.repos[repo.id]?.ui.detailTab).toBe('terminal')
+    expect(state.repos[repo.id]?.ui.preferredDetailTab).toBe('terminal')
     expect(state.selectedTerminalByWorktree).toMatchObject({
       [worktreeTerminalKey(repo.id, '/tmp/repo-feature')]: key,
     })
@@ -333,7 +333,7 @@ describe('useRendererEffectIntentRouter', () => {
     })
 
     const state = useReposStore.getState()
-    expect(state.repos[repo.id]?.ui.detailTab).toBe('status')
+    expect(state.repos[repo.id]?.ui.preferredDetailTab).toBe('status')
     expect(state.detailCollapsed).toBe(before.detailCollapsed)
     expect(closeRepoSpy).not.toHaveBeenCalled()
   })

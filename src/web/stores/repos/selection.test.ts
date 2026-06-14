@@ -140,7 +140,9 @@ describe('setBranchViewMode', () => {
     expect(calls).toEqual([{ branches: ['main'], mode: 'full' }])
   })
 
-  test('falls back from terminal when the new view selection has no worktree', () => {
+  test('preserves the terminal preference when the view mode hides the active worktree branch', () => {
+    // The store only re-picks the visible branch — the preferred tab is
+    // never re-projected. The UI hook decides what's actually renderable.
     seedRepo({
       selectedBranch: 'main',
       detailTab: 'terminal',
@@ -151,7 +153,7 @@ describe('setBranchViewMode', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.selectedBranch).toBe('feature/plain')
-    expect(repo?.ui.detailTab).toBe('status')
+    expect(repo?.ui.preferredDetailTab).toBe('terminal')
   })
 })
 
@@ -223,14 +225,17 @@ describe('selectBranch', () => {
     expect(calls).toBe(0)
   })
 
-  test('falls back from terminal when selecting a branch without a worktree', () => {
+  test('preserves the terminal preference when selecting a branch without a worktree', () => {
+    // selectBranch updates `selectedBranch` only; the preferred tab is
+    // preserved verbatim. The UI hook resolves the effective tab from
+    // the active branch's worktree and the terminal session count.
     seedRepo({ selectedBranch: 'feature/worktree', detailTab: 'terminal' })
 
     useReposStore.getState().selectBranch(REPO_ID, 'feature/plain')
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.selectedBranch).toBe('feature/plain')
-    expect(repo?.ui.detailTab).toBe('status')
+    expect(repo?.ui.preferredDetailTab).toBe('terminal')
   })
 })
 
@@ -240,7 +245,7 @@ describe('setDetailTab', () => {
 
     useReposStore.getState().setDetailTab(REPO_ID, 'terminal')
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.detailTab).toBe('terminal')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredDetailTab).toBe('terminal')
   })
 
   test('does not refresh when reselecting the current tab', () => {
@@ -256,7 +261,7 @@ describe('setDetailTab', () => {
     useReposStore.getState().setDetailTab(REPO_ID, 'changes')
     await flushAsyncWork()
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.detailTab).toBe('changes')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredDetailTab).toBe('changes')
   })
 
   test('passes the current repo token to detail tab refreshes', () => {
@@ -292,75 +297,25 @@ describe('setDetailTab', () => {
     expect(calls).toEqual([['main']])
   })
 
-  test('opens terminal only for branches with a worktree', () => {
-    seedRepo({ selectedBranch: 'feature/worktree', detailTab: 'status' })
-
-    useReposStore.getState().setDetailTab(REPO_ID, 'terminal')
-
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.detailTab).toBe('terminal')
-  })
-
-  test('falls back to status when terminal is selected without a worktree', () => {
+  test('sets the terminal preference regardless of worktree presence', () => {
+    // setDetailTab is a pure preference write. Whether `terminal` is
+    // *renderable* is decided at read time by `computeEffectiveDetailTab`,
+    // which inspects the active branch's worktree + terminal session count.
     seedRepo({ selectedBranch: 'feature/plain', detailTab: 'status' })
 
     useReposStore.getState().setDetailTab(REPO_ID, 'terminal')
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.detailTab).toBe('status')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredDetailTab).toBe('terminal')
   })
 
-  test('dismissing the active exited terminal detail falls back to status and collapses the pane', async () => {
-    let refreshedBranches: string[] | undefined
-    ipcHandlers['repo.pullRequests'] = async ({ branches }: { branches: string[] }) => {
-      refreshedBranches = branches
-      return []
-    }
-    seedRepo({ selectedBranch: 'feature/worktree', detailTab: 'terminal' })
-    useReposStore.setState({ detailCollapsed: false })
+  test('preserves the terminal preference even when no worktree exists for the active branch', () => {
+    // Previously the store would re-project to `status` here. With the
+    // derived-value pattern the preference is preserved; the UI hook
+    // returns `status` for the rendered tab.
+    seedRepo({ selectedBranch: 'feature/plain', detailTab: 'terminal' })
+    useReposStore.getState().setDetailTab(REPO_ID, 'terminal')
 
-    useReposStore
-      .getState()
-      .dismissExitedTerminalDetail(REPO_ID, '/tmp/feature-worktree', { affectVisibleWorkspace: true })
-
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.detailTab).toBe('status')
-    expect(useReposStore.getState().detailCollapsed).toBe(true)
-    await flushAsyncWork()
-    expect(refreshedBranches).toEqual(['feature/worktree'])
-  })
-
-  test('dismissing a stale exited terminal session leaves the current detail selection alone', () => {
-    seedRepo({ selectedBranch: 'feature/worktree', detailTab: 'terminal' })
-    useReposStore.setState({ detailCollapsed: false })
-
-    useReposStore
-      .getState()
-      .dismissExitedTerminalDetail(REPO_ID, '/tmp/other-worktree', { affectVisibleWorkspace: true })
-
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.detailTab).toBe('terminal')
-    expect(useReposStore.getState().detailCollapsed).toBe(false)
-  })
-
-  test('dismissing terminal detail keeps the pane expanded in left-right layout', () => {
-    seedRepo({ selectedBranch: 'feature/worktree', detailTab: 'terminal' })
-    useReposStore.getState().setWorkspaceLayout('left-right')
-
-    useReposStore
-      .getState()
-      .dismissExitedTerminalDetail(REPO_ID, '/tmp/feature-worktree', { affectVisibleWorkspace: true })
-
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.detailTab).toBe('status')
-    expect(useReposStore.getState().detailCollapsed).toBe(false)
-  })
-
-  test('dismissing a background terminal detail leaves global detail collapse unchanged', () => {
-    seedRepo({ selectedBranch: 'feature/worktree', detailTab: 'terminal' })
-    useReposStore.setState({ detailCollapsed: false })
-
-    useReposStore
-      .getState()
-      .dismissExitedTerminalDetail(REPO_ID, '/tmp/feature-worktree', { affectVisibleWorkspace: false })
-
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.detailTab).toBe('status')
-    expect(useReposStore.getState().detailCollapsed).toBe(false)
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredDetailTab).toBe('terminal')
   })
 })
 
@@ -546,7 +501,6 @@ describe('setBranchSearchQuery', () => {
       ui: {
         selectedBranch: repo.ui.selectedBranch,
         branchViewMode: repo.ui.branchViewMode,
-        detailTab: repo.ui.detailTab,
       },
     }
     useReposStore.setState({ restorableRepoCache: { [REPO_ID]: cached } })
