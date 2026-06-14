@@ -170,10 +170,10 @@ export function isValidTerminalClientId(value: unknown): value is string {
   return typeof value === 'string' && TERMINAL_CLIENT_ID_RE.test(value)
 }
 
-export async function attachServerTerminal(
+export function attachServerTerminal(
   clientId: string,
   input: TerminalAttachInput,
-): Promise<TerminalAttachResult> {
+): TerminalAttachResult {
   if (
     !isValidTerminalClientId(clientId) ||
     !isValidTerminalSessionId(input?.sessionId) ||
@@ -190,13 +190,13 @@ export async function attachServerTerminal(
     input.attachmentId,
     broker.attachmentIsConnected(clientId, input.attachmentId),
   )
-  return result.ok ? await withSessionSnapshot(result) : result
+  return result.ok ? withSessionSnapshot(result) : result
 }
 
-export async function restartServerTerminal(
+export function restartServerTerminal(
   clientId: string,
   input: TerminalRestartInput,
-): Promise<TerminalAttachResult> {
+): TerminalAttachResult {
   if (
     !isValidTerminalClientId(clientId) ||
     !isValidTerminalSessionId(input?.sessionId) ||
@@ -213,7 +213,7 @@ export async function restartServerTerminal(
     input.attachmentId,
     broker.attachmentIsConnected(clientId, input.attachmentId),
   )
-  return result.ok ? await withSessionSnapshot(result) : result
+  return result.ok ? withSessionSnapshot(result) : result
 }
 
 export async function createServerTerminal(
@@ -350,11 +350,18 @@ export function closeAllServerTerminalSessions(): void {
   manager.closeAll()
 }
 
-async function withSessionSnapshot(
+function withSessionSnapshot(
   result: Extract<TerminalAttachResult, { ok: true }>,
-): Promise<Extract<TerminalAttachResult, { ok: true }>> {
-  const snapshot = await manager.snapshotSession(result.sessionId)
-  return snapshot ? { ...result, snapshot: snapshot.snapshot, snapshotSeq: snapshot.snapshotSeq } : result
+): Extract<TerminalAttachResult, { ok: true }> {
+  // The buffer-based replay is itself the canonical snapshot — the
+  // client writes it verbatim into its xterm and ends up in the same
+  // state. We mirror the buffer into the snapshot fields so the client's
+  // existing snapshot-first path picks it up without a code change.
+  return {
+    ...result,
+    snapshot: result.replay,
+    snapshotSeq: result.replaySeq,
+  }
 }
 
 function isValidTerminalId(value: unknown): value is string {

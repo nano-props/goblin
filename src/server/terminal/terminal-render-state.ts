@@ -1,242 +1,79 @@
-import * as xtermHeadlessImport from '@xterm/headless'
-import type { SerializeAddon as XTermSerializeAddon } from '@xterm/addon-serialize'
-import { SerializeAddon } from '@xterm/addon-serialize'
-import type { TerminalSessionSnapshot } from '#/shared/terminal.ts'
+// Per-session render state. Owns the raw output stream the server replays
+// to a newly-attached client, plus a sequence counter for client-side
+// dedup. The buffer is the single source of truth — there is no headless
+// xterm or serialization layer here, the client writes the replay into
+// its own local xterm and that is what the user sees.
 
-const MAX_SESSION_BUFFER_CHARS = 16 * 1024 * 1024
-
-export interface HeadlessTerminalLike {
-  write(data: string | Uint8Array, callback?: () => void): void
-  resize(cols: number, rows: number): void
-  loadAddon(addon: XTermSerializeAddon): void
-  onTitleChange(listener: (title: string) => void): { dispose(): void }
-  dispose(): void
-}
-
-export interface TerminalRenderModel {
-  term: HeadlessTerminalLike
-  serializeAddon: XTermSerializeAddon
-  chain: Promise<void>
-}
+const MAX_BUFFER_CHARS = 16 * 1024 * 1024
 
 export interface TerminalRenderState {
-  buffer: string
-  bufferTruncated: boolean
+  cols: number
+  rows: number
   sequence: number
-  canonicalTitle: string | null
-  titleEventVersion: number
-  model: TerminalRenderModel | null
+  /** Concatenated raw PTY output. The client writes this verbatim into its xterm on attach. */
+  buffer: string
+  /** Set to true the first time the buffer is truncated. Stays true for the rest of the session. */
+  bufferTruncated: boolean
+  /** Last OSC 0 title set by the shell (parsed out of `buffer`). */
+  title: string | null
 }
 
-const headlessModule = ('default' in xtermHeadlessImport ? xtermHeadlessImport.default : xtermHeadlessImport) as {
-  Terminal: new (options?: {
-    cols?: number
-    rows?: number
-    scrollback?: number
-    allowProposedApi?: boolean
-  }) => HeadlessTerminalLike
-}
-const { Terminal: HeadlessTerminal } = headlessModule
-
-export function createEmptyTerminalRenderState(): TerminalRenderState {
-  return {
-    buffer: '',
-    bufferTruncated: false,
-    sequence: 0,
-    canonicalTitle: null,
-    titleEventVersion: 0,
-    model: null,
-  }
+export function createEmptyTerminalRenderState(cols: number, rows: number): TerminalRenderState {
+  return { cols, rows, sequence: 0, buffer: '', bufferTruncated: false, title: null }
 }
 
-export function createTerminalRenderModel(cols: number, rows: number): TerminalRenderModel {
-  const term = new HeadlessTerminal({ cols, rows, scrollback: 10000, allowProposedApi: true })
-  const serializeAddon = new SerializeAddon()
-  term.loadAddon(serializeAddon)
-  return {
-    term,
-    serializeAddon,
-    chain: Promise.resolve(),
-  }
+export function resizeRender(state: TerminalRenderState, cols: number, rows: number): void {
+  state.cols = cols
+  state.rows = rows
 }
 
-export function bindTerminalRenderTitle(
-  state: TerminalRenderState,
-  onTitle: (canonicalTitle: string | null) => void,
-): { dispose(): void } {
-  return (
-    state.model?.term.onTitleChange((title) => {
-      state.titleEventVersion += 1
-      const nextCanonicalTitle = normalizeTerminalTitle(title)
-      if (state.canonicalTitle === nextCanonicalTitle) return
-      state.canonicalTitle = nextCanonicalTitle
-      onTitle(nextCanonicalTitle)
-    }) ?? { dispose() {} }
-  )
-}
-
-export function appendTerminalReplayData(state: TerminalRenderState, data: string): number {
+export function appendOutput(state: TerminalRenderState, data: string): number {
   state.sequence += 1
   state.buffer += data
-  if (state.buffer.length > MAX_SESSION_BUFFER_CHARS) {
-    state.buffer = safeReplayTail(state.buffer, MAX_SESSION_BUFFER_CHARS)
+  if (state.buffer.length > MAX_BUFFER_CHARS) {
+    state.buffer = safeTail(state.buffer, MAX_BUFFER_CHARS)
     state.bufferTruncated = true
   }
+  const newTitle = extractTitle(data)
+  if (newTitle !== null) state.title = newTitle
   return state.sequence
 }
 
-export function queueTerminalRenderWrite(state: TerminalRenderState, data: string, onParsed?: () => void): void {
-  const model = state.model
-  if (!model) return
-  model.chain = model.chain
-    .catch(() => {})
-    .then(
-      () =>
-        new Promise<void>((resolve) => {
-          model.term.write(data, resolve)
-        }),
-    )
-    .then(() => {
-      if (state.model !== model) return
-      onParsed?.()
-    })
+export function setTitle(state: TerminalRenderState, title: string | null): void {
+  state.title = title
 }
 
-export function queueTerminalRenderResize(state: TerminalRenderState, cols: number, rows: number): void {
-  const model = state.model
-  if (!model) return
-  model.chain = model.chain
-    .catch(() => {})
-    .then(() => {
-      model.term.resize(cols, rows)
-    })
+export interface RenderSnapshot {
+  /** Raw output to write into the client xterm. */
+  snapshot: string
+  /** Sequence at the time the snapshot was taken. Client dedup boundary. */
+  snapshotSeq: number
+  /** True iff the buffer was ever truncated; client should reset its xterm. */
+  snapshotTruncated: boolean
 }
 
-/**
- * Erase the headless's visible area, then resize to the new dimensions, in a
- * single chain step.
- *
- * Why combine: the headless lives at whatever size it was last resized to.
- * When the PTY is resized, the shell receives SIGWINCH and re-paints the
- * prompt at the new dimensions; the re-paint reaches the headless via
- * PTY.onData. If the headless is still at the old size when the re-paint
- * arrives, the re-paint is processed (and possibly wrapped/truncated) at
- * the old size, and a subsequent deferred headless resize reflows the
- * buffer — letting the original prompt cells survive into the snapshot
- * alongside the re-painted prompt. The client then sees a duplicated line.
- *
- * Erasing the visible area with `\e[2J` first (xterm's default
- * `scrollOnEraseInDisplay: false` keeps scrollback intact) removes the
- * cells that would otherwise be reflowed into the new visible area, and
- * putting the erase and the resize in the same chain step guarantees the
- * shell's re-paint lands on a clean, correctly-sized headless.
- *
- * The write callback is used so the chain step does not resolve until xterm
- * has actually applied the `\e[2J` to the headless. Without the callback,
- * the step would resolve as soon as JavaScript returns from `term.write`,
- * but the xterm.js WriteBuffer would still have the write pending — leaving
- * any subsequent snapshot that awaits this chain reading the pre-wipe
- * buffer.
- */
-export function queueTerminalRenderClearAndResize(
-  state: TerminalRenderState,
-  cols: number,
-  rows: number,
-): void {
-  const model = state.model
-  if (!model) return
-  model.chain = model.chain
-    .catch(() => {})
-    .then(
-      () =>
-        new Promise<void>((resolve) => {
-          model.term.write('\x1b[2J', () => {
-            model.term.resize(cols, rows)
-            resolve()
-          })
-        }),
-    )
-}
-
-export async function snapshotTerminalRenderState(
-  sessionId: string,
-  state: TerminalRenderState,
-): Promise<TerminalSessionSnapshot | null> {
-  if (!state.model) return null
-  // The headless's chain is a manually-chained promise: each
-  // appendTerminalReplayData / queueTerminalRenderWrite reassigns
-  // `state.model.chain` to a new promise that includes the new step. If a
-  // re-paint from SIGWINCH arrives *while* this snapshot is awaiting the
-  // current chain reference, that new step is appended to a *new* chain
-  // promise — the await on the old reference resolves without ever
-  // observing it. The serialized snapshot would then miss the re-paint,
-  // and the snapshotSeq would be one (or more) behind the re-paint's
-  // actual seq, so the client's dedup boundary swallows the re-paint
-  // *as if* it were new content and re-applies it on top of the
-  // snapshot's blank cells, producing the visible duplicate.
-  //
-  // Loop on the chain reference: each time the await returns we check
-  // whether `state.model.chain` is still the same promise; if it isn't,
-  // a new step landed during the await and we have to wait again.
-  // JavaScript is single-threaded so the check itself is race-free —
-  // no new step can be appended between the await returning and the
-  // reference comparison on the next line.
-  let chainRef: Promise<void> = state.model.chain
-  while (true) {
-    try {
-      await chainRef
-    } catch {}
-    if (!state.model) return null
-    if (state.model.chain === chainRef) break
-    chainRef = state.model.chain
-  }
-  // Read the seq *after* the chain has fully drained, so any seq set by
-  // a re-paint whose write was drained by the loop above is reflected
-  // in the boundary the client uses.
-  const snapshotSeq = state.sequence
+export function takeSnapshot(state: TerminalRenderState): RenderSnapshot | null {
+  if (state.sequence === 0) return null
   return {
-    sessionId,
-    snapshot: state.model.serializeAddon.serialize({ excludeAltBuffer: false }),
-    snapshotSeq,
+    snapshot: state.buffer,
+    snapshotSeq: state.sequence,
+    snapshotTruncated: state.bufferTruncated,
   }
 }
 
-export function resetTerminalRenderState(state: TerminalRenderState): void {
+export function resetRender(state: TerminalRenderState, cols: number, rows: number): void {
+  state.cols = cols
+  state.rows = rows
+  state.sequence = 0
   state.buffer = ''
   state.bufferTruncated = false
-  state.sequence = 0
-  state.canonicalTitle = null
-  state.titleEventVersion = 0
+  state.title = null
 }
 
-export function disposeTerminalRenderState(state: TerminalRenderState): void {
-  try {
-    state.model?.term.dispose()
-  } catch {}
-  state.model = null
-}
-
-export function maybeClearCanonicalTitleOnShellReturn(
-  sessionId: string,
-  state: TerminalRenderState,
-  previousProcessName: string,
-  nextProcessName: string,
-  currentProcessName: string,
-  canonicalTitleBeforeWrite: string | null,
-  titleEventVersionBeforeWrite: number,
-  onTitle: (canonicalTitle: string | null) => void,
-): void {
-  if (!canonicalTitleBeforeWrite) return
-  if (previousProcessName === nextProcessName) return
-  if (!isShellProcessName(nextProcessName) || isShellProcessName(previousProcessName)) return
-  if (currentProcessName !== nextProcessName) return
-  if (state.titleEventVersion !== titleEventVersionBeforeWrite) return
-  if (state.canonicalTitle !== canonicalTitleBeforeWrite) return
-  state.canonicalTitle = null
-  onTitle(null)
-}
-
-function safeReplayTail(buffer: string, maxChars: number): string {
+// Pull a tail slice off `buffer` that is safe to use as a replay
+// starting point. Strips split surrogate pairs and incomplete ANSI
+// sequences at the boundary so the client can resume cleanly.
+function safeTail(buffer: string, maxChars: number): string {
   let tail = buffer.slice(buffer.length - maxChars)
   if (tail.length === 0) return tail
 
@@ -264,14 +101,8 @@ function stripLeadingIncompleteAnsi(s: string): string {
     let i = 2
     while (i < s.length) {
       const c = s.charCodeAt(i)
-      if (c >= 0x30 && c <= 0x3f) {
-        i++
-        continue
-      }
-      if (c >= 0x20 && c <= 0x2f) {
-        i++
-        continue
-      }
+      if (c >= 0x30 && c <= 0x3f) { i++; continue }
+      if (c >= 0x20 && c <= 0x2f) { i++; continue }
       if (c >= 0x40 && c <= 0x7e) return s // complete CSI
       break // incomplete
     }
@@ -285,13 +116,13 @@ function stripLeadingIncompleteAnsi(s: string): string {
   return s.slice(2)
 }
 
-function normalizeTerminalTitle(title: string | null | undefined): string | null {
-  if (typeof title !== 'string') return null
-  const normalized = title.replace(/\s+/g, ' ').trim()
-  return normalized.length > 0 ? normalized : null
-}
-
-function isShellProcessName(processName: string): boolean {
-  const base = processName.replace(/^.*[\\/]/, '')
-  return /^(?:ba|z|fi|tc|c|k)?sh$|^nu$/.test(base)
+// OSC 0 is the "set window title" sequence the shell uses for the tab title.
+// The shell may also use OSC 2 — we treat both the same way: keep the
+// last title seen in this chunk.
+function extractTitle(data: string): string | null {
+  let title: string | null | undefined
+  for (const m of data.matchAll(/\x1b\][02];([^\x07\x1b]*)\x07/g)) {
+    title = m[1] ?? null
+  }
+  return title === undefined ? null : title
 }

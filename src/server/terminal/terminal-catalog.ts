@@ -75,7 +75,7 @@ interface TerminalCatalogOptions {
   broadcastSessionsChanged(repoRoot: string): void
   withSessionSnapshot(
     result: Extract<TerminalAttachResult, { ok: true }>,
-  ): Promise<Extract<TerminalAttachResult, { ok: true }>>
+  ): Extract<TerminalAttachResult, { ok: true }>
 }
 
 class TerminalCatalog {
