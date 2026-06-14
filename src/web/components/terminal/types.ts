@@ -25,7 +25,7 @@ export interface TerminalProgressState {
 
 export interface TerminalBellEvent {
   processName: string
-  /** Server-canonical terminal title from the headless session model. */
+  /** Server-canonical terminal title parsed from the OSC 0/2 stream. */
   canonicalTitle?: string | null
   visible: boolean
 }

@@ -1295,8 +1295,10 @@ describe('ManagedTerminalSession', () => {
     expect(terminalCalls.write).toHaveBeenCalledWith({ sessionId: 'session-1', data: 'input during replay' })
   })
 
-  test('resets the terminal before replaying truncated history', async () => {
-    terminalCalls.attach.mockResolvedValueOnce(attachResult('session-1', { replay: 'tail', replayTruncated: true }))
+  test('resets the terminal before replaying the snapshot', async () => {
+    terminalCalls.attach.mockResolvedValueOnce(
+      attachResult('session-1', { replay: 'tail', snapshot: 'tail', snapshotSeq: 1 }),
+    )
     const host = document.createElement('div')
     document.body.appendChild(host)
     const session = new ManagedTerminalSession(descriptor, vi.fn())
@@ -1592,7 +1594,6 @@ function attachResult(
     sessionId,
     replay: '',
     replaySeq: 0,
-    replayTruncated: false,
     processName: 'zsh',
     canonicalTitle: null,
     controller: { attachmentId: 'attachment_local', status: 'connected' },

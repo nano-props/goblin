@@ -36,7 +36,6 @@ type EnsureTerminalCatalogResult =
       action: TerminalCatalogAction
       replay: string
       replaySeq: number
-      replayTruncated: boolean
       processName: string
       canonicalTitle: string | null
       snapshot?: string
@@ -75,7 +74,7 @@ interface TerminalCatalogOptions {
   broadcastSessionsChanged(repoRoot: string): void
   withSessionSnapshot(
     result: Extract<TerminalAttachResult, { ok: true }>,
-  ): Promise<Extract<TerminalAttachResult, { ok: true }>>
+  ): Extract<TerminalAttachResult, { ok: true }>
 }
 
 class TerminalCatalog {
@@ -226,7 +225,7 @@ class TerminalCatalog {
     })
     if (!result.ok) return { ok: false, message: result.message }
     this.options.broadcastSessionsChanged(input.repoRoot)
-    return toEnsureResult(context.targetSessionKey, context.action, await this.options.withSessionSnapshot(result))
+    return toEnsureResult(context.targetSessionKey, context.action, this.options.withSessionSnapshot(result))
   }
 
   private async ensureLocal(
@@ -258,7 +257,7 @@ class TerminalCatalog {
     })
     if (!result.ok) return { ok: false, message: result.message }
     this.options.broadcastSessionsChanged(input.repoRoot)
-    return toEnsureResult(context.targetSessionKey, context.action, await this.options.withSessionSnapshot(result))
+    return toEnsureResult(context.targetSessionKey, context.action, this.options.withSessionSnapshot(result))
   }
 }
 
@@ -274,7 +273,6 @@ function toEnsureResult(
     action,
     replay: snapshotResult.replay,
     replaySeq: snapshotResult.replaySeq,
-    replayTruncated: snapshotResult.replayTruncated,
     processName: snapshotResult.processName,
     canonicalTitle: snapshotResult.canonicalTitle,
     snapshot: snapshotResult.snapshot,

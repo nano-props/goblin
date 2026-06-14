@@ -22,16 +22,10 @@ import {
   updateTerminalAttachmentConnection,
 } from '#/server/terminal/terminal-ownership.ts'
 import {
-  appendTerminalReplayData,
-  bindTerminalRenderTitle,
+  appendOutput,
   createEmptyTerminalRenderState,
-  createTerminalRenderModel,
-  disposeTerminalRenderState,
-  maybeClearCanonicalTitleOnShellReturn,
-  queueTerminalRenderResize,
-  queueTerminalRenderWrite,
-  resetTerminalRenderState,
-  snapshotTerminalRenderState,
+  resetRender,
+  takeSnapshot,
   type TerminalRenderState,
 } from '#/server/terminal/terminal-render-state.ts'
 import { spawnTerminalPtyRuntime, type TerminalPtyRuntime } from '#/server/terminal/terminal-pty-runtime.ts'
@@ -298,10 +292,12 @@ export class TerminalSessionManager<TOwner extends string | number> {
     for (const sessionId of Array.from(this.sessionsById.keys())) this.closeSession(sessionId)
   }
 
-  async snapshotSession(sessionId: string): Promise<TerminalSessionSnapshot | null> {
+  snapshotSession(sessionId: string): TerminalSessionSnapshot | null {
     const session = this.sessionsById.get(sessionId)
     if (!session) return null
-    return await snapshotTerminalRenderState(sessionId, session.render)
+    const snap = takeSnapshot(session.render)
+    if (!snap) return null
+    return { sessionId, snapshot: snap.snapshot, snapshotSeq: snap.snapshotSeq }
   }
 
   async listSessions(scope: string): Promise<TerminalSessionSummary[]> {
@@ -314,7 +310,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
           cwd: session.cwd,
           controller: cloneTerminalController(session.controller),
           processName: session.processName,
-          canonicalTitle: session.render.canonicalTitle,
+          canonicalTitle: session.render.title,
           cols: session.cols,
           rows: session.rows,
           displayOrder: session.displayOrder,
@@ -372,6 +368,16 @@ export class TerminalSessionManager<TOwner extends string | number> {
     if (id) this.closeSession(id)
   }
 
+  // Sends SIGWINCH to the child PTY. The shell responds by re-painting
+  // its current frame at the new dimensions, and the re-paint bytes
+  // arrive through the regular `onData` path → `appendOutput` →
+  // `session.render.buffer`. If a client attaches between this call
+  // and the re-paint, the snapshot it receives was laid out for the
+  // old size; the live `output` event carrying the re-paint corrects
+  // the visible state as soon as it streams in. This is acceptable
+  // because the window is short (a few hundred ms for typical shells)
+  // and a single terminal state is always the result of decoding the
+  // concatenated stream.
   private resizeSessionPty(session: TerminalSession<TOwner>, cols: number, rows: number): boolean {
     if (!session.pty) return false
     if (session.cols === cols && session.rows === rows) return true
@@ -379,7 +385,6 @@ export class TerminalSessionManager<TOwner extends string | number> {
       session.pty.resize(cols, rows)
       session.cols = cols
       session.rows = rows
-      queueTerminalRenderResize(session.render, cols, rows)
       this.emitOwnership(session)
       return true
     } catch (err) {
@@ -404,9 +409,8 @@ export class TerminalSessionManager<TOwner extends string | number> {
       sessionId: session.id,
       replay: session.render.buffer,
       replaySeq: session.render.sequence,
-      replayTruncated: session.render.bufferTruncated,
       processName: session.processName,
-      canonicalTitle: session.render.canonicalTitle,
+      canonicalTitle: session.render.title,
       controller: cloneTerminalController(session.controller),
       canonicalCols: session.cols,
       canonicalRows: session.rows,
@@ -438,7 +442,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     this.disposeSessionResources(session)
     session.cols = cols
     session.rows = rows
-    resetTerminalRenderState(session.render)
+    resetRender(session.render)
     session.processName = ''
     session.inputQueue = []
     session.inputFlushScheduled = false
@@ -458,34 +462,26 @@ export class TerminalSessionManager<TOwner extends string | number> {
     }
     session.pty = spawnResult.runtime
     session.processName = session.pty.processName()
-    session.render.model = createTerminalRenderModel(session.cols, session.rows)
-    session.disposables.push(
-      bindTerminalRenderTitle(session.render, (canonicalTitle) => {
-        this.sink.onTitle?.(session.ownerId, { sessionId: session.id, canonicalTitle })
-      }),
-    )
+    // Track the last broadcast title so we don't spam the client with
+    // the same title on every chunk. The render state only mutates
+    // `title` when the captured OSC value differs from the previous
+    // one, so a reference comparison is sufficient as a "did the title
+    // just change?" signal. Initialized to `null` (matching the initial
+    // render state) so the first chunk does not broadcast a spurious
+    // `canonicalTitle: null` event before the shell has set anything.
+    let lastBroadcastTitle: string | null = session.render.title
     session.disposables.push(
       session.pty.onData((data) => {
-        const seq = appendTerminalReplayData(session.render, data)
-        const previousProcessName = session.processName
+        const seq = appendOutput(session.render, data)
         const processName = session.pty?.processName() ?? 'terminal'
         session.processName = processName
-        const canonicalTitleBeforeWrite = session.render.canonicalTitle
-        const titleEventVersionBeforeWrite = session.render.titleEventVersion
-        queueTerminalRenderWrite(session.render, data, () => {
-          maybeClearCanonicalTitleOnShellReturn(
-            session.id,
-            session.render,
-            previousProcessName,
-            processName,
-            session.processName,
-            canonicalTitleBeforeWrite,
-            titleEventVersionBeforeWrite,
-            (canonicalTitle) => {
-              this.sink.onTitle?.(session.ownerId, { sessionId: session.id, canonicalTitle })
-            },
-          )
-        })
+        if (session.render.title !== lastBroadcastTitle) {
+          lastBroadcastTitle = session.render.title
+          this.sink.onTitle?.(session.ownerId, {
+            sessionId: session.id,
+            canonicalTitle: session.render.title,
+          })
+        }
         this.sink.onOutput(session.ownerId, { sessionId: session.id, data, seq, processName })
       }),
     )
@@ -511,7 +507,6 @@ export class TerminalSessionManager<TOwner extends string | number> {
     session.pty = null
     session.inputQueue = []
     session.inputFlushScheduled = false
-    disposeTerminalRenderState(session.render)
   }
 
   private scheduleInputFlush(session: TerminalSession<TOwner>): void {
