@@ -12,6 +12,7 @@ import {
   type TerminalSessionSummary,
   type TerminalTakeoverResult,
 } from '#/shared/terminal.ts'
+import { serverLogger } from '#/server/logger.ts'
 import {
   attachTerminalAttachment,
   claimTerminalAttachmentControl,
@@ -32,6 +33,7 @@ import { spawnTerminalPtyRuntime, type TerminalPtyRuntime } from '#/server/termi
 
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 const SESSION_ID_RE = /^[A-Za-z0-9_-]{16,64}$/
+const sessionManagerLogger = serverLogger.child({ module: 'terminal-session-manager' })
 
 export interface TerminalEnsureSessionInput<TOwner extends string | number> {
   ownerId: TOwner
@@ -388,7 +390,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
       this.emitOwnership(session)
       return true
     } catch (err) {
-      console.warn('[terminal] failed to resize PTY', err)
+      sessionManagerLogger.warn({ sessionId: session.id, err }, 'failed to resize PTY')
       return false
     }
   }
@@ -473,16 +475,27 @@ export class TerminalSessionManager<TOwner extends string | number> {
     session.disposables.push(
       session.pty.onData((data) => {
         const seq = appendOutput(session.render, data)
-        const processName = session.pty?.processName() ?? 'terminal'
-        session.processName = processName
         if (session.render.title !== lastBroadcastTitle) {
           lastBroadcastTitle = session.render.title
+          // Title OSC and exec events travel together: when the shell
+          // exec's a new command (e.g. zsh -> bash -> vim) the child
+          // updates both its title and its /proc-style name atomically.
+          // Reading `pty.process` on every chunk is a syscall on Unix
+          // (kill(pid, 0) + comm read) so we sample it only on this
+          // cheap-and-reliable title-change signal.
+          const nextName = session.pty?.processName()
+          if (nextName && nextName !== session.processName) session.processName = nextName
           this.sink.onTitle?.(session.ownerId, {
             sessionId: session.id,
             canonicalTitle: session.render.title,
           })
         }
-        this.sink.onOutput(session.ownerId, { sessionId: session.id, data, seq, processName })
+        this.sink.onOutput(session.ownerId, {
+          sessionId: session.id,
+          data,
+          seq,
+          processName: session.processName,
+        })
       }),
     )
     session.disposables.push(
@@ -501,7 +514,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
       try {
         session.pty.kill()
       } catch (err) {
-        console.warn('[terminal] failed to kill PTY', err)
+        sessionManagerLogger.warn({ sessionId: session.id, err }, 'failed to kill PTY')
       }
     }
     session.pty = null
@@ -524,7 +537,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     try {
       session.pty.write(batch)
     } catch (err) {
-      console.warn('[terminal] failed to write PTY', err)
+      sessionManagerLogger.warn({ sessionId: session.id, err, bytes: batch.length }, 'failed to write PTY')
     }
   }
 
@@ -549,7 +562,7 @@ function disposeSessionListeners<TOwner extends string | number>(session: Termin
     try {
       disposable.dispose()
     } catch (err) {
-      console.warn('[terminal] failed to dispose PTY listener', err)
+      sessionManagerLogger.warn({ sessionId: session.id, err }, 'failed to dispose PTY listener')
     }
   }
 }

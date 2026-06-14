@@ -43,6 +43,9 @@ interface MockPty {
   kill: ReturnType<typeof vi.fn>
   emitData: (data: string) => void
   emitExit: () => void
+  setProcessName: (next: string) => void
+  /** Tracks how many times the `process` getter was read. */
+  processReads: () => number
 }
 
 const mockPtys: MockPty[] = []
@@ -52,16 +55,22 @@ vi.mock('node-pty', () => ({
     let onData: ((data: string) => void) | null = null
     let onExit: (() => void) | null = null
     let processName = 'zsh'
+    let processReads = 0
     const pty: MockPty = {
       write: vi.fn(),
       resize: vi.fn(),
       kill: vi.fn(),
       emitData: (data) => onData?.(data),
       emitExit: () => onExit?.(),
+      setProcessName: (next) => {
+        processName = next
+      },
+      processReads: () => processReads,
     }
     mockPtys.push(pty)
     return {
       get process() {
+        processReads += 1
         return processName
       },
       write: pty.write,
@@ -253,9 +262,6 @@ describe('server terminal sessions', () => {
     expect(second.key).toBe(first.key)
   })
 
-
-
-
   test('broadcasts output and exit events to registered web terminal sockets', async () => {
     const socket = { send: vi.fn(), close: vi.fn() }
     registerTerminalSocket('client_1', 'attachment_a', socket)
@@ -286,6 +292,47 @@ describe('server terminal sessions', () => {
       type: 'exit',
       event: { sessionId: expect.any(String) },
     })
+
+    unregisterTerminalSocket('client_1', 'attachment_a', socket)
+  })
+
+  test('caches processName across plain output chunks and refreshes on title OSC', async () => {
+    const socket = { send: vi.fn(), close: vi.fn() }
+    registerTerminalSocket('client_1', 'attachment_a', socket)
+    const sessionId = await createTerminalSession('client_1')
+    socket.send.mockClear()
+
+    // Initial read happens once at spawn. Reset the counter so we can
+    // assert the cache holds for chunks that do not carry a title OSC.
+    const initialReads = mockPtys[0]?.processReads() ?? 0
+
+    // Plain chunks without OSC must NOT re-read pty.processName.
+    mockPtys[0]?.setProcessName('bash')
+    mockPtys[0]?.emitData('plain-output-a')
+    mockPtys[0]?.emitData('plain-output-b')
+    mockPtys[0]?.emitData('plain-output-c')
+
+    const plainMessages = socket.send.mock.calls
+      .map(([payload]) => JSON.parse(String(payload)))
+      .filter((message) => message.type === 'output')
+    expect(plainMessages).toHaveLength(3)
+    expect(plainMessages.map((m) => m.event.processName)).toEqual(['zsh', 'zsh', 'zsh'])
+    expect(mockPtys[0]?.processReads()).toBe(initialReads)
+
+    // A title OSC (BEL-terminated `\x1b]0;...\x07`) is the documented
+    // signal that the shell exec'd a new command. The cached name should
+    // refresh exactly once and every subsequent chunk should carry the
+    // refreshed value without re-reading the getter.
+    mockPtys[0]?.emitData('\x1b]0;vim\x07')
+    mockPtys[0]?.emitData('plain-output-d')
+    mockPtys[0]?.emitData('plain-output-e')
+
+    const allMessages = socket.send.mock.calls
+      .map(([payload]) => JSON.parse(String(payload)))
+      .filter((message) => message.type === 'output')
+    expect(allMessages.slice(3).map((m) => m.event.processName)).toEqual(['bash', 'bash', 'bash'])
+    // One re-read at title change, zero more on the following plain chunks.
+    expect(mockPtys[0]?.processReads()).toBe(initialReads + 1)
 
     unregisterTerminalSocket('client_1', 'attachment_a', socket)
   })
@@ -471,7 +518,6 @@ describe('server terminal sessions', () => {
     unregisterTerminalSocket('client_1', 'attachment_a', socket)
   })
 
-
   test('keeps sessions alive during the reconnect grace period and reuses them after a second attach', async () => {
     const socketA = { send: vi.fn(), close: vi.fn() }
     registerTerminalSocket('client_1', 'attachment_a', socketA)
@@ -638,22 +684,15 @@ describe('server terminal sessions', () => {
     mockPtys[0]?.emitData('\x1b]0;a title\x07')
     await vi.waitFor(() => {
       const messages = socket.send.mock.calls.map(([payload]) => JSON.parse(String(payload)))
-      expect(
-        messages.some(
-          (message) =>
-            message.type === 'title' && message.event?.canonicalTitle === 'a title',
-        ),
-      ).toBe(true)
+      expect(messages.some((message) => message.type === 'title' && message.event?.canonicalTitle === 'a title')).toBe(
+        true,
+      )
     })
 
     mockPtys[0]?.emitData('\x1b]0;\x07')
     await vi.waitFor(() => {
       const messages = socket.send.mock.calls.map(([payload]) => JSON.parse(String(payload)))
-      expect(
-        messages.some(
-          (message) => message.type === 'title' && message.event?.canonicalTitle === null,
-        ),
-      ).toBe(true)
+      expect(messages.some((message) => message.type === 'title' && message.event?.canonicalTitle === null)).toBe(true)
     })
 
     unregisterTerminalSocket('client_1', 'attachment_a', socket)
@@ -1066,5 +1105,4 @@ describe('server terminal sessions', () => {
 
     unregisterTerminalSocket('client_1', 'attachment_a', socket)
   })
-
 })

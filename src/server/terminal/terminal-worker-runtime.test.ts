@@ -181,4 +181,37 @@ describe('terminal worker runtime', () => {
 
     expect(emitted).toEqual([{ type: 'response', requestId: 'req_fail', ok: false, error: 'boom' }])
   })
+
+  test('rejects unknown terminal worker actions instead of returning a silent success', async () => {
+    // Forward-compat scenario: a newer worker binary emits an action that the
+    // host's dispatch table does not know about. We model this by sending a
+    // request whose `action` field bypasses the typed TerminalWorkerAction
+    // union; the runtime must surface the failure rather than fall through
+    // the switch and serialize `undefined` as a successful response payload.
+    const service = createTerminalFacadeStub()
+    const emitted: TerminalWorkerMessage[] = []
+    const runtime = new TerminalWorkerRuntime({
+      service,
+      emit(message) {
+        emitted.push(message)
+      },
+      exit: vi.fn(),
+    })
+
+    await runtime.handleMessage({
+      type: 'request',
+      requestId: 'req_unknown',
+      action: 'future-action' as never,
+      clientId: 'client_1',
+      input: { sessionId: 'term_123456789012' } as never,
+    })
+
+    expect(emitted).toHaveLength(1)
+    expect(emitted[0]).toMatchObject({
+      type: 'response',
+      requestId: 'req_unknown',
+      ok: false,
+      error: expect.stringContaining('future-action'),
+    })
+  })
 })

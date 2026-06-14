@@ -46,7 +46,12 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
 
   const loadMissingSnapshots = useCallback(
     async (serverSessions: TerminalSessionSummary[]): Promise<Map<string, TerminalSessionSnapshot>> => {
-      const snapshotEntries = await Promise.all(
+      // allSettled (not all) so a single hung or rejected snapshot fetch does
+      // not cancel the rest of the reconciliation. Each request is bounded
+      // by the bridge's per-request timeout, so the worst case here is that
+      // one slow session delays the final map by that timeout — but every
+      // other session's snapshot is delivered to the caller regardless.
+      const settled = await Promise.allSettled(
         serverSessions.map(async (session) => {
           try {
             const snapshot = await terminalBridge.getSessionSnapshot({ sessionId: session.sessionId })
@@ -57,7 +62,13 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
           }
         }),
       )
-      return new Map(snapshotEntries.filter((entry) => entry !== null))
+      const entries: Array<readonly [string, TerminalSessionSnapshot]> = []
+      for (const result of settled) {
+        if (result.status !== 'fulfilled') continue
+        const entry = result.value
+        if (entry) entries.push(entry)
+      }
+      return new Map(entries)
     },
     [registry],
   )

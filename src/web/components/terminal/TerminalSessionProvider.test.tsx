@@ -1443,6 +1443,64 @@ describe('TerminalSessionProvider', () => {
     }
   })
 
+  test('continues reconciling healthy sessions when one snapshot fetch rejects', async () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      detailTab: 'terminal',
+    })
+    listSessionsMock.mockResolvedValue([
+      {
+        sessionId: 'session_fail',
+        key: `${REPO_ID} ${WORKTREE_PATH} terminal-1`,
+        cwd: WORKTREE_PATH,
+        controller: { attachmentId: 'attachment_remote', status: 'connected' },
+        processName: 'bash',
+        canonicalTitle: null,
+        cols: 80,
+        rows: 24,
+        displayOrder: 1,
+      },
+      {
+        sessionId: 'session_ok',
+        key: `${REPO_ID} ${WORKTREE_PATH} terminal-2`,
+        cwd: WORKTREE_PATH,
+        controller: { attachmentId: 'attachment_remote', status: 'connected' },
+        processName: 'bash',
+        canonicalTitle: null,
+        cols: 80,
+        rows: 24,
+        displayOrder: 2,
+      },
+    ])
+    // First snapshot rejects, second resolves. With Promise.all a single
+    // rejection would cancel the whole reconciliation; with allSettled the
+    // healthy session's snapshot is still delivered to the registry.
+    getSessionSnapshotMock.mockImplementation(async ({ sessionId }) => {
+      if (sessionId === 'session_fail') throw new Error('snapshot unavailable')
+      return { sessionId: 'session_ok', snapshot: 'ok-snapshot', snapshotSeq: 1 }
+    })
+
+    const { unmount } = await renderProvider()
+    try {
+      await act(async () => {
+        sessionsChangedHandler?.(REPO_ID)
+        await Promise.resolve()
+      })
+
+      const okSession = mockSessions.find((item) => item.descriptor.terminalId === 'terminal-2')
+      if (!okSession) throw new Error('missing terminal-2 mock session')
+      // The healthy session still receives its snapshot — the failure of
+      // session_fail did not poison the whole reconcile.
+      expect(okSession.hydrate).toHaveBeenLastCalledWith(
+        expect.objectContaining({ sessionId: 'session_ok', snapshot: 'ok-snapshot', snapshotSeq: 1 }),
+      )
+    } finally {
+      await unmount()
+    }
+  })
+
   test('exposes reactive worktree metadata through external-store facade hooks', async () => {
     seedRepoState({
       id: REPO_ID,
