@@ -110,9 +110,12 @@ export class TerminalWorkerRuntime {
         // defence: a forward-incompatible worker (newer binary talking to an
         // older host) could still surface an unknown action via message.parse;
         // throwing here makes handleRequest produce a real failure rather than
-        // sending `undefined` back as a success payload.
+        // sending `undefined` back as a success payload. Logged at `warn`
+        // because handleRequest already emits its own catch-side log — this
+        // gives reviewers one place to grep for unknown-action signals without
+        // duplicating at `error` level.
         const incoming = message as unknown as { requestId: string; clientId: string; action: string }
-        terminalWorkerRuntimeLogger.error(
+        terminalWorkerRuntimeLogger.warn(
           { requestId: incoming.requestId, clientId: incoming.clientId, action: incoming.action },
           'received unknown terminal worker action',
         )

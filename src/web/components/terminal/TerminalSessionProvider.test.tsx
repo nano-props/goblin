@@ -1443,7 +1443,7 @@ describe('TerminalSessionProvider', () => {
     }
   })
 
-  test('continues reconciling healthy sessions when one snapshot fetch rejects', async () => {
+  test('skips failed snapshot fetches via Promise.allSettled so healthy sessions still hydrate', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -1474,9 +1474,14 @@ describe('TerminalSessionProvider', () => {
         displayOrder: 2,
       },
     ])
-    // First snapshot rejects, second resolves. With Promise.all a single
-    // rejection would cancel the whole reconciliation; with allSettled the
-    // healthy session's snapshot is still delivered to the registry.
+    // First snapshot rejects, second resolves. The provider uses
+    // Promise.allSettled (not Promise.all) so the rejection does not
+    // cancel the whole reconcile. Rejections are surfaced via
+    // result.reason and logged via console.debug; healthy results are
+    // collected into the snapshot map. A regression to Promise.all
+    // would either cancel reconcile entirely or surface the rejection
+    // to the caller as an unhandled promise.
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {})
     getSessionSnapshotMock.mockImplementation(async ({ sessionId }) => {
       if (sessionId === 'session_fail') throw new Error('snapshot unavailable')
       return { sessionId: 'session_ok', snapshot: 'ok-snapshot', snapshotSeq: 1 }
@@ -1491,12 +1496,18 @@ describe('TerminalSessionProvider', () => {
 
       const okSession = mockSessions.find((item) => item.descriptor.terminalId === 'terminal-2')
       if (!okSession) throw new Error('missing terminal-2 mock session')
-      // The healthy session still receives its snapshot — the failure of
-      // session_fail did not poison the whole reconcile.
       expect(okSession.hydrate).toHaveBeenLastCalledWith(
         expect.objectContaining({ sessionId: 'session_ok', snapshot: 'ok-snapshot', snapshotSeq: 1 }),
       )
+      // The failed session's rejection is logged but does not poison
+      // the other session's hydrate path.
+      expect(debugSpy).toHaveBeenCalledWith(
+        expect.stringContaining('failed to load terminal session snapshot'),
+        'session_fail',
+        expect.any(Error),
+      )
     } finally {
+      debugSpy.mockRestore()
       await unmount()
     }
   })

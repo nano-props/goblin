@@ -213,13 +213,15 @@ export class WorkerBackedTerminalHost implements ServerTerminalHost {
     const requestId = crypto.randomUUID()
     return awaitable<T>((resolve, reject) => {
       this.pending.set(requestId, { resolve, reject })
-      // child_process.send() returns false only when the IPC channel is
-      // disconnected or in the process of closing (Node's docs: "Returns
-      // false if the channel has been closed or the backlog exceeds
-      // threshold"). On `false`, the message is *not* enqueued — no late
-      // worker response will arrive for this requestId. We can therefore
-      // safely delete the pending entry and reject the caller without
-      // racing a response.
+      // child_process.send() returns false in two cases: (a) the IPC
+      // channel is disconnected or closing (message definitely not
+      // enqueued), or (b) the IPC channel's high-water mark is exceeded
+      // and the message may or may not be enqueued depending on back-
+      // pressure recovery. We treat both cases identically — the safe
+      // assumption is "no response is coming for this requestId" — and
+      // delete the pending entry plus reject the caller. Better to
+      // surface a real failure than to leave a pending entry that
+      // silently never settles.
       const sent = worker.send?.({ type: 'request', requestId, action, clientId, input }) ?? false
       if (!sent) {
         this.pending.delete(requestId)

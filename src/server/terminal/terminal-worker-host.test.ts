@@ -89,8 +89,10 @@ describe('worker-backed terminal host', () => {
     })
 
     await expect(promise).rejects.toThrow(/Terminal worker unavailable/)
+    const failure = host.getDiagnostics().lastWorkerFailure
+    expect(failure?.kind).toBe('send-failed')
+    expect(failure?.detail).toBe('action=write')
     expect(host.getDiagnostics().pendingRequests).toBe(0)
-    expect(host.getDiagnostics().lastWorkerFailure?.kind).toBe('send-failed')
   })
 
   test('restarts the worker with backoff when sockets are still registered', async () => {

@@ -1,6 +1,7 @@
 import { userInfo } from 'node:os'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { resolveLocalShell, spawnTerminalPtyRuntime } from '#/server/terminal/terminal-pty-runtime.ts'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { resolveLocalShell } from '#/server/terminal/terminal-local-shell.ts'
+import { spawnTerminalPtyRuntime } from '#/server/terminal/terminal-pty-runtime.ts'
 
 const { spawnMock } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
@@ -18,9 +19,19 @@ vi.mock('node:os', async (importOriginal) => {
   }
 })
 
+const originalShell = process.env.SHELL
+
 beforeEach(() => {
   spawnMock.mockReset()
   vi.mocked(userInfo).mockReset()
+  // Force a stable test env. Without this, a CI runner with SHELL=
+  // (or unset) would skip the inherited-SHELL branch and the test
+  // would race against the host environment.
+  process.env.SHELL = '/bin/zsh'
+})
+
+afterEach(() => {
+  process.env.SHELL = originalShell
 })
 
 function ptyStub(processName = 'zsh') {
@@ -122,6 +133,10 @@ describe('spawnTerminalPtyRuntime', () => {
       ['--login'],
       expect.objectContaining({ cwd: '/repo' }),
     )
+    // Explicit override must short-circuit both env and userInfo lookups —
+    // otherwise a future regression that always polls userInfo would slow
+    // every explicit-override spawn by an os syscall.
+    expect(userInfo).not.toHaveBeenCalled()
   })
 
   test('uses the inherited SHELL on Unix when it is set, with -l for login mode', () => {
@@ -134,28 +149,41 @@ describe('spawnTerminalPtyRuntime', () => {
       rows: 24,
     })
 
-    expect(spawnMock).toHaveBeenCalledWith(process.env.SHELL, ['-l'], expect.objectContaining({ cwd: '/repo' }))
+    expect(spawnMock).toHaveBeenCalledWith('/bin/zsh', ['-l'], expect.objectContaining({ cwd: '/repo' }))
     // Explicit env.SHELL must win — passwd fallback is only consulted when
     // the inherited env is silent (CI / devcontainer scenarios).
     expect(userInfo).not.toHaveBeenCalled()
   })
 
   test('falls back to os.userInfo().shell when SHELL is not set (CI / devcontainer)', () => {
-    const envWithoutShell: NodeJS.ProcessEnv = { PATH: '/usr/bin' }
     vi.mocked(userInfo).mockReturnValue({ shell: '/usr/bin/zsh' } as ReturnType<typeof userInfo>)
-    spawnMock.mockReturnValue(ptyStub())
 
-    const resolved = resolveLocalShell({}, envWithoutShell)
+    const resolved = resolveLocalShell({}, { PATH: '/usr/bin' })
 
     expect(resolved).toEqual({ command: '/usr/bin/zsh', args: ['-l'] })
     expect(userInfo).toHaveBeenCalledTimes(1)
+  })
+
+  test('treats whitespace-only SHELL as unset and falls through to userInfo', () => {
+    vi.mocked(userInfo).mockReturnValue({ shell: '/usr/bin/zsh' } as ReturnType<typeof userInfo>)
+
+    const resolved = resolveLocalShell({}, { SHELL: '   ' })
+
+    expect(resolved).toEqual({ command: '/usr/bin/zsh', args: ['-l'] })
+  })
+
+  test('treats whitespace-only userInfo().shell as unset and falls back to /bin/sh', () => {
+    vi.mocked(userInfo).mockReturnValue({ shell: '   ' } as ReturnType<typeof userInfo>)
+
+    const resolved = resolveLocalShell({}, {})
+
+    expect(resolved).toEqual({ command: '/bin/sh', args: ['-l'] })
   })
 
   test('falls back to /bin/sh when neither env.SHELL nor userInfo().shell is available', () => {
     vi.mocked(userInfo).mockImplementation(() => {
       throw new Error('userInfo unavailable')
     })
-    spawnMock.mockReturnValue(ptyStub())
 
     const resolved = resolveLocalShell({}, {})
 

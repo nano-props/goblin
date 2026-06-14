@@ -334,6 +334,20 @@ describe('server terminal sessions', () => {
     // One re-read at title change, zero more on the following plain chunks.
     expect(mockPtys[0]?.processReads()).toBe(initialReads + 1)
 
+    // Mixed chunks — title OSC surrounded by plain bytes — must trigger
+    // exactly one re-read. extractTitle uses /g and processes the whole
+    // chunk at once, so a single OSC inside plain text is treated as
+    // "title changed" with no extra re-reads.
+    mockPtys[0]?.setProcessName('python3')
+    mockPtys[0]?.emitData('prefix\x1b]0;python\x07suffix')
+    mockPtys[0]?.emitData('plain-output-f')
+
+    const finalMessages = socket.send.mock.calls
+      .map(([payload]) => JSON.parse(String(payload)))
+      .filter((message) => message.type === 'output')
+    expect(finalMessages.slice(-2).map((m) => m.event.processName)).toEqual(['python3', 'python3'])
+    expect(mockPtys[0]?.processReads()).toBe(initialReads + 2)
+
     unregisterTerminalSocket('client_1', 'attachment_a', socket)
   })
 
