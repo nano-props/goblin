@@ -170,10 +170,7 @@ export function isValidTerminalClientId(value: unknown): value is string {
   return typeof value === 'string' && TERMINAL_CLIENT_ID_RE.test(value)
 }
 
-export function attachServerTerminal(
-  clientId: string,
-  input: TerminalAttachInput,
-): TerminalAttachResult {
+export function attachServerTerminal(clientId: string, input: TerminalAttachInput): TerminalAttachResult {
   if (
     !isValidTerminalClientId(clientId) ||
     !isValidTerminalSessionId(input?.sessionId) ||
@@ -193,10 +190,7 @@ export function attachServerTerminal(
   return result.ok ? withSessionSnapshot(result) : result
 }
 
-export function restartServerTerminal(
-  clientId: string,
-  input: TerminalRestartInput,
-): TerminalAttachResult {
+export function restartServerTerminal(clientId: string, input: TerminalRestartInput): TerminalAttachResult {
   if (
     !isValidTerminalClientId(clientId) ||
     !isValidTerminalSessionId(input?.sessionId) ||

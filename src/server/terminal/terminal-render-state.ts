@@ -98,8 +98,14 @@ function stripLeadingIncompleteAnsi(s: string): string {
     let i = 2
     while (i < s.length) {
       const c = s.charCodeAt(i)
-      if (c >= 0x30 && c <= 0x3f) { i++; continue }
-      if (c >= 0x20 && c <= 0x2f) { i++; continue }
+      if (c >= 0x30 && c <= 0x3f) {
+        i++
+        continue
+      }
+      if (c >= 0x20 && c <= 0x2f) {
+        i++
+        continue
+      }
       if (c >= 0x40 && c <= 0x7e) return s // complete CSI
       break // incomplete
     }

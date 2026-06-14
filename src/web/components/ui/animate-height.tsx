@@ -1,12 +1,6 @@
 import { useLayoutEffect, useRef } from 'react'
 
-export function AnimateHeight({
-  children,
-  duration = 200,
-}: {
-  children: React.ReactNode
-  duration?: number
-}) {
+export function AnimateHeight({ children, duration = 200 }: { children: React.ReactNode; duration?: number }) {
   const outerRef = useRef<HTMLDivElement>(null)
   const innerRef = useRef<HTMLDivElement>(null)
   const initial = useRef(true)

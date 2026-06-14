@@ -44,10 +44,7 @@ type RestorableWorkspaceSelectionActions = Pick<
 
 type LocalWorkspaceSelectionActions = Pick<ReposStore, 'setBranchSearchQuery'>
 
-type RuntimeCoherentSelectionActions = Pick<
-  ReposStore,
-  'setBranchViewMode' | 'setDetailTab' | 'selectBranch'
->
+type RuntimeCoherentSelectionActions = Pick<ReposStore, 'setBranchViewMode' | 'setDetailTab' | 'selectBranch'>
 
 type RepoMutationSelectionActions = Pick<ReposStore, 'checkoutSelectedInRepo' | 'checkoutSelected'>
 

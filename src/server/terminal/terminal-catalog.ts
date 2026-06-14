@@ -72,9 +72,7 @@ interface TerminalCatalogOptions {
   manager: TerminalCatalogManager
   attachmentIsConnected(clientId: string, attachmentId?: string): boolean | undefined
   broadcastSessionsChanged(repoRoot: string): void
-  withSessionSnapshot(
-    result: Extract<TerminalAttachResult, { ok: true }>,
-  ): Extract<TerminalAttachResult, { ok: true }>
+  withSessionSnapshot(result: Extract<TerminalAttachResult, { ok: true }>): Extract<TerminalAttachResult, { ok: true }>
 }
 
 class TerminalCatalog {

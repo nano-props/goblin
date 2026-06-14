@@ -379,12 +379,7 @@ export class ManagedTerminalSession {
     }
   }
 
-  private async replayActiveView(
-    token: number,
-    term: XTermTerminal,
-    replay: string,
-    replaySeq: number,
-  ): Promise<void> {
+  private async replayActiveView(token: number, term: XTermTerminal, replay: string, replaySeq: number): Promise<void> {
     this.runtime.beginReplay(replaySeq)
     try {
       term.reset()

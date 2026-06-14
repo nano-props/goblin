@@ -2,7 +2,7 @@
   "name": "goblin",
   "productName": "Goblin",
   "version": "0.1.0",
-  "description": "Goblin \u2014 Git Branch List, desktop edition",
+  "description": "Goblin — Git Branch List, desktop edition",
   "private": true,
   "type": "module",
   "main": "src/main/main.ts",
