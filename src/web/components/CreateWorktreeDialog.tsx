@@ -138,7 +138,8 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
 
   const existingBranchWorktree = existingBranch && existingBranchExists ? branchWorktree(existingBranch) : undefined
   const branchExistingWorktree = branchTrimmed && branchExists ? branchWorktree(branchTrimmed) : undefined
-  const trackLocalBranchWorktree = trackLocalBranch && trackLocalBranchExists ? branchWorktree(trackLocalBranch) : undefined
+  const trackLocalBranchWorktree =
+    trackLocalBranch && trackLocalBranchExists ? branchWorktree(trackLocalBranch) : undefined
 
   const baseError = mode === 'newBranch' && base && !baseExists ? t('action.create-worktree-base-missing') : ''
   const branchError =
@@ -323,9 +324,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
                       <SelectItem key={b.name} value={b.name} textValue={b.name}>
                         <span className="truncate">{b.name}</span>
                         {b.worktree && (
-                          <span className="ml-1 text-[10px] text-muted-foreground/60">
-                            {tildify(b.worktree.path)}
-                          </span>
+                          <span className="ml-1 text-[10px] text-muted-foreground/60">{tildify(b.worktree.path)}</span>
                         )}
                       </SelectItem>
                     ))}

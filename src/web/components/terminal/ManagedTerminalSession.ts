@@ -140,7 +140,12 @@ export class ManagedTerminalSession {
     const data = this.pendingWriteBuffer
     this.pendingWriteBuffer = ''
     if (!data) return
-    void terminalBridge.write({ sessionId, data }).catch(() => {})
+    void terminalBridge.write({ sessionId, data }).catch((err) => {
+      // Keystrokes that fail to reach the shell leave the user thinking
+      // their input was accepted — surface the failure so a debugger can
+      // correlate with terminalBridge.write validation/transport errors.
+      console.warn('[terminal] write failed for session', sessionId, err)
+    })
   }
 
   findNext(term: string, incremental = false): TerminalSearchResult {
@@ -379,12 +384,7 @@ export class ManagedTerminalSession {
     }
   }
 
-  private async replayActiveView(
-    token: number,
-    term: XTermTerminal,
-    replay: string,
-    replaySeq: number,
-  ): Promise<void> {
+  private async replayActiveView(token: number, term: XTermTerminal, replay: string, replaySeq: number): Promise<void> {
     this.runtime.beginReplay(replaySeq)
     try {
       term.reset()
@@ -443,7 +443,12 @@ export class ManagedTerminalSession {
       .then((ok) => {
         if (ok && this.runtime.currentSessionId() === sessionId) this.runtime.acknowledgeResize(cols, rows)
       })
-      .catch(() => {})
+      .catch((err) => {
+        // Resize rejection leaves the view stuck at the old geometry —
+        // surface the failure so ops can correlate with server-side
+        // validation rejections (size out of range, lost controller, etc.).
+        console.warn('[terminal] resize failed for session', sessionId, err)
+      })
   }
 
   private applyCanonicalSizeToView(): void {

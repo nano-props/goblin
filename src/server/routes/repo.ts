@@ -143,13 +143,7 @@ export function createRepoRoutes() {
     const { cwd, worktreePath, mode, sourceToken } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.createWorktree, c)
     return c.json(
       await jsonOr(
-        () =>
-          createRepositoryWorktree(
-            cwd,
-            { worktreePath, mode },
-            c.req.raw.signal,
-            sourceToken,
-          ),
+        () => createRepositoryWorktree(cwd, { worktreePath, mode }, c.req.raw.signal, sourceToken),
         READ_REPO_ERROR,
         'create-worktree',
       ),

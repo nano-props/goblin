@@ -1443,6 +1443,75 @@ describe('TerminalSessionProvider', () => {
     }
   })
 
+  test('skips failed snapshot fetches via Promise.allSettled so healthy sessions still hydrate', async () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      detailTab: 'terminal',
+    })
+    listSessionsMock.mockResolvedValue([
+      {
+        sessionId: 'session_fail',
+        key: `${REPO_ID} ${WORKTREE_PATH} terminal-1`,
+        cwd: WORKTREE_PATH,
+        controller: { attachmentId: 'attachment_remote', status: 'connected' },
+        processName: 'bash',
+        canonicalTitle: null,
+        cols: 80,
+        rows: 24,
+        displayOrder: 1,
+      },
+      {
+        sessionId: 'session_ok',
+        key: `${REPO_ID} ${WORKTREE_PATH} terminal-2`,
+        cwd: WORKTREE_PATH,
+        controller: { attachmentId: 'attachment_remote', status: 'connected' },
+        processName: 'bash',
+        canonicalTitle: null,
+        cols: 80,
+        rows: 24,
+        displayOrder: 2,
+      },
+    ])
+    // First snapshot rejects, second resolves. The provider uses
+    // Promise.allSettled (not Promise.all) so the rejection does not
+    // cancel the whole reconcile. Rejections are surfaced via
+    // result.reason and logged via console.debug; healthy results are
+    // collected into the snapshot map. A regression to Promise.all
+    // would either cancel reconcile entirely or surface the rejection
+    // to the caller as an unhandled promise.
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {})
+    getSessionSnapshotMock.mockImplementation(async ({ sessionId }) => {
+      if (sessionId === 'session_fail') throw new Error('snapshot unavailable')
+      return { sessionId: 'session_ok', snapshot: 'ok-snapshot', snapshotSeq: 1 }
+    })
+
+    const { unmount } = await renderProvider()
+    try {
+      await act(async () => {
+        sessionsChangedHandler?.(REPO_ID)
+        await Promise.resolve()
+      })
+
+      const okSession = mockSessions.find((item) => item.descriptor.terminalId === 'terminal-2')
+      if (!okSession) throw new Error('missing terminal-2 mock session')
+      expect(okSession.hydrate).toHaveBeenLastCalledWith(
+        expect.objectContaining({ sessionId: 'session_ok', snapshot: 'ok-snapshot', snapshotSeq: 1 }),
+      )
+      // The failed session's rejection is logged but does not poison
+      // the other session's hydrate path.
+      expect(debugSpy).toHaveBeenCalledWith(
+        expect.stringContaining('failed to load terminal session snapshot'),
+        'session_fail',
+        expect.any(Error),
+      )
+    } finally {
+      debugSpy.mockRestore()
+      await unmount()
+    }
+  })
+
   test('exposes reactive worktree metadata through external-store facade hooks', async () => {
     seedRepoState({
       id: REPO_ID,

@@ -213,6 +213,15 @@ export class WorkerBackedTerminalHost implements ServerTerminalHost {
     const requestId = crypto.randomUUID()
     return awaitable<T>((resolve, reject) => {
       this.pending.set(requestId, { resolve, reject })
+      // child_process.send() returns false in two cases: (a) the IPC
+      // channel is disconnected or closing (message definitely not
+      // enqueued), or (b) the IPC channel's high-water mark is exceeded
+      // and the message may or may not be enqueued depending on back-
+      // pressure recovery. We treat both cases identically — the safe
+      // assumption is "no response is coming for this requestId" — and
+      // delete the pending entry plus reject the caller. Better to
+      // surface a real failure than to leave a pending entry that
+      // silently never settles.
       const sent = worker.send?.({ type: 'request', requestId, action, clientId, input }) ?? false
       if (!sent) {
         this.pending.delete(requestId)
@@ -303,6 +312,16 @@ export class WorkerBackedTerminalHost implements ServerTerminalHost {
   }
 
   private handleWorkerMessage(message: TerminalWorkerMessage): void {
+    // Trust boundary: the worker is our own child process spawned by
+    // `defaultSpawnWorker` from the bundled JS entry — the messages it
+    // sends via process.send are validated at the wire-format level by
+    // the IPC channel, but their semantic shape is currently trusted
+    // (cast as TerminalWorkerMessage, not parsed through a runtime
+    // schema). This is acceptable as long as the worker entry is bundled
+    // with the host binary. If a future plugin or extension model ever
+    // lets the worker be supplied by third-party code, route this through
+    // a valibot parser (mirror normalizeTerminalWorkerMessage) before
+    // dispatching.
     if (message.type === 'response') {
       const pending = this.pending.get(message.requestId)
       if (!pending) return

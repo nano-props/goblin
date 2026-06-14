@@ -70,9 +70,7 @@ export async function getTerminalAppAvailability(signal?: AbortSignal): Promise<
 /** Open `path` in the terminal selected by `pref`. */
 export async function openInPreferredTerminal(path: string, pref: TerminalPref): Promise<ExecResult> {
   const resolved = resolveTerminalApp(pref, await getTerminalAppAvailability())
-  return resolved
-    ? backends[resolved].open(path)
-    : { ok: false, message: 'error.terminal-not-installed' }
+  return resolved ? backends[resolved].open(path) : { ok: false, message: 'error.terminal-not-installed' }
 }
 
 /** Open a remote SSH workspace in the terminal selected by `pref`. */

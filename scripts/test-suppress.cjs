@@ -29,10 +29,7 @@ const { emit: originalEmit } = process
 // warnings, including the ones we want to filter. Intercepting it is the
 // only reliable way to suppress them; `process.on('warning', ...)` does not
 // fire for the ones printed during early process startup.
-const warningMessageFilters = [
-  '--localstorage-file was provided without a valid path',
-  'Sourcemap for',
-]
+const warningMessageFilters = ['--localstorage-file was provided without a valid path', 'Sourcemap for']
 
 process.emit = function patchedEmit(event, payload, ...rest) {
   if (event === 'warning' && payload && typeof payload.message === 'string') {
@@ -46,9 +43,7 @@ process.emit = function patchedEmit(event, payload, ...rest) {
 // jsdom and a few native modules print their notes via `console.error`
 // (not via `process.emit('warning')`). Wrap `console.error` so we keep
 // real test failures visible but drop the un-implemented-API noise.
-const consoleErrorMessageFilters = [
-  'Not implemented:',
-]
+const consoleErrorMessageFilters = ['Not implemented:']
 const originalConsoleError = console.error.bind(console)
 console.error = function patchedConsoleError(...args) {
   const first = args[0]

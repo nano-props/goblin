@@ -14,9 +14,8 @@ vi.mock('electron', () => ({
   },
 }))
 
-const { DEFAULT_EMBEDDED_SERVER_PORT, parseServerPort, reserveEmbeddedServerPort } = await import(
-  '#/main/server-manager.ts'
-)
+const { DEFAULT_EMBEDDED_SERVER_PORT, parseServerPort, reserveEmbeddedServerPort } =
+  await import('#/main/server-manager.ts')
 
 const openServers: Array<ReturnType<typeof createServer>> = []
 

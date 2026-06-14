@@ -46,18 +46,32 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
 
   const loadMissingSnapshots = useCallback(
     async (serverSessions: TerminalSessionSummary[]): Promise<Map<string, TerminalSessionSnapshot>> => {
-      const snapshotEntries = await Promise.all(
-        serverSessions.map(async (session) => {
-          try {
-            const snapshot = await terminalBridge.getSessionSnapshot({ sessionId: session.sessionId })
-            return snapshot ? ([session.sessionId, snapshot] as const) : null
-          } catch (err) {
-            console.debug('[TerminalSessionProvider] failed to load terminal session snapshot:', err)
-            return null
-          }
-        }),
+      // allSettled (not all) so a single rejected snapshot fetch does not
+      // cancel the rest of the reconciliation. Each request is bounded by
+      // the bridge's per-request timeout, so the worst case here is that
+      // one slow session delays the final map by that timeout — but every
+      // other session's snapshot is delivered to the caller regardless.
+      // Rejections are surfaced via `result.reason` so they remain visible
+      // in logs without poisoning the reconciliation.
+      const settled = await Promise.allSettled(
+        serverSessions.map((session) => terminalBridge.getSessionSnapshot({ sessionId: session.sessionId })),
       )
-      return new Map(snapshotEntries.filter((entry) => entry !== null))
+      const entries: Array<readonly [string, TerminalSessionSnapshot]> = []
+      settled.forEach((result, index) => {
+        const session = serverSessions[index]
+        if (!session) return
+        if (result.status === 'fulfilled') {
+          const snapshot = result.value
+          if (snapshot) entries.push([session.sessionId, snapshot])
+          return
+        }
+        console.debug(
+          '[TerminalSessionProvider] failed to load terminal session snapshot:',
+          session.sessionId,
+          result.reason,
+        )
+      })
+      return new Map(entries)
     },
     [registry],
   )

@@ -1,5 +1,6 @@
 import type { ServerTerminalSocket } from '#/server/terminal/terminal-host.ts'
 import type {
+  TerminalWorkerAction,
   TerminalWorkerActionRequest,
   TerminalWorkerFailureMessage,
   TerminalWorkerMessage,
@@ -103,6 +104,25 @@ export class TerminalWorkerRuntime {
         return await this.options.service.getSessionSnapshot(message.clientId, message.input)
       case 'reorder':
         return await this.options.service.reorder(message.clientId, message.input)
+      default: {
+        // Compile-time exhaustiveness: adding a new action to TerminalWorkerAction
+        // without a dispatch case above breaks this `never` assignment. Runtime
+        // defence: a forward-incompatible worker (newer binary talking to an
+        // older host) could still surface an unknown action via message.parse;
+        // throwing here makes handleRequest produce a real failure rather than
+        // sending `undefined` back as a success payload. Logged at `warn`
+        // because handleRequest already emits its own catch-side log — this
+        // gives reviewers one place to grep for unknown-action signals without
+        // duplicating at `error` level.
+        const incoming = message as unknown as { requestId: string; clientId: string; action: string }
+        terminalWorkerRuntimeLogger.warn(
+          { requestId: incoming.requestId, clientId: incoming.clientId, action: incoming.action },
+          'received unknown terminal worker action',
+        )
+        const _exhaustive: never = message
+        void _exhaustive
+        throw new Error(`Unknown terminal worker action: ${incoming.action}`)
+      }
     }
   }
 

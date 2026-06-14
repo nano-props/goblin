@@ -58,6 +58,12 @@ export class TerminalRealtimeBroker {
     const payload = JSON.stringify(message)
     const sockets = this.socketsByClientId.get(clientId)
     if (!sockets || sockets.size === 0) return
+    // Per-message payload size is not capped here; the de-facto cap is the
+    // PTY write rate × MAX_TERMINAL_WRITE_CHARS (1 MiB per write) and the
+    // render buffer cap MAX_BUFFER_CHARS (16 MiB). A single 16 MiB chunk
+    // would be sent verbatim; the WebSocket frame size cap on the receiving
+    // side is what ultimately bounds it. If output throughput becomes a
+    // concern, add a fragmenting writer here.
     for (const socket of Array.from(sockets)) this.sendOrUnregister(socket, payload)
   }
 

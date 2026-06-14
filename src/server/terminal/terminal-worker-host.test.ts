@@ -74,6 +74,27 @@ describe('worker-backed terminal host', () => {
     await expect(promise).rejects.toThrow('Terminal worker exited')
   })
 
+  test('rejects and drops the pending entry when child_process.send returns false', async () => {
+    // child_process.send() returns false when the IPC channel is
+    // disconnecting. The host must surface this as a caller-facing failure
+    // and clean up its own pending map — otherwise a late response (which
+    // cannot actually arrive since the channel is closing) would orphan a
+    // settled promise on the next 'response' message.
+    worker.sendResult = false
+    const host = new WorkerBackedTerminalHost({ spawnWorker: () => worker as any })
+    const promise = host.write('client_1', {
+      sessionId: 'term_123456789012',
+      data: 'ls',
+      attachmentId: 'attachment_a',
+    })
+
+    await expect(promise).rejects.toThrow(/Terminal worker unavailable/)
+    const failure = host.getDiagnostics().lastWorkerFailure
+    expect(failure?.kind).toBe('send-failed')
+    expect(failure?.detail).toBe('action=write')
+    expect(host.getDiagnostics().pendingRequests).toBe(0)
+  })
+
   test('restarts the worker with backoff when sockets are still registered', async () => {
     vi.useFakeTimers()
     const workerA = new FakeWorker()

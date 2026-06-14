@@ -26,7 +26,11 @@ import { useT } from '#/web/stores/i18n.ts'
 import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
 import { ToolbarTabList, ToolbarTabStrip, ToolbarTabStripBody } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
 import { ToolbarClosableTab } from '#/web/components/tab-strip/ToolbarClosableTab.tsx'
-import { toolbarTabButtonClassName, toolbarTabChromeClassName, toolbarTabIconClassName } from '#/web/components/tab-strip/tab-variants.ts'
+import {
+  toolbarTabButtonClassName,
+  toolbarTabChromeClassName,
+  toolbarTabIconClassName,
+} from '#/web/components/tab-strip/tab-variants.ts'
 import { useFocusRegistry, type FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useSortableTab } from '#/web/components/tab-strip/useSortableTab.ts'
 

@@ -1,4 +1,5 @@
 import * as pty from 'node-pty'
+import { resolveLocalShell } from '#/server/terminal/terminal-local-shell.ts'
 
 export interface TerminalPtyRuntime {
   write(data: string): void
@@ -21,13 +22,9 @@ export type SpawnTerminalPtyRuntimeResult = { ok: true; runtime: TerminalPtyRunt
 
 export function spawnTerminalPtyRuntime(input: SpawnTerminalPtyRuntimeInput): SpawnTerminalPtyRuntimeResult {
   try {
-    const shell =
-      input.command ||
-      process.env.SHELL ||
-      (process.platform === 'win32' ? process.env.COMSPEC || 'cmd.exe' : '/bin/zsh')
-    const args = input.args ?? (process.platform === 'win32' ? [] : ['-l'])
+    const shell = resolveLocalShell(input)
     const env = { ...process.env, TERM: 'xterm-256color' }
-    const term = pty.spawn(shell, args, {
+    const term = pty.spawn(shell.command, shell.args, {
       name: 'xterm-256color',
       cols: input.cols,
       rows: input.rows,
