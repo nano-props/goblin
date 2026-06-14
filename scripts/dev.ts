@@ -95,13 +95,22 @@ async function waitForDevServer(): Promise<void> {
 }
 
 function launchElectron(): Bun.Subprocess {
+  // ELECTRON_RUN_AS_NODE=1 in the shell environment makes the spawned
+  // electron process run as a plain Node.js child — the `electron` module
+  // is then resolved from npm and is just the binary-path downloader
+  // stub, so every `import { app } from 'electron'` in the main process
+  // fails with "does not provide an export named 'app'". Strip the flag
+  // here so the Electron process starts as a real main process; the
+  // embedded server child process still re-applies it via server-manager.ts
+  // to spawn Node for the worker entry.
+  const { ELECTRON_RUN_AS_NODE: _ignored, ...electronEnv } = process.env
   const proc = Bun.spawn(electronArgs, {
     cwd: repoRoot,
     stdin: 'inherit',
     stdout: 'inherit',
     stderr: 'inherit',
     env: {
-      ...process.env,
+      ...electronEnv,
       GOBLIN_WEB_DEV_URL: webDevUrl,
       GOBLIN_SERVER_HOST: webDevHost,
       GOBLIN_SERVER_PORT: String(embeddedServerPort),
