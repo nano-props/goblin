@@ -254,7 +254,13 @@ function createViewMenu(state: AppMenuState): MenuItemConstructorOptions {
         accelerator: accelerator(state, 'CmdOrCtrl+R'),
         click: () => focusedRegisteredSurface()?.window.webContents.reload(),
       },
-      { role: 'togglefullscreen', label: t('menu.view.toggle-full-screen') },
+      // On macOS AppKit already injects an "Enter Full Screen" entry into
+      // the View menu whenever the window is fullscreenable (the default),
+      // so adding one here produces a duplicate. Skip it on darwin and let
+      // the system own the entry — that gives us free localization,
+      // ⌃⌘F, and a native full-screen transition. On Windows / Linux
+      // Electron does not auto-provide it, so we add it manually.
+      ...(state.isMac ? [] : [{ role: 'togglefullscreen' as const, label: t('menu.view.toggle-full-screen') }]),
       separator(),
       state.shortcutsDisabled
         ? {
