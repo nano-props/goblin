@@ -8,7 +8,7 @@ function makeTerminalHost(overrides: Partial<ServerTerminalHost> = {}): ServerTe
   const isValidClientId = ((value: unknown): value is string => typeof value === 'string') as never
   return {
     isValidClientId,
-    getDiagnostics: vi.fn(async () => ({}) as never),
+    getDiagnostics: vi.fn(() => ({}) as never),
     registerSocket: vi.fn(),
     unregisterSocket: vi.fn(),
     attach: vi.fn(async () => ({ ok: true }) as never),
@@ -17,11 +17,11 @@ function makeTerminalHost(overrides: Partial<ServerTerminalHost> = {}): ServerTe
     resize: vi.fn(async () => ({ ok: true }) as never),
     takeover: vi.fn(async () => ({ ok: true }) as never),
     close: vi.fn(async () => ({ ok: true }) as never),
-    notifyBell: vi.fn(async () => ({ ok: true }) as never),
     listSessions: vi.fn(async () => []),
     create: vi.fn(async () => ({ ok: true }) as never),
     prune: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
     getSessionSnapshot: vi.fn(async () => null),
+    reorder: vi.fn(async () => true),
     handleRealtimeMessage: vi.fn(),
     shutdown: vi.fn(),
     ...overrides,

@@ -83,6 +83,12 @@ export class TerminalRealtimeBroker {
     return (this.socketsByClientId.get(clientId)?.size ?? 0) > 0
   }
 
+  socketCount(): number {
+    let total = 0
+    for (const sockets of this.socketsByClientId.values()) total += sockets.size
+    return total
+  }
+
   disconnectAll(): void {
     for (const sockets of this.socketsByClientId.values()) {
       for (const socket of Array.from(sockets)) {

@@ -17,6 +17,7 @@ import {
   type TerminalCreateInput,
   type TerminalSessionSummary,
 } from '#/shared/terminal.ts'
+import { formatTerminalSessionKey, parseTerminalSessionKey, terminalSessionScope } from '#/shared/terminal-session-key.ts'
 
 interface EnsureTerminalCatalogInput {
   repoRoot: string
@@ -61,7 +62,7 @@ interface TerminalCatalogEnsureSessionInput {
 }
 
 interface TerminalCatalogManager {
-  ensureSession(input: TerminalCatalogEnsureSessionInput): TerminalAttachResult
+  ensureSession(input: TerminalCatalogEnsureSessionInput): Promise<TerminalAttachResult>
   listSessions(repoRoot: string): Promise<TerminalSessionSummary[]>
   closeSession(sessionId: string): void
 }
@@ -96,14 +97,11 @@ class TerminalCatalog {
 
     const sessionScope = terminalSessionScope(input.repoRoot)
     const existingSessions = await this.options.manager.listSessions(sessionScope)
-    // Build the target session key from the same form the manager uses to
-    // scope listSessions — without this normalization, on Windows a
-    // forward-slash path like "C:/Users/foo" never matches a session
-    // keyed by its resolved "C:\Users\foo" form, so the existing-session
-    // lookup falls through and every reopen lands in the 'created'
-    // branch instead of 'restored'/'reused'.
-    const targetSessionKey = sessionKey(
-      terminalSessionScope(input.repoRoot),
+    // Build the target session key from the same form the manager uses
+    // to scope listSessions — see the comment on `terminalSessionScope`
+    // in shared/terminal-session-key.ts for the normalization rationale.
+    const targetSessionKey = formatTerminalSessionKey(
+      sessionScope,
       isRemoteRepoId(input.repoRoot) ? input.worktreePath : path.resolve(input.worktreePath),
       terminalId,
     )
@@ -156,7 +154,7 @@ class TerminalCatalog {
     const liveWorktreePaths = new Set(worktrees.map((worktree) => path.resolve(worktree.path)))
     let pruned = 0
     for (const session of allSessions) {
-      const parsed = parseSessionKey(session.key)
+      const parsed = parseTerminalSessionKey(session.key)
       if (!parsed) continue
       if (path.resolve(parsed.repoRoot) !== path.resolve(repoRoot)) continue
       if (liveWorktreePaths.has(path.resolve(parsed.worktreePath))) continue
@@ -176,7 +174,7 @@ class TerminalCatalog {
     const sessions = await this.options.manager.listSessions(scopedRepoRoot)
     let maxIndex = 0
     for (const session of sessions) {
-      const parsed = parseSessionKey(session.key)
+      const parsed = parseTerminalSessionKey(session.key)
       if (!parsed || parsed.repoRoot !== scopedRepoRoot || parsed.worktreePath !== scopedWorktreePath) continue
       const index = parseTerminalIdIndex(parsed.terminalId)
       if (index === null) continue
@@ -208,7 +206,7 @@ class TerminalCatalog {
       cols: context.cols,
       rows: context.rows,
     })
-    const result = this.options.manager.ensureSession({
+    const result = await this.options.manager.ensureSession({
       ownerId: clientId,
       scope: input.repoRoot,
       key: context.targetSessionKey,
@@ -242,7 +240,7 @@ class TerminalCatalog {
 
     const repoRoot = path.resolve(input.repoRoot)
     const worktreePath = path.resolve(resolved.path)
-    const result = this.options.manager.ensureSession({
+    const result = await this.options.manager.ensureSession({
       ownerId: clientId,
       scope: repoRoot,
       key: context.targetSessionKey,
@@ -279,20 +277,6 @@ function toEnsureResult(
     canonicalCols: snapshotResult.canonicalCols,
     canonicalRows: snapshotResult.canonicalRows,
   }
-}
-
-function sessionKey(repoRoot: string, worktreePath: string, terminalId?: string): string {
-  return `${repoRoot}\0${worktreePath}\0${terminalId ?? formatTerminalId(1)}`
-}
-
-function parseSessionKey(key: string): { repoRoot: string; worktreePath: string; terminalId: string } | null {
-  const parts = key.split('\0')
-  if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return null
-  return { repoRoot: parts[0], worktreePath: parts[1], terminalId: parts[2] }
-}
-
-function terminalSessionScope(repoRoot: string): string {
-  return isRemoteRepoId(repoRoot) ? repoRoot : path.resolve(repoRoot)
 }
 
 export function createTerminalCatalog(options: TerminalCatalogOptions): TerminalCatalog {

@@ -235,7 +235,13 @@ const MIN_TERMINAL_COLS = 1
 const MAX_TERMINAL_COLS = 500
 const MIN_TERMINAL_ROWS = 1
 const MAX_TERMINAL_ROWS = 300
-const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
+// Cap the data inside a single `write` request. The realtime route
+// also enforces a per-WS-message cap that is intentionally identical
+// (see `TERMINAL_WS_MESSAGE_LIMIT_BYTES` in `src/server/routes/realtime.ts`).
+// Both caps use the same constant below so a change to one cap cannot
+// silently grow the attack surface.
+export const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
+export const TERMINAL_WS_MESSAGE_LIMIT_BYTES = MAX_TERMINAL_WRITE_CHARS
 const TERMINAL_SESSION_ID_RE = /^[A-Za-z0-9_-]{16,64}$/
 const TERMINAL_ATTACHMENT_ID_RE = /^[A-Za-z0-9_-]{1,128}$/
 const TERMINAL_REQUEST_ID_RE = /^[A-Za-z0-9_-]{1,128}$/

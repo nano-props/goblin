@@ -4,7 +4,6 @@ import { WebSocketServer } from 'ws'
 import { serverLogger } from '#/server/logger.ts'
 import { disconnectAllInvalidationSockets } from '#/server/modules/invalidation-broker.ts'
 import { createServerRuntime } from '#/server/runtime.ts'
-import { resolveTerminalWorkerEntry } from '#/server/terminal/terminal-worker-entry.ts'
 
 const DEFAULT_HOST = '127.0.0.1'
 const DEFAULT_PORT = 32100
@@ -23,8 +22,8 @@ export interface BootstrappedServer {
 }
 
 export interface BootstrapServerOptions {
-  terminalWorkerDir?: string
-  terminalWorkerEntry?: string
+  /** Path to the bundled PTY worker entry. Enables subprocess PTY isolation. */
+  ptyWorkerEntry?: string
   exit?: (code: number) => void
 }
 
@@ -32,15 +31,11 @@ export function bootstrapServer(options: BootstrapServerOptions = {}): Bootstrap
   const startedAt = Date.now()
   const hostname = process.env.GOBLIN_SERVER_HOST?.trim() || DEFAULT_HOST
   const port = parsePort(process.env.GOBLIN_SERVER_PORT)
-  const terminalWorkerEntry =
-    options.terminalWorkerEntry ??
-    (options.terminalWorkerDir ? resolveTerminalWorkerEntry(options.terminalWorkerDir) : null)
-  if (!terminalWorkerEntry) throw new Error('terminal worker entry or dir is required')
   const runtime = createServerRuntime({
     version: process.env.npm_package_version?.trim() || '0.1.0',
     startedAt,
     internalSecret: process.env.GOBLIN_SERVER_INTERNAL_SECRET?.trim() || '',
-    terminalWorkerEntry,
+    ptyWorkerEntry: options.ptyWorkerEntry,
     serverHost: hostname,
     serverPort: port,
   })

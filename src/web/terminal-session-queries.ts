@@ -1,16 +1,16 @@
-import { queryOptions } from '@tanstack/react-query'
 import type { TerminalSessionSummary } from '#/shared/terminal.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 
-export function terminalSessionsQueryKey(repoRoot: string) {
-  return ['terminal-sessions', repoRoot] as const
-}
-
-export function terminalSessionsQueryOptions(repoRoot: string) {
-  return queryOptions<TerminalSessionSummary[]>({
-    queryKey: terminalSessionsQueryKey(repoRoot),
-    queryFn: () => terminalBridge.listSessions({ repoRoot }),
-    staleTime: 0,
-    gcTime: 5 * 60_000,
-  })
+// Plain async loader for a repo's terminal session list. The
+// TerminalSessionRegistry is the single source of truth for session
+// state; this loader is only used by the provider to refetch the
+// list when a `sessions-changed` realtime event arrives. It used
+// to be wrapped in a TanStack Query `queryOptions` (the only
+// remaining call site), but the wrapper added no caching, dedup,
+// or refetch control that the provider needed — the provider
+// already drives the refetch lifecycle on its own. Keeping the
+// loader as a plain async function means there is no second
+// client-side state surface to keep in sync with the registry.
+export async function loadTerminalSessions(repoRoot: string): Promise<TerminalSessionSummary[]> {
+  return await terminalBridge.listSessions({ repoRoot })
 }

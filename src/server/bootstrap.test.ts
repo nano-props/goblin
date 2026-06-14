@@ -76,7 +76,6 @@ describe('bootstrap server shutdown', () => {
     const { bootstrapServer } = await import('#/server/bootstrap.ts')
 
     const server = bootstrapServer({
-      terminalWorkerEntry: '/tmp/terminal-worker.ts',
       exit,
     })
     const stopPromise = server.stop()

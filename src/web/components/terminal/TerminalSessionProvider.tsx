@@ -11,8 +11,7 @@ import {
   TerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import { readOrCreateWebTerminalAttachmentId } from '#/web/renderer-terminal-bridge.ts'
-import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
-import { terminalSessionsQueryKey, terminalSessionsQueryOptions } from '#/web/terminal-session-queries.ts'
+import { loadTerminalSessions } from '#/web/terminal-session-queries.ts'
 import { TerminalSessionRegistry } from '#/web/components/terminal/TerminalSessionRegistry.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { repoIndexEqual, repoIndexFromRepos } from '#/web/components/terminal/terminal-repo-index.ts'
@@ -81,7 +80,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       if (!repoRoot || !repoIndexRef.current[repoRoot]) return
       try {
         const attachmentId = readOrCreateWebTerminalAttachmentId()
-        const serverSessions = await mainWindowQueryClient.fetchQuery(terminalSessionsQueryOptions(repoRoot))
+        const serverSessions = await loadTerminalSessions(repoRoot)
         const snapshotsBySessionId = await loadMissingSnapshots(serverSessions)
         if (!repoIndexRef.current[repoRoot]) return
         registry.reconcileServerSessions(repoRoot, serverSessions, attachmentId, snapshotsBySessionId)
@@ -152,7 +151,6 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     window.addEventListener('focus', handleFocus)
 
     const offSessionsChanged = terminalBridge.onSessionsChanged((repoRoot) => {
-      void mainWindowQueryClient.invalidateQueries({ queryKey: terminalSessionsQueryKey(repoRoot), exact: true })
       void syncServerSessions(repoRoot)
     })
 

@@ -346,9 +346,9 @@ if (!existsSync(serverDistEntry)) {
   console.error(`Error: server build artifact missing: ${serverDistEntry}`)
   process.exit(1)
 }
-const terminalWorkerDistEntry = path.join(repoRoot, 'dist/server/terminal-worker.js')
-if (!existsSync(terminalWorkerDistEntry)) {
-  console.error(`Error: server build artifact missing: ${terminalWorkerDistEntry}`)
+const ptyWorkerDistEntry = path.join(repoRoot, 'dist/server/pty-worker.js')
+if (!existsSync(ptyWorkerDistEntry)) {
+  console.error(`Error: PTY worker build artifact missing: ${ptyWorkerDistEntry}`)
   process.exit(1)
 }
 

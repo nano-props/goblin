@@ -1,0 +1,90 @@
+import crypto from 'node:crypto'
+import { resolveLocalShell } from '#/server/terminal/terminal-local-shell.ts'
+import { spawnTerminalPtyRuntime, type TerminalPtyRuntime } from '#/server/terminal/terminal-pty-runtime.ts'
+import {
+  createPtyHandle,
+  type PtyHandle,
+  type PtySpawnInput,
+  type PtySpawnResult,
+  type PtySupervisor,
+} from '#/server/terminal/pty-supervisor.ts'
+
+interface PtyEntry {
+  runtime: TerminalPtyRuntime
+  processName: string
+}
+
+export function createInProcessPtySupervisor(): PtySupervisor {
+  const entries = new Map<string, PtyEntry>()
+  let shuttingDown = false
+
+  return {
+    mode: 'in-process',
+    async spawn(input: PtySpawnInput): Promise<PtySpawnResult> {
+      const result = spawnTerminalPtyRuntime(input)
+      if (!result.ok) return { ok: false, message: result.message }
+      const handle = createPtyHandle(createPtySessionId())
+      const processName = result.runtime.processName()
+      entries.set(handle.sessionId, { runtime: result.runtime, processName })
+      return { ok: true, handle, processName }
+    },
+    write(handle, data) {
+      entries.get(handle.sessionId)?.runtime.write(data)
+    },
+    resize(handle, cols, rows) {
+      entries.get(handle.sessionId)?.runtime.resize(cols, rows)
+    },
+    kill(handle) {
+      entries.get(handle.sessionId)?.runtime.kill()
+    },
+    onData(handle, listener) {
+      const entry = entries.get(handle.sessionId)
+      if (!entry) return { dispose: () => {} }
+      return entry.runtime.onData(listener)
+    },
+    onExit(handle, listener) {
+      const entry = entries.get(handle.sessionId)
+      if (!entry) return { dispose: () => {} }
+      // node-pty's onExit only signals "exited" without (code, signal).
+      // The supervisor contract carries both; we pass nulls because the
+      // worker is the source of truth for exit metadata and the in-process
+      // variant cannot recover it after the fact.
+      return entry.runtime.onExit(() => listener(null, null))
+    },
+    processName(handle) {
+      return entries.get(handle.sessionId)?.processName ?? 'terminal'
+    },
+    getDiagnostics() {
+      return {
+        mode: 'in-process',
+        state: shuttingDown ? 'shutting-down' : entries.size > 0 ? 'running' : 'idle',
+        workerRunning: false,
+        workerPid: null,
+        workerStartedAt: null,
+        workerUptimeMs: null,
+        pendingRequests: 0,
+        restartAttempts: 0,
+        restartScheduled: false,
+        shuttingDown,
+        lastSuccessfulResponseAt: null,
+        lastExitCode: null,
+        lastExitSignal: null,
+        lastFailure: null,
+      }
+    },
+    shutdown() {
+      if (shuttingDown) return
+      shuttingDown = true
+      for (const entry of Array.from(entries.values())) {
+        try {
+          entry.runtime.kill()
+        } catch {}
+      }
+      entries.clear()
+    },
+  }
+}
+
+function createPtySessionId(): string {
+  return `pty_${crypto.randomUUID()}`
+}

@@ -12,6 +12,7 @@ import {
   type TerminalSessionSummary,
   type TerminalTakeoverResult,
 } from '#/shared/terminal.ts'
+import { parseTerminalSessionKey } from '#/shared/terminal-session-key.ts'
 import { serverLogger } from '#/server/logger.ts'
 import {
   attachTerminalAttachment,
@@ -29,7 +30,7 @@ import {
   takeSnapshot,
   type TerminalRenderState,
 } from '#/server/terminal/terminal-render-state.ts'
-import { spawnTerminalPtyRuntime, type TerminalPtyRuntime } from '#/server/terminal/terminal-pty-runtime.ts'
+import type { PtyHandle, PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 const SESSION_ID_RE = /^[A-Za-z0-9_-]{16,64}$/
@@ -59,7 +60,7 @@ interface TerminalSession<TOwner extends string | number> {
   args?: string[]
   cols: number
   rows: number
-  pty: TerminalPtyRuntime | null
+  pty: PtyHandle | null
   disposables: Array<{ dispose: () => void }>
   render: TerminalRenderState
   processName: string
@@ -86,12 +87,14 @@ export class TerminalSessionManager<TOwner extends string | number> {
   private readonly sessionsById = new Map<string, TerminalSession<TOwner>>()
   private readonly sessionIdByOwnerKey = new Map<string, string>()
   private readonly sink: TerminalEventSink<TOwner>
+  private readonly ptySupervisor: PtySupervisor
 
-  constructor(sink: TerminalEventSink<TOwner>) {
+  constructor(ptySupervisor: PtySupervisor, sink: TerminalEventSink<TOwner>) {
+    this.ptySupervisor = ptySupervisor
     this.sink = sink
   }
 
-  ensureSession(input: TerminalEnsureSessionInput<TOwner>): TerminalAttachResult {
+  async ensureSession(input: TerminalEnsureSessionInput<TOwner>): Promise<TerminalAttachResult> {
     const size = normalizeTerminalSize(input.cols, input.rows)
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
 
@@ -140,17 +143,23 @@ export class TerminalSessionManager<TOwner extends string | number> {
         ? { attachmentId: input.attachmentId, status: 'connected' }
         : null
     }
-    const spawnResult = this.spawnSessionPty(session)
-    if (!spawnResult.ok) {
+    const result = await this.spawnSessionPty(session)
+    if (!result.ok) {
+      // Spawn failed: do not leave a zombie session in the maps. The
+      // catalog would otherwise find it on retry and surface it as a
+      // successful attach with an empty buffer and a null pty — i.e.
+      // a blank, non-responsive terminal. `closeSession` removes the
+      // map entry and frees pty/listener resources via the standard
+      // disposal path.
       this.closeSession(id)
-      return spawnResult
+      return result
     }
-    return spawnResult
+    return result
   }
 
   writeSession(ownerId: TOwner, sessionId: string, data: string, attachmentId?: string): boolean {
     if (!isValidTerminalSessionId(sessionId) || !isValidTerminalWriteData(data)) return false
-    const session = this.ownedSession(ownerId, sessionId)
+    const session = this.getSession(ownerId, sessionId)
     if (!session?.pty) return false
     if (attachmentId && session.controller?.attachmentId !== attachmentId) return false
     session.inputQueue.push(data)
@@ -169,7 +178,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     if (!isValidTerminalSessionId(sessionId)) return { ok: false, message: 'error.invalid-arguments' }
     const size = normalizeTerminalSize(cols, rows)
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
-    const session = this.ownedSession(ownerId, sessionId)
+    const session = this.getSession(ownerId, sessionId)
     if (!session) return { ok: false, message: 'error.invalid-arguments' }
     if (attachmentId) {
       registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
@@ -189,7 +198,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     if (!isValidTerminalSessionId(sessionId)) return false
     const size = normalizeTerminalSize(cols, rows)
     if (!size) return false
-    const session = this.ownedSession(ownerId, sessionId)
+    const session = this.getSession(ownerId, sessionId)
     if (!session) return false
     if (!attachmentId) return false
     registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
@@ -208,7 +217,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     if (!isValidTerminalSessionId(sessionId)) return { ok: false, message: 'error.invalid-arguments' }
     const size = normalizeTerminalSize(cols, rows)
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
-    const session = this.ownedSession(ownerId, sessionId)
+    const session = this.getSession(ownerId, sessionId)
     if (!session) return { ok: false, message: 'error.invalid-arguments' }
     if (attachmentId) {
       registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
@@ -218,31 +227,29 @@ export class TerminalSessionManager<TOwner extends string | number> {
     return { ok: false, message: 'error.invalid-arguments' }
   }
 
-  restartSession(
+  async restartSession(
     ownerId: TOwner,
     sessionId: string,
     cols: number,
     rows: number,
     attachmentId?: string,
     attachmentConnected?: boolean,
-  ): TerminalAttachResult {
+  ): Promise<TerminalAttachResult> {
     if (!isValidTerminalSessionId(sessionId)) return { ok: false, message: 'error.invalid-arguments' }
     const size = normalizeTerminalSize(cols, rows)
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
-    const session = this.ownedSession(ownerId, sessionId)
+    const session = this.getSession(ownerId, sessionId)
     if (!session) return { ok: false, message: 'error.invalid-arguments' }
     if (attachmentId) {
       registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
       restartTerminalAttachmentControl(session, attachmentId)
     }
     this.resetSessionState(session, size.cols, size.rows)
-    const spawnResult = this.spawnSessionPty(session)
-    if (!spawnResult.ok) return spawnResult
-    return this.attachResult(session)
+    return await this.spawnSessionPty(session)
   }
 
   closeOwnedSession(ownerId: TOwner, sessionId: string): boolean {
-    if (!this.ownedSession(ownerId, sessionId)) return false
+    if (!this.getSession(ownerId, sessionId)) return false
     this.closeSession(sessionId)
     return true
   }
@@ -280,13 +287,6 @@ export class TerminalSessionManager<TOwner extends string | number> {
       if (session.ownerId !== ownerId) continue
       if (!releaseTerminalAttachmentControl(session, attachmentId)) continue
       this.emitOwnership(session)
-    }
-  }
-
-  pruneScope(ownerId: TOwner, scope: string, liveKeys: Set<string>): void {
-    for (const session of Array.from(this.sessionsById.values())) {
-      const key = terminalPruneKey(session.key)
-      if (session.ownerId === ownerId && session.scope === scope && !liveKeys.has(key)) this.closeSession(session.id)
     }
   }
 
@@ -353,12 +353,10 @@ export class TerminalSessionManager<TOwner extends string | number> {
     return max + 1
   }
 
-  private ownedSession(ownerId: TOwner, sessionId: string): TerminalSession<TOwner> | undefined {
-    if (!this.isValidOwnerId(ownerId) || !isValidTerminalSessionId(sessionId)) return undefined
-    const session = this.sessionsById.get(sessionId)
-    return session?.ownerId === ownerId ? session : undefined
-  }
-
+  // Look up a session by id and verify it belongs to the given
+  // owner. Public so the runtime can resolve the scope for
+  // `sessions-changed` broadcasts without exposing the rest of the
+  // session internals.
   getSession(ownerId: TOwner, sessionId: string): TerminalSession<TOwner> | undefined {
     if (!this.isValidOwnerId(ownerId) || !isValidTerminalSessionId(sessionId)) return undefined
     const session = this.sessionsById.get(sessionId)
@@ -384,7 +382,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     if (!session.pty) return false
     if (session.cols === cols && session.rows === rows) return true
     try {
-      session.pty.resize(cols, rows)
+      this.ptySupervisor.resize(session.pty, cols, rows)
       session.cols = cols
       session.rows = rows
       this.emitOwnership(session)
@@ -450,20 +448,32 @@ export class TerminalSessionManager<TOwner extends string | number> {
     session.inputFlushScheduled = false
   }
 
-  private spawnSessionPty(session: TerminalSession<TOwner>): TerminalAttachResult {
-    const spawnResult = spawnTerminalPtyRuntime({
-      command: session.command,
-      args: session.args,
-      cwd: session.cwd,
-      cols: session.cols,
-      rows: session.rows,
-    })
-    if (!spawnResult.ok) {
-      this.disposeSessionResources(session)
-      return spawnResult
+  private async spawnSessionPty(session: TerminalSession<TOwner>): Promise<TerminalAttachResult> {
+    // We do NOT call `disposeSessionResources` on the failure path
+    // here. The caller decides what to do with a failed spawn:
+    //   - `ensureSession` removes the just-created session from the
+    //     maps so the catalog doesn't surface a zombie on retry.
+    //   - `restartSession` keeps the session in the maps (the new
+    //     pty simply wasn't created) so a later retry can succeed.
+    // In both cases the failed spawn itself does not need any
+    // listener/pty cleanup — the spawn attempt never wired them.
+    let resolved: { ok: true; handle: PtyHandle; processName: string } | { ok: false; message: string }
+    try {
+      resolved = await this.ptySupervisor.spawn({
+        command: session.command,
+        args: session.args,
+        cwd: session.cwd,
+        cols: session.cols,
+        rows: session.rows,
+      })
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : 'error.unknown' }
     }
-    session.pty = spawnResult.runtime
-    session.processName = session.pty.processName()
+    if (!resolved.ok) {
+      return resolved
+    }
+    session.pty = resolved.handle
+    session.processName = resolved.processName
     // Track the last broadcast title so we don't spam the client with
     // the same title on every chunk. The render state only mutates
     // `title` when the captured OSC value differs from the previous
@@ -472,18 +482,19 @@ export class TerminalSessionManager<TOwner extends string | number> {
     // render state) so the first chunk does not broadcast a spurious
     // `canonicalTitle: null` event before the shell has set anything.
     let lastBroadcastTitle: string | null = session.render.title
+    const handle = resolved.handle
     session.disposables.push(
-      session.pty.onData((data) => {
+      this.ptySupervisor.onData(handle, (data) => {
         const seq = appendOutput(session.render, data)
         if (session.render.title !== lastBroadcastTitle) {
           lastBroadcastTitle = session.render.title
           // Title OSC and exec events travel together: when the shell
           // exec's a new command (e.g. zsh -> bash -> vim) the child
           // updates both its title and its /proc-style name atomically.
-          // Reading `pty.process` on every chunk is a syscall on Unix
-          // (kill(pid, 0) + comm read) so we sample it only on this
-          // cheap-and-reliable title-change signal.
-          const nextName = session.pty?.processName()
+          // Reading the process name on every chunk would be a syscall
+          // on Unix (kill(pid, 0) + comm read) so we sample it only on
+          // this cheap-and-reliable title-change signal.
+          const nextName = this.ptySupervisor.processName(handle)
           if (nextName && nextName !== session.processName) session.processName = nextName
           this.sink.onTitle?.(session.ownerId, {
             sessionId: session.id,
@@ -499,7 +510,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
       }),
     )
     session.disposables.push(
-      session.pty.onExit(() => {
+      this.ptySupervisor.onExit(handle, () => {
         session.pty = null
         this.sink.onExit(session.ownerId, { sessionId: session.id })
         this.closeSession(session.id)
@@ -512,7 +523,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     disposeSessionListeners(session)
     if (session.pty) {
       try {
-        session.pty.kill()
+        this.ptySupervisor.kill(session.pty)
       } catch (err) {
         sessionManagerLogger.warn({ sessionId: session.id, err }, 'failed to kill PTY')
       }
@@ -535,7 +546,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     if (session.inputQueue.length === 0 || !session.pty) return
     const batch = session.inputQueue.splice(0).join('')
     try {
-      session.pty.write(batch)
+      this.ptySupervisor.write(session.pty, batch)
     } catch (err) {
       sessionManagerLogger.warn({ sessionId: session.id, err, bytes: batch.length }, 'failed to write PTY')
     }
@@ -571,12 +582,6 @@ function createSessionId(): string {
   return `term_${crypto.randomUUID()}`
 }
 
-function terminalPruneKey(key: string): string {
-  const parts = key.split('\0')
-  return parts.length >= 2 ? `${parts[0]}\0${parts[1]}` : key
-}
-
 function parseWorktreePathFromKey(key: string): string | null {
-  const parts = key.split('\0')
-  return parts.length >= 3 ? parts[1]! : null
+  return parseTerminalSessionKey(key)?.worktreePath ?? null
 }

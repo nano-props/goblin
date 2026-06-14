@@ -15,7 +15,7 @@
     "build": "bun scripts/build.ts",
     "build:preload": "bun scripts/build-preload.ts",
     "build:web": "vite build",
-    "build:server": "bun build ./src/server/entrypoints/main.ts ./src/server/entrypoints/terminal-worker.ts --outdir ./dist/server --target node --external node-pty",
+    "build:server": "bun build ./src/server/entrypoints/main.ts ./src/server/entrypoints/pty-worker.ts --outdir ./dist/server --target node --external node-pty",
     "start:server": "node scripts/start-server.ts",
     "build:electron": "electron-builder",
     "check:architecture": "bun scripts/check-architecture.ts",

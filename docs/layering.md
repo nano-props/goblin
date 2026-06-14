@@ -217,9 +217,14 @@ It also shows that not every complex feature needs a separate runtime facade lay
 ### Terminal
 
 - boundary: `src/server/routes/realtime.ts`, `src/web/terminal.ts`
-- read: `src/web/terminal-session-queries.ts`
-- write: `src/server/terminal/terminal.ts` (session mutation orchestration)
-- source: `src/server/terminal/terminal-session-manager.ts`, `src/server/terminal/terminal-pty-runtime.ts`
+- read: `src/web/terminal-session-queries.ts` (loader helper), `src/web/components/terminal/TerminalSessionRegistry.ts` (read projection)
+- write: `src/server/terminal/terminal-runtime.ts` (factory; the only owner of session/catalog/broker/dispatch), `src/web/components/terminal/TerminalSessionRegistry.ts` (renderer-side write paths for `attach`/`select`/`create`)
+- source: `src/server/terminal/terminal-session-manager.ts` (in-process state for sessions, ownership, render), `src/server/terminal/pty-supervisor.ts` (PtySupervisor interface), `src/server/terminal/pty-supervisor-inprocess.ts` + `pty-supervisor-worker.ts` (PTY pool impls)
+- protocol types: `src/shared/terminal.ts` (client↔server wire types + valibot schemas), `src/shared/terminal-session-key.ts` (canonical session/worktree key encoding), `src/server/terminal/pty-worker-protocol.ts` (main↔PTY-worker wire types)
+
+The server-side terminal runtime is created by `createServerTerminalRuntime({ ptySupervisor })` and is the only place that implements `ServerTerminalHost`. The realtime route receives the host via dependency injection from the server factory. The TerminalSessionProvider on the renderer side keeps `TerminalSessionRegistry` as the single source of truth for live session state and uses the bridge only for fetches and mutations.
+
+**PtySupervisor exit metadata — deliberate asymmetry.** The in-process supervisor (`pty-supervisor-inprocess.ts`) reports `pty-exit` to listeners as `(code, signal) = (null, null)` because `node-pty`'s `onExit` only signals "exited" without those values, and by the time the callback fires the underlying term is already gone. The worker-backed supervisor delivers the real values carried by the IPC `pty-exit` event. The session manager does not currently branch on `code`/`signal` — `pty === null` is the canonical "session ended" signal — so the asymmetry is invisible at higher layers. A future need for `code`/`signal` (e.g. for status-bar UI) would require a more invasive change: the in-process supervisor would have to register an `onExit` listener at spawn time and persist the metadata, similar to how it currently caches the process name.
 
 ### Smaller UI interactions
 

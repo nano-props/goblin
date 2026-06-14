@@ -2,11 +2,19 @@ import type { Hono } from 'hono'
 import { createApp, type ServerAppOptions } from '#/server/app-factory.ts'
 import { stopBackgroundSync } from '#/server/modules/background-sync.ts'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
-import { WorkerBackedTerminalHost } from '#/server/terminal/terminal-worker-host.ts'
+import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-inprocess.ts'
+import { WorkerBackedPtySupervisor } from '#/server/terminal/pty-supervisor-worker.ts'
+import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.ts'
 
 export interface ServerRuntimeOptions extends Omit<ServerAppOptions, 'terminalHost' | 'serverHost' | 'serverPort'> {
   terminalHost?: ServerTerminalHost
-  terminalWorkerEntry?: string
+  /**
+   * On-disk path of the bundled PTY worker entry. When provided, the
+   * runtime uses a dedicated subprocess for node-pty work, so a PTY
+   * crash never tears down the main process. When omitted the runtime
+   * hosts PTY sessions in-process (cheap, useful for tests).
+   */
+  ptyWorkerEntry?: string
   serverHost: string
   serverPort: number
 }
@@ -18,8 +26,15 @@ export interface ServerRuntime {
 }
 
 export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntime {
-  const { terminalHost: providedTerminalHost, terminalWorkerEntry, serverHost, serverPort, ...appOptions } = options
-  const terminalHost = providedTerminalHost ?? new WorkerBackedTerminalHost({ workerEntry: terminalWorkerEntry })
+  const { terminalHost: providedTerminalHost, ptyWorkerEntry, serverHost, serverPort, ...appOptions } = options
+  const runtime = providedTerminalHost
+    ? null
+    : createServerTerminalRuntime({
+        ptySupervisor: ptyWorkerEntry
+          ? new WorkerBackedPtySupervisor({ workerEntry: ptyWorkerEntry })
+          : createInProcessPtySupervisor(),
+      })
+  const terminalHost = providedTerminalHost ?? (runtime?.host as ServerTerminalHost)
   const app = createApp({ ...appOptions, terminalHost, serverHost, serverPort })
   let stopped = false
   return {
@@ -29,7 +44,11 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
       if (stopped) return
       stopped = true
       stopBackgroundSync()
-      terminalHost.shutdown()
+      if (runtime) {
+        runtime.shutdown()
+      } else {
+        terminalHost.shutdown()
+      }
     },
   }
 }

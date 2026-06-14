@@ -4,7 +4,7 @@ import type {
   TerminalCatalogMutationResult,
   TerminalCreateInput,
   TerminalMutationResult,
-  TerminalNotifyBellInput,
+  TerminalReorderInput,
   TerminalResizeInput,
   TerminalRestartInput,
   TerminalSessionInput,
@@ -18,40 +18,55 @@ import type {
 
 type MaybePromise<T> = T | Promise<T>
 
-export interface ServerTerminalSocket {
-  send(data: string): void
-  close(code?: number, reason?: string): void
-}
+// Re-export the broker's socket interface as the host's socket
+// interface. They are structurally identical; the host's contract
+// for a realtime socket is the same as the broker's contract for
+// one. Defining the alias here (instead of duplicating the shape)
+// keeps the two layers in lockstep when the wire protocol grows.
+import type { TerminalRealtimeSocket } from '#/server/terminal/terminal-realtime-broker.ts'
+export type { TerminalRealtimeSocket }
+export type ServerTerminalSocket = TerminalRealtimeSocket
 
-export interface ServerTerminalWorkerFailureDiagnostics {
+export type ServerTerminalHostState = 'idle' | 'running' | 'shutting-down'
+
+export type PtySupervisorMode = 'in-process' | 'worker-backed'
+
+export type PtySupervisorState = 'idle' | 'running' | 'restarting' | 'shutting-down'
+
+export interface PtySupervisorFailureDiagnostics {
   kind: 'exit' | 'error' | 'send-failed'
   at: number
   detail: string
 }
 
-export type ServerTerminalHostState = 'idle' | 'running' | 'restarting' | 'shutting-down'
-
-export interface ServerTerminalHostDiagnostics {
-  mode: 'worker-backed'
-  state: ServerTerminalHostState
+export interface PtySupervisorDiagnostics {
+  mode: PtySupervisorMode
+  state: PtySupervisorState
   workerRunning: boolean
   workerPid: number | null
   workerStartedAt: number | null
   workerUptimeMs: number | null
   pendingRequests: number
-  registeredSockets: number
   restartAttempts: number
   restartScheduled: boolean
   shuttingDown: boolean
   lastSuccessfulResponseAt: number | null
   lastExitCode: number | null
   lastExitSignal: NodeJS.Signals | null
-  lastWorkerFailure: ServerTerminalWorkerFailureDiagnostics | null
+  lastFailure: PtySupervisorFailureDiagnostics | null
+}
+
+export interface ServerTerminalHostDiagnostics {
+  mode: PtySupervisorMode
+  state: ServerTerminalHostState
+  registeredSockets: number
+  shuttingDown: boolean
+  pty: PtySupervisorDiagnostics
 }
 
 export interface ServerTerminalHost {
   isValidClientId(value: unknown): value is string
-  getDiagnostics(): MaybePromise<ServerTerminalHostDiagnostics>
+  getDiagnostics(): ServerTerminalHostDiagnostics
   registerSocket(clientId: string, attachmentId: string, socket: ServerTerminalSocket): void
   unregisterSocket(clientId: string, attachmentId: string, socket: ServerTerminalSocket): void
   attach(clientId: string, input: TerminalAttachInput): MaybePromise<TerminalAttachResult>
@@ -60,7 +75,6 @@ export interface ServerTerminalHost {
   resize(clientId: string, input: TerminalResizeInput): MaybePromise<TerminalMutationResult>
   takeover(clientId: string, input: TerminalTakeoverInput): MaybePromise<TerminalTakeoverResult>
   close(clientId: string, input: TerminalSessionInput): MaybePromise<TerminalMutationResult>
-  notifyBell(clientId: string, input: TerminalNotifyBellInput): MaybePromise<TerminalMutationResult>
   listSessions(clientId: string, repoRoot: string): MaybePromise<TerminalSessionSummary[]>
   create(clientId: string, input: TerminalCreateInput): MaybePromise<TerminalCatalogMutationResult>
   prune(clientId: string, repoRoot: string): MaybePromise<{ pruned: number; remaining: number }>
@@ -68,6 +82,7 @@ export interface ServerTerminalHost {
     clientId: string,
     input: TerminalSessionSnapshotInput,
   ): MaybePromise<TerminalSessionSnapshot | null>
+  reorder(clientId: string, input: TerminalReorderInput): MaybePromise<TerminalMutationResult>
   /** Handle an incoming realtime message from a client socket. */
   handleRealtimeMessage(clientId: string, attachmentId: string, socket: ServerTerminalSocket, message: string): void
   shutdown(): void

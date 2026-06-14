@@ -7,6 +7,7 @@ import { compactTerminalProcessName, compactTerminalTitle } from '#/web/componen
 import { terminalBridge } from '#/web/terminal.ts'
 import { readOrCreateWebTerminalAttachmentId } from '#/web/renderer-terminal-bridge.ts'
 import { parseTerminalIdIndex, resolveTerminalOwnership } from '#/shared/terminal.ts'
+import { parseTerminalSessionKey } from '#/shared/terminal-session-key.ts'
 import type {
   TerminalSessionSnapshot,
   TerminalSessionSummary as ServerTerminalSessionSummary,
@@ -27,11 +28,9 @@ const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
   processName: 'terminal',
   canonicalTitle: null,
 }
-function parseServerSessionKey(key: string): { repoRoot: string; worktreePath: string; terminalId: string } | null {
-  const parts = key.split('\0')
-  if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return null
-  return { repoRoot: parts[0], worktreePath: parts[1], terminalId: parts[2] }
-}
+// Re-exported for any callers that still want the parser under its
+// renderer-side name.
+export const parseServerSessionKey = parseTerminalSessionKey
 
 interface ReattachSnapshotCacheEntry {
   sessionId: string
@@ -144,15 +143,50 @@ export class TerminalSessionRegistry {
     snapshotsBySessionId: ReadonlyMap<string, TerminalSessionSnapshot>,
   ): void {
     if (!this.repoIndex[repoRoot]) return
-    const serverSessionsByKey = new Map(serverSessions.map((session) => [session.key, session]))
-    const controllerKeyByWorktree = new Map<string, string>()
-    const touchedWorktrees = new Set<string>()
-    const localKeys = Array.from(this.sessions.entries())
+
+    const localKeysBefore = Array.from(this.sessions.entries())
       .filter(([, session]) => session.descriptor.repoRoot === repoRoot)
       .map(([key]) => key)
 
+    const { controllerKeyByWorktree, touchedWorktrees, missingLocalCount } = this.materializeServerSessions(
+      repoRoot,
+      serverSessions,
+      attachmentId,
+      snapshotsBySessionId,
+    )
+
+    const serverKeys = new Set(serverSessions.map((s) => s.key))
+    const orphanedLocalCount = this.evictOrphanedLocalSessions(repoRoot, serverKeys)
+
+    this.resolveSelectedKeysForTouchedWorktrees(touchedWorktrees, controllerKeyByWorktree)
+
+    if (missingLocalCount > 0 || orphanedLocalCount > 0) {
+      console.debug('[TerminalSessionProvider] sync results for', repoRoot, ':', {
+        serverSessions: serverSessions.length,
+        localSessions: localKeysBefore.length,
+        missingLocal: missingLocalCount,
+        orphanedLocal: orphanedLocalCount,
+      })
+    }
+  }
+
+  // Phase 1: for each server session, ensure a local ManagedTerminalSession
+  // exists, hydrate it with the latest server-side metadata, and track
+  // which worktrees saw any change. Side effects: ensureSession,
+  // session.hydrate, displayOrderByKey, syncSessionIdIndex.
+  private materializeServerSessions(
+    repoRoot: string,
+    serverSessions: ServerTerminalSessionSummary[],
+    attachmentId: string,
+    snapshotsBySessionId: ReadonlyMap<string, TerminalSessionSnapshot>,
+  ): {
+    controllerKeyByWorktree: Map<string, string>
+    touchedWorktrees: Set<string>
+    missingLocalCount: number
+  } {
+    const controllerKeyByWorktree = new Map<string, string>()
+    const touchedWorktrees = new Set<string>()
     let missingLocalCount = 0
-    let orphanedLocalCount = 0
 
     for (const serverSession of serverSessions) {
       const parsed = parseServerSessionKey(serverSession.key)
@@ -192,34 +226,44 @@ export class TerminalSessionRegistry {
       this.displayOrderByKey.set(descriptor.key, serverSession.displayOrder)
     }
 
-    for (const key of localKeys) {
-      const session = this.sessions.get(key)
-      if (!session) continue
-      if (serverSessionsByKey.has(key)) continue
+    return { controllerKeyByWorktree, touchedWorktrees, missingLocalCount }
+  }
+
+  // Phase 2: drop local sessions that have a serverId but no longer
+  // appear on the server. Only sessions that have ever been attached
+  // (i.e. have a sessionId in our index) are eligible for eviction;
+  // never-attached local shells (purely UI placeholders) are left
+  // alone. Returns the count for the debug log.
+  private evictOrphanedLocalSessions(repoRoot: string, serverKeys: Set<string>): number {
+    let orphanedLocalCount = 0
+    for (const [key, session] of this.sessions.entries()) {
+      if (session.descriptor.repoRoot !== repoRoot) continue
+      if (serverKeys.has(key)) continue
       if (!this.sessionIdByKey.has(key)) continue
       orphanedLocalCount += 1
       this.discardLocalSessionAndDismissDetailIfLast(key, session.descriptor)
     }
+    return orphanedLocalCount
+  }
 
-    if (missingLocalCount > 0 || orphanedLocalCount > 0) {
-      console.debug('[TerminalSessionProvider] sync results for', repoRoot, ':', {
-        serverSessions: serverSessions.length,
-        localSessions: localKeys.length,
-        missingLocal: missingLocalCount,
-        orphanedLocal: orphanedLocalCount,
-      })
-    }
-
-    for (const worktreeTerminalKey of touchedWorktrees) {
-      const current = this.selectedKeyByWorktree.get(worktreeTerminalKey) ?? null
-      const preferred = this.preferredSelectedKeyByWorktree.get(worktreeTerminalKey) ?? null
+  // Phase 3: for every worktree that saw a server-side change, decide
+  // which local terminal should be selected. The selection prefers the
+  // controller of the worktree, then the user's last selection, then
+  // the first available terminal.
+  private resolveSelectedKeysForTouchedWorktrees(
+    touchedWorktrees: Set<string>,
+    controllerKeyByWorktree: Map<string, string>,
+  ): void {
+    for (const worktreeKey of touchedWorktrees) {
+      const current = this.selectedKeyByWorktree.get(worktreeKey) ?? null
+      const preferred = this.preferredSelectedKeyByWorktree.get(worktreeKey) ?? null
       const next = this.resolveSelectedTerminalKey(
-        worktreeTerminalKey,
+        worktreeKey,
         preferred,
         current,
-        controllerKeyByWorktree.get(worktreeTerminalKey) ?? null,
+        controllerKeyByWorktree.get(worktreeKey) ?? null,
       )
-      this.selectTerminalKey(worktreeTerminalKey, next)
+      this.selectTerminalKey(worktreeKey, next)
     }
   }
 

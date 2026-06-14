@@ -7,6 +7,7 @@ import {
 } from '#/server/modules/invalidation-broker.ts'
 import { safeEqualString } from '#/server/common/timing-safe.ts'
 import { errorJson } from '#/server/common/responses.ts'
+import { TERMINAL_WS_MESSAGE_LIMIT_BYTES } from '#/shared/terminal.ts'
 import type { ServerTerminalHost, ServerTerminalSocket } from '#/server/terminal/terminal-host.ts'
 
 interface RealtimeRouteOptions {
@@ -14,11 +15,13 @@ interface RealtimeRouteOptions {
   terminalHost: ServerTerminalHost
 }
 
-// Cap each terminal WS message at 1 MiB. Real terminal input is
-// a keystroke or a paste; 1 MiB covers the largest legitimate
-// paste while preventing a hostile client from streaming an
-// unbounded buffer through the worker.
-const TERMINAL_WS_MESSAGE_LIMIT_BYTES = 1 * 1024 * 1024
+// Cap each terminal WS message. Real terminal input is a keystroke
+// or a paste; the cap covers the largest legitimate paste while
+// preventing a hostile client from streaming an unbounded buffer
+// through the worker. Sourced from `shared/terminal.ts` so the
+// per-write cap (MAX_TERMINAL_WRITE_CHARS) and the per-message cap
+// stay aligned as a single invariant — see the export site for the
+// reasoning.
 
 // Server-authoritative realtime only. Native-host renderer effect intents stay
 // on Electron IPC so the server does not become a broker for local shell APIs.

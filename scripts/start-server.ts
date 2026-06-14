@@ -43,7 +43,8 @@ if (!process.env.npm_package_version?.trim()) {
 const webIndex = path.join(repoRoot, 'dist/web/index.html')
 const webBoot = path.join(repoRoot, 'dist/web/boot.js')
 const webReady = existsSync(webIndex) && existsSync(webBoot)
-const server = bootstrapServer({ terminalWorkerDir: path.join(repoRoot, 'src/server/entrypoints') })
+const ptyWorkerEntry = path.join(repoRoot, 'dist/server/pty-worker.js')
+const server = bootstrapServer({ ptyWorkerEntry: existsSync(ptyWorkerEntry) ? ptyWorkerEntry : undefined })
 
 console.log(`[embedded-server] listening on http://${server.hostname}:${server.port}`)
 console.log(`[embedded-server] data dir: ${serverDataDir()}`)

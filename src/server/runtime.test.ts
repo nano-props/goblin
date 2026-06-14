@@ -4,7 +4,14 @@ import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 const mocks = vi.hoisted(() => ({
   createApp: vi.fn(() => ({ fetch: vi.fn() })),
   stopBackgroundSync: vi.fn(),
-  workerHostCtor: vi.fn(),
+  createInProcessPtySupervisor: vi.fn(() => ({ mode: 'in-process' })),
+  createServerTerminalRuntime: vi.fn(() => ({
+    host: {
+      isValidClientId: (_value: unknown): _value is string => true,
+      shutdown: vi.fn(),
+    } as unknown as ServerTerminalHost,
+    shutdown: vi.fn(),
+  })),
 }))
 
 vi.mock('#/server/app-factory.ts', () => ({
@@ -15,31 +22,12 @@ vi.mock('#/server/modules/background-sync.ts', () => ({
   stopBackgroundSync: mocks.stopBackgroundSync,
 }))
 
-vi.mock('#/server/terminal/terminal-worker-host.ts', () => ({
-  WorkerBackedTerminalHost: class {
-    constructor(options?: unknown) {
-      const host = {
-        isValidClientId: (_value: unknown): _value is string => true,
-        getDiagnostics: vi.fn(),
-        registerSocket: vi.fn(),
-        unregisterSocket: vi.fn(),
-        attach: vi.fn(),
-        restart: vi.fn(),
-        write: vi.fn(),
-        resize: vi.fn(),
-        takeover: vi.fn(),
-        close: vi.fn(),
-        notifyBell: vi.fn(),
-        listSessions: vi.fn(),
-        create: vi.fn(),
-        prune: vi.fn(),
-        getSessionSnapshot: vi.fn(),
-        shutdown: vi.fn(),
-      }
-      mocks.workerHostCtor({ host, options })
-      return host
-    }
-  },
+vi.mock('#/server/terminal/pty-supervisor-inprocess.ts', () => ({
+  createInProcessPtySupervisor: mocks.createInProcessPtySupervisor,
+}))
+
+vi.mock('#/server/terminal/terminal-runtime.ts', () => ({
+  createServerTerminalRuntime: mocks.createServerTerminalRuntime,
 }))
 
 describe('server runtime', () => {
@@ -71,7 +59,7 @@ describe('server runtime', () => {
     })
   })
 
-  test('uses the worker-backed terminal host by default', async () => {
+  test('wires the in-process pty supervisor into the terminal runtime by default', async () => {
     const { createServerRuntime } = await import('#/server/runtime.ts')
 
     const runtime = createServerRuntime({
@@ -80,15 +68,14 @@ describe('server runtime', () => {
       internalSecret: 'secret',
       serverHost: '127.0.0.1',
       serverPort: 32100,
-      terminalWorkerEntry: '/tmp/entrypoints/terminal-worker.ts',
     })
 
-    expect(mocks.workerHostCtor).toHaveBeenCalledTimes(1)
-    expect(runtime.terminalHost).toBe(mocks.workerHostCtor.mock.calls[0]?.[0]?.host)
-    expect(mocks.workerHostCtor).toHaveBeenCalledWith({
-      host: runtime.terminalHost,
-      options: { workerEntry: '/tmp/entrypoints/terminal-worker.ts' },
+    expect(mocks.createInProcessPtySupervisor).toHaveBeenCalledTimes(1)
+    expect(mocks.createServerTerminalRuntime).toHaveBeenCalledTimes(1)
+    expect(mocks.createServerTerminalRuntime).toHaveBeenCalledWith({
+      ptySupervisor: expect.objectContaining({ mode: 'in-process' }),
     })
+    expect(runtime.terminalHost).toBe(mocks.createServerTerminalRuntime.mock.results[0]?.value.host)
     expect(mocks.createApp).toHaveBeenCalledWith({
       version: '0.1.0',
       startedAt: 1,
