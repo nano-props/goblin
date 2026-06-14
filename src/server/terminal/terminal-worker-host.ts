@@ -312,6 +312,16 @@ export class WorkerBackedTerminalHost implements ServerTerminalHost {
   }
 
   private handleWorkerMessage(message: TerminalWorkerMessage): void {
+    // Trust boundary: the worker is our own child process spawned by
+    // `defaultSpawnWorker` from the bundled JS entry — the messages it
+    // sends via process.send are validated at the wire-format level by
+    // the IPC channel, but their semantic shape is currently trusted
+    // (cast as TerminalWorkerMessage, not parsed through a runtime
+    // schema). This is acceptable as long as the worker entry is bundled
+    // with the host binary. If a future plugin or extension model ever
+    // lets the worker be supplied by third-party code, route this through
+    // a valibot parser (mirror normalizeTerminalWorkerMessage) before
+    // dispatching.
     if (message.type === 'response') {
       const pending = this.pending.get(message.requestId)
       if (!pending) return
