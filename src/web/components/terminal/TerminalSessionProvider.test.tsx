@@ -10,7 +10,6 @@ import {
   useWorktreeTerminalCount,
   useTerminalSessionSummaries,
 } from '#/web/components/terminal/terminal-session-store.ts'
-import { RepoSyncTracker } from '#/web/components/terminal/repo-sync-tracker.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
@@ -18,6 +17,7 @@ import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-queries.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import type {
   TerminalBellEvent,
   TerminalDescriptor,
@@ -300,6 +300,7 @@ beforeEach(() => {
     return { ok: true, action: 'created', key, sessions: managedServerSessions }
   })
   resetReposStore()
+  useRepoSyncStore.setState(useRepoSyncStore.getInitialState())
   window.sessionStorage.setItem('goblin:web-terminal-attachment-id', 'attachment_local')
   mainWindowQueryClient.clear()
   mainWindowQueryClient.setQueryData(
@@ -1002,10 +1003,8 @@ describe('TerminalSessionProvider', () => {
       },
       order: [REPO_ID, SECOND_REPO_ID],
     }))
-    const { unmount } = await renderProviderWithProbe(
-      worktreeTerminalKey(REPO_ID, WORKTREE_PATH),
-      new RepoSyncTracker(0),
-    )
+    useRepoSyncStore.setState({ cooldownMs: 0 })
+    const { unmount } = await renderProviderWithProbe(worktreeTerminalKey(REPO_ID, WORKTREE_PATH))
 
     try {
       await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
@@ -1576,10 +1575,7 @@ async function renderProvider(): Promise<{
   }
 }
 
-async function renderProviderWithProbe(
-  worktreeTerminalKey: string,
-  syncTracker?: RepoSyncTracker,
-): Promise<{
+async function renderProviderWithProbe(worktreeTerminalKey: string): Promise<{
   getContext: () => TerminalSessionContextValue
   getProbe: () => {
     count: number
@@ -1614,7 +1610,7 @@ async function renderProviderWithProbe(
 
   await act(async () => {
     root.render(
-      <TerminalSessionProvider syncTracker={syncTracker}>
+      <TerminalSessionProvider>
         <CaptureContext onContext={(value) => (context = value)} />
         <CaptureGroupProbe worktreeTerminalKey={worktreeTerminalKey} onProbe={(value) => (probe = value)} />
       </TerminalSessionProvider>,

@@ -127,8 +127,6 @@ export interface TerminalSessionContextValue {
 export interface TerminalSessionReadContextValue {
   worktreeSnapshot: (worktreeTerminalKey: string) => WorktreeTerminalSnapshot
   subscribeWorktree: (worktreeTerminalKey: string, listener: () => void) => () => void
-  repoSyncReady: (repoRoot: string) => boolean
-  subscribeRepoSync: (repoRoot: string, listener: () => void) => () => void
   snapshot: (key: string) => TerminalSnapshot
   subscribeSnapshot: (key: string, listener: () => void) => () => void
 }

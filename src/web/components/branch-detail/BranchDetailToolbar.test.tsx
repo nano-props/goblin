@@ -316,8 +316,6 @@ function renderToolbar(options: {
   const readContext: TerminalSessionReadContextValue = {
     worktreeSnapshot: () => worktreeSnapshot,
     subscribeWorktree: () => () => {},
-    repoSyncReady: () => false,
-    subscribeRepoSync: () => () => {},
     snapshot: () => terminalSnapshot,
     subscribeSnapshot: () => () => {},
   }

@@ -91,8 +91,6 @@ describe('TerminalSlot', () => {
     const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => worktreeSnapshot,
       subscribeWorktree: () => () => {},
-      repoSyncReady: () => true,
-      subscribeRepoSync: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -133,7 +131,6 @@ describe('TerminalSlot', () => {
     const container = document.createElement('div')
     document.body.appendChild(container)
     const root: Root = createRoot(container)
-    let repoReady = false
     const emptyWorktreeSnapshot = {
       worktreeTerminalKey: '/repo\0/worktree',
       selectedDescriptor: null,
@@ -163,8 +160,6 @@ describe('TerminalSlot', () => {
     const readContext: TerminalSessionReadContextValue = {
       worktreeSnapshot: () => emptyWorktreeSnapshot,
       subscribeWorktree: () => () => {},
-      repoSyncReady: () => repoReady,
-      subscribeRepoSync: () => () => {},
       snapshot: () => emptySnapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -181,7 +176,6 @@ describe('TerminalSlot', () => {
 
     try {
       expect(container.querySelector('.goblin-terminal-slot__empty')).toBeNull()
-      repoReady = true
       await act(async () => {
         root.render(
           <TerminalSessionContext.Provider value={context}>

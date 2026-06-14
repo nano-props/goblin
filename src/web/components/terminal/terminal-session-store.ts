@@ -1,5 +1,7 @@
 import { useCallback, useSyncExternalStore } from 'react'
 import { useTerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
+import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
 import type {
   WorktreeTerminalSnapshot,
   TerminalSnapshot,
@@ -69,13 +71,11 @@ export function useTerminalSessionSummaries(worktreeTerminalKey: string | null):
 }
 
 export function useTerminalRepoSyncReady(repoRoot: string | null): boolean {
-  const { repoSyncReady, subscribeRepoSync } = useTerminalSessionReadContext()
-  const subscribe = useCallback(
-    (listener: () => void) => (repoRoot ? subscribeRepoSync(repoRoot, listener) : () => {}),
-    [repoRoot, subscribeRepoSync],
-  )
-  const getSnapshot = useCallback(() => (repoRoot ? repoSyncReady(repoRoot) : false), [repoRoot, repoSyncReady])
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  const instanceToken = useReposStore((s) => (repoRoot ? s.repos[repoRoot]?.instanceToken : undefined))
+  return useRepoSyncStore((s) => {
+    if (!repoRoot || typeof instanceToken !== 'number') return false
+    return s.ready.get(repoRoot) === instanceToken
+  })
 }
 
 export function useTerminalSnapshot(key: string | null): TerminalSnapshot {

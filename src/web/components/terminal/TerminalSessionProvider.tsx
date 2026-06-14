@@ -4,6 +4,7 @@ import { useStoreWithEqualityFn } from 'zustand/traditional'
 import type { TerminalSessionSnapshot, TerminalSessionSummary } from '#/shared/terminal.ts'
 import '#/web/components/terminal/terminal-session.css'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 import {
   TerminalSessionContext,
@@ -15,16 +16,13 @@ import { terminalSessionsQueryKey, terminalSessionsQueryOptions } from '#/web/te
 import { TerminalSessionRegistry } from '#/web/components/terminal/TerminalSessionRegistry.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { repoIndexEqual, repoIndexFromRepos } from '#/web/components/terminal/terminal-repo-index.ts'
-import { RepoSyncTracker } from '#/web/components/terminal/repo-sync-tracker.ts'
 import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 
 interface TerminalSessionProviderProps {
   children: ReactNode
-  /** @internal For tests only. */
-  syncTracker?: RepoSyncTracker
 }
 
-export function TerminalSessionProvider({ children, syncTracker: syncTrackerProp }: TerminalSessionProviderProps) {
+export function TerminalSessionProvider({ children }: TerminalSessionProviderProps) {
   const repoIndex = useStoreWithEqualityFn(useReposStore, (s) => repoIndexFromRepos(s.repos), repoIndexEqual)
   // The provider lives at the router root (above the per-route App), so it
   // reads the active repo directly from the repos store rather than via a
@@ -39,9 +37,6 @@ export function TerminalSessionProvider({ children, syncTracker: syncTrackerProp
   currentRepoIdRef.current = currentRepoId
   const repoIndexRef = useRef(repoIndex)
   repoIndexRef.current = repoIndex
-
-  const syncTrackerRef = useRef(syncTrackerProp ?? new RepoSyncTracker())
-  const syncTracker = syncTrackerRef.current
 
   const registryRef = useRef<TerminalSessionRegistry | null>(null)
   if (!registryRef.current) {
@@ -81,11 +76,11 @@ export function TerminalSessionProvider({ children, syncTracker: syncTrackerProp
       } finally {
         const instanceToken = repoIndexRef.current[repoRoot]?.instanceToken
         if (typeof instanceToken === 'number') {
-          syncTracker.markReady(repoRoot, instanceToken)
+          useRepoSyncStore.getState().markReady(repoRoot, instanceToken)
         }
       }
     },
-    [loadMissingSnapshots, registry, syncTracker],
+    [loadMissingSnapshots, registry],
   )
 
   // Registry state sync
@@ -137,7 +132,7 @@ export function TerminalSessionProvider({ children, syncTracker: syncTrackerProp
     const handleFocus = () => {
       if (!currentRepoIdRef.current) return
       const repoRoot = currentRepoIdRef.current
-      if (!syncTracker.shouldSync(repoRoot)) return
+      if (!useRepoSyncStore.getState().shouldSync(repoRoot)) return
       void syncServerSessions(repoRoot)
     }
     window.addEventListener('focus', handleFocus)
@@ -151,7 +146,7 @@ export function TerminalSessionProvider({ children, syncTracker: syncTrackerProp
       window.removeEventListener('focus', handleFocus)
       offSessionsChanged()
     }
-  }, [currentRepoId, currentRepoInstanceToken, syncServerSessions, syncTracker])
+  }, [currentRepoId, currentRepoInstanceToken, syncServerSessions])
 
   const commandValue = useMemo<TerminalSessionContextValue>(
     () => ({
@@ -179,15 +174,10 @@ export function TerminalSessionProvider({ children, syncTracker: syncTrackerProp
     () => ({
       worktreeSnapshot: registry.worktreeSnapshot,
       subscribeWorktree: registry.subscribeWorktree,
-      repoSyncReady: (repoRoot: string) => {
-        const instanceToken = repoIndex[repoRoot]?.instanceToken
-        return syncTracker.isReady(repoRoot, instanceToken)
-      },
-      subscribeRepoSync: syncTracker.subscribe,
       snapshot: registry.snapshot,
       subscribeSnapshot: registry.subscribeSnapshot,
     }),
-    [registry, repoIndex, syncTracker],
+    [registry],
   )
 
   return (
