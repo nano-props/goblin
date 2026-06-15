@@ -1296,9 +1296,7 @@ describe('ManagedTerminalSession', () => {
   })
 
   test('resets the terminal before replaying the snapshot', async () => {
-    terminalCalls.attach.mockResolvedValueOnce(
-      attachResult('session-1', { snapshot: 'tail', snapshotSeq: 1 }),
-    )
+    terminalCalls.attach.mockResolvedValueOnce(attachResult('session-1', { snapshot: 'tail', snapshotSeq: 1 }))
     const host = document.createElement('div')
     document.body.appendChild(host)
     const session = new ManagedTerminalSession(descriptor, vi.fn())

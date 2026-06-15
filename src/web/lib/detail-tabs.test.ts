@@ -22,9 +22,7 @@ describe('computeEffectiveDetailTab', () => {
     // The persisted preference is preserved; the UI just has nothing to
     // show on the changes tab, so the effective tab falls back to status.
     expect(computeEffectiveDetailTab('changes', ctx({ hasChanges: false }))).toBe('status')
-    expect(
-      computeEffectiveDetailTab('changes', ctx({ hasChanges: false, terminalSessionCount: 7 })),
-    ).toBe('status')
+    expect(computeEffectiveDetailTab('changes', ctx({ hasChanges: false, terminalSessionCount: 7 }))).toBe('status')
   })
 
   test('keeps the changes preference when there is at least one change', () => {
@@ -33,9 +31,7 @@ describe('computeEffectiveDetailTab', () => {
 
   test('falls back to status when no worktree exists, regardless of preference', () => {
     expect(computeEffectiveDetailTab('terminal', ctx({ hasWorktree: false }))).toBe('status')
-    expect(
-      computeEffectiveDetailTab('terminal', ctx({ hasWorktree: false, terminalSessionCount: 5 })),
-    ).toBe('status')
+    expect(computeEffectiveDetailTab('terminal', ctx({ hasWorktree: false, terminalSessionCount: 5 }))).toBe('status')
   })
 
   test('preserves the terminal preference when sync has not yet settled', () => {
@@ -90,17 +86,11 @@ describe('visibleDetailTabs', () => {
   })
 
   test('hides the changes tab when the worktree is clean', () => {
-    expect(visibleDetailTabs({ hasWorktree: true, hasChanges: false }).map((t) => t.id)).toEqual([
-      'status',
-      'terminal',
-    ])
+    expect(visibleDetailTabs({ hasWorktree: true, hasChanges: false }).map((t) => t.id)).toEqual(['status', 'terminal'])
   })
 
   test('hides the terminal tab when the branch has no worktree', () => {
-    expect(visibleDetailTabs({ hasWorktree: false, hasChanges: true }).map((t) => t.id)).toEqual([
-      'status',
-      'changes',
-    ])
+    expect(visibleDetailTabs({ hasWorktree: false, hasChanges: true }).map((t) => t.id)).toEqual(['status', 'changes'])
     expect(visibleDetailTabs({ hasWorktree: false, hasChanges: false }).map((t) => t.id)).toEqual(['status'])
   })
 })

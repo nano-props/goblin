@@ -104,4 +104,3 @@ export function normalizePtyWorkerMessage(value: unknown): PtyWorkerMessage | nu
   const parsed = v.safeParse(PtyWorkerMessageSchema, value)
   return parsed.success ? (parsed.output as PtyWorkerMessage) : null
 }
-

@@ -28,8 +28,17 @@
  * the server boundary so a superseded run actually unblocks
  * instead of holding a TCP connection open until its own timeout.
  */
-import { isRemoteRepoId, type RemoteRepoFailureReason, type RemoteRepoLifecycleResult, type RemoteRepoTarget } from '#/shared/remote-repo.ts'
-import { addResolvedRepo, addUnavailableRepo, type InitialRepoRefresh } from '#/web/stores/repos/lifecycle-write-paths.ts'
+import {
+  isRemoteRepoId,
+  type RemoteRepoFailureReason,
+  type RemoteRepoLifecycleResult,
+  type RemoteRepoTarget,
+} from '#/shared/remote-repo.ts'
+import {
+  addResolvedRepo,
+  addUnavailableRepo,
+  type InitialRepoRefresh,
+} from '#/web/stores/repos/lifecycle-write-paths.ts'
 import { markRemoteLifecycleConnecting } from '#/web/stores/repos/availability.ts'
 import { runLatestOperation } from '#/web/stores/repos/operation-runner.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
@@ -109,9 +118,7 @@ export async function runRemoteRepoLifecycle(
     priority: 50,
     targets: [{ key: 'lifecycle', reason: 'manual-refresh' as const }],
     task: async (signal) => {
-      const composed = options.signal
-        ? AbortSignal.any([signal, options.signal])
-        : signal
+      const composed = options.signal ? AbortSignal.any([signal, options.signal]) : signal
       const result = await resolveRemoteRepoLifecycle({ repoId }, composed)
       return toOutcome(result)
     },

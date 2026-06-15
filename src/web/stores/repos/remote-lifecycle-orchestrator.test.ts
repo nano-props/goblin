@@ -251,7 +251,7 @@ describe('runRemoteRepoLifecycle', () => {
     expect(useReposStore.getState().repos[REMOTE_ID]?.remote.lifecycle?.kind).toBe('ready')
   })
 
-  test('a superseded run does not overwrite the newer run\'s writes', async () => {
+  test("a superseded run does not overwrite the newer run's writes", async () => {
     // Two consecutive runLatestOperation-style runs against the
     // same key. The first runs synchronously to completion, the
     // second starts after the first settles. Both run to

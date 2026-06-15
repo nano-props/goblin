@@ -26,7 +26,10 @@ class FakeWorker extends EventEmitter {
   disconnect(): void {}
 }
 
-function buildSupervisor(worker: FakeWorker, options: { now?: () => number; setTimer?: typeof setTimeout; clearTimer?: typeof clearTimeout } = {}) {
+function buildSupervisor(
+  worker: FakeWorker,
+  options: { now?: () => number; setTimer?: typeof setTimeout; clearTimer?: typeof clearTimeout } = {},
+) {
   return new WorkerBackedPtySupervisor({
     workerEntry: '/tmp/pty-worker.js',
     spawnWorker: () => worker as never,

@@ -1,6 +1,10 @@
 import { describe, expect, test, vi } from 'vitest'
 import { buildWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-worktree-snapshot.ts'
-import type { ManagedTerminalSessionLike, TerminalDescriptor, TerminalSnapshot } from '#/web/components/terminal/types.ts'
+import type {
+  ManagedTerminalSessionLike,
+  TerminalDescriptor,
+  TerminalSnapshot,
+} from '#/web/components/terminal/types.ts'
 
 function makeDescriptor(terminalId: string, index: number): TerminalDescriptor {
   return {

@@ -15,7 +15,11 @@ import {
 } from '#/shared/terminal-types.ts'
 import { formatTerminalId, parseTerminalIdIndex } from '#/shared/terminal-ids.ts'
 import { isValidTerminalAttachmentId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
-import { formatTerminalSessionKey, parseTerminalSessionKey, terminalSessionScope } from '#/shared/terminal-session-key.ts'
+import {
+  formatTerminalSessionKey,
+  parseTerminalSessionKey,
+  terminalSessionScope,
+} from '#/shared/terminal-session-key.ts'
 
 interface EnsureTerminalCatalogInput {
   repoRoot: string

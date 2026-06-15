@@ -1,8 +1,5 @@
 import type { RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
-import {
-  isRemoteRepoLifecycleTerminal,
-  type RemoteRepoLifecycle,
-} from '#/shared/remote-repo.ts'
+import { isRemoteRepoLifecycleTerminal, type RemoteRepoLifecycle } from '#/shared/remote-repo.ts'
 
 /**
  * Structural equality for the lifecycle union as it appears on a

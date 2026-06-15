@@ -26,8 +26,12 @@ export function UnavailableRepoView({ repo }: Props) {
   const isUnavailable = isRepoUnavailable(repo)
   const isRemote = isRemoteRepoId(repo.id)
   const reason = isRemote
-    ? (repo.remote.lifecycle?.kind === 'failed' ? repo.remote.lifecycle.reason : 'error.failed-read-repo')
-    : (repo.availability.phase === 'unavailable' ? repo.availability.reason : 'error.failed-read-repo')
+    ? repo.remote.lifecycle?.kind === 'failed'
+      ? repo.remote.lifecycle.reason
+      : 'error.failed-read-repo'
+    : repo.availability.phase === 'unavailable'
+      ? repo.availability.reason
+      : 'error.failed-read-repo'
   if (!isUnavailable) {
     // Defensive: this view is only mounted by RepoView when
     // the repo is unavailable, but a stale render after a state

@@ -8,12 +8,12 @@ import {
 describe('shared terminal ownership helpers', () => {
   test('resolves controller, viewer, and unowned attachment roles', () => {
     expect(resolveTerminalAttachmentRole(null, 'attachment_a')).toBe('unowned')
-    expect(
-      resolveTerminalAttachmentRole({ attachmentId: 'attachment_a', status: 'connected' }, 'attachment_a'),
-    ).toBe('controller')
-    expect(
-      resolveTerminalAttachmentRole({ attachmentId: 'attachment_a', status: 'connected' }, 'attachment_b'),
-    ).toBe('viewer')
+    expect(resolveTerminalAttachmentRole({ attachmentId: 'attachment_a', status: 'connected' }, 'attachment_a')).toBe(
+      'controller',
+    )
+    expect(resolveTerminalAttachmentRole({ attachmentId: 'attachment_a', status: 'connected' }, 'attachment_b')).toBe(
+      'viewer',
+    )
   })
 
   test('resolves ownership view model with controller status fallback', () => {

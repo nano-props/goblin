@@ -152,12 +152,7 @@ export function applyPullRequestEntries(
 }
 
 export function shouldAttemptFetch(repo: RepoState | null | undefined, token: number): boolean {
-  return (
-    !!repo &&
-    repo.instanceToken === token &&
-    repo.remote.hasRemotes === true &&
-    !isRepoUnavailable(repo)
-  )
+  return !!repo && repo.instanceToken === token && repo.remote.hasRemotes === true && !isRepoUnavailable(repo)
 }
 
 export function repoIfFresh(get: ReposGet, id: string, token: number): RepoState | null {

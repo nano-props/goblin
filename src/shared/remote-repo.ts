@@ -127,9 +127,7 @@ export const REMOTE_REPO_FAILURE_REASONS: readonly RemoteRepoFailureReason[] = [
 ]
 
 export function isRemoteRepoFailureReason(value: unknown): value is RemoteRepoFailureReason {
-  return (
-    typeof value === 'string' && (REMOTE_REPO_FAILURE_REASONS as readonly string[]).includes(value)
-  )
+  return typeof value === 'string' && (REMOTE_REPO_FAILURE_REASONS as readonly string[]).includes(value)
 }
 
 /**
@@ -191,9 +189,7 @@ export type RemoteRepoLifecycle =
   | { kind: 'failed'; reason: RemoteRepoFailureReason; target?: RemoteRepoTarget }
 
 /** Narrow a lifecycle to its concrete target, if any. */
-export function remoteRepoLifecycleTarget(
-  lifecycle: RemoteRepoLifecycle | null | undefined,
-): RemoteRepoTarget | null {
+export function remoteRepoLifecycleTarget(lifecycle: RemoteRepoLifecycle | null | undefined): RemoteRepoTarget | null {
   if (!lifecycle) return null
   if (lifecycle.kind === 'ready') return lifecycle.target
   if (lifecycle.kind === 'failed') return lifecycle.target ?? null
@@ -201,9 +197,7 @@ export function remoteRepoLifecycleTarget(
 }
 
 /** Whether the lifecycle is in the transient `connecting` state. */
-export function isRemoteRepoLifecycleConnecting(
-  lifecycle: RemoteRepoLifecycle | null | undefined,
-): boolean {
+export function isRemoteRepoLifecycleConnecting(lifecycle: RemoteRepoLifecycle | null | undefined): boolean {
   return !!lifecycle && lifecycle.kind === 'connecting'
 }
 

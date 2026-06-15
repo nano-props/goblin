@@ -231,10 +231,7 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
     })
     worker.once('error', (error) => {
       this.recordFailure('error', error instanceof Error ? error.message : String(error))
-      ptyWorkerLogger.error(
-        { err: error, pid: worker.pid, sessions: this.sessions.size },
-        'PTY worker process error',
-      )
+      ptyWorkerLogger.error({ err: error, pid: worker.pid, sessions: this.sessions.size }, 'PTY worker process error')
       if (this.worker === worker) this.worker = null
       const hadSessions = this.sessions.size > 0
       this.failPendingSpawns(error instanceof Error ? error : new Error(String(error)))

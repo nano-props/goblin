@@ -247,4 +247,3 @@ function BranchSelector({
     </DropdownMenu>
   )
 }
-

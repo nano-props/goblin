@@ -118,7 +118,8 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       broker.registerSocket(clientId, attachmentId, buffered)
     },
     unregisterSocket(clientId, attachmentId, socket) {
-      const buffered = bufferedSocketByRawSocket.get(socket as TerminalRealtimeSocket) ?? (socket as TerminalRealtimeSocket)
+      const buffered =
+        bufferedSocketByRawSocket.get(socket as TerminalRealtimeSocket) ?? (socket as TerminalRealtimeSocket)
       if (buffered instanceof BufferedTerminalSocket) buffered.deactivate()
       broker.unregisterSocket(clientId, attachmentId, buffered)
       bufferedSocketByRawSocket.delete(socket as TerminalRealtimeSocket)

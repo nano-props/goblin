@@ -62,11 +62,19 @@ vi.mock('node-pty', () => ({
       ...pty,
       onData: (cb: (data: string) => void) => {
         onData = cb
-        return { dispose: vi.fn(() => { if (onData === cb) onData = null }) }
+        return {
+          dispose: vi.fn(() => {
+            if (onData === cb) onData = null
+          }),
+        }
       },
       onExit: (cb: () => void) => {
         onExit = cb
-        return { dispose: vi.fn(() => { if (onExit === cb) onExit = null }) }
+        return {
+          dispose: vi.fn(() => {
+            if (onExit === cb) onExit = null
+          }),
+        }
       },
     }
   }),
@@ -877,7 +885,7 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_1', 'attachment_a', socket)
-    const sessionId = await createTerminalSession(host, 'client_1',)
+    const sessionId = await createTerminalSession(host, 'client_1')
 
     const attach = await host.attach('client_1', {
       sessionId,

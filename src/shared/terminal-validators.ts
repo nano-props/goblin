@@ -39,7 +39,13 @@ const TERMINAL_CONNECTED_CONTROLLER_STATUS_VALUES = ['connected', 'grace'] satis
   TerminalControllerStatus,
   'none'
 >[]
-const TERMINAL_SESSION_PHASE_VALUES = ['opening', 'restarting', 'open', 'error', 'closed'] satisfies TerminalSessionPhase[]
+const TERMINAL_SESSION_PHASE_VALUES = [
+  'opening',
+  'restarting',
+  'open',
+  'error',
+  'closed',
+] satisfies TerminalSessionPhase[]
 const TerminalSessionIdSchema = v.pipe(v.string(), v.regex(TERMINAL_SESSION_ID_RE))
 const TerminalAttachmentIdSchema = v.pipe(v.string(), v.regex(TERMINAL_ATTACHMENT_ID_RE))
 const TerminalRequestIdSchema = v.pipe(v.string(), v.regex(TERMINAL_REQUEST_ID_RE))

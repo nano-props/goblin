@@ -108,7 +108,8 @@ export class TerminalSessionRegistry {
 
   destroy(): void {
     setTerminalFocused(false)
-    for (const pending of this.pendingCreateByWorktree.values()) pending.reject(new Error('terminal registry destroyed'))
+    for (const pending of this.pendingCreateByWorktree.values())
+      pending.reject(new Error('terminal registry destroyed'))
     for (const session of this.sessions.values()) session.dispose({ closeSession: false })
     this.sessions.clear()
     this.sessionKeyBySessionId.clear()
@@ -181,12 +182,7 @@ export class TerminalSessionRegistry {
       .map(([key]) => key)
 
     const { controllerKeyByWorktree, touchedWorktrees, displayOrderChangedWorktrees, missingLocalCount } =
-      this.materializeServerSessions(
-      repoRoot,
-      serverSessions,
-      attachmentId,
-      snapshotsBySessionId,
-      )
+      this.materializeServerSessions(repoRoot, serverSessions, attachmentId, snapshotsBySessionId)
 
     const serverKeys = new Set(serverSessions.map((s) => s.key))
     const orphanedLocalCount = this.evictOrphanedLocalSessions(repoRoot, serverKeys)

@@ -143,10 +143,7 @@ export async function resolveServerRemoteRepoLifecycle(
   }
 
   // Step 2: resolve the SSH target.
-  const targetResult = await resolveServerRemoteTarget(
-    { alias: ref.alias, remotePath: ref.remotePath },
-    signal,
-  )
+  const targetResult = await resolveServerRemoteTarget({ alias: ref.alias, remotePath: ref.remotePath }, signal)
   if ('error' in targetResult) {
     return {
       kind: 'failed',

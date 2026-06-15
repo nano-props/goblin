@@ -330,7 +330,7 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
             </Button>
           )}
         </div>
-        )}
+      )}
       {dragOver && (
         <div className="goblin-terminal-slot__drop-overlay">
           <span>{t('terminal.drop-hint')}</span>

@@ -28,11 +28,7 @@ export function terminalSessionScope(repoRoot: string): string {
   return isRemoteRepoId(repoRoot) ? repoRoot : path.resolve(repoRoot)
 }
 
-export function formatTerminalSessionKey(
-  repoRoot: string,
-  worktreePath: string,
-  terminalId: string,
-): string {
+export function formatTerminalSessionKey(repoRoot: string, worktreePath: string, terminalId: string): string {
   return `${repoRoot}\0${worktreePath}\0${terminalId}`
 }
 

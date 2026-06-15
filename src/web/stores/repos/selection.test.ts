@@ -377,9 +377,7 @@ describe('setWorkspaceLayout', () => {
   // therefore the CmdOrCtrl+J accelerator — rebuilds in the same tick.
   describe('push to native menu', () => {
     test('forwards the new layout to the native menu when setWorkspaceLayout changes it', () => {
-      const pushSpy = vi
-        .spyOn(settingsClient, 'pushWorkspaceLayoutToNativeMenu')
-        .mockResolvedValue(undefined)
+      const pushSpy = vi.spyOn(settingsClient, 'pushWorkspaceLayoutToNativeMenu').mockResolvedValue(undefined)
 
       useReposStore.getState().setWorkspaceLayout('left-right')
       // The push is fire-and-forget — wait a microtask for the Promise
@@ -392,9 +390,7 @@ describe('setWorkspaceLayout', () => {
     })
 
     test('does not forward when the layout is unchanged', () => {
-      const pushSpy = vi
-        .spyOn(settingsClient, 'pushWorkspaceLayoutToNativeMenu')
-        .mockResolvedValue(undefined)
+      const pushSpy = vi.spyOn(settingsClient, 'pushWorkspaceLayoutToNativeMenu').mockResolvedValue(undefined)
 
       // Default layout is 'top-bottom'; setting it again is a no-op.
       useReposStore.getState().setWorkspaceLayout('top-bottom')
@@ -404,9 +400,7 @@ describe('setWorkspaceLayout', () => {
     })
 
     test('forwards the reset back to top-bottom so Cmd+J re-enables after a left-right detour', () => {
-      const pushSpy = vi
-        .spyOn(settingsClient, 'pushWorkspaceLayoutToNativeMenu')
-        .mockResolvedValue(undefined)
+      const pushSpy = vi.spyOn(settingsClient, 'pushWorkspaceLayoutToNativeMenu').mockResolvedValue(undefined)
 
       useReposStore.getState().setWorkspaceLayout('left-right')
       pushSpy.mockClear()
@@ -419,9 +413,7 @@ describe('setWorkspaceLayout', () => {
     })
 
     test('does not push from resetLayout when already at top-bottom', () => {
-      const pushSpy = vi
-        .spyOn(settingsClient, 'pushWorkspaceLayoutToNativeMenu')
-        .mockResolvedValue(undefined)
+      const pushSpy = vi.spyOn(settingsClient, 'pushWorkspaceLayoutToNativeMenu').mockResolvedValue(undefined)
 
       useReposStore.getState().resetLayout()
 

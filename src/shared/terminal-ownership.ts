@@ -1,8 +1,4 @@
-import type {
-  TerminalAttachmentRole,
-  TerminalController,
-  TerminalResolvedOwnership,
-} from '#/shared/terminal-types.ts'
+import type { TerminalAttachmentRole, TerminalController, TerminalResolvedOwnership } from '#/shared/terminal-types.ts'
 
 export function resolveTerminalAttachmentRole(
   controller: TerminalController | null,

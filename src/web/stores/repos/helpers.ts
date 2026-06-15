@@ -110,10 +110,7 @@ export function deriveConnectivity(repo: RepoState): RepoConnectivity {
  * any subset that carries the lifecycle (e.g. `BranchActionRepo`,
  * `BranchDetailRepo`).
  */
-export function remoteRepoTarget(
-  id: string,
-  lifecycle: RemoteRepoLifecycle | null,
-): RemoteRepoTarget | null {
+export function remoteRepoTarget(id: string, lifecycle: RemoteRepoLifecycle | null): RemoteRepoTarget | null {
   if (!isRemoteRepoId(id)) return null
   return remoteRepoLifecycleTarget(lifecycle)
 }

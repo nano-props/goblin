@@ -294,11 +294,7 @@ function notifyOperationIdleWaiters(repoId: string): void {
   for (const waiter of [...waiters]) waiter()
 }
 
-export function waitForRepoOperationsIdle(
-  repoId: string,
-  keys: string[],
-  signal?: AbortSignal,
-): Promise<void> {
+export function waitForRepoOperationsIdle(repoId: string, keys: string[], signal?: AbortSignal): Promise<void> {
   if (keys.every((key) => !repoOperationBusy(repoId, key))) return Promise.resolve()
   return new Promise((resolve, reject) => {
     let settled = false

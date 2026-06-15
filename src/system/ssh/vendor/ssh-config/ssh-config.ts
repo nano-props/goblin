@@ -10,7 +10,8 @@ import glob from './glob.ts'
 const RE_SPACE = /\s/
 const RE_LINE_BREAK = /\r|\n/
 const RE_SECTION_DIRECTIVE = /^(Host|Match)$/i
-const RE_MULTI_VALUE_DIRECTIVE = /^(GlobalKnownHostsFile|Host|IPQoS|SendEnv|UserKnownHostsFile|ProxyCommand|Match|CanonicalDomains)$/i
+const RE_MULTI_VALUE_DIRECTIVE =
+  /^(GlobalKnownHostsFile|Host|IPQoS|SendEnv|UserKnownHostsFile|ProxyCommand|Match|CanonicalDomains)$/i
 const RE_QUOTE_DIRECTIVE = /^(?:CertificateFile|IdentityFile|IdentityAgent|User)$/i
 const RE_SINGLE_LINE_DIRECTIVE = /^(Include|IdentityFile)$/i
 
@@ -249,10 +250,7 @@ export default class SSHConfig extends Array<Line> {
    * Query SSH config by host with options.
    */
   compute(host: string, computeOpts?: ComputeOptions): Record<string, string | string[]>
-  compute(
-    opts: string | MatchOptions,
-    computeOpts?: ComputeOptions,
-  ): Record<string, string | string[]> {
+  compute(opts: string | MatchOptions, computeOpts?: ComputeOptions): Record<string, string | string[]> {
     if (typeof opts === 'string') opts = { Host: opts }
     let userInfo: { username: string }
     try {
@@ -318,10 +316,7 @@ export default class SSHConfig extends Array<Line> {
         // Host and Match directives are always case-insensitive (per OpenSSH behavior)
         if (
           /^host$/i.test(line.param) &&
-          glob(
-            Array.isArray(line.value) ? line.value.map(({ val }) => val) : line.value,
-            context.params.Host,
-          )
+          glob(Array.isArray(line.value) ? line.value.map(({ val }) => val) : line.value, context.params.Host)
         ) {
           let canonicalizeHostName = false
           let canonicalDomains: string[] = []
@@ -329,10 +324,7 @@ export default class SSHConfig extends Array<Line> {
           for (const subline of (line as Section).config) {
             if (subline.type === LineType.DIRECTIVE) {
               setProperty(subline.param, subline.value)
-              if (
-                /^CanonicalizeHostName$/i.test(subline.param) &&
-                subline.value === 'yes'
-              ) {
+              if (/^CanonicalizeHostName$/i.test(subline.param) && subline.value === 'yes') {
                 canonicalizeHostName = true
               }
               if (/^CanonicalDomains$/i.test(subline.param) && Array.isArray(subline.value)) {
@@ -356,11 +348,7 @@ export default class SSHConfig extends Array<Line> {
               }
             }
           }
-        } else if (
-          /^match$/i.test(line.param) &&
-          'criteria' in line &&
-          match(line.criteria, context)
-        ) {
+        } else if (/^match$/i.test(line.param) && 'criteria' in line && match(line.criteria, context)) {
           for (const subline of line.config) {
             if (subline.type === LineType.DIRECTIVE) {
               setProperty(subline.param, subline.value)
@@ -388,11 +376,7 @@ export default class SSHConfig extends Array<Line> {
    * Find by search function.
    */
   find(predicate: (line: Line, index: number, config: Line[]) => unknown): Line | undefined
-  find(
-    opts:
-      | FindOptions
-      | ((line: Line, index: number, config: Line[]) => unknown),
-  ): Line | undefined {
+  find(opts: FindOptions | ((line: Line, index: number, config: Line[]) => unknown)): Line | undefined {
     if (typeof opts === 'function') return super.find(opts)
     if (!(opts && ('Host' in opts || 'Match' in opts))) {
       throw new Error('Can only find by Host or Match')
@@ -408,20 +392,14 @@ export default class SSHConfig extends Array<Line> {
    * Remove section by search function.
    */
   remove(predicate: (line: Line, index: number, config: Line[]) => unknown): Line[] | undefined
-  remove(
-    opts:
-      | FindOptions
-      | ((line: Line, index: number, config: Line[]) => unknown),
-  ): Line[] | undefined {
+  remove(opts: FindOptions | ((line: Line, index: number, config: Line[]) => unknown)): Line[] | undefined {
     let index: number
     if (typeof opts === 'function') {
       index = super.findIndex(opts)
     } else if (!(opts && ('Host' in opts || 'Match' in opts))) {
       throw new Error('Can only remove by Host or Match')
     } else {
-      index = super.findIndex(
-        (line) => 'param' in line && compare(line, opts as Record<string, unknown>),
-      )
+      index = super.findIndex((line) => 'param' in line && compare(line, opts as Record<string, unknown>))
     }
     if (index >= 0) return this.splice(index, 1)
     return undefined
@@ -454,9 +432,7 @@ export default class SSHConfig extends Array<Line> {
         type: LineType.DIRECTIVE,
         param,
         separator: ' ',
-        value: Array.isArray(value)
-          ? value.map((val, i) => ({ val, separator: i === 0 ? '' : ' ' }))
-          : value,
+        value: Array.isArray(value) ? value.map((val, i) => ({ val, separator: i === 0 ? '' : ' ' })) : value,
         before: sectionLineFound ? indent : indent.replace(/  |\t/, ''),
         after: '\n',
       }
@@ -504,9 +480,7 @@ export default class SSHConfig extends Array<Line> {
         type: LineType.DIRECTIVE,
         param,
         separator: ' ',
-        value: Array.isArray(value)
-          ? value.map((val, i) => ({ val, separator: i === 0 ? '' : ' ' }))
-          : value,
+        value: Array.isArray(value) ? value.map((val, i) => ({ val, separator: i === 0 ? '' : ' ' })) : value,
         before: '',
         after: '\n',
       }
@@ -659,7 +633,12 @@ export function parse(text: string | Buffer): SSHConfig {
       chr = next()
     }
     if (quoted || escaped) {
-      throw new Error(`Unexpected line break at ${results.map(({ val }) => val).concat(val).join(' ')}`)
+      throw new Error(
+        `Unexpected line break at ${results
+          .map(({ val }) => val)
+          .concat(val)
+          .join(' ')}`,
+      )
     }
     if (val) results.push({ val, separator: valSeparator, quoted: valQuoted })
     return results.length > 1 ? results : results[0].val
@@ -766,7 +745,10 @@ export function stringify(config: SSHConfig): string {
     str += line.before
     if (line.type === LineType.COMMENT) {
       str += line.content
-    } else if (line.type === LineType.DIRECTIVE && REPEATABLE_DIRECTIVES.includes(line.param as (typeof REPEATABLE_DIRECTIVES)[number])) {
+    } else if (
+      line.type === LineType.DIRECTIVE &&
+      REPEATABLE_DIRECTIVES.includes(line.param as (typeof REPEATABLE_DIRECTIVES)[number])
+    ) {
       ;(Array.isArray(line.value) ? line.value : [line.value]).forEach((value, i, values) => {
         str += formatDirective({ ...line, value: typeof value !== 'string' ? value.val : value })
         if (i < values.length - 1) str += `\n${line.before}`

@@ -15,11 +15,14 @@ export function countOrphanedTerminalSessionKeys(input: {
   return orphanedKeys
 }
 
-export function resolveAdjacentTerminalSelectionAfterRemoval(orderedKeysBeforeRemoval: string[], removedKey: string): string | null {
+export function resolveAdjacentTerminalSelectionAfterRemoval(
+  orderedKeysBeforeRemoval: string[],
+  removedKey: string,
+): string | null {
   const closedOrderIndex = orderedKeysBeforeRemoval.indexOf(removedKey)
   if (closedOrderIndex < 0) return orderedKeysBeforeRemoval[0] ?? null
   const remaining = orderedKeysBeforeRemoval.filter((key) => key !== removedKey)
   const right = remaining[closedOrderIndex] ?? null
-  const left = closedOrderIndex >= 1 ? remaining[closedOrderIndex - 1] ?? null : null
+  const left = closedOrderIndex >= 1 ? (remaining[closedOrderIndex - 1] ?? null) : null
   return right ?? left ?? null
 }

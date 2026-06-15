@@ -1,5 +1,8 @@
 import { computeEffectiveDetailTab, type DetailTabContext } from '#/web/lib/detail-tabs.ts'
-import { useTerminalRepoSyncReady, useWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-store.ts'
+import {
+  useTerminalRepoSyncReady,
+  useWorktreeTerminalSnapshot,
+} from '#/web/components/terminal/terminal-session-store.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import { branchWorktreeHasChanges } from '#/web/stores/repos/worktree-state.ts'
 import type { DetailTab, RepoDataState, RepoState, RepoUiState } from '#/web/stores/repos/types.ts'

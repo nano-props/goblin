@@ -80,7 +80,18 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
     // `remote.resolveTarget` to return different targets per
     // call; the lifecycle mock uses whatever it returns.
     const resolveResult = handlers['remote.resolveTarget']?.({ alias: 'example', remotePath: '/srv/repo' }) as
-      | { target?: { id: string; alias: string; host: string; user: string; port: number; remotePath: string; displayName: string }; error?: string }
+      | {
+          target?: {
+            id: string
+            alias: string
+            host: string
+            user: string
+            port: number
+            remotePath: string
+            displayName: string
+          }
+          error?: string
+        }
       | undefined
     if (resolveResult?.error) {
       return {

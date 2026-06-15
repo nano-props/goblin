@@ -17,9 +17,7 @@
 
 import type { TerminalRealtimeSocket } from '#/server/terminal/terminal-realtime-broker.ts'
 
-type BufferedEntry =
-  | { type: 'send'; payload: string }
-  | { type: 'close'; code?: number; reason?: string }
+type BufferedEntry = { type: 'send'; payload: string } | { type: 'close'; code?: number; reason?: string }
 
 export class BufferedTerminalSocket implements TerminalRealtimeSocket {
   private paused = 0

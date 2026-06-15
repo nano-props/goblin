@@ -17,11 +17,7 @@ export async function resolveRemoteRepositoryTarget(
   ref: { alias: string; remotePath: string },
   signal?: AbortSignal,
 ): Promise<RemoteRepoTarget> {
-  const result = await postServerJson<typeof ref, ResolveTargetResponse>(
-    '/api/remote/resolve-target',
-    ref,
-    { signal },
-  )
+  const result = await postServerJson<typeof ref, ResolveTargetResponse>('/api/remote/resolve-target', ref, { signal })
   if ('error' in result) throw new Error(result.error)
   return result.target
 }
@@ -38,11 +34,7 @@ export async function resolveRemoteRepoLifecycle(
   input: { repoId: string },
   signal?: AbortSignal,
 ): Promise<RemoteRepoLifecycleResult> {
-  return await postServerJson<typeof input, RemoteRepoLifecycleResult>(
-    '/api/remote/lifecycle',
-    input,
-    { signal },
-  )
+  return await postServerJson<typeof input, RemoteRepoLifecycleResult>('/api/remote/lifecycle', input, { signal })
 }
 
 export async function getRemoteSshHosts(): Promise<SshConfigHostsResult> {
