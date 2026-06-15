@@ -119,6 +119,11 @@ function stripLeadingIncompleteAnsi(s: string): string {
   return s.slice(2)
 }
 
+export function isShellProcessName(processName: string): boolean {
+  const base = processName.replace(/^.*[\\/]/, '')
+  return /^(?:ba|z|fi|tc|c|k)?sh$|^nu$/.test(base)
+}
+
 // OSC 0 is the "set window title" sequence the shell uses for the tab title.
 // The shell may also use OSC 2 — we treat both the same way: keep the
 // last title seen in this chunk. Returns `undefined` if no title sequence

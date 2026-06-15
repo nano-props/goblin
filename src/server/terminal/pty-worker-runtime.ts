@@ -3,15 +3,14 @@
 // sessions, sockets, or business state — it translates the wire
 // protocol into node-pty calls and emits data/exit events.
 //
-// Process-name sampling is deferred to the first onData chunk and
-// then refreshed on every title-OSC change. The first-chunk sample
-// avoids the macOS spawn-helper race (term.process read in the same
-// tick as pty.spawn returns the helper's comm, not the shell's).
+// Process-name is sampled on every onData chunk (cheap property
+// read from node-pty) so the main process always has a fresh view
+// of the foreground process — even after a child exits without
+// emitting a title-OSC.
 
 import * as pty from 'node-pty'
 import { resolveLocalShell } from '#/server/terminal/terminal-local-shell.ts'
 import { type TerminalPtyRuntime } from '#/server/terminal/terminal-pty-runtime.ts'
-import { appendOutput, createEmptyTerminalRenderState } from '#/server/terminal/terminal-render-state.ts'
 import type { PtySpawnInput } from '#/server/terminal/pty-supervisor.ts'
 import type { PtyWorkerMessage, PtyWorkerRequest } from '#/server/terminal/pty-worker-protocol.ts'
 
@@ -93,27 +92,18 @@ export class PtyWorkerRuntime {
   }
 
   private wireDataAndExitEvents(sessionId: string, runtime: TerminalPtyRuntime): void {
-    const render = createEmptyTerminalRenderState()
-    let lastBroadcastTitle: string | null = render.title
-    let sampled = false
     runtime.onData((data) => {
-      this.options.emit({ type: 'pty-data', sessionId, data })
-      appendOutput(render, data)
-      // Sample on the first chunk (safe — spawn-helper is gone) and
-      // on every title-OSC change (shell exec'd a new command). Both
-      // signals travel together in practice, but the first-chunk sample
-      // alone covers shells that never set a title (sh, minimal configs).
-      const titleChanged = render.title !== lastBroadcastTitle
-      if (titleChanged) lastBroadcastTitle = render.title
-      if (!sampled || titleChanged) {
-        sampled = true
-        const nextName = safeProcessName(runtime)
-        const entry = this.ptys.get(sessionId)
-        if (entry && nextName && nextName !== entry.processName) {
-          entry.processName = nextName
-          this.options.emit({ type: 'pty-process-name-changed', sessionId, processName: nextName })
-        }
+      // Always sample process name so the main process has a fresh view
+      // of the foreground process, even after a child exits without
+      // setting a title-OSC. Emit the name-change BEFORE pty-data so
+      // the main process's cache is updated when it processes this chunk.
+      const nextName = safeProcessName(runtime)
+      const entry = this.ptys.get(sessionId)
+      if (entry && nextName && nextName !== entry.processName) {
+        entry.processName = nextName
+        this.options.emit({ type: 'pty-process-name-changed', sessionId, processName: nextName })
       }
+      this.options.emit({ type: 'pty-data', sessionId, data })
     })
     runtime.onExit(() => {
       this.options.emit({ type: 'pty-exit', sessionId, code: null, signal: null })

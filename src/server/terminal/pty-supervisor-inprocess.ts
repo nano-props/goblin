@@ -8,15 +8,9 @@ import {
   type PtySpawnResult,
   type PtySupervisor,
 } from '#/server/terminal/pty-supervisor.ts'
-import { appendOutput, createEmptyTerminalRenderState } from '#/server/terminal/terminal-render-state.ts'
 
 interface PtyEntry {
   runtime: TerminalPtyRuntime
-  processName: string
-  /** Until the first onData chunk arrives, term.process returns the
-   *  comm of node-pty's spawn-helper binary (or kernel_task) on macOS,
-   *  not the shell. Sample on the first chunk instead. */
-  needsInitialSample: boolean
 }
 
 export function createInProcessPtySupervisor(): PtySupervisor {
@@ -29,9 +23,9 @@ export function createInProcessPtySupervisor(): PtySupervisor {
       const result = spawnTerminalPtyRuntime(input)
       if (!result.ok) return { ok: false, message: result.message }
       const handle = createPtyHandle(createPtySessionId())
-      const entry: PtyEntry = { runtime: result.runtime, processName: 'terminal', needsInitialSample: true }
+      const entry: PtyEntry = { runtime: result.runtime }
       entries.set(handle.sessionId, entry)
-      return { ok: true, handle, processName: entry.processName }
+      return { ok: true, handle, processName: entry.runtime.processName() || 'terminal' }
     },
     write(handle, data) {
       entries.get(handle.sessionId)?.runtime.write(data)
@@ -47,25 +41,7 @@ export function createInProcessPtySupervisor(): PtySupervisor {
     onData(handle, listener) {
       const entry = entries.get(handle.sessionId)
       if (!entry) return { dispose: () => {} }
-      // Mirror the worker's title-OSC-driven sampling so the cached
-      // processName stays accurate after every shell exec (e.g. zsh
-      // -> bash -> vim). The first-chunk sample also closes the
-      // macOS spawn-helper race: by then spawn-helper has exec'd the
-      // shell and term.process returns the real name.
-      const render = createEmptyTerminalRenderState()
-      let lastTitle: string | null = render.title
       return entry.runtime.onData((data) => {
-        if (entry.needsInitialSample) {
-          entry.needsInitialSample = false
-          const name = entry.runtime.processName()
-          if (name && name !== entry.processName) entry.processName = name
-        }
-        appendOutput(render, data)
-        if (render.title !== lastTitle) {
-          lastTitle = render.title
-          const name = entry.runtime.processName()
-          if (name && name !== entry.processName) entry.processName = name
-        }
         listener(data)
       })
     },
@@ -82,7 +58,13 @@ export function createInProcessPtySupervisor(): PtySupervisor {
       })
     },
     processName(handle) {
-      return entries.get(handle.sessionId)?.processName ?? 'terminal'
+      const entry = entries.get(handle.sessionId)
+      if (!entry) return 'terminal'
+      try {
+        return entry.runtime.processName() || 'terminal'
+      } catch {
+        return 'terminal'
+      }
     },
     getDiagnostics() {
       return {

@@ -27,6 +27,7 @@ import {
 import {
   appendOutput,
   createEmptyTerminalRenderState,
+  isShellProcessName,
   resetRender,
   takeSnapshot,
   type TerminalRenderState,
@@ -497,14 +498,41 @@ export class TerminalSessionManager<TOwner extends string | number> {
     }
     session.pty = resolved.handle
     markTerminalSessionOpen(session)
-    // The PtySupervisor owns the processName cache. It samples on the
-    // first data chunk (deferred past the macOS spawn-helper exec) and
-    // refreshes on every title-OSC change. We query it on demand.
-    let lastBroadcastTitle: string | null = session.render.title
     const handle = resolved.handle
+    const supervisor = this.ptySupervisor
+    let lastBroadcastTitle: string | null = session.render.title
+    let lastProcessName: string = supervisor.processName(handle)
     session.disposables.push(
-      this.ptySupervisor.onData(handle, (data) => {
+      supervisor.onData(handle, (data) => {
+        const titleBeforeData = session.render.title
+        const processNameBeforeData = lastProcessName
+
         const seq = appendOutput(session.render, data)
+
+        const processNameAfterData = supervisor.processName(handle)
+        lastProcessName = processNameAfterData
+
+        // Stale title detection: when a child process exits without
+        // setting a new title-OSC, the tab would keep showing the
+        // child's title (e.g. "Claude Code 2.1.174"). Detect the
+        // non-shell → shell process name transition with no new
+        // title in the chunk and clear the stale title.
+        if (
+          titleBeforeData !== null &&
+          session.render.title === titleBeforeData &&
+          !isShellProcessName(processNameBeforeData) &&
+          isShellProcessName(processNameAfterData)
+        ) {
+          session.render.title = null
+          if (lastBroadcastTitle !== null) {
+            lastBroadcastTitle = null
+            this.sink.onTitle?.(session.ownerId, {
+              sessionId: session.id,
+              canonicalTitle: null,
+            })
+          }
+        }
+
         if (session.render.title !== lastBroadcastTitle) {
           lastBroadcastTitle = session.render.title
           this.sink.onTitle?.(session.ownerId, {
@@ -516,7 +544,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
           sessionId: session.id,
           data,
           seq,
-          processName: this.ptySupervisor.processName(handle),
+          processName: processNameAfterData,
         })
       }),
     )
