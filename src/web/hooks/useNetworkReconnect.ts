@@ -10,29 +10,25 @@ import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
  *
  * Per docs/goblin-remote-repo-refactor-plan.md §1 and §6, "网络
  * 变动导致 tab 一直转圈" is a root symptom of an unowned
- * `connecting` state. The `useNetworkReconnect` hook is the
- * only caller that re-enters the orchestrator for *all* remote
- * repos on a connectivity change — every other entry point is
- * user-driven (open / retry) or boot-driven (hydrate).
- *
- * Re-entrancy is handled by the orchestrator itself (latest-wins
- * per repo) and by the in-flight tracking the orchestrator
- * already does. This hook is intentionally a thin dispatcher.
+ * `connecting` state. The `useNetworkReconnect` hook re-enters
+ * the orchestrator for *all* remote repos on a connectivity
+ * change — both `failed` and `connecting` repos get a fresh
+ * probe. Re-probing a `connecting` repo is safe: the
+ * orchestrator's latest-wins semantics abort the in-flight run
+ * (which may be stuck against a dead network connection) and
+ * start a new one with fresh signal state. Without this, a
+ * `connecting` probe that started before the network came back
+ * holds its 20s SSH timeout before the user sees a `failed`
+ * state that the next `online` event would re-probe.
  *
  * Throttling: the browser fires `online` after the OS reports a
  * route change; in practice the user reopens wifi/VPN seconds
  * before the OS catches up, so the first probe often still
  * fails. We don't retry inside the hook — the failed
- * `useRemoteRepoLifecycle` call settles to `failed { reason:
- * 'unknown' }` (per §6.5) and the next user action / next
- * `online` event gives the next attempt.
+ * `runRemoteRepoLifecycle` call settles to `failed` and the
+ * next `online` event gives the next attempt.
  */
 export function useNetworkReconnect(): void {
-  // Avoid running the loop twice in React 19 StrictMode dev: the
-  // hook installs the listener once, the effect cleanup removes
-  // it, and the remount re-installs. The store is the source of
-  // truth for the current repo set, so we always read from it
-  // inside the listener (not from a captured snapshot).
   const setRef = useRef<ReposSet>(useReposStore.setState)
   const getRef = useRef<ReposGet>(useReposStore.getState)
   setRef.current = useReposStore.setState
@@ -46,18 +42,12 @@ export function useNetworkReconnect(): void {
       for (const repo of Object.values(repos)) {
         if (!isRemoteRepoId(repo.id)) continue
         const lifecycle = repo.remote.lifecycle
-        if (!lifecycle) continue
-        if (lifecycle.kind === 'ready' || lifecycle.kind === 'connecting') {
-          // A `ready` repo is the success terminus of a converged
-          // lifecycle — no re-probe is needed when the network
-          // comes back, because the next user-driven fetch will
-          // surface any new failure. A `connecting` repo is
-          // already in flight; the orchestrator owns its writes.
-          continue
-        }
-        // `failed` repo: re-probe. The orchestrator flips it to
-        // `connecting` (preserving the last-known target), runs
-        // the resolution, and settles to `ready` or `failed`.
+        // `ready` is the success terminus — no re-probe needed.
+        // `failed` and `connecting` repos both get a fresh probe.
+        // For `connecting`, the orchestrator's latest-wins abort
+        // kills the stale in-flight run and starts over with the
+        // now-working network.
+        if (lifecycle?.kind === 'ready') continue
         void runRemoteRepoLifecycle(set, get, repo.id)
       }
     }

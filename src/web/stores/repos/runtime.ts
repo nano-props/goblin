@@ -193,7 +193,7 @@ class RepoLane {
 interface RepoRuntime {
   nextOperationId: number
   queues: Record<RepoTaskLane, RepoLane>
-  operations: Partial<Record<RepoOperationKey, RepoOperationState>>
+  operations: Record<string, RepoOperationState | undefined>
 }
 
 const runtimes = new Map<string, RepoRuntime>()
@@ -231,20 +231,20 @@ export function nextRepoOperationId(repoId: string): number {
   return runtime.nextOperationId++
 }
 
-function ensureRepoOperation(repoId: string, key: RepoOperationKey): RepoOperationState {
+function ensureRepoOperation(repoId: string, key: string): RepoOperationState {
   const operations = getRuntime(repoId).operations
   return (operations[key] ??= idleOperation())
 }
 
-export function repoOperation(repoId: string, key: RepoOperationKey): RepoOperationState {
+export function repoOperation(repoId: string, key: string): RepoOperationState {
   return runtimes.get(repoId)?.operations[key] ?? idleOperation()
 }
 
-export function repoOperationBusy(repoId: string, key: RepoOperationKey): boolean {
+export function repoOperationBusy(repoId: string, key: string): boolean {
   return operationBusy(repoOperation(repoId, key))
 }
 
-export function repoOperationCurrent(repoId: string, key: RepoOperationKey, operationId: number): boolean {
+export function repoOperationCurrent(repoId: string, key: string, operationId: number): boolean {
   return repoOperation(repoId, key).operationId === operationId
 }
 
@@ -296,7 +296,7 @@ function notifyOperationIdleWaiters(repoId: string): void {
 
 export function waitForRepoOperationsIdle(
   repoId: string,
-  keys: RepoOperationKey[],
+  keys: string[],
   signal?: AbortSignal,
 ): Promise<void> {
   if (keys.every((key) => !repoOperationBusy(repoId, key))) return Promise.resolve()

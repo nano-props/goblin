@@ -147,7 +147,6 @@ function seedRepo(id: string, lifecycle: RemoteRepoLifecycle | null) {
           status: { operationId: 0, phase: 'idle', reason: null, target: null, startedAt: null, settledAt: null, error: null },
           pullRequests: { operationId: 0, phase: 'idle', reason: null, target: null, startedAt: null, settledAt: null, error: null },
           branchAction: { operationId: 0, phase: 'idle', reason: null, target: null, startedAt: null, settledAt: null, error: null },
-          remoteLifecycle: { operationId: 0, phase: 'idle', reason: null, target: null, startedAt: null, settledAt: null, error: null },
           pullRequestsByBranch: {},
         },
         ui: { selectedBranch: null, branchViewMode: 'all', preferredDetailTab: 'status' },
@@ -187,21 +186,20 @@ describe('useNetworkReconnect', () => {
     expect(lifecycle?.kind).toBe('ready')
   })
 
-  test('skips a `connecting` remote repo (orchestrator owns its writes)', async () => {
+  test('re-probes a `connecting` remote repo on `online` (orchestrator aborts stale run)', async () => {
     const target = remoteTargetFixture()
     seedRepo(target.id, { kind: 'connecting' })
     await mountHook()
 
     fireOnline()
-    for (let i = 0; i < 5; i += 1) await Promise.resolve()
+    for (let i = 0; i < 10; i += 1) await Promise.resolve()
 
-    // Still connecting — the hook didn't disturb it. We don't
-    // assert the exact instanceToken / operationId because the
-    // orchestrator's own re-marking during the test setup
-    // could in principle change them; the salient invariant
-    // is that the kind stays `connecting`.
+    // The connecting repo was re-probed and settled to `ready`.
+    // Without this re-probe, a connecting run that started before
+    // the network came back would hold its SSH timeout before the
+    // user sees a recoverable `failed` state.
     const lifecycle = useReposStore.getState().repos[target.id]?.remote.lifecycle
-    expect(lifecycle?.kind).toBe('connecting')
+    expect(lifecycle?.kind).toBe('ready')
   })
 
   test('skips local repos entirely', async () => {

@@ -93,7 +93,6 @@ describe('runRemoteRepoLifecycle', () => {
           status: idle(),
           pullRequests: idle(),
           branchAction: idle(),
-          remoteLifecycle: idle(),
           pullRequestsByBranch: {},
         },
         ui: { selectedBranch: null, branchViewMode: 'all', preferredDetailTab: 'status' },
@@ -416,7 +415,6 @@ function emptyOperations() {
     status: idle(),
     pullRequests: idle(),
     branchAction: idle(),
-    remoteLifecycle: idle(),
     pullRequestsByBranch: {},
   }
 }
