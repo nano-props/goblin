@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 
-import type { TerminalSessionSnapshot, TerminalSessionSummary } from '#/shared/terminal.ts'
+import type { TerminalSessionSnapshot, TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import '#/web/components/terminal/terminal-session.css'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'

@@ -1,250 +1,22 @@
 import * as v from 'valibot'
-
-export type TerminalControllerStatus = 'connected' | 'grace' | 'none'
-export type TerminalAttachmentRole = 'controller' | 'viewer' | 'unowned'
-export type TerminalSessionPhase = 'opening' | 'open' | 'error'
-export interface TerminalResolvedOwnership {
-  role: TerminalAttachmentRole
-  controllerStatus: TerminalControllerStatus
-}
-
-export interface TerminalController {
-  attachmentId: string
-  status: Exclude<TerminalControllerStatus, 'none'>
-}
-
-export interface TerminalAttachInput {
-  sessionId: string
-  cols: number
-  rows: number
-  attachmentId?: string
-}
-
-export interface TerminalCreateInput {
-  repoRoot: string
-  branch: string
-  worktreePath: string
-  kind: 'primary' | 'additional'
-  cols?: number
-  rows?: number
-  attachmentId?: string
-}
-
-export interface TerminalRestartInput {
-  sessionId: string
-  cols: number
-  rows: number
-  attachmentId?: string
-}
-
-export type TerminalTakeoverResult =
-  | {
-      ok: true
-      sessionId: string
-      controller: TerminalController | null
-      canonicalCols: number
-      canonicalRows: number
-    }
-  | { ok: false; message: string }
-
-export type TerminalAttachResult =
-  | {
-      ok: true
-      sessionId: string
-      replay: string
-      replaySeq: number
-      processName: string
-      /** Server-canonical terminal title parsed from the OSC 0/2 stream. */
-      canonicalTitle: string | null
-      phase: TerminalSessionPhase
-      message: string | null
-      snapshot?: string
-      snapshotSeq?: number
-      controller: TerminalController | null
-      canonicalCols?: number
-      canonicalRows?: number
-    }
-  | { ok: false; message: string }
-
-export type TerminalCatalogAction = 'created' | 'restored' | 'reused'
-
-export type TerminalCatalogMutationResult =
-  | {
-      ok: true
-      action: TerminalCatalogAction
-      key: string
-      sessions: TerminalSessionSummary[]
-    }
-  | { ok: false; message: string }
-
-export interface TerminalWriteInput {
-  sessionId: string
-  data: string
-  attachmentId?: string
-}
-
-export interface TerminalResizeInput {
-  sessionId: string
-  cols: number
-  rows: number
-  attachmentId?: string
-}
-
-export type TerminalTakeoverInput = TerminalResizeInput
-
-export interface TerminalSessionInput {
-  sessionId: string
-}
-
-export interface TerminalNotifyBellInput {
-  title: string
-  body: string
-  key?: string
-  /** Clicking the notification focuses Goblin and navigates to this repo's terminal tab. */
-  repoRoot: string
-}
-
-export interface TerminalListSessionsInput {
-  repoRoot: string
-}
-
-export interface TerminalReorderInput {
-  repoRoot: string
-  worktreePath: string
-  orderedKeys: string[]
-}
-
-export interface TerminalSessionSummary {
-  sessionId: string
-  key: string
-  cwd: string
-  controller: TerminalController | null
-  processName: string
-  /** Server-canonical terminal title parsed from the OSC 0/2 stream. */
-  canonicalTitle: string | null
-  phase: TerminalSessionPhase
-  message: string | null
-  cols: number
-  rows: number
-  displayOrder: number
-}
-
-export interface TerminalSessionSnapshotInput {
-  sessionId: string
-}
-
-export interface TerminalSessionSnapshot {
-  sessionId: string
-  snapshot: string
-  snapshotSeq: number
-}
-
-export type TerminalMutationResult = boolean
-
-export interface TerminalOutputEvent {
-  sessionId: string
-  data: string
-  seq: number
-  processName: string
-}
-
-export interface TerminalTitleEvent {
-  sessionId: string
-  /** Server-canonical terminal title parsed from the OSC 0/2 stream. */
-  canonicalTitle: string | null
-}
-
-export interface TerminalExitEvent {
-  sessionId: string
-}
-
-export interface TerminalOwnershipEvent {
-  sessionId: string
-  controller: TerminalController | null
-  cols: number
-  rows: number
-}
-
-export type TerminalRealtimeMessage =
-  | { type: 'output'; event: TerminalOutputEvent }
-  | { type: 'title'; event: TerminalTitleEvent }
-  | { type: 'exit'; event: TerminalExitEvent }
-  | { type: 'ownership'; event: TerminalOwnershipEvent }
-  | { type: 'sessions-changed'; repoRoot: string }
-
-export interface TerminalSocketRequestInputs {
-  attach: TerminalAttachInput
-  restart: TerminalRestartInput
-  write: TerminalWriteInput
-  resize: TerminalResizeInput
-  takeover: TerminalTakeoverInput
-  close: TerminalSessionInput
-  'list-sessions': TerminalListSessionsInput
-  create: TerminalCreateInput
-  prune: { repoRoot: string }
-  'session-snapshot': TerminalSessionSnapshotInput
-  reorder: TerminalReorderInput
-}
-
-export interface TerminalSocketResponseOutputs {
-  attach: TerminalAttachResult
-  restart: TerminalAttachResult
-  write: TerminalMutationResult
-  resize: TerminalMutationResult
-  takeover: TerminalTakeoverResult
-  close: TerminalMutationResult
-  'list-sessions': TerminalSessionSummary[]
-  create: TerminalCatalogMutationResult
-  prune: { pruned: number; remaining: number }
-  'session-snapshot': TerminalSessionSnapshot | null
-  reorder: TerminalMutationResult
-}
-
-export type TerminalSocketRequestAction = keyof TerminalSocketRequestInputs
-
-export type TerminalSocketRequestMessage = {
-  [TAction in TerminalSocketRequestAction]: {
-    type: 'request'
-    requestId: string
-    action: TAction
-    input: TerminalSocketRequestInputs[TAction]
-  }
-}[TerminalSocketRequestAction]
-
-export type TerminalSocketResponseMessage =
-  | {
-      [TAction in TerminalSocketRequestAction]: {
-        type: 'response'
-        requestId: string
-        ok: true
-        action: TAction
-        payload: TerminalSocketResponseOutputs[TAction]
-      }
-    }[TerminalSocketRequestAction]
-  | {
-      [TAction in TerminalSocketRequestAction]: {
-        type: 'response'
-        requestId: string
-        ok: false
-        action: TAction
-        error: string
-      }
-    }[TerminalSocketRequestAction]
-
-export type TerminalSocketServerMessage = TerminalRealtimeMessage | TerminalSocketResponseMessage
-
-/** Client → Server realtime messages over the bidirectional WebSocket. */
-export type TerminalClientMessage = TerminalSocketRequestMessage
+import type {
+  TerminalClientMessage,
+  TerminalRealtimeMessage,
+  TerminalSocketRequestAction,
+  TerminalSocketServerMessage,
+} from '#/shared/terminal-socket.ts'
+import type {
+  TerminalControllerStatus,
+  TerminalNotifyBellInput,
+  TerminalSessionPhase,
+  TerminalSessionSnapshot,
+  TerminalSessionSummary,
+} from '#/shared/terminal-types.ts'
 
 const MIN_TERMINAL_COLS = 1
 const MAX_TERMINAL_COLS = 500
 const MIN_TERMINAL_ROWS = 1
 const MAX_TERMINAL_ROWS = 300
-// Cap the data inside a single `write` request. The realtime route
-// also enforces a per-WS-message cap that is intentionally identical
-// (see `TERMINAL_WS_MESSAGE_LIMIT_BYTES` in `src/server/routes/realtime.ts`).
-// Both caps use the same constant below so a change to one cap cannot
-// silently grow the attack surface.
 export const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 export const TERMINAL_WS_MESSAGE_LIMIT_BYTES = MAX_TERMINAL_WRITE_CHARS
 const TERMINAL_SESSION_ID_RE = /^[A-Za-z0-9_-]{16,64}$/
@@ -267,7 +39,7 @@ const TERMINAL_CONNECTED_CONTROLLER_STATUS_VALUES = ['connected', 'grace'] satis
   TerminalControllerStatus,
   'none'
 >[]
-const TERMINAL_SESSION_PHASE_VALUES = ['opening', 'open', 'error'] satisfies TerminalSessionPhase[]
+const TERMINAL_SESSION_PHASE_VALUES = ['opening', 'restarting', 'open', 'error', 'closed'] satisfies TerminalSessionPhase[]
 const TerminalSessionIdSchema = v.pipe(v.string(), v.regex(TERMINAL_SESSION_ID_RE))
 const TerminalAttachmentIdSchema = v.pipe(v.string(), v.regex(TERMINAL_ATTACHMENT_ID_RE))
 const TerminalRequestIdSchema = v.pipe(v.string(), v.regex(TERMINAL_REQUEST_ID_RE))
@@ -348,6 +120,10 @@ const TerminalTitleEventSchema = v.object({
 const TerminalExitEventSchema = v.object({
   sessionId: v.string(),
 })
+
+export function isValidTerminalSessionId(value: unknown): value is string {
+  return typeof value === 'string' && TERMINAL_SESSION_ID_RE.test(value)
+}
 const TerminalOwnershipEventSchema = v.object({
   sessionId: v.string(),
   controller: v.nullable(TerminalControllerSchema),
@@ -379,7 +155,6 @@ const TerminalSocketServerMessageSchema = v.variant('type', [
     error: v.string(),
   }),
 ])
-
 const TerminalClientMessageSchema = v.variant('type', [
   v.object({
     type: v.literal('request'),
@@ -508,41 +283,4 @@ export function normalizeTerminalSocketServerMessage(value: unknown): TerminalSo
 export function normalizeTerminalClientMessage(value: unknown): TerminalClientMessage | null {
   const parsed = v.safeParse(TerminalClientMessageSchema, value)
   return parsed.success ? parsed.output : null
-}
-
-export function resolveTerminalAttachmentRole(
-  controller: TerminalController | null,
-  attachmentId: string,
-): TerminalAttachmentRole {
-  if (!controller) return 'unowned'
-  return controller.attachmentId === attachmentId ? 'controller' : 'viewer'
-}
-
-export function resolveTerminalOwnership(
-  controller: TerminalController | null,
-  attachmentId: string,
-): TerminalResolvedOwnership {
-  return {
-    role: resolveTerminalAttachmentRole(controller, attachmentId),
-    controllerStatus: controller?.status ?? 'none',
-  }
-}
-
-export function cloneTerminalController(controller: TerminalController | null): TerminalController | null {
-  return controller ? { ...controller } : null
-}
-
-const TERMINAL_ID_INDEX_RE = /^terminal-(\d+)$/
-
-/** Parse a terminal id like `terminal-3` into its 1-based index, or `null` if not a standard id. */
-export function parseTerminalIdIndex(terminalId: string): number | null {
-  const match = TERMINAL_ID_INDEX_RE.exec(terminalId)
-  if (!match) return null
-  const index = Number.parseInt(match[1] ?? '', 10)
-  return Number.isFinite(index) && index > 0 ? index : null
-}
-
-/** Build a standard terminal id from a 1-based index (e.g. `3` → `terminal-3`). */
-export function formatTerminalId(index: number): string {
-  return `terminal-${index}`
 }

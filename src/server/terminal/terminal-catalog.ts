@@ -6,17 +6,15 @@ import { resolveRemoteTarget } from '#/system/ssh/config.ts'
 import { buildRemoteTerminalInvocation } from '#/system/ssh/commands.ts'
 import { isRemoteRepoId, parseRemoteRepoId } from '#/shared/remote-repo.ts'
 import {
-  formatTerminalId,
-  isValidTerminalAttachmentId,
-  isValidTerminalSize,
-  parseTerminalIdIndex,
   type TerminalAttachResult,
   type TerminalCatalogAction,
   type TerminalCatalogMutationResult,
   type TerminalControllerStatus,
   type TerminalCreateInput,
   type TerminalSessionSummary,
-} from '#/shared/terminal.ts'
+} from '#/shared/terminal-types.ts'
+import { formatTerminalId, parseTerminalIdIndex } from '#/shared/terminal-ids.ts'
+import { isValidTerminalAttachmentId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import { formatTerminalSessionKey, parseTerminalSessionKey, terminalSessionScope } from '#/shared/terminal-session-key.ts'
 
 interface EnsureTerminalCatalogInput {

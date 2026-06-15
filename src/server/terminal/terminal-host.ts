@@ -14,7 +14,7 @@ import type {
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalWriteInput,
-} from '#/shared/terminal.ts'
+} from '#/shared/terminal-types.ts'
 
 type MaybePromise<T> = T | Promise<T>
 

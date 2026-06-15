@@ -1,5 +1,4 @@
-import type { TerminalAttachResult, TerminalOutputEvent } from '#/shared/terminal.ts'
-import type { TerminalSessionPhase } from '#/shared/terminal.ts'
+import type { TerminalAttachResult, TerminalOutputEvent, TerminalSessionPhase } from '#/shared/terminal-types.ts'
 import { TerminalSessionState } from '#/web/components/terminal/terminal-session-state.ts'
 import type { TerminalOwnershipViewModel, TerminalSearchResult } from '#/web/components/terminal/types.ts'
 export class TerminalSessionRuntime {
@@ -12,7 +11,7 @@ export class TerminalSessionRuntime {
     return this.state.snapshot(this.ptySessionId)
   }
 
-  phase(): 'opening' | 'open' | 'error' {
+  phase(): 'opening' | 'restarting' | 'open' | 'error' | 'closed' {
     return this.state.getPhase()
   }
 
@@ -53,7 +52,7 @@ export class TerminalSessionRuntime {
     this.ptySessionId = null
     if (oldPtySessionId) this.replacingPtySessionId = oldPtySessionId
     this.restartOnStart = true
-    return { changed: this.state.setOpening() }
+    return { changed: this.state.setRestarting() }
   }
 
   settleStartAttempt(): void {

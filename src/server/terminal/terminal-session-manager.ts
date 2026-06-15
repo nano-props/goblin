@@ -1,8 +1,6 @@
 import crypto from 'node:crypto'
 import path from 'node:path'
 import {
-  cloneTerminalController,
-  normalizeTerminalSize,
   type TerminalAttachResult,
   type TerminalController,
   type TerminalExitEvent,
@@ -12,14 +10,16 @@ import {
   type TerminalSessionSnapshot,
   type TerminalSessionSummary,
   type TerminalTakeoverResult,
-} from '#/shared/terminal.ts'
+} from '#/shared/terminal-types.ts'
+import { cloneTerminalController } from '#/shared/terminal-ownership.ts'
+import { isValidTerminalSessionId, normalizeTerminalSize } from '#/shared/terminal-validators.ts'
 import { parseTerminalSessionKey } from '#/shared/terminal-session-key.ts'
 import { serverLogger } from '#/server/logger.ts'
 import {
   attachTerminalAttachment,
   claimTerminalAttachmentControl,
+  expireTerminalAttachment,
   registerTerminalAttachment,
-  releaseTerminalAttachmentControl,
   restartTerminalAttachmentControl,
   type TerminalAttachmentState,
   updateTerminalAttachmentConnection,
@@ -31,10 +31,16 @@ import {
   takeSnapshot,
   type TerminalRenderState,
 } from '#/server/terminal/terminal-render-state.ts'
+import {
+  markTerminalSessionClosed,
+  markTerminalSessionError,
+  markTerminalSessionOpen,
+  markTerminalSessionOpening,
+  markTerminalSessionRestarting,
+} from '#/server/terminal/terminal-session-lifecycle.ts'
 import type { PtyHandle, PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
-const SESSION_ID_RE = /^[A-Za-z0-9_-]{16,64}$/
 const sessionManagerLogger = serverLogger.child({ module: 'terminal-session-manager' })
 
 export interface TerminalEnsureSessionInput<TOwner extends string | number> {
@@ -64,8 +70,7 @@ interface TerminalSession<TOwner extends string | number> {
   pty: PtyHandle | null
   disposables: Array<{ dispose(): void }>
   render: TerminalRenderState
-  attachmentId: string | null
-  attachment: TerminalAttachmentState | null
+  attachments: Map<string, TerminalAttachmentState>
   controller: TerminalController | null
   allowImplicitAttachControl: boolean
   phase: TerminalSessionPhase
@@ -128,8 +133,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
       pty: null,
       disposables: [],
       render: createEmptyTerminalRenderState(),
-      attachmentId: null,
-      attachment: null,
+      attachments: new Map(),
       controller: null,
       allowImplicitAttachControl: true,
       phase: 'opening',
@@ -142,7 +146,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     this.sessionIdByOwnerKey.set(ownerKey, id)
     if (input.attachmentId) {
       registerTerminalAttachment(session, input.attachmentId, size.cols, size.rows, input.attachmentConnected ?? true)
-      session.controller = session.attachment?.connected
+      session.controller = session.attachments.get(input.attachmentId)?.connected
         ? { attachmentId: input.attachmentId, status: 'connected' }
         : null
     }
@@ -186,9 +190,6 @@ export class TerminalSessionManager<TOwner extends string | number> {
     if (attachmentId) {
       registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
       this.applyOwnershipEffect(session, attachTerminalAttachment(session, attachmentId))
-      if (session.controller?.attachmentId === attachmentId) {
-        this.resizeSessionPty(session, size.cols, size.rows)
-      }
     }
     return this.attachResult(session)
   }
@@ -250,11 +251,10 @@ export class TerminalSessionManager<TOwner extends string | number> {
       registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
       restartTerminalAttachmentControl(session, attachmentId)
     }
-    this.resetSessionState(session, size.cols, size.rows)
+    this.resetSessionState(session, size.cols, size.rows, 'restarting')
     const result = await this.spawnSessionPty(session)
     if (!result.ok) {
-      session.phase = 'error'
-      session.message = result.message
+      markTerminalSessionError(session, result.message)
     }
     return result
   }
@@ -268,6 +268,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
   closeSession(sessionId: string): void {
     const session = this.sessionsById.get(sessionId)
     if (!session) return
+    markTerminalSessionClosed(session)
     this.sessionsById.delete(sessionId)
     const ownerKey = this.sessionOwnerKey(session.ownerId, session.key)
     if (this.sessionIdByOwnerKey.get(ownerKey) === sessionId) this.sessionIdByOwnerKey.delete(ownerKey)
@@ -293,11 +294,12 @@ export class TerminalSessionManager<TOwner extends string | number> {
     }
   }
 
-  releaseAttachmentControl(ownerId: TOwner, attachmentId: string): void {
+  expireAttachment(ownerId: TOwner, attachmentId: string): void {
     for (const session of Array.from(this.sessionsById.values())) {
       if (session.ownerId !== ownerId) continue
-      if (!releaseTerminalAttachmentControl(session, attachmentId)) continue
-      this.emitOwnership(session)
+      const effect = expireTerminalAttachment(session, attachmentId)
+      if (!effect.removed) continue
+      if (effect.emitOwnership) this.emitOwnership(session)
     }
   }
 
@@ -453,12 +455,17 @@ export class TerminalSessionManager<TOwner extends string | number> {
     if (effect.emitOwnership) this.emitOwnership(session)
   }
 
-  private resetSessionState(session: TerminalSession<TOwner>, cols: number, rows: number): void {
+  private resetSessionState(
+    session: TerminalSession<TOwner>,
+    cols: number,
+    rows: number,
+    phase: TerminalSessionPhase = 'opening',
+  ): void {
     this.disposeSessionResources(session)
     session.cols = cols
     session.rows = rows
-    session.phase = 'opening'
-    session.message = null
+    if (phase === 'restarting') markTerminalSessionRestarting(session)
+    else markTerminalSessionOpening(session)
     resetRender(session.render)
     session.inputQueue = []
     session.inputFlushScheduled = false
@@ -489,8 +496,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
       return resolved
     }
     session.pty = resolved.handle
-    session.phase = 'open'
-    session.message = null
+    markTerminalSessionOpen(session)
     // The PtySupervisor owns the processName cache. It samples on the
     // first data chunk (deferred past the macOS spawn-helper exec) and
     // refreshes on every title-OSC change. We query it on demand.
@@ -563,10 +569,6 @@ export class TerminalSessionManager<TOwner extends string | number> {
       (typeof ownerId === 'string' && ownerId.length > 0)
     )
   }
-}
-
-export function isValidTerminalSessionId(value: unknown): value is string {
-  return typeof value === 'string' && SESSION_ID_RE.test(value)
 }
 
 export function isValidTerminalWriteData(value: unknown): value is string {

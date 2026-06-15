@@ -3,8 +3,8 @@ import type {
   TerminalControllerStatus,
   TerminalExitEvent,
   TerminalOutputEvent,
-} from '#/shared/terminal.ts'
-export type TerminalPhase = 'opening' | 'open' | 'error'
+} from '#/shared/terminal-types.ts'
+export type TerminalPhase = 'opening' | 'restarting' | 'open' | 'error' | 'closed'
 
 export interface TerminalDescriptor {
   key: string
@@ -46,6 +46,15 @@ export interface TerminalOwnershipViewModel extends TerminalAttachmentOwnershipV
   sessionId: string
   canonicalCols: number
   canonicalRows: number
+}
+
+export interface TerminalSessionHydrationInput extends TerminalOwnershipViewModel {
+  phase: TerminalPhase
+  message: string | null
+  processName: string
+  canonicalTitle?: string | null
+  snapshot?: string
+  snapshotSeq?: number
 }
 
 export interface TerminalSnapshot {

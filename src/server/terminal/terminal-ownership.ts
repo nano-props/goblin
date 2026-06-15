@@ -1,4 +1,4 @@
-import type { TerminalController, TerminalControllerStatus } from '#/shared/terminal.ts'
+import type { TerminalController, TerminalControllerStatus } from '#/shared/terminal-types.ts'
 
 export interface TerminalAttachmentState {
   cols: number
@@ -7,8 +7,7 @@ export interface TerminalAttachmentState {
 }
 
 export interface TerminalOwnershipState {
-  attachmentId: string | null
-  attachment: TerminalAttachmentState | null
+  attachments: Map<string, TerminalAttachmentState>
   controller: TerminalController | null
   allowImplicitAttachControl: boolean
   cols: number
@@ -20,6 +19,11 @@ export interface TerminalOwnershipEffect {
   emitOwnership: boolean
 }
 
+export interface TerminalAttachmentExpiryEffect {
+  emitOwnership: boolean
+  removed: boolean
+}
+
 export function registerTerminalAttachment(
   state: TerminalOwnershipState,
   attachmentId: string,
@@ -27,21 +31,29 @@ export function registerTerminalAttachment(
   rows: number,
   connected?: boolean,
 ): void {
-  state.attachmentId = attachmentId
-  state.attachment = {
+  const existing = state.attachments.get(attachmentId)
+  state.attachments.set(attachmentId, {
     cols,
     rows,
-    connected: connected ?? state.attachment?.connected ?? false,
-  }
+    connected: connected ?? existing?.connected ?? false,
+  })
 }
 
 export function attachTerminalAttachment(state: TerminalOwnershipState, attachmentId: string): TerminalOwnershipEffect {
-  if (
-    state.controller !== null ||
-    !state.allowImplicitAttachControl ||
-    state.attachmentId !== attachmentId ||
-    !state.attachment?.connected
-  ) {
+  const attachment = state.attachments.get(attachmentId)
+  if (!attachment?.connected) {
+    return { emitOwnership: false }
+  }
+  if (state.controller?.attachmentId === attachmentId) {
+    const sizeChanged = state.cols !== attachment.cols || state.rows !== attachment.rows
+    const statusChanged = state.controller.status !== 'connected'
+    if (statusChanged) state.controller = { attachmentId, status: 'connected' }
+    return {
+      resizeTo: sizeChanged ? { cols: attachment.cols, rows: attachment.rows } : undefined,
+      emitOwnership: statusChanged && !sizeChanged,
+    }
+  }
+  if (state.controller !== null || !state.allowImplicitAttachControl) {
     return { emitOwnership: false }
   }
   return claimTerminalAttachmentControl(state, attachmentId)
@@ -51,24 +63,19 @@ export function claimTerminalAttachmentControl(
   state: TerminalOwnershipState,
   attachmentId: string,
 ): TerminalOwnershipEffect {
-  if (state.attachmentId !== attachmentId || !state.attachment) return { emitOwnership: false }
-  if (!state.attachment.connected) {
-    state.attachment = null
-    state.attachmentId = null
-    return { emitOwnership: false }
-  }
-  const sizeChanged = state.cols !== state.attachment.cols || state.rows !== state.attachment.rows
+  const attachment = state.attachments.get(attachmentId)
+  if (!attachment?.connected) return { emitOwnership: false }
+  const sizeChanged = state.cols !== attachment.cols || state.rows !== attachment.rows
   state.controller = { attachmentId, status: 'connected' }
   state.allowImplicitAttachControl = false
   return {
-    resizeTo: sizeChanged ? { cols: state.attachment.cols, rows: state.attachment.rows } : undefined,
+    resizeTo: sizeChanged ? { cols: attachment.cols, rows: attachment.rows } : undefined,
     emitOwnership: !sizeChanged,
   }
 }
 
 export function restartTerminalAttachmentControl(state: TerminalOwnershipState, attachmentId: string): void {
-  state.controller =
-    state.attachmentId === attachmentId && state.attachment?.connected ? { attachmentId, status: 'connected' } : null
+  state.controller = state.attachments.get(attachmentId)?.connected ? { attachmentId, status: 'connected' } : null
   if (state.controller) state.allowImplicitAttachControl = false
 }
 
@@ -77,22 +84,19 @@ export function updateTerminalAttachmentConnection(
   attachmentId: string,
   connected: boolean,
 ): TerminalOwnershipEffect {
-  if (state.attachmentId !== attachmentId || !state.attachment) return { emitOwnership: false }
+  const attachment = state.attachments.get(attachmentId)
+  if (!attachment) return { emitOwnership: false }
   const controllerStatus = connected ? 'connected' : 'grace'
   if (
-    state.attachment.connected === connected &&
+    attachment.connected === connected &&
     (state.controller?.attachmentId !== attachmentId || state.controller?.status === controllerStatus)
   ) {
     return { emitOwnership: false }
   }
-  state.attachment.connected = connected
+  attachment.connected = connected
   if (state.controller?.attachmentId !== attachmentId) {
     if (connected && state.controller === null && state.allowImplicitAttachControl) {
       return claimTerminalAttachmentControl(state, attachmentId)
-    }
-    if (!connected) {
-      state.attachment = null
-      state.attachmentId = null
     }
     return { emitOwnership: false }
   }
@@ -103,10 +107,24 @@ export function updateTerminalAttachmentConnection(
 
 export function releaseTerminalAttachmentControl(state: TerminalOwnershipState, attachmentId: string): boolean {
   if (state.controller?.attachmentId !== attachmentId) return false
-  if (state.attachment?.connected) return false
+  if (state.attachments.get(attachmentId)?.connected) return false
   state.controller = null
   state.allowImplicitAttachControl = false
-  state.attachment = null
-  state.attachmentId = null
+  state.attachments.delete(attachmentId)
   return true
+}
+
+export function expireTerminalAttachment(
+  state: TerminalOwnershipState,
+  attachmentId: string,
+): TerminalAttachmentExpiryEffect {
+  const attachment = state.attachments.get(attachmentId)
+  if (!attachment || attachment.connected) return { emitOwnership: false, removed: false }
+  const wasController = state.controller?.attachmentId === attachmentId
+  if (wasController) {
+    state.controller = null
+    state.allowImplicitAttachControl = false
+  }
+  state.attachments.delete(attachmentId)
+  return { emitOwnership: wasController, removed: true }
 }

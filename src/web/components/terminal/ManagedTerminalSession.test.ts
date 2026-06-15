@@ -17,7 +17,7 @@ import type {
   TerminalTakeoverResult,
   TerminalTakeoverInput,
   TerminalWriteInput,
-} from '#/shared/terminal.ts'
+} from '#/shared/terminal-types.ts'
 
 const xtermMocks = vi.hoisted(() => {
   const terminals: any[] = []
@@ -1624,7 +1624,7 @@ function hydrateManagedSession(
   session: ManagedTerminalSession,
   overrides: Partial<{
     sessionId: string
-    phase: 'opening' | 'open' | 'error'
+    phase: 'opening' | 'restarting' | 'open' | 'error' | 'closed'
     message: string | null
     processName: string
     canonicalTitle?: string | null

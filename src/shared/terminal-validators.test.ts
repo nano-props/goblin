@@ -1,0 +1,92 @@
+import { describe, expect, test } from 'vitest'
+import {
+  isValidTerminalAttachmentId,
+  isValidTerminalNotifyBellInput,
+  isValidTerminalSize,
+  isValidTerminalSessionId,
+  normalizeTerminalClientMessage,
+  normalizeTerminalSize,
+  normalizeTerminalSocketServerMessage,
+} from '#/shared/terminal-validators.ts'
+
+describe('shared terminal validators', () => {
+  test('normalizes terminal sizes within supported bounds', () => {
+    expect(normalizeTerminalSize(80, 24)).toEqual({ cols: 80, rows: 24 })
+    expect(normalizeTerminalSize(80.9, 24.2)).toEqual({ cols: 80, rows: 24 })
+    expect(normalizeTerminalSize(0, 24)).toBeNull()
+    expect(normalizeTerminalSize(80, 301)).toBeNull()
+    expect(isValidTerminalSize(120, 40)).toBe(true)
+    expect(isValidTerminalSize('120', 40)).toBe(false)
+  })
+
+  test('validates attachment ids and bell payloads', () => {
+    expect(isValidTerminalSessionId('term_1234567890abcdef')).toBe(true)
+    expect(isValidTerminalSessionId('short')).toBe(false)
+    expect(isValidTerminalSessionId('bad id')).toBe(false)
+
+    expect(isValidTerminalAttachmentId(undefined)).toBe(true)
+    expect(isValidTerminalAttachmentId('attachment_a')).toBe(true)
+    expect(isValidTerminalAttachmentId('bad id')).toBe(false)
+
+    expect(
+      isValidTerminalNotifyBellInput({
+        title: 'Build finished',
+        body: 'done',
+        repoRoot: '/repo',
+      }),
+    ).toBe(true)
+    expect(
+      isValidTerminalNotifyBellInput({
+        title: '',
+        body: 'done',
+        repoRoot: '/repo',
+      }),
+    ).toBe(false)
+  })
+
+  test('normalizes valid terminal client messages', () => {
+    expect(
+      normalizeTerminalClientMessage({
+        type: 'request',
+        requestId: 'req_1',
+        action: 'attach',
+        input: { sessionId: 'term_1234567890abcdef', cols: 80, rows: 24, attachmentId: 'attachment_a' },
+      }),
+    ).toEqual({
+      type: 'request',
+      requestId: 'req_1',
+      action: 'attach',
+      input: { sessionId: 'term_1234567890abcdef', cols: 80, rows: 24, attachmentId: 'attachment_a' },
+    })
+
+    expect(
+      normalizeTerminalClientMessage({
+        type: 'request',
+        requestId: 'bad id',
+        action: 'attach',
+        input: { sessionId: 'term_1234567890abcdef', cols: 80, rows: 24 },
+      }),
+    ).toBeNull()
+  })
+
+  test('normalizes valid terminal socket server messages', () => {
+    expect(
+      normalizeTerminalSocketServerMessage({
+        type: 'output',
+        event: { sessionId: 'term_1234567890abcdef', data: 'hi', seq: 1, processName: 'zsh' },
+      }),
+    ).toEqual({
+      type: 'output',
+      event: { sessionId: 'term_1234567890abcdef', data: 'hi', seq: 1, processName: 'zsh' },
+    })
+
+    expect(
+      normalizeTerminalSocketServerMessage({
+        type: 'response',
+        requestId: 'req_1',
+        ok: false,
+        action: 'attach',
+      }),
+    ).toBeNull()
+  })
+})

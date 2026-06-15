@@ -21,7 +21,7 @@ describe('TerminalSessionState', () => {
         canonicalRows: 40,
       }),
     ).toBe(true)
-    expect(state.setOpen()).toBe(true)
+    expect(state.setOpen()).toBe(false)
     expect(state.snapshot('session-1')).toEqual({
       phase: 'open',
       message: null,
@@ -35,6 +35,26 @@ describe('TerminalSessionState', () => {
         canonicalCols: 120,
         canonicalRows: 40,
       },
+    })
+  })
+
+  test('restarting state is non-interactive until open resumes', () => {
+    const state = new TerminalSessionState()
+    state.applyOpenResult({
+      processName: 'zsh',
+      canonicalTitle: null,
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalCols: 120,
+      canonicalRows: 40,
+    })
+    expect(state.snapshot('session-1').attachment?.active).toBe(true)
+    expect(state.setRestarting()).toBe(true)
+    expect(state.snapshot('session-1')).toEqual({
+      phase: 'restarting',
+      message: null,
+      processName: 'zsh',
+      canonicalTitle: null,
     })
   })
 

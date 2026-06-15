@@ -38,7 +38,7 @@ function makeServerSession(
     controller: { attachmentId: string; status: 'connected' | 'grace' }
     processName: string
     canonicalTitle: string | null
-    phase: 'opening' | 'open' | 'error'
+    phase: 'opening' | 'restarting' | 'open' | 'error' | 'closed'
     message: string | null
     cols: number
     rows: number
@@ -274,6 +274,35 @@ describe('TerminalSessionRegistry', () => {
       ;(registry as any).removeSession(activeKey, { dispose: false, closeSession: false })
 
       expect(registry.worktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalId).toBe('terminal-1')
+    })
+
+    test('invalidates cached worktree snapshot when server display order changes', () => {
+      registry.setRepoIndex(makeRepoIndex())
+      registry.reconcileServerSessions(
+        REPO_ROOT,
+        [
+          makeServerSession('session-1', 'terminal-1', { displayOrder: 0 }),
+          makeServerSession('session-2', 'terminal-2', { displayOrder: 1 }),
+        ],
+        'attachment_local',
+        new Map(),
+      )
+
+      const firstSnapshot = registry.worktreeSnapshot(WORKTREE_KEY)
+      expect(firstSnapshot.sessions.map((session) => session.terminalId)).toEqual(['terminal-1', 'terminal-2'])
+
+      registry.reconcileServerSessions(
+        REPO_ROOT,
+        [
+          makeServerSession('session-1', 'terminal-1', { displayOrder: 1 }),
+          makeServerSession('session-2', 'terminal-2', { displayOrder: 0 }),
+        ],
+        'attachment_local',
+        new Map(),
+      )
+
+      const secondSnapshot = registry.worktreeSnapshot(WORKTREE_KEY)
+      expect(secondSnapshot.sessions.map((session) => session.terminalId)).toEqual(['terminal-2', 'terminal-1'])
     })
   })
 

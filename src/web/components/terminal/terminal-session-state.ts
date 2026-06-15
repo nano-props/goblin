@@ -1,4 +1,4 @@
-import type { TerminalOutputEvent } from '#/shared/terminal.ts'
+import type { TerminalOutputEvent } from '#/shared/terminal-types.ts'
 import { stripTerminalControlSequences } from '#/web/components/terminal/terminal-output-text.ts'
 import { createTerminalAttachmentSnapshot } from '#/web/components/terminal/types.ts'
 import type {
@@ -75,7 +75,7 @@ export class TerminalSessionState {
   }
 
   getCanResize(): boolean {
-    return this.runtimeState.phase !== 'error' && this.runtimeState.attachmentOwnership.role === 'controller'
+    return this.runtimeState.phase === 'open' && this.runtimeState.attachmentOwnership.role === 'controller'
   }
 
   getCanonicalSize(): { cols: number; rows: number } {
@@ -106,6 +106,10 @@ export class TerminalSessionState {
 
   setOpening(): boolean {
     return this.setPhaseAndMessage('opening', null)
+  }
+
+  setRestarting(): boolean {
+    return this.setPhaseAndMessage('restarting', null)
   }
 
   setOpen(): boolean {

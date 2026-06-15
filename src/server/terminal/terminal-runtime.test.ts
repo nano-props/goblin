@@ -5,10 +5,10 @@
 // exercises `createServerTerminalRuntime` end-to-end through its
 // `ServerTerminalHost` surface so the wiring between the supervisor,
 // manager, broker, and catalog stays in lockstep with the shared
-// protocol types in `shared/terminal.ts`.
+// protocol types in `shared/terminal-types.ts`.
 // `ServerTerminalHost` surface so the wiring between the supervisor,
 // manager, broker, and catalog stays in lockstep with the shared
-// protocol types in `shared/terminal.ts`.
+// protocol types in `shared/terminal-types.ts`.
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { getWorktrees } from '#/system/git/worktrees.ts'
@@ -132,6 +132,105 @@ describe('server terminal runtime', () => {
     ])
 
     host.unregisterSocket('client_1', 'attachment_a', socket)
+    shutdown()
+  })
+
+  test('a second attachment can attach as viewer without stealing controller ownership', async () => {
+    const { host, shutdown } = buildRuntime()
+    const socketA = { send: vi.fn(), close: vi.fn() }
+    const socketB = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_1', 'attachment_a', socketA)
+    host.registerSocket('client_1', 'attachment_b', socketB)
+
+    const createResult = await host.create('client_1', {
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'additional',
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_a',
+    })
+    expect(createResult.ok).toBe(true)
+    if (!createResult.ok) return
+    const sessionId = createResult.sessions[0]?.sessionId
+    if (!sessionId) throw new Error('expected session id')
+
+    const attachResult = await host.attach('client_1', {
+      sessionId,
+      cols: 120,
+      rows: 40,
+      attachmentId: 'attachment_b',
+    })
+    expect(attachResult).toMatchObject({
+      ok: true,
+      sessionId,
+      controller: { attachmentId: 'attachment_a', status: 'connected' },
+      canonicalCols: 80,
+      canonicalRows: 24,
+    })
+
+    const sessions = await host.listSessions('client_1', '/repo')
+    expect(sessions).toEqual([
+      expect.objectContaining({
+        sessionId,
+        controller: { attachmentId: 'attachment_a', status: 'connected' },
+        cols: 80,
+        rows: 24,
+      }),
+    ])
+
+    host.unregisterSocket('client_1', 'attachment_a', socketA)
+    host.unregisterSocket('client_1', 'attachment_b', socketB)
+    shutdown()
+  })
+
+  test('reattaching the grace controller restores connected ownership and canonical geometry', async () => {
+    const { host, shutdown } = buildRuntime()
+    const socketA = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_1', 'attachment_a', socketA)
+
+    const createResult = await host.create('client_1', {
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'additional',
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_a',
+    })
+    expect(createResult.ok).toBe(true)
+    if (!createResult.ok) return
+    const sessionId = createResult.sessions[0]?.sessionId
+    if (!sessionId) throw new Error('expected session id')
+
+    host.unregisterSocket('client_1', 'attachment_a', socketA)
+
+    const reattachResult = await host.attach('client_1', {
+      sessionId,
+      cols: 101,
+      rows: 31,
+      attachmentId: 'attachment_a',
+    })
+    expect(reattachResult).toMatchObject({
+      ok: true,
+      sessionId,
+      controller: { attachmentId: 'attachment_a', status: 'connected' },
+      canonicalCols: 101,
+      canonicalRows: 31,
+    })
+    expect(mockPtys[0]?.resize).toHaveBeenLastCalledWith(101, 31)
+
+    const sessions = await host.listSessions('client_1', '/repo')
+    expect(sessions).toEqual([
+      expect.objectContaining({
+        sessionId,
+        controller: { attachmentId: 'attachment_a', status: 'connected' },
+        cols: 101,
+        rows: 31,
+      }),
+    ])
+
     shutdown()
   })
 
@@ -608,6 +707,130 @@ describe('server terminal runtime', () => {
     expect(replacementAttach.sessionId).not.toBe(first.sessionId)
 
     host.unregisterSocket('client_1', 'attachment_b', socket2)
+    shutdown()
+  })
+
+  test('a released controller does not implicitly regain control on reattach, but can takeover explicitly', async () => {
+    vi.useFakeTimers()
+    const { host, shutdown } = buildRuntime()
+    const socketA = { send: vi.fn(), close: vi.fn() }
+    const socketB = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_1', 'attachment_a', socketA)
+    const created = await host.create('client_1', {
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'additional',
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_a',
+    })
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+    const sessionId = created.sessions[0]?.sessionId
+    if (!sessionId) throw new Error('expected session id')
+    host.registerSocket('client_1', 'attachment_b', socketB)
+
+    const viewerAttach = await host.attach('client_1', {
+      sessionId,
+      cols: 120,
+      rows: 40,
+      attachmentId: 'attachment_b',
+    })
+    expect(viewerAttach.ok).toBe(true)
+
+    host.unregisterSocket('client_1', 'attachment_a', socketA)
+    await vi.advanceTimersByTimeAsync(30_000 + 1)
+    await vi.runOnlyPendingTimersAsync()
+    await Promise.resolve()
+
+    const afterRelease = await host.listSessions('client_1', '/repo')
+    expect(afterRelease).toEqual([
+      expect.objectContaining({
+        sessionId,
+        controller: null,
+        cols: 80,
+        rows: 24,
+      }),
+    ])
+
+    const reattach = await host.attach('client_1', {
+      sessionId,
+      cols: 101,
+      rows: 31,
+      attachmentId: 'attachment_a',
+    })
+    expect(reattach).toMatchObject({
+      ok: true,
+      sessionId,
+      controller: null,
+      canonicalCols: 80,
+      canonicalRows: 24,
+    })
+
+    const takeover = host.takeover('client_1', {
+      sessionId,
+      cols: 101,
+      rows: 31,
+      attachmentId: 'attachment_a',
+    })
+    expect(takeover).toEqual({
+      ok: true,
+      sessionId,
+      controller: { attachmentId: 'attachment_a', status: 'connected' },
+      canonicalCols: 101,
+      canonicalRows: 31,
+    })
+
+    host.unregisterSocket('client_1', 'attachment_b', socketB)
+    shutdown()
+  })
+
+  test('expiring a disconnected viewer attachment leaves the current controller unchanged', async () => {
+    vi.useFakeTimers()
+    const { host, shutdown } = buildRuntime()
+    const socketA = { send: vi.fn(), close: vi.fn() }
+    const socketB = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_1', 'attachment_a', socketA)
+    const created = await host.create('client_1', {
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'additional',
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_a',
+    })
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+    const sessionId = created.sessions[0]?.sessionId
+    if (!sessionId) throw new Error('expected session id')
+
+    host.registerSocket('client_1', 'attachment_b', socketB)
+    const viewerAttach = await host.attach('client_1', {
+      sessionId,
+      cols: 120,
+      rows: 40,
+      attachmentId: 'attachment_b',
+    })
+    expect(viewerAttach.ok).toBe(true)
+
+    host.unregisterSocket('client_1', 'attachment_b', socketB)
+    await vi.advanceTimersByTimeAsync(30_000 + 1)
+    await vi.runOnlyPendingTimersAsync()
+    await Promise.resolve()
+
+    const sessionsAfterExpiry = await host.listSessions('client_1', '/repo')
+    expect(sessionsAfterExpiry).toEqual([
+      expect.objectContaining({
+        sessionId,
+        controller: { attachmentId: 'attachment_a', status: 'connected' },
+        cols: 80,
+        rows: 24,
+      }),
+    ])
+
+    host.unregisterSocket('client_1', 'attachment_a', socketA)
     shutdown()
   })
 

@@ -13,7 +13,7 @@ import type {
   TerminalSessionSnapshot,
   TerminalSessionSummary,
   TerminalTakeoverResult,
-} from '#/shared/terminal.ts'
+} from '#/shared/terminal-types.ts'
 import type { BranchSnapshotInfo, PullRequestInfo, WorktreeStatus } from '#/web/types.ts'
 import type { DetailTab, RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
 import {

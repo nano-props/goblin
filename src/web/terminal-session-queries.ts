@@ -1,4 +1,4 @@
-import type { TerminalSessionSummary } from '#/shared/terminal.ts'
+import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 
 // Plain async loader for a repo's terminal session list. The

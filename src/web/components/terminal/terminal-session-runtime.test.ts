@@ -29,6 +29,8 @@ describe('TerminalSessionRuntime', () => {
     runtime.prepareRestart()
 
     expect(runtime.currentSessionId()).toBeNull()
+    expect(runtime.phase()).toBe('restarting')
+    expect(runtime.snapshot().attachment).toBeUndefined()
     expect(runtime.consumeRestartFlag()).toBe(true)
     expect(runtime.closeReplacingSessionId()).toBe('session-1')
   })

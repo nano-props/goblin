@@ -4,6 +4,7 @@ import {
   registerTerminalAttachment,
   attachTerminalAttachment,
   claimTerminalAttachmentControl,
+  expireTerminalAttachment,
   restartTerminalAttachmentControl,
   updateTerminalAttachmentConnection,
   releaseTerminalAttachmentControl,
@@ -11,8 +12,7 @@ import {
 
 function createState(overrides?: Partial<TerminalOwnershipState>): TerminalOwnershipState {
   return {
-    attachmentId: null,
-    attachment: null,
+    attachments: new Map(),
     controller: null,
     allowImplicitAttachControl: true,
     cols: 80,
@@ -25,26 +25,33 @@ describe('registerTerminalAttachment', () => {
   test('registers a new attachment with defaults', () => {
     const state = createState()
     registerTerminalAttachment(state, 'a1', 100, 30)
-    expect(state.attachmentId).toBe('a1')
-    expect(state.attachment).toEqual({ cols: 100, rows: 30, connected: false })
+    expect(state.attachments.get('a1')).toEqual({ cols: 100, rows: 30, connected: false })
   })
 
   test('preserves existing connected flag when omitted', () => {
-    const state = createState({ attachment: { cols: 80, rows: 24, connected: true } })
+    const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]) })
     registerTerminalAttachment(state, 'a1', 100, 30)
-    expect(state.attachment?.connected).toBe(true)
+    expect(state.attachments.get('a1')?.connected).toBe(true)
   })
 
   test('overrides existing connected flag when provided', () => {
-    const state = createState({ attachment: { cols: 80, rows: 24, connected: true } })
+    const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]) })
     registerTerminalAttachment(state, 'a1', 100, 30, false)
-    expect(state.attachment?.connected).toBe(false)
+    expect(state.attachments.get('a1')?.connected).toBe(false)
+  })
+
+  test('keeps multiple attachments instead of replacing the previous one', () => {
+    const state = createState()
+    registerTerminalAttachment(state, 'a1', 80, 24, true)
+    registerTerminalAttachment(state, 'a2', 100, 30, false)
+    expect(state.attachments.get('a1')).toEqual({ cols: 80, rows: 24, connected: true })
+    expect(state.attachments.get('a2')).toEqual({ cols: 100, rows: 30, connected: false })
   })
 })
 
 describe('attachTerminalAttachment', () => {
   test('claims control when allowed, matching, and connected', () => {
-    const state = createState({ attachmentId: 'a1', attachment: { cols: 80, rows: 24, connected: true } })
+    const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]) })
     const effect = attachTerminalAttachment(state, 'a1')
     expect(effect.emitOwnership).toBe(true)
     expect(effect.resizeTo).toBeUndefined()
@@ -54,8 +61,7 @@ describe('attachTerminalAttachment', () => {
 
   test('rejects when controller already exists', () => {
     const state = createState({
-      attachmentId: 'a1',
-      attachment: { cols: 80, rows: 24, connected: true },
+      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
       controller: { attachmentId: 'a1', status: 'connected' },
     })
     const effect = attachTerminalAttachment(state, 'a1')
@@ -64,8 +70,7 @@ describe('attachTerminalAttachment', () => {
 
   test('rejects when implicit attach is disallowed', () => {
     const state = createState({
-      attachmentId: 'a1',
-      attachment: { cols: 80, rows: 24, connected: true },
+      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
       allowImplicitAttachControl: false,
     })
     const effect = attachTerminalAttachment(state, 'a1')
@@ -73,21 +78,47 @@ describe('attachTerminalAttachment', () => {
   })
 
   test('rejects when attachmentId does not match', () => {
-    const state = createState({ attachmentId: 'a1', attachment: { cols: 80, rows: 24, connected: true } })
+    const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]) })
     const effect = attachTerminalAttachment(state, 'a2')
     expect(effect.emitOwnership).toBe(false)
   })
 
   test('rejects when attachment is not connected', () => {
-    const state = createState({ attachmentId: 'a1', attachment: { cols: 80, rows: 24, connected: false } })
+    const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24, connected: false }]]) })
     const effect = attachTerminalAttachment(state, 'a1')
     expect(effect.emitOwnership).toBe(false)
+  })
+
+  test('restores a grace controller to connected on attach', () => {
+    const state = createState({
+      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
+      controller: { attachmentId: 'a1', status: 'grace' },
+      allowImplicitAttachControl: false,
+    })
+    const effect = attachTerminalAttachment(state, 'a1')
+    expect(effect.emitOwnership).toBe(true)
+    expect(effect.resizeTo).toBeUndefined()
+    expect(state.controller).toEqual({ attachmentId: 'a1', status: 'connected' })
+  })
+
+  test('requests resize when reconnecting controller reports a new geometry', () => {
+    const state = createState({
+      attachments: new Map([['a1', { cols: 100, rows: 30, connected: true }]]),
+      controller: { attachmentId: 'a1', status: 'grace' },
+      allowImplicitAttachControl: false,
+      cols: 80,
+      rows: 24,
+    })
+    const effect = attachTerminalAttachment(state, 'a1')
+    expect(effect.emitOwnership).toBe(false)
+    expect(effect.resizeTo).toEqual({ cols: 100, rows: 30 })
+    expect(state.controller).toEqual({ attachmentId: 'a1', status: 'connected' })
   })
 })
 
 describe('claimTerminalAttachmentControl', () => {
   test('claims control and emits ownership when size matches', () => {
-    const state = createState({ attachmentId: 'a1', attachment: { cols: 80, rows: 24, connected: true } })
+    const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]) })
     const effect = claimTerminalAttachmentControl(state, 'a1')
     expect(effect.emitOwnership).toBe(true)
     expect(effect.resizeTo).toBeUndefined()
@@ -96,30 +127,29 @@ describe('claimTerminalAttachmentControl', () => {
   })
 
   test('claims control and requests resize when size differs', () => {
-    const state = createState({ attachmentId: 'a1', attachment: { cols: 100, rows: 30, connected: true } })
+    const state = createState({ attachments: new Map([['a1', { cols: 100, rows: 30, connected: true }]]) })
     const effect = claimTerminalAttachmentControl(state, 'a1')
     expect(effect.emitOwnership).toBe(false)
     expect(effect.resizeTo).toEqual({ cols: 100, rows: 30 })
   })
 
   test('rejects when attachmentId does not match', () => {
-    const state = createState({ attachmentId: 'a1', attachment: { cols: 80, rows: 24, connected: true } })
+    const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]) })
     const effect = claimTerminalAttachmentControl(state, 'a2')
     expect(effect.emitOwnership).toBe(false)
     expect(state.controller).toBeNull()
   })
 
-  test('rejects and clears attachment when not connected', () => {
-    const state = createState({ attachmentId: 'a1', attachment: { cols: 80, rows: 24, connected: false } })
+  test('rejects when not connected but preserves attachment record', () => {
+    const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24, connected: false }]]) })
     const effect = claimTerminalAttachmentControl(state, 'a1')
     expect(effect.emitOwnership).toBe(false)
     expect(state.controller).toBeNull()
-    expect(state.attachment).toBeNull()
-    expect(state.attachmentId).toBeNull()
+    expect(state.attachments.get('a1')).toEqual({ cols: 80, rows: 24, connected: false })
   })
 
   test('rejects when attachment is missing', () => {
-    const state = createState({ attachmentId: 'a1', attachment: null })
+    const state = createState()
     const effect = claimTerminalAttachmentControl(state, 'a1')
     expect(effect.emitOwnership).toBe(false)
   })
@@ -127,7 +157,7 @@ describe('claimTerminalAttachmentControl', () => {
 
 describe('restartTerminalAttachmentControl', () => {
   test('restores controller for matching connected attachment', () => {
-    const state = createState({ attachmentId: 'a1', attachment: { cols: 80, rows: 24, connected: true } })
+    const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]) })
     restartTerminalAttachmentControl(state, 'a1')
     expect(state.controller).toEqual({ attachmentId: 'a1', status: 'connected' })
     expect(state.allowImplicitAttachControl).toBe(false)
@@ -135,8 +165,7 @@ describe('restartTerminalAttachmentControl', () => {
 
   test('clears controller when attachmentId does not match', () => {
     const state = createState({
-      attachmentId: 'a1',
-      attachment: { cols: 80, rows: 24, connected: true },
+      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
       controller: { attachmentId: 'a1', status: 'connected' },
     })
     restartTerminalAttachmentControl(state, 'a2')
@@ -145,8 +174,7 @@ describe('restartTerminalAttachmentControl', () => {
 
   test('clears controller when attachment is disconnected', () => {
     const state = createState({
-      attachmentId: 'a1',
-      attachment: { cols: 80, rows: 24, connected: false },
+      attachments: new Map([['a1', { cols: 80, rows: 24, connected: false }]]),
       controller: { attachmentId: 'a1', status: 'connected' },
     })
     restartTerminalAttachmentControl(state, 'a1')
@@ -157,8 +185,7 @@ describe('restartTerminalAttachmentControl', () => {
 describe('updateTerminalAttachmentConnection', () => {
   test('no-op when connected state unchanged and controller matches', () => {
     const state = createState({
-      attachmentId: 'a1',
-      attachment: { cols: 80, rows: 24, connected: true },
+      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
       controller: { attachmentId: 'a1', status: 'connected' },
     })
     const effect = updateTerminalAttachmentConnection(state, 'a1', true)
@@ -167,20 +194,18 @@ describe('updateTerminalAttachmentConnection', () => {
 
   test('transitions to grace when connected becomes false', () => {
     const state = createState({
-      attachmentId: 'a1',
-      attachment: { cols: 80, rows: 24, connected: true },
+      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
       controller: { attachmentId: 'a1', status: 'connected' },
     })
     const effect = updateTerminalAttachmentConnection(state, 'a1', false)
     expect(effect.emitOwnership).toBe(true)
     expect(state.controller?.status).toBe('grace')
-    expect(state.attachment?.connected).toBe(false)
+    expect(state.attachments.get('a1')?.connected).toBe(false)
   })
 
   test('auto-claims control on connect when no controller and implicit attach allowed', () => {
     const state = createState({
-      attachmentId: 'a1',
-      attachment: { cols: 80, rows: 24, connected: false },
+      attachments: new Map([['a1', { cols: 80, rows: 24, connected: false }]]),
       controller: null,
     })
     const effect = updateTerminalAttachmentConnection(state, 'a1', true)
@@ -190,8 +215,7 @@ describe('updateTerminalAttachmentConnection', () => {
 
   test('does not auto-claim when implicit attach is disallowed', () => {
     const state = createState({
-      attachmentId: 'a1',
-      attachment: { cols: 80, rows: 24, connected: false },
+      attachments: new Map([['a1', { cols: 80, rows: 24, connected: false }]]),
       controller: null,
       allowImplicitAttachControl: false,
     })
@@ -200,46 +224,55 @@ describe('updateTerminalAttachmentConnection', () => {
     expect(state.controller).toBeNull()
   })
 
-  test('clears attachment on disconnect when not controller', () => {
+  test('preserves disconnected viewer attachment state', () => {
     const state = createState({
-      attachmentId: 'a1',
-      attachment: { cols: 80, rows: 24, connected: true },
+      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
       controller: null,
       allowImplicitAttachControl: false,
     })
     const effect = updateTerminalAttachmentConnection(state, 'a1', false)
     expect(effect.emitOwnership).toBe(false)
-    expect(state.attachment).toBeNull()
-    expect(state.attachmentId).toBeNull()
+    expect(state.attachments.get('a1')).toEqual({ cols: 80, rows: 24, connected: false })
   })
 
   test('ignores update for non-matching attachmentId', () => {
-    const state = createState({ attachmentId: 'a1', attachment: { cols: 80, rows: 24, connected: true } })
+    const state = createState({ attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]) })
     const effect = updateTerminalAttachmentConnection(state, 'a2', false)
     expect(effect.emitOwnership).toBe(false)
-    expect(state.attachment?.connected).toBe(true)
+    expect(state.attachments.get('a1')?.connected).toBe(true)
+  })
+
+  test('disconnecting a viewer does not disturb a different controller', () => {
+    const state = createState({
+      attachments: new Map([
+        ['a1', { cols: 80, rows: 24, connected: true }],
+        ['a2', { cols: 100, rows: 30, connected: true }],
+      ]),
+      controller: { attachmentId: 'a1', status: 'connected' },
+    })
+    const effect = updateTerminalAttachmentConnection(state, 'a2', false)
+    expect(effect.emitOwnership).toBe(false)
+    expect(state.controller).toEqual({ attachmentId: 'a1', status: 'connected' })
+    expect(state.attachments.get('a2')).toEqual({ cols: 100, rows: 30, connected: false })
   })
 })
 
 describe('releaseTerminalAttachmentControl', () => {
   test('releases control and clears state when disconnected', () => {
     const state = createState({
-      attachmentId: 'a1',
-      attachment: { cols: 80, rows: 24, connected: false },
+      attachments: new Map([['a1', { cols: 80, rows: 24, connected: false }]]),
       controller: { attachmentId: 'a1', status: 'grace' },
     })
     const released = releaseTerminalAttachmentControl(state, 'a1')
     expect(released).toBe(true)
     expect(state.controller).toBeNull()
-    expect(state.attachment).toBeNull()
-    expect(state.attachmentId).toBeNull()
+    expect(state.attachments.has('a1')).toBe(false)
     expect(state.allowImplicitAttachControl).toBe(false)
   })
 
   test('refuses to release when still connected', () => {
     const state = createState({
-      attachmentId: 'a1',
-      attachment: { cols: 80, rows: 24, connected: true },
+      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
       controller: { attachmentId: 'a1', status: 'connected' },
     })
     const released = releaseTerminalAttachmentControl(state, 'a1')
@@ -249,11 +282,50 @@ describe('releaseTerminalAttachmentControl', () => {
 
   test('refuses to release when attachmentId does not match controller', () => {
     const state = createState({
-      attachmentId: 'a1',
-      attachment: { cols: 80, rows: 24, connected: false },
+      attachments: new Map([['a1', { cols: 80, rows: 24, connected: false }]]),
       controller: { attachmentId: 'a2', status: 'grace' },
     })
     const released = releaseTerminalAttachmentControl(state, 'a1')
     expect(released).toBe(false)
+  })
+})
+
+describe('expireTerminalAttachment', () => {
+  test('removes a disconnected viewer attachment without emitting ownership', () => {
+    const state = createState({
+      attachments: new Map([
+        ['a1', { cols: 80, rows: 24, connected: true }],
+        ['a2', { cols: 100, rows: 30, connected: false }],
+      ]),
+      controller: { attachmentId: 'a1', status: 'connected' },
+    })
+    const effect = expireTerminalAttachment(state, 'a2')
+    expect(effect).toEqual({ emitOwnership: false, removed: true })
+    expect(state.controller).toEqual({ attachmentId: 'a1', status: 'connected' })
+    expect(state.attachments.has('a2')).toBe(false)
+  })
+
+  test('removes a disconnected grace controller and emits ownership', () => {
+    const state = createState({
+      attachments: new Map([['a1', { cols: 80, rows: 24, connected: false }]]),
+      controller: { attachmentId: 'a1', status: 'grace' },
+      allowImplicitAttachControl: false,
+    })
+    const effect = expireTerminalAttachment(state, 'a1')
+    expect(effect).toEqual({ emitOwnership: true, removed: true })
+    expect(state.controller).toBeNull()
+    expect(state.attachments.has('a1')).toBe(false)
+    expect(state.allowImplicitAttachControl).toBe(false)
+  })
+
+  test('does not remove a connected attachment', () => {
+    const state = createState({
+      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
+      controller: { attachmentId: 'a1', status: 'connected' },
+    })
+    const effect = expireTerminalAttachment(state, 'a1')
+    expect(effect).toEqual({ emitOwnership: false, removed: false })
+    expect(state.attachments.has('a1')).toBe(true)
+    expect(state.controller).toEqual({ attachmentId: 'a1', status: 'connected' })
   })
 })

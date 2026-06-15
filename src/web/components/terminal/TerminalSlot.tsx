@@ -287,7 +287,7 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
           takeoverPending={snapshot.takeoverPending}
         />
       )}
-      {hasSessions && snapshot.phase === 'opening' && (
+      {hasSessions && (snapshot.phase === 'opening' || snapshot.phase === 'restarting') && (
         <div className="goblin-terminal-slot__status-overlay">
           <span>{t('terminal.opening')}</span>
         </div>

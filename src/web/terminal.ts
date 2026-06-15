@@ -17,7 +17,7 @@ import type {
   TerminalTakeoverResult,
   TerminalTitleEvent,
   TerminalWriteInput,
-} from '#/shared/terminal.ts'
+} from '#/shared/terminal-types.ts'
 import { getRendererBridge } from '#/web/renderer-bridge.ts'
 import type { RendererTerminalBridge } from '#/web/renderer-bridge-types.ts'
 import type { TerminalOwnershipViewModel } from '#/web/components/terminal/types.ts'

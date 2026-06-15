@@ -3,26 +3,40 @@ import { ManagedTerminalSession } from '#/web/components/terminal/ManagedTermina
 import { createTerminalBellController } from '#/web/components/terminal/terminal-bell-controller.ts'
 import { terminalDescriptor } from '#/web/components/terminal/terminal-descriptor.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
-import { compactTerminalProcessName, compactTerminalTitle } from '#/web/components/terminal/terminal-title.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 import { readOrCreateWebTerminalAttachmentId } from '#/web/renderer-terminal-bridge.ts'
-import {
-  preloadTerminalFont,
-  proposeTerminalGeometry,
-} from '#/web/components/terminal/terminal-geometry.ts'
-import { parseTerminalIdIndex, resolveTerminalOwnership } from '#/shared/terminal.ts'
 import { parseTerminalSessionKey } from '#/shared/terminal-session-key.ts'
 import type {
   TerminalSessionSnapshot,
   TerminalSessionSummary as ServerTerminalSessionSummary,
-} from '#/shared/terminal.ts'
+} from '#/shared/terminal-types.ts'
 import { branchForTerminalWorktree } from '#/web/components/terminal/terminal-repo-index.ts'
+import {
+  projectServerTerminalSession,
+  type ReattachSnapshotCacheEntry,
+} from '#/web/components/terminal/terminal-session-projection.ts'
+import {
+  applyDisplayOrder,
+  restoreDisplayOrder,
+  snapshotDisplayOrder,
+  terminalSessionDisplayOrder,
+} from '#/web/components/terminal/terminal-session-display-order.ts'
+import {
+  captureTerminalHostGeometry,
+  resolveTerminalCreateGeometry,
+} from '#/web/components/terminal/terminal-session-geometry.ts'
+import {
+  countOrphanedTerminalSessionKeys,
+  resolveAdjacentTerminalSelectionAfterRemoval,
+} from '#/web/components/terminal/terminal-session-eviction.ts'
+import { syncTerminalSessionIdIndex } from '#/web/components/terminal/terminal-session-index.ts'
+import { resolveSelectedTerminalKey } from '#/web/components/terminal/terminal-session-selection.ts'
+import { buildWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-worktree-snapshot.ts'
 import type {
   TerminalDescriptor,
   TerminalRepoIndex,
   WorktreeTerminalSnapshot,
   TerminalSessionBase,
-  TerminalSessionSummary,
   TerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
 
@@ -35,12 +49,6 @@ const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
 // Re-exported for any callers that still want the parser under its
 // renderer-side name.
 export const parseServerSessionKey = parseTerminalSessionKey
-
-interface ReattachSnapshotCacheEntry {
-  sessionId: string
-  snapshot: string
-  snapshotSeq: number
-}
 
 export class TerminalSessionRegistry {
   private repoIndex: TerminalRepoIndex = {}
@@ -167,25 +175,20 @@ export class TerminalSessionRegistry {
       .filter(([, session]) => session.descriptor.repoRoot === repoRoot)
       .map(([key]) => key)
 
-    const { controllerKeyByWorktree, touchedWorktrees, missingLocalCount } = this.materializeServerSessions(
+    const { controllerKeyByWorktree, touchedWorktrees, displayOrderChangedWorktrees, missingLocalCount } =
+      this.materializeServerSessions(
       repoRoot,
       serverSessions,
       attachmentId,
       snapshotsBySessionId,
-    )
+      )
 
     const serverKeys = new Set(serverSessions.map((s) => s.key))
     const orphanedLocalCount = this.evictOrphanedLocalSessions(repoRoot, serverKeys)
 
     this.resolveSelectedKeysForTouchedWorktrees(touchedWorktrees, controllerKeyByWorktree)
-
-    if (missingLocalCount > 0 || orphanedLocalCount > 0) {
-      console.debug('[TerminalSessionProvider] sync results for', repoRoot, ':', {
-        serverSessions: serverSessions.length,
-        localSessions: localKeysBefore.length,
-        missingLocal: missingLocalCount,
-        orphanedLocal: orphanedLocalCount,
-      })
+    for (const worktreeTerminalKey of displayOrderChangedWorktrees) {
+      this.notifyWorktree(worktreeTerminalKey)
     }
   }
 
@@ -201,53 +204,41 @@ export class TerminalSessionRegistry {
   ): {
     controllerKeyByWorktree: Map<string, string>
     touchedWorktrees: Set<string>
+    displayOrderChangedWorktrees: Set<string>
     missingLocalCount: number
   } {
     const controllerKeyByWorktree = new Map<string, string>()
     const touchedWorktrees = new Set<string>()
+    const displayOrderChangedWorktrees = new Set<string>()
     let missingLocalCount = 0
 
     for (const serverSession of serverSessions) {
-      const parsed = parseServerSessionKey(serverSession.key)
-      if (!parsed || parsed.repoRoot !== repoRoot) continue
-      const branch = branchForTerminalWorktree(this.repoIndex, parsed.repoRoot, parsed.worktreePath)
-      if (!branch) continue
-      const terminalWorktreeKey = worktreeTerminalKey(parsed.repoRoot, parsed.worktreePath)
-      touchedWorktrees.add(terminalWorktreeKey)
-      const descriptor = terminalDescriptor(
-        { repoRoot: parsed.repoRoot, branch, worktreePath: parsed.worktreePath },
-        parsed.terminalId,
-        parseTerminalIdIndex(parsed.terminalId) ?? 1,
-      )
+      const projected = projectServerTerminalSession({
+        repoIndex: this.repoIndex,
+        repoRoot,
+        serverSession,
+        attachmentId,
+        serverSnapshot: snapshotsBySessionId.get(serverSession.sessionId) ?? null,
+        reattachSnapshot: this.reattachSnapshotCache.get(serverSession.key) ?? null,
+      })
+      if (!projected) continue
+      touchedWorktrees.add(projected.worktreeTerminalKey)
+      const { descriptor } = projected
       if (!this.sessions.has(descriptor.key)) {
         missingLocalCount += 1
         this.ensureSession(descriptor)
       }
-      const reattachCache = this.reattachSnapshotCache.get(descriptor.key)
-      const isReattachMatch = reattachCache?.sessionId === serverSession.sessionId
-      const serverSnapshot = snapshotsBySessionId.get(serverSession.sessionId) ?? null
-      const ownership = resolveTerminalOwnership(serverSession.controller, attachmentId)
-      this.sessions.get(descriptor.key)?.hydrate({
-        sessionId: serverSession.sessionId,
-        processName: serverSession.processName,
-        canonicalTitle: serverSession.canonicalTitle,
-        phase: serverSession.phase,
-        message: serverSession.message,
-        role: ownership.role,
-        controllerStatus: ownership.controllerStatus,
-        canonicalCols: serverSession.cols,
-        canonicalRows: serverSession.rows,
-        snapshot: serverSnapshot?.snapshot ?? (isReattachMatch ? reattachCache?.snapshot : undefined),
-        snapshotSeq: serverSnapshot?.snapshotSeq ?? (isReattachMatch ? reattachCache?.snapshotSeq : undefined),
-      })
-      this.syncSessionIdIndex(descriptor.key, serverSession.sessionId)
-      if (serverSession.controller?.attachmentId === attachmentId) {
-        controllerKeyByWorktree.set(terminalWorktreeKey, descriptor.key)
+      this.sessions.get(descriptor.key)?.hydrate(projected.hydrateInput)
+      this.syncSessionIdIndex(descriptor.key, projected.hydrateInput.sessionId)
+      if (projected.controlsAttachment) controllerKeyByWorktree.set(projected.worktreeTerminalKey, descriptor.key)
+      const previousDisplayOrder = this.displayOrderByKey.get(descriptor.key)
+      this.displayOrderByKey.set(descriptor.key, projected.displayOrder)
+      if (previousDisplayOrder !== undefined && previousDisplayOrder !== projected.displayOrder) {
+        displayOrderChangedWorktrees.add(projected.worktreeTerminalKey)
       }
-      this.displayOrderByKey.set(descriptor.key, serverSession.displayOrder)
     }
 
-    return { controllerKeyByWorktree, touchedWorktrees, missingLocalCount }
+    return { controllerKeyByWorktree, touchedWorktrees, displayOrderChangedWorktrees, missingLocalCount }
   }
 
   // Phase 2: drop local sessions that have a serverId but no longer
@@ -256,15 +247,19 @@ export class TerminalSessionRegistry {
   // never-attached local shells (purely UI placeholders) are left
   // alone. Returns the count for the debug log.
   private evictOrphanedLocalSessions(repoRoot: string, serverKeys: Set<string>): number {
-    let orphanedLocalCount = 0
-    for (const [key, session] of this.sessions.entries()) {
-      if (session.descriptor.repoRoot !== repoRoot) continue
-      if (serverKeys.has(key)) continue
-      if (!this.sessionIdByKey.has(key)) continue
-      orphanedLocalCount += 1
+    const orphanedKeys = countOrphanedTerminalSessionKeys({
+      repoRoot,
+      localSessionKeys: Array.from(this.sessions.keys()),
+      getRepoRootForKey: (key) => this.sessions.get(key)?.descriptor.repoRoot ?? null,
+      hasServerSessionId: (key) => this.sessionIdByKey.has(key),
+      serverKeys,
+    })
+    for (const key of orphanedKeys) {
+      const session = this.sessions.get(key)
+      if (!session) continue
       this.discardLocalSessionAndDismissDetailIfLast(key, session.descriptor)
     }
-    return orphanedLocalCount
+    return orphanedKeys.length
   }
 
   // Phase 3: for every worktree that saw a server-side change, decide
@@ -278,12 +273,14 @@ export class TerminalSessionRegistry {
     for (const worktreeKey of touchedWorktrees) {
       const current = this.selectedKeyByWorktree.get(worktreeKey) ?? null
       const preferred = this.preferredSelectedKeyByWorktree.get(worktreeKey) ?? null
-      const next = this.resolveSelectedTerminalKey(
-        worktreeKey,
-        preferred,
-        current,
-        controllerKeyByWorktree.get(worktreeKey) ?? null,
-      )
+      const next = resolveSelectedTerminalKey({
+        worktreeTerminalKey: worktreeKey,
+        preferredKey: preferred,
+        currentKey: current,
+        controllerKey: controllerKeyByWorktree.get(worktreeKey) ?? null,
+        sortedDescriptors: this.sortedSessionsForWorktree(worktreeKey).map((session) => session.descriptor),
+        isSelectedKeyValid: (candidateWorktreeKey, key) => this.isSelectedKeyValid(candidateWorktreeKey, key),
+      })
       this.selectTerminalKey(worktreeKey, next)
     }
   }
@@ -297,7 +294,11 @@ export class TerminalSessionRegistry {
 
   registerHost = (worktreeTerminalKey: string, host: HTMLElement): void => {
     this.hostByWorktree.set(worktreeTerminalKey, host)
-    void this.captureHostGeometry(worktreeTerminalKey)
+    void captureTerminalHostGeometry({
+      worktreeTerminalKey,
+      hostByWorktree: this.hostByWorktree,
+      geometryByWorktree: this.geometryByWorktree,
+    })
     void this.flushPendingCreate(worktreeTerminalKey)
   }
 
@@ -316,7 +317,7 @@ export class TerminalSessionRegistry {
       repoRoot: base.repoRoot,
       branch: base.branch,
       worktreePath: base.worktreePath,
-      kind: this.sessionSummaries(terminalWorktreeKey).length === 0 ? 'primary' : 'additional',
+      kind: this.sortedSessionsForWorktree(terminalWorktreeKey).length === 0 ? 'primary' : 'additional',
       cols: geometry.cols,
       rows: geometry.rows,
       attachmentId,
@@ -338,28 +339,13 @@ export class TerminalSessionRegistry {
   }
 
   private async resolveCreateGeometry(worktreeTerminalKey: string): Promise<{ cols: number; rows: number } | null> {
-    const measured = await this.captureHostGeometry(worktreeTerminalKey)
-    if (measured) return measured
-    const selected = this.selectedDescriptor(worktreeTerminalKey)
-    if (selected) {
-      const attachment = this.snapshot(selected.key).attachment
-      if (attachment?.canonicalCols && attachment.canonicalRows) {
-        const geometry = { cols: attachment.canonicalCols, rows: attachment.canonicalRows }
-        this.geometryByWorktree.set(worktreeTerminalKey, geometry)
-        return geometry
-      }
-    }
-    return this.geometryByWorktree.get(worktreeTerminalKey) ?? null
-  }
-
-  private async captureHostGeometry(worktreeTerminalKey: string): Promise<{ cols: number; rows: number } | null> {
-    const host = this.hostByWorktree.get(worktreeTerminalKey)
-    if (!host?.isConnected) return null
-    await preloadTerminalFont()
-    const geometry = proposeTerminalGeometry(host)
-    if (!geometry) return null
-    this.geometryByWorktree.set(worktreeTerminalKey, geometry)
-    return geometry
+    return await resolveTerminalCreateGeometry({
+      worktreeTerminalKey,
+      hostByWorktree: this.hostByWorktree,
+      geometryByWorktree: this.geometryByWorktree,
+      selectedDescriptor: this.selectedDescriptor(worktreeTerminalKey),
+      getAttachmentSnapshot: (key) => this.snapshot(key).attachment,
+    })
   }
 
   private enqueuePendingCreate(base: TerminalSessionBase, worktreeTerminalKey: string): Promise<string> {
@@ -416,36 +402,18 @@ export class TerminalSessionRegistry {
   worktreeSnapshot = (worktreeTerminalKey: string): WorktreeTerminalSnapshot => {
     const cached = this.worktreeSnapshotCache.get(worktreeTerminalKey)
     if (cached) return cached
-    const sessions = this.sessionSummaries(worktreeTerminalKey)
-    const snapshot: WorktreeTerminalSnapshot = {
+    const snapshot = buildWorktreeTerminalSnapshot({
       worktreeTerminalKey,
       selectedDescriptor: this.selectedDescriptor(worktreeTerminalKey),
-      sessions,
-      count: sessions.length,
       pendingCreate: this.pendingCreateByWorktree.has(worktreeTerminalKey),
-    }
+      sessions: this.sortedSessionsForWorktree(worktreeTerminalKey),
+      selectedKey: this.selectedKeyByWorktree.get(worktreeTerminalKey) ?? null,
+      getCachedSnapshot: (key) => this.snapshotCache.get(key) ?? null,
+      cacheSnapshot: (key, nextSnapshot) => this.snapshotCache.set(key, nextSnapshot),
+      hasBell: (key) => this.bellController.hasBell(key),
+    })
     this.worktreeSnapshotCache.set(worktreeTerminalKey, snapshot)
     return snapshot
-  }
-
-  private sessionSummaries(worktreeTerminalKey: string): TerminalSessionSummary[] {
-    const selectedKey = this.selectedKeyByWorktree.get(worktreeTerminalKey) ?? null
-    return this.sortedSessionsForWorktree(worktreeTerminalKey).map((session) => {
-      const snapshot = this.snapshotCache.get(session.descriptor.key) ?? session.snapshot()
-      this.snapshotCache.set(session.descriptor.key, snapshot)
-      return {
-        key: session.descriptor.key,
-        worktreeTerminalKey,
-        terminalId: session.descriptor.terminalId,
-        index: session.descriptor.index,
-        title: summarizeTerminalTitle(snapshot, session.descriptor.index),
-        fullTitle: fullTerminalTitle(snapshot, session.descriptor.index),
-        originalTitle: terminalOriginalTitle(snapshot),
-        phase: snapshot.phase,
-        selected: session.descriptor.key === selectedKey,
-        hasBell: this.bellController.hasBell(session.descriptor.key),
-      }
-    })
   }
 
   subscribeWorktree = (worktreeTerminalKey: string, listener: () => void): (() => void) => {
@@ -559,11 +527,8 @@ export class TerminalSessionRegistry {
     }
     if (!parsed) return false
     // Snapshot current order so we can roll back if the server rejects the reorder.
-    const previousOrder = new Map<string, number | undefined>()
-    for (const key of orderedKeys) previousOrder.set(key, this.displayOrderByKey.get(key))
-    for (let i = 0; i < orderedKeys.length; i++) {
-      this.displayOrderByKey.set(orderedKeys[i], i)
-    }
+    const previousOrder = snapshotDisplayOrder(orderedKeys, this.displayOrderByKey)
+    applyDisplayOrder(this.displayOrderByKey, orderedKeys)
     this.notifyWorktree(scope)
     const result = await terminalBridge.reorder({
       repoRoot: parsed.repoRoot,
@@ -571,10 +536,7 @@ export class TerminalSessionRegistry {
       orderedKeys,
     })
     if (!result) {
-      for (const [key, order] of previousOrder) {
-        if (order === undefined) this.displayOrderByKey.delete(key)
-        else this.displayOrderByKey.set(key, order)
-      }
+      restoreDisplayOrder(this.displayOrderByKey, previousOrder)
       this.notifyWorktree(scope)
     }
     return result
@@ -618,20 +580,12 @@ export class TerminalSessionRegistry {
   }
 
   private syncSessionIdIndex(key: string, sessionId: string | null): void {
-    const previousSessionId = this.sessionIdByKey.get(key)
-    if (
-      previousSessionId &&
-      previousSessionId !== sessionId &&
-      this.sessionKeyBySessionId.get(previousSessionId) === key
-    ) {
-      this.sessionKeyBySessionId.delete(previousSessionId)
-    }
-    if (!sessionId) {
-      this.sessionIdByKey.delete(key)
-      return
-    }
-    this.sessionIdByKey.set(key, sessionId)
-    this.sessionKeyBySessionId.set(sessionId, key)
+    syncTerminalSessionIdIndex({
+      key,
+      sessionId,
+      sessionIdByKey: this.sessionIdByKey,
+      sessionKeyBySessionId: this.sessionKeyBySessionId,
+    })
   }
 
   private notifySession(key: string, reason: 'metadata' | 'outputSummary' = 'metadata'): void {
@@ -656,7 +610,6 @@ export class TerminalSessionRegistry {
     const orderedKeysBeforeRemoval = this.sortedSessionsForWorktree(worktreeTerminalKey).map(
       (item) => item.descriptor.key,
     )
-    const closedOrderIndex = orderedKeysBeforeRemoval.indexOf(key)
     const wasSelected = this.selectedKeyByWorktree.get(worktreeTerminalKey) === key
     this.syncSessionIdIndex(key, null)
     this.sessions.delete(key)
@@ -667,10 +620,7 @@ export class TerminalSessionRegistry {
     this.bellController.remove(key)
     if (options.dispose) session.dispose({ closeSession: options.closeSession !== false })
     if (wasSelected) {
-      const remaining = this.sortedSessionsForWorktree(worktreeTerminalKey)
-      const right = closedOrderIndex >= 0 ? remaining[closedOrderIndex] : null
-      const left = closedOrderIndex >= 1 ? remaining[closedOrderIndex - 1] : null
-      const nextKey = right?.descriptor.key ?? left?.descriptor.key ?? null
+      const nextKey = resolveAdjacentTerminalSelectionAfterRemoval(orderedKeysBeforeRemoval, key)
       this.selectTerminalKey(worktreeTerminalKey, nextKey, { notify: false })
     }
     this.notifyWorktree(worktreeTerminalKey)
@@ -763,38 +713,9 @@ export class TerminalSessionRegistry {
     return Array.from(this.sessions.values())
       .filter((session) => session.descriptor.worktreeTerminalKey === worktreeTerminalKey)
       .sort((a, b) => {
-        const orderA = this.displayOrderByKey.get(a.descriptor.key) ?? a.descriptor.index - 1
-        const orderB = this.displayOrderByKey.get(b.descriptor.key) ?? b.descriptor.index - 1
+        const orderA = terminalSessionDisplayOrder(a.descriptor, this.displayOrderByKey)
+        const orderB = terminalSessionDisplayOrder(b.descriptor, this.displayOrderByKey)
         return orderA - orderB || a.descriptor.index - b.descriptor.index
       })
   }
-
-  private resolveSelectedTerminalKey(
-    worktreeTerminalKey: string,
-    preferredKey: string | null,
-    currentKey: string | null = this.selectedKeyByWorktree.get(worktreeTerminalKey) ?? null,
-    controllerKey: string | null = null,
-  ): string | null {
-    if (preferredKey && this.isSelectedKeyValid(worktreeTerminalKey, preferredKey)) return preferredKey
-    if (currentKey && this.isSelectedKeyValid(worktreeTerminalKey, currentKey)) return currentKey
-    if (controllerKey && this.isSelectedKeyValid(worktreeTerminalKey, controllerKey)) return controllerKey
-    return this.sortedSessionsForWorktree(worktreeTerminalKey)[0]?.descriptor.key ?? null
-  }
-}
-
-function summarizeTerminalTitle(snapshot: TerminalSnapshot, index: number): string {
-  const canonicalTitle = terminalOriginalTitle(snapshot) ?? ''
-  if (canonicalTitle) return compactTerminalTitle(canonicalTitle) || canonicalTitle
-  const processName = compactTerminalProcessName(snapshot.processName)
-  return processName || `terminal ${index}`
-}
-
-function fullTerminalTitle(snapshot: TerminalSnapshot, index: number): string {
-  const canonicalTitle = terminalOriginalTitle(snapshot) ?? ''
-  return canonicalTitle || snapshot.processName || `terminal ${index}`
-}
-
-function terminalOriginalTitle(snapshot: TerminalSnapshot): string | null {
-  const canonicalTitle = typeof snapshot.canonicalTitle === 'string' ? snapshot.canonicalTitle.trim() : ''
-  return canonicalTitle || null
 }

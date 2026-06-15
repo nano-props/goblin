@@ -7,30 +7,28 @@ import type {
   TerminalAttachInput,
   TerminalOutputEvent,
   TerminalRestartInput,
-  TerminalSessionPhase,
-} from '#/shared/terminal.ts'
-import { resolveTerminalOwnership } from '#/shared/terminal.ts'
+} from '#/shared/terminal-types.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 import { setTerminalFocused } from '#/web/terminal-focus.ts'
 import { openExternalUrl } from '#/web/app-shell-client.ts'
 import { preloadTerminalFont } from '#/web/components/terminal/terminal-geometry.ts'
+import {
+  projectTerminalAttachResultForAttachment,
+  type TerminalAttachResultWithOwnership,
+} from '#/web/components/terminal/terminal-session-projection.ts'
 import { TerminalSessionRuntime } from '#/web/components/terminal/terminal-session-runtime.ts'
 import { TerminalSessionView } from '#/web/components/terminal/terminal-session-view.ts'
 import { readOrCreateWebTerminalAttachmentId } from '#/web/renderer-terminal-bridge.ts'
 import type {
   TerminalBellEvent,
   TerminalDescriptor,
+  TerminalSessionHydrationInput,
   TerminalOwnershipViewModel,
   TerminalSearchResult,
 } from '#/web/components/terminal/types.ts'
 const EMPTY_SEARCH_RESULT: TerminalSearchResult = { resultIndex: -1, resultCount: 0, found: false }
 
 export type TerminalNotifyReason = 'metadata' | 'outputSummary'
-
-type TerminalAttachResultWithOwnership = Extract<TerminalAttachResult, { ok: true }> & {
-  role: TerminalOwnershipViewModel['role']
-  controllerStatus: TerminalOwnershipViewModel['controllerStatus']
-}
 
 export class ManagedTerminalSession {
   descriptor: TerminalDescriptor
@@ -178,19 +176,7 @@ export class ManagedTerminalSession {
     return this.runtime.currentSessionId()
   }
 
-  hydrate(input: {
-    sessionId: string
-    phase: TerminalSessionPhase
-    message: string | null
-    processName: string
-    canonicalTitle?: string | null
-    role: TerminalOwnershipViewModel['role']
-    controllerStatus: TerminalOwnershipViewModel['controllerStatus']
-    canonicalCols: number
-    canonicalRows: number
-    snapshot?: string
-    snapshotSeq?: number
-  }): void {
+  hydrate(input: TerminalSessionHydrationInput): void {
     this.hydratedSnapshot =
       typeof input.snapshot === 'string' && typeof input.snapshotSeq === 'number'
         ? { snapshot: input.snapshot, snapshotSeq: input.snapshotSeq }
@@ -389,10 +375,7 @@ export class ManagedTerminalSession {
 
   private withLocalOwnership(result: Extract<TerminalAttachResult, { ok: true }>): TerminalAttachResultWithOwnership {
     const attachmentId = readOrCreateWebTerminalAttachmentId()
-    return {
-      ...result,
-      ...resolveTerminalOwnership(result.controller, attachmentId),
-    }
+    return projectTerminalAttachResultForAttachment(result, attachmentId)
   }
 
   private async replayActiveView(token: number, term: XTermTerminal, replay: string, replaySeq: number): Promise<void> {

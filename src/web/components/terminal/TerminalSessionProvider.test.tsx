@@ -34,7 +34,7 @@ import type {
   TerminalSessionSnapshot,
   TerminalSessionSummary,
   TerminalTitleEvent,
-} from '#/shared/terminal.ts'
+} from '#/shared/terminal-types.ts'
 
 const mockSessions = vi.hoisted(
   () =>

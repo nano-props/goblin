@@ -7,7 +7,7 @@ import {
 } from '#/server/modules/invalidation-broker.ts'
 import { safeEqualString } from '#/server/common/timing-safe.ts'
 import { errorJson } from '#/server/common/responses.ts'
-import { TERMINAL_WS_MESSAGE_LIMIT_BYTES } from '#/shared/terminal.ts'
+import { TERMINAL_WS_MESSAGE_LIMIT_BYTES } from '#/shared/terminal-validators.ts'
 import type { ServerTerminalHost, ServerTerminalSocket } from '#/server/terminal/terminal-host.ts'
 
 interface RealtimeRouteOptions {
@@ -18,7 +18,7 @@ interface RealtimeRouteOptions {
 // Cap each terminal WS message. Real terminal input is a keystroke
 // or a paste; the cap covers the largest legitimate paste while
 // preventing a hostile client from streaming an unbounded buffer
-// through the worker. Sourced from `shared/terminal.ts` so the
+// through the worker. Sourced from `shared/terminal-validators.ts` so the
 // per-write cap (MAX_TERMINAL_WRITE_CHARS) and the per-message cap
 // stay aligned as a single invariant — see the export site for the
 // reasoning.

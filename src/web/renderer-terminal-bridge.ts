@@ -4,9 +4,15 @@ import {
   normalizeTerminalSocketServerMessage,
   normalizeTerminalSessionSnapshot,
   normalizeTerminalSessionSummaryList,
-  resolveTerminalOwnership,
-} from '#/shared/terminal.ts'
-import type { TerminalClientMessage } from '#/shared/terminal.ts'
+} from '#/shared/terminal-validators.ts'
+import { resolveTerminalOwnership } from '#/shared/terminal-ownership.ts'
+import type {
+  TerminalClientMessage,
+  TerminalSocketRequestAction,
+  TerminalSocketRequestInputs,
+  TerminalSocketResponseOutputs,
+  TerminalSocketServerMessage,
+} from '#/shared/terminal-socket.ts'
 import type {
   TerminalAttachInput,
   TerminalAttachResult,
@@ -20,14 +26,10 @@ import type {
   TerminalSessionSnapshot,
   TerminalSessionSnapshotInput,
   TerminalSessionSummary,
-  TerminalSocketRequestAction,
-  TerminalSocketRequestInputs,
-  TerminalSocketResponseOutputs,
-  TerminalSocketServerMessage,
   TerminalTakeoverResult,
   TerminalTitleEvent,
   TerminalRestartInput,
-} from '#/shared/terminal.ts'
+} from '#/shared/terminal-types.ts'
 import type { RendererTerminalBridge } from '#/web/renderer-bridge-types.ts'
 import type { TerminalOwnershipViewModel } from '#/web/components/terminal/types.ts'
 import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'

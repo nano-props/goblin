@@ -1,7 +1,7 @@
 interface TerminalConnectionStateOptions {
   ownershipGraceMs: number
   detachedTtlMs: number
-  onOwnershipRelease(clientId: string, attachmentId: string): void
+  onAttachmentExpired(clientId: string, attachmentId: string): void
   onClientExpired(clientId: string): void
 }
 
@@ -35,7 +35,7 @@ export class TerminalConnectionState {
       setTimeout(() => {
         this.ownershipTimerByAttachmentKey.delete(attachmentKey)
         if (stillConnected()) return
-        this.options.onOwnershipRelease(clientId, attachmentId)
+        this.options.onAttachmentExpired(clientId, attachmentId)
       }, this.options.ownershipGraceMs),
     )
   }

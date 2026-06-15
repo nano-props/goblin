@@ -1,4 +1,4 @@
-import type { TerminalRealtimeMessage } from '#/shared/terminal.ts'
+import type { TerminalRealtimeMessage } from '#/shared/terminal-socket.ts'
 
 export interface TerminalRealtimeSocket {
   send(data: string): void

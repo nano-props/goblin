@@ -6,9 +6,8 @@ import { t } from '#/main/i18n/index.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 import {
   isValidTerminalNotifyBellInput,
-  type TerminalMutationResult,
-  type TerminalNotifyBellInput,
-} from '#/shared/terminal.ts'
+} from '#/shared/terminal-validators.ts'
+import type { TerminalMutationResult, TerminalNotifyBellInput } from '#/shared/terminal-types.ts'
 import {
   TERMINAL_NOTIFY_BELL_CHANNEL,
   TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL,

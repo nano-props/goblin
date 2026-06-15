@@ -35,6 +35,12 @@ const RULES: Rule[] = [
     disallow: ['electron'],
     reason: 'shared layer must be reusable across web/server/main; must not depend on Electron',
   },
+  {
+    fromPrefix: '/src/',
+    disallow: ['#/shared/terminal.ts'],
+    reason:
+      'terminal protocol is split by concern; import terminal-types/socket/validators/ownership/ids directly instead of the aggregate entrypoint',
+  },
 ]
 
 function listFiles(dir: string): string[] {

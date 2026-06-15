@@ -22,7 +22,7 @@ import type {
   TerminalTakeoverResult,
   TerminalTitleEvent,
   TerminalWriteInput,
-} from '#/shared/terminal.ts'
+} from '#/shared/terminal-types.ts'
 import type { TerminalOwnershipViewModel } from '#/web/components/terminal/types.ts'
 
 export interface RendererTerminalBridge {
