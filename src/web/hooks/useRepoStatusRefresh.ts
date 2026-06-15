@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
+import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { DetailTab } from '#/web/stores/repos/types.ts'
 
@@ -7,7 +8,13 @@ interface ActiveRepoStatusSnapshot {
   id: string
   token: number
   detailTab: DetailTab
-  availability: 'available' | 'unavailable'
+  /**
+   * Phase 4: the snapshot's `availability` is now derived from
+   * the lifecycle union (via `isRepoUnavailable`) so the field
+   * correctly reflects BOTH local (`availability.phase`) and
+   * remote (`remote.lifecycle.kind === 'failed'`) terminals.
+   */
+  unavailable: boolean
   statusPhase: 'idle' | 'loading' | 'refreshing'
 }
 
@@ -22,7 +29,7 @@ function activeRepoStatusSnapshotEqual(
       a.id === b.id &&
       a.token === b.token &&
       a.detailTab === b.detailTab &&
-      a.availability === b.availability &&
+      a.unavailable === b.unavailable &&
       a.statusPhase === b.statusPhase)
   )
 }
@@ -35,7 +42,7 @@ function activeRepoStatusSnapshotEqual(
 // switching repos is an explicit "I want fresh data" signal — we shouldn't
 // second-guess it.
 export function isRepoStatusRefreshable(repo: ActiveRepoStatusSnapshot): boolean {
-  return repo.availability === 'available' && repo.statusPhase === 'idle'
+  return !repo.unavailable && repo.statusPhase === 'idle'
 }
 
 export function useRepoStatusRefresh() {
@@ -49,7 +56,7 @@ export function useRepoStatusRefresh() {
         id: repo.id,
         token: repo.instanceToken,
         detailTab: repo.ui.preferredDetailTab,
-        availability: repo.availability.phase,
+        unavailable: isRepoUnavailable(repo),
         statusPhase: repo.resources.status.phase,
       }
     },

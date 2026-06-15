@@ -3,6 +3,7 @@ import {
   getServerSshHosts,
   openServerRemoteEditor,
   openServerRemoteTerminal,
+  resolveServerRemoteRepoLifecycle,
   resolveServerRemoteTarget,
   testServerRemoteRepository,
 } from '#/server/modules/remote.ts'
@@ -15,6 +16,14 @@ export function createRemoteRoutes() {
   app.post('/resolve-target', async (c) => {
     const { alias, remotePath } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.resolveTarget, c)
     return c.json(await resolveServerRemoteTarget({ alias, remotePath }, c.req.raw.signal))
+  })
+  // Unified lifecycle boundary (docs/.../plan §5). The renderer
+  // calls this from the orchestrator's task; the server returns
+  // a converged `ready`/`failed` lifecycle result. NEVER
+  // returns `connecting` — that's a renderer projection.
+  app.post('/lifecycle', async (c) => {
+    const { repoId } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.remoteLifecycle, c)
+    return c.json(await resolveServerRemoteRepoLifecycle({ repoId }, c.req.raw.signal))
   })
   app.post('/path-suggestions', async (c) => {
     const { alias, remotePath, prefix } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.pathSuggestions, c)

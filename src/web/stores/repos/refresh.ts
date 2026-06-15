@@ -1,4 +1,5 @@
 import { appendRepoEvent, errorEvent, updateIfFresh } from '#/web/stores/repos/helpers.ts'
+import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import { isRepoUnavailableReason, markRepoUnavailable } from '#/web/stores/repos/availability.ts'
 import { runExclusiveOperation, runLatestOperation } from '#/web/stores/repos/operation-runner.ts'
 import { persistRestorableRepoSnapshot } from '#/web/stores/repos/persistence.ts'
@@ -30,7 +31,7 @@ import type { RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 import type { ExecResult, PullRequestFetchMode, PullRequestInfo } from '#/web/types.ts'
 
 function resolvePullRequestRefreshRequest(
-  repo: Pick<RepoState, 'availability' | 'data' | 'remote'>,
+  repo: Pick<RepoState, 'id' | 'availability' | 'data' | 'remote'>,
   branchesArg?: string[],
   options?: {
     mode?: PullRequestFetchMode
@@ -42,7 +43,15 @@ function resolvePullRequestRefreshRequest(
   mode: PullRequestFetchMode
   clearMissing: boolean
 } | null {
-  if (repo.availability.phase === 'unavailable') return null
+  // Phase 4: inlined because the caller is a `Pick<RepoState>`
+  // and `isRepoUnavailable` wants a full repo (it reads `id`).
+  // Local repos carry their failure in `availability.phase`;
+  // remote repos carry theirs in `remote.lifecycle.kind`.
+  if (isRemoteRepoId(repo.id)) {
+    if (repo.remote.lifecycle?.kind === 'failed') return null
+  } else if (repo.availability.phase === 'unavailable') {
+    return null
+  }
   const mode = options?.mode ?? 'full'
   const clearMissing = options?.clearMissing ?? mode === 'full'
   const branchNames = branchesArg ?? repo.data.branches.map((branch) => branch.name)

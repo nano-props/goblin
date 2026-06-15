@@ -147,7 +147,7 @@ describe('repo lifecycle', () => {
     const result = await useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(target!))
 
     expect(result).toEqual({ ok: true, id: target!.id })
-    expect(useReposStore.getState().repos[target!.id]?.remote.target).toEqual(target)
+    expect(useReposStore.getState().repos[target!.id]?.remote.lifecycle).toEqual({ kind: 'ready', target })
     expect(calls.recent).toEqual([remoteRepoSessionEntry(target!)])
   })
 
@@ -183,7 +183,7 @@ describe('repo lifecycle', () => {
 
     const first = await useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(oldTarget!))
     expect(first).toEqual({ ok: true, id: oldTarget!.id })
-    expect(useReposStore.getState().repos[oldTarget!.id]?.remote.target).toEqual(oldTarget)
+    expect(useReposStore.getState().repos[oldTarget!.id]?.remote.lifecycle).toEqual({ kind: 'ready', target: oldTarget })
 
     // Second open with a different SSH host. The target update must
     // trigger a refresh — the previous build returned `changed: false`
@@ -194,7 +194,7 @@ describe('repo lifecycle', () => {
     })
     const second = await useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(newTarget!))
     expect(second).toEqual({ ok: true, id: newTarget!.id })
-    expect(useReposStore.getState().repos[newTarget!.id]?.remote.target).toEqual(newTarget)
+    expect(useReposStore.getState().repos[newTarget!.id]?.remote.lifecycle).toEqual({ kind: 'ready', target: newTarget })
     expect(calls.composite).toEqual([newTarget!.id])
   })
 })

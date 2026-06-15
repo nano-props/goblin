@@ -20,11 +20,11 @@ describe('persistedOpenWorkspaceEntries', () => {
 
     expect(
       persistedOpenWorkspaceEntries(['/tmp/repo-a', target!.id, '/tmp/missing'], {
-        '/tmp/repo-a': { id: '/tmp/repo-a', remote: {} },
+        '/tmp/repo-a': { id: '/tmp/repo-a', remote: { lifecycle: null } },
         [target!.id]: {
           id: target!.id,
           remote: {
-            target: target!,
+            lifecycle: { kind: 'ready', target: target! },
           },
         },
       }),

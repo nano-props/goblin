@@ -21,6 +21,7 @@ import { Input } from '#/web/components/ui/input.tsx'
 import { ToggleGroup, ToggleGroupItem } from '#/web/components/ui/toggle-group.tsx'
 import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
+import { remoteRepoTarget } from '#/web/stores/repos/helpers.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { getRepositoryRemoteBranches } from '#/web/repo-client.ts'
@@ -104,7 +105,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
     return () => ctrl.abort()
   }, [mode, open, remoteBranches.length, repo.id])
 
-  const remoteTarget = repo.remote.target
+  const remoteTarget = remoteRepoTarget(repo.id, repo.remote.lifecycle)
   const localBranchNames = repo.data.branches.map((b) => b.name)
   const hasLocalBranch = (name: string) => localBranchNames.includes(name)
   const branchWorktree = (name: string) => repo.data.branches.find((b) => b.name === name)?.worktree

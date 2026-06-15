@@ -169,7 +169,7 @@ describe('branch action capabilities', () => {
       id: target!.id,
       branches: [branch],
       remote: {
-        target: target!,
+        lifecycle: { kind: 'ready', target: target! },
         remotes: ['origin'],
         hasRemotes: true,
         hasBrowserRemote: true,

@@ -1,5 +1,6 @@
 import { markRepoAvailable } from '#/web/stores/repos/availability.ts'
 import { selectedBranchForBranchSet } from '#/web/stores/repos/branch-view-mode.ts'
+import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
 import { pruneRepoOperationViewsForBranches } from '#/web/stores/repos/operations.ts'
 import {
   cancelResource,
@@ -155,7 +156,7 @@ export function shouldAttemptFetch(repo: RepoState | null | undefined, token: nu
     !!repo &&
     repo.instanceToken === token &&
     repo.remote.hasRemotes === true &&
-    repo.availability.phase !== 'unavailable'
+    !isRepoUnavailable(repo)
   )
 }
 

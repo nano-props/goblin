@@ -202,11 +202,11 @@ describe('repo session hydration', () => {
     await useReposStore.getState().hydrateSession([remoteRepoSessionEntry(target!)], target!.id)
 
     // The derived connectivity naturally reads as 'connected' once
-    // remote.target lands, with no explicit field write. addResolvedRepo
-    // is the only thing that sets remote.target, so this also confirms
+    // the lifecycle lands on `ready`. addResolvedRepo is the only
+    // thing that sets `remote.lifecycle`, so this also confirms
     // the probe chain ran end-to-end.
     const repo = useReposStore.getState().repos[target!.id]
-    expect(repo?.remote.target).toEqual(target)
+    expect(repo?.remote.lifecycle).toEqual({ kind: 'ready', target })
     expect(deriveConnectivity(repo!)).toBe('connected')
   })
 
@@ -272,7 +272,7 @@ describe('repo session hydration', () => {
 
     await useReposStore.getState().hydrateSession([remoteRepoSessionEntry(target!)], target!.id)
 
-    expect(useReposStore.getState().repos[target!.id]?.remote.target).toEqual(target)
+    expect(useReposStore.getState().repos[target!.id]?.remote.lifecycle).toEqual({ kind: 'ready', target })
     expect(useReposStore.getState().activeId).toBe(target!.id)
   })
 
@@ -291,10 +291,16 @@ describe('repo session hydration', () => {
 
     await useReposStore.getState().hydrateSession([remoteRepoSessionEntry(target!)], target!.id)
 
+    // Phase 4: the lifecycle union owns the failure signal.
+    // The `availability` mirror field is kept for the refresh
+    // pipeline guards (refresh.ts / refresh-coordinator.ts)
+    // but is NOT the authoritative source — this assertion
+    // pins the union shape, not the mirror.
     expect(useReposStore.getState().repos[target!.id]).toMatchObject({
       id: target!.id,
-      remote: { target },
-      availability: { phase: 'unavailable', reason: 'path-missing' },
+      remote: {
+        lifecycle: { kind: 'failed', reason: 'path-missing', target },
+      },
     })
   })
 
@@ -347,7 +353,16 @@ describe('repo session hydration', () => {
     // resolved target should not be applied.
     pending.splice(0).forEach((resolve) => resolve())
     await flushIpc()
-    expect(useReposStore.getState().repos[REPO_A]?.remote.target).toBeUndefined()
-    expect(useReposStore.getState().repos[REPO_B]?.remote.target).toBeUndefined()
+    // After abort, the local-probe path is short-circuited
+    // (the abort check in `resolveRepoPath` fires before
+    // the probe runs). The placeholder stays in the store
+    // with its initial `lifecycle: null` (local repos don't
+    // carry a lifecycle). The aborted probe is dropped without
+    // writing any state — there's no equivalent of the
+    // orchestrator's "no orphaned connecting" invariant
+    // here, because local repos don't have a `connecting`
+    // projection in the first place.
+    expect(useReposStore.getState().repos[REPO_A]?.remote.lifecycle).toBeNull()
+    expect(useReposStore.getState().repos[REPO_B]?.remote.lifecycle).toBeNull()
   })
 })

@@ -7,7 +7,7 @@ import type {
   PullRequestFetchMode,
   WorktreeStatus,
 } from '#/web/types.ts'
-import type { RemoteRepoTarget, RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { RemoteRepoLifecycle, RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspaceDetailPaneSizes, WorkspaceLayout } from '#/shared/workspace-layout.ts'
 import type { SessionState, DetailTab } from '#/shared/api-types.ts'
 export type { DetailTab }
@@ -78,7 +78,16 @@ export interface RepoProjectionMeta {
 }
 
 export interface RepoRemoteState {
-  target?: RemoteRepoTarget
+  /**
+   * Single source-of-truth lifecycle for a remote repo. `null` for local
+   * repos. The lifecycle union owns `target` — code MUST read the target
+   * from `lifecycle.target` (ready / failed-with-target). The legacy
+   * `target?: RemoteRepoTarget` field has been removed in Phase 4 of the
+   * remote-repo refactor; new code should call `remoteRepoTarget(repo)`
+   * from `web/stores/repos/helpers.ts` instead of reaching into
+   * `repo.remote.target`.
+   */
+  lifecycle: RemoteRepoLifecycle | null
   remotes?: string[]
   remoteDetails?: GitRemoteInfo[]
   hasRemotes?: boolean
@@ -200,6 +209,15 @@ export interface RuntimeCoherentRepoProjectionActions {
    *  anything about the current active selection. */
   ensureWorkspaceOpen: (path: string | RepoSessionEntry) => Promise<OpenRepoResult>
   closeRepo: (id: string) => void
+  /**
+   * Re-probe a remote repo's lifecycle. The single user-facing
+   * entry point for "retry" (and the only path the
+   * `useNetworkReconnect` hook calls to recover from a failed
+   * lifecycle). Safe to call regardless of the current lifecycle
+   * phase — the orchestrator flips to `connecting` and re-runs.
+   * Returns the new outcome, or `null` for non-remote ids.
+   */
+  retryRemoteRepoLifecycle: (id: string) => Promise<{ ok: boolean; reason?: string } | null>
   /** Updates the user-preferred detail tab. The store does not project
    *  against terminal session count or worktree presence — the UI computes
    *  the effective tab via `computeEffectiveDetailTab` at read time, which

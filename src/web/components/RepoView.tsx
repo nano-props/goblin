@@ -5,6 +5,7 @@
 import { Smartphone } from 'lucide-react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
 import { BranchList } from '#/web/components/BranchList.tsx'
 import { BranchDetail } from '#/web/components/BranchDetail.tsx'
 import { RepoToolbar } from '#/web/components/repo-toolbar/RepoToolbar.tsx'
@@ -59,7 +60,7 @@ export function RepoView({ repoId }: Props) {
   const compactLeftRight = uiMode === 'compact' && view.workspaceLayout === 'left-right'
 
   if (!view.exists || !repo) return <div />
-  if (repo.availability.phase === 'unavailable') return <UnavailableRepoView repo={repo} />
+  if (isRepoUnavailable(repo)) return <UnavailableRepoView repo={repo} />
   if (view.initialLoading) {
     return (
       <RepoWorkspaceSkeleton

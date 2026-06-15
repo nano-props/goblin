@@ -1,4 +1,4 @@
-import { appendRepoEvent, errorEvent, updateIfFresh } from '#/web/stores/repos/helpers.ts'
+import { appendRepoEvent, errorEvent, isRepoUnavailable, updateIfFresh } from '#/web/stores/repos/helpers.ts'
 import { persistRestorableRepoSnapshot } from '#/web/stores/repos/persistence.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 import {
@@ -111,5 +111,5 @@ export async function runCoreDataRefreshWorkflow(get: ReposGet, options: { id: s
   await get().refreshSnapshotAndStatus(options.id, { skipLogBackfill: true, token: options.token })
   const after = get().repos[options.id]
   if (!after || after.instanceToken !== options.token) return
-  if (after.availability.phase === 'unavailable') return
+  if (isRepoUnavailable(after)) return
 }

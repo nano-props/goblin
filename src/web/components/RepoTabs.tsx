@@ -17,6 +17,7 @@ import type { RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
 import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
 import { useRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { repoTabStoreActionsEqual, repoTabStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
+import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
 
 interface RepoTabsProps {
   currentRepoId: string | null
@@ -41,15 +42,14 @@ export function RepoTabs({ currentRepoId, onOpenRepoPathDialog, onOpenRemote, on
       s.order
         .map<RepoTabSummary | null>((id) => {
           const r = s.repos[id]
-          return r
-            ? {
-                id: r.id,
-                name: r.name,
-                remoteDetails: r.remote.remoteDetails ?? [],
-                remoteTarget: r.remote.target,
-                unavailable: r.availability.phase === 'unavailable',
-              }
-            : null
+          if (!r) return null
+          return {
+            id: r.id,
+            name: r.name,
+            remoteDetails: r.remote.remoteDetails ?? [],
+            lifecycle: r.remote.lifecycle,
+            unavailable: isRepoUnavailable(r),
+          }
         })
         .filter((x): x is RepoTabSummary => x !== null),
     repoTabSummariesEqual,

@@ -220,7 +220,7 @@ describe('RepoTabTooltipLayer', () => {
 })
 
 function repo(name: string, id: string, remoteDetails: RepoTabSummary['remoteDetails']): RepoTabSummary {
-  return { id, name, remoteDetails }
+  return { id, name, remoteDetails, lifecycle: null, unavailable: false }
 }
 
 function render(element: ReactNode) {

@@ -18,14 +18,24 @@ function createRepo(
   id: string,
   options: {
     detailTab?: 'status' | 'changes' | 'terminal'
-    availability?: 'available' | 'unavailable'
+    /**
+     * Phase 4: the legacy `availability.phase` field is gone for
+     * remote repos. The snapshot's `unavailable` boolean is
+     * computed by `isRepoUnavailable(repo)`. For local repos
+     * (which these tests are about), the field is set via
+     * `availability.phase`. The factory below just routes the
+     * test's intent through whichever legacy field still works
+     * — the snapshot tests don't care which storage the
+     * boolean came from.
+     */
+    unavailable?: boolean
     statusPhase?: 'idle' | 'loading' | 'refreshing'
   } = {},
 ) {
   const repo = emptyRepo(id, 'repo')
   repo.instanceToken = id === '/repo-a' ? 1 : 2
   repo.ui.preferredDetailTab = options.detailTab ?? 'status'
-  repo.availability.phase = options.availability ?? 'available'
+  if (options.unavailable) repo.availability = { phase: 'unavailable', reason: 'error.failed-read-repo', checkedAt: 0 }
   repo.resources.status.phase = options.statusPhase ?? 'idle'
   return repo
 }
@@ -37,7 +47,7 @@ describe('isRepoStatusRefreshable', () => {
         id: '/r',
         token: 1,
         detailTab: 'status',
-        availability: 'available',
+        unavailable: false,
         statusPhase: 'idle',
       }),
     ).toBe(true)
@@ -49,7 +59,7 @@ describe('isRepoStatusRefreshable', () => {
         id: '/r',
         token: 1,
         detailTab: 'status',
-        availability: 'unavailable',
+        unavailable: true,
         statusPhase: 'idle',
       }),
     ).toBe(false)
@@ -61,7 +71,7 @@ describe('isRepoStatusRefreshable', () => {
         id: '/r',
         token: 1,
         detailTab: 'status',
-        availability: 'available',
+        unavailable: false,
         statusPhase: 'loading',
       }),
     ).toBe(false)
@@ -70,7 +80,7 @@ describe('isRepoStatusRefreshable', () => {
         id: '/r',
         token: 1,
         detailTab: 'status',
-        availability: 'available',
+        unavailable: false,
         statusPhase: 'refreshing',
       }),
     ).toBe(false)
@@ -200,7 +210,7 @@ describe('useRepoStatusRefresh', () => {
   })
 
   test('skips refresh when the repo is unavailable', async () => {
-    const repo = createRepo('/repo-a', { availability: 'unavailable' })
+    const repo = createRepo('/repo-a', { unavailable: true })
     await act(async () => {
       useReposStore.setState({
         repos: { '/repo-a': repo },

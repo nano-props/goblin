@@ -9,7 +9,7 @@ import {
   type RepoOperationState,
   type RepoOperationTarget,
 } from '#/web/stores/repos/operations.ts'
-export type RepoTaskLane = 'network' | 'read' | 'write'
+export type RepoTaskLane = 'network' | 'read' | 'write' | 'lifecycle'
 export type { RepoOperationKey, RepoOperationTarget as RepoRuntimeOperationTarget }
 
 interface QueuedRepoTask<T> {
@@ -42,6 +42,15 @@ function rejectQueuedTask(task: QueuedRepoTask<unknown>, message: string): void 
 class RepoLane {
   private active = 0
   private activeControllers = new Set<AbortController>()
+  // Index of active tasks by their `replaceKey`, so a new
+  // latest-wins submission can abort the previous run's signal
+  // in addition to draining the queue. The orchestrator relies
+  // on this to free the lane's concurrency slot immediately on
+  // supersede — without it, a long-running lifecycle probe (up
+  // to 20s) would block a retry that the user explicitly
+  // requested, because the new run is queued behind the old
+  // active one (concurrency=1).
+  private activeByReplaceKey = new Map<string, AbortController>()
   private queued: Array<QueuedRepoTask<unknown>> = []
 
   private readonly concurrency: number
@@ -60,7 +69,13 @@ class RepoLane {
         resolve,
         reject,
       }
-      if (queuedTask.replaceKey) this.cancelQueued(queuedTask.replaceKey)
+      if (queuedTask.replaceKey) {
+        this.cancelQueued(queuedTask.replaceKey)
+        // Active-cancel must run BEFORE the new task is registered
+        // — otherwise the new run's own controller would be the
+        // one we find in the map and we'd abort ourselves.
+        this.cancelActiveByKey(queuedTask.replaceKey)
+      }
       if (this.active < this.concurrency) this.start(queuedTask, false)
       else {
         options?.onQueued?.()
@@ -86,18 +101,27 @@ class RepoLane {
       task.ctrl.abort()
       rejectQueuedTask(task, 'cancelled')
     }
+    // Clear the active-key index — every active task is being
+    // canceled, so the index is stale by definition. `start`'s
+    // `.finally()` will see the empty map and skip the index
+    // cleanup, which is fine (the map is already empty).
+    this.activeByReplaceKey.clear()
   }
 
   private start<T>(queuedTask: QueuedRepoTask<T>, wasQueued: boolean): void {
     if (queuedTask.timeout) globalThis.clearTimeout(queuedTask.timeout)
     this.active += 1
     this.activeControllers.add(queuedTask.ctrl)
+    if (queuedTask.replaceKey) this.activeByReplaceKey.set(queuedTask.replaceKey, queuedTask.ctrl)
     let work: Promise<T>
     try {
       queuedTask.onStart?.(wasQueued)
       work = queuedTask.task(queuedTask.ctrl.signal)
     } catch (err) {
       this.activeControllers.delete(queuedTask.ctrl)
+      if (queuedTask.replaceKey && this.activeByReplaceKey.get(queuedTask.replaceKey) === queuedTask.ctrl) {
+        this.activeByReplaceKey.delete(queuedTask.replaceKey)
+      }
       this.active -= 1
       queuedTask.reject(err)
       this.drain()
@@ -105,6 +129,9 @@ class RepoLane {
     }
     work.then(queuedTask.resolve, queuedTask.reject).finally(() => {
       this.activeControllers.delete(queuedTask.ctrl)
+      if (queuedTask.replaceKey && this.activeByReplaceKey.get(queuedTask.replaceKey) === queuedTask.ctrl) {
+        this.activeByReplaceKey.delete(queuedTask.replaceKey)
+      }
       this.active -= 1
       this.drain()
     })
@@ -130,6 +157,20 @@ class RepoLane {
     }
     this.queued = keep
     return cancelled
+  }
+
+  /**
+   * Abort the active task for a given `replaceKey` if one is in
+   * flight. Returns whether an active task was found. The aborted
+   * task's promise rejects with an `AbortError`, its `.finally()`
+   * cleans up the index, and the next queued task (if any) is
+   * drained into the freed concurrency slot.
+   */
+  private cancelActiveByKey(replaceKey: string): boolean {
+    const ctrl = this.activeByReplaceKey.get(replaceKey)
+    if (!ctrl) return false
+    ctrl.abort()
+    return true
   }
 
   private removeQueued(task: QueuedRepoTask<unknown>): boolean {
@@ -165,6 +206,12 @@ function createRuntime(): RepoRuntime {
       network: new RepoLane(1),
       read: new RepoLane(3),
       write: new RepoLane(1),
+      // Lifecycle runs are long-lived (resolveTarget + testRemote =
+      // up to 20s) and must not block snapshot/status refreshes.
+      // Concurrency 1 per repo: a lifecycle run is its own critical
+      // section — concurrent runs of the same repo would race the
+      // lifecycle union writes.
+      lifecycle: new RepoLane(1),
     },
     operations: {},
   }

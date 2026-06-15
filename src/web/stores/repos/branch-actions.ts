@@ -4,7 +4,7 @@ import {
   type RepoOperationTarget,
 } from '#/web/stores/repos/operation-runner.ts'
 import type { RepoBranchActionReason, RepoOperationReason } from '#/web/stores/repos/operations.ts'
-import { updateIfFresh } from '#/web/stores/repos/helpers.ts'
+import { isRepoUnavailable, updateIfFresh } from '#/web/stores/repos/helpers.ts'
 import { repoOperation, repoOperationBusy, waitForRepoOperationsIdle } from '#/web/stores/repos/runtime.ts'
 import {
   cancelResource,
@@ -270,8 +270,19 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
       if (repoBefore.instanceToken !== token) return null
       const network = isNetworkBranchAction(action)
       const branchOperation = repoOperation(id, 'branchAction')
-      if (repoBefore.availability.phase === 'unavailable') {
-        return { ok: false, message: repoBefore.availability.reason }
+      if (isRepoUnavailable(repoBefore)) {
+        // Per the lifecycle union: local repos carry their
+        // failure reason in `availability.reason`; remote repos
+        // carry it in `remote.lifecycle.reason` (or 'unknown'
+        // before Phase 3 had a chance to settle it). Either way,
+        // we won't run branch actions on a failed repo.
+        const reason =
+          repoBefore.remote.lifecycle?.kind === 'failed'
+            ? repoBefore.remote.lifecycle.reason
+            : repoBefore.availability.phase === 'unavailable'
+              ? repoBefore.availability.reason
+              : 'error.failed-read-repo'
+        return { ok: false, message: reason }
       }
       if (branchOperation.phase === 'running' || branchOperation.phase === 'queued') {
         // A queued pull/push can be replaced by the latest network branch action; running work cannot.

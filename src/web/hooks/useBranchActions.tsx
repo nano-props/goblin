@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { remoteRepoTarget } from '#/web/stores/repos/helpers.ts'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 import { BranchActionDialogs, type RemoveConfirm } from '#/web/components/BranchActionDialogs.tsx'
 import type { ExecResult } from '#/web/types.ts'
@@ -155,7 +156,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   function openTerminal() {
     if (!branch.worktree?.path) return
     const worktreePath = branch.worktree.path
-    if (repo.remote.target) {
+    if (remoteRepoTarget(repo.id, repo.remote.lifecycle)) {
       return runUiAction('terminal', () => openRemoteRepositoryTerminal(repo.id, worktreePath))
     }
     return runUiAction('terminal', () => openRepositoryTerminal(worktreePath))
@@ -164,7 +165,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   function openEditor() {
     if (!branch.worktree?.path) return
     const worktreePath = branch.worktree.path
-    if (repo.remote.target) {
+    if (remoteRepoTarget(repo.id, repo.remote.lifecycle)) {
       return runUiAction('editor', () => openRemoteRepositoryEditor(repo.id, worktreePath))
     }
     return runUiAction('editor', () => openRepositoryEditor(worktreePath))
@@ -236,7 +237,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   const dialogs = (
     <BranchActionDialogs
       branch={branch}
-      remoteTarget={repo.remote.target}
+      remoteTarget={remoteRepoTarget(repo.id, repo.remote.lifecycle)}
       hasUpstream={hasUpstream}
       pushConfirm={pushConfirm}
       deleteConfirm={deleteConfirm}

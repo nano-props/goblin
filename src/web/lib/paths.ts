@@ -51,10 +51,10 @@ export function untildify(path: string): string {
   return untildifyPath(path, homeDirectory())
 }
 
-export function formatRepoLocator(path: string, target?: RemoteRepoTarget): string {
+export function formatRepoLocator(path: string, target?: RemoteRepoTarget | null): string {
   return target ? remoteTargetSubtitle(target) : tildify(path)
 }
 
-export function formatWorktreePath(path: string, target?: RemoteRepoTarget): string {
+export function formatWorktreePath(path: string, target?: RemoteRepoTarget | null): string {
   return target ? remoteWorktreePathLabel(target, path) : tildify(path)
 }

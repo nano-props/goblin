@@ -92,6 +92,160 @@ export interface RemoteDiagnosticsResult {
   details?: string
 }
 
+/**
+ * Lifecycle-level failure reason for a remote repo.
+ *
+ * This is intentionally coarser than {@link RemoteDiagnosticCategory}:
+ * the diagnostic category explains *why* a probe step failed (with
+ * sub-categories like `shell-failed`, `git-missing`, `cancelled`),
+ * while this reason classifies the *outcome* of a lifecycle run at
+ * the level the UI cares about. `cancelled` and transient sub-step
+ * failures map to `unknown` here — the orchestrator's caller decides
+ * whether to retry.
+ */
+export type RemoteRepoFailureReason =
+  | 'config-changed'
+  | 'auth-failed'
+  | 'host-key'
+  | 'unreachable'
+  | 'handshake-failed'
+  | 'path-missing'
+  | 'not-a-repo'
+  | 'timeout'
+  | 'unknown'
+
+export const REMOTE_REPO_FAILURE_REASONS: readonly RemoteRepoFailureReason[] = [
+  'config-changed',
+  'auth-failed',
+  'host-key',
+  'unreachable',
+  'handshake-failed',
+  'path-missing',
+  'not-a-repo',
+  'timeout',
+  'unknown',
+]
+
+export function isRemoteRepoFailureReason(value: unknown): value is RemoteRepoFailureReason {
+  return (
+    typeof value === 'string' && (REMOTE_REPO_FAILURE_REASONS as readonly string[]).includes(value)
+  )
+}
+
+/**
+ * Map a raw failure source (i18n key, `RemoteDiagnosticCategory`, or
+ * arbitrary string) to a {@link RemoteRepoFailureReason}. Shared
+ * between the server (lifecycle boundary) and the web (legacy
+ * probe-failure writes that haven't been migrated to the new
+ * boundary yet). The lifecycle union takes a `RemoteRepoFailureReason`
+ * directly — the server is the authoritative source of the
+ * reason after Phase 3, but the helper is co-located here so the
+ * `RemoteDiagnosticCategory` / i18n-key → `RemoteRepoFailureReason`
+ * mapping has one definition.
+ */
+export function toRemoteRepoFailureReason(reason: string): RemoteRepoFailureReason {
+  if (isRemoteRepoFailureReason(reason)) return reason
+  switch (reason) {
+    case 'error.ssh-config-changed':
+    case 'config-changed':
+      return 'config-changed'
+    case 'auth-failed':
+      return 'auth-failed'
+    case 'host-key':
+      return 'host-key'
+    case 'unreachable':
+      return 'unreachable'
+    case 'handshake-failed':
+    case 'shell-failed':
+      return 'handshake-failed'
+    case 'path-missing':
+    case 'error.path-not-found':
+    case 'error.path-not-directory':
+      return 'path-missing'
+    case 'not-a-repo':
+    case 'git-missing':
+    case 'error.not-git-repo':
+      return 'not-a-repo'
+    case 'timeout':
+      return 'timeout'
+    default:
+      return 'unknown'
+  }
+}
+
+/**
+ * The single source-of-truth lifecycle state for a remote repo.
+ *
+ * Three orthogonal meanings collapse into one union:
+ *   - `connecting`: lifecycle started, has not yet converged
+ *   - `ready`:      lifecycle converged to success; concrete target is known
+ *   - `failed`:     lifecycle converged to failure; last-known target may be
+ *                   retained so the UI can still display remote context
+ *
+ * `target` is intentionally only accessible inside the union — this is
+ * what forbids the legacy `if (!repo.remote.target) /* connecting *​/` pattern.
+ */
+export type RemoteRepoLifecycle =
+  | { kind: 'connecting' }
+  | { kind: 'ready'; target: RemoteRepoTarget }
+  | { kind: 'failed'; reason: RemoteRepoFailureReason; target?: RemoteRepoTarget }
+
+/** Narrow a lifecycle to its concrete target, if any. */
+export function remoteRepoLifecycleTarget(
+  lifecycle: RemoteRepoLifecycle | null | undefined,
+): RemoteRepoTarget | null {
+  if (!lifecycle) return null
+  if (lifecycle.kind === 'ready') return lifecycle.target
+  if (lifecycle.kind === 'failed') return lifecycle.target ?? null
+  return null
+}
+
+/** Whether the lifecycle is in the transient `connecting` state. */
+export function isRemoteRepoLifecycleConnecting(
+  lifecycle: RemoteRepoLifecycle | null | undefined,
+): boolean {
+  return !!lifecycle && lifecycle.kind === 'connecting'
+}
+
+/** Whether the lifecycle has converged to a terminal state. */
+export function isRemoteRepoLifecycleTerminal(
+  lifecycle: RemoteRepoLifecycle | null | undefined,
+): lifecycle is
+  | { kind: 'ready'; target: RemoteRepoTarget }
+  | { kind: 'failed'; reason: RemoteRepoFailureReason; target?: RemoteRepoTarget } {
+  return !!lifecycle && (lifecycle.kind === 'ready' || lifecycle.kind === 'failed')
+}
+
+/**
+ * Server-side converged result for a remote-repo lifecycle run.
+ *
+ * This is the wire contract for the unified server boundary
+ * (see docs/goblin-remote-repo-refactor-plan.md §5.2). The server
+ * returns ONLY the converged terminals — `ready` or `failed`.
+ * `connecting` is a renderer-side projection; the renderer
+ * writes it before the server call lands and replaces it with
+ * the converged result after.
+ *
+ * `lifecycle.target` is the same `RemoteRepoTarget` the
+ * renderer will land on `RepoRemoteState.lifecycle.target` after
+ * the orchestrator's settle. The `target?` in the failed
+ * variant retains the last-known target so the UI keeps
+ * showing the remote locator on a failed tab.
+ */
+export type RemoteRepoLifecycleResult =
+  | {
+      kind: 'ready'
+      repoId: string
+      name: string
+      lifecycle: { kind: 'ready'; target: RemoteRepoTarget }
+    }
+  | {
+      kind: 'failed'
+      repoId: string
+      name: string
+      lifecycle: { kind: 'failed'; reason: RemoteRepoFailureReason; target?: RemoteRepoTarget }
+    }
+
 export interface RemoteRepoTargetInput {
   alias?: unknown
   host?: unknown

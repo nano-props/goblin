@@ -122,6 +122,15 @@ function createRepo(input: {
         settledAt: null,
         error: null,
       },
+      remoteLifecycle: {
+        operationId: 0,
+        phase: 'idle',
+        reason: null,
+        target: null,
+        startedAt: null,
+        settledAt: null,
+        error: null,
+      },
       pullRequestsByBranch: {},
     },
     ui: {
@@ -131,6 +140,7 @@ function createRepo(input: {
     },
     projection: { source: 'fresh', savedAt: null },
     remote: {
+      lifecycle: null,
       remotes: [],
       remoteDetails: [],
       hasRemotes: input.remote.hasRemotes,

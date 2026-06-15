@@ -3,6 +3,7 @@ import type { ComponentPropsWithoutRef } from 'react'
 import { cn } from '#/web/lib/cn.ts'
 import { DelegatedTooltipLayer, DELEGATED_TOOLTIP_DEFAULTS } from '#/web/components/DelegatedTooltipLayer.tsx'
 import { formatRepoLocator } from '#/web/lib/paths.ts'
+import { remoteRepoLifecycleTarget } from '#/shared/remote-repo.ts'
 import type { RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
 import { ToolbarTabList } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
 import {
@@ -47,11 +48,15 @@ export function RepoTabTooltipLayer({
 
 function RepoTabTooltipContent({ repo }: { repo: RepoTabSummary }) {
   const t = useT()
+  // The tooltip shows the remote locator (alias@host:path) for
+  // ready/failed remote repos with a retained target. Connecting
+  // remotes and local repos fall back to a plain repo-id render.
+  const remoteTarget = remoteRepoLifecycleTarget(repo.lifecycle)
   return (
     <>
       <div className="truncate text-xs font-semibold text-foreground">{repo.name}</div>
       <div className={cn('mt-0.5 truncate font-mono', TOOLTIP_META_TEXT_CLASS)}>
-        {formatRepoLocator(repo.id, repo.remoteTarget)}
+        {formatRepoLocator(repo.id, remoteTarget)}
       </div>
       {repo.remoteDetails.length > 0 && (
         <div className={cn('mt-2 border-t border-border/40 pt-2', TOOLTIP_STACK_MD_CLASS)}>
