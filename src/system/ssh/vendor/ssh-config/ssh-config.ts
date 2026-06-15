@@ -18,14 +18,15 @@ const RE_SINGLE_LINE_DIRECTIVE = /^(Include|IdentityFile)$/i
  * A type of line in an ssh-config file. Differentiates between directives,
  * comments, and empty lines.
  */
-export enum LineType {
+export const LineType = {
   /** line with a directive in an ssh-config file */
-  DIRECTIVE = 1,
+  DIRECTIVE: 1,
   /** line with a comment in an ssh-config file */
-  COMMENT = 2,
+  COMMENT: 2,
   /** empty line in an ssh-config file */
-  EMPTY = 3,
-}
+  EMPTY: 3,
+} as const
+export type LineType = (typeof LineType)[keyof typeof LineType]
 
 /** A separator character in a directive. */
 export type Separator = ' ' | '=' | '\t'
@@ -44,7 +45,7 @@ export interface ValueToken {
  * much like a key-value pair.
  */
 export interface Directive {
-  type: LineType.DIRECTIVE
+  type: typeof LineType.DIRECTIVE
   /** unrelated string encountered before this directive */
   before: string
   /** unrelated string encountered after this directive */
@@ -83,7 +84,7 @@ export interface Match extends Section {
  * string in {@link Comment.content}.
  */
 export interface Comment {
-  type: LineType.COMMENT
+  type: typeof LineType.COMMENT
   /** unrelated string encountered before this directive */
   before: string
   /** unrelated string encountered after this directive */
@@ -99,7 +100,7 @@ export interface Comment {
  * the {@link Empty.after | after} field is permitted, too.
  */
 export interface Empty {
-  type: LineType.EMPTY
+  type: typeof LineType.EMPTY
   /** unrelated string encountered before this directive */
   before: string
   /** unrelated string encountered after this directive */
@@ -216,11 +217,11 @@ function match(criteria: Record<string, string | ValueToken[]>, context: MatchCo
  */
 export default class SSHConfig extends Array<Line> {
   /** shortcut to access {@link LineType.DIRECTIVE} */
-  static readonly DIRECTIVE: LineType.DIRECTIVE = LineType.DIRECTIVE
+  static readonly DIRECTIVE: typeof LineType.DIRECTIVE = LineType.DIRECTIVE
   /** shortcut to access {@link LineType.COMMENT} */
-  static readonly COMMENT: LineType.COMMENT = LineType.COMMENT
+  static readonly COMMENT: typeof LineType.COMMENT = LineType.COMMENT
   /** shortcut to access {@link LineType.EMPTY} */
-  static readonly EMPTY: LineType.EMPTY = LineType.EMPTY
+  static readonly EMPTY: typeof LineType.EMPTY = LineType.EMPTY
 
   /**
    * Parse SSH config text into structured object.
