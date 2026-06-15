@@ -15,6 +15,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { visibleBranches } from '#/web/stores/repos/branch-view-mode.ts'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { adjacentDetailTab } from '#/web/lib/detail-tabs.ts'
+import { branchWorktreeHasChanges } from '#/web/stores/repos/worktree-state.ts'
 import { runBranchActionShortcut } from '#/web/keyboard/branch-action-shortcuts.ts'
 import { matchRendererKeyboardShortcut } from '#/shared/shortcut-definitions.ts'
 import { isTerminalFocused } from '#/web/terminal-focus.ts'
@@ -203,6 +204,7 @@ export function useKeyboard({
               repo.ui.preferredDetailTab,
               action === 'next-detail-tab' ? 1 : -1,
               !!selected?.worktree?.path,
+              selected ? branchWorktreeHasChanges(repo, selected) : false,
             ),
           )
           break

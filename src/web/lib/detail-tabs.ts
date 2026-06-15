@@ -11,8 +11,36 @@ export function isDetailTab(value: string | null | undefined): value is DetailTa
   return value === 'status' || value === 'changes' || value === 'terminal'
 }
 
-export function visibleDetailTabs(hasWorktree: boolean) {
-  return hasWorktree ? DETAIL_TABS : DETAIL_TABS.filter((tab) => tab.id !== 'terminal')
+/**
+ * The runtime truth that determines which detail tab is renderable.
+ * Grouped into an object so callers can't accidentally swap two
+ * booleans at the call site.
+ */
+export interface DetailTabContext {
+  /** Whether the selected branch has a worktree on disk. */
+  hasWorktree: boolean
+  /** Whether that worktree has uncommitted changes. */
+  hasChanges: boolean
+  /** Number of open terminal sessions for the worktree. */
+  terminalSessionCount: number
+  /** Whether the terminal session registry has finished its first sync. */
+  terminalSyncReady: boolean
+  /** True while a `create terminal` IPC is in flight. */
+  terminalPendingCreate?: boolean
+}
+
+/**
+ * The set of detail tabs the UI should offer for the selected branch.
+ * The `changes` tab is hidden when the worktree is clean — there's
+ * nothing to look at, and an empty list tab would just be noise.
+ * `terminal` stays gated on `hasWorktree` for the same reason.
+ */
+export function visibleDetailTabs({ hasWorktree, hasChanges }: Pick<DetailTabContext, 'hasWorktree' | 'hasChanges'>) {
+  return DETAIL_TABS.filter((tab) => {
+    if (!hasWorktree && tab.id === 'terminal') return false
+    if (!hasChanges && tab.id === 'changes') return false
+    return true
+  })
 }
 
 export function detailTabForWorktree(tab: DetailTab, hasWorktree: boolean): DetailTab {
@@ -24,10 +52,9 @@ export function detailTabForWorktree(tab: DetailTab, hasWorktree: boolean): Deta
  * Resolve the detail tab the UI should actually render.
  *
  * The repos store holds the user's *preferred* tab (the persisted intent).
- * Whether that preference is renderable depends on two pieces of
- * runtime truth owned by other layers:
- *  - `hasWorktree` for the selected branch (repo data)
- *  - `terminalSessionCount` + `terminalSyncReady` from the
+ * Whether that preference is renderable depends on the live context:
+ *  - `hasWorktree` and `hasChanges` describe the worktree (repo data)
+ *  - `terminalSessionCount` + `terminalSyncReady` come from the
  *    TerminalSessionRegistry (live terminal context)
  *
  * `syncReady` lets us avoid briefly flashing `status → terminal → status`
@@ -35,19 +62,19 @@ export function detailTabForWorktree(tab: DetailTab, hasWorktree: boolean): Deta
  * `terminal` preference is preserved. Once the first sync settles, an
  * empty worktree dismisses the `terminal` preference.
  *
+ * A `changes` preference with no current changes is routed to `status`
+ * so the user always sees meaningful content; the persisted preference
+ * is preserved, so the changes tab reappears (and re-selects) as soon
+ * as something is dirty again.
+ *
  * Pure function so it can be unit-tested without React.
  */
-export function computeEffectiveDetailTab(
-  preferred: DetailTab,
-  hasWorktree: boolean,
-  terminalSessionCount: number,
-  terminalSyncReady: boolean,
-  terminalPendingCreate = false,
-): DetailTab {
-  if (!hasWorktree) return detailTabForWorktree(preferred, hasWorktree)
+export function computeEffectiveDetailTab(preferred: DetailTab, context: DetailTabContext): DetailTab {
+  if (!context.hasWorktree) return detailTabForWorktree(preferred, context.hasWorktree)
+  if (preferred === 'changes' && !context.hasChanges) return 'status'
   if (preferred !== 'terminal') return preferred
-  if (!terminalSyncReady) return 'terminal'
-  return terminalSessionCount > 0 || terminalPendingCreate ? 'terminal' : 'status'
+  if (!context.terminalSyncReady) return 'terminal'
+  return context.terminalSessionCount > 0 || context.terminalPendingCreate ? 'terminal' : 'status'
 }
 
 export function detailTabNavigationKey(key: string): DetailTabNavigationKey | null {
@@ -55,8 +82,13 @@ export function detailTabNavigationKey(key: string): DetailTabNavigationKey | nu
 }
 
 // Shared by the ARIA tablist handler and global shortcuts; callers own focus and collapse side effects.
-export function navigatedDetailTab(current: DetailTab, key: DetailTabNavigationKey, hasWorktree = true): DetailTab {
-  const tabs = visibleDetailTabs(hasWorktree)
+export function navigatedDetailTab(
+  current: DetailTab,
+  key: DetailTabNavigationKey,
+  hasWorktree: boolean,
+  hasChanges: boolean,
+): DetailTab {
+  const tabs = visibleDetailTabs({ hasWorktree, hasChanges })
   const visibleCurrent = detailTabForWorktree(current, hasWorktree)
   // If the current tab disappeared from the visible set, navigate from the first tab.
   const index = Math.max(
@@ -74,6 +106,11 @@ export function navigatedDetailTab(current: DetailTab, key: DetailTabNavigationK
   return tabs[next].id
 }
 
-export function adjacentDetailTab(current: DetailTab, direction: 1 | -1, hasWorktree = true): DetailTab {
-  return navigatedDetailTab(current, direction === 1 ? 'ArrowRight' : 'ArrowLeft', hasWorktree)
+export function adjacentDetailTab(
+  current: DetailTab,
+  direction: 1 | -1,
+  hasWorktree: boolean,
+  hasChanges: boolean,
+): DetailTab {
+  return navigatedDetailTab(current, direction === 1 ? 'ArrowRight' : 'ArrowLeft', hasWorktree, hasChanges)
 }

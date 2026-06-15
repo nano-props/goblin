@@ -211,6 +211,7 @@ describe('BranchDetailToolbar', () => {
     const showRepoDetailTab = vi.fn()
     const { container: c } = renderToolbar({
       terminalCount: 2,
+      changeCount: 1,
       navigation: navigationWith({ showRepoDetailTab }),
     })
 
@@ -240,6 +241,36 @@ describe('BranchDetailToolbar', () => {
     await flush()
     expect(showRepoDetailTab).toHaveBeenNthCalledWith(3, REPO_ID, 'changes')
     expect(document.activeElement).toBe(changesTab)
+  })
+
+  test('skips the changes tab in keyboard navigation when the worktree is clean', async () => {
+    const showRepoDetailTab = vi.fn()
+    const { container: c } = renderToolbar({
+      terminalCount: 2,
+      // no changeCount — worktree is clean
+      navigation: navigationWith({ showRepoDetailTab }),
+    })
+
+    expect(c.querySelector('#detail-changes-tab')).toBeNull()
+    const statusTab = c.querySelector<HTMLButtonElement>('#detail-status-tab')
+    const terminalTab = c.querySelector<HTMLButtonElement>('#detail-terminal-tab')
+    if (!statusTab || !terminalTab) throw new Error('missing branch detail tabs')
+
+    act(() => {
+      statusTab.focus()
+      statusTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    })
+    await flush()
+    // No changes tab to land on — ArrowRight from status jumps to terminal.
+    expect(showRepoDetailTab).toHaveBeenLastCalledWith(REPO_ID, 'terminal')
+    expect(document.activeElement).toBe(terminalTab)
+
+    act(() => {
+      terminalTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
+    })
+    await flush()
+    expect(showRepoDetailTab).toHaveBeenLastCalledWith(REPO_ID, 'status')
+    expect(document.activeElement).toBe(statusTab)
   })
 })
 

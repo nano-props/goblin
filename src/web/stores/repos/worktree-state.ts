@@ -89,3 +89,13 @@ export function getBranchWorktreeState(repo: BranchWorktreeRepo, branch: RepoBra
 export function selectedBranchStatus(repo: BranchWorktreeRepo, branch: RepoBranchState | null): WorktreeStatus[] {
   return branch?.worktree ? repo.data.status.filter((wt) => wt.path === branch.worktree?.path) : []
 }
+
+/**
+ * Whether the branch's worktree currently has uncommitted changes
+ * worth surfacing. Centralises the dirty-state derivation so the
+ * status tab, keyboard shortcut, and toolbar all agree on the
+ * answer — and stay in sync if the fallback chain is ever tweaked.
+ */
+export function branchWorktreeHasChanges(repo: BranchWorktreeRepo, branch: RepoBranchState): boolean {
+  return (getBranchWorktreeState(repo, branch)?.changeCount ?? 0) > 0
+}

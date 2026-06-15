@@ -24,6 +24,7 @@ import { useRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useEffectiveDetailTab } from '#/web/components/branch-detail/useEffectiveDetailTab.ts'
+import { branchWorktreeHasChanges } from '#/web/stores/repos/worktree-state.ts'
 import {
   branchDetailToolbarStoreActionsEqual,
   branchDetailToolbarStoreActionsFromStore,
@@ -50,7 +51,11 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
   const compact = useIsCompactUi()
   const behavior = repoWorkspaceBehavior(layout, collapsed, detailFocusMode)
   const effectiveTab = useEffectiveDetailTab(repo)
-  const tabs = visibleDetailTabs(!!detail.branch?.worktree?.path)
+  // Single source of truth for "is the worktree dirty" — mirrors
+  // `useEffectiveDetailTab` and the global keyboard shortcut so the
+  // toolbar's hide/show rule never disagrees with the effective tab.
+  const hasChanges = detail.branch ? branchWorktreeHasChanges(repo, detail.branch) : false
+  const tabs = visibleDetailTabs({ hasWorktree: !!detail.branch?.worktree?.path, hasChanges })
   const terminalWorktreeKey = detail.branch?.worktree?.path
     ? worktreeTerminalKey(repo.id, detail.branch.worktree.path)
     : null
@@ -142,7 +147,7 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
     const key = detailTabNavigationKey(e.key)
     if (!key) return
     e.preventDefault()
-    const nextTab = navigatedDetailTab(tabId, key, !!detail.branch?.worktree?.path)
+    const nextTab = navigatedDetailTab(tabId, key, !!detail.branch?.worktree?.path, hasChanges)
     navigation.showRepoDetailTab(repo.id, nextTab)
     setDetailCollapsed(false)
     if (nextTab === 'terminal') {
@@ -242,9 +247,14 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
                   focusTerminalTab()
                   return
                 }
-                navigation.showRepoDetailTab(repo.id, 'changes')
+                // 'prev' (or any other direction): step back into the
+                // detail tabs. The changes tab is hidden when the
+                // worktree is clean, so 'prev' lands on status in that
+                // case rather than focusing a missing tab.
+                const prevTab = hasChanges ? 'changes' : 'status'
+                navigation.showRepoDetailTab(repo.id, prevTab)
                 setDetailCollapsed(false)
-                focusDetailTab('changes')
+                focusDetailTab(prevTab)
               }}
             />
           </>

@@ -65,10 +65,11 @@ export interface RepoUiState {
   selectedBranch: string | null
   branchViewMode: BranchViewMode
   /** The user-preferred detail tab. This is the persisted intent; what the
-   *  user actually sees is `computeEffectiveDetailTab(preferred, hasWorktree,
-   *  terminalSessionCount, terminalSyncReady)` evaluated at read time. The
-   *  store never adjusts this on snapshot/branch changes — the derived value
-   *  handles those cases, preserving the user's preference across them. */
+   *  user actually sees is `computeEffectiveDetailTab(preferred, context)`
+   *  evaluated at read time, where `context` carries the worktree, dirty
+   *  state, and terminal session truth. The store never adjusts this on
+   *  snapshot/branch changes — the derived value handles those cases,
+   *  preserving the user's preference across them. */
   preferredDetailTab: DetailTab
 }
 
