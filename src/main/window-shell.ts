@@ -13,6 +13,7 @@ import { randomUUID } from 'node:crypto'
 import os from 'node:os'
 import path from 'node:path'
 import { openHttpExternal } from '#/main/external-url.ts'
+import { windowNodeLog } from '#/node/logger.ts'
 import {
   allowTrustedAppUrlForWebContents,
   isTrustedAppUrlForWebContents,
@@ -193,7 +194,11 @@ export function configureTrustedRendererWindow(win: BrowserWindow, logLabel: str
   })
   win.webContents.setWindowOpenHandler(({ url: nextUrl }) => {
     void openHttpExternal(nextUrl).catch((err) => {
-      console.warn(`[${logLabel}] failed to open external window URL`, err)
+      // Pre-bound `windowNodeLog` instead of `nodeLogger.child({ tag: logLabel })`
+      // so this hot click-path doesn't allocate a fresh child logger per
+      // navigation event. `logLabel` is preserved in the signature for
+      // future call sites; the only current caller passes `'window'`.
+      windowNodeLog.warn({ err }, 'failed to open external window URL')
     })
     return { action: 'deny' }
   })

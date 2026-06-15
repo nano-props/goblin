@@ -1,6 +1,7 @@
 import * as v from 'valibot'
 import { Hono } from 'hono'
 import { IpcError } from '#/shared/api-types.ts'
+import { serverLogger } from '#/server/logger.ts'
 import { errorJson } from '#/server/common/responses.ts'
 
 /**
@@ -70,7 +71,7 @@ export function createRouteApp(): Hono {
   const app = new Hono()
   app.onError((err, c) => {
     if (err instanceof IpcError) return errorJson(c, err.code, err.message)
-    console.error('[server] unhandled error', err)
+    serverLogger.error({ err }, 'unhandled error')
     return errorJson(c, 'INTERNAL_SERVER_ERROR', 'Internal server error')
   })
   return app

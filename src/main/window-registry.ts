@@ -6,6 +6,7 @@
 //   lives in window-shell.ts.
 
 import { BrowserWindow, type BrowserWindow as BrowserWindowType } from 'electron'
+import { windowRegistryNodeLog } from '#/node/logger.ts'
 
 export interface RegisteredRendererSurfaceCapabilities {
   ipcBroadcast: boolean
@@ -136,7 +137,7 @@ export function sendToRegisteredWindow(
   try {
     if (!win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send(channel, ...args)
   } catch (err) {
-    console.warn('[window-registry] failed to send event to window', err)
+    windowRegistryNodeLog.warn({ err }, 'failed to send event to window')
   }
 }
 

@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessionProvider.tsx'
+import { terminalSessionProviderLog } from '#/web/logger.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import {
   useWorktreeTerminalCount,
@@ -1533,11 +1534,12 @@ describe('TerminalSessionProvider', () => {
     // First snapshot rejects, second resolves. The provider uses
     // Promise.allSettled (not Promise.all) so the rejection does not
     // cancel the whole reconcile. Rejections are surfaced via
-    // result.reason and logged via console.debug; healthy results are
-    // collected into the snapshot map. A regression to Promise.all
-    // would either cancel reconcile entirely or surface the rejection
-    // to the caller as an unhandled promise.
-    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {})
+    // result.reason and logged via terminalSessionProviderLog.debug;
+    // healthy results are collected into the snapshot map. A
+    // regression to Promise.all would either cancel reconcile
+    // entirely or surface the rejection to the caller as an
+    // unhandled promise.
+    const debugSpy = vi.spyOn(terminalSessionProviderLog, 'debug').mockImplementation(() => {})
     getSessionSnapshotMock.mockImplementation(async ({ sessionId }) => {
       if (sessionId === 'session_fail') throw new Error('snapshot unavailable')
       return { sessionId: 'session_ok', snapshot: 'ok-snapshot', snapshotSeq: 1 }
@@ -1557,11 +1559,10 @@ describe('TerminalSessionProvider', () => {
       )
       // The failed session's rejection is logged but does not poison
       // the other session's hydrate path.
-      expect(debugSpy).toHaveBeenCalledWith(
-        expect.stringContaining('failed to load terminal session snapshot'),
-        'session_fail',
-        expect.any(Error),
-      )
+      expect(debugSpy).toHaveBeenCalledWith('failed to load terminal session snapshot', {
+        sessionId: 'session_fail',
+        err: expect.any(Error),
+      })
     } finally {
       debugSpy.mockRestore()
       await unmount()

@@ -10,6 +10,7 @@ import { syncRecentRepos } from '#/main/recent-repos.ts'
 import { assertDictionaryParity, resolveLang, setCurrentLang } from '#/main/i18n/index.ts'
 import { wireIpc } from '#/main/ipc.ts'
 import { wireShellBridgeIpc } from '#/main/shell-bridge.ts'
+import { windowNodeLog, windowStateNodeLog, serverNodeLog } from '#/node/logger.ts'
 import { wireTerminalIpc } from '#/main/terminal.ts'
 import { syncGlobalShortcuts, unregisterAppShortcuts } from '#/main/shortcuts.ts'
 import { enqueueExternalOpenPath } from '#/main/external-open.ts'
@@ -24,7 +25,7 @@ function activateMainWindowFromEvent(): void {
       return activateMainWindow()
     })
     .catch((err) => {
-      console.error('[window] failed to activate main window', err)
+      windowNodeLog.error({ err }, 'failed to activate main window')
     })
 }
 
@@ -80,7 +81,7 @@ async function finalizeMainProcessExit(): Promise<void> {
   try {
     broadcastRendererEffectIntent({ type: 'app-quitting' })
     const windowStateFlushed = await flushWindowState()
-    if (!windowStateFlushed) console.error('[window-state] final flush failed before quit')
+    if (!windowStateFlushed) windowStateNodeLog.error('final flush failed before quit')
     await stopEmbeddedServer()
   } finally {
     unregisterAppShortcuts()
@@ -102,7 +103,7 @@ async function startEmbeddedServerForMainProcess(): Promise<void> {
   try {
     await startEmbeddedServer()
   } catch (err) {
-    console.warn('[server] failed to start embedded server', err)
+    serverNodeLog.warn({ err }, 'failed to start embedded server')
     const message = err instanceof Error ? err.message : String(err)
     dialog.showErrorBox('Goblin failed to start', `Embedded web server failed to start.\n\n${message}`)
     throw err

@@ -1,4 +1,5 @@
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import { settingsLog } from '#/web/logger.ts'
 import type {
   EditorAppState,
   EditorPref,
@@ -134,7 +135,7 @@ export async function runSettingsControllerAction<T>(label: string, task: () => 
   try {
     return await task()
   } catch (err) {
-    console.warn(`[settings] ${label} failed`, err)
+    settingsLog.warn(`${label} failed`, { err })
     return null
   }
 }

@@ -7,6 +7,7 @@
 // Electron needs at runtime.
 
 import { app } from 'electron'
+import { i18nNodeLog } from '#/node/logger.ts'
 import { DICTS, en, type DictKey } from '#/shared/i18n/dictionaries.ts'
 import { resolvePreferredLang } from '#/shared/i18n/resolve-lang.ts'
 import type { Lang, LangPref } from '#/shared/api-types.ts'
@@ -38,7 +39,7 @@ export function assertDictionaryParity(isDev: boolean): void {
   if (issues.length === 0) return
   const msg = `[i18n] dictionary parity broken:\n  ${issues.join('\n  ')}`
   if (isDev) throw new Error(msg)
-  console.warn(msg)
+  i18nNodeLog.warn({ issues }, 'dictionary parity broken')
 }
 
 /**

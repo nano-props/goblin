@@ -1,5 +1,6 @@
 import { canUseGlobalShortcutSettings, canUseNativeIpcBridge } from '#/web/app-shell-client.ts'
 import { invokeNativeIpcPath } from '#/web/native-host-client.ts'
+import { sessionLog } from '#/web/logger.ts'
 import { fetchServerJson, postServerJson } from '#/web/lib/server-fetch.ts'
 import type {
   EditorAppState,
@@ -162,7 +163,7 @@ export async function pushWorkspaceLayoutToNativeMenu(workspaceLayout: Workspace
   try {
     await invokeNativeIpcPath<boolean>('session.setWorkspaceLayout', { workspaceLayout })
   } catch (err) {
-    console.warn('[session] failed to push workspace layout to native menu', err)
+    sessionLog.warn('failed to push workspace layout to native menu', { err })
   }
 }
 

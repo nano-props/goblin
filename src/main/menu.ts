@@ -17,6 +17,7 @@
 
 import { app, Menu, type MenuItemConstructorOptions } from 'electron'
 import { activateMainWindow, getMainWindow, resetMainWindowToDefault } from '#/main/window.ts'
+import { menuNodeLog } from '#/node/logger.ts'
 import { openDataFolderMenuKey, t } from '#/main/i18n/index.ts'
 import { sendRendererEffectIntent } from '#/main/renderer-surface-events.ts'
 import { getTheme } from '#/main/theme.ts'
@@ -80,7 +81,7 @@ async function sendRendererIntent(intent: RendererEffectIntent): Promise<void> {
     const win = getMainWindow() ?? focusedRegisteredSurface()?.window ?? (await activateMainWindow())
     sendRendererEffectIntent(win, intent)
   } catch (err) {
-    console.warn('[menu] failed to send renderer intent', err)
+    menuNodeLog.warn({ err }, 'failed to send renderer intent')
   }
 }
 

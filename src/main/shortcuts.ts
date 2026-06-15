@@ -1,5 +1,6 @@
 import { globalShortcut } from 'electron'
 import { activateMainWindow } from '#/main/window.ts'
+import { shortcutsNodeLog } from '#/node/logger.ts'
 import { DEFAULT_GLOBAL_SHORTCUT, normalizeGlobalShortcut } from '#/shared/accelerator.ts'
 
 let registeredShortcut: string | null = null
@@ -15,7 +16,7 @@ export function syncGlobalShortcuts(disabled: boolean, accelerator = DEFAULT_GLO
     registeredShortcut = registered ? normalized : null
     return registered
   } catch (err) {
-    console.warn('[shortcuts] global shortcut registration failed', err)
+    shortcutsNodeLog.warn({ err }, 'global shortcut registration failed')
     registeredShortcut = null
     return false
   }

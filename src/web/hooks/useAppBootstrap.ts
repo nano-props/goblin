@@ -5,6 +5,7 @@ import { useI18nStore } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useSessionRestoreStore } from '#/web/stores/session-restore.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
+import { bootstrapLog } from '#/web/logger.ts'
 export function useAppBootstrap() {
   const hydratedRef = useRef(false)
 
@@ -44,7 +45,7 @@ export function useAppBootstrap() {
         await hydrateSession(session.openRepos, session.activeRepo)
         applySessionDetailTabByRepo(restoredWorkspaceState.detailTabByRepo)
       } catch (err) {
-        console.warn('[bootstrap] failed', err)
+        bootstrapLog.warn('failed', { err })
         useReposStore.setState({ sessionReady: true })
       }
     })()

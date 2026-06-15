@@ -2,6 +2,7 @@ import { execa } from 'execa'
 import { existsSync, statSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { ghosttyNodeLog } from '#/node/logger.ts'
 import { buildRemoteTerminalInvocation } from '#/system/remote-terminal.ts'
 
 const GHOSTTY_BUNDLE_ID = 'com.mitchellh.ghostty'
@@ -80,7 +81,7 @@ export async function openInGhostty(p: string): Promise<{ ok: boolean; message: 
   try {
     if (await openInRunningGhostty(p)) return { ok: true, message: p }
   } catch (err) {
-    console.warn('[ghostty] AppleScript open failed, falling back to launch', err)
+    ghosttyNodeLog.warn({ err }, 'AppleScript open failed, falling back to launch')
   }
 
   try {
@@ -139,7 +140,7 @@ export async function openRemoteInGhostty(
   try {
     if (await openRemoteInRunningGhostty(invocation.shellCommand)) return { ok: true, message: remotePath }
   } catch (err) {
-    console.warn('[ghostty] AppleScript remote open failed, falling back to launch', err)
+    ghosttyNodeLog.warn({ err }, 'AppleScript remote open failed, falling back to launch')
   }
 
   try {

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { replaceRepo } from '#/web/stores/repos/helpers.ts'
+import { terminalLog } from '#/web/logger.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { markRepoOperationTargets, repoOperation } from '#/web/stores/repos/runtime.ts'
 import { branch, REPO_ID, resetRefreshTest, ipcHandlers, seedRepo } from '#/web/stores/repos/refresh-test-utils.ts'
@@ -848,7 +849,7 @@ describe('core refresh request ordering', () => {
   test('snapshot refresh warns when pruning terminal sessions fails', async () => {
     const token = seedRepo([branch('stale', undefined, { worktree: { path: '/tmp/stale-worktree' } })])
     const err = new Error('prune failed')
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(terminalLog, 'warn').mockImplementation(() => {})
     ipcHandlers['terminal.prune'] = async () => {
       throw err
     }
@@ -860,6 +861,6 @@ describe('core refresh request ordering', () => {
     await useReposStore.getState().refreshSnapshot(REPO_ID, { token })
     await new Promise((resolve) => setTimeout(resolve, 0))
 
-    expect(warnSpy).toHaveBeenCalledWith('[terminal] failed to prune repo sessions', err)
+    expect(warnSpy).toHaveBeenCalledWith('failed to prune repo sessions', { err })
   })
 })

@@ -1,4 +1,5 @@
 import { getBackgroundSyncRepos, setBackgroundSyncRepos } from '#/server/modules/background-sync.ts'
+import { serverRepoNodeLog } from '#/node/logger.ts'
 import {
   getRepositoryComposite,
   getRepositoryPatch,
@@ -39,7 +40,7 @@ export function createRepoRoutes() {
     try {
       return await run()
     } catch (err) {
-      console.warn(`[server][repo] ${label} failed`, err)
+      serverRepoNodeLog.warn({ err, label }, 'failed')
       return fallback
     }
   }

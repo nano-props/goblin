@@ -6,6 +6,7 @@ import '#/web/components/terminal/terminal-session.css'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { terminalBridge } from '#/web/terminal.ts'
+import { terminalSessionProviderLog } from '#/web/logger.ts'
 import {
   TerminalSessionContext,
   TerminalSessionReadContext,
@@ -64,11 +65,10 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
           if (snapshot) entries.push([session.sessionId, snapshot])
           return
         }
-        console.debug(
-          '[TerminalSessionProvider] failed to load terminal session snapshot:',
-          session.sessionId,
-          result.reason,
-        )
+        terminalSessionProviderLog.debug('failed to load terminal session snapshot', {
+          sessionId: session.sessionId,
+          err: result.reason,
+        })
       })
       return new Map(entries)
     },
@@ -85,7 +85,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
         if (!repoIndexRef.current[repoRoot]) return
         registry.reconcileServerSessions(repoRoot, serverSessions, attachmentId, snapshotsBySessionId)
       } catch (err) {
-        console.debug('[TerminalSessionProvider] failed to sync server sessions:', err)
+        terminalSessionProviderLog.debug('failed to sync server sessions', { err })
       } finally {
         const instanceToken = repoIndexRef.current[repoRoot]?.instanceToken
         if (typeof instanceToken === 'number') {

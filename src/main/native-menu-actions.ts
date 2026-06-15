@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs'
 import { openDataFolderMenuKey, t } from '#/main/i18n/index.ts'
 import { getEmbeddedServerUrl } from '#/main/window-shell.ts'
 import { openHttpExternal } from '#/main/external-url.ts'
+import { menuNodeLog } from '#/node/logger.ts'
 
 export async function openWebVersionFromMenu(): Promise<void> {
   const baseUrl = getEmbeddedServerUrl()
@@ -28,7 +29,7 @@ export async function openDataFolder(): Promise<void> {
 
 function reportOpenDataFolderError(err: unknown): void {
   const message = err instanceof Error ? err.message : String(err)
-  console.warn('[menu] failed to open data folder', err)
+  menuNodeLog.warn({ err }, 'failed to open data folder')
   // Match the menu label so the error dialog doesn't contradict the
   // entry the user just clicked. macOS users see "Finder" in the
   // title, Windows users see "Explorer".

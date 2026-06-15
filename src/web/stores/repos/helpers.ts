@@ -7,6 +7,7 @@ import {
 } from '#/shared/remote-repo.ts'
 import { emptyRepoOperations } from '#/web/stores/repos/operations.ts'
 import { emptyRepoResources } from '#/web/stores/repos/resources.ts'
+import { deriveConnectivityLog } from '#/web/logger.ts'
 import type { RepoEvent, RepoResultEventOptions, RepoState, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
 
 let nextInstanceToken = 1
@@ -93,7 +94,7 @@ export function deriveConnectivity(repo: RepoState): RepoConnectivity {
   // as `connecting` so the UI shows a spinner — never as a
   // silently-broken `connected` tab.
   if (import.meta.env.DEV) {
-    console.warn(`[deriveConnectivity] remote repo ${repo.id} has no lifecycle; treating as connecting`)
+    deriveConnectivityLog.warn(`remote repo ${repo.id} has no lifecycle; treating as connecting`)
   }
   return 'connecting'
 }

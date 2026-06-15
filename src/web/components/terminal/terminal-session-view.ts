@@ -32,6 +32,7 @@ import {
   isMacNavigatorPlatform,
   terminalInputForMacOptionArrow,
 } from '#/web/components/terminal/terminal-keyboard.ts'
+import { terminalLog } from '#/web/logger.ts'
 const DEFAULT_PARKING_WIDTH = 800
 const DEFAULT_PARKING_HEIGHT = 400
 const RESIZE_DEBOUNCE_MS = 80
@@ -287,7 +288,7 @@ export class TerminalSessionView {
       term.loadAddon(new Unicode11Addon())
       term.unicode.activeVersion = '11'
     } catch (err) {
-      console.warn('[terminal] failed to load unicode11 addon', err)
+      terminalLog.warn('failed to load unicode11 addon', { err })
     }
   }
 
@@ -295,7 +296,7 @@ export class TerminalSessionView {
     try {
       term.loadAddon(new WebLinksAddon((_event, uri) => this.handlers.onOpenExternalLink(uri)))
     } catch (err) {
-      console.warn('[terminal] failed to load web links addon', err)
+      terminalLog.warn('failed to load web links addon', { err })
     }
   }
 
@@ -306,7 +307,7 @@ export class TerminalSessionView {
       this.disposables.push(searchAddon.onDidChangeResults((event) => this.handlers.onSearchResult(event)))
       this.searchAddon = searchAddon
     } catch (err) {
-      console.warn('[terminal] failed to load search addon', err)
+      terminalLog.warn('failed to load search addon', { err })
     }
   }
 
@@ -316,7 +317,7 @@ export class TerminalSessionView {
       term.loadAddon(serializeAddon)
       this.serializeAddon = serializeAddon
     } catch (err) {
-      console.warn('[terminal] failed to load serialize addon', err)
+      terminalLog.warn('failed to load serialize addon', { err })
     }
   }
 
@@ -326,7 +327,7 @@ export class TerminalSessionView {
       term.loadAddon(imageAddon)
       this.imageAddon = imageAddon
     } catch (err) {
-      console.warn('[terminal] failed to load image addon', err)
+      terminalLog.warn('failed to load image addon', { err })
     }
   }
 
@@ -337,7 +338,7 @@ export class TerminalSessionView {
       this.disposables.push(progressAddon.onChange(({ state, value }) => this.handlers.onProgress(state, value)))
       this.progressAddon = progressAddon
     } catch (err) {
-      console.warn('[terminal] failed to load progress addon', err)
+      terminalLog.warn('failed to load progress addon', { err })
     }
   }
 

@@ -3,6 +3,7 @@ import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { onRendererLocalEventType } from '#/web/local-events.ts'
 import { subscribeRendererEffectIntent } from '#/web/renderer-ingress.ts'
+import { intentLog } from '#/web/logger.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import {
   createExternalOpenIntentDrainer,
@@ -106,7 +107,7 @@ export function useRendererEffectIntentRouter({
           if (await handleAppLevelRendererIntent(event, sharedDeps())) return
           if (await handleWorkspaceRendererIntent(event, sharedDeps())) return
         } catch (err) {
-          console.warn(`[intent] ${event.type} failed`, err)
+          intentLog.warn(`${event.type} failed`, { err })
         }
       })()
     })

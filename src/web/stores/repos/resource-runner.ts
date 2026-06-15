@@ -27,7 +27,14 @@ export interface RunLatestResourceOperationOptions<T> {
   applyResult: (repo: RepoDraft, result: T) => boolean | void
   onSuccess?: (result: T, ctx: { isCurrent: () => boolean }) => void | Promise<void>
   onError?: (message: string, repo: RepoDraft) => void
-  errorLog?: string
+  /**
+   * Hook for the caller to log the failure through its own logger
+   * (e.g. `(msg) => refreshStatusLog.warn('failed', { err: new Error(msg) })`).
+   * Runs before the state update so the log line precedes the UI mutation
+   * in the timeline; the test silent-in-test policy applies because this
+   * routes through the caller's `xxxLog`, not raw `console.*`.
+   */
+  onErrorLog?: (message: string) => void
 }
 
 export async function runLatestResourceOperation<T>(options: RunLatestResourceOperationOptions<T>): Promise<void> {
@@ -54,7 +61,7 @@ export async function runLatestResourceOperation<T>(options: RunLatestResourceOp
       await options.onSuccess?.(result, ctx)
     },
     onError: (message) => {
-      if (options.errorLog) console.warn(options.errorLog, message)
+      options.onErrorLog?.(message)
       updateIfFresh(options.set, options.id, options.token, (repo) => {
         finishResourceError(options.selectResource(repo), message)
         options.onError?.(message, repo)

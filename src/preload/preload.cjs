@@ -1,8 +1,11 @@
 // Preload bridge. Exposes low-level IPC under `window.goblinNative` to the renderer.
 // IMPORTANT: This preload runs with sandbox: true (see window.ts). Only
 // the `electron` module is available here — do NOT require Node built-ins
-// like `os`, `fs`, or `path`. Anything that needs Node lives
-// in the main process and is reached via IPC.
+// like `os`, `fs`, or `path`, and do NOT require `pino` / `consola`.
+// The `console.warn` calls below are intentionally raw: in sandboxed
+// preload we have no structured logger available, and these errors are
+// only visible in DevTools where the renderer-side `web/logger.ts` will
+// already be emitting its own (more detailed) records.
 const { contextBridge, ipcRenderer, webUtils } = require('electron')
 const IPC = {
   ipc: {

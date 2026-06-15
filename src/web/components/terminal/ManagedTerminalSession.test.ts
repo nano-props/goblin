@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { ManagedTerminalSession } from '#/web/components/terminal/ManagedTerminalSession.ts'
+import { terminalLog } from '#/web/logger.ts'
 import { installTerminalThemeStyles } from '#/web/components/terminal/terminal-theme-test-utils.ts'
 import { isTerminalFocused } from '#/web/terminal-focus.ts'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
@@ -841,7 +842,7 @@ describe('ManagedTerminalSession', () => {
       image: true,
       progress: true,
     })
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(terminalLog, 'warn').mockImplementation(() => {})
     const host = document.createElement('div')
     document.body.appendChild(host)
     const session = new ManagedTerminalSession(descriptor, vi.fn())
@@ -855,12 +856,12 @@ describe('ManagedTerminalSession', () => {
     expect(session.snapshot().phase).toBe('open')
     expect(session.findNext('needle')).toEqual({ resultIndex: -1, resultCount: 0, found: false })
     expect(session.serialize()).toBe('')
-    expect(warnSpy).toHaveBeenCalledWith('[terminal] failed to load unicode11 addon', expect.any(Error))
-    expect(warnSpy).toHaveBeenCalledWith('[terminal] failed to load web links addon', expect.any(Error))
-    expect(warnSpy).toHaveBeenCalledWith('[terminal] failed to load search addon', expect.any(Error))
-    expect(warnSpy).toHaveBeenCalledWith('[terminal] failed to load serialize addon', expect.any(Error))
-    expect(warnSpy).toHaveBeenCalledWith('[terminal] failed to load image addon', expect.any(Error))
-    expect(warnSpy).toHaveBeenCalledWith('[terminal] failed to load progress addon', expect.any(Error))
+    expect(warnSpy).toHaveBeenCalledWith('failed to load unicode11 addon', { err: expect.any(Error) })
+    expect(warnSpy).toHaveBeenCalledWith('failed to load web links addon', { err: expect.any(Error) })
+    expect(warnSpy).toHaveBeenCalledWith('failed to load search addon', { err: expect.any(Error) })
+    expect(warnSpy).toHaveBeenCalledWith('failed to load serialize addon', { err: expect.any(Error) })
+    expect(warnSpy).toHaveBeenCalledWith('failed to load image addon', { err: expect.any(Error) })
+    expect(warnSpy).toHaveBeenCalledWith('failed to load progress addon', { err: expect.any(Error) })
     expect(session.snapshot().progress).toBeUndefined()
     warnSpy.mockRestore()
   })

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { pullRequestsNodeLog } from '#/node/logger.ts'
 import { PULL_REQUEST_TRANSIENT_CACHE_TTL_MS } from '#/shared/pull-request-state.ts'
 import {
   getBranchPullRequest,
@@ -247,7 +248,10 @@ describe('getBranchPullRequests request coordination', () => {
   test('does not let a signaled caller abort an unsignaled shared request', async () => {
     const repo = '/tmp/repo'
     const ctrl = new AbortController()
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    // Spy on pino's child logger, not `console.warn` — after the
+    // migration production routes through `pullRequestsNodeLog`, so
+    // a `console.warn` spy is vacuous (it would never observe calls).
+    const warn = vi.spyOn(pullRequestsNodeLog, 'warn').mockImplementation(() => {})
     let releaseFirstFetch!: () => void
     let fetchCalls = 0
     const firstFetchStarted = new Promise<void>((resolve) => {
@@ -277,7 +281,7 @@ describe('getBranchPullRequests request coordination', () => {
 
     const [, secondResult] = await Promise.all([first, second])
     expect(secondResult?.get('feature/a')?.number).toBe(7)
-    expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('[pull-requests]'), expect.anything())
+    expect(warn).not.toHaveBeenCalled()
   })
 
   test('shares pending requests for callers using the same signal', async () => {
@@ -329,14 +333,18 @@ describe('getBranchPullRequests request coordination', () => {
     const summary = await getBranchPullRequests(repo, undefined, { mode: 'summary' })
     expect(summary?.get('cached')?.number).toBe(3)
 
-    vi.spyOn(console, 'warn').mockImplementation(() => {
+    // Spy on the pino child logger so the test exercises the real
+    // production warn path (and the defensive `try { ... } catch {}`
+    // around it at pull-requests.ts:412-414). After the migration a
+    // `console.warn` spy would never observe calls.
+    vi.spyOn(pullRequestsNodeLog, 'warn').mockImplementation(() => {
       throw new Error('logger unavailable')
     })
     execaMock.mockRejectedValueOnce(Object.assign(new Error('server down'), { stderr: 'gh: server down (HTTP 500)' }))
     await expect(getBranchPullRequests(repo, undefined, { mode: 'full' })).rejects.toThrow(
       'GoblinPullRequests failed on github.com: HTTP_ERROR HTTP 500 (retryable) - gh: server down (HTTP 500)',
     )
-    vi.mocked(console.warn).mockRestore()
+    vi.mocked(pullRequestsNodeLog.warn).mockRestore()
     const cached = await getBranchPullRequests(repo, undefined, { mode: 'summary' })
 
     expect(cached?.get('cached')?.number).toBe(3)

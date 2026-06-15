@@ -1,5 +1,6 @@
 import { appendRepoEvent, errorEvent, isRepoUnavailable, updateIfFresh } from '#/web/stores/repos/helpers.ts'
 import { persistRestorableRepoSnapshot } from '#/web/stores/repos/persistence.ts'
+import { refreshPullRequestsLog, terminalLog } from '#/web/logger.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 import {
   PULL_REQUEST_UNKNOWN_RETRY_DELAY_MS,
@@ -79,7 +80,7 @@ export async function runSnapshotSuccessWorkflow(
   if (!options.isSnapshotCurrent()) return
   persistRestorableRepoSnapshot(set, get().repos[options.id], options.token)
   void terminalBridge.pruneTerminals(options.id).catch((err) => {
-    console.warn('[terminal] failed to prune repo sessions', err)
+    terminalLog.warn('failed to prune repo sessions', { err })
   })
   void (async () => {
     try {
@@ -87,7 +88,7 @@ export async function runSnapshotSuccessWorkflow(
       if (pullRequestRefreshFailed(get, options.id, options.token)) return
       if (options.isSnapshotCurrent()) await runSnapshotVisibleDetailBackfill(get, options)
     } catch (err) {
-      console.warn('[refreshPullRequests] failed', err)
+      refreshPullRequestsLog.warn('failed', { err })
       const message = err instanceof Error ? err.message : String(err)
       updateIfFresh(set, options.id, options.token, (r) => {
         r.events = appendRepoEvent(r.events, errorEvent(message))

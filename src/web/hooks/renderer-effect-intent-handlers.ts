@@ -9,6 +9,7 @@ import { clearRecentRepoHistory } from '#/web/settings-write-paths.ts'
 import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
 import { consumeExternalOpenPaths } from '#/web/app-shell-client.ts'
 import { openRepoPaths } from '#/web/lib/open-repo-paths.ts'
+import { externalOpenLog } from '#/web/logger.ts'
 import {
   runShowDetailTabCommand,
   runTerminalPrimaryActionCommand,
@@ -225,7 +226,7 @@ export function createExternalOpenIntentDrainer(deps: ExternalOpenIntentDrainerD
           if (!rerun) break
         }
       } catch (err) {
-        console.warn('[external-open] failed to drain queued paths', err)
+        externalOpenLog.warn('failed to drain queued paths', { err })
       } finally {
         draining = false
         if (rerun && !disposed) drain()

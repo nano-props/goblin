@@ -29,6 +29,14 @@ describe('applyApiSecurityHeaders', () => {
 
   test('applies headers on error responses too', async () => {
     const app = new Hono()
+    // Suppress Hono's default `console.error(error)` for the deliberate
+    // throw below — the test is about header application, not error
+    // logging, and the default handler would surface as stderr noise
+    // under verbose reporters. Production wires a real `onError` in
+    // `http-validate.ts:createRouteApp`; this minimal stub matches the
+    // shape production uses (IpcError-aware handler is unnecessary
+    // here because the test only throws plain Errors).
+    app.onError((_err, c) => c.text('Internal Server Error', 500))
     app.use('/api/*', applyApiSecurityHeaders())
     app.get('/api/fail', () => {
       throw new Error('boom')

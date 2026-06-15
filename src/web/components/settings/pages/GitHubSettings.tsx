@@ -6,6 +6,7 @@ import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
 import { useGitHubCliQuery } from '#/web/settings-queries.ts'
 import { refreshGitHubCliDetection } from '#/web/settings-write-paths.ts'
 import { useT } from '#/web/stores/i18n.ts'
+import { settingsLog } from '#/web/logger.ts'
 import { cn } from '#/web/lib/cn.ts'
 
 function hostLoginCommand(host: string): string {
@@ -27,7 +28,7 @@ export function GitHubSettings() {
       try {
         await refreshGitHubCliDetection()
       } catch (err) {
-        console.warn('[settings] GitHub CLI refresh failed', err)
+        settingsLog.warn('GitHub CLI refresh failed', { err })
       }
     })
   }

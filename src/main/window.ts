@@ -24,6 +24,7 @@ import {
   windowCanvasBackground,
 } from '#/main/window-shell.ts'
 import { getTheme } from '#/main/theme.ts'
+import { rendererNodeLog, windowNodeLog } from '#/node/logger.ts'
 import { WINDOW_TOPBAR_HEIGHT_PX } from '#/shared/window-chrome.ts'
 
 const DEFAULT_BOUNDS: WindowBounds = { width: 1100, height: 720 }
@@ -112,10 +113,10 @@ async function createMainWindow(): Promise<BrowserWindow> {
     webPreferences: await createRendererWindowWebPreferences(),
   })
   win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
-    console.error(`[renderer] failed to load ${validatedURL}: ${errorCode} ${errorDescription}`)
+    rendererNodeLog.error({ validatedURL, errorCode, errorDescription }, 'failed to load')
   })
   win.webContents.on('render-process-gone', (_event, details) => {
-    console.error('[renderer] process gone', details)
+    rendererNodeLog.error({ details }, 'process gone')
   })
   attachRendererSurfaceWindow(win, { logLabel: 'window', surface: MAIN_WINDOW_SURFACE })
   const { url } = createRendererEntryUrl({ routePath: '/' })
@@ -140,7 +141,7 @@ async function createMainWindow(): Promise<BrowserWindow> {
   try {
     await win.loadURL(url.toString())
   } catch (err) {
-    console.warn('[window] failed to load app URL', err)
+    windowNodeLog.warn({ err }, 'failed to load app URL')
   }
   return win
 }

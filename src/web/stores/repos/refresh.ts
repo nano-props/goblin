@@ -1,4 +1,5 @@
 import { appendRepoEvent, errorEvent, updateIfFresh } from '#/web/stores/repos/helpers.ts'
+import { refreshPullRequestsLog, refreshStatusLog } from '#/web/logger.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import { isRepoUnavailableReason, markRepoUnavailable } from '#/web/stores/repos/availability.ts'
 import { runExclusiveOperation, runLatestOperation } from '#/web/stores/repos/operation-runner.ts'
@@ -142,9 +143,10 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
     token: number,
     branchNames: string[],
     mode: PullRequestFetchMode,
-    message: string,
+    err: unknown,
   ): void {
-    console.warn('[refreshPullRequests] failed', message)
+    const message = err instanceof Error ? err.message : String(err)
+    refreshPullRequestsLog.warn('failed', { err })
     updateIfFresh(set, id, token, (r) => {
       applyPullRequestRefreshErrorState(r, branchNames, mode, message)
       r.events = appendRepoEvent(r.events, errorEvent(message))
@@ -266,7 +268,9 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         onError: (message, r) => {
           if (isRepoUnavailableReason(message)) markRepoUnavailable(r, message)
         },
-        errorLog: '[refreshStatus] failed',
+        onErrorLog: (message) => {
+          refreshStatusLog.warn('failed', { err: new Error(message) })
+        },
       })
     },
 

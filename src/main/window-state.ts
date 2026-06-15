@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import writeFileAtomic from 'write-file-atomic'
+import { windowStateNodeLog } from '#/node/logger.ts'
 
 export interface WindowBounds {
   x?: number
@@ -87,7 +88,7 @@ async function doFlush(): Promise<boolean> {
     await writeFileAtomic(target, JSON.stringify(cache, null, 2), { encoding: 'utf-8' })
     return true
   } catch (err) {
-    console.warn('[window-state] write failed', err)
+    windowStateNodeLog.warn({ err }, 'write failed')
     return false
   }
 }

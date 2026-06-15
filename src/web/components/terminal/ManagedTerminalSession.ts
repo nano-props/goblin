@@ -19,6 +19,7 @@ import {
 import { TerminalSessionRuntime } from '#/web/components/terminal/terminal-session-runtime.ts'
 import { TerminalSessionView } from '#/web/components/terminal/terminal-session-view.ts'
 import { readOrCreateWebTerminalAttachmentId } from '#/web/renderer-terminal-bridge.ts'
+import { terminalLog } from '#/web/logger.ts'
 import type {
   TerminalBellEvent,
   TerminalDescriptor,
@@ -143,7 +144,7 @@ export class ManagedTerminalSession {
       // Keystrokes that fail to reach the shell leave the user thinking
       // their input was accepted — surface the failure so a debugger can
       // correlate with terminalBridge.write validation/transport errors.
-      console.warn('[terminal] write failed for session', sessionId, err)
+      terminalLog.warn('write failed for session', { sessionId, err })
     })
   }
 
@@ -442,7 +443,7 @@ export class ManagedTerminalSession {
         // Resize rejection leaves the view stuck at the old geometry —
         // surface the failure so ops can correlate with server-side
         // validation rejections (size out of range, lost controller, etc.).
-        console.warn('[terminal] resize failed for session', sessionId, err)
+        terminalLog.warn('resize failed for session', { sessionId, cols, rows, err })
       })
   }
 

@@ -20,6 +20,7 @@ import { createCommitActions } from '#/web/stores/repos/commit.ts'
 import { createLifecycleActions } from '#/web/stores/repos/lifecycle.ts'
 import { createRefreshActions } from '#/web/stores/repos/refresh.ts'
 import { createSelectionActions } from '#/web/stores/repos/selection.ts'
+import { reposLog } from '#/web/logger.ts'
 import { normalizeRestorableRepoCache } from '#/web/stores/repos/persistence.ts'
 import {
   DEFAULT_DETAIL_COLLAPSED,
@@ -57,7 +58,7 @@ const repoStorage: PersistStorage<PersistedReposStore, void> = {
     } catch (err) {
       lastStoredRepoCacheRef = undefined
       lastStoredReposJson = undefined
-      console.warn(`[repos] failed to read persisted store ${name}:`, err)
+      reposLog.warn(`failed to read persisted store ${name}`, { err })
       return null
     }
   },
@@ -76,7 +77,7 @@ const repoStorage: PersistStorage<PersistedReposStore, void> = {
       lastStoredRepoCacheRef = restorableRepoCache
       lastStoredReposJson = serialized
     } catch (err) {
-      console.warn(`[repos] failed to persist store ${name}:`, err)
+      reposLog.warn(`failed to persist store ${name}`, { err })
     }
   },
   removeItem: (name) => {
@@ -87,7 +88,7 @@ const repoStorage: PersistStorage<PersistedReposStore, void> = {
       lastStoredRepoCacheRef = undefined
       lastStoredReposJson = undefined
     } catch (err) {
-      console.warn(`[repos] failed to remove persisted store ${name}:`, err)
+      reposLog.warn(`failed to remove persisted store ${name}`, { err })
     }
   },
 }

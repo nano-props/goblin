@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import type { Readable } from 'node:stream'
 import path from 'node:path'
 import { app } from 'electron'
+import { serverNodeLog } from '#/node/logger.ts'
 import { reserveAvailablePort } from '#/system/port-allocation.ts'
 
 const DEFAULT_HOST = '127.0.0.1'
@@ -96,6 +97,13 @@ function deriveServerClientId(secret: string): string {
 function pipeProcessLogs(proc: ServerChildProcess): void {
   proc.stdout.setEncoding('utf8')
   proc.stderr.setEncoding('utf8')
+  // These `console.*` writes forward the child process's own stdout/stderr
+  // line-for-line to the main process's stdio. They are not our logs —
+  // they go to the operator's terminal unchanged, with the child's
+  // original format and level. Routing them through pino would (a) wrap
+  // raw server output in JSON, losing the child's own format, and (b)
+  // subject them to pino's level filter, which can drop server output
+  // below the configured level. Keep as raw console.
   proc.stdout.on('data', (chunk) => {
     const output = chunk.trim()
     if (output) console.log(`[server] ${output}`)
@@ -151,12 +159,12 @@ export async function startEmbeddedServer(): Promise<EmbeddedServerRuntime | nul
       runtime = null
     })
     proc.once('error', (error) => {
-      console.error('[server] process failed', error)
+      serverNodeLog.error({ err: error }, 'process failed')
     })
     try {
       await waitForServer(url, SERVER_READY_TIMEOUT_MS)
       runtime = { host, port, url, secret, clientId }
-      console.log(`[server] ready at ${url}`)
+      serverNodeLog.info({ url }, 'ready')
       return runtime
     } catch (error) {
       await stopEmbeddedServer()

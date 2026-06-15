@@ -1,23 +1,9 @@
-import pino from 'pino'
+// Server-side logger. Kept as a thin re-export of the shared Node logger
+// in `src/node/logger.ts` so every existing `import { serverLogger } from
+// '#/server/logger.ts'` call site continues to work without churn. New
+// Node-side loggers (main, preload, system) live next to this one in
+// `src/node/logger.ts`; if you find yourself reaching for `console.*` in
+// a `.ts` file under `src/`, that file should import from
+// `src/node/logger.ts` (or this one) instead.
 
-function resolveServerLogLevel(): pino.LevelWithSilent {
-  const envLevel = process.env.GOBLIN_SERVER_LOG_LEVEL?.trim()
-  if (
-    envLevel === 'fatal' ||
-    envLevel === 'error' ||
-    envLevel === 'warn' ||
-    envLevel === 'info' ||
-    envLevel === 'debug' ||
-    envLevel === 'trace' ||
-    envLevel === 'silent'
-  ) {
-    return envLevel
-  }
-  return process.env.NODE_ENV === 'test' ? 'silent' : 'info'
-}
-
-export const serverLogger = pino({
-  name: 'goblin-server',
-  level: resolveServerLogLevel(),
-  timestamp: pino.stdTimeFunctions.isoTime,
-})
+export { serverNodeLog as serverLogger } from '#/node/logger.ts'

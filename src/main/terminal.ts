@@ -4,6 +4,7 @@ import { broadcastRendererEffectIntent } from '#/main/renderer-surface-events.ts
 import { activateMainWindow } from '#/main/window.ts'
 import { t } from '#/main/i18n/index.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
+import { terminalNodeLog } from '#/node/logger.ts'
 import {
   isValidTerminalNotifyBellInput,
 } from '#/shared/terminal-validators.ts'
@@ -74,7 +75,7 @@ async function notifyTerminalBell(webContents: WebContents, input: TerminalNotif
     // event so the caller gets an accurate result instead of an optimistic true.
     return await showNotificationWithResult(input.title, input.body, input.repoRoot, input.key)
   } catch (err) {
-    console.warn('[terminal] failed to show bell notification', err)
+    terminalNodeLog.warn({ err }, 'failed to show bell notification')
     return false
   }
 }

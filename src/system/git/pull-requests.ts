@@ -1,4 +1,5 @@
 import { formatGraphqlError, getGitHubRepoRef, graphqlRequestResult } from '#/system/github/graphql.ts'
+import { pullRequestsNodeLog } from '#/node/logger.ts'
 import {
   isGitHubHostCoolingDown,
   markGitHubHostRateLimited,
@@ -409,7 +410,7 @@ function logGraphqlError(error: GraphqlRequestError): void {
   if (Date.now() - lastLoggedAt < PULL_REQUEST_CACHE_TTL_MS) return
   loggedGraphqlErrors.set(key, Date.now())
   try {
-    console.warn('[pull-requests]', formatGraphqlError(error))
+    pullRequestsNodeLog.warn(formatGraphqlError(error))
   } catch {}
 }
 

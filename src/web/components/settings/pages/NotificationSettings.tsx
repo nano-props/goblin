@@ -7,6 +7,7 @@ import { useFetchSettingsController, useRuntimeFetchSettings } from '#/web/runti
 import { useT } from '#/web/stores/i18n.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
+import { settingsLog } from '#/web/logger.ts'
 export function NotificationSettings() {
   const t = useT()
   const { terminalNotificationsEnabled } = useRuntimeFetchSettings()
@@ -33,7 +34,7 @@ export function NotificationSettings() {
         }
       })
       .catch((err) => {
-        console.warn('[settings] terminal notification test failed', err)
+        settingsLog.warn('terminal notification test failed', { err })
         toast.error(t('settings.terminal-notifications-test-failed'), {
           description: t(hintKey),
         })

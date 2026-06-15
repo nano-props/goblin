@@ -3,6 +3,7 @@ import { persistSessionState } from '#/web/settings-write-paths.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { restorableWorkspaceStateFromStore } from '#/web/stores/repos/selector-state.ts'
 import { sessionStateFromRestorableWorkspaceState } from '#/web/restorable-workspace-state.ts'
+import { sessionLog } from '#/web/logger.ts'
 const SESSION_SAVE_DEBOUNCE_MS = 200
 
 export function useSessionPersistence() {
@@ -53,7 +54,7 @@ export function useSessionPersistence() {
       lastSavedRef.current = serialized
       void persistSessionState(session).catch((err) => {
         lastSavedRef.current = null
-        console.warn('[session] save failed', err)
+        sessionLog.warn('save failed', { err })
       })
     }
     if (immediate) {

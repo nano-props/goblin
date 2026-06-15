@@ -11,6 +11,7 @@ import { ErrorBoundary as ReactErrorBoundary, getErrorMessage, type FallbackProp
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { useT } from '#/web/stores/i18n.ts'
+import { gblLog } from '#/web/logger.ts'
 
 interface Props {
   /** When this prop changes (e.g. activeRepoId), state is reset. */
@@ -44,7 +45,7 @@ function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
 function logRenderError(error: unknown, info: ErrorInfo): void {
   // Log to console — packaged builds don't ship a remote error sink, so
   // the next-best signal is the local devtools.
-  console.error('[gbl] render crash', error, info.componentStack)
+  gblLog.error('render crash', { error, componentStack: info.componentStack })
 }
 
 export function ErrorBoundary({ resetKey, children }: Props): ReactNode {

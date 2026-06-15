@@ -7,7 +7,7 @@ import { serverLogger } from '#/server/logger.ts'
  * misbehaving client or a slow handler was invisible. This keeps
  * the log volume low (one line per request, no body) and routes
  * through the existing pino logger so operators can mute it via
- * `GOBLIN_SERVER_LOG_LEVEL=warn`.
+ * `GOBLIN_NODE_LOG_LEVEL=warn`.
  *
  * Static asset traffic through `serveStatic` is also logged; if
  * that becomes noisy, gate it on path prefix later.

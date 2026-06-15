@@ -12,6 +12,7 @@ import { Toolbar } from '#/web/components/Layout.tsx'
 import { detailTabNavigationKey, navigatedDetailTab, visibleDetailTabs } from '#/web/lib/detail-tabs.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
+import { terminalLog } from '#/web/logger.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import { useWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-store.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
@@ -87,7 +88,7 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
     if (!terminalBase) return
     enterTerminalTab()
     void createTerminal(terminalBase).catch((err) => {
-      console.warn('[terminal] failed to create terminal', err)
+      terminalLog.warn('failed to create terminal', { err })
       const message = err instanceof Error ? err.message : 'error.terminal-create-failed'
       toast.error(t('action.result-error'), { description: t(message) })
     })

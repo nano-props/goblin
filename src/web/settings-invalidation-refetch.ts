@@ -1,4 +1,5 @@
 import { subscribeSettingsInvalidation } from '#/web/settings-invalidation-ingress.ts'
+import { settingsLog } from '#/web/logger.ts'
 import type { SettingsInvalidationScope } from '#/shared/server-invalidation.ts'
 
 interface SettingsInvalidationSubscriptionOptions<T> {
@@ -29,7 +30,7 @@ export function subscribeSettingsInvalidationRefetch<T>({
     inFlight = fetch()
       .then((value) => apply(value))
       .catch((err) => {
-        console.warn(`[${label}] web sync failed`, err)
+        settingsLog.warn(`${label} web sync failed`, { err })
       })
       .finally(() => {
         inFlight = null
