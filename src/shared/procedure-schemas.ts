@@ -218,4 +218,12 @@ export const NATIVE_IPC_PROCEDURE_SCHEMAS = {
     setGlobalShortcut: v.object({ accelerator: v.string() }),
     applyShellProjection: NativeShellProjectionSchema,
   },
+  session: {
+    // Renderer-side session state that the menu depends on. Mirrors the
+    // relevant subset of SessionState — currently only `workspaceLayout`,
+    // which gates the CmdOrCtrl+J toggle shortcut's `enabled` predicate.
+    setWorkspaceLayout: v.object({
+      workspaceLayout: v.picklist<readonly WorkspaceLayout[]>(WORKSPACE_LAYOUTS),
+    }),
+  },
 } as const

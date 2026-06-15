@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, test } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { replaceRepo } from '#/web/stores/repos/helpers.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { DetailTab, RepoState } from '#/web/stores/repos/types.ts'
+import * as settingsClient from '#/web/settings-client.ts'
 import {
   createRepoBranch as branch,
   installGoblinTestBridge,
@@ -366,6 +367,66 @@ describe('setWorkspaceLayout', () => {
       detailCollapsed: false,
       detailFocusMode: false,
       detailPaneSizes: { 'top-bottom': 55, 'left-right': 45 },
+    })
+  })
+
+  // Regression test for the CmdOrCtrl+J disappearance bug: when the user
+  // toggles the layout through the in-app toolbar (rather than the
+  // native radio menu), the renderer must push the new value to main so
+  // the native menu's `view-toggle-detail` `enabled` predicate — and
+  // therefore the CmdOrCtrl+J accelerator — rebuilds in the same tick.
+  describe('push to native menu', () => {
+    test('forwards the new layout to the native menu when setWorkspaceLayout changes it', () => {
+      const pushSpy = vi
+        .spyOn(settingsClient, 'pushWorkspaceLayoutToNativeMenu')
+        .mockResolvedValue(undefined)
+
+      useReposStore.getState().setWorkspaceLayout('left-right')
+      // The push is fire-and-forget — wait a microtask for the Promise
+      // resolution to settle before asserting.
+      return Promise.resolve().then(() => {
+        expect(pushSpy).toHaveBeenCalledTimes(1)
+        expect(pushSpy).toHaveBeenCalledWith('left-right')
+        pushSpy.mockRestore()
+      })
+    })
+
+    test('does not forward when the layout is unchanged', () => {
+      const pushSpy = vi
+        .spyOn(settingsClient, 'pushWorkspaceLayoutToNativeMenu')
+        .mockResolvedValue(undefined)
+
+      // Default layout is 'top-bottom'; setting it again is a no-op.
+      useReposStore.getState().setWorkspaceLayout('top-bottom')
+
+      expect(pushSpy).not.toHaveBeenCalled()
+      pushSpy.mockRestore()
+    })
+
+    test('forwards the reset back to top-bottom so Cmd+J re-enables after a left-right detour', () => {
+      const pushSpy = vi
+        .spyOn(settingsClient, 'pushWorkspaceLayoutToNativeMenu')
+        .mockResolvedValue(undefined)
+
+      useReposStore.getState().setWorkspaceLayout('left-right')
+      pushSpy.mockClear()
+
+      useReposStore.getState().resetLayout()
+
+      expect(pushSpy).toHaveBeenCalledTimes(1)
+      expect(pushSpy).toHaveBeenCalledWith('top-bottom')
+      pushSpy.mockRestore()
+    })
+
+    test('does not push from resetLayout when already at top-bottom', () => {
+      const pushSpy = vi
+        .spyOn(settingsClient, 'pushWorkspaceLayoutToNativeMenu')
+        .mockResolvedValue(undefined)
+
+      useReposStore.getState().resetLayout()
+
+      expect(pushSpy).not.toHaveBeenCalled()
+      pushSpy.mockRestore()
     })
   })
 })

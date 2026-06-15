@@ -26,7 +26,7 @@ import type { LangPref, ThemePref } from '#/shared/api-types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
 import { focusedRegisteredSurface } from '#/main/window-registry.ts'
-import { readMenuRuntimeState, setMenuWorkspaceLayout as setMenuWorkspaceLayoutState } from '#/main/menu-state.ts'
+import { applyMenuRuntimeState, readMenuRuntimeState } from '#/main/menu-state.ts'
 import {
   closeShortcutAccelerators,
   rendererMenuCommandById,
@@ -71,12 +71,6 @@ const WORKSPACE_LAYOUT_MENU_OPTIONS = [
   { layout: 'left-right', labelKey: 'menu.view.layout-left-right' },
 ] as const
 
-// Main keeps an optimistic layout snapshot for the native radio menu.
-// At boot it intentionally starts null so readMenuState falls back to the
-// persisted session; menu clicks update this immediately, and the renderer
-// later confirms the same value through saveSession.
-let menuWorkspaceLayout: WorkspaceLayout | null = null
-
 function send(intent: RendererEffectIntent): void {
   void sendRendererIntent(intent)
 }
@@ -94,12 +88,21 @@ function separator(): MenuItemConstructorOptions {
   return { type: 'separator' }
 }
 
-export function setMenuWorkspaceLayout(layout: WorkspaceLayout): void {
+/**
+ * Apply a new workspace layout to the menu's runtime state.
+ *
+ * Single source of truth for the menu's view of `workspaceLayout` is
+ * `MenuRuntimeState.workspaceLayout`, seeded from the persisted session at
+ * boot and updated by both the native radio click (main side) and the
+ * renderer's IPC push (renderer side). No parallel optimistic snapshot —
+ * the radio click is already synchronous, so there is nothing to hide.
+ */
+export function applyMenuWorkspaceLayout(layout: WorkspaceLayout): boolean {
   const next = normalizeWorkspaceLayout(layout)
-  if (menuWorkspaceLayout === next && readMenuRuntimeState().workspaceLayout === next) return
-  menuWorkspaceLayout = next
-  setMenuWorkspaceLayoutState(next)
+  if (readMenuRuntimeState().workspaceLayout === next) return false
+  applyMenuRuntimeState({ workspaceLayout: next })
   buildAppMenu()
+  return true
 }
 
 export function buildAppMenu(): void {
@@ -122,7 +125,7 @@ function readMenuState(): AppMenuState {
     swapCloseShortcuts: runtimeState.swapCloseShortcuts,
     themePref: getTheme().pref,
     langPref: runtimeState.langPref,
-    workspaceLayout: normalizeWorkspaceLayout(menuWorkspaceLayout ?? runtimeState.workspaceLayout),
+    workspaceLayout: normalizeWorkspaceLayout(runtimeState.workspaceLayout),
   }
 }
 
@@ -379,7 +382,7 @@ function menuCommandContext(state: AppMenuState): AppMenuCommandContext {
 }
 
 function setWorkspaceLayoutFromMenu(layout: WorkspaceLayout): void {
-  setMenuWorkspaceLayout(layout)
+  applyMenuWorkspaceLayout(layout)
   send({ type: 'workspace-layout-set-requested', layout })
 }
 
