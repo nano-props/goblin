@@ -42,7 +42,7 @@ export interface RepoOperationState {
 }
 
 export interface RepoOperationTarget {
-  key: RepoOperationKey
+  key: string
   reason: RepoOperationReason
   target?: string | null
 }
@@ -99,15 +99,15 @@ export function emptyRepoOperations(): RepoOperationsState {
   }
 }
 
-function isPullRequestOperationKey(key: RepoOperationKey): key is `pullRequest:${string}` {
+function isPullRequestOperationKey(key: string): key is `pullRequest:${string}` {
   return key.startsWith('pullRequest:')
 }
 
-function operationForKey(operations: RepoOperationsState, key: RepoOperationKey): RepoOperationState {
+function operationForKey(operations: RepoOperationsState, key: string): RepoOperationState {
   if (isPullRequestOperationKey(key)) {
     return (operations.pullRequestsByBranch[key.slice('pullRequest:'.length)] ??= idleOperation())
   }
-  switch (key) {
+  switch (key as RepoOperationKey) {
     case 'fetch':
       return operations.fetch
     case 'manualRefresh':
@@ -123,14 +123,13 @@ function operationForKey(operations: RepoOperationsState, key: RepoOperationKey)
     case 'remoteLifecycle':
       return operations.remoteLifecycle
   }
-  const exhaustive: never = key
-  return exhaustive
+  return idleOperation()
 }
 
-function readOperationForKey(operations: RepoOperationsState, key: RepoOperationKey): RepoOperationState {
+function readOperationForKey(operations: RepoOperationsState, key: string): RepoOperationState | undefined {
   if (isPullRequestOperationKey(key))
     return operations.pullRequestsByBranch[key.slice('pullRequest:'.length)] ?? idleOperation()
-  switch (key) {
+  switch (key as RepoOperationKey) {
     case 'fetch':
       return operations.fetch
     case 'manualRefresh':
@@ -146,8 +145,7 @@ function readOperationForKey(operations: RepoOperationsState, key: RepoOperation
     case 'remoteLifecycle':
       return operations.remoteLifecycle
   }
-  const exhaustive: never = key
-  return exhaustive
+  return undefined
 }
 
 export function markRepoOperationViews(
@@ -160,7 +158,7 @@ export function markRepoOperationViews(
   if (phase === 'running' && wasQueued) {
     const allTargetsQueuedForOperation = targets.every((target) => {
       const operation = readOperationForKey(operations, target.key)
-      return operation.operationId === operationId && operation.phase === 'queued'
+      return operation?.operationId === operationId && operation?.phase === 'queued'
     })
     if (!allTargetsQueuedForOperation) return
   }
@@ -181,7 +179,8 @@ export function settleRepoOperationViews(
   error: string | null,
 ): void {
   for (const target of targets) {
-    settleOperation(readOperationForKey(operations, target.key), operationId, { error })
+    const operation = readOperationForKey(operations, target.key)
+    if (operation) settleOperation(operation, operationId, { error })
   }
 }
 
