@@ -11,11 +11,9 @@ import { BranchActionControls } from '#/web/components/BranchActionControls.tsx'
 import { BranchSearchInput } from '#/web/components/repo-toolbar/BranchSearchInput.tsx'
 import { BranchViewModeControl } from '#/web/components/repo-toolbar/BranchViewModeControl.tsx'
 import { RepoToolbarActions } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
-import { WorkspaceLayoutControl } from '#/web/components/repo-toolbar/WorkspaceLayoutControl.tsx'
 import { BranchSummaryInline } from '#/web/components/repo-workspace/BranchSummaryInline.tsx'
 import { Toolbar } from '#/web/components/Layout.tsx'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
-import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
 import { visibleBranches } from '#/web/stores/repos/branch-view-mode.ts'
@@ -45,7 +43,6 @@ export function RepoToolbar({ repoId }: Props) {
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <RepoToolbarActions repoId={repoId} />
-        <WorkspaceLayoutControlConnected />
       </div>
     </Toolbar>
   )
@@ -251,11 +248,3 @@ function BranchSelector({
   )
 }
 
-function WorkspaceLayoutControlConnected() {
-  const uiMode = useResponsiveUiMode()
-  const workspaceLayout = useReposStore((s) => s.workspaceLayout)
-  const setWorkspaceLayout = useReposStore((s) => s.setWorkspaceLayout)
-  if (uiMode === 'compact') return null
-
-  return <WorkspaceLayoutControl value={workspaceLayout} onChange={setWorkspaceLayout} />
-}

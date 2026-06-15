@@ -79,7 +79,10 @@ export const en = {
 
   // ---- Topbar -------------------------------------------------------------
   'topbar.open': 'Open',
+  'topbar.menu': 'Menu',
   'topbar.settings': 'Settings (⌘,)',
+  'topbar.layout.top-bottom': 'Top/Bottom Layout',
+  'topbar.layout.left-right': 'Left/Right Layout',
 
   // ---- Dependencies -------------------------------------------------------
 

@@ -68,7 +68,10 @@ export const zh: Record<DictKey, string> = {
 
   // ---- Topbar ------------------------------------------------------------
   'topbar.open': '打开',
+  'topbar.menu': '菜单',
   'topbar.settings': '设置 (⌘,)',
+  'topbar.layout.top-bottom': '上下布局',
+  'topbar.layout.left-right': '左右布局',
 
   // ---- Dependencies ------------------------------------------------------
 
