@@ -4,11 +4,14 @@ cd "$(dirname "$0")"
 
 APP_NAME=Goblin
 BINARY_PATH_FRAGMENT="/$APP_NAME.app/Contents/MacOS/"
-WAS_RUNNING=false
+# Log if Goblin is currently running — build.ts calls closeRunningApp()
+# before replacing the .app, so the running process is always closed.
+# The fresh install is left to the caller to start: launching ad-hoc
+# signed Electron apps via launchd hits a Mach guard abort on macOS
+# 26.5.1+, so use a user-process launcher script instead.
 if pgrep -f "$BINARY_PATH_FRAGMENT" > /dev/null; then
-  WAS_RUNNING=true
+  echo "${APP_NAME} is running; install will close it before replacing the .app."
 fi
-export WAS_RUNNING
 
 # Defaults tuned for a fast reinstall. Override via env (handy for CI) or the
 # CLI flags below. `bun run build` (no `install` positional) keeps upstream
@@ -76,8 +79,7 @@ export ELECTRON_MIRROR ELECTRON_BUILDER_BINARIES_MIRROR
 
 # Go through bun to match `package.json`'s `build` script — the build
 # script itself shells out to `bun install` / `bun run ...`, so requiring
-# bun here keeps the toolchain assumption in one place. The post-install
-# restart (when WAS_RUNNING=1) happens inside build.ts via
-# scripts/close-app.ts, which knows the real install destination for
-# the host architecture.
+# bun here keeps the toolchain assumption in one place. build.ts calls
+# closeRunningApp() before replacing the .app; the caller is responsible
+# for launching the fresh install (see the Mach guard note above).
 bun scripts/build.ts install ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}

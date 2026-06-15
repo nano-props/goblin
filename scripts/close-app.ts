@@ -1,15 +1,9 @@
 #!/usr/bin/env bun
-// Manage a running Goblin app:
-//   - closeRunningApp(): gracefully quit, force-killing if it doesn't respond
-//     (macOS uses AppleScript + pgrep; Windows uses tasklist + taskkill).
-//   - launchInstalledApp(): start the freshly installed binary at the given
-//     destination. macOS uses `open -g` to avoid stealing focus; Windows
-//     spawns the .exe detached so the build script can exit cleanly.
-// On other platforms both are no-ops, since the install flow only runs on
-// macOS or Windows.
+// Close a running Goblin app before the install replaces it. macOS uses
+// AppleScript + pgrep; Windows uses tasklist + taskkill. On other
+// platforms this is a no-op, since the install flow only runs on macOS
+// or Windows.
 import { $ } from 'bun'
-import { existsSync } from 'node:fs'
-import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 
 const APP_NAME = 'Goblin'
@@ -20,7 +14,6 @@ const APP_NAME = 'Goblin'
 const MAC_BINARY_PATH_FRAGMENT = `/${APP_NAME}.app/Contents/MacOS/`
 // On Windows the unpacked install lives at
 // %LOCALAPPDATA%\Programs\Goblin[ -arm64]\Goblin.exe.
-const WIN_BINARY_PATH_FRAGMENT = `\\Programs\\${APP_NAME}`
 const WIN_IMAGE_NAME = 'Goblin.exe'
 
 async function isRunningMac(): Promise<boolean> {
@@ -82,30 +75,6 @@ export async function closeRunningApp(): Promise<void> {
       await $`taskkill /F /IM ${WIN_IMAGE_NAME}`.quiet().nothrow()
       await sleep(1000)
     }
-  }
-}
-
-export async function launchInstalledApp(destPath: string, appName: string): Promise<void> {
-  if (process.platform === 'darwin') {
-    // `open -g` launches without stealing focus from whatever the user was
-    // doing during the build. `open` hands off to launchd and exits almost
-    // immediately, so awaiting surfaces a missing/broken .app without
-    // blocking on the launched app itself.
-    const proc = Bun.spawn(['open', '-g', destPath], { stdout: 'inherit', stderr: 'inherit' })
-    if ((await proc.exited) !== 0) {
-      console.warn(`Warning: open exited non-zero; ${appName} may not have launched.`)
-    }
-    return
-  }
-  if (process.platform === 'win32') {
-    const exe = path.join(destPath, `${appName}.exe`)
-    if (!existsSync(exe)) {
-      console.warn(`Warning: ${exe} not found; ${appName} was not launched.`)
-      return
-    }
-    // Detach so the build script can exit without taking the app down.
-    const proc = Bun.spawn([exe], { detached: true, stdout: 'ignore', stderr: 'ignore' })
-    proc.unref()
   }
 }
 

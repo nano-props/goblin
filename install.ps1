@@ -15,14 +15,6 @@ $ErrorActionPreference = 'Stop'
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $ScriptDir
 
-$AppName = 'Goblin'
-
-# Detect whether Goblin is already running so we can restart it after the
-# install. closeRunningApp() inside build.ts will close it before the
-# rename; launchInstalledApp() restarts the fresh binary afterwards.
-$WasRunning = [bool](Get-Process -Name $AppName -ErrorAction SilentlyContinue)
-$env:WAS_RUNNING = if ($WasRunning) { '1' } else { '0' }
-
 $SkipTypecheck = if ($env:SKIP_TYPECHECK) { $env:SKIP_TYPECHECK } else { '1' }
 $SkipRebuild   = if ($env:SKIP_REBUILD)   { $env:SKIP_REBUILD }   else { '1' }
 $NpmMirrorElectron  = if ($env:NPM_MIRROR_ELECTRON)  { $env:NPM_MIRROR_ELECTRON }  else { 'https://npmmirror.com/mirrors/electron/' }
@@ -93,7 +85,7 @@ if ($Clean) { $ExtraArgs += '--clean' }
 
 # Go through bun to match package.json's build script — the build script
 # itself shells out to bun install / bun run ..., so requiring bun here
-# keeps the toolchain assumption in one place. The post-install restart
-# (when WAS_RUNNING=1) happens inside build.ts via scripts/close-app.ts,
-# which knows the real install destination for the host architecture.
+# keeps the toolchain assumption in one place. build.ts calls
+# closeRunningApp() before replacing the .app; the caller is responsible
+# for launching the fresh install.
 bun scripts/build.ts install @ExtraArgs

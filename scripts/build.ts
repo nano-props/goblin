@@ -18,7 +18,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync } fr
 import os from 'node:os'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
-import { closeRunningApp, launchInstalledApp } from './close-app.ts'
+import { closeRunningApp } from './close-app.ts'
 
 const repoRoot = path.resolve(import.meta.dirname, '..')
 process.chdir(repoRoot)
@@ -408,15 +408,6 @@ if (shouldInstall) {
   console.log(`Installed: ${destApp}`)
 
   await plan.postInstall(destApp)
-
-  // Restart the app only if it was running before the install started.
-  // Shell wrappers (install.sh / install.ps1) detect this via pgrep /
-  // tasklist and pass the boolean through WAS_RUNNING, so the launch
-  // path stays a single source of truth (plan.installDestination).
-  if (truthy(process.env.WAS_RUNNING)) {
-    console.log(`Restarting ${APP_NAME}...`)
-    await launchInstalledApp(destApp, APP_NAME)
-  }
 
   rmSync(path.join(repoRoot, 'release'), { recursive: true, force: true })
   console.log('Done.')
