@@ -33,8 +33,11 @@ export function toolbarTabChromeClassName(options: {
   )
 }
 
-export function toolbarTabButtonClassName(variant: ToolbarTabVariant): string | undefined {
-  return variant === 'repo' ? 'h-full rounded-sm' : undefined
+export function toolbarTabButtonClassName(_variant: ToolbarTabVariant): string | undefined {
+  // Reserved for future variant-specific button tweaks. `h-full` lives on
+  // the shared base button className in ToolbarClosableTab so the
+  // clickable area always fills the container's full height.
+  return undefined
 }
 
 export function toolbarTabIconClassName(active: boolean): string {
