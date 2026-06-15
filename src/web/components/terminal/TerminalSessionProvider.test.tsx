@@ -253,6 +253,8 @@ function attachResult(): TerminalAttachResult {
     sessionId: 'unused',
     replay: '',
     replaySeq: 0,
+    snapshot: '',
+    snapshotSeq: 0,
     processName: 'zsh',
     canonicalTitle: null,
     phase: 'open',

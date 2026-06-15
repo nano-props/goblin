@@ -176,8 +176,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
               ok: true as const,
               sessionId: 'session-1',
               controller: { attachmentId: 'attachment_local', status: 'connected' as const },
-              canonicalCols: 80,
-              canonicalRows: 24,
             }),
           close: () => Promise.resolve(true),
           create: () => Promise.resolve({ ok: false, message: 'unhandled terminal create' }),
@@ -248,8 +246,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
             ok: true as const,
             sessionId: 'session-1',
             controller: { attachmentId: 'attachment_local', status: 'connected' as const },
-            canonicalCols: 80,
-            canonicalRows: 24,
           }
         case 'terminal.prune':
           return { pruned: 0, remaining: 0 }

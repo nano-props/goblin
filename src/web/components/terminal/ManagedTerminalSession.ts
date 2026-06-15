@@ -45,7 +45,10 @@ export class ManagedTerminalSession {
   private pendingOutput: string[] = []
   private pendingWriteBuffer = ''
   private inputFlushScheduled = false
-  private hydratedSnapshot: { snapshot: string; snapshotSeq: number } | null = null
+  // An empty snapshot string is the "no preload" sentinel — the hydration
+  // input always carries the field, so the runtime type can stay
+  // non-nullable and consumers branch on `.snapshot.length`.
+  private hydratedSnapshot: { snapshot: string; snapshotSeq: number } = { snapshot: '', snapshotSeq: 0 }
   private disposed = false
 
   constructor(
@@ -178,10 +181,7 @@ export class ManagedTerminalSession {
   }
 
   hydrate(input: TerminalSessionHydrationInput): void {
-    this.hydratedSnapshot =
-      typeof input.snapshot === 'string' && typeof input.snapshotSeq === 'number'
-        ? { snapshot: input.snapshot, snapshotSeq: input.snapshotSeq }
-        : null
+    this.hydratedSnapshot = { snapshot: input.snapshot, snapshotSeq: input.snapshotSeq }
     const previousSessionId = this.runtime.currentSessionId()
     const changed = this.runtime.hydrateSession({
       sessionId: input.sessionId,
@@ -206,9 +206,16 @@ export class ManagedTerminalSession {
   }
 
   handleOwnership(event: TerminalOwnershipViewModel): void {
+    // The realtime broker routes ownership events by sessionId, so we
+    // normally only see events for this session. The sessionId can
+    // change (e.g. during a re-hydrate) and a stale event for the old
+    // sessionId may still reach us, in which case `runtime.handleOwnership`
+    // no-ops. Guard the takeover-pending clear so it only follows an
+    // event that actually applies to this session.
+    const applies = this.runtime.currentSessionId() === event.sessionId
     const wasController = this.runtime.canResize()
     const changed = this.runtime.handleOwnership(event)
-    const pendingCleared = this.runtime.clearTakeoverPending()
+    const pendingCleared = applies ? this.runtime.clearTakeoverPending() : false
     if (changed) {
       const isController = this.runtime.canResize()
       if (!isController) {
@@ -341,7 +348,7 @@ export class ManagedTerminalSession {
         this.queueResize(term.cols, term.rows)
       }
     }
-    await this.replayActiveView(token, term, result.snapshot ?? result.replay, result.snapshotSeq ?? result.replaySeq)
+    await this.replayActiveView(token, term, result.snapshot, result.snapshotSeq)
     this.guardStart(token, term)
   }
 
@@ -393,7 +400,11 @@ export class ManagedTerminalSession {
 
   private async preloadHydratedSnapshot(token: number, term: XTermTerminal): Promise<boolean> {
     const hydratedSnapshot = this.hydratedSnapshot
-    if (!hydratedSnapshot || !this.currentStart(token, term)) return false
+    // An empty snapshot is the "no preload" sentinel — the hydration
+    // input always carries the field, but producers use '' when they
+    // have no buffer to seed. Resetting/writing on empty would clobber
+    // the term for nothing.
+    if (hydratedSnapshot.snapshot.length === 0 || !this.currentStart(token, term)) return false
     this.runtime.beginReplay(hydratedSnapshot.snapshotSeq)
     try {
       term.reset()
@@ -409,7 +420,7 @@ export class ManagedTerminalSession {
     const hydratedSnapshot = this.hydratedSnapshot
     if (!term) return
     term.reset()
-    if (hydratedSnapshot?.snapshot) term.write(hydratedSnapshot.snapshot)
+    if (hydratedSnapshot.snapshot.length > 0) term.write(hydratedSnapshot.snapshot)
   }
 
   private queueResize(cols: number, rows: number): void {

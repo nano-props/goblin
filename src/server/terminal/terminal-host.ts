@@ -27,7 +27,7 @@ import type { TerminalRealtimeSocket } from '#/server/terminal/terminal-realtime
 export type { TerminalRealtimeSocket }
 export type ServerTerminalSocket = TerminalRealtimeSocket
 
-export type ServerTerminalHostState = 'idle' | 'running' | 'shutting-down'
+export type ServerTerminalHostState = 'running' | 'shutting-down'
 
 export type PtySupervisorMode = 'in-process' | 'worker-backed'
 

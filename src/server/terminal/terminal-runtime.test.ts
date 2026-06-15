@@ -88,7 +88,11 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-async function createTerminalSession(host: ServerTerminalHost, clientId: string): Promise<string> {
+async function createTerminalSession(
+  host: ServerTerminalHost,
+  clientId: string,
+  attachmentId?: string,
+): Promise<string> {
   const result = await host.create(clientId, {
     repoRoot: '/repo',
     branch: 'feature',
@@ -96,6 +100,7 @@ async function createTerminalSession(host: ServerTerminalHost, clientId: string)
     kind: 'additional',
     cols: 80,
     rows: 24,
+    ...(attachmentId ? { attachmentId } : {}),
   })
   expect(result.ok).toBe(true)
   if (!result.ok) throw new Error(result.message)
@@ -429,7 +434,7 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_1', 'attachment_a', socket)
-    const sessionId = await createTerminalSession(host, 'client_1')
+    const sessionId = await createTerminalSession(host, 'client_1', 'attachment_a')
 
     const { spawn } = await import('node-pty')
     vi.mocked(spawn).mockImplementationOnce(() => {
@@ -458,6 +463,46 @@ describe('server terminal runtime', () => {
     ])
 
     host.unregisterSocket('client_1', 'attachment_a', socket)
+    shutdown()
+  })
+
+  test('a viewer cannot restart a session it does not control', async () => {
+    const { host, shutdown } = buildRuntime()
+    const socketA = { send: vi.fn(), close: vi.fn() }
+    const socketB = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_1', 'attachment_a', socketA)
+    host.registerSocket('client_1', 'attachment_b', socketB)
+    const sessionId = await createTerminalSession(host, 'client_1', 'attachment_a')
+
+    const restarted = await host.restart('client_1', {
+      sessionId,
+      cols: 100,
+      rows: 30,
+      attachmentId: 'attachment_b',
+    })
+    expect(restarted.ok).toBe(false)
+    if (restarted.ok) return
+    expect(restarted.message).toBe('error.not-controller')
+
+    // The session is still owned by attachment_a; a subsequent restart
+    // from the real controller must succeed (here it would fail at
+    // spawn, but only after passing the authority check).
+    const { spawn } = await import('node-pty')
+    vi.mocked(spawn).mockImplementationOnce(() => {
+      throw new Error('pty restart failed')
+    })
+    const retry = await host.restart('client_1', {
+      sessionId,
+      cols: 100,
+      rows: 30,
+      attachmentId: 'attachment_a',
+    })
+    expect(retry.ok).toBe(false)
+    if (retry.ok) return
+    expect(retry.message).toBe('pty restart failed')
+
+    host.unregisterSocket('client_1', 'attachment_a', socketA)
+    host.unregisterSocket('client_1', 'attachment_b', socketB)
     shutdown()
   })
 
@@ -594,8 +639,6 @@ describe('server terminal runtime', () => {
       ok: true,
       sessionId,
       controller: { attachmentId: 'attachment_b', status: 'connected' },
-      canonicalCols: 120,
-      canonicalRows: 40,
     })
     expect(mockPtys[0]?.resize).toHaveBeenLastCalledWith(120, 40)
 
@@ -641,8 +684,6 @@ describe('server terminal runtime', () => {
         ok: true,
         sessionId,
         controller: { attachmentId: 'attachment_b', status: 'connected' },
-        canonicalCols: 120,
-        canonicalRows: 40,
       },
     })
 
@@ -778,8 +819,6 @@ describe('server terminal runtime', () => {
       ok: true,
       sessionId,
       controller: { attachmentId: 'attachment_a', status: 'connected' },
-      canonicalCols: 101,
-      canonicalRows: 31,
     })
 
     host.unregisterSocket('client_1', 'attachment_b', socketB)

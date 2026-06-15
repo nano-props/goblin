@@ -103,6 +103,8 @@ describe('terminal session projection helpers', () => {
         sessionId: 'session_123',
         replay: '',
         replaySeq: 0,
+        snapshot: '',
+        snapshotSeq: 0,
         processName: 'zsh',
         canonicalTitle: null,
         phase: 'open',

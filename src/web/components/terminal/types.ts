@@ -53,8 +53,8 @@ export interface TerminalSessionHydrationInput extends TerminalOwnershipViewMode
   message: string | null
   processName: string
   canonicalTitle?: string | null
-  snapshot?: string
-  snapshotSeq?: number
+  snapshot: string
+  snapshotSeq: number
 }
 
 export interface TerminalSnapshot {

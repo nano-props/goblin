@@ -71,6 +71,11 @@ export class TerminalSessionRegistry {
   >()
   private readonly snapshotCache = new Map<string, TerminalSnapshot>()
   private readonly reattachSnapshotCache = new Map<string, ReattachSnapshotCacheEntry>()
+  // Cap the reattach snapshot cache so repeated worktree switches
+  // cannot grow it without bound. Each entry is a serialized xterm
+  // buffer (up to ~3 MB worst-case at the configured 10k scrollback),
+  // so a runaway growth here is a real memory hazard.
+  private static readonly REATTACH_SNAPSHOT_CACHE_LIMIT = 32
   private readonly worktreeSnapshotCache = new Map<string, WorktreeTerminalSnapshot>()
   private readonly worktreeListeners = new Map<string, Set<() => void>>()
   private readonly snapshotListeners = new Map<string, Set<() => void>>()
@@ -459,7 +464,7 @@ export class TerminalSessionRegistry {
       const serialized = session.serialize()
       const sessionId = session.currentSessionId()
       if (serialized && sessionId) {
-        this.reattachSnapshotCache.set(key, { sessionId, snapshot: serialized, snapshotSeq: 0 })
+        this.setReattachSnapshot(key, { sessionId, snapshot: serialized, snapshotSeq: 0 })
       }
       session.detach(host, this.parkingRoot)
     }
@@ -600,6 +605,19 @@ export class TerminalSessionRegistry {
     if (reason !== 'outputSummary') {
       const worktreeTerminalKey = session?.descriptor.worktreeTerminalKey
       if (worktreeTerminalKey) this.notifyWorktree(worktreeTerminalKey)
+    }
+  }
+
+  // Insertion-ordered LRU cap on the reattach snapshot cache. We track
+  // recency by deleting-then-resetting on hit (Map iteration order) so
+  // a fresh detach of a known key keeps it at the tail.
+  private setReattachSnapshot(key: string, entry: ReattachSnapshotCacheEntry): void {
+    if (this.reattachSnapshotCache.has(key)) this.reattachSnapshotCache.delete(key)
+    this.reattachSnapshotCache.set(key, entry)
+    while (this.reattachSnapshotCache.size > TerminalSessionRegistry.REATTACH_SNAPSHOT_CACHE_LIMIT) {
+      const oldestKey = this.reattachSnapshotCache.keys().next().value
+      if (oldestKey === undefined) break
+      this.reattachSnapshotCache.delete(oldestKey)
     }
   }
 

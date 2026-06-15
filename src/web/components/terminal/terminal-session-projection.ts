@@ -78,9 +78,10 @@ export function projectServerTerminalSession(input: {
       controllerStatus: ownership.controllerStatus,
       canonicalCols: input.serverSession.cols,
       canonicalRows: input.serverSession.rows,
-      snapshot: input.serverSnapshot?.snapshot ?? (isReattachMatch ? input.reattachSnapshot?.snapshot : undefined),
+      snapshot:
+        input.serverSnapshot?.snapshot ?? (isReattachMatch ? (input.reattachSnapshot?.snapshot ?? '') : ''),
       snapshotSeq:
-        input.serverSnapshot?.snapshotSeq ?? (isReattachMatch ? input.reattachSnapshot?.snapshotSeq : undefined),
+        input.serverSnapshot?.snapshotSeq ?? (isReattachMatch ? (input.reattachSnapshot?.snapshotSeq ?? 0) : 0),
     },
     controlsAttachment: input.serverSession.controller?.attachmentId === input.attachmentId,
     displayOrder: input.serverSession.displayOrder,

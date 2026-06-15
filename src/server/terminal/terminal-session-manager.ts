@@ -18,6 +18,7 @@ import { serverLogger } from '#/server/logger.ts'
 import {
   attachTerminalAttachment,
   claimTerminalAttachmentControl,
+  decideTerminalActionAuthority,
   expireTerminalAttachment,
   registerTerminalAttachment,
   restartTerminalAttachmentControl,
@@ -169,7 +170,16 @@ export class TerminalSessionManager<TOwner extends string | number> {
     if (!isValidTerminalSessionId(sessionId) || !isValidTerminalWriteData(data)) return false
     const session = this.getSession(ownerId, sessionId)
     if (!session?.pty) return false
-    if (attachmentId && session.controller?.attachmentId !== attachmentId) return false
+    if (attachmentId) {
+      // Register the attachment first so a brand-new socket can satisfy
+      // the unknown-attachment gate, then defer to the shared authority
+      // decision so write/resize/restart stay in lockstep.
+      registerTerminalAttachment(session, attachmentId, session.cols, session.rows, undefined)
+      if (decideTerminalActionAuthority(session, attachmentId, 'write').kind !== 'allow') return false
+    } else if (session.controller !== null) {
+      // A controller exists but the caller did not identify itself.
+      return false
+    }
     session.inputQueue.push(data)
     this.scheduleInputFlush(session)
     return true
@@ -210,7 +220,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     if (!session) return false
     if (!attachmentId) return false
     registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
-    if (session.controller?.attachmentId !== attachmentId) return false
+    if (decideTerminalActionAuthority(session, attachmentId, 'resize').kind !== 'allow') return false
     return this.resizeSessionPty(session, size.cols, size.rows)
   }
 
@@ -228,7 +238,13 @@ export class TerminalSessionManager<TOwner extends string | number> {
     const session = this.getSession(ownerId, sessionId)
     if (!session) return { ok: false, message: 'error.invalid-arguments' }
     if (attachmentId) {
+      // Takeover is the only path that may preempt, but it still
+      // requires the caller to be a known attachment. Use the same
+      // authority gate as the other actions for consistency.
       registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
+      if (decideTerminalActionAuthority(session, attachmentId, 'takeover').kind !== 'allow') {
+        return { ok: false, message: 'error.invalid-arguments' }
+      }
       this.applyOwnershipEffect(session, claimTerminalAttachmentControl(session, attachmentId))
       return this.takeoverResult(session)
     }
@@ -250,7 +266,17 @@ export class TerminalSessionManager<TOwner extends string | number> {
     if (!session) return { ok: false, message: 'error.invalid-arguments' }
     if (attachmentId) {
       registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
+      const decision = decideTerminalActionAuthority(session, attachmentId, 'restart')
+      if (decision.kind !== 'allow') {
+        return {
+          ok: false,
+          message: decision.kind === 'deny' ? authorityReasonToMessage(decision.reason) : 'error.invalid-arguments',
+        }
+      }
       restartTerminalAttachmentControl(session, attachmentId)
+    } else if (session.controller !== null) {
+      // A controller exists but the caller did not identify itself.
+      return { ok: false, message: 'error.invalid-arguments' }
     }
     this.resetSessionState(session, size.cols, size.rows, 'restarting')
     const result = await this.spawnSessionPty(session)
@@ -414,8 +440,6 @@ export class TerminalSessionManager<TOwner extends string | number> {
       ok: true,
       sessionId: session.id,
       controller: cloneTerminalController(session.controller),
-      canonicalCols: session.cols,
-      canonicalRows: session.rows,
     }
   }
 
@@ -425,6 +449,8 @@ export class TerminalSessionManager<TOwner extends string | number> {
       sessionId: session.id,
       replay: session.render.buffer,
       replaySeq: session.render.sequence,
+      snapshot: session.render.buffer,
+      snapshotSeq: session.render.sequence,
       processName: session.pty ? this.ptySupervisor.processName(session.pty) : 'terminal',
       canonicalTitle: session.render.title,
       phase: session.phase,
@@ -601,6 +627,25 @@ export class TerminalSessionManager<TOwner extends string | number> {
 
 export function isValidTerminalWriteData(value: unknown): value is string {
   return typeof value === 'string' && value.length <= MAX_TERMINAL_WRITE_CHARS
+}
+
+// Map the shared authority-rejection reasons to user-visible error
+// keys. Lives next to the manager because the keys are the wire
+// protocol's; the decision function itself stays string-free so it
+// can be reused for non-IPC paths (e.g. internal supervisor logic).
+function authorityReasonToMessage(reason: 'not-controller' | 'session-unowned' | 'unknown-attachment'): string {
+  switch (reason) {
+    case 'not-controller':
+      return 'error.not-controller'
+    case 'session-unowned':
+      // Unowned sessions must be explicitly taken over before they
+      // can be restarted. The same error key is appropriate: a
+      // different session already "owns" the recovery, even if the
+      // controller slot is currently empty.
+      return 'error.not-controller'
+    case 'unknown-attachment':
+      return 'error.invalid-arguments'
+  }
 }
 
 function disposeSessionListeners<TOwner extends string | number>(session: TerminalSession<TOwner>): void {

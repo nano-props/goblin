@@ -62,7 +62,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         input.attachmentId,
         resolveAttachmentConnected(clientId, input.attachmentId),
       )
-      return result.ok ? withSessionSnapshot(result) : result
+      return result
     },
 
     async restart(clientId: string, input: TerminalRestartInput): Promise<TerminalAttachResult> {
@@ -84,7 +84,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         resolveAttachmentConnected(clientId, input.attachmentId),
       )
       if (repoRoot) broker.broadcastGlobal({ type: 'sessions-changed', repoRoot })
-      return result.ok ? withSessionSnapshot(result) : result
+      return result
     },
 
     async create(clientId: string, input: TerminalCreateInput): Promise<TerminalCatalogMutationResult> {
@@ -188,19 +188,3 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     },
   }
 }
-
-// The buffer-based replay is itself the canonical snapshot — the
-// client writes it verbatim into its xterm and ends up in the same
-// state. We mirror the buffer into the snapshot fields so the
-// client's existing snapshot-first path picks it up without a code
-// change.
-export function withSessionSnapshot(
-  result: Extract<TerminalAttachResult, { ok: true }>,
-): Extract<TerminalAttachResult, { ok: true }> {
-  return {
-    ...result,
-    snapshot: result.replay,
-    snapshotSeq: result.replaySeq,
-  }
-}
-

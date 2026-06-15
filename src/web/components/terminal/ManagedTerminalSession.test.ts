@@ -1013,7 +1013,7 @@ describe('ManagedTerminalSession', () => {
   })
 
   test('preloads hydrated snapshot before attaching as controller', async () => {
-    terminalCalls.attach.mockResolvedValueOnce(attachResult('session-1', { replay: '', replaySeq: 0 }))
+    terminalCalls.attach.mockResolvedValueOnce(attachResult('session-1'))
     const host = document.createElement('div')
     document.body.appendChild(host)
     const session = new ManagedTerminalSession(descriptor, vi.fn())
@@ -1153,8 +1153,6 @@ describe('ManagedTerminalSession', () => {
     terminalCalls.takeover.mockResolvedValueOnce(
       takeoverResult('session-1', {
         controller: { attachmentId: 'attachment_local', status: 'connected' },
-        canonicalCols: 101,
-        canonicalRows: 31,
       }),
     )
     const host = document.createElement('div')
@@ -1211,8 +1209,6 @@ describe('ManagedTerminalSession', () => {
     terminalCalls.takeover.mockResolvedValueOnce(
       takeoverResult('session-1', {
         controller: null,
-        canonicalCols: 120,
-        canonicalRows: 40,
       }),
     )
     const host = document.createElement('div')
@@ -1284,7 +1280,7 @@ describe('ManagedTerminalSession', () => {
   })
 
   test('forwards user input while replay is being written', async () => {
-    terminalCalls.attach.mockResolvedValueOnce(attachResult('session-1', { replay: 'history', replaySeq: 1 }))
+    terminalCalls.attach.mockResolvedValueOnce(attachResult('session-1', { snapshot: 'history', snapshotSeq: 1 }))
     const host = document.createElement('div')
     document.body.appendChild(host)
     const session = new ManagedTerminalSession(descriptor, vi.fn())
@@ -1301,7 +1297,7 @@ describe('ManagedTerminalSession', () => {
 
   test('resets the terminal before replaying the snapshot', async () => {
     terminalCalls.attach.mockResolvedValueOnce(
-      attachResult('session-1', { replay: 'tail', snapshot: 'tail', snapshotSeq: 1 }),
+      attachResult('session-1', { snapshot: 'tail', snapshotSeq: 1 }),
     )
     const host = document.createElement('div')
     document.body.appendChild(host)
@@ -1598,6 +1594,8 @@ function attachResult(
     sessionId,
     replay: '',
     replaySeq: 0,
+    snapshot: '',
+    snapshotSeq: 0,
     processName: 'zsh',
     canonicalTitle: null,
     phase: 'open',
@@ -1615,8 +1613,6 @@ function takeoverResult(
     ok: true,
     sessionId,
     controller: { attachmentId: 'attachment_local', status: 'connected' },
-    canonicalCols: 100,
-    canonicalRows: 30,
     ...overrides,
   }
 }
@@ -1633,8 +1629,8 @@ function hydrateManagedSession(
     controllerStatus: 'connected' | 'grace' | 'none'
     canonicalCols: number
     canonicalRows: number
-    snapshot?: string
-    snapshotSeq?: number
+    snapshot: string
+    snapshotSeq: number
   }> = {},
 ): void {
   session.hydrate({
@@ -1647,6 +1643,8 @@ function hydrateManagedSession(
     controllerStatus: 'connected',
     canonicalCols: 100,
     canonicalRows: 30,
+    snapshot: '',
+    snapshotSeq: 0,
     ...overrides,
   })
 }
