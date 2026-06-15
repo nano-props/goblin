@@ -41,11 +41,18 @@ export type TerminalTakeoverResult =
       ok: true
       sessionId: string
       controller: TerminalController | null
-      canonicalCols: number
-      canonicalRows: number
     }
   | { ok: false; message: string }
 
+/**
+ * Successful attach/restart result.
+ *
+ * `replay`/`replaySeq` and `snapshot`/`snapshotSeq` carry the same
+ * data — the session's server-side render buffer and its monotonic
+ * sequence number. The two pairs are kept for wire-protocol
+ * stability (the catalog/socket still publish under the `replay`
+ * name); the renderer reads only `snapshot`/`snapshotSeq`.
+ */
 export type TerminalAttachResult =
   | {
       ok: true
@@ -56,8 +63,8 @@ export type TerminalAttachResult =
       canonicalTitle: string | null
       phase: TerminalSessionPhase
       message: string | null
-      snapshot?: string
-      snapshotSeq?: number
+      snapshot: string
+      snapshotSeq: number
       controller: TerminalController | null
       canonicalCols?: number
       canonicalRows?: number

@@ -440,6 +440,7 @@ export const zh: Record<DictKey, string> = {
   'error.invalid-path': '路径无效',
   'error.invalid-worktree-path': '工作树路径无效',
   'error.invalid-arguments': '参数无效',
+  'error.not-controller': '此终端正由另一个会话控制',
   'error.network-op-in-progress': '另一个 git 网络操作正在进行中。',
   'error.branch-action-wait-timeout': '等待仓库刷新完成超时。',
   'error.unknown': '未知错误',

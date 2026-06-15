@@ -205,9 +205,33 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
 
   const progress = snapshot.progress
   const attachment = snapshot.attachment
-  const isController = hasSessions && snapshot.phase === 'open' && attachment?.role === 'controller'
-  const isReadonly =
-    hasSessions && snapshot.phase === 'open' && (attachment?.role === 'viewer' || attachment?.role === 'unowned')
+  // Slot mode is a small state machine. The previous two-flag design
+  // (`isController` / `isReadonly`, both gated on `phase === 'open'`)
+  // silently broke error-phase rendering: a viewer in error phase
+  // would see neither the viewer overlay (open-gated) nor the
+  // correctly-gated error chip, leaving the restart button visible
+  // even though the server would reject the request. Modelling the
+  // mode explicitly keeps the per-state UI rules in one place.
+  const slotMode: 'opening' | 'restarting' | 'open-controller' | 'open-viewer' | 'error-controller' | 'error-viewer' =
+    (() => {
+      if (!hasSessions) return 'opening'
+      if (snapshot.phase === 'opening') return 'opening'
+      if (snapshot.phase === 'restarting') return 'restarting'
+      if (snapshot.phase === 'error') {
+        return attachment?.role === 'controller' ? 'error-controller' : 'error-viewer'
+      }
+      // phase === 'open'
+      return attachment?.role === 'controller' ? 'open-controller' : 'open-viewer'
+    })()
+  // `isController` is the *interactive* affordance flag — it gates the
+  // mobile toolbar and the xterm's `aria-readonly`. The PTY is dead
+  // in `error-controller`, so we deliberately exclude that state even
+  // though the controller status is still ours. The error chip is
+  // shown via `showErrorChip` instead.
+  const isController = slotMode === 'open-controller'
+  const isReadonly = slotMode === 'open-viewer' || slotMode === 'error-viewer'
+  const showViewerOverlay = isReadonly
+  const showErrorChip = slotMode === 'error-controller'
   const readonlyBadge = attachment?.role === 'viewer' ? t('terminal.mirror-controlled') : t('terminal.unowned')
   const progressVariant =
     progress?.state === 2 ? 'error' : progress?.state === 4 ? 'warning' : progress?.state === 3 ? 'indeterminate' : ''
@@ -276,7 +300,7 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
           onScrollLines={(amount) => scrollLines(key, amount)}
         />
       )}
-      {isReadonly && (
+      {showViewerOverlay && (
         <ViewerOverlay
           badge={readonlyBadge}
           takeoverLabel={t('terminal.takeover')}
@@ -286,12 +310,18 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
           takeoverPending={snapshot.takeoverPending}
         />
       )}
-      {hasSessions && (snapshot.phase === 'opening' || snapshot.phase === 'restarting') && (
+      {(slotMode === 'opening' || slotMode === 'restarting') && (
         <div className="goblin-terminal-slot__status-overlay">
           <span>{t('terminal.opening')}</span>
         </div>
       )}
-      {hasSessions && snapshot.phase === 'error' && snapshot.message !== 'terminal.empty' && (
+      {/* Error-state rendering is mode-driven: only the controller sees
+          the error chip with a working restart button; a viewer in
+          error state must takeover first (the viewer overlay covers
+          that path), so we suppress the chip rather than stack two
+          overlays. The empty-message case is reserved for the
+          "no sessions yet" placeholder and never renders the chip. */}
+      {showErrorChip && snapshot.message !== 'terminal.empty' && (
         <div className="goblin-terminal-slot__status-overlay goblin-terminal-slot__status-overlay--error">
           <span>{t(snapshot.message ?? 'error.unknown')}</span>
           {key && (
@@ -300,7 +330,7 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
             </Button>
           )}
         </div>
-      )}
+        )}
       {dragOver && (
         <div className="goblin-terminal-slot__drop-overlay">
           <span>{t('terminal.drop-hint')}</span>

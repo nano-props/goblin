@@ -27,6 +27,10 @@ interface EnsureTerminalCatalogInput {
   attachmentId?: string
 }
 
+// Internal-only shape for the catalog's ensure/restore result. The
+// wire contract is `TerminalCatalogMutationResult`; this richer
+// payload is used to ferry attach metadata between the catalog's
+// private helpers. Do not export.
 type EnsureTerminalCatalogResult =
   | {
       ok: true
@@ -37,8 +41,8 @@ type EnsureTerminalCatalogResult =
       replaySeq: number
       processName: string
       canonicalTitle: string | null
-      snapshot?: string
-      snapshotSeq?: number
+      snapshot: string
+      snapshotSeq: number
       controller: { attachmentId: string; status: Exclude<TerminalControllerStatus, 'none'> } | null
       canonicalCols?: number
       canonicalRows?: number
@@ -71,7 +75,6 @@ interface TerminalCatalogOptions {
   manager: TerminalCatalogManager
   attachmentIsConnected(clientId: string, attachmentId?: string): boolean | undefined
   broadcastSessionsChanged(repoRoot: string): void
-  withSessionSnapshot(result: Extract<TerminalAttachResult, { ok: true }>): Extract<TerminalAttachResult, { ok: true }>
 }
 
 class TerminalCatalog {
@@ -219,7 +222,7 @@ class TerminalCatalog {
     })
     if (!result.ok) return { ok: false, message: result.message }
     this.options.broadcastSessionsChanged(input.repoRoot)
-    return toEnsureResult(context.targetSessionKey, context.action, this.options.withSessionSnapshot(result))
+    return toEnsureResult(context.targetSessionKey, context.action, result)
   }
 
   private async ensureLocal(
@@ -251,7 +254,7 @@ class TerminalCatalog {
     })
     if (!result.ok) return { ok: false, message: result.message }
     this.options.broadcastSessionsChanged(input.repoRoot)
-    return toEnsureResult(context.targetSessionKey, context.action, this.options.withSessionSnapshot(result))
+    return toEnsureResult(context.targetSessionKey, context.action, result)
   }
 }
 

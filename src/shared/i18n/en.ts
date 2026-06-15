@@ -464,6 +464,7 @@ export const en = {
   'error.invalid-path': 'Invalid path',
   'error.invalid-worktree-path': 'Invalid worktree path',
   'error.invalid-arguments': 'Invalid arguments',
+  'error.not-controller': 'Another session is controlling this terminal',
   'error.network-op-in-progress': 'Another git network operation is already running.',
   'error.branch-action-wait-timeout': 'Timed out waiting for repository refresh to finish.',
   'error.unknown': 'Unknown error',

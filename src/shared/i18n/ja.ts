@@ -459,6 +459,7 @@ export const ja: Record<DictKey, string> = {
   'error.invalid-path': '無効なパス',
   'error.invalid-worktree-path': '無効なワークツリーパス',
   'error.invalid-arguments': '無効な引数',
+  'error.not-controller': 'このターミナルは他のセッションが制御しています',
   'error.network-op-in-progress': '別の git ネットワーク操作がすでに実行中です。',
   'error.branch-action-wait-timeout': 'リポジトリの更新完了待ちがタイムアウトしました。',
   'error.unknown': '不明なエラー',

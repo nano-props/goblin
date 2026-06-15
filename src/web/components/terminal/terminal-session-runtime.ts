@@ -178,6 +178,10 @@ export class TerminalSessionRuntime {
 
   finishReplay(): TerminalOutputEvent[] {
     const events = this.state.finishReplay()
+    // The output summary is read only by the viewer overlay (gated on
+    // !canResize). In controller mode it would never be read, so skip
+    // the per-event string work.
+    if (this.state.getCanResize()) return events
     for (const event of events) this.state.appendOutputSummary(event.data)
     return events
   }

@@ -15,10 +15,7 @@ import { normalizeTerminalClientMessage } from '#/shared/terminal-validators.ts'
 import { serverLogger } from '#/server/logger.ts'
 import { createTerminalCatalog } from '#/server/terminal/terminal-catalog.ts'
 import type { TerminalRealtimeSocket } from '#/server/terminal/terminal-realtime-broker.ts'
-import {
-  createTerminalRuntimeActions,
-  withSessionSnapshot,
-} from '#/server/terminal/terminal-runtime-actions.ts'
+import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
 import { createTerminalRuntimeCoordinator } from '#/server/terminal/terminal-runtime-coordinator.ts'
 import {
   createTerminalRealtimeHandlers,
@@ -86,7 +83,6 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     broadcastSessionsChanged(repoRoot) {
       broker.broadcastGlobal({ type: 'sessions-changed', repoRoot })
     },
-    withSessionSnapshot,
   })
 
   const bufferedSocketByRawSocket = new WeakMap<TerminalRealtimeSocket, BufferedTerminalSocket>()
