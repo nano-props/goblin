@@ -1,4 +1,5 @@
 import { access, readFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import os from 'node:os'
 import path from 'node:path'
@@ -189,7 +190,13 @@ export function createApp(options: ServerAppOptions): Hono {
       return c.text('Not Found', 404)
     }
   })
-  app.use('/*', serveStatic({ root: WEB_DIST_DIR }))
+  // Only register the static-file middleware when the built web bundle
+  // exists. Skipping it on a fresh checkout (e.g. `bun run test` without
+  // `bun run build`) keeps Hono from logging `serveStatic: root path ...
+  // is not found` on every server boot.
+  if (existsSync(WEB_DIST_DIR)) {
+    app.use('/*', serveStatic({ root: WEB_DIST_DIR }))
+  }
   // Catch-all SPA fallback: deep-links that didn't match a static
   // file (e.g. /repos/abc123) get the rendered index.html so the
   // React app can take over routing. /api/* and /ws/* requests
