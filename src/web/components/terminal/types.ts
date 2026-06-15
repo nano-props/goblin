@@ -100,10 +100,13 @@ export interface WorktreeTerminalSnapshot {
   selectedDescriptor: TerminalDescriptor | null
   sessions: TerminalSessionSummary[]
   count: number
+  pendingCreate: boolean
 }
 
 export interface TerminalSessionContextValue {
   createTerminal: (base: TerminalSessionBase) => Promise<string>
+  registerHost: (worktreeTerminalKey: string, host: HTMLElement) => void
+  unregisterHost: (worktreeTerminalKey: string, host: HTMLElement) => void
   selectTerminal: (worktreeTerminalKey: string, key: string) => void
   scrollToBottom: (key: string) => void
   scrollLines: (key: string, amount: number) => void

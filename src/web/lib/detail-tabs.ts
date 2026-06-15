@@ -42,11 +42,12 @@ export function computeEffectiveDetailTab(
   hasWorktree: boolean,
   terminalSessionCount: number,
   terminalSyncReady: boolean,
+  terminalPendingCreate = false,
 ): DetailTab {
   if (!hasWorktree) return detailTabForWorktree(preferred, hasWorktree)
   if (preferred !== 'terminal') return preferred
   if (!terminalSyncReady) return 'terminal'
-  return terminalSessionCount > 0 ? 'terminal' : 'status'
+  return terminalSessionCount > 0 || terminalPendingCreate ? 'terminal' : 'status'
 }
 
 export function detailTabNavigationKey(key: string): DetailTabNavigationKey | null {

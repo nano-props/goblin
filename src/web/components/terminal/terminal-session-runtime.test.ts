@@ -13,6 +13,8 @@ describe('TerminalSessionRuntime', () => {
         replaySeq: 0,
         processName: 'zsh',
         canonicalTitle: null,
+        phase: 'open',
+        message: null,
         controller: { attachmentId: 'attachment_local', status: 'connected' },
         role: 'controller',
         controllerStatus: 'connected',
@@ -41,6 +43,8 @@ describe('TerminalSessionRuntime', () => {
         replaySeq: 0,
         processName: 'zsh',
         canonicalTitle: null,
+        phase: 'open',
+        message: null,
         controller: { attachmentId: 'attachment_remote', status: 'connected' },
         role: 'viewer',
         controllerStatus: 'connected',
@@ -114,6 +118,8 @@ describe('TerminalSessionRuntime', () => {
         replaySeq: 0,
         processName: 'zsh',
         canonicalTitle: '~/Developer/goblin — npm run dev',
+        phase: 'open',
+        message: null,
         controller: { attachmentId: 'attachment_remote', status: 'connected' },
         role: 'viewer',
         controllerStatus: 'connected',
@@ -135,6 +141,8 @@ describe('TerminalSessionRuntime', () => {
     expect(
       runtime.hydrateSession({
         sessionId: 'session-remote',
+        phase: 'open',
+        message: null,
         processName: 'node',
         role: 'viewer',
         controllerStatus: 'connected',
@@ -164,6 +172,8 @@ describe('TerminalSessionRuntime', () => {
     const runtime = new TerminalSessionRuntime()
     runtime.hydrateSession({
       sessionId: 'session-1',
+      phase: 'open',
+      message: null,
       processName: 'zsh',
       role: 'viewer',
       controllerStatus: 'connected',

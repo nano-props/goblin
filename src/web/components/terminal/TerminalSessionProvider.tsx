@@ -163,6 +163,8 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   const commandValue = useMemo<TerminalSessionContextValue>(
     () => ({
       createTerminal: registry.createTerminal,
+      registerHost: registry.registerHost,
+      unregisterHost: registry.unregisterHost,
       selectTerminal: registry.selectTerminal,
       scrollToBottom: registry.scrollToBottom,
       scrollLines: registry.scrollLines,

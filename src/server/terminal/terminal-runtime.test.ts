@@ -124,10 +124,72 @@ describe('server terminal runtime', () => {
       expect.objectContaining({
         key: result.key,
         controller: { attachmentId: 'attachment_a', status: 'connected' },
+        phase: 'open',
+        message: null,
         cols: 80,
         rows: 24,
       }),
     ])
+
+    host.unregisterSocket('client_1', 'attachment_a', socket)
+    shutdown()
+  })
+
+  test('realtime attach injects the socket attachmentId and resizes an owned session to the live terminal size', async () => {
+    const { host, shutdown } = buildRuntime()
+    const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_1', 'attachment_a', socket)
+
+    const createResult = await host.create('client_1', {
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'primary',
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_a',
+    })
+    expect(createResult.ok).toBe(true)
+    if (!createResult.ok) return
+    const sessionId = createResult.sessions[0]?.sessionId
+    if (!sessionId) throw new Error('expected session id')
+    socket.send.mockClear()
+
+    host.handleRealtimeMessage(
+      'client_1',
+      'attachment_a',
+      socket,
+      JSON.stringify({
+        type: 'request',
+        requestId: 'req_attach_resize',
+        action: 'attach',
+        input: { sessionId, cols: 101, rows: 31 },
+      }),
+    )
+
+    await vi.waitFor(() => {
+      expect(socket.send.mock.calls.some(([payload]) => JSON.parse(String(payload)).type === 'response')).toBe(true)
+    })
+
+    const response = socket.send.mock.calls
+      .map(([payload]) => JSON.parse(String(payload)))
+      .find((message) => message.type === 'response' && message.requestId === 'req_attach_resize')
+    expect(response).toMatchObject({
+      type: 'response',
+      requestId: 'req_attach_resize',
+      ok: true,
+      action: 'attach',
+      payload: {
+        ok: true,
+        sessionId,
+        phase: 'open',
+        message: null,
+        canonicalCols: 101,
+        canonicalRows: 31,
+        controller: { attachmentId: 'attachment_a', status: 'connected' },
+      },
+    })
+    expect(mockPtys[0]?.resize).toHaveBeenLastCalledWith(101, 31)
 
     host.unregisterSocket('client_1', 'attachment_a', socket)
     shutdown()
@@ -156,6 +218,7 @@ describe('server terminal runtime', () => {
       .map(([payload]) => JSON.parse(String(payload)))
       .find((message) => message.type === 'exit')
     expect(exitMessage).toMatchObject({ type: 'exit' })
+    expect(host.getDiagnostics().pty.state).toBe('idle')
 
     host.unregisterSocket('client_1', 'attachment_a', socket)
     shutdown()
@@ -258,6 +321,42 @@ describe('server terminal runtime', () => {
     })
     expect(retried.ok).toBe(true)
     if (retried.ok) expect(retried.action).toBe('created')
+
+    host.unregisterSocket('client_1', 'attachment_a', socket)
+    shutdown()
+  })
+
+  test('a failed restart keeps the session visible as error state', async () => {
+    const { host, shutdown } = buildRuntime()
+    const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_1', 'attachment_a', socket)
+    const sessionId = await createTerminalSession(host, 'client_1')
+
+    const { spawn } = await import('node-pty')
+    vi.mocked(spawn).mockImplementationOnce(() => {
+      throw new Error('pty restart failed')
+    })
+
+    const restarted = await host.restart('client_1', {
+      sessionId,
+      cols: 100,
+      rows: 30,
+      attachmentId: 'attachment_a',
+    })
+    expect(restarted.ok).toBe(false)
+    if (restarted.ok) return
+    expect(restarted.message).toBe('pty restart failed')
+
+    const sessionsAfterFailure = await host.listSessions('client_1', '/repo')
+    expect(sessionsAfterFailure).toEqual([
+      expect.objectContaining({
+        sessionId,
+        phase: 'error',
+        message: 'pty restart failed',
+        cols: 100,
+        rows: 30,
+      }),
+    ])
 
     host.unregisterSocket('client_1', 'attachment_a', socket)
     shutdown()
@@ -400,6 +499,53 @@ describe('server terminal runtime', () => {
       canonicalRows: 40,
     })
     expect(mockPtys[0]?.resize).toHaveBeenLastCalledWith(120, 40)
+
+    host.unregisterSocket('client_1', 'attachment_a', socketA)
+    host.unregisterSocket('client_1', 'attachment_b', socketB)
+    shutdown()
+  })
+
+  test('realtime takeover injects the socket attachmentId so viewer tabs can take control', async () => {
+    const { host, shutdown } = buildRuntime()
+    const socketA = { send: vi.fn(), close: vi.fn() }
+    const socketB = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_1', 'attachment_a', socketA)
+    const sessionId = await createTerminalSession(host, 'client_1')
+    host.registerSocket('client_1', 'attachment_b', socketB)
+    socketB.send.mockClear()
+
+    host.handleRealtimeMessage(
+      'client_1',
+      'attachment_b',
+      socketB,
+      JSON.stringify({
+        type: 'request',
+        requestId: 'req_takeover',
+        action: 'takeover',
+        input: { sessionId, cols: 120, rows: 40 },
+      }),
+    )
+
+    await vi.waitFor(() => {
+      expect(socketB.send.mock.calls.some(([payload]) => JSON.parse(String(payload)).type === 'response')).toBe(true)
+    })
+
+    const response = socketB.send.mock.calls
+      .map(([payload]) => JSON.parse(String(payload)))
+      .find((message) => message.type === 'response' && message.requestId === 'req_takeover')
+    expect(response).toMatchObject({
+      type: 'response',
+      requestId: 'req_takeover',
+      ok: true,
+      action: 'takeover',
+      payload: {
+        ok: true,
+        sessionId,
+        controller: { attachmentId: 'attachment_b', status: 'connected' },
+        canonicalCols: 120,
+        canonicalRows: 40,
+      },
+    })
 
     host.unregisterSocket('client_1', 'attachment_a', socketA)
     host.unregisterSocket('client_1', 'attachment_b', socketB)

@@ -8,6 +8,7 @@ import {
   type TerminalExitEvent,
   type TerminalOwnershipEvent,
   type TerminalOutputEvent,
+  type TerminalSessionPhase,
   type TerminalSessionSnapshot,
   type TerminalSessionSummary,
   type TerminalTakeoverResult,
@@ -67,6 +68,8 @@ interface TerminalSession<TOwner extends string | number> {
   attachment: TerminalAttachmentState | null
   controller: TerminalController | null
   allowImplicitAttachControl: boolean
+  phase: TerminalSessionPhase
+  message: string | null
   /** Display order within the worktree for tab strip sorting. */
   displayOrder: number
   /** Input queue ensures ordered PTY writes even with multiple concurrent callers. */
@@ -129,6 +132,8 @@ export class TerminalSessionManager<TOwner extends string | number> {
       attachment: null,
       controller: null,
       allowImplicitAttachControl: true,
+      phase: 'opening',
+      message: null,
       displayOrder: this.nextDisplayOrder(input.scope, parseWorktreePathFromKey(input.key) ?? input.key),
       inputQueue: [],
       inputFlushScheduled: false,
@@ -181,6 +186,9 @@ export class TerminalSessionManager<TOwner extends string | number> {
     if (attachmentId) {
       registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
       this.applyOwnershipEffect(session, attachTerminalAttachment(session, attachmentId))
+      if (session.controller?.attachmentId === attachmentId) {
+        this.resizeSessionPty(session, size.cols, size.rows)
+      }
     }
     return this.attachResult(session)
   }
@@ -243,7 +251,12 @@ export class TerminalSessionManager<TOwner extends string | number> {
       restartTerminalAttachmentControl(session, attachmentId)
     }
     this.resetSessionState(session, size.cols, size.rows)
-    return await this.spawnSessionPty(session)
+    const result = await this.spawnSessionPty(session)
+    if (!result.ok) {
+      session.phase = 'error'
+      session.message = result.message
+    }
+    return result
   }
 
   closeOwnedSession(ownerId: TOwner, sessionId: string): boolean {
@@ -311,6 +324,8 @@ export class TerminalSessionManager<TOwner extends string | number> {
           controller: cloneTerminalController(session.controller),
           processName: session.pty ? this.ptySupervisor.processName(session.pty) : 'terminal',
           canonicalTitle: session.render.title,
+          phase: session.phase,
+          message: session.message,
           cols: session.cols,
           rows: session.rows,
           displayOrder: session.displayOrder,
@@ -409,6 +424,8 @@ export class TerminalSessionManager<TOwner extends string | number> {
       replaySeq: session.render.sequence,
       processName: session.pty ? this.ptySupervisor.processName(session.pty) : 'terminal',
       canonicalTitle: session.render.title,
+      phase: session.phase,
+      message: session.message,
       controller: cloneTerminalController(session.controller),
       canonicalCols: session.cols,
       canonicalRows: session.rows,
@@ -440,6 +457,8 @@ export class TerminalSessionManager<TOwner extends string | number> {
     this.disposeSessionResources(session)
     session.cols = cols
     session.rows = rows
+    session.phase = 'opening'
+    session.message = null
     resetRender(session.render)
     session.inputQueue = []
     session.inputFlushScheduled = false
@@ -470,6 +489,8 @@ export class TerminalSessionManager<TOwner extends string | number> {
       return resolved
     }
     session.pty = resolved.handle
+    session.phase = 'open'
+    session.message = null
     // The PtySupervisor owns the processName cache. It samples on the
     // first data chunk (deferred past the macOS spawn-helper exec) and
     // refreshes on every title-OSC change. We query it on demand.

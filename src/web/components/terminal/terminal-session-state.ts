@@ -75,7 +75,7 @@ export class TerminalSessionState {
   }
 
   getCanResize(): boolean {
-    return this.runtimeState.attachmentOwnership.role === 'controller'
+    return this.runtimeState.phase !== 'error' && this.runtimeState.attachmentOwnership.role === 'controller'
   }
 
   getCanonicalSize(): { cols: number; rows: number } {
@@ -131,6 +131,8 @@ export class TerminalSessionState {
   }
 
   applyOpenResult(input: {
+    phase?: TerminalPhase
+    message?: string | null
     processName: string
     canonicalTitle?: string | null
     role: TerminalAttachmentOwnershipViewModel['role']
@@ -139,6 +141,7 @@ export class TerminalSessionState {
     canonicalRows: number
   }): boolean {
     let changed = false
+    changed = this.setPhaseAndMessage(input.phase ?? 'open', input.message ?? null) || changed
     changed = this.setProcessName(input.processName) || changed
     changed = this.setCanonicalTitle(input.canonicalTitle ?? null) || changed
     if (

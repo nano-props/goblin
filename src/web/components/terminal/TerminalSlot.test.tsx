@@ -55,6 +55,7 @@ describe('TerminalSlot', () => {
       selectedDescriptor: descriptor,
       sessions: summaries,
       count: 1,
+      pendingCreate: false,
     }
     const snapshot = {
       phase: 'open' as const,
@@ -71,6 +72,8 @@ describe('TerminalSlot', () => {
     }
     const context: TerminalSessionContextValue = {
       createTerminal: async () => 'terminal-1',
+      registerHost: vi.fn(),
+      unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
       scrollToBottom: vi.fn(),
       scrollLines: vi.fn(),
@@ -136,10 +139,13 @@ describe('TerminalSlot', () => {
       selectedDescriptor: null,
       sessions: [],
       count: 0,
+      pendingCreate: false,
     }
     const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
     const context: TerminalSessionContextValue = {
       createTerminal: vi.fn(async () => 'terminal-2'),
+      registerHost: vi.fn(),
+      unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
       scrollToBottom: vi.fn(),
       scrollLines: vi.fn(),

@@ -7,13 +7,15 @@ import type {
   TerminalAttachInput,
   TerminalOutputEvent,
   TerminalRestartInput,
+  TerminalSessionPhase,
 } from '#/shared/terminal.ts'
 import { resolveTerminalOwnership } from '#/shared/terminal.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 import { setTerminalFocused } from '#/web/terminal-focus.ts'
 import { openExternalUrl } from '#/web/app-shell-client.ts'
+import { preloadTerminalFont } from '#/web/components/terminal/terminal-geometry.ts'
 import { TerminalSessionRuntime } from '#/web/components/terminal/terminal-session-runtime.ts'
-import { TerminalSessionView, preloadTerminalFont } from '#/web/components/terminal/terminal-session-view.ts'
+import { TerminalSessionView } from '#/web/components/terminal/terminal-session-view.ts'
 import { readOrCreateWebTerminalAttachmentId } from '#/web/renderer-terminal-bridge.ts'
 import type {
   TerminalBellEvent,
@@ -21,7 +23,6 @@ import type {
   TerminalOwnershipViewModel,
   TerminalSearchResult,
 } from '#/web/components/terminal/types.ts'
-const RESIZE_DEBOUNCE_MS = 80
 const EMPTY_SEARCH_RESULT: TerminalSearchResult = { resultIndex: -1, resultCount: 0, found: false }
 
 export type TerminalNotifyReason = 'metadata' | 'outputSummary'
@@ -38,7 +39,7 @@ export class ManagedTerminalSession {
   private readonly runtime = new TerminalSessionRuntime()
   private readonly view: TerminalSessionView
   private startToken = 0
-  private resizeFlushTimer: number | null = null
+  private resizeFlushScheduled = false
   private outputFlushFrame: number | null = null
 
   private pendingResize: { cols: number; rows: number } | null = null
@@ -179,6 +180,8 @@ export class ManagedTerminalSession {
 
   hydrate(input: {
     sessionId: string
+    phase: TerminalSessionPhase
+    message: string | null
     processName: string
     canonicalTitle?: string | null
     role: TerminalOwnershipViewModel['role']
@@ -195,6 +198,8 @@ export class ManagedTerminalSession {
     const previousSessionId = this.runtime.currentSessionId()
     const changed = this.runtime.hydrateSession({
       sessionId: input.sessionId,
+      phase: input.phase,
+      message: input.message,
       processName: input.processName,
       canonicalTitle: input.canonicalTitle ?? null,
       role: input.role,
@@ -278,6 +283,12 @@ export class ManagedTerminalSession {
     try {
       const { term, preloaded } = await this.openPhase(token)
       const result = await this.ipcPhase(token, term)
+      if (result.phase === 'error') {
+        const changed = this.runtime.applyAttachResult(result, { cols: term.cols, rows: term.rows })
+        this.destroyActiveView()
+        if (changed) this.notify('metadata')
+        return
+      }
       await this.replayPhase(token, term, result, preloaded)
       this.finalizePhase(token, term)
     } catch (err) {
@@ -422,11 +433,12 @@ export class ManagedTerminalSession {
     const canonicalSize = this.runtime.currentCanonicalSize()
     if (canonicalSize.cols === cols && canonicalSize.rows === rows && !this.pendingResize) return
     this.pendingResize = { cols, rows }
-    this.cancelResizeFlush()
-    this.resizeFlushTimer = window.setTimeout(() => {
-      this.resizeFlushTimer = null
+    if (this.resizeFlushScheduled) return
+    this.resizeFlushScheduled = true
+    queueMicrotask(() => {
+      this.resizeFlushScheduled = false
       this.flushResize()
-    }, RESIZE_DEBOUNCE_MS)
+    })
   }
 
   private flushResize(): void {
@@ -457,9 +469,7 @@ export class ManagedTerminalSession {
   }
 
   private cancelResizeFlush(): void {
-    if (this.resizeFlushTimer === null) return
-    window.clearTimeout(this.resizeFlushTimer)
-    this.resizeFlushTimer = null
+    this.resizeFlushScheduled = false
   }
 
   private queueOutput(data: string): void {

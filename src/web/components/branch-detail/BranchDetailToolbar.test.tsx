@@ -311,6 +311,7 @@ function renderToolbar(options: {
     selectedDescriptor,
     sessions,
     count: options.terminalCount,
+    pendingCreate: false,
   }
   const terminalSnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
   const readContext: TerminalSessionReadContextValue = {
@@ -325,6 +326,8 @@ function renderToolbar(options: {
   const showRepoDetailTab = vi.fn(options.navigation.showRepoDetailTab)
   const commandContext: TerminalSessionContextValue = {
     createTerminal,
+    registerHost: vi.fn(),
+    unregisterHost: vi.fn(),
     selectTerminal,
     scrollToBottom,
     scrollLines: vi.fn(),

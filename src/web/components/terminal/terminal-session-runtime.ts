@@ -1,4 +1,5 @@
 import type { TerminalAttachResult, TerminalOutputEvent } from '#/shared/terminal.ts'
+import type { TerminalSessionPhase } from '#/shared/terminal.ts'
 import { TerminalSessionState } from '#/web/components/terminal/terminal-session-state.ts'
 import type { TerminalOwnershipViewModel, TerminalSearchResult } from '#/web/components/terminal/types.ts'
 export class TerminalSessionRuntime {
@@ -69,6 +70,8 @@ export class TerminalSessionRuntime {
     this.replacingPtySessionId = null
     this.ptySessionId = result.sessionId
     return this.state.applyOpenResult({
+      phase: result.phase,
+      message: result.message,
       processName: result.processName,
       canonicalTitle: result.canonicalTitle ?? null,
       role: result.role,
@@ -80,6 +83,8 @@ export class TerminalSessionRuntime {
 
   hydrateSession(input: {
     sessionId: string
+    phase: TerminalSessionPhase
+    message: string | null
     processName: string
     canonicalTitle?: string | null
     role: TerminalOwnershipViewModel['role']
@@ -92,6 +97,8 @@ export class TerminalSessionRuntime {
     this.restartOnStart = false
     this.ptySessionId = input.sessionId
     const metadataChanged = this.state.applyOpenResult({
+      phase: input.phase,
+      message: input.message,
       processName: input.processName,
       canonicalTitle: input.canonicalTitle ?? null,
       role: input.role,
@@ -99,8 +106,7 @@ export class TerminalSessionRuntime {
       canonicalCols: input.canonicalCols,
       canonicalRows: input.canonicalRows,
     })
-    const phaseChanged = this.state.setOpen()
-    const stateChanged = metadataChanged || phaseChanged
+    const stateChanged = metadataChanged
     return sessionChanged || stateChanged
   }
 

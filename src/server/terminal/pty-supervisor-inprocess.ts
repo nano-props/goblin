@@ -40,7 +40,9 @@ export function createInProcessPtySupervisor(): PtySupervisor {
       entries.get(handle.sessionId)?.runtime.resize(cols, rows)
     },
     kill(handle) {
-      entries.get(handle.sessionId)?.runtime.kill()
+      const entry = entries.get(handle.sessionId)
+      entries.delete(handle.sessionId)
+      entry?.runtime.kill()
     },
     onData(handle, listener) {
       const entry = entries.get(handle.sessionId)
@@ -74,7 +76,10 @@ export function createInProcessPtySupervisor(): PtySupervisor {
       // The supervisor contract carries both; we pass nulls because the
       // worker is the source of truth for exit metadata and the in-process
       // variant cannot recover it after the fact.
-      return entry.runtime.onExit(() => listener(null, null))
+      return entry.runtime.onExit(() => {
+        entries.delete(handle.sessionId)
+        listener(null, null)
+      })
     },
     processName(handle) {
       return entries.get(handle.sessionId)?.processName ?? 'terminal'

@@ -1,5 +1,5 @@
 import { computeEffectiveDetailTab } from '#/web/lib/detail-tabs.ts'
-import { useTerminalRepoSyncReady, useWorktreeTerminalCount } from '#/web/components/terminal/terminal-session-store.ts'
+import { useTerminalRepoSyncReady, useWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-store.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import type { DetailTab, RepoDataState, RepoState, RepoUiState } from '#/web/stores/repos/types.ts'
 
@@ -27,7 +27,13 @@ export function useEffectiveDetailTab(repo: EffectiveDetailTabRepo | null | unde
     selectedBranch && repo ? (repo.data.branches.find((entry) => entry.name === selectedBranch) ?? null) : null
   const worktreePath = branch?.worktree?.path ?? null
   const terminalKey = worktreePath && repoId ? worktreeTerminalKey(repoId, worktreePath) : null
-  const sessionCount = useWorktreeTerminalCount(terminalKey)
+  const terminalSnapshot = useWorktreeTerminalSnapshot(terminalKey)
   if (!repo) return 'status'
-  return computeEffectiveDetailTab(repo.ui.preferredDetailTab, !!worktreePath, sessionCount, syncReady)
+  return computeEffectiveDetailTab(
+    repo.ui.preferredDetailTab,
+    !!worktreePath,
+    terminalSnapshot.count,
+    syncReady,
+    terminalSnapshot.pendingCreate,
+  )
 }

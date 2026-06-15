@@ -6,6 +6,10 @@ import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-
 import { compactTerminalProcessName, compactTerminalTitle } from '#/web/components/terminal/terminal-title.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 import { readOrCreateWebTerminalAttachmentId } from '#/web/renderer-terminal-bridge.ts'
+import {
+  preloadTerminalFont,
+  proposeTerminalGeometry,
+} from '#/web/components/terminal/terminal-geometry.ts'
 import { parseTerminalIdIndex, resolveTerminalOwnership } from '#/shared/terminal.ts'
 import { parseTerminalSessionKey } from '#/shared/terminal-session-key.ts'
 import type {
@@ -46,6 +50,17 @@ export class TerminalSessionRegistry {
   private readonly sessionIdByKey = new Map<string, string>()
   private readonly selectedKeyByWorktree = new Map<string, string>()
   private readonly preferredSelectedKeyByWorktree = new Map<string, string>()
+  private readonly hostByWorktree = new Map<string, HTMLElement>()
+  private readonly geometryByWorktree = new Map<string, { cols: number; rows: number }>()
+  private readonly pendingCreateByWorktree = new Map<
+    string,
+    {
+      base: TerminalSessionBase
+      promise: Promise<string>
+      resolve: (key: string) => void
+      reject: (error: unknown) => void
+    }
+  >()
   private readonly snapshotCache = new Map<string, TerminalSnapshot>()
   private readonly reattachSnapshotCache = new Map<string, ReattachSnapshotCacheEntry>()
   private readonly worktreeSnapshotCache = new Map<string, WorktreeTerminalSnapshot>()
@@ -80,12 +95,16 @@ export class TerminalSessionRegistry {
 
   destroy(): void {
     setTerminalFocused(false)
+    for (const pending of this.pendingCreateByWorktree.values()) pending.reject(new Error('terminal registry destroyed'))
     for (const session of this.sessions.values()) session.dispose({ closeSession: false })
     this.sessions.clear()
     this.sessionKeyBySessionId.clear()
     this.sessionIdByKey.clear()
     this.selectedKeyByWorktree.clear()
     this.preferredSelectedKeyByWorktree.clear()
+    this.hostByWorktree.clear()
+    this.geometryByWorktree.clear()
+    this.pendingCreateByWorktree.clear()
     this.snapshotCache.clear()
     this.reattachSnapshotCache.clear()
     this.worktreeSnapshotCache.clear()
@@ -212,6 +231,8 @@ export class TerminalSessionRegistry {
         sessionId: serverSession.sessionId,
         processName: serverSession.processName,
         canonicalTitle: serverSession.canonicalTitle,
+        phase: serverSession.phase,
+        message: serverSession.message,
         role: ownership.role,
         controllerStatus: ownership.controllerStatus,
         canonicalCols: serverSession.cols,
@@ -268,6 +289,27 @@ export class TerminalSessionRegistry {
   }
 
   createTerminal = async (base: TerminalSessionBase): Promise<string> => {
+    const terminalWorktreeKey = worktreeTerminalKey(base.repoRoot, base.worktreePath)
+    const geometry = await this.resolveCreateGeometry(terminalWorktreeKey)
+    if (!geometry) return await this.enqueuePendingCreate(base, terminalWorktreeKey)
+    return await this.performCreateTerminal(base, geometry)
+  }
+
+  registerHost = (worktreeTerminalKey: string, host: HTMLElement): void => {
+    this.hostByWorktree.set(worktreeTerminalKey, host)
+    void this.captureHostGeometry(worktreeTerminalKey)
+    void this.flushPendingCreate(worktreeTerminalKey)
+  }
+
+  unregisterHost = (worktreeTerminalKey: string, host: HTMLElement): void => {
+    if (this.hostByWorktree.get(worktreeTerminalKey) !== host) return
+    this.hostByWorktree.delete(worktreeTerminalKey)
+  }
+
+  private async performCreateTerminal(
+    base: TerminalSessionBase,
+    geometry: { cols: number; rows: number },
+  ): Promise<string> {
     const attachmentId = readOrCreateWebTerminalAttachmentId()
     const terminalWorktreeKey = worktreeTerminalKey(base.repoRoot, base.worktreePath)
     const result = await terminalBridge.create({
@@ -275,6 +317,8 @@ export class TerminalSessionRegistry {
       branch: base.branch,
       worktreePath: base.worktreePath,
       kind: this.sessionSummaries(terminalWorktreeKey).length === 0 ? 'primary' : 'additional',
+      cols: geometry.cols,
+      rows: geometry.rows,
       attachmentId,
     })
     if (!result.ok) {
@@ -291,6 +335,60 @@ export class TerminalSessionRegistry {
       new Map<string, TerminalSessionSnapshot>(),
     )
     return result.key
+  }
+
+  private async resolveCreateGeometry(worktreeTerminalKey: string): Promise<{ cols: number; rows: number } | null> {
+    const measured = await this.captureHostGeometry(worktreeTerminalKey)
+    if (measured) return measured
+    const selected = this.selectedDescriptor(worktreeTerminalKey)
+    if (selected) {
+      const attachment = this.snapshot(selected.key).attachment
+      if (attachment?.canonicalCols && attachment.canonicalRows) {
+        const geometry = { cols: attachment.canonicalCols, rows: attachment.canonicalRows }
+        this.geometryByWorktree.set(worktreeTerminalKey, geometry)
+        return geometry
+      }
+    }
+    return this.geometryByWorktree.get(worktreeTerminalKey) ?? null
+  }
+
+  private async captureHostGeometry(worktreeTerminalKey: string): Promise<{ cols: number; rows: number } | null> {
+    const host = this.hostByWorktree.get(worktreeTerminalKey)
+    if (!host?.isConnected) return null
+    await preloadTerminalFont()
+    const geometry = proposeTerminalGeometry(host)
+    if (!geometry) return null
+    this.geometryByWorktree.set(worktreeTerminalKey, geometry)
+    return geometry
+  }
+
+  private enqueuePendingCreate(base: TerminalSessionBase, worktreeTerminalKey: string): Promise<string> {
+    const existing = this.pendingCreateByWorktree.get(worktreeTerminalKey)
+    if (existing) return existing.promise
+    let resolve!: (key: string) => void
+    let reject!: (error: unknown) => void
+    const promise = new Promise<string>((innerResolve, innerReject) => {
+      resolve = innerResolve
+      reject = innerReject
+    })
+    this.pendingCreateByWorktree.set(worktreeTerminalKey, { base, promise, resolve, reject })
+    this.notifyWorktree(worktreeTerminalKey)
+    void this.flushPendingCreate(worktreeTerminalKey)
+    return promise
+  }
+
+  private async flushPendingCreate(worktreeTerminalKey: string): Promise<void> {
+    const pending = this.pendingCreateByWorktree.get(worktreeTerminalKey)
+    if (!pending) return
+    const geometry = await this.resolveCreateGeometry(worktreeTerminalKey)
+    if (!geometry) return
+    this.pendingCreateByWorktree.delete(worktreeTerminalKey)
+    this.notifyWorktree(worktreeTerminalKey)
+    try {
+      pending.resolve(await this.performCreateTerminal(pending.base, geometry))
+    } catch (error) {
+      pending.reject(error)
+    }
   }
 
   private selectedDescriptor(worktreeTerminalKey: string): TerminalDescriptor | null {
@@ -324,6 +422,7 @@ export class TerminalSessionRegistry {
       selectedDescriptor: this.selectedDescriptor(worktreeTerminalKey),
       sessions,
       count: sessions.length,
+      pendingCreate: this.pendingCreateByWorktree.has(worktreeTerminalKey),
     }
     this.worktreeSnapshotCache.set(worktreeTerminalKey, snapshot)
     return snapshot

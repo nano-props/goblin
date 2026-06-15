@@ -239,6 +239,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   }
 
   async function restartServerTerminal(clientId: string, input: TerminalRestartInput): Promise<TerminalAttachResult> {
+    const repoRoot = manager.getSession(clientId, input.sessionId)?.scope
     if (
       !isValidTerminalClientId(clientId) ||
       !isValidTerminalSessionId(input?.sessionId) ||
@@ -255,6 +256,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       input.attachmentId,
       broker.attachmentIsConnected(clientId, input.attachmentId),
     )
+    if (repoRoot) broker.broadcastGlobal({ type: 'sessions-changed', repoRoot })
     return result.ok ? withSessionSnapshot(result) : result
   }
 
@@ -380,20 +382,20 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       input: TerminalSocketRequestInputs[TAction],
     ) => MaybePromise<TerminalSocketResponseOutputs[TAction]>
   } = {
-    attach(clientId, _attachmentId, input) {
-      return host.attach(clientId, input)
+    attach(clientId, attachmentId, input) {
+      return host.attach(clientId, { ...input, attachmentId })
     },
-    restart(clientId, _attachmentId, input) {
-      return host.restart(clientId, input)
+    restart(clientId, attachmentId, input) {
+      return host.restart(clientId, { ...input, attachmentId })
     },
-    write(clientId, _attachmentId, input) {
-      return host.write(clientId, input)
+    write(clientId, attachmentId, input) {
+      return host.write(clientId, { ...input, attachmentId })
     },
-    resize(clientId, _attachmentId, input) {
-      return host.resize(clientId, input)
+    resize(clientId, attachmentId, input) {
+      return host.resize(clientId, { ...input, attachmentId })
     },
-    takeover(clientId, _attachmentId, input) {
-      return host.takeover(clientId, input)
+    takeover(clientId, attachmentId, input) {
+      return host.takeover(clientId, { ...input, attachmentId })
     },
     close(clientId, _attachmentId, input) {
       return host.close(clientId, input)

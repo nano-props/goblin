@@ -39,6 +39,8 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
     clearBell,
     attach,
     detach,
+    registerHost,
+    unregisterHost,
     scrollLines,
     isTerminalFocusTarget,
     findNext,
@@ -49,6 +51,21 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
     restart,
   } = context
   const terminalWorktreeKey = worktreeTerminalKey(repoRoot, worktreePath)
+  useLayoutEffect(() => {
+    const host = hostRef.current
+    if (!host) return
+    registerHost(terminalWorktreeKey, host)
+    return () => unregisterHost(terminalWorktreeKey, host)
+  }, [registerHost, terminalWorktreeKey, unregisterHost])
+
+  useLayoutEffect(() => {
+    const host = hostRef.current
+    if (!host || typeof ResizeObserver !== 'function') return
+    const observer = new ResizeObserver(() => registerHost(terminalWorktreeKey, host))
+    observer.observe(host)
+    return () => observer.disconnect()
+  }, [registerHost, terminalWorktreeKey])
+
   const descriptor = useWorktreeTerminalSelectedDescriptor(terminalWorktreeKey)
   const key = descriptor?.key ?? null
   const snapshot = useTerminalSnapshot(key)

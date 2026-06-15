@@ -32,6 +32,9 @@ The project runs in Node.js strip-only mode (no `tsc` emit). Do not use these un
   - `docs/state-sync.md` for state ownership and sync guidance
   - `docs/renderer-model.md` for renderer model guidance
   - `docs/realtime.md` for realtime guidance
+  - `docs/terminal.md` for terminal system design
+  - `docs/terminal-roadmap.md` for terminal refactor roadmap
+  - `docs/terminal-target-model.md` for terminal lifecycle and ownership target model
 - Keep the architecture guard green with `bun run check:architecture`. The enforced boundaries are:
   - `src/main/**` must not import `src/web/**` or `src/server/**`.
   - `src/web/**` must not import `src/main/**`.

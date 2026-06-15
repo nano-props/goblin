@@ -38,6 +38,8 @@ function makeServerSession(
     controller: { attachmentId: string; status: 'connected' | 'grace' }
     processName: string
     canonicalTitle: string | null
+    phase: 'opening' | 'open' | 'error'
+    message: string | null
     cols: number
     rows: number
     displayOrder: number
@@ -50,6 +52,8 @@ function makeServerSession(
     controller: overrides.controller ?? null,
     processName: overrides.processName ?? 'bash',
     canonicalTitle: overrides.canonicalTitle ?? null,
+    phase: overrides.phase ?? 'open',
+    message: overrides.message ?? null,
     cols: overrides.cols ?? 80,
     rows: overrides.rows ?? 24,
     displayOrder: overrides.displayOrder ?? 1,

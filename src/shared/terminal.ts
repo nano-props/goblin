@@ -2,6 +2,7 @@ import * as v from 'valibot'
 
 export type TerminalControllerStatus = 'connected' | 'grace' | 'none'
 export type TerminalAttachmentRole = 'controller' | 'viewer' | 'unowned'
+export type TerminalSessionPhase = 'opening' | 'open' | 'error'
 export interface TerminalResolvedOwnership {
   role: TerminalAttachmentRole
   controllerStatus: TerminalControllerStatus
@@ -55,6 +56,8 @@ export type TerminalAttachResult =
       processName: string
       /** Server-canonical terminal title parsed from the OSC 0/2 stream. */
       canonicalTitle: string | null
+      phase: TerminalSessionPhase
+      message: string | null
       snapshot?: string
       snapshotSeq?: number
       controller: TerminalController | null
@@ -119,6 +122,8 @@ export interface TerminalSessionSummary {
   processName: string
   /** Server-canonical terminal title parsed from the OSC 0/2 stream. */
   canonicalTitle: string | null
+  phase: TerminalSessionPhase
+  message: string | null
   cols: number
   rows: number
   displayOrder: number
@@ -262,6 +267,7 @@ const TERMINAL_CONNECTED_CONTROLLER_STATUS_VALUES = ['connected', 'grace'] satis
   TerminalControllerStatus,
   'none'
 >[]
+const TERMINAL_SESSION_PHASE_VALUES = ['opening', 'open', 'error'] satisfies TerminalSessionPhase[]
 const TerminalSessionIdSchema = v.pipe(v.string(), v.regex(TERMINAL_SESSION_ID_RE))
 const TerminalAttachmentIdSchema = v.pipe(v.string(), v.regex(TERMINAL_ATTACHMENT_ID_RE))
 const TerminalRequestIdSchema = v.pipe(v.string(), v.regex(TERMINAL_REQUEST_ID_RE))
@@ -318,6 +324,8 @@ const TerminalSessionSummarySchema = v.object({
   controller: v.nullable(TerminalControllerSchema),
   processName: v.string(),
   canonicalTitle: v.nullable(v.string()),
+  phase: v.picklist(TERMINAL_SESSION_PHASE_VALUES),
+  message: v.nullable(v.string()),
   cols: v.number(),
   rows: v.number(),
   displayOrder: v.number(),

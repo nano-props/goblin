@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
+import { act, useEffect, useRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
@@ -49,6 +49,18 @@ const mockSessions = vi.hoisted(
     }>,
 )
 
+const geometryMocks = vi.hoisted(() => ({
+  preloadTerminalFont: vi.fn(async () => {}),
+  proposeTerminalGeometry: vi.fn(() => ({ cols: 100, rows: 30 })),
+}))
+
+vi.mock('#/web/components/terminal/terminal-geometry.ts', () => ({
+  DEFAULT_TERMINAL_COLS: 80,
+  DEFAULT_TERMINAL_ROWS: 24,
+  preloadTerminalFont: geometryMocks.preloadTerminalFont,
+  proposeTerminalGeometry: geometryMocks.proposeTerminalGeometry,
+}))
+
 vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
   class ManagedTerminalSession {
     descriptor: TerminalDescriptor
@@ -73,7 +85,7 @@ vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
       this.onBell = onBell
       this.sessionId = null
       this.snapshotValue = {
-        phase: 'open',
+        phase: 'opening',
         message: null,
         processName: `terminal ${this.descriptor.index}`,
         canonicalTitle: null,
@@ -139,6 +151,8 @@ vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
 
     hydrate(input: {
       sessionId: string
+      phase: 'opening' | 'open' | 'error'
+      message: string | null
       processName: string
       canonicalTitle?: string | null
       role: 'controller' | 'viewer' | 'unowned'
@@ -151,8 +165,8 @@ vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
       this.hydrateSpy(input)
       this.sessionId = input.sessionId
       this.snapshotValue = {
-        phase: 'open',
-        message: null,
+        phase: input.phase,
+        message: input.message,
         processName: input.processName,
         canonicalTitle: input.canonicalTitle ?? null,
         attachment: {
@@ -240,6 +254,8 @@ function attachResult(): TerminalAttachResult {
     replaySeq: 0,
     processName: 'zsh',
     canonicalTitle: null,
+    phase: 'open',
+    message: null,
     controller: { attachmentId: 'attachment_local', status: 'connected' },
   }
 }
@@ -292,6 +308,8 @@ beforeEach(() => {
         controller,
         processName: terminalId,
         canonicalTitle: null,
+        phase: 'open',
+        message: null,
         cols: 80,
         rows: 24,
         displayOrder: 1,
@@ -333,6 +351,8 @@ beforeEach(() => {
           replaySeq: 0,
           processName: 'zsh',
           canonicalTitle: null,
+          phase: 'open',
+          message: null,
         })),
         restart: vi.fn(async () => ({
           ok: true,
@@ -341,6 +361,8 @@ beforeEach(() => {
           replaySeq: 0,
           processName: 'zsh',
           canonicalTitle: null,
+          phase: 'open',
+          message: null,
         })),
         write: vi.fn(async () => true),
         resize: vi.fn(async () => true),
@@ -519,11 +541,15 @@ describe('TerminalSessionProvider', () => {
         ...base,
         kind: 'primary',
         attachmentId: 'attachment_local',
+        cols: 100,
+        rows: 30,
       })
       expect(createTerminalMock).toHaveBeenNthCalledWith(2, {
         ...base,
         kind: 'additional',
         attachmentId: 'attachment_local',
+        cols: 100,
+        rows: 30,
       })
       expect(getProbe().summaries.map((session) => [session.terminalId, session.selected, session.hasBell])).toEqual([
         ['terminal-1', false, false],
@@ -757,6 +783,8 @@ describe('TerminalSessionProvider', () => {
         controller: { attachmentId: 'attachment_remote', status: 'connected' },
         processName: 'zsh',
         canonicalTitle: null,
+        phase: 'open',
+        message: null,
         cols: 120,
         rows: 40,
         displayOrder: 1,
@@ -820,6 +848,8 @@ describe('TerminalSessionProvider', () => {
         controller: { attachmentId: 'attachment_local', status: 'connected' },
         processName: 'zsh',
         canonicalTitle: null,
+        phase: 'open',
+        message: null,
         cols: 80,
         rows: 24,
         displayOrder: 1,
@@ -882,6 +912,8 @@ describe('TerminalSessionProvider', () => {
         controller: null,
         processName: 'zsh',
         canonicalTitle: null,
+        phase: 'open',
+        message: null,
         cols: 80,
         rows: 24,
         displayOrder: 1,
@@ -893,6 +925,8 @@ describe('TerminalSessionProvider', () => {
         controller: { attachmentId: 'attachment_local', status: 'connected' },
         processName: 'zsh',
         canonicalTitle: null,
+        phase: 'open',
+        message: null,
         cols: 80,
         rows: 24,
         displayOrder: 1,
@@ -1068,6 +1102,8 @@ describe('TerminalSessionProvider', () => {
         controller: { attachmentId: 'attachment_remote', status: 'connected' },
         processName: 'node',
         canonicalTitle: null,
+        phase: 'open',
+        message: null,
         cols: 100,
         rows: 30,
         displayOrder: 1,
@@ -1113,6 +1149,8 @@ describe('TerminalSessionProvider', () => {
         controller: { attachmentId: 'attachment_remote', status: 'connected' },
         processName: 'bash',
         canonicalTitle: null,
+        phase: 'open',
+        message: null,
         cols: 100,
         rows: 30,
         displayOrder: 1,
@@ -1143,6 +1181,8 @@ describe('TerminalSessionProvider', () => {
           controller: { attachmentId: 'attachment_remote', status: 'connected' },
           processName: 'bash',
           canonicalTitle: null,
+          phase: 'open',
+          message: null,
           cols: 100,
           rows: 30,
           displayOrder: 1,
@@ -1182,6 +1222,8 @@ describe('TerminalSessionProvider', () => {
         controller: { attachmentId: 'attachment_remote', status: 'connected' },
         processName: 'bash',
         canonicalTitle: null,
+        phase: 'open',
+        message: null,
         cols: 100,
         rows: 30,
         displayOrder: 1,
@@ -1247,6 +1289,8 @@ describe('TerminalSessionProvider', () => {
         controller: { attachmentId: 'attachment_remote', status: 'connected' },
         processName: 'bash',
         canonicalTitle: null,
+        phase: 'open',
+        message: null,
         cols: 100,
         rows: 30,
         displayOrder: 1,
@@ -1282,6 +1326,8 @@ describe('TerminalSessionProvider', () => {
           controller: { attachmentId: 'attachment_remote', status: 'connected' },
           processName: 'bash',
           canonicalTitle: null,
+          phase: 'open',
+          message: null,
           cols: 100,
           rows: 30,
           displayOrder: 1,
@@ -1318,6 +1364,8 @@ describe('TerminalSessionProvider', () => {
         controller: { attachmentId: 'attachment_remote', status: 'connected' },
         processName: 'bash',
         canonicalTitle: null,
+        phase: 'open',
+        message: null,
         cols: 100,
         rows: 30,
         displayOrder: 1,
@@ -1355,6 +1403,8 @@ describe('TerminalSessionProvider', () => {
           controller: { attachmentId: 'attachment_remote', status: 'connected' },
           processName: 'bash',
           canonicalTitle: null,
+          phase: 'open',
+          message: null,
           cols: 100,
           rows: 30,
           displayOrder: 1,
@@ -1393,6 +1443,8 @@ describe('TerminalSessionProvider', () => {
         controller: { attachmentId: 'attachment_remote', status: 'connected' },
         processName: 'bash',
         canonicalTitle: null,
+        phase: 'open',
+        message: null,
         cols: 100,
         rows: 30,
         displayOrder: 1,
@@ -1458,6 +1510,8 @@ describe('TerminalSessionProvider', () => {
         controller: { attachmentId: 'attachment_remote', status: 'connected' },
         processName: 'bash',
         canonicalTitle: null,
+        phase: 'open',
+        message: null,
         cols: 80,
         rows: 24,
         displayOrder: 1,
@@ -1469,6 +1523,8 @@ describe('TerminalSessionProvider', () => {
         controller: { attachmentId: 'attachment_remote', status: 'connected' },
         processName: 'bash',
         canonicalTitle: null,
+        phase: 'open',
+        message: null,
         cols: 80,
         rows: 24,
         displayOrder: 2,
@@ -1619,6 +1675,13 @@ async function renderProvider(): Promise<{
   getContext: () => TerminalSessionContextValue
   unmount: () => Promise<void>
 }> {
+  return renderProviderWithHost()
+}
+
+async function renderProviderWithHost(): Promise<{
+  getContext: () => TerminalSessionContextValue
+  unmount: () => Promise<void>
+}> {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root: Root = createRoot(container)
@@ -1628,6 +1691,7 @@ async function renderProvider(): Promise<{
     root.render(
       <TerminalSessionProvider>
         <CaptureContext onContext={(value) => (context = value)} />
+        <RegisterHost worktreeTerminalKey={worktreeTerminalKey(REPO_ID, WORKTREE_PATH)} />
       </TerminalSessionProvider>,
     )
   })
@@ -1681,6 +1745,7 @@ async function renderProviderWithProbe(worktreeTerminalKey: string): Promise<{
     root.render(
       <TerminalSessionProvider>
         <CaptureContext onContext={(value) => (context = value)} />
+        <RegisterHost worktreeTerminalKey={worktreeTerminalKey} />
         <CaptureGroupProbe worktreeTerminalKey={worktreeTerminalKey} onProbe={(value) => (probe = value)} />
       </TerminalSessionProvider>,
     )
@@ -1700,4 +1765,20 @@ async function renderProviderWithProbe(worktreeTerminalKey: string): Promise<{
       container.remove()
     },
   }
+}
+
+function RegisterHost({ worktreeTerminalKey }: { worktreeTerminalKey: string }) {
+  const context = useTerminalSessionContext()
+  const ref = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    const host = ref.current
+    if (!host) return
+    context.registerHost(worktreeTerminalKey, host)
+    return () => {
+      context.unregisterHost(worktreeTerminalKey, host)
+    }
+  }, [context, worktreeTerminalKey])
+
+  return <div ref={ref} />
 }

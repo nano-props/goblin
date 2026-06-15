@@ -14,6 +14,15 @@ import type { ITheme } from '@xterm/xterm'
 import type { Terminal as XTermTerminal } from '@xterm/xterm'
 import { Terminal } from '@xterm/xterm'
 import {
+  DEFAULT_TERMINAL_COLS,
+  DEFAULT_TERMINAL_ROWS,
+  preloadTerminalFont,
+  proposeTerminalGeometry,
+  TERMINAL_FONT_FAMILY,
+  TERMINAL_FONT_SIZE,
+  TERMINAL_LINE_HEIGHT,
+} from '#/web/components/terminal/terminal-geometry.ts'
+import {
   observeTerminalTheme,
   terminalSearchDecorationsForCurrentDocument,
   terminalThemeForCurrentDocument,
@@ -25,74 +34,8 @@ import {
 } from '#/web/components/terminal/terminal-keyboard.ts'
 const DEFAULT_PARKING_WIDTH = 800
 const DEFAULT_PARKING_HEIGHT = 400
-const DEFAULT_TERMINAL_COLS = 80
-const DEFAULT_TERMINAL_ROWS = 24
-const MIN_INITIAL_TERMINAL_COLS = 2
-const MIN_INITIAL_TERMINAL_ROWS = 1
-const TERMINAL_SCROLLBAR_WIDTH = 14
 const RESIZE_DEBOUNCE_MS = 80
 const FONT_REMEASURE_DEBOUNCE_MS = 80
-const TERMINAL_FONT_SIZE = 14
-const TERMINAL_FONT_FAMILY = "'Goblin Mono', monospace"
-const TERMINAL_LINE_HEIGHT = 1.35
-
-let cachedTerminalCellMetrics: { cellWidth: number; cellHeight: number } | null = null
-
-export function preloadTerminalFont(): Promise<void> {
-  if (!document.fonts) return Promise.resolve()
-  const spec = `${TERMINAL_FONT_SIZE}px ${TERMINAL_FONT_FAMILY}`
-  if (document.fonts.check(spec)) return Promise.resolve()
-  return document.fonts
-    .load(spec)
-    .then(() => {})
-    .catch(() => {})
-}
-
-function measureTerminalCell(): { cellWidth: number; cellHeight: number } | null {
-  if (cachedTerminalCellMetrics) return cachedTerminalCellMetrics
-  if (!document.body) return null
-  const probe = document.createElement('span')
-  // 100 'M' chars amortizes sub-pixel rounding across a wider sample so the
-  // derived cell width lands within ~1 CSS pixel of xterm.js's own canvas
-  // glyph metric. Inline styles override any cascading rules and match the
-  // exact font xterm.js uses to lay out cells.
-  probe.textContent = 'M'.repeat(100)
-  probe.style.cssText = [
-    'position:absolute',
-    'top:-9999px',
-    'left:-9999px',
-    'visibility:hidden',
-    'pointer-events:none',
-    'white-space:pre',
-    'letter-spacing:0',
-    'font-variant-ligatures:none',
-    `font-family:${TERMINAL_FONT_FAMILY}`,
-    `font-size:${TERMINAL_FONT_SIZE}px`,
-    `line-height:${TERMINAL_LINE_HEIGHT}`,
-  ].join(';')
-  document.body.appendChild(probe)
-  const width = probe.offsetWidth
-  const height = probe.offsetHeight
-  probe.remove()
-  if (width <= 0 || height <= 0) return null
-  cachedTerminalCellMetrics = { cellWidth: width / 100, cellHeight: height }
-  return cachedTerminalCellMetrics
-}
-
-function proposeInitialTerminalGeometry(host: HTMLElement): { cols: number; rows: number } | null {
-  if (!hasMeasurableBox(host)) return null
-  const metrics = measureTerminalCell()
-  if (!metrics) return null
-  const rect = host.getBoundingClientRect()
-  // Mirror FitAddon.proposeDimensions: subtract the scrollbar width that
-  // xterm.js reserves whenever scrollback is enabled, then floor by cell
-  // size. .xterm itself has zero padding, so the host rect is the
-  // available content box.
-  const availableWidth = Math.max(0, rect.width - TERMINAL_SCROLLBAR_WIDTH)
-  const cols = Math.max(MIN_INITIAL_TERMINAL_COLS, Math.floor(availableWidth / metrics.cellWidth))
-  const rows = Math.max(MIN_INITIAL_TERMINAL_ROWS, Math.floor(rect.height / metrics.cellHeight))
-  return { cols, rows }
-}
 
 export class TerminalSessionView {
   private readonly frame: HTMLDivElement
@@ -188,7 +131,7 @@ export class TerminalSessionView {
     // would paint once at 80×24 and then fitAddon.fit() would resize the
     // buffer, which causes a visible reflow and occasionally leaves a
     // stale reverse-video cursor cell at the top-left in narrow hosts.
-    const initialGeometry = proposeInitialTerminalGeometry(this.xtermHost)
+    const initialGeometry = proposeTerminalGeometry(this.xtermHost)
     const term = new Terminal({
       allowProposedApi: true,
       cols: initialGeometry?.cols ?? DEFAULT_TERMINAL_COLS,
@@ -447,7 +390,6 @@ export class TerminalSessionView {
   private fitForFontLoad(term: XTermTerminal): void {
     if (this.term !== term || !this.fitAddon || !hasMeasurableBox(this.xtermHost)) return
     this.fitAddon.fit()
-    term.refresh(0, Math.max(0, term.rows - 1))
     this.pinToBottomSoon()
   }
 

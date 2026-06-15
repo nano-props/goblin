@@ -14,6 +14,7 @@ const EMPTY_WORKTREE_TERMINAL_SNAPSHOT: WorktreeTerminalSnapshot = {
   selectedDescriptor: null,
   sessions: [],
   count: 0,
+  pendingCreate: false,
 }
 
 const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = { phase: 'opening', message: null, processName: 'terminal' }

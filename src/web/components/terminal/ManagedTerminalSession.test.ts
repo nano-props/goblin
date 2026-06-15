@@ -418,8 +418,7 @@ const descriptor = {
 }
 
 beforeEach(() => {
-  // Use fake timers so debounce waits (RESIZE_DEBOUNCE_MS = 80, FONT_REMEASURE_DEBOUNCE_MS = 80)
-  // and the rAF chain fire deterministically when helpers advance the clock, instead of
+  // Use fake timers so font refit waits and the rAF chain fire deterministically when helpers advance the clock, instead of
   // burning real wall time on every test.
   vi.useFakeTimers({
     toFake: ['setTimeout', 'setInterval', 'requestAnimationFrame', 'cancelAnimationFrame'],
@@ -619,7 +618,7 @@ describe('ManagedTerminalSession', () => {
     await flushFontRefit()
 
     expect(fitAddon.fit).toHaveBeenCalledTimes(1)
-    expect(term.refresh).toHaveBeenCalledWith(0, term.rows - 1)
+    expect(term.refresh).not.toHaveBeenCalled()
 
     term.refresh.mockClear()
     fitAddon.fit.mockClear()
@@ -628,7 +627,7 @@ describe('ManagedTerminalSession', () => {
     await flushFontRefit()
 
     expect(fitAddon.fit).toHaveBeenCalledTimes(1)
-    expect(term.refresh).toHaveBeenCalledWith(0, term.rows - 1)
+    expect(term.refresh).not.toHaveBeenCalled()
   })
 
   test('loads terminal addons and exposes search and serialization', async () => {
@@ -970,9 +969,9 @@ describe('ManagedTerminalSession', () => {
     await flushUntil(() => session.snapshot().phase === 'open')
 
     xtermMocks.terminals[0]!.resize(101, 31)
-    await flushResizeDebounce()
+    await flushResizeDispatch()
     xtermMocks.terminals[0]!.resize(101, 31)
-    await flushResizeDebounce()
+    await flushResizeDispatch()
 
     expect(terminalCalls.resize).toHaveBeenCalledTimes(2)
     expect(terminalCalls.resize).toHaveBeenNthCalledWith(1, { sessionId: 'session-1', cols: 101, rows: 31 })
@@ -997,7 +996,7 @@ describe('ManagedTerminalSession', () => {
     await flushUntil(() => session.snapshot().phase === 'open')
 
     xtermMocks.terminals[0]!.resize(101, 31)
-    await flushResizeDebounce()
+    await flushResizeDispatch()
     expect(terminalCalls.resize).not.toHaveBeenCalled()
 
     xtermMocks.terminals[0]!.emitData('input')
@@ -1021,6 +1020,8 @@ describe('ManagedTerminalSession', () => {
 
     session.hydrate({
       sessionId: 'session-remote',
+      phase: 'open',
+      message: null,
       processName: 'node',
       role: 'controller',
       controllerStatus: 'connected',
@@ -1054,6 +1055,8 @@ describe('ManagedTerminalSession', () => {
 
     session.hydrate({
       sessionId: 'session-remote',
+      phase: 'open',
+      message: null,
       processName: 'node',
       role: 'viewer',
       controllerStatus: 'connected',
@@ -1162,7 +1165,7 @@ describe('ManagedTerminalSession', () => {
     await flushUntil(() => session.snapshot().phase === 'open')
 
     xtermMocks.terminals[0]!.resize(101, 31)
-    await flushResizeDebounce()
+    await flushResizeDispatch()
     expect(session.snapshot().attachment).toMatchObject({
       role: 'viewer',
       controllerStatus: 'connected',
@@ -1596,6 +1599,8 @@ function attachResult(
     replaySeq: 0,
     processName: 'zsh',
     canonicalTitle: null,
+    phase: 'open',
+    message: null,
     controller: { attachmentId: 'attachment_local', status: 'connected' },
     ...overrides,
   }
@@ -1619,6 +1624,8 @@ function hydrateManagedSession(
   session: ManagedTerminalSession,
   overrides: Partial<{
     sessionId: string
+    phase: 'opening' | 'open' | 'error'
+    message: string | null
     processName: string
     canonicalTitle?: string | null
     role: 'controller' | 'viewer' | 'unowned'
@@ -1631,6 +1638,8 @@ function hydrateManagedSession(
 ): void {
   session.hydrate({
     sessionId: 'session-1',
+    phase: 'open',
+    message: null,
     processName: 'zsh',
     canonicalTitle: null,
     role: 'controller',
@@ -1663,9 +1672,9 @@ async function flushTerminalStart(): Promise<void> {
   await vi.runAllTimersAsync()
 }
 
-async function flushResizeDebounce(): Promise<void> {
-  // RESIZE_DEBOUNCE_MS in the source is 80. Advance past it.
-  await vi.advanceTimersByTimeAsync(100)
+async function flushResizeDispatch(): Promise<void> {
+  await Promise.resolve()
+  await Promise.resolve()
 }
 
 async function flushFontRefit(): Promise<void> {

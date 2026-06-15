@@ -27,6 +27,10 @@ describe('computeEffectiveDetailTab', () => {
     expect(computeEffectiveDetailTab('terminal', true, 0, true)).toBe('status')
   })
 
+  test('keeps terminal renderable while a create request is pending', () => {
+    expect(computeEffectiveDetailTab('terminal', true, 0, true, true)).toBe('terminal')
+  })
+
   test('does not dismiss terminal when sync settled with non-zero sessions', () => {
     expect(computeEffectiveDetailTab('terminal', true, 1, true)).toBe('terminal')
   })
@@ -40,6 +44,7 @@ describe('computeEffectiveDetailTab', () => {
       [['terminal', false, 0, true], 'status'],
       [['terminal', true, 0, false], 'terminal'],
       [['terminal', true, 0, true], 'status'],
+      [['terminal', true, 0, true, true], 'terminal'],
       [['terminal', true, 3, true], 'terminal'],
     ]
     for (const [input, expected] of cases) {
