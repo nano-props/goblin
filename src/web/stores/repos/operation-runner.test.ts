@@ -247,7 +247,7 @@ describe('runLatestOperation active-task cancellation', () => {
       lane: 'lifecycle',
       operationKey: 'remoteLifecycle',
       priority: 1,
-      targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
+      targets: [{ key: 'remoteLifecycle', reason: 'remote-lifecycle' }],
       task: (signal) =>
         new Promise<{ ok: true; tag: 'first' }>((resolve) => {
           signal.addEventListener('abort', () => {
@@ -270,7 +270,7 @@ describe('runLatestOperation active-task cancellation', () => {
       lane: 'lifecycle',
       operationKey: 'remoteLifecycle',
       priority: 1,
-      targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
+      targets: [{ key: 'remoteLifecycle', reason: 'remote-lifecycle' }],
       task: async () => {
         secondStarted = true
         return { ok: true, tag: 'second' as const }
@@ -307,7 +307,7 @@ describe('runLatestOperation active-task cancellation', () => {
       lane: 'lifecycle',
       operationKey: 'remoteLifecycle',
       priority: 1,
-      targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
+      targets: [{ key: 'remoteLifecycle', reason: 'remote-lifecycle' }],
       task: (signal) =>
         new Promise<{ ok: true }>((resolve) => {
           signal.addEventListener('abort', () => resolve({ ok: true }))
@@ -324,7 +324,7 @@ describe('runLatestOperation active-task cancellation', () => {
       lane: 'lifecycle',
       operationKey: 'remoteLifecycle',
       priority: 1,
-      targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
+      targets: [{ key: 'remoteLifecycle', reason: 'remote-lifecycle' }],
       task: async () => {
         secondStarted = true
         return { ok: true }
@@ -409,7 +409,7 @@ describe('runLatestOperation active-task cancellation', () => {
       lane: 'lifecycle',
       operationKey: 'remoteLifecycle',
       priority: 1,
-      targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
+      targets: [{ key: 'remoteLifecycle', reason: 'remote-lifecycle' }],
       task: (signal) =>
         new Promise<string>((resolve) => {
           signal.addEventListener('abort', () => {
@@ -430,7 +430,7 @@ describe('runLatestOperation active-task cancellation', () => {
       lane: 'lifecycle',
       operationKey: 'remoteLifecycle',
       priority: 1,
-      targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
+      targets: [{ key: 'remoteLifecycle', reason: 'remote-lifecycle' }],
       task: async () => 'NEW',
     })
 

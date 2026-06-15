@@ -92,9 +92,6 @@ export function deriveConnectivity(repo: RepoState): RepoConnectivity {
   // migrating every writer to the lifecycle helpers, treat it
   // as `connecting` so the UI shows a spinner — never as a
   // silently-broken `connected` tab.
-  if (import.meta.env.DEV) {
-    console.warn(`[deriveConnectivity] remote repo ${repo.id} has no lifecycle; treating as connecting`)
-  }
   return 'connecting'
 }
 
