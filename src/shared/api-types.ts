@@ -310,6 +310,13 @@ export interface NativeIpcHandlers {
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
     applyShellProjection: (input: NativeShellProjection) => Promise<void>
   }
+  session: {
+    // Renderer pushes session-level state that affects the native menu
+    // (currently: workspace layout, which gates the CmdOrCtrl+J toggle
+    // shortcut's `enabled` predicate). Returns true when the value
+    // changed and the menu was rebuilt.
+    setWorkspaceLayout: (input: { workspaceLayout: WorkspaceLayout }) => Promise<boolean>
+  }
 }
 
 export type NativeIpcPath = {
@@ -400,6 +407,11 @@ export interface AppRouter {
         input: unknown,
       ) => Promise<Awaited<ReturnType<NativeIpcHandlers['settings'][K]>>>
     }
+    session: {
+      [K in keyof NativeIpcHandlers['session']]: (
+        input: unknown,
+      ) => Promise<Awaited<ReturnType<NativeIpcHandlers['session'][K]>>>
+    }
   }
 }
 
@@ -411,6 +423,7 @@ export function createAppRouter(handlers: NativeIpcHandlers, schemas: NativeIpcP
   return {
     createCaller: () => ({
       settings: createValidatedNamespace(handlers.settings, schemas.settings),
+      session: createValidatedNamespace(handlers.session, schemas.session),
     }),
   }
 }

@@ -48,7 +48,3 @@ export function readMenuRuntimeState(): MenuRuntimeState {
 export function applyMenuRuntimeState(next: Partial<MenuRuntimeState>): void {
   state = nextMenuRuntimeState(state, next)
 }
-
-export function setMenuWorkspaceLayout(workspaceLayout: WorkspaceLayout): void {
-  applyMenuRuntimeState({ workspaceLayout })
-}

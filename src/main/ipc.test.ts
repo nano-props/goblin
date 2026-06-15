@@ -148,7 +148,7 @@ vi.mock('#/main/shortcuts.ts', () => ({
 
 vi.mock('#/main/menu.ts', () => ({
   buildAppMenu: vi.fn(),
-  setMenuWorkspaceLayout: vi.fn(),
+  applyMenuWorkspaceLayout: vi.fn(() => false),
 }))
 
 vi.mock('#/main/i18n/index.ts', () => ({

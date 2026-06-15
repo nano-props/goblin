@@ -22,6 +22,7 @@ import type {
 } from '#/web/stores/repos/types.ts'
 import type { WorkspaceDetailPaneSizes } from '#/shared/workspace-layout.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
+import { pushWorkspaceLayoutToNativeMenu } from '#/web/settings-client.ts'
 
 type RestorableWorkspaceSelectionActions = Pick<
   ReposStore,
@@ -107,7 +108,10 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
     },
 
     setWorkspaceLayout(layout: RepoWorkspaceLayout) {
+      let layoutChanged = false
+      let previousLayout: RepoWorkspaceLayout | undefined
       set((s) => {
+        previousLayout = s.workspaceLayout
         const detailFocusMode = layout === 'top-bottom' ? s.detailFocusMode : false
         const detailCollapsed = effectiveDetailCollapsed(layout, s.detailCollapsed)
         if (
@@ -117,8 +121,18 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
         ) {
           return s
         }
+        layoutChanged = true
         return { workspaceLayout: layout, detailCollapsed, detailFocusMode }
       })
+      // Push the new layout to main so the native menu's
+      // `view-toggle-detail` `enabled` predicate — and therefore the
+      // CmdOrCtrl+J accelerator — stays in sync with the renderer's
+      // store in the same tick, not after the session save lands.
+      // Fire-and-forget; transient IPC failures are caught and logged
+      // inside the helper.
+      if (layoutChanged && previousLayout !== layout) {
+        void pushWorkspaceLayoutToNativeMenu(layout)
+      }
     },
 
     applySessionLayoutState(layoutState: Parameters<ReposStore['applySessionLayoutState']>[0]) {
@@ -206,7 +220,10 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
     },
 
     resetLayout() {
+      let layoutChanged = false
+      let previousLayout: RepoWorkspaceLayout | undefined
       set((s) => {
+        previousLayout = s.workspaceLayout
         const detailCollapsed = effectiveDetailCollapsed(DEFAULT_WORKSPACE_LAYOUT, DEFAULT_DETAIL_COLLAPSED)
         if (
           s.workspaceLayout === DEFAULT_WORKSPACE_LAYOUT &&
@@ -217,6 +234,7 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
         ) {
           return s
         }
+        layoutChanged = true
         return {
           workspaceLayout: DEFAULT_WORKSPACE_LAYOUT,
           detailCollapsed,
@@ -224,6 +242,12 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
           detailPaneSizes: DEFAULT_DETAIL_PANE_SIZES,
         }
       })
+      // Same main-sync reason as `setWorkspaceLayout`: the native menu
+      // must rebuild so the CmdOrCtrl+J accelerator re-enables when the
+      // user resets out of `left-right`.
+      if (layoutChanged && previousLayout !== DEFAULT_WORKSPACE_LAYOUT) {
+        void pushWorkspaceLayoutToNativeMenu(DEFAULT_WORKSPACE_LAYOUT)
+      }
     },
 
     setSelectedTerminal(worktreeTerminalKey: string, key: string | null) {
