@@ -3,11 +3,10 @@
 // sessions, sockets, or business state — it translates the wire
 // protocol into node-pty calls and emits data/exit events.
 //
-// Title-OSC-driven process-name updates: when the worker sees a
-// title OSC (or the equivalent exec event) it samples the pty's
-// `process` name and pushes a `pty-process-name-changed` event so
-// the main process can refresh its cache without making a roundtrip
-// per chunk.
+// Process-name sampling is deferred to the first onData chunk and
+// then refreshed on every title-OSC change. The first-chunk sample
+// avoids the macOS spawn-helper race (term.process read in the same
+// tick as pty.spawn returns the helper's comm, not the shell's).
 
 import * as pty from 'node-pty'
 import { resolveLocalShell } from '#/server/terminal/terminal-local-shell.ts'
@@ -20,9 +19,7 @@ import type { PtyWorkerMessage, PtyWorkerRequest } from '#/server/terminal/pty-w
  *  runtime's spawnPty fn returns this same shape so the failure path
  *  (a structured `{ ok: false, message }` instead of a throw) is
  *  expressible from the start. */
-type PtySpawnOutcome =
-  | { ok: true; runtime: TerminalPtyRuntime }
-  | { ok: false; message: string }
+type PtySpawnOutcome = { ok: true; runtime: TerminalPtyRuntime } | { ok: false; message: string }
 
 export interface PtyWorkerRuntimeOptions {
   emit(message: PtyWorkerMessage): void
@@ -79,36 +76,41 @@ export class PtyWorkerRuntime {
       return
     }
     const sessionId = createSessionId()
-    const initialProcessName = safeProcessName(result.runtime)
-    this.ptys.set(sessionId, { runtime: result.runtime, processName: initialProcessName })
+    // Defer the initial sample to the first onData chunk: node-pty's
+    // macOS spawn-helper briefly holds the PTY before exec'ing the
+    // shell, so term.process read in the same tick as pty.spawn returns
+    // the helper's comm. By the time the shell has produced output,
+    // the helper is gone and the comm is the real name.
+    this.ptys.set(sessionId, { runtime: result.runtime, processName: 'terminal' })
     this.options.emit({
       type: 'pty-spawn-result',
       requestId,
       ok: true,
       sessionId,
-      processName: initialProcessName,
+      processName: 'terminal',
     })
-    this.wireDataAndExitEvents(sessionId, result.runtime, initialProcessName)
+    this.wireDataAndExitEvents(sessionId, result.runtime)
   }
 
-  private wireDataAndExitEvents(sessionId: string, runtime: TerminalPtyRuntime, initialProcessName: string): void {
+  private wireDataAndExitEvents(sessionId: string, runtime: TerminalPtyRuntime): void {
     const render = createEmptyTerminalRenderState()
     let lastBroadcastTitle: string | null = render.title
-    let lastProcessName = initialProcessName
+    let sampled = false
     runtime.onData((data) => {
       this.options.emit({ type: 'pty-data', sessionId, data })
       appendOutput(render, data)
-      // Sample the child process name on title-change boundaries only.
-      // Reading pty.process on every chunk is a syscall on Unix, and
-      // shell title-OSC and exec events travel together (zsh -> bash
-      // -> vim etc.) so the cheapest reliable signal is a title diff.
-      if (render.title !== lastBroadcastTitle) {
-        lastBroadcastTitle = render.title
+      // Sample on the first chunk (safe — spawn-helper is gone) and
+      // on every title-OSC change (shell exec'd a new command). Both
+      // signals travel together in practice, but the first-chunk sample
+      // alone covers shells that never set a title (sh, minimal configs).
+      const titleChanged = render.title !== lastBroadcastTitle
+      if (titleChanged) lastBroadcastTitle = render.title
+      if (!sampled || titleChanged) {
+        sampled = true
         const nextName = safeProcessName(runtime)
-        if (nextName && nextName !== lastProcessName) {
-          lastProcessName = nextName
-          const entry = this.ptys.get(sessionId)
-          if (entry) entry.processName = nextName
+        const entry = this.ptys.get(sessionId)
+        if (entry && nextName && nextName !== entry.processName) {
+          entry.processName = nextName
           this.options.emit({ type: 'pty-process-name-changed', sessionId, processName: nextName })
         }
       }

@@ -61,9 +61,8 @@ interface TerminalSession<TOwner extends string | number> {
   cols: number
   rows: number
   pty: PtyHandle | null
-  disposables: Array<{ dispose: () => void }>
+  disposables: Array<{ dispose(): void }>
   render: TerminalRenderState
-  processName: string
   attachmentId: string | null
   attachment: TerminalAttachmentState | null
   controller: TerminalController | null
@@ -126,7 +125,6 @@ export class TerminalSessionManager<TOwner extends string | number> {
       pty: null,
       disposables: [],
       render: createEmptyTerminalRenderState(),
-      processName: '',
       attachmentId: null,
       attachment: null,
       controller: null,
@@ -311,7 +309,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
           key: session.key,
           cwd: session.cwd,
           controller: cloneTerminalController(session.controller),
-          processName: session.processName,
+          processName: session.pty ? this.ptySupervisor.processName(session.pty) : 'terminal',
           canonicalTitle: session.render.title,
           cols: session.cols,
           rows: session.rows,
@@ -409,7 +407,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
       sessionId: session.id,
       replay: session.render.buffer,
       replaySeq: session.render.sequence,
-      processName: session.processName,
+      processName: session.pty ? this.ptySupervisor.processName(session.pty) : 'terminal',
       canonicalTitle: session.render.title,
       controller: cloneTerminalController(session.controller),
       canonicalCols: session.cols,
@@ -443,7 +441,6 @@ export class TerminalSessionManager<TOwner extends string | number> {
     session.cols = cols
     session.rows = rows
     resetRender(session.render)
-    session.processName = ''
     session.inputQueue = []
     session.inputFlushScheduled = false
   }
@@ -473,14 +470,9 @@ export class TerminalSessionManager<TOwner extends string | number> {
       return resolved
     }
     session.pty = resolved.handle
-    session.processName = resolved.processName
-    // Track the last broadcast title so we don't spam the client with
-    // the same title on every chunk. The render state only mutates
-    // `title` when the captured OSC value differs from the previous
-    // one, so a reference comparison is sufficient as a "did the title
-    // just change?" signal. Initialized to `null` (matching the initial
-    // render state) so the first chunk does not broadcast a spurious
-    // `canonicalTitle: null` event before the shell has set anything.
+    // The PtySupervisor owns the processName cache. It samples on the
+    // first data chunk (deferred past the macOS spawn-helper exec) and
+    // refreshes on every title-OSC change. We query it on demand.
     let lastBroadcastTitle: string | null = session.render.title
     const handle = resolved.handle
     session.disposables.push(
@@ -488,14 +480,6 @@ export class TerminalSessionManager<TOwner extends string | number> {
         const seq = appendOutput(session.render, data)
         if (session.render.title !== lastBroadcastTitle) {
           lastBroadcastTitle = session.render.title
-          // Title OSC and exec events travel together: when the shell
-          // exec's a new command (e.g. zsh -> bash -> vim) the child
-          // updates both its title and its /proc-style name atomically.
-          // Reading the process name on every chunk would be a syscall
-          // on Unix (kill(pid, 0) + comm read) so we sample it only on
-          // this cheap-and-reliable title-change signal.
-          const nextName = this.ptySupervisor.processName(handle)
-          if (nextName && nextName !== session.processName) session.processName = nextName
           this.sink.onTitle?.(session.ownerId, {
             sessionId: session.id,
             canonicalTitle: session.render.title,
@@ -505,7 +489,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
           sessionId: session.id,
           data,
           seq,
-          processName: session.processName,
+          processName: this.ptySupervisor.processName(handle),
         })
       }),
     )

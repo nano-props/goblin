@@ -37,17 +37,33 @@ vi.mock('node-pty', () => ({
       },
     }
     mockPtys.push(pty)
-    return {
-      ...pty,
+    // Spread does NOT preserve getter closures — it captures the
+    // current value at spread time. The worker wraps this object in
+    // NodePtyTerminalRuntime and reads `.process` later, so we have
+    // to expose the live pty directly. `onData`/`onExit` are layered
+    // on top of the same pty.
+    const wrapped: MockPty & {
+      onData: (cb: (data: string) => void) => { dispose(): void }
+      onExit: (cb: () => void) => { dispose(): void }
+    } = Object.assign(pty, {
       onData: (cb: (data: string) => void) => {
         onData = cb
-        return { dispose: vi.fn(() => { if (onData === cb) onData = null }) }
+        return {
+          dispose: vi.fn(() => {
+            if (onData === cb) onData = null
+          }),
+        }
       },
       onExit: (cb: () => void) => {
         onExit = cb
-        return { dispose: vi.fn(() => { if (onExit === cb) onExit = null }) }
+        return {
+          dispose: vi.fn(() => {
+            if (onExit === cb) onExit = null
+          }),
+        }
       },
-    }
+    })
+    return wrapped
   }),
 }))
 
@@ -67,7 +83,7 @@ beforeEach(() => {
 })
 
 describe('PtyWorkerRuntime', () => {
-  test('pty-spawn returns a sessionId and the initial process name', () => {
+  test('pty-spawn returns a sessionId and a placeholder process name', () => {
     const { runtime, emitted } = buildRuntime()
     runtime.handleMessage({ type: 'pty-spawn', requestId: 'req_1', input: { cwd: '/repo', cols: 80, rows: 24 } })
 
@@ -77,8 +93,43 @@ describe('PtyWorkerRuntime', () => {
       requestId: 'req_1',
       ok: true,
       sessionId: expect.stringMatching(/^ptyw_/),
-      processName: 'zsh',
+      // The initial processName is a placeholder; the real name is
+      // sampled on the first onData chunk so the macOS spawn-helper
+      // comm never leaks. See "samples the real process name on the
+      // first onData chunk" below.
+      processName: 'terminal',
     })
+  })
+
+  test('samples the real process name on the first onData chunk', () => {
+    const { runtime, emitted } = buildRuntime()
+    runtime.handleMessage({ type: 'pty-spawn', requestId: 'req', input: { cwd: '/repo', cols: 80, rows: 24 } })
+    const pty = mockPtys[0]
+    if (!pty) throw new Error('no pty')
+    const sessionId = (emitted.find((m) => m.type === 'pty-spawn-result' && m.ok) as { sessionId: string } | undefined)
+      ?.sessionId
+    if (!sessionId) throw new Error('no session id')
+
+    pty.emitData('hello')
+
+    const nameChanges = emitted.filter((m) => m.type === 'pty-process-name-changed')
+    expect(nameChanges).toEqual([{ type: 'pty-process-name-changed', sessionId, processName: 'zsh' }])
+  })
+
+  test('does not re-sample on subsequent plain chunks when the title is unchanged', () => {
+    const { runtime, emitted } = buildRuntime()
+    runtime.handleMessage({ type: 'pty-spawn', requestId: 'req', input: { cwd: '/repo', cols: 80, rows: 24 } })
+    const pty = mockPtys[0]
+    if (!pty) throw new Error('no pty')
+
+    pty.emitData('a')
+    pty.emitData('b')
+    pty.emitData('c')
+
+    const nameChanges = emitted.filter((m) => m.type === 'pty-process-name-changed')
+    // Only the first-chunk sample fires; the next two plain chunks
+    // leave the cached name alone.
+    expect(nameChanges).toHaveLength(1)
   })
 
   test('pty-spawn surfaces a structured failure when node-pty throws', () => {
@@ -127,9 +178,7 @@ describe('PtyWorkerRuntime', () => {
     pty.emitData('hello')
     pty.emitExit()
 
-    expect(emitted.filter((m) => m.type === 'pty-data')).toEqual([
-      { type: 'pty-data', sessionId, data: 'hello' },
-    ])
+    expect(emitted.filter((m) => m.type === 'pty-data')).toEqual([{ type: 'pty-data', sessionId, data: 'hello' }])
     expect(emitted.filter((m) => m.type === 'pty-exit')).toEqual([
       { type: 'pty-exit', sessionId, code: null, signal: null },
     ])
@@ -142,16 +191,16 @@ describe('PtyWorkerRuntime', () => {
       ?.sessionId
     if (!sessionId) throw new Error('no session id')
 
-    // Title-OSC handling and processName sampling is exercised in the
-    // in-process supervisor and render-state unit tests. Here we just
-    // verify the wiring: plain data should be emitted as pty-data without
-    // an accompanying pty-process-name-changed event when the title has
-    // not changed.
     const pty = mockPtys[0]
     if (!pty) throw new Error('no pty')
     pty.emitData('plain-output')
-    const dataOnly = emitted.filter((m) => m.type === 'pty-data')
-    expect(dataOnly).toEqual([{ type: 'pty-data', sessionId, data: 'plain-output' }])
+    pty.setProcessName('vim')
+    pty.emitData('\x1b]0;vim\x07')
+    const nameChanges = emitted.filter((m) => m.type === 'pty-process-name-changed')
+    expect(nameChanges).toEqual([
+      { type: 'pty-process-name-changed', sessionId, processName: 'zsh' },
+      { type: 'pty-process-name-changed', sessionId, processName: 'vim' },
+    ])
   })
 
   test('shutdown kills every live pty', () => {
