@@ -45,7 +45,7 @@ export function ToolbarClosableTab({
         type="button"
         {...buttonProps}
         className={cn(
-          'flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-left text-inherit outline-none',
+          'flex h-full min-w-0 flex-1 cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-left text-inherit outline-none',
           buttonClassName,
         )}
       >
