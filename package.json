@@ -27,7 +27,6 @@
     "format:check": "prettier --check .",
     "publish": "bun scripts/publish.ts",
     "count-lines": "bun scripts/count-lines.ts",
-    "postinstall": "bun scripts/fix-noisy-sourcemaps.cjs",
     "clean": "rm -rf dist release"
   },
   "devDependencies": {
@@ -90,7 +89,6 @@
     "react-i18next": "17.0.8",
     "react-resizable-panels": "4.11.2",
     "sonner": "2.0.7",
-    "ssh-config": "5.1.0",
     "tailwind-merge": "3.6.0",
     "valibot": "1.4.1",
     "write-file-atomic": "8.0.0",

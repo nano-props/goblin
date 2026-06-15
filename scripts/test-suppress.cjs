@@ -5,15 +5,10 @@
 //        - Node v22+ warning that `--localstorage-file` was passed without a
 //          valid path. Some node v25 builds print this even when nothing
 //          asked for the flag; tests do not depend on it.
-//        - Bun's "Sourcemap for ... points to missing source files" warning
-//          for dependencies that ship no `.map` files (ssh-config, etc.).
 //        - jsdom's "Not implemented:" warnings. jsdom does not implement
 //          every Web API, but tests only call a handful of them and a
 //          missing implementation is the test's own choice, not a real
 //          signal.
-//        - Hono's "serveStatic: root path '...' is not found" warning when
-//          the optional `dist/web` directory is absent (typical of a fresh
-//          `bun run test` without `bun run build`).
 //
 //   2. Provide a working `localStorage` / `sessionStorage` shim in the
 //      default `node` environment so persist middlewares (e.g. Zustand in
@@ -29,7 +24,7 @@ const { emit: originalEmit } = process
 // warnings, including the ones we want to filter. Intercepting it is the
 // only reliable way to suppress them; `process.on('warning', ...)` does not
 // fire for the ones printed during early process startup.
-const warningMessageFilters = ['--localstorage-file was provided without a valid path', 'Sourcemap for']
+const warningMessageFilters = ['--localstorage-file was provided without a valid path']
 
 process.emit = function patchedEmit(event, payload, ...rest) {
   if (event === 'warning' && payload && typeof payload.message === 'string') {

@@ -14,7 +14,7 @@ export default defineConfig({
     restoreMocks: true,
     // Load `scripts/test-suppress.cjs` in every worker fork. It runs at
     // process startup, before user test code, so it can:
-    //   - silence process-level warnings (--localstorage-file, sourcemap,
+    //   - silence process-level warnings (--localstorage-file,
     //     jsdom "Not implemented")
     //   - install a localStorage / sessionStorage shim so Zustand persist
     //     middleware never sees a half-stubbed `globalThis.localStorage`
