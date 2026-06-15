@@ -29,8 +29,8 @@ const APP_ID = 'goblin.app'
 
 // Tunable behaviour. CLI flags win; env vars fill the gap so shell/CI can
 // set them once. Install-mode defaults are tuned for a fast rebuild
-// (`install.sh` / `install.ps1` is the hot path; `bun run build` keeps
-// upstream behaviour).
+// (`install.ts` is the hot path; `bun run build` keeps upstream
+// behaviour).
 const shouldInstallMode = (mode: string) => mode === 'install' || mode === 'i'
 const truthy = (v: string | undefined) => v === '1' || v === 'true'
 
@@ -60,7 +60,7 @@ const NPM_MIRROR_BINARIES = 'https://npmmirror.com/mirrors/electron-builder-bina
 function resolveOptions(mode: string, cli: CliFlags): BuildOptions {
   const shouldInstall = shouldInstallMode(mode)
   // Defaults: mirrors off (use GitHub). The user opts into a mirror via
-  // --npm-mirror, env vars, or --mirror/--binaries-mirror. install.sh
+  // --npm-mirror, env vars, or --mirror/--binaries-mirror. install.ts
   // translates --npmmirror into the env vars before invoking this script,
   // so the two paths share the same env-driven config.
   const defaults: BuildOptions = {

@@ -18,6 +18,7 @@
     "build:server": "bun build ./src/server/entrypoints/main.ts ./src/server/entrypoints/pty-worker.ts --outdir ./dist/server --target node --external node-pty",
     "start:server": "node scripts/start-server.ts",
     "build:electron": "electron-builder",
+    "install:app": "bun install.ts",
     "check:architecture": "bun scripts/check-architecture.ts",
     "typecheck": "bun scripts/typecheck.ts",
     "test": "vitest run",
