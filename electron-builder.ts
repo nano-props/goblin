@@ -16,6 +16,7 @@ const config: Configuration = {
     // imports through Electron's native TS loader, so removing these globs
     // breaks packaged builds even though dev still works.
     'src/main/**/*.ts',
+    'src/node/**/*.ts',
     'src/system/**/*.ts',
     'src/server/**/*.ts',
     'src/shared/**/*.ts',
