@@ -244,39 +244,38 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
         className={cn('goblin-terminal-slot__host', isReadonly && 'goblin-terminal-slot__host--hidden')}
         aria-readonly={(!isController && hasSessions) || undefined}
       />
-      <div className="goblin-terminal-float-group">
-        {searchOpen && (
-          <div className="goblin-terminal-slot__search">
-            <input
-              ref={searchInputRef}
-              className="goblin-terminal-slot__search-input"
-              value={searchTerm}
-              aria-label={t('terminal.search-placeholder')}
-              placeholder={t('terminal.search-placeholder')}
-              onChange={(event) => handleSearchChange(event.target.value)}
-              onKeyDown={handleSearchKeyDown}
-            />
-            <span className="goblin-terminal-slot__search-result" role="status" aria-live="polite" aria-atomic="true">
-              {resultLabel}
-            </span>
-            <Button type="button" size="sm" variant="ghost" onClick={searchPrevious} disabled={!searchTerm}>
-              {t('terminal.search-previous')}
-            </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={() => searchNext()} disabled={!searchTerm}>
-              {t('terminal.search-next')}
-            </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={closeSearch}>
-              {t('terminal.search-close')}
-            </Button>
-          </div>
-        )}
-        {isMobileDevice() && isController && key && (
-          <MobileTerminalToolbar
-            onInput={(data) => writeInput(key, data)}
-            onScrollLines={(amount) => scrollLines(key, amount)}
+      {searchOpen && (
+        <div className="goblin-terminal-slot__search">
+          <input
+            ref={searchInputRef}
+            className="goblin-terminal-slot__search-input"
+            value={searchTerm}
+            aria-label={t('terminal.search-placeholder')}
+            placeholder={t('terminal.search-placeholder')}
+            onChange={(event) => handleSearchChange(event.target.value)}
+            onKeyDown={handleSearchKeyDown}
           />
-        )}
-      </div>
+          <span className="goblin-terminal-slot__search-result" role="status" aria-live="polite" aria-atomic="true">
+            {resultLabel}
+          </span>
+          <Button type="button" size="sm" variant="ghost" onClick={searchPrevious} disabled={!searchTerm}>
+            {t('terminal.search-previous')}
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={() => searchNext()} disabled={!searchTerm}>
+            {t('terminal.search-next')}
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={closeSearch}>
+            {t('terminal.search-close')}
+          </Button>
+        </div>
+      )}
+      {isMobileDevice() && isController && key && (
+        <MobileTerminalToolbar
+          className="goblin-terminal-mobile-toolbar--floating"
+          onInput={(data) => writeInput(key, data)}
+          onScrollLines={(amount) => scrollLines(key, amount)}
+        />
+      )}
       {isReadonly && (
         <ViewerOverlay
           badge={readonlyBadge}

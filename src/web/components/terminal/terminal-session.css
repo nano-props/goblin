@@ -113,6 +113,10 @@
 }
 
 .goblin-terminal-slot__search {
+  position: absolute;
+  top: var(--goblin-terminal-float-offset);
+  right: var(--goblin-terminal-float-offset);
+  z-index: 2;
   display: flex;
   max-width: calc(100% - 20px);
   align-items: center;
@@ -122,17 +126,6 @@
   background: color-mix(in srgb, var(--color-popover) 96%, transparent);
   padding: 6px;
   box-shadow: var(--shadow-sm);
-}
-
-.goblin-terminal-float-group {
-  position: absolute;
-  top: var(--goblin-terminal-float-offset);
-  right: var(--goblin-terminal-float-offset);
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  gap: var(--goblin-terminal-float-offset);
-  align-items: flex-end;
 }
 
 .goblin-terminal-slot__search-input {
@@ -290,6 +283,14 @@
   box-shadow: var(--shadow-sm);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
+}
+
+.goblin-terminal-mobile-toolbar--floating {
+  position: absolute;
+  right: var(--goblin-terminal-float-offset);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
 }
 
 .goblin-terminal-mobile-toolbar__row {
