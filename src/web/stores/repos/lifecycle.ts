@@ -8,8 +8,9 @@ import {
   refreshInitialRepoState,
   resolveRepoPath,
 } from '#/web/stores/repos/lifecycle-write-paths.ts'
+import { runRemoteRepoLifecycle } from '#/web/stores/repos/remote-lifecycle-orchestrator.ts'
 import { activeRepoIdAfterWorkspaceHydration } from '#/web/open-workspace-state.ts'
-import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
+import { isRemoteRepoId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 
 interface InitialRepoRefresh {
   id: string
@@ -101,14 +102,38 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
           limitProbe(async () => {
             // Respect the abort signal: if the caller (e.g. the boot
             // effect) unmounted, skip starting the probe and don't
-            // apply its result. In-flight network calls can't be
-            // cancelled through JS, but we don't process their results
-            // and we don't keep the store from converging to its Phase 1
-            // state.
+            // apply its result.
             if (signal?.aborted) return
-            const probe = await resolveRepoPath(entry, (err) => {
-              console.warn(`[session] probe failed for ${repoSessionEntryId(entry)}:`, err)
-            })
+            if (isRemoteRepoId(entry.id)) {
+              // Remote entries go through the unified orchestrator.
+              // It owns: connecting → server boundary → ready/failed
+              // → initial refresh. Local probes stay on the
+              // legacy path below since they have no remote
+              // lifecycle to converge.
+              const outcome = await runRemoteRepoLifecycle(set, get, entry.id, { signal })
+              if (signal?.aborted) return
+              // Hydration must keep the user-selected active repo
+              // in sync with the orchestrator's writes. The
+              // orchestrator updates the store directly; we just
+              // re-derive the activeId after each settlement.
+              if (outcome) {
+                set((s) => {
+                  const { repos, order } = s
+                  const activeId = activeRepoIdAfterWorkspaceHydration(
+                    s.activeId,
+                    repos,
+                    order,
+                    activeRepo,
+                    managedActiveId,
+                  )
+                  if (s.activeId === null || s.activeId === managedActiveId) managedActiveId = activeId
+                  if (repos === s.repos && order === s.order && activeId === s.activeId) return s
+                  return { repos, order, activeId }
+                })
+              }
+              return
+            }
+            const probe = await resolveRepoPath(entry)
             if (signal?.aborted) return
             if (!probe.repo) {
               set((s) => {

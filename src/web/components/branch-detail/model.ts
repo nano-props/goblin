@@ -9,7 +9,7 @@ export interface BranchDetailRepo extends BranchActionRepo {
   data: BranchActionRepo['data'] & Pick<RepoState['data'], 'branches' | 'statusLoaded'>
   ui: Pick<RepoState['ui'], 'selectedBranch' | 'preferredDetailTab'>
   resources: Pick<RepoState['resources'], 'status' | 'pullRequests'>
-  remote: BranchActionRepo['remote'] & Pick<RepoState['remote'], 'target'>
+  remote: BranchActionRepo['remote'] & Pick<RepoState['remote'], 'lifecycle'>
 }
 
 export function getSelectedBranchDetail(repo: BranchDetailRepo) {
@@ -18,7 +18,14 @@ export function getSelectedBranchDetail(repo: BranchDetailRepo) {
   const worktreeState = branch ? getBranchWorktreeState(repo, branch) : null
   const statusCount = worktreeState?.changeCount ?? selectedStatus.reduce((n, wt) => n + wt.entries.length, 0)
 
-  return { branch, selectedStatus, statusCount, worktreeState, remoteTarget: repo.remote.target }
+  // The detail presentation reads the target from the lifecycle
+  // union via `remoteRepoTarget`; we don't mirror it on the
+  // `remote` shape anymore (Phase 4 removed the legacy
+  // `target` field). `repoId` is forwarded so consumers can
+  // re-resolve the live lifecycle via `useReposStore` (the
+  // detail object is a snapshot — it doesn't re-render on
+  // lifecycle transitions).
+  return { repoId: repo.id, branch, selectedStatus, statusCount, worktreeState }
 }
 
 export function getSelectedBranchDetailPresentation(repo: BranchDetailRepo) {

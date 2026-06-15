@@ -1,4 +1,4 @@
-import { updateIfFresh } from '#/web/stores/repos/helpers.ts'
+import { isRepoUnavailable, updateIfFresh } from '#/web/stores/repos/helpers.ts'
 import { runExclusiveOperation } from '#/web/stores/repos/operation-runner.ts'
 import {
   applyFetchResourceError,
@@ -65,7 +65,7 @@ export function createRefreshSyncHelpers(set: ReposSet, get: ReposGet) {
         return null
       }
       repo = repoIfFresh(get, id, token)
-      if (!repo || repo.availability.phase === 'unavailable') return null
+      if (!repo || isRepoUnavailable(repo)) return null
       if (!canStartRemoteFetch(repo)) return null
     }
     try {

@@ -23,6 +23,8 @@ import {
 import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { formatWorktreePath } from '#/web/lib/paths.ts'
+import { remoteRepoTarget } from '#/web/stores/repos/helpers.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
 import { PROTECTED_BRANCHES, branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import type { SelectedBranchDetail } from '#/web/components/branch-detail/model.ts'
 import type { RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
@@ -84,7 +86,14 @@ export function BranchStatus({ detail, layout }: Props) {
   if (!branch) return <EmptyState title={t('branches.empty')} />
 
   const protectedBranch = PROTECTED_BRANCHES.has(branch.name)
-  const worktreePath = branch.worktree?.path ? formatWorktreePath(branch.worktree?.path, detail.remoteTarget) : ''
+  // Phase 4: pull the target off the lifecycle union. The
+  // selector is keyed on the lifecycle itself, so a re-probe
+  // (e.g. network reconnect) re-renders this row.
+  const worktreeTarget = useReposStore((s) => {
+    const repo = s.repos[detail.repoId]
+    return repo ? remoteRepoTarget(repo.id, repo.remote.lifecycle) : null
+  })
+  const worktreePath = branch.worktree?.path ? formatWorktreePath(branch.worktree?.path, worktreeTarget) : ''
   const worktreeChangeCount = detail.worktreeState?.changeCount ?? statusCount
   const pullRequest =
     branch.pullRequest && branchPullRequestBelongsToBranch(branch, branch.pullRequest) ? branch.pullRequest : undefined

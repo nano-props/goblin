@@ -1,9 +1,19 @@
-import { remoteRepoRefFromTarget, remoteRepoSessionEntry, type RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import {
+  isRemoteRepoId,
+  remoteRepoLifecycleTarget,
+  remoteRepoRefFromTarget,
+  remoteRepoSessionEntry,
+  type RemoteRepoLifecycle,
+  type RepoSessionEntry,
+} from '#/shared/remote-repo.ts'
+
+/** Minimal shape this helper needs from a `RepoState`. Defined
+ *  locally so the persistence / session layer doesn't have to
+ *  depend on the full store types. */
 interface OpenWorkspaceRepoLike {
   id: string
   remote: {
-    target?: RemoteRepoTarget
+    lifecycle: RemoteRepoLifecycle | null
   }
 }
 
@@ -14,9 +24,18 @@ export function persistedOpenWorkspaceEntries(
   return order.flatMap<RepoSessionEntry>((id) => {
     const repo = repos[id]
     if (!repo) return []
-    return repo.remote.target
-      ? [remoteRepoSessionEntry(remoteRepoRefFromTarget(repo.remote.target))]
-      : [{ kind: 'local', id: repo.id }]
+    if (!isRemoteRepoId(repo.id)) return [{ kind: 'local', id: repo.id }]
+    // For remote repos, reconstruct the session entry from the
+    // last-known target (lifecycle.target). A failed lifecycle
+    // may or may not have a retained target; without one we
+    // can't reconstruct a session entry, so the repo is dropped
+    // from the recent-workspace list. This is the same
+    // intentional trade-off as the pre-Phase-4 code: a
+    // placeholder with no target is just a connecting spinner,
+    // not a repo the user explicitly opened.
+    const target = remoteRepoLifecycleTarget(repo.remote.lifecycle)
+    if (!target) return []
+    return [remoteRepoSessionEntry(remoteRepoRefFromTarget(target))]
   })
 }
 

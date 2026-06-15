@@ -3,21 +3,25 @@ import { repoTabSummariesEqual } from '#/web/components/repo-tabs/summary-equali
 import type { RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
 
 describe('repoTabSummariesEqual', () => {
-  test('treats remote target metadata changes as unequal even when repo id stays the same', () => {
+  test('treats remote lifecycle target changes as unequal even when repo id stays the same', () => {
     const left: RepoTabSummary[] = [
       {
         id: 'ssh-config://example/srv%2Frepo',
         name: 'repo',
         remoteDetails: [],
-        remoteTarget: {
-          id: 'ssh-config://example/srv%2Frepo',
-          alias: 'example',
-          host: 'old-host.internal',
-          user: 'old-user',
-          port: 22,
-          remotePath: '/srv/repo',
-          displayName: 'example:repo',
+        lifecycle: {
+          kind: 'ready',
+          target: {
+            id: 'ssh-config://example/srv%2Frepo',
+            alias: 'example',
+            host: 'old-host.internal',
+            user: 'old-user',
+            port: 22,
+            remotePath: '/srv/repo',
+            displayName: 'example:repo',
+          },
         },
+        unavailable: false,
       },
     ]
     const right: RepoTabSummary[] = [
@@ -25,15 +29,19 @@ describe('repoTabSummariesEqual', () => {
         id: 'ssh-config://example/srv%2Frepo',
         name: 'repo',
         remoteDetails: [],
-        remoteTarget: {
-          id: 'ssh-config://example/srv%2Frepo',
-          alias: 'example',
-          host: 'new-host.internal',
-          user: 'new-user',
-          port: 2222,
-          remotePath: '/srv/repo',
-          displayName: 'example-renamed:repo',
+        lifecycle: {
+          kind: 'ready',
+          target: {
+            id: 'ssh-config://example/srv%2Frepo',
+            alias: 'example',
+            host: 'new-host.internal',
+            user: 'new-user',
+            port: 2222,
+            remotePath: '/srv/repo',
+            displayName: 'example-renamed:repo',
+          },
         },
+        unavailable: false,
       },
     ]
 

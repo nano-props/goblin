@@ -5,8 +5,8 @@ import type { ExecResult, PullRequestFetchMode, WorktreeStatus } from '#/shared/
 import type { ProbeResult } from '#/shared/api-types.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 
-export async function probeRepository(cwd: string): Promise<ProbeResult> {
-  return await getServerJson('/api/repo/probe', { cwd })
+export async function probeRepository(cwd: string, signal?: AbortSignal): Promise<ProbeResult> {
+  return await getServerJson('/api/repo/probe', { cwd }, { signal })
 }
 
 export async function cloneRepository(input: {

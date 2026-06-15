@@ -3,6 +3,7 @@ import { createElement, type ReactNode } from 'react'
 import { GitHubOutlineIcon } from '#/web/components/GitHubOutlineIcon.tsx'
 import { GitLabLogoIcon } from '#/web/components/GitLabLogoIcon.tsx'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
+import { remoteRepoTarget } from '#/web/stores/repos/helpers.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { EditorAppIcon, TerminalAppIcon } from '#/web/components/ExternalAppIcon/index.tsx'
 import { useBranchActions, type BranchActionItemId } from '#/web/hooks/useBranchActions.tsx'
@@ -80,7 +81,7 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
   const pullRequest =
     branch.pullRequest && branchPullRequestBelongsToBranch(branch, branch.pullRequest) ? branch.pullRequest : undefined
   const remoteIcon = pullRequest ? GitPullRequest : browserRemoteIcon(branchBrowserRemoteProvider(repo, branch))
-  const isRemoteRepo = !!repo.remote.target
+  const isRemoteRepo = remoteRepoTarget(repo.id, repo.remote.lifecycle) !== null
   // For remote repos the SSH invocation runs on the user's machine, so we
   // don't need the local terminal/editor to be installed — the menu item
   // stays visible regardless of `terminalAvailable` / `editorAvailable`.

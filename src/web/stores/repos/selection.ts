@@ -1,6 +1,6 @@
 import { arrayMove } from '@dnd-kit/sortable'
 import { selectedBranchForViewMode } from '#/web/stores/repos/branch-view-mode.ts'
-import { replaceRepo, replaceRepoState } from '#/web/stores/repos/helpers.ts'
+import { isRepoUnavailable, replaceRepo, replaceRepoState } from '#/web/stores/repos/helpers.ts'
 import { persistRestorableRepoSnapshot } from '#/web/stores/repos/persistence.ts'
 import {
   DEFAULT_DETAIL_COLLAPSED,
@@ -368,7 +368,7 @@ function createRepoMutationSelectionActions(set: ReposSet, get: ReposGet): RepoM
       const state = get()
       const repo = state.repos[id]
       if (!repo) return
-      if (repo.availability.phase === 'unavailable') return
+      if (isRepoUnavailable(repo)) return
       const token = repo.instanceToken
       const branch = repo.ui.selectedBranch
       if (!branch || branch === repo.data.currentBranch) return

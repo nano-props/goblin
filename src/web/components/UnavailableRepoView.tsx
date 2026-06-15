@@ -1,4 +1,5 @@
 import { AlertCircle, RefreshCw, Shield, X } from 'lucide-react'
+import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { PanelInset } from '#/web/components/ui/panel.tsx'
@@ -6,6 +7,7 @@ import { formatRepoLocator } from '#/web/lib/paths.ts'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import { formatTranslatableReason, shouldOfferSshSettings, unavailableBodyKey } from '#/web/lib/remote-support.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
+import { isRepoUnavailable, remoteRepoTarget } from '#/web/stores/repos/helpers.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
@@ -16,8 +18,22 @@ interface Props {
 export function UnavailableRepoView({ repo }: Props) {
   const t = useT()
   const navigation = useMainWindowNavigation()
-  const reason = repo.availability.phase === 'unavailable' ? repo.availability.reason : 'error.failed-read-repo'
-  const isRemote = !!repo.remote.target
+  // Phase 4 invariant: the `availability.phase` mirror is a
+  // legacy hint for the refresh-pipeline guards, NOT the
+  // authoritative source. The lifecycle union is. Gate on
+  // `isRepoUnavailable` (which dispatches by repo kind) and
+  // read the reason from the field that owns it for each kind.
+  const isUnavailable = isRepoUnavailable(repo)
+  const isRemote = isRemoteRepoId(repo.id)
+  const reason = isRemote
+    ? (repo.remote.lifecycle?.kind === 'failed' ? repo.remote.lifecycle.reason : 'error.failed-read-repo')
+    : (repo.availability.phase === 'unavailable' ? repo.availability.reason : 'error.failed-read-repo')
+  if (!isUnavailable) {
+    // Defensive: this view is only mounted by RepoView when
+    // the repo is unavailable, but a stale render after a state
+    // transition shouldn't render an empty body.
+    return null
+  }
   const bodyKey = unavailableBodyKey(isRemote, reason)
   const canOpenSshSettings = isRemote && shouldOfferSshSettings(reason)
 
@@ -34,7 +50,7 @@ export function UnavailableRepoView({ repo }: Props) {
                 {t('repo-unavailable.path')}
               </div>
               <div className="mt-1 break-all font-mono text-[11px] text-foreground">
-                {formatRepoLocator(repo.id, repo.remote.target)}
+                {formatRepoLocator(repo.id, remoteRepoTarget(repo.id, repo.remote.lifecycle))}
               </div>
               <div className="mt-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 {t('repo-unavailable.reason')}

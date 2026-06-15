@@ -19,7 +19,7 @@ export interface BranchActionRepo {
   operations: Pick<RepoState['operations'], 'branchAction'>
   remote: Pick<
     RepoState['remote'],
-    'hasRemotes' | 'hasBrowserRemote' | 'hasGitHubRemote' | 'target' | 'browserRemoteProvider' | 'remoteProviders'
+    'lifecycle' | 'hasRemotes' | 'hasBrowserRemote' | 'hasGitHubRemote' | 'browserRemoteProvider' | 'remoteProviders'
   >
 }
 

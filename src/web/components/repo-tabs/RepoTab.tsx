@@ -40,14 +40,19 @@ export function RepoTab({
   unavailableLabel,
 }: RepoTabProps) {
   const t = useT()
-  const tabLabel = repo.unavailable ? `${repo.name} — ${unavailableLabel}` : repo.name
   const sortable = useSortableTab(repo.id, { onButtonRef: focusRegistry?.setRef(repo.id) })
   const isRemote = isRemoteRepoId(repo.id)
-  // A remote tab shows the "connecting" spinner whenever it has no
-  // resolved target — not just at boot, but any time a probe is in
-  // flight or has yet to produce a target (e.g. re-probe after
-  // reconnection). Local tabs never show it.
-  const showConnecting = isRemote && !repo.unavailable && !repo.remoteTarget
+  // A remote tab's chrome is driven entirely by the lifecycle
+  // union: 'connecting' → spinner, 'failed' → warning badge,
+  // 'ready' (or null for local) → plain tab.
+  const lifecycle = repo.lifecycle
+  const showConnecting = lifecycle?.kind === 'connecting'
+  const showFailed = lifecycle?.kind === 'failed'
+  // Phase 1 keeps the legacy `unavailable` boolean in sync via the
+  // markRemoteLifecycleFailed helper, so the existing tooltip /
+  // aria-label path keeps working. Once Phase 4 removes the legacy
+  // field, the union is the only signal.
+  const tabLabel = showFailed ? `${repo.name} — ${unavailableLabel}` : repo.name
   const connectingTitle = t('repo-tabs.connecting-title')
 
   return (
@@ -114,7 +119,8 @@ export function RepoTab({
           <Loader2 size={12} className="animate-spin" aria-hidden />
         </span>
       )}
-      {repo.unavailable && <AlertCircle size={12} className="shrink-0 text-warning" aria-hidden />}
+      {showFailed && <AlertCircle size={12} className="shrink-0 text-warning" aria-hidden />}
     </ToolbarClosableTab>
   )
 }
+

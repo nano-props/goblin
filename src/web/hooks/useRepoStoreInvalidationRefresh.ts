@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { subscribeRepoQueryInvalidation } from '#/web/repo-query-invalidation-ingress.ts'
+import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
 import { handleRepoInvalidationRefresh } from '#/web/stores/repos/refresh-coordinator.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 export function useRepoStoreInvalidationRefresh() {
@@ -8,7 +9,7 @@ export function useRepoStoreInvalidationRefresh() {
       if (event.query !== 'repo-snapshot') return
       const state = useReposStore.getState()
       const repo = state.repos[event.repoId]
-      if (!repo || repo.availability.phase === 'unavailable') return
+      if (!repo || isRepoUnavailable(repo)) return
       const token = repo.instanceToken
       void handleRepoInvalidationRefresh(useReposStore.getState, event, token)
     })

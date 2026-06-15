@@ -1,4 +1,5 @@
 import type { RepoState } from '#/web/stores/repos/types.ts'
+import { toRemoteRepoFailureReason, type RemoteRepoTarget } from '#/shared/remote-repo.ts'
 type RepoAvailabilityTarget = Pick<RepoState, 'availability' | 'remote'>
 
 const UNAVAILABLE_REASONS = new Set([
@@ -21,4 +22,59 @@ export function markRepoUnavailable(repo: RepoAvailabilityTarget, reason: string
   repo.availability = { phase: 'unavailable', reason, checkedAt: Date.now() }
   repo.remote.fetchFailed = false
   repo.remote.fetchError = null
+}
+
+// Re-export the shared reason-mapping helper so existing
+// `import { toRemoteRepoFailureReason } from '#/web/.../availability.ts'`
+// call sites keep compiling through the Phase 1→3 transition. The
+// canonical definition lives in `shared/remote-repo.ts` so the
+// server boundary can use the same mapping.
+export { toRemoteRepoFailureReason } from '#/shared/remote-repo.ts'
+
+/**
+ * Set the remote lifecycle to `connecting` (entry point of a fresh
+ * remote-repo run). The legacy `target` field is gone in Phase 4;
+ * the lifecycle union owns the target and the `connecting` variant
+ * has no slot for it. Pass-through to availability keeps the
+ * refresh-pipeline call sites (refresh.ts) that flip
+ * `availability` from `available` working unchanged — the
+ * availability mirror is still useful as a hint, not as the
+ * lifecycle signal.
+ */
+export function markRemoteLifecycleConnecting(repo: Pick<RepoState, 'remote' | 'availability'>): void {
+  repo.remote.lifecycle = { kind: 'connecting' }
+  repo.remote.fetchFailed = false
+  repo.remote.fetchError = null
+}
+
+/**
+ * Set the remote lifecycle to `ready` with a concrete target. This is
+ * the success terminus of a remote-repo run. Mirrors
+ * `markRepoAvailable` on the availability field (kept as a hint
+ * for the refresh-pipeline guards in refresh.ts).
+ */
+export function markRemoteLifecycleReady(
+  repo: Pick<RepoState, 'remote' | 'availability'>,
+  target: RemoteRepoTarget,
+): void {
+  repo.remote.lifecycle = { kind: 'ready', target }
+  markRepoAvailable(repo)
+}
+
+/**
+ * Set the remote lifecycle to `failed` with a reason and an optional
+ * last-known target. Mirrors `markRepoUnavailable` on the
+ * availability field (kept as a hint for the refresh-pipeline
+ * guards in refresh.ts).
+ */
+export function markRemoteLifecycleFailed(
+  repo: Pick<RepoState, 'remote' | 'availability'>,
+  reason: string,
+  target?: RemoteRepoTarget,
+): void {
+  const lifecycleReason = toRemoteRepoFailureReason(reason)
+  repo.remote.lifecycle = target
+    ? { kind: 'failed', reason: lifecycleReason, target }
+    : { kind: 'failed', reason: lifecycleReason }
+  markRepoUnavailable(repo, reason)
 }

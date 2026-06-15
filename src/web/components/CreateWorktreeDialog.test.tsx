@@ -143,7 +143,7 @@ function createRemoteRepo(): RepoState {
   if (!target) throw new Error('Failed to create remote target for test')
   const repo = createRepo()
   repo.id = target.id
-  repo.remote.target = target
+  repo.remote.lifecycle = { kind: 'ready', target }
   return repo
 }
 

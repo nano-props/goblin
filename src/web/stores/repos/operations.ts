@@ -7,6 +7,7 @@ export type RepoOperationKey =
   | 'status'
   | 'pullRequests'
   | 'branchAction'
+  | 'remoteLifecycle'
   | `pullRequest:${string}`
 export type RepoBranchActionReason =
   | 'branch:checkout'
@@ -26,6 +27,7 @@ export type RepoOperationReason =
   | 'pullRequests'
   | 'user-fetch'
   | 'manual-refresh'
+  | 'remote-lifecycle'
   | RepoPullRequestReason
   | RepoBranchActionReason
 
@@ -52,6 +54,15 @@ export interface RepoOperationsState {
   status: RepoOperationState
   pullRequests: RepoOperationState
   branchAction: RepoOperationState
+  /**
+   * Reserved for the remote-repo lifecycle orchestrator
+   * (web/stores/repos/remote-lifecycle-orchestrator.ts). The
+   * orchestrator keeps its own state in `remote.lifecycle`, so this
+   * slot is intentionally unused at runtime — it exists so the
+   * operation-key routing in `runLatestOperation` can dispatch
+   * without throwing. New code MUST NOT read this field.
+   */
+  remoteLifecycle: RepoOperationState
   pullRequestsByBranch: Record<string, RepoOperationState>
 }
 
@@ -83,6 +94,7 @@ export function emptyRepoOperations(): RepoOperationsState {
     status: idleOperation(),
     pullRequests: idleOperation(),
     branchAction: idleOperation(),
+    remoteLifecycle: idleOperation(),
     pullRequestsByBranch: {},
   }
 }
@@ -108,6 +120,8 @@ function operationForKey(operations: RepoOperationsState, key: RepoOperationKey)
       return operations.pullRequests
     case 'branchAction':
       return operations.branchAction
+    case 'remoteLifecycle':
+      return operations.remoteLifecycle
   }
   const exhaustive: never = key
   return exhaustive
@@ -129,6 +143,8 @@ function readOperationForKey(operations: RepoOperationsState, key: RepoOperation
       return operations.pullRequests
     case 'branchAction':
       return operations.branchAction
+    case 'remoteLifecycle':
+      return operations.remoteLifecycle
   }
   const exhaustive: never = key
   return exhaustive

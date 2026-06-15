@@ -1,20 +1,48 @@
 import { fetchServerJson, postServerJson } from '#/web/lib/server-fetch.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
-import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
-import type { RemoteDiagnosticsResult, RemotePathSuggestionsInput, SshConfigHostsResult } from '#/shared/remote-repo.ts'
+import type {
+  RemoteDiagnosticsResult,
+  RemotePathSuggestionsInput,
+  RemoteRepoLifecycleResult,
+  RemoteRepoTarget,
+  SshConfigHostsResult,
+} from '#/shared/remote-repo.ts'
 
 /** Server-side result for resolve-target: concrete target or an i18n
  *  key (e.g. `error.ssh-config-changed`, `repo-tabs.open-remote-home-unavailable`).
  *  Callers localize the error message via `t()`. */
 type ResolveTargetResponse = { target: RemoteRepoTarget } | { error: string }
 
-export async function resolveRemoteRepositoryTarget(ref: {
-  alias: string
-  remotePath: string
-}): Promise<RemoteRepoTarget> {
-  const result = await postServerJson<typeof ref, ResolveTargetResponse>('/api/remote/resolve-target', ref)
+export async function resolveRemoteRepositoryTarget(
+  ref: { alias: string; remotePath: string },
+  signal?: AbortSignal,
+): Promise<RemoteRepoTarget> {
+  const result = await postServerJson<typeof ref, ResolveTargetResponse>(
+    '/api/remote/resolve-target',
+    ref,
+    { signal },
+  )
   if ('error' in result) throw new Error(result.error)
   return result.target
+}
+
+/**
+ * Single-server-call remote-repo lifecycle boundary (see
+ * docs/.../plan §5). The server composes resolveTarget +
+ * probe + classification and returns a converged
+ * `RemoteRepoLifecycleResult` (ready or failed, never
+ * connecting). The orchestrator's task is a thin
+ * delegation to this function.
+ */
+export async function resolveRemoteRepoLifecycle(
+  input: { repoId: string },
+  signal?: AbortSignal,
+): Promise<RemoteRepoLifecycleResult> {
+  return await postServerJson<typeof input, RemoteRepoLifecycleResult>(
+    '/api/remote/lifecycle',
+    input,
+    { signal },
+  )
 }
 
 export async function getRemoteSshHosts(): Promise<SshConfigHostsResult> {

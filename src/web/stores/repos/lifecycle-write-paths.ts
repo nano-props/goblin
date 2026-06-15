@@ -6,6 +6,12 @@ import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import { abortRepositoryOperation, probeRepository } from '#/web/repo-client.ts'
 import { resolveRemoteRepositoryTarget } from '#/web/remote-client.ts'
 import { recordRecentRepo } from '#/web/settings-write-paths.ts'
+import { runRemoteRepoLifecycle } from '#/web/stores/repos/remote-lifecycle-orchestrator.ts'
+import {
+  markRemoteLifecycleConnecting,
+  markRemoteLifecycleFailed,
+  markRemoteLifecycleReady,
+} from '#/web/stores/repos/availability.ts'
 import type { OpenRepoResult, ReposGet, ReposSet, RepoState, ReposStore } from '#/web/stores/repos/types.ts'
 import { nextActiveRepoIdAfterWorkspaceClose } from '#/web/open-workspace-state.ts'
 import {
@@ -13,6 +19,7 @@ import {
   localRepoSessionEntry,
   normalizeRemoteRepoRef,
   parseRemoteRepoId,
+  remoteRepoLifecycleTarget,
   remoteRepoSessionEntry,
   type RemoteRepoTarget,
   type RepoSessionEntry,
@@ -31,7 +38,7 @@ interface ProbeResult {
   target?: RemoteRepoTarget
 }
 
-interface InitialRepoRefresh {
+export interface InitialRepoRefresh {
   id: string
   token: number
 }
@@ -111,7 +118,7 @@ function buildNewRepo(
   return restoreRepoProjectionFromSnapshot(emptyRepo(id, name), cached)
 }
 
-function remoteTargetsEqual(a: RemoteRepoTarget | undefined, b: RemoteRepoTarget | undefined): boolean {
+function remoteTargetsEqual(a: RemoteRepoTarget | undefined | null, b: RemoteRepoTarget | undefined): boolean {
   if (!a || !b) return false
   return (
     a.alias === b.alias && a.host === b.host && a.user === b.user && a.port === b.port && a.remotePath === b.remotePath
@@ -166,7 +173,12 @@ export function addResolvedRepo(
     rankById,
     create: () => {
       const repo = buildNewRepo(s, resolvedRepo.id, [resolvedRepo.name])
-      if (resolvedRepo.target) repo.remote.target = resolvedRepo.target
+      // Local resolves carry no target, so `lifecycle` stays null
+      // (emptyRepo's default). Remote resolves with a target settle
+      // to 'ready'. The `addResolvedRepo` write path is only ever
+      // reached for a remote entry with a target — the failure
+      // branch in resolveRepoPath calls addUnavailableRepo instead.
+      if (resolvedRepo.target) markRemoteLifecycleReady(repo, resolvedRepo.target)
       return repo
     },
     update: (existing) => {
@@ -176,11 +188,17 @@ export function addResolvedRepo(
       // by the absence of a change. A matching target is also a no-op
       // — the resolved probe reaffirmed what we already had.
       if (!resolvedRepo.target) return null
-      if (remoteTargetsEqual(existing.remote.target, resolvedRepo.target)) return null
-      return {
+      if (remoteTargetsEqual(remoteRepoLifecycleTarget(existing.remote.lifecycle), resolvedRepo.target)) return null
+      // Promote the existing remote repo from 'connecting' (or
+      // 'failed' with a stale target) to 'ready' with the new
+      // concrete target. Phase 4 dropped the legacy `target`
+      // field; the lifecycle union owns the target now.
+      const next: RepoState = {
         ...existing,
-        remote: { ...existing.remote, target: resolvedRepo.target },
+        remote: { ...existing.remote },
       }
+      markRemoteLifecycleReady(next, resolvedRepo.target)
+      return next
     },
   })
 }
@@ -207,15 +225,28 @@ export function addUnavailableRepo(
     rankById,
     create: () => {
       const repo = buildNewRepo(s, id, [target?.displayName])
-      if (target) repo.remote.target = target
-      repo.availability = { phase: 'unavailable', reason, checkedAt: Date.now() }
+      // New repo: write the failed lifecycle (with last-known target
+      // if the probe got far enough to resolve one). The legacy
+      // `target` field is mirrored for un-migrated call sites.
+      markRemoteLifecycleFailed(repo, reason, target)
       return repo
     },
-    update: (existing) => ({
-      ...existing,
-      availability: { phase: 'unavailable', reason, checkedAt: Date.now() },
-      remote: target ? { ...existing.remote, target } : existing.remote,
-    }),
+    update: (existing) => {
+      // Existing repo: refresh the failed lifecycle with the new
+      // reason. Preserve the last-known target if the new failure
+      // didn't pin down a fresh one — the user can still see the
+      // remote locator on the failed tab. The remote slice MUST
+      // be a fresh object — zustand's middleware freezes the
+      // state tree, and markRemoteLifecycleFailed mutates the
+      // passed repo's remote.
+      const retainedTarget = target ?? remoteRepoLifecycleTarget(existing.remote.lifecycle) ?? undefined
+      const next: RepoState = {
+        ...existing,
+        remote: { ...existing.remote },
+      }
+      markRemoteLifecycleFailed(next, reason, retainedTarget)
+      return next
+    },
   })
 }
 
@@ -245,6 +276,13 @@ export function insertPlaceholderRepo(
     create: () => {
       const fallbackName = entry.kind === 'remote' ? entry.ref.displayName : null
       const repo = buildNewRepo(s, entry.id, [fallbackName])
+      // Placeholders exist only to occupy the tab slot during a
+      // remote-repo lifecycle run. For a local placeholder the
+      // lifecycle stays null (local repos don't have one); for a
+      // remote placeholder we mark `connecting` so deriveConnectivity
+      // can show the spinner until addResolvedRepo /
+      // addUnavailableRepo replaces it.
+      if (entry.kind === 'remote') markRemoteLifecycleConnecting(repo)
       // 'refreshing' so the cached branches render with a stale indicator
       // (resourceInitialLoading would hide them).
       const cached = s.restorableRepoCache[entry.id]
@@ -270,10 +308,42 @@ export function refreshInitialRepoState(get: ReposGet, refresh: InitialRepoRefre
 export function createRuntimeRepoLifecycleActions(
   set: ReposSet,
   get: ReposGet,
-): Pick<ReposStore, 'ensureWorkspaceOpen' | 'closeRepo'> {
+): Pick<ReposStore, 'ensureWorkspaceOpen' | 'closeRepo' | 'retryRemoteRepoLifecycle'> {
   return {
     async ensureWorkspaceOpen(pathOrEntry: string | RepoSessionEntry): Promise<OpenRepoResult> {
       const entry = sessionEntryFromInput(pathOrEntry)
+      // Remote entries go through the unified orchestrator. It
+      // owns the connecting → ready/failed transition and the
+      // initial refresh kickoff, so this caller only has to
+      // translate the outcome into the OpenRepoResult contract.
+      if (isRemoteRepoId(entry.id)) {
+        // Per docs/.../plan §6.3 the orchestrator expects the repo
+        // shell to exist already. Pre-insert the placeholder so
+        // the orchestrator's "set connecting" lands on a real
+        // store entry; the orchestrator will fill in target +
+        // trigger refresh on settle.
+        if (!get().repos[entry.id]) {
+          set((s) => {
+            const result = insertPlaceholderRepo(
+              { repos: s.repos, restorableRepoCache: s.restorableRepoCache, order: s.order },
+              entry,
+            )
+            return { ...s, repos: result.repos, order: result.order }
+          })
+        }
+        const outcome = await runRemoteRepoLifecycle(set, get, entry.id)
+        if (!outcome) return { ok: false, message: 'error.not-git-repo' }
+        if (outcome.kind === 'ready' && outcome.target) {
+          const recentEntry = remoteRepoSessionEntry(outcome.target)
+          void recordRecentRepo(recentEntry).catch(() => {
+            /* recent menu is best-effort */
+          })
+          return { ok: true, id: outcome.repoId }
+        }
+        return { ok: false, message: outcome.reason ?? 'error.failed-read-repo' }
+      }
+      // Local probe stays on the legacy path — there's no remote
+      // lifecycle to converge and no orchestrator concern.
       const resolved = await resolveRepoPath(entry, undefined, 'error.not-git-repo')
       if (!resolved.repo) return { ok: false, message: resolved.reason ?? 'error.not-git-repo' }
       const repo = resolved.repo
@@ -322,6 +392,14 @@ export function createRuntimeRepoLifecycleActions(
         const activeId = nextActiveRepoIdAfterWorkspaceClose(s.order, s.activeId, id)
         return { repos, branchSearchQueries, selectedTerminalByWorktree, order, activeId }
       })
+    },
+
+    async retryRemoteRepoLifecycle(id: string) {
+      if (!isRemoteRepoId(id)) return null
+      const outcome = await runRemoteRepoLifecycle(set, get, id)
+      if (!outcome) return null
+      if (outcome.kind === 'ready') return { ok: true }
+      return { ok: false, reason: outcome.reason ?? 'unknown' }
     },
   }
 }

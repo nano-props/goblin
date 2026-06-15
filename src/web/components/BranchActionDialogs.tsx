@@ -20,7 +20,7 @@ interface RetainedDialogViewState<T> {
 
 interface BranchActionDialogsProps {
   branch: RepoBranchState
-  remoteTarget?: RemoteRepoTarget
+  remoteTarget?: RemoteRepoTarget | null
   hasUpstream: boolean
   pushConfirm: RetainedDialogViewState<string>
   deleteConfirm: RetainedDialogViewState<string>

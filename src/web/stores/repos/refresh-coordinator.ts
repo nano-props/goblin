@@ -3,6 +3,7 @@ import {
   shouldSuppressRepoInvalidationSource,
   resetRepoInvalidationSourceState,
 } from '#/web/stores/repos/invalidation-sources.ts'
+import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
 import type { ReposGet } from '#/web/stores/repos/types.ts'
 
 interface RepoRefreshIntentBase {
@@ -43,7 +44,7 @@ export async function handleRepoInvalidationRefresh(
 ): Promise<void> {
   const repoId = event.repoId
   const repo = get().repos[repoId]
-  if (!repo || repo.instanceToken !== token || repo.availability.phase === 'unavailable') return
+  if (!repo || repo.instanceToken !== token || isRepoUnavailable(repo)) return
   const disposition = repoInvalidationRefreshDisposition(event)
   if (disposition !== 'refresh') return
   await get().refreshCoreData(repoId, { token })

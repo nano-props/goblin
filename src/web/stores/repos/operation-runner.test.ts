@@ -227,3 +227,217 @@ describe('runExclusiveOperation', () => {
     await expect(first).resolves.toEqual({ ok: true, message: 'done' })
   })
 })
+
+describe('runLatestOperation active-task cancellation', () => {
+  test('a same-key submission aborts the in-flight active task', async () => {
+    // The first run's task body awaits a never-resolving promise.
+    // Its signal must be aborted by the lane when the second run
+    // comes in (latest-wins), so the task can reject instead of
+    // holding the concurrency slot until its own timeout.
+    let activeAborted = false
+    let release!: () => void
+    const activeSettled = new Promise<void>((resolve) => {
+      release = () => resolve()
+    })
+    const first = runLatestOperation({
+      set: useReposStore.setState,
+      get: useReposStore.getState,
+      id: REPO_ID,
+      token: 1,
+      lane: 'lifecycle',
+      operationKey: 'remoteLifecycle',
+      priority: 1,
+      targets: [{ key: 'remoteLifecycle', reason: 'remote-lifecycle' }],
+      task: (signal) =>
+        new Promise<{ ok: true; tag: 'first' }>((resolve) => {
+          signal.addEventListener('abort', () => {
+            activeAborted = true
+            resolve({ ok: true, tag: 'first' })
+            release()
+          })
+        }),
+    })
+    // Yield once so the first run's `markOperationState` +
+    // `start` actually land the controller in the active index.
+    await Promise.resolve()
+
+    let secondStarted = false
+    const second = runLatestOperation({
+      set: useReposStore.setState,
+      get: useReposStore.getState,
+      id: REPO_ID,
+      token: 1,
+      lane: 'lifecycle',
+      operationKey: 'remoteLifecycle',
+      priority: 1,
+      targets: [{ key: 'remoteLifecycle', reason: 'remote-lifecycle' }],
+      task: async () => {
+        secondStarted = true
+        return { ok: true, tag: 'second' as const }
+      },
+    })
+
+    // The first run's task body has synchronously seen the
+    // abort. The second run's task body is queued to start in
+    // the next microtask (after the active-cancel's `.finally`
+    // decrements `active` and `drain()` shifts the new task
+    // over). Yield a few times so the microtask queue drains.
+    expect(activeAborted).toBe(true)
+    for (let i = 0; i < 5; i += 1) await Promise.resolve()
+    expect(secondStarted).toBe(true)
+
+    await first
+    await second
+    await activeSettled
+  })
+
+  test('a same-key submission frees the concurrency slot immediately for the next run', async () => {
+    // Sanity check: with concurrency=1, if the active-cancel
+    // path is broken, the second run sits in the queue for as
+    // long as the first run takes. We assert that the second run
+    // starts BEFORE the first's task body would otherwise
+    // resolve. The first task reacts to the abort by resolving
+    // its own promise immediately, simulating a real SSH call
+    // that detects `signal.aborted` and bails.
+    const first = runLatestOperation({
+      set: useReposStore.setState,
+      get: useReposStore.getState,
+      id: REPO_ID,
+      token: 1,
+      lane: 'lifecycle',
+      operationKey: 'remoteLifecycle',
+      priority: 1,
+      targets: [{ key: 'remoteLifecycle', reason: 'remote-lifecycle' }],
+      task: (signal) =>
+        new Promise<{ ok: true }>((resolve) => {
+          signal.addEventListener('abort', () => resolve({ ok: true }))
+        }),
+    })
+    await Promise.resolve()
+
+    let secondStarted = false
+    const second = runLatestOperation({
+      set: useReposStore.setState,
+      get: useReposStore.getState,
+      id: REPO_ID,
+      token: 1,
+      lane: 'lifecycle',
+      operationKey: 'remoteLifecycle',
+      priority: 1,
+      targets: [{ key: 'remoteLifecycle', reason: 'remote-lifecycle' }],
+      task: async () => {
+        secondStarted = true
+        return { ok: true }
+      },
+    })
+    // Yield a few times so the abort propagates, the old
+    // task body resolves, the queue drains, and the new task
+    // starts. With the active-cancel path, this is a few
+    // microtasks; without it, the second run would never
+    // start (the first's promise would never settle on its
+    // own).
+    for (let i = 0; i < 5; i += 1) await Promise.resolve()
+    expect(secondStarted).toBe(true)
+
+    await first
+    await second
+  })
+
+  test('active-cancel does not affect tasks with a different replaceKey', async () => {
+    // The `read` lane's default-key tasks (no `operationKey`)
+    // must not be aborted by a `lifecycle` submission. The lane
+    // index is keyed by `replaceKey`, so unrelated tasks are
+    // insulated.
+    const reads: string[] = []
+    let releaseRead!: () => void
+    const read = runLatestOperation({
+      set: useReposStore.setState,
+      get: useReposStore.getState,
+      id: REPO_ID,
+      token: 1,
+      lane: 'read',
+      priority: 1,
+      targets: [{ key: 'snapshot', reason: 'snapshot' }],
+      task: () =>
+        new Promise<{ ok: true }>((resolve) => {
+          reads.push('started')
+          releaseRead = () => resolve({ ok: true })
+        }),
+    })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(reads).toEqual(['started'])
+
+    // Submit a same-lane read with a different `operationKey`
+    // (so a different `replaceKey`). It supersedes ONLY by
+    // queuing, not by aborting — the read concurrency is 3, so
+    // both can run in parallel; and the replaceKeys differ.
+    const read2 = runLatestOperation({
+      set: useReposStore.setState,
+      get: useReposStore.getState,
+      id: REPO_ID,
+      token: 1,
+      lane: 'read',
+      operationKey: 'status',
+      priority: 1,
+      targets: [{ key: 'status', reason: 'status' }],
+      task: async () => ({ ok: true }),
+    })
+    // `read` is still running. The cancelActiveByKey for
+    // `read:status` finds no active match (the active one is
+    // keyed `undefined`). So the original read is NOT aborted.
+    await new Promise((r) => setTimeout(r, 0))
+    expect(reads).toEqual(['started'])
+
+    releaseRead()
+    await read
+    await read2
+  })
+
+  test('stale run does not overwrite the new run on the lifecycle union', async () => {
+    // End-to-end check that supersede preserves the new run's
+    // result, even when the old run's task body resolved with
+    // a sentinel value via the abort listener. The
+    // `runLatestOperation` returns `null` for a stale run
+    // (because the new run superseded it) — the OLD's result
+    // does NOT leak to the caller. The NEW run returns its
+    // own result normally.
+    const old = runLatestOperation<string>({
+      set: useReposStore.setState,
+      get: useReposStore.getState,
+      id: REPO_ID,
+      token: 1,
+      lane: 'lifecycle',
+      operationKey: 'remoteLifecycle',
+      priority: 1,
+      targets: [{ key: 'remoteLifecycle', reason: 'remote-lifecycle' }],
+      task: (signal) =>
+        new Promise<string>((resolve) => {
+          signal.addEventListener('abort', () => {
+            // Sentinel value. If the orchestrator's
+            // stale-suppression is broken, this would be
+            // returned to the caller.
+            resolve('OLD')
+          })
+        }),
+    })
+    await Promise.resolve()
+
+    const fresh = runLatestOperation<string>({
+      set: useReposStore.setState,
+      get: useReposStore.getState,
+      id: REPO_ID,
+      token: 1,
+      lane: 'lifecycle',
+      operationKey: 'remoteLifecycle',
+      priority: 1,
+      targets: [{ key: 'remoteLifecycle', reason: 'remote-lifecycle' }],
+      task: async () => 'NEW',
+    })
+
+    // OLD: null because the new run superseded it (ctx.isCurrent
+    // is false → return null).
+    // NEW: the actual task result, because this run is current.
+    expect(await old).toBeNull()
+    expect(await fresh).toBe('NEW')
+  })
+})

@@ -1,5 +1,10 @@
 import { produce, type Draft } from 'immer'
-import { isRemoteRepoId } from '#/shared/remote-repo.ts'
+import {
+  isRemoteRepoId,
+  remoteRepoLifecycleTarget,
+  type RemoteRepoLifecycle,
+  type RemoteRepoTarget,
+} from '#/shared/remote-repo.ts'
 import { emptyRepoOperations } from '#/web/stores/repos/operations.ts'
 import { emptyRepoResources } from '#/web/stores/repos/resources.ts'
 import type { RepoEvent, RepoResultEventOptions, RepoState, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
@@ -36,6 +41,9 @@ export function emptyRepo(id: string, name: string): RepoState {
       savedAt: null,
     },
     remote: {
+      // Local repos never have a remote lifecycle. Remote repos set this
+      // through addResolvedRepo / addUnavailableRepo / insertPlaceholderRepo.
+      lifecycle: null,
       remotes: [],
       remoteDetails: [],
       hasRemotes: false,
@@ -53,14 +61,16 @@ export function emptyRepo(id: string, name: string): RepoState {
 
 /**
  * Live SSH liveness state for remote repos. Derived — never stored —
- * from `isRemoteRepoId(id)` + `remote.target` presence + `availability.phase`,
- * so all three transitions (placeholder → connected / unreachable) fall
- * out of the existing state mutations without a separate write.
- *   - `connecting`:  remote repo whose concrete target hasn't been
- *     resolved yet (boot probe in flight)
- *   - `connected`:   remote repo with a resolved target that's still
- *     reachable; also the default for local repos
- *   - `unreachable`: remote repo whose last probe / check failed
+ * from `isRemoteRepoId(id)` + `remote.lifecycle.kind`. Per
+ * docs/goblin-remote-repo-refactor-plan.md §4: the lifecycle union
+ * is the single source of truth; the legacy `availability.phase` /
+ * `target presence` inference is gone after Phase 4.
+ *   - `connecting`:  remote repo whose lifecycle run has not
+ *     converged (placeholder / in-flight probe)
+ *   - `connected`:   remote repo with a converged `ready` lifecycle;
+ *     also the default for local repos
+ *   - `unreachable`: remote repo whose last probe converged to
+ *     `failed`
  *
  * Co-located with `deriveConnectivity` (the only meaningful producer)
  * rather than the general `types.ts` to keep the connectivity domain
@@ -70,9 +80,54 @@ export type RepoConnectivity = 'connecting' | 'connected' | 'unreachable'
 
 export function deriveConnectivity(repo: RepoState): RepoConnectivity {
   if (!isRemoteRepoId(repo.id)) return 'connected'
-  if (repo.availability.phase === 'unavailable') return 'unreachable'
-  if (!repo.remote.target) return 'connecting'
-  return 'connected'
+  const lifecycle = repo.remote.lifecycle
+  if (lifecycle) {
+    if (lifecycle.kind === 'failed') return 'unreachable'
+    if (lifecycle.kind === 'connecting') return 'connecting'
+    return 'connected'
+  }
+  // A remote repo without a lifecycle is a pre-Phase-1 fixture
+  // (test mocks, persistence restores) and SHOULD be treated
+  // as a programming error in production. Until Phase 4 finishes
+  // migrating every writer to the lifecycle helpers, treat it
+  // as `connecting` so the UI shows a spinner — never as a
+  // silently-broken `connected` tab.
+  return 'connecting'
+}
+
+/**
+ * The concrete remote target for a remote repo id + lifecycle, or
+ * `null` for local repos and remote repos whose lifecycle hasn't
+ * reached a terminal state with a retained target. Replaces the
+ * legacy `repo.remote.target` field — Phase 4 deletes the field,
+ * this helper is the only sanctioned access path.
+ *
+ * Takes the id and the lifecycle separately so it works on
+ * any subset that carries the lifecycle (e.g. `BranchActionRepo`,
+ * `BranchDetailRepo`).
+ */
+export function remoteRepoTarget(
+  id: string,
+  lifecycle: RemoteRepoLifecycle | null,
+): RemoteRepoTarget | null {
+  if (!isRemoteRepoId(id)) return null
+  return remoteRepoLifecycleTarget(lifecycle)
+}
+
+/**
+ * Whether a repo is in a terminal "cannot be operated on" state:
+ *   - Local repo: `availability.phase === 'unavailable'`
+ *   - Remote repo: `remote.lifecycle.kind === 'failed'`
+ *
+ * Replaces the per-call-site `repo.availability.phase === 'unavailable'`
+ * check. Callers that previously had to know whether they were
+ * looking at a local or remote repo now just call this helper.
+ */
+export function isRepoUnavailable(repo: RepoState): boolean {
+  if (isRemoteRepoId(repo.id)) {
+    return repo.remote.lifecycle?.kind === 'failed'
+  }
+  return repo.availability.phase === 'unavailable'
 }
 
 export function resultEvent(result: { ok: boolean; message: string }, options?: RepoResultEventOptions): RepoEvent {
