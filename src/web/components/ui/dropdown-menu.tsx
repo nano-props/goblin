@@ -9,6 +9,15 @@ import { cn } from '#/web/lib/cn.ts'
 // dismissal. Keep this file as a thin Radix/shadcn-style primitive wrapper;
 // do not bake Goblin-specific drag-region workarounds into this shared
 // component.
+//
+// Positioning: DropdownMenu is the command/navigation dropdown. The trigger
+// is a ghost button or icon button (e.g. a chevron on a tab, an icon in the
+// topbar) — used for switching the active repo/terminal/branch or opening
+// a menu of actions. Items use `bg-selected text-selected-foreground`
+// (applied via `SelectedDropdownMenuItem`) to mark the currently-active
+// entry. Do NOT reach for this in form fields — that's `select.tsx`,
+// whose trigger is a bordered input-style control and whose items render a
+// built-in checkmark for the selected value.
 function DropdownMenu({ ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
   return <DropdownMenuPrimitive.Root data-slot="dropdown-menu" {...props} />
 }
@@ -203,6 +212,29 @@ function DropdownMenuSubContent({
   )
 }
 
+// SelectedDropdownMenuItem pairs the "currently selected" intent with the
+// codebase's persistent selection styling (`bg-selected text-selected-foreground`).
+// Use this for items that pick one option from a list (e.g. switching the
+// active repo/terminal/branch in their tab-strip dropdowns); the selected
+// item remains focusable so it still picks up the hover accent. The same
+// `bg-selected text-selected-foreground` className is also applied directly
+// (without this wrapper) by the topbar's active menu item and the settings
+// sidebar nav, where the underlying element isn't a DropdownMenuItem.
+// If you want a built-in selection indicator and keyboard-driven single-select
+// semantics, prefer `DropdownMenuRadioGroup` + `DropdownMenuRadioItem`.
+function SelectedDropdownMenuItem({
+  selected,
+  className,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuItem> & { selected: boolean }) {
+  return (
+    <DropdownMenuItem
+      className={cn(selected && 'bg-selected text-selected-foreground', className)}
+      {...props}
+    />
+  )
+}
+
 export {
   DropdownMenu,
   DropdownMenuPortal,
@@ -211,6 +243,7 @@ export {
   DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuItem,
+  SelectedDropdownMenuItem,
   DropdownMenuCheckboxItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
