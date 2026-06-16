@@ -18,14 +18,22 @@ export function SettingsPageScreen({ page, onBack, onPageChange }: SettingsPageS
   return (
     <div className="flex h-full flex-col bg-background">
       <div
-        className="topbar flex shrink-0 items-center gap-2 border-b border-separator/70 bg-background text-sm"
+        className="topbar grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-separator/70 bg-background text-sm"
         style={{ height: WINDOW_TOPBAR_HEIGHT_PX }}
       >
-        <Button type="button" variant="ghost" size="sm" className="gap-1.5 px-2" onClick={onBack}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="justify-self-start gap-1.5 px-2"
+          onClick={onBack}
+        >
           <ArrowLeft className="size-4" />
           {t('settings.back')}
         </Button>
-        <div className="min-w-0 flex-1 truncate text-center text-sm font-semibold text-foreground">{pageTitle}</div>
+        <div className="truncate text-center text-sm font-semibold text-foreground">{pageTitle}</div>
+        {/* Mirror the left column so the title sits in the topbar's true geometric center. */}
+        <div aria-hidden />
       </div>
       <div className="min-h-0 flex-1">
         <SettingsSurface page={page} onPageChange={onPageChange} />
