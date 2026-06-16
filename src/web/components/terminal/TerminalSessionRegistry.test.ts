@@ -139,6 +139,36 @@ describe('TerminalSessionRegistry', () => {
       registry.handleExit({ sessionId: 'session-b' })
       expect(handleExitSpy).not.toHaveBeenCalled()
     })
+
+    test('handleExit invalidates the reattach snapshot cache for the exiting session', () => {
+      registry.setRepoIndex(makeRepoIndex())
+      registry.reconcileServerSessions(
+        REPO_ROOT,
+        [makeServerSession('session-a', 'terminal-1')],
+        'attachment_local',
+        new Map(),
+      )
+
+      const key = registry.worktreeSnapshot(WORKTREE_KEY).sessions[0]!.key
+      // Seed the reattach cache directly so we can assert the exit
+      // event is what removes the entry, not the local-session
+      // cleanup.
+      ;(registry as any).reattachSnapshotCache.set(key, {
+        sessionId: 'session-a',
+        snapshot: 'cached',
+        snapshotSeq: 7,
+      })
+      expect((registry as any).reattachSnapshotCache.has(key)).toBe(true)
+
+      // Stub the local session's handleExit to return true so the
+      // registry's existing discard path runs (the cache eviction
+      // must not depend on it being absent, though).
+      const session = (registry as any).sessions.get(key)
+      vi.spyOn(session, 'handleExit').mockReturnValue(true)
+
+      registry.handleExit({ sessionId: 'session-a' })
+      expect((registry as any).reattachSnapshotCache.has(key)).toBe(false)
+    })
   })
 
   describe('notify granularity', () => {

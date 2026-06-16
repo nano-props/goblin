@@ -70,12 +70,13 @@ export class TerminalSessionRegistry {
     }
   >()
   private readonly snapshotCache = new Map<string, TerminalSnapshot>()
+  // The reattach snapshot cache is keyed by the local session key. It
+  // grows when a terminal detaches (so the next attach can hydrate
+  // instantly) and shrinks when the underlying session exits
+  // (handleExit), the local session is removed, or the registry is
+  // destroyed. Because every entry has a paired cleanup site, the
+  // cache is unbounded on the live side — no LRU cap needed.
   private readonly reattachSnapshotCache = new Map<string, ReattachSnapshotCacheEntry>()
-  // Cap the reattach snapshot cache so repeated worktree switches
-  // cannot grow it without bound. Each entry is a serialized xterm
-  // buffer (up to ~3 MB worst-case at the configured 10k scrollback),
-  // so a runaway growth here is a real memory hazard.
-  private static readonly REATTACH_SNAPSHOT_CACHE_LIMIT = 32
   private readonly worktreeSnapshotCache = new Map<string, WorktreeTerminalSnapshot>()
   private readonly worktreeListeners = new Map<string, Set<() => void>>()
   private readonly snapshotListeners = new Map<string, Set<() => void>>()
@@ -146,6 +147,12 @@ export class TerminalSessionRegistry {
   handleExit(event: { sessionId: string }): void {
     const directKey = this.sessionKeyBySessionId.get(event.sessionId)
     const directSession = directKey ? this.sessions.get(directKey) : null
+    // The reattach cache is keyed by the local session key, so a
+    // server-exit event invalidates the entry here. Doing this before
+    // the local-session cleanup keeps the cache in lockstep with the
+    // server: there is no path where a known-dead session still has a
+    // hydratable snapshot.
+    if (directKey) this.reattachSnapshotCache.delete(directKey)
     if (directKey && directSession?.handleExit(event)) {
       this.discardLocalSessionAndDismissDetailIfLast(directKey, directSession.descriptor)
       return
@@ -604,17 +611,11 @@ export class TerminalSessionRegistry {
     }
   }
 
-  // Insertion-ordered LRU cap on the reattach snapshot cache. We track
-  // recency by deleting-then-resetting on hit (Map iteration order) so
-  // a fresh detach of a known key keeps it at the tail.
+  // Cache write for the reattach path. Re-setting a known key just
+  // overwrites; the cache is not LRU-bounded because every entry has a
+  // paired cleanup in handleExit / removeSession / destroy.
   private setReattachSnapshot(key: string, entry: ReattachSnapshotCacheEntry): void {
-    if (this.reattachSnapshotCache.has(key)) this.reattachSnapshotCache.delete(key)
     this.reattachSnapshotCache.set(key, entry)
-    while (this.reattachSnapshotCache.size > TerminalSessionRegistry.REATTACH_SNAPSHOT_CACHE_LIMIT) {
-      const oldestKey = this.reattachSnapshotCache.keys().next().value
-      if (oldestKey === undefined) break
-      this.reattachSnapshotCache.delete(oldestKey)
-    }
   }
 
   private removeSession(key: string, options: { dispose: boolean; closeSession?: boolean }): boolean {
