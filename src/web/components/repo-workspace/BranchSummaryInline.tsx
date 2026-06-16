@@ -1,5 +1,20 @@
+// Read-only branch "status strip" used in two places: the branch list
+// rows (BranchRow) and the focus-mode toolbar (BranchInfoBar). It is
+// intentionally non-interactive — the affordance for switching branches
+// lives on the caller. BranchInfoBar wires a dropdown trigger around
+// the branch name; BranchRow does not (clicking the row selects the
+// branch in the list).
+//
+// Layout (left to right):
+//   [icon]  [name]  [meta…]  <badges · deltas · last-commit author/time>
+//
+// The icon and meta are exported as standalone subcomponents so callers
+// that need a different name trigger (e.g. BranchInfoBar's dropdown)
+// can reuse the visual primitives without re-deriving the branch-state
+// predicates.
+
 import { ArrowDown, ArrowUp, Check, FolderTree, GitBranch } from 'lucide-react'
-import { useI18nStore, useT } from '#/web/stores/i18n.ts'
+import { useI18nStore, useT, type Lang } from '#/web/stores/i18n.ts'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 import { Badge } from '#/web/components/ui/badge.tsx'
 import { cn } from '#/web/lib/cn.ts'
@@ -35,9 +50,11 @@ function Delta({ direction, count, label }: { direction: 'ahead' | 'behind'; cou
   )
 }
 
-export function BranchSummaryInline({ repo, branch, selected = false, className }: BranchSummaryInlineProps) {
-  const t = useT()
-  const lang = useI18nStore((s) => s.lang)
+// Derives the visual-state predicates and last-commit meta for a
+// (branch, repo) pair. Single source of truth shared by the icon, the
+// meta strip, and the outer title — recomputing these in three places
+// is what originally kept this file sprawling.
+export function computeBranchSummaryState(branch: RepoBranchState, repo: BranchSummaryInlineRepo, lang: Lang) {
   const isCurrent = branch.name === repo.data.currentBranch
   const hasWorktree = !!branch.worktree?.path
   const isWorktree = hasWorktree && !isCurrent
@@ -49,30 +66,141 @@ export function BranchSummaryInline({ repo, branch, selected = false, className 
       ? `${branch.lastCommitAuthor} · ${commitTime}`
       : commitTime
     : null
-  const title = [
+  return { isCurrent, hasWorktree, isWorktree, worktreeDirty, commitMeta }
+}
+
+type BranchSummaryState = ReturnType<typeof computeBranchSummaryState>
+
+// Comma-joined `title` attribute. Mirrors the visible body so the hover
+// tooltip stays consistent across the branch list and the focus-mode
+// toolbar (where the icon and the meta are non-clickable but still
+// useful to inspect).
+export function buildBranchSummaryTitle(
+  state: BranchSummaryState,
+  branch: RepoBranchState,
+  t: (key: string, params?: Record<string, string | number>) => string,
+): string {
+  return [
     branch.name,
-    isCurrent ? t('branch-status.current') : null,
+    state.isCurrent ? t('branch-status.current') : null,
     branch.isDefault ? t('branches.default') : null,
-    hasWorktree ? t(worktreeDirty ? 'branches.dirty' : 'branches.worktree') : null,
+    state.hasWorktree ? t(state.worktreeDirty ? 'branches.dirty' : 'branches.worktree') : null,
     branch.trackingGone ? t('branches.gone') : null,
     branch.ahead > 0 ? t('branch-status.sync.ahead', { n: branch.ahead }) : null,
     branch.behind > 0 ? t('branch-status.sync.behind', { n: branch.behind }) : null,
-    commitMeta,
+    state.commitMeta,
   ]
     .filter(Boolean)
     .join(', ')
+}
+
+// The status icon on the leading edge of a branch row. Tri-state:
+// checked (HEAD), folder-tree (worktree branch), or plain branch glyph.
+// Kept as a 4-wide column so the name column has a stable left margin
+// even when the icon kind changes.
+export function BranchSummaryIcon({
+  isCurrent,
+  isWorktree,
+  worktreeDirty,
+  selected,
+}: {
+  isCurrent: boolean
+  isWorktree: boolean
+  worktreeDirty: boolean
+  selected: boolean
+}) {
+  return (
+    <span className="flex w-4 shrink-0 items-center justify-center">
+      {isCurrent ? (
+        <Check size={14} className="text-success" />
+      ) : isWorktree ? (
+        <FolderTree size={14} className={worktreeDirty ? 'text-attention' : 'text-brand-text'} />
+      ) : (
+        <GitBranch size={14} className={selected ? 'text-selected-muted-foreground' : 'text-muted-foreground'} />
+      )}
+    </span>
+  )
+}
+
+// The trailing metadata strip: optional badges (default / dirty /
+// worktree / gone), ahead/behind deltas, and the last-commit author +
+// relative time. Read-only by design — none of the inner spans are
+// interactive. BranchInfoBar composes this next to a custom branch-name
+// trigger (e.g. a dropdown); BranchRow renders it as part of
+// BranchSummaryInline.
+export function BranchSummaryMeta({
+  repo,
+  branch,
+  selected = false,
+}: Pick<BranchSummaryInlineProps, 'repo' | 'branch' | 'selected'>) {
+  const t = useT()
+  const lang = useI18nStore((s) => s.lang)
+  const { hasWorktree, isWorktree, worktreeDirty, commitMeta } = computeBranchSummaryState(branch, repo, lang)
+
+  return (
+    <span
+      className={cn(
+        'flex min-w-0 items-center gap-1.5 overflow-hidden text-xs',
+        selected ? 'text-selected-muted-foreground' : 'text-muted-foreground',
+      )}
+    >
+      {branch.isDefault && (
+        <Badge variant="outline" className="text-muted-foreground">
+          {t('branches.default')}
+        </Badge>
+      )}
+      {hasWorktree && worktreeDirty ? (
+        <Badge variant="attention" className="gap-1">
+          <FolderTree size={10} />
+          {t('branches.dirty')}
+        </Badge>
+      ) : isWorktree ? (
+        <Badge variant="outline" className="gap-1 text-muted-foreground">
+          <FolderTree size={10} />
+          {t('branches.worktree')}
+        </Badge>
+      ) : null}
+      {branch.trackingGone && <Badge variant="attention">{t('branches.gone')}</Badge>}
+      {branch.ahead > 0 && (
+        <Delta direction="ahead" count={branch.ahead} label={t('branch-status.sync.ahead', { n: branch.ahead })} />
+      )}
+      {branch.behind > 0 && (
+        <Delta
+          direction="behind"
+          count={branch.behind}
+          label={t('branch-status.sync.behind', { n: branch.behind })}
+        />
+      )}
+      {commitMeta && (
+        <span
+          className={cn(
+            'min-w-0 truncate whitespace-nowrap text-[11px] leading-none',
+            selected ? 'text-selected-muted-foreground/90' : 'text-muted-foreground/85',
+          )}
+          title={commitMeta}
+        >
+          {commitMeta}
+        </span>
+      )}
+    </span>
+  )
+}
+
+export function BranchSummaryInline({ repo, branch, selected = false, className }: BranchSummaryInlineProps) {
+  const t = useT()
+  const lang = useI18nStore((s) => s.lang)
+  const state = computeBranchSummaryState(branch, repo, lang)
+  const { isCurrent, hasWorktree, isWorktree, worktreeDirty, commitMeta } = state
+  const title = buildBranchSummaryTitle(state, branch, t)
 
   return (
     <div title={title} className={cn('flex min-w-0 items-center gap-2', className)}>
-      <span className="flex w-4 shrink-0 items-center justify-center">
-        {isCurrent ? (
-          <Check size={14} className="text-success" />
-        ) : isWorktree ? (
-          <FolderTree size={14} className={worktreeDirty ? 'text-attention' : 'text-brand-text'} />
-        ) : (
-          <GitBranch size={14} className={selected ? 'text-selected-muted-foreground' : 'text-muted-foreground'} />
-        )}
-      </span>
+      <BranchSummaryIcon
+        isCurrent={isCurrent}
+        isWorktree={isWorktree}
+        worktreeDirty={worktreeDirty}
+        selected={selected}
+      />
       <span className="flex min-w-0 items-center gap-2 overflow-hidden">
         <span
           className={cn(
@@ -82,51 +210,7 @@ export function BranchSummaryInline({ repo, branch, selected = false, className 
         >
           {branch.name}
         </span>
-        <span
-          className={cn(
-            'flex min-w-0 items-center gap-1.5 overflow-hidden text-xs',
-            selected ? 'text-selected-muted-foreground' : 'text-muted-foreground',
-          )}
-        >
-          {branch.isDefault && (
-            <Badge variant="outline" className="text-muted-foreground">
-              {t('branches.default')}
-            </Badge>
-          )}
-          {hasWorktree && worktreeDirty ? (
-            <Badge variant="attention" className="gap-1">
-              <FolderTree size={10} />
-              {t('branches.dirty')}
-            </Badge>
-          ) : isWorktree ? (
-            <Badge variant="outline" className="gap-1 text-muted-foreground">
-              <FolderTree size={10} />
-              {t('branches.worktree')}
-            </Badge>
-          ) : null}
-          {branch.trackingGone && <Badge variant="attention">{t('branches.gone')}</Badge>}
-          {branch.ahead > 0 && (
-            <Delta direction="ahead" count={branch.ahead} label={t('branch-status.sync.ahead', { n: branch.ahead })} />
-          )}
-          {branch.behind > 0 && (
-            <Delta
-              direction="behind"
-              count={branch.behind}
-              label={t('branch-status.sync.behind', { n: branch.behind })}
-            />
-          )}
-          {commitMeta && (
-            <span
-              className={cn(
-                'min-w-0 truncate whitespace-nowrap text-[11px] leading-none',
-                selected ? 'text-selected-muted-foreground/90' : 'text-muted-foreground/85',
-              )}
-              title={commitMeta}
-            >
-              {commitMeta}
-            </span>
-          )}
-        </span>
+        <BranchSummaryMeta repo={repo} branch={branch} selected={selected} />
       </span>
     </div>
   )

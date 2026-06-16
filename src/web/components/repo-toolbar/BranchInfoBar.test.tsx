@@ -43,7 +43,7 @@ afterEach(() => {
 })
 
 describe('BranchInfoBar', () => {
-  test('shows the selected branch summary beside the pager in focus mode', () => {
+  test('renders the selected branch summary with the branch name as the dropdown trigger in focus mode', () => {
     seedRepoState({
       id: REPO_ID,
       branches: [
@@ -63,13 +63,23 @@ describe('BranchInfoBar', () => {
 
     renderBar(navigationWith({}))
 
-    expect(container?.textContent).toContain('2 / 3')
+    // The pager counter ("1 / N") is gone — the dropdown trigger now IS
+    // the branch name + chevron. The ahead/behind deltas and commit
+    // meta continue to render in the read-only meta strip.
+    expect(container?.textContent).not.toContain('2 / 3')
     expect(container?.textContent).toContain('feature/a')
     expect(container?.textContent).toContain('2')
     expect(container?.textContent).toContain('1')
+
+    const trigger = container?.querySelector('button[aria-label="branches.switch"]')
+    expect(trigger).toBeInstanceOf(HTMLButtonElement)
+    expect(trigger?.getAttribute('aria-haspopup')).toBe('menu')
+    expect(trigger?.textContent).toContain('feature/a')
+    // Chevron is rendered as an SVG inside the trigger.
+    expect(trigger?.querySelector('svg')).not.toBeNull()
   })
 
-  test('shows a branch dropdown in focus mode instead of prev/next buttons', () => {
+  test('does not render prev/next pager buttons in focus mode', () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('main'), createRepoBranch('feature/a'), createRepoBranch('feature/b')],
@@ -80,8 +90,6 @@ describe('BranchInfoBar', () => {
 
     renderBar(navigationWith({}))
 
-    expect(container?.textContent).toContain('2 / 3')
-
     const buttons = Array.from(container?.querySelectorAll('button') ?? [])
     const prevButton = buttons.find((button) => button.getAttribute('aria-label') === 'help.row.prev-branch')
     const nextButton = buttons.find((button) => button.getAttribute('aria-label') === 'help.row.next-branch')
@@ -90,6 +98,37 @@ describe('BranchInfoBar', () => {
 
     const switchButton = buttons.find((button) => button.getAttribute('aria-label') === 'branches.switch')
     expect(switchButton).toBeInstanceOf(HTMLButtonElement)
+  })
+
+  test('opens the branch list dropdown when the trigger is activated', () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('main'), createRepoBranch('feature/a'), createRepoBranch('feature/b')],
+      currentBranch: 'main',
+      selectedBranch: 'feature/a',
+    })
+    useReposStore.setState({ workspaceLayout: 'top-bottom', detailCollapsed: false, detailFocusMode: true })
+
+    renderBar(navigationWith({}))
+
+    const trigger = container?.querySelector<HTMLButtonElement>('button[aria-label="branches.switch"]')
+    expect(trigger).toBeInstanceOf(HTMLButtonElement)
+
+    // Radix's DropdownMenu opens on `pointerdown` rather than `click`,
+    // so a bare .click() in jsdom leaves the menu closed.
+    act(() => {
+      trigger?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' }))
+      trigger?.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, pointerType: 'mouse' }))
+      trigger?.click()
+    })
+
+    // The menu mounts into a Radix portal; query the document instead
+    // of the test container.
+    const menu = document.querySelector('[role="menu"]')
+    expect(menu).not.toBeNull()
+    const items = Array.from(menu?.querySelectorAll('[role="menuitem"]') ?? [])
+    const labels = items.map((item) => item.textContent?.trim() ?? '')
+    expect(labels).toEqual(expect.arrayContaining(['main', 'feature/a', 'feature/b']))
   })
 
   test('always renders focus content regardless of workspace focus mode (caller decides when to mount)', () => {
@@ -103,7 +142,8 @@ describe('BranchInfoBar', () => {
 
     renderBar(navigationWith({}))
 
-    expect(container?.textContent).toContain('1 / 2')
+    expect(container?.textContent).not.toContain('1 / 2')
+    expect(container?.textContent).toContain('main')
   })
 })
 
