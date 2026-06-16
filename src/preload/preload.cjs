@@ -26,6 +26,9 @@ const IPC = {
     sendTestNotification: 'goblin:terminal-send-test-notification',
     setBadge: 'goblin:terminal-set-badge',
   },
+  clipboard: {
+    saveBinaryFiles: 'goblin:clipboard-save-binary-files',
+  },
   bootstrap: {
     get: 'goblin:get-bootstrap',
   },
@@ -192,6 +195,30 @@ contextBridge.exposeInMainWorld('goblinNative', {
     setBadge: (count) => {
       ipcRenderer.send(IPC.terminal.setBadge, count)
     },
+  },
+  // Clipboard paste / drop blob backstop. `File` is not structured-clonable
+  // across the contextBridge, so we materialise each blob to a plain
+  // `{name, bytes: ArrayBuffer}` here in the preload before invoking IPC.
+  // (Electron's IPC has no `transfer` list — `ArrayBuffer` and
+  // `Uint8Array` both copy — so the choice is a typing/contract one.)
+  // Errors are swallowed to `[]` because the renderer-side resolver
+  // treats `[]` as "blob save failed for everything" and surfaces a
+  // single `paste-file-failed` toast.
+  saveClipboardFiles: async (files) => {
+    if (!Array.isArray(files) || files.length === 0) return []
+    try {
+      const payload = await Promise.all(
+        files.map(async (file) => ({
+          name: typeof file?.name === 'string' && file.name.length > 0 ? file.name : 'clipboard.bin',
+          bytes: await file.arrayBuffer(),
+        })),
+      )
+      const result = await safeInvoke(IPC.clipboard.saveBinaryFiles, payload)
+      return Array.isArray(result) ? result.filter((p) => typeof p === 'string') : []
+    } catch (err) {
+      console.warn('[preload] saveClipboardFiles failed', err)
+      return []
+    }
   },
   onEvent: (cb) => {
     ipcEventSubscribers.add(cb)
