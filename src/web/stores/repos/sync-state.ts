@@ -15,13 +15,3 @@ export function canStartRemoteFetch(repo: RepoState | undefined): repo is RepoSt
     !repoOperationBusy(repo.id, 'status')
   )
 }
-
-export function isRemoteFetchDue(
-  repo: RepoState | undefined,
-  intervalMs: number,
-  now: number = Date.now(),
-): repo is RepoState {
-  if (intervalMs <= 0 || !canStartRemoteFetch(repo)) return false
-  const lastFetchAt = repo.resources.fetch.loadedAt
-  return lastFetchAt === null || now - lastFetchAt >= intervalMs
-}

@@ -26,11 +26,4 @@ export function useBackgroundFetch() {
     const repoIds = fetchIntervalSec > 0 ? eligibleRepoIdsKey.split('\0').filter(Boolean) : []
     void setBackgroundSyncRepos(repoIds)
   }, [eligibleRepoIdsKey, fetchIntervalSec, hasEmbeddedServer])
-
-  useEffect(() => {
-    if (!hasEmbeddedServer) return
-    return () => {
-      void setBackgroundSyncRepos([])
-    }
-  }, [hasEmbeddedServer])
 }

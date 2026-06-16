@@ -125,6 +125,58 @@ describe('server background sync scheduler', () => {
     expect(mocks.fetchRepository).toHaveBeenCalledTimes(2)
   })
 
+  test('does not abort or re-fetch when re-registering the same repo set', async () => {
+    mocks.fetchRepository.mockResolvedValue({ ok: true, message: 'ok' })
+    const { setBackgroundSyncRepos } = await import('#/server/modules/background-sync.ts')
+
+    await setBackgroundSyncRepos(['/tmp/repo-a'])
+    await vi.runOnlyPendingTimersAsync()
+    const callsAfterFirst = mocks.fetchRepository.mock.calls.length
+
+    // Re-registering the same set must not abort the in-flight task or
+    // re-trigger an immediate fetch — the interval hasn't elapsed.
+    await setBackgroundSyncRepos(['/tmp/repo-a'])
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(mocks.fetchRepository.mock.calls.length).toBe(callsAfterFirst)
+    expect(mocks.abortBackgroundServerNetworkOp).not.toHaveBeenCalled()
+  })
+
+  test('re-enqueues a tab-switched repo from the previous fetch\'s finally', async () => {
+    let resolveFetchA: (value: { ok: boolean; message: string }) => void = () => {}
+    const fetchAStarted = vi.fn()
+    mocks.fetchRepository.mockImplementation(async (repoId: string) => {
+      if (repoId === '/repo-a') {
+        fetchAStarted()
+        return await new Promise<{ ok: boolean; message: string }>((resolve) => {
+          resolveFetchA = resolve
+        })
+      }
+      return { ok: true, message: 'ok' }
+    })
+    const { setBackgroundSyncRepos } = await import('#/server/modules/background-sync.ts')
+
+    await setBackgroundSyncRepos(['/repo-a'])
+    await vi.runOnlyPendingTimersAsync()
+    expect(fetchAStarted).toHaveBeenCalledTimes(1)
+
+    // While A is in flight, the user switches to B. The immediate enqueue for B
+    // is skipped because the queue is busy, but the `finally` on A's task must
+    // re-enqueue as soon as A settles — without waiting for the next cron tick.
+    await setBackgroundSyncRepos(['/repo-b'])
+    expect(mocks.fetchRepository.mock.calls.some((c) => c[0] === '/repo-b')).toBe(false)
+
+    resolveFetchA({ ok: true, message: 'ok' })
+    // waitFor polls microtasks; using advanceTimersByTime would risk letting
+    // the per-second cron catch B for us and mask a broken `finally` re-enqueue.
+    await vi.waitFor(() =>
+      expect(mocks.fetchRepository).toHaveBeenCalledWith('/repo-b', 'background'),
+    )
+
+    const bCalls = mocks.fetchRepository.mock.calls.filter((c) => c[0] === '/repo-b' && c[1] === 'background')
+    expect(bCalls.length).toBe(1)
+  })
+
   test('backs off retries after a fetch failure and resumes normal cadence after success', async () => {
     mocks.fetchRepository
       .mockResolvedValueOnce({ ok: false, message: 'fatal: offline' })

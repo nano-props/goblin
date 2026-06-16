@@ -131,6 +131,29 @@ async function enqueueScheduledFetch(generation: number): Promise<void> {
   })
 }
 
+// Used from `runScheduledFetch`'s `finally` to pick up a repo that was
+// registered while the queue was busy — its initial fetch was skipped by the
+// in-flight check in `enqueueScheduledFetch`, and waiting for the per-second
+// cron would delay a "sync on switch" by up to one tick.
+//
+// Bypasses `enqueueScheduledFetch` and adds to the queue directly: p-queue
+// decrements its `_activeCount` only after the current task's promise
+// resolves, so a same-tick call into `enqueueScheduledFetch` would still see
+// `size > 0` and skip. Adding straight to `_pendingTasks` lets p-queue's own
+// post-task `_tryToStartAnother` pick the new task up the moment the current
+// slot is released — preserving the concurrency=1 invariant.
+function enqueuePendingRegistrationFetch(): void {
+  if (state.repoIds.length === 0 || state.intervalMs <= 0) return
+  for (const candidateId of state.repoIds) {
+    if (state.lastFetchAtByRepo[candidateId] === null || state.lastFetchAtByRepo[candidateId] === undefined) {
+      void syncQueue.add(async () => {
+        await runScheduledFetch(state.generation)
+      })
+      return
+    }
+  }
+}
+
 async function runScheduledFetch(generation: number): Promise<void> {
   if (generation !== state.generation || state.tickRunning) return
   state.tickRunning = true
@@ -176,12 +199,22 @@ async function runScheduledFetch(generation: number): Promise<void> {
     )
   } finally {
     state.tickRunning = false
+    enqueuePendingRegistrationFetch()
   }
 }
 
 export async function setBackgroundSyncRepos(repoIds: string[]): Promise<void> {
   await ensureSettingsSubscription()
   const nextRepoIds = Array.from(new Set(repoIds.filter((repoId) => typeof repoId === 'string' && repoId.length > 0)))
+  // Short-circuit when the list is unchanged: the fetch-interval change is
+  // already applied via `subscribeServerFetchInterval`, and bumping the
+  // generation here would abort any in-flight background fetch for no gain.
+  if (
+    nextRepoIds.length === state.repoIds.length &&
+    nextRepoIds.every((repoId) => state.repoIds.includes(repoId))
+  ) {
+    return
+  }
   const removedRepoIds = state.repoIds.filter((repoId) => !nextRepoIds.includes(repoId))
   state.generation += 1
   for (const repoId of removedRepoIds) abortBackgroundServerNetworkOp(repoId)

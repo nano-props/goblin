@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, test } from 'vitest'
 import { emptyRepo } from '#/web/stores/repos/helpers.ts'
-import { finishResourceSuccess } from '#/web/stores/repos/resources.ts'
 import { disposeRepoRuntime, markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/repos/runtime.ts'
-import { canStartRemoteFetch, isRemoteFetchDue } from '#/web/stores/repos/sync-state.ts'
+import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
 import type { RepoRuntimeOperationTarget } from '#/web/stores/repos/runtime.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 type CoreRemoteFetchBlockerKey = 'fetch' | 'branchAction' | 'snapshot' | 'status'
@@ -12,7 +11,6 @@ interface RepoOverrides {
   branchActionBusy?: boolean
   snapshotBusy?: boolean
   statusBusy?: boolean
-  lastFetchSettledAt?: number | null
 }
 
 function repo(overrides: RepoOverrides = {}): RepoState {
@@ -38,9 +36,6 @@ function repo(overrides: RepoOverrides = {}): RepoState {
   }
   if (overrides.statusBusy) {
     markRepoOperationTargets(base.id, nextRepoOperationId(base.id), [{ key: 'status', reason: 'status' }], 'running')
-  }
-  if (overrides.lastFetchSettledAt !== undefined && overrides.lastFetchSettledAt !== null) {
-    finishResourceSuccess(base.resources.fetch, overrides.lastFetchSettledAt)
   }
   return base
 }
@@ -71,22 +66,4 @@ describe('canStartRemoteFetch', () => {
       expect(canStartRemoteFetch(r)).toBe(false)
     },
   )
-})
-
-describe('isRemoteFetchDue', () => {
-  test('is due when no remote fetch has settled yet', () => {
-    expect(isRemoteFetchDue(repo(), 60_000, 100_000)).toBe(true)
-  })
-
-  test('is due only after the interval since the last settled fetch', () => {
-    expect(isRemoteFetchDue(repo({ lastFetchSettledAt: 50_000 }), 60_000, 100_000)).toBe(false)
-    expect(isRemoteFetchDue(repo({ lastFetchSettledAt: 40_000 }), 60_000, 100_000)).toBe(true)
-  })
-
-  test('is not due when disabled or core fetch state is busy', () => {
-    expect(isRemoteFetchDue(repo(), 0, 100_000)).toBe(false)
-    expect(isRemoteFetchDue(repo({ fetchBusy: true, lastFetchSettledAt: null }), 60_000, 100_000)).toBe(false)
-    expect(isRemoteFetchDue(repo({ branchActionBusy: true, lastFetchSettledAt: null }), 60_000, 100_000)).toBe(false)
-    expect(isRemoteFetchDue(repo({ snapshotBusy: true, lastFetchSettledAt: null }), 60_000, 100_000)).toBe(false)
-  })
 })
