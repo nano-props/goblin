@@ -74,8 +74,15 @@ export class TerminalSessionRegistry {
   // grows when a terminal detaches (so the next attach can hydrate
   // instantly) and shrinks when the underlying session exits
   // (handleExit), the local session is removed, or the registry is
-  // destroyed. Because every entry has a paired cleanup site, the
-  // cache is unbounded on the live side — no LRU cap needed.
+  // destroyed. Each entry holds a serialized xterm buffer that can be
+  // a few MB at the configured scrollback cap, so we keep a small
+  // hard ceiling as a safety net against bookkeeping drift — the
+  // expected cleanup is the server-exit event, but if that never
+  // arrives for a session the user has navigated away from, the
+  // ceiling bounds worst-case memory. The cap is set well above any
+  // realistic number of simultaneously-detached sessions, so in normal
+  // use no entry is ever evicted by the trim path.
+  private static readonly REATTACH_SNAPSHOT_CACHE_LIMIT = 32
   private readonly reattachSnapshotCache = new Map<string, ReattachSnapshotCacheEntry>()
   private readonly worktreeSnapshotCache = new Map<string, WorktreeTerminalSnapshot>()
   private readonly worktreeListeners = new Map<string, Set<() => void>>()
@@ -611,11 +618,20 @@ export class TerminalSessionRegistry {
     }
   }
 
-  // Cache write for the reattach path. Re-setting a known key just
-  // overwrites; the cache is not LRU-bounded because every entry has a
-  // paired cleanup in handleExit / removeSession / destroy.
+  // Cache write for the reattach path. The expected cleanup is the
+  // server-exit event (handleExit), with removeSession / destroy as
+  // secondary sites. A small hard cap trims the oldest entries if
+  // bookkeeping ever drifts (e.g., a wedged server that never emits
+  // exit); the limit is set well above the realistic number of
+  // simultaneously-detached sessions.
   private setReattachSnapshot(key: string, entry: ReattachSnapshotCacheEntry): void {
+    if (this.reattachSnapshotCache.has(key)) this.reattachSnapshotCache.delete(key)
     this.reattachSnapshotCache.set(key, entry)
+    while (this.reattachSnapshotCache.size > TerminalSessionRegistry.REATTACH_SNAPSHOT_CACHE_LIMIT) {
+      const oldestKey = this.reattachSnapshotCache.keys().next().value
+      if (oldestKey === undefined) break
+      this.reattachSnapshotCache.delete(oldestKey)
+    }
   }
 
   private removeSession(key: string, options: { dispose: boolean; closeSession?: boolean }): boolean {
