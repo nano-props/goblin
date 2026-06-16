@@ -4,14 +4,18 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type ClipboardEvent,
   type DragEvent,
   type FocusEvent,
   type KeyboardEvent,
 } from 'react'
+import { toast } from 'sonner'
 import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { setTerminalFocused } from '#/web/terminal-focus.ts'
-import { pathForDroppedFile } from '#/web/app-shell-client.ts'
+import { collectClipboardFiles } from '#/web/clipboard/collect-clipboard-files.ts'
+import { processDrop, processPaste } from '#/web/clipboard/process.ts'
+import { PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
@@ -172,6 +176,49 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
       : ''
 
   const [dragOver, setDragOver] = useState(false)
+  const progress = snapshot.progress
+  const attachment = snapshot.attachment
+  // Slot mode is a small state machine. The previous two-flag design
+  // (`isController` / `isReadonly`, both gated on `phase === 'open'`)
+  // silently broke error-phase rendering: a viewer in error phase
+  // would see neither the viewer overlay (open-gated) nor the
+  // correctly-gated error chip, leaving the restart button visible
+  // even though the server would reject the request. Modelling the
+  // mode explicitly keeps the per-state UI rules in one place.
+  //
+  // Computed *before* the paste/drop handlers below so the handlers
+  // share a single source of truth for the controller gate (the
+  // `isController` derived flag). Earlier drafts kept a parallel
+  // `earlyIsController = hasSessions && snapshot.phase === 'open'
+  // && attachment?.role === 'controller'` near the handlers and
+  // a separate `isController = slotMode === 'open-controller'`
+  // definition below — those two stayed in sync by accident, not by
+  // contract, and would have drifted the moment either side got
+  // edited.
+  const slotMode: 'opening' | 'restarting' | 'open-controller' | 'open-viewer' | 'error-controller' | 'error-viewer' =
+    (() => {
+      if (!hasSessions) return 'opening'
+      if (snapshot.phase === 'opening') return 'opening'
+      if (snapshot.phase === 'restarting') return 'restarting'
+      if (snapshot.phase === 'error') {
+        return attachment?.role === 'controller' ? 'error-controller' : 'error-viewer'
+      }
+      // phase === 'open'
+      return attachment?.role === 'controller' ? 'open-controller' : 'open-viewer'
+    })()
+  // `isController` is the *interactive* affordance flag — it gates the
+  // mobile toolbar, the paste/drop file handlers, and the xterm's
+  // `aria-readonly`. The PTY is dead in `error-controller`, so we
+  // deliberately exclude that state even though the controller status
+  // is still ours. The error chip is shown via `showErrorChip`
+  // instead.
+  const isController = slotMode === 'open-controller'
+  const isReadonly = slotMode === 'open-viewer' || slotMode === 'error-viewer'
+  const showViewerOverlay = isReadonly
+  const showErrorChip = slotMode === 'error-controller'
+  const readonlyBadge = attachment?.role === 'viewer' ? t('terminal.mirror-controlled') : t('terminal.unowned')
+  const progressVariant =
+    progress?.state === 2 ? 'error' : progress?.state === 4 ? 'warning' : progress?.state === 3 ? 'indeterminate' : ''
   const handleDragEnter = useCallback((event: DragEvent<HTMLDivElement>) => {
     if (!event.dataTransfer.types.includes('Files')) return
     event.preventDefault()
@@ -187,53 +234,77 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
     const relatedTarget = event.relatedTarget
     if (!(relatedTarget instanceof Node) || !event.currentTarget.contains(relatedTarget)) setDragOver(false)
   }, [])
+  const writeResolutionToPty = useCallback(
+    (paths: string[], failed: number, sessionKey: string) => {
+      if (paths.length === 0) {
+        toast.error(t('terminal.paste-file-failed'))
+        return
+      }
+      const escaped = paths.map(shellEscapePath).join(' ')
+      writeInput(sessionKey, escaped)
+      if (failed > 0) toast.error(t('terminal.paste-file-partial'))
+    },
+    [t, writeInput],
+  )
   const handleDrop = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
       if (!event.dataTransfer.types.includes('Files')) return
       event.preventDefault()
       setDragOver(false)
-      if (!key) return
-      const paths = Array.from(event.dataTransfer.files)
-        .map((file) => pathForDroppedFile(file))
-        .filter((path) => path.length > 0)
-      if (paths.length === 0) return
-      const escaped = paths.map(shellEscapePath).join(' ')
-      writeInput(key, escaped)
+      // `isController` gate matches paste: a viewer dropping files into
+      // a session it doesn't own would otherwise silently route input
+      // to the controller's PTY. The `!key` half preserves the
+      // pre-existing guard against slots with no session.
+      if (!key || !isController) return
+      const files = Array.from(event.dataTransfer.files).filter((f) => f.size > 0)
+      if (files.length === 0) return
+      void processDrop({ files }).then((outcome) => {
+        if (outcome.kind === 'no-op') return
+        if (outcome.kind === 'too-large') {
+          toast.error(t('terminal.paste-file-too-large'))
+          return
+        }
+        writeResolutionToPty(outcome.resolution.paths, outcome.resolution.failed, key)
+      })
     },
-    [key, writeInput],
+    [isController, key, t, writeResolutionToPty],
   )
-  const progress = snapshot.progress
-  const attachment = snapshot.attachment
-  // Slot mode is a small state machine. The previous two-flag design
-  // (`isController` / `isReadonly`, both gated on `phase === 'open'`)
-  // silently broke error-phase rendering: a viewer in error phase
-  // would see neither the viewer overlay (open-gated) nor the
-  // correctly-gated error chip, leaving the restart button visible
-  // even though the server would reject the request. Modelling the
-  // mode explicitly keeps the per-state UI rules in one place.
-  const slotMode: 'opening' | 'restarting' | 'open-controller' | 'open-viewer' | 'error-controller' | 'error-viewer' =
-    (() => {
-      if (!hasSessions) return 'opening'
-      if (snapshot.phase === 'opening') return 'opening'
-      if (snapshot.phase === 'restarting') return 'restarting'
-      if (snapshot.phase === 'error') {
-        return attachment?.role === 'controller' ? 'error-controller' : 'error-viewer'
+  const handlePasteCapture = useCallback(
+    (event: ClipboardEvent<HTMLDivElement>) => {
+      if (!key || !isController) return
+      const files = collectClipboardFiles(event.clipboardData)
+      // Files-first: a Linux file copy carries both `text/uri-list`
+      // and a `text/plain` rendering of the same URI list. If we let
+      // text win, the user pastes a literal `file:///…` string.
+      if (files.length > 0) {
+        if (files.some((f) => f.size > PASTE_FILE_MAX_BYTES)) {
+          event.preventDefault()
+          toast.error(t('terminal.paste-file-too-large'))
+          return
+        }
+        // preventDefault() in capture phase is enough to stop xterm —
+        // xterm renders inside this slot's root, so the bubble-phase
+        // listener never sees the event. Do NOT call stopPropagation:
+        // it would silently break any future bubble-phase paste
+        // listener mounted higher in the tree.
+        event.preventDefault()
+        const text = event.clipboardData.getData('text/plain')
+        void processPaste({ files, text }).then((outcome) => {
+          if (outcome.kind === 'files') {
+            writeResolutionToPty(outcome.resolution.paths, outcome.resolution.failed, key)
+            return
+          }
+          if (outcome.kind === 'too-large') {
+            toast.error(t('terminal.paste-file-too-large'))
+          }
+        })
+        return
       }
-      // phase === 'open'
-      return attachment?.role === 'controller' ? 'open-controller' : 'open-viewer'
-    })()
-  // `isController` is the *interactive* affordance flag — it gates the
-  // mobile toolbar and the xterm's `aria-readonly`. The PTY is dead
-  // in `error-controller`, so we deliberately exclude that state even
-  // though the controller status is still ours. The error chip is
-  // shown via `showErrorChip` instead.
-  const isController = slotMode === 'open-controller'
-  const isReadonly = slotMode === 'open-viewer' || slotMode === 'error-viewer'
-  const showViewerOverlay = isReadonly
-  const showErrorChip = slotMode === 'error-controller'
-  const readonlyBadge = attachment?.role === 'viewer' ? t('terminal.mirror-controlled') : t('terminal.unowned')
-  const progressVariant =
-    progress?.state === 2 ? 'error' : progress?.state === 4 ? 'warning' : progress?.state === 3 ? 'indeterminate' : ''
+      // No files: let xterm handle text paste as today. Do NOT
+      // preventDefault — that would block xterm's own text path.
+    },
+    [isController, key, t, writeResolutionToPty],
+  )
 
   return (
     <div
@@ -242,6 +313,7 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
       onFocusCapture={handleFocus}
       onBlurCapture={handleBlur}
       onKeyDownCapture={handleKeyDownCapture}
+      onPasteCapture={handlePasteCapture}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}

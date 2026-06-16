@@ -367,6 +367,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     onIpcEvent: () => () => {},
     onEffectIntent: () => () => {},
     pathForFile: () => '',
+    saveClipboardFiles: () => Promise.resolve([]),
     shell: () => window.goblinNative.shell ?? null,
     terminal: () => ({
       attach: async (input) => callTerminalHandler('terminal.attach', input),

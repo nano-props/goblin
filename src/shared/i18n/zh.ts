@@ -326,6 +326,9 @@ export const zh: Record<DictKey, string> = {
   'terminal.index-title': '终端 {index}',
   'terminal.bell-unread': '终端有未读提醒',
   'terminal.bell-unread-count': '{count} 个未读终端提醒',
+  'terminal.paste-file-failed': '无法将文件粘贴到终端。',
+  'terminal.paste-file-partial': '部分文件未能成功保存。',
+  'terminal.paste-file-too-large': '文件过大,无法粘贴。请改用 scp、rsync 或文件管理器。',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': '在访达中显示',

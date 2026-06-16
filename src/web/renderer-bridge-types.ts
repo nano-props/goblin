@@ -64,6 +64,15 @@ export interface RendererBridge {
   onIpcEvent(cb: (event: IpcEvent) => void): () => void
   onEffectIntent(cb: (event: RendererEffectIntent) => void): () => void
   pathForFile(file: File): string
+  /**
+   * Persist clipboard / drop file blobs to a runtime-resolved location and
+   * return absolute paths the PTY can read. Electron writes under
+   * `<os.tmpdir>/goblin-clipboard-<pid>/`; web POSTs multipart to
+   * `/api/clipboard/files` and the server writes under
+   * `<serverDataDir()>/clipboard-tmp-<pid>/`. Returns `[]` on any failure
+   * (the resolver maps that to a single `paste-file-failed` toast).
+   */
+  saveClipboardFiles(files: File[]): Promise<string[]>
   shell(): RendererShellBridge | null
   terminal(): RendererTerminalBridge
 }

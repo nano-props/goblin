@@ -544,6 +544,7 @@ beforeEach(() => {
     onIpcEvent: vi.fn(() => () => {}),
     onEffectIntent: vi.fn(() => () => {}),
     pathForFile: vi.fn(() => ''),
+    saveClipboardFiles: vi.fn(() => Promise.resolve([])),
     shell: () => window.goblinNative.shell ?? null,
     terminal: () => ({
       attach: terminalCalls.attach.mockResolvedValue(attachResult('session-1')),

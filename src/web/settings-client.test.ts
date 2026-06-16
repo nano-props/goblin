@@ -57,6 +57,7 @@ function testBridge(overrides: Partial<RendererBridge> = {}): RendererBridge {
     onIpcEvent: () => () => {},
     onEffectIntent: () => () => {},
     pathForFile: () => '',
+    saveClipboardFiles: () => Promise.resolve([]),
     shell: () => null,
     terminal: (() => {
       throw new Error('unused terminal bridge')

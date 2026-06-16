@@ -15,7 +15,12 @@ vi.mock('#/web/stores/i18n.ts', () => ({
 }))
 
 vi.mock('#/web/app-shell-client.ts', () => ({
-  pathForDroppedFile: () => '',
+  pathForDroppedFile: vi.fn(() => ''),
+  saveClipboardFiles: vi.fn(() => Promise.resolve([])),
+}))
+
+vi.mock('sonner', () => ({
+  toast: { error: vi.fn(), success: vi.fn(), message: vi.fn() },
 }))
 
 vi.mock('#/web/components/terminal/mobile-detection.ts', () => ({
@@ -312,6 +317,775 @@ describe('TerminalSlot', () => {
       // a11y tree reflects the role.
       const host = container.querySelector('.goblin-terminal-slot__host')
       expect(host?.getAttribute('aria-readonly')).toBe('true')
+    } finally {
+      await act(async () => root.unmount())
+      container.remove()
+    }
+  })
+
+  test('drop on a viewer slot is ignored (isController gate matches paste)', async () => {
+    // Regression for the previous drop handler that only checked `!key`.
+    // A viewer dropping a file would silently route input into the
+    // controller's PTY; the isController gate added alongside paste
+    // closes that hole.
+    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root: Root = createRoot(container)
+    const writeInput = vi.fn()
+    const descriptor = {
+      key: 'terminal-1',
+      worktreeTerminalKey: '/repo\0/worktree',
+      terminalId: 'terminal-1',
+      index: 1,
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/worktree',
+    }
+    const worktreeSnapshot = {
+      worktreeTerminalKey: '/repo\0/worktree',
+      selectedDescriptor: descriptor,
+      sessions: [
+        {
+          key: 'terminal-1',
+          worktreeTerminalKey: '/repo\0/worktree',
+          terminalId: 'terminal-1',
+          index: 1,
+          title: 'zsh',
+          phase: 'open' as const,
+          selected: true,
+          hasBell: false,
+        },
+      ],
+      count: 1,
+      pendingCreate: false,
+    }
+    // Viewer attachment: the !isController branch of handleDrop should
+    // short-circuit before touching writeInput.
+    const snapshot = {
+      phase: 'open' as const,
+      message: null,
+      processName: 'zsh',
+      attachment: {
+        role: 'viewer' as const,
+        controllerStatus: 'connected' as const,
+        active: false,
+        canTakeover: true,
+        canonicalCols: 120,
+        canonicalRows: 40,
+      },
+    }
+    const context: TerminalSessionContextValue = {
+      createTerminal: async () => 'terminal-1',
+      registerHost: vi.fn(),
+      unregisterHost: vi.fn(),
+      selectTerminal: vi.fn(),
+      scrollToBottom: vi.fn(),
+      scrollLines: vi.fn(),
+      clearBell: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(() => []),
+      attach: vi.fn(),
+      detach: vi.fn(),
+      restart: vi.fn(),
+      isTerminalFocusTarget: vi.fn(() => false),
+      findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      clearSearch: vi.fn(),
+      writeInput,
+      takeover: vi.fn(),
+      reorderSessions: vi.fn(async () => true),
+      serialize: vi.fn(() => ''),
+    }
+    const readContext: TerminalSessionReadContextValue = {
+      worktreeSnapshot: () => worktreeSnapshot,
+      subscribeWorktree: () => () => {},
+      snapshot: () => snapshot,
+      subscribeSnapshot: () => () => {},
+    }
+
+    await act(async () => {
+      root.render(
+        <TerminalSessionContext.Provider value={context}>
+          <TerminalSessionReadContext.Provider value={readContext}>
+            <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+          </TerminalSessionReadContext.Provider>
+        </TerminalSessionContext.Provider>,
+      )
+    })
+
+    try {
+      const slotRoot = container.querySelector('.goblin-terminal-slot') as HTMLElement
+      expect(slotRoot).toBeTruthy()
+      // Synthesize a Drop event with one file. jsdom's DataTransfer
+      // doesn't accept programmatic `files` assignment cleanly, so we
+      // build a minimal proxy that satisfies the handler.
+      const file = new File([new Uint8Array([1, 2, 3])], 'shot.png')
+      const dataTransfer = {
+        types: ['Files'],
+        files: [file] as unknown as FileList,
+        dropEffect: '',
+      } as unknown as DataTransfer
+      const dropEvent = new Event('drop', { bubbles: true, cancelable: true })
+      Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
+      await act(async () => {
+        slotRoot.dispatchEvent(dropEvent)
+        // give the resolver microtask chain a tick — even though we
+        // expect it never to run.
+        await Promise.resolve()
+      })
+      expect(writeInput).not.toHaveBeenCalled()
+    } finally {
+      await act(async () => root.unmount())
+      container.remove()
+    }
+  })
+
+  test('drop on a controller slot writes shell-escaped paths to the PTY', async () => {
+    // Happy-path companion to the viewer-rejection test above. Locks
+    // the contract: a controller drop that resolves to a path
+    // (Electron path-attempt tier) calls writeInput with the
+    // shell-escaped path; a controller drop with no path falls
+    // through to the blob-save tier. Without this test, the
+    // resolver wiring inside TerminalSlot only had negative
+    // coverage — a regression that swapped the two paths or
+    // dropped the controller gate would have slipped through.
+    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root: Root = createRoot(container)
+    const writeInput = vi.fn()
+    const descriptor = {
+      key: 'terminal-1',
+      worktreeTerminalKey: '/repo\0/worktree',
+      terminalId: 'terminal-1',
+      index: 1,
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/worktree',
+    }
+    const worktreeSnapshot = {
+      worktreeTerminalKey: '/repo\0/worktree',
+      selectedDescriptor: descriptor,
+      sessions: [
+        {
+          key: 'terminal-1',
+          worktreeTerminalKey: '/repo\0/worktree',
+          terminalId: 'terminal-1',
+          index: 1,
+          title: 'zsh',
+          phase: 'open' as const,
+          selected: true,
+          hasBell: false,
+        },
+      ],
+      count: 1,
+      pendingCreate: false,
+    }
+    // Controller attachment — the `isController` branch of handleDrop
+    // must NOT short-circuit.
+    const snapshot = {
+      phase: 'open' as const,
+      message: null,
+      processName: 'zsh',
+      attachment: {
+        role: 'controller' as const,
+        controllerStatus: 'connected' as const,
+        active: true,
+        canTakeover: false,
+        canonicalCols: 120,
+        canonicalRows: 40,
+      },
+    }
+    const context: TerminalSessionContextValue = {
+      createTerminal: async () => 'terminal-1',
+      registerHost: vi.fn(),
+      unregisterHost: vi.fn(),
+      selectTerminal: vi.fn(),
+      scrollToBottom: vi.fn(),
+      scrollLines: vi.fn(),
+      clearBell: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(() => []),
+      attach: vi.fn(),
+      detach: vi.fn(),
+      restart: vi.fn(),
+      isTerminalFocusTarget: vi.fn(() => false),
+      findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      clearSearch: vi.fn(),
+      writeInput,
+      takeover: vi.fn(),
+      reorderSessions: vi.fn(async () => true),
+      serialize: vi.fn(() => ''),
+    }
+    const readContext: TerminalSessionReadContextValue = {
+      worktreeSnapshot: () => worktreeSnapshot,
+      subscribeWorktree: () => () => {},
+      snapshot: () => snapshot,
+      subscribeSnapshot: () => () => {},
+    }
+
+    // Stub the bridge surface for this test only. The default mock
+    // returns '' / [], which would route every file through the
+    // blob-save backend and ultimately write nothing. We override
+    // to drive the path-attempt tier and assert the resulting
+    // shell-escaped writeInput call.
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockImplementation(
+      (file: File) => `/resolved/${file.name}`,
+    )
+    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
+
+    try {
+      await act(async () => {
+        root.render(
+          <TerminalSessionContext.Provider value={context}>
+            <TerminalSessionReadContext.Provider value={readContext}>
+              <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+            </TerminalSessionReadContext.Provider>
+          </TerminalSessionContext.Provider>,
+        )
+      })
+
+      const slotRoot = container.querySelector('.goblin-terminal-slot') as HTMLElement
+      expect(slotRoot).toBeTruthy()
+      const file = new File([new Uint8Array([1, 2, 3])], "shot with space.png", { type: 'image/png' })
+      const dataTransfer = {
+        types: ['Files'],
+        files: [file] as unknown as FileList,
+        dropEffect: '',
+      } as unknown as DataTransfer
+      const dropEvent = new Event('drop', { bubbles: true, cancelable: true })
+      Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
+
+      await act(async () => {
+        slotRoot.dispatchEvent(dropEvent)
+        // processDrop -> resolvePastedFiles -> setTimeout-free, but
+        // the handler awaits a Promise chain. Let it drain.
+        await new Promise((r) => setTimeout(r, 0))
+      })
+
+      // One writeInput call with a shell-escaped path. The path
+      // contains a space, so shellEscapePath wraps it in single
+      // quotes — if the escape regresses to plain concat this
+      // assertion catches it.
+      expect(writeInput).toHaveBeenCalledTimes(1)
+      expect(writeInput).toHaveBeenCalledWith('terminal-1', "'/resolved/shot with space.png'")
+      // The path-attempt tier succeeded, so the blob-save backend
+      // was never consulted.
+      expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
+    } finally {
+      await act(async () => root.unmount())
+      container.remove()
+    }
+  })
+
+  test('paste on a viewer slot is ignored (isController gate)', async () => {
+    // Companion to the viewer-drop rejection test. The paste handler
+    // runs in capture phase on the slot root (`onPasteCapture`); xterm
+    // renders inside the root, so DOM dispatch order beats xterm and
+    // we don't need any extra `stopPropagation`. This test locks the
+    // controller gate for paste the same way the drop test does.
+    //
+    // jsdom does not implement ClipboardEvent, so we synthesise one:
+    // a plain Event with `clipboardData` grafted on via defineProperty,
+    // bubbling so it reaches the slot's React listener. We only need
+    // `clipboardData.getData('text/plain')` and a `files`-like accessor
+    // for the paste handler's happy/early-exit paths.
+    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root: Root = createRoot(container)
+    const writeInput = vi.fn()
+    const descriptor = {
+      key: 'terminal-1',
+      worktreeTerminalKey: '/repo\0/worktree',
+      terminalId: 'terminal-1',
+      index: 1,
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/worktree',
+    }
+    const worktreeSnapshot = {
+      worktreeTerminalKey: '/repo\0/worktree',
+      selectedDescriptor: descriptor,
+      sessions: [
+        {
+          key: 'terminal-1',
+          worktreeTerminalKey: '/repo\0/worktree',
+          terminalId: 'terminal-1',
+          index: 1,
+          title: 'zsh',
+          phase: 'open' as const,
+          selected: true,
+          hasBell: false,
+        },
+      ],
+      count: 1,
+      pendingCreate: false,
+    }
+    const snapshot = {
+      phase: 'open' as const,
+      message: null,
+      processName: 'zsh',
+      attachment: {
+        role: 'viewer' as const,
+        controllerStatus: 'connected' as const,
+        active: false,
+        canTakeover: true,
+        canonicalCols: 120,
+        canonicalRows: 40,
+      },
+    }
+    const context: TerminalSessionContextValue = {
+      createTerminal: async () => 'terminal-1',
+      registerHost: vi.fn(),
+      unregisterHost: vi.fn(),
+      selectTerminal: vi.fn(),
+      scrollToBottom: vi.fn(),
+      scrollLines: vi.fn(),
+      clearBell: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(() => []),
+      attach: vi.fn(),
+      detach: vi.fn(),
+      restart: vi.fn(),
+      isTerminalFocusTarget: vi.fn(() => false),
+      findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      clearSearch: vi.fn(),
+      writeInput,
+      takeover: vi.fn(),
+      reorderSessions: vi.fn(async () => true),
+      serialize: vi.fn(() => ''),
+    }
+    const readContext: TerminalSessionReadContextValue = {
+      worktreeSnapshot: () => worktreeSnapshot,
+      subscribeWorktree: () => () => {},
+      snapshot: () => snapshot,
+      subscribeSnapshot: () => () => {},
+    }
+
+    try {
+      await act(async () => {
+        root.render(
+          <TerminalSessionContext.Provider value={context}>
+            <TerminalSessionReadContext.Provider value={readContext}>
+              <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+            </TerminalSessionReadContext.Provider>
+          </TerminalSessionContext.Provider>,
+        )
+      })
+      const slotRoot = container.querySelector('.goblin-terminal-slot') as HTMLElement
+      const file = new File([new Uint8Array([1, 2, 3])], 'shot.png')
+      const clipboardData = {
+        files: {
+          length: 1,
+          item: (i: number) => [file][i] ?? null,
+        } as unknown as FileList,
+        items: [] as unknown as DataTransferItemList,
+        getData: () => '',
+      } as unknown as DataTransfer
+      const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
+      Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardData })
+      await act(async () => {
+        slotRoot.dispatchEvent(pasteEvent)
+        await new Promise((r) => setTimeout(r, 0))
+      })
+      expect(writeInput).not.toHaveBeenCalled()
+    } finally {
+      await act(async () => root.unmount())
+      container.remove()
+    }
+  })
+
+  test('paste on a controller slot writes shell-escaped paths to the PTY (files branch)', async () => {
+    // Happy-path paste test. Mirrors the controller drop test but
+    // exercises the capture-phase handler on `clipboardData.files`.
+    // The path-attempt tier returns a real path; the blob-save tier
+    // is never reached; writeInput gets the shell-escaped path.
+    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root: Root = createRoot(container)
+    const writeInput = vi.fn()
+    const descriptor = {
+      key: 'terminal-1',
+      worktreeTerminalKey: '/repo\0/worktree',
+      terminalId: 'terminal-1',
+      index: 1,
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/worktree',
+    }
+    const worktreeSnapshot = {
+      worktreeTerminalKey: '/repo\0/worktree',
+      selectedDescriptor: descriptor,
+      sessions: [
+        {
+          key: 'terminal-1',
+          worktreeTerminalKey: '/repo\0/worktree',
+          terminalId: 'terminal-1',
+          index: 1,
+          title: 'zsh',
+          phase: 'open' as const,
+          selected: true,
+          hasBell: false,
+        },
+      ],
+      count: 1,
+      pendingCreate: false,
+    }
+    const snapshot = {
+      phase: 'open' as const,
+      message: null,
+      processName: 'zsh',
+      attachment: {
+        role: 'controller' as const,
+        controllerStatus: 'connected' as const,
+        active: true,
+        canTakeover: false,
+        canonicalCols: 120,
+        canonicalRows: 40,
+      },
+    }
+    const context: TerminalSessionContextValue = {
+      createTerminal: async () => 'terminal-1',
+      registerHost: vi.fn(),
+      unregisterHost: vi.fn(),
+      selectTerminal: vi.fn(),
+      scrollToBottom: vi.fn(),
+      scrollLines: vi.fn(),
+      clearBell: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(() => []),
+      attach: vi.fn(),
+      detach: vi.fn(),
+      restart: vi.fn(),
+      isTerminalFocusTarget: vi.fn(() => false),
+      findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      clearSearch: vi.fn(),
+      writeInput,
+      takeover: vi.fn(),
+      reorderSessions: vi.fn(async () => true),
+      serialize: vi.fn(() => ''),
+    }
+    const readContext: TerminalSessionReadContextValue = {
+      worktreeSnapshot: () => worktreeSnapshot,
+      subscribeWorktree: () => () => {},
+      snapshot: () => snapshot,
+      subscribeSnapshot: () => () => {},
+    }
+
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockImplementation(
+      (file: File) => `/resolved/${file.name}`,
+    )
+    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
+
+    try {
+      await act(async () => {
+        root.render(
+          <TerminalSessionContext.Provider value={context}>
+            <TerminalSessionReadContext.Provider value={readContext}>
+              <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+            </TerminalSessionReadContext.Provider>
+          </TerminalSessionContext.Provider>,
+        )
+      })
+
+      const slotRoot = container.querySelector('.goblin-terminal-slot') as HTMLElement
+      const file = new File([new Uint8Array([1, 2, 3])], "weird name & space.png")
+      const clipboardData = {
+        files: {
+          length: 1,
+          item: (i: number) => [file][i] ?? null,
+        } as unknown as FileList,
+        items: [] as unknown as DataTransferItemList,
+        // Linux file managers also carry a text/plain rendering of
+        // the same URI list — the paste handler must ignore that and
+        // prefer files. We surface text here so the test would catch
+        // any regression that lets text win.
+        getData: (mime: string) => (mime === 'text/plain' ? 'file:///tmp/weird%20name.png' : ''),
+      } as unknown as DataTransfer
+      const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
+      Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardData })
+
+      await act(async () => {
+        slotRoot.dispatchEvent(pasteEvent)
+        await new Promise((r) => setTimeout(r, 0))
+      })
+
+      // One writeInput call. The path contains a space and an `&`,
+      // both of which `shellEscapePath` wraps in single quotes — if
+      // the escape regresses to plain concat this catches it.
+      expect(writeInput).toHaveBeenCalledTimes(1)
+      expect(writeInput).toHaveBeenCalledWith(
+        'terminal-1',
+        "'/resolved/weird name & space.png'",
+      )
+      expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
+    } finally {
+      await act(async () => root.unmount())
+      container.remove()
+    }
+  })
+
+  test('paste with oversized file triggers paste-file-too-large and prevents xterm fallback', async () => {
+    // The handler must call preventDefault() synchronously when it
+    // sees an oversized file, so xterm doesn't also try to paste
+    // the oversized clipboard data. We assert on `defaultPrevented`
+    // after the synchronous dispatch (processPaste is async but
+    // the size check runs first and returns).
+    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root: Root = createRoot(container)
+    const writeInput = vi.fn()
+    const descriptor = {
+      key: 'terminal-1',
+      worktreeTerminalKey: '/repo\0/worktree',
+      terminalId: 'terminal-1',
+      index: 1,
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/worktree',
+    }
+    const worktreeSnapshot = {
+      worktreeTerminalKey: '/repo\0/worktree',
+      selectedDescriptor: descriptor,
+      sessions: [
+        {
+          key: 'terminal-1',
+          worktreeTerminalKey: '/repo\0/worktree',
+          terminalId: 'terminal-1',
+          index: 1,
+          title: 'zsh',
+          phase: 'open' as const,
+          selected: true,
+          hasBell: false,
+        },
+      ],
+      count: 1,
+      pendingCreate: false,
+    }
+    const snapshot = {
+      phase: 'open' as const,
+      message: null,
+      processName: 'zsh',
+      attachment: {
+        role: 'controller' as const,
+        controllerStatus: 'connected' as const,
+        active: true,
+        canTakeover: false,
+        canonicalCols: 120,
+        canonicalRows: 40,
+      },
+    }
+    const context: TerminalSessionContextValue = {
+      createTerminal: async () => 'terminal-1',
+      registerHost: vi.fn(),
+      unregisterHost: vi.fn(),
+      selectTerminal: vi.fn(),
+      scrollToBottom: vi.fn(),
+      scrollLines: vi.fn(),
+      clearBell: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(() => []),
+      attach: vi.fn(),
+      detach: vi.fn(),
+      restart: vi.fn(),
+      isTerminalFocusTarget: vi.fn(() => false),
+      findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      clearSearch: vi.fn(),
+      writeInput,
+      takeover: vi.fn(),
+      reorderSessions: vi.fn(async () => true),
+      serialize: vi.fn(() => ''),
+    }
+    const readContext: TerminalSessionReadContextValue = {
+      worktreeSnapshot: () => worktreeSnapshot,
+      subscribeWorktree: () => () => {},
+      snapshot: () => snapshot,
+      subscribeSnapshot: () => () => {},
+    }
+
+    const shellClient = await import('#/web/app-shell-client.ts')
+    const oversized = new File(
+      [new Uint8Array(11 * 1024 * 1024)],
+      'huge.bin',
+      { type: 'application/octet-stream' },
+    )
+    // size is settable on File in jsdom (the constructor doesn't
+    // refuse it), but read it from the object to keep the assertion
+    // in sync with the constant.
+    expect(oversized.size).toBeGreaterThan(10 * 1024 * 1024)
+
+    try {
+      await act(async () => {
+        root.render(
+          <TerminalSessionContext.Provider value={context}>
+            <TerminalSessionReadContext.Provider value={readContext}>
+              <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+            </TerminalSessionReadContext.Provider>
+          </TerminalSessionContext.Provider>,
+        )
+      })
+
+      const slotRoot = container.querySelector('.goblin-terminal-slot') as HTMLElement
+      const clipboardData = {
+        files: {
+          length: 1,
+          item: (i: number) => [oversized][i] ?? null,
+        } as unknown as FileList,
+        items: [] as unknown as DataTransferItemList,
+        getData: () => '',
+      } as unknown as DataTransfer
+      const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
+      Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardData })
+      await act(async () => {
+        slotRoot.dispatchEvent(pasteEvent)
+        await new Promise((r) => setTimeout(r, 0))
+      })
+      // The synchronous size check called preventDefault() before
+      // returning; the resolver never ran, so neither did the
+      // bridge. writeInput is also untouched.
+      expect(pasteEvent.defaultPrevented).toBe(true)
+      expect(writeInput).not.toHaveBeenCalled()
+      expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
+    } finally {
+      await act(async () => root.unmount())
+      container.remove()
+    }
+  })
+
+  test('controller drop with partial backend failure writes the resolved paths AND surfaces paste-file-partial', async () => {
+    // Locks the toast-mapping contract from §9 of the design doc:
+    // a multi-file paste where path-attempt succeeded for some and
+    // blob-save succeeded for fewer than the remaining inputs must
+    // (a) write the resolved paths to the PTY and (b) toast a
+    // paste-file-partial so the user notices the silent loss. The
+    // resolver counts failed correctly (resolver.test.ts), but
+    // without this integration test nothing pinned the slot's
+    // writeResolutionToPty wiring.
+    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root: Root = createRoot(container)
+    const writeInput = vi.fn()
+    const descriptor = {
+      key: 'terminal-1',
+      worktreeTerminalKey: '/repo\0/worktree',
+      terminalId: 'terminal-1',
+      index: 1,
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/worktree',
+    }
+    const worktreeSnapshot = {
+      worktreeTerminalKey: '/repo\0/worktree',
+      selectedDescriptor: descriptor,
+      sessions: [
+        {
+          key: 'terminal-1',
+          worktreeTerminalKey: '/repo\0/worktree',
+          terminalId: 'terminal-1',
+          index: 1,
+          title: 'zsh',
+          phase: 'open' as const,
+          selected: true,
+          hasBell: false,
+        },
+      ],
+      count: 1,
+      pendingCreate: false,
+    }
+    const snapshot = {
+      phase: 'open' as const,
+      message: null,
+      processName: 'zsh',
+      attachment: {
+        role: 'controller' as const,
+        controllerStatus: 'connected' as const,
+        active: true,
+        canTakeover: false,
+        canonicalCols: 120,
+        canonicalRows: 40,
+      },
+    }
+    const context: TerminalSessionContextValue = {
+      createTerminal: async () => 'terminal-1',
+      registerHost: vi.fn(),
+      unregisterHost: vi.fn(),
+      selectTerminal: vi.fn(),
+      scrollToBottom: vi.fn(),
+      scrollLines: vi.fn(),
+      clearBell: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(() => []),
+      attach: vi.fn(),
+      detach: vi.fn(),
+      restart: vi.fn(),
+      isTerminalFocusTarget: vi.fn(() => false),
+      findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      clearSearch: vi.fn(),
+      writeInput,
+      takeover: vi.fn(),
+      reorderSessions: vi.fn(async () => true),
+      serialize: vi.fn(() => ''),
+    }
+    const readContext: TerminalSessionReadContextValue = {
+      worktreeSnapshot: () => worktreeSnapshot,
+      subscribeWorktree: () => () => {},
+      snapshot: () => snapshot,
+      subscribeSnapshot: () => () => {},
+    }
+
+    // 3 files: a has a path (path-attempt tier), b/c have no path
+    // and go to the blob-save tier. Backend returns 1 path (only b
+    // made it) so 1 file is "failed".
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockImplementation((file: File) =>
+      file.name === 'a.png' ? '/abs/a.png' : '',
+    )
+    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue(['/tmp/b.png'])
+    const { toast } = await import('sonner')
+
+    try {
+      await act(async () => {
+        root.render(
+          <TerminalSessionContext.Provider value={context}>
+            <TerminalSessionReadContext.Provider value={readContext}>
+              <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+            </TerminalSessionReadContext.Provider>
+          </TerminalSessionContext.Provider>,
+        )
+      })
+      vi.mocked(toast.error).mockClear()
+
+      const slotRoot = container.querySelector('.goblin-terminal-slot') as HTMLElement
+      const files = [
+        new File([new Uint8Array([1])], 'a.png'),
+        new File([new Uint8Array([1])], 'b.png'),
+        new File([new Uint8Array([1])], 'c.png'),
+      ]
+      const dataTransfer = {
+        types: ['Files'],
+        files: files as unknown as FileList,
+        dropEffect: '',
+      } as unknown as DataTransfer
+      const dropEvent = new Event('drop', { bubbles: true, cancelable: true })
+      Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
+      await act(async () => {
+        slotRoot.dispatchEvent(dropEvent)
+        await new Promise((r) => setTimeout(r, 0))
+      })
+
+      // writeInput must receive the joined, shell-escaped paths in
+      // the order the resolver returns them (path-attempt tier first,
+      // then blob-save). paste-file-partial toasts once.
+      expect(writeInput).toHaveBeenCalledTimes(1)
+      expect(writeInput).toHaveBeenCalledWith('terminal-1', '/abs/a.png /tmp/b.png')
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-partial')
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
     } finally {
       await act(async () => root.unmount())
       container.remove()

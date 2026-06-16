@@ -52,6 +52,24 @@ export function pathForDroppedFile(file: File): string {
   }
 }
 
+/**
+ * Persist clipboard / drop blobs via the active renderer bridge.
+ *
+ * Returns absolute paths the PTY can read. On any failure (bridge
+ * unavailable, IPC error, HTTP transport problem, server 4xx/5xx),
+ * the underlying bridge collapses the error to `[]`; this wrapper
+ * preserves that contract so the resolver can map "fewer paths back
+ * than files in" to a `paste-file-partial` toast and "nothing back"
+ * to `paste-file-failed`.
+ */
+export function saveClipboardFiles(files: File[]): Promise<string[]> {
+  try {
+    return getRendererBridge().saveClipboardFiles(files)
+  } catch {
+    return Promise.resolve([])
+  }
+}
+
 function isAllowedExternalUrl(url: string, allowHttp: boolean): boolean {
   try {
     const parsed = new URL(url)
