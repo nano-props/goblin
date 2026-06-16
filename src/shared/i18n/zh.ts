@@ -320,7 +320,6 @@ export const zh: Record<DictKey, string> = {
   'terminal.progress': '终端进度',
   'terminal.empty': '没有打开的终端',
   'terminal.drop-hint': '松手粘贴路径',
-  'terminal.paste-failed': '无法从剪贴板粘贴',
   'terminal.mirror-controlled': '其他窗口或标签页正在控制终端',
   'terminal.unowned': '当前终端没有控制者',
   'terminal.takeover': '接管',

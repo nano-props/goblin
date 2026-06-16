@@ -1,32 +1,28 @@
-import { ChevronsUp, ChevronsDown, ClipboardPaste, Square } from 'lucide-react'
+import { ChevronsUp, ChevronsDown, Square } from 'lucide-react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
 
 interface MobileTerminalToolbarProps {
   onInput: (data: string) => void
-  onPaste?: () => void | Promise<void>
   onScrollLines?: (amount: number) => void
   disabled?: boolean
   className?: string
 }
 
 type ToolbarKey =
-  | { type: 'input'; label: string; value: string; title: string }
-  | { type: 'scroll'; icon: React.ReactNode; amount: number; title: string }
-  | { type: 'command'; icon: React.ReactNode; value: string; title: string }
-  | { type: 'paste'; icon: React.ReactNode; title: string }
+  | { type: 'input'; label: string; value: string; accessibleName: string }
+  | { type: 'scroll'; icon: React.ReactNode; amount: number; accessibleName: string }
+  | { type: 'command'; icon: React.ReactNode; value: string; accessibleName: string }
 const KEYS: ToolbarKey[] = [
-  { type: 'input', label: '⎋', value: '\x1b', title: 'Escape' },
-  { type: 'input', label: '⇥', value: '\t', title: 'Tab' },
-  { type: 'command', icon: <CtrlCIcon />, value: '\x03', title: 'Ctrl+C' },
-  { type: 'paste', icon: <ClipboardPaste className="size-4" />, title: 'Paste' },
-  { type: 'scroll', icon: <ChevronsUp className="size-4" />, amount: -12, title: 'Page Up (scroll up)' },
-  { type: 'scroll', icon: <ChevronsDown className="size-4" />, amount: 12, title: 'Page Down (scroll down)' },
+  { type: 'input', label: '⎋', value: '\x1b', accessibleName: 'Escape' },
+  { type: 'input', label: '⇥', value: '\t', accessibleName: 'Tab' },
+  { type: 'command', icon: <CtrlCIcon />, value: '\x03', accessibleName: 'Ctrl+C' },
+  { type: 'scroll', icon: <ChevronsUp className="size-4" />, amount: -12, accessibleName: 'Page Up (scroll up)' },
+  { type: 'scroll', icon: <ChevronsDown className="size-4" />, amount: 12, accessibleName: 'Page Down (scroll down)' },
 ]
 
 export function MobileTerminalToolbar({
   onInput,
-  onPaste,
   onScrollLines,
   disabled,
   className,
@@ -42,29 +38,25 @@ export function MobileTerminalToolbar({
               size="icon"
               variant="secondary"
               disabled={disabled}
-              aria-label={key.title}
-              // No `title` attribute: this toolbar only renders on
-              // touch devices, where Safari shows a native callout on
-              // long-press of any element with a title. `aria-label`
-              // is the right surface for the description.
+              // Accessible name comes from a visually-hidden span, not
+              // `aria-label`: iOS Safari pops a native callout on
+              // long-press of any element whose accessible name is
+              // provided via `aria-label`. Visually-hidden text doesn't
+              // trigger that OS-level tooltip, but screen readers still
+              // announce it as the button's name.
               className="goblin-terminal-mobile-toolbar__btn"
               onClick={() => {
                 if (key.type === 'scroll') {
                   onScrollLines?.(key.amount)
                   return
                 }
-                if (key.type === 'paste') {
-                  void onPaste?.()
-                  return
-                }
-                if (key.type === 'command') {
-                  onInput(key.value)
-                  return
-                }
                 onInput(key.value)
               }}
             >
-              {key.type === 'scroll' || key.type === 'command' || key.type === 'paste' ? key.icon : key.label}
+              <span aria-hidden="true">
+                {key.type === 'scroll' || key.type === 'command' ? key.icon : key.label}
+              </span>
+              <span className="sr-only">{key.accessibleName}</span>
             </Button>
           )
         })}

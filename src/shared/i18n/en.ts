@@ -340,7 +340,6 @@ export const en = {
   'terminal.progress': 'Terminal progress',
   'terminal.empty': 'No terminal open',
   'terminal.drop-hint': 'Drop to paste path',
-  'terminal.paste-failed': 'Could not paste from clipboard',
   'terminal.mirror-controlled': 'Another window or tab is currently controlling this terminal.',
   'terminal.unowned': 'This terminal currently has no controller.',
   'terminal.takeover': 'Take over terminal',

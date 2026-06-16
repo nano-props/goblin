@@ -28,7 +28,6 @@ afterEach(() => {
 function render(
   props: {
     onInput?: (data: string) => void
-    onPaste?: () => void | Promise<void>
     onScrollLines?: (amount: number) => void
     disabled?: boolean
   } = {},
@@ -38,7 +37,6 @@ function render(
     root!.render(
       <MobileTerminalToolbar
         onInput={props.onInput ?? vi.fn()}
-        onPaste={props.onPaste}
         onScrollLines={props.onScrollLines}
         disabled={props.disabled}
       />,
@@ -46,22 +44,27 @@ function render(
   })
 }
 
-function clickButton(label: string) {
+function clickButton(visibleLabel: string) {
+  // Match by the visible glyph only (the first child span is
+  // aria-hidden, so its text alone identifies the button).
   const button = Array.from(container!.querySelectorAll('button')).find(
-    (element) => element.textContent === label,
+    (element) => element.querySelector('[aria-hidden="true"]')?.textContent === visibleLabel,
   ) as HTMLButtonElement
-  expect(button, `expected a button labeled ${label}`).toBeTruthy()
+  expect(button, `expected a button with visible label ${visibleLabel}`).toBeTruthy()
   act(() => {
     button.click()
   })
 }
 
-function clickButtonByLabel(labelPrefix: string) {
-  // The mobile toolbar exposes its labels via aria-label only — no
-  // `title` attribute, since iOS Safari pops a native callout on
-  // long-press of any element with one.
-  const button = container!.querySelector(`button[aria-label^="${labelPrefix}"]`) as HTMLButtonElement | null
-  expect(button, `expected a button labeled ${labelPrefix}`).toBeTruthy()
+function clickButtonByAccessibleName(labelPrefix: string) {
+  // The toolbar exposes accessible names via an sr-only span, not
+  // aria-label — iOS Safari pops a native callout on long-press of
+  // any element whose accessible name comes from aria-label. Reading
+  // the sr-only text mirrors how an assistive technology would.
+  const button = Array.from(container!.querySelectorAll('button')).find((element) =>
+    element.querySelector('.sr-only')?.textContent?.startsWith(labelPrefix),
+  ) as HTMLButtonElement | null
+  expect(button, `expected a button whose accessible name starts with ${labelPrefix}`).toBeTruthy()
   act(() => {
     button!.click()
   })
@@ -80,7 +83,7 @@ describe('MobileTerminalToolbar', () => {
   test('Ctrl+C shortcut button sends the interrupt byte directly', () => {
     const onInput = vi.fn()
     render({ onInput })
-    clickButtonByLabel('Ctrl+C')
+    clickButtonByAccessibleName('Ctrl+C')
     expect(onInput).toHaveBeenCalledWith('\x03')
   })
 
@@ -88,22 +91,11 @@ describe('MobileTerminalToolbar', () => {
     const onInput = vi.fn()
     const onScrollLines = vi.fn()
     render({ onInput, onScrollLines })
-    const upButton = container!.querySelector('button[aria-label^="Page Up"]') as HTMLButtonElement
-    const downButton = container!.querySelector('button[aria-label^="Page Down"]') as HTMLButtonElement
-    act(() => {
-      upButton.click()
-      downButton.click()
-    })
+    clickButtonByAccessibleName('Page Up')
+    clickButtonByAccessibleName('Page Down')
     expect(onScrollLines).toHaveBeenNthCalledWith(1, -12)
     expect(onScrollLines).toHaveBeenNthCalledWith(2, 12)
     expect(onInput).not.toHaveBeenCalled()
-  })
-
-  test('Paste button invokes the paste handler', () => {
-    const onPaste = vi.fn()
-    render({ onPaste })
-    clickButtonByLabel('Paste')
-    expect(onPaste).toHaveBeenCalledTimes(1)
   })
 
   test('Buttons honour the disabled prop', () => {
@@ -115,16 +107,20 @@ describe('MobileTerminalToolbar', () => {
     }
   })
 
-  test('Buttons do not render a `title` attribute (Safari long-press callout)', () => {
+  test('Buttons have neither `title` nor `aria-label` (iOS Safari long-press callout)', () => {
+    // iOS Safari pops a native tooltip on long-press of any element
+    // whose accessible name is exposed via either the `title` HTML
+    // attribute or the `aria-label` ARIA attribute. The mobile
+    // toolbar is touch-only, so both are unset and the accessible
+    // name is provided by an sr-only text child instead — which
+    // iOS does not treat as a tooltip source.
     render({})
     const buttons = container!.querySelectorAll('button')
     expect(buttons.length).toBeGreaterThan(0)
     for (const button of buttons) {
-      // iOS Safari shows a native tooltip on long-press of any element
-      // that has a `title` attribute. The mobile toolbar is only ever
-      // rendered on touch devices, so we expose labels via aria-label
-      // and leave `title` unset.
       expect(button.hasAttribute('title')).toBe(false)
+      expect(button.hasAttribute('aria-label')).toBe(false)
+      expect(button.querySelector('.sr-only')?.textContent?.trim().length ?? 0).toBeGreaterThan(0)
     }
   })
 })

@@ -328,7 +328,6 @@ export const ko: Record<DictKey, string> = {
   'terminal.progress': '터미널 진행률',
   'terminal.empty': '열린 터미널 없음',
   'terminal.drop-hint': '놓아서 경로 붙여넣기',
-  'terminal.paste-failed': '클립보드에서 붙여넣을 수 없습니다',
   'terminal.mirror-controlled': '다른 창이나 탭이 현재 이 터미널을 제어하고 있습니다.',
   'terminal.unowned': '현재 이 터미널을 제어하는 창이 없습니다.',
   'terminal.takeover': '터미널 제어 가져오기',
