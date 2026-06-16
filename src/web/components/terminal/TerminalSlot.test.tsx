@@ -16,6 +16,11 @@ vi.mock('#/web/stores/i18n.ts', () => ({
 
 vi.mock('#/web/app-shell-client.ts', () => ({
   pathForDroppedFile: () => '',
+  saveClipboardFiles: () => Promise.resolve([]),
+}))
+
+vi.mock('sonner', () => ({
+  toast: { error: vi.fn(), success: vi.fn(), message: vi.fn() },
 }))
 
 vi.mock('#/web/components/terminal/mobile-detection.ts', () => ({
@@ -312,6 +317,123 @@ describe('TerminalSlot', () => {
       // a11y tree reflects the role.
       const host = container.querySelector('.goblin-terminal-slot__host')
       expect(host?.getAttribute('aria-readonly')).toBe('true')
+    } finally {
+      await act(async () => root.unmount())
+      container.remove()
+    }
+  })
+
+  test('drop on a viewer slot is ignored (isController gate matches paste)', async () => {
+    // Regression for the previous drop handler that only checked `!key`.
+    // A viewer dropping a file would silently route input into the
+    // controller's PTY; the isController gate added alongside paste
+    // closes that hole.
+    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root: Root = createRoot(container)
+    const writeInput = vi.fn()
+    const descriptor = {
+      key: 'terminal-1',
+      worktreeTerminalKey: '/repo\0/worktree',
+      terminalId: 'terminal-1',
+      index: 1,
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/worktree',
+    }
+    const worktreeSnapshot = {
+      worktreeTerminalKey: '/repo\0/worktree',
+      selectedDescriptor: descriptor,
+      sessions: [
+        {
+          key: 'terminal-1',
+          worktreeTerminalKey: '/repo\0/worktree',
+          terminalId: 'terminal-1',
+          index: 1,
+          title: 'zsh',
+          phase: 'open' as const,
+          selected: true,
+          hasBell: false,
+        },
+      ],
+      count: 1,
+      pendingCreate: false,
+    }
+    // Viewer attachment: the !isController branch of handleDrop should
+    // short-circuit before touching writeInput.
+    const snapshot = {
+      phase: 'open' as const,
+      message: null,
+      processName: 'zsh',
+      attachment: {
+        role: 'viewer' as const,
+        controllerStatus: 'connected' as const,
+        active: false,
+        canTakeover: true,
+        canonicalCols: 120,
+        canonicalRows: 40,
+      },
+    }
+    const context: TerminalSessionContextValue = {
+      createTerminal: async () => 'terminal-1',
+      registerHost: vi.fn(),
+      unregisterHost: vi.fn(),
+      selectTerminal: vi.fn(),
+      scrollToBottom: vi.fn(),
+      scrollLines: vi.fn(),
+      clearBell: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(() => []),
+      attach: vi.fn(),
+      detach: vi.fn(),
+      restart: vi.fn(),
+      isTerminalFocusTarget: vi.fn(() => false),
+      findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      clearSearch: vi.fn(),
+      writeInput,
+      takeover: vi.fn(),
+      reorderSessions: vi.fn(async () => true),
+      serialize: vi.fn(() => ''),
+    }
+    const readContext: TerminalSessionReadContextValue = {
+      worktreeSnapshot: () => worktreeSnapshot,
+      subscribeWorktree: () => () => {},
+      snapshot: () => snapshot,
+      subscribeSnapshot: () => () => {},
+    }
+
+    await act(async () => {
+      root.render(
+        <TerminalSessionContext.Provider value={context}>
+          <TerminalSessionReadContext.Provider value={readContext}>
+            <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+          </TerminalSessionReadContext.Provider>
+        </TerminalSessionContext.Provider>,
+      )
+    })
+
+    try {
+      const slotRoot = container.querySelector('.goblin-terminal-slot') as HTMLElement
+      expect(slotRoot).toBeTruthy()
+      // Synthesize a Drop event with one file. jsdom's DataTransfer
+      // doesn't accept programmatic `files` assignment cleanly, so we
+      // build a minimal proxy that satisfies the handler.
+      const file = new File([new Uint8Array([1, 2, 3])], 'shot.png')
+      const dataTransfer = {
+        types: ['Files'],
+        files: [file] as unknown as FileList,
+        dropEffect: '',
+      } as unknown as DataTransfer
+      const dropEvent = new Event('drop', { bubbles: true, cancelable: true })
+      Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
+      await act(async () => {
+        slotRoot.dispatchEvent(dropEvent)
+        // give the resolver microtask chain a tick — even though we
+        // expect it never to run.
+        await Promise.resolve()
+      })
+      expect(writeInput).not.toHaveBeenCalled()
     } finally {
       await act(async () => root.unmount())
       container.remove()

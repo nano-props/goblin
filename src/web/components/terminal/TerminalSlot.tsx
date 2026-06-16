@@ -4,14 +4,18 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type ClipboardEvent,
   type DragEvent,
   type FocusEvent,
   type KeyboardEvent,
 } from 'react'
+import { toast } from 'sonner'
 import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { setTerminalFocused } from '#/web/terminal-focus.ts'
-import { pathForDroppedFile } from '#/web/app-shell-client.ts'
+import { collectClipboardFiles } from '#/web/clipboard/collect-clipboard-files.ts'
+import { processDrop, processPaste } from '#/web/clipboard/process.ts'
+import { PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
@@ -172,6 +176,11 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
       : ''
 
   const [dragOver, setDragOver] = useState(false)
+  // Slot mode is computed below; we need `isController` here for the
+  // paste/drop gates, so resolve attachment role inline. The full
+  // slotMode state machine below mirrors the same source of truth.
+  const earlyAttachment = snapshot.attachment
+  const earlyIsController = hasSessions && snapshot.phase === 'open' && earlyAttachment?.role === 'controller'
   const handleDragEnter = useCallback((event: DragEvent<HTMLDivElement>) => {
     if (!event.dataTransfer.types.includes('Files')) return
     event.preventDefault()
@@ -187,20 +196,76 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
     const relatedTarget = event.relatedTarget
     if (!(relatedTarget instanceof Node) || !event.currentTarget.contains(relatedTarget)) setDragOver(false)
   }, [])
+  const writeResolutionToPty = useCallback(
+    (paths: string[], failed: number, sessionKey: string) => {
+      if (paths.length === 0) {
+        toast.error(t('terminal.paste-file-failed'))
+        return
+      }
+      const escaped = paths.map(shellEscapePath).join(' ')
+      writeInput(sessionKey, escaped)
+      if (failed > 0) toast.error(t('terminal.paste-file-partial'))
+    },
+    [t, writeInput],
+  )
   const handleDrop = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
       if (!event.dataTransfer.types.includes('Files')) return
       event.preventDefault()
       setDragOver(false)
-      if (!key) return
-      const paths = Array.from(event.dataTransfer.files)
-        .map((file) => pathForDroppedFile(file))
-        .filter((path) => path.length > 0)
-      if (paths.length === 0) return
-      const escaped = paths.map(shellEscapePath).join(' ')
-      writeInput(key, escaped)
+      // `isController` gate matches paste: a viewer dropping files into
+      // a session it doesn't own would otherwise silently route input
+      // to the controller's PTY. The `!key` half preserves the
+      // pre-existing guard against slots with no session.
+      if (!key || !earlyIsController) return
+      const files = Array.from(event.dataTransfer.files).filter((f) => f.size > 0)
+      if (files.length === 0) return
+      void processDrop({ files }).then((outcome) => {
+        if (outcome.kind === 'no-op') return
+        if (outcome.kind === 'too-large') {
+          toast.error(t('terminal.paste-file-too-large'))
+          return
+        }
+        writeResolutionToPty(outcome.resolution.paths, outcome.resolution.failed, key)
+      })
     },
-    [key, writeInput],
+    [earlyIsController, key, t, writeResolutionToPty],
+  )
+  const handlePasteCapture = useCallback(
+    (event: ClipboardEvent<HTMLDivElement>) => {
+      if (!key || !earlyIsController) return
+      const files = collectClipboardFiles(event.clipboardData)
+      // Files-first: a Linux file copy carries both `text/uri-list`
+      // and a `text/plain` rendering of the same URI list. If we let
+      // text win, the user pastes a literal `file:///…` string.
+      if (files.length > 0) {
+        if (files.some((f) => f.size > PASTE_FILE_MAX_BYTES)) {
+          event.preventDefault()
+          toast.error(t('terminal.paste-file-too-large'))
+          return
+        }
+        // preventDefault() in capture phase is enough to stop xterm —
+        // xterm renders inside this slot's root, so the bubble-phase
+        // listener never sees the event. Do NOT call stopPropagation:
+        // it would silently break any future bubble-phase paste
+        // listener mounted higher in the tree.
+        event.preventDefault()
+        const text = event.clipboardData.getData('text/plain')
+        void processPaste({ files, text }).then((outcome) => {
+          if (outcome.kind === 'files') {
+            writeResolutionToPty(outcome.resolution.paths, outcome.resolution.failed, key)
+            return
+          }
+          if (outcome.kind === 'too-large') {
+            toast.error(t('terminal.paste-file-too-large'))
+          }
+        })
+        return
+      }
+      // No files: let xterm handle text paste as today. Do NOT
+      // preventDefault — that would block xterm's own text path.
+    },
+    [earlyIsController, key, t, writeResolutionToPty],
   )
   const progress = snapshot.progress
   const attachment = snapshot.attachment
@@ -242,6 +307,7 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
       onFocusCapture={handleFocus}
       onBlurCapture={handleBlur}
       onKeyDownCapture={handleKeyDownCapture}
+      onPasteCapture={handlePasteCapture}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}

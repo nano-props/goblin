@@ -346,6 +346,9 @@ export const en = {
   'terminal.index-title': 'Terminal {index}',
   'terminal.bell-unread': 'Unread terminal bell',
   'terminal.bell-unread-count': '{count} unread bell',
+  'terminal.paste-file-failed': 'Could not paste the file into the terminal.',
+  'terminal.paste-file-partial': 'Some pasted files could not be saved.',
+  'terminal.paste-file-too-large': 'File is too large to paste. Use scp, rsync, or a file manager instead.',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) ---
   'worktrees.reveal-title': 'Reveal in Finder',

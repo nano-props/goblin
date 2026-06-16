@@ -341,6 +341,9 @@ export const ja: Record<DictKey, string> = {
   'terminal.index-title': 'ターミナル {index}',
   'terminal.bell-unread': '未読のターミナルベル',
   'terminal.bell-unread-count': '未読ベル {count} 件',
+  'terminal.paste-file-failed': 'ファイルをターミナルに貼り付けできませんでした。',
+  'terminal.paste-file-partial': '一部のファイルを保存できませんでした。',
+  'terminal.paste-file-too-large': 'ファイルが大きすぎて貼り付けできません。scp、rsync、またはファイルマネージャをご利用ください。',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': 'Finder で表示',
