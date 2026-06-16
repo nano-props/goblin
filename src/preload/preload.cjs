@@ -7,6 +7,13 @@
 // only visible in DevTools where the renderer-side `web/logger.ts` will
 // already be emitting its own (more detailed) records.
 const { contextBridge, ipcRenderer, webUtils } = require('electron')
+// Mirrors `src/shared/clipboard-paste.ts:CLIPBOARD_FALLBACK_FILE_NAME`.
+// CommonJS preloads can't import from the Vite-resolved `src/` tree at
+// runtime, so we duplicate the literal here. If the constant ever
+// changes, update both copies (a unit test in
+// `src/shared/clipboard-paste.test.ts` could lock this if it became
+// worth the friction).
+const CLIPBOARD_FALLBACK_FILE_NAME = 'clipboard.bin'
 const IPC = {
   ipc: {
     call: 'goblin:ipc',
@@ -27,7 +34,7 @@ const IPC = {
     setBadge: 'goblin:terminal-set-badge',
   },
   clipboard: {
-    saveBinaryFiles: 'goblin:clipboard-save-binary-files',
+    saveFiles: 'goblin:clipboard-save-files',
   },
   bootstrap: {
     get: 'goblin:get-bootstrap',
@@ -209,11 +216,20 @@ contextBridge.exposeInMainWorld('goblinNative', {
     try {
       const payload = await Promise.all(
         files.map(async (file) => ({
-          name: typeof file?.name === 'string' && file.name.length > 0 ? file.name : 'clipboard.bin',
+          // Mirrors the web HTTP backend: the empty-name fallback
+          // (CLIPBOARD_FALLBACK_FILE_NAME) is the literal duplicated
+          // there as well, and the server-side `sanitizeBaseName`
+          // preserves it. Keeping the names identical across runtimes
+          // avoids a class of debugging where Electron and web leave
+          // different temp filenames for the same paste payload.
+          name:
+            typeof file?.name === 'string' && file.name.length > 0
+              ? file.name
+              : CLIPBOARD_FALLBACK_FILE_NAME,
           bytes: await file.arrayBuffer(),
         })),
       )
-      const result = await safeInvoke(IPC.clipboard.saveBinaryFiles, payload)
+      const result = await safeInvoke(IPC.clipboard.saveFiles, payload)
       return Array.isArray(result) ? result.filter((p) => typeof p === 'string') : []
     } catch (err) {
       console.warn('[preload] saveClipboardFiles failed', err)

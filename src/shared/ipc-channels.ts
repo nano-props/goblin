@@ -13,4 +13,9 @@ export const TERMINAL_NOTIFY_BELL_CHANNEL = 'goblin:terminal-notify-bell'
 export const TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL = 'goblin:terminal-send-test-notification'
 export const TERMINAL_SET_BADGE_CHANNEL = 'goblin:terminal-set-badge'
 
-export const CLIPBOARD_SAVE_BINARY_FILES_CHANNEL = 'goblin:clipboard-save-binary-files'
+// Renderer bridge exposes `saveClipboardFiles` (single method that takes
+// File[]). Channel name mirrors that — no `-binary` suffix, since the
+// bridge contract doesn't distinguish binary vs text-clipboard files
+// either. (The renderer always passes binary blobs across this channel
+// because File -> ArrayBuffer is the wire format; see preload.cjs.)
+export const CLIPBOARD_SAVE_FILES_CHANNEL = 'goblin:clipboard-save-files'

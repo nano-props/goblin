@@ -26,3 +26,14 @@ export const PASTE_FILE_MAX_BYTES = 10 * 1024 * 1024 // 10 MiB
  * streaming arbitrary bytes).
  */
 export const MAX_PASTE_BATCH_BYTES = PASTE_FILE_MAX_BYTES + 2 * 1024 * 1024 // 12 MiB
+
+/**
+ * Filename used when a `File` synthesised from `clipboardData.items` (or
+ * otherwise constructed without a `name`) hits the multipart upload path.
+ * Multipart requires a filename for `File` parts; the server-side
+ * `sanitizeBaseName` then preserves this literal (it contains no
+ * Windows-reserved characters). Both the Electron preload and the web
+ * HTTP backend must use this constant so the upload shape stays
+ * symmetric across runtimes.
+ */
+export const CLIPBOARD_FALLBACK_FILE_NAME = 'clipboard.bin'

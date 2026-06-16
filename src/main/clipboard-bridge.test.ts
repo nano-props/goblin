@@ -129,14 +129,14 @@ describe('wireClipboardBridgeIpc', () => {
     await new Promise((r) => setTimeout(r, 10))
     const entries = await readdir(testTmpdir)
     expect(entries).not.toContain('goblin-clipboard-99999')
-    expect(ipcHandlers.has('goblin:clipboard-save-binary-files')).toBe(true)
+    expect(ipcHandlers.has('goblin:clipboard-save-files')).toBe(true)
   })
 
   test('handler rejects untrusted senders by returning []', async () => {
     isTrustedIpcEventMock.mockReturnValue(false)
     const { wireClipboardBridgeIpc } = await import('#/main/clipboard-bridge.ts')
     wireClipboardBridgeIpc()
-    const handler = ipcHandlers.get('goblin:clipboard-save-binary-files')!
+    const handler = ipcHandlers.get('goblin:clipboard-save-files')!
     const result = await handler(
       {},
       [{ name: 'a.txt', bytes: new ArrayBuffer(1) }],
@@ -147,7 +147,7 @@ describe('wireClipboardBridgeIpc', () => {
   test('handler returns [] on malformed payload shape', async () => {
     const { wireClipboardBridgeIpc } = await import('#/main/clipboard-bridge.ts')
     wireClipboardBridgeIpc()
-    const handler = ipcHandlers.get('goblin:clipboard-save-binary-files')!
+    const handler = ipcHandlers.get('goblin:clipboard-save-files')!
     expect(await handler({}, 'not an array')).toEqual([])
     expect(await handler({}, [{ name: 5, bytes: new ArrayBuffer(1) }])).toEqual([])
     expect(await handler({}, [{ name: 'ok', bytes: 'not-an-ArrayBuffer' }])).toEqual([])
@@ -156,7 +156,7 @@ describe('wireClipboardBridgeIpc', () => {
   test('handler returns absolute paths for a well-formed payload', async () => {
     const { wireClipboardBridgeIpc } = await import('#/main/clipboard-bridge.ts')
     wireClipboardBridgeIpc()
-    const handler = ipcHandlers.get('goblin:clipboard-save-binary-files')!
+    const handler = ipcHandlers.get('goblin:clipboard-save-files')!
     const result = await handler(
       {},
       [{ name: 'a.txt', bytes: new TextEncoder().encode('hi').buffer as ArrayBuffer }],
@@ -168,7 +168,7 @@ describe('wireClipboardBridgeIpc', () => {
   test('handler swallows write errors to []', async () => {
     const { wireClipboardBridgeIpc } = await import('#/main/clipboard-bridge.ts')
     wireClipboardBridgeIpc()
-    const handler = ipcHandlers.get('goblin:clipboard-save-binary-files')!
+    const handler = ipcHandlers.get('goblin:clipboard-save-files')!
     const oversized = new ArrayBuffer(PASTE_FILE_MAX_BYTES + 1)
     const result = await handler({}, [{ name: 'big.bin', bytes: oversized }])
     expect(result).toEqual([])
