@@ -2,7 +2,7 @@ export const DEFAULT_TERMINAL_COLS = 80
 export const DEFAULT_TERMINAL_ROWS = 24
 export const TERMINAL_FONT_SIZE = 14
 export const TERMINAL_FONT_FAMILY = "'Goblin Mono', monospace"
-export const TERMINAL_LINE_HEIGHT = 1.35
+export const TERMINAL_LINE_HEIGHT = 1
 
 const MIN_INITIAL_TERMINAL_COLS = 2
 const MIN_INITIAL_TERMINAL_ROWS = 1
