@@ -416,14 +416,7 @@ export class ManagedTerminalSession {
     // have no buffer to seed. Resetting/writing on empty would clobber
     // the term for nothing.
     if (hydratedSnapshot.snapshot.length === 0 || !this.currentStart(token, term)) return false
-    // Start a replay window at the cached snapshot's seq. The window
-    // spans the preload term.write, the ipcPhase, and the post-attach
-    // replayActiveView's beginReplay+write+finishReplay; the
-    // finishReplay filters by the new attach's snapshot seq, so
-    // events captured here with seq > newSeq are queued to the term
-    // after the new snapshot is written (and added to the summary
-    // under the new role), while events with seq <= newSeq are
-    // dropped (they are already in the new snapshot).
+    // Open the replay window — see state.beginReplay for the preload+post-attach contract.
     this.runtime.beginReplay(hydratedSnapshot.snapshotSeq)
     try {
       term.reset()
