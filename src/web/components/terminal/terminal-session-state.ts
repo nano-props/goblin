@@ -178,16 +178,11 @@ export class TerminalSessionState {
     return true
   }
 
-  // Update the replay boundary. The pending-output buffer is not
-  // cleared here — the buffer is the events captured since the last
-  // `finishReplay` (or `resetTransientState`), and a new window that
-  // starts before the previous one is drained inherits the captured
-  // events. The preload path (beginReplay at the cached snapshot's
-  // seq) is followed by the post-attach path (beginReplay at the new
-  // attach's seq, before the new `finishReplay`); the post-attach
-  // `finishReplay` filters by the new boundary so events older than
-  // the new snapshot are dropped, but events newer than the new
-  // snapshot that were captured during the preload are kept.
+  // Updates the replay boundary. The pending-output buffer is
+  // preserved across calls, so a preload window (cached snapshot's
+  // seq) followed by a post-attach window (new snapshot's seq)
+  // shares the same buffer; the post-attach `finishReplay` filters
+  // by the new boundary.
   beginReplay(replaySeq: number): void {
     this.replayBufferState.replayBoundarySeq = replaySeq
   }
@@ -206,10 +201,8 @@ export class TerminalSessionState {
     return pendingOutput.filter((event) => event.seq > replaySeq)
   }
 
-  // Clears the replay buffer and boundary without queueing events to
-  // the term or building the output summary. Used by error /
-  // cancellation paths in `ManagedTerminalSession` to clean up
-  // replay state when the attach fails partway through. Cheaper than
+  // Clears the replay buffer and boundary without queueing to the
+  // term or appending to the output summary. Cheaper than
   // `finishReplay` because it skips the splice + filter.
   discardReplay(): void {
     this.replayBufferState.replayBoundarySeq = null

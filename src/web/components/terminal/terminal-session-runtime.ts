@@ -186,14 +186,9 @@ export class TerminalSessionRuntime {
     return events
   }
 
-  // Discards the replay buffer (boundary + captured events) without
-  // queueing anything to the term or appending to the output
-  // summary. Used by error / cancellation paths in
-  // `ManagedTerminalSession` to clear replay state when the attach
-  // fails partway through. The success path does not call this — the
-  // preload's beginReplay and the post-attach's beginReplay share the
-  // same window, and the post-attach's `finishReplay` drains the
-  // combined buffer with the new boundary.
+  // Drops the replay buffer for the error / cancellation paths. The
+  // success path uses `finishReplay` instead, which appends to the
+  // summary under the new role.
   drainReplay(): void {
     this.state.discardReplay()
   }
