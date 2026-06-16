@@ -149,14 +149,14 @@ export class TerminalSessionRegistry {
     const directKey = this.sessionKeyBySessionId.get(event.sessionId)
     const directSession = directKey ? this.sessions.get(directKey) : null
     if (directKey && directSession?.handleExit(event)) {
-      // Local runtime accepted the exit — the reattach cache entry
-      // for this key is now stale. Gating the delete on the runtime's
-      // accept (rather than evicting eagerly on the sessionId match)
-      // avoids discarding a still-valid cache entry during a race
-      // where the local session has moved to a new sessionId (e.g.
-      // after a server-side restart) but the index still maps the old
-      // sessionId to the same key.
-      this.reattachSnapshotCache.delete(directKey)
+      // Local runtime accepted the exit. Gating the discard on the
+      // runtime's accept (rather than evicting eagerly on the
+      // sessionId match) avoids discarding a still-valid cache entry
+      // during a race where the local session has moved to a new
+      // sessionId (e.g. after a server-side restart) but the index
+      // still maps the old sessionId to the same key.
+      // `discardLocalSessionAndDismissDetailIfLast → removeSession`
+      // is what actually evicts the reattach cache entry for `directKey`.
       this.discardLocalSessionAndDismissDetailIfLast(directKey, directSession.descriptor)
       return
     }
