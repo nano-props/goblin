@@ -11,6 +11,7 @@ import { createInternalAuthMiddleware } from '#/server/common/auth.ts'
 import { applyApiSecurityHeaders, buildCorsOriginPredicate } from '#/server/common/http-harden.ts'
 import { accessLog } from '#/server/common/access-log.ts'
 import { errorJson } from '#/server/common/responses.ts'
+import { createClipboardRoutes } from '#/server/routes/clipboard.ts'
 import { createHealthRoutes } from '#/server/routes/health.ts'
 import { createRemoteRoutes } from '#/server/routes/remote.ts'
 import { createRealtimeRoutes } from '#/server/routes/realtime.ts'
@@ -26,6 +27,7 @@ import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
 import { initialSettingsFromSnapshot } from '#/shared/settings-defaults.ts'
 import type { LangPref } from '#/shared/api-types.ts'
 import type { RendererBootstrapSnapshot } from '#/shared/bootstrap.ts'
+import { MAX_PASTE_BATCH_BYTES } from '#/shared/clipboard-paste.ts'
 
 export interface ServerAppOptions {
   version: string
@@ -46,8 +48,16 @@ export interface ServerAppOptions {
 // Cap request bodies on the data endpoints at 1 MiB. The largest real
 // payload today is a settings patch (a few KB); 1 MiB leaves headroom
 // for future growth (PR lists, diff hunks) while preventing a hostile
-// client from pinning a worker with a multi-GB POST.
+// client from pinning a worker with a multi-GB POST. Registered per
+// sub-path (not globally on `/api/*`) so the clipboard route can opt
+// in to a larger cap without widening the limit for everyone — Hono's
+// `bodyLimit` reads Content-Length and short-circuits with `onError`
+// before calling `next`, so a global rule cannot be overridden by a
+// later, more permissive one. See `node_modules/hono/dist/middleware/body-limit/index.js`.
 const API_BODY_LIMIT_BYTES = 1 * 1024 * 1024
+// Tighter cap for the unauthenticated health endpoints — they don't
+// take meaningful bodies, so a kilobyte is generous.
+const HEALTH_BODY_LIMIT_BYTES = 1024
 
 const WEB_DIST_DIR = path.resolve(import.meta.dirname, '../../dist/web')
 const WEB_INDEX_HTML = path.join(WEB_DIST_DIR, 'index.html')
@@ -128,10 +138,18 @@ export function createApp(options: ServerAppOptions): Hono {
     }),
   )
   app.use('/api/*', applyApiSecurityHeaders())
+  // Body-limit is per sub-path rather than global on `/api/*` so the
+  // clipboard route can use a larger cap (multipart blob uploads) while
+  // every other route stays at the 1 MiB default and `/api/health/*`
+  // uses an even tighter cap. Each `bodyLimit` registration is placed
+  // *after* the auth middleware for the same sub-path: an unauthenticated
+  // probe with a huge body should see 401 (not 413), so the server
+  // doesn't measure the request and doesn't leak the presence of a size
+  // limit before the secret check.
   app.use(
-    '/api/*',
+    '/api/health/*',
     bodyLimit({
-      maxSize: API_BODY_LIMIT_BYTES,
+      maxSize: HEALTH_BODY_LIMIT_BYTES,
       onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
     }),
   )
@@ -144,11 +162,41 @@ export function createApp(options: ServerAppOptions): Hono {
     createHealthRoutes({ version: options.version, startedAt: options.startedAt, terminalHost: options.terminalHost }),
   )
   app.use('/api/settings/*', createInternalAuthMiddleware(options.internalSecret))
+  app.use(
+    '/api/settings/*',
+    bodyLimit({
+      maxSize: API_BODY_LIMIT_BYTES,
+      onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
+    }),
+  )
   app.use('/api/remote/*', createInternalAuthMiddleware(options.internalSecret))
+  app.use(
+    '/api/remote/*',
+    bodyLimit({
+      maxSize: API_BODY_LIMIT_BYTES,
+      onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
+    }),
+  )
   app.use('/api/repo/*', createInternalAuthMiddleware(options.internalSecret))
+  app.use(
+    '/api/repo/*',
+    bodyLimit({
+      maxSize: API_BODY_LIMIT_BYTES,
+      onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
+    }),
+  )
+  app.use('/api/clipboard/*', createInternalAuthMiddleware(options.internalSecret))
+  app.use(
+    '/api/clipboard/*',
+    bodyLimit({
+      maxSize: MAX_PASTE_BATCH_BYTES,
+      onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
+    }),
+  )
   app.route('/api/settings', createSettingsRoutes(settingsState))
   app.route('/api/remote', createRemoteRoutes())
   app.route('/api/repo', createRepoRoutes())
+  app.route('/api/clipboard', createClipboardRoutes())
   app.route('/ws', createRealtimeRoutes({ internalSecret: options.internalSecret, terminalHost: options.terminalHost }))
 
   // Explicit SPA routes — must be before serveStatic so the

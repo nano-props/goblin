@@ -236,3 +236,127 @@ describe('server app html bootstrap', () => {
     expect(response.headers.get('content-type')).toMatch(/application\/json/)
   })
 })
+
+describe('per-sub-path body limits and auth ordering', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.clearAllMocks()
+  })
+
+  test('unauth probe to /api/settings/* with oversized body sees 401, not 413', async () => {
+    const { createApp } = await import('#/server/app-factory.ts')
+    const app = createApp({
+      version: '0.1.0',
+      startedAt: Date.now(),
+      internalSecret: 'secret',
+      terminalHost: terminalHostStub,
+    })
+    // 5 MiB body — well over the 1 MiB cap; Content-Length is set.
+    const response = await app.request(
+      new Request('http://127.0.0.1:32100/api/settings/prefs', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'content-length': String(5 * 1024 * 1024),
+        },
+        body: 'x'.repeat(5 * 1024 * 1024),
+      }),
+    )
+    expect(response.status).toBe(401)
+  })
+
+  test('authed oversized body to /api/settings/* sees 413', async () => {
+    const { createApp } = await import('#/server/app-factory.ts')
+    const app = createApp({
+      version: '0.1.0',
+      startedAt: Date.now(),
+      internalSecret: 'secret',
+      terminalHost: terminalHostStub,
+    })
+    const response = await app.request(
+      new Request('http://127.0.0.1:32100/api/settings/prefs', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'content-length': String(5 * 1024 * 1024),
+          'x-goblin-internal-secret': 'secret',
+        },
+        body: 'x'.repeat(5 * 1024 * 1024),
+      }),
+    )
+    expect(response.status).toBe(413)
+  })
+
+  test('authed 8 MiB body to /api/clipboard/* sees 200 (or 400/500 from the route, never 413)', async () => {
+    const { createApp } = await import('#/server/app-factory.ts')
+    const app = createApp({
+      version: '0.1.0',
+      startedAt: Date.now(),
+      internalSecret: 'secret',
+      terminalHost: terminalHostStub,
+    })
+    // 8 MiB raw bytes — under the per-batch ceiling for /api/clipboard/*
+    // but well over the 1 MiB cap of other routes. The route layer will
+    // reject the body shape (no multipart parsing), but the bodyLimit
+    // must not short-circuit at 413.
+    const response = await app.request(
+      new Request('http://127.0.0.1:32100/api/clipboard/files', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/octet-stream',
+          'content-length': String(8 * 1024 * 1024),
+          'x-goblin-internal-secret': 'secret',
+        },
+        body: 'x'.repeat(8 * 1024 * 1024),
+      }),
+    )
+    expect(response.status).not.toBe(413)
+  })
+
+  test('/api/clipboard/* still rejects bodies larger than the 12 MiB batch cap with 413', async () => {
+    const { createApp } = await import('#/server/app-factory.ts')
+    const app = createApp({
+      version: '0.1.0',
+      startedAt: Date.now(),
+      internalSecret: 'secret',
+      terminalHost: terminalHostStub,
+    })
+    const response = await app.request(
+      new Request('http://127.0.0.1:32100/api/clipboard/files', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/octet-stream',
+          'content-length': String(20 * 1024 * 1024),
+          'x-goblin-internal-secret': 'secret',
+        },
+        body: 'x'.repeat(20 * 1024 * 1024),
+      }),
+    )
+    expect(response.status).toBe(413)
+  })
+
+  test('/api/health/* enforces a tight (1 KiB) body cap', async () => {
+    const { createApp } = await import('#/server/app-factory.ts')
+    const app = createApp({
+      version: '0.1.0',
+      startedAt: Date.now(),
+      internalSecret: 'secret',
+      terminalHost: terminalHostStub,
+    })
+    // Two-kilobyte body to a hypothetical /api/health endpoint —
+    // 1 KiB is plenty for the JSON requests health probes actually
+    // send, so anything bigger should 413 (regardless of whether
+    // the endpoint exists with that method).
+    const response = await app.request(
+      new Request('http://127.0.0.1:32100/api/health', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'content-length': String(2 * 1024),
+        },
+        body: 'x'.repeat(2 * 1024),
+      }),
+    )
+    expect(response.status).toBe(413)
+  })
+})
