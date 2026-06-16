@@ -10,6 +10,16 @@ import {
 } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 
+const toastMocks = vi.hoisted(() => ({
+  error: vi.fn(),
+}))
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: toastMocks.error,
+  },
+}))
+
 vi.mock('#/web/stores/i18n.ts', () => ({
   useT: () => (key: string) => key,
 }))
@@ -18,8 +28,13 @@ vi.mock('#/web/app-shell-client.ts', () => ({
   pathForDroppedFile: () => '',
 }))
 
+vi.mock('#/web/components/terminal/mobile-detection.ts', () => ({
+  isMobileDevice: () => true,
+}))
+
 afterEach(() => {
   document.body.innerHTML = ''
+  toastMocks.error.mockReset()
 })
 
 describe('TerminalSlot', () => {
@@ -309,6 +324,117 @@ describe('TerminalSlot', () => {
       const host = container.querySelector('.goblin-terminal-slot__host')
       expect(host?.getAttribute('aria-readonly')).toBe('true')
     } finally {
+      await act(async () => root.unmount())
+      container.remove()
+    }
+  })
+
+  test('paste failure shows a lightweight toast on mobile toolbar', async () => {
+    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root: Root = createRoot(container)
+    const writeInput = vi.fn()
+    const descriptor = {
+      key: 'terminal-1',
+      worktreeTerminalKey: '/repo\0/worktree',
+      terminalId: 'terminal-1',
+      index: 1,
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/worktree',
+    }
+    const worktreeSnapshot = {
+      worktreeTerminalKey: '/repo\0/worktree',
+      selectedDescriptor: descriptor,
+      sessions: [
+        {
+          key: 'terminal-1',
+          worktreeTerminalKey: '/repo\0/worktree',
+          terminalId: 'terminal-1',
+          index: 1,
+          title: 'zsh',
+          phase: 'open' as const,
+          selected: true,
+          hasBell: false,
+        },
+      ],
+      count: 1,
+      pendingCreate: false,
+    }
+    const snapshot = {
+      phase: 'open' as const,
+      message: null,
+      processName: 'zsh',
+      attachment: {
+        role: 'controller' as const,
+        controllerStatus: 'connected' as const,
+        active: true,
+        canTakeover: true,
+        canonicalCols: 120,
+        canonicalRows: 40,
+      },
+    }
+    const context: TerminalSessionContextValue = {
+      createTerminal: async () => 'terminal-1',
+      registerHost: vi.fn(),
+      unregisterHost: vi.fn(),
+      selectTerminal: vi.fn(),
+      scrollToBottom: vi.fn(),
+      scrollLines: vi.fn(),
+      clearBell: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(() => []),
+      attach: vi.fn(),
+      detach: vi.fn(),
+      restart: vi.fn(),
+      isTerminalFocusTarget: vi.fn(() => false),
+      findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      clearSearch: vi.fn(),
+      writeInput,
+      takeover: vi.fn(),
+      reorderSessions: vi.fn(async () => true),
+      serialize: vi.fn(() => ''),
+    }
+    const readContext: TerminalSessionReadContextValue = {
+      worktreeSnapshot: () => worktreeSnapshot,
+      subscribeWorktree: () => () => {},
+      snapshot: () => snapshot,
+      subscribeSnapshot: () => () => {},
+    }
+    const originalClipboard = navigator.clipboard
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        readText: vi.fn(async () => {
+          throw new Error('denied')
+        }),
+      },
+    })
+
+    await act(async () => {
+      root.render(
+        <TerminalSessionContext.Provider value={context}>
+          <TerminalSessionReadContext.Provider value={readContext}>
+            <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+          </TerminalSessionReadContext.Provider>
+        </TerminalSessionContext.Provider>,
+      )
+    })
+
+    try {
+      const pasteButton = container.querySelector('button[title="Paste"]') as HTMLButtonElement | null
+      expect(pasteButton).toBeTruthy()
+      await act(async () => {
+        pasteButton!.click()
+      })
+      expect(writeInput).not.toHaveBeenCalled()
+      expect(toastMocks.error).toHaveBeenCalledWith('terminal.paste-failed')
+    } finally {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: originalClipboard,
+      })
       await act(async () => root.unmount())
       container.remove()
     }

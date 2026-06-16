@@ -335,6 +335,7 @@ export const ja: Record<DictKey, string> = {
   'terminal.progress': 'ターミナル進行状況',
   'terminal.empty': '開いているターミナルはありません',
   'terminal.drop-hint': 'ドロップしてパスを貼り付け',
+  'terminal.paste-failed': 'クリップボードから貼り付けできませんでした',
   'terminal.mirror-controlled': '現在このターミナルは別のウィンドウまたはタブが操作しています。',
   'terminal.unowned': '現在このターミナルを操作しているウィンドウはありません。',
   'terminal.takeover': 'ターミナルを引き継ぐ',
