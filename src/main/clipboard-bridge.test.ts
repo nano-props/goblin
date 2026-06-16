@@ -51,11 +51,32 @@ describe('saveClipboardBinaryFiles', () => {
     // `/-0-shot\.png$/` regex would still match (the `.` was a
     // wildcard). Split into literal-segment assertions so the
     // regression re-fails loudly.
-    expect(path.basename(paths[0]).endsWith('-0-shot.png')).toBe(true)
-    expect(path.basename(paths[1]).endsWith('-1-doc.pdf')).toBe(true)
+    expect(path.basename(paths[0]).endsWith('shot.png')).toBe(true)
+    expect(path.basename(paths[1]).endsWith('doc.pdf')).toBe(true)
     expect(paths[0]).toContain(`goblin-clipboard-${process.pid}`)
     expect(await readFile(paths[0], 'utf8')).toBe('alpha')
     expect(await readFile(paths[1], 'utf8')).toBe('beta')
+  })
+
+  test('two single-file pastes in the same millisecond produce distinct filenames', async () => {
+    // Regression test for the timestamp/index collision. The
+    // previous format `<ISO>-<index>-<name>` was unique per
+    // request (because index 0 vs 1 differed inside a single
+    // multi-file request) but collided across two *different*
+    // single-file requests that landed in the same millisecond —
+    // the second `writeFile` silently overwrote the first. The
+    // new format inserts a process-level counter between index
+    // and name; this test pins that the counter is part of the
+    // filename and is unique per call.
+    const { saveClipboardBinaryFiles } = await import('#/main/clipboard-bridge.ts')
+    const a = await saveClipboardBinaryFiles([{ name: 'first.bin', bytes: new ArrayBuffer(1) }])
+    const b = await saveClipboardBinaryFiles([{ name: 'first.bin', bytes: new ArrayBuffer(1) }])
+    expect(a[0]).not.toBe(b[0])
+    // The counter is a non-empty segment between `-<index>-` and
+    // `-<name>`. Assert the literal basename shape, not a regex,
+    // so a future refactor that drops the counter re-fails.
+    expect(path.basename(a[0])).toMatch(/^.+-0-\d+-first\.bin$/)
+    expect(path.basename(b[0])).toMatch(/^.+-0-\d+-first\.bin$/)
   })
 
   test('returns empty array for empty input without creating the temp dir', async () => {
@@ -85,8 +106,8 @@ describe('saveClipboardBinaryFiles', () => {
     // replacement. Also assert the exact `attempt.png` substring
     // survives intact.
     const basename = path.basename(paths[0])
-    expect(basename.includes('-0-attempt.png')).toBe(true)
-    expect(basename.endsWith('-0-attempt.png')).toBe(true)
+    expect(basename.includes('attempt.png')).toBe(true)
+    expect(basename.endsWith('attempt.png')).toBe(true)
   })
 
   test('strips C1 control characters (0x7F-0x9F) from file names', async () => {
@@ -103,7 +124,7 @@ describe('saveClipboardBinaryFiles', () => {
     const paths = await saveClipboardBinaryFiles([{ name, bytes: new ArrayBuffer(1) }])
     const basename = path.basename(paths[0])
     expect(basename).not.toContain(c1Char)
-    expect(basename.endsWith('-0-name_tail.bin')).toBe(true)
+    expect(basename.endsWith('name_tail.bin')).toBe(true)
   })
 })
 

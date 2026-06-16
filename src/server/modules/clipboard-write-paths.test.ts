@@ -30,8 +30,21 @@ describe('saveClipboardFiles', () => {
     // would have silently passed if `sanitizeBaseName` turned
     // `shot.png` into `shot_png` (the `.` is a regex wildcard). See
     // the same fix in main/clipboard-bridge.test.ts for context.
-    expect(path.basename(paths[0]).endsWith('-0-shot.png')).toBe(true)
+    expect(path.basename(paths[0]).endsWith('shot.png')).toBe(true)
     expect(await readFile(paths[0])).toEqual(Buffer.from([1, 2, 3]))
+  })
+
+  test('two single-file pastes in the same millisecond produce distinct filenames', async () => {
+    // Mirrors the main-process regression test. Locks the
+    // process-level counter into the filename so the
+    // `<ISO>-<index>-<name>` collision across paste events
+    // can't return.
+    const { saveClipboardFiles } = await import('#/server/modules/clipboard-write-paths.ts')
+    const a = await saveClipboardFiles([new File([new Uint8Array([1])], 'first.bin')])
+    const b = await saveClipboardFiles([new File([new Uint8Array([1])], 'first.bin')])
+    expect(a.paths[0]).not.toBe(b.paths[0])
+    expect(path.basename(a.paths[0])).toMatch(/^.+-0-\d+-first\.bin$/)
+    expect(path.basename(b.paths[0])).toMatch(/^.+-0-\d+-first\.bin$/)
   })
 
   test('returns empty paths for empty input', async () => {
@@ -53,7 +66,7 @@ describe('saveClipboardFiles', () => {
     // Literal substring assertion — the regex `\.bin$` form used to
     // silently pass even when the sanitiser replaced the dot with
     // `_`. See sibling fix in main/clipboard-bridge.test.ts.
-    expect(path.basename(paths[0]).endsWith('-0-attempt.bin')).toBe(true)
+    expect(path.basename(paths[0]).endsWith('attempt.bin')).toBe(true)
   })
 
   test('strips C1 control characters (0x7F-0x9F) from file names', async () => {
@@ -67,14 +80,16 @@ describe('saveClipboardFiles', () => {
     const file = new File([new Uint8Array([0])], `name${c1Char}tail.bin`)
     const { paths } = await saveClipboardFiles([file])
     expect(paths[0]).not.toContain(c1Char)
-    expect(path.basename(paths[0]).endsWith('-0-name_tail.bin')).toBe(true)
+    expect(path.basename(paths[0]).endsWith('name_tail.bin')).toBe(true)
   })
 
   test('falls back to "clipboard.bin" for empty file names', async () => {
     const { saveClipboardFiles } = await import('#/server/modules/clipboard-write-paths.ts')
     const file = new File([new Uint8Array([0])], '')
     const { paths } = await saveClipboardFiles([file])
-    expect(path.basename(paths[0])).toMatch(/-0-clipboard\.bin$/)
+    // Filename is `<ISO>-0-<counter>-clipboard.bin`; the counter is
+    // process-level so the exact value isn't pinned here.
+    expect(path.basename(paths[0])).toMatch(/\d+-\d+-clipboard\.bin$/)
   })
 })
 

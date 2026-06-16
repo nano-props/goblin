@@ -29,9 +29,21 @@ function sanitizeBaseName(name: string): string {
   return base.length > 0 ? base : 'clipboard.bin'
 }
 
+// Process-level monotonically increasing counter. The previous
+// `${ISO-timestamp}-${index}` scheme collided when two single-file
+// pastes landed in the same millisecond — the second `writeFile`
+// silently overwrote the first. The counter (combined with the
+// per-request index) is unique within the process lifetime.
+let filenameCounter = 0
 function timestampedFileName(index: number, name: string): string {
+  // Format: <ISO>-<index>-<counter>-<name>. The counter is the
+  // process-level increment; the index is the per-request array
+  // position. Two different paste events in the same millisecond
+  // land at different counter values even when both are
+  // single-file.
+  filenameCounter += 1
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-  return `${timestamp}-${index}-${sanitizeBaseName(name)}`
+  return `${timestamp}-${index}-${filenameCounter}-${sanitizeBaseName(name)}`
 }
 
 export interface SaveClipboardFilesResult {

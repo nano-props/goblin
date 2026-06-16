@@ -42,11 +42,22 @@ function sanitizeBaseName(name: string): string {
   return base.length > 0 ? base : 'clipboard.bin'
 }
 
+// Process-level monotonically increasing counter. The previous
+// `${ISO-timestamp}-${index}` scheme collided when two single-file
+// pastes landed in the same millisecond from the same paste event —
+// the second `writeFile` silently overwrote the first. The counter
+// (combined with the per-request index) is unique within the
+// process lifetime.
+let filenameCounter = 0
 function timestampedFileName(index: number, name: string): string {
-  // Sequence the index too, so multi-file pastes in the same millisecond
-  // don't collide on the same name.
+  // Format: <ISO>-<index>-<counter>-<name>. The counter is the
+  // process-level increment; the index is the per-request array
+  // position. Multi-file pastes still get index 0..N within a
+  // single counter step, but two *different* paste events in the
+  // same millisecond land at different counter values.
+  filenameCounter += 1
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-  return `${timestamp}-${index}-${sanitizeBaseName(name)}`
+  return `${timestamp}-${index}-${filenameCounter}-${sanitizeBaseName(name)}`
 }
 
 /**
@@ -141,7 +152,24 @@ export function wireClipboardBridgeIpc(): void {
       return []
     }
   })
+  // Startup prune removes leftovers from previous PIDs. Periodic
+  // prune handles the long-running main process: the temp dir at
+  // `<os.tmpdir>/goblin-clipboard-<pid>/` only grows on writes
+  // (no per-write cleanup), so a 24/7 desktop install that pastes
+  // files hundreds of times a day would otherwise accumulate
+  // forever. The cadence is deliberately coarse (1 h) — the cap
+  // is bounded by per-file size, not file count, so this is a
+  // housekeeping measure, not a security control.
   void pruneStaleClipboardTempDirs()
+  const periodic = setInterval(() => {
+    void pruneStaleClipboardTempDirs().catch((err) =>
+      console.warn('[clipboard-bridge] periodic prune failed', err),
+    )
+  }, 60 * 60 * 1000)
+  // Allow the process to exit naturally even with the timer
+  // attached — without this, the interval keeps the event loop
+  // alive indefinitely.
+  if (typeof periodic.unref === 'function') periodic.unref()
 }
 
 // resolveOsClipboardPath was added during the design phase as a

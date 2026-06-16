@@ -186,6 +186,21 @@ export function createApp(options: ServerAppOptions): Hono {
     }),
   )
   app.use('/api/clipboard/*', createInternalAuthMiddleware(options.internalSecret))
+  // MAX_PASTE_BATCH_BYTES (12 MiB) is the *success* ceiling. The
+  // failure case is also bounded but the timing depends on the
+  // request's Transfer-Encoding: when `Content-Length` is set,
+  // Hono rejects on the header value alone (see
+  // node_modules/hono/dist/middleware/body-limit/index.js:18-21)
+  // without reading any body bytes; when `Transfer-Encoding:
+  // chunked` is set (or `Content-Length` is absent), Hono
+  // accumulates bytes chunk-by-chunk and rejects once the running
+  // total exceeds `maxSize`. A single oversized chunked request
+  // can therefore pin ~`maxSize` of memory until the next GC.
+  // For our threat model (auth required, body cap of 12 MiB, no
+  // rate limiter) that's a bounded DoS surface, not an unbounded
+  // one — but a future PR should add a per-IP rate limit on this
+  // route to cap concurrent accumulation. The 413 envelope
+  // already exists; rate-limiting is the missing piece.
   app.use(
     '/api/clipboard/*',
     bodyLimit({
@@ -198,6 +213,25 @@ export function createApp(options: ServerAppOptions): Hono {
   app.route('/api/repo', createRepoRoutes())
   app.route('/api/clipboard', createClipboardRoutes())
   app.route('/ws', createRealtimeRoutes({ internalSecret: options.internalSecret, terminalHost: options.terminalHost }))
+
+  // Periodic prune of clipboard temp dirs left by previous server
+  // runs. The route factory's `pruneStaleClipboardTempDirs` call
+  // already cleaned the current-run dir from any prior PIDs, but a
+  // long-lived server (e.g. LAN deployment) would otherwise
+  // accumulate files until next restart. The cap is bounded by
+  // per-file size, not file count, so this is housekeeping, not
+  // security. Coarse cadence (1 h) because the cost is trivial.
+  // The `unref` lets the process exit naturally — without it, the
+  // interval keeps the event loop alive.
+  const periodic = setInterval(
+    () => {
+      void import('#/server/modules/clipboard-write-paths.ts').then((m) =>
+        m.pruneStaleClipboardTempDirs(),
+      )
+    },
+    60 * 60 * 1000,
+  )
+  if (typeof periodic.unref === 'function') periodic.unref()
 
   // Explicit SPA routes — must be before serveStatic so the
   // bootstrap script is injected into the HTML response instead

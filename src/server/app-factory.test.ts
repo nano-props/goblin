@@ -72,10 +72,23 @@ const terminalHostStub = {
   shutdown: vi.fn(),
 } satisfies ServerTerminalHost
 
-vi.mock('node:fs/promises', () => ({
-  access: mocks.access,
-  readFile: mocks.readFile,
-}))
+// The clipboard write-paths module imports mkdir / writeFile /
+// readdir / rm from node:fs/promises. The earlier two-method mock
+// silently turned them into `undefined`, which made the new
+// `with valid multipart` route test explode with 500. Pass them
+// through to the real module so disk operations work in this
+// file's integration-style tests.
+vi.mock('node:fs/promises', async () => {
+  const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+  return {
+    access: mocks.access,
+    readFile: mocks.readFile,
+    mkdir: actual.mkdir,
+    writeFile: actual.writeFile,
+    readdir: actual.readdir,
+    rm: actual.rm,
+  }
+})
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerSettingsPrefs: mocks.getServerSettingsPrefs,
@@ -241,6 +254,23 @@ describe('per-sub-path body limits and auth ordering', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
+    // The clipboard write-path module reads serverDataDir() to
+    // pick the temp dir, which on macOS points under
+    // ~/Library/Application Support/Goblin. Real-disk writes
+    // there during a test would pollute the user's machine, so
+    // point everything at a per-test scratch dir.
+    const scratch = process.env['GOBLIN_SERVER_DATA_DIR']
+    if (!scratch) {
+      const os = require('node:os') as typeof import('node:os')
+      const path = require('node:path') as typeof import('node:path')
+      const fs = require('node:fs') as typeof import('node:fs')
+      const dir = path.join(
+        os.tmpdir(),
+        `app-factory-test-${process.pid}-${Math.random().toString(36).slice(2)}`,
+      )
+      fs.mkdirSync(dir, { recursive: true })
+      vi.stubEnv('GOBLIN_SERVER_DATA_DIR', dir)
+    }
   })
 
   test('unauth probe to /api/settings/* with oversized body sees 401, not 413', async () => {
@@ -287,7 +317,16 @@ describe('per-sub-path body limits and auth ordering', () => {
     expect(response.status).toBe(413)
   })
 
-  test('authed 8 MiB body to /api/clipboard/* sees 200 (or 400/500 from the route, never 413)', async () => {
+  test('authed 8 MiB body to /api/clipboard/* with valid multipart is processed by the route', async () => {
+    // The previous version of this test asserted only `not.toBe(413)`,
+    // which would pass even if the bodyLimit was broken (returning 200
+    // from a junk body) or the route was broken (returning 500). It
+    // didn't actually exercise the success path. Replace it with a
+    // real multipart payload that the route will process. The write
+    // module is not mocked here — Hono's app.request() runs through
+    // the real write-paths module, which on a clean data dir writes
+    // to disk and returns absolute paths. The test asserts the route
+    // is reached *and* the bodyLimit doesn't pre-empt it.
     const { createApp } = await import('#/server/app-factory.ts')
     const app = createApp({
       version: '0.1.0',
@@ -295,10 +334,35 @@ describe('per-sub-path body limits and auth ordering', () => {
       internalSecret: 'secret',
       terminalHost: terminalHostStub,
     })
-    // 8 MiB raw bytes — under the per-batch ceiling for /api/clipboard/*
-    // but well over the 1 MiB cap of other routes. The route layer will
-    // reject the body shape (no multipart parsing), but the bodyLimit
-    // must not short-circuit at 413.
+    const form = new FormData()
+    form.append('files', new File([new Uint8Array([1, 2, 3])], 'a.png'))
+    const response = await app.request(
+      new Request('http://127.0.0.1:32100/api/clipboard/files', {
+        method: 'POST',
+        headers: { 'x-goblin-internal-secret': 'secret' },
+        body: form,
+      }),
+    )
+    expect(response.status).toBe(200)
+    const json = (await response.json()) as { paths: string[] }
+    expect(json.paths).toHaveLength(1)
+    expect(json.paths[0]).toContain('clipboard-tmp-')
+  })
+
+  test('authed 8 MiB body to /api/clipboard/* with octet-stream (non-multipart) reaches the route and is rejected there', async () => {
+    // Verifies the bodyLimit is *not* what rejects non-multipart
+    // bodies — the route layer's BAD_REQUEST is. This is the
+    // contract that protects the worker from a hostile client
+    // that strips the multipart boundary to claim a smaller
+    // Content-Length and then streams the body in a different
+    // Content-Type. The route is the second line of defence.
+    const { createApp } = await import('#/server/app-factory.ts')
+    const app = createApp({
+      version: '0.1.0',
+      startedAt: Date.now(),
+      internalSecret: 'secret',
+      terminalHost: terminalHostStub,
+    })
     const response = await app.request(
       new Request('http://127.0.0.1:32100/api/clipboard/files', {
         method: 'POST',
@@ -310,7 +374,12 @@ describe('per-sub-path body limits and auth ordering', () => {
         body: 'x'.repeat(8 * 1024 * 1024),
       }),
     )
-    expect(response.status).not.toBe(413)
+    // c.req.parseBody throws on a non-multipart body, the route
+    // returns BAD_REQUEST (400). Anything other than 413 proves
+    // the bodyLimit let the request through.
+    expect(response.status).toBe(400)
+    const json = (await response.json()) as { ok: false; code: string }
+    expect(json.code).toBe('BAD_REQUEST')
   })
 
   test('/api/clipboard/* still rejects bodies larger than the 12 MiB batch cap with 413', async () => {
