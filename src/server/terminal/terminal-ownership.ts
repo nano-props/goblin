@@ -18,13 +18,28 @@ import type { TerminalController, TerminalControllerStatus } from '#/shared/term
  */
 export type TerminalAuthorityAction = 'write' | 'resize' | 'restart' | 'takeover'
 
-export type TerminalAuthorityDecision =
-  | { kind: 'allow' }
-  | { kind: 'deny'; reason: 'not-controller' }
-  | { kind: 'deny'; reason: 'session-unowned' }
-  | { kind: 'deny'; reason: 'unknown-attachment' }
+export type TerminalAuthorityReason = 'not-controller' | 'session-unowned' | 'unknown-attachment'
 
-export function decideTerminalActionAuthority(
+type TerminalAuthorityDecision = { kind: 'allow' } | { kind: 'deny'; reason: TerminalAuthorityReason }
+
+export function isAuthoritative(
+  state: TerminalOwnershipState,
+  attachmentId: string,
+  action: TerminalAuthorityAction,
+): boolean {
+  return decideTerminalActionAuthority(state, attachmentId, action).kind === 'allow'
+}
+
+export function explainAuthority(
+  state: TerminalOwnershipState,
+  attachmentId: string,
+  action: TerminalAuthorityAction,
+): TerminalAuthorityReason | null {
+  const decision = decideTerminalActionAuthority(state, attachmentId, action)
+  return decision.kind === 'allow' ? null : decision.reason
+}
+
+function decideTerminalActionAuthority(
   state: TerminalOwnershipState,
   attachmentId: string,
   action: TerminalAuthorityAction,
@@ -120,8 +135,8 @@ export function claimTerminalAttachmentControl(
 }
 
 // Reassigns control for the restart path. The caller is expected to
-// have already validated authority via `decideTerminalActionAuthority`
-// with action='restart', so by the time this runs the caller is the
+// have already validated authority via `isAuthoritative` with
+// action='restart', so by the time this runs the caller is the
 // (sole) controller. We re-assert control here anyway because the
 // session is being torn down and rebuilt — `state.controller` may
 // have been cleared by the spawn failure path. If the attachment

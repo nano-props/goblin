@@ -186,6 +186,13 @@ export class TerminalSessionRuntime {
     return events
   }
 
+  // Drops the replay buffer for the error / cancellation paths. The
+  // success path uses `finishReplay` instead, which appends to the
+  // summary under the new role.
+  drainReplay(): void {
+    this.state.discardReplay()
+  }
+
   acknowledgeResize(cols: number, rows: number): void {
     this.state.setCanonicalSize(cols, rows)
   }

@@ -8,6 +8,8 @@ import {
   restartTerminalAttachmentControl,
   updateTerminalAttachmentConnection,
   releaseTerminalAttachmentControl,
+  isAuthoritative,
+  explainAuthority,
 } from '#/server/terminal/terminal-ownership.ts'
 
 function createState(overrides?: Partial<TerminalOwnershipState>): TerminalOwnershipState {
@@ -327,5 +329,93 @@ describe('expireTerminalAttachment', () => {
     expect(effect).toEqual({ emitOwnership: false, removed: false })
     expect(state.attachments.has('a1')).toBe(true)
     expect(state.controller).toEqual({ attachmentId: 'a1', status: 'connected' })
+  })
+})
+
+describe('isAuthoritative', () => {
+  test('allows the controller to write, resize, and restart', () => {
+    const state = createState({
+      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
+      controller: { attachmentId: 'a1', status: 'connected' },
+    })
+    expect(isAuthoritative(state, 'a1', 'write')).toBe(true)
+    expect(isAuthoritative(state, 'a1', 'resize')).toBe(true)
+    expect(isAuthoritative(state, 'a1', 'restart')).toBe(true)
+  })
+
+  test('allows takeover for any registered attachment, even a non-controller', () => {
+    const state = createState({
+      attachments: new Map([
+        ['a1', { cols: 80, rows: 24, connected: true }],
+        ['a2', { cols: 80, rows: 24, connected: true }],
+      ]),
+      controller: { attachmentId: 'a1', status: 'connected' },
+    })
+    expect(isAuthoritative(state, 'a2', 'takeover')).toBe(true)
+  })
+
+  test('denies write / resize / restart from a non-controller viewer', () => {
+    const state = createState({
+      attachments: new Map([
+        ['a1', { cols: 80, rows: 24, connected: true }],
+        ['a2', { cols: 80, rows: 24, connected: true }],
+      ]),
+      controller: { attachmentId: 'a1', status: 'connected' },
+    })
+    expect(isAuthoritative(state, 'a2', 'write')).toBe(false)
+    expect(isAuthoritative(state, 'a2', 'resize')).toBe(false)
+    expect(isAuthoritative(state, 'a2', 'restart')).toBe(false)
+  })
+
+  test('denies write / resize / restart when the session is unowned', () => {
+    const state = createState({
+      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
+    })
+    expect(isAuthoritative(state, 'a1', 'write')).toBe(false)
+    expect(isAuthoritative(state, 'a1', 'resize')).toBe(false)
+    expect(isAuthoritative(state, 'a1', 'restart')).toBe(false)
+  })
+
+  test('denies all actions for an unknown attachment', () => {
+    const state = createState({
+      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
+      controller: { attachmentId: 'a1', status: 'connected' },
+    })
+    expect(isAuthoritative(state, 'a-unknown', 'write')).toBe(false)
+    expect(isAuthoritative(state, 'a-unknown', 'resize')).toBe(false)
+    expect(isAuthoritative(state, 'a-unknown', 'restart')).toBe(false)
+    expect(isAuthoritative(state, 'a-unknown', 'takeover')).toBe(false)
+  })
+})
+
+describe('explainAuthority', () => {
+  test('returns null when the action is allowed', () => {
+    const state = createState({
+      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
+      controller: { attachmentId: 'a1', status: 'connected' },
+    })
+    expect(explainAuthority(state, 'a1', 'write')).toBeNull()
+  })
+
+  test('returns the deny reason for diagnostic consumers', () => {
+    const viewerState = createState({
+      attachments: new Map([
+        ['a1', { cols: 80, rows: 24, connected: true }],
+        ['a2', { cols: 80, rows: 24, connected: true }],
+      ]),
+      controller: { attachmentId: 'a1', status: 'connected' },
+    })
+    expect(explainAuthority(viewerState, 'a2', 'write')).toBe('not-controller')
+
+    const unownedState = createState({
+      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
+    })
+    expect(explainAuthority(unownedState, 'a1', 'write')).toBe('session-unowned')
+
+    const unknownState = createState({
+      attachments: new Map([['a1', { cols: 80, rows: 24, connected: true }]]),
+      controller: { attachmentId: 'a1', status: 'connected' },
+    })
+    expect(explainAuthority(unknownState, 'a-unknown', 'write')).toBe('unknown-attachment')
   })
 })

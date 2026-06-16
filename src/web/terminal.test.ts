@@ -165,8 +165,6 @@ describe('terminal web host bridge', () => {
         payload: {
           ok: true,
           sessionId: 'term_1234567890123456',
-          replay: '',
-          replaySeq: 0,
           snapshot: '',
           snapshotSeq: 0,
           processName: 'zsh',
@@ -207,8 +205,6 @@ describe('terminal web host bridge', () => {
         payload: {
           ok: true,
           sessionId: 'term_1234567890123456',
-          replay: '',
-          replaySeq: 0,
           snapshot: '',
           snapshotSeq: 0,
           processName: 'zsh',

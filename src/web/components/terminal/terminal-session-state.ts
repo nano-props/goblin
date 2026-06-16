@@ -178,9 +178,13 @@ export class TerminalSessionState {
     return true
   }
 
+  // Updates the replay boundary. The pending-output buffer is
+  // preserved across calls, so a preload window (cached snapshot's
+  // seq) followed by a post-attach window (new snapshot's seq)
+  // shares the same buffer; the post-attach `finishReplay` filters
+  // by the new boundary.
   beginReplay(replaySeq: number): void {
     this.replayBufferState.replayBoundarySeq = replaySeq
-    this.replayBufferState.replayPendingOutput = []
   }
 
   captureReplayOutput(event: TerminalOutputEvent): boolean {
@@ -195,6 +199,14 @@ export class TerminalSessionState {
     this.replayBufferState.replayBoundarySeq = null
     if (replaySeq === null) return []
     return pendingOutput.filter((event) => event.seq > replaySeq)
+  }
+
+  // Clears the replay buffer and boundary without queueing to the
+  // term or appending to the output summary. Cheaper than
+  // `finishReplay` because it skips the splice + filter.
+  discardReplay(): void {
+    this.replayBufferState.replayBoundarySeq = null
+    this.replayBufferState.replayPendingOutput = []
   }
 
   resetTransientState(): boolean {

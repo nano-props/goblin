@@ -139,6 +139,90 @@ describe('TerminalSessionRegistry', () => {
       registry.handleExit({ sessionId: 'session-b' })
       expect(handleExitSpy).not.toHaveBeenCalled()
     })
+
+    test('handleExit invalidates the reattach snapshot cache for the exiting session', () => {
+      registry.setRepoIndex(makeRepoIndex())
+      registry.reconcileServerSessions(
+        REPO_ROOT,
+        [makeServerSession('session-a', 'terminal-1')],
+        'attachment_local',
+        new Map(),
+      )
+
+      const key = registry.worktreeSnapshot(WORKTREE_KEY).sessions[0]!.key
+      // Seed the reattach cache directly so we can assert the exit
+      // event is what removes the entry, not the local-session
+      // cleanup.
+      ;(registry as any).reattachSnapshotCache.set(key, {
+        sessionId: 'session-a',
+        snapshot: 'cached',
+        snapshotSeq: 7,
+      })
+      expect((registry as any).reattachSnapshotCache.has(key)).toBe(true)
+
+      // Stub the local session's handleExit to return true so the
+      // registry's existing discard path runs (the cache eviction
+      // must not depend on it being absent, though).
+      const session = (registry as any).sessions.get(key)
+      vi.spyOn(session, 'handleExit').mockReturnValue(true)
+
+      registry.handleExit({ sessionId: 'session-a' })
+      expect((registry as any).reattachSnapshotCache.has(key)).toBe(false)
+    })
+
+    test('setReattachSnapshot evicts the oldest entry when the cache exceeds the safety cap', () => {
+      // The cap is a safety net against bookkeeping drift (e.g. a
+      // wedged server that never emits exit events). In normal use no
+      // entry should be evicted, but if the cache somehow exceeds the
+      // limit, the oldest entry is dropped.
+      const limit = (TerminalSessionRegistry as unknown as { REATTACH_SNAPSHOT_CACHE_HARD_CAP: number })
+        .REATTACH_SNAPSHOT_CACHE_HARD_CAP
+
+      for (let i = 0; i < limit + 1; i++) {
+        ;(registry as any).setReattachSnapshot(`key-${i}`, {
+          sessionId: `session-${i}`,
+          snapshot: `snap-${i}`,
+          snapshotSeq: i,
+        })
+      }
+      expect((registry as any).reattachSnapshotCache.size).toBe(limit)
+      expect((registry as any).reattachSnapshotCache.has('key-0')).toBe(false)
+      expect((registry as any).reattachSnapshotCache.has(`key-${limit}`)).toBe(true)
+    })
+
+    test('handleExit preserves the reattach cache when the local session rejects the exit', () => {
+      // Race scenario: the server emitted an exit for an old
+      // sessionId, but the local session has already been updated to
+      // a new sessionId (e.g., after a server-side restart). The
+      // sessionKeyBySessionId index may still map the old sessionId
+      // to the local key. Evicting the reattach cache here would
+      // discard a snapshot the user can still use on next reattach.
+      registry.setRepoIndex(makeRepoIndex())
+      registry.reconcileServerSessions(
+        REPO_ROOT,
+        [makeServerSession('session-a', 'terminal-1')],
+        'attachment_local',
+        new Map(),
+      )
+
+      const key = registry.worktreeSnapshot(WORKTREE_KEY).sessions[0]!.key
+      const session = (registry as any).sessions.get(key)
+      // Local session is alive under a *different* sessionId.
+      session.currentSessionId = () => 'session-b'
+      session.handleExit = vi.fn().mockReturnValue(false)
+
+      // Seed the reattach cache for the old sessionId.
+      ;(registry as any).reattachSnapshotCache.set(key, {
+        sessionId: 'session-a',
+        snapshot: 'cached',
+        snapshotSeq: 7,
+      })
+      expect((registry as any).reattachSnapshotCache.has(key)).toBe(true)
+
+      registry.handleExit({ sessionId: 'session-a' })
+      // Cache survives — the local session didn't confirm the exit.
+      expect((registry as any).reattachSnapshotCache.has(key)).toBe(true)
+    })
   })
 
   describe('notify granularity', () => {

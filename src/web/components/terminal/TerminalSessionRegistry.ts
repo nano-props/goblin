@@ -70,12 +70,14 @@ export class TerminalSessionRegistry {
     }
   >()
   private readonly snapshotCache = new Map<string, TerminalSnapshot>()
+  // Safety-net hard cap. The expected cleanup is the server-exit
+  // event (handleExit), with removeSession / destroy as secondary
+  // sites; a small ceiling trims the oldest entries if bookkeeping
+  // ever drifts (e.g. a wedged server that never emits exit). Set
+  // well above the realistic number of simultaneously-detached
+  // sessions, so in normal use no entry is evicted by the trim path.
+  private static readonly REATTACH_SNAPSHOT_CACHE_HARD_CAP = 32
   private readonly reattachSnapshotCache = new Map<string, ReattachSnapshotCacheEntry>()
-  // Cap the reattach snapshot cache so repeated worktree switches
-  // cannot grow it without bound. Each entry is a serialized xterm
-  // buffer (up to ~3 MB worst-case at the configured 10k scrollback),
-  // so a runaway growth here is a real memory hazard.
-  private static readonly REATTACH_SNAPSHOT_CACHE_LIMIT = 32
   private readonly worktreeSnapshotCache = new Map<string, WorktreeTerminalSnapshot>()
   private readonly worktreeListeners = new Map<string, Set<() => void>>()
   private readonly snapshotListeners = new Map<string, Set<() => void>>()
@@ -147,10 +149,23 @@ export class TerminalSessionRegistry {
     const directKey = this.sessionKeyBySessionId.get(event.sessionId)
     const directSession = directKey ? this.sessions.get(directKey) : null
     if (directKey && directSession?.handleExit(event)) {
+      // Local runtime accepted the exit. Gating the discard on the
+      // runtime's accept (rather than evicting eagerly on the
+      // sessionId match) avoids discarding a still-valid cache entry
+      // during a race where the local session has moved to a new
+      // sessionId (e.g. after a server-side restart) but the index
+      // still maps the old sessionId to the same key.
+      // `discardLocalSessionAndDismissDetailIfLast → removeSession`
+      // is what actually evicts the reattach cache entry for `directKey`.
       this.discardLocalSessionAndDismissDetailIfLast(directKey, directSession.descriptor)
       return
     }
     if (directKey && directSession && !directSession.currentSessionId()) {
+      // The runtime is empty (exit was observed earlier, or the
+      // session was never attached) but the sessionId index still
+      // points at it. The cache entry is keyed by the local key, not
+      // the old sessionId, so leaving it in place is the right call —
+      // the next reattach may still hydrate from it.
       this.discardLocalSessionAndDismissDetailIfLast(directKey, directSession.descriptor)
     }
   }
@@ -604,13 +619,16 @@ export class TerminalSessionRegistry {
     }
   }
 
-  // Insertion-ordered LRU cap on the reattach snapshot cache. We track
-  // recency by deleting-then-resetting on hit (Map iteration order) so
-  // a fresh detach of a known key keeps it at the tail.
+  // Cache write for the reattach path. The expected cleanup is the
+  // server-exit event (handleExit), with removeSession / destroy as
+  // secondary sites. A small hard cap trims the oldest entries if
+  // bookkeeping ever drifts (e.g., a wedged server that never emits
+  // exit); the limit is set well above the realistic number of
+  // simultaneously-detached sessions.
   private setReattachSnapshot(key: string, entry: ReattachSnapshotCacheEntry): void {
     if (this.reattachSnapshotCache.has(key)) this.reattachSnapshotCache.delete(key)
     this.reattachSnapshotCache.set(key, entry)
-    while (this.reattachSnapshotCache.size > TerminalSessionRegistry.REATTACH_SNAPSHOT_CACHE_LIMIT) {
+    while (this.reattachSnapshotCache.size > TerminalSessionRegistry.REATTACH_SNAPSHOT_CACHE_HARD_CAP) {
       const oldestKey = this.reattachSnapshotCache.keys().next().value
       if (oldestKey === undefined) break
       this.reattachSnapshotCache.delete(oldestKey)

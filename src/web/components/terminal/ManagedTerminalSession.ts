@@ -278,6 +278,10 @@ export class ManagedTerminalSession {
       const { term, preloaded } = await this.openPhase(token)
       const result = await this.ipcPhase(token, term)
       if (result.phase === 'error') {
+        // The attach failed. Drop the replay window the preload
+        // started so the boundary and captured events don't leak
+        // into the next start.
+        this.runtime.drainReplay()
         const changed = this.runtime.applyAttachResult(result, { cols: term.cols, rows: term.rows })
         this.destroyActiveView()
         if (changed) this.notify('metadata')
@@ -286,7 +290,14 @@ export class ManagedTerminalSession {
       await this.replayPhase(token, term, result, preloaded)
       this.finalizePhase(token, term)
     } catch (err) {
-      if (err instanceof StartCancelledError) return
+      if (err instanceof StartCancelledError) {
+        // A newer start has superseded this one. Drop the replay
+        // window the cancelled preload opened, so the next start's
+        // beginReplay doesn't inherit events captured against the
+        // cancelled term.
+        this.runtime.drainReplay()
+        return
+      }
       this.closeReplacingPtySession()
       if (!this.currentToken(token)) return
       this.destroyActiveView()
@@ -405,13 +416,17 @@ export class ManagedTerminalSession {
     // have no buffer to seed. Resetting/writing on empty would clobber
     // the term for nothing.
     if (hydratedSnapshot.snapshot.length === 0 || !this.currentStart(token, term)) return false
+    // Open the replay window — see state.beginReplay for the preload+post-attach contract.
     this.runtime.beginReplay(hydratedSnapshot.snapshotSeq)
     try {
       term.reset()
       if (hydratedSnapshot.snapshot) await termWrite(term, hydratedSnapshot.snapshot)
       return this.currentStart(token, term)
-    } finally {
-      if (this.currentStart(token, term)) this.runtime.finishReplay()
+    } catch (err) {
+      // Term write failed — drop the replay window so the boundary
+      // and buffer don't leak into the next start.
+      this.runtime.drainReplay()
+      throw err
     }
   }
 
