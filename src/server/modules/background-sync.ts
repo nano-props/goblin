@@ -136,22 +136,20 @@ async function enqueueScheduledFetch(generation: number): Promise<void> {
 // in-flight check in `enqueueScheduledFetch`, and waiting for the per-second
 // cron would delay a "sync on switch" by up to one tick.
 //
-// Bypasses `enqueueScheduledFetch` and adds to the queue directly: p-queue
-// decrements its `_activeCount` only after the current task's promise
-// resolves, so a same-tick call into `enqueueScheduledFetch` would still see
-// `size > 0` and skip. Adding straight to `_pendingTasks` lets p-queue's own
-// post-task `_tryToStartAnother` pick the new task up the moment the current
-// slot is released — preserving the concurrency=1 invariant.
+// We can't go through `enqueueScheduledFetch` here: it's gated on
+// `pending + size > 0`, and the current task is still occupying p-queue's
+// running slot at this point, so the new fetch would be skipped. Calling
+// `syncQueue.add` directly lets p-queue pick the new task up on its own
+// once the current slot releases, preserving the concurrency=1 invariant.
 function enqueuePendingRegistrationFetch(): void {
   if (state.repoIds.length === 0 || state.intervalMs <= 0) return
-  for (const candidateId of state.repoIds) {
-    if (state.lastFetchAtByRepo[candidateId] === null || state.lastFetchAtByRepo[candidateId] === undefined) {
-      void syncQueue.add(async () => {
-        await runScheduledFetch(state.generation)
-      })
-      return
-    }
-  }
+  const hasUnfetched = state.repoIds.some(
+    (repoId) => state.lastFetchAtByRepo[repoId] === null || state.lastFetchAtByRepo[repoId] === undefined,
+  )
+  if (!hasUnfetched) return
+  void syncQueue.add(async () => {
+    await runScheduledFetch(state.generation)
+  })
 }
 
 async function runScheduledFetch(generation: number): Promise<void> {
@@ -209,10 +207,7 @@ export async function setBackgroundSyncRepos(repoIds: string[]): Promise<void> {
   // Short-circuit when the list is unchanged: the fetch-interval change is
   // already applied via `subscribeServerFetchInterval`, and bumping the
   // generation here would abort any in-flight background fetch for no gain.
-  if (
-    nextRepoIds.length === state.repoIds.length &&
-    nextRepoIds.every((repoId) => state.repoIds.includes(repoId))
-  ) {
+  if (nextRepoIds.length === state.repoIds.length && nextRepoIds.every((repoId) => state.repoIds.includes(repoId))) {
     return
   }
   const removedRepoIds = state.repoIds.filter((repoId) => !nextRepoIds.includes(repoId))
