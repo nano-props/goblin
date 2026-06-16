@@ -62,8 +62,16 @@ function isAllowedExternalUrl(url: string, allowHttp: boolean): boolean {
 }
 
 function openBrowserUrl(url: string): ExecResult {
-  const opened = window.open(url, '_blank', 'noopener,noreferrer')
-  return opened ? { ok: true, message: url } : { ok: false, message: 'error.failed-open-browser' }
+  // window.open() with `noopener` returns null by spec even when the new tab
+  // does open — that is the whole point of `noopener`: sever the opener's
+  // reference to prevent reverse tabnabbing. Popup blockers and sandboxed
+  // iframes also surface as null. With noopener required for security, we
+  // cannot distinguish "opened" from "blocked" synchronously, so trust the
+  // browser. The URL has already been validated by isAllowedExternalUrl.
+  // Mirrors shell-bridge.ts's desktop behaviour, which likewise reports
+  // success based on the platform call rather than an observable side effect.
+  window.open(url, '_blank', 'noopener,noreferrer')
+  return { ok: true, message: url }
 }
 
 function openExternalUrlInBrowser(url: string, allowHttp: boolean): ExecResult {

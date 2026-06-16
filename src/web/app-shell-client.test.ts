@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
 
-function installWindow() {
+function installWindow(openReturn: unknown = {}) {
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
     value: {
@@ -11,7 +11,7 @@ function installWindow() {
         origin: 'http://127.0.0.1:32100',
         search: '',
       },
-      open: vi.fn(() => ({})),
+      open: vi.fn(() => openReturn),
     },
   })
 }
@@ -78,6 +78,17 @@ describe('app shell client', () => {
   })
 
   test('opens external URLs in the browser when no native shell is available', async () => {
+    const { openExternalUrl } = await import('#/web/app-shell-client.ts')
+    await expect(openExternalUrl('https://example.com')).resolves.toEqual({ ok: true, message: 'https://example.com' })
+    expect(window.open).toHaveBeenCalledWith('https://example.com', '_blank', 'noopener,noreferrer')
+  })
+
+  test('still reports success when window.open returns null under noopener', async () => {
+    // window.open() with `noopener` returns null by spec even when the new
+    // tab opens — that is the entire point of noopener (reverse-tabnabbing
+    // protection). The renderer cannot observe the outcome, so the URL
+    // handoff is treated as best-effort success.
+    installWindow(null)
     const { openExternalUrl } = await import('#/web/app-shell-client.ts')
     await expect(openExternalUrl('https://example.com')).resolves.toEqual({ ok: true, message: 'https://example.com' })
     expect(window.open).toHaveBeenCalledWith('https://example.com', '_blank', 'noopener,noreferrer')
