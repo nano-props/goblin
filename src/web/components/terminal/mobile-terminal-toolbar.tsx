@@ -41,9 +41,12 @@ export function MobileTerminalToolbar({
               type="button"
               size="icon"
               variant="secondary"
-              title={key.title}
               disabled={disabled}
               aria-label={key.title}
+              // No `title` attribute: this toolbar only renders on
+              // touch devices, where Safari shows a native callout on
+              // long-press of any element with a title. `aria-label`
+              // is the right surface for the description.
               className="goblin-terminal-mobile-toolbar__btn"
               onClick={() => {
                 if (key.type === 'scroll') {

@@ -423,7 +423,7 @@ describe('TerminalSlot', () => {
     })
 
     try {
-      const pasteButton = container.querySelector('button[title="Paste"]') as HTMLButtonElement | null
+      const pasteButton = container.querySelector('button[aria-label="Paste"]') as HTMLButtonElement | null
       expect(pasteButton).toBeTruthy()
       await act(async () => {
         pasteButton!.click()

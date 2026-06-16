@@ -56,9 +56,12 @@ function clickButton(label: string) {
   })
 }
 
-function clickButtonByTitle(titlePrefix: string) {
-  const button = container!.querySelector(`button[title^="${titlePrefix}"]`) as HTMLButtonElement | null
-  expect(button, `expected a button titled ${titlePrefix}`).toBeTruthy()
+function clickButtonByLabel(labelPrefix: string) {
+  // The mobile toolbar exposes its labels via aria-label only — no
+  // `title` attribute, since iOS Safari pops a native callout on
+  // long-press of any element with one.
+  const button = container!.querySelector(`button[aria-label^="${labelPrefix}"]`) as HTMLButtonElement | null
+  expect(button, `expected a button labeled ${labelPrefix}`).toBeTruthy()
   act(() => {
     button!.click()
   })
@@ -77,7 +80,7 @@ describe('MobileTerminalToolbar', () => {
   test('Ctrl+C shortcut button sends the interrupt byte directly', () => {
     const onInput = vi.fn()
     render({ onInput })
-    clickButtonByTitle('Ctrl+C')
+    clickButtonByLabel('Ctrl+C')
     expect(onInput).toHaveBeenCalledWith('\x03')
   })
 
@@ -85,8 +88,8 @@ describe('MobileTerminalToolbar', () => {
     const onInput = vi.fn()
     const onScrollLines = vi.fn()
     render({ onInput, onScrollLines })
-    const upButton = container!.querySelector('button[title^="Page Up"]') as HTMLButtonElement
-    const downButton = container!.querySelector('button[title^="Page Down"]') as HTMLButtonElement
+    const upButton = container!.querySelector('button[aria-label^="Page Up"]') as HTMLButtonElement
+    const downButton = container!.querySelector('button[aria-label^="Page Down"]') as HTMLButtonElement
     act(() => {
       upButton.click()
       downButton.click()
@@ -99,7 +102,7 @@ describe('MobileTerminalToolbar', () => {
   test('Paste button invokes the paste handler', () => {
     const onPaste = vi.fn()
     render({ onPaste })
-    clickButtonByTitle('Paste')
+    clickButtonByLabel('Paste')
     expect(onPaste).toHaveBeenCalledTimes(1)
   })
 
@@ -109,6 +112,19 @@ describe('MobileTerminalToolbar', () => {
     expect(buttons.length).toBeGreaterThan(0)
     for (const button of buttons) {
       expect((button as HTMLButtonElement).disabled).toBe(true)
+    }
+  })
+
+  test('Buttons do not render a `title` attribute (Safari long-press callout)', () => {
+    render({})
+    const buttons = container!.querySelectorAll('button')
+    expect(buttons.length).toBeGreaterThan(0)
+    for (const button of buttons) {
+      // iOS Safari shows a native tooltip on long-press of any element
+      // that has a `title` attribute. The mobile toolbar is only ever
+      // rendered on touch devices, so we expose labels via aria-label
+      // and leave `title` unset.
+      expect(button.hasAttribute('title')).toBe(false)
     }
   })
 })
