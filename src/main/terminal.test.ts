@@ -51,8 +51,14 @@ describe('terminal IPC', () => {
     wireTerminalIpc()
   })
 
-  beforeEach(() => {
+  // The spy has to be re-applied in beforeEach because vitest.config sets
+  // `restoreMocks: true`, which restores the original implementation of
+  // every spy after each test — a beforeAll spy would be wiped before the
+  // second test ran.
+  beforeEach(async () => {
     vi.clearAllMocks()
+    const { platform } = await import('#/main/platform.ts')
+    vi.spyOn(platform, 'isMacOS').mockReturnValue(true)
   })
 
   test('wires native terminal notification handlers', () => {

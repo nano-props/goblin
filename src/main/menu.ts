@@ -39,6 +39,7 @@ import {
   openDataFolder as runOpenDataFolder,
   openWebVersionFromMenu as runOpenWebVersionFromMenu,
 } from '#/main/native-menu-actions.ts'
+import { platform } from '#/main/platform.ts'
 
 interface AppMenuState {
   isMac: boolean
@@ -108,12 +109,6 @@ export function applyMenuWorkspaceLayout(layout: WorkspaceLayout): boolean {
 
 export function buildAppMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate(createAppMenuTemplate(readMenuState())))
-}
-
-export const platform = {
-  isMacOS(): boolean {
-    return process.platform === 'darwin'
-  },
 }
 
 function readMenuState(): AppMenuState {

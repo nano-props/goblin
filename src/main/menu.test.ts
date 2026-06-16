@@ -115,7 +115,7 @@ describe('app menu actions', () => {
     mocks.getFocusedWindow.mockReturnValue(null)
     mocks.focusedRegisteredSurface.mockReturnValue(null)
     mocks.activateMainWindow.mockResolvedValue(mocks.win)
-    const { platform } = await import('#/main/menu.ts')
+    const { platform } = await import('#/main/platform.ts')
     vi.spyOn(platform, 'isMacOS').mockReturnValue(true)
   })
 
@@ -278,7 +278,7 @@ describe('app menu actions', () => {
     })
   })
 
-  test('includes standard edit roles and full screen in the menu', async () => {
+  test('includes standard edit roles in the menu', async () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
 
     buildAppMenu()
@@ -295,17 +295,35 @@ describe('app menu actions', () => {
       'menu.edit.delete',
       'menu.edit.select-all',
     ])
+  })
+
+  // On macOS AppKit injects its own "Enter Full Screen" entry into the
+  // View menu whenever the window is fullscreenable (the default), so we
+  // deliberately skip our own role-based one to avoid a duplicate.
+  test('skips the toggle-full-screen entry on macOS', async () => {
+    const { buildAppMenu } = await import('#/main/menu.ts')
+    const { platform } = await import('#/main/platform.ts')
+    vi.mocked(platform.isMacOS).mockReturnValue(true)
+
+    buildAppMenu()
 
     const viewMenu = mocks.template.find((entry) => entry.label === 'menu.view')
     const fullScreenItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.toggle-full-screen')
-    // On macOS AppKit injects its own "Enter Full Screen" entry into the
-    // View menu, so we deliberately skip our own role-based one to avoid a
-    // duplicate. On Windows / Linux we still need to add it manually.
-    if (process.platform === 'darwin') {
-      expect(fullScreenItem).toBeUndefined()
-    } else {
-      expect(fullScreenItem?.role).toBe('togglefullscreen')
-    }
+    expect(fullScreenItem).toBeUndefined()
+  })
+
+  // On Windows / Linux Electron does not auto-provide a full-screen entry,
+  // so we add one with the standard role.
+  test('adds the toggle-full-screen role entry on Windows and Linux', async () => {
+    const { buildAppMenu } = await import('#/main/menu.ts')
+    const { platform } = await import('#/main/platform.ts')
+    vi.mocked(platform.isMacOS).mockReturnValue(false)
+
+    buildAppMenu()
+
+    const viewMenu = mocks.template.find((entry) => entry.label === 'menu.view')
+    const fullScreenItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.toggle-full-screen')
+    expect(fullScreenItem?.role).toBe('togglefullscreen')
   })
 
   test('puts native window management items before repo navigation', async () => {

@@ -2,6 +2,7 @@ import { BrowserWindow, Notification, app, ipcMain } from 'electron'
 import type { WebContents } from 'electron'
 import { broadcastRendererEffectIntent } from '#/main/renderer-surface-events.ts'
 import { activateMainWindow } from '#/main/window.ts'
+import { platform } from '#/main/platform.ts'
 import { t } from '#/main/i18n/index.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 import { terminalNodeLog } from '#/node/logger.ts'
@@ -38,7 +39,7 @@ export function wireTerminalIpc(): void {
   ipcMain.on(TERMINAL_SET_BADGE_CHANNEL, (event, count: unknown): void => {
     if (!isTrustedIpcEvent(event)) return
     const n = typeof count === 'number' && Number.isFinite(count) && count >= 0 ? Math.floor(count) : 0
-    if (process.platform === 'darwin') app.dock?.setBadge(n > 0 ? String(n) : '')
+    if (platform.isMacOS()) app.dock?.setBadge(n > 0 ? String(n) : '')
   })
 }
 
@@ -64,7 +65,7 @@ async function notifyTerminalBell(webContents: WebContents, input: TerminalNotif
         } catch {}
       }, 1500)
     }
-    if (process.platform === 'darwin') app.dock?.bounce('informational')
+    if (platform.isMacOS()) app.dock?.bounce('informational')
     // flashFrame and dock bounce already delivered the attention cue above.
     // If system notifications are unsupported we still return true — the user
     // was notified via those mechanisms, so the bell was not silently dropped.
