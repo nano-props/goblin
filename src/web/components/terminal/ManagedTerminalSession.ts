@@ -290,7 +290,14 @@ export class ManagedTerminalSession {
       await this.replayPhase(token, term, result, preloaded)
       this.finalizePhase(token, term)
     } catch (err) {
-      if (err instanceof StartCancelledError) return
+      if (err instanceof StartCancelledError) {
+        // A newer start has superseded this one. Drop the replay
+        // window the cancelled preload opened, so the next start's
+        // beginReplay doesn't inherit events captured against the
+        // cancelled term.
+        this.runtime.drainReplay()
+        return
+      }
       this.closeReplacingPtySession()
       if (!this.currentToken(token)) return
       this.destroyActiveView()
