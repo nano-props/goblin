@@ -186,14 +186,16 @@ export class TerminalSessionRuntime {
     return events
   }
 
-  // Drains the replay buffer without appending to the output summary.
-  // Used by the preload path in `ManagedTerminalSession`, which runs
-  // before the new attach result is in hand. The role of the new
-  // attach is unknown at that point, so any summary work here would
-  // be made with the previous role's `canResize`. The post-attach
-  // `replayActiveView` rebuilds the summary with the correct role.
-  drainReplay(): TerminalOutputEvent[] {
-    return this.state.finishReplay()
+  // Discards the replay buffer (boundary + captured events) without
+  // queueing anything to the term or appending to the output
+  // summary. Used by error / cancellation paths in
+  // `ManagedTerminalSession` to clear replay state when the attach
+  // fails partway through. The success path does not call this — the
+  // preload's beginReplay and the post-attach's beginReplay share the
+  // same window, and the post-attach's `finishReplay` drains the
+  // combined buffer with the new boundary.
+  drainReplay(): void {
+    this.state.discardReplay()
   }
 
   acknowledgeResize(cols: number, rows: number): void {
