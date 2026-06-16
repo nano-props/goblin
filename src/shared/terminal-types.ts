@@ -47,18 +47,14 @@ export type TerminalTakeoverResult =
 /**
  * Successful attach/restart result.
  *
- * `replay`/`replaySeq` and `snapshot`/`snapshotSeq` carry the same
- * data — the session's server-side render buffer and its monotonic
- * sequence number. The two pairs are kept for wire-protocol
- * stability (the catalog/socket still publish under the `replay`
- * name); the renderer reads only `snapshot`/`snapshotSeq`.
+ * `snapshot`/`snapshotSeq` are the session's server-side render buffer
+ * and its monotonic sequence number. The renderer hydrates from these
+ * and re-replays any post-snapshot events the runtime captures.
  */
 export type TerminalAttachResult =
   | {
       ok: true
       sessionId: string
-      replay: string
-      replaySeq: number
       processName: string
       canonicalTitle: string | null
       phase: TerminalSessionPhase

@@ -1590,8 +1590,6 @@ function attachResult(
   return {
     ok: true,
     sessionId,
-    replay: '',
-    replaySeq: 0,
     snapshot: '',
     snapshotSeq: 0,
     processName: 'zsh',

@@ -447,8 +447,6 @@ export class TerminalSessionManager<TOwner extends string | number> {
     return {
       ok: true,
       sessionId: session.id,
-      replay: session.render.buffer,
-      replaySeq: session.render.sequence,
       snapshot: session.render.buffer,
       snapshotSeq: session.render.sequence,
       processName: session.pty ? this.ptySupervisor.processName(session.pty) : 'terminal',

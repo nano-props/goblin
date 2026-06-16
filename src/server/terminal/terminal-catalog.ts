@@ -41,8 +41,6 @@ type EnsureTerminalCatalogResult =
       sessionId: string
       key: string
       action: TerminalCatalogAction
-      replay: string
-      replaySeq: number
       processName: string
       canonicalTitle: string | null
       snapshot: string
@@ -272,8 +270,6 @@ function toEnsureResult(
     sessionId: snapshotResult.sessionId,
     key,
     action,
-    replay: snapshotResult.replay,
-    replaySeq: snapshotResult.replaySeq,
     processName: snapshotResult.processName,
     canonicalTitle: snapshotResult.canonicalTitle,
     snapshot: snapshotResult.snapshot,

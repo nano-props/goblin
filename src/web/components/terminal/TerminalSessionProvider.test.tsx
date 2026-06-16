@@ -251,8 +251,6 @@ function attachResult(): TerminalAttachResult {
   return {
     ok: true,
     sessionId: 'unused',
-    replay: '',
-    replaySeq: 0,
     snapshot: '',
     snapshotSeq: 0,
     processName: 'zsh',

@@ -9,8 +9,6 @@ describe('TerminalSessionRuntime', () => {
       {
         ok: true,
         sessionId: 'session-1',
-        replay: '',
-        replaySeq: 0,
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',
@@ -43,8 +41,6 @@ describe('TerminalSessionRuntime', () => {
       {
         ok: true,
         sessionId: 'session-1',
-        replay: '',
-        replaySeq: 0,
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',
@@ -89,8 +85,6 @@ describe('TerminalSessionRuntime', () => {
       {
         ok: true,
         sessionId: 'session-1',
-        replay: '',
-        replaySeq: 0,
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',
@@ -154,8 +148,6 @@ describe('TerminalSessionRuntime', () => {
       {
         ok: true,
         sessionId: 'session-1',
-        replay: '',
-        replaySeq: 0,
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',
