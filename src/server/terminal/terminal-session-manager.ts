@@ -18,8 +18,9 @@ import { serverLogger } from '#/server/logger.ts'
 import {
   attachTerminalAttachment,
   claimTerminalAttachmentControl,
-  decideTerminalActionAuthority,
+  explainAuthority,
   expireTerminalAttachment,
+  isAuthoritative,
   registerTerminalAttachment,
   restartTerminalAttachmentControl,
   type TerminalAttachmentState,
@@ -172,10 +173,10 @@ export class TerminalSessionManager<TOwner extends string | number> {
     if (!session?.pty) return false
     if (attachmentId) {
       // Register the attachment first so a brand-new socket can satisfy
-      // the unknown-attachment gate, then defer to the shared authority
-      // decision so write/resize/restart stay in lockstep.
+      // the unknown-attachment gate, then defer to the shared
+      // authority helper so write/resize/restart stay in lockstep.
       registerTerminalAttachment(session, attachmentId, session.cols, session.rows, undefined)
-      if (decideTerminalActionAuthority(session, attachmentId, 'write').kind !== 'allow') return false
+      if (!isAuthoritative(session, attachmentId, 'write')) return false
     } else if (session.controller !== null) {
       // A controller exists but the caller did not identify itself.
       return false
@@ -220,7 +221,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     if (!session) return false
     if (!attachmentId) return false
     registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
-    if (decideTerminalActionAuthority(session, attachmentId, 'resize').kind !== 'allow') return false
+    if (!isAuthoritative(session, attachmentId, 'resize')) return false
     return this.resizeSessionPty(session, size.cols, size.rows)
   }
 
@@ -242,7 +243,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
       // requires the caller to be a known attachment. Use the same
       // authority gate as the other actions for consistency.
       registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
-      if (decideTerminalActionAuthority(session, attachmentId, 'takeover').kind !== 'allow') {
+      if (!isAuthoritative(session, attachmentId, 'takeover')) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
       this.applyOwnershipEffect(session, claimTerminalAttachmentControl(session, attachmentId))
@@ -266,12 +267,9 @@ export class TerminalSessionManager<TOwner extends string | number> {
     if (!session) return { ok: false, message: 'error.invalid-arguments' }
     if (attachmentId) {
       registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
-      const decision = decideTerminalActionAuthority(session, attachmentId, 'restart')
-      if (decision.kind !== 'allow') {
-        return {
-          ok: false,
-          message: decision.kind === 'deny' ? authorityReasonToMessage(decision.reason) : 'error.invalid-arguments',
-        }
+      const denyReason = explainAuthority(session, attachmentId, 'restart')
+      if (denyReason !== null) {
+        return { ok: false, message: authorityReasonToMessage(denyReason) }
       }
       restartTerminalAttachmentControl(session, attachmentId)
     } else if (session.controller !== null) {
