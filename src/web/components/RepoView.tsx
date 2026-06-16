@@ -1,6 +1,7 @@
-// Active-repo body. The repo toolbar stays on top; split layouts render
-// branch list + detail, while focus mode renders detail directly under
-// the toolbar with the selected-branch summary in the toolbar itself.
+// Active-repo body. In split/collapsed modes the branch pane carries its
+// own toolbar (BranchPaneToolbar); in focus mode the selected-branch
+// info bar (BranchInfoBar) caps the section above the detail pane.
+// Both bars share the RepoToolbar chrome.
 
 import { Smartphone } from 'lucide-react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
@@ -8,7 +9,8 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
 import { BranchList } from '#/web/components/BranchList.tsx'
 import { BranchDetail } from '#/web/components/BranchDetail.tsx'
-import { RepoToolbar } from '#/web/components/repo-toolbar/RepoToolbar.tsx'
+import { BranchInfoBar } from '#/web/components/repo-toolbar/BranchInfoBar.tsx'
+import { BranchPaneToolbar } from '#/web/components/repo-toolbar/BranchPaneToolbar.tsx'
 import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
 import { RepoWorkspace, RepoWorkspacePane } from '#/web/components/Layout.tsx'
 import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
@@ -96,6 +98,7 @@ export function RepoView({ repoId }: Props) {
         onDetailSizeChange={(size) => setDetailPaneSize(layout, size)}
         branchPane={
           <RepoWorkspacePane>
+            <BranchPaneToolbar repoId={repoId} />
             <BranchList repoId={repoId} showActions={behavior.branchListActionsVisible} />
           </RepoWorkspacePane>
         }
@@ -105,7 +108,7 @@ export function RepoView({ repoId }: Props) {
 
   return (
     <section className="relative flex min-w-0 flex-1 flex-col">
-      <RepoToolbar repoId={repoId} />
+      {behavior.mode === 'focus' && <BranchInfoBar repoId={repoId} />}
 
       {compactLeftRight && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-background/95 p-6 text-center">

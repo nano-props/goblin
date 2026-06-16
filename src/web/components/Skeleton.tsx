@@ -57,25 +57,22 @@ export function RepoWorkspaceSkeleton({
     </RepoWorkspacePane>
   )
   const workspaceMode = behavior.mode === 'collapsed' ? 'collapsed' : 'split'
+  const branchPane = (
+    <RepoWorkspacePane>
+      {showRepoToolbar && <RepoToolbarSkeleton compact={compact} />}
+      <BranchListSkeleton showBranchActions={behavior.branchListActionsVisible} />
+    </RepoWorkspacePane>
+  )
   const workspaceBody =
     behavior.mode === 'focus' ? (
       detailPane
     ) : (
-      <RepoWorkspace
-        layout={layout}
-        mode={workspaceMode}
-        branchPane={
-          <RepoWorkspacePane>
-            <BranchListSkeleton showBranchActions={behavior.branchListActionsVisible} />
-          </RepoWorkspacePane>
-        }
-        detailPane={detailPane}
-      />
+      <RepoWorkspace layout={layout} mode={workspaceMode} branchPane={branchPane} detailPane={detailPane} />
     )
 
   return (
     <section className="flex min-w-0 flex-1 flex-col">
-      {showRepoToolbar && <RepoToolbarSkeleton focusMode={behavior.mode === 'focus'} compact={compact} />}
+      {showRepoToolbar && behavior.mode === 'focus' && <RepoToolbarSkeleton focusMode compact={compact} />}
       {workspaceBody}
     </section>
   )

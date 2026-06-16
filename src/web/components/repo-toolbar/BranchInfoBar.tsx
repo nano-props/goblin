@@ -1,0 +1,207 @@
+// Focus-mode branch info bar. Renders the selected-branch summary, the
+// branch switcher dropdown, the HEAD label, and branch-level actions on
+// top of the shared RepoToolbar chrome. Caller is expected to mount
+// this only in focus mode (see RepoView / RepoWorkspaceSkeleton for the
+// pattern); the bar itself does not check.
+
+import { ChevronDown } from 'lucide-react'
+import { useStoreWithEqualityFn } from 'zustand/traditional'
+import { Button } from '#/web/components/ui/button.tsx'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  SelectedDropdownMenuItem,
+} from '#/web/components/ui/dropdown-menu.tsx'
+import { BranchActionControls } from '#/web/components/BranchActionControls.tsx'
+import { BranchSummaryInline } from '#/web/components/repo-workspace/BranchSummaryInline.tsx'
+import { RepoToolbar } from '#/web/components/repo-toolbar/RepoToolbar.tsx'
+import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
+import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
+import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
+import { visibleBranches } from '#/web/stores/repos/branch-view-mode.ts'
+import { useT } from '#/web/stores/i18n.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
+import type { RepoBranchState } from '#/web/stores/repos/types.ts'
+import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
+
+interface Props {
+  repoId: string
+}
+
+export function BranchInfoBar({ repoId }: Props) {
+  return (
+    <RepoToolbar repoId={repoId}>
+      <FocusBranchControls repoId={repoId} />
+    </RepoToolbar>
+  )
+}
+
+function FocusBranchControls({ repoId }: Props) {
+  const navigation = useMainWindowNavigation()
+  const { branches, selectedBranch, selectedBranchData, summaryRepo, currentHEAD } = useStoreWithEqualityFn(
+    useReposStore,
+    (s) => {
+      const repo = s.repos[repoId]
+      return {
+        branches: repo
+          ? visibleBranches({
+              branches: repo.data.branches,
+              viewMode: repo.ui.branchViewMode,
+            })
+          : [],
+        selectedBranch: repo?.ui.selectedBranch ?? null,
+        selectedBranchData: repo?.ui.selectedBranch
+          ? (repo.data.branches.find((branch) => branch.name === repo.ui.selectedBranch) ?? null)
+          : null,
+        summaryRepo: repo
+          ? {
+              data: {
+                currentBranch: repo.data.currentBranch,
+                status: repo.data.status,
+                worktreesByPath: repo.data.worktreesByPath,
+              },
+            }
+          : null,
+        currentHEAD: repo?.data.currentHEAD,
+      }
+    },
+    (a, b) =>
+      a.branches === b.branches &&
+      a.selectedBranch === b.selectedBranch &&
+      a.selectedBranchData === b.selectedBranchData &&
+      a.summaryRepo?.data.currentBranch === b.summaryRepo?.data.currentBranch &&
+      a.summaryRepo?.data.status === b.summaryRepo?.data.status &&
+      a.summaryRepo?.data.worktreesByPath === b.summaryRepo?.data.worktreesByPath &&
+      a.currentHEAD === b.currentHEAD,
+  )
+
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <BranchSelector repoId={repoId} branches={branches} selectedBranch={selectedBranch} navigation={navigation} />
+      {selectedBranchData && summaryRepo && (
+        <>
+          <div aria-hidden="true" className="mx-1 h-4 border-l border-separator/70" />
+          <BranchSummaryInline repo={summaryRepo} branch={selectedBranchData} className="min-w-0 flex-1" />
+        </>
+      )}
+      {currentHEAD && (
+        <>
+          <div aria-hidden="true" className="mx-1 h-4 border-l border-separator/70" />
+          <span className="shrink-0 font-mono text-xs text-muted-foreground">HEAD at {currentHEAD}</span>
+        </>
+      )}
+      {selectedBranchData && <FocusBranchActions repoId={repoId} branch={selectedBranchData} />}
+    </div>
+  )
+}
+
+const FOCUS_BRANCH_ACTIONS_REPO_EQUAL = (a: BranchActionRepo | undefined, b: BranchActionRepo | undefined) =>
+  a === b ||
+  (!!a &&
+    !!b &&
+    a.id === b.id &&
+    a.instanceToken === b.instanceToken &&
+    a.data.currentBranch === b.data.currentBranch &&
+    a.data.status === b.data.status &&
+    a.data.worktreesByPath === b.data.worktreesByPath &&
+    a.operations.branchAction === b.operations.branchAction &&
+    a.remote.hasRemotes === b.remote.hasRemotes &&
+    a.remote.hasBrowserRemote === b.remote.hasBrowserRemote &&
+    a.remote.hasGitHubRemote === b.remote.hasGitHubRemote &&
+    a.remote.lifecycle === b.remote.lifecycle &&
+    a.remote.browserRemoteProvider === b.remote.browserRemoteProvider &&
+    a.remote.remoteProviders === b.remote.remoteProviders)
+
+function FocusBranchActions({ repoId, branch }: { repoId: string; branch: RepoBranchState }) {
+  const repo = useStoreWithEqualityFn(
+    useReposStore,
+    (s): BranchActionRepo | undefined => {
+      const repoState = s.repos[repoId]
+      if (!repoState) return undefined
+      return {
+        id: repoState.id,
+        instanceToken: repoState.instanceToken,
+        data: {
+          currentBranch: repoState.data.currentBranch,
+          status: repoState.data.status,
+          worktreesByPath: repoState.data.worktreesByPath,
+        },
+        operations: {
+          branchAction: repoState.operations.branchAction,
+        },
+        remote: {
+          hasRemotes: repoState.remote.hasRemotes,
+          hasBrowserRemote: repoState.remote.hasBrowserRemote,
+          hasGitHubRemote: repoState.remote.hasGitHubRemote,
+          lifecycle: repoState.remote.lifecycle,
+          browserRemoteProvider: repoState.remote.browserRemoteProvider,
+          remoteProviders: repoState.remote.remoteProviders,
+        },
+      }
+    },
+    FOCUS_BRANCH_ACTIONS_REPO_EQUAL,
+  )
+
+  // FocusBranchActions is only mounted when FocusBranchControls has a
+  // selectedBranchData branch, which implies repo exists in the store.
+  const actions = useBranchActionItems(repo!, branch)
+  useBranchActionShortcutRegistry(actions)
+
+  if (!repo) return null
+
+  return (
+    <>
+      {actions.dialogs}
+      <BranchActionControls actions={actions} variant="menu" />
+    </>
+  )
+}
+
+function BranchSelector({
+  repoId,
+  branches,
+  selectedBranch,
+  navigation,
+}: {
+  repoId: string
+  branches: { name: string }[]
+  selectedBranch: string | null
+  navigation: ReturnType<typeof useMainWindowNavigation>
+}) {
+  const t = useT()
+  if (branches.length === 0) return null
+  const index = branches.findIndex((branch) => branch.name === selectedBranch)
+  const current = index >= 0 ? index + 1 : 1
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          className="gap-1 tabular-nums text-muted-foreground"
+          aria-label={t('branches.switch')}
+          title={t('branches.switch')}
+        >
+          <span>
+            {current} / {branches.length}
+          </span>
+          <ChevronDown className="size-3" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="bottom" align="start" className="w-max">
+        {branches.map((branch) => (
+          <SelectedDropdownMenuItem
+            key={branch.name}
+            selected={branch.name === selectedBranch}
+            className="whitespace-nowrap"
+            onSelect={() => navigation.selectRepoBranch(repoId, branch.name)}
+            aria-current={branch.name === selectedBranch ? 'true' : undefined}
+          >
+            {branch.name}
+          </SelectedDropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}

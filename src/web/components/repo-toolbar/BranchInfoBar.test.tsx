@@ -4,12 +4,12 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { RepoToolbar } from '#/web/components/repo-toolbar/RepoToolbar.tsx'
+import { BranchInfoBar } from '#/web/components/repo-toolbar/BranchInfoBar.tsx'
 import { MainWindowNavigationProvider, type MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { resetReposStore, seedRepoState, createRepoBranch } from '#/web/stores/repos/test-utils.ts'
 
-const REPO_ID = '/tmp/gbl-repo-toolbar-repo'
+const REPO_ID = '/tmp/gbl-branch-info-bar-repo'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
@@ -42,7 +42,7 @@ afterEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
-describe('RepoToolbar', () => {
+describe('BranchInfoBar', () => {
   test('shows the selected branch summary beside the pager in focus mode', () => {
     seedRepoState({
       id: REPO_ID,
@@ -61,34 +61,12 @@ describe('RepoToolbar', () => {
     })
     useReposStore.setState({ workspaceLayout: 'top-bottom', detailCollapsed: false, detailFocusMode: true })
 
-    renderToolbar(navigationWith({}))
+    renderBar(navigationWith({}))
 
     expect(container?.textContent).toContain('2 / 3')
     expect(container?.textContent).toContain('feature/a')
     expect(container?.textContent).toContain('2')
     expect(container?.textContent).toContain('1')
-  })
-
-  test('hides branch pager but keeps filter controls on small screens in non-focus mode', () => {
-    seedRepoState({
-      id: REPO_ID,
-      branches: [createRepoBranch('main'), createRepoBranch('feature/a'), createRepoBranch('feature/b')],
-      currentBranch: 'main',
-      selectedBranch: 'feature/a',
-    })
-
-    renderToolbar(navigationWith({}))
-
-    expect(container?.textContent).not.toContain('2 / 3')
-    expect(container?.querySelector('[aria-label="workspace.layout-label"]')).toBeNull()
-
-    const buttons = Array.from(container?.querySelectorAll('button') ?? [])
-    const prevButton = buttons.find((button) => button.getAttribute('aria-label') === 'help.row.prev-branch')
-    const nextButton = buttons.find((button) => button.getAttribute('aria-label') === 'help.row.next-branch')
-    expect(prevButton).toBeUndefined()
-    expect(nextButton).toBeUndefined()
-
-    expect(container?.querySelector('[aria-label="branches.filter-label"]')).not.toBeNull()
   })
 
   test('shows a branch dropdown in focus mode instead of prev/next buttons', () => {
@@ -100,7 +78,7 @@ describe('RepoToolbar', () => {
     })
     useReposStore.setState({ workspaceLayout: 'top-bottom', detailCollapsed: false, detailFocusMode: true })
 
-    renderToolbar(navigationWith({}))
+    renderBar(navigationWith({}))
 
     expect(container?.textContent).toContain('2 / 3')
 
@@ -114,23 +92,28 @@ describe('RepoToolbar', () => {
     expect(switchButton).toBeInstanceOf(HTMLButtonElement)
   })
 
-  test('hides branch pager on small screens with left-right layout', () => {
-    useReposStore.setState({ workspaceLayout: 'left-right' })
+  test('always renders focus content regardless of workspace focus mode (caller decides when to mount)', () => {
     seedRepoState({
       id: REPO_ID,
-      branches: [createRepoBranch('main'), createRepoBranch('feature/a'), createRepoBranch('feature/b')],
+      branches: [createRepoBranch('main'), createRepoBranch('feature/a')],
       currentBranch: 'main',
-      selectedBranch: 'feature/a',
+      selectedBranch: 'main',
     })
+    useReposStore.setState({ workspaceLayout: 'top-bottom', detailCollapsed: false, detailFocusMode: false })
 
-    renderToolbar(navigationWith({}))
+    renderBar(navigationWith({}))
 
-    expect(container?.textContent).not.toContain('2 / 3')
-    expect(container?.querySelector('[aria-label="workspace.layout-label"]')).toBeNull()
+    expect(container?.textContent).toContain('1 / 2')
+  })
+
+  test('renders nothing when the repo is not in the store (chrome exists guard)', () => {
+    renderBar(navigationWith({}))
+
+    expect(container?.textContent ?? '').toBe('')
   })
 })
 
-function renderToolbar(navigation: MainWindowNavigationActions) {
+function renderBar(navigation: MainWindowNavigationActions) {
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -139,7 +122,7 @@ function renderToolbar(navigation: MainWindowNavigationActions) {
     root!.render(
       <QueryClientProvider client={queryClient!}>
         <MainWindowNavigationProvider value={navigation}>
-          <RepoToolbar repoId={REPO_ID} />
+          <BranchInfoBar repoId={REPO_ID} />
         </MainWindowNavigationProvider>
       </QueryClientProvider>,
     )
