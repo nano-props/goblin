@@ -38,7 +38,7 @@ function sanitizeBaseName(name: string): string {
   // that one substitutes for an empty `File.name` at the multipart
   // boundary, while this one substitutes for a name whose
   // post-sanitisation residue is empty.
-  const base = path.basename(name).replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim()
+  const base = path.basename(name).replace(/[<>:"/\\|?*\x00-\x1f\x7f-\x9f]/g, '_').trim()
   return base.length > 0 ? base : 'clipboard.bin'
 }
 

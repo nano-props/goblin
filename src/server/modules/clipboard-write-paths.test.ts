@@ -56,6 +56,20 @@ describe('saveClipboardFiles', () => {
     expect(path.basename(paths[0]).endsWith('-0-attempt.bin')).toBe(true)
   })
 
+  test('strips C1 control characters (0x7F-0x9F) from file names', async () => {
+    // Mirrors the main-process test. Locks the contract that the
+    // sanitiser covers the C0 (\x00-\x1F) and C1 (\x7F-\x9F) ranges
+    // together — Windows NTFS treats both as reserved. If a future
+    // refactor narrows the character class to \x00-\x1F, this
+    // re-fails loudly.
+    const { saveClipboardFiles } = await import('#/server/modules/clipboard-write-paths.ts')
+    const c1Char = String.fromCharCode(0x90)
+    const file = new File([new Uint8Array([0])], `name${c1Char}tail.bin`)
+    const { paths } = await saveClipboardFiles([file])
+    expect(paths[0]).not.toContain(c1Char)
+    expect(path.basename(paths[0]).endsWith('-0-name_tail.bin')).toBe(true)
+  })
+
   test('falls back to "clipboard.bin" for empty file names', async () => {
     const { saveClipboardFiles } = await import('#/server/modules/clipboard-write-paths.ts')
     const file = new File([new Uint8Array([0])], '')

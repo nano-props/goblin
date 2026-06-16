@@ -25,7 +25,7 @@ function sanitizeBaseName(name: string): string {
   // Strip path separators (defence in depth — `path.basename` should already
   // have removed them) and a small set of Windows-reserved characters. The
   // dash inside the class is escaped so it stays a literal, not a range.
-  const base = path.basename(name).replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim()
+  const base = path.basename(name).replace(/[<>:"/\\|?*\x00-\x1f\x7f-\x9f]/g, '_').trim()
   return base.length > 0 ? base : 'clipboard.bin'
 }
 

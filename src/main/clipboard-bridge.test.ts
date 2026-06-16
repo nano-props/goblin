@@ -88,6 +88,23 @@ describe('saveClipboardBinaryFiles', () => {
     expect(basename.includes('-0-attempt.png')).toBe(true)
     expect(basename.endsWith('-0-attempt.png')).toBe(true)
   })
+
+  test('strips C1 control characters (0x7F-0x9F) from file names', async () => {
+    // The C1 control range (U+007F DELETE through U+009F) is also
+    // reserved on Windows NTFS, and would reject the file at
+    // later-write time. The sanitiser covers the C0 (\x00-\x1F) and
+    // C1 (\x7F-\x9F) ranges together. This test exercises an
+    // out-of-band character in the C1 range to lock the contract
+    // — if a future refactor narrows the character class to
+    // \x00-\x1F, this re-fails loudly.
+    const { saveClipboardBinaryFiles } = await import('#/main/clipboard-bridge.ts')
+    const c1Char = String.fromCharCode(0x90) // U+0090, control char
+    const name = `name${c1Char}tail.bin`
+    const paths = await saveClipboardBinaryFiles([{ name, bytes: new ArrayBuffer(1) }])
+    const basename = path.basename(paths[0])
+    expect(basename).not.toContain(c1Char)
+    expect(basename.endsWith('-0-name_tail.bin')).toBe(true)
+  })
 })
 
 describe('pruneStaleClipboardTempDirs', () => {
