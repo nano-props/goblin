@@ -18,11 +18,26 @@ import type { TerminalController, TerminalControllerStatus } from '#/shared/term
  */
 export type TerminalAuthorityAction = 'write' | 'resize' | 'restart' | 'takeover'
 
-export type TerminalAuthorityDecision =
-  | { kind: 'allow' }
-  | { kind: 'deny'; reason: 'not-controller' }
-  | { kind: 'deny'; reason: 'session-unowned' }
-  | { kind: 'deny'; reason: 'unknown-attachment' }
+export type TerminalAuthorityReason = 'not-controller' | 'session-unowned' | 'unknown-attachment'
+
+export type TerminalAuthorityDecision = { kind: 'allow' } | { kind: 'deny'; reason: TerminalAuthorityReason }
+
+export function isAuthoritative(
+  state: TerminalOwnershipState,
+  attachmentId: string,
+  action: TerminalAuthorityAction,
+): boolean {
+  return decideTerminalActionAuthority(state, attachmentId, action).kind === 'allow'
+}
+
+export function explainAuthority(
+  state: TerminalOwnershipState,
+  attachmentId: string,
+  action: TerminalAuthorityAction,
+): TerminalAuthorityReason | null {
+  const decision = decideTerminalActionAuthority(state, attachmentId, action)
+  return decision.kind === 'allow' ? null : decision.reason
+}
 
 export function decideTerminalActionAuthority(
   state: TerminalOwnershipState,
