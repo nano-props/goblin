@@ -5,14 +5,12 @@
 // (non-focus mode); this component intentionally knows nothing about
 // workspace modes so callers can compose it without branching.
 //
-// Returns null when `s.repos[repoId]` is missing so the chrome is safe
-// to mount unconditionally — callers do not need their own `exists`
-// guard.
+// Caller must guarantee `s.repos[repoId]` exists before mounting;
+// see RepoView for the canonical gate.
 
 import type { ReactNode } from 'react'
 import { Toolbar } from '#/web/components/Layout.tsx'
 import { RepoToolbarActions } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
-import { useReposStore } from '#/web/stores/repos/store.ts'
 
 interface Props {
   repoId: string
@@ -20,9 +18,6 @@ interface Props {
 }
 
 export function RepoToolbar({ repoId, children }: Props) {
-  const exists = useReposStore((s) => !!s.repos[repoId])
-  if (!exists) return null
-
   return (
     <Toolbar variant="repo" className="justify-between gap-3">
       <div className="flex min-w-0 flex-1 items-center gap-2">{children}</div>

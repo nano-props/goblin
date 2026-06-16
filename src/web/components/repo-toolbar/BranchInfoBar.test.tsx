@@ -105,12 +105,6 @@ describe('BranchInfoBar', () => {
 
     expect(container?.textContent).toContain('1 / 2')
   })
-
-  test('renders nothing when the repo is not in the store (chrome exists guard)', () => {
-    renderBar(navigationWith({}))
-
-    expect(container?.textContent ?? '').toBe('')
-  })
 })
 
 function renderBar(navigation: MainWindowNavigationActions) {
