@@ -77,6 +77,40 @@ describe('TerminalSessionRuntime', () => {
     expect(runtime.processName()).toBe('bash')
     expect(runtime.finishReplay()).toEqual([{ sessionId: 'session-1', data: 'new', seq: 3, processName: 'bash' }])
     expect(runtime.snapshot().outputSummary).toBe('new')
+  })
+
+  test('drainReplay returns replayed events without appending to the output summary', () => {
+    // The preload path runs before the new attach result is known, so
+    // any summary build here would be made with the previous role's
+    // `canResize`. `drainReplay` skips the summary side-effect and
+    // leaves the role-aware rebuild to the post-attach replay.
+    const runtime = new TerminalSessionRuntime()
+    runtime.applyAttachResult(
+      {
+        ok: true,
+        sessionId: 'session-1',
+        replay: '',
+        replaySeq: 0,
+        snapshot: '',
+        snapshotSeq: 0,
+        processName: 'zsh',
+        canonicalTitle: null,
+        phase: 'open',
+        message: null,
+        controller: { attachmentId: 'attachment_remote', status: 'connected' },
+        role: 'viewer',
+        controllerStatus: 'connected',
+        canonicalCols: 120,
+        canonicalRows: 40,
+      },
+      { cols: 100, rows: 30 },
+    )
+    runtime.markAttached()
+
+    runtime.beginReplay(2)
+    runtime.handleOutput({ sessionId: 'session-1', data: 'new', seq: 3, processName: 'bash' })
+    expect(runtime.drainReplay()).toEqual([{ sessionId: 'session-1', data: 'new', seq: 3, processName: 'bash' }])
+    expect(runtime.snapshot().outputSummary).toBeUndefined()
 
     expect(
       runtime.handleOwnership({

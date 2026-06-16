@@ -411,7 +411,11 @@ export class ManagedTerminalSession {
       if (hydratedSnapshot.snapshot) await termWrite(term, hydratedSnapshot.snapshot)
       return this.currentStart(token, term)
     } finally {
-      if (this.currentStart(token, term)) this.runtime.finishReplay()
+      // Drain — but do not append to the output summary here. The
+      // role of the new attach is unknown until `applyAttachResult`
+      // runs after `ipcPhase`; the post-attach `replayActiveView`
+      // rebuilds the summary with the correct role.
+      if (this.currentStart(token, term)) this.runtime.drainReplay()
     }
   }
 

@@ -186,6 +186,16 @@ export class TerminalSessionRuntime {
     return events
   }
 
+  // Drains the replay buffer without appending to the output summary.
+  // Used by the preload path in `ManagedTerminalSession`, which runs
+  // before the new attach result is in hand. The role of the new
+  // attach is unknown at that point, so any summary work here would
+  // be made with the previous role's `canResize`. The post-attach
+  // `replayActiveView` rebuilds the summary with the correct role.
+  drainReplay(): TerminalOutputEvent[] {
+    return this.state.finishReplay()
+  }
+
   acknowledgeResize(cols: number, rows: number): void {
     this.state.setCanonicalSize(cols, rows)
   }
