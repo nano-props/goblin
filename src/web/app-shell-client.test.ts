@@ -142,4 +142,38 @@ describe('app shell client', () => {
     await expect(chooseLocalRepositoryPath()).resolves.toBe('/tmp/repo')
     await expect(chooseCloneParentPath()).resolves.toBe('/tmp')
   })
+
+  test('saveClipboardFiles forwards paths from the bridge', async () => {
+    // Happy path — the resolver relies on the wrapper passing the
+    // bridge's response through unchanged so a multi-file paste can
+    // hit the paste-file-partial branch when only some files made
+    // it across. Without this test, that contract relied on
+    // coincidence.
+    const bridgeModule = await import('#/web/renderer-bridge.ts')
+    bridgeModule.setRendererBridgeForTests(
+      testBridge({ saveClipboardFiles: vi.fn(async () => ['/tmp/a', '/tmp/b']) }),
+    )
+    const { saveClipboardFiles } = await import('#/web/app-shell-client.ts')
+    await expect(saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).resolves.toEqual([
+      '/tmp/a',
+      '/tmp/b',
+    ])
+  })
+
+  test('saveClipboardFiles collapses bridge throw to [] (resolver treats this as paste-file-failed)', async () => {
+    // The wrapper mirrors pathForDroppedFile's pattern: a bridge that
+    // throws (uninitialised, IPC channel down, etc.) must not bubble
+    // the error out of app-shell-client — the resolver reads `[]`
+    // and surfaces a single toast instead.
+    const bridgeModule = await import('#/web/renderer-bridge.ts')
+    bridgeModule.setRendererBridgeForTests(
+      testBridge({
+        saveClipboardFiles: vi.fn(() => {
+          throw new Error('bridge unavailable')
+        }),
+      }),
+    )
+    const { saveClipboardFiles } = await import('#/web/app-shell-client.ts')
+    await expect(saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).resolves.toEqual([])
+  })
 })

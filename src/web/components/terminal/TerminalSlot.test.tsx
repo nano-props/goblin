@@ -15,8 +15,8 @@ vi.mock('#/web/stores/i18n.ts', () => ({
 }))
 
 vi.mock('#/web/app-shell-client.ts', () => ({
-  pathForDroppedFile: () => '',
-  saveClipboardFiles: () => Promise.resolve([]),
+  pathForDroppedFile: vi.fn(() => ''),
+  saveClipboardFiles: vi.fn(() => Promise.resolve([])),
 }))
 
 vi.mock('sonner', () => ({
@@ -434,6 +434,145 @@ describe('TerminalSlot', () => {
         await Promise.resolve()
       })
       expect(writeInput).not.toHaveBeenCalled()
+    } finally {
+      await act(async () => root.unmount())
+      container.remove()
+    }
+  })
+
+  test('drop on a controller slot writes shell-escaped paths to the PTY', async () => {
+    // Happy-path companion to the viewer-rejection test above. Locks
+    // the contract: a controller drop that resolves to a path
+    // (Electron path-attempt tier) calls writeInput with the
+    // shell-escaped path; a controller drop with no path falls
+    // through to the blob-save tier. Without this test, the
+    // resolver wiring inside TerminalSlot only had negative
+    // coverage — a regression that swapped the two paths or
+    // dropped the controller gate would have slipped through.
+    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root: Root = createRoot(container)
+    const writeInput = vi.fn()
+    const descriptor = {
+      key: 'terminal-1',
+      worktreeTerminalKey: '/repo\0/worktree',
+      terminalId: 'terminal-1',
+      index: 1,
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/worktree',
+    }
+    const worktreeSnapshot = {
+      worktreeTerminalKey: '/repo\0/worktree',
+      selectedDescriptor: descriptor,
+      sessions: [
+        {
+          key: 'terminal-1',
+          worktreeTerminalKey: '/repo\0/worktree',
+          terminalId: 'terminal-1',
+          index: 1,
+          title: 'zsh',
+          phase: 'open' as const,
+          selected: true,
+          hasBell: false,
+        },
+      ],
+      count: 1,
+      pendingCreate: false,
+    }
+    // Controller attachment — the `isController` branch of handleDrop
+    // must NOT short-circuit.
+    const snapshot = {
+      phase: 'open' as const,
+      message: null,
+      processName: 'zsh',
+      attachment: {
+        role: 'controller' as const,
+        controllerStatus: 'connected' as const,
+        active: true,
+        canTakeover: false,
+        canonicalCols: 120,
+        canonicalRows: 40,
+      },
+    }
+    const context: TerminalSessionContextValue = {
+      createTerminal: async () => 'terminal-1',
+      registerHost: vi.fn(),
+      unregisterHost: vi.fn(),
+      selectTerminal: vi.fn(),
+      scrollToBottom: vi.fn(),
+      scrollLines: vi.fn(),
+      clearBell: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(() => []),
+      attach: vi.fn(),
+      detach: vi.fn(),
+      restart: vi.fn(),
+      isTerminalFocusTarget: vi.fn(() => false),
+      findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      clearSearch: vi.fn(),
+      writeInput,
+      takeover: vi.fn(),
+      reorderSessions: vi.fn(async () => true),
+      serialize: vi.fn(() => ''),
+    }
+    const readContext: TerminalSessionReadContextValue = {
+      worktreeSnapshot: () => worktreeSnapshot,
+      subscribeWorktree: () => () => {},
+      snapshot: () => snapshot,
+      subscribeSnapshot: () => () => {},
+    }
+
+    // Stub the bridge surface for this test only. The default mock
+    // returns '' / [], which would route every file through the
+    // blob-save backend and ultimately write nothing. We override
+    // to drive the path-attempt tier and assert the resulting
+    // shell-escaped writeInput call.
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockImplementation(
+      (file: File) => `/resolved/${file.name}`,
+    )
+    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
+
+    try {
+      await act(async () => {
+        root.render(
+          <TerminalSessionContext.Provider value={context}>
+            <TerminalSessionReadContext.Provider value={readContext}>
+              <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+            </TerminalSessionReadContext.Provider>
+          </TerminalSessionContext.Provider>,
+        )
+      })
+
+      const slotRoot = container.querySelector('.goblin-terminal-slot') as HTMLElement
+      expect(slotRoot).toBeTruthy()
+      const file = new File([new Uint8Array([1, 2, 3])], "shot with space.png", { type: 'image/png' })
+      const dataTransfer = {
+        types: ['Files'],
+        files: [file] as unknown as FileList,
+        dropEffect: '',
+      } as unknown as DataTransfer
+      const dropEvent = new Event('drop', { bubbles: true, cancelable: true })
+      Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
+
+      await act(async () => {
+        slotRoot.dispatchEvent(dropEvent)
+        // processDrop -> resolvePastedFiles -> setTimeout-free, but
+        // the handler awaits a Promise chain. Let it drain.
+        await new Promise((r) => setTimeout(r, 0))
+      })
+
+      // One writeInput call with a shell-escaped path. The path
+      // contains a space, so shellEscapePath wraps it in single
+      // quotes — if the escape regresses to plain concat this
+      // assertion catches it.
+      expect(writeInput).toHaveBeenCalledTimes(1)
+      expect(writeInput).toHaveBeenCalledWith('terminal-1', "'/resolved/shot with space.png'")
+      // The path-attempt tier succeeded, so the blob-save backend
+      // was never consulted.
+      expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
     } finally {
       await act(async () => root.unmount())
       container.remove()

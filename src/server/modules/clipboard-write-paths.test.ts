@@ -26,7 +26,11 @@ describe('saveClipboardFiles', () => {
     const writtenDir = path.dirname(paths[0])
     expect(path.basename(writtenDir)).toBe(`clipboard-tmp-${process.pid}`)
     expect(path.dirname(writtenDir)).toBe(dataDir)
-    expect(path.basename(paths[0])).toMatch(/-0-shot\.png$/)
+    // Literal-segment basename assertion — the regex `\.png$` form
+    // would have silently passed if `sanitizeBaseName` turned
+    // `shot.png` into `shot_png` (the `.` is a regex wildcard). See
+    // the same fix in main/clipboard-bridge.test.ts for context.
+    expect(path.basename(paths[0]).endsWith('-0-shot.png')).toBe(true)
     expect(await readFile(paths[0])).toEqual(Buffer.from([1, 2, 3]))
   })
 
@@ -46,7 +50,10 @@ describe('saveClipboardFiles', () => {
     const file = new File([new Uint8Array([0])], '../escape/attempt.bin')
     const { paths } = await saveClipboardFiles([file])
     expect(paths[0]).not.toContain('../')
-    expect(path.basename(paths[0])).toMatch(/-0-attempt\.bin$/)
+    // Literal substring assertion — the regex `\.bin$` form used to
+    // silently pass even when the sanitiser replaced the dot with
+    // `_`. See sibling fix in main/clipboard-bridge.test.ts.
+    expect(path.basename(paths[0]).endsWith('-0-attempt.bin')).toBe(true)
   })
 
   test('falls back to "clipboard.bin" for empty file names', async () => {

@@ -176,11 +176,49 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
       : ''
 
   const [dragOver, setDragOver] = useState(false)
-  // Slot mode is computed below; we need `isController` here for the
-  // paste/drop gates, so resolve attachment role inline. The full
-  // slotMode state machine below mirrors the same source of truth.
-  const earlyAttachment = snapshot.attachment
-  const earlyIsController = hasSessions && snapshot.phase === 'open' && earlyAttachment?.role === 'controller'
+  const progress = snapshot.progress
+  const attachment = snapshot.attachment
+  // Slot mode is a small state machine. The previous two-flag design
+  // (`isController` / `isReadonly`, both gated on `phase === 'open'`)
+  // silently broke error-phase rendering: a viewer in error phase
+  // would see neither the viewer overlay (open-gated) nor the
+  // correctly-gated error chip, leaving the restart button visible
+  // even though the server would reject the request. Modelling the
+  // mode explicitly keeps the per-state UI rules in one place.
+  //
+  // Computed *before* the paste/drop handlers below so the handlers
+  // share a single source of truth for the controller gate (the
+  // `isController` derived flag). Earlier drafts kept a parallel
+  // `earlyIsController = hasSessions && snapshot.phase === 'open'
+  // && attachment?.role === 'controller'` near the handlers and
+  // a separate `isController = slotMode === 'open-controller'`
+  // definition below — those two stayed in sync by accident, not by
+  // contract, and would have drifted the moment either side got
+  // edited.
+  const slotMode: 'opening' | 'restarting' | 'open-controller' | 'open-viewer' | 'error-controller' | 'error-viewer' =
+    (() => {
+      if (!hasSessions) return 'opening'
+      if (snapshot.phase === 'opening') return 'opening'
+      if (snapshot.phase === 'restarting') return 'restarting'
+      if (snapshot.phase === 'error') {
+        return attachment?.role === 'controller' ? 'error-controller' : 'error-viewer'
+      }
+      // phase === 'open'
+      return attachment?.role === 'controller' ? 'open-controller' : 'open-viewer'
+    })()
+  // `isController` is the *interactive* affordance flag — it gates the
+  // mobile toolbar, the paste/drop file handlers, and the xterm's
+  // `aria-readonly`. The PTY is dead in `error-controller`, so we
+  // deliberately exclude that state even though the controller status
+  // is still ours. The error chip is shown via `showErrorChip`
+  // instead.
+  const isController = slotMode === 'open-controller'
+  const isReadonly = slotMode === 'open-viewer' || slotMode === 'error-viewer'
+  const showViewerOverlay = isReadonly
+  const showErrorChip = slotMode === 'error-controller'
+  const readonlyBadge = attachment?.role === 'viewer' ? t('terminal.mirror-controlled') : t('terminal.unowned')
+  const progressVariant =
+    progress?.state === 2 ? 'error' : progress?.state === 4 ? 'warning' : progress?.state === 3 ? 'indeterminate' : ''
   const handleDragEnter = useCallback((event: DragEvent<HTMLDivElement>) => {
     if (!event.dataTransfer.types.includes('Files')) return
     event.preventDefault()
@@ -217,7 +255,7 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
       // a session it doesn't own would otherwise silently route input
       // to the controller's PTY. The `!key` half preserves the
       // pre-existing guard against slots with no session.
-      if (!key || !earlyIsController) return
+      if (!key || !isController) return
       const files = Array.from(event.dataTransfer.files).filter((f) => f.size > 0)
       if (files.length === 0) return
       void processDrop({ files }).then((outcome) => {
@@ -229,11 +267,11 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
         writeResolutionToPty(outcome.resolution.paths, outcome.resolution.failed, key)
       })
     },
-    [earlyIsController, key, t, writeResolutionToPty],
+    [isController, key, t, writeResolutionToPty],
   )
   const handlePasteCapture = useCallback(
     (event: ClipboardEvent<HTMLDivElement>) => {
-      if (!key || !earlyIsController) return
+      if (!key || !isController) return
       const files = collectClipboardFiles(event.clipboardData)
       // Files-first: a Linux file copy carries both `text/uri-list`
       // and a `text/plain` rendering of the same URI list. If we let
@@ -265,40 +303,8 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
       // No files: let xterm handle text paste as today. Do NOT
       // preventDefault — that would block xterm's own text path.
     },
-    [earlyIsController, key, t, writeResolutionToPty],
+    [isController, key, t, writeResolutionToPty],
   )
-  const progress = snapshot.progress
-  const attachment = snapshot.attachment
-  // Slot mode is a small state machine. The previous two-flag design
-  // (`isController` / `isReadonly`, both gated on `phase === 'open'`)
-  // silently broke error-phase rendering: a viewer in error phase
-  // would see neither the viewer overlay (open-gated) nor the
-  // correctly-gated error chip, leaving the restart button visible
-  // even though the server would reject the request. Modelling the
-  // mode explicitly keeps the per-state UI rules in one place.
-  const slotMode: 'opening' | 'restarting' | 'open-controller' | 'open-viewer' | 'error-controller' | 'error-viewer' =
-    (() => {
-      if (!hasSessions) return 'opening'
-      if (snapshot.phase === 'opening') return 'opening'
-      if (snapshot.phase === 'restarting') return 'restarting'
-      if (snapshot.phase === 'error') {
-        return attachment?.role === 'controller' ? 'error-controller' : 'error-viewer'
-      }
-      // phase === 'open'
-      return attachment?.role === 'controller' ? 'open-controller' : 'open-viewer'
-    })()
-  // `isController` is the *interactive* affordance flag — it gates the
-  // mobile toolbar and the xterm's `aria-readonly`. The PTY is dead
-  // in `error-controller`, so we deliberately exclude that state even
-  // though the controller status is still ours. The error chip is
-  // shown via `showErrorChip` instead.
-  const isController = slotMode === 'open-controller'
-  const isReadonly = slotMode === 'open-viewer' || slotMode === 'error-viewer'
-  const showViewerOverlay = isReadonly
-  const showErrorChip = slotMode === 'error-controller'
-  const readonlyBadge = attachment?.role === 'viewer' ? t('terminal.mirror-controlled') : t('terminal.unowned')
-  const progressVariant =
-    progress?.state === 2 ? 'error' : progress?.state === 4 ? 'warning' : progress?.state === 3 ? 'indeterminate' : ''
 
   return (
     <div

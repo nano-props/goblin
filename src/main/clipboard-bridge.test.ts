@@ -49,9 +49,15 @@ describe('saveClipboardBinaryFiles', () => {
       { name: 'doc.pdf', bytes: new TextEncoder().encode('beta').buffer as ArrayBuffer },
     ])
     expect(paths).toHaveLength(2)
-    expect(paths[0]).toMatch(/goblin-clipboard-\d+/)
-    expect(paths[0]).toMatch(/-0-shot\.png$/)
-    expect(paths[1]).toMatch(/-1-doc\.pdf$/)
+    // Use literal basename assertions, not regex — `.` is a regex
+    // metacharacter and a too-wide character class in `sanitizeBaseName`
+    // would silently turn `shot.png` into `shot_png` while a
+    // `/-0-shot\.png$/` regex would still match (the `.` was a
+    // wildcard). Split into literal-segment assertions so the
+    // regression re-fails loudly.
+    expect(path.basename(paths[0]).endsWith('-0-shot.png')).toBe(true)
+    expect(path.basename(paths[1]).endsWith('-1-doc.pdf')).toBe(true)
+    expect(paths[0]).toContain(`goblin-clipboard-${process.pid}`)
     expect(await readFile(paths[0], 'utf8')).toBe('alpha')
     expect(await readFile(paths[1], 'utf8')).toBe('beta')
   })
@@ -76,7 +82,15 @@ describe('saveClipboardBinaryFiles', () => {
       { name: '../escape/attempt.png', bytes: new ArrayBuffer(4) },
     ])
     expect(paths[0]).not.toContain('../')
-    expect(path.basename(paths[0])).toMatch(/-0-attempt\.png$/)
+    // Anchor the literal `.png` extension — see comment above on why
+    // a bare `.png$` regex is not enough to catch the sanitiser
+    // regression. We split the basename into literal segments so a
+    // regex metacharacter cannot quietly compensate for a bad
+    // replacement. Also assert the exact `attempt.png` substring
+    // survives intact.
+    const basename = path.basename(paths[0])
+    expect(basename.includes('-0-attempt.png')).toBe(true)
+    expect(basename.endsWith('-0-attempt.png')).toBe(true)
   })
 })
 
