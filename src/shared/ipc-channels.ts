@@ -12,3 +12,5 @@ export const SHELL_OPEN_IN_FINDER_CHANNEL = 'goblin:shell-open-in-finder'
 export const TERMINAL_NOTIFY_BELL_CHANNEL = 'goblin:terminal-notify-bell'
 export const TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL = 'goblin:terminal-send-test-notification'
 export const TERMINAL_SET_BADGE_CHANNEL = 'goblin:terminal-set-badge'
+
+export const CLIPBOARD_SAVE_BINARY_FILES_CHANNEL = 'goblin:clipboard-save-binary-files'
