@@ -275,14 +275,9 @@
 .goblin-terminal-mobile-toolbar {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--goblin-terminal-float-radius);
-  background: color-mix(in srgb, var(--color-popover) 96%, transparent);
-  padding: 6px;
-  box-shadow: var(--shadow-sm);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  /* No background / border / shadow on the container — the toolbar
+     should feel like a control surface hovering on the terminal canvas,
+     not a popover. Tap-target spacing comes from the row gap. */
 }
 
 .goblin-terminal-mobile-toolbar--floating {
@@ -296,7 +291,7 @@
 .goblin-terminal-mobile-toolbar__row {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
 }
 
 .goblin-terminal-mobile-toolbar__btn {
@@ -308,4 +303,26 @@
   font-size: 14px;
   font-weight: 500;
   flex-shrink: 0;
+  /* Tinted surface sits over the terminal so the glyph stays legible on
+     both light and dark palettes; the border is a hairline at low alpha
+     so individual buttons remain distinguishable without looking like
+     a hard-edged panel. */
+  background-color: color-mix(in srgb, var(--color-secondary) 35%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border) 30%, transparent);
+}
+
+.goblin-terminal-mobile-toolbar__btn:hover {
+  background-color: color-mix(in srgb, var(--color-secondary) 55%, transparent);
+}
+
+.goblin-terminal-mobile-toolbar__btn--active {
+  /* Ctrl-armed state must read as clearly ON — a fully-opaque primary
+     surface is the affordance signal that the next tap will be modified. */
+  background-color: var(--color-primary);
+  color: var(--color-primary-foreground);
+  border-color: var(--color-primary);
+}
+
+.goblin-terminal-mobile-toolbar__btn--active:hover {
+  background-color: var(--color-primary);
 }
