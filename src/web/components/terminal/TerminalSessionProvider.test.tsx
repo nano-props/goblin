@@ -459,6 +459,7 @@ beforeEach(() => {
     onIpcEvent: vi.fn(() => () => {}),
     onEffectIntent: vi.fn(() => () => {}),
     pathForFile: vi.fn(() => ''),
+    saveClipboardFiles: vi.fn(() => Promise.resolve([])),
     shell: () => null,
     terminal: () => ({
       attach: vi.fn(async () => attachResult()),

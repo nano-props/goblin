@@ -3,6 +3,7 @@ import type { RendererBootstrapSnapshot, RendererNativeCapability, RendererPlatf
 import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
 import { isRendererPlatform } from '#/web/renderer-bootstrap-bridge.ts'
 import { readNativeBridge } from '#/web/native-bridge.ts'
+import { createHttpClipboardBackend } from '#/web/clipboard/http-backend.ts'
 import {
   emptyRendererBridgeBootstrap as emptyBootstrapSnapshot,
   normalizeRendererServerClientId,
@@ -116,6 +117,14 @@ function electronBridge(): RendererBridge {
       if (!bridge) throw new Error('Goblin bridge is unavailable')
       return bridge.pathForFile(file)
     },
+    saveClipboardFiles(files) {
+      const bridge = readNativeBridge()
+      // Older preloads may not expose `saveClipboardFiles`; treat as a
+      // total failure so the resolver falls back to a single
+      // `paste-file-failed` toast instead of throwing.
+      if (!bridge || typeof bridge.saveClipboardFiles !== 'function') return Promise.resolve([])
+      return bridge.saveClipboardFiles(files)
+    },
     shell() {
       return readNativeBridge()?.shell ?? null
     },
@@ -136,6 +145,15 @@ function webBridge(): RendererBridge {
       return server
     },
   })
+  // Clipboard backend reuses the same bootstrap-derived server URL +
+  // secret. Constructed lazily inside `saveClipboardFiles` so a missing
+  // initialServer (which makes paste impossible anyway) doesn't crash
+  // the whole bridge.
+  const clipboardBackend = (() => {
+    const server = bootstrap.initialServer
+    if (!server?.url || !server?.secret) return null
+    return createHttpClipboardBackend({ url: server.url, secret: server.secret })
+  })()
 
   return {
     kind() {
@@ -161,6 +179,10 @@ function webBridge(): RendererBridge {
     },
     pathForFile() {
       return ''
+    },
+    saveClipboardFiles(files) {
+      if (!clipboardBackend) return Promise.resolve([])
+      return clipboardBackend.saveClipboardFiles(files)
     },
     shell() {
       return null

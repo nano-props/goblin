@@ -165,6 +165,7 @@ describe('renderer bootstrap', () => {
       onIpcEvent: () => () => {},
       onEffectIntent: () => () => {},
       pathForFile: () => '',
+      saveClipboardFiles: () => Promise.resolve([]),
       shell: () => null,
       terminal: () => ({
         attach: async () => ({ ok: false, message: 'unavailable' }),
