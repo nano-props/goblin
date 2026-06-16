@@ -13,7 +13,6 @@ import { SortableContext, horizontalListSortingStrategy, sortableKeyboardCoordin
 import { Button } from '#/web/components/ui/button.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
-import { cn } from '#/web/lib/cn.ts'
 import { ToolbarTabStrip, ToolbarTabStripBody } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
 import { createRestrictToTabStripBounds } from '#/web/components/tab-strip/drag-bounds.ts'
 import {
@@ -23,6 +22,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
+  SelectedDropdownMenuItem,
 } from '#/web/components/ui/dropdown-menu.tsx'
 import { useIsSmallScreen } from '#/web/hooks/useIsSmallScreen.ts'
 import { RepoTab } from '#/web/components/repo-tabs/RepoTab.tsx'
@@ -345,17 +345,15 @@ export function RepoTabStrip({
                   <DropdownMenuContent side="bottom" align="start" className="flex w-max flex-col !overflow-hidden">
                     <ScrollArea className="max-h-[200px]" scrollbarMode="compact">
                       {dropdownRepos.map((repo) => (
-                        <DropdownMenuItem
+                        <SelectedDropdownMenuItem
                           key={repo.id}
-                          className={cn(
-                            'whitespace-nowrap',
-                            repo.id === activeId && 'bg-selected text-selected-foreground',
-                          )}
+                          selected={repo.id === activeId}
+                          className="whitespace-nowrap"
                           onSelect={() => onActivate(repo.id)}
                           aria-current={repo.id === activeId ? 'true' : undefined}
                         >
                           <span className="truncate">{repo.name}</span>
-                        </DropdownMenuItem>
+                        </SelectedDropdownMenuItem>
                       ))}
                     </ScrollArea>
                     {dropdownRepos.length > 0 && <DropdownMenuSeparator />}

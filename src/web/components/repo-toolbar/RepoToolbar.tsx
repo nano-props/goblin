@@ -4,8 +4,8 @@ import { Button } from '#/web/components/ui/button.tsx'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
+  SelectedDropdownMenuItem,
 } from '#/web/components/ui/dropdown-menu.tsx'
 import { BranchActionControls } from '#/web/components/BranchActionControls.tsx'
 import { BranchSearchInput } from '#/web/components/repo-toolbar/BranchSearchInput.tsx'
@@ -234,14 +234,15 @@ function BranchSelector({
       </DropdownMenuTrigger>
       <DropdownMenuContent side="bottom" align="start" className="w-max">
         {branches.map((branch) => (
-          <DropdownMenuItem
+          <SelectedDropdownMenuItem
             key={branch.name}
+            selected={branch.name === selectedBranch}
             className="whitespace-nowrap"
-            disabled={branch.name === selectedBranch}
             onSelect={() => navigation.selectRepoBranch(repoId, branch.name)}
+            aria-current={branch.name === selectedBranch ? 'true' : undefined}
           >
-            <span className={branch.name === selectedBranch ? 'text-muted-foreground' : undefined}>{branch.name}</span>
-          </DropdownMenuItem>
+            {branch.name}
+          </SelectedDropdownMenuItem>
         ))}
       </DropdownMenuContent>
     </DropdownMenu>

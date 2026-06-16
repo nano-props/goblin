@@ -2,6 +2,14 @@ import * as React from 'react'
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react'
 import { Select as SelectPrimitive } from 'radix-ui'
 import { cn } from '#/web/lib/cn.ts'
+
+// Positioning: Select is the form-field dropdown. The trigger is a bordered
+// input-style control — used in settings rows (label on the left, this on
+// the right) and other form layouts. Radix renders a built-in checkmark on
+// the selected item, matching the HTML <select> convention. Do NOT reach
+// for this in command bars or navigation toolbars — that's `dropdown-menu.tsx`,
+// whose trigger is a ghost/icon button and which marks the active entry
+// with `bg-selected text-selected-foreground`.
 function Select({ ...props }: React.ComponentProps<typeof SelectPrimitive.Root>) {
   return <SelectPrimitive.Root data-slot="select" {...props} />
 }
