@@ -83,8 +83,6 @@ function CreateWorktreeAction({ repoId, compact }: Props & { compact: boolean })
   const createTip = t('action.create-worktree-title')
   if (!repo) return null
 
-  // Buttons carry their label inline so the adjacent refresh-like glyphs
-  // don't make the user guess which action they are invoking.
   return (
     <>
       <Tip label={createTip}>
@@ -98,7 +96,6 @@ function CreateWorktreeAction({ repoId, compact }: Props & { compact: boolean })
             aria-label={createTip}
           >
             <FolderPlus />
-            {!compact && t('action.create-worktree')}
           </Button>
         </span>
       </Tip>

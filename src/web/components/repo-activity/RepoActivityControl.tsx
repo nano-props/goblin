@@ -155,7 +155,6 @@ function RepoRefreshButton({
         {({ busy }) => (
           <>
             <RefreshCw className={busy ? 'animate-spin' : ''} />
-            {!compact && label}
           </>
         )}
       </AsyncButton>
