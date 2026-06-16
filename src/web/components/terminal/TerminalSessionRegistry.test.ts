@@ -175,8 +175,8 @@ describe('TerminalSessionRegistry', () => {
       // wedged server that never emits exit events). In normal use no
       // entry should be evicted, but if the cache somehow exceeds the
       // limit, the oldest entry is dropped.
-      const limit = (TerminalSessionRegistry as unknown as { REATTACH_SNAPSHOT_CACHE_LIMIT: number })
-        .REATTACH_SNAPSHOT_CACHE_LIMIT
+      const limit = (TerminalSessionRegistry as unknown as { REATTACH_SNAPSHOT_CACHE_HARD_CAP: number })
+        .REATTACH_SNAPSHOT_CACHE_HARD_CAP
 
       for (let i = 0; i < limit + 1; i++) {
         ;(registry as any).setReattachSnapshot(`key-${i}`, {
