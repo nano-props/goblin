@@ -314,15 +314,3 @@
 .goblin-terminal-mobile-toolbar__btn:hover {
   background-color: color-mix(in srgb, var(--color-secondary) 55%, transparent);
 }
-
-.goblin-terminal-mobile-toolbar__btn--active {
-  /* Ctrl-armed state must read as clearly ON — a fully-opaque primary
-     surface is the affordance signal that the next tap will be modified. */
-  background-color: var(--color-primary);
-  color: var(--color-primary-foreground);
-  border-color: var(--color-primary);
-}
-
-.goblin-terminal-mobile-toolbar__btn--active:hover {
-  background-color: var(--color-primary);
-}

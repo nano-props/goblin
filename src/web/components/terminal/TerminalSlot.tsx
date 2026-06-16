@@ -8,6 +8,7 @@ import {
   type FocusEvent,
   type KeyboardEvent,
 } from 'react'
+import { toast } from 'sonner'
 import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { setTerminalFocused } from '#/web/terminal-focus.ts'
@@ -202,6 +203,19 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
     },
     [key, writeInput],
   )
+  const handleToolbarPaste = useCallback(async () => {
+    if (!key || typeof navigator === 'undefined' || !navigator.clipboard?.readText) {
+      toast.error(t('terminal.paste-failed'))
+      return
+    }
+    try {
+      const text = await navigator.clipboard.readText()
+      if (text.length === 0) return
+      writeInput(key, text)
+    } catch {
+      toast.error(t('terminal.paste-failed'))
+    }
+  }, [key, t, writeInput])
 
   const progress = snapshot.progress
   const attachment = snapshot.attachment
@@ -297,6 +311,7 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
         <MobileTerminalToolbar
           className="goblin-terminal-mobile-toolbar--floating"
           onInput={(data) => writeInput(key, data)}
+          onPaste={handleToolbarPaste}
           onScrollLines={(amount) => scrollLines(key, amount)}
         />
       )}
