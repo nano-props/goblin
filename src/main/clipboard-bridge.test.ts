@@ -6,16 +6,12 @@ import { PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
 
 const ipcHandlers = new Map<string, (event: unknown, payload: unknown) => Promise<unknown>>()
 const isTrustedIpcEventMock = vi.hoisted(() => vi.fn(() => true))
-const getPathForFileMock = vi.hoisted(() => vi.fn((_file: File) => '/resolved/path'))
 
 vi.mock('electron', () => ({
   ipcMain: {
     handle: vi.fn((channel: string, handler: (event: unknown, payload: unknown) => Promise<unknown>) => {
       ipcHandlers.set(channel, handler)
     }),
-  },
-  webUtils: {
-    getPathForFile: getPathForFileMock,
   },
 }))
 
@@ -172,23 +168,5 @@ describe('wireClipboardBridgeIpc', () => {
     const oversized = new ArrayBuffer(PASTE_FILE_MAX_BYTES + 1)
     const result = await handler({}, [{ name: 'big.bin', bytes: oversized }])
     expect(result).toEqual([])
-  })
-})
-
-describe('resolveOsClipboardPath', () => {
-  test('delegates to webUtils.getPathForFile', async () => {
-    getPathForFileMock.mockReturnValueOnce('/abs/path.png')
-    const { resolveOsClipboardPath } = await import('#/main/clipboard-bridge.ts')
-    const fakeFile = {} as File
-    expect(resolveOsClipboardPath(fakeFile)).toBe('/abs/path.png')
-    expect(getPathForFileMock).toHaveBeenCalledWith(fakeFile)
-  })
-
-  test('returns empty string when webUtils throws', async () => {
-    getPathForFileMock.mockImplementationOnce(() => {
-      throw new Error('not a real file')
-    })
-    const { resolveOsClipboardPath } = await import('#/main/clipboard-bridge.ts')
-    expect(resolveOsClipboardPath({} as File)).toBe('')
   })
 })
