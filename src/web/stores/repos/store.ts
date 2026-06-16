@@ -114,7 +114,6 @@ export const useReposStore = create<ReposStore>()(
 
       // Local renderer-only state.
       sessionReady: false,
-      branchSearchQueries: {},
 
       ...createLifecycleActions(set, get),
       ...createSelectionActions(set, get),

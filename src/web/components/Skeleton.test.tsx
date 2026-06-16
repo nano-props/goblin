@@ -46,7 +46,6 @@ describe('RepoWorkspaceSkeleton', () => {
     expect(container?.querySelectorAll('[data-testid="branch-list-skeleton-action"]')).toHaveLength(6)
     expect(container?.querySelector('[data-testid="branch-detail-skeleton-action"]')).toBeNull()
     expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-branch-view"]')).not.toBeNull()
-    expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-branch-search"]')).not.toBeNull()
     expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-layout-control"]')).not.toBeNull()
     expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-pager"]')).toBeNull()
   })

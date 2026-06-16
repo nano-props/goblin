@@ -240,11 +240,8 @@ export const en = {
 
   // ---- Branches list ------------------------------------------------------
   'branches.empty': 'No branches found in this repository.',
-  'branches.filter-empty': 'No branches match the current filters.',
+  'branches.filter-empty': 'No branches match the current filter.',
   'branches.filter-label': 'Filter branches',
-  'branches.search-label': 'Search branches',
-  'branches.search-placeholder': 'Search branches',
-  'branches.search-clear': 'Clear branch search',
   'branches.selected': 'Selected branch',
   'branches.switch': 'Switch branch',
   'branches.filter.all': 'All',

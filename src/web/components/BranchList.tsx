@@ -84,7 +84,6 @@ export function BranchList({ repoId, showActions = true }: Props) {
     },
     [repoId, handleSelectBranch, navigation, setDetailCollapsed],
   )
-  const branchSearchQuery = useReposStore((s) => s.branchSearchQueries[repoId] ?? '')
   const repo = useStoreWithEqualityFn(
     useReposStore,
     (s) => {
@@ -131,7 +130,6 @@ export function BranchList({ repoId, showActions = true }: Props) {
   const branches = visibleBranches({
     branches: repo.data.branches,
     viewMode: repo.ui.branchViewMode,
-    searchQuery: branchSearchQuery,
   })
   useEffect(() => {
     if (!openActionMenu) return

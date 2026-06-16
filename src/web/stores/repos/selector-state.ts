@@ -1,5 +1,4 @@
 import type {
-  LocalWorkspaceState,
   RepoState,
   ReposStore,
   RestorableWorkspaceState,
@@ -16,7 +15,6 @@ export interface MainWindowNavigationState extends Pick<ReposStore, 'activeId' |
 export interface KeyboardRuntimeState {
   detailCollapsed: boolean
   repo: RepoState | null
-  searchQuery: string
 }
 
 export interface RestorableWorkspaceViewportState extends Pick<
@@ -25,10 +23,6 @@ export interface RestorableWorkspaceViewportState extends Pick<
 > {}
 
 export interface RestorableWorkspaceNavigationState extends Pick<ReposStore, 'activeId' | 'order'> {}
-
-export interface LocalWorkspaceSessionState extends Pick<ReposStore, 'sessionReady'> {}
-
-export interface LocalWorkspaceSearchState extends Pick<ReposStore, 'branchSearchQueries'> {}
 
 export function runtimeCoherentRepoProjectionStateFromStore(
   state: Pick<ReposStore, 'repos'>,
@@ -63,15 +57,6 @@ export function restorableWorkspaceStateFromStore(
   }
 }
 
-export function localWorkspaceStateFromStore(
-  state: Pick<ReposStore, 'sessionReady' | 'branchSearchQueries'>,
-): LocalWorkspaceState {
-  return {
-    sessionReady: state.sessionReady,
-    branchSearchQueries: state.branchSearchQueries,
-  }
-}
-
 function restorableWorkspaceViewportStateFromStore(
   state: Pick<ReposStore, 'activeId' | 'order' | 'detailCollapsed' | 'detailFocusMode' | 'workspaceLayout'>,
 ): RestorableWorkspaceViewportState {
@@ -93,22 +78,6 @@ export function restorableWorkspaceNavigationStateFromStore(
   }
 }
 
-export function localWorkspaceSessionStateFromStore(
-  state: Pick<ReposStore, 'sessionReady'>,
-): LocalWorkspaceSessionState {
-  return {
-    sessionReady: state.sessionReady,
-  }
-}
-
-export function localWorkspaceSearchStateFromStore(
-  state: Pick<ReposStore, 'branchSearchQueries'>,
-): LocalWorkspaceSearchState {
-  return {
-    branchSearchQueries: state.branchSearchQueries,
-  }
-}
-
 export function mainWindowWorkspaceStateFromStore(
   state: Pick<
     ReposStore,
@@ -116,14 +85,13 @@ export function mainWindowWorkspaceStateFromStore(
   >,
 ): MainWindowWorkspaceState {
   const restorable = restorableWorkspaceViewportStateFromStore(state)
-  const local = localWorkspaceSessionStateFromStore({ sessionReady: state.sessionReady })
   return {
     activeId: restorable.activeId,
     order: restorable.order,
     detailCollapsed: restorable.detailCollapsed,
     detailFocusMode: restorable.detailFocusMode,
     workspaceLayout: restorable.workspaceLayout,
-    sessionReady: local.sessionReady,
+    sessionReady: state.sessionReady,
   }
 }
 
@@ -159,23 +127,13 @@ export function activeRepoFromStore(state: Pick<ReposStore, 'activeId' | 'repos'
 }
 
 export function keyboardRuntimeStateFromStore(
-  state: Pick<ReposStore, 'detailCollapsed' | 'repos' | 'branchSearchQueries'>,
+  state: Pick<ReposStore, 'detailCollapsed' | 'repos'>,
   currentRepoId: string | null,
 ): KeyboardRuntimeState {
-  const runtimeCoherent = runtimeCoherentRepoProjectionStateFromStore({ repos: state.repos })
-  const restorable = restorableWorkspaceViewportStateFromStore({
-    activeId: null,
-    order: [],
-    detailCollapsed: state.detailCollapsed,
-    detailFocusMode: false,
-    workspaceLayout: 'top-bottom',
-  })
-  const local = localWorkspaceSearchStateFromStore({ branchSearchQueries: state.branchSearchQueries })
-  const repo = currentRepoId ? (runtimeCoherent.repos[currentRepoId] ?? null) : null
+  const repo = currentRepoId ? (state.repos[currentRepoId] ?? null) : null
   return {
-    detailCollapsed: restorable.detailCollapsed,
+    detailCollapsed: state.detailCollapsed,
     repo,
-    searchQuery: repo ? (local.branchSearchQueries[repo.id] ?? '') : '',
   }
 }
 

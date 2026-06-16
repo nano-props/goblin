@@ -89,7 +89,6 @@ describe('RepoToolbar', () => {
     expect(nextButton).toBeUndefined()
 
     expect(container?.querySelector('[aria-label="branches.filter-label"]')).not.toBeNull()
-    expect(container?.querySelector('[placeholder="branches.search-placeholder"]')).not.toBeNull()
   })
 
   test('shows a branch dropdown in focus mode instead of prev/next buttons', () => {

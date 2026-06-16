@@ -1,7 +1,5 @@
 import type { ReposStore } from '#/web/stores/repos/types.ts'
 
-export interface LocalWorkspaceStoreActions extends Pick<ReposStore, 'setBranchSearchQuery'> {}
-
 export interface RestorableWorkspaceNavigationStoreActions extends Pick<
   ReposStore,
   'setActive' | 'reorderRepos' | 'cycleActive'
@@ -81,14 +79,6 @@ export interface BranchDetailToolbarStoreActions extends Pick<
 > {}
 
 export interface DetailPanelStoreActions extends Pick<ReposStore, 'setDetailCollapsed'> {}
-
-export function localWorkspaceStoreActionsFromStore(
-  state: Pick<ReposStore, 'setBranchSearchQuery'>,
-): LocalWorkspaceStoreActions {
-  return {
-    setBranchSearchQuery: state.setBranchSearchQuery,
-  }
-}
 
 export function restorableWorkspaceViewportStoreActionsFromStore(
   state: Pick<ReposStore, 'setActive' | 'cycleActive'>,

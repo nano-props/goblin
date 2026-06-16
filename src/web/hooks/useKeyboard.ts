@@ -57,39 +57,24 @@ function nextIndex(current: number, length: number, direction: MoveDirection): n
   return Math.max(0, current < 0 ? 0 : current - 1)
 }
 
-function moveBranchSelectionWithNavigation(
+function moveBranchSelection(
   input: {
     repo: RepoState
-    searchQuery: string
-    selectBranch: (repoId: string, branch: string) => void
-  },
-  direction: MoveDirection,
-  navigation?: MainWindowNavigationActions,
-): boolean {
-  const branches = visibleBranches({
-    branches: input.repo.data.branches,
-    viewMode: input.repo.ui.branchViewMode,
-    searchQuery: input.searchQuery,
-  })
-  if (branches.length === 0) return false
-  const index = branches.findIndex((branch) => branch.name === input.repo.ui.selectedBranch)
-  const next = branches[nextIndex(index, branches.length, direction)]
-  if (!next) return false
-  if (navigation) navigation.selectRepoBranch(input.repo.id, next.name)
-  else input.selectBranch(input.repo.id, next.name)
-  return true
-}
-
-function moveSelection(
-  input: {
-    repo: RepoState
-    searchQuery: string
     selectBranch: (repoId: string, branch: string) => void
   },
   direction: MoveDirection,
   navigation: MainWindowNavigationActions,
 ): boolean {
-  return moveBranchSelectionWithNavigation(input, direction, navigation)
+  const branches = visibleBranches({
+    branches: input.repo.data.branches,
+    viewMode: input.repo.ui.branchViewMode,
+  })
+  if (branches.length === 0) return false
+  const index = branches.findIndex((branch) => branch.name === input.repo.ui.selectedBranch)
+  const next = branches[nextIndex(index, branches.length, direction)]
+  if (!next) return false
+  navigation.selectRepoBranch(input.repo.id, next.name)
+  return true
 }
 
 export function useKeyboard({
@@ -168,26 +153,12 @@ export function useKeyboard({
         }
         case 'next-branch': {
           if (overlayOpen || !repo) break
-          if (
-            moveSelection(
-              { repo, searchQuery: keyboardState.searchQuery, selectBranch: state.selectBranch },
-              1,
-              navigation,
-            )
-          )
-            e.preventDefault()
+          if (moveBranchSelection({ repo, selectBranch: state.selectBranch }, 1, navigation)) e.preventDefault()
           break
         }
         case 'prev-branch': {
           if (overlayOpen || !repo) break
-          if (
-            moveSelection(
-              { repo, searchQuery: keyboardState.searchQuery, selectBranch: state.selectBranch },
-              -1,
-              navigation,
-            )
-          )
-            e.preventDefault()
+          if (moveBranchSelection({ repo, selectBranch: state.selectBranch }, -1, navigation)) e.preventDefault()
           break
         }
         case 'next-detail-tab':

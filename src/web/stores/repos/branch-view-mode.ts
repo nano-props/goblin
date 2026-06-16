@@ -9,7 +9,6 @@ interface BranchSelectionInput {
 interface VisibleBranchesInput {
   branches: RepoBranchState[]
   viewMode: BranchViewMode
-  searchQuery?: string
 }
 
 export function branchMatchesViewMode(branch: RepoBranchState, viewMode: BranchViewMode): boolean {
@@ -18,15 +17,8 @@ export function branchMatchesViewMode(branch: RepoBranchState, viewMode: BranchV
   return true
 }
 
-export function branchMatchesSearchQuery(branch: RepoBranchState, query: string): boolean {
-  const needle = query.trim().toLowerCase()
-  return needle.length === 0 || branch.name.toLowerCase().includes(needle)
-}
-
-export function visibleBranches({ branches, viewMode, searchQuery = '' }: VisibleBranchesInput): RepoBranchState[] {
-  return branches.filter(
-    (branch) => branchMatchesViewMode(branch, viewMode) && branchMatchesSearchQuery(branch, searchQuery),
-  )
+export function visibleBranches({ branches, viewMode }: VisibleBranchesInput): RepoBranchState[] {
+  return branches.filter((branch) => branchMatchesViewMode(branch, viewMode))
 }
 
 export function selectedBranchForBranchSet({

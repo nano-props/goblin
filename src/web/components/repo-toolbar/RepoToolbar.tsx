@@ -8,7 +8,6 @@ import {
   SelectedDropdownMenuItem,
 } from '#/web/components/ui/dropdown-menu.tsx'
 import { BranchActionControls } from '#/web/components/BranchActionControls.tsx'
-import { BranchSearchInput } from '#/web/components/repo-toolbar/BranchSearchInput.tsx'
 import { BranchViewModeControl } from '#/web/components/repo-toolbar/BranchViewModeControl.tsx'
 import { RepoToolbarActions } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
 import { BranchSummaryInline } from '#/web/components/repo-workspace/BranchSummaryInline.tsx'
@@ -169,21 +168,21 @@ function FocusBranchActions({ repoId, branch }: { repoId: string; branch: RepoBr
   )
 }
 
+const BRANCH_FILTER_CONTROLS_EQUAL = (
+  a: { branchCount: number; branchViewMode: BranchViewMode },
+  b: { branchCount: number; branchViewMode: BranchViewMode },
+) => a.branchCount === b.branchCount && a.branchViewMode === b.branchViewMode
+
 function BranchFilterControls({ repoId }: Props) {
-  const { branchCount, branchViewMode, branchSearchQuery } = useStoreWithEqualityFn(
+  const { branchCount, branchViewMode } = useStoreWithEqualityFn(
     useReposStore,
     (s) => ({
       branchCount: s.repos[repoId]?.data.branches.length ?? 0,
       branchViewMode: s.repos[repoId]?.ui.branchViewMode ?? 'all',
-      branchSearchQuery: s.branchSearchQueries[repoId] ?? '',
     }),
-    (a, b) =>
-      a.branchCount === b.branchCount &&
-      a.branchViewMode === b.branchViewMode &&
-      a.branchSearchQuery === b.branchSearchQuery,
+    BRANCH_FILTER_CONTROLS_EQUAL,
   )
   const setBranchViewMode = useReposStore((s) => s.setBranchViewMode)
-  const setBranchSearchQuery = useReposStore((s) => s.setBranchSearchQuery)
 
   return (
     <div className="flex items-center gap-2">
@@ -191,11 +190,6 @@ function BranchFilterControls({ repoId }: Props) {
         value={branchViewMode as BranchViewMode}
         disabled={branchCount === 0}
         onChange={(viewMode) => setBranchViewMode(repoId, viewMode)}
-      />
-      <BranchSearchInput
-        value={branchSearchQuery}
-        disabled={branchCount === 0}
-        onChange={(query) => setBranchSearchQuery(repoId, query)}
       />
     </div>
   )

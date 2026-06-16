@@ -220,11 +220,8 @@ export const zh: Record<DictKey, string> = {
 
   // ---- Branches list -----------------------------------------------------
   'branches.empty': '该仓库暂无分支。',
-  'branches.filter-empty': '没有匹配当前筛选或搜索的分支。',
+  'branches.filter-empty': '没有匹配当前筛选的分支。',
   'branches.filter-label': '筛选分支',
-  'branches.search-label': '搜索分支',
-  'branches.search-placeholder': '搜索分支',
-  'branches.search-clear': '清除分支搜索',
   'branches.selected': '选中的分支',
   'branches.switch': '切换分支',
   'branches.filter.all': '全部',

@@ -381,16 +381,14 @@ export function createRuntimeRepoLifecycleActions(
       set((s) => {
         if (!s.repos[id]) return s
         const repos = { ...s.repos }
-        const branchSearchQueries = { ...s.branchSearchQueries }
         const selectedTerminalByWorktree = { ...s.selectedTerminalByWorktree }
         delete repos[id]
-        delete branchSearchQueries[id]
         for (const worktreeKey of Object.keys(selectedTerminalByWorktree)) {
           if (worktreeKey.startsWith(`${id}\0`)) delete selectedTerminalByWorktree[worktreeKey]
         }
         const order = s.order.filter((x) => x !== id)
         const activeId = nextActiveRepoIdAfterWorkspaceClose(s.order, s.activeId, id)
-        return { repos, branchSearchQueries, selectedTerminalByWorktree, order, activeId }
+        return { repos, selectedTerminalByWorktree, order, activeId }
       })
     },
 

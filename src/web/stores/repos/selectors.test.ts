@@ -1,9 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import {
   keyboardRuntimeStateFromStore,
-  localWorkspaceStateFromStore,
-  localWorkspaceSearchStateFromStore,
-  localWorkspaceSessionStateFromStore,
   mainWindowWorkspaceStateEqual,
   mainWindowWorkspaceStateFromStore,
   navigationWorkspaceStateEqual,
@@ -18,7 +15,6 @@ import {
   branchDetailToolbarStoreActionsFromStore,
   detailPanelStoreActionsEqual,
   detailPanelStoreActionsFromStore,
-  localWorkspaceStoreActionsFromStore,
   mainWindowNavigationStoreActionsEqual,
   mainWindowNavigationStoreActionsFromStore,
   rendererEffectIntentStoreActionsEqual,
@@ -56,25 +52,16 @@ describe('repo selectors', () => {
       },
     })
     expect(
-      localWorkspaceStateFromStore({
+      mainWindowWorkspaceStateFromStore({
+        activeId: '/tmp/repo',
+        order: ['/tmp/repo'],
+        detailCollapsed: false,
+        detailFocusMode: false,
+        workspaceLayout: 'top-bottom',
         sessionReady: true,
-        branchSearchQueries: {
-          '/tmp/repo': 'feature',
-        },
       }),
-    ).toEqual({
+    ).toMatchObject({
       sessionReady: true,
-      branchSearchQueries: {
-        '/tmp/repo': 'feature',
-      },
-    })
-    expect(localWorkspaceSessionStateFromStore({ sessionReady: true })).toEqual({ sessionReady: true })
-    expect(
-      localWorkspaceSearchStateFromStore({
-        branchSearchQueries: { '/tmp/repo': 'feature' },
-      }),
-    ).toEqual({
-      branchSearchQueries: { '/tmp/repo': 'feature' },
     })
   })
 
@@ -181,13 +168,6 @@ describe('repo selectors', () => {
   test('compares action bundles by function identity', () => {
     const fnA = () => {}
     const fnB = () => {}
-    expect(
-      localWorkspaceStoreActionsFromStore({
-        setBranchSearchQuery: fnA as never,
-      }),
-    ).toEqual({
-      setBranchSearchQuery: fnA,
-    })
     expect(
       restorableWorkspaceStoreActionsFromStore({
         setActive: fnA as never,
@@ -399,30 +379,24 @@ describe('repo selectors', () => {
               id: '/tmp/repo-a',
             } as never,
           },
-          branchSearchQueries: {
-            '/tmp/repo-a': 'feature',
-          },
         },
         '/tmp/repo-a',
       ),
     ).toMatchObject({
       detailCollapsed: true,
       repo: { id: '/tmp/repo-a' },
-      searchQuery: 'feature',
     })
     expect(
       keyboardRuntimeStateFromStore(
         {
           detailCollapsed: false,
           repos: {},
-          branchSearchQueries: {},
         },
         null,
       ),
     ).toEqual({
       detailCollapsed: false,
       repo: null,
-      searchQuery: '',
     })
   })
 })

@@ -171,12 +171,6 @@ export interface LocalWorkspaceState {
   /** Hydration flag — true once boot session is restored, so we don't
    *  overwrite the saved session with an empty one before restore. */
   sessionReady: boolean
-  /** Ephemeral renderer-only branch filter text; never persisted to SessionState. */
-  branchSearchQueries: Record<string, string>
-}
-
-export interface LocalWorkspaceActions {
-  setBranchSearchQuery: (id: string, query: string) => void
 }
 
 export interface RestorableWorkspaceActions {
@@ -276,7 +270,6 @@ export interface ReposStore
     RestorableRepoCacheState,
     RestorableWorkspaceState,
     LocalWorkspaceState,
-    LocalWorkspaceActions,
     RestorableWorkspaceActions,
     RuntimeCoherentRepoProjectionActions,
     RepoMutationActions {}

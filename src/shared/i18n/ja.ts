@@ -237,9 +237,6 @@ export const ja: Record<DictKey, string> = {
   'branches.empty': 'このリポジトリにブランチがありません。',
   'branches.filter-empty': '現在のフィルターに一致するブランチはありません。',
   'branches.filter-label': 'ブランチをフィルター',
-  'branches.search-label': 'ブランチを検索',
-  'branches.search-placeholder': 'ブランチを検索',
-  'branches.search-clear': 'ブランチ検索をクリア',
   'branches.selected': '選択中のブランチ',
   'branches.switch': 'ブランチを切り替え',
   'branches.filter.all': 'すべて',
@@ -343,7 +340,8 @@ export const ja: Record<DictKey, string> = {
   'terminal.bell-unread-count': '未読ベル {count} 件',
   'terminal.paste-file-failed': 'ファイルをターミナルに貼り付けできませんでした。',
   'terminal.paste-file-partial': '一部のファイルを保存できませんでした。',
-  'terminal.paste-file-too-large': 'ファイルが大きすぎて貼り付けできません。scp、rsync、またはファイルマネージャをご利用ください。',
+  'terminal.paste-file-too-large':
+    'ファイルが大きすぎて貼り付けできません。scp、rsync、またはファイルマネージャをご利用ください。',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': 'Finder で表示',

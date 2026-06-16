@@ -43,8 +43,6 @@ type RestorableWorkspaceSelectionActions = Pick<
   | 'setSelectedTerminal'
 >
 
-type LocalWorkspaceSelectionActions = Pick<ReposStore, 'setBranchSearchQuery'>
-
 type RuntimeCoherentSelectionActions = Pick<ReposStore, 'setBranchViewMode' | 'setDetailTab' | 'selectBranch'>
 
 type RepoMutationSelectionActions = Pick<ReposStore, 'checkoutSelectedInRepo' | 'checkoutSelected'>
@@ -266,23 +264,6 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
   }
 }
 
-function createLocalWorkspaceSelectionActions(set: ReposSet): LocalWorkspaceSelectionActions {
-  return {
-    setBranchSearchQuery(id: string, query: string) {
-      set((s) => {
-        if (!s.repos[id]) return s
-        const hasQuery = query.trim().length > 0
-        const currentQuery = s.branchSearchQueries[id]
-        if (hasQuery ? currentQuery === query : currentQuery === undefined) return s
-        const branchSearchQueries = { ...s.branchSearchQueries }
-        if (hasQuery) branchSearchQueries[id] = query
-        else delete branchSearchQueries[id]
-        return { branchSearchQueries }
-      })
-    },
-  }
-}
-
 function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): RuntimeCoherentSelectionActions {
   // Shared post-write effects for actions that may have updated detailTab/branch:
   // persist the warm-restore snapshot and refresh the visible branch's pull
@@ -388,7 +369,6 @@ function createRepoMutationSelectionActions(set: ReposSet, get: ReposGet): RepoM
 export function createSelectionActions(set: ReposSet, get: ReposGet) {
   return {
     ...createRestorableWorkspaceSelectionActions(set, get),
-    ...createLocalWorkspaceSelectionActions(set),
     ...createRuntimeCoherentSelectionActions(set, get),
     ...createRepoMutationSelectionActions(set, get),
   }

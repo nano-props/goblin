@@ -137,7 +137,6 @@ function RepoToolbarSkeleton({ focusMode = false, compact = false }: { focusMode
         ) : (
           <>
             <ToolbarSegmentedControlSkeleton items={3} dataTestId="repo-toolbar-skeleton-branch-view" />
-            <ToolbarSearchSkeleton dataTestId="repo-toolbar-skeleton-branch-search" />
           </>
         )}
       </div>
@@ -168,17 +167,6 @@ function ToolbarPagerSkeleton() {
       <Skeleton className="h-4 w-10" />
       <Skeleton className="h-7 w-7" />
       <Skeleton className="h-7 w-7" />
-    </div>
-  )
-}
-
-function ToolbarSearchSkeleton({ dataTestId }: { dataTestId?: string }) {
-  return (
-    <div
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-input bg-control shadow-xs"
-      data-testid={dataTestId}
-    >
-      <Skeleton className="h-4 w-4 rounded-full" />
     </div>
   )
 }
