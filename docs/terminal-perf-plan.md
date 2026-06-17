@@ -92,7 +92,7 @@ These are already correct and stay unchanged:
 | Microtask-batched resize                                       | `src/web/components/terminal/ManagedTerminalSession.ts:481-514`  | Coalesces resize storms                                                      |
 | `waitForMeasurableHost` with AbortSignal, no hardcoded timeout | `src/web/components/terminal/terminal-session-geometry.ts:59-99` | Lands in #55; do not regress                                                 |
 | 80 ms resize / font-load debounce                              | `src/web/components/terminal/terminal-session-view.ts:34-35`     | 5 frames, well-tuned                                                         |
-| Reattach snapshot cache (cap 32, insertion-order LRU)          | `src/web/components/terminal/TerminalSessionRegistry.ts:79-636`  | Correctness is fine; the cap itself is over-sized for single-user (see T2.1) |
+| Reattach snapshot cache (cap 8, insertion-order LRU)           | `src/web/components/terminal/TerminalSessionRegistry.ts:79-636`  | Correctness is fine; the cap is sized for single-user (see T2.1)        |
 | `WorktreeTerminalSnapshot` lazy invalidation                   | `src/web/components/terminal/TerminalSessionRegistry.ts:561-566` | Worktree-keyed granular invalidation                                         |
 | Connection-state TTL: 30 s grace + 24 h detached               | `src/server/terminal/terminal-connection-state.ts:30-53`         | Disconnect/reconnect with no orphans                                         |
 | WeakMap-based socket metadata                                  | `src/server/terminal/terminal-realtime-broker.ts:17-20`          | GC-driven leak prevention                                                    |
