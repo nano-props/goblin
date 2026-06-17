@@ -170,6 +170,7 @@ function CompactRepoTabs({
             onKeyboardNavigate={onKeyboardNavigate}
             closeLabel={labels.closeWithName}
             unavailableLabel={labels.unavailable}
+            compact
           />
         ))}
       </RepoTabTooltipLayer>

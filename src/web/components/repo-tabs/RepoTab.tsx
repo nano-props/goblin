@@ -23,6 +23,10 @@ interface RepoTabProps {
   onKeyboardNavigate: (id: string, direction: 'prev' | 'next' | 'first' | 'last') => void
   closeLabel: (name: string) => string
   unavailableLabel: string
+  // Compact strips render only the visible repo tab; it should look like
+  // an unselected tab on the expanded strip, so the chrome falls back to
+  // the muted "idle" palette.
+  compact?: boolean
 }
 
 export function RepoTab({
@@ -38,6 +42,7 @@ export function RepoTab({
   onKeyboardNavigate,
   closeLabel,
   unavailableLabel,
+  compact = false,
 }: RepoTabProps) {
   const t = useT()
   const sortable = useSortableTab(repo.id, { onButtonRef: focusRegistry?.setRef(repo.id) })
@@ -70,6 +75,7 @@ export function RepoTab({
         variant: 'repo',
         active: isActive,
         dragging: sortable.isDragging,
+        compact,
       })}
       overlay={
         showSeparator ? (
@@ -109,9 +115,9 @@ export function RepoTab({
       }}
     >
       {isRemote ? (
-        <Server size={13} className={toolbarTabIconClassName(isActive)} />
+        <Server size={13} className={toolbarTabIconClassName(isActive, compact)} />
       ) : (
-        <FolderGit2 size={13} className={toolbarTabIconClassName(isActive)} />
+        <FolderGit2 size={13} className={toolbarTabIconClassName(isActive, compact)} />
       )}
       <span className="truncate font-medium">{repo.name}</span>
       {showConnecting && (
