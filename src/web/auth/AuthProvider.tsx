@@ -1,9 +1,5 @@
 import { createContext, useContext, type ReactNode } from 'react'
-import {
-  useAccessTokenStatus,
-  type AccessTokenStatus,
-  type AccessTokenStatusState,
-} from '#/web/hooks/useAccessTokenStatus.ts'
+import { useAccessTokenStatus, type AccessTokenStatusState } from '#/web/hooks/useAccessTokenStatus.ts'
 
 const AuthContext = createContext<AccessTokenStatusState | null>(null)
 
@@ -35,5 +31,3 @@ export function useAuth(): AccessTokenStatusState {
   if (!ctx) throw new Error('useAuth must be used within <AuthProvider>')
   return ctx
 }
-
-export type { AccessTokenStatus, AccessTokenStatusState }
