@@ -339,7 +339,7 @@ beforeEach(() => {
       platform: 'web',
       initialI18n: null,
       initialSettings: null,
-      initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret', clientId: 'client_sharedterminal' },
+      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
       invokeIpc: vi.fn(async () => []),
       abortIpc: vi.fn(),
       onEvent: vi.fn(() => () => {}),
@@ -428,7 +428,7 @@ beforeEach(() => {
       platform: 'web',
       initialI18n: null,
       initialSettings: null,
-      initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret', clientId: 'client_sharedterminal' },
+      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
     },
   })
   setRendererBridgeForTests({
@@ -452,7 +452,7 @@ beforeEach(() => {
       platform: 'web',
       initialI18n: null,
       initialSettings: null,
-      initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret', clientId: 'client_sharedterminal' },
+      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
     }),
     invokeIpc: vi.fn(async () => []),
     abortIpc: vi.fn(async () => false),

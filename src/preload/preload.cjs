@@ -1,4 +1,12 @@
-// Preload bridge. Exposes low-level IPC under `window.goblinNative` to the renderer.
+// Preload bridge. Exposes low-level IPC under `window.goblinNative` to the
+// renderer. The renderer no longer needs a bootstrap roundtrip here — the
+// server renders the full bootstrap JSON into the HTML response
+// (`<script id="goblin-bootstrap">`), which is read by `web/bootstrap.ts`
+// after page load. The preload is now strictly an IPC bridge: every
+// function it exposes corresponds to a capability that the renderer
+// could not get from the server (open settings window, send IPC
+// requests to main, etc.).
+//
 // IMPORTANT: This preload runs with sandbox: true (see window.ts). Only
 // the `electron` module is available here — do NOT require Node built-ins
 // like `os`, `fs`, or `path`, and do NOT require `pino` / `consola`.
@@ -36,8 +44,8 @@ const IPC = {
   clipboard: {
     saveFiles: 'goblin:clipboard-save-files',
   },
-  bootstrap: {
-    get: 'goblin:get-bootstrap',
+  accessToken: {
+    rotate: 'goblin:rotate-access-token',
   },
 }
 
@@ -73,71 +81,8 @@ function ipcCall(request) {
     })
 }
 
-// A short `--goblin-bootstrap-token=...` is injected by main via
-// webPreferences.additionalArguments (see window-shell.ts). Keep the actual
-// bootstrap payload off the renderer command line: Windows has a much lower
-// process command-line limit than macOS, and a full base64 payload can make
-// Chromium fail to launch the renderer process before page scripts run.
-function safeReadBootstrapArgument() {
-  const token =
-    process.argv.find((a) => a.startsWith(BOOTSTRAP_TOKEN_PREFIX))?.slice(BOOTSTRAP_TOKEN_PREFIX.length) ?? ''
-  if (!token) return null
-  try {
-    return ipcRenderer.sendSync(IPC.bootstrap.get, token)
-  } catch (err) {
-    console.warn('[preload] failed to read bootstrap payload', err)
-    return null
-  }
-}
-
-const BOOTSTRAP_TOKEN_PREFIX = '--goblin-bootstrap-token='
-const bootstrap = safeReadBootstrapArgument()
-const runtime =
-  isObject(bootstrap?.runtime) &&
-  (bootstrap.runtime.kind === 'electron' || bootstrap.runtime.kind === 'web') &&
-  typeof bootstrap.runtime.bridgeVersion === 'number' &&
-  Array.isArray(bootstrap.runtime.capabilities) &&
-  bootstrap.runtime.capabilities.every((value) => typeof value === 'string')
-    ? bootstrap.runtime
-    : { kind: 'electron', bridgeVersion: 1, capabilities: [] }
-const homeDir = typeof bootstrap?.homeDir === 'string' ? bootstrap.homeDir : ''
-/**
- * Host platform. The renderer is sandboxed and does not have `process`
- * at runtime, so we surface the platform from the bootstrap payload main
- * hands us. The list mirrors NodeJS.Platform plus 'web' (used when the
- * renderer runs outside Electron, e.g. the dev server).
- */
-const KNOWN_RENDERER_PLATFORMS = new Set([
-  'aix',
-  'android',
-  'cygwin',
-  'darwin',
-  'freebsd',
-  'haiku',
-  'linux',
-  'netbsd',
-  'openbsd',
-  'sunos',
-  'win32',
-  'web',
-])
-const platform =
-  typeof bootstrap?.platform === 'string' && KNOWN_RENDERER_PLATFORMS.has(bootstrap.platform)
-    ? bootstrap.platform
-    : 'web'
-const initialI18n = isObject(bootstrap?.i18n) ? bootstrap.i18n : null
-const initialSettings = isObject(bootstrap?.settings) ? bootstrap.settings : null
-const initialServer =
-  isObject(bootstrap?.server) &&
-  typeof bootstrap.server.url === 'string' &&
-  typeof bootstrap.server.secret === 'string' &&
-  (typeof bootstrap.server.clientId === 'undefined' || typeof bootstrap.server.clientId === 'string')
-    ? bootstrap.server
-    : null
 const ipcEventSubscribers = new Set()
 let ipcEventListener = null
-const effectIntentSubscribers = new Set()
-let effectIntentListener = null
 
 function ensureIpcEventListener() {
   if (ipcEventListener) return
@@ -158,6 +103,9 @@ function maybeDisposeIpcEventListener() {
   ipcRenderer.off(IPC.ipc.event, ipcEventListener)
   ipcEventListener = null
 }
+
+const effectIntentSubscribers = new Set()
+let effectIntentListener = null
 
 function ensureEffectIntentListener() {
   if (effectIntentListener) return
@@ -180,12 +128,6 @@ function maybeDisposeEffectIntentListener() {
 }
 
 contextBridge.exposeInMainWorld('goblinNative', {
-  runtime,
-  homeDir,
-  platform,
-  initialI18n,
-  initialSettings,
-  initialServer,
   invokeIpc: ({ path, input, requestId }) => ipcCall({ path, input, requestId }),
   abortIpc: (requestId) => safeInvoke(IPC.ipc.abort, { requestId }),
   pathForFile: (file) => {
@@ -260,6 +202,7 @@ contextBridge.exposeInMainWorld('goblinNative', {
       maybeDisposeIpcEventListener()
     }
   },
+  rotateAccessToken: () => safeInvoke(IPC.accessToken.rotate),
   onIntent: (cb) => {
     effectIntentSubscribers.add(cb)
     ensureEffectIntentListener()

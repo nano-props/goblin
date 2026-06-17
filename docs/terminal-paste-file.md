@@ -222,7 +222,8 @@ Add a single route to the server under `/api/clipboard/files`, parallel to the e
 
 ```
 POST /api/clipboard/files
-  Headers: x-goblin-internal-secret: <secret>
+  Headers: x-goblin-access-token: <accessToken>      // embedded renderer / dev mode
+            Cookie:    goblin_access_token=<token>    // browser, http-only
   Body:    multipart/form-data
              files: <binary blobs, repeated>
   200 OK:  { paths: string[] }                        // bare business object, matching settings/repo/remote conventions
@@ -233,7 +234,7 @@ The success-shape convention here is "bare business object via `c.json(...)`", n
 
 Concretely:
 
-- New factory `createClipboardRoutes()` under `src/server/routes/clipboard.ts`, mounted in `app-factory.ts`. The mount point is `/api/clipboard`, which means the existing `cors` and `applyApiSecurityHeaders` middlewares (registered for `/api/*` in `app-factory.ts`) cover the new route automatically. **Auth is not** auto-applied: `createInternalAuthMiddleware` is only registered on `/api/settings/*`, `/api/repo/*`, `/api/remote/*`. Add an explicit `app.use('/api/clipboard/*', createInternalAuthMiddleware(options.internalSecret))` in `app-factory.ts` next to the existing auth registrations, before mounting the new routes.
+- New factory `createClipboardRoutes()` under `src/server/routes/clipboard.ts`, mounted in `app-factory.ts`. The mount point is `/api/clipboard`, which means the existing `cors` and `applyApiSecurityHeaders` middlewares (registered for `/api/*` in `app-factory.ts`) cover the new route automatically. **Auth is not** auto-applied: `createAccessTokenMiddleware` is only registered on `/api/settings/*`, `/api/repo/*`, `/api/remote/*`. Add an explicit `app.use('/api/clipboard/*', createAccessTokenMiddleware(options.accessToken))` in `app-factory.ts` next to the existing auth registrations, before mounting the new routes.
 - Per `docs/layering.md`, the route file is thin — it parses the multipart body, calls into the write layer, and returns the JSON envelope. Orchestration lives in a new `src/server/modules/clipboard-write-paths.ts` module, parallel to `settings-write-paths.ts` and `repo-write-paths.ts`.
 - **Body limit refactor**. The existing `bodyLimit({ maxSize: 1 MiB })` middleware on `/api/*` (`app-factory.ts:131-137`) is too tight for 10 MiB blobs (multipart overhead included), and a per-route override registered *after* the global one does not take effect — Hono's `bodyLimit` reads `Content-Length` and returns `onError(c)` directly when it exceeds `maxSize` *before* calling `next()` (see `node_modules/hono/dist/middleware/body-limit/index.js:18-21`), so any later middleware in the chain never runs. The fix is to delete the global `/api/*` `bodyLimit` and register one per sub-path that needs it.
 
@@ -275,7 +276,7 @@ export function createHttpClipboardBackend(config: {
       }
       const res = await fetch(new URL('api/clipboard/files', config.url), {
         method: 'POST',
-        headers: { 'x-goblin-internal-secret': config.secret },
+        headers: { 'x-goblin-access-token': config.accessToken },
         body: form,
       })
       if (!res.ok) return []

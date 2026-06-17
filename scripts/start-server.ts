@@ -9,10 +9,10 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
-import { randomBytes } from 'node:crypto'
 import qrcode from 'qrcode'
 import { bootstrapServer } from '#/server/bootstrap.ts'
-import { serverDataDir } from '#/server/common/data-dir.ts'
+import { serverDataDir } from '#/shared/data-dir.ts'
+import { readOrCreateAccessToken } from '#/shared/access-token-file.ts'
 import { getLanUrls, isLanAddress } from '#/shared/lan-addresses.ts'
 
 const repoRoot = path.resolve(import.meta.dirname, '..')
@@ -23,7 +23,7 @@ const { values } = parseArgs({
     host: { type: 'string' },
     port: { type: 'string' },
     'data-dir': { type: 'string' },
-    secret: { type: 'string' },
+    token: { type: 'string' },
   },
   strict: true,
 })
@@ -31,10 +31,16 @@ const { values } = parseArgs({
 if (values.host?.trim()) process.env.GOBLIN_SERVER_HOST = values.host.trim()
 if (values.port?.trim()) process.env.GOBLIN_SERVER_PORT = values.port.trim()
 if (values['data-dir']?.trim()) process.env.GOBLIN_SERVER_DATA_DIR = values['data-dir'].trim()
-if (values.secret?.trim()) process.env.GOBLIN_SERVER_INTERNAL_SECRET = values.secret.trim()
-if (!process.env.GOBLIN_SERVER_INTERNAL_SECRET?.trim()) {
-  process.env.GOBLIN_SERVER_INTERNAL_SECRET = randomBytes(32).toString('hex')
-}
+
+// Resolve (and persist on first run) the access token *before* spawning
+// the server. The server's own bootstrap re-reads the file unless
+// `GOBLIN_SERVER_ACCESS_TOKEN` is set, so we pass the token via env so
+// the server's startup log doesn't double-print and so the value
+// printed here matches the in-memory value the server uses.
+const accessToken =
+  values.token?.trim() || (await readOrCreateAccessToken(serverDataDir()))
+process.env.GOBLIN_SERVER_ACCESS_TOKEN = accessToken
+
 if (!process.env.npm_package_version?.trim()) {
   const pkg = JSON.parse(readFileSync(path.join(repoRoot, 'package.json'), 'utf8')) as { version?: string }
   process.env.npm_package_version = pkg.version?.trim() || '0.1.0'
@@ -44,11 +50,17 @@ const webIndex = path.join(repoRoot, 'dist/web/index.html')
 const webBoot = path.join(repoRoot, 'dist/web/boot.js')
 const webReady = existsSync(webIndex) && existsSync(webBoot)
 const ptyWorkerEntry = path.join(repoRoot, 'dist/server/pty-worker.js')
-const server = bootstrapServer({ ptyWorkerEntry: existsSync(ptyWorkerEntry) ? ptyWorkerEntry : undefined })
+const server = await bootstrapServer({ ptyWorkerEntry: existsSync(ptyWorkerEntry) ? ptyWorkerEntry : undefined })
 
 console.log(`[embedded-server] listening on http://${server.hostname}:${server.port}`)
 console.log(`[embedded-server] data dir: ${serverDataDir()}`)
-console.log(`[embedded-server] internal secret: ${process.env.GOBLIN_SERVER_INTERNAL_SECRET}`)
+// The token is the single piece of info a browser / LAN client needs.
+// It's printed once on stdout; the file at `<dataDir>/server-token`
+// holds the same value persistently, so subsequent boots reuse it.
+console.log(`[embedded-server] access token: ${accessToken}`)
+console.log(
+  `[embedded-server] open the app at http://${server.hostname}:${server.port}/ and paste the token into the gate.`,
+)
 
 const lanUrls: string[] =
   server.hostname === '0.0.0.0'
@@ -58,12 +70,19 @@ const lanUrls: string[] =
       : []
 
 for (const url of lanUrls) {
-  console.log(`[embedded-server] LAN QR code for ${url}`)
+  // Embed the access token in the URL so scanning the QR auto-fills
+  // the gate on the phone. The page consumes the token on first load
+  // (POST `/api/login` → Set-Cookie → strip from URL); the Referer
+  // / history leak window is the few milliseconds between page load
+  // and the `history.replaceState` call. Acceptable for a single-user
+  // LAN tool with a 128-bit, ephemeral, 1-year-cookie token.
+  const urlWithToken = `${url.replace(/\/$/, '')}/?accessToken=${encodeURIComponent(accessToken)}`
+  console.log(`[embedded-server] LAN URL: ${urlWithToken}`)
   try {
-    const qr = await qrcode.toString(url, { type: 'terminal', small: true })
+    const qr = await qrcode.toString(urlWithToken, { type: 'terminal', small: true })
     console.log(qr)
   } catch {
-    console.warn(`[embedded-server] failed to generate QR code for ${url}`)
+    console.warn(`[embedded-server] failed to generate QR code for ${urlWithToken}`)
   }
 }
 

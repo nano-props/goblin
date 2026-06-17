@@ -74,7 +74,7 @@ describe('repo-client', () => {
   })
 
   test('opens repository remote through the native shell bridge when available', async () => {
-    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     window.open = vi.fn(() => null)
     const bridgeModule = await import('#/web/renderer-bridge.ts')
     const openExternalUrl = vi.fn(async () => ({ ok: true, message: 'https://github.com/acme/repo/tree/feature/test' }))
@@ -82,7 +82,7 @@ describe('repo-client', () => {
       testBridge({
         getBootstrap: () => ({
           ...webBootstrap(),
-          initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+          initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
         shell: () => ({
           openSettingsWindow: vi.fn(),
@@ -110,14 +110,14 @@ describe('repo-client', () => {
       'http://127.0.0.1:32100/api/repo/open-remote',
       expect.objectContaining({
         method: 'POST',
-        headers: expect.objectContaining({ 'x-goblin-internal-secret': 'secret' }),
+        headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
         body: JSON.stringify({ cwd: '/tmp/repo', branch: 'feature/test' }),
       }),
     )
   })
 
   test('clones repositories through the embedded server when no Electron bridge exists', async () => {
-    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => ({ ok: true, message: 'ok', path: '/tmp/repo' }),
@@ -139,7 +139,7 @@ describe('repo-client', () => {
       'http://127.0.0.1:32100/api/repo/clone',
       expect.objectContaining({
         method: 'POST',
-        headers: expect.objectContaining({ 'x-goblin-internal-secret': 'secret' }),
+        headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
       }),
     )
   })
@@ -155,7 +155,7 @@ describe('repo-client', () => {
       configurable: true,
       value: {
         __GOBLIN_BOOTSTRAP__: electronBootstrap({
-          initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+          initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
         goblinNative: {
           runtime: {
@@ -199,7 +199,7 @@ describe('repo-client', () => {
       'http://127.0.0.1:32100/api/repo/open-terminal',
       expect.objectContaining({
         method: 'POST',
-        headers: expect.objectContaining({ 'x-goblin-internal-secret': 'secret' }),
+        headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
         body: JSON.stringify({ path: '/tmp/repo' }),
       }),
     )
@@ -208,7 +208,7 @@ describe('repo-client', () => {
       'http://127.0.0.1:32100/api/repo/open-editor',
       expect.objectContaining({
         method: 'POST',
-        headers: expect.objectContaining({ 'x-goblin-internal-secret': 'secret' }),
+        headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
         body: JSON.stringify({ path: '/tmp/repo' }),
       }),
     )

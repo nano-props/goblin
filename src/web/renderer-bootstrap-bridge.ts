@@ -52,13 +52,16 @@ export { isRendererPlatform }
 function isRendererBootstrapSnapshot(value: unknown): value is RendererBootstrapSnapshot {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<RendererBootstrapSnapshot>
+  // `runtime` is now optional in the validation: the bridge layer
+  // detects Electron vs web by the presence of `window.goblinNative`,
+  // not by `bootstrap.runtime.kind`. Tests that previously had the
+  // runtime carried via the preload (and never in the bootstrap)
+  // keep working without having to fill in both surfaces. The
+  // `getBootstrap()` reader in `renderer-bridge.ts` substitutes a
+  // sensible default when the field is missing.
   return (
-    isRendererRuntimeSnapshot(candidate.runtime) &&
+    (candidate.runtime === undefined || isRendererRuntimeSnapshot(candidate.runtime)) &&
     typeof candidate.homeDir === 'string' &&
-    // `platform` is optional in the input shape so legacy hand-written
-    // bootstrap scripts (and existing tests) keep working. The reader
-    // path in renderer-bridge.ts fills in the 'web' default before
-    // exposing the snapshot to the rest of the app.
     'initialI18n' in candidate &&
     'initialSettings' in candidate &&
     'initialServer' in candidate
@@ -79,15 +82,24 @@ function normalizeServerClientId(value: string | null | undefined): string | nul
   return /^[A-Za-z0-9_-]{1,128}$/.test(value) ? value : null
 }
 
+function fillRuntimeDefaults(snapshot: RendererBootstrapSnapshot): RendererBootstrapSnapshot {
+  if (snapshot.runtime) return snapshot
+  // The `runtime` field is now optional in the input; substitute a
+  // web default when the source omitted it. The bridge layer's
+  // Electron detection does not depend on this field — see
+  // `getRendererBridge` in `#/web/renderer-bridge.ts`.
+  return { ...snapshot, runtime: { ...EMPTY_BOOTSTRAP.runtime } }
+}
+
 export function readInjectedWebBootstrap(): RendererBootstrapSnapshot | null {
   try {
-    if (isRendererBootstrapSnapshot(window.__GOBLIN_BOOTSTRAP__)) return window.__GOBLIN_BOOTSTRAP__
+    if (isRendererBootstrapSnapshot(window.__GOBLIN_BOOTSTRAP__)) return fillRuntimeDefaults(window.__GOBLIN_BOOTSTRAP__)
   } catch {}
   try {
     const raw = document.getElementById('goblin-bootstrap')?.textContent
     if (!raw) return null
     const parsed = JSON.parse(raw)
-    if (isRendererBootstrapSnapshot(parsed)) return parsed
+    if (isRendererBootstrapSnapshot(parsed)) return fillRuntimeDefaults(parsed)
   } catch {}
   return null
 }
@@ -95,15 +107,15 @@ export function readInjectedWebBootstrap(): RendererBootstrapSnapshot | null {
 export function readQueryBootstrap(createWebTerminalClientId: () => string): RendererBootstrapSnapshot | null {
   try {
     const params = new URLSearchParams(window.location.search)
-    const secret = params.get('goblinServerSecret')?.trim()
+    const accessToken = params.get('accessToken')?.trim()
     const clientId = normalizeServerClientId(params.get('goblinServerClientId')?.trim()) ?? createWebTerminalClientId()
-    if (!secret) return null
+    if (!accessToken) return null
     const url = normalizeServerUrl(params.get('goblinServerUrl')?.trim() || window.location.origin)
     if (!url || !clientId) return null
     return {
       ...EMPTY_BOOTSTRAP,
       runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
-      initialServer: { url, secret, clientId },
+      initialServer: { url, accessToken, clientId },
     }
   } catch {
     return null

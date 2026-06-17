@@ -4,6 +4,7 @@ import { WebSocketServer } from 'ws'
 import { serverLogger } from '#/server/logger.ts'
 import { disconnectAllInvalidationSockets } from '#/server/modules/invalidation-broker.ts'
 import { createServerRuntime } from '#/server/runtime.ts'
+import { readOrCreateAccessToken } from '#/shared/access-token-file.ts'
 
 const DEFAULT_HOST = '127.0.0.1'
 const DEFAULT_PORT = 32100
@@ -27,14 +28,27 @@ export interface BootstrapServerOptions {
   exit?: (code: number) => void
 }
 
-export function bootstrapServer(options: BootstrapServerOptions = {}): BootstrappedServer {
+/**
+ * Resolve the access token for the server. The `GOBLIN_SERVER_ACCESS_TOKEN`
+ * env var wins when set (CI / tests / an explicit override), otherwise we
+ * read (or create) the file in the server's data dir. This is the same
+ * file the Electron main reads, so the two processes see the same value.
+ */
+async function resolveAccessToken(): Promise<string> {
+  const override = process.env.GOBLIN_SERVER_ACCESS_TOKEN?.trim()
+  if (override) return override
+  return await readOrCreateAccessToken()
+}
+
+export async function bootstrapServer(options: BootstrapServerOptions = {}): Promise<BootstrappedServer> {
   const startedAt = Date.now()
   const hostname = process.env.GOBLIN_SERVER_HOST?.trim() || DEFAULT_HOST
   const port = parsePort(process.env.GOBLIN_SERVER_PORT)
+  const accessToken = await resolveAccessToken()
   const runtime = createServerRuntime({
     version: process.env.npm_package_version?.trim() || '0.1.0',
     startedAt,
-    internalSecret: process.env.GOBLIN_SERVER_INTERNAL_SECRET?.trim() || '',
+    accessToken,
     ptyWorkerEntry: options.ptyWorkerEntry,
     serverHost: hostname,
     serverPort: port,

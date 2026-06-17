@@ -125,7 +125,7 @@ describe('web invalidation sync', () => {
   })
 
   test('theme store refetches theme state on theme invalidation', async () => {
-    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     let settingsReadCount = 0
     vi.stubGlobal(
       'fetch',
@@ -152,7 +152,7 @@ describe('web invalidation sync', () => {
   })
 
   test('settings snapshot invalidation no longer refetches theme state', async () => {
-    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     let settingsReadCount = 0
     vi.stubGlobal(
       'fetch',
@@ -180,7 +180,7 @@ describe('web invalidation sync', () => {
   })
 
   test('unknown settings invalidation scopes are ignored', async () => {
-    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => settingsSnapshotResponse(),
@@ -206,7 +206,7 @@ describe('web invalidation sync', () => {
   })
 
   test('i18n store refetches payload only on i18n invalidation', async () => {
-    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     let i18nReadCount = 0
     vi.stubGlobal(
       'fetch',
@@ -234,7 +234,7 @@ describe('web invalidation sync', () => {
   })
 
   test('settings refetch subscription coalesces repeated invalidations while a fetch is in flight', async () => {
-    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
 
     const resolvers: Array<(value: number) => void> = []
     const apply = vi.fn()

@@ -42,7 +42,7 @@ describe('server runtime', () => {
     const runtime = createServerRuntime({
       version: '0.1.0',
       startedAt: 1,
-      internalSecret: 'secret',
+      accessToken: 'secret',
       serverHost: '127.0.0.1',
       serverPort: 32100,
       terminalHost,
@@ -52,7 +52,7 @@ describe('server runtime', () => {
     expect(mocks.createApp).toHaveBeenCalledWith({
       version: '0.1.0',
       startedAt: 1,
-      internalSecret: 'secret',
+      accessToken: 'secret',
       serverHost: '127.0.0.1',
       serverPort: 32100,
       terminalHost,
@@ -65,7 +65,7 @@ describe('server runtime', () => {
     const runtime = createServerRuntime({
       version: '0.1.0',
       startedAt: 1,
-      internalSecret: 'secret',
+      accessToken: 'secret',
       serverHost: '127.0.0.1',
       serverPort: 32100,
     })
@@ -79,7 +79,7 @@ describe('server runtime', () => {
     expect(mocks.createApp).toHaveBeenCalledWith({
       version: '0.1.0',
       startedAt: 1,
-      internalSecret: 'secret',
+      accessToken: 'secret',
       serverHost: '127.0.0.1',
       serverPort: 32100,
       terminalHost: runtime.terminalHost,
@@ -101,7 +101,7 @@ describe('server runtime', () => {
     const runtime = createServerRuntime({
       version: '0.1.0',
       startedAt: 1,
-      internalSecret: 'secret',
+      accessToken: 'secret',
       serverHost: '127.0.0.1',
       serverPort: 32100,
       terminalHost,

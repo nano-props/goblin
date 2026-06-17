@@ -3,7 +3,6 @@ import type { SettingsSnapshot } from '#/shared/api-types.ts'
 import { activateMainWindow } from '#/main/window.ts'
 import { initTheme } from '#/main/theme.ts'
 import { flushWindowState } from '#/main/window-state.ts'
-import { registerBootstrapIpc } from '#/main/window-shell.ts'
 import { buildAppMenu } from '#/main/menu.ts'
 import { initializeMenuRuntimeState } from '#/main/menu-state.ts'
 import { syncRecentRepos } from '#/main/recent-repos.ts'
@@ -11,6 +10,7 @@ import { assertDictionaryParity, resolveLang, setCurrentLang } from '#/main/i18n
 import { wireIpc } from '#/main/ipc.ts'
 import { wireShellBridgeIpc } from '#/main/shell-bridge.ts'
 import { wireClipboardBridgeIpc } from '#/main/clipboard-bridge.ts'
+import { wireAccessTokenBridgeIpc } from '#/main/access-token-bridge.ts'
 import { windowNodeLog, windowStateNodeLog, serverNodeLog } from '#/node/logger.ts'
 import { wireTerminalIpc } from '#/main/terminal.ts'
 import { syncGlobalShortcuts, unregisterAppShortcuts } from '#/main/shortcuts.ts'
@@ -132,11 +132,7 @@ function wireMainProcessIpc(): void {
   wireShellBridgeIpc()
   wireTerminalIpc()
   wireClipboardBridgeIpc()
-  // Bootstrap handler must be registered once, before the first
-  // BrowserWindow is created — the preload synchronously reads its
-  // bootstrap token during startup, and a missing handler makes the
-  // preload fall back to defaults.
-  registerBootstrapIpc()
+  wireAccessTokenBridgeIpc()
 }
 
 async function syncInitialGlobalShortcutState(settingsSnapshot: SettingsSnapshot): Promise<void> {

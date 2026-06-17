@@ -12,6 +12,7 @@ let root: Root | null = null
 const reactActEnvironment = globalThis as typeof globalThis & {
   IS_REACT_ACT_ENVIRONMENT?: boolean
   goblinNative?: unknown
+  __GOBLIN_BOOTSTRAP__?: unknown
 }
 
 beforeEach(() => {
@@ -21,6 +22,14 @@ beforeEach(() => {
     configurable: true,
     value: vi.fn(),
   })
+  reactActEnvironment.__GOBLIN_BOOTSTRAP__ = {
+    runtime: { kind: 'electron', bridgeVersion: 1, capabilities: [] },
+    homeDir: '/Users/tester',
+    platform: 'darwin',
+    initialI18n: null,
+    initialSettings: null,
+    initialServer: null,
+  }
   reactActEnvironment.goblinNative = {
     homeDir: '/Users/tester',
     pathForFile: () => '',
@@ -39,6 +48,7 @@ afterEach(() => {
   container = null
   document.body.innerHTML = ''
   delete reactActEnvironment.goblinNative
+  delete reactActEnvironment.__GOBLIN_BOOTSTRAP__
   delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView
   vi.useRealTimers()
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false

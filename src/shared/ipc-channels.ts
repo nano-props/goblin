@@ -19,3 +19,13 @@ export const TERMINAL_SET_BADGE_CHANNEL = 'goblin:terminal-set-badge'
 // either. (The renderer always passes binary blobs across this channel
 // because File -> ArrayBuffer is the wire format; see preload.cjs.)
 export const CLIPBOARD_SAVE_FILES_CHANNEL = 'goblin:clipboard-save-files'
+
+// `goblin:rotate-access-token` — main-only. The renderer calls
+// this to invalidate the current token and force a fresh one to be
+// generated on the next server start. Main deletes the token file,
+// stops the embedded server, and restarts it; the in-memory token
+// becomes whatever the freshly-started server read from disk (or
+// freshly generated if the file was missing). The response is the
+// new access token, which the renderer surfaces in the Web settings
+// page so the user can re-authenticate.
+export const ROTATE_ACCESS_TOKEN_CHANNEL = 'goblin:rotate-access-token'

@@ -35,6 +35,8 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
           : createInProcessPtySupervisor(),
       })
   const terminalHost = providedTerminalHost ?? (runtime?.host as ServerTerminalHost)
+  // `appOptions` carries `accessToken` (renamed from the pre-PR
+  // `internalSecret`); it's forwarded straight to `createApp`.
   const app = createApp({ ...appOptions, terminalHost, serverHost, serverPort })
   let stopped = false
   return {

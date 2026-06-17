@@ -115,6 +115,20 @@ beforeEach(() => {
   fetchMock.mockClear()
   vi.stubGlobal('fetch', fetchMock)
   testWindow.__GOBLIN_BOOTSTRAP__ = {
+    runtime: {
+      kind: 'electron',
+      bridgeVersion: 1,
+      capabilities: [
+        'settings-ipc',
+        'open-settings-window',
+        'open-external-url',
+        'open-directory-dialog',
+        'consume-external-open-paths',
+        'open-in-finder',
+        'terminal-notifications',
+        'terminal-badge',
+      ],
+    },
     homeDir: '/Users/tester',
     initialI18n: null,
     initialSettings: {
@@ -130,7 +144,7 @@ beforeEach(() => {
       editorApp: 'auto',
       lanEnabled: false,
     },
-    initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+    initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
   }
   testWindow.goblinNative = {
     homeDir: '/Users/tester',
@@ -148,7 +162,7 @@ beforeEach(() => {
       editorApp: 'auto',
       lanEnabled: false,
     },
-    initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+    initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     pathForFile: () => '',
     invokeIpc,
     abortIpc: async () => true,
@@ -267,7 +281,7 @@ describe('SettingsSurface', () => {
           expect
             .objectContaining({
               'content-type': 'application/json',
-              'x-goblin-internal-secret': 'secret',
+              'x-goblin-access-token': 'secret',
             })
             .asymmetricMatch((options as RequestInit).headers)
         )

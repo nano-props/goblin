@@ -1,7 +1,6 @@
 import { ELECTRON_RENDERER_CAPABILITIES } from '#/shared/bootstrap.ts'
-import type { RendererBootstrapSnapshot, RendererNativeCapability, RendererPlatform } from '#/shared/bootstrap.ts'
+import type { RendererBootstrapSnapshot, RendererNativeCapability } from '#/shared/bootstrap.ts'
 import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
-import { isRendererPlatform } from '#/web/renderer-bootstrap-bridge.ts'
 import { readNativeBridge } from '#/web/native-bridge.ts'
 import { createHttpClipboardBackend } from '#/web/clipboard/http-backend.ts'
 import {
@@ -19,25 +18,29 @@ const WEB_TERMINAL_CLIENT_ID_STORAGE_KEY = 'goblin:web-terminal-client-id'
 
 function readServerTerminalConfig(): RendererServerTerminalConfig | null {
   const server = readWebBootstrap(readOrCreateWebTerminalClientId).initialServer
-  if (!server?.url || !server?.secret) return null
+  if (!server?.url) return null
   const clientId = normalizeRendererServerClientId(server.clientId) ?? readOrCreateWebTerminalClientId()
   if (!clientId) return null
-  return { url: server.url, secret: server.secret, clientId }
+  return { url: server.url, accessToken: server.accessToken ?? '', clientId }
 }
 
 function electronBridge(): RendererBridge {
   const capabilities = new Set<RendererNativeCapability>([...ELECTRON_RENDERER_CAPABILITIES])
   const serverTerminalBridge = (() => {
-    const server = readNativeBridge()?.initialServer
-    if (!server?.url || !server?.secret) return null
+    const server = readWebBootstrap(readOrCreateWebTerminalClientId).initialServer
+    if (!server?.url) return null
     return createServerTerminalBridge({
       getAttachmentId: readOrCreateWebTerminalAttachmentId,
       getServerConfig() {
-        const nextServer = readNativeBridge()?.initialServer
-        if (!nextServer?.url || !nextServer?.secret) throw new Error('Renderer terminal bridge is unavailable')
+        const nextServer = readWebBootstrap(readOrCreateWebTerminalClientId).initialServer
+        if (!nextServer?.url) throw new Error('Renderer terminal bridge is unavailable')
         const clientId = normalizeRendererServerClientId(nextServer.clientId) ?? readOrCreateWebTerminalClientId()
         if (!clientId) throw new Error('Renderer terminal bridge is unavailable')
-        return { url: nextServer.url, secret: nextServer.secret, clientId }
+        // `accessToken` is optional at the bridge layer: when present
+        // (embedded + dev) it's sent as `?t=` on the WebSocket URL;
+        // when absent the WS upgrade relies on the http-only cookie
+        // (browser-prod) or fails 401 (no-cookie tests).
+        return { url: nextServer.url, accessToken: nextServer.accessToken ?? '', clientId }
       },
       notifyBell(input) {
         const bridge = readNativeBridge()
@@ -56,41 +59,13 @@ function electronBridge(): RendererBridge {
   })()
   return {
     kind() {
-      return readNativeBridge()?.runtime?.kind === 'web' ? 'web' : 'electron'
+      return 'electron'
     },
     hasCapability(capability) {
-      const runtimeCapabilities = readNativeBridge()?.runtime?.capabilities
-      return Array.isArray(runtimeCapabilities)
-        ? runtimeCapabilities.includes(capability)
-        : capabilities.has(capability)
+      return capabilities.has(capability)
     },
     getBootstrap() {
-      const bridge = readNativeBridge()
-      const bootstrap = readWebBootstrap(readOrCreateWebTerminalClientId)
-      // Older preloads (or a test mock) may not surface `platform`. Fall
-      // back to 'web' — the only contract we can honestly honour when
-      // the host platform is unknown. The previous 'darwin' default
-      // predated Windows/Linux support and would have shown the macOS
-      // Settings UI on a Windows install that happened to be running
-      // an out-of-date preload.
-      let platform: RendererPlatform = bootstrap.platform
-      if (bridge) {
-        platform = isRendererPlatform(bridge.platform) ? bridge.platform : 'web'
-      }
-      return {
-        runtime:
-          bridge?.runtime &&
-          (bridge.runtime.kind === 'electron' || bridge.runtime.kind === 'web') &&
-          typeof bridge.runtime.bridgeVersion === 'number' &&
-          Array.isArray(bridge.runtime.capabilities)
-            ? bridge.runtime
-            : bootstrap.runtime,
-        homeDir: typeof bridge?.homeDir === 'string' ? bridge.homeDir : bootstrap.homeDir,
-        platform,
-        initialI18n: bridge?.initialI18n ?? bootstrap.initialI18n ?? null,
-        initialSettings: bridge?.initialSettings ?? bootstrap.initialSettings ?? null,
-        initialServer: bridge?.initialServer ?? bootstrap.initialServer ?? null,
-      }
+      return readWebBootstrap(readOrCreateWebTerminalClientId)
     },
     invokeIpc(request) {
       const bridge = readNativeBridge()
@@ -146,18 +121,21 @@ function webBridge(): RendererBridge {
     },
   })
   // Clipboard backend reuses the same bootstrap-derived server URL +
-  // secret. Constructed lazily inside `saveClipboardFiles` so a missing
-  // initialServer (which makes paste impossible anyway) doesn't crash
-  // the whole bridge.
+  // access token. Constructed lazily inside `saveClipboardFiles` so a
+  // missing initialServer (which makes paste impossible anyway) doesn't
+  // crash the whole bridge.
   const clipboardBackend = (() => {
     const server = bootstrap.initialServer
-    if (!server?.url || !server?.secret) return null
-    return createHttpClipboardBackend({ url: server.url, secret: server.secret })
+    if (!server?.url) return null
+    return createHttpClipboardBackend({
+      url: server.url,
+      accessToken: server.accessToken ?? '',
+    })
   })()
 
   return {
     kind() {
-      return bootstrap.runtime.kind
+      return 'web'
     },
     hasCapability() {
       return false

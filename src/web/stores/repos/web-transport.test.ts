@@ -13,7 +13,7 @@ describe('repo web transport helpers', () => {
           homeDir: '',
           initialI18n: null,
           initialSettings: null,
-          initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+          initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         },
         location: {
           href: 'http://127.0.0.1:32100/',
@@ -40,7 +40,7 @@ describe('repo web transport helpers', () => {
         method: 'POST',
         headers: expect.objectContaining({
           'content-type': 'application/json',
-          'x-goblin-internal-secret': 'secret',
+          'x-goblin-access-token': 'secret',
         }),
       }),
     )
@@ -81,7 +81,7 @@ describe('repo web transport helpers', () => {
           homeDir: '',
           initialI18n: null,
           initialSettings: null,
-          initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+          initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         },
         location: {
           href: 'http://127.0.0.1:32100/',
@@ -111,7 +111,7 @@ describe('repo web transport helpers', () => {
         method: 'POST',
         headers: expect.objectContaining({
           'content-type': 'application/json',
-          'x-goblin-internal-secret': 'secret',
+          'x-goblin-access-token': 'secret',
         }),
       }),
     )

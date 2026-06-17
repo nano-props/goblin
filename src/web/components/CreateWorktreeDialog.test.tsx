@@ -12,13 +12,24 @@ import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 let container: HTMLDivElement | null = null
 let root: Root | null = null
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-const testWindow = window as unknown as { goblinNative?: unknown }
+const testWindow = window as unknown as {
+  goblinNative?: unknown
+  __GOBLIN_BOOTSTRAP__?: unknown
+}
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
+  testWindow.__GOBLIN_BOOTSTRAP__ = {
+    runtime: { kind: 'electron', bridgeVersion: 1, capabilities: [] },
+    homeDir: '/Users/tester',
+    platform: 'darwin',
+    initialI18n: null,
+    initialSettings: null,
+    initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
+  }
   testWindow.goblinNative = {
     homeDir: '/Users/tester',
-    initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+    initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     pathForFile: () => '',
     invokeIpc: async () => null,
     abortIpc: async () => true,
@@ -35,6 +46,7 @@ afterEach(() => {
   container = null
   document.body.innerHTML = ''
   delete testWindow.goblinNative
+  delete testWindow.__GOBLIN_BOOTSTRAP__
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 

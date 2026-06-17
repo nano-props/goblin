@@ -2,7 +2,7 @@ import { getEmbeddedServerIpcRoute, type EmbeddedServerIpcPath } from '#/shared/
 
 export interface EmbeddedServerRuntime {
   url: string
-  secret: string
+  accessToken: string
 }
 
 export async function requestEmbeddedServerJson<T>(
@@ -13,7 +13,7 @@ export async function requestEmbeddedServerJson<T>(
   const response = await fetch(new URL(path, runtime.url).toString(), {
     ...init,
     headers: {
-      'x-goblin-internal-secret': runtime.secret,
+      'x-goblin-access-token': runtime.accessToken,
       ...(init?.headers ?? {}),
     },
   })

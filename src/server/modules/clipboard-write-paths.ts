@@ -1,6 +1,6 @@
 import { mkdir, readdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { serverDataDir } from '#/server/common/data-dir.ts'
+import { serverDataDir } from '#/shared/data-dir.ts'
 import { PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
 
 /**

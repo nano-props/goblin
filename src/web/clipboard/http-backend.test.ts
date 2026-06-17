@@ -9,7 +9,7 @@ describe('createHttpClipboardBackend', () => {
   test('returns [] without fetching when no files are given', async () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
-    const backend = createHttpClipboardBackend({ url: 'http://server/', secret: 'sec' })
+    const backend = createHttpClipboardBackend({ url: 'http://server/', accessToken: 'sec' })
     expect(await backend.saveClipboardFiles([])).toEqual([])
     expect(fetchMock).not.toHaveBeenCalled()
   })
@@ -20,7 +20,7 @@ describe('createHttpClipboardBackend', () => {
       json: async () => ({ paths: ['/tmp/a.png', '/tmp/b.png'] }),
     }))
     vi.stubGlobal('fetch', fetchMock)
-    const backend = createHttpClipboardBackend({ url: 'http://server/', secret: 'sec-123' })
+    const backend = createHttpClipboardBackend({ url: 'http://server/', accessToken: 'sec-123' })
     const a = new File([new Uint8Array([1])], 'a.png')
     const b = new File([new Uint8Array([2])], 'b.png')
     const result = await backend.saveClipboardFiles([a, b])
@@ -31,7 +31,7 @@ describe('createHttpClipboardBackend', () => {
     const init = call[1]
     expect(String(url)).toBe('http://server/api/clipboard/files')
     expect(init?.method).toBe('POST')
-    expect(init?.headers).toEqual({ 'x-goblin-internal-secret': 'sec-123' })
+    expect(init?.headers).toEqual({ 'x-goblin-access-token': 'sec-123' })
     expect(init?.body).toBeInstanceOf(FormData)
     const form = init?.body as FormData
     const filesField = form.getAll('files')
@@ -46,7 +46,7 @@ describe('createHttpClipboardBackend', () => {
       json: async () => ({ paths: ['/x'] }),
     }))
     vi.stubGlobal('fetch', fetchMock)
-    const backend = createHttpClipboardBackend({ url: 'http://server/', secret: 'sec' })
+    const backend = createHttpClipboardBackend({ url: 'http://server/', accessToken: 'sec' })
     const blob = new File([new Uint8Array([1])], '')
     await backend.saveClipboardFiles([blob])
     const init = fetchMock.mock.calls[0][1]
@@ -60,7 +60,7 @@ describe('createHttpClipboardBackend', () => {
       'fetch',
       vi.fn(async () => ({ ok: false, status: 401, json: async () => ({}) })),
     )
-    const backend = createHttpClipboardBackend({ url: 'http://server/', secret: 'sec' })
+    const backend = createHttpClipboardBackend({ url: 'http://server/', accessToken: 'sec' })
     expect(await backend.saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).toEqual([])
   })
 
@@ -71,7 +71,7 @@ describe('createHttpClipboardBackend', () => {
         throw new Error('network')
       }),
     )
-    const backend = createHttpClipboardBackend({ url: 'http://server/', secret: 'sec' })
+    const backend = createHttpClipboardBackend({ url: 'http://server/', accessToken: 'sec' })
     expect(await backend.saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).toEqual([])
   })
 
@@ -80,7 +80,7 @@ describe('createHttpClipboardBackend', () => {
       'fetch',
       vi.fn(async () => ({ ok: true, json: async () => ({ paths: 'not-an-array' }) })),
     )
-    const backend = createHttpClipboardBackend({ url: 'http://server/', secret: 'sec' })
+    const backend = createHttpClipboardBackend({ url: 'http://server/', accessToken: 'sec' })
     expect(await backend.saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).toEqual([])
   })
 
@@ -89,7 +89,7 @@ describe('createHttpClipboardBackend', () => {
       'fetch',
       vi.fn(async () => ({ ok: true, json: async () => ({ paths: ['/ok', 123, null, '/also-ok'] }) })),
     )
-    const backend = createHttpClipboardBackend({ url: 'http://server/', secret: 'sec' })
+    const backend = createHttpClipboardBackend({ url: 'http://server/', accessToken: 'sec' })
     expect(await backend.saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).toEqual(['/ok', '/also-ok'])
   })
 })

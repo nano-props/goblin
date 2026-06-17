@@ -34,7 +34,7 @@ beforeEach(() => {
     homeDir: '/Users/tester',
     initialI18n: null,
     initialSettings: null,
-    initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+    initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
   }
   // Use `defineProperty` with `writable: true` so a previous test that
   // installed a read-only descriptor (via `defineProperty` without writable)

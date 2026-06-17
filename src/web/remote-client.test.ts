@@ -15,7 +15,7 @@ describe('remote client web helpers', () => {
           homeDir: '',
           initialI18n: null,
           initialSettings: null,
-          initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+          initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         },
         location: {
           href: 'http://127.0.0.1:32100/',
@@ -38,7 +38,7 @@ describe('remote client web helpers', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:32100/api/remote/ssh-hosts',
       expect.objectContaining({
-        headers: expect.objectContaining({ 'x-goblin-internal-secret': 'secret' }),
+        headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
       }),
     )
   })

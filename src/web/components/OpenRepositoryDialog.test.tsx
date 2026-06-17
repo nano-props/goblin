@@ -12,12 +12,23 @@ let container: HTMLDivElement | null = null
 let root: Root | null = null
 let ipcCalls: Array<{ path: string; input?: unknown }> = []
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-const testWindow = window as unknown as { goblinNative?: unknown }
+const testWindow = window as unknown as {
+  goblinNative?: unknown
+  __GOBLIN_BOOTSTRAP__?: unknown
+}
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   ipcCalls = []
   setRendererBridgeForTests(null)
+  testWindow.__GOBLIN_BOOTSTRAP__ = {
+    runtime: { kind: 'electron', bridgeVersion: 1, capabilities: [] },
+    homeDir: '/Users/tester',
+    platform: 'darwin',
+    initialI18n: null,
+    initialSettings: null,
+    initialServer: null,
+  }
   testWindow.goblinNative = {
     homeDir: '/Users/tester',
     pathForFile: () => '',
@@ -42,6 +53,7 @@ afterEach(() => {
   container = null
   document.body.innerHTML = ''
   delete testWindow.goblinNative
+  delete testWindow.__GOBLIN_BOOTSTRAP__
   setRendererBridgeForTests(null)
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })

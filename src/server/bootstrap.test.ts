@@ -75,7 +75,10 @@ describe('bootstrap server shutdown', () => {
     const exit = vi.fn()
     const { bootstrapServer } = await import('#/server/bootstrap.ts')
 
-    const server = bootstrapServer({
+    // `bootstrapServer` is now async because it reads (or creates)
+    // the access token from the data dir before serving. Await it
+    // here; the rest of the test is unchanged.
+    const server = await bootstrapServer({
       exit,
     })
     const stopPromise = server.stop()

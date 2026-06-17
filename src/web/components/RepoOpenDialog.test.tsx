@@ -13,16 +13,32 @@ import { resetReposStore } from '#/web/stores/repos/test-utils.ts'
 let container: HTMLDivElement | null = null
 let root: Root | null = null
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-const testWindow = window as unknown as { goblinNative?: unknown }
+const testWindow = window as unknown as {
+  goblinNative?: unknown
+  __GOBLIN_BOOTSTRAP__?: unknown
+}
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
   setRendererBridgeForTests(null)
+  // The bootstrap is the source of truth for `homeDir`; the
+  // preload only exposes IPC. Set both so the bridge detects
+  // Electron and the path-tilde resolution gets the right prefix.
+  Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
+    configurable: true,
+    value: {
+      runtime: { kind: 'electron', bridgeVersion: 1, capabilities: [] },
+      homeDir: '/Users/tester',
+      platform: 'darwin',
+      initialI18n: null,
+      initialSettings: null,
+      initialServer: null,
+    },
+  })
   Object.defineProperty(window, 'goblinNative', {
     configurable: true,
     value: {
-      homeDir: '/Users/tester',
       pathForFile: () => '',
       invokeIpc: async (_request: { path: string; input?: unknown }) => null,
       abortIpc: async () => true,
@@ -39,6 +55,7 @@ afterEach(() => {
   root = null
   container = null
   delete testWindow.goblinNative
+  delete testWindow.__GOBLIN_BOOTSTRAP__
   setRendererBridgeForTests(null)
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })

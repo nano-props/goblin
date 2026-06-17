@@ -2,8 +2,6 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 import { describe, expect, test, vi } from 'vitest'
-import type { RendererBootstrapPayload } from '#/shared/bootstrap.ts'
-import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import {
   RENDERER_EFFECT_INTENT_CHANNEL,
   IPC_ABORT_CHANNEL,
@@ -19,57 +17,13 @@ import {
   TERMINAL_SET_BADGE_CHANNEL,
 } from '#/shared/ipc-channels.ts'
 
-function defaultBootstrapPayload(): RendererBootstrapPayload {
-  return {
-    runtime: {
-      kind: 'electron',
-      bridgeVersion: RENDERER_BRIDGE_VERSION,
-      capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
-    },
-    homeDir: '/home/test',
-    platform: 'web',
-    i18n: { lang: 'en', pref: 'ja', dict: { hello: 'world' } },
-    settings: {
-      fetchIntervalSec: 120,
-      terminalNotificationsEnabled: false,
-      shortcutsDisabled: false,
-      globalShortcutDisabled: false,
-      swapCloseShortcuts: false,
-      toggleDetailOnActionBarBlankClick: false,
-      globalShortcut: 'CommandOrControl+Shift+G',
-      globalShortcutRegistered: false,
-      terminalApp: 'auto',
-      editorApp: 'cursor',
-      lanEnabled: false,
-    },
-    server: null,
-  }
-}
-
-const BOOTSTRAP_TOKEN_PREFIX = '--goblin-bootstrap-token='
-const BOOTSTRAP_CHANNEL = 'goblin:get-bootstrap'
-
-function defaultArgv() {
-  return [BOOTSTRAP_TOKEN_PREFIX + 'test-bootstrap-token']
-}
-
-function loadPreload(
-  options: {
-    invoke?: (channel: string, ...args: unknown[]) => Promise<unknown>
-    argv?: string[]
-    /** Per-token payload table. Tokens not present in this map resolve to `null`,
-     *  matching how the main process answers for unknown tokens. */
-    bootstrap?: Map<string, RendererBootstrapPayload | null>
-    /** When set, the bootstrap `sendSync` throws this error instead of
-     *  returning a payload. */
-    sendSyncError?: Error
-  } = {},
-) {
+function loadPreload(options: {
+  invoke?: (channel: string, ...args: unknown[]) => Promise<unknown>
+  argv?: string[]
+} = {}) {
   const exposed: Record<string, any> = {}
   const invocations: Array<{ channel: string; args: unknown[] }> = []
   const sends: Array<{ channel: string; args: unknown[] }> = []
-  const syncCalls: Array<{ channel: string; args: unknown[] }> = []
-  const bootstrap = options.bootstrap ?? new Map([['test-bootstrap-token', defaultBootstrapPayload()]])
   const ipcRenderer = {
     invoke: vi.fn((channel: string, ...args: unknown[]) => {
       invocations.push({ channel, args })
@@ -78,13 +32,6 @@ function loadPreload(
     send: vi.fn((channel: string, ...args: unknown[]) => {
       sends.push({ channel, args })
     }),
-    sendSync: vi.fn((channel: string, ...args: unknown[]) => {
-      syncCalls.push({ channel, args })
-      if (options.sendSyncError) throw options.sendSyncError
-      if (channel !== BOOTSTRAP_CHANNEL) return null
-      const token = args[0] as string
-      return bootstrap.has(token) ? (bootstrap.get(token) ?? null) : null
-    }),
     on: vi.fn(),
     off: vi.fn(),
   }
@@ -92,9 +39,7 @@ function loadPreload(
   const sandbox = {
     console,
     Buffer,
-    process: {
-      argv: options.argv ?? defaultArgv(),
-    },
+    process: { argv: options.argv ?? [] },
     require: (name: string) => {
       if (name !== 'electron') throw new Error(`unexpected require: ${name}`)
       return {
@@ -109,53 +54,31 @@ function loadPreload(
     },
   }
   vm.runInNewContext(code, sandbox, { filename: 'preload.cjs' })
-  return { goblinNative: exposed.goblinNative, invocations, sends, syncCalls, ipcRenderer }
+  return { goblinNative: exposed.goblinNative, invocations, sends, ipcRenderer }
 }
 
 describe('preload goblinNative bridge', () => {
-  test('exposes bootstrap snapshots parsed from the single preload payload', () => {
+  test('exposes only the IPC surface, no bootstrap fields', () => {
+    // The renderer-side bootstrap is now carried by the HTML
+    // (server-injected `<script id="goblin-bootstrap">`), not by the
+    // preload. The preload is a strict IPC bridge; tests should fail
+    // if it ever starts exposing `runtime` / `homeDir` / `initialI18n`
+    // / `initialSettings` again, since that was the original
+    // `internalSecret` leak channel that this refactor closed.
     const { goblinNative } = loadPreload()
-
-    expect(goblinNative.runtime).toEqual({
-      kind: 'electron',
-      bridgeVersion: RENDERER_BRIDGE_VERSION,
-      capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
-    })
-    expect(goblinNative.homeDir).toBe('/home/test')
-    expect(goblinNative.initialI18n).toEqual({ lang: 'en', pref: 'ja', dict: { hello: 'world' } })
-    expect(goblinNative.initialSettings).toMatchObject({
-      fetchIntervalSec: 120,
-      terminalNotificationsEnabled: false,
-      editorApp: 'cursor',
-    })
-  })
-
-  test('falls back cleanly when the bootstrap token is unknown', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const { goblinNative, syncCalls } = loadPreload({
-      argv: [BOOTSTRAP_TOKEN_PREFIX + 'unregistered-token'],
-      bootstrap: new Map(),
-    })
-
-    expect(goblinNative.homeDir).toBe('')
-    expect(goblinNative.initialI18n).toBeNull()
-    expect(goblinNative.initialSettings).toBeNull()
-    expect(syncCalls[0]).toEqual({ channel: BOOTSTRAP_CHANNEL, args: ['unregistered-token'] })
-    expect(warn).not.toHaveBeenCalled()
-    warn.mockRestore()
-  })
-
-  test('falls back cleanly when the bootstrap sendSync throws', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const { goblinNative } = loadPreload({
-      sendSyncError: new Error('ipc exploded'),
-    })
-
-    expect(goblinNative.homeDir).toBe('')
-    expect(goblinNative.initialI18n).toBeNull()
-    expect(warn.mock.calls[0]?.[0]).toBe('[preload] failed to read bootstrap payload')
-    expect((warn.mock.calls[0]?.[1] as Error | undefined)?.message).toBe('ipc exploded')
-    warn.mockRestore()
+    expect(goblinNative).not.toHaveProperty('runtime')
+    expect(goblinNative).not.toHaveProperty('homeDir')
+    expect(goblinNative).not.toHaveProperty('initialI18n')
+    expect(goblinNative).not.toHaveProperty('initialSettings')
+    expect(goblinNative).not.toHaveProperty('initialServer')
+    expect(goblinNative).toHaveProperty('invokeIpc')
+    expect(goblinNative).toHaveProperty('abortIpc')
+    expect(goblinNative).toHaveProperty('pathForFile')
+    expect(goblinNative).toHaveProperty('shell')
+    expect(goblinNative).toHaveProperty('terminal')
+    expect(goblinNative).toHaveProperty('saveClipboardFiles')
+    expect(goblinNative).toHaveProperty('onEvent')
+    expect(goblinNative).toHaveProperty('onIntent')
   })
 
   test('forwards IPC request ids to the main process', async () => {

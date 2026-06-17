@@ -6,7 +6,7 @@ export const SETTINGS_PAGES = [
   'sync',
   'apps',
   'github',
-  'lan',
+  'web',
   'about',
 ] as const
 
@@ -24,6 +24,6 @@ export const SETTINGS_PAGE_CONFIG = {
   sync: { titleKey: 'settings.nav.refresh', labelKey: 'settings.nav.refresh' },
   apps: { titleKey: 'settings.group.apps', labelKey: 'settings.group.apps' },
   github: { titleKey: 'settings.github.title', labelKey: 'settings.nav.github' },
-  lan: { titleKey: 'settings.lan.title', labelKey: 'settings.nav.lan' },
+  web: { titleKey: 'settings.web.title', labelKey: 'settings.nav.web' },
   about: { titleKey: 'settings.about', labelKey: 'settings.about' },
 } as const satisfies Record<SettingsPage, { titleKey: string; labelKey: string }>

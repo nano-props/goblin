@@ -15,7 +15,7 @@ afterEach(() => {
 describe('serverDataDir', () => {
   test('prefers an explicit data dir override', async () => {
     process.env.GOBLIN_SERVER_DATA_DIR = '/tmp/goblin-explicit'
-    const { serverDataDir } = await import('#/server/common/data-dir.ts')
+    const { serverDataDir } = await import('#/shared/data-dir.ts')
     expect(serverDataDir()).toBe('/tmp/goblin-explicit')
   })
 
@@ -33,7 +33,7 @@ describe('serverDataDir', () => {
     if (process.platform !== 'darwin' && process.platform !== 'win32') {
       process.env.HOME = '/home/tester'
     }
-    const { serverDataDir } = await import('#/server/common/data-dir.ts')
+    const { serverDataDir } = await import('#/shared/data-dir.ts')
     const dir = serverDataDir()
     if (process.platform === 'darwin') {
       expect(dir).toBe('/Users/tester/Library/Application Support/Goblin')

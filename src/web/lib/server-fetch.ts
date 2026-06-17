@@ -1,15 +1,30 @@
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
 import { resolveApiBaseUrl } from '#/web/lib/websocket-url.ts'
 
+/**
+ * Mirrors `ACCESS_TOKEN_HEADER` in `#/server/common/auth.ts`. Kept
+ * inline here so the renderer bundle does not pull in the server
+ * module (which imports `hono`, `node:*`, etc.). Update both if the
+ * header name ever changes.
+ */
+const ACCESS_TOKEN_HEADER = 'x-goblin-access-token'
+
 interface EmbeddedServerConfig {
   url: string
-  secret: string
+  accessToken: string
 }
 
 function getEmbeddedServer(): EmbeddedServerConfig | null {
   const server = getInitialBootstrap().initialServer
-  if (!server?.url || !server?.secret) return null
-  return server
+  if (!server?.url) return null
+  // `accessToken` is only present when the server inlined it into the
+  // bootstrap (embedded Electron runtime, or `bun run dev` with the
+  // dev flag set). In standalone `serve.sh` mode the field is absent
+  // and the renderer authenticates via the http-only cookie set by
+  // `POST /api/login`; in that case this function returns `''` for
+  // the token, and the caller must NOT attach the header — the
+  // browser will send the cookie automatically.
+  return { url: server.url, accessToken: server.accessToken ?? '' }
 }
 
 function requireEmbeddedServer(): EmbeddedServerConfig {
@@ -22,15 +37,23 @@ export async function fetchServerJson<T>(path: string | URL, init?: RequestInit)
   const server = requireEmbeddedServer()
   const url = typeof path === 'string' ? new URL(path, resolveApiBaseUrl(server.url)).toString() : path.toString()
   const { headers: extraHeaders, ...rest } = init ?? {}
-  const headers: Record<string, string> = {
-    'x-goblin-internal-secret': server.secret,
+  const headers: Record<string, string> = {}
+  if (server.accessToken) {
+    // Embedded renderer or dev mode: send the token as a header.
+    // Standalone browser mode: leave the header off entirely; the
+    // cookie is the only auth channel and the browser attaches it
+    // automatically on same-origin requests.
+    headers[ACCESS_TOKEN_HEADER] = server.accessToken
   }
   if (extraHeaders) {
     new Headers(extraHeaders).forEach((value, key) => {
       headers[key] = value
     })
   }
-  const response = await fetch(url, { ...rest, headers })
+  // `credentials: 'include'` makes the browser attach the cookie on
+  // cross-origin LAN requests; for same-origin (the Vite dev proxy
+  // case) it's a no-op.
+  const response = await fetch(url, { ...rest, headers, credentials: 'include' })
   if (!response.ok) {
     let detail = `HTTP ${response.status}`
     try {
