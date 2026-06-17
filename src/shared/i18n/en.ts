@@ -480,6 +480,7 @@ export const en = {
   'error.ghostty-not-installed': 'Ghostty not installed',
   'error.terminal-not-installed': 'Terminal not installed',
   'error.terminal-create-failed': 'Terminal could not be created',
+  'error.terminal-host-not-measurable': 'Terminal host is not visible',
   'error.vscode-not-installed': 'VS Code not installed',
   'error.editor-not-installed': 'No editor found',
   'error.remote-editor-not-supported': 'The selected editor cannot open remote SSH workspaces',

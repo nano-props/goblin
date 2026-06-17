@@ -172,17 +172,15 @@ Geometry should be treated as part of terminal correctness.
 - Narrow layouts are especially sensitive because shell prompt rendering reacts immediately to initial columns.
 - Extra defensive redraws are not a substitute for correct geometry flow.
 
-### Narrow hosts and shell-prompt redraw
+### Unmeasurable hosts at attach time
 
-When a terminal is first opened into a host whose box is not yet measurable — for example, a side-by-side split that is still animating to its final width, or a pane that mounts before its parent layout has settled — the view layer must wait for the host to become measurable rather than falling back to a historical default like `80x24`.
+When a terminal is first opened into a host whose box is not yet measurable (e.g. a split pane that is still animating to its final width), the orchestrator must wait for the host to become measurable rather than fall back to a historical default. Spawning a PTY at the wrong column count and resizing later is **not** equivalent to spawning it at the correct width — the shell may lay out its prompt against the wrong `$COLUMNS` before the resize settles.
 
-Spawning a PTY at the wrong column count and then resizing later is **not** equivalent to spawning it at the correct width. Shells like zsh compute their prompt and `RPROMPT` layout from `$COLUMNS` at prompt-render time, and many common configurations do not redraw the visible prompt on `SIGWINCH`. By the time the bridge resize settles, zsh has already painted a prompt laid out for the wrong width, and the user sees a two-line prompt whose first line overflows above the visible viewport in narrow hosts.
+The acquisition of geometry belongs to the orchestrator, not the view: the view accepts the measured geometry as a parameter, never reaches into layout, and never soft-fails to a default. A stuck host surfaces as a fatal attach failure the user can retry by re-selecting the terminal.
 
-The macOS-vs-Linux asymmetry reported by users is a system-level font fallback difference: Apple Color Emoji on macOS renders emoji such as `👾` as 2 cells, while Linux falls back to a 1-cell monochrome Nerd Font glyph (the actual font asset is `MapleMono-NF-CN-*`, identical across platforms). That 1-cell shift can push a borderline wrap point across the viewport edge and turn a previously-acceptable layout into a wrapped one.
+### Narrow-host multi-line prompt wrap
 
-Related upstream reports (same family of bugs, different exact root causes): [xterm.js #2529](https://github.com/xtermjs/xterm.js/issues/2529) "ZSH: prompt line not wrapping correctly", [xterm.js #2752](https://github.com/xtermjs/xterm.js/issues/2752) "wrap issue when prompt is over 2 lines".
-
-The product rule is therefore: prefer waiting for a measurable host over falling back to a default, and treat post-resize scroll behaviour as part of correctness — pinning the viewport to the live tail must not hide the prompt head when the prompt is taller than the new viewport.
+Multi-line shell prompts (e.g. `PS1="👾:%~\\n$ "`) clip the path line at the top of the viewport after a narrow-host resize. Root cause is upstream — see [issue #56](https://github.com/nano-props/goblin/issues/56) for full reproduction and the OSC 133 path forward.
 
 ## Replay and hydration
 

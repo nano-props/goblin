@@ -456,6 +456,7 @@ export const zh: Record<DictKey, string> = {
   'error.ghostty-not-installed': '未安装 Ghostty',
   'error.terminal-not-installed': '未安装终端',
   'error.terminal-create-failed': '无法创建终端',
+  'error.terminal-host-not-measurable': '终端面板不可见',
   'error.vscode-not-installed': '未安装 VS Code',
   'error.editor-not-installed': '未找到编辑器',
   'error.remote-editor-not-supported': '所选编辑器无法打开远程 SSH 工作区',

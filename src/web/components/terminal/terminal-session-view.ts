@@ -14,10 +14,6 @@ import type { ITheme } from '@xterm/xterm'
 import type { Terminal as XTermTerminal } from '@xterm/xterm'
 import { Terminal } from '@xterm/xterm'
 import {
-  DEFAULT_TERMINAL_COLS,
-  DEFAULT_TERMINAL_ROWS,
-  preloadTerminalFont,
-  proposeTerminalGeometry,
   TERMINAL_FONT_FAMILY,
   TERMINAL_FONT_SIZE,
   TERMINAL_LINE_HEIGHT,
@@ -125,18 +121,25 @@ export class TerminalSessionView {
     blurElementIfFocused(this.frame)
   }
 
-  openTerminal(onMacOptionInput: (input: string) => void): XTermTerminal {
+  /**
+   * Exposes the xterm DOM host so the orchestrator can drive geometry
+   * measurement (see `waitForMeasurableHost` in
+   * `terminal-session-geometry.ts`). The view itself never falls back to
+   * a default geometry — it is given one by the orchestrator and trusts it.
+   */
+  measurableHost(): HTMLElement {
+    return this.xtermHost
+  }
+
+  openTerminal(
+    geometry: { cols: number; rows: number },
+    onMacOptionInput: (input: string) => void,
+  ): XTermTerminal {
     const theme = terminalThemeForCurrentDocument()
-    // Pre-measure the host box and derive cell metrics so the very first
-    // paint already lands at the real geometry. Without this the terminal
-    // would paint once at 80×24 and then fitAddon.fit() would resize the
-    // buffer, which causes a visible reflow and occasionally leaves a
-    // stale reverse-video cursor cell at the top-left in narrow hosts.
-    const initialGeometry = proposeTerminalGeometry(this.xtermHost)
     const term = new Terminal({
       allowProposedApi: true,
-      cols: initialGeometry?.cols ?? DEFAULT_TERMINAL_COLS,
-      rows: initialGeometry?.rows ?? DEFAULT_TERMINAL_ROWS,
+      cols: geometry.cols,
+      rows: geometry.rows,
       cursorBlink: true,
       cursorStyle: 'bar',
       fontFamily: TERMINAL_FONT_FAMILY,

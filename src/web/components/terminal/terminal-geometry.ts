@@ -1,5 +1,12 @@
+/**
+ * Test-only fixtures: historical fallback geometry used by tests that mock
+ * the terminal-geometry module. Production code MUST go through
+ * `waitForMeasurableHost` (in terminal-session-geometry.ts) instead of
+ * falling back to these — see docs/terminal.md "Geometry and layout model".
+ */
 export const DEFAULT_TERMINAL_COLS = 80
 export const DEFAULT_TERMINAL_ROWS = 24
+
 export const TERMINAL_FONT_SIZE = 14
 export const TERMINAL_FONT_FAMILY = "'Goblin Mono', monospace"
 export const TERMINAL_LINE_HEIGHT = 1
