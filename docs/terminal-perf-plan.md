@@ -224,52 +224,76 @@ These are already correct and stay unchanged:
   - `src/web/components/terminal/TerminalSessionProvider.tsx`
     (subscribe to `visibilitychange` / `pageshow`).
 - **Change**:
-  1. Bridge gains a `kickReconnect()` that **only** acts if the
-     socket is in a non-OPEN state (`CONNECTING`, `CLOSING`,
-     `CLOSED`); if the socket is already OPEN, the call is a
-     no-op. The method does not actively probe or close a
-     working socket.
-  2. Bridge also gains a `probeLiveness()` that sends one
-     `listSessions` request. If the request times out (existing
-     30s `TERMINAL_REQUEST_TIMEOUT_MS`) the bridge force-closes
-     the socket so `scheduleReconnect` runs.
-  3. `TerminalSessionProvider` listens for
+  1. Bridge gains a `kickReconnect()` that **only** acts if
+     the socket is in a non-OPEN state (`CONNECTING`,
+     `CLOSING`, `CLOSED`); if the socket is already OPEN, the
+     call is a no-op. The method does not actively probe or
+     close a working socket.
+  2. `TerminalSessionProvider` listens for
      `document.visibilitychange === 'visible'` and for
-     `pageshow` with `event.persisted === true`. On either:
-     - call `bridge.kickReconnect()` (cheap; no-op if fine),
-     - if WS re-establishes (next `open` event), call
-       `registry.reconcileServerSessions(...)` for the currently
-       focused worktree.
+     `pageshow` with `event.persisted === true`. On either
+     event: call `bridge.kickReconnect()`.
+  3. **No** proactive `reconcileServerSessions` call. State
+     updates flow through the existing server-push
+     `sessions-changed` event after `scheduleReconnect`
+     re-establishes the socket. A client-side reconcile would
+     multiply round-trips on slow mobile networks and is a
+     second source of truth for state the server already
+     broadcasts.
 - **Fallback paths**:
   - If `kickReconnect` is a no-op (socket is fine), nothing
     changes — no extra traffic, no extra reconnects.
   - If the bridge can't reach the server, the existing
     `scheduleReconnect` 300 ms backoff keeps retrying.
+  - If the socket is OPEN but silently dead (rare, mobile NAT
+    edge case), the user is not blocked — `output` events from
+    the server resume on the next reconnect.
 - **What this does NOT do**:
-  - No periodic polling. No setInterval. No `setTimeout` chain
-    outside the existing reconnect timer.
+  - No periodic polling. No `setInterval`. No `setTimeout`
+    chain outside the existing reconnect timer.
   - No force-close of a socket that's reporting OPEN.
-  - No `freeze`/`resume` events (Chrome-only, overlap with
-    `visibilitychange`).
-- **Risk**: low. The hook is a thin event-listener; both
-  `kickReconnect` and `probeLiveness` are guarded no-ops on a
-  healthy socket. `reconcileServerSessions` is already
-  idempotent.
+  - No `freeze` / `resume` events (Chrome desktop only;
+    overlap with `visibilitychange`).
+  - No client-side state reconcile (see Change 3).
+- **Risk**: low. The hook is a thin event-listener; the
+  `kickReconnect` guard makes it a no-op on a healthy socket.
 
-#### T5.2 — Persist scroll position in `sessionStorage`
+#### T5.2 — Persist scroll position in `sessionStorage` *(Phase 5+ optional)*
+- **Status**: implement **only** if Phase 5 (T5.1) ships and
+  users report scroll-position loss as a real friction point.
+  This is a polish item, not a correctness fix. The server
+  snapshot already covers content restoration.
 - **Files**:
   - `src/web/components/terminal/TerminalSessionView.ts` (read
-    on `openTerminal` / `attach`),
+    on attach; write on scroll),
   - `src/web/components/terminal/ManagedTerminalSession.ts`
-    (write on `detach` / scroll).
+    (write on `detach`).
 - **Change**: store
   `goblin:terminal-scroll:${sessionId} = <lineNumber>` in
-  `sessionStorage`. On attach, after the server snapshot has
-  been written into xterm, call
-  `term.scrollToLine(savedLine)` if the saved value is still
-  within the new buffer's line range.
+  `sessionStorage`. On attach, restore in this exact order
+  (each step awaits):
+  ```ts
+  await termWrite(term, serverSnapshot)        // 1. ingest replay
+  const saved = readSavedScrollTop(sessionId)  // 2. read persisted
+  if (saved !== null) {
+    const maxLine = term.buffer.active.length - 1
+    if (saved <= maxLine) {
+      await termScrollToLine(term, saved)      // 3. apply if valid
+    }
+  }
+  ```
+  The `termWrite` / `termScrollToLine` wrappers follow the
+  same callback-to-Promise pattern as `termWrite` in
+  `ManagedTerminalSession.ts:628-632`.
+- **Write triggers** (both must be implemented together):
+  - On `detach`: synchronous `sessionStorage.setItem` for
+    "tab switch" and route navigation.
+  - On scroll events: debounced **1000 ms** (not 200 ms —
+    `sessionStorage.setItem` is synchronous and can hitch the
+    main thread at 60 fps). The debounce timer is cleared on
+    `detach` and the final value is written then.
 - **Scope (intentionally limited)**:
-  - Persist **only** `scrollTop` (a single integer per
+  - Persist **only** scroll position (a single integer per
     session). Do **not** persist scrollback content — the
     server's ring buffer is the source of truth for that.
   - Do **not** persist search results, progress, bell state.
@@ -279,23 +303,41 @@ These are already correct and stay unchanged:
   - `sessionStorage` write failure (quota, privacy mode) is
     caught and ignored — the resume falls back to the existing
     "scroll to bottom" behavior.
-  - Stale value (saved line beyond current buffer) is clamped
-    to the buffer's last line.
-  - Multiple tabs writing the same key: last write wins.
-    Acceptable for a single user; explicit cross-tab sync is
-    out of scope.
+  - Stale value (saved line beyond current buffer) is skipped
+    silently — the buffer's `scrollToBottom` remains the
+    default. We do **not** clamp; we skip.
+  - Cross-tab writes: last writer wins. Explicit cross-tab
+    sync via the `storage` event is a future option, not
+    required now.
+- **Primitives (xterm 5.x)**:
+  - `term.buffer.active.viewportY` is the canonical
+    "current top line" reading.
+  - `term.scrollToLine(line)` is async (returns Promise /
+    accepts callback). Wrap consistently with `termWrite`.
+  - Requires xterm.js ≥ 5.x. Verify in `package.json` before
+    implementing.
 - **Why this is safe**: the server snapshot covers content
   correctness; the persisted value is a *cosmetic* preference
   on top of it. Worst case: stale value is ignored.
 
 ### Items rejected from the mobile resilience pass
 
-- **Periodic WS ping (e.g. every 30s)** — folded into T5.1
-  as a one-shot probe on resume, not a recurring timer.
-  Periodic probes on a single-user app are pure overhead.
+- **Periodic WS ping (e.g. every 30s)** — pure overhead for
+  a single-user app. The OS's TCP keepalive plus the
+  `visibilitychange` hook together cover the recovery case.
+  If a real "socket OPEN but dead" complaint surfaces, add
+  an opt-in probe with a short (5s) timeout — not a
+  recurring timer.
 - **Native WebSocket ping/pong frames** — depends on
   `Hono`/`ws` server-side support, which is out of scope for
-  this plan. Revisit if T5.1's probe proves insufficient.
+  this plan. Revisit only if the application-level probe
+  proves insufficient.
+- **Proactive `reconcileServerSessions` on visibility** —
+  the server already broadcasts `sessions-changed`. After
+  `kickReconnect` re-establishes the socket, missed events
+  replay naturally. Adding a client-side reconcile would be
+  a second source of truth and would multiply round-trips on
+  slow mobile networks.
 - **Persisting scrollback content in `sessionStorage`** —
   duplicates the server ring buffer. The 5-10 MB
   `sessionStorage` quota is a hard ceiling; the server
@@ -395,7 +437,8 @@ For every change:
 | Phase 2 | T2.1 (cap 32 → 8) | ≤ 0.5 day | if reattach eviction complaints come in, revert |
 | Phase 3 (deferred) | T3.1 (output batching) | 1-2 weeks | only if preflight shows server CPU bottleneck |
 | Phase 4 | T4.1 (diagnostics) | ≤ 0.5 day | none |
-| Phase 5 | T5.1, T5.2 (mobile resilience) | ≤ 1 day | manual test on iOS Safari + Android Chrome; confirm no reconnect storms |
+| Phase 5 | T5.1 (visibility hook + kickReconnect) | ≤ 0.5 day | manual test on iOS Safari + Android Chrome; confirm no reconnect storms |
+| Phase 5+ (optional) | T5.2 (scrollTop persistence) | ≤ 1 day | only if Phase 5 ships and users report scroll-position loss |
 
 Each phase lands as a separate PR with its own test pass and a
 `docs/terminal-perf-plan.md` update.
