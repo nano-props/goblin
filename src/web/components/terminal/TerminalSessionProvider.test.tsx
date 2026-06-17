@@ -1659,6 +1659,89 @@ describe('TerminalSessionProvider', () => {
     }
   })
 
+  test('T1.2: prewarms the terminal WebSocket when the active repo is set', async () => {
+    const prewarm = vi.fn(async () => {})
+    setRendererBridgeForTests({
+      kind: () => 'electron',
+      hasCapability: () => false,
+      getBootstrap: () => ({
+        runtime: {
+          kind: 'electron',
+          bridgeVersion: RENDERER_BRIDGE_VERSION,
+          capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+        },
+        homeDir: '/home',
+        platform: 'web',
+        initialI18n: null,
+        initialSettings: null,
+        initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret', clientId: 'client_sharedterminal' },
+      }),
+      invokeIpc: vi.fn(async () => null),
+      abortIpc: vi.fn(async () => false),
+      onIpcEvent: vi.fn(() => () => {}),
+      onEffectIntent: vi.fn(() => () => {}),
+      pathForFile: vi.fn(() => ''),
+      saveClipboardFiles: vi.fn(async () => []),
+      shell: () => null,
+      terminal: () => ({
+        attach: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
+        restart: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
+        write: vi.fn(async () => false),
+        resize: vi.fn(async () => false),
+        takeover: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
+        close: vi.fn(async () => false),
+        create: vi.fn(async () => ({ ok: true as const, action: 'created' as const, key: 'k', sessions: [] })),
+        pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
+        listSessions: vi.fn(async () => []),
+        prewarm,
+        kickReconnect: vi.fn(() => {}),
+        getSessionSnapshot: vi.fn(async () => null),
+        reorder: vi.fn(async () => false),
+        notifyBell: vi.fn(async () => false),
+        sendTestNotification: vi.fn(async () => false),
+        setBadge: () => {},
+        onOutput: () => () => {},
+        onTitle: () => () => {},
+        onExit: () => () => {},
+        onOwnership: () => () => {},
+        onSessionsChanged: () => () => {},
+      }),
+    })
+
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    try {
+      await act(async () => {
+        root.render(
+          <TerminalSessionProvider>
+            <span>probe</span>
+          </TerminalSessionProvider>,
+        )
+      })
+
+      // No active repo yet → effect's guard skips the prewarm.
+      expect(prewarm).not.toHaveBeenCalled()
+
+      // Seed a repo: this sets activeId, the effect fires, prewarm is called.
+      // The function takes no parameters (single shared socket, not per-repo).
+      seedRepoState({
+        id: REPO_ID,
+        branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+        selectedBranch: 'feature/worktree',
+        detailTab: 'terminal',
+      })
+      await act(async () => {
+        await Promise.resolve()
+      })
+      expect(prewarm).toHaveBeenCalledTimes(1)
+      expect(prewarm).toHaveBeenCalledWith()
+    } finally {
+      await act(async () => root.unmount())
+      container.remove()
+    }
+  })
+
   test('T5.1: kicks reconnect on visibilitychange:visible and on persisted pageshow', async () => {
     const kickReconnect = vi.fn(() => {})
     setRendererBridgeForTests({

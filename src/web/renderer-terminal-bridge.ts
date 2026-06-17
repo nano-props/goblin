@@ -121,9 +121,9 @@ export function createServerTerminalBridge(options: {
   // backoff: if the socket is null or fully CLOSED, we open
   // immediately. If it's OPEN, we do nothing — the socket is
   // healthy and a gratuitous cycle would just burn a handshake. If
-  // it's CONNECTING or CLOSING, we let the in-flight transition
-  // complete; the close handler will route through
-  // scheduleReconnect if it fails.
+  // it's CONNECTING or CLOSING, ensureSocket's internal guard makes
+  // the call a no-op; the in-flight transition's close handler will
+  // route through scheduleReconnect on its own if it fails.
   function kickReconnect() {
     if (quitting) return
     if (!hasRealtimeSubscribers()) return
@@ -263,8 +263,8 @@ export function createServerTerminalBridge(options: {
       })
     },
     prewarm() {
-      // T1.2: pay the WebSocket handshake cost on worktree-pane mount
-      // so the first real IPC after the user clicks a terminal tab
+      // T1.2: pay the WebSocket handshake cost when the user enters
+      // a repo so the first real IPC after they click a terminal tab
       // doesn't have to. waitForSocketOpen() resolves immediately if
       // the socket is already OPEN; otherwise it calls ensureSocket()
       // and waits for the 'open' event. Swallow failures — this is

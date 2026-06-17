@@ -37,13 +37,15 @@ export interface RendererTerminalBridge {
   listSessions: (input: { repoRoot: string }) => Promise<TerminalSessionSummary[]>
   /**
    * Open the underlying WebSocket (if not already open) and resolve
-   * once it reaches the OPEN state. Used as a T1.2 prewarm on
-   * worktree-pane mount so the user pays the DNS+TCP+TLS+WS
-   * handshake before they click a terminal tab. Returns silently on
-   * any failure (the next real `listSessions`/`attach` will retry
-   * and surface a real error if the server is unreachable).
+   * once it reaches the OPEN state. Used as a T1.2 prewarm when the
+   * user enters a repo so they pay the DNS+TCP+TLS+WS handshake
+   * before clicking a terminal tab. Idempotent (already-open socket
+   * resolves immediately) and best-effort (failures are swallowed;
+   * the next real `listSessions`/`attach` will retry and surface a
+   * real error if the server is unreachable). No parameters: the
+   * bridge maintains a single shared socket, not per-repo sockets.
    */
-  prewarm: (input: { repoRoot: string }) => Promise<void>
+  prewarm: () => Promise<void>
   /**
    * T5.1: force-reconnect if the socket is in a non-OPEN state.
    * Used as a recovery hook on `visibilitychange:visible` and

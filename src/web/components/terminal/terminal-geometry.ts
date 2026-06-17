@@ -83,11 +83,3 @@ function hasMeasurableBox(element: HTMLElement): boolean {
   const rect = element.getBoundingClientRect()
   return rect.width > 0 && rect.height > 0
 }
-
-/**
- * Test-only: clear the process-wide cell-metrics cache so the next
- * `measureTerminalCell()` call re-measures. There is no production
- * caller — the cache is only ever invalidated by a page reload, by
- * definition. This export exists so unit tests can exercise the
- * cache-miss path deterministically.
- */
