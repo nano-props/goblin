@@ -27,8 +27,8 @@ describe('normalizeWorkspaceSessionLayoutState', () => {
         detailPaneSizes: { 'top-bottom': 'bad' },
       }),
     ).toEqual({
-      workspaceLayout: 'top-bottom',
-      detailCollapsed: true,
+      workspaceLayout: 'left-right',
+      detailCollapsed: false,
       detailFocusMode: false,
       detailPaneSizes: DEFAULT_DETAIL_PANE_SIZES,
     })

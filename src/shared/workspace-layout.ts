@@ -4,7 +4,7 @@ export type WorkspaceLayout = (typeof WORKSPACE_LAYOUTS)[number]
 export type WorkspaceLayoutAxis = 'rows' | 'columns'
 export type WorkspaceDetailPaneSizes = Record<WorkspaceLayout, number>
 
-export const DEFAULT_WORKSPACE_LAYOUT: WorkspaceLayout = 'top-bottom'
+export const DEFAULT_WORKSPACE_LAYOUT: WorkspaceLayout = 'left-right'
 export const DEFAULT_DETAIL_COLLAPSED = true
 export const DEFAULT_DETAIL_FOCUS_MODE = false
 export const DEFAULT_DETAIL_PANE_SIZES: WorkspaceDetailPaneSizes = { 'top-bottom': 61.8, 'left-right': 61.8 }

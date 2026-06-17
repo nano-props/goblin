@@ -322,6 +322,7 @@ describe('setDetailTab', () => {
 
 describe('setWorkspaceLayout', () => {
   test('allows detail collapse changes in top-bottom layout', () => {
+    useReposStore.getState().setWorkspaceLayout('top-bottom')
     useReposStore.getState().setDetailCollapsed(false)
     expect(useReposStore.getState().detailCollapsed).toBe(false)
 
@@ -379,12 +380,12 @@ describe('setWorkspaceLayout', () => {
     test('forwards the new layout to the native menu when setWorkspaceLayout changes it', () => {
       const pushSpy = vi.spyOn(settingsClient, 'pushWorkspaceLayoutToNativeMenu').mockResolvedValue(undefined)
 
-      useReposStore.getState().setWorkspaceLayout('left-right')
+      useReposStore.getState().setWorkspaceLayout('top-bottom')
       // The push is fire-and-forget — wait a microtask for the Promise
       // resolution to settle before asserting.
       return Promise.resolve().then(() => {
         expect(pushSpy).toHaveBeenCalledTimes(1)
-        expect(pushSpy).toHaveBeenCalledWith('left-right')
+        expect(pushSpy).toHaveBeenCalledWith('top-bottom')
         pushSpy.mockRestore()
       })
     })
@@ -392,27 +393,27 @@ describe('setWorkspaceLayout', () => {
     test('does not forward when the layout is unchanged', () => {
       const pushSpy = vi.spyOn(settingsClient, 'pushWorkspaceLayoutToNativeMenu').mockResolvedValue(undefined)
 
-      // Default layout is 'top-bottom'; setting it again is a no-op.
-      useReposStore.getState().setWorkspaceLayout('top-bottom')
+      // Default layout is 'left-right'; setting it again is a no-op.
+      useReposStore.getState().setWorkspaceLayout('left-right')
 
       expect(pushSpy).not.toHaveBeenCalled()
       pushSpy.mockRestore()
     })
 
-    test('forwards the reset back to top-bottom so Cmd+J re-enables after a left-right detour', () => {
+    test('forwards the reset back to left-right after a top-bottom detour', () => {
       const pushSpy = vi.spyOn(settingsClient, 'pushWorkspaceLayoutToNativeMenu').mockResolvedValue(undefined)
 
-      useReposStore.getState().setWorkspaceLayout('left-right')
+      useReposStore.getState().setWorkspaceLayout('top-bottom')
       pushSpy.mockClear()
 
       useReposStore.getState().resetLayout()
 
       expect(pushSpy).toHaveBeenCalledTimes(1)
-      expect(pushSpy).toHaveBeenCalledWith('top-bottom')
+      expect(pushSpy).toHaveBeenCalledWith('left-right')
       pushSpy.mockRestore()
     })
 
-    test('does not push from resetLayout when already at top-bottom', () => {
+    test('does not push from resetLayout when already at left-right', () => {
       const pushSpy = vi.spyOn(settingsClient, 'pushWorkspaceLayoutToNativeMenu').mockResolvedValue(undefined)
 
       useReposStore.getState().resetLayout()
@@ -425,6 +426,7 @@ describe('setWorkspaceLayout', () => {
 
 describe('setDetailFocusMode', () => {
   test('enables focus mode and expands detail in top-bottom layout', () => {
+    useReposStore.getState().setWorkspaceLayout('top-bottom')
     useReposStore.getState().setDetailCollapsed(true)
 
     useReposStore.getState().setDetailFocusMode(true)
@@ -434,6 +436,7 @@ describe('setDetailFocusMode', () => {
   })
 
   test('keeps focus mode when detail is collapsed', () => {
+    useReposStore.getState().setWorkspaceLayout('top-bottom')
     useReposStore.getState().setDetailFocusMode(true)
 
     useReposStore.getState().setDetailCollapsed(true)
@@ -443,6 +446,7 @@ describe('setDetailFocusMode', () => {
   })
 
   test('exits focus mode without expanding a collapsed detail panel', () => {
+    useReposStore.getState().setWorkspaceLayout('top-bottom')
     useReposStore.getState().setDetailFocusMode(true)
     useReposStore.getState().setDetailCollapsed(true)
 
@@ -453,6 +457,7 @@ describe('setDetailFocusMode', () => {
   })
 
   test('re-expands into focus mode when focus is enabled while collapsed', () => {
+    useReposStore.getState().setWorkspaceLayout('top-bottom')
     useReposStore.getState().setDetailFocusMode(true)
     useReposStore.getState().setDetailCollapsed(true)
 
@@ -482,6 +487,7 @@ describe('setDetailFocusMode', () => {
 
   test('preserves focus preference when filtering leaves no selected branch', () => {
     seedRepo({ selectedBranch: 'main', branches: [branch('main')] })
+    useReposStore.getState().setWorkspaceLayout('top-bottom')
     useReposStore.getState().setDetailFocusMode(true)
 
     useReposStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
@@ -522,8 +528,8 @@ describe('resetLayout', () => {
 
     useReposStore.getState().resetLayout()
 
-    expect(useReposStore.getState().workspaceLayout).toBe('top-bottom')
-    expect(useReposStore.getState().detailCollapsed).toBe(true)
+    expect(useReposStore.getState().workspaceLayout).toBe('left-right')
+    expect(useReposStore.getState().detailCollapsed).toBe(false)
     expect(useReposStore.getState().detailFocusMode).toBe(false)
     expect(useReposStore.getState().detailPaneSizes).toBe(DEFAULT_DETAIL_PANE_SIZES)
   })

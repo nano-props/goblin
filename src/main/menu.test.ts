@@ -483,14 +483,14 @@ describe('app menu actions', () => {
     test('normalizes unknown layout values rather than persisting them', async () => {
       mocks.readMenuRuntimeState.mockReturnValue({
         ...defaultMenuRuntimeState(),
-        workspaceLayout: 'left-right',
+        workspaceLayout: 'top-bottom',
       })
       const { applyMenuWorkspaceLayout } = await import('#/main/menu.ts')
 
       const changed = applyMenuWorkspaceLayout('branches' as unknown as 'top-bottom')
 
       expect(changed).toBe(true)
-      expect(mocks.applyMenuRuntimeState).toHaveBeenCalledWith({ workspaceLayout: 'top-bottom' })
+      expect(mocks.applyMenuRuntimeState).toHaveBeenCalledWith({ workspaceLayout: 'left-right' })
     })
   })
 })

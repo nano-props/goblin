@@ -200,7 +200,7 @@ describe('web invalidation sync', () => {
     expect(useSessionRestoreStore.getState().bootSessionSnapshot).toMatchObject({
       openRepos: [],
       activeRepo: null,
-      workspaceLayout: 'top-bottom',
+      workspaceLayout: 'left-right',
     })
     expect(useThemeStore.getState()).toMatchObject({ pref: 'auto', resolved: 'light', colorTheme: 'default' })
   })

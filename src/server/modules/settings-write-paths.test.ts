@@ -184,6 +184,6 @@ describe('settings write paths', () => {
     })
     // Defaults fill in the omitted keys.
     expect(parsed.session.detailCollapsed).toBe(true)
-    expect(parsed.session.workspaceLayout).toBe('top-bottom')
+    expect(parsed.session.workspaceLayout).toBe('left-right')
   })
 })

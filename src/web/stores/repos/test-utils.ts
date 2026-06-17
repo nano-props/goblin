@@ -20,6 +20,7 @@ import {
   DEFAULT_DETAIL_COLLAPSED,
   DEFAULT_DETAIL_PANE_SIZES,
   DEFAULT_WORKSPACE_LAYOUT,
+  effectiveDetailCollapsed,
 } from '#/shared/workspace-layout.ts'
 export type IpcTestHandler = (input: any) => unknown
 
@@ -104,7 +105,7 @@ export function resetReposStore(): void {
     order: [],
     activeId: null,
     sessionReady: false,
-    detailCollapsed: DEFAULT_DETAIL_COLLAPSED,
+    detailCollapsed: effectiveDetailCollapsed(DEFAULT_WORKSPACE_LAYOUT, DEFAULT_DETAIL_COLLAPSED),
     detailFocusMode: false,
     workspaceLayout: DEFAULT_WORKSPACE_LAYOUT,
     detailPaneSizes: DEFAULT_DETAIL_PANE_SIZES,
