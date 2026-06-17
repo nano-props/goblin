@@ -430,10 +430,12 @@ These are already correct and stay unchanged:
      since mount. Before the first completion, pass
      `isLoading: true` to `TerminalTabs`.
   2. `TerminalTabs`, when `sessions.length === 0`:
-     - if `isLoading`: render 3 placeholder tab chips with
-       a subtle pulse animation (not a spinner — spinner
-       implies work in a fixed location; pulse communicates
-       "we don't know how many tabs yet").
+     - if `isLoading`: render 3 placeholder tab chips,
+       each with a spinner inside (per the user's
+       original request: "loading spinner is also OK").
+       The exact animation is an implementation
+       detail; the contract is "3 visible placeholders
+       that disappear when the real tabs arrive".
      - else: render the existing single "+ New" button
        (current behavior).
   3. The `TerminalSlot` "Opening..." overlay already covers
@@ -461,15 +463,29 @@ These are already correct and stay unchanged:
   - **Writer (single)**: `reconcileServerSessions` success
     path only. Every successful reconcile overwrites the
     key.
-  - **Reader (single)**: Provider mount /
-    `syncServerSessions` start. Used as a *render hint*,
-    never as a source of truth.
+  - **Reader (single)**: Provider mount only. The cache
+    is **not** read on subsequent `syncServerSessions`
+    calls (window focus, sessions-changed events)
+    because the registry already has live data in those
+    cases — reading the cache would briefly override it
+    and cause a "flash back to last session's tabs"
+    regression. Implementation: read the cache inside
+    `useState(() => readCachedSessionList(...))` at the
+    top of `TerminalSessionProvider`, then never read it
+    again.
   - **Invalidation**: implicit — the next reconcile
-    overwrites the key. There is no other writer and no
-    expiration timer. (The "no TTL" choice is deliberate:
-    single-user, low churn, and the server reconciles
-    frequently enough that stale data is bounded by user
-    activity.)
+    overwrites the key. There is no other writer.
+  - **Read-time guard (optional, recommended)**:
+    on read, check `savedAt` against
+    `Date.now() - MAX_CACHED_SESSION_AGE_MS` (e.g.
+    10 minutes). If the cache is older, ignore it and
+    fall back to T6.1's skeleton. This bounds the
+    "phantom tab flash" window for the case where the
+    user closes the browser and returns hours later
+    — without it, the cache could be arbitrarily old.
+    Without this guard, the `evictOrphanedLocalSessions`
+    filter still removes stale entries correctly, but
+    the user sees the flash for longer.
 - **Stale handling**:
   - Cached entries the server has since closed are filtered
     by the existing `evictOrphanedLocalSessions` path
@@ -526,10 +542,14 @@ These are already correct and stay unchanged:
 - **Use IndexedDB instead of sessionStorage** — overkill
   for ~2 KB per worktree; sessionStorage is synchronous
   and bounded for the use case.
-- **Add a TTL to the cached session list** — false sense
-  of safety. The cache is always overwritten by the next
-  reconcile; a TTL would just produce more "expired"
-  reads that the existing filter already handles.
+- **Add a hard TTL to the cached session list** — false
+  sense of safety. The cache is always overwritten by the
+  next reconcile; a hard TTL would just produce more
+  "expired" reads that the existing filter already
+  handles. (The *optional* read-time guard in T6.2 is
+  different: it's a soft age cap that just chooses
+  between cache-vs-skeleton at read time, not an
+  expiration that actively invalidates the entry.)
 
 ## 5. Preflight (do this first)
 
