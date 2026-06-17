@@ -272,6 +272,49 @@ describe('BranchDetailToolbar', () => {
     expect(showRepoDetailTab).toHaveBeenLastCalledWith(REPO_ID, 'status')
     expect(document.activeElement).toBe(statusTab)
   })
+
+  test('T1.2: prewarms the WebSocket on mount with the active worktreeTerminalKey', async () => {
+    const prewarm = vi.fn(async () => {})
+    setRendererBridgeForTests({
+      kind: () => 'electron',
+      hasCapability: () => false,
+      getBootstrap: emptyRendererBridgeBootstrap,
+      invokeIpc: vi.fn(async () => null),
+      abortIpc: vi.fn(async () => false),
+      onIpcEvent: vi.fn(() => () => {}),
+      onEffectIntent: vi.fn(() => () => {}),
+      pathForFile: vi.fn(() => ''),
+      saveClipboardFiles: vi.fn(async () => []),
+      shell: () => null,
+      terminal: () => ({
+        attach: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
+        restart: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
+        write: vi.fn(async () => false),
+        resize: vi.fn(async () => false),
+        takeover: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
+        close: vi.fn(async () => false),
+        create: vi.fn(async () => ({ ok: true as const, action: 'created' as const, key: 'k', sessions: [] })),
+        pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
+        listSessions: vi.fn(async () => []),
+        prewarm,
+        getSessionSnapshot: vi.fn(async () => null),
+        reorder: vi.fn(async () => false),
+        notifyBell: vi.fn(async () => false),
+        sendTestNotification: vi.fn(async () => false),
+        setBadge: () => {},
+        onOutput: () => () => {},
+        onTitle: () => () => {},
+        onExit: () => () => {},
+        onOwnership: () => () => {},
+        onSessionsChanged: () => () => {},
+      }),
+    })
+
+    renderToolbar({ terminalCount: 0, navigation: navigationWith({}) })
+    await flush()
+
+    expect(prewarm).toHaveBeenCalledWith({ repoRoot: `${REPO_ID}\0${WORKTREE_PATH}` })
+  })
 })
 
 function renderToolbar(options: {

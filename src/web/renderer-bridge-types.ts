@@ -35,6 +35,15 @@ export interface RendererTerminalBridge {
   create: (input: TerminalCreateInput) => Promise<TerminalCatalogMutationResult>
   pruneTerminals: (repoRoot: string) => Promise<{ pruned: number; remaining: number }>
   listSessions: (input: { repoRoot: string }) => Promise<TerminalSessionSummary[]>
+  /**
+   * Open the underlying WebSocket (if not already open) and resolve
+   * once it reaches the OPEN state. Used as a T1.2 prewarm on
+   * worktree-pane mount so the user pays the DNS+TCP+TLS+WS
+   * handshake before they click a terminal tab. Returns silently on
+   * any failure (the next real `listSessions`/`attach` will retry
+   * and surface a real error if the server is unreachable).
+   */
+  prewarm: (input: { repoRoot: string }) => Promise<void>
   getSessionSnapshot: (input: TerminalSessionSnapshotInput) => Promise<TerminalSessionSnapshot | null>
   reorder: (input: TerminalReorderInput) => Promise<TerminalMutationResult>
   notifyBell: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>

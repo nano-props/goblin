@@ -12,6 +12,7 @@ import {
   TerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import { readOrCreateWebTerminalAttachmentId } from '#/web/renderer-terminal-bridge.ts'
+import { preloadTerminalFont } from '#/web/components/terminal/terminal-geometry.ts'
 import { loadTerminalSessions } from '#/web/terminal-session-queries.ts'
 import { TerminalSessionRegistry } from '#/web/components/terminal/TerminalSessionRegistry.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
@@ -37,6 +38,16 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   currentRepoIdRef.current = currentRepoId
   const repoIndexRef = useRef(repoIndex)
   repoIndexRef.current = repoIndex
+
+  // T1.1: prewarm the terminal font at app startup. The provider lives at
+  // the router root above the per-route App, so this fires once per app
+  // run (no `key` prop on the provider). preloadTerminalFont is
+  // idempotent — `document.fonts.check` short-circuits on the second
+  // call when openPhase's own preload fires. Failure is swallowed
+  // inside the function; we don't surface it.
+  useEffect(() => {
+    void preloadTerminalFont()
+  }, [])
 
   const registryRef = useRef<TerminalSessionRegistry | null>(null)
   if (!registryRef.current) {

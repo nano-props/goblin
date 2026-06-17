@@ -363,7 +363,15 @@ export class ManagedTerminalSession {
     await waitForTerminalLayout()
     this.guardStart(token, term)
     this.view.fitNow()
-    await waitForTerminalLayout()
+    // The post-fitNow rAF barrier is intentionally concurrent with the
+    // subsequent ipcPhase.attach: view.fitNow() is synchronous, so
+    // term.cols/term.rows are correct the moment we return from openPhase,
+    // and the attach IPC reads them synchronously when ipcPhase runs.
+    // The rAF settles the *layout paint* for measurement accuracy in
+    // later operations, but the attach roundtrip doesn't need that
+    // paint to have completed. A future refactor that turns attach into
+    // a local cache lookup MUST restore the blocking wait (T1.3).
+    void waitForTerminalLayout()
     this.guardStart(token, term)
     return { term, preloaded }
   }

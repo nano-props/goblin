@@ -578,6 +578,7 @@ beforeEach(() => {
       ),
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       listSessions: vi.fn(async () => []),
+      prewarm: vi.fn(async () => {}),
       getSessionSnapshot: vi.fn(async () => null),
       reorder: vi.fn(async () => true),
       notifyBell: terminalCalls.notifyBell.mockResolvedValue(true),

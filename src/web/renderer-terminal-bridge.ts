@@ -238,6 +238,18 @@ export function createServerTerminalBridge(options: {
         return sessions
       })
     },
+    prewarm() {
+      // T1.2: pay the WebSocket handshake cost on worktree-pane mount
+      // so the first real IPC after the user clicks a terminal tab
+      // doesn't have to. waitForSocketOpen() resolves immediately if
+      // the socket is already OPEN; otherwise it calls ensureSocket()
+      // and waits for the 'open' event. Swallow failures — this is
+      // a best-effort optimization, the next real call will surface
+      // any actual problem.
+      return waitForSocketOpen()
+        .then(() => undefined)
+        .catch(() => {})
+    },
     getSessionSnapshot(input) {
       return requestOverSocket('session-snapshot', input satisfies TerminalSessionSnapshotInput).then((value) => {
         if (value === null) return null

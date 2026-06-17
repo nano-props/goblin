@@ -477,6 +477,7 @@ beforeEach(() => {
       create: createTerminalMock,
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       listSessions: listSessionsMock,
+      prewarm: vi.fn(async () => {}),
       getSessionSnapshot: getSessionSnapshotMock,
       reorder: vi.fn(async () => true),
       notifyBell: window.goblinNative.terminal.notifyBell,
@@ -1630,6 +1631,30 @@ describe('TerminalSessionProvider', () => {
       expect(getProbe()).toMatchObject({ count: 0, terminalIds: [] })
     } finally {
       await unmount()
+    }
+  })
+
+  test('T1.1: prewarms preloadTerminalFont on provider mount', async () => {
+    geometryMocks.preloadTerminalFont.mockClear()
+    // Mount the Provider with no children that go through the host
+    // registration path (no RegisterHost, no probes) so the only
+    // preloadTerminalFont call comes from the new useEffect in
+    // TerminalSessionProvider itself.
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    try {
+      await act(async () => {
+        root.render(
+          <TerminalSessionProvider>
+            <span>probe</span>
+          </TerminalSessionProvider>,
+        )
+      })
+      expect(geometryMocks.preloadTerminalFont).toHaveBeenCalledTimes(1)
+    } finally {
+      await act(async () => root.unmount())
+      container.remove()
     }
   })
 })
