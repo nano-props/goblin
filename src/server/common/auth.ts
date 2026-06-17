@@ -1,26 +1,7 @@
 import type { MiddlewareHandler } from 'hono'
 import { safeEqualString } from '#/server/common/timing-safe.ts'
 import { errorJson } from '#/server/common/responses.ts'
-
-/**
- * Cookie / header / query names for the persistent access token.
- *
- * - `goblin_access_token` cookie: set by `POST /api/login` after a
- *   successful token submission. http-only, SameSite=Lax,
- *   Max-Age=1y. Used by browser clients on same-origin requests.
- * - `x-goblin-access-token` header: sent by the embedded Electron
- *   renderer, which fetches the token via IPC and cannot use
- *   cookies from a `file://` origin.
- * - `?t=<token>` query: WebSocket fallback. Browsers cannot set WS
- *   headers, so the embedded renderer also uses this for WS
- *   upgrades. Non-browser clients (LAN CLI) use it too.
- *
- * Keep these in lockstep with the renderer (see
- * `src/web/lib/server-fetch.ts` and `src/web/renderer-terminal-bridge.ts`).
- */
-export const ACCESS_TOKEN_COOKIE = 'goblin_access_token'
-export const ACCESS_TOKEN_HEADER = 'x-goblin-access-token'
-export const ACCESS_TOKEN_QUERY = 't'
+import { ACCESS_TOKEN_COOKIE, ACCESS_TOKEN_HEADER, ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
 
 /**
  * Auth middleware for the access token. Accepts the token through

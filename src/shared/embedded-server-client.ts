@@ -1,4 +1,5 @@
 import { getEmbeddedServerIpcRoute, type EmbeddedServerIpcPath } from '#/shared/embedded-server-ipc-routes.ts'
+import { ACCESS_TOKEN_HEADER } from '#/shared/access-token.ts'
 
 export interface EmbeddedServerRuntime {
   url: string
@@ -13,7 +14,7 @@ export async function requestEmbeddedServerJson<T>(
   const response = await fetch(new URL(path, runtime.url).toString(), {
     ...init,
     headers: {
-      'x-goblin-access-token': runtime.accessToken,
+      [ACCESS_TOKEN_HEADER]: runtime.accessToken,
       ...(init?.headers ?? {}),
     },
   })

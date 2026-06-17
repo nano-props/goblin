@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchServerJson, postServerJson } from '#/web/lib/server-fetch.ts'
+import { ACCESS_TOKEN_URL_PARAM } from '#/shared/access-token.ts'
 
 export type AccessTokenStatus = 'checking' | 'authenticated' | 'unauthenticated'
 
@@ -20,7 +21,7 @@ export interface AccessTokenStatusState {
 function readAccessTokenFromUrl(): string | null {
   try {
     const params = new URLSearchParams(window.location.search)
-    const token = params.get('accessToken')?.trim()
+    const token = params.get(ACCESS_TOKEN_URL_PARAM)?.trim()
     return token && token.length > 0 ? token : null
   } catch {
     return null
@@ -29,15 +30,15 @@ function readAccessTokenFromUrl(): string | null {
 
 /**
  * Strip the `accessToken` query param from the URL bar (and from
- * the history entry) without reloading the page. Called after a
- * successful `POST /api/login` so the token doesn't linger in
- * browser history or get sent as a `Referer` header.
+ * the history entry) without reloading the page. Called after any
+ * URL-token consume — successful or not — so the token doesn't
+ * linger in browser history or get sent as a `Referer` header.
  */
 function stripAccessTokenFromUrl(): void {
   try {
     const url = new URL(window.location.href)
-    if (!url.searchParams.has('accessToken')) return
-    url.searchParams.delete('accessToken')
+    if (!url.searchParams.has(ACCESS_TOKEN_URL_PARAM)) return
+    url.searchParams.delete(ACCESS_TOKEN_URL_PARAM)
     const next = url.pathname + (url.search ? `?${url.searchParams.toString()}` : '') + url.hash
     window.history.replaceState(window.history.state, '', next)
   } catch {}
@@ -70,14 +71,25 @@ export function useAccessTokenStatus(): AccessTokenStatusState {
       // the manual login form on the next whoami.
       const urlToken = readAccessTokenFromUrl()
       if (urlToken) {
+        let loginOk = false
         try {
           await postServerJson<{ token: string }, { ok: true }>('/api/login', { token: urlToken })
-          if (cancelled) return
-          stripAccessTokenFromUrl()
+          loginOk = true
         } catch {
-          // Bad token or network error: leave the URL token in place
-          // so the user can see what they scanned, and let whoami
-          // report 401 below.
+          // Bad token (401) or network error. Either way, strip the
+          // token from the URL: on a successful login the cookie
+          // outlives the URL, and on a failure the token must not
+          // linger — it would otherwise be sent as `Referer` on
+          // any subsequent same-origin request and stay in browser
+          // history indefinitely. The login form re-appears
+          // (state = unauthenticated below) so the user can paste
+          // a corrected token by hand.
+        }
+        if (cancelled) return
+        stripAccessTokenFromUrl()
+        if (!loginOk) {
+          setState('unauthenticated')
+          return
         }
       }
       // Step 2: probe the auth state.

@@ -1,13 +1,6 @@
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
 import { resolveApiBaseUrl } from '#/web/lib/websocket-url.ts'
-
-/**
- * Mirrors `ACCESS_TOKEN_HEADER` in `#/server/common/auth.ts`. Kept
- * inline here so the renderer bundle does not pull in the server
- * module (which imports `hono`, `node:*`, etc.). Update both if the
- * header name ever changes.
- */
-const ACCESS_TOKEN_HEADER = 'x-goblin-access-token'
+import { ACCESS_TOKEN_HEADER } from '#/shared/access-token.ts'
 
 interface EmbeddedServerConfig {
   url: string

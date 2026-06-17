@@ -1,5 +1,6 @@
 import type { RendererBootstrapSnapshot, RendererPlatform, RendererRuntimeSnapshot } from '#/shared/bootstrap.ts'
 import { RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { ACCESS_TOKEN_URL_PARAM } from '#/shared/access-token.ts'
 
 /**
  * Web-hosted renderers have no host OS, so we fall back to a sentinel
@@ -107,7 +108,7 @@ export function readInjectedWebBootstrap(): RendererBootstrapSnapshot | null {
 export function readQueryBootstrap(createWebTerminalClientId: () => string): RendererBootstrapSnapshot | null {
   try {
     const params = new URLSearchParams(window.location.search)
-    const accessToken = params.get('accessToken')?.trim()
+    const accessToken = params.get(ACCESS_TOKEN_URL_PARAM)?.trim()
     const clientId = normalizeServerClientId(params.get('goblinServerClientId')?.trim()) ?? createWebTerminalClientId()
     if (!accessToken) return null
     const url = normalizeServerUrl(params.get('goblinServerUrl')?.trim() || window.location.origin)

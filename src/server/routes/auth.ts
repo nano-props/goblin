@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { setCookie, deleteCookie } from 'hono/cookie'
-import { ACCESS_TOKEN_COOKIE, createAccessTokenMiddleware } from '#/server/common/auth.ts'
+import { createAccessTokenMiddleware } from '#/server/common/auth.ts'
+import { ACCESS_TOKEN_COOKIE } from '#/shared/access-token.ts'
 import { errorJson } from '#/server/common/responses.ts'
 import { safeEqualString } from '#/server/common/timing-safe.ts'
 

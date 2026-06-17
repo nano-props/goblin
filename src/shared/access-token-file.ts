@@ -4,14 +4,6 @@ import { randomBytes } from 'node:crypto'
 import { serverDataDir } from '#/shared/data-dir.ts'
 
 const TOKEN_FILE = 'server-token'
-
-/**
- * Public name of the access token file. Exported so the Electron
- * main process can build the same path the server uses (the main
- * deletes the file before restarting the embedded server during
- * a rotation; see `#/main/access-token-bridge.ts`).
- */
-export const ACCESS_TOKEN_FILE_NAME = TOKEN_FILE
 // 25 base36 chars, exactly 128 bits of entropy (16 random bytes).
 // Keep this regex in lockstep with `generateAccessToken` below — it
 // catches corruption from a torn write or hand-edited file.

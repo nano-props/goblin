@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Copy, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
+import { ACCESS_TOKEN_URL_PARAM } from '#/shared/access-token.ts'
 import { SettingsGroup, SettingsList, SettingsRow } from '#/web/components/settings/SettingsPrimitives.tsx'
 import { Switch } from '#/web/components/ui/switch.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
@@ -95,9 +96,6 @@ export function WebSettings() {
       // cookie, and strips the URL. After the next tick the user is
       // logged in with the new token — no manual paste required.
       try {
-        window.localStorage.setItem('goblin:rotated-access-token', next)
-      } catch {}
-      try {
         await postServerJson('/api/logout', {})
       } catch {
         // Best-effort: the cookie may already be invalid against the
@@ -108,7 +106,7 @@ export function WebSettings() {
         window.history.replaceState(
           window.history.state,
           '',
-          `${window.location.pathname}?accessToken=${encodeURIComponent(next)}${window.location.hash}`,
+          `${window.location.pathname}?${ACCESS_TOKEN_URL_PARAM}=${encodeURIComponent(next)}${window.location.hash}`,
         )
       } catch {}
       window.location.reload()

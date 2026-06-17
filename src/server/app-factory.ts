@@ -6,7 +6,8 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { bodyLimit } from 'hono/body-limit'
 import { serveStatic } from '@hono/node-server/serve-static'
-import { ACCESS_TOKEN_HEADER, createAccessTokenMiddleware } from '#/server/common/auth.ts'
+import { createAccessTokenMiddleware } from '#/server/common/auth.ts'
+import { ACCESS_TOKEN_HEADER } from '#/shared/access-token.ts'
 import { applyApiSecurityHeaders, buildCorsOriginPredicate } from '#/server/common/http-harden.ts'
 import { accessLog } from '#/server/common/access-log.ts'
 import { errorJson } from '#/server/common/responses.ts'
@@ -216,6 +217,28 @@ export function createApp(options: ServerAppOptions): Hono {
   // cookie, and the only thing they prove is that the caller knows
   // the token (or already has a valid cookie).
   app.route('/api', createAuthRoutes({ accessToken: options.accessToken }))
+  // Body limit on the auth surface. The login route accepts an
+  // unauthenticated JSON body (the only field is a 25-char base36
+  // token — a few hundred bytes). Capping at 1 KiB stops a hostile
+  // LAN client from POSTing a 100 MB body to /api/login and forcing
+  // the server to allocate that much before the empty-token check
+  // can return 400. `bodyLimit` short-circuits on Content-Length
+  // before the JSON parser runs, so the cap is enforced without
+  // needing to read the body.
+  app.use(
+    '/api/login',
+    bodyLimit({
+      maxSize: 1024,
+      onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
+    }),
+  )
+  app.use(
+    '/api/logout',
+    bodyLimit({
+      maxSize: 1024,
+      onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
+    }),
+  )
   app.use('/api/settings/*', createAccessTokenMiddleware(options.accessToken))
   app.use(
     '/api/settings/*',
