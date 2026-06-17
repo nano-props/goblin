@@ -100,12 +100,16 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       return isValidTerminalClientId(value)
     },
     getDiagnostics() {
+      const bufferStats = manager.getSessionBufferStats()
       return {
         mode: ptySupervisor.getDiagnostics().mode,
         state: shuttingDown ? 'shutting-down' : 'running',
         registeredSockets: broker.socketCount(),
         shuttingDown,
         pty: ptySupervisor.getDiagnostics(),
+        liveSessionCount: bufferStats.count,
+        totalRingBufferChars: bufferStats.totalBufferChars,
+        maxRingBufferChars: bufferStats.maxBufferChars,
       }
     },
     registerSocket(clientId, attachmentId, socket) {
