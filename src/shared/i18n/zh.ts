@@ -301,6 +301,7 @@ export const zh: Record<DictKey, string> = {
 
   // ---- Terminal ----------------------------------------------------------
   'terminal.opening': '正在打开终端…',
+  'terminal.loading': '正在加载终端…',
   'terminal.restart': '重启终端',
   'terminal.search-placeholder': '搜索终端',
   'terminal.search-no-results': '无结果',

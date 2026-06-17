@@ -403,6 +403,26 @@ export class TerminalSessionManager<TOwner extends string | number> {
     return session?.ownerId === ownerId ? session : undefined
   }
 
+  // T4.1: aggregate replay-buffer stats across all live sessions, for
+  // exposure via `ServerTerminalHost.getDiagnostics()`. The per-session
+  // buffer is the source of truth for reattach; the renderer caches
+  // a copy but the server's view is the authoritative memory number.
+  // The char count is a close approximation of bytes for terminal
+  // output (mostly ASCII); full UTF-16 byte count would be
+  // `buffer.length * 2` and is an upper bound.
+  getSessionBufferStats(): { count: number; totalBufferChars: number; maxBufferChars: number } {
+    let count = 0
+    let totalBufferChars = 0
+    let maxBufferChars = 0
+    for (const session of this.sessionsById.values()) {
+      count += 1
+      const chars = session.render.buffer.length
+      totalBufferChars += chars
+      if (chars > maxBufferChars) maxBufferChars = chars
+    }
+    return { count, totalBufferChars, maxBufferChars }
+  }
+
   private closeOwnerKey(ownerId: TOwner, key: string): void {
     const id = this.sessionIdByOwnerKey.get(this.sessionOwnerKey(ownerId, key))
     if (id) this.closeSession(id)

@@ -62,6 +62,17 @@ export interface ServerTerminalHostDiagnostics {
   registeredSockets: number
   shuttingDown: boolean
   pty: PtySupervisorDiagnostics
+  /**
+   * T4.1: aggregate stats across all live terminal sessions.
+   * `liveSessionCount` is the number of in-memory sessions owned by
+   * the manager; `totalRingBufferChars` and `maxRingBufferChars` are
+   * the sum and the maximum per-session replay buffer size, in
+   * JavaScript string chars (close to bytes for ASCII-heavy terminal
+   * output; an upper bound is `chars * 2` for full UTF-16).
+   */
+  liveSessionCount: number
+  totalRingBufferChars: number
+  maxRingBufferChars: number
 }
 
 export interface ServerTerminalHost {

@@ -353,7 +353,15 @@ export class ManagedTerminalSession {
     await waitForTerminalLayout()
     this.guardStart(token, term)
     this.view.fitNow()
-    await waitForTerminalLayout()
+    // The post-fitNow rAF barrier is intentionally concurrent with the
+    // subsequent ipcPhase.attach: view.fitNow() is synchronous, so
+    // term.cols/term.rows are correct the moment we return from openPhase,
+    // and the attach IPC reads them synchronously when ipcPhase runs.
+    // The rAF settles the *layout paint* for measurement accuracy in
+    // later operations, but the attach roundtrip doesn't need that
+    // paint to have completed. A future refactor that turns attach into
+    // a local cache lookup MUST restore the blocking wait.
+    void waitForTerminalLayout()
     this.guardStart(token, term)
     return { term, preloaded }
   }
@@ -461,6 +469,13 @@ export class ManagedTerminalSession {
     try {
       term.reset()
       if (hydratedSnapshot.snapshot) await termWrite(term, hydratedSnapshot.snapshot)
+      // Identity check: a concurrent hydrate() between termWrite start
+      // and resolve may have already replaced this.hydratedSnapshot
+      // with a fresher value. Clearing in that case would discard it;
+      // we leave the new value for its own write path to clear.
+      if (this.hydratedSnapshot === hydratedSnapshot) {
+        this.hydratedSnapshot = { snapshot: '', snapshotSeq: 0 }
+      }
       return this.currentStart(token, term)
     } catch (err) {
       // Term write failed — drop the replay window so the boundary
@@ -475,7 +490,16 @@ export class ManagedTerminalSession {
     const hydratedSnapshot = this.hydratedSnapshot
     if (!term) return
     term.reset()
-    if (hydratedSnapshot.snapshot.length > 0) term.write(hydratedSnapshot.snapshot)
+    if (hydratedSnapshot.snapshot.length === 0) return
+    term.write(hydratedSnapshot.snapshot, () => {
+      // Identity check: see preloadHydratedSnapshot. A concurrent
+      // hydrate() may have replaced this.hydratedSnapshot since we
+      // captured the local reference; only clear if it still points
+      // at the snapshot we just wrote.
+      if (this.hydratedSnapshot === hydratedSnapshot) {
+        this.hydratedSnapshot = { snapshot: '', snapshotSeq: 0 }
+      }
+    })
   }
 
   private queueResize(cols: number, rows: number): void {

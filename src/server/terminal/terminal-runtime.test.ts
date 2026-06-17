@@ -951,4 +951,49 @@ describe('server terminal runtime', () => {
     host.unregisterSocket('client_1', 'attachment_a', socket)
     shutdown()
   })
+
+  test('T4.1: getDiagnostics exposes aggregate live session count and ring buffer stats', async () => {
+    const { host, shutdown } = buildRuntime()
+    try {
+      // Empty runtime: no sessions, no buffers.
+      let stats = host.getDiagnostics()
+      expect(stats.liveSessionCount).toBe(0)
+      expect(stats.totalRingBufferChars).toBe(0)
+      expect(stats.maxRingBufferChars).toBe(0)
+
+      // Create two sessions; their buffers start empty.
+      const sessionA = await createTerminalSession(host, 'client_1')
+      const sessionB = await createTerminalSession(host, 'client_1')
+      stats = host.getDiagnostics()
+      expect(stats.liveSessionCount).toBe(2)
+      expect(stats.totalRingBufferChars).toBe(0)
+      expect(stats.maxRingBufferChars).toBe(0)
+
+      // Emit data into the first session's PTY. The manager's
+      // onOutput sink routes through broker.broadcast but also
+      // appends to the per-session render buffer, which is what
+      // the new diagnostic fields measure.
+      mockPtys[0]?.emitData('aaaaa')
+      stats = host.getDiagnostics()
+      expect(stats.liveSessionCount).toBe(2)
+      expect(stats.totalRingBufferChars).toBe(5)
+      expect(stats.maxRingBufferChars).toBe(5)
+
+      // Emit more data into the second session. The max should
+      // track the larger of the two; the total should sum both.
+      mockPtys[1]?.emitData('bbbbbbbbbb')
+      stats = host.getDiagnostics()
+      expect(stats.liveSessionCount).toBe(2)
+      expect(stats.totalRingBufferChars).toBe(15)
+      expect(stats.maxRingBufferChars).toBe(10)
+
+      // The sessionA / sessionB identifiers are unused here — the
+      // assertion is on aggregate state, not on which mock PTY
+      // was which. Reference them so the linter doesn't complain
+      // about unused locals.
+      expect([sessionA, sessionB]).toHaveLength(2)
+    } finally {
+      shutdown()
+    }
+  })
 })

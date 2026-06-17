@@ -12,6 +12,7 @@ import {
   TerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import { readOrCreateWebTerminalAttachmentId } from '#/web/renderer-terminal-bridge.ts'
+import { preloadTerminalFont } from '#/web/components/terminal/terminal-geometry.ts'
 import { loadTerminalSessions } from '#/web/terminal-session-queries.ts'
 import { TerminalSessionRegistry } from '#/web/components/terminal/TerminalSessionRegistry.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
@@ -37,6 +38,16 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   currentRepoIdRef.current = currentRepoId
   const repoIndexRef = useRef(repoIndex)
   repoIndexRef.current = repoIndex
+
+  // T1.1: prewarm the terminal font at app startup. The provider lives at
+  // the router root above the per-route App, so this fires once per app
+  // run (no `key` prop on the provider). preloadTerminalFont is
+  // idempotent — `document.fonts.check` short-circuits on the second
+  // call when openPhase's own preload fires. Failure is swallowed
+  // inside the function; we don't surface it.
+  useEffect(() => {
+    void preloadTerminalFont()
+  }, [])
 
   const registryRef = useRef<TerminalSessionRegistry | null>(null)
   if (!registryRef.current) {
@@ -106,6 +117,36 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   useEffect(() => {
     registry.setParkingRoot(parkingRootRef.current)
   })
+
+  // T5.1: visibility recovery hook. On `visibilitychange:visible` and
+  // on `pageshow` (bfcache restore on Safari/Firefox mobile), call
+  // `kickReconnect()` so a backgrounded tab reconnects without
+  // waiting for the 300ms backoff. The kick is a no-op if the socket
+  // is already healthy, so it costs nothing on a desktop browser
+  // where the WS rarely drops. No periodic polling, no force-close
+  // of a working socket. State updates flow through the existing
+  // server-push `sessions-changed` event after the (re)opened
+  // socket delivers its initial snapshot — we never trigger a
+  // client-side reconcile here.
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return
+      terminalBridge.kickReconnect()
+    }
+    const onPageShow = (event: PageTransitionEvent) => {
+      // `event.persisted === true` means the page came from the
+      // bfcache (Safari/Firefox mobile). A non-persisted pageshow
+      // is a regular full load and the bridge is already healthy.
+      if (!event.persisted) return
+      terminalBridge.kickReconnect()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('pageshow', onPageShow)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('pageshow', onPageShow)
+    }
+  }, [])
 
   // Registry lifecycle (event listeners + bridge + destroy)
   useEffect(() => {

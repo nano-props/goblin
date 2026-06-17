@@ -180,6 +180,8 @@ describe('renderer bootstrap', () => {
             : { ok: true as const, action: 'created' as const, key: 'repo\0worktree\0terminal-2', sessions: [] },
         pruneTerminals: async () => ({ pruned: 0, remaining: 0 }),
         listSessions: async () => [],
+        prewarm: async () => {},
+        kickReconnect: () => {},
         getSessionSnapshot: async () => null,
         reorder: async () => false,
         notifyBell: async () => false,

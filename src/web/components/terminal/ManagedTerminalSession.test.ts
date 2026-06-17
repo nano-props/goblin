@@ -578,6 +578,8 @@ beforeEach(() => {
       ),
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       listSessions: vi.fn(async () => []),
+      prewarm: vi.fn(async () => {}),
+      kickReconnect: vi.fn(() => {}),
       getSessionSnapshot: vi.fn(async () => null),
       reorder: vi.fn(async () => true),
       notifyBell: terminalCalls.notifyBell.mockResolvedValue(true),
@@ -626,7 +628,10 @@ describe('ManagedTerminalSession', () => {
     // Park preloadTerminalFont so the orchestrator yields mid-openPhase.
     let resolvePreload!: () => void
     geometryMocks.preloadTerminalFont.mockImplementationOnce(
-      () => new Promise<void>((r) => { resolvePreload = r }),
+      () =>
+        new Promise<void>((r) => {
+          resolvePreload = r
+        }),
     )
 
     const session = new ManagedTerminalSession(descriptor, vi.fn())
@@ -1093,6 +1098,76 @@ describe('ManagedTerminalSession', () => {
     expect(terminalCalls.attach).toHaveBeenCalled()
   })
 
+  test('clears hydratedSnapshot after preloadHydratedSnapshot writes the snapshot to the term', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+
+    session.hydrate({
+      sessionId: 'session-remote',
+      phase: 'open',
+      message: null,
+      processName: 'node',
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalCols: 120,
+      canonicalRows: 40,
+      snapshot: 'hydrated-screen',
+      snapshotSeq: 5,
+    })
+    // Sanity-check the leak precondition: hydrate() populated the field.
+    expect(
+      (session as unknown as { hydratedSnapshot: { snapshot: string; snapshotSeq: number } }).hydratedSnapshot,
+    ).toEqual({ snapshot: 'hydrated-screen', snapshotSeq: 5 })
+
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    // The T1.5 fix: after the write resolves, the field should be reset
+    // to the empty sentinel so we don't keep a stale up-to-16 MiB copy
+    // around until the next hydrate().
+    expect(hydratedSnapshot(session)).toEqual({ snapshot: '', snapshotSeq: 0 })
+  })
+
+  test('clears hydratedSnapshot after applyHydratedSnapshotToActiveView writes the snapshot to the term', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    const term = xtermMocks.terminals[0]!
+    term.reset.mockClear()
+    term.write.mockClear()
+
+    // hydrate() with a different sessionId triggers
+    // applyHydratedSnapshotToActiveView on the existing term (line 204).
+    session.hydrate({
+      sessionId: 'session-2',
+      phase: 'open',
+      message: null,
+      processName: 'node',
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalCols: 120,
+      canonicalRows: 40,
+      snapshot: 'rehydrated',
+      snapshotSeq: 7,
+    })
+
+    expect(term.write).toHaveBeenCalledWith('rehydrated', expect.any(Function))
+
+    // The T1.5 fix: after the term.write callback fires, the field is
+    // cleared. The mock invokes the callback via queueMicrotask, so
+    // draining microtasks is enough to observe the post-callback state.
+    await flushResizeDispatch()
+    expect(hydratedSnapshot(session)).toEqual({ snapshot: '', snapshotSeq: 0 })
+  })
+
   test('resets an existing terminal view when hydrate switches to a different session id', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
@@ -1121,7 +1196,9 @@ describe('ManagedTerminalSession', () => {
     await flushTerminalStart()
 
     expect(term.reset).toHaveBeenCalled()
-    expect(term.write).toHaveBeenCalledWith('remote-screen')
+    // T1.5: applyHydratedSnapshotToActiveView now passes a callback as the
+    // second arg so it can clear the field after the write resolves.
+    expect(term.write).toHaveBeenCalledWith('remote-screen', expect.any(Function))
     expect(session.currentSessionId()).toBe('session-remote')
   })
 
@@ -1695,6 +1772,10 @@ function hydrateManagedSession(
     snapshotSeq: 0,
     ...overrides,
   })
+}
+
+function hydratedSnapshot(session: ManagedTerminalSession): { snapshot: string; snapshotSeq: number } {
+  return (session as unknown as { hydratedSnapshot: { snapshot: string; snapshotSeq: number } }).hydratedSnapshot
 }
 
 function deferred<T>() {

@@ -54,6 +54,9 @@ const terminalHostStub = {
       lastExitSignal: null,
       lastFailure: null,
     },
+    liveSessionCount: 0,
+    totalRingBufferChars: 0,
+    maxRingBufferChars: 0,
   })),
   registerSocket: vi.fn(),
   unregisterSocket: vi.fn(),
@@ -264,10 +267,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       const os = require('node:os') as typeof import('node:os')
       const path = require('node:path') as typeof import('node:path')
       const fs = require('node:fs') as typeof import('node:fs')
-      const dir = path.join(
-        os.tmpdir(),
-        `app-factory-test-${process.pid}-${Math.random().toString(36).slice(2)}`,
-      )
+      const dir = path.join(os.tmpdir(), `app-factory-test-${process.pid}-${Math.random().toString(36).slice(2)}`)
       fs.mkdirSync(dir, { recursive: true })
       vi.stubEnv('GOBLIN_SERVER_DATA_DIR', dir)
     }
