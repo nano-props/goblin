@@ -30,7 +30,7 @@ export function BranchViewModeControl({ value, disabled = false, onChange }: Pro
       disabled={disabled}
       aria-label={t('branches.filter-label')}
       size="icon-sm"
-      spacing={1}
+      spacing={0.5}
       className={cn(
         'shrink-0 rounded-lg border border-separator bg-control p-0.5 shadow-[var(--shadow-control-inset-highlight)]',
         disabled && 'opacity-50',
