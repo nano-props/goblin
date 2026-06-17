@@ -1,0 +1,18 @@
+# This file exists for ONE purpose: stop people from accidentally running
+# `bun test` (Bun's built-in test runner) instead of `bun run test` (vitest).
+#
+# Why this matters:
+#   - `bun test` would silently no-op on our vitest-flavored tests
+#     (`describe`/`it`/`expect` from 'vitest' register callbacks that
+#     never run because vitest's runner isn't started). A mistyped
+#     `bun test` would exit 0 with "0 tests", looking like a green run.
+#   - There is no bun config option to disable the built-in test runner,
+#     so the earliest interception point is `[test] preload`.
+#   - vitest is unaffected: it reads `vitest.config.ts` and never loads
+#     this preload (verified by running `bun run test` after the change).
+#
+# If/when Bun adds `[test] disabled = true` or similar, this file can
+# shrink to a single line.
+
+[test]
+preload = ["./scripts/bun-test-guard.ts"]
