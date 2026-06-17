@@ -534,6 +534,7 @@ export const zh: Record<DictKey, string> = {
   'settings.lan.enabled-hint': '允许本地网络中的其他设备访问 Goblin。',
   'settings.lan.restart-hint': '此设置将在重启 Goblin 后生效。',
   'settings.web.title': 'Web',
+  'settings.nav.web': 'Web',
   'settings.web.server': '服务器',
   'settings.web.url': '服务器地址',
   'settings.web.url-hint': '浏览器访问嵌入式服务器时使用的地址。',

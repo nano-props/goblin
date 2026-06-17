@@ -25,8 +25,14 @@ const TOKEN_FILE_MODE = 0o600
  * that still carries 128 bits of entropy.
  */
 export function generateAccessToken(): string {
+  // 16 bytes = 128 bits = log_36(2^128) ≈ 24.6 base36 chars. `BigInt(...).toString(36)`
+  // strips leading zeros, so without padding a 16-byte random encodes to
+  // 1-25 chars depending on the high bits. Roughly 6.6% of random buffers
+  // produce a token < 25 chars, which would fail `TOKEN_PATTERN` on
+  // subsequent reads and force a re-generation on every server boot.
+  // Pad to a fixed width so the on-disk token is always exactly 25 chars.
   const bytes = randomBytes(16)
-  return BigInt(`0x${bytes.toString('hex')}`).toString(36)
+  return BigInt(`0x${bytes.toString('hex')}`).toString(36).padStart(25, '0')
 }
 
 /**

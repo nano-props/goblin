@@ -559,6 +559,7 @@ export const ja: Record<DictKey, string> = {
   'settings.lan.enabled-hint': 'ローカルネットワーク上の他のデバイスからGoblinへのアクセスを許可します。',
   'settings.lan.restart-hint': 'この設定はGoblinを再起動後に有効になります。',
   'settings.web.title': 'Web',
+  'settings.nav.web': 'Web',
   'settings.web.server': 'サーバー',
   'settings.web.url': 'サーバーURL',
   'settings.web.url-hint': 'ブラウザが組み込みサーバーにアクセスするためのアドレス。',

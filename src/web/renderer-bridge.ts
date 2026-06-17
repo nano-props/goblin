@@ -92,6 +92,11 @@ function electronBridge(): RendererBridge {
       if (!bridge) throw new Error('Goblin bridge is unavailable')
       return bridge.pathForFile(file)
     },
+    async rotateAccessToken() {
+      const bridge = readNativeBridge()
+      if (!bridge?.rotateAccessToken) throw new Error('Token rotation is unavailable in this runtime')
+      return await bridge.rotateAccessToken()
+    },
     saveClipboardFiles(files) {
       const bridge = readNativeBridge()
       // Older preloads may not expose `saveClipboardFiles`; treat as a

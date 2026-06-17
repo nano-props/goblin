@@ -566,6 +566,7 @@ export const en = {
   'settings.lan.enabled-hint': 'Allow other devices on your local network to access Goblin.',
   'settings.lan.restart-hint': 'This setting takes effect after restarting Goblin.',
   'settings.web.title': 'Web',
+  'settings.nav.web': 'Web',
   'settings.web.server': 'Server',
   'settings.web.url': 'Server URL',
   'settings.web.url-hint': 'The address your browser uses to reach the embedded server.',
