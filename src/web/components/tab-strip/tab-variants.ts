@@ -28,7 +28,9 @@ export function toolbarTabChromeClassName(options: {
     variant === 'repo'
       ? active && !treatAsUnselected
         ? 'border-input bg-card text-foreground'
-        : 'border-transparent text-muted-foreground hover:bg-accent/70 hover:text-foreground'
+        : compact
+          ? 'border-separator text-muted-foreground hover:bg-accent/70 hover:text-foreground'
+          : 'border-transparent text-muted-foreground hover:bg-accent/70 hover:text-foreground'
       : active
         ? 'border-transparent bg-selected text-selected-foreground'
         : 'border-separator text-muted-foreground hover:bg-accent/50 hover:text-foreground',

@@ -1,5 +1,5 @@
 import { type ReactNode, type Ref, useCallback, useMemo, useRef, useState } from 'react'
-import { ChevronDown, Download, FolderOpen, Plus, Server } from 'lucide-react'
+import { ChevronDown, Download, FolderOpen, Plus, Server, X } from 'lucide-react'
 import {
   DndContext,
   type DragEndEvent,
@@ -24,7 +24,6 @@ import {
   DropdownMenuTrigger,
   SelectedDropdownMenuItem,
 } from '#/web/components/ui/dropdown-menu.tsx'
-import { useIsSmallScreen } from '#/web/hooks/useIsSmallScreen.ts'
 import { RepoTab } from '#/web/components/repo-tabs/RepoTab.tsx'
 import { RepoTabTooltipLayer } from '#/web/components/repo-tabs/RepoTabTooltipLayer.tsx'
 import { useFocusRegistry, type FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
@@ -138,7 +137,8 @@ function OpenRepoMenuItems({
 }
 
 function CompactRepoTabs({
-  repos,
+  visibleRepos,
+  allRepos,
   activeId,
   hoveredId,
   labels,
@@ -148,20 +148,32 @@ function CompactRepoTabs({
   onKeyboardNavigate,
   focusRegistry,
   moreMenu,
-}: RepoTabsContentProps & { moreMenu: ReactNode }) {
-  const lastVisibleRepo = repos[repos.length - 1]
+}: {
+  visibleRepos: RepoTabSummary[]
+  allRepos: RepoTabSummary[]
+  activeId: string | null
+  hoveredId: string | null
+  labels: RepoTabStripLabels
+  onHoverChange: (id: string | null) => void
+  onActivate: (id: string) => void
+  onClose: (id: string) => void
+  onKeyboardNavigate: (id: string, direction: 'prev' | 'next' | 'first' | 'last') => void
+  focusRegistry: FocusRegistry<string, HTMLButtonElement>
+  moreMenu: ReactNode
+}) {
+  const lastVisibleRepo = visibleRepos[visibleRepos.length - 1]
   const showMoreSeparator = !!lastVisibleRepo && lastVisibleRepo.id !== activeId && lastVisibleRepo.id !== hoveredId
 
   return (
     <ToolbarTabStripBody>
-      <RepoTabTooltipLayer repos={repos} role="tablist">
-        {repos.map((repo, index) => (
+      <RepoTabTooltipLayer repos={allRepos} role="tablist">
+        {visibleRepos.map((repo, index) => (
           <RepoTab
             key={repo.id}
             repo={repo}
             isActive={repo.id === activeId}
             index={index}
-            total={repos.length}
+            total={allRepos.length}
             showSeparator={false}
             focusRegistry={focusRegistry}
             onHoverChange={onHoverChange}
@@ -255,7 +267,6 @@ export function RepoTabStrip({
   onOpenRemote,
   onClone,
 }: RepoTabStripProps) {
-  const isSmallScreen = useIsSmallScreen()
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -296,8 +307,11 @@ export function RepoTabStrip({
   const showOpenSeparator = !!lastRepo && lastRepo.id !== activeId && lastRepo.id !== hoveredId
 
   const activeRepo = repos.find((r) => r.id === activeId)
-  const visibleRepos = isSmallScreen ? (activeRepo ? [activeRepo] : repos.slice(0, 1)) : repos
-  const dropdownRepos = isSmallScreen ? repos : []
+  // Compact mode is always one + dropdown: the active tab is the only tab
+  // visible in the strip, and every repo (including the active one) lives
+  // in the overflow menu so the user can switch with a single click.
+  const visibleRepos = activeRepo ? [activeRepo] : repos.slice(0, 1)
+  const dropdownRepos = repos
 
   const openMenu = (
     <RepoTabEdgeAction actionRef={openMenuRef} showSeparator={showOpenSeparator}>
@@ -325,7 +339,8 @@ export function RepoTabStrip({
           compact={true}
           compactContent={
             <CompactRepoTabs
-              repos={visibleRepos}
+              visibleRepos={visibleRepos}
+              allRepos={repos}
               activeId={activeId}
               hoveredId={hoveredId}
               labels={labels}
@@ -346,15 +361,31 @@ export function RepoTabStrip({
                   <DropdownMenuContent side="bottom" align="start" className="flex w-max flex-col !overflow-hidden">
                     <ScrollArea className="max-h-[200px]" scrollbarMode="compact">
                       {dropdownRepos.map((repo) => (
-                        <SelectedDropdownMenuItem
-                          key={repo.id}
-                          selected={repo.id === activeId}
-                          className="whitespace-nowrap"
-                          onSelect={() => onActivate(repo.id)}
-                          aria-current={repo.id === activeId ? 'true' : undefined}
-                        >
-                          <span className="truncate">{repo.name}</span>
-                        </SelectedDropdownMenuItem>
+                        <div key={repo.id} className="group relative flex items-center">
+                          <SelectedDropdownMenuItem
+                            selected={repo.id === activeId}
+                            className="min-w-0 flex-1 gap-2 pr-8"
+                            onSelect={() => onActivate(repo.id)}
+                            aria-current={repo.id === activeId ? 'true' : undefined}
+                          >
+                            <span className="truncate">{repo.name}</span>
+                          </SelectedDropdownMenuItem>
+                          <Button
+                            type="button"
+                            size="icon-sm"
+                            variant="ghost"
+                            className="absolute right-1 h-6 w-6 text-muted-foreground"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleClose(repo.id)
+                            }}
+                            title={labels.closeWithName(repo.name)}
+                            aria-label={labels.closeWithName(repo.name)}
+                          >
+                            <X size={14} />
+                          </Button>
+                        </div>
                       ))}
                     </ScrollArea>
                     {dropdownRepos.length > 0 && <DropdownMenuSeparator />}

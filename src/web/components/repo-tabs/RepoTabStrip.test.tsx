@@ -92,28 +92,15 @@ describe('RepoTabStrip', () => {
     expect(selectedItem?.getAttribute('aria-current')).toBe('true')
   })
 
-  test('moves focus through the full tab strip with keyboard navigation on large screens', () => {
+  test('renders only the active repo tab when multiple repos are open, with the rest in the overflow dropdown', () => {
     vi.stubGlobal('matchMedia', createMatchMedia(false))
-    // Define rAF as a writable property so a prior test in the same worker
-    // that installed a non-writable descriptor (via `defineProperty` without
-    // `writable: true`) does not turn this `vi.spyOn` into "The property
-    // 'requestAnimationFrame' is not defined on the object".
-    Object.defineProperty(window, 'requestAnimationFrame', {
-      configurable: true,
-      writable: true,
-      value: (cb: FrameRequestCallback) => {
-        cb(0)
-        return 0
-      },
-    })
-    const onActivate = vi.fn()
 
     render(
       <RepoTabStrip
         repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b'), repo('repo-c', '/tmp/repo-c')]}
-        activeId="/tmp/repo-a"
+        activeId="/tmp/repo-b"
         labels={labels}
-        onActivate={onActivate}
+        onActivate={() => {}}
         onClose={() => {}}
         onReorder={() => {}}
         onOpenLocal={() => {}}
@@ -122,35 +109,12 @@ describe('RepoTabStrip', () => {
       />,
     )
 
-    const repoA = document.body.querySelector('[data-repo-tab-id="/tmp/repo-a"]')
-    const repoB = document.body.querySelector('[data-repo-tab-id="/tmp/repo-b"]')
-    const repoC = document.body.querySelector('[data-repo-tab-id="/tmp/repo-c"]')
-    if (
-      !(repoA instanceof HTMLButtonElement) ||
-      !(repoB instanceof HTMLButtonElement) ||
-      !(repoC instanceof HTMLButtonElement)
-    ) {
-      throw new Error('missing repo tab buttons')
-    }
-
-    act(() => {
-      repoA.focus()
-      repoA.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-    })
-    expect(onActivate).toHaveBeenNthCalledWith(1, '/tmp/repo-b')
-    expect(document.activeElement).toBe(repoB)
-
-    act(() => {
-      repoB.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }))
-    })
-    expect(onActivate).toHaveBeenNthCalledWith(2, '/tmp/repo-c')
-    expect(document.activeElement).toBe(repoC)
-
-    act(() => {
-      repoC.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }))
-    })
-    expect(onActivate).toHaveBeenNthCalledWith(3, '/tmp/repo-a')
-    expect(document.activeElement).toBe(repoA)
+    // Only the active repo is rendered as a tab — every other repo lives
+    // behind the overflow trigger.
+    expect(document.body.querySelector('[data-repo-tab-id="/tmp/repo-b"]')).not.toBeNull()
+    expect(document.body.querySelector('[data-repo-tab-id="/tmp/repo-a"]')).toBeNull()
+    expect(document.body.querySelector('[data-repo-tab-id="/tmp/repo-c"]')).toBeNull()
+    expect(document.body.querySelector('button[aria-label="More"]')).not.toBeNull()
   })
 })
 

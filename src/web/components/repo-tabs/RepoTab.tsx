@@ -108,7 +108,7 @@ export function RepoTab({
       }}
       buttonClassName={toolbarTabButtonClassName('repo')}
       closeLabel={closeLabel(repo.name)}
-      closeVisible={isActive}
+      closeVisible={false}
       onClose={(e) => {
         e.stopPropagation()
         onClose(repo.id)
