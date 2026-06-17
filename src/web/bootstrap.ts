@@ -15,12 +15,14 @@ function readInitialBootstrap(): RendererBootstrapSnapshot {
 // therefore return defaults, or a partially populated snapshot,
 // even when a fully populated one is now reachable.
 //
-// The previous version re-read only when the snapshot was *fully*
-// empty. A partial read (e.g. `homeDir` set but `initialI18n`
-// still null) locked the cache to that partial, so the rest of the
-// renderer never saw the populated version. We now re-read while
-// the cached value is missing any optional field, and stop as
-// soon as two consecutive reads agree.
+// When the cached value is partial, take a single re-read. Two
+// consecutive reads on the synchronous bridge see the same DOM
+// state, so one re-read is enough to detect "the bootstrap just
+// populated" without going through the sameSnapshot dance.
+//
+// A bare cache (no re-read at all) would lock the renderer into
+// the first read forever, which is the bug this function exists
+// to prevent.
 
 let initialBootstrap = readInitialBootstrap()
 
@@ -33,33 +35,8 @@ function isPartial(b: RendererBootstrapSnapshot): boolean {
   )
 }
 
-function sameSnapshot(a: RendererBootstrapSnapshot, b: RendererBootstrapSnapshot): boolean {
-  return (
-    a.homeDir === b.homeDir &&
-    a.platform === b.platform &&
-    a.initialI18n === b.initialI18n &&
-    a.initialSettings === b.initialSettings &&
-    a.initialServer === b.initialServer &&
-    a.runtime.kind === b.runtime.kind
-  )
-}
-
 export function getInitialBootstrap(): RendererBootstrapSnapshot {
   if (!isPartial(initialBootstrap)) return initialBootstrap
-  // Re-read up to a small bound. Stop as soon as two consecutive
-  // reads agree, which catches both "static" environments (URL
-  // query / test fixtures that always return the same partial)
-  // and the "boot race" case (a later read yields the populated
-  // version the first read missed).
-  let last = initialBootstrap
-  for (let i = 0; i < 5; i++) {
-    const next = readInitialBootstrap()
-    if (sameSnapshot(next, last)) {
-      initialBootstrap = next
-      return initialBootstrap
-    }
-    last = next
-  }
-  initialBootstrap = last
+  initialBootstrap = readInitialBootstrap()
   return initialBootstrap
 }
