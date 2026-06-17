@@ -10,3 +10,9 @@ Use this doc for UI language and presentation rules.
 - Prefer shadcn/ui primitives in `src/web/components/ui/`.
 - Reuse shared field primitives for forms.
 - Show home-relative paths with `~` via existing `tildify` helpers.
+- Focus rings on shadcn primitives use `focusRingInset` / `focusRingVisibleInset`
+  from `src/web/components/ui/focus.ts`. These draw the ring _inside_ the
+  border box (box-shadow inset), so ancestor `overflow: hidden` /
+  `clip-path` / scroll containers can't slice the halo. Concentric outer
+  rings are clip-fragile — the `AnimateHeight` height transition was
+  previously clipping Input's left/right focus halo mid-animation.
