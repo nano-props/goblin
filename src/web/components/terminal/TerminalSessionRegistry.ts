@@ -76,7 +76,15 @@ export class TerminalSessionRegistry {
   // ever drifts (e.g. a wedged server that never emits exit). Set
   // well above the realistic number of simultaneously-detached
   // sessions, so in normal use no entry is evicted by the trim path.
-  private static readonly REATTACH_SNAPSHOT_CACHE_HARD_CAP = 32
+  //
+  // T2.1: lowered from 32 to 8. The 32 was sized for multi-tenant
+  // assumptions; for a single user, typical detached-session count
+  // is 1-3 with occasional 5. 8 gives generous headroom and caps
+  // worst-case reattach memory at ~16 MiB (8 × 2 MiB per snapshot,
+  // which is itself an upper bound). Eviction is the source-of-truth
+  // fallback: a user who lost the snapshot sees the server's
+  // 16 MiB ring buffer on next attach.
+  private static readonly REATTACH_SNAPSHOT_CACHE_HARD_CAP = 8
   private readonly reattachSnapshotCache = new Map<string, ReattachSnapshotCacheEntry>()
   private readonly worktreeSnapshotCache = new Map<string, WorktreeTerminalSnapshot>()
   private readonly worktreeListeners = new Map<string, Set<() => void>>()

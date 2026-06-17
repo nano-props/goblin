@@ -190,6 +190,20 @@ describe('TerminalSessionRegistry', () => {
       expect((registry as any).reattachSnapshotCache.has(`key-${limit}`)).toBe(true)
     })
 
+    test('T2.1: reattach snapshot cap is 8 (was 32, sized for multi-tenant)', () => {
+      // The cap is a single-user tuning knob. 8 is well above the
+      // typical 1-3 detached sessions a single user has at any time
+      // (occasional 5), and caps worst-case reattach memory at
+      // ~16 MiB (8 × 2 MiB per snapshot, which is itself an upper
+      // bound). Raising this back toward 32 (the old multi-tenant
+      // value) is a deliberate decision and should not happen
+      // silently — if a future change moves it, this test forces a
+      // conversation.
+      const cap = (TerminalSessionRegistry as unknown as { REATTACH_SNAPSHOT_CACHE_HARD_CAP: number })
+        .REATTACH_SNAPSHOT_CACHE_HARD_CAP
+      expect(cap).toBe(8)
+    })
+
     test('handleExit preserves the reattach cache when the local session rejects the exit', () => {
       // Race scenario: the server emitted an exit for an old
       // sessionId, but the local session has already been updated to
