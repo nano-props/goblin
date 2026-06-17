@@ -1,4 +1,5 @@
-import type { MiddlewareHandler } from 'hono'
+import type { Context, MiddlewareHandler } from 'hono'
+import { getCookie } from 'hono/cookie'
 import { safeEqualString } from '#/server/common/timing-safe.ts'
 import { errorJson } from '#/server/common/responses.ts'
 import { ACCESS_TOKEN_COOKIE, ACCESS_TOKEN_HEADER, ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
@@ -22,7 +23,7 @@ export function createAccessTokenMiddleware(token: string): MiddlewareHandler {
       // notice is "server misconfigured", not "every client broken".
       return errorJson(c, 'INTERNAL', 'Server access token not configured', 500)
     }
-    const cookieValue = parseCookie(c.req.header('cookie') ?? '', ACCESS_TOKEN_COOKIE)
+    const cookieValue = readCookie(c, ACCESS_TOKEN_COOKIE)
     const headerValue = c.req.header(ACCESS_TOKEN_HEADER) ?? ''
     const queryValue = c.req.query(ACCESS_TOKEN_QUERY) ?? ''
     // Order matters only for the observability of which channel
@@ -35,20 +36,15 @@ export function createAccessTokenMiddleware(token: string): MiddlewareHandler {
 }
 
 /**
- * Minimal cookie header parser. Handles `name=value; name2=value2`
- * with optional whitespace around `;` and `=`. Does not handle
- * quoted values or `=` inside values — the cookie set by
- * `POST /api/login` is a base36 string with no special characters,
- * so the simple split is sufficient. If a future cookie needs more
- * structure, swap in `cookie` from `npm:cookie` and keep the
- * `name` argument as the lookup key.
+ * Read a single cookie from the request's Cookie header. Uses
+ * Hono's `getCookie` (which percent-decodes values and handles
+ * quoted / `=`-inside-value cases per RFC 6265) — the previous
+ * inline parser split on the literal `=` and would have rejected
+ * any token containing it. Since the access-token format is base36
+ * (`[0-9a-z]`) no decoding actually fires today, but a future
+ * format change (e.g. base64url) would have silently broken login
+ * for the unlucky user with an `=` in their token.
  */
-function parseCookie(cookieHeader: string, name: string): string {
-  for (const part of cookieHeader.split(';')) {
-    const trimmed = part.trim()
-    const eq = trimmed.indexOf('=')
-    if (eq <= 0) continue
-    if (trimmed.slice(0, eq) === name) return trimmed.slice(eq + 1)
-  }
-  return ''
+function readCookie(c: Context, name: string): string {
+  return getCookie(c, name) ?? ''
 }

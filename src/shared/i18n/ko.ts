@@ -686,4 +686,15 @@ export const ko: Record<DictKey, string> = {
   'commit.files-changed-plural': '{n} 개 파일 변경',
   'commit.empty': '파일 변경 없음 (병합 또는 빈 커밋).',
   'commit.binary': '바이너리',
+
+  // ---- 인증 게이트 (쿠키/헤더/토큰이 없을 때 표시되는 로그인 폼) -------------
+  'auth.gate.loading': '불러오는 중…',
+  'auth.gate.title': '접근 토큰 입력',
+  'auth.gate.description': '서버 시작 시 출력된 접근 토큰을 붙여넣으세요. 토큰은 이 기기에 http-only 쿠키로 저장됩니다.',
+  'auth.gate.token-label': '접근 토큰',
+  'auth.gate.token-placeholder': '25자 base36 토큰',
+  'auth.gate.sign-in': '로그인',
+  'auth.gate.signing-in': '로그인 중…',
+  'auth.gate.error-empty': '접근 토큰을 입력하세요',
+  'auth.gate.error-failed': '로그인 실패',
 }

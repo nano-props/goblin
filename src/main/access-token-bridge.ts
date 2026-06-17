@@ -1,9 +1,7 @@
 import { unlink } from 'node:fs/promises'
-import path from 'node:path'
 import { app, ipcMain } from 'electron'
 import { ROTATE_ACCESS_TOKEN_CHANNEL } from '#/shared/ipc-channels.ts'
-import { readOrCreateAccessToken } from '#/shared/access-token-file.ts'
-import { ACCESS_TOKEN_FILE_NAME } from '#/shared/access-token.ts'
+import { accessTokenFilePath, readOrCreateAccessToken } from '#/shared/access-token-file.ts'
 import { startEmbeddedServer, stopEmbeddedServer } from '#/main/server-manager.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 
@@ -22,38 +20,51 @@ import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
  *     `EmbeddedServerRuntime`, and the renderer shows the new
  *     token in the Web settings page.
  *
- * The renderer then needs to log in again: any existing cookie
- * references the now-defunct old token. The Web settings page
- * surfaces the new token + a "log in" button so the user can
- * re-authenticate without re-scanning a QR.
- *
- * Failure modes: if the file delete or server stop throws, the
- * error propagates back to the renderer (which surfaces it as
- * an `ipcRequestFailed` toast). The caller is responsible for
- * not leaving the renderer in a half-rotated state; in practice
- * the only side effect is a stale `EmbeddedServerRuntime`
- * reference, which gets replaced as soon as the next
- * `startEmbeddedServer()` call resolves.
+ * Concurrency: a module-level Promise chain serializes concurrent
+ * rotation calls. Without this, two rapid clicks (or two renderers
+ * firing the IPC) race on `unlink` + `stop` + `start` + `read`:
+ * the second `unlink` may delete the freshly written token, the
+ * second `stop` may issue SIGKILL against the first start's proc,
+ * and the second `read` may return a token that no longer matches
+ * the server's in-memory state. The mutex is the cheapest way to
+ * keep the four steps atomic from the renderer's perspective.
  */
+let rotationPromise: Promise<unknown> = Promise.resolve()
+
+function rotateToken(): Promise<{ accessToken: string }> {
+  const next = rotationPromise.then(() => doRotate())
+  // Swallow rejections on the chain itself so one failure doesn't
+  // poison subsequent rotations; the inner promise's rejection is
+  // surfaced to the original caller.
+  rotationPromise = next.catch(() => undefined)
+  return next
+}
+
+async function doRotate(): Promise<{ accessToken: string }> {
+  const dataDir = app.getPath('userData')
+  const tokenFile = accessTokenFilePath(dataDir)
+  try {
+    await unlink(tokenFile)
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
+  }
+  await stopEmbeddedServer()
+  await startEmbeddedServer()
+  // After the server is back up, read the freshly written file so
+  // the value we return is the one the running server is using.
+  // (Could be replaced with `runtime.accessToken` once the
+  // runtime token and the file token are guaranteed to match —
+  // they are today because `startEmbeddedServer` always sets them
+  // from the same `readOrCreateAccessToken` call.)
+  const accessToken = await readOrCreateAccessToken(dataDir)
+  return { accessToken }
+}
+
 export function wireAccessTokenBridgeIpc(): void {
-  ipcMain.handle(
-    ROTATE_ACCESS_TOKEN_CHANNEL,
-    async (event): Promise<{ accessToken: string }> => {
-      if (!isTrustedIpcEvent(event)) {
-        throw new Error('Untrusted IPC sender for rotate-access-token')
-      }
-      const tokenFile = path.join(app.getPath('userData'), ACCESS_TOKEN_FILE_NAME)
-      try {
-        await unlink(tokenFile)
-      } catch (err) {
-        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
-      }
-      await stopEmbeddedServer()
-      await startEmbeddedServer()
-      // After the server is back up, read the freshly written file so
-      // the value we return is the one the running server is using.
-      const accessToken = await readOrCreateAccessToken(app.getPath('userData'))
-      return { accessToken }
-    },
-  )
+  ipcMain.handle(ROTATE_ACCESS_TOKEN_CHANNEL, async (event): Promise<{ accessToken: string }> => {
+    if (!isTrustedIpcEvent(event)) {
+      throw new Error('Untrusted IPC sender for rotate-access-token')
+    }
+    return await rotateToken()
+  })
 }

@@ -2,6 +2,7 @@ import { getInitialBootstrap } from '#/web/bootstrap.ts'
 import { isServerInvalidationEvent, type ServerInvalidationEvent } from '#/shared/server-invalidation.ts'
 import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'
 import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
+import { ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
 
 type Listener = (event: ServerInvalidationEvent) => void
 // Shared server-owned invalidation ingress for browser and Electron renderers.
@@ -25,7 +26,7 @@ function createInvalidationWebSocketUrl(baseUrl: string, accessToken: string | n
   // Embedded / dev path: `accessToken` is non-null and is passed as
   // `?t=` because the WebSocket constructor cannot set custom
   // headers.
-  if (accessToken) httpUrl.searchParams.set('t', accessToken)
+  if (accessToken) httpUrl.searchParams.set(ACCESS_TOKEN_QUERY, accessToken)
   return httpUrl.toString()
 }
 

@@ -701,6 +701,17 @@ export const en = {
   'commit.files-changed-plural': '{n} files changed',
   'commit.empty': 'No file changes (merge or empty commit).',
   'commit.binary': 'binary',
+
+  // ---- Auth gate (browser login form shown when no cookie/header/token) ---
+  'auth.gate.loading': 'Loading…',
+  'auth.gate.title': 'Enter access token',
+  'auth.gate.description': 'Paste the access token printed when the server started. The token is saved as an http-only cookie on this device.',
+  'auth.gate.token-label': 'Access token',
+  'auth.gate.token-placeholder': '25-character base36 token',
+  'auth.gate.sign-in': 'Sign in',
+  'auth.gate.signing-in': 'Signing in…',
+  'auth.gate.error-empty': 'Enter your access token',
+  'auth.gate.error-failed': 'Login failed',
 } as const
 
 export type DictKey = keyof typeof en

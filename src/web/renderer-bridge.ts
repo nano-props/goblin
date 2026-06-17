@@ -116,7 +116,13 @@ function electronBridge(): RendererBridge {
 }
 
 function webBridge(): RendererBridge {
-  const bootstrap = readWebBootstrap(readOrCreateWebTerminalClientId)
+  // Read the bootstrap lazily on every `getBootstrap()` call. The
+  // web-runtime bootstrap is composed from `window.__GOBLIN_BOOTSTRAP__`,
+  // the `<script id="goblin-bootstrap">` tag, and the URL query —
+  // all of which can be populated at different times during boot.
+  // Eager capture here would lock the first read (often empty) into
+  // the bridge and prevent later, more populated reads from being
+  // observed by `bootstrap.ts`'s re-read loop.
   const terminalBridge = createServerTerminalBridge({
     getAttachmentId: readOrCreateWebTerminalAttachmentId,
     getServerConfig() {
@@ -130,7 +136,7 @@ function webBridge(): RendererBridge {
   // missing initialServer (which makes paste impossible anyway) doesn't
   // crash the whole bridge.
   const clipboardBackend = (() => {
-    const server = bootstrap.initialServer
+    const server = readWebBootstrap(readOrCreateWebTerminalClientId).initialServer
     if (!server?.url) return null
     return createHttpClipboardBackend({
       url: server.url,
@@ -146,7 +152,7 @@ function webBridge(): RendererBridge {
       return false
     },
     getBootstrap() {
-      return bootstrap
+      return readWebBootstrap(readOrCreateWebTerminalClientId)
     },
     async invokeIpc() {
       throw new Error('Web renderer IPC bridge is unavailable')

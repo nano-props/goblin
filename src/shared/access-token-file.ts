@@ -2,13 +2,18 @@ import { chmod, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { serverDataDir } from '#/shared/data-dir.ts'
+import { ACCESS_TOKEN_FILE_NAME } from '#/shared/access-token.ts'
 
-const TOKEN_FILE = 'server-token'
 // 25 base36 chars, exactly 128 bits of entropy (16 random bytes).
 // Keep this regex in lockstep with `generateAccessToken` below — it
 // catches corruption from a torn write or hand-edited file.
 const TOKEN_PATTERN = /^[0-9a-z]{25}$/
 const TOKEN_FILE_MODE = 0o600
+
+/** Build the canonical path for the on-disk access token file. */
+export function accessTokenFilePath(dataDir: string = serverDataDir()): string {
+  return path.join(dataDir, ACCESS_TOKEN_FILE_NAME)
+}
 
 /**
  * Generate a 128-bit access token and base36-encode it. The format
@@ -48,7 +53,7 @@ export function generateAccessToken(): string {
  * default (`serverDataDir()`).
  */
 export async function readOrCreateAccessToken(dataDir: string = serverDataDir()): Promise<string> {
-  const filePath = path.join(dataDir, TOKEN_FILE)
+  const filePath = accessTokenFilePath(dataDir)
   const existing = await readExistingToken(filePath)
   if (existing) return existing
   return await createAccessTokenFile(dataDir, filePath)

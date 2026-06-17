@@ -1,5 +1,6 @@
 import { emitRendererLocalEvent } from '#/web/local-events.ts'
 import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
+import { ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
 import {
   normalizeTerminalSocketServerMessage,
   normalizeTerminalSessionSnapshot,
@@ -429,7 +430,7 @@ export function createTerminalWebSocketUrl(
   // it's the only way to authenticate a non-browser WS client (LAN
   // CLI). The server middleware accepts all three channels
   // (cookie / header / `?t=`).
-  httpUrl.searchParams.set('t', accessToken)
+  httpUrl.searchParams.set(ACCESS_TOKEN_QUERY, accessToken)
   httpUrl.searchParams.set('clientId', clientId)
   httpUrl.searchParams.set('attachmentId', attachmentId)
   return httpUrl.toString()

@@ -668,4 +668,15 @@ export const zh: Record<DictKey, string> = {
   'commit.files-changed-plural': '{n} 个文件有改动',
   'commit.empty': '没有文件改动（合并或空提交）。',
   'commit.binary': '二进制',
+
+  // ---- 认证门（无 cookie / header / token 时显示的登录表单）-----------------
+  'auth.gate.loading': '加载中…',
+  'auth.gate.title': '输入访问令牌',
+  'auth.gate.description': '请粘贴服务器启动时打印的访问令牌。令牌将以 http-only cookie 保存在本设备。',
+  'auth.gate.token-label': '访问令牌',
+  'auth.gate.token-placeholder': '25 个字符的 base36 令牌',
+  'auth.gate.sign-in': '登录',
+  'auth.gate.signing-in': '正在登录…',
+  'auth.gate.error-empty': '请输入访问令牌',
+  'auth.gate.error-failed': '登录失败',
 }

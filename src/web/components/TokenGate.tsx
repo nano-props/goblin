@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useAccessTokenStatus } from '#/web/hooks/useAccessTokenStatus.ts'
+import { useT } from '#/web/stores/i18n.ts'
 import { postServerJson } from '#/web/lib/server-fetch.ts'
 
 /**
@@ -13,7 +14,8 @@ import { postServerJson } from '#/web/lib/server-fetch.ts'
  * because the access token is a 25-char base36 string the user is
  * expected to paste from a server log or settings panel. There is
  * no signup, no "forgot token" flow, no rate limit UI; rotate by
- * deleting `<dataDir>/server-token` and restarting.
+ * deleting the access-token file under `app.getPath('userData')`
+ * (see `ACCESS_TOKEN_FILE_NAME`) and restarting.
  */
 export function TokenGate({ children }: { children: React.ReactNode }) {
   const status = useAccessTokenStatus()
@@ -23,14 +25,16 @@ export function TokenGate({ children }: { children: React.ReactNode }) {
 }
 
 function CheckingPlaceholder() {
+  const t = useT()
   return (
     <div className="flex h-full items-center justify-center text-muted-foreground">
-      <span>Loading…</span>
+      <span>{t('auth.gate.loading')}</span>
     </div>
   )
 }
 
 function LoginForm({ onSuccess }: { onSuccess: () => void }) {
+  const t = useT()
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -40,7 +44,7 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
     if (submitting) return
     const trimmed = value.trim()
     if (trimmed.length === 0) {
-      setError('Enter your access token')
+      setError(t('auth.gate.error-empty'))
       return
     }
     setSubmitting(true)
@@ -49,7 +53,7 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
       await postServerJson<{ token: string }, { ok: true }>('/api/login', { token: trimmed })
       onSuccess()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed')
+      setError(err instanceof Error ? err.message : t('auth.gate.error-failed'))
       setSubmitting(false)
     }
   }
@@ -60,13 +64,10 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
         onSubmit={handleSubmit}
         className="flex w-full max-w-sm flex-col gap-3 rounded-md border border-border bg-card p-6 text-card-foreground shadow-sm"
       >
-        <h1 className="text-lg font-semibold">Enter access token</h1>
-        <p className="text-sm text-muted-foreground">
-          Paste the access token printed when the server started. The token is saved as an http-only cookie on this
-          device.
-        </p>
+        <h1 className="text-lg font-semibold">{t('auth.gate.title')}</h1>
+        <p className="text-sm text-muted-foreground">{t('auth.gate.description')}</p>
         <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium">Access token</span>
+          <span className="text-sm font-medium">{t('auth.gate.token-label')}</span>
           <input
             type="text"
             inputMode="text"
@@ -78,7 +79,7 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
             onChange={(e) => setValue(e.target.value)}
             disabled={submitting}
             className="rounded-md border border-input bg-background px-3 py-2 font-mono text-sm"
-            placeholder="25-character base36 token"
+            placeholder={t('auth.gate.token-placeholder')}
           />
         </label>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
@@ -87,7 +88,7 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
           disabled={submitting}
           className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
         >
-          {submitting ? 'Signing in…' : 'Sign in'}
+          {submitting ? t('auth.gate.signing-in') : t('auth.gate.sign-in')}
         </button>
       </form>
     </div>

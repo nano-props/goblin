@@ -85,6 +85,51 @@ describe('renderer bootstrap', () => {
     })
   })
 
+  test('replaces a partial web bootstrap once the bridge populates fully', async () => {
+    // Regression for the 5-field-empty gate: the previous version
+    // only re-read on a fully-empty snapshot, so a partial read
+    // (e.g. `homeDir` set, `initialI18n` still null) would lock
+    // the cache and never pick up the populated version. The
+    // new gate re-reads while ANY optional field is missing.
+    const { getInitialBootstrap } = await import('#/web/bootstrap.ts')
+    expect(getInitialBootstrap()).toEqual({
+      runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+      homeDir: '',
+      platform: 'web',
+      initialI18n: null,
+      initialSettings: null,
+      initialServer: null,
+    })
+
+    // A later read returns a fully populated snapshot. The next
+    // call must converge on it, even though the cached value is
+    // only partially empty (none of the fields populated, in this
+    // case — picked up as the "all default" snapshot above).
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {
+        __GOBLIN_BOOTSTRAP__: {
+          runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+          homeDir: '/Users/partial',
+          platform: 'web',
+          initialI18n: { lang: 'en', pref: 'en', dict: { hello: 'hi' } },
+          initialSettings: null,
+          initialServer: null,
+        },
+        location: { href: 'http://127.0.0.1:32100/', origin: 'http://127.0.0.1:32100', search: '' },
+      },
+    })
+
+    expect(getInitialBootstrap()).toEqual({
+      runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+      homeDir: '/Users/partial',
+      platform: 'web',
+      initialI18n: { lang: 'en', pref: 'en', dict: { hello: 'hi' } },
+      initialSettings: null,
+      initialServer: null,
+    })
+  })
+
   test('re-detects the Electron bridge after an early web-host bootstrap', async () => {
     const { getInitialBootstrap } = await import('#/web/bootstrap.ts')
     expect(getInitialBootstrap()).toEqual({

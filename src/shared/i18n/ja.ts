@@ -694,4 +694,15 @@ export const ja: Record<DictKey, string> = {
   'commit.files-changed-plural': '{n} 件のファイル変更',
   'commit.empty': 'ファイル変更なし（マージまたは空コミット）。',
   'commit.binary': 'バイナリ',
+
+  // ---- 認証ゲート（cookie / ヘッダー / token がない時に表示するログインフォーム）
+  'auth.gate.loading': '読み込み中…',
+  'auth.gate.title': 'アクセストークンを入力',
+  'auth.gate.description': 'サーバー起動時に表示されたアクセストークンを貼り付けてください。トークンはこの端末に http-only cookie として保存されます。',
+  'auth.gate.token-label': 'アクセストークン',
+  'auth.gate.token-placeholder': '25 文字の base36 トークン',
+  'auth.gate.sign-in': 'サインイン',
+  'auth.gate.signing-in': 'サインイン中…',
+  'auth.gate.error-empty': 'アクセストークンを入力してください',
+  'auth.gate.error-failed': 'ログインに失敗しました',
 }
