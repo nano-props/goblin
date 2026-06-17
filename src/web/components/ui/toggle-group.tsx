@@ -66,7 +66,11 @@ function ToggleGroupItem({
           variant: context.variant || variant,
           size: context.size || size,
         }),
-        'w-auto min-w-0 shrink-0 px-3 focus:z-10 focus-visible:z-10',
+        'min-w-0 shrink-0 focus:z-10 focus-visible:z-10',
+        // Text-sized toggles should hug their content; icon-sized variants
+        // (like `icon-sm`) intentionally keep the square width from
+        // `toggleVariants`, so only restore `w-auto` for text button sizes.
+        'data-[size=default]:w-auto data-[size=sm]:w-auto data-[size=lg]:w-auto',
         'data-[spacing=0]:rounded-none data-[spacing=0]:shadow-none data-[spacing=0]:first:rounded-l-md data-[spacing=0]:last:rounded-r-md data-[spacing=0]:data-[variant=outline]:border-l-0 data-[spacing=0]:data-[variant=outline]:first:border-l',
         className,
       )}

@@ -141,19 +141,19 @@ describe('setBranchViewMode', () => {
     expect(calls).toEqual([{ branches: ['main'], mode: 'full' }])
   })
 
-  test('preserves the terminal preference when the view mode hides the active worktree branch', () => {
+  test('preserves the terminal preference when the view mode hides the active branch', () => {
     // The store only re-picks the visible branch — the preferred tab is
     // never re-projected. The UI hook decides what's actually renderable.
     seedRepo({
-      selectedBranch: 'main',
+      selectedBranch: 'feature/plain',
       detailTab: 'terminal',
       branches: [branch('main', { worktree: { path: '/repo' } }), branch('feature/plain')],
     })
 
-    useReposStore.getState().setBranchViewMode(REPO_ID, 'no-worktree')
+    useReposStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.ui.selectedBranch).toBe('feature/plain')
+    expect(repo?.ui.selectedBranch).toBe('main')
     expect(repo?.ui.preferredDetailTab).toBe('terminal')
   })
 })

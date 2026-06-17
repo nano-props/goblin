@@ -38,7 +38,7 @@ const RestorableRepoSnapshotSchema = v.object({
   }),
   ui: v.object({
     selectedBranch: v.nullable(v.string()),
-    branchViewMode: v.picklist(['all', 'worktrees', 'no-worktree']),
+    branchViewMode: v.picklist(['all', 'worktrees']),
   }),
 })
 

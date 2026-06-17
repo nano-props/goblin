@@ -13,7 +13,6 @@ interface VisibleBranchesInput {
 
 export function branchMatchesViewMode(branch: RepoBranchState, viewMode: BranchViewMode): boolean {
   if (viewMode === 'worktrees') return !!branch.worktree?.path
-  if (viewMode === 'no-worktree') return !branch.worktree?.path
   return true
 }
 

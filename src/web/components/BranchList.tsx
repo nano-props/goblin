@@ -33,7 +33,7 @@ type BranchListRepo = BranchActionRepo & {
   }
   ui: {
     selectedBranch: string | null
-    branchViewMode: 'all' | 'worktrees' | 'no-worktree'
+    branchViewMode: 'all' | 'worktrees'
   }
 }
 

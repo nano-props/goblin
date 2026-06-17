@@ -17,6 +17,10 @@ const toggleVariants = cva(
       size: {
         default: 'h-9 min-w-9 px-2',
         sm: 'h-8 min-w-8 px-1.5',
+        // Square icon-only toggle used by compact segmented controls
+        // (e.g. branch view mode). Keep width/height coupled and drop
+        // text-button padding/gap so callers don't need `!size-*` or `!px-0` overrides.
+        'icon-sm': "size-6 px-0 gap-0 [&_svg:not([class*='size-'])]:size-3.5",
         lg: 'h-10 min-w-10 px-2.5',
       },
     },

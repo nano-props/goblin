@@ -1,5 +1,5 @@
 // Toolbar for the branch pane (non-focus mode). Wraps the shared
-// RepoToolbar chrome with the branch view-mode control (all / local /
+// RepoToolbar chrome with the branch view-mode control (all /
 // worktrees). The section-level slot in focus mode uses BranchInfoBar
 // instead.
 
