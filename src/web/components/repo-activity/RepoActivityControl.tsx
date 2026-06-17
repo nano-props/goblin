@@ -14,7 +14,6 @@ import {
   isRepoPrimaryRefreshBusy,
 } from '#/web/components/repo-activity/model.ts'
 import { useVisibleLoadingValue } from '#/web/hooks/useLoadingVisibility.ts'
-import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { repoEventActionSuccessLabel } from '#/web/stores/repos/action-labels.ts'
@@ -53,12 +52,11 @@ function repoActivityControlRepoEqual(a: RepoState | undefined, b: RepoState | u
 
 export function RepoActivityControl({ repoId }: Props) {
   const repo = useStoreWithEqualityFn(useReposStore, (s) => s.repos[repoId], repoActivityControlRepoEqual)
-  const compact = useIsCompactUi()
   if (!repo) return null
-  return <RepoActivityControlView repo={repo} compact={compact} />
+  return <RepoActivityControlView repo={repo} />
 }
 
-function RepoActivityControlView({ repo, compact }: { repo: RepoState; compact: boolean }) {
+function RepoActivityControlView({ repo }: { repo: RepoState }) {
   const visibleActivity = useRepoActivityControlPresentation(repo)
   const completion = useRepoCompletion(repo.id)
   const view = getRepoActivityControlView({
@@ -69,13 +67,13 @@ function RepoActivityControlView({ repo, compact }: { repo: RepoState; compact: 
 
   switch (view.kind) {
     case 'activity':
-      return <RepoActivityIndicator activity={view.activity} compact={compact} />
+      return <RepoActivityIndicator activity={view.activity} />
     case 'completion':
-      return <RepoCompletionIndicator completion={view.completion} compact={compact} />
+      return <RepoCompletionIndicator completion={view.completion} />
     case 'refresh-button':
       return (
         <div className="flex items-center gap-2">
-          <RepoRefreshButton repo={repo} manualSyncBusy={view.manualSyncBusy} compact={compact} />
+          <RepoRefreshButton repo={repo} manualSyncBusy={view.manualSyncBusy} />
           <RepoCacheIndicator repo={repo} />
           <RepoFetchFailureIndicator repo={repo} />
         </div>
@@ -122,11 +120,9 @@ function useRepoCompletion(repoId: string): RepoCompletion | null {
 function RepoRefreshButton({
   repo,
   manualSyncBusy,
-  compact,
 }: {
   repo: RepoState
   manualSyncBusy: boolean
-  compact: boolean
 }) {
   const t = useT()
   const label = t('action.refresh')
@@ -147,6 +143,7 @@ function RepoRefreshButton({
     <Tip label={t(repo.remote.hasRemotes === false ? 'action.fetch-local-title' : 'action.fetch-title')}>
       <AsyncButton
         variant="ghost"
+        size="icon-lg"
         disabled={manualSyncBusy}
         loading={manualSyncBusy}
         onClick={handleSync}
@@ -162,7 +159,7 @@ function RepoRefreshButton({
   )
 }
 
-function RepoActivityIndicator({ activity, compact }: { activity: RepoActivity; compact: boolean }) {
+function RepoActivityIndicator({ activity }: { activity: RepoActivity }) {
   const t = useT()
   const label = t(activity.labelKey, activity.labelParams)
 
@@ -172,13 +169,13 @@ function RepoActivityIndicator({ activity, compact }: { activity: RepoActivity; 
         <span className="inline-flex">
           <Button
             variant="ghost"
+            size="icon-lg"
             disabled
             aria-busy
             aria-label={label}
             className={cn('bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground')}
           >
             <Loader2 className="animate-spin" />
-            {!compact && label}
           </Button>
         </span>
       </Tip>
@@ -189,7 +186,7 @@ function RepoActivityIndicator({ activity, compact }: { activity: RepoActivity; 
   )
 }
 
-function RepoCompletionIndicator({ completion, compact }: { completion: RepoCompletion; compact: boolean }) {
+function RepoCompletionIndicator({ completion }: { completion: RepoCompletion }) {
   const t = useT()
   const label = t(completion.labelKey, completion.labelParams)
 
@@ -199,12 +196,12 @@ function RepoCompletionIndicator({ completion, compact }: { completion: RepoComp
         <span className="inline-flex">
           <Button
             variant="ghost"
+            size="icon-lg"
             disabled
             aria-label={label}
             className="border-success-border bg-success-surface text-success hover:bg-success-surface hover:text-success"
           >
             <Check />
-            {!compact && label}
           </Button>
         </span>
       </Tip>

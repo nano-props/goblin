@@ -3,6 +3,10 @@
 // top of the shared RepoToolbar chrome. Caller is expected to mount
 // this only in focus mode (see RepoView / RepoWorkspaceSkeleton for the
 // pattern); the bar itself does not check.
+//
+// The per-repo actions (Refresh, worktree filter, new worktree) live
+// in the Topbar now — see `Topbar.tsx` and `App.tsx` — so this bar
+// does not duplicate them.
 
 import { ChevronDown } from 'lucide-react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
@@ -38,7 +42,7 @@ interface Props {
 
 export function BranchInfoBar({ repoId }: Props) {
   return (
-    <RepoToolbar repoId={repoId}>
+    <RepoToolbar>
       <FocusBranchControls repoId={repoId} />
     </RepoToolbar>
   )

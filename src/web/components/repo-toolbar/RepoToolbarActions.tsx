@@ -1,9 +1,14 @@
-// Repo-level chrome buttons. These actions sit here because they are
-// unrelated to any single branch:
+// Per-repo chrome buttons. These actions sit to the right of the
+// repo tabs in the Topbar (see `Topbar.tsx`) — they are unrelated
+// to any single branch:
 //
 //   Refresh — syncs configured remotes when present, then rebuilds the
 //             local snapshot (branches, status, log) from disk. Local-only
 //             repositories skip remote sync and refresh from local reads only.
+//   Filter  — single-button toggle for `branchViewMode` (worktrees-only /
+//             all), the same visual idiom as the Focus Mode button in
+//             `BranchDetailToolbar`.
+//   Create  — open the new-worktree dialog for the active repo.
 //
 // Branch-scoped operations (Checkout / Pull / Push / Open in Terminal
 // / Open in GitHub) live with the selected-branch detail, not here —
@@ -18,23 +23,56 @@ import { Tip } from '#/web/components/Tip.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { CreateWorktreeDialog, type CreateWorktreeRequest } from '#/web/components/CreateWorktreeDialog.tsx'
 import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivityControl.tsx'
-import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
+import { BranchViewModeControl } from '#/web/components/repo-toolbar/BranchViewModeControl.tsx'
+import type { BranchViewMode } from '#/web/stores/repos/types.ts'
 
 interface Props {
   repoId: string
 }
 
 export function RepoToolbarActions({ repoId }: Props) {
-  const compact = useIsCompactUi()
+  // Render the three actions as direct children (no wrapper) so
+  // they pick up the parent topbar's `gap-2`. Wrapping them in a
+  // flex container with its own smaller `gap-1` made the spacing
+  // between the actions visibly tighter than the gap from the
+  // last action to the Settings button — the four topbar buttons
+  // should read as one row of equally-spaced peers.
   return (
-    <div className="flex items-center gap-1">
+    <>
       <RepoActivityControl repoId={repoId} />
-      <CreateWorktreeAction repoId={repoId} compact={compact} />
-    </div>
+      <WorktreeFilterAction repoId={repoId} />
+      <CreateWorktreeAction repoId={repoId} />
+    </>
   )
 }
 
-function CreateWorktreeAction({ repoId, compact }: Props & { compact: boolean }) {
+// Reads the worktree-filter state from the repos store and feeds it
+// into the BranchViewModeControl toggle. Sits between Refresh and
+// CreateWorktree in the topbar, the visual grouping is implied by
+// the row order rather than a separate flex container.
+function WorktreeFilterAction({ repoId }: Props) {
+  const setBranchViewMode = useReposStore((s) => s.setBranchViewMode)
+  const { branchCount, branchViewMode } = useStoreWithEqualityFn(
+    useReposStore,
+    (s) => {
+      const repo = s.repos[repoId]
+      return {
+        branchCount: repo?.data.branches.length ?? 0,
+        branchViewMode: repo?.ui.branchViewMode ?? 'all',
+      }
+    },
+    (a, b) => a.branchCount === b.branchCount && a.branchViewMode === b.branchViewMode,
+  )
+  return (
+    <BranchViewModeControl
+      value={branchViewMode}
+      disabled={branchCount === 0}
+      onChange={(viewMode: BranchViewMode) => setBranchViewMode(repoId, viewMode)}
+    />
+  )
+}
+
+function CreateWorktreeAction({ repoId }: Props) {
   const t = useT()
   const submitBranchAction = useReposStore((s) => s.submitBranchAction)
   const repo = useStoreWithEqualityFn(
@@ -86,18 +124,17 @@ function CreateWorktreeAction({ repoId, compact }: Props & { compact: boolean })
   return (
     <>
       <Tip label={createTip}>
-        <span className="inline-flex">
-          <Button
-            variant="ghost"
-            onClick={() => {
-              if (!branchActionBusy) setCreateOpen(true)
-            }}
-            disabled={branchActionBusy}
-            aria-label={createTip}
-          >
-            <FolderPlus />
-          </Button>
-        </span>
+        <Button
+          variant="ghost"
+          size="icon-lg"
+          onClick={() => {
+            if (!branchActionBusy) setCreateOpen(true)
+          }}
+          disabled={branchActionBusy}
+          aria-label={createTip}
+        >
+          <FolderPlus />
+        </Button>
       </Tip>
       <CreateWorktreeDialogConnected
         repoId={repoId}

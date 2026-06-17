@@ -38,22 +38,21 @@ afterEach(() => {
 
 describe('RepoWorkspaceSkeleton', () => {
   test('shows compact branch rows with list actions in top-bottom split mode', () => {
-    render(
-      <RepoWorkspaceSkeleton showRepoToolbar layout="top-bottom" detailCollapsed={false} detailFocusMode={false} />,
-    )
+    render(<RepoWorkspaceSkeleton layout="top-bottom" detailCollapsed={false} detailFocusMode={false} />)
 
     expect(container?.querySelectorAll('li')).toHaveLength(14)
     expect(container?.querySelectorAll('[data-testid="branch-list-skeleton-action"]')).toHaveLength(6)
     expect(container?.querySelector('[data-testid="branch-detail-skeleton-action"]')).toBeNull()
-    expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-branch-view"]')).not.toBeNull()
-    expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-layout-control"]')).not.toBeNull()
+    // The per-repo toolbar moved up to the Topbar, so the
+    // workspace skeleton no longer carries its own toolbar —
+    // including the worktree-filter and layout-control slots.
+    expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-branch-view"]')).toBeNull()
+    expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-layout-control"]')).toBeNull()
     expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-pager"]')).toBeNull()
   })
 
   test('renders split workspace with list actions in left-right mode', () => {
-    render(
-      <RepoWorkspaceSkeleton showRepoToolbar layout="left-right" detailCollapsed={false} detailFocusMode={false} />,
-    )
+    render(<RepoWorkspaceSkeleton layout="left-right" detailCollapsed={false} detailFocusMode={false} />)
 
     expect(container?.querySelectorAll('li')).toHaveLength(14)
     expect(container?.querySelectorAll('[data-testid="branch-list-skeleton-action"]')).toHaveLength(6)
@@ -61,29 +60,12 @@ describe('RepoWorkspaceSkeleton', () => {
   })
 
   test('hides the branch pane entirely in top-bottom focus mode', () => {
-    render(<RepoWorkspaceSkeleton showRepoToolbar layout="top-bottom" detailCollapsed={false} detailFocusMode />)
+    render(<RepoWorkspaceSkeleton layout="top-bottom" detailCollapsed={false} detailFocusMode />)
 
     expect(container?.querySelectorAll('li')).toHaveLength(8)
     expect(container?.querySelectorAll('[data-testid="branch-list-skeleton-action"]')).toHaveLength(0)
-    expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-pager"]')).not.toBeNull()
+    expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-pager"]')).toBeNull()
     expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-branch-view"]')).toBeNull()
-  })
-
-  test('uses the compact toolbar shape on small screens', () => {
-    render(
-      <RepoWorkspaceSkeleton
-        showRepoToolbar
-        layout="top-bottom"
-        detailCollapsed={false}
-        detailFocusMode={false}
-        compact
-      />,
-    )
-
-    expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-pager"]')).not.toBeNull()
-    expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-branch-view"]')).toBeNull()
-    expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-branch-search"]')).toBeNull()
-    expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-layout-control"]')).toBeNull()
   })
 })
 

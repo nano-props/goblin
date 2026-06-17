@@ -8,7 +8,6 @@ import { RepoView } from '#/web/components/RepoView.tsx'
 import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 
@@ -29,7 +28,6 @@ export function App({ routeSettingsPage = null, onRouteSettingsPageChange }: App
   const workspaceLayout = useReposStore((s) => s.workspaceLayout)
   const detailCollapsed = useReposStore((s) => s.detailCollapsed)
   const detailFocusMode = useReposStore((s) => s.detailFocusMode)
-  const uiMode = useResponsiveUiMode()
 
   if (routeSettingsPage) {
     return (
@@ -43,7 +41,7 @@ export function App({ routeSettingsPage = null, onRouteSettingsPageChange }: App
 
   return (
     <>
-      <Topbar onOpenSettings={() => onRouteSettingsPageChange?.('general')}>
+      <Topbar onOpenSettings={() => onRouteSettingsPageChange?.('general')} repoId={activeId}>
         <RepoTabs
           currentRepoId={activeId}
           onOpenRepoPathDialog={overlayActions.openRepoPathDialog}
@@ -57,11 +55,9 @@ export function App({ routeSettingsPage = null, onRouteSettingsPageChange }: App
             <RepoView repoId={activeId} />
           ) : !sessionReady ? (
             <RepoWorkspaceSkeleton
-              showRepoToolbar
               layout={workspaceLayout}
               detailCollapsed={detailCollapsed}
               detailFocusMode={detailFocusMode}
-              compact={uiMode === 'compact'}
             />
           ) : (
             <EmptyState />

@@ -1,7 +1,9 @@
-// Active-repo body. In split/collapsed modes the branch pane carries its
-// own toolbar (BranchPaneToolbar); in focus mode the selected-branch
-// info bar (BranchInfoBar) caps the section above the detail pane.
-// Both bars share the RepoToolbar chrome.
+// Active-repo body. The per-repo actions (Refresh, worktree
+// filter, new worktree) live in the Topbar — see `Topbar.tsx`
+// and `App.tsx` — so the workspace below the topbar is just the
+// branch list (split/collapsed) or the detail pane (focus). In
+// focus mode the selected-branch info bar (BranchInfoBar) caps
+// the section above the detail pane.
 
 import { Smartphone } from 'lucide-react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
@@ -10,7 +12,6 @@ import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
 import { BranchList } from '#/web/components/BranchList.tsx'
 import { BranchDetail } from '#/web/components/BranchDetail.tsx'
 import { BranchInfoBar } from '#/web/components/repo-toolbar/BranchInfoBar.tsx'
-import { BranchPaneToolbar } from '#/web/components/repo-toolbar/BranchPaneToolbar.tsx'
 import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
 import { RepoWorkspace, RepoWorkspacePane } from '#/web/components/Layout.tsx'
 import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
@@ -66,11 +67,9 @@ export function RepoView({ repoId }: Props) {
   if (view.initialLoading) {
     return (
       <RepoWorkspaceSkeleton
-        showRepoToolbar
         layout={layout}
         detailCollapsed={behavior.detailCollapsed}
         detailFocusMode={behavior.detailFocusMode}
-        compact={uiMode === 'compact'}
       />
     )
   }
@@ -98,7 +97,6 @@ export function RepoView({ repoId }: Props) {
         onDetailSizeChange={(size) => setDetailPaneSize(layout, size)}
         branchPane={
           <RepoWorkspacePane>
-            <BranchPaneToolbar repoId={repoId} />
             <BranchList repoId={repoId} showActions={behavior.branchListActionsVisible} />
           </RepoWorkspacePane>
         }

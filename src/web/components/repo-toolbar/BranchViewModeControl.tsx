@@ -1,8 +1,29 @@
+// Single-button worktree filter for the topbar. The previous
+// SegmentedControl (all / worktrees) was hard to discover and the
+// "blue pill" reading of the selected thumb (low-opacity accent
+// tint) only ever landed muddy against the toolbar's gray
+// surroundings. This control is now a single toggle styled the
+// same as `BranchDetailToolbar`'s Focus Mode button
+// (variant="ghost" + size="icon-lg" + bg-accent on press) so the
+// topbar's icon toggles share one visual language: a flat ghost
+// button that paints a subtle accent fill when active. The
+// size="icon-lg" matches the rest of the topbar buttons so the
+// four controls (Refresh / Filter / CreateWorktree / Settings)
+// read as one row of equal-weight buttons.
+//
+// Behaviour:
+//   pressed   → branchViewMode === 'worktrees' (filter on, only
+//                branches that own a worktree path render)
+//   unpressed → branchViewMode === 'all'       (no filter)
+// The underlying store action `setBranchViewMode` is unchanged;
+// BranchList / persistence / refresh continue to read
+// `repo.ui.branchViewMode` as before.
+
 import { FolderTree, ListTree, type LucideIcon } from 'lucide-react'
+import { Button } from '#/web/components/ui/button.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
-import { SegmentedControl } from '#/web/components/ui/segmented-control.tsx'
 import { useT } from '#/web/stores/i18n.ts'
-import { BRANCH_VIEW_MODE_OPTIONS } from '#/web/components/repo-toolbar/branch-view-mode-options.ts'
+import { cn } from '#/web/lib/cn.ts'
 import type { BranchViewMode } from '#/web/stores/repos/types.ts'
 
 interface Props {
@@ -11,34 +32,35 @@ interface Props {
   onChange: (viewMode: BranchViewMode) => void
 }
 
-const BRANCH_VIEW_MODE_ICONS = {
-  all: ListTree,
-  worktrees: FolderTree,
-} satisfies Record<BranchViewMode, LucideIcon>
-
 export function BranchViewModeControl({ value, disabled = false, onChange }: Props) {
   const t = useT()
+  const worktreesOnly = value === 'worktrees'
+  // Icon reflects the *current* state: ListTree when the full
+  // list is shown, FolderTree when only worktree-bearing
+  // branches are. Mirrors the i18n labels under those keys.
+  const Icon: LucideIcon = worktreesOnly ? FolderTree : ListTree
+  const label = t(worktreesOnly ? 'branches.filter.worktrees' : 'branches.filter.all')
 
   return (
-    <SegmentedControl.Root
-      value={value}
-      onValueChange={(next) => {
-        if (next) onChange(next as BranchViewMode)
-      }}
-      disabled={disabled}
-      aria-label={t('branches.filter-label')}
-    >
-      {BRANCH_VIEW_MODE_OPTIONS.map((option) => {
-        const Icon = BRANCH_VIEW_MODE_ICONS[option.id]
-        const label = t(option.tooltipKey)
-        return (
-          <Tip key={option.id} label={label}>
-            <SegmentedControl.Item value={option.id} aria-label={label}>
-              <Icon />
-            </SegmentedControl.Item>
-          </Tip>
-        )
-      })}
-    </SegmentedControl.Root>
+    <Tip label={label}>
+      <Button
+        variant="ghost"
+        size="icon-lg"
+        disabled={disabled}
+        onClick={() => onChange(worktreesOnly ? 'all' : 'worktrees')}
+        aria-pressed={worktreesOnly}
+        aria-label={t('branches.filter-label')}
+        className={cn(
+          // Match the Focus Mode button's pressed treatment so the
+          // topbar's toggles read as one family. `hover:bg-accent`
+          // sticks while pressed so the active state doesn't
+          // flicker back to ghost on mouse-over.
+          worktreesOnly &&
+            'bg-accent text-accent-foreground shadow-xs hover:bg-accent hover:text-accent-foreground',
+        )}
+      >
+        <Icon />
+      </Button>
+    </Tip>
   )
 }
