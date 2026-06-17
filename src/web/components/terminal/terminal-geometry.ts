@@ -7,6 +7,14 @@
 export const DEFAULT_TERMINAL_COLS = 80
 export const DEFAULT_TERMINAL_ROWS = 24
 
+/**
+ * Page-lifetime constants. The cell-metrics cache below assumes these
+ * do not change for the page's lifetime; if any of them ever becomes
+ * user-configurable at runtime, the cache MUST be invalidated on
+ * change. `__resetCachedTerminalCellMetricsForTest` is the
+ * process-level escape hatch used by tests to exercise the
+ * cache-miss path.
+ */
 export const TERMINAL_FONT_SIZE = 14
 export const TERMINAL_FONT_FAMILY = "'Goblin Mono', monospace"
 export const TERMINAL_LINE_HEIGHT = 1
@@ -15,6 +23,14 @@ const MIN_INITIAL_TERMINAL_COLS = 2
 const MIN_INITIAL_TERMINAL_ROWS = 1
 const TERMINAL_SCROLLBAR_WIDTH = 14
 
+/**
+ * Process-wide cache of measured cell dimensions. Populated on the
+ * first successful `measureTerminalCell()` call and reused for the
+ * rest of the page lifetime. The invariant is that the font family
+ * and size above never change at runtime; if they ever do, the cache
+ * must be invalidated. There is no automatic invalidation by design
+ * — see `__resetCachedTerminalCellMetricsForTest`.
+ */
 let cachedTerminalCellMetrics: { cellWidth: number; cellHeight: number } | null = null
 
 export function preloadTerminalFont(): Promise<void> {
@@ -69,4 +85,15 @@ function measureTerminalCell(): { cellWidth: number; cellHeight: number } | null
 function hasMeasurableBox(element: HTMLElement): boolean {
   const rect = element.getBoundingClientRect()
   return rect.width > 0 && rect.height > 0
+}
+
+/**
+ * Test-only: clear the process-wide cell-metrics cache so the next
+ * `measureTerminalCell()` call re-measures. There is no production
+ * caller — the cache is only ever invalidated by a page reload, by
+ * definition. This export exists so unit tests can exercise the
+ * cache-miss path deterministically.
+ */
+export function __resetCachedTerminalCellMetricsForTest(): void {
+  cachedTerminalCellMetrics = null
 }
