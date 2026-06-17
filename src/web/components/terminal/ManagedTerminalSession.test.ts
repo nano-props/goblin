@@ -334,6 +334,24 @@ vi.mock('@xterm/addon-serialize', () => ({ SerializeAddon: xtermMocks.MockSerial
 vi.mock('@xterm/addon-unicode11', () => ({ Unicode11Addon: xtermMocks.MockUnicode11Addon }))
 vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: xtermMocks.MockWebLinksAddon }))
 
+// jsdom does not lay out, so proposeTerminalGeometry would return null. The
+// orchestrator now waits for a measurable host via waitForMeasurableHost;
+// mock the geometry module so the synchronous happy path resolves.
+const geometryMocks = vi.hoisted(() => ({
+  preloadTerminalFont: vi.fn(async () => {}),
+  proposeTerminalGeometry: vi.fn(() => ({ cols: 80, rows: 24 })),
+}))
+
+vi.mock('#/web/components/terminal/terminal-geometry.ts', () => ({
+  preloadTerminalFont: geometryMocks.preloadTerminalFont,
+  proposeTerminalGeometry: geometryMocks.proposeTerminalGeometry,
+  TERMINAL_FONT_FAMILY: "'Goblin Mono', monospace",
+  TERMINAL_FONT_SIZE: 14,
+  TERMINAL_LINE_HEIGHT: 1,
+  DEFAULT_TERMINAL_COLS: 80,
+  DEFAULT_TERMINAL_ROWS: 24,
+}))
+
 class MockResizeObserver {
   static instances: MockResizeObserver[] = []
   observe = vi.fn()
@@ -599,6 +617,39 @@ describe('ManagedTerminalSession', () => {
     expect(xtermMocks.terminals[0]!.options.rescaleOverlappingGlyphs).toBe(true)
     expect(terminalCalls.restart).not.toHaveBeenCalled()
     expect(session.snapshot().phase).toBe('open')
+  })
+
+  test('dispose during font preload aborts before waitForMeasurableHost runs', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+
+    // Park preloadTerminalFont so the orchestrator yields mid-openPhase.
+    let resolvePreload!: () => void
+    geometryMocks.preloadTerminalFont.mockImplementationOnce(
+      () => new Promise<void>((r) => { resolvePreload = r }),
+    )
+
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+
+    session.attach(host)
+    await flushTerminalStart()
+
+    // Session is parked inside the await preloadTerminalFont() call —
+    // no ResizeObserver should exist yet because the geometry wait has
+    // not been reached.
+    expect(MockResizeObserver.instances).toHaveLength(0)
+
+    // Dispose while the preload promise is unresolved. Then resolve it.
+    session.dispose()
+    resolvePreload()
+    await flushTerminalStart()
+
+    // The guard after the preload await must catch the disposed state and
+    // throw StartCancelledError before reaching waitForMeasurableHost, so
+    // no ResizeObserver should have been created against a detached host.
+    expect(MockResizeObserver.instances).toHaveLength(0)
+    expect(xtermMocks.terminals).toHaveLength(0)
   })
 
   test('remeasures and refits after fonts finish loading', async () => {

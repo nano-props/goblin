@@ -469,6 +469,7 @@ export const ko: Record<DictKey, string> = {
   'error.ghostty-not-installed': 'Ghostty가 설치되어 있지 않습니다',
   'error.terminal-not-installed': '터미널이 설치되어 있지 않습니다',
   'error.terminal-create-failed': '터미널을 만들 수 없습니다',
+  'error.terminal-host-not-measurable': '터미널 패널이 보이지 않습니다',
   'error.vscode-not-installed': 'VS Code가 설치되어 있지 않습니다',
   'error.editor-not-installed': '에디터를 찾을 수 없습니다',
   'error.remote-editor-not-supported': '선택한 에디터는 원격 SSH 작업 영역을 열 수 없습니다',

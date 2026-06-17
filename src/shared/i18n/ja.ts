@@ -477,6 +477,7 @@ export const ja: Record<DictKey, string> = {
   'error.ghostty-not-installed': 'Ghostty がインストールされていません',
   'error.terminal-not-installed': 'ターミナルがインストールされていません',
   'error.terminal-create-failed': 'ターミナルを作成できませんでした',
+  'error.terminal-host-not-measurable': 'ターミナルパネルが見えません',
   'error.vscode-not-installed': 'VS Code がインストールされていません',
   'error.editor-not-installed': 'エディタが見つかりません',
   'error.remote-editor-not-supported': '選択したエディタはリモート SSH ワークスペースを開けません',

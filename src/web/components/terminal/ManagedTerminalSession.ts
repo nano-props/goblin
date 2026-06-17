@@ -13,6 +13,10 @@ import { setTerminalFocused } from '#/web/terminal-focus.ts'
 import { openExternalUrl } from '#/web/app-shell-client.ts'
 import { preloadTerminalFont } from '#/web/components/terminal/terminal-geometry.ts'
 import {
+  TerminalHostNotMeasurableError,
+  waitForMeasurableHost,
+} from '#/web/components/terminal/terminal-session-geometry.ts'
+import {
   projectTerminalAttachResultForAttachment,
   type TerminalAttachResultWithOwnership,
 } from '#/web/components/terminal/terminal-session-projection.ts'
@@ -38,6 +42,7 @@ export class ManagedTerminalSession {
   private readonly runtime = new TerminalSessionRuntime()
   private readonly view: TerminalSessionView
   private startToken = 0
+  private geometryAbortController: AbortController | null = null
   private resizeFlushScheduled = false
   private outputFlushFrame: number | null = null
 
@@ -102,6 +107,8 @@ export class ManagedTerminalSession {
   dispose(options: { closeSession?: boolean } = {}): void {
     if (this.disposed) return
     this.disposed = true
+    this.geometryAbortController?.abort()
+    this.geometryAbortController = null
     this.clearTerminalFocusIfOwned()
     this.view.blurIfFocused()
     const sessionIds = this.runtime.disposeSessionIds()
@@ -308,7 +315,40 @@ export class ManagedTerminalSession {
   private async openPhase(token: number): Promise<{ term: XTermTerminal; preloaded: boolean }> {
     if (this.disposed || this.startToken !== token || this.view.currentTerminal()) throw new StartCancelledError()
     await preloadTerminalFont()
-    const term = this.view.openTerminal((input) => this.writeInput(input))
+    // The preload await can yield long enough for the session to be disposed
+    // (React unmount, user navigation). Without this guard the orchestrator
+    // would proceed to waitForMeasurableHost with a detached host, leaking a
+    // ResizeObserver and hanging the promise indefinitely.
+    if (this.disposed || this.startToken !== token) throw new StartCancelledError()
+    // The orchestrator owns the geometry wait. The view never falls back to
+    // a default — if the host never becomes measurable, this attach fails
+    // and the user can retry by re-selecting the terminal. See
+    // docs/terminal.md "Geometry and layout model".
+    const geometryAbortController = new AbortController()
+    this.geometryAbortController?.abort()
+    this.geometryAbortController = geometryAbortController
+    let geometry: { cols: number; rows: number }
+    try {
+      geometry = await waitForMeasurableHost(this.view.measurableHost(), {
+        signal: geometryAbortController.signal,
+      })
+    } catch (err) {
+      if (err instanceof TerminalHostNotMeasurableError || geometryAbortController.signal.aborted) {
+        terminalLog.warn('terminal host did not become measurable; failing attach', { err })
+        // The wait may have been aborted by a newer start() or by dispose().
+        // In that case a fresh attach is already in flight and we must not
+        // tear its transient state down. Tear down only if our start token
+        // is still current.
+        if (this.currentToken(token)) {
+          this.destroyActiveView()
+          if (this.runtime.failAttachAttempt('error.terminal-host-not-measurable')) this.notify('metadata')
+        }
+        throw new StartCancelledError()
+      }
+      throw err
+    }
+    if (this.geometryAbortController === geometryAbortController) this.geometryAbortController = null
+    const term = this.view.openTerminal(geometry, (input) => this.writeInput(input))
     const preloaded = await this.preloadHydratedSnapshot(token, term)
     await waitForTerminalLayout()
     this.guardStart(token, term)
@@ -504,6 +544,8 @@ export class ManagedTerminalSession {
   }
 
   private destroyActiveView(options?: { preserveTransientState?: boolean }): void {
+    this.geometryAbortController?.abort()
+    this.geometryAbortController = null
     this.cancelResizeFlush()
     if (this.outputFlushFrame !== null) {
       cancelScheduledAnimationFrame(this.outputFlushFrame)

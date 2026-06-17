@@ -182,6 +182,8 @@ This allows the system to reason about:
 - whether a control transition requires a resize
 - whether reconnecting control should restore the attachment's geometry
 
+Geometry acquisition belongs to the orchestrator, not the view. The view accepts a measured geometry as a parameter and never reaches into layout.
+
 ## Restart semantics in the target model
 
 Restart should be modeled as a lifecycle transition, not as an attach-shaped side effect.

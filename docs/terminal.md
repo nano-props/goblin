@@ -172,6 +172,16 @@ Geometry should be treated as part of terminal correctness.
 - Narrow layouts are especially sensitive because shell prompt rendering reacts immediately to initial columns.
 - Extra defensive redraws are not a substitute for correct geometry flow.
 
+### Unmeasurable hosts at attach time
+
+When a terminal is first opened into a host whose box is not yet measurable (e.g. a split pane that is still animating to its final width), the orchestrator must wait for the host to become measurable rather than fall back to a historical default. Spawning a PTY at the wrong column count and resizing later is **not** equivalent to spawning it at the correct width — the shell may lay out its prompt against the wrong `$COLUMNS` before the resize settles.
+
+The acquisition of geometry belongs to the orchestrator, not the view: the view accepts the measured geometry as a parameter, never reaches into layout, and never soft-fails to a default. A stuck host surfaces as a fatal attach failure the user can retry by re-selecting the terminal.
+
+### Narrow-host multi-line prompt wrap
+
+Multi-line shell prompts (e.g. `PS1="👾:%~\\n$ "`) clip the path line at the top of the viewport after a narrow-host resize. Root cause is upstream — see [issue #56](https://github.com/nano-props/goblin/issues/56) for full reproduction and the OSC 133 path forward.
+
 ## Replay and hydration
 
 The system supports replay and snapshot hydration so users can reattach to running terminals without losing visual context.
