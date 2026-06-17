@@ -13,6 +13,10 @@ export function toolbarTabChromeClassName(options: {
   compact?: boolean
 }): string {
   const { variant, active, dragging = false, compact = false } = options
+  // Compact repo strips render only the active tab, so the "active" chrome
+  // would be visually misleading — collapse it to the unselected chrome
+  // (matching the look of an idle tab on the expanded strip).
+  const treatAsUnselected = variant === 'repo' && compact
   return cn(
     'group relative shrink-0 select-none items-center transition-colors duration-100',
     compositeFocusRing,
@@ -22,7 +26,7 @@ export function toolbarTabChromeClassName(options: {
         ? 'flex h-7 w-32 gap-1 rounded-md border px-2.5 text-sm'
         : 'flex h-7 w-36 gap-1 rounded-md border px-2.5 text-sm',
     variant === 'repo'
-      ? active
+      ? active && !treatAsUnselected
         ? 'border-input bg-card text-foreground'
         : 'border-transparent text-muted-foreground hover:bg-accent/70 hover:text-foreground'
       : active
@@ -40,6 +44,9 @@ export function toolbarTabButtonClassName(_variant: ToolbarTabVariant): string |
   return undefined
 }
 
-export function toolbarTabIconClassName(active: boolean): string {
-  return cn('shrink-0', active ? 'text-foreground' : 'text-muted-foreground')
+export function toolbarTabIconClassName(active: boolean, compact = false): string {
+  // Compact repo strips show only the active tab; the icon follows the
+  // tab chrome and stays muted to match the unselected look.
+  const emphasized = active && !compact
+  return cn('shrink-0', emphasized ? 'text-foreground' : 'text-muted-foreground')
 }
