@@ -9,6 +9,29 @@
 > fallback path to the source of truth**. Many items in earlier drafts
 > were cut for that reason — see "Items removed" at the bottom.
 
+## 0. TL;DR
+
+6 phases, 12 items (3 marked optional), all gated by explicit
+safety rules and measurement where applicable.
+
+| Phase | Items | Duration | Gate |
+|---|---|---|---|
+| 1 | T1.1–T1.4 (first-open latency quick wins) + **T1.5** (real leak fix) | ≤ 1 day | run Preflight; ≥ 50% cold-start reduction |
+| 2 | T2.1 (reattach cap 32→8) | ≤ 0.5 day | revert if eviction complaints |
+| 3 (deferred) | T3.1 (server output batching, bounded) | 1-2 weeks | only if Preflight shows server CPU bottleneck |
+| 4 | T4.1 (diagnostics, additive) | ≤ 0.5 day | none |
+| 5 | T5.1 (visibility hook) + T5.2+ (scrollTop, optional) | ≤ 0.5 day (+ 1 day opt) | manual mobile test; confirm no reconnect storms |
+| 6 | T6.1 (skeleton tab strip) + T6.2 (session list cache, mount-only reader) | ≤ 1 day | refresh test; bounded phantom-tab flash |
+
+Two real bugs found during the audit and addressed: T1.5
+(hydratedSnapshot never cleared) and the existing `detach` ↔
+reattach cache interaction under T2.1.
+
+The plan is **gated** by the Preflight measurement pass — Phase 1
+target is ≥ 50% cold-start reduction. If Preflight doesn't show
+that, the diagnosis was wrong and the plan needs revision before
+Phase 2+ ships.
+
 ## 1. Background
 
 Two inputs drive this plan:
@@ -469,10 +492,32 @@ These are already correct and stay unchanged:
     because the registry already has live data in those
     cases — reading the cache would briefly override it
     and cause a "flash back to last session's tabs"
-    regression. Implementation: read the cache inside
-    `useState(() => readCachedSessionList(...))` at the
-    top of `TerminalSessionProvider`, then never read it
-    again.
+    regression.
+- **Architecture for the reader (must be `方案 A`)**:
+  the cached list is consumed by pre-populating
+  `registry.worktreeSnapshotCache` at registry
+  construction. `TerminalTabs` continues to read via
+  `useWorktreeTerminalSnapshot(worktreeKey)` → it sees
+  the cached data without any prop drilling. The
+  existing lazy-invalidation path (rebuild on
+  `notifyWorktree`) handles the transition from cache to
+  live data:
+  ```ts
+  // TerminalSessionRegistry.ts, in constructor
+  for (const [worktreeKey, cached] of readAllCachedSessionLists()) {
+    this.worktreeSnapshotCache.set(worktreeKey, {
+      worktreeTerminalKey: worktreeKey,
+      selectedDescriptor: null,  // filled by reconcile
+      sessions: cached.sessions,
+      count: cached.sessions.length,
+      pendingCreate: false,
+    })
+  }
+  ```
+  This reuses the existing `worktreeSnapshotCache` as
+  the in-memory layer between the persisted cache and
+  the React components. No new prop, no new state hook
+  in the Provider, no architectural surface area added.
   - **Invalidation**: implicit — the next reconcile
     overwrites the key. There is no other writer.
   - **Read-time guard (optional, recommended)**:
@@ -591,8 +636,14 @@ lens:
   session), so the change is 0% helpful in the dominant path; the
   state-machine reshape is a real safety hit. **Cut**.
 - **T-output-summary-merge (T2.4 in earlier draft)** — rAF-merging
-  `outputSummary` notify calls. Viewer mode is a cold path; not
-  justified for a single user. **Cut**.
+  `outputSummary` notify calls in
+  `ManagedTerminalSession.scheduleSummaryNotify`. Viewer mode
+  (non-controller) is a cold path for a single user; the rAF
+  merge would add a microtask/rAF scheduling state for a
+  ~5-10% re-render saving that the user is unlikely to notice.
+  If viewer mode ever becomes hot (e.g., a collaboration feature
+  is added that has many viewers per session), revisit with
+  measurement. **Cut**.
 - **T-shared-resize-observer (T3.1 in earlier draft)** — sharing a
   single `ResizeObserver` per host across multiple views. The
   benefit is one fewer frame of attach latency for multi-tab
