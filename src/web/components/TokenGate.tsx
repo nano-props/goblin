@@ -1,14 +1,14 @@
-import { useState, type FormEvent } from 'react'
-import { useAccessTokenStatus } from '#/web/hooks/useAccessTokenStatus.ts'
+import { useState, type FormEvent, type ReactNode } from 'react'
+import { useAuth } from '#/web/auth/AuthProvider.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { postServerJson } from '#/web/lib/server-fetch.ts'
 
 /**
  * Auth gate for the renderer. Mounts above the app's normal
- * children; on first load calls `/api/whoami` and either passes
- * through (authenticated) or shows a one-field login form
- * (unauthenticated). Embedded renderers have the access token in
- * the bootstrap and never see the form.
+ * children; reads the shared auth state from `useAuth()` and
+ * either passes through (authenticated) or shows a one-field
+ * login form (unauthenticated). Embedded renderers have the
+ * access token in the bootstrap and never see the form.
  *
  * The form is intentionally minimal — single text input + submit —
  * because the access token is a 25-char base36 string the user is
@@ -16,11 +16,17 @@ import { postServerJson } from '#/web/lib/server-fetch.ts'
  * no signup, no "forgot token" flow, no rate limit UI; rotate by
  * deleting the access-token file under `app.getPath('userData')`
  * (see `ACCESS_TOKEN_FILE_NAME`) and restarting.
+ *
+ * Mounted children only exist in the React tree once auth has
+ * resolved to `authenticated`, so any side effects (WebSocket
+ * subscribers, periodic polls) declared inside this subtree
+ * run only after the user has a valid session. This is what
+ * keeps the server log quiet on first load.
  */
-export function TokenGate({ children }: { children: React.ReactNode }) {
-  const status = useAccessTokenStatus()
-  if (status.state === 'checking') return <CheckingPlaceholder />
-  if (status.state === 'unauthenticated') return <LoginForm onSuccess={status.refresh} />
+export function TokenGate({ children }: { children: ReactNode }) {
+  const auth = useAuth()
+  if (auth.state === 'checking') return <CheckingPlaceholder />
+  if (auth.state === 'unauthenticated') return <LoginForm onSuccess={auth.refresh} />
   return <>{children}</>
 }
 
