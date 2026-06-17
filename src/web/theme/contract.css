@@ -27,6 +27,15 @@
   --color-accent-foreground: var(--goblin-text-primary);
   --color-control: var(--goblin-surface-control, var(--goblin-surface-raised));
   --color-control-hover: var(--goblin-surface-control-hover, var(--goblin-surface-hover));
+  /* Recessed track behind the selected "thumb" in SegmentedControl.
+   * Distinct from --color-muted (subtle bg for code blocks / badges)
+   * and from --color-accent (hover feedback) — this is a permanent
+   * container surface that should sit *visibly below* the selected
+   * item without competing with it for attention. Themes should
+   * pick values closer to iOS's ~#e5e5ea than to a hard gray, so
+   * the track reads as "container hint" rather than "prominent
+   * box". Falls back to --color-accent when not defined. */
+  --color-segmented-track: var(--goblin-surface-segmented-track, var(--goblin-surface-hover));
   --color-separator: var(--goblin-border-subtle);
   --color-border: var(--goblin-border-default);
   --color-input: var(--goblin-border-strong);

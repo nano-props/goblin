@@ -7,6 +7,7 @@ html[data-color-theme='mono'][data-theme='light'] {
   --goblin-surface-overlay: #ffffff;
   --goblin-surface-muted: #f4f4f5;
   --goblin-surface-hover: #e4e4e7;
+  --goblin-surface-segmented-track: #e7e7ea;
   --goblin-surface-control: #ffffff;
   --goblin-surface-control-hover: #f4f4f5;
   --goblin-text-primary: #09090b;
@@ -85,6 +86,7 @@ html[data-color-theme='mono'][data-theme='dark'] {
   --goblin-surface-overlay: #18181b;
   --goblin-surface-muted: #27272a;
   --goblin-surface-hover: #27272a;
+  --goblin-surface-segmented-track: #3f3f46;
   --goblin-surface-control: #18181b;
   --goblin-surface-control-hover: #27272a;
   --goblin-text-primary: #fafafa;
