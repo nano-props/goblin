@@ -478,6 +478,7 @@ beforeEach(() => {
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       listSessions: listSessionsMock,
       prewarm: vi.fn(async () => {}),
+      kickReconnect: vi.fn(() => {}),
       getSessionSnapshot: getSessionSnapshotMock,
       reorder: vi.fn(async () => true),
       notifyBell: window.goblinNative.terminal.notifyBell,
@@ -1655,6 +1656,105 @@ describe('TerminalSessionProvider', () => {
     } finally {
       await act(async () => root.unmount())
       container.remove()
+    }
+  })
+
+  test('T5.1: kicks reconnect on visibilitychange:visible and on persisted pageshow', async () => {
+    const kickReconnect = vi.fn(() => {})
+    setRendererBridgeForTests({
+      kind: () => 'electron',
+      hasCapability: () => false,
+      getBootstrap: () => ({
+        runtime: {
+          kind: 'electron',
+          bridgeVersion: RENDERER_BRIDGE_VERSION,
+          capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+        },
+        homeDir: '/home',
+        platform: 'web',
+        initialI18n: null,
+        initialSettings: null,
+        initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret', clientId: 'client_sharedterminal' },
+      }),
+      invokeIpc: vi.fn(async () => null),
+      abortIpc: vi.fn(async () => false),
+      onIpcEvent: vi.fn(() => () => {}),
+      onEffectIntent: vi.fn(() => () => {}),
+      pathForFile: vi.fn(() => ''),
+      saveClipboardFiles: vi.fn(async () => []),
+      shell: () => null,
+      terminal: () => ({
+        attach: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
+        restart: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
+        write: vi.fn(async () => false),
+        resize: vi.fn(async () => false),
+        takeover: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
+        close: vi.fn(async () => false),
+        create: vi.fn(async () => ({ ok: true as const, action: 'created' as const, key: 'k', sessions: [] })),
+        pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
+        listSessions: vi.fn(async () => []),
+        prewarm: vi.fn(async () => {}),
+        kickReconnect,
+        getSessionSnapshot: vi.fn(async () => null),
+        reorder: vi.fn(async () => false),
+        notifyBell: vi.fn(async () => false),
+        sendTestNotification: vi.fn(async () => false),
+        setBadge: () => {},
+        onOutput: () => () => {},
+        onTitle: () => () => {},
+        onExit: () => () => {},
+        onOwnership: () => () => {},
+        onSessionsChanged: () => () => {},
+      }),
+    })
+
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    try {
+      await act(async () => {
+        root.render(
+          <TerminalSessionProvider>
+            <span>probe</span>
+          </TerminalSessionProvider>,
+        )
+      })
+
+      // visibilitychange:visible → kick
+      kickReconnect.mockClear()
+      await act(async () => {
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' })
+        document.dispatchEvent(new Event('visibilitychange'))
+      })
+      expect(kickReconnect).toHaveBeenCalledTimes(1)
+
+      // visibilitychange:hidden → no kick
+      kickReconnect.mockClear()
+      await act(async () => {
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
+        document.dispatchEvent(new Event('visibilitychange'))
+      })
+      expect(kickReconnect).not.toHaveBeenCalled()
+
+      // pageshow with persisted=true → kick (bfcache restore)
+      kickReconnect.mockClear()
+      await act(async () => {
+        window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
+      })
+      expect(kickReconnect).toHaveBeenCalledTimes(1)
+
+      // pageshow with persisted=false → no kick (regular full load)
+      kickReconnect.mockClear()
+      await act(async () => {
+        window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: false }))
+      })
+      expect(kickReconnect).not.toHaveBeenCalled()
+    } finally {
+      await act(async () => root.unmount())
+      container.remove()
+      // Reset visibilityState to the jsdom default so other tests
+      // aren't affected by our defineProperty.
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' })
     }
   })
 })

@@ -118,6 +118,36 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     registry.setParkingRoot(parkingRootRef.current)
   })
 
+  // T5.1: visibility recovery hook. On `visibilitychange:visible` and
+  // on `pageshow` (bfcache restore on Safari/Firefox mobile), call
+  // `kickReconnect()` so a backgrounded tab reconnects without
+  // waiting for the 300ms backoff. The kick is a no-op if the socket
+  // is already healthy, so it costs nothing on a desktop browser
+  // where the WS rarely drops. No periodic polling, no force-close
+  // of a working socket. State updates flow through the existing
+  // server-push `sessions-changed` event after the (re)opened
+  // socket delivers its initial snapshot — we never trigger a
+  // client-side reconcile here.
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return
+      terminalBridge.kickReconnect()
+    }
+    const onPageShow = (event: PageTransitionEvent) => {
+      // `event.persisted === true` means the page came from the
+      // bfcache (Safari/Firefox mobile). A non-persisted pageshow
+      // is a regular full load and the bridge is already healthy.
+      if (!event.persisted) return
+      terminalBridge.kickReconnect()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('pageshow', onPageShow)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('pageshow', onPageShow)
+    }
+  }, [])
+
   // Registry lifecycle (event listeners + bridge + destroy)
   useEffect(() => {
     const offOutput = terminalBridge.onOutput((event) => {

@@ -379,6 +379,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       pruneTerminals: async (repoRoot) => callTerminalHandler('terminal.prune', { repoRoot }),
       listSessions: async (input) => callTerminalHandler('terminal.listSessions', input),
       prewarm: async () => {},
+      kickReconnect: () => {},
       getSessionSnapshot: async (input) => callTerminalHandler('terminal.getSessionSnapshot', input),
       reorder: async (input) => callTerminalHandler('terminal.reorder', input),
       notifyBell: async (input) => callTerminalHandler('terminal.notifyBell', input),

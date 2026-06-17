@@ -112,6 +112,30 @@ export function createServerTerminalBridge(options: {
     }, 300)
   }
 
+  // T5.1: explicit reconnect trigger for visibility recovery (mobile
+  // background-tab resume, bfcache restore). The mobile OS may silently
+  // drop the WebSocket while the tab is backgrounded; the existing
+  // handleSocketDisconnection → scheduleReconnect path is correct
+  // but the 300ms backoff adds latency the user feels on the first
+  // visible-tab interaction. kickReconnect() short-circuits that
+  // backoff: if the socket is null or fully CLOSED, we open
+  // immediately. If it's OPEN, we do nothing — the socket is
+  // healthy and a gratuitous cycle would just burn a handshake. If
+  // it's CONNECTING or CLOSING, we let the in-flight transition
+  // complete; the close handler will route through
+  // scheduleReconnect if it fails.
+  function kickReconnect() {
+    if (quitting) return
+    if (!hasRealtimeSubscribers()) return
+    if (typeof WebSocket === 'undefined') return
+    const currentSocket = socket
+    if (!currentSocket || currentSocket.readyState === WebSocket.CLOSED) {
+      // ensureSocket is a no-op if `socket` is already non-null and
+      // OPEN, so this is safe in any state.
+      ensureSocket()
+    }
+  }
+
   function ensureSocket() {
     if (socket || typeof WebSocket === 'undefined' || quitting) return
     let socketUrl: string
@@ -317,6 +341,9 @@ export function createServerTerminalBridge(options: {
         sessionsChangedSubscribers.delete(cb)
         closeSocketIfIdle()
       }
+    },
+    kickReconnect() {
+      kickReconnect()
     },
   }
 

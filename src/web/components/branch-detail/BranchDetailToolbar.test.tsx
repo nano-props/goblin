@@ -297,6 +297,7 @@ describe('BranchDetailToolbar', () => {
         pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
         listSessions: vi.fn(async () => []),
         prewarm,
+        kickReconnect: vi.fn(() => {}),
         getSessionSnapshot: vi.fn(async () => null),
         reorder: vi.fn(async () => false),
         notifyBell: vi.fn(async () => false),

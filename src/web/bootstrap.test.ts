@@ -181,6 +181,7 @@ describe('renderer bootstrap', () => {
         pruneTerminals: async () => ({ pruned: 0, remaining: 0 }),
         listSessions: async () => [],
         prewarm: async () => {},
+        kickReconnect: () => {},
         getSessionSnapshot: async () => null,
         reorder: async () => false,
         notifyBell: async () => false,
