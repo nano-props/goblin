@@ -5,3 +5,4 @@ release
 *.log
 .vscode
 .claude/
+.env
