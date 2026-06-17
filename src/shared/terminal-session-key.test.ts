@@ -1,4 +1,3 @@
-import path from 'node:path'
 import { describe, expect, test } from 'vitest'
 import {
   formatTerminalSessionKey,
@@ -6,19 +5,9 @@ import {
   parseTerminalSessionKey,
   parseWorktreeTerminalKey,
   terminalPruneKeyFromSessionKey,
-  terminalSessionScope,
 } from '#/shared/terminal-session-key.ts'
 
 describe('terminal session key helpers', () => {
-  test('normalizes local repo roots into canonical session scope', () => {
-    expect(terminalSessionScope('/repo')).toBe(path.resolve('/repo'))
-    expect(terminalSessionScope('./repo')).toBe(path.resolve('./repo'))
-  })
-
-  test('preserves remote repo roots as opaque session scopes', () => {
-    expect(terminalSessionScope('ssh-config://prod/%2Frepo')).toBe('ssh-config://prod/%2Frepo')
-  })
-
   test('formats and parses terminal session keys round-trip', () => {
     const key = formatTerminalSessionKey('/repo', '/repo/worktree', 'terminal-2')
     expect(key).toBe('/repo\0/repo/worktree\0terminal-2')

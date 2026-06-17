@@ -15,11 +15,8 @@ import {
 } from '#/shared/terminal-types.ts'
 import { formatTerminalId, parseTerminalIdIndex } from '#/shared/terminal-ids.ts'
 import { isValidTerminalAttachmentId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
-import {
-  formatTerminalSessionKey,
-  parseTerminalSessionKey,
-  terminalSessionScope,
-} from '#/shared/terminal-session-key.ts'
+import { formatTerminalSessionKey, parseTerminalSessionKey } from '#/shared/terminal-session-key.ts'
+import { terminalSessionScope } from '#/server/terminal/terminal-session-scope.ts'
 
 interface EnsureTerminalCatalogInput {
   repoRoot: string
@@ -102,7 +99,7 @@ class TerminalCatalog {
     const existingSessions = await this.options.manager.listSessions(sessionScope)
     // Build the target session key from the same form the manager uses
     // to scope listSessions — see the comment on `terminalSessionScope`
-    // in shared/terminal-session-key.ts for the normalization rationale.
+    // in server/terminal/terminal-session-scope.ts for the normalization rationale.
     const targetSessionKey = formatTerminalSessionKey(
       sessionScope,
       isRemoteRepoId(input.repoRoot) ? input.worktreePath : path.resolve(input.worktreePath),

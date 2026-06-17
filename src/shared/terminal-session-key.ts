@@ -5,28 +5,15 @@
 // deliberately NUL-delimited because neither segment can contain
 // `\0` (validated upstream) and a NUL split makes the key
 // human-readable in logs.
-
-import path from 'node:path'
-import { isRemoteRepoId } from '#/shared/remote-repo.ts'
+//
+// Scope normalization (`terminalSessionScope`) lives in
+// `server/terminal/terminal-session-scope.ts` because it depends on
+// `node:path`. This file stays pure so the renderer can import the
+// format/parse helpers via `web/components/terminal/terminal-session-keys.ts`
+// without dragging Node built-ins into the bundle.
 
 const KEY_SEGMENT = 3
 const WORKTREE_SEGMENT = 2
-
-/**
- * Normalize a repoRoot into the scope string the manager stores on
- * each session. For local repos this is the path-resolved form (so
- * `/repo` and `./repo` collapse to the same scope on every platform,
- * including Windows where `path.resolve('/repo')` becomes `C:\repo`).
- * For remote (SSH) repos the input is opaque and stays as-is.
- *
- * This is the **single source of truth** for session scope. Any
- * caller that needs to ask the manager about a repoRoot (create,
- * list, reorder, prune) must normalize through here first, otherwise
- * string-equality lookups will silently miss.
- */
-export function terminalSessionScope(repoRoot: string): string {
-  return isRemoteRepoId(repoRoot) ? repoRoot : path.resolve(repoRoot)
-}
 
 export function formatTerminalSessionKey(repoRoot: string, worktreePath: string, terminalId: string): string {
   return `${repoRoot}\0${worktreePath}\0${terminalId}`

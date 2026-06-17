@@ -1,7 +1,6 @@
 import path from 'node:path'
 import { isValidRepoLocator } from '#/shared/input-validation.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
-import { terminalSessionScope } from '#/shared/terminal-session-key.ts'
 import type {
   TerminalAttachInput,
   TerminalAttachResult,
@@ -24,6 +23,7 @@ import {
   isValidTerminalSessionId,
   isValidTerminalSize,
 } from '#/shared/terminal-validators.ts'
+import { terminalSessionScope } from '#/server/terminal/terminal-session-scope.ts'
 import type { TerminalRealtimeBroker } from '#/server/terminal/terminal-realtime-broker.ts'
 import { isValidTerminalWriteData, type TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 
