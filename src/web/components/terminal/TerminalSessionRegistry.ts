@@ -79,11 +79,12 @@ export class TerminalSessionRegistry {
   //
   // T2.1: lowered from 32 to 8. The 32 was sized for multi-tenant
   // assumptions; for a single user, typical detached-session count
-  // is 1-3 with occasional 5. 8 gives generous headroom and caps
-  // worst-case reattach memory at ~16 MiB (8 × 2 MiB per snapshot,
-  // which is itself an upper bound). Eviction is the source-of-truth
-  // fallback: a user who lost the snapshot sees the server's
-  // 16 MiB ring buffer on next attach.
+  // is 1-3 with occasional 5. 8 gives generous headroom. Per-snapshot
+  // size is bounded by the server's 16 MiB ring buffer (terminal-render-state.ts),
+  // so worst-case reattach memory is 8 × 16 MiB = 128 MiB — almost
+  // never realised because most snapshots are KB-scale. Eviction is
+  // the source-of-truth fallback: a user who lost the snapshot sees
+  // the server's ring buffer on next attach.
   private static readonly REATTACH_SNAPSHOT_CACHE_HARD_CAP = 8
   private readonly reattachSnapshotCache = new Map<string, ReattachSnapshotCacheEntry>()
   private readonly worktreeSnapshotCache = new Map<string, WorktreeTerminalSnapshot>()
