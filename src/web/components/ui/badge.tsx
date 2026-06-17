@@ -2,6 +2,7 @@ import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { Slot } from 'radix-ui'
 import { cn } from '#/web/lib/cn.ts'
+import { focusRingVisibleInset } from '#/web/components/ui/focus.ts'
 import { STATUS_TONE_CHIP_CLASS } from '#/web/components/ui/status-tones.ts'
 
 // Calibrated for the desktop tool's chip density: small caps on
@@ -10,7 +11,10 @@ import { STATUS_TONE_CHIP_CLASS } from '#/web/components/ui/status-tones.ts'
 // the rest of the inline UI furniture (status codes, two-letter
 // X/Y codes from `git status`, commit shortHash).
 const badgeVariants = cva(
-  'inline-flex w-fit shrink-0 items-center justify-center overflow-hidden rounded-sm border border-transparent font-medium leading-tight whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-danger-border aria-invalid:ring-danger/20 dark:aria-invalid:ring-danger/40 [&>svg]:pointer-events-none',
+  cn(
+    'inline-flex w-fit shrink-0 items-center justify-center overflow-hidden rounded-sm border border-transparent font-medium leading-tight whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring aria-invalid:border-danger-border aria-invalid:ring-danger/20 dark:aria-invalid:ring-danger/40 [&>svg]:pointer-events-none',
+    focusRingVisibleInset,
+  ),
   {
     variants: {
       variant: {

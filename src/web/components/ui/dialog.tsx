@@ -2,6 +2,7 @@ import * as React from 'react'
 import { XIcon } from 'lucide-react'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import { cn } from '#/web/lib/cn.ts'
+import { focusRingInset } from '#/web/components/ui/focus.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
@@ -61,7 +62,10 @@ function DialogContent({
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            className="absolute top-3 right-3 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5"
+            className={cn(
+              "absolute top-3 right-3 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
+              focusRingInset,
+            )}
           >
             <XIcon />
             <span className="sr-only">Close</span>
