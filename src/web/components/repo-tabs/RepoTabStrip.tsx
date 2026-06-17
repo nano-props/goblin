@@ -321,7 +321,7 @@ export function RepoTabStrip({
         openMenu
       ) : (
         <ToolbarTabStrip
-          compact={isSmallScreen}
+          compact={true}
           compactContent={
             <CompactRepoTabs
               repos={visibleRepos}
