@@ -40,7 +40,24 @@ export interface InitialSettingsSnapshot {
 
 export interface InitialServerSnapshot {
   url: string
-  secret: string
+  /**
+   * Access token, inlined into the bootstrap only when the server is
+   * running in a context where the browser / renderer can't otherwise
+   * obtain it:
+   *  - the embedded Electron renderer (server spawned by main with
+   *    `GOBLIN_EMBEDDED_RUNTIME=1`)
+   *  - the Vite dev server (`GOBLIN_DEV_BOOTSTRAP_INCLUDES_TOKEN=1`)
+   *
+   * In standalone `serve.sh` mode neither flag is set, the field is
+   * absent, and the renderer must go through `POST /api/login` to
+   * set the http-only cookie.
+   */
+  accessToken?: string
+  /**
+   * Reserved for legacy back-compat; new code should not read this.
+   * The renderer now generates its own client id at runtime; the
+   * server no longer derives one from the access token.
+   */
   clientId?: string
 }
 

@@ -35,15 +35,18 @@ export function toInitialServerSnapshot(
   server:
     | {
         url: string
-        secret: string
+        accessToken?: string
         clientId?: string
       }
     | null
     | undefined,
 ): InitialServerSnapshot | null {
-  return server
-    ? { url: server.url, secret: server.secret, ...(server.clientId ? { clientId: server.clientId } : {}) }
-    : null
+  if (!server) return null
+  return {
+    url: server.url,
+    ...(server.accessToken ? { accessToken: server.accessToken } : {}),
+    ...(server.clientId ? { clientId: server.clientId } : {}),
+  }
 }
 
 export function createRendererBootstrapPayload(seed: RendererBootstrapSeed): RendererBootstrapPayload {

@@ -51,9 +51,6 @@ const settingsRoute = createRoute({
     if (!isSettingsPage(params.page)) {
       throw redirect({ to: '/settings/general' })
     }
-    if (params.page === 'lan' && getInitialBootstrap().runtime.kind !== 'electron') {
-      throw redirect({ to: '/settings/general' })
-    }
   },
 })
 

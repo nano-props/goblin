@@ -15,7 +15,18 @@ const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENV
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   vi.useFakeTimers()
-  const testWindow = globalThis as typeof globalThis & { goblinNative?: unknown }
+  const testWindow = globalThis as typeof globalThis & {
+    goblinNative?: unknown
+    __GOBLIN_BOOTSTRAP__?: unknown
+  }
+  testWindow.__GOBLIN_BOOTSTRAP__ = {
+    runtime: { kind: 'electron', bridgeVersion: 1, capabilities: [] },
+    homeDir: '/Users/tester',
+    platform: 'darwin',
+    initialI18n: null,
+    initialSettings: null,
+    initialServer: null,
+  }
   testWindow.goblinNative = {
     homeDir: '/Users/tester',
     pathForFile: () => '',
@@ -33,8 +44,12 @@ afterEach(() => {
   root = null
   container = null
   document.body.innerHTML = ''
-  const testWindow = globalThis as typeof globalThis & { goblinNative?: unknown }
+  const testWindow = globalThis as typeof globalThis & {
+    goblinNative?: unknown
+    __GOBLIN_BOOTSTRAP__?: unknown
+  }
   delete testWindow.goblinNative
+  delete testWindow.__GOBLIN_BOOTSTRAP__
   vi.useRealTimers()
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })

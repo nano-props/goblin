@@ -63,7 +63,7 @@ beforeEach(() => {
     homeDir: '/Users/test',
     initialI18n: null,
     initialSettings: null,
-    initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+    initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
   }
   Object.defineProperty(window, 'goblinNative', {
     configurable: true,

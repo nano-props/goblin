@@ -92,6 +92,15 @@ export interface RendererBridge {
    * (the resolver maps that to a single `paste-file-failed` toast).
    */
   saveClipboardFiles(files: File[]): Promise<string[]>
+  /**
+   * Electron-only: invalidate the current access token, restart the
+   * embedded server, and return the freshly-generated token. The
+   * renderer surfaces the new value in the Web settings page so
+   * the user can re-authenticate. Throws (via the IPC reject path)
+   * when called from a non-Electron runtime; the Web settings page
+   * gates the rotation button on `kind() === 'electron'`.
+   */
+  rotateAccessToken?(): Promise<{ accessToken: string }>
   shell(): RendererShellBridge | null
   terminal(): RendererTerminalBridge
 }

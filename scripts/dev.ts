@@ -26,7 +26,17 @@ const viteProc = Bun.spawn(viteArgs, {
   stdin: 'inherit',
   stdout: 'inherit',
   stderr: 'inherit',
-  env: { ...process.env, GOBLIN_SERVER_HOST: webDevHost, GOBLIN_SERVER_PORT: String(embeddedServerPort) },
+  // In dev the Vite-served renderer (different origin from the
+  // embedded server) can't share cookies. Set this so the server
+  // inlines the access token in the HTML bootstrap; the renderer
+  // then attaches it as the `x-goblin-access-token` header on
+  // every fetch. See `#/server/app-factory.ts:shouldInlineAccessTokenInBootstrap`.
+  env: {
+    ...process.env,
+    GOBLIN_SERVER_HOST: webDevHost,
+    GOBLIN_SERVER_PORT: String(embeddedServerPort),
+    GOBLIN_DEV_BOOTSTRAP_INCLUDES_TOKEN: '1',
+  },
 })
 
 log(`starting Vite dev server at ${webDevUrl}`)

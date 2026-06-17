@@ -21,7 +21,7 @@ const resolveRemoteTargetMock = vi.hoisted(() => vi.fn())
 const resolveTrackedRemoteTargetMock = vi.hoisted(() => vi.fn())
 const runRemoteCommandMock = vi.hoisted(() => vi.fn())
 const getEmbeddedServerRuntimeMock = vi.hoisted(() =>
-  vi.fn<() => { url: string; secret: string; clientId: string } | null>(() => null),
+  vi.fn<() => { url: string; accessToken: string; clientId: string } | null>(() => null),
 )
 
 function settingsPrefs(overrides: Partial<SettingsPrefs> = {}): SettingsPrefs {
@@ -342,7 +342,7 @@ describe('main repo ipc cancellation', () => {
   test('returns NOT_FOUND for repo IPCs that now belong to the embedded server http path', async () => {
     getEmbeddedServerRuntimeMock.mockReturnValue({
       url: 'http://127.0.0.1:32100',
-      secret: 'secret',
+      accessToken: 'secret',
       clientId: 'client_sharedterminal',
     })
     const fetchMock = vi.fn(async () => ({
@@ -364,7 +364,7 @@ describe('main repo ipc cancellation', () => {
   test('returns NOT_FOUND for remote IPCs that now belong to the embedded server http path', async () => {
     getEmbeddedServerRuntimeMock.mockReturnValue({
       url: 'http://127.0.0.1:32100',
-      secret: 'secret',
+      accessToken: 'secret',
       clientId: 'client_sharedterminal',
     })
     const fetchMock = vi.fn(async () => ({
@@ -405,7 +405,7 @@ describe('main repo ipc cancellation', () => {
   test('returns false when aborting a missing native ipc request id', async () => {
     getEmbeddedServerRuntimeMock.mockReturnValue({
       url: 'http://127.0.0.1:32100',
-      secret: 'secret',
+      accessToken: 'secret',
       clientId: 'client_sharedterminal',
     })
     let observedSignal: AbortSignal | undefined

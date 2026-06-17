@@ -4,10 +4,10 @@ import { ExternalAppSettings } from '#/web/components/settings/pages/ExternalApp
 import { GeneralSettings } from '#/web/components/settings/pages/GeneralSettings.tsx'
 import { GitHubSettings } from '#/web/components/settings/pages/GitHubSettings.tsx'
 import { KeyboardShortcutSettings } from '#/web/components/settings/pages/KeyboardShortcutSettings.tsx'
-import { LanSettings } from '#/web/components/settings/pages/LanSettings.tsx'
 import { NotificationSettings } from '#/web/components/settings/pages/NotificationSettings.tsx'
 import { SshRemoteSettings } from '#/web/components/settings/pages/SshRemoteSettings.tsx'
 import { SyncSettings } from '#/web/components/settings/pages/SyncSettings.tsx'
+import { WebSettings } from '#/web/components/settings/pages/WebSettings.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import type { SettingsPage } from '#/shared/api-types.ts'
 interface SettingsSurfaceProps {
@@ -29,7 +29,7 @@ export function SettingsSurface({ page, onPageChange, topInset = 0, autoFocusSel
         {page === 'ssh' && <SshRemoteSettings />}
         {page === 'shortcuts' && <KeyboardShortcutSettings />}
         {page === 'notifications' && <NotificationSettings />}
-        {page === 'lan' && <LanSettings />}
+        {page === 'web' && <WebSettings />}
         {page === 'about' && <AboutSettings />}
       </>
     </SettingsLayout>

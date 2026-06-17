@@ -8,12 +8,18 @@
  * resolver maps that to a `paste-file-failed` toast.
  */
 import { CLIPBOARD_FALLBACK_FILE_NAME } from '#/shared/clipboard-paste.ts'
+import { ACCESS_TOKEN_HEADER } from '#/shared/access-token.ts'
 
 export interface HttpClipboardBackendConfig {
   /** Bootstrap-derived server origin, e.g. `http://127.0.0.1:32100/`. */
   url: string
-  /** Bootstrap-derived internal secret for the auth middleware. */
-  secret: string
+  /**
+   * Bootstrap-derived access token. When present (embedded renderer
+   * or Vite dev), sent as the access-token header. When
+   * absent (standalone browser), the request is sent without the
+   * header and relies on the http-only cookie set by `POST /api/login`.
+   */
+  accessToken: string
 }
 
 export function createHttpClipboardBackend(config: HttpClipboardBackendConfig): {
@@ -34,10 +40,15 @@ export function createHttpClipboardBackend(config: HttpClipboardBackendConfig): 
       }
       try {
         const endpoint = new URL('api/clipboard/files', config.url)
+        const headers: Record<string, string> = {}
+        if (config.accessToken) headers[ACCESS_TOKEN_HEADER] = config.accessToken
         const res = await fetch(endpoint, {
           method: 'POST',
-          headers: { 'x-goblin-internal-secret': config.secret },
+          headers,
           body: form,
+          // `credentials: 'include'` carries the cookie on cross-origin
+          // LAN requests; for same-origin it's a no-op.
+          credentials: 'include',
         })
         if (!res.ok) return []
         const json = (await res.json()) as { paths?: unknown }

@@ -2,6 +2,7 @@ import { getInitialBootstrap } from '#/web/bootstrap.ts'
 import { isServerInvalidationEvent, type ServerInvalidationEvent } from '#/shared/server-invalidation.ts'
 import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'
 import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
+import { ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
 
 type Listener = (event: ServerInvalidationEvent) => void
 // Shared server-owned invalidation ingress for browser and Electron renderers.
@@ -16,10 +17,16 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
 const INVALIDATION_RECONNECT_DELAY_MS = 300
 
-function createInvalidationWebSocketUrl(baseUrl: string, secret: string): string {
+function createInvalidationWebSocketUrl(baseUrl: string, accessToken: string | null): string {
   const httpUrl = new URL('/ws/invalidation', baseUrl)
   httpUrl.protocol = resolveWebSocketProtocol()
-  httpUrl.searchParams.set('token', secret)
+  // Browser path: `accessToken` is null (cookie handles auth). The
+  // server's WS middleware accepts cookie / header / `?t=` query;
+  // same-origin browser WS upgrades attach the cookie automatically.
+  // Embedded / dev path: `accessToken` is non-null and is passed as
+  // `?t=` because the WebSocket constructor cannot set custom
+  // headers.
+  if (accessToken) httpUrl.searchParams.set(ACCESS_TOKEN_QUERY, accessToken)
   return httpUrl.toString()
 }
 
@@ -39,7 +46,7 @@ function ensureSocket(): void {
   clearReconnectTimer()
   manualSocketClose = false
   const generation = (socketGeneration += 1)
-  const currentSocket = new WebSocket(createInvalidationWebSocketUrl(server.url, server.secret))
+  const currentSocket = new WebSocket(createInvalidationWebSocketUrl(server.url, server.accessToken ?? null))
   socket = currentSocket
   currentSocket.addEventListener('open', () => {
     if (socket !== currentSocket || socketGeneration !== generation) return

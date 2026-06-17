@@ -46,7 +46,7 @@ function acceptOnly(allowed: string): ServerTerminalHost['isValidClientId'] {
 describe('createRealtimeRoutes — auth middleware', () => {
   test('rejects /invalidation without a token', async () => {
     const host = makeTerminalHost()
-    const app = createRealtimeRoutes({ internalSecret: 'secret', terminalHost: host })
+    const app = createRealtimeRoutes({ accessToken: 'secret', terminalHost: host })
     const res = await app.request('http://localhost/invalidation')
     expect(res.status).toBe(401)
     const json = (await res.json()) as { ok: false; code: string; message: string }
@@ -56,22 +56,22 @@ describe('createRealtimeRoutes — auth middleware', () => {
 
   test('rejects /invalidation with a wrong token', async () => {
     const host = makeTerminalHost()
-    const app = createRealtimeRoutes({ internalSecret: 'secret', terminalHost: host })
-    const res = await app.request('http://localhost/invalidation?token=wrong')
+    const app = createRealtimeRoutes({ accessToken: 'secret', terminalHost: host })
+    const res = await app.request('http://localhost/invalidation?t=wrong')
     expect(res.status).toBe(401)
   })
 
   test('rejects /terminal with a wrong token', async () => {
     const host = makeTerminalHost({ isValidClientId: acceptOnly('c1') })
-    const app = createRealtimeRoutes({ internalSecret: 'secret', terminalHost: host })
-    const res = await app.request('http://localhost/terminal?token=wrong&clientId=c1&attachmentId=a1')
+    const app = createRealtimeRoutes({ accessToken: 'secret', terminalHost: host })
+    const res = await app.request('http://localhost/terminal?t=wrong&clientId=c1&attachmentId=a1')
     expect(res.status).toBe(401)
   })
 
   test('rejects /terminal with an invalid clientId', async () => {
     const host = makeTerminalHost({ isValidClientId: acceptOnly('c1') })
-    const app = createRealtimeRoutes({ internalSecret: 'secret', terminalHost: host })
-    const res = await app.request('http://localhost/terminal?token=secret&clientId=bad&attachmentId=a1')
+    const app = createRealtimeRoutes({ accessToken: 'secret', terminalHost: host })
+    const res = await app.request('http://localhost/terminal?t=secret&clientId=bad&attachmentId=a1')
     expect(res.status).toBe(400)
     const json = (await res.json()) as { ok: false; message: string }
     expect(json.message).toBe('Invalid client id')
@@ -79,8 +79,8 @@ describe('createRealtimeRoutes — auth middleware', () => {
 
   test('rejects /terminal with a missing attachmentId', async () => {
     const host = makeTerminalHost({ isValidClientId: acceptAll() })
-    const app = createRealtimeRoutes({ internalSecret: 'secret', terminalHost: host })
-    const res = await app.request('http://localhost/terminal?token=secret&clientId=c1')
+    const app = createRealtimeRoutes({ accessToken: 'secret', terminalHost: host })
+    const res = await app.request('http://localhost/terminal?t=secret&clientId=c1')
     expect(res.status).toBe(400)
     const json = (await res.json()) as { ok: false; message: string }
     expect(json.message).toBe('Missing attachment id')

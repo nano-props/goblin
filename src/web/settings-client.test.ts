@@ -74,7 +74,7 @@ describe('settings-client', () => {
   })
 
   test('reads theme state from embedded server settings when no Electron bridge exists', async () => {
-    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({
@@ -111,7 +111,7 @@ describe('settings-client', () => {
   })
 
   test('returns authoritative theme state directly from the settings write response', async () => {
-    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => ({
@@ -141,7 +141,7 @@ describe('settings-client', () => {
   })
 
   test('fetches i18n payload from embedded server when no Electron bridge exists', async () => {
-    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => ({ lang: 'ko', pref: 'auto', dict: { hello: '안녕' } }),
@@ -153,7 +153,7 @@ describe('settings-client', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:32100/api/settings/i18n',
       expect.objectContaining({
-        headers: expect.objectContaining({ 'x-goblin-internal-secret': 'secret' }),
+        headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
       }),
     )
   })
@@ -164,7 +164,7 @@ describe('settings-client', () => {
       configurable: true,
       value: {
         __GOBLIN_BOOTSTRAP__: electronBootstrap({
-          initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+          initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
         goblinNative: {
           runtime: {
@@ -210,7 +210,7 @@ describe('settings-client', () => {
       configurable: true,
       value: {
         __GOBLIN_BOOTSTRAP__: electronBootstrap({
-          initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+          initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
         goblinNative: {
           runtime: {
@@ -287,7 +287,7 @@ describe('settings-client', () => {
       configurable: true,
       value: {
         __GOBLIN_BOOTSTRAP__: electronBootstrap({
-          initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+          initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
         goblinNative: {
           runtime: {
@@ -329,7 +329,7 @@ describe('settings-client', () => {
       'http://127.0.0.1:32100/api/settings/recent-repos/add',
       expect.objectContaining({
         method: 'POST',
-        headers: expect.objectContaining({ 'x-goblin-internal-secret': 'secret' }),
+        headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
         body: JSON.stringify({ repo: { kind: 'local', id: '/tmp/../tmp/repo' } }),
       }),
     )
@@ -351,7 +351,7 @@ describe('settings-client', () => {
       configurable: true,
       value: {
         __GOBLIN_BOOTSTRAP__: electronBootstrap({
-          initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+          initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
         goblinNative: {
           runtime: {
@@ -387,7 +387,7 @@ describe('settings-client', () => {
       'http://127.0.0.1:32100/api/settings/recent-repos/clear',
       expect.objectContaining({
         method: 'POST',
-        headers: expect.objectContaining({ 'x-goblin-internal-secret': 'secret' }),
+        headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
       }),
     )
     expect(invokeIpc).toHaveBeenCalledTimes(1)
@@ -400,7 +400,7 @@ describe('settings-client', () => {
   })
 
   test('returns authoritative terminal app state directly from the settings write response', async () => {
-    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => ({
@@ -452,7 +452,7 @@ describe('settings-client', () => {
   })
 
   test('returns authoritative editor app state directly from the settings write response', async () => {
-    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' } }))
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => ({
@@ -509,7 +509,7 @@ describe('settings-client', () => {
       configurable: true,
       value: {
         __GOBLIN_BOOTSTRAP__: electronBootstrap({
-          initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+          initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         }),
         goblinNative: {
           runtime: {

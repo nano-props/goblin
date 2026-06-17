@@ -1,5 +1,6 @@
 import { emitRendererLocalEvent } from '#/web/local-events.ts'
 import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
+import { ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
 import {
   normalizeTerminalSocketServerMessage,
   normalizeTerminalSessionSnapshot,
@@ -36,7 +37,7 @@ import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'
 
 export interface RendererServerTerminalConfig {
   url: string
-  secret: string
+  accessToken: string
   clientId: string
 }
 
@@ -141,7 +142,7 @@ export function createServerTerminalBridge(options: {
     let socketUrl: string
     try {
       const server = options.getServerConfig()
-      socketUrl = createTerminalWebSocketUrl(server.url, server.secret, server.clientId, attachmentId)
+      socketUrl = createTerminalWebSocketUrl(server.url, server.accessToken, server.clientId, attachmentId)
     } catch {
       return
     }
@@ -456,13 +457,19 @@ export function createServerTerminalBridge(options: {
 
 export function createTerminalWebSocketUrl(
   baseUrl: string,
-  secret: string,
+  accessToken: string,
   clientId: string,
   attachmentId: string,
 ): string {
   const httpUrl = new URL('/ws/terminal', baseUrl)
   httpUrl.protocol = resolveWebSocketProtocol()
-  httpUrl.searchParams.set('token', secret)
+  // `?t=` is the WebSocket auth channel for the access token. The
+  // browser path also sends the cookie (auto-attached on the WS
+  // upgrade), but `?t=` works for both browser and Electron — and
+  // it's the only way to authenticate a non-browser WS client (LAN
+  // CLI). The server middleware accepts all three channels
+  // (cookie / header / `?t=`).
+  httpUrl.searchParams.set(ACCESS_TOKEN_QUERY, accessToken)
   httpUrl.searchParams.set('clientId', clientId)
   httpUrl.searchParams.set('attachmentId', attachmentId)
   return httpUrl.toString()

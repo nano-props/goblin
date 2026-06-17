@@ -1,16 +1,17 @@
 import { access, readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
-import { createHash } from 'node:crypto'
 import os from 'node:os'
 import path from 'node:path'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { bodyLimit } from 'hono/body-limit'
 import { serveStatic } from '@hono/node-server/serve-static'
-import { createInternalAuthMiddleware } from '#/server/common/auth.ts'
+import { createAccessTokenMiddleware } from '#/server/common/auth.ts'
+import { ACCESS_TOKEN_HEADER } from '#/shared/access-token.ts'
 import { applyApiSecurityHeaders, buildCorsOriginPredicate } from '#/server/common/http-harden.ts'
 import { accessLog } from '#/server/common/access-log.ts'
 import { errorJson } from '#/server/common/responses.ts'
+import { createAuthRoutes } from '#/server/routes/auth.ts'
 import { createClipboardRoutes } from '#/server/routes/clipboard.ts'
 import { createHealthRoutes } from '#/server/routes/health.ts'
 import { createRemoteRoutes } from '#/server/routes/remote.ts'
@@ -32,7 +33,13 @@ import { MAX_PASTE_BATCH_BYTES } from '#/shared/clipboard-paste.ts'
 export interface ServerAppOptions {
   version: string
   startedAt: number
-  internalSecret: string
+  /**
+   * Persistent access token shared with browser (cookie) and embedded
+   * (header / `?t=` query) clients. Read from `dataDir/server-token`
+   * by the server bootstrap (`#/server/bootstrap.ts`) — the same file
+   * the Electron main reads, so the two processes see the same value.
+   */
+  accessToken: string
   terminalHost: ServerTerminalHost
   /**
    * The actual host the server is listening on. Used by the CORS
@@ -61,22 +68,55 @@ const HEALTH_BODY_LIMIT_BYTES = 1024
 
 const WEB_DIST_DIR = path.resolve(import.meta.dirname, '../../dist/web')
 const WEB_INDEX_HTML = path.join(WEB_DIST_DIR, 'index.html')
-function deriveServerClientId(secret: string): string {
-  return `client_${createHash('sha256').update(secret).digest('hex').slice(0, 32)}`
+
+/**
+ * Decide whether to inline the access token in the HTML bootstrap.
+ *
+ * - `GOBLIN_EMBEDDED_RUNTIME=1` is set by the Electron main when it
+ *   spawns the server; the embedded renderer is the primary HTML
+ *   consumer, so the bootstrap carries the token directly.
+ * - `GOBLIN_DEV_BOOTSTRAP_INCLUDES_TOKEN=1` is set by `bun run dev`
+ *   so the Vite-served browser (which can't share cookies with the
+ *   server on a different origin) can attach the token as a header.
+ *
+ * Standalone `serve.sh` / `scripts/start-server.ts` sets neither,
+ * producing a token-less bootstrap that drives the renderer through
+ * the cookie + `/api/login` gate.
+ */
+function shouldInlineAccessTokenInBootstrap(): boolean {
+  return (
+    process.env.GOBLIN_EMBEDDED_RUNTIME === '1' ||
+    process.env.GOBLIN_DEV_BOOTSTRAP_INCLUDES_TOKEN === '1'
+  )
+}
+
+/**
+ * Read `homeDir` and `platform` from the spawn env (set by the
+ * Electron main in `#/main/server-manager.ts`), falling back to
+ * `os.homedir()` / `os.platform()` when the server is started outside
+ * the Electron host (e.g. `bun run dev`, `scripts/start-server.ts`).
+ * The fallback is benign — the values just go into the renderer
+ * bootstrap for display purposes.
+ */
+function resolveBootstrapHostInfo(): { homeDir: string; platform: string } {
+  const homeDir = process.env.GOBLIN_HOME_DIR?.trim() || os.homedir()
+  const platform = process.env.GOBLIN_PLATFORM?.trim() || os.platform()
+  return { homeDir, platform }
 }
 
 function buildWebBootstrap(
   requestUrl: string,
-  internalSecret: string,
   acceptLanguageHeader: string | null,
   langPref: LangPref,
   settings: Awaited<ReturnType<typeof getServerSettingsPrefs>>,
+  options: { accessToken: string; includeAccessToken: boolean },
 ): RendererBootstrapSnapshot {
   const origin = new URL(requestUrl).origin
+  const { homeDir, platform } = resolveBootstrapHostInfo()
   return createRendererBootstrapSnapshot({
     runtime: createRendererRuntimeSnapshot('web', WEB_RENDERER_CAPABILITIES),
-    homeDir: os.homedir(),
-    platform: 'web',
+    homeDir,
+    platform: platform as NodeJS.Platform,
     i18n: resolveI18nSnapshot(langPref, acceptLanguageHeader),
     settings: initialSettingsFromSnapshot({
       ...settings,
@@ -84,8 +124,7 @@ function buildWebBootstrap(
     }),
     server: toInitialServerSnapshot({
       url: `${origin}/`,
-      secret: internalSecret,
-      clientId: deriveServerClientId(internalSecret),
+      ...(options.includeAccessToken ? { accessToken: options.accessToken } : {}),
     }),
   })
 }
@@ -113,12 +152,18 @@ function injectBootstrapIntoHtml(indexHtml: string, bootstrap: RendererBootstrap
 
 async function renderRendererIndexHtml(
   requestUrl: string,
-  internalSecret: string,
   acceptLanguageHeader: string | null,
+  accessToken: string,
 ): Promise<string> {
   await access(WEB_INDEX_HTML)
   const settings = await getServerSettingsPrefs()
-  const bootstrap = buildWebBootstrap(requestUrl, internalSecret, acceptLanguageHeader, settings.lang, settings)
+  const bootstrap = buildWebBootstrap(
+    requestUrl,
+    acceptLanguageHeader,
+    settings.lang,
+    settings,
+    { accessToken, includeAccessToken: shouldInlineAccessTokenInBootstrap() },
+  )
   return injectBootstrapIntoHtml(await readFile(WEB_INDEX_HTML, 'utf8'), bootstrap)
 }
 
@@ -132,9 +177,14 @@ export function createApp(options: ServerAppOptions): Hono {
     '/api/*',
     cors({
       origin: (origin: string, _c) => (buildCorsOriginPredicate(serverHost, serverPort)(origin) ? origin : ''),
-      allowHeaders: ['Content-Type', 'x-goblin-internal-secret'],
+      // `credentials: true` is required so the browser sends the
+      // `goblin_access_token` cookie on cross-origin LAN requests.
+      // Hono's `cors()` echoes the matched origin in
+      // `Access-Control-Allow-Origin` (never `*`) and adds
+      // `Vary: Origin` automatically when `credentials` is on.
+      credentials: true,
+      allowHeaders: ['Content-Type', ACCESS_TOKEN_HEADER],
       allowMethods: ['GET', 'POST', 'OPTIONS'],
-      credentials: false,
     }),
   )
   app.use('/api/*', applyApiSecurityHeaders())
@@ -161,7 +211,35 @@ export function createApp(options: ServerAppOptions): Hono {
     '/api',
     createHealthRoutes({ version: options.version, startedAt: options.startedAt, terminalHost: options.terminalHost }),
   )
-  app.use('/api/settings/*', createInternalAuthMiddleware(options.internalSecret))
+  // Login / logout / whoami. `whoami` is gated by the same middleware
+  // the data routes use, but `login` and `logout` are intentionally
+  // unauthenticated — they're the only way to obtain / clear the
+  // cookie, and the only thing they prove is that the caller knows
+  // the token (or already has a valid cookie).
+  app.route('/api', createAuthRoutes({ accessToken: options.accessToken }))
+  // Body limit on the auth surface. The login route accepts an
+  // unauthenticated JSON body (the only field is a 25-char base36
+  // token — a few hundred bytes). Capping at 1 KiB stops a hostile
+  // LAN client from POSTing a 100 MB body to /api/login and forcing
+  // the server to allocate that much before the empty-token check
+  // can return 400. `bodyLimit` short-circuits on Content-Length
+  // before the JSON parser runs, so the cap is enforced without
+  // needing to read the body.
+  app.use(
+    '/api/login',
+    bodyLimit({
+      maxSize: 1024,
+      onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
+    }),
+  )
+  app.use(
+    '/api/logout',
+    bodyLimit({
+      maxSize: 1024,
+      onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
+    }),
+  )
+  app.use('/api/settings/*', createAccessTokenMiddleware(options.accessToken))
   app.use(
     '/api/settings/*',
     bodyLimit({
@@ -169,7 +247,7 @@ export function createApp(options: ServerAppOptions): Hono {
       onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
     }),
   )
-  app.use('/api/remote/*', createInternalAuthMiddleware(options.internalSecret))
+  app.use('/api/remote/*', createAccessTokenMiddleware(options.accessToken))
   app.use(
     '/api/remote/*',
     bodyLimit({
@@ -177,7 +255,7 @@ export function createApp(options: ServerAppOptions): Hono {
       onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
     }),
   )
-  app.use('/api/repo/*', createInternalAuthMiddleware(options.internalSecret))
+  app.use('/api/repo/*', createAccessTokenMiddleware(options.accessToken))
   app.use(
     '/api/repo/*',
     bodyLimit({
@@ -185,7 +263,7 @@ export function createApp(options: ServerAppOptions): Hono {
       onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
     }),
   )
-  app.use('/api/clipboard/*', createInternalAuthMiddleware(options.internalSecret))
+  app.use('/api/clipboard/*', createAccessTokenMiddleware(options.accessToken))
   // MAX_PASTE_BATCH_BYTES (12 MiB) is the *success* ceiling. The
   // failure case is also bounded but the timing depends on the
   // request's Transfer-Encoding: when `Content-Length` is set,
@@ -212,7 +290,7 @@ export function createApp(options: ServerAppOptions): Hono {
   app.route('/api/remote', createRemoteRoutes())
   app.route('/api/repo', createRepoRoutes())
   app.route('/api/clipboard', createClipboardRoutes())
-  app.route('/ws', createRealtimeRoutes({ internalSecret: options.internalSecret, terminalHost: options.terminalHost }))
+  app.route('/ws', createRealtimeRoutes({ accessToken: options.accessToken, terminalHost: options.terminalHost }))
 
   // Periodic prune of clipboard temp dirs left by previous server
   // runs. The route factory's `pruneStaleClipboardTempDirs` call
@@ -235,11 +313,14 @@ export function createApp(options: ServerAppOptions): Hono {
 
   // Explicit SPA routes — must be before serveStatic so the
   // bootstrap script is injected into the HTML response instead
-  // of serving the raw dist/web/index.html file.
+  // of serving the raw dist/web/index.html file. The token-in-bootstrap
+  // decision lives in `shouldInlineAccessTokenInBootstrap()` and only
+  // resolves to "true" for the embedded renderer (`GOBLIN_EMBEDDED_RUNTIME=1`)
+  // and `bun run dev` (`GOBLIN_DEV_BOOTSTRAP_INCLUDES_TOKEN=1`).
   app.get('/', async (c) => {
     try {
       return c.html(
-        await renderRendererIndexHtml(c.req.url, options.internalSecret, c.req.header('accept-language') ?? null),
+        await renderRendererIndexHtml(c.req.url, c.req.header('accept-language') ?? null, options.accessToken),
       )
     } catch {
       return c.text('Not Found', 404)
@@ -248,7 +329,7 @@ export function createApp(options: ServerAppOptions): Hono {
   app.get('/index.html', async (c) => {
     try {
       return c.html(
-        await renderRendererIndexHtml(c.req.url, options.internalSecret, c.req.header('accept-language') ?? null),
+        await renderRendererIndexHtml(c.req.url, c.req.header('accept-language') ?? null, options.accessToken),
       )
     } catch {
       return c.text('Not Found', 404)
@@ -257,7 +338,7 @@ export function createApp(options: ServerAppOptions): Hono {
   app.get('/settings', async (c) => {
     try {
       return c.html(
-        await renderRendererIndexHtml(c.req.url, options.internalSecret, c.req.header('accept-language') ?? null),
+        await renderRendererIndexHtml(c.req.url, c.req.header('accept-language') ?? null, options.accessToken),
       )
     } catch {
       return c.text('Not Found', 404)
@@ -266,7 +347,7 @@ export function createApp(options: ServerAppOptions): Hono {
   app.get('/settings/*', async (c) => {
     try {
       return c.html(
-        await renderRendererIndexHtml(c.req.url, options.internalSecret, c.req.header('accept-language') ?? null),
+        await renderRendererIndexHtml(c.req.url, c.req.header('accept-language') ?? null, options.accessToken),
       )
     } catch {
       return c.text('Not Found', 404)
@@ -287,7 +368,7 @@ export function createApp(options: ServerAppOptions): Hono {
     if (c.req.path.startsWith('/api/') || c.req.path.startsWith('/ws/')) return next()
     try {
       return c.html(
-        await renderRendererIndexHtml(c.req.url, options.internalSecret, c.req.header('accept-language') ?? null),
+        await renderRendererIndexHtml(c.req.url, c.req.header('accept-language') ?? null, options.accessToken),
       )
     } catch {
       return c.text('Not Found', 404)

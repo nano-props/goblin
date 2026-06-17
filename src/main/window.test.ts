@@ -21,9 +21,9 @@ const mocks = vi.hoisted(() => {
     isFullScreen: vi.fn(() => false),
     isMaximized: vi.fn(() => false),
     isMinimized: vi.fn(() => false),
-    getEmbeddedServerRuntime: vi.fn<() => { url: string; secret: string; clientId: string } | null>(() => ({
+    getEmbeddedServerRuntime: vi.fn<() => { url: string; accessToken: string; clientId: string } | null>(() => ({
       url: 'http://127.0.0.1:32100/',
-      secret: 'secret',
+      accessToken: 'secret',
       clientId: 'client_sharedterminal',
     })),
     readFileSync: vi.fn(() => JSON.stringify({ file: 'preload-0.1.0-testhash.cjs' })),
@@ -227,27 +227,17 @@ describe('main window navigation boundaries', () => {
   })
 
   test('uses the renderer dev server origin in bootstrap server config during development', async () => {
+    // The bootstrap payload is now built by the embedded server
+    // (see `#/server/app-factory.ts:buildWebBootstrap`) and rendered
+    // into the HTML response, not ferried via preload IPC. The dev-URL
+    // override flows through `webDevUrl` in the same place; the
+    // server-side test in `app-factory.test.ts` covers it.
     process.env.GOBLIN_WEB_DEV_URL = 'http://127.0.0.1:5173/'
     const { getOrCreateMainWindow } = await import('#/main/window.ts')
 
     await getOrCreateMainWindow()
 
-    const payload = await readBootstrapPayload()
-    expect(payload.server).toMatchObject({
-      url: 'http://127.0.0.1:5173/',
-      secret: expect.any(String),
-      clientId: expect.any(String),
-    })
-  })
-
-  test('uses the settings snapshot language preference in renderer bootstrap', async () => {
-    mocks.getSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot({ lang: 'ja' }))
-    const { getOrCreateMainWindow } = await import('#/main/window.ts')
-
-    await getOrCreateMainWindow()
-
-    const payload = await readBootstrapPayload()
-    expect(payload.i18n).toMatchObject({ pref: 'ja' })
+    expect(mocks.windowOptions[0]?.webPreferences?.preload).toBeTruthy()
   })
 
   test('fails window creation when no renderer base URL is available', async () => {
@@ -352,36 +342,3 @@ describe('main window navigation boundaries', () => {
     expect(mocks.setBounds).not.toHaveBeenCalled()
   })
 })
-
-const BOOTSTRAP_TOKEN_PREFIX = '--goblin-bootstrap-token='
-const BOOTSTRAP_CHANNEL = 'goblin:get-bootstrap'
-
-/**
- * Recover the renderer bootstrap payload by replaying the same IPC
- * path the preload uses: extract the token from the additionalArguments
- * injected by `createRendererWindowWebPreferences`, then call the
- * `ipcMain.on(BOOTSTRAP_CHANNEL)` handler the window-shell module
- * exposes via `registerBootstrapIpc()`. Registering must happen
- * explicitly — see the comment on `registerBootstrapIpc` — so this
- * helper does the registration up front.
- */
-async function readBootstrapPayload(): Promise<Record<string, unknown>> {
-  const { ipcMain } = await import('electron')
-  const { registerBootstrapIpc, resetBootstrapIpcForTests } = await import('#/main/window-shell.ts')
-  resetBootstrapIpcForTests()
-  registerBootstrapIpc()
-  const tokenArg = mocks.windowOptions[0]?.webPreferences?.additionalArguments?.find((arg: string) =>
-    arg.startsWith(BOOTSTRAP_TOKEN_PREFIX),
-  )
-  if (!tokenArg) throw new Error(`no ${BOOTSTRAP_TOKEN_PREFIX}* arg found in additionalArguments`)
-  const token = tokenArg.slice(BOOTSTRAP_TOKEN_PREFIX.length)
-  const handler = vi
-    .mocked(ipcMain.on)
-    .mock.calls.map(([channel, fn]) => (channel === BOOTSTRAP_CHANNEL ? fn : null))
-    .find((fn): fn is (event: { returnValue: unknown }, token: string) => void => fn !== undefined)
-  if (!handler) throw new Error(`no handler registered for ${BOOTSTRAP_CHANNEL}`)
-  const event = { returnValue: undefined as unknown }
-  handler(event, token)
-  if (!event.returnValue) throw new Error(`bootstrap token ${token} was not registered`)
-  return event.returnValue as Record<string, unknown>
-}

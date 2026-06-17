@@ -58,7 +58,7 @@ describe('server invalidation source', () => {
         homeDir: '',
         initialI18n: null,
         initialSettings: null,
-        initialServer: { url: 'http://127.0.0.1:5173/', secret: 'secret', clientId: 'client_sharedterminal' },
+        initialServer: { url: 'http://127.0.0.1:5173/', accessToken: 'secret', clientId: 'client_sharedterminal' },
       },
     })
   })

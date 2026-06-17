@@ -7,10 +7,8 @@
 // - It does NOT own surface identity/capabilities; that lives in
 //   window-registry.ts / renderer-surface.ts.
 
-import { app, ipcMain, type BrowserWindow, type BrowserWindowConstructorOptions } from 'electron'
+import { app, type BrowserWindow, type BrowserWindowConstructorOptions } from 'electron'
 import { readFileSync } from 'node:fs'
-import { randomUUID } from 'node:crypto'
-import os from 'node:os'
 import path from 'node:path'
 import { openHttpExternal } from '#/main/external-url.ts'
 import { windowNodeLog } from '#/node/logger.ts'
@@ -19,119 +17,29 @@ import {
   isTrustedAppUrlForWebContents,
   registerTrustedAppUrl,
 } from '#/main/ipc/trusted-webcontents.ts'
-import { getCurrentLang } from '#/main/i18n/index.ts'
 import { getTheme } from '#/main/theme.ts'
 import { getEmbeddedServerRuntime } from '#/main/server-manager.ts'
-import { getSettingsSnapshot } from '#/main/settings-server-client.ts'
-import type { InitialSettingsSnapshot, RendererBootstrapPayload } from '#/shared/bootstrap.ts'
-import { ELECTRON_RENDERER_CAPABILITIES } from '#/shared/bootstrap.ts'
-import {
-  createRendererBootstrapPayload,
-  createRendererRuntimeSnapshot,
-  toInitialServerSnapshot,
-} from '#/shared/bootstrap-builders.ts'
-import { buildI18nSnapshot } from '#/shared/i18n/snapshot.ts'
-import type { LangPref } from '#/shared/api-types.ts'
 import { WINDOW_BACKGROUND_BY_COLOR_THEME } from '#/shared/theme-tokens.ts'
-import { DEFAULT_COLOR_THEME, initialSettingsFromSnapshot } from '#/shared/settings-defaults.ts'
+import { DEFAULT_COLOR_THEME } from '#/shared/settings-defaults.ts'
 
 const webDevUrl = process.env.GOBLIN_WEB_DEV_URL?.trim()
 const WEB_DIST_DIR = path.join(app.getAppPath(), 'dist/web')
 const PRELOAD_SOURCE_PATH = path.join(app.getAppPath(), 'src/preload/preload.cjs')
 const PRELOAD_DIST_DIR = path.join(app.getAppPath(), 'dist/preload')
 const PRELOAD_MANIFEST_PATH = path.join(PRELOAD_DIST_DIR, 'manifest.json')
-const BOOTSTRAP_CHANNEL = 'goblin:get-bootstrap'
-const BOOTSTRAP_TOKEN_PREFIX = '--goblin-bootstrap-token='
-/**
- * How long a bootstrap payload stays reachable for a freshly-spawned
- * renderer. The preload reads the payload synchronously at startup, so the
- * practical minimum is the time it takes Chromium to spawn the renderer
- * process — a few seconds. We hold the entry for 60 s as a safety margin
- * (slow CI machines, antivirus hooks, etc.) and then evict it. Without
- * this, every createRendererWindowWebPreferences() call would leak the
- * full bootstrap JSON forever.
- */
-const BOOTSTRAP_TTL_MS = 60_000
-const rendererBootstraps = new Map<string, RendererBootstrapPayload>()
-const rendererBootstrapTimers = new Map<string, NodeJS.Timeout>()
-
-function evictBootstrap(token: string): void {
-  rendererBootstraps.delete(token)
-  const timer = rendererBootstrapTimers.get(token)
-  if (timer) {
-    clearTimeout(timer)
-    rendererBootstrapTimers.delete(token)
-  }
-}
-
-/**
- * Register the renderer-bootstrap IPC handler.
- *
- * Why explicit: previously this was wired as a side effect of importing
- * the module, which meant the handler got re-registered on every import
- * (vitest reload, hot reload, anything that re-evaluated the module
- * graph). `ipcMain.on` does not replace a prior handler, so a duplicate
- * registration meant the preload's first sendSync would hit whichever
- * handler fired first — in practice the most recent one, but in some
- * reload orders it was the stale one returning a payload from an
- * already-evicted token. Call this exactly once from the main
- * bootstrap.
- */
-let bootstrapHandlerRegistered = false
-export function registerBootstrapIpc(): void {
-  if (bootstrapHandlerRegistered) return
-  bootstrapHandlerRegistered = true
-  ipcMain.on(BOOTSTRAP_CHANNEL, (event, token: unknown) => {
-    if (typeof token !== 'string') {
-      event.returnValue = null
-      return
-    }
-    event.returnValue = rendererBootstraps.get(token) ?? null
-  })
-}
-
-/** Test-only: reset registration flag so each test starts clean. */
-export function resetBootstrapIpcForTests(): void {
-  bootstrapHandlerRegistered = false
-}
 
 export function windowCanvasBackground(): string {
   const { resolved, colorTheme } = getTheme()
   return WINDOW_BACKGROUND_BY_COLOR_THEME[colorTheme][resolved]
 }
 
-function buildRendererBootstrapPayload(
-  langPref: LangPref,
-  initialSettings: InitialSettingsSnapshot,
-): RendererBootstrapPayload {
-  const runtime = getEmbeddedServerRuntime()
-  return createRendererBootstrapPayload({
-    runtime: createRendererRuntimeSnapshot('electron', ELECTRON_RENDERER_CAPABILITIES),
-    homeDir: os.homedir(),
-    platform: process.platform,
-    i18n: buildI18nSnapshot({ lang: getCurrentLang(), pref: langPref }),
-    settings: initialSettings,
-    server: toInitialServerSnapshot(runtime ? { ...runtime, url: webDevUrl || runtime.url } : null),
-  })
-}
-
 export async function createRendererWindowWebPreferences(): Promise<BrowserWindowConstructorOptions['webPreferences']> {
-  const settingsSnapshot = await getSettingsSnapshot()
-  const initialSettings: InitialSettingsSnapshot = initialSettingsFromSnapshot(settingsSnapshot)
-  const bootstrapToken = randomUUID()
-  const payload = buildRendererBootstrapPayload(settingsSnapshot.lang, initialSettings)
-  rendererBootstraps.set(bootstrapToken, payload)
-  rendererBootstrapTimers.set(
-    bootstrapToken,
-    setTimeout(() => evictBootstrap(bootstrapToken), BOOTSTRAP_TTL_MS),
-  )
   return {
     preload: resolvePreloadPath(),
     contextIsolation: true,
     nodeIntegration: false,
     sandbox: true,
     webSecurity: true,
-    additionalArguments: [`${BOOTSTRAP_TOKEN_PREFIX}${bootstrapToken}`],
   }
 }
 

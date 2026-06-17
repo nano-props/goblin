@@ -8,15 +8,14 @@ import { GitHubMark } from '#/web/components/GitHubMark.tsx'
 import {
   AppWindow,
   Bell,
-  Globe,
   Info,
   Keyboard,
+  Server,
   Settings2,
   Shield,
   SlidersHorizontal,
   type LucideIcon,
 } from 'lucide-react'
-import { getInitialBootstrap } from '#/web/bootstrap.ts'
 const SETTINGS_PAGE_ICONS = {
   general: Settings2,
   shortcuts: Keyboard,
@@ -25,7 +24,7 @@ const SETTINGS_PAGE_ICONS = {
   sync: SlidersHorizontal,
   apps: AppWindow,
   github: GitHubMark,
-  lan: Globe,
+  web: Server,
   about: Info,
 } as const satisfies Record<SettingsPage, LucideIcon | typeof GitHubMark>
 
@@ -37,10 +36,6 @@ interface SettingsLayoutProps {
   onPageChange?: (page: SettingsPage) => void
 }
 
-function isLanPageVisible(): boolean {
-  return getInitialBootstrap().runtime.kind === 'electron'
-}
-
 export function SettingsLayout({
   page,
   topInset = 0,
@@ -49,7 +44,7 @@ export function SettingsLayout({
   onPageChange,
 }: SettingsLayoutProps) {
   const t = useT()
-  const pages = SETTINGS_PAGES.filter((pageKey) => pageKey !== 'lan' || isLanPageVisible()).map((pageKey) => {
+  const pages = SETTINGS_PAGES.map((pageKey) => {
     const config = SETTINGS_PAGE_CONFIG[pageKey]
     return {
       page: pageKey,

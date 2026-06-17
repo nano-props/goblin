@@ -126,14 +126,14 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         platform: 'web',
         initialI18n: null,
         initialSettings: null,
-        initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+        initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       },
       goblinNative: {
         homeDir: '/Users/test',
         platform: 'web',
         initialI18n: null,
         initialSettings: null,
-        initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret' },
+        initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         invokeIpc: ({ path, input }: { path: string; input?: unknown }) => {
           const handler = handlers[path]
           if (!handler) throw new Error(`Unhandled IPC path: ${path}`)
@@ -355,7 +355,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       platform: 'web',
       initialI18n: null,
       initialSettings: null,
-      initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret', clientId: 'client_testterminal' },
+      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     }),
     invokeIpc: async ({ path, input }: { path: string; input?: unknown }) => {
       const handler = handlers[path]

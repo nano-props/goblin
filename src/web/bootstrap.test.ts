@@ -61,14 +61,11 @@ describe('renderer bootstrap', () => {
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
-        goblinNative: {
-          runtime: bootstrap.runtime,
-          homeDir: bootstrap.homeDir,
-          platform: bootstrap.platform,
-          initialI18n: bootstrap.initialI18n,
-          initialSettings: bootstrap.initialSettings,
-          initialServer: bootstrap.initialServer,
-        },
+        // The bootstrap is now the single source of truth — the
+        // server renders it into `<script id="goblin-bootstrap">`
+        // (or sets `__GOBLIN_BOOTSTRAP__` in test mocks). The preload
+        // does not carry the snapshot anymore.
+        __GOBLIN_BOOTSTRAP__: bootstrap,
       },
     })
 
@@ -88,6 +85,51 @@ describe('renderer bootstrap', () => {
     })
   })
 
+  test('replaces a partial web bootstrap once the bridge populates fully', async () => {
+    // Regression for the 5-field-empty gate: the previous version
+    // only re-read on a fully-empty snapshot, so a partial read
+    // (e.g. `homeDir` set, `initialI18n` still null) would lock
+    // the cache and never pick up the populated version. The
+    // new gate re-reads while ANY optional field is missing.
+    const { getInitialBootstrap } = await import('#/web/bootstrap.ts')
+    expect(getInitialBootstrap()).toEqual({
+      runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+      homeDir: '',
+      platform: 'web',
+      initialI18n: null,
+      initialSettings: null,
+      initialServer: null,
+    })
+
+    // A later read returns a fully populated snapshot. The next
+    // call must converge on it, even though the cached value is
+    // only partially empty (none of the fields populated, in this
+    // case — picked up as the "all default" snapshot above).
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {
+        __GOBLIN_BOOTSTRAP__: {
+          runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+          homeDir: '/Users/partial',
+          platform: 'web',
+          initialI18n: { lang: 'en', pref: 'en', dict: { hello: 'hi' } },
+          initialSettings: null,
+          initialServer: null,
+        },
+        location: { href: 'http://127.0.0.1:32100/', origin: 'http://127.0.0.1:32100', search: '' },
+      },
+    })
+
+    expect(getInitialBootstrap()).toEqual({
+      runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+      homeDir: '/Users/partial',
+      platform: 'web',
+      initialI18n: { lang: 'en', pref: 'en', dict: { hello: 'hi' } },
+      initialSettings: null,
+      initialServer: null,
+    })
+  })
+
   test('re-detects the Electron bridge after an early web-host bootstrap', async () => {
     const { getInitialBootstrap } = await import('#/web/bootstrap.ts')
     expect(getInitialBootstrap()).toEqual({
@@ -102,7 +144,11 @@ describe('renderer bootstrap', () => {
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
-        goblinNative: {
+        // The bootstrap is now the source of truth for renderer state;
+        // the bridge only contributes IPC. After the first read returns
+        // an empty default, a populated `__GOBLIN_BOOTSTRAP__` should
+        // be picked up on the next read.
+        __GOBLIN_BOOTSTRAP__: {
           runtime: {
             kind: 'electron',
             bridgeVersion: RENDERER_BRIDGE_VERSION,
@@ -113,6 +159,8 @@ describe('renderer bootstrap', () => {
           initialI18n: null,
           initialSettings: null,
           initialServer: null,
+        },
+        goblinNative: {
           invokeIpc: async () => null,
           abortIpc: async () => false,
           onEvent: () => () => {},
@@ -153,7 +201,7 @@ describe('renderer bootstrap', () => {
   test('prefers the configured renderer bridge over directly reading window.goblinNative', async () => {
     const bootstrap: RendererBootstrapSnapshot = webBootstrap({
       homeDir: '/Users/host',
-      initialServer: { url: 'http://127.0.0.1:32100', secret: 'secret', clientId: 'client_sharedterminal' },
+      initialServer: { url: 'http://127.0.0.1:32100', accessToken: 'secret', clientId: 'client_sharedterminal' },
     })
     const bridgeModule = await import('#/web/renderer-bridge.ts')
     bridgeModule.setRendererBridgeForTests({
@@ -201,7 +249,7 @@ describe('renderer bootstrap', () => {
 
   test('reads injected web bootstrap when the Electron bridge is unavailable', async () => {
     const bootstrap: RendererBootstrapSnapshot = webBootstrap({
-      initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret', clientId: 'client_sharedterminal' },
+      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
     })
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
@@ -219,7 +267,7 @@ describe('renderer bootstrap', () => {
     const bootstrap: RendererBootstrapSnapshot = webBootstrap({
       homeDir: '/Users/tester',
       initialI18n: { lang: 'ko', pref: 'ko', dict: { hello: '안녕' } },
-      initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret', clientId: 'client_sharedterminal' },
+      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
     })
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
@@ -239,13 +287,18 @@ describe('renderer bootstrap', () => {
   })
 
   test('builds a minimal web bootstrap from URL query parameters', async () => {
+    // The dev-mode escape hatch: `?accessToken=...` in the URL
+    // populates the bootstrap so a Vite-served browser can attach
+    // the token as a header. The old `?goblinServerSecret=...`
+    // query was the original per-launch-secret leak; the new name
+    // matches the field on `InitialServerSnapshot`.
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
         location: {
-          href: 'http://127.0.0.1:32100/?goblinServerSecret=test-secret',
+          href: 'http://127.0.0.1:32100/?accessToken=test-secret',
           origin: 'http://127.0.0.1:32100',
-          search: '?goblinServerSecret=test-secret',
+          search: '?accessToken=test-secret',
         },
       },
     })
@@ -259,7 +312,7 @@ describe('renderer bootstrap', () => {
       initialSettings: null,
       initialServer: {
         url: 'http://127.0.0.1:32100/',
-        secret: 'test-secret',
+        accessToken: 'test-secret',
         clientId: expect.stringMatching(/^web_/),
       },
     })

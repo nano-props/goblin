@@ -1,9 +1,10 @@
 import { spawn, type ChildProcessByStdio } from 'node:child_process'
-import { createHash, randomBytes } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import type { Readable } from 'node:stream'
+import os from 'node:os'
 import path from 'node:path'
 import { app } from 'electron'
+import { readOrCreateAccessToken } from '#/shared/access-token-file.ts'
 import { serverNodeLog } from '#/node/logger.ts'
 import { reserveAvailablePort } from '#/system/port-allocation.ts'
 
@@ -17,8 +18,13 @@ interface EmbeddedServerRuntime {
   host: string
   port: number
   url: string
-  secret: string
-  clientId: string
+  /**
+   * Held in main-process memory so the IPC client
+   * (`#/shared/embedded-server-client.ts`) can attach the header
+   * when the main process calls into the embedded server's HTTP
+   * API (e.g. settings, session). Not exposed to the renderer.
+   */
+  accessToken: string
 }
 
 type ServerChildProcess = ChildProcessByStdio<null, Readable, Readable>
@@ -90,10 +96,6 @@ async function waitForServer(url: string, timeoutMs: number): Promise<void> {
   throw new Error('Timed out waiting for embedded server')
 }
 
-function deriveServerClientId(secret: string): string {
-  return `client_${createHash('sha256').update(secret).digest('hex').slice(0, 32)}`
-}
-
 function pipeProcessLogs(proc: ServerChildProcess): void {
   proc.stdout.setEncoding('utf8')
   proc.stderr.setEncoding('utf8')
@@ -136,8 +138,7 @@ export async function startEmbeddedServer(): Promise<EmbeddedServerRuntime | nul
     }
     const preferredPort = parseServerPort(process.env.GOBLIN_SERVER_PORT)
     const port = await reserveEmbeddedServerPort(host, preferredPort)
-    const secret = randomBytes(32).toString('hex')
-    const clientId = deriveServerClientId(secret)
+    const accessToken = await readOrCreateAccessToken(app.getPath('userData'))
     const accessHost = host === '0.0.0.0' ? '127.0.0.1' : host
     const url = `http://${accessHost}:${port}`
     const command = serverCommand()
@@ -147,8 +148,14 @@ export async function startEmbeddedServer(): Promise<EmbeddedServerRuntime | nul
         ...command.env,
         GOBLIN_SERVER_HOST: host,
         GOBLIN_SERVER_PORT: String(port),
-        GOBLIN_SERVER_INTERNAL_SECRET: secret,
+        GOBLIN_SERVER_ACCESS_TOKEN: accessToken,
         GOBLIN_SERVER_DATA_DIR: app.getPath('userData'),
+        // The server renders these into the HTML bootstrap so the
+        // preload can stop ferrying them via IPC. See
+        // `#/server/app-factory.ts:buildWebBootstrap`.
+        GOBLIN_EMBEDDED_RUNTIME: '1',
+        GOBLIN_HOME_DIR: os.homedir(),
+        GOBLIN_PLATFORM: process.platform,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     })
@@ -163,7 +170,7 @@ export async function startEmbeddedServer(): Promise<EmbeddedServerRuntime | nul
     })
     try {
       await waitForServer(url, SERVER_READY_TIMEOUT_MS)
-      runtime = { host, port, url, secret, clientId }
+      runtime = { host, port, url, accessToken }
       serverNodeLog.info({ url }, 'ready')
       return runtime
     } catch (error) {

@@ -103,7 +103,7 @@ describe('server app body limit', () => {
     const app = createApp({
       version: '0.1.0',
       startedAt: Date.now(),
-      internalSecret: 'secret',
+      accessToken: 'secret',
       terminalHost: terminalHostStub,
     })
     const oversized = 'x'.repeat(2 * 1024 * 1024)
@@ -112,7 +112,7 @@ describe('server app body limit', () => {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'x-goblin-internal-secret': 'secret',
+          'x-goblin-access-token': 'secret',
         },
         body: JSON.stringify({ session: { blob: oversized } }),
       }),
@@ -127,7 +127,7 @@ describe('server app body limit', () => {
     const app = createApp({
       version: '0.1.0',
       startedAt: Date.now(),
-      internalSecret: 'secret',
+      accessToken: 'secret',
       terminalHost: terminalHostStub,
     })
     // A small, well-formed body: validation will run after the body
@@ -137,7 +137,7 @@ describe('server app body limit', () => {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'x-goblin-internal-secret': 'secret',
+          'x-goblin-access-token': 'secret',
         },
         body: JSON.stringify({}),
       }),
@@ -157,7 +157,7 @@ describe('server app html bootstrap', () => {
     const app = createApp({
       version: '0.1.0',
       startedAt: Date.now(),
-      internalSecret: 'secret',
+      accessToken: 'secret',
       terminalHost: terminalHostStub,
     })
 
@@ -172,7 +172,12 @@ describe('server app html bootstrap', () => {
     const html = await response.text()
     expect(response.status).toBe(200)
     expect(html).toContain('<script id="goblin-bootstrap" type="application/json">')
-    expect(html).toContain('"secret"')
+    // The access token is no longer inlined in the bootstrap in
+    // prod (no GOBLIN_EMBEDDED_RUNTIME / GOBLIN_DEV_BOOTSTRAP_INCLUDES_TOKEN
+    // envs are set in this test). Confirm both that the literal
+    // `secret` is absent and that the URL made it through.
+    expect(html).not.toContain('"secret"')
+    expect(html).toContain('"url":"http://127.0.0.1:32100/"')
     expect(html).toContain('"lang":"zh"')
     expect(html).toContain('打开本地仓库')
   })
@@ -182,7 +187,7 @@ describe('server app html bootstrap', () => {
     const app = createApp({
       version: '0.1.0',
       startedAt: Date.now(),
-      internalSecret: 'secret',
+      accessToken: 'secret',
       terminalHost: terminalHostStub,
     })
 
@@ -205,7 +210,7 @@ describe('server app html bootstrap', () => {
     const app = createApp({
       version: '0.1.0',
       startedAt: Date.now(),
-      internalSecret: 'secret',
+      accessToken: 'secret',
       terminalHost: terminalHostStub,
     })
 
@@ -214,7 +219,8 @@ describe('server app html bootstrap', () => {
       const html = await response.text()
       expect(response.status).toBe(200)
       expect(html).toContain('<script id="goblin-bootstrap" type="application/json">')
-      expect(html).toContain('"secret"')
+      expect(html).not.toContain('"secret"')
+      expect(html).toContain('"url":"http://127.0.0.1:32100/"')
       expect(html).toContain('<base href="http://127.0.0.1:32100/">')
     }
   })
@@ -224,7 +230,7 @@ describe('server app html bootstrap', () => {
     const app = createApp({
       version: '0.1.0',
       startedAt: Date.now(),
-      internalSecret: 'secret',
+      accessToken: 'secret',
       terminalHost: terminalHostStub,
     })
     for (const path of ['/', '/repos/abc123', '/repos/abc123/changes']) {
@@ -240,7 +246,7 @@ describe('server app html bootstrap', () => {
     const app = createApp({
       version: '0.1.0',
       startedAt: Date.now(),
-      internalSecret: 'secret',
+      accessToken: 'secret',
       terminalHost: terminalHostStub,
     })
     const response = await app.request(new Request('http://127.0.0.1:32100/api/unknown'))
@@ -278,7 +284,7 @@ describe('per-sub-path body limits and auth ordering', () => {
     const app = createApp({
       version: '0.1.0',
       startedAt: Date.now(),
-      internalSecret: 'secret',
+      accessToken: 'secret',
       terminalHost: terminalHostStub,
     })
     // 5 MiB body — well over the 1 MiB cap; Content-Length is set.
@@ -300,7 +306,7 @@ describe('per-sub-path body limits and auth ordering', () => {
     const app = createApp({
       version: '0.1.0',
       startedAt: Date.now(),
-      internalSecret: 'secret',
+      accessToken: 'secret',
       terminalHost: terminalHostStub,
     })
     const response = await app.request(
@@ -309,7 +315,7 @@ describe('per-sub-path body limits and auth ordering', () => {
         headers: {
           'content-type': 'application/json',
           'content-length': String(5 * 1024 * 1024),
-          'x-goblin-internal-secret': 'secret',
+          'x-goblin-access-token': 'secret',
         },
         body: 'x'.repeat(5 * 1024 * 1024),
       }),
@@ -331,7 +337,7 @@ describe('per-sub-path body limits and auth ordering', () => {
     const app = createApp({
       version: '0.1.0',
       startedAt: Date.now(),
-      internalSecret: 'secret',
+      accessToken: 'secret',
       terminalHost: terminalHostStub,
     })
     const form = new FormData()
@@ -339,7 +345,7 @@ describe('per-sub-path body limits and auth ordering', () => {
     const response = await app.request(
       new Request('http://127.0.0.1:32100/api/clipboard/files', {
         method: 'POST',
-        headers: { 'x-goblin-internal-secret': 'secret' },
+        headers: { 'x-goblin-access-token': 'secret' },
         body: form,
       }),
     )
@@ -360,7 +366,7 @@ describe('per-sub-path body limits and auth ordering', () => {
     const app = createApp({
       version: '0.1.0',
       startedAt: Date.now(),
-      internalSecret: 'secret',
+      accessToken: 'secret',
       terminalHost: terminalHostStub,
     })
     const response = await app.request(
@@ -369,7 +375,7 @@ describe('per-sub-path body limits and auth ordering', () => {
         headers: {
           'content-type': 'application/octet-stream',
           'content-length': String(8 * 1024 * 1024),
-          'x-goblin-internal-secret': 'secret',
+          'x-goblin-access-token': 'secret',
         },
         body: 'x'.repeat(8 * 1024 * 1024),
       }),
@@ -387,7 +393,7 @@ describe('per-sub-path body limits and auth ordering', () => {
     const app = createApp({
       version: '0.1.0',
       startedAt: Date.now(),
-      internalSecret: 'secret',
+      accessToken: 'secret',
       terminalHost: terminalHostStub,
     })
     const response = await app.request(
@@ -396,7 +402,7 @@ describe('per-sub-path body limits and auth ordering', () => {
         headers: {
           'content-type': 'application/octet-stream',
           'content-length': String(20 * 1024 * 1024),
-          'x-goblin-internal-secret': 'secret',
+          'x-goblin-access-token': 'secret',
         },
         body: 'x'.repeat(20 * 1024 * 1024),
       }),
@@ -409,7 +415,7 @@ describe('per-sub-path body limits and auth ordering', () => {
     const app = createApp({
       version: '0.1.0',
       startedAt: Date.now(),
-      internalSecret: 'secret',
+      accessToken: 'secret',
       terminalHost: terminalHostStub,
     })
     // Two-kilobyte body to a hypothetical /api/health endpoint —

@@ -116,7 +116,7 @@ describe('terminal web host bridge', () => {
         homeDir: '',
         initialI18n: null,
         initialSettings: null,
-        initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret', clientId: 'client_sharedterminal' },
+        initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
       },
     })
     Object.defineProperty(window, 'location', {
@@ -137,7 +137,7 @@ describe('terminal web host bridge', () => {
     const dispose = terminalBridge.onOutput(() => {})
     const socket = MockWebSocket.instances[0]
     expect(socket?.url).toMatch(
-      /^ws:\/\/127\.0\.0\.1:32100\/ws\/terminal\?token=secret&clientId=client_sharedterminal&attachmentId=attachment_/,
+      /^ws:\/\/127\.0\.0\.1:32100\/ws\/terminal\?t=secret&clientId=client_sharedterminal&attachmentId=attachment_/,
     )
     const attachPromise = terminalBridge.attach({
       sessionId: 'term_1234567890123456',

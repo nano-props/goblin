@@ -4,6 +4,7 @@ import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { ErrorBoundary } from '#/web/components/ErrorBoundary.tsx'
 import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessionProvider.tsx'
+import { TokenGate } from '#/web/components/TokenGate.tsx'
 import { RepoCloneDialog } from '#/web/components/RepoCloneDialog.tsx'
 import { RepoOpenDialog } from '#/web/components/RepoOpenDialog.tsx'
 import { OpenRemoteRepositoryDialog } from '#/web/components/OpenRemoteRepositoryDialog.tsx'
@@ -95,29 +96,31 @@ export function Layout() {
 
   return (
     <ErrorBoundary>
-      <MainWindowNavigationProvider value={navigation}>
-        <LayoutOverlayActions.Provider
-          value={{
-            openRepoPathDialog: overlays.openRepoPathDialog,
-            openCloneRepo: overlays.openCloneRepo,
-            openRemoteRepo: overlays.openRemoteRepo,
-          }}
-        >
-          <TerminalSessionProvider>
-            <div
-              className="relative flex h-full flex-col"
-              onDragEnter={repoDrop.onDragEnter}
-              onDragOver={repoDrop.onDragOver}
-              onDragLeave={repoDrop.onDragLeave}
-              onDrop={repoDrop.onDrop}
-            >
-              <Outlet />
-              <MainWindowOverlays overlays={overlays} repoDrop={repoDrop} />
-            </div>
-          </TerminalSessionProvider>
-        </LayoutOverlayActions.Provider>
-      </MainWindowNavigationProvider>
-      {import.meta.env.DEV ? <TanStackRouterDevtools /> : null}
+      <TokenGate>
+        <MainWindowNavigationProvider value={navigation}>
+          <LayoutOverlayActions.Provider
+            value={{
+              openRepoPathDialog: overlays.openRepoPathDialog,
+              openCloneRepo: overlays.openCloneRepo,
+              openRemoteRepo: overlays.openRemoteRepo,
+            }}
+          >
+            <TerminalSessionProvider>
+              <div
+                className="relative flex h-full flex-col"
+                onDragEnter={repoDrop.onDragEnter}
+                onDragOver={repoDrop.onDragOver}
+                onDragLeave={repoDrop.onDragLeave}
+                onDrop={repoDrop.onDrop}
+              >
+                <Outlet />
+                <MainWindowOverlays overlays={overlays} repoDrop={repoDrop} />
+              </div>
+            </TerminalSessionProvider>
+          </LayoutOverlayActions.Provider>
+        </MainWindowNavigationProvider>
+        {import.meta.env.DEV ? <TanStackRouterDevtools /> : null}
+      </TokenGate>
     </ErrorBoundary>
   )
 }

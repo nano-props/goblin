@@ -1,20 +1,30 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { InitialSettingsSnapshot } from '#/shared/bootstrap.ts'
 import type { I18nSnapshot } from '#/shared/api-types.ts'
+
 function installBridge(
   overrides: {
     initialI18n?: I18nSnapshot | null
     initialSettings?: InitialSettingsSnapshot | null
   } = {},
 ) {
+  // The bootstrap is now the source of truth for renderer-side
+  // state (i18n, settings, server URL). The preload no longer
+  // ferries these via `goblinNative`; it just exposes the IPC
+  // surface. We set `__GOBLIN_BOOTSTRAP__` for state and a
+  // minimal `goblinNative` to satisfy the bridge detection.
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
     value: {
-      goblinNative: {
+      __GOBLIN_BOOTSTRAP__: {
+        runtime: { kind: 'electron', bridgeVersion: 1, capabilities: [] },
         homeDir: '/Users/test',
         platform: 'web',
         initialI18n: overrides.initialI18n ?? null,
         initialSettings: overrides.initialSettings ?? null,
+        initialServer: null,
+      },
+      goblinNative: {
         invokeIpc: vi.fn(),
         abortIpc: vi.fn(() => Promise.resolve(false)),
         onEvent: vi.fn(() => () => {}),

@@ -1,5 +1,4 @@
 import { useEffect } from 'react'
-import QRCode from 'qrcode'
 import { queryOptions, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ExternalAppsSnapshot, GitHubCliState, LanInfo, SettingsSnapshot } from '#/shared/api-types.ts'
 import { getExternalAppsSnapshot, getGitHubCliState, getLanInfo, getSettingsSnapshot } from '#/web/settings-client.ts'
@@ -103,25 +102,10 @@ export function githubCliQueryOptions(hosts?: string[]) {
   })
 }
 
-export interface LanInfoWithQrCodes extends LanInfo {
-  qrCodes: Record<string, string>
-}
-
 export function lanInfoQueryOptions() {
-  return queryOptions<LanInfoWithQrCodes>({
+  return queryOptions<LanInfo>({
     queryKey: lanInfoQueryKey(),
-    queryFn: async () => {
-      const info = await getLanInfo()
-      const qrCodes: Record<string, string> = {}
-      for (const url of info.lanUrls) {
-        try {
-          qrCodes[url] = await QRCode.toDataURL(url, { width: 180, margin: 2 })
-        } catch {
-          // ignore
-        }
-      }
-      return { ...info, qrCodes }
-    },
+    queryFn: async () => await getLanInfo(),
     staleTime: 5 * 60_000,
     gcTime: 10 * 60_000,
   })

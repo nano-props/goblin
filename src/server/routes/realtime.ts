@@ -5,13 +5,13 @@ import {
   registerInvalidationSocket,
   unregisterInvalidationSocket,
 } from '#/server/modules/invalidation-broker.ts'
-import { safeEqualString } from '#/server/common/timing-safe.ts'
+import { createAccessTokenMiddleware } from '#/server/common/auth.ts'
 import { errorJson } from '#/server/common/responses.ts'
 import { TERMINAL_WS_MESSAGE_LIMIT_BYTES } from '#/shared/terminal-validators.ts'
 import type { ServerTerminalHost, ServerTerminalSocket } from '#/server/terminal/terminal-host.ts'
 
 interface RealtimeRouteOptions {
-  internalSecret: string
+  accessToken: string
   terminalHost: ServerTerminalHost
 }
 
@@ -25,24 +25,28 @@ interface RealtimeRouteOptions {
 
 // Server-authoritative realtime only. Native-host renderer effect intents stay
 // on Electron IPC so the server does not become a broker for local shell APIs.
-export function createRealtimeRoutes({ internalSecret, terminalHost }: RealtimeRouteOptions) {
+export function createRealtimeRoutes({ accessToken, terminalHost }: RealtimeRouteOptions) {
+  // The shared middleware accepts cookie, header, or `?t=` query, so
+  // browser clients (cookie), embedded Electron clients (`?t=`),
+  // and LAN CLI clients (any of the three) all work.
+  const auth = createAccessTokenMiddleware(accessToken)
+
   const app = new Hono()
-  app.use('/invalidation', async (c, next) => {
-    if (!safeEqualString(c.req.query('token') ?? '', internalSecret)) {
-      return errorJson(c, 'FORBIDDEN', 'Unauthorized')
-    }
-    await next()
-  })
-  app.use('/terminal', async (c, next) => {
-    if (!safeEqualString(c.req.query('token') ?? '', internalSecret)) {
-      return errorJson(c, 'FORBIDDEN', 'Unauthorized')
-    }
-    if (!terminalHost.isValidClientId(c.req.query('clientId'))) {
-      return errorJson(c, 'BAD_REQUEST', 'Invalid client id')
-    }
-    if (!c.req.query('attachmentId')) return errorJson(c, 'BAD_REQUEST', 'Missing attachment id')
-    await next()
-  })
+  app.use('/invalidation', auth)
+  app.use(
+    '/terminal',
+    auth,
+    async (c, next) => {
+      if (!terminalHost.isValidClientId(c.req.query('clientId'))) {
+        return errorJson(c, 'BAD_REQUEST', 'Invalid client id')
+      }
+      if (!c.req.query('attachmentId')) {
+        return errorJson(c, 'BAD_REQUEST', 'Missing attachment id')
+      }
+      await next()
+    },
+  )
+
   app.get(
     '/invalidation',
     upgradeWebSocket(() => {
