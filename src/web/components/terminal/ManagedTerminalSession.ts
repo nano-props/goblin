@@ -123,16 +123,6 @@ export class ManagedTerminalSession {
     return this.runtime.snapshot()
   }
 
-  /**
-   * Test-only: read the current `hydratedSnapshot` value. The field is
-   * private because the only legitimate user is the hydration pipeline
-   * itself; tests need to verify that `preloadHydratedSnapshot` and
-   * `applyHydratedSnapshotToActiveView` clear it after writing.
-   */
-  __test__hydratedSnapshot(): { snapshot: string; snapshotSeq: number } {
-    return { snapshot: this.hydratedSnapshot.snapshot, snapshotSeq: this.hydratedSnapshot.snapshotSeq }
-  }
-
   isTerminalFocusTarget(target: EventTarget | null): boolean {
     return this.view.isTerminalFocusTarget(target)
   }
@@ -370,7 +360,7 @@ export class ManagedTerminalSession {
     // The rAF settles the *layout paint* for measurement accuracy in
     // later operations, but the attach roundtrip doesn't need that
     // paint to have completed. A future refactor that turns attach into
-    // a local cache lookup MUST restore the blocking wait (T1.3).
+    // a local cache lookup MUST restore the blocking wait.
     void waitForTerminalLayout()
     this.guardStart(token, term)
     return { term, preloaded }

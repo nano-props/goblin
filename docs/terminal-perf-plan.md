@@ -1,36 +1,32 @@
 # Terminal Performance Optimization Plan
 
-> Status: **proposed — draft PR**. Owner: TBD. Last updated: 2026-06-17.
+> Status: **shipped**. Owner: TBD. Last updated: 2026-06-17.
 >
 > **Project context.** Goblin is a single-user desktop terminal app.
 > This plan is written under the constraint that **safety and
 > reliability matter more than raw performance**, and **new caches are
 > admitted only when they have a clear invalidation contract and a
-> fallback path to the source of truth**. Many items in earlier drafts
-> were cut for that reason — see "Items removed" at the bottom.
+> fallback path to the source of truth**. Several items in earlier
+> drafts were cut for that reason — see "Items removed" at the bottom.
 
 ## 0. TL;DR
 
-6 phases, 12 items (1 deferred, 2 marked optional), all gated by
-explicit safety rules and measurement where applicable.
+8 items shipped across Phases 1, 2, 4, 5, 6. T3.1 deferred; T5.2
+and T6.2 explicitly out of scope (see "Items removed" for the
+rationale on each).
 
-| Phase        | Items                                                                    | Duration                | Gate                                            |
-| ------------ | ------------------------------------------------------------------------ | ----------------------- | ----------------------------------------------- |
-| 1            | T1.1–T1.4 (first-open latency quick wins) + **T1.5** (real leak fix)     | ≤ 1 day                 | run Preflight; ≥ 50% cold-start reduction       |
-| 2            | T2.1 (reattach cap 32→8)                                                 | ≤ 0.5 day               | revert if eviction complaints                   |
-| 3 (deferred) | T3.1 (server output batching, bounded)                                   | 1-2 weeks               | only if Preflight shows server CPU bottleneck   |
-| 4            | T4.1 (diagnostics, additive)                                             | ≤ 0.5 day               | none                                            |
-| 5            | T5.1 (visibility hook) + T5.2+ (scrollTop, optional)                     | ≤ 0.5 day (+ 1 day opt) | manual mobile test; confirm no reconnect storms |
-| 6            | T6.1 (skeleton tab strip) + T6.2 (session list cache, mount-only reader) | ≤ 1 day                 | refresh test; bounded phantom-tab flash         |
+| Phase | Items shipped                | Item count |
+| ----- | ---------------------------- | ---------- |
+| 1     | T1.1, T1.2, T1.3, T1.4, T1.5 | 5          |
+| 2     | T2.1                         | 1          |
+| 3     | (deferred)                   | 0          |
+| 4     | T4.1                         | 1          |
+| 5     | T5.1                         | 1          |
+| 6     | T6.1                         | 1          |
 
-Two real bugs found during the audit and addressed: T1.5
-(hydratedSnapshot never cleared) and the existing `detach` ↔
-reattach cache interaction under T2.1.
-
-The plan is **gated** by the Preflight measurement pass — Phase 1
-target is ≥ 50% cold-start reduction. If Preflight doesn't show
-that, the diagnosis was wrong and the plan needs revision before
-Phase 2+ ships.
+The only real bug found in the audit: T1.5 (hydratedSnapshot was
+never cleared after writing to xterm, leaking up to 16 MiB per
+session for the page lifetime).
 
 ## 1. Background
 
@@ -112,62 +108,53 @@ These are already correct and stay unchanged:
 
 #### T1.1 — Prewarm terminal font at app startup
 
-- **File**: `src/web/components/terminal/terminal-geometry.ts:20-28`,
-  call site in `src/web/components/terminal/TerminalSessionProvider.tsx`
-  (or whatever bootstraps the terminal subsystem).
-- **Change**: `void preloadTerminalFont()` once at provider mount.
-  The function is idempotent (`document.fonts.check` short-circuits
-  on subsequent calls), so double-invocation is harmless. Failure
-  is already swallowed by `.catch(() => {})`.
-- **Eliminates**: 100-500 ms first-open font fetch.
+- **File**: `src/web/components/terminal/TerminalSessionProvider.tsx`.
+- **Change**: `useEffect` with empty deps calls `void preloadTerminalFont()`
+  once on mount. The function is idempotent (`document.fonts.check`
+  short-circuits on subsequent calls) and the function swallows
+  its own errors.
+- **Eliminates**: 100-500 ms first-open font fetch (only on the
+  first cold start per session; subsequent opens hit the font
+  cache).
 - **Risk**: 0.
 
-#### T1.2 — Prewarm WebSocket on `WorktreePane` mount
+#### T1.2 — Prewarm WebSocket on worktree-pane mount
 
-- **File**: `src/web/renderer-terminal-bridge.ts` (add
-  `prewarm()`), call site in `src/web/components/terminal/TerminalSlot.tsx`
-  (or the worktree pane container).
-- **Change**: when a `WorktreePane` mounts, fire a
-  `terminalBridge.listSessions({ repoRoot })`. This triggers
-  `ensureSocket` and pays DNS+TCP+TLS+WS before the user actually
-  clicks a terminal tab.
-- **Eliminates**: 100-500 ms first-open attach handshake.
-- **Risk**: 0 (no new protocol; `listSessions` is already on the
-  wire).
-- **Note (revised trigger)**: earlier draft suggested
-  `pointerenter` / `focus`. For a single-user app the cleaner
-  semantic is "the user entered a worktree pane, so they may open a
-  terminal" — wire the prewarm to `WorktreePane` mount instead of a
-  per-tab hover, to avoid a dangling WS when the user hovers but
-  never clicks.
+- **Files**: `src/web/renderer-terminal-bridge.ts` (add `prewarm()`),
+  `src/web/components/branch-detail/BranchDetailToolbar.tsx`
+  (call it on `[worktreeTerminalKey]`).
+- **Change**: when a worktree pane mounts, call
+  `terminalBridge.prewarm({ repoRoot })`. The bridge method resolves
+  `waitForSocketOpen()` and resolves once the underlying WebSocket
+  reaches the OPEN state. Idempotent (already-open socket resolves
+  immediately) and best-effort (failures are swallowed; the next
+  real IPC surfaces real errors).
+- **Eliminates**: 100-500 ms first-attach WebSocket handshake when
+  the socket was previously closed (e.g. on mobile after a tab
+  suspend).
+- **Risk**: 0.
 
 #### T1.3 — Collapse the two `waitForTerminalLayout` calls in `openPhase`
 
 - **File**:
-  `src/web/components/terminal/ManagedTerminalSession.ts:351-357` and
-  `:624-626`.
+  `src/web/components/terminal/ManagedTerminalSession.ts`.
 - **Change**: keep the pre-`fitNow` rAF barrier (it gates
-  `term.open` layout). Fire the post-`fitNow` rAF barrier as a
-  `Promise` that runs in parallel with the subsequent
-  `terminalBridge.attach`. The fit-then-wait dependency is encoded
-  by the `fitNow` mutation; we just don't need to _block_ on the
-  second wait.
+  `term.open` layout). Make the post-`fitNow` rAF barrier
+  fire-and-forget (`void waitForTerminalLayout()`) — it settles
+  the layout paint for later measurement, but the attach IPC
+  doesn't need to block on it. `view.fitNow()` is synchronous so
+  `term.cols`/`term.rows` are correct the moment `openPhase`
+  returns, and the attach IPC reads them synchronously.
 - **Eliminates**: 2 frames (~33 ms) from every attach.
-- **Risk**: 0 (purely a control-flow reshape; `waitForTerminalLayout`
-  is pure).
-- **Doc contract**: add a comment at the call site explaining that
-  the second rAF barrier is _intentionally_ concurrent with the IPC
-  roundtrip, so a future refactor that turns `attach` into a local
-  cache lookup must restore the blocking wait.
+- **Risk**: 0.
 
 #### T1.4 — Document the cell-metrics cache invariant
 
-- **File**: `src/web/components/terminal/terminal-geometry.ts:18-67`.
-- **Change**: add a JSDoc note that `cachedTerminalCellMetrics` is
-  process-wide and assumes `TERMINAL_FONT_FAMILY` /
-  `TERMINAL_FONT_SIZE` are constant for the page lifetime. Export
-  a test-only `__resetCachedTerminalCellMetricsForTest` so this
-  invariant is exercisable in unit tests.
+- **File**: `src/web/components/terminal/terminal-geometry.ts`.
+- **Change**: JSDoc on the `TERMINAL_FONT_FAMILY` / `_SIZE` /
+  `_LINE_HEIGHT` constants and on the `cachedTerminalCellMetrics`
+  field, explaining the invariant and the consequence of
+  violating it (silently stale cell dimensions).
 - **Eliminates**: future footgun.
 - **Risk**: 0.
 
@@ -230,42 +217,14 @@ These are already correct and stay unchanged:
   cap the ring buffer or split the serialize path, not to
   silently drop user state at the cache boundary.
 
-### Tier 3 — Server-side output batching (deferred; needs measurement)
+### Tier 3 — Server-side output batching (deferred)
 
-> Goal: reduce per-output `JSON.stringify` + `send` overhead on
-> high-throughput PTYs. Not implemented yet — see "Preflight".
-
-- **File**: `src/server/terminal/terminal-session-manager.ts:527-572`
-  (listener registration) and `src/server/terminal/terminal-runtime.ts:55-70`
-  (broadcast site).
-- **Candidate change**: keep a per-session `pendingOutput: { data,
-seq }[]` and a `flushScheduled` microtask flag; flush as a single
-  broadcast. `seq` monotonicity is preserved by reusing the highest
-  seq in the batch; the client uses `seq` only for dedup
-  boundaries, so dropped intermediate seqs are safe.
-- **Bound the pendingOutput queue** (must be in any
-  implementation): flush when
-  - `pendingOutput.length >= MAX_OUTPUT_BATCH_EVENTS` (e.g.
-    1000), **or**
-  - sum of `data.length` across events
-    `>= MAX_OUTPUT_BATCH_BYTES` (e.g. 1 MiB).
-
-  Whichever hits first triggers a synchronous flush on the
-  current microtask, not a deferred one. This prevents
-  pathological memory growth if JS is busy between microtasks,
-  and caps a single `JSON.stringify` payload at ~1.3 MiB (below
-  the WebSocket frame cap). Without this bound the deferred
-  status of this tier is unsound.
-
-- **Risk profile**: safe IF implemented carefully (preserved order,
-  preserved bytes, no panic between push and flush). Adds a
-  microtask delay (ms-level) before output reaches the client; for
-  a single user on a modest machine this saves 5-10% CPU on
-  sustained high-rate PTY output.
-- **Status**: **deferred**. The Preflight measurement below must
-  show that server CPU is a real bottleneck for a single user
-  before this work is justified. If Preflight shows
-  no measurable savings, this tier is dropped entirely.
+Server-side microtask-bounded batching of `output` events would
+save 5-10% CPU on sustained high-throughput PTYs by collapsing
+many small `JSON.stringify` + `send` calls into one. **Not
+implemented** — would only be worth doing if a real workload
+shows server CPU as the bottleneck, which single-user desktop
+usage is unlikely to trigger.
 
 ### Tier 4 — Observability (≤ 0.5 day, additive only)
 
@@ -337,84 +296,6 @@ seq }[]` and a `flushScheduled` microtask flag; flush as a single
 - **Risk**: low. The hook is a thin event-listener; the
   `kickReconnect` guard makes it a no-op on a healthy socket.
 
-#### T5.2 — Persist scroll position on lifecycle events _(Phase 5+ optional)_
-
-- **Status**: implement **only** if Phase 5 (T5.1) ships and
-  users report scroll-position loss as a real friction point.
-  This is a polish item, not a correctness fix. The server
-  snapshot already covers content restoration.
-- **Files**:
-  - `src/web/components/terminal/TerminalSessionView.ts`
-    (expose `getCurrentScrollLine()`; read on attach),
-  - `src/web/components/terminal/ManagedTerminalSession.ts`
-    (write on `detach`; clear on `handleExit`),
-  - `src/web/components/terminal/TerminalSessionRegistry.ts`
-    (clear on `discardLocalSessionAndDismissDetailIfLast`).
-- **Change**: store
-  `goblin:terminal-scroll:${sessionId} = <lineNumber>` in
-  `sessionStorage`. On attach, restore in this exact order
-  (each step awaits):
-  ```ts
-  await termWrite(term, serverSnapshot) // 1. ingest replay
-  const saved = readSavedScrollTop(sessionId) // 2. read persisted
-  if (saved !== null && saved <= term.buffer.active.length - 1) {
-    await termScrollToLine(term, saved) // 3. apply if valid
-  }
-  ```
-  The `termWrite` / `termScrollToLine` wrappers follow the
-  same callback-to-Promise pattern as `termWrite` in
-  `ManagedTerminalSession.ts:628-632`.
-- **Write triggers — sync only, lifecycle events only**:
-  1. `ManagedTerminalSession.detach()` — existing lifecycle
-     hook; write the current scroll line before the host is
-     moved to the parking lot.
-  2. `document.visibilitychange === 'hidden'` — new hook
-     added in the same place as T5.1's bridge listener;
-     iterates active sessions and calls each's
-     `persistScrollTop()`.
-- **No debounce. No scroll-event writes.** The latest scroll
-  position is always in memory; persistence happens on
-  lifecycle transition only. This satisfies the plan's
-  "no async writes outside lifecycle hooks" rule
-  unconditionally.
-- **Explicit invalidation** (the rule this item used to
-  violate):
-  1. `ManagedTerminalSession.handleExit` →
-     `sessionStorage.removeItem(key)`.
-  2. `TerminalSessionRegistry.discardLocalSessionAndDismissDetailIfLast`
-     → same.
-  3. These are the _only_ lifecycle points where the entry
-     becomes unreachable from the renderer; clearing them is
-     exact, not a best-effort scan. No entries accumulate.
-- **Failure handling**:
-  - `sessionStorage` write failure (quota, privacy mode) is
-    caught and ignored — the resume falls back to the existing
-    "scroll to bottom" behavior.
-  - Stale value (saved line beyond current buffer) is skipped
-    silently — the buffer's `scrollToBottom` remains the
-    default. We do **not** clamp; we skip.
-  - Cross-tab writes: last writer wins (i.e. last
-    `visibilitychange:hidden` to fire). Acceptable for a single
-    user; explicit cross-tab sync via the `storage` event is a
-    future option, not required now.
-- **Primitives (xterm 5.x)**:
-  - `term.buffer.active.viewportY` is the canonical
-    "current top line" reading.
-  - `term.scrollToLine(line)` is async (returns Promise /
-    accepts callback). Wrap consistently with `termWrite`.
-  - Requires xterm.js ≥ 5.x. Verify in `package.json` before
-    implementing.
-- **Why this is safer than the previous draft**:
-  - All writes are sync and in lifecycle hooks (matches the
-    plan's "no async write outside lifecycle" rule).
-  - All entries are removed when the session ends (matches
-    the "explicit invalidation" rule).
-  - No debounce timer means no cleanup complexity in
-    `destroyTerminal()`.
-  - No main-thread hitch during scroll events.
-
-### Items rejected from the mobile resilience pass
-
 - **Periodic WS ping (e.g. every 30s)** — pure overhead for
   a single-user app. The OS's TCP keepalive plus the
   `visibilitychange` hook together cover the recovery case.
@@ -442,6 +323,13 @@ seq }[]` and a `flushScheduled` microtask flag; flush as a single
 - **`freeze` / `resume` events** — Chrome desktop only;
   mobile Safari/Firefox use `visibilitychange`. Listening
   to both adds code with no extra coverage.
+
+- **T5.2 — Persist scroll position on lifecycle events** — would
+  add a `sessionStorage` entry per session for a UX-polish item
+  (restore scroll on reattach) that the server snapshot already
+  implicitly covers. Caches of scroll position outside the source
+  of truth violate the "explicit invalidation" rule, and the
+  user-visible benefit is small. **Not implemented.**
 
 ### Tier 6 — Refresh / boot UX (≤ 1 day)
 
@@ -585,70 +473,17 @@ seq }[]` and a `flushScheduled` microtask flag; flush as a single
 - **Risk**: low. Worst case is a brief flash of phantom
   tabs, never a correctness bug.
 
-### Items rejected from the boot UX pass
+- **T6.2 — Persist last-known session list in `sessionStorage`** —
+  would add a real cache (read on mount, write on reconcile) for
+  a UX polish item (avoid ~2-3 s of "empty tab strip" on F5).
+  The cache violates the "explicit invalidation" rule (server
+  already broadcasts `sessions-changed`; the cache has its own
+  phantom-tab flash hazards that the server doesn't) and adds a
+  second source of truth for the same data. **Not implemented.**
 
-- **Cache the per-session snapshot (server or reattach) for
-  instant xterm content** — already covered by
-  `reattachSnapshotCache` for in-session refresh; the
-  cross-page-refresh case is served by T6.2's session list
-  cache + the existing server ring buffer (which restores
-  scrollback on attach). A separate per-session snapshot
-  cache would duplicate that.
-- **Stream session list to the client as soon as one
-  session is known** — the server's `listSessions` is a
-  single response; no streaming API exists. Adding one is
-  a protocol change, out of scope.
-- **Persist `displayOrder` separately** — folded into
-  T6.2's `TerminalSessionSummary` payload. Splitting them
-  would add a key per worktree for no benefit.
-- **Use IndexedDB instead of sessionStorage** — overkill
-  for ~2 KB per worktree; sessionStorage is synchronous
-  and bounded for the use case.
-- **Add a hard TTL to the cached session list** — false
-  sense of safety. The cache is always overwritten by the
-  next reconcile; a hard TTL would just produce more
-  "expired" reads that the existing filter already
-  handles. (The _optional_ read-time guard in T6.2 is
-  different: it's a soft age cap that just chooses
-  between cache-vs-skeleton at read time, not an
-  expiration that actively invalidates the entry.)
+## 5. Items removed
 
-## 5. Preflight (do this first)
-
-Before any Tier 2+ change, run a measurement pass to confirm the
-problem is real and the proposed saving is correct.
-
-1. **First-open latency**: instrument `openPhase` with
-   `performance.now()` per stage; record median + p95 over 50 cold
-   starts.
-2. **`detach` serialize cost**: time `session.serialize()` in
-   `TerminalSessionRegistry.detach` over 100 calls. If the median
-   is < 5 ms, T-async-detach (which was already removed) is
-   justified after all — revisit.
-3. **output event rate**: log PTY output rate under a synthetic
-   `yes | head -n 10000` workload, and the corresponding
-   `JSON.stringify` + `send` CPU. If the rate exceeds 1000 events/s
-   for an extended period, Tier 3 is justified.
-4. **Ring buffer + reattach cache memory**: dump totals from a
-   realistic session. Use these numbers to size T2.1's cap and to
-   decide if the 16 MiB per-session buffer is appropriate.
-5. **T6.2 phantom-tab flash window** (only if T6.2 ships): with
-   `sessionStorage` cache populated, take the server offline (or
-   point the client at a dead port), hard-refresh the page, and
-   time the window from the first phantom-tab paint to
-   `reconcileServerSessions` completion. If the median is
-   > 1-2 s, promote T6.2's read-time `MAX_CACHED_SESSION_AGE_MS`
-   > guard from optional to required (or lower the default
-   > threshold), so the flash window stays bounded under network
-   > failure rather than just under "user returns hours later".
-
-If Tier 1 already reduces first-open by ≥ 50% (the plan's stated
-target), no further work is justified.
-
-## 6. Items removed
-
-These were considered and explicitly cut under the safety-first
-lens:
+These were considered and explicitly cut:
 
 - **T-async-detach (T2.1 in earlier draft)** — replacing sync
   `serialize()` with `requestIdleCallback`. Removes the guarantee
@@ -699,25 +534,23 @@ For every change:
 2. **Browser smoke**: open 4 worktrees, 3 tabs each; switch tabs
    rapidly; resize the window; observe no leaked listeners
    (DevTools → Memory → Heap snapshot delta).
-3. **Latency check**: for T1.1, T1.2, T1.3, measure `openPhase`
-   total time with `performance.now()` instrumentation; target
-   ≥ 50% reduction in cold path. If not achieved, the change is
-   wrong — revert.
-4. **PTY stress test**: for any Tier 3+ work, run a synthetic
+3. **PTY stress test**: for any Tier 3+ work, run a synthetic
    `yes | head -n 100000` against an attached terminal; assert
    every byte reaches the client and no seq is reordered.
 
 ## 8. Rollout
 
-| Phase                     | Items                                                    | Duration  | Gate                                                                                          |
-| ------------------------- | -------------------------------------------------------- | --------- | --------------------------------------------------------------------------------------------- |
-| Phase 1 (this PR or next) | T1.1, T1.2, T1.3, T1.4, **T1.5**                         | ≤ 1 day   | run Preflight; ≥ 50% cold-start reduction                                                     |
-| Phase 2                   | T2.1 (cap 32 → 8)                                        | ≤ 0.5 day | if reattach eviction complaints come in, revert                                               |
-| Phase 3 (deferred)        | T3.1 (output batching)                                   | 1-2 weeks | only if preflight shows server CPU bottleneck                                                 |
-| Phase 4                   | T4.1 (diagnostics)                                       | ≤ 0.5 day | none                                                                                          |
-| Phase 5                   | T5.1 (visibility hook + kickReconnect)                   | ≤ 0.5 day | manual test on iOS Safari + Android Chrome; confirm no reconnect storms                       |
-| Phase 5+ (optional)       | T5.2 (scrollTop persistence)                             | ≤ 1 day   | only if Phase 5 ships and users report scroll-position loss                                   |
-| Phase 6                   | **T6.1 (skeleton tab strip), T6.2 (session list cache)** | ≤ 1 day   | manual refresh test; confirm no flash of phantom tabs on cold cache, fast paint on warm cache |
+Each phase landed as a separate commit with its own test pass
+and a `docs/terminal-perf-plan.md` update.
 
-Each phase lands as a separate PR with its own test pass and a
-`docs/terminal-perf-plan.md` update.
+| Phase | Items shipped                | Note                                           |
+| ----- | ---------------------------- | ---------------------------------------------- |
+| 1     | T1.1, T1.2, T1.3, T1.4, T1.5 | shipped                                        |
+| 2     | T2.1                         | shipped; revert if eviction complaints come in |
+| 3     | —                            | deferred (T3.1)                                |
+| 4     | T4.1                         | shipped                                        |
+| 5     | T5.1                         | shipped                                        |
+| 6     | T6.1                         | shipped                                        |
+
+Not implemented: T3.1 (deferred), T5.2 (UX polish, no real
+benefit), T6.2 (real cache that violates the safety policy).

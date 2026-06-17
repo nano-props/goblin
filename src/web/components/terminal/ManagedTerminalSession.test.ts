@@ -1117,7 +1117,9 @@ describe('ManagedTerminalSession', () => {
       snapshotSeq: 5,
     })
     // Sanity-check the leak precondition: hydrate() populated the field.
-    expect(session.__test__hydratedSnapshot()).toEqual({ snapshot: 'hydrated-screen', snapshotSeq: 5 })
+    expect(
+      (session as unknown as { hydratedSnapshot: { snapshot: string; snapshotSeq: number } }).hydratedSnapshot,
+    ).toEqual({ snapshot: 'hydrated-screen', snapshotSeq: 5 })
 
     session.attach(host)
     await flushTerminalStart()
@@ -1126,7 +1128,7 @@ describe('ManagedTerminalSession', () => {
     // The T1.5 fix: after the write resolves, the field should be reset
     // to the empty sentinel so we don't keep a stale up-to-16 MiB copy
     // around until the next hydrate().
-    expect(session.__test__hydratedSnapshot()).toEqual({ snapshot: '', snapshotSeq: 0 })
+    expect(hydratedSnapshot(session)).toEqual({ snapshot: '', snapshotSeq: 0 })
   })
 
   test('clears hydratedSnapshot after applyHydratedSnapshotToActiveView writes the snapshot to the term', async () => {
@@ -1163,7 +1165,7 @@ describe('ManagedTerminalSession', () => {
     // cleared. The mock invokes the callback via queueMicrotask, so
     // draining microtasks is enough to observe the post-callback state.
     await flushResizeDispatch()
-    expect(session.__test__hydratedSnapshot()).toEqual({ snapshot: '', snapshotSeq: 0 })
+    expect(hydratedSnapshot(session)).toEqual({ snapshot: '', snapshotSeq: 0 })
   })
 
   test('resets an existing terminal view when hydrate switches to a different session id', async () => {
@@ -1770,6 +1772,10 @@ function hydrateManagedSession(
     snapshotSeq: 0,
     ...overrides,
   })
+}
+
+function hydratedSnapshot(session: ManagedTerminalSession): { snapshot: string; snapshotSeq: number } {
+  return (session as unknown as { hydratedSnapshot: { snapshot: string; snapshotSeq: number } }).hydratedSnapshot
 }
 
 function deferred<T>() {
