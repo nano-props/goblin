@@ -9,6 +9,7 @@
 // progress), so it lives alongside the other runtime-coherent stores
 // (theme, i18n, repos, session-restore) under src/web/stores/.
 
+import { useMemo } from 'react'
 import { create } from 'zustand'
 
 const DEFAULT_COOLDOWN_MS = 2000
@@ -43,3 +44,18 @@ export const useRepoSyncStore = create<RepoSyncState>((set, get) => ({
     return Date.now() - last >= get().cooldownMs
   },
 }))
+
+// T6.1: reactive flag used by the tab strip to show 3 placeholder
+// chips while the first server-side session list is in flight. Returns
+// true until the provider's first `syncServerSessions` call has
+// completed (or failed) for the given repo. Reads from
+// `useRepoSyncStore.ready` which the provider updates in its
+// `finally` block; subscribing to the store gives us reactive
+// re-renders when the flag flips without a separate context.
+export function useIsInitialSyncInFlight(repoRoot: string | null | undefined): boolean {
+  const readyMap = useRepoSyncStore((s) => s.ready)
+  return useMemo(() => {
+    if (!repoRoot) return false
+    return !readyMap.has(repoRoot)
+  }, [readyMap, repoRoot])
+}

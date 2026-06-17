@@ -26,6 +26,7 @@ import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useEffectiveDetailTab } from '#/web/components/branch-detail/useEffectiveDetailTab.ts'
 import { branchWorktreeHasChanges } from '#/web/stores/repos/worktree-state.ts'
+import { useIsInitialSyncInFlight } from '#/web/stores/repo-sync.ts'
 import {
   branchDetailToolbarStoreActionsEqual,
   branchDetailToolbarStoreActionsFromStore,
@@ -56,6 +57,11 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
   // `useEffectiveDetailTab` and the global keyboard shortcut so the
   // toolbar's hide/show rule never disagrees with the effective tab.
   const hasChanges = detail.branch ? branchWorktreeHasChanges(repo, detail.branch) : false
+  // T6.1: while the first server-side session list for this repo is
+  // in flight, render skeleton placeholder chips in the tab strip.
+  // Hooks into the existing repo-sync store which the Provider
+  // updates via markReady() at the end of every syncServerSessions.
+  const isInitialSyncInFlight = useIsInitialSyncInFlight(repo.id)
   const tabs = visibleDetailTabs({ hasWorktree: !!detail.branch?.worktree?.path, hasChanges })
   const terminalWorktreeKey = detail.branch?.worktree?.path
     ? worktreeTerminalKey(repo.id, detail.branch.worktree.path)
@@ -241,6 +247,11 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
               focusMode={detailFocusMode}
               focusRegistry={terminalTabFocusRegistry}
               emptyFocusKey={EMPTY_TERMINAL_TAB_FOCUS_KEY}
+              // T6.1: while the first server-side session list is in
+              // flight (mount or repo switch), show 3 placeholder chips
+              // instead of the lone "+ New" button — the user gets a
+              // visible signal that the strip is loading, not broken.
+              isLoading={isInitialSyncInFlight}
               onNew={handleNewTerminal}
               onSelect={handleSelectTerminal}
               onScrollToBottom={handleScrollToBottom}

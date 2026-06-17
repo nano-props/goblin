@@ -1,4 +1,4 @@
-import { Plus, Terminal, X, ChevronDown } from 'lucide-react'
+import { Plus, Terminal, X, ChevronDown, Loader2 } from 'lucide-react'
 import { useCallback, useLayoutEffect, useMemo, useRef, type ComponentPropsWithoutRef } from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
@@ -43,6 +43,15 @@ interface TerminalTabsProps {
   focusMode?: boolean
   focusRegistry?: FocusRegistry<string, HTMLButtonElement>
   emptyFocusKey?: string
+  /**
+   * T6.1: when true AND `sessions.length === 0`, render 3 placeholder
+   * chips with a spinner inside instead of the single "+ New" button.
+   * The caller derives this from the repo-sync store — it flips to
+   * false after the first `syncServerSessions` completes (success or
+   * failure). The skeleton gives the user a visible signal that the
+   * strip is loading, not broken.
+   */
+  isLoading?: boolean
   onNew: () => void
   onSelect: (worktreeTerminalKey: string, key: string) => void
   onScrollToBottom: (key: string) => void
@@ -64,6 +73,7 @@ export function TerminalTabs({
   focusMode,
   focusRegistry: externalFocusRegistry,
   emptyFocusKey = EMPTY_TERMINAL_TAB_FOCUS_KEY,
+  isLoading = false,
   onNew,
   onSelect,
   onScrollToBottom,
@@ -205,6 +215,36 @@ export function TerminalTabs({
   )
 
   if (sessions.length === 0) {
+    if (isLoading) {
+      // T6.1: 3 placeholder chips with spinners. They disappear as
+      // soon as the first sync completes (sessions.length flips to
+      // >0) or isLoading flips to false (sync failed or returned
+      // empty) — whichever happens first. Each chip is non-interactive
+      // (no onClick) so they can't be mistaken for real tabs; the
+      // `aria-busy` and `role="status"` make the loading state
+      // explicit to assistive tech.
+      return (
+        <div
+          className="flex items-center gap-1"
+          role="status"
+          aria-busy="true"
+          aria-label={t('terminal.loading')}
+          data-terminal-skeleton-strip=""
+        >
+          {[0, 1, 2].map((index) => (
+            <div
+              key={index}
+              className="flex h-7 items-center gap-1.5 rounded-md border border-separator px-2.5 text-sm font-normal text-muted-foreground"
+              aria-hidden="true"
+              data-terminal-skeleton-chip=""
+            >
+              <Loader2 size={13} className="animate-spin shrink-0" />
+              <span className="inline-block h-2.5 w-10 rounded-sm bg-separator/60" />
+            </div>
+          ))}
+        </div>
+      )
+    }
     return (
       <Button
         ref={focusRegistry.setRef(emptyFocusKey)}

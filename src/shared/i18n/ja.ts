@@ -318,6 +318,7 @@ export const ja: Record<DictKey, string> = {
 
   // ---- Terminal ----------------------------------------------------------
   'terminal.opening': 'ターミナルを開いています…',
+  'terminal.loading': 'ターミナルを読み込み中…',
   'terminal.restart': 'ターミナルを再起動',
   'terminal.search-placeholder': 'ターミナルを検索',
   'terminal.search-no-results': '結果なし',

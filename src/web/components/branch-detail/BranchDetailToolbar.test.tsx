@@ -20,6 +20,7 @@ import type {
 import { MainWindowNavigationProvider, type MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import { emptyRendererBridgeBootstrap, setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
@@ -59,6 +60,12 @@ beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
   setRendererBridgeForTests(null)
+  // T6.1: the toolbar reads `isInitialSyncInFlight` from
+  // useRepoSyncStore; existing tests assume the repo has been
+  // synced (no skeleton). Mark ready by default so the "+ New"
+  // button renders; the T6.1 test will reset the store to test
+  // the loading state.
+  useRepoSyncStore.setState({ ready: new Map(), timestamps: new Map() })
 })
 
 afterEach(() => {
@@ -316,6 +323,30 @@ describe('BranchDetailToolbar', () => {
 
     expect(prewarm).toHaveBeenCalledWith({ repoRoot: `${REPO_ID}\0${WORKTREE_PATH}` })
   })
+
+  test('T6.1: renders 3 skeleton placeholder chips while the initial session sync is in flight', async () => {
+    const { container: c } = renderToolbar({
+      terminalCount: 0,
+      navigation: navigationWith({}),
+      loading: true,
+    })
+
+    // The skeleton markers are present; the real button is not.
+    expect(c.querySelector('[data-terminal-skeleton-strip=""]')).not.toBeNull()
+    expect(c.querySelectorAll('[data-terminal-skeleton-chip=""]')).toHaveLength(3)
+    expect(c.querySelector('#detail-terminal-tab')).toBeNull()
+    // role="status" + aria-busy for assistive tech.
+    const strip = c.querySelector('[role="status"][aria-busy="true"]')
+    expect(strip).not.toBeNull()
+
+    // Once the provider calls markReady() (which the real Provider
+    // does at the end of syncServerSessions' finally block), the
+    // skeleton disappears and the real button appears.
+    useRepoSyncStore.getState().markReady(REPO_ID, 0)
+    await flush()
+    expect(c.querySelector('[data-terminal-skeleton-strip=""]')).toBeNull()
+    expect(c.querySelector('#detail-terminal-tab')).not.toBeNull()
+  })
 })
 
 function renderToolbar(options: {
@@ -326,6 +357,15 @@ function renderToolbar(options: {
   detailFocusMode?: boolean
   collapsed?: boolean
   layout?: RepoWorkspaceLayout
+  /**
+   * T6.1: when true, do NOT mark the repo ready before mounting.
+   * The toolbar reads `isInitialSyncInFlight` from the store and
+   * renders the 3-skeleton-chip loading state instead of the
+   * "+ New" button. The T6.1 test uses this; all other tests use
+   * the default (false) so the existing assertions still find
+   * `#detail-terminal-tab`.
+   */
+  loading?: boolean
 }): {
   container: HTMLDivElement
   terminalTab: HTMLButtonElement
@@ -336,6 +376,13 @@ function renderToolbar(options: {
     showRepoDetailTab: ReturnType<typeof vi.fn>
   }
 } {
+  // T6.1: mark the repo as already-synced so the toolbar renders
+  // the "+ New" button instead of the 3 placeholder skeleton chips.
+  // The T6.1 skeleton test passes `loading: true` to skip this and
+  // exercise the loading state.
+  if (!options.loading) {
+    useRepoSyncStore.getState().markReady(REPO_ID, 0)
+  }
   const repo = seedRepoState({
     id: REPO_ID,
     branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -448,10 +495,10 @@ function renderToolbar(options: {
   })
 
   const tab = container.querySelector<HTMLButtonElement>('#detail-terminal-tab')
-  if (!tab) throw new Error('missing terminal tab')
+  if (!tab && !options.loading) throw new Error('missing terminal tab')
   return {
     container,
-    terminalTab: tab,
+    terminalTab: tab as HTMLButtonElement,
     mocks: {
       createTerminal,
       selectTerminal,
