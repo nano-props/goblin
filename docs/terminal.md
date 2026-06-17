@@ -172,6 +172,18 @@ Geometry should be treated as part of terminal correctness.
 - Narrow layouts are especially sensitive because shell prompt rendering reacts immediately to initial columns.
 - Extra defensive redraws are not a substitute for correct geometry flow.
 
+### Narrow hosts and shell-prompt redraw
+
+When a terminal is first opened into a host whose box is not yet measurable — for example, a side-by-side split that is still animating to its final width, or a pane that mounts before its parent layout has settled — the view layer must wait for the host to become measurable rather than falling back to a historical default like `80x24`.
+
+Spawning a PTY at the wrong column count and then resizing later is **not** equivalent to spawning it at the correct width. Shells like zsh compute their prompt and `RPROMPT` layout from `$COLUMNS` at prompt-render time, and many common configurations do not redraw the visible prompt on `SIGWINCH`. By the time the bridge resize settles, zsh has already painted a prompt laid out for the wrong width, and the user sees a two-line prompt whose first line overflows above the visible viewport in narrow hosts.
+
+The macOS-vs-Linux asymmetry reported by users is a system-level font fallback difference: Apple Color Emoji on macOS renders emoji such as `👾` as 2 cells, while Linux falls back to a 1-cell monochrome Nerd Font glyph (the actual font asset is `MapleMono-NF-CN-*`, identical across platforms). That 1-cell shift can push a borderline wrap point across the viewport edge and turn a previously-acceptable layout into a wrapped one.
+
+Related upstream reports (same family of bugs, different exact root causes): [xterm.js #2529](https://github.com/xtermjs/xterm.js/issues/2529) "ZSH: prompt line not wrapping correctly", [xterm.js #2752](https://github.com/xtermjs/xterm.js/issues/2752) "wrap issue when prompt is over 2 lines".
+
+The product rule is therefore: prefer waiting for a measurable host over falling back to a default, and treat post-resize scroll behaviour as part of correctness — pinning the viewport to the live tail must not hide the prompt head when the prompt is taller than the new viewport.
+
 ## Replay and hydration
 
 The system supports replay and snapshot hydration so users can reattach to running terminals without losing visual context.
