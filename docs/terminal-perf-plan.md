@@ -143,6 +143,39 @@ These are already correct and stay unchanged:
 - **Eliminates**: future footgun.
 - **Risk**: 0.
 
+#### T1.5 — Clear `hydratedSnapshot` after successful preload
+- **File**:
+  `src/web/components/terminal/ManagedTerminalSession.ts:56, 191, 452-471, 473-479`.
+- **Status**: **bug fix, not optimization**. The current code
+  stores the hydration snapshot on every `hydrate()` call and
+  never clears it. After the snapshot is written into xterm
+  (via `preloadHydratedSnapshot` or
+  `applyHydratedSnapshotToActiveView`), the in-memory copy is
+  pure waste. Worst case: ~16 MiB per session × N sessions,
+  re-populated on every reconcile.
+- **Change**: in `preloadHydratedSnapshot` and
+  `applyHydratedSnapshotToActiveView`, after the
+  `term.write(snapshot)` resolves, clear
+  `this.hydratedSnapshot` — but only if the field still holds
+  the same reference (the registry may re-hydrate between
+  `await termWrite` and the clear; without the identity check
+  we'd discard a fresher value).
+  ```ts
+  // inside preloadHydratedSnapshot, after the write:
+  if (this.hydratedSnapshot === hydratedSnapshot) {
+    this.hydratedSnapshot = { snapshot: '', snapshotSeq: 0 }
+  }
+  ```
+  Same pattern in `applyHydratedSnapshotToActiveView`.
+- **Eliminates**: up to 16 MiB × session count of dead
+  memory, kept forever.
+- **Risk**: 0. The identity check prevents the only race
+  (re-hydration during the write). No external behavior change.
+- **Why this lives in Tier 1**: it's a 4-line patch that
+  fixes a real leak, not a perf optimization. Doing it now
+  also means every later tier operates on the smaller,
+  saner memory profile.
+
 ### Tier 2 — Single-user memory tuning (≤ 1 day, one number change)
 
 > Goal: align an over-provisioned cap with single-user reality,
@@ -376,6 +409,128 @@ These are already correct and stay unchanged:
   mobile Safari/Firefox use `visibilitychange`. Listening
   to both adds code with no extra coverage.
 
+### Tier 6 — Refresh / boot UX (≤ 1 day)
+
+> Goal: when the user hits F5 (or the page is killed on
+> mobile), make the terminal tabs visible immediately with a
+> clear "Loading..." state, instead of an empty tab strip
+> during the `listSessions` round-trip. T6.1 covers the cold
+> path (no cache), T6.2 covers the warm path (cache hit on
+> subsequent refreshes).
+
+#### T6.1 — Skeleton tab strip during `listSessions`
+- **Files**:
+  - `src/web/components/terminal/TerminalSessionProvider.tsx`
+    (expose `isInitialSyncInFlight` derived state),
+  - `src/web/components/terminal/TerminalTabs.tsx` (add
+    `isLoading` prop, render skeleton when empty + loading).
+- **Change**:
+  1. `TerminalSessionProvider` tracks whether
+     `syncServerSessions` has ever completed successfully
+     since mount. Before the first completion, pass
+     `isLoading: true` to `TerminalTabs`.
+  2. `TerminalTabs`, when `sessions.length === 0`:
+     - if `isLoading`: render 3 placeholder tab chips with
+       a subtle pulse animation (not a spinner — spinner
+       implies work in a fixed location; pulse communicates
+       "we don't know how many tabs yet").
+     - else: render the existing single "+ New" button
+       (current behavior).
+  3. The `TerminalSlot` "Opening..." overlay already covers
+     per-tab loading; this just extends the same idea to the
+     tab strip level.
+- **What this does NOT do**:
+  - No new state beyond the `isInitialSyncInFlight` boolean.
+  - No cache. No `sessionStorage` write. No new decision
+    logic.
+  - No change to when `listSessions` is called or how
+    `reconcileServerSessions` runs.
+- **Risk**: 0.
+
+#### T6.2 — Persist last-known session list in `sessionStorage`
+- **Files**:
+  - `src/web/components/terminal/TerminalSessionRegistry.ts`
+    (read in `syncServerSessions` start, write in
+    `reconcileServerSessions` success),
+  - `src/web/components/terminal/TerminalSessionProvider.tsx`
+    (pass cached list into the initial render).
+- **Cache contract** (must be respected exactly):
+  - **Key**: `goblin:terminal-sessions:${worktreeTerminalKey}`
+  - **Value**: JSON of
+    `{ sessions: TerminalSessionSummary[], savedAt: <epochMs> }`
+  - **Writer (single)**: `reconcileServerSessions` success
+    path only. Every successful reconcile overwrites the
+    key.
+  - **Reader (single)**: Provider mount /
+    `syncServerSessions` start. Used as a *render hint*,
+    never as a source of truth.
+  - **Invalidation**: implicit — the next reconcile
+    overwrites the key. There is no other writer and no
+    expiration timer. (The "no TTL" choice is deliberate:
+    single-user, low churn, and the server reconciles
+    frequently enough that stale data is bounded by user
+    activity.)
+- **Stale handling**:
+  - Cached entries the server has since closed are filtered
+    by the existing `evictOrphanedLocalSessions` path
+    (`TerminalSessionRegistry.ts:265-279`). The user sees
+    a brief "Loading..." flash for closed sessions, then
+    they disappear.
+  - If the server is in a *totally* different state (e.g.,
+    user switched databases), all cached tabs will be
+    filtered. Worst case: 5-10 seconds of phantom tabs
+    being filtered. For a single user this is annoying but
+    not breaking. We accept the trade-off.
+- **Failure handling**:
+  - `sessionStorage` read failure (quota, privacy mode,
+    malformed JSON, schema mismatch): caught and ignored —
+    the UI falls back to T6.1's skeleton.
+  - `sessionStorage` write failure: caught and ignored — the
+    next session boots with the older cache (or no cache).
+  - Cross-tab consistency: last writer wins. Acceptable for
+    a single user; explicit cross-tab sync via the
+    `storage` event is a future option, not required now.
+- **Size**: each `TerminalSessionSummary` is ~200 bytes
+  (key + title + processName). 10 sessions × 10 worktrees
+  = 20 KB total across the sessionStorage. The 5-10 MB
+  quota is not a constraint.
+- **Why this is safe** (per the cache rules):
+  - Explicit invalidation: every reconcile success
+    overwrites the entry. No other writer.
+  - Read-once: only on mount, only as a render hint, never
+    as authoritative.
+  - Stale values are filtered by the existing
+    `evictOrphanedLocalSessions` path (already on the
+    critical path).
+  - No decision logic at write time (no "estimate and
+    skip").
+- **Risk**: low. Worst case is a brief flash of phantom
+  tabs, never a correctness bug.
+
+### Items rejected from the boot UX pass
+
+- **Cache the per-session snapshot (server or reattach) for
+  instant xterm content** — already covered by
+  `reattachSnapshotCache` for in-session refresh; the
+  cross-page-refresh case is served by T6.2's session list
+  cache + the existing server ring buffer (which restores
+  scrollback on attach). A separate per-session snapshot
+  cache would duplicate that.
+- **Stream session list to the client as soon as one
+  session is known** — the server's `listSessions` is a
+  single response; no streaming API exists. Adding one is
+  a protocol change, out of scope.
+- **Persist `displayOrder` separately** — folded into
+  T6.2's `TerminalSessionSummary` payload. Splitting them
+  would add a key per worktree for no benefit.
+- **Use IndexedDB instead of sessionStorage** — overkill
+  for ~2 KB per worktree; sessionStorage is synchronous
+  and bounded for the use case.
+- **Add a TTL to the cached session list** — false sense
+  of safety. The cache is always overwritten by the next
+  reconcile; a TTL would just produce more "expired"
+  reads that the existing filter already handles.
+
 ## 5. Preflight (do this first)
 
 Before any Tier 2+ change, run a measurement pass to confirm the
@@ -459,12 +614,13 @@ For every change:
 
 | Phase | Items | Duration | Gate |
 |---|---|---|---|
-| Phase 1 (this PR or next) | T1.1, T1.2, T1.3, T1.4 | ≤ 1 day | run Preflight; ≥ 50% cold-start reduction |
+| Phase 1 (this PR or next) | T1.1, T1.2, T1.3, T1.4, **T1.5** | ≤ 1 day | run Preflight; ≥ 50% cold-start reduction |
 | Phase 2 | T2.1 (cap 32 → 8) | ≤ 0.5 day | if reattach eviction complaints come in, revert |
 | Phase 3 (deferred) | T3.1 (output batching) | 1-2 weeks | only if preflight shows server CPU bottleneck |
 | Phase 4 | T4.1 (diagnostics) | ≤ 0.5 day | none |
 | Phase 5 | T5.1 (visibility hook + kickReconnect) | ≤ 0.5 day | manual test on iOS Safari + Android Chrome; confirm no reconnect storms |
 | Phase 5+ (optional) | T5.2 (scrollTop persistence) | ≤ 1 day | only if Phase 5 ships and users report scroll-position loss |
+| Phase 6 | **T6.1 (skeleton tab strip), T6.2 (session list cache)** | ≤ 1 day | manual refresh test; confirm no flash of phantom tabs on cold cache, fast paint on warm cache |
 
 Each phase lands as a separate PR with its own test pass and a
 `docs/terminal-perf-plan.md` update.
