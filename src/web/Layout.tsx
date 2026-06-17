@@ -41,8 +41,6 @@ export function Layout() {
   useSettingsWriteErrorToast()
   useBackgroundFetch()
   useRepoStatusRefresh()
-  useRepoStoreInvalidationRefresh()
-  useSettingsQueryInvalidationSync()
   useNetworkReconnect()
 
   const overlays = useAppOverlays()
@@ -97,6 +95,7 @@ export function Layout() {
   return (
     <ErrorBoundary>
       <TokenGate>
+        <AuthenticatedSideEffects />
         <MainWindowNavigationProvider value={navigation}>
           <LayoutOverlayActions.Provider
             value={{
@@ -143,4 +142,28 @@ function MainWindowOverlays({ overlays, repoDrop }: MainWindowOverlaysProps) {
       <Toaster position="bottom-right" closeButton />
     </>
   )
+}
+
+/**
+ * Auth-gated side effects. Mounts only when `<TokenGate>` lets
+ * its children through (i.e. the user is authenticated), so the
+ * hooks below — and the WebSocket connections they open — do
+ * not exist while the login form is showing.
+ *
+ * This is the architectural fix for the "/ws/invalidation
+ * 401-flood on first load" bug. The pre-fix Layout declared the
+ * invalidation hooks at its top level, so they ran before
+ * `TokenGate` had a chance to decide whether the user was
+ * authenticated. The result was an unauthenticated WebSocket
+ * upgrade every 300 ms (the client's reconnect delay) until the
+ * user logged in.
+ *
+ * Rules of hooks: this component exists solely to host hooks.
+ * It renders `null` and is colocated with `Layout` because no
+ * other subtree needs the same set of subscriptions.
+ */
+function AuthenticatedSideEffects(): null {
+  useRepoStoreInvalidationRefresh()
+  useSettingsQueryInvalidationSync()
+  return null
 }
