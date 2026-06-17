@@ -7,6 +7,7 @@ html[data-color-theme='github'][data-theme='light'] {
   --goblin-surface-overlay: #ffffff;
   --goblin-surface-muted: #f6f8fa;
   --goblin-surface-hover: #f3f4f6;
+  --goblin-surface-segmented-track: #e8ebef;
   --goblin-surface-control: #ffffff;
   --goblin-surface-control-hover: #f6f8fa;
   --goblin-text-primary: #1f2328;
@@ -85,6 +86,7 @@ html[data-color-theme='github'][data-theme='dark'] {
   --goblin-surface-overlay: #161b22;
   --goblin-surface-muted: #21262d;
   --goblin-surface-hover: #30363d;
+  --goblin-surface-segmented-track: #30363d;
   --goblin-surface-control: #161b22;
   --goblin-surface-control-hover: #21262d;
   --goblin-text-primary: #e6edf3;

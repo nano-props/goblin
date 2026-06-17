@@ -38,12 +38,10 @@ function BranchFilterControls({ repoId }: Props) {
   const setBranchViewMode = useReposStore((s) => s.setBranchViewMode)
 
   return (
-    <div className="flex items-center gap-2">
-      <BranchViewModeControl
-        value={branchViewMode}
-        disabled={branchCount === 0}
-        onChange={(viewMode) => setBranchViewMode(repoId, viewMode)}
-      />
-    </div>
+    <BranchViewModeControl
+      value={branchViewMode}
+      disabled={branchCount === 0}
+      onChange={(viewMode) => setBranchViewMode(repoId, viewMode)}
+    />
   )
 }
