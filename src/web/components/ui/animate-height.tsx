@@ -26,12 +26,19 @@ export function AnimateHeight({ children, duration = 200 }: { children: React.Re
     const h = inner.scrollHeight
     if (Math.abs(h - targetRef.current) > 0.5) {
       outer.style.overflow = 'hidden'
+      // Defensive: any future child that paints an outer halo (box-shadow,
+      // outline) within 4px of the box edge won't be clipped by the
+      // height-transition overflow. Combined with the inset focus-ring
+      // convention used by the UI primitives, this makes the component
+      // robust to clip-fragile decorations.
+      outer.style.overflowClipMargin = '4px'
       outer.style.height = `${h}px`
       targetRef.current = h
       outer.addEventListener(
         'transitionend',
         () => {
           outer.style.overflow = ''
+          outer.style.overflowClipMargin = ''
         },
         { once: true },
       )

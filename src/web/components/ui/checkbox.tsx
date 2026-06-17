@@ -12,7 +12,10 @@ function Checkbox({ className, variant = 'default', ...props }: CheckboxProps) {
       data-slot="checkbox"
       data-variant={variant}
       className={cn(
-        'peer size-4 shrink-0 rounded-sm border border-input bg-control shadow-xs transition-[color,background-color,border-color,box-shadow] duration-100 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-danger-border aria-invalid:ring-danger/20 dark:aria-invalid:ring-danger/40',
+        // focus-visible:ring-inset keeps the focus ring inside the border box,
+        // so ancestor overflow:hidden can't clip it. Concentric outer rings
+        // are fundamentally clip-fragile.
+        'peer size-4 shrink-0 rounded-sm border border-input bg-control shadow-xs transition-[color,background-color,border-color,box-shadow] duration-100 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-danger-border aria-invalid:ring-danger/20 dark:aria-invalid:ring-danger/40',
         variant === 'destructive'
           ? 'data-[state=checked]:border-destructive data-[state=checked]:bg-destructive data-[state=checked]:text-destructive-foreground'
           : 'data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground',
