@@ -180,6 +180,19 @@ These are already correct and stay unchanged:
   broadcast. `seq` monotonicity is preserved by reusing the highest
   seq in the batch; the client uses `seq` only for dedup
   boundaries, so dropped intermediate seqs are safe.
+- **Bound the pendingOutput queue** (must be in any
+  implementation): flush when
+  - `pendingOutput.length >= MAX_OUTPUT_BATCH_EVENTS` (e.g.
+    1000), **or**
+  - sum of `data.length` across events
+    `>= MAX_OUTPUT_BATCH_BYTES` (e.g. 1 MiB).
+
+  Whichever hits first triggers a synchronous flush on the
+  current microtask, not a deferred one. This prevents
+  pathological memory growth if JS is busy between microtasks,
+  and caps a single `JSON.stringify` payload at ~1.3 MiB (below
+  the WebSocket frame cap). Without this bound the deferred
+  status of this tier is unsound.
 - **Risk profile**: safe IF implemented carefully (preserved order,
   preserved bytes, no panic between push and flush). Adds a
   microtask delay (ms-level) before output reaches the client; for
@@ -258,16 +271,18 @@ These are already correct and stay unchanged:
 - **Risk**: low. The hook is a thin event-listener; the
   `kickReconnect` guard makes it a no-op on a healthy socket.
 
-#### T5.2 — Persist scroll position in `sessionStorage` *(Phase 5+ optional)*
+#### T5.2 — Persist scroll position on lifecycle events *(Phase 5+ optional)*
 - **Status**: implement **only** if Phase 5 (T5.1) ships and
   users report scroll-position loss as a real friction point.
   This is a polish item, not a correctness fix. The server
   snapshot already covers content restoration.
 - **Files**:
-  - `src/web/components/terminal/TerminalSessionView.ts` (read
-    on attach; write on scroll),
+  - `src/web/components/terminal/TerminalSessionView.ts`
+    (expose `getCurrentScrollLine()`; read on attach),
   - `src/web/components/terminal/ManagedTerminalSession.ts`
-    (write on `detach`).
+    (write on `detach`; clear on `handleExit`),
+  - `src/web/components/terminal/TerminalSessionRegistry.ts`
+    (clear on `discardLocalSessionAndDismissDetailIfLast`).
 - **Change**: store
   `goblin:terminal-scroll:${sessionId} = <lineNumber>` in
   `sessionStorage`. On attach, restore in this exact order
@@ -275,30 +290,35 @@ These are already correct and stay unchanged:
   ```ts
   await termWrite(term, serverSnapshot)        // 1. ingest replay
   const saved = readSavedScrollTop(sessionId)  // 2. read persisted
-  if (saved !== null) {
-    const maxLine = term.buffer.active.length - 1
-    if (saved <= maxLine) {
-      await termScrollToLine(term, saved)      // 3. apply if valid
-    }
+  if (saved !== null && saved <= term.buffer.active.length - 1) {
+    await termScrollToLine(term, saved)        // 3. apply if valid
   }
   ```
   The `termWrite` / `termScrollToLine` wrappers follow the
   same callback-to-Promise pattern as `termWrite` in
   `ManagedTerminalSession.ts:628-632`.
-- **Write triggers** (both must be implemented together):
-  - On `detach`: synchronous `sessionStorage.setItem` for
-    "tab switch" and route navigation.
-  - On scroll events: debounced **1000 ms** (not 200 ms —
-    `sessionStorage.setItem` is synchronous and can hitch the
-    main thread at 60 fps). The debounce timer is cleared on
-    `detach` and the final value is written then.
-- **Scope (intentionally limited)**:
-  - Persist **only** scroll position (a single integer per
-    session). Do **not** persist scrollback content — the
-    server's ring buffer is the source of truth for that.
-  - Do **not** persist search results, progress, bell state.
-    Those are session-runtime concerns and should reset to
-    clean state on resume.
+- **Write triggers — sync only, lifecycle events only**:
+  1. `ManagedTerminalSession.detach()` — existing lifecycle
+     hook; write the current scroll line before the host is
+     moved to the parking lot.
+  2. `document.visibilitychange === 'hidden'` — new hook
+     added in the same place as T5.1's bridge listener;
+     iterates active sessions and calls each's
+     `persistScrollTop()`.
+- **No debounce. No scroll-event writes.** The latest scroll
+  position is always in memory; persistence happens on
+  lifecycle transition only. This satisfies the plan's
+  "no async writes outside lifecycle hooks" rule
+  unconditionally.
+- **Explicit invalidation** (the rule this item used to
+  violate):
+  1. `ManagedTerminalSession.handleExit` →
+     `sessionStorage.removeItem(key)`.
+  2. `TerminalSessionRegistry.discardLocalSessionAndDismissDetailIfLast`
+     → same.
+  3. These are the *only* lifecycle points where the entry
+     becomes unreachable from the renderer; clearing them is
+     exact, not a best-effort scan. No entries accumulate.
 - **Failure handling**:
   - `sessionStorage` write failure (quota, privacy mode) is
     caught and ignored — the resume falls back to the existing
@@ -306,9 +326,10 @@ These are already correct and stay unchanged:
   - Stale value (saved line beyond current buffer) is skipped
     silently — the buffer's `scrollToBottom` remains the
     default. We do **not** clamp; we skip.
-  - Cross-tab writes: last writer wins. Explicit cross-tab
-    sync via the `storage` event is a future option, not
-    required now.
+  - Cross-tab writes: last writer wins (i.e. last
+    `visibilitychange:hidden` to fire). Acceptable for a single
+    user; explicit cross-tab sync via the `storage` event is a
+    future option, not required now.
 - **Primitives (xterm 5.x)**:
   - `term.buffer.active.viewportY` is the canonical
     "current top line" reading.
@@ -316,9 +337,14 @@ These are already correct and stay unchanged:
     accepts callback). Wrap consistently with `termWrite`.
   - Requires xterm.js ≥ 5.x. Verify in `package.json` before
     implementing.
-- **Why this is safe**: the server snapshot covers content
-  correctness; the persisted value is a *cosmetic* preference
-  on top of it. Worst case: stale value is ignored.
+- **Why this is safer than the previous draft**:
+  - All writes are sync and in lifecycle hooks (matches the
+    plan's "no async write outside lifecycle" rule).
+  - All entries are removed when the session ends (matches
+    the "explicit invalidation" rule).
+  - No debounce timer means no cleanup complexity in
+    `destroyTerminal()`.
+  - No main-thread hitch during scroll events.
 
 ### Items rejected from the mobile resilience pass
 
