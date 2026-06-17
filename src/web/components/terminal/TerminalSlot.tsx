@@ -72,6 +72,16 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
 
   const descriptor = useWorktreeTerminalSelectedDescriptor(terminalWorktreeKey)
   const key = descriptor?.key ?? null
+  // `key` can change when the user switches worktrees mid-flight. The
+  // paste/drop handlers capture it at invocation time; a ref tracks
+  // the latest value so the post-resolve `.then` can detect a switch
+  // and drop the write — the captured session is no longer the user's
+  // focus, and the path landing in it would be invisible (or worse,
+  // typed into a now-detached session).
+  const keyRef = useRef<string | null>(key)
+  useEffect(() => {
+    keyRef.current = key
+  }, [key])
   const snapshot = useTerminalSnapshot(key)
   const hasSessions = useWorktreeTerminalCount(terminalWorktreeKey) > 0
 
@@ -258,13 +268,24 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
       if (!key || !isController) return
       const files = Array.from(event.dataTransfer.files).filter((f) => f.size > 0)
       if (files.length === 0) return
+      // Capture the session key the user actually dropped into. The
+      // blob-save tier (web HTTP path) is a real roundtrip, so a
+      // worktree switch during resolve would otherwise route the
+      // write to a session the user is no longer looking at.
+      const sessionKey = key
       void processDrop({ files }).then((outcome) => {
-        if (outcome.kind === 'no-op') return
-        if (outcome.kind === 'too-large') {
-          toast.error(t('terminal.paste-file-too-large'))
+        if (keyRef.current !== sessionKey) return
+        // `no-op` is unreachable at this call site: `handleDrop`
+        // filters zero-byte files before calling `processDrop`, so
+        // `processDrop` can only return `files` or `too-large`.
+        // `handlePasteCapture` uses the same if-narrowing shape.
+        if (outcome.kind === 'files') {
+          writeResolutionToPty(outcome.resolution.paths, outcome.resolution.failed, sessionKey)
           return
         }
-        writeResolutionToPty(outcome.resolution.paths, outcome.resolution.failed, key)
+        if (outcome.kind === 'too-large') {
+          toast.error(t('terminal.paste-file-too-large'))
+        }
       })
     },
     [isController, key, t, writeResolutionToPty],
@@ -288,10 +309,13 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
         // it would silently break any future bubble-phase paste
         // listener mounted higher in the tree.
         event.preventDefault()
-        const text = event.clipboardData.getData('text/plain')
-        void processPaste({ files, text }).then((outcome) => {
+        // Capture the session key the user pasted into. See
+        // `handleDrop` for the worktree-switch rationale.
+        const sessionKey = key
+        void processPaste({ files }).then((outcome) => {
+          if (keyRef.current !== sessionKey) return
           if (outcome.kind === 'files') {
-            writeResolutionToPty(outcome.resolution.paths, outcome.resolution.failed, key)
+            writeResolutionToPty(outcome.resolution.paths, outcome.resolution.failed, sessionKey)
             return
           }
           if (outcome.kind === 'too-large') {

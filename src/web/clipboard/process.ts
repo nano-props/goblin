@@ -7,17 +7,17 @@ import { resolvePastedFiles, type PasteResolution } from '#/web/clipboard/resolv
  * `TerminalSlot` handlers wrap these with React state + toast plumbing,
  * but the logic itself is testable without a DOM event constructor
  * (jsdom's `ClipboardEvent` / `DataTransfer` are partial stubs).
+ *
+ * Text payloads (the `text/plain` rendering of a `ClipboardEvent`) are
+ * intentionally not part of this surface. The terminal slot falls
+ * through to xterm's own text path when no files are present — we
+ * never need to decide what to do with text here, only with files.
  */
 
-export type PasteOutcome =
-  | { kind: 'no-op' }
-  | { kind: 'text'; text: string }
-  | { kind: 'too-large' }
-  | { kind: 'files'; resolution: PasteResolution }
+export type PasteOutcome = { kind: 'no-op' } | { kind: 'too-large' } | { kind: 'files'; resolution: PasteResolution }
 
 export interface PasteInputs {
   files: File[]
-  text: string
 }
 
 export interface DropInputs {
@@ -25,10 +25,11 @@ export interface DropInputs {
 }
 
 /**
- * Decide what a paste should do without firing it. Files win over text
- * — on Linux a file copy carries both `text/uri-list` and a
- * `text/plain` rendering of the same URI list; if we let text win the
- * user sees a literal `file:///…` string in the PTY.
+ * Decide what a paste should do without firing it. Files win over
+ * text — on Linux a file copy carries both `text/uri-list` and a
+ * `text/plain` rendering of the same URI list, but we only ever
+ * reach this function with files already extracted; the no-files
+ * branch is the caller's xterm fallback.
  *
  * The function is async because the files branch awaits the resolver.
  * Caller wires `event.preventDefault()` *synchronously* based on the
@@ -41,7 +42,6 @@ export async function processPaste(inputs: PasteInputs): Promise<PasteOutcome> {
     const resolution = await resolvePastedFiles(inputs.files)
     return { kind: 'files', resolution }
   }
-  if (inputs.text.length > 0) return { kind: 'text', text: inputs.text }
   return { kind: 'no-op' }
 }
 

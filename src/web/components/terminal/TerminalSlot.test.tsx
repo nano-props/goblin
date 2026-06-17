@@ -589,8 +589,8 @@ describe('TerminalSlot', () => {
     // jsdom does not implement ClipboardEvent, so we synthesise one:
     // a plain Event with `clipboardData` grafted on via defineProperty,
     // bubbling so it reaches the slot's React listener. We only need
-    // `clipboardData.getData('text/plain')` and a `files`-like accessor
-    // for the paste handler's happy/early-exit paths.
+    // a `files`-like accessor for the paste handler's happy/early-exit
+    // paths.
     ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
     const container = document.createElement('div')
     document.body.appendChild(container)
@@ -682,7 +682,6 @@ describe('TerminalSlot', () => {
           item: (i: number) => [file][i] ?? null,
         } as unknown as FileList,
         items: [] as unknown as DataTransferItemList,
-        getData: () => '',
       } as unknown as DataTransfer
       const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
       Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardData })
@@ -800,11 +799,6 @@ describe('TerminalSlot', () => {
           item: (i: number) => [file][i] ?? null,
         } as unknown as FileList,
         items: [] as unknown as DataTransferItemList,
-        // Linux file managers also carry a text/plain rendering of
-        // the same URI list — the paste handler must ignore that and
-        // prefer files. We surface text here so the test would catch
-        // any regression that lets text win.
-        getData: (mime: string) => (mime === 'text/plain' ? 'file:///tmp/weird%20name.png' : ''),
       } as unknown as DataTransfer
       const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
       Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardData })
@@ -937,7 +931,6 @@ describe('TerminalSlot', () => {
           item: (i: number) => [oversized][i] ?? null,
         } as unknown as FileList,
         items: [] as unknown as DataTransferItemList,
-        getData: () => '',
       } as unknown as DataTransfer
       const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
       Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardData })
@@ -1086,6 +1079,194 @@ describe('TerminalSlot', () => {
       expect(writeInput).toHaveBeenCalledWith('terminal-1', '/abs/a.png /tmp/b.png')
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-partial')
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
+    } finally {
+      await act(async () => root.unmount())
+      container.remove()
+    }
+  })
+
+  test('drop resolves with the write dropped if the worktree key changed during resolve', async () => {
+    // Locks the worktree-switch guard added on top of the basic
+    // controller-drop path. The blob-save tier is a real roundtrip
+    // (HTTP POST in web, IPC in Electron), so the user has a real
+    // window to switch worktrees before the resolver returns. The
+    // captured `sessionKey` would otherwise be typed into a session
+    // the user is no longer looking at — invisible to them, or worse,
+    // into a now-detached session that the registry silently drops.
+    // The fix: capture `key` at handler invocation time, compare to
+    // a `keyRef` updated by useEffect on every render, and bail if
+    // they diverge.
+    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root: Root = createRoot(container)
+    const writeInput = vi.fn()
+    const descriptorA = {
+      key: 'terminal-1',
+      worktreeTerminalKey: '/repo\0/worktree',
+      terminalId: 'terminal-1',
+      index: 1,
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/worktree',
+    }
+    const descriptorB = {
+      key: 'terminal-2',
+      worktreeTerminalKey: '/repo\0/worktree-other',
+      terminalId: 'terminal-2',
+      index: 1,
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/worktree-other',
+    }
+    const worktreeSnapshotA = {
+      worktreeTerminalKey: '/repo\0/worktree',
+      selectedDescriptor: descriptorA,
+      sessions: [
+        {
+          key: 'terminal-1',
+          worktreeTerminalKey: '/repo\0/worktree',
+          terminalId: 'terminal-1',
+          index: 1,
+          title: 'zsh',
+          phase: 'open' as const,
+          selected: true,
+          hasBell: false,
+        },
+      ],
+      count: 1,
+      pendingCreate: false,
+    }
+    const worktreeSnapshotB = {
+      worktreeTerminalKey: '/repo\0/worktree-other',
+      selectedDescriptor: descriptorB,
+      sessions: [
+        {
+          key: 'terminal-2',
+          worktreeTerminalKey: '/repo\0/worktree-other',
+          terminalId: 'terminal-2',
+          index: 1,
+          title: 'zsh',
+          phase: 'open' as const,
+          selected: true,
+          hasBell: false,
+        },
+      ],
+      count: 1,
+      pendingCreate: false,
+    }
+    const snapshotOpen = {
+      phase: 'open' as const,
+      message: null,
+      processName: 'zsh',
+      attachment: {
+        role: 'controller' as const,
+        controllerStatus: 'connected' as const,
+        active: true,
+        canTakeover: false,
+        canonicalCols: 120,
+        canonicalRows: 40,
+      },
+    }
+    const context: TerminalSessionContextValue = {
+      createTerminal: async () => 'terminal-1',
+      registerHost: vi.fn(),
+      unregisterHost: vi.fn(),
+      selectTerminal: vi.fn(),
+      scrollToBottom: vi.fn(),
+      scrollLines: vi.fn(),
+      clearBell: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(() => []),
+      attach: vi.fn(),
+      detach: vi.fn(),
+      restart: vi.fn(),
+      isTerminalFocusTarget: vi.fn(() => false),
+      findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      clearSearch: vi.fn(),
+      writeInput,
+      takeover: vi.fn(),
+      reorderSessions: vi.fn(async () => true),
+      serialize: vi.fn(() => ''),
+    }
+    let activeWorktreeSnapshot = worktreeSnapshotA
+    const readContext: TerminalSessionReadContextValue = {
+      worktreeSnapshot: () => activeWorktreeSnapshot,
+      subscribeWorktree: () => () => {},
+      snapshot: () => snapshotOpen,
+      subscribeSnapshot: () => () => {},
+    }
+
+    // Force the blob-save tier (no path-attempt) and gate the
+    // resolution on a Promise we control. The dispatch returns
+    // synchronously; the resolver only runs when we call the
+    // `resolve` we capture here.
+    let resolveSave: (paths: string[]) => void = () => {}
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
+    vi.mocked(shellClient.saveClipboardFiles).mockImplementation(
+      () => new Promise<string[]>((resolve) => { resolveSave = resolve }),
+    )
+
+    try {
+      await act(async () => {
+        root.render(
+          <TerminalSessionContext.Provider value={context}>
+            <TerminalSessionReadContext.Provider value={readContext}>
+              <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+            </TerminalSessionReadContext.Provider>
+          </TerminalSessionContext.Provider>,
+        )
+      })
+
+      const slotRoot = container.querySelector('.goblin-terminal-slot') as HTMLElement
+      const file = new File([new Uint8Array([1])], 'a.png')
+      const dataTransfer = {
+        types: ['Files'],
+        files: [file] as unknown as FileList,
+        dropEffect: '',
+      } as unknown as DataTransfer
+      const dropEvent = new Event('drop', { bubbles: true, cancelable: true })
+      Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
+
+      await act(async () => {
+        slotRoot.dispatchEvent(dropEvent)
+        // Yield to let the resolver start awaiting the (still-pending)
+        // saveClipboardFiles Promise.
+        await Promise.resolve()
+      })
+
+      // User switches worktrees mid-resolve. The slot re-renders with
+      // the new descriptor, which updates `keyRef.current` via the
+      // useEffect on `key`.
+      activeWorktreeSnapshot = worktreeSnapshotB
+      await act(async () => {
+        root.render(
+          <TerminalSessionContext.Provider value={context}>
+            <TerminalSessionReadContext.Provider value={readContext}>
+              <TerminalSlot
+                repoRoot="/repo"
+                branch="feature"
+                worktreePath="/worktree-other"
+              />
+            </TerminalSessionReadContext.Provider>
+          </TerminalSessionContext.Provider>,
+        )
+      })
+
+      // Now resolve the in-flight blob-save call. The post-resolve
+      // guard must see the divergence and drop the write — neither
+      // key (old nor new) should receive input. The chain runs
+      // through several microtask hops (saveClipboardFiles.then →
+      // resolvePastedFiles.then → processDrop.then → handler.then);
+      // setTimeout(0) is the established pattern in the other
+      // integration tests for draining them all in one act.
+      await act(async () => {
+        resolveSave(['/tmp/a.png'])
+        await new Promise((r) => setTimeout(r, 0))
+      })
+
+      expect(writeInput).not.toHaveBeenCalled()
     } finally {
       await act(async () => root.unmount())
       container.remove()

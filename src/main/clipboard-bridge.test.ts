@@ -207,4 +207,26 @@ describe('wireClipboardBridgeIpc', () => {
     const result = await handler({}, [{ name: 'big.bin', bytes: oversized }])
     expect(result).toEqual([])
   })
+
+  test('clears any prior periodic-prune interval on re-entry', async () => {
+    // Regression for the previous implementation that called
+    // `setInterval` unconditionally on every wire-up. The test
+    // harness re-enters `wireClipboardBridgeIpc` (each test that
+    // touches the handler calls it again), and without the
+    // clearInterval guard each call stacked a 1 h timer that no one
+    // ever cleared. We assert that the second call invokes
+    // `clearInterval` exactly once with a non-zero handle, leaving
+    // the most recent timer in place.
+    const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval')
+    const { wireClipboardBridgeIpc } = await import('#/main/clipboard-bridge.ts')
+    wireClipboardBridgeIpc()
+    const firstCallCount = clearIntervalSpy.mock.calls.length
+    wireClipboardBridgeIpc()
+    const newCalls = clearIntervalSpy.mock.calls.slice(firstCallCount)
+    expect(newCalls).toHaveLength(1)
+    const cleared = newCalls[0]?.[0]
+    expect(cleared).toBeDefined()
+    expect(cleared).not.toBe(0)
+    clearIntervalSpy.mockRestore()
+  })
 })

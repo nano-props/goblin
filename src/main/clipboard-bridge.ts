@@ -60,6 +60,15 @@ function timestampedFileName(index: number, name: string): string {
   return `${timestamp}-${index}-${filenameCounter}-${sanitizeBaseName(name)}`
 }
 
+// Module-level handle to the periodic prune interval. `wireClipboardBridgeIpc`
+// can be called more than once in the test harness (and could be in a
+// future hot-reload), and `setInterval` itself has no idea about that —
+// without this handle, each call would schedule an additional 1 h timer
+// and the old ones would never be cleared. The IPC handler is
+// overwritten by `ipcMain.handle`, so the *handler* leak is not an
+// issue, but the *timer* leak is.
+let periodicPrune: NodeJS.Timeout | null = null
+
 /**
  * Persist clipboard / drop blobs to the per-process temp directory.
  *
@@ -161,7 +170,15 @@ export function wireClipboardBridgeIpc(): void {
   // is bounded by per-file size, not file count, so this is a
   // housekeeping measure, not a security control.
   void pruneStaleClipboardTempDirs()
-  const periodic = setInterval(() => {
+  // Clear any previous interval — `wireClipboardBridgeIpc` may be
+  // re-entered (test harness, future hot-reload), and `setInterval`
+  // itself doesn't know about re-entry. Without this guard each call
+  // would stack another timer that no one ever clears.
+  if (periodicPrune !== null) {
+    clearInterval(periodicPrune)
+    periodicPrune = null
+  }
+  periodicPrune = setInterval(() => {
     void pruneStaleClipboardTempDirs().catch((err) =>
       console.warn('[clipboard-bridge] periodic prune failed', err),
     )
@@ -169,7 +186,7 @@ export function wireClipboardBridgeIpc(): void {
   // Allow the process to exit naturally even with the timer
   // attached — without this, the interval keeps the event loop
   // alive indefinitely.
-  if (typeof periodic.unref === 'function') periodic.unref()
+  if (typeof periodicPrune.unref === 'function') periodicPrune.unref()
 }
 
 // resolveOsClipboardPath was added during the design phase as a

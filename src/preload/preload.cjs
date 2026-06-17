@@ -188,7 +188,23 @@ contextBridge.exposeInMainWorld('goblinNative', {
   initialServer,
   invokeIpc: ({ path, input, requestId }) => ipcCall({ path, input, requestId }),
   abortIpc: (requestId) => safeInvoke(IPC.ipc.abort, { requestId }),
-  pathForFile: (file) => webUtils.getPathForFile(file),
+  pathForFile: (file) => {
+    // `webUtils` itself is destructured at the top of this file, so
+    // a missing symbol there would already have crashed the preload
+    // load — by the time we get here it's the call that can throw.
+    // That happens when a non-`File` object reaches us (synthetic
+    // `File` from older test mocks, IPC proxies that lost the
+    // prototype, etc.) or when an internal Electron check fails.
+    // Returning `''` matches the renderer's contract: an empty
+    // path-attempt result falls through to the blob-save tier, and
+    // a `paste-file-failed` toast surfaces the loss to the user.
+    try {
+      return webUtils.getPathForFile(file)
+    } catch (err) {
+      console.warn('[preload] pathForFile failed', err)
+      return ''
+    }
+  },
   shell: {
     openSettingsWindow: (input) => safeInvoke(IPC.shell.openSettingsWindow, input),
     openExternalUrl: (input) => safeInvoke(IPC.shell.openExternalUrl, input),

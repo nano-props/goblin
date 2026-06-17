@@ -14,32 +14,28 @@ describe('processPaste', () => {
     vi.clearAllMocks()
   })
 
-  test('returns no-op when there are no files and no text', async () => {
+  test('returns no-op for empty input', async () => {
     const { processPaste } = await import('#/web/clipboard/process.ts')
-    await expect(processPaste({ files: [], text: '' })).resolves.toEqual({ kind: 'no-op' })
+    await expect(processPaste({ files: [] })).resolves.toEqual({ kind: 'no-op' })
     expect(mocks.resolvePastedFiles).not.toHaveBeenCalled()
-  })
-
-  test('returns text outcome when there are no files but text is present', async () => {
-    const { processPaste } = await import('#/web/clipboard/process.ts')
-    await expect(processPaste({ files: [], text: 'hello' })).resolves.toEqual({ kind: 'text', text: 'hello' })
-  })
-
-  test('prefers files over text (Linux text+uri-list mixed payload)', async () => {
-    mocks.resolvePastedFiles.mockResolvedValue({ paths: ['/abs/foo.png'], failed: 0 })
-    const { processPaste } = await import('#/web/clipboard/process.ts')
-    const f = new File([new Uint8Array([1])], 'foo.png')
-    await expect(
-      processPaste({ files: [f], text: 'file:///abs/foo.png' }),
-    ).resolves.toEqual({ kind: 'files', resolution: { paths: ['/abs/foo.png'], failed: 0 } })
   })
 
   test('returns too-large for any file exceeding PASTE_FILE_MAX_BYTES', async () => {
     const { processPaste } = await import('#/web/clipboard/process.ts')
     const ok = new File([new Uint8Array([1])], 'ok.png')
     const huge = new File([new Uint8Array(PASTE_FILE_MAX_BYTES + 1)], 'huge.bin')
-    await expect(processPaste({ files: [ok, huge], text: '' })).resolves.toEqual({ kind: 'too-large' })
+    await expect(processPaste({ files: [ok, huge] })).resolves.toEqual({ kind: 'too-large' })
     expect(mocks.resolvePastedFiles).not.toHaveBeenCalled()
+  })
+
+  test('returns the resolver result on the happy path', async () => {
+    mocks.resolvePastedFiles.mockResolvedValue({ paths: ['/abs/foo.png'], failed: 0 })
+    const { processPaste } = await import('#/web/clipboard/process.ts')
+    const f = new File([new Uint8Array([1])], 'foo.png')
+    await expect(processPaste({ files: [f] })).resolves.toEqual({
+      kind: 'files',
+      resolution: { paths: ['/abs/foo.png'], failed: 0 },
+    })
   })
 
   test('passes partial failure through from the resolver', async () => {
@@ -47,7 +43,7 @@ describe('processPaste', () => {
     const { processPaste } = await import('#/web/clipboard/process.ts')
     const a = new File([new Uint8Array([1])], 'a')
     const b = new File([new Uint8Array([1])], 'b')
-    await expect(processPaste({ files: [a, b], text: '' })).resolves.toEqual({
+    await expect(processPaste({ files: [a, b] })).resolves.toEqual({
       kind: 'files',
       resolution: { paths: ['/tmp/a'], failed: 1 },
     })
