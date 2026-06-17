@@ -1,6 +1,6 @@
 import { ArrowUp, Maximize2, Minimize2, Minus } from 'lucide-react'
 import type { KeyboardEvent } from 'react'
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -17,7 +17,6 @@ import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-
 import { useWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-store.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { EMPTY_TERMINAL_TAB_FOCUS_KEY, TerminalTabs } from '#/web/components/terminal/TerminalTabs.tsx'
-import { terminalBridge } from '#/web/terminal.ts'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
 import type { BranchDetailRepo, SelectedBranchDetailPresentation } from '#/web/components/branch-detail/model.ts'
@@ -82,17 +81,6 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
         : null,
     [repo.id, detail.branch],
   )
-
-  // T1.2: prewarm the terminal WebSocket when the user enters a worktree
-  // pane. Fires once per worktree visit (when terminalWorktreeKey
-  // changes), so the DNS+TCP+TLS+WS handshake completes before the user
-  // clicks a terminal tab. The prewarm is fire-and-forget — failures are
-  // swallowed inside the bridge; the next real IPC will surface a real
-  // error if the server is unreachable.
-  useEffect(() => {
-    if (!terminalWorktreeKey) return
-    void terminalBridge.prewarm({ repoRoot: terminalWorktreeKey })
-  }, [terminalWorktreeKey])
 
   // Shared "enter the terminal tab" effect for any terminal-targeting action:
   // set the user's preferred tab to terminal (when not already there) and

@@ -49,6 +49,18 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     void preloadTerminalFont()
   }, [])
 
+  // T1.2: pay the WebSocket handshake cost when the user enters a repo,
+  // before they click a terminal tab. The bridge maintains a single
+  // shared socket, so watching currentRepoId (not worktreeTerminalKey)
+  // is the right granularity: one handshake per repo visit, not one per
+  // worktree tab. The prewarm is fire-and-forget — failures are
+  // swallowed inside the bridge; the next real IPC will surface a real
+  // error if the server is unreachable.
+  useEffect(() => {
+    if (!currentRepoId) return
+    void terminalBridge.prewarm()
+  }, [currentRepoId])
+
   const registryRef = useRef<TerminalSessionRegistry | null>(null)
   if (!registryRef.current) {
     registryRef.current = new TerminalSessionRegistry(() => currentRepoIdRef.current, setSelectedTerminal)
