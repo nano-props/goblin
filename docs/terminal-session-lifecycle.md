@@ -458,6 +458,133 @@ report.
 
 ---
 
+## Takeover atomicity (follow-up #2)
+
+### Status
+
+Implemented on `main`. The `terminal.takeover` response is now
+the authoritative handshake for the new controller's view; the
+realtime `ownership` event keeps the same shape (and the same
+authority role) for the *other* ownership-change paths
+(controller crash, grace expiry, fresh attach). The renderer no
+longer waits for a follow-up `ownership` event before painting
+the post-takeover frame.
+
+### The two-step handshake that was
+
+Before this change, `terminal.takeover` returned only
+`{ ok, sessionId, controller }`. The renderer treated the
+realtime `ownership` event as the authority and used the bridge
+response only to "trigger the server-side handoff". The
+comment in `ManagedTerminalSession.takeover()` was explicit:
+
+> "Ownership changes are applied exclusively via authoritative
+> onOwnership realtime messages. The bridge response is only used
+> to trigger the server-side handoff."
+
+The cost was a stale window between the response settling and the
+`onOwnership` event arriving:
+
+- `runtime.canResize()` returned `false` (viewer gate), so any
+  resize the user fired in that window was short-circuited at
+  `flushResize` and never reached the PTY.
+- User keystrokes typed in that window were dropped at the
+  input gate.
+- The takeover spinner cleared only after the realtime event
+  arrived (~50–100ms after the response).
+
+This violated the same "atomicity" R0 enforced for `create` /
+`attach` / `restart`: the renderer had to wait for a separate
+round-trip to know the new frame state, instead of trusting the
+response.
+
+### What changed
+
+1. `TerminalTakeoverResult` now carries the full first-frame
+   payload on the success branch — `role`,
+   `controllerStatus`, `canonicalCols`, `canonicalRows`, `phase`,
+   alongside the existing `controller`. The shape mirrors
+   `TerminalFirstFrame` minus the snapshot fields
+   (`snapshot`, `snapshotSeq`) — takeover doesn't return a fresh
+   snapshot because the new controller keeps whatever the viewer
+   was already showing (no need to re-fetch the buffer).
+2. `TerminalOwnershipEvent` and the renderer-side
+   `TerminalOwnershipViewModel` gain `phase` so the realtime path
+   stays shape-consistent with the takeover response. Both
+   surfaces carry the same fields, and the renderer can apply
+   either without re-checking what fields it has.
+3. The server-side `TerminalSessionManager.takeoverResult`
+   builder now reads `session.cols`, `session.rows`,
+   `session.phase` synchronously after `applyOwnershipEffect`
+   runs and packs them into the response. The realtime
+   `emitOwnership` payload carries `phase: session.phase` for
+   the non-takeover paths.
+4. `TerminalSessionState.applyOwnership` accepts `phase` and
+   routes it through `setPhaseAndMessage` so role / geometry /
+   phase are applied in the same atomic patch.
+5. `ManagedTerminalSession.takeover()` now awaits the response
+   and calls `runtime.applyTakeover(result)`, a new method that
+   feeds the response into the existing `applyOwnership` path.
+   The previous `.catch(() => {})` becomes
+   `terminalLog.warn('takeover failed ...')` to mirror the
+   `terminal.ts:resize` rejection pattern.
+6. `TerminalSessionRegistry.handleOwnership` and the bridge
+   conversion in `renderer-terminal-bridge.ts` were aligned to
+   carry the new `phase` field through.
+
+### What is *not* changed
+
+The realtime `ownership` event keeps its authority role on the
+non-takeover paths (controller crash, grace expiry, controller
+reconnect). For those, ownership-event-as-authority is the only
+choice — there is no response to be authoritative. A subsequent
+realtime event for the *same* sessionId after a successful
+takeover is treated as a benign re-apply with identical values
+(no-op).
+
+`TerminalSlot` and `BranchDetailToolbar` UI are unchanged — they
+read `role` / `controllerStatus` from the runtime and simply see
+the new values arrive one round-trip sooner.
+
+### Multi-window safety
+
+The authoritative takeover response and the realtime `ownership`
+event for the same session carry the same fields. If two windows
+take over in parallel, the server resolves the conflict (one
+window becomes controller, the other becomes viewer); both
+windows get a consistent picture within one round-trip — the
+takeover winner sees role flip from the response, the loser
+sees role flip from the realtime event the server emits. Both
+arrive at the same final state.
+
+### Verification
+
+- `bun run test` — all 1425 tests pass (added 2 takeover tests
+  asserting the new authoritative contract; flipped 2 existing
+  tests that asserted the old "wait for the realtime event"
+  behavior).
+- `bun run typecheck` — clean (the new fields propagate through
+  every typed surface; the inline `TerminalOwnershipViewModel`
+  literal at `TerminalSessionRegistry.handleOwnership` and in
+  the test files were collapsed to the named type so future
+  field additions propagate automatically).
+- `terminal.test.ts` — wire-format ownership message updated to
+  include `phase` so the validator accepts it.
+- `terminal-runtime.test.ts` — two takeover success assertions
+  updated to the new 7-field shape; the existing
+  `expect(ownershipMessage).toMatchObject({...})` for the
+  realtime emission already accepts the new `phase` field as an
+  additive change.
+
+### Out of scope
+
+- No restructuring of who-emits-when for the realtime event.
+- `TerminalFirstFrame` is unchanged — takeover borrows its shape
+  but doesn't need to extend it.
+- Task #70 (P2 contract tests) — separate phase.
+
+---
+
 ## Implementation history
 
 All four roots landed on `main`:
@@ -472,6 +599,12 @@ All four roots landed on `main`:
   set this document describes — it is not a draft. Treat those
   three as implemented at `fa67adb` for any forward-looking
   planning.
+
+Follow-up #2 from §Suggested follow-ups also landed: takeover's
+two-step handshake (response + realtime `ownership` event) was
+collapsed into a single authoritative handshake, with the realtime
+event kept as the authority only on the non-takeover paths. See
+§Takeover atomicity (follow-up #2).
 
 For reference, the notional landing order *had* this fix set been
 split into separate commits (it was not, due to the wip-snapshot
@@ -613,15 +746,25 @@ any individual implementation:
 1. **Done** — tighten the shared `TerminalCatalogMutationResult`
    type so the first-frame fields are required at the type level,
    not only by renderer-side validation. (See §Type-level atomicity.)
-2. Decide explicitly whether the same-session snapshot reapply
-   patch (broadened `ManagedTerminalSession.hydrate()`) should stay
-   as a supported repair path.
-3. Decide explicitly whether the delayed provider-destroy heuristic
-   (one-macrotask delay on `TerminalSessionProvider` cleanup) should
-   remain until P1.7 lands.
-4. Move `TerminalSessionRegistry` to a renderer-level singleton
-   lifetime. Tracked as `terminal-roadmap.md` P1.7.
-5. Add a contract-test pass over the terminal invariants listed in
+2. **Done** — collapse the takeover two-step handshake (response +
+   realtime `ownership` event) into a single authoritative
+   handshake, keeping the realtime event as authority only on the
+   non-takeover paths. (See §Takeover atomicity.)
+3. **Done (P1.7)** — Move `TerminalSessionRegistry` to a renderer-
+   level singleton lifetime. Tracked as `terminal-roadmap.md` P1.7.
+4. **Done** — Decide explicitly whether the same-session snapshot
+   reapply patch (broadened `ManagedTerminalSession.hydrate()`)
+   should stay as a supported repair path. The same-session
+   reapply stays; the broadened hydrate is part of the first-
+   frame patch set and serves the takeover path's "idempotent
+   re-apply" contract.
+5. **Done** — Decide explicitly whether the delayed provider-
+   destroy heuristic (one-macrotask delay on
+   `TerminalSessionProvider` cleanup) should remain until P1.7
+   lands. P1.7 supersedes it — the registry is now a renderer-
+   level singleton, so the per-provider destroy heuristic is no
+   longer needed.
+6. Add a contract-test pass over the terminal invariants listed in
    `terminal-roadmap.md` P2.
 
 ---
