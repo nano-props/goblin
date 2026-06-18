@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   </body>
 </html>`,
   ),
+  existsSync: vi.fn(() => true),
   getServerSettingsPrefs: vi.fn(async () => ({
     lang: 'auto',
     theme: 'auto',
@@ -93,6 +94,19 @@ vi.mock('node:fs/promises', async () => {
   }
 })
 
+// The HTML-serve tests want the SPA fallback (`dist/web/index.html`
+// for deep links) to actually run. Pretend the build exists so the
+// middleware + catch-all register, and let `readFile` return the
+// fake HTML above. Tests that don't care can rely on the catch-all
+// skipping when `existsSync` returns false.
+vi.mock('node:fs', async () => {
+  const actual = await vi.importActual<typeof import('node:fs')>('node:fs')
+  return {
+    ...actual,
+    existsSync: mocks.existsSync,
+  }
+})
+
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerSettingsPrefs: mocks.getServerSettingsPrefs,
 }))
@@ -146,13 +160,13 @@ describe('server app body limit', () => {
   })
 })
 
-describe('server app html bootstrap', () => {
+describe('server app html static', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
   })
 
-  test('injects bootstrap into the web index html for web requests', async () => {
+  test('serves the index html as plain static (no bootstrap injection, no token)', async () => {
     const { createApp } = await import('#/server/app-factory.ts')
     const app = createApp({
       version: '0.1.0',
@@ -171,18 +185,18 @@ describe('server app html bootstrap', () => {
 
     const html = await response.text()
     expect(response.status).toBe(200)
-    expect(html).toContain('<script id="goblin-bootstrap" type="application/json">')
-    // The access token is no longer inlined in the bootstrap in
-    // prod (no GOBLIN_EMBEDDED_RUNTIME / GOBLIN_DEV_BOOTSTRAP_INCLUDES_TOKEN
-    // envs are set in this test). Confirm both that the literal
-    // `secret` is absent and that the URL made it through.
+    // The HTML is the raw dist/web/index.html (mocked above) with
+    // no `<script id="goblin-bootstrap">` injection and no token in
+    // the response. The renderer reads i18n from
+    // `/api/i18n` and the access token either from the
+    // Electron preload's IPC or the `/api/login` cookie.
+    expect(html).not.toContain('goblin-bootstrap')
+    expect(html).not.toContain('"accessToken"')
     expect(html).not.toContain('"secret"')
-    expect(html).toContain('"url":"http://127.0.0.1:32100/"')
-    expect(html).toContain('"lang":"zh"')
-    expect(html).toContain('打开本地仓库')
+    expect(html).toContain('<div id="root"></div>')
   })
 
-  test('resolves auto language from the first supported accept-language candidate', async () => {
+  test('serves static html for deep-link paths (serveStatic falls through to index)', async () => {
     const { createApp } = await import('#/server/app-factory.ts')
     const app = createApp({
       version: '0.1.0',
@@ -190,55 +204,34 @@ describe('server app html bootstrap', () => {
       accessToken: 'secret',
       terminalHost: terminalHostStub,
     })
+    for (const path of ['/repos/abc123', '/repos/abc123/changes']) {
+      const response = await app.request(new Request(`http://127.0.0.1:32100${path}`))
+      const html = await response.text()
+      expect(response.status).toBe(200)
+      expect(html).toContain('<div id="root"></div>')
+      expect(html).not.toContain('goblin-bootstrap')
+    }
+  })
 
-    const response = await app.request(
-      new Request('http://127.0.0.1:32100/', {
-        headers: {
-          'accept-language': 'fr-FR,ja;q=0.9,en;q=0.8',
-        },
-      }),
-    )
-
-    const html = await response.text()
+  test('exposes /api/host as a public, unauthenticated endpoint', async () => {
+    // Host info is non-sensitive (home dir path + platform string)
+    // and is needed by the renderer's settings page on first paint,
+    // before the user clears the token gate. The endpoint therefore
+    // must not require `x-goblin-access-token` or a session cookie.
+    const { createApp } = await import('#/server/app-factory.ts')
+    const app = createApp({
+      version: '0.1.0',
+      startedAt: Date.now(),
+      accessToken: 'secret',
+      terminalHost: terminalHostStub,
+    })
+    const response = await app.request(new Request('http://127.0.0.1:32100/api/host'))
     expect(response.status).toBe(200)
-    expect(html).toContain('"lang":"ja"')
-    expect(html).toContain('ローカルリポジトリを開く')
-  })
-
-  test('serves renderer html for settings routes', async () => {
-    const { createApp } = await import('#/server/app-factory.ts')
-    const app = createApp({
-      version: '0.1.0',
-      startedAt: Date.now(),
-      accessToken: 'secret',
-      terminalHost: terminalHostStub,
-    })
-
-    for (const path of ['/settings', '/settings/general']) {
-      const response = await app.request(new Request(`http://127.0.0.1:32100${path}`))
-      const html = await response.text()
-      expect(response.status).toBe(200)
-      expect(html).toContain('<script id="goblin-bootstrap" type="application/json">')
-      expect(html).not.toContain('"secret"')
-      expect(html).toContain('"url":"http://127.0.0.1:32100/"')
-      expect(html).toContain('<base href="http://127.0.0.1:32100/">')
-    }
-  })
-
-  test('serves renderer html for arbitrary deep-link paths (SPA fallback)', async () => {
-    const { createApp } = await import('#/server/app-factory.ts')
-    const app = createApp({
-      version: '0.1.0',
-      startedAt: Date.now(),
-      accessToken: 'secret',
-      terminalHost: terminalHostStub,
-    })
-    for (const path of ['/', '/repos/abc123', '/repos/abc123/changes']) {
-      const response = await app.request(new Request(`http://127.0.0.1:32100${path}`))
-      const html = await response.text()
-      expect(response.status).toBe(200)
-      expect(html).toContain('<script id="goblin-bootstrap" type="application/json">')
-    }
+    const json = (await response.json()) as { homeDir: string; platform: string; hostname: string; pid: number }
+    expect(json.homeDir).toBeTypeOf('string')
+    expect(json.platform).toBeTypeOf('string')
+    expect(json.hostname).toBeTypeOf('string')
+    expect(json.pid).toBeTypeOf('number')
   })
 
   test('returns JSON 404 (not the SPA shell) for unknown /api paths', async () => {
@@ -254,7 +247,7 @@ describe('server app html bootstrap', () => {
     const json = (await response.json()) as { ok: false; code: string }
     expect(json).toEqual({ ok: false, code: 'NOT_FOUND', message: expect.any(String) })
     // Make sure the catch-all didn't accidentally serve the HTML
-    // shell (it would contain the bootstrap script).
+    // shell (it would contain the root div).
     expect(response.headers.get('content-type')).toMatch(/application\/json/)
   })
 })

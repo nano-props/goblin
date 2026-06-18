@@ -1,7 +1,6 @@
 import { spawn, type ChildProcessByStdio } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import type { Readable } from 'node:stream'
-import os from 'node:os'
 import path from 'node:path'
 import { app } from 'electron'
 import { readOrCreateAccessToken } from '#/shared/access-token-file.ts'
@@ -148,14 +147,13 @@ export async function startEmbeddedServer(): Promise<EmbeddedServerRuntime | nul
         ...command.env,
         GOBLIN_SERVER_HOST: host,
         GOBLIN_SERVER_PORT: String(port),
+        // The server child process reads this and uses it as the
+        // shared auth secret for cookie / header / `?t=` middleware.
+        // The renderer does NOT see this env var — it gets the
+        // token via the `goblin:get-access-token` IPC channel
+        // backed by the `runtime.accessToken` field above.
         GOBLIN_SERVER_ACCESS_TOKEN: accessToken,
         GOBLIN_SERVER_DATA_DIR: app.getPath('userData'),
-        // The server renders these into the HTML bootstrap so the
-        // preload can stop ferrying them via IPC. See
-        // `#/server/app-factory.ts:buildWebBootstrap`.
-        GOBLIN_EMBEDDED_RUNTIME: '1',
-        GOBLIN_HOME_DIR: os.homedir(),
-        GOBLIN_PLATFORM: process.platform,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     })

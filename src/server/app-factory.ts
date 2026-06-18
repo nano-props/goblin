@@ -1,6 +1,4 @@
-import { access, readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
-import os from 'node:os'
 import path from 'node:path'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
@@ -14,20 +12,14 @@ import { errorJson } from '#/server/common/responses.ts'
 import { createAuthRoutes } from '#/server/routes/auth.ts'
 import { createClipboardRoutes } from '#/server/routes/clipboard.ts'
 import { createHealthRoutes } from '#/server/routes/health.ts'
+import { createHostRoutes } from '#/server/routes/host.ts'
 import { createRemoteRoutes } from '#/server/routes/remote.ts'
 import { createRealtimeRoutes } from '#/server/routes/realtime.ts'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
 import { createSettingsRoutes } from '#/server/routes/settings.ts'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
-import { getServerSettingsPrefs } from '#/server/modules/settings-source.ts'
 import { createServerSettingsState } from '#/server/modules/settings-state.ts'
-import { createRendererBootstrapSnapshot, toInitialServerSnapshot } from '#/shared/bootstrap-builders.ts'
-import { createRendererRuntimeSnapshot } from '#/shared/bootstrap-builders.ts'
-import { WEB_RENDERER_CAPABILITIES } from '#/shared/bootstrap.ts'
-import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
-import { initialSettingsFromSnapshot } from '#/shared/settings-defaults.ts'
-import type { LangPref } from '#/shared/api-types.ts'
-import type { RendererBootstrapSnapshot } from '#/shared/bootstrap.ts'
+import { getServerI18nSnapshot } from '#/server/modules/i18n.ts'
 import { MAX_PASTE_BATCH_BYTES } from '#/shared/clipboard-paste.ts'
 
 export interface ServerAppOptions {
@@ -67,105 +59,7 @@ const API_BODY_LIMIT_BYTES = 1 * 1024 * 1024
 const HEALTH_BODY_LIMIT_BYTES = 1024
 
 const WEB_DIST_DIR = path.resolve(import.meta.dirname, '../../dist/web')
-const WEB_INDEX_HTML = path.join(WEB_DIST_DIR, 'index.html')
 
-/**
- * Decide whether to inline the access token in the HTML bootstrap.
- *
- * - `GOBLIN_EMBEDDED_RUNTIME=1` is set by the Electron main when it
- *   spawns the server; the embedded renderer is the primary HTML
- *   consumer, so the bootstrap carries the token directly.
- * - `GOBLIN_DEV_BOOTSTRAP_INCLUDES_TOKEN=1` is set by `bun run dev`
- *   so the Vite-served browser (which can't share cookies with the
- *   server on a different origin) can attach the token as a header.
- *
- * Standalone `serve.sh` / `scripts/start-server.ts` sets neither,
- * producing a token-less bootstrap that drives the renderer through
- * the cookie + `/api/login` gate.
- */
-function shouldInlineAccessTokenInBootstrap(): boolean {
-  return (
-    process.env.GOBLIN_EMBEDDED_RUNTIME === '1' ||
-    process.env.GOBLIN_DEV_BOOTSTRAP_INCLUDES_TOKEN === '1'
-  )
-}
-
-/**
- * Read `homeDir` and `platform` from the spawn env (set by the
- * Electron main in `#/main/server-manager.ts`), falling back to
- * `os.homedir()` / `os.platform()` when the server is started outside
- * the Electron host (e.g. `bun run dev`, `scripts/start-server.ts`).
- * The fallback is benign — the values just go into the renderer
- * bootstrap for display purposes.
- */
-function resolveBootstrapHostInfo(): { homeDir: string; platform: string } {
-  const homeDir = process.env.GOBLIN_HOME_DIR?.trim() || os.homedir()
-  const platform = process.env.GOBLIN_PLATFORM?.trim() || os.platform()
-  return { homeDir, platform }
-}
-
-function buildWebBootstrap(
-  requestUrl: string,
-  acceptLanguageHeader: string | null,
-  langPref: LangPref,
-  settings: Awaited<ReturnType<typeof getServerSettingsPrefs>>,
-  options: { accessToken: string; includeAccessToken: boolean },
-): RendererBootstrapSnapshot {
-  const origin = new URL(requestUrl).origin
-  const { homeDir, platform } = resolveBootstrapHostInfo()
-  return createRendererBootstrapSnapshot({
-    runtime: createRendererRuntimeSnapshot('web', WEB_RENDERER_CAPABILITIES),
-    homeDir,
-    platform: platform as NodeJS.Platform,
-    i18n: resolveI18nSnapshot(langPref, acceptLanguageHeader),
-    settings: initialSettingsFromSnapshot({
-      ...settings,
-      globalShortcutRegistered: false,
-    }),
-    server: toInitialServerSnapshot({
-      url: `${origin}/`,
-      ...(options.includeAccessToken ? { accessToken: options.accessToken } : {}),
-    }),
-  })
-}
-
-function escapeBootstrapJson(value: unknown): string {
-  return JSON.stringify(value)
-    .replace(/</g, '\\u003c')
-    .replace(/>/g, '\\u003e')
-    .replace(/&/g, '\\u0026')
-    .replace(/\u2028/g, '\\u2028')
-    .replace(/\u2029/g, '\\u2029')
-}
-
-function injectBootstrapIntoHtml(indexHtml: string, bootstrap: RendererBootstrapSnapshot): string {
-  const baseHref = bootstrap.initialServer ? `${new URL(bootstrap.initialServer.url).origin}/` : '/'
-  const bootstrapScript = `<script id="goblin-bootstrap" type="application/json">${escapeBootstrapJson(bootstrap)}</script>`
-  return indexHtml
-    .replace('<html lang="en">', `<html lang="${bootstrap.initialI18n?.lang ?? 'en'}">`)
-    .replace('<head>', `<head>\n    <base href="${baseHref}">`)
-    .replace(
-      '<script type="module" src="./boot.js"></script>',
-      `${bootstrapScript}\n    <script type="module" src="./boot.js"></script>`,
-    )
-}
-
-async function renderRendererIndexHtml(
-  requestUrl: string,
-  acceptLanguageHeader: string | null,
-  accessToken: string,
-): Promise<string> {
-  await access(WEB_INDEX_HTML)
-  const settings = await getServerSettingsPrefs()
-  const bootstrap = buildWebBootstrap(
-    requestUrl,
-    acceptLanguageHeader,
-    settings.lang,
-    settings,
-    { accessToken, includeAccessToken: shouldInlineAccessTokenInBootstrap() },
-  )
-  return injectBootstrapIntoHtml(await readFile(WEB_INDEX_HTML, 'utf8'), bootstrap)
-}
 
 export function createApp(options: ServerAppOptions): Hono {
   const settingsState = createServerSettingsState()
@@ -287,6 +181,19 @@ export function createApp(options: ServerAppOptions): Hono {
     }),
   )
   app.route('/api/settings', createSettingsRoutes(settingsState))
+  // i18n is mounted at a separate public path so the renderer can
+  // fetch it before the user is authenticated. The token gate's
+  // labels are translated by this endpoint; if it were under
+  // `/api/settings/*` the gate would be stuck in raw-key land
+  // until the user pasted a token. The handler is unauthenticated
+  // by design — the dictionary is not sensitive.
+  app.get('/api/i18n', async (c) => c.json(await getServerI18nSnapshot(c.req.header('accept-language'))))
+  // Host info is public for the same reason i18n is: the renderer's
+  // settings page mounts inside the token gate on first paint and
+  // needs to know which OS-specific terminal entries to render
+  // before the user is authenticated. The payload is non-sensitive
+  // (home directory path + platform identifier).
+  app.route('/api/host', createHostRoutes())
   app.route('/api/remote', createRemoteRoutes())
   app.route('/api/repo', createRepoRoutes())
   app.route('/api/clipboard', createClipboardRoutes())
@@ -311,69 +218,32 @@ export function createApp(options: ServerAppOptions): Hono {
   )
   if (typeof periodic.unref === 'function') periodic.unref()
 
-  // Explicit SPA routes — must be before serveStatic so the
-  // bootstrap script is injected into the HTML response instead
-  // of serving the raw dist/web/index.html file. The token-in-bootstrap
-  // decision lives in `shouldInlineAccessTokenInBootstrap()` and only
-  // resolves to "true" for the embedded renderer (`GOBLIN_EMBEDDED_RUNTIME=1`)
-  // and `bun run dev` (`GOBLIN_DEV_BOOTSTRAP_INCLUDES_TOKEN=1`).
-  app.get('/', async (c) => {
-    try {
-      return c.html(
-        await renderRendererIndexHtml(c.req.url, c.req.header('accept-language') ?? null, options.accessToken),
-      )
-    } catch {
-      return c.text('Not Found', 404)
-    }
-  })
-  app.get('/index.html', async (c) => {
-    try {
-      return c.html(
-        await renderRendererIndexHtml(c.req.url, c.req.header('accept-language') ?? null, options.accessToken),
-      )
-    } catch {
-      return c.text('Not Found', 404)
-    }
-  })
-  app.get('/settings', async (c) => {
-    try {
-      return c.html(
-        await renderRendererIndexHtml(c.req.url, c.req.header('accept-language') ?? null, options.accessToken),
-      )
-    } catch {
-      return c.text('Not Found', 404)
-    }
-  })
-  app.get('/settings/*', async (c) => {
-    try {
-      return c.html(
-        await renderRendererIndexHtml(c.req.url, c.req.header('accept-language') ?? null, options.accessToken),
-      )
-    } catch {
-      return c.text('Not Found', 404)
-    }
-  })
-  // Only register the static-file middleware when the built web bundle
-  // exists. Skipping it on a fresh checkout (e.g. `bun run test` without
-  // `bun run build`) keeps Hono from logging `serveStatic: root path ...
-  // is not found` on every server boot.
+  // The built web bundle is served as plain static files. The
+  // renderer pulls its bootstrap (i18n, settings, server URL) from
+  // `/api/settings/*` and the access token either from the Electron
+  // preload's IPC or the `/api/login` cookie — the server no longer
+  // rewrites `dist/web/index.html`. Skipping the middleware on a
+  // fresh checkout (e.g. `bun run test` without `bun run build`)
+  // keeps Hono from logging `serveStatic: root path ... is not
+  // found` on every server boot.
   if (existsSync(WEB_DIST_DIR)) {
+    const webIndexHtmlPath = path.join(WEB_DIST_DIR, 'index.html')
     app.use('/*', serveStatic({ root: WEB_DIST_DIR }))
+    // SPA fallback: deep links that don't match a real static file
+    // (e.g. `/repos/abc123/changes`) get the raw `index.html` so
+    // React Router can take over. `/api/*` and `/ws/*` requests
+    // fall through to the JSON `notFound` handler below.
+    app.get('*', async (c) => {
+      if (c.req.path.startsWith('/api/') || c.req.path.startsWith('/ws/')) {
+        return errorJson(c, 'NOT_FOUND', `No route for ${c.req.method} ${c.req.path}`)
+      }
+      try {
+        const { readFile } = await import('node:fs/promises')
+        return c.html(await readFile(webIndexHtmlPath, 'utf8'))
+      } catch {
+        return c.text('Not Found', 404)
+      }
+    })
   }
-  // Catch-all SPA fallback: deep-links that didn't match a static
-  // file (e.g. /repos/abc123) get the rendered index.html so the
-  // React app can take over routing. /api/* and /ws/* requests
-  // that reach here fall through to the JSON notFound handler.
-  app.get('*', async (c, next) => {
-    if (c.req.path.startsWith('/api/') || c.req.path.startsWith('/ws/')) return next()
-    try {
-      return c.html(
-        await renderRendererIndexHtml(c.req.url, c.req.header('accept-language') ?? null, options.accessToken),
-      )
-    } catch {
-      return c.text('Not Found', 404)
-    }
-  })
-  app.notFound((c) => errorJson(c, 'NOT_FOUND', `No route for ${c.req.method} ${c.req.path}`))
   return app
 }
