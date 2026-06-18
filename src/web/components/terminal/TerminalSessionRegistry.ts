@@ -780,7 +780,7 @@ export class TerminalSessionRegistry {
     })
   }
 
-  private notifySession(key: string, reason: 'metadata' | 'outputSummary' = 'metadata'): void {
+  private notifySession(key: string): void {
     const session = this.sessions.get(key)
     this.syncSessionIdIndex(key, session?.currentSessionId() ?? null)
     if (session) {
@@ -789,10 +789,8 @@ export class TerminalSessionRegistry {
       this.snapshotCache.delete(key)
     }
     this.notifySnapshot(key)
-    if (reason !== 'outputSummary') {
-      const worktreeTerminalKey = session?.descriptor.worktreeTerminalKey
-      if (worktreeTerminalKey) this.notifyWorktree(worktreeTerminalKey)
-    }
+    const worktreeTerminalKey = session?.descriptor.worktreeTerminalKey
+    if (worktreeTerminalKey) this.notifyWorktree(worktreeTerminalKey)
   }
 
   // Cache write for the reattach path. The expected cleanup is the
@@ -874,7 +872,7 @@ export class TerminalSessionRegistry {
     }
     const session = new ManagedTerminalSession(
       descriptor,
-      (reason) => this.notifySession(descriptor.key, reason),
+      () => this.notifySession(descriptor.key),
       this.bellController.handleBell,
       (sessionId) => this.enqueueDurableClose({ sessionId, worktreeTerminalKey: descriptor.worktreeTerminalKey }),
     )

@@ -65,23 +65,20 @@ describe('TerminalSessionRuntime', () => {
     expect(runtime.handleOutput({ sessionId: 'session-1', data: 'old', seq: 1, processName: 'zsh' })).toEqual({
       changed: false,
       output: null,
-      summaryChanged: false,
     })
     expect(runtime.handleOutput({ sessionId: 'session-1', data: 'new', seq: 3, processName: 'bash' })).toEqual({
       changed: true,
       output: null,
-      summaryChanged: false,
     })
     expect(runtime.processName()).toBe('bash')
     expect(runtime.finishReplay()).toEqual([{ sessionId: 'session-1', data: 'new', seq: 3, processName: 'bash' }])
-    expect(runtime.snapshot().outputSummary).toBe('new')
   })
 
-  test('drainReplay discards the replay buffer without appending to the output summary', () => {
+  test('drainReplay discards the replay buffer without surfacing captured events', () => {
     // The error / cancellation path in `ManagedTerminalSession` calls
     // `drainReplay` to clear the preload's replay window when the
     // attach fails partway through. drainReplay must not surface
-    // captured events to the term or build the summary.
+    // captured events to the term.
     const runtime = new TerminalSessionRuntime()
     runtime.applyAttachResult(
       {
@@ -106,7 +103,6 @@ describe('TerminalSessionRuntime', () => {
     runtime.beginReplay(2)
     runtime.handleOutput({ sessionId: 'session-1', data: 'new', seq: 3, processName: 'bash' })
     runtime.drainReplay()
-    expect(runtime.snapshot().outputSummary).toBeUndefined()
     // Subsequent finishReplay returns nothing — the buffer was cleared.
     expect(runtime.finishReplay()).toEqual([])
   })
@@ -157,8 +153,6 @@ describe('TerminalSessionRuntime', () => {
     // preload-new (seq 6) is newer than the new snapshot → kept
     // post-attach (seq 7) is newer than the new snapshot → kept
     expect(events.map((e) => e.data)).toEqual(['preload-new', 'post-attach'])
-    // In viewer mode, kept events go into the output summary.
-    expect(runtime.snapshot().outputSummary).toBe('preload-new\npost-attach')
   })
 
   test('preserves server-provided title when attaching an existing session', () => {
@@ -220,7 +214,6 @@ describe('TerminalSessionRuntime', () => {
     expect(runtime.handleOutput({ sessionId: 'session-remote', data: 'tick', seq: 1, processName: 'node' })).toEqual({
       changed: false,
       output: 'tick',
-      summaryChanged: true,
     })
   })
 

@@ -526,7 +526,6 @@ function ViewerOverlay({
             <span className="goblin-terminal-slot__viewer-title">{snapshot.canonicalTitle}</span>
           )}
         </div>
-        {snapshot.outputSummary && <pre className="goblin-terminal-slot__viewer-output">{snapshot.outputSummary}</pre>}
         <Button
           type="button"
           size="sm"

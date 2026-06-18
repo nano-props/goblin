@@ -154,12 +154,11 @@ export class TerminalSessionRuntime {
     return this.state.resetTransientState()
   }
 
-  handleOutput(event: TerminalOutputEvent): { changed: boolean; output: string | null; summaryChanged: boolean } {
-    if (event.sessionId !== this.ptySessionId) return { changed: false, output: null, summaryChanged: false }
+  handleOutput(event: TerminalOutputEvent): { changed: boolean; output: string | null } {
+    if (event.sessionId !== this.ptySessionId) return { changed: false, output: null }
     const changed = this.state.setProcessName(event.processName)
-    if (this.state.captureReplayOutput(event)) return { changed, output: null, summaryChanged: false }
-    const summaryChanged = this.state.getCanResize() ? false : this.state.appendOutputSummary(event.data)
-    return { changed, output: event.data, summaryChanged }
+    if (this.state.captureReplayOutput(event)) return { changed, output: null }
+    return { changed, output: event.data }
   }
 
   handleOwnership(event: TerminalOwnershipViewModel): boolean {
@@ -208,13 +207,7 @@ export class TerminalSessionRuntime {
   }
 
   finishReplay(): TerminalOutputEvent[] {
-    const events = this.state.finishReplay()
-    // The output summary is read only by the viewer overlay (gated on
-    // !canResize). In controller mode it would never be read, so skip
-    // the per-event string work.
-    if (this.state.getCanResize()) return events
-    for (const event of events) this.state.appendOutputSummary(event.data)
-    return events
+    return this.state.finishReplay()
   }
 
   // Drops the replay buffer for the error / cancellation paths. The

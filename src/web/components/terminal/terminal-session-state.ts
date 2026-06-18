@@ -1,5 +1,4 @@
 import type { TerminalOutputEvent } from '#/shared/terminal-types.ts'
-import { stripTerminalControlSequences } from '#/web/components/terminal/terminal-output-text.ts'
 import { createTerminalAttachmentSnapshot } from '#/web/components/terminal/types.ts'
 import type {
   TerminalPhase,
@@ -52,11 +51,6 @@ export class TerminalSessionState {
     searchResult: null,
     progressState: null,
   }
-  /** Viewer-mode output summary: last N characters of stripped terminal output. */
-  private outputSummary = ''
-  private outputSummaryLines: string[] = []
-  private readonly MAX_OUTPUT_SUMMARY_CHARS = 500
-  private readonly MAX_OUTPUT_SUMMARY_LINES = 1000
 
   getPhase(): TerminalPhase {
     return this.runtimeState.phase
@@ -100,8 +94,6 @@ export class TerminalSessionState {
     if (this.transientViewState.searchResult) snapshot.search = this.transientViewState.searchResult
     if (this.transientViewState.progressState) snapshot.progress = this.transientViewState.progressState
     if (this.runtimeState.takeoverPending) snapshot.takeoverPending = true
-    const summary = this.outputSummary.trimEnd()
-    if (summary) snapshot.outputSummary = summary
     return snapshot
   }
 
@@ -220,63 +212,12 @@ export class TerminalSessionState {
       this.replayBufferState.replayBoundarySeq !== null || this.replayBufferState.replayPendingOutput.length > 0
     const hadSearch = this.transientViewState.searchResult !== null
     const hadProgress = this.transientViewState.progressState !== null
-    const hadSummary = this.outputSummary.length > 0
-    const changed = hadReplay || hadSearch || hadProgress || hadSummary
+    const changed = hadReplay || hadSearch || hadProgress
     this.replayBufferState.replayBoundarySeq = null
     this.replayBufferState.replayPendingOutput = []
     this.transientViewState.searchResult = null
     this.transientViewState.progressState = null
-    this.outputSummary = ''
-    this.outputSummaryLines = []
     return changed
-  }
-
-  getOutputSummary(): string | null {
-    const trimmed = this.outputSummary.trimEnd()
-    return trimmed.length > 0 ? trimmed : null
-  }
-
-  appendOutputSummary(data: string): boolean {
-    const stripped = stripTerminalControlSequences(data)
-    if (!stripped) return false
-
-    const incomingLines = stripped.split(/\r\n|\r|\n/)
-    for (const line of incomingLines) {
-      if (line.trim().length === 0) continue
-      this.outputSummaryLines.push(line.trimEnd())
-    }
-    if (this.outputSummaryLines.length > this.MAX_OUTPUT_SUMMARY_LINES) {
-      this.outputSummaryLines = this.outputSummaryLines.slice(-this.MAX_OUTPUT_SUMMARY_LINES)
-    }
-
-    const collapsed: string[] = []
-    for (const line of this.outputSummaryLines) {
-      if (collapsed.length === 0) {
-        collapsed.push(line)
-        continue
-      }
-      const last = collapsed[collapsed.length - 1]
-      const match = /^(.+) \[x(\d+)\]$/.exec(last)
-      const base = match ? match[1] : last
-      const count = match ? parseInt(match[2], 10) : 1
-      if (line === base) {
-        collapsed[collapsed.length - 1] = `${base} [x${count + 1}]`
-      } else {
-        collapsed.push(line)
-      }
-    }
-
-    const tail = collapsed.slice(-20)
-    let result = tail.join('\n')
-    if (result.length > this.MAX_OUTPUT_SUMMARY_CHARS) {
-      result = result.slice(-this.MAX_OUTPUT_SUMMARY_CHARS)
-      const firstNl = result.indexOf('\n')
-      if (firstNl >= 0) {
-        result = result.slice(firstNl + 1)
-      }
-    }
-    this.outputSummary = result
-    return true
   }
 
   setSearchResult(result: TerminalSearchResult | null): boolean {
