@@ -1835,58 +1835,12 @@ describe('ManagedTerminalSession', () => {
 
   // Contract: ownership (response + realtime event interleavings).
   // The takeover atomicity work made the response authoritative AND
-  // kept the realtime event firing for other listeners. These tests
-  // pin that the *most recent* authoritative write wins regardless
-  // of which surface it arrived on.
+  // kept the realtime event firing for other listeners. This test
+  // pins the one orthogonal new invariant that the existing
+  // follow-up #2 tests don't already cover: that phase is part of
+  // the realtime event surface and can override the response's
+  // phase after the takeover settled.
   describe('ownership contract (response + realtime event interleavings)', () => {
-    test('a second takeover response supersedes the first', async () => {
-      // The two takeover responses carry different geometry; that
-      // is the only field on `attachment` that distinguishes them
-      // (role is 'controller' for both, controllerStatus is
-      // 'connected' for both). The final state must reflect the
-      // second response, not the first.
-      terminalCalls.attach.mockResolvedValueOnce(
-        attachResult('session-1', {
-          controller: { attachmentId: 'attachment_remote', status: 'connected' },
-          canonicalCols: 120,
-          canonicalRows: 40,
-        }),
-      )
-      terminalCalls.takeover.mockResolvedValueOnce(
-        takeoverResult('session-1', {
-          controller: { attachmentId: 'attachment_a', status: 'connected' },
-          canonicalCols: 100,
-          canonicalRows: 30,
-        }),
-      )
-      terminalCalls.takeover.mockResolvedValueOnce(
-        takeoverResult('session-1', {
-          controller: { attachmentId: 'attachment_b', status: 'connected' },
-          canonicalCols: 132,
-          canonicalRows: 43,
-        }),
-      )
-      const host = document.createElement('div')
-      document.body.appendChild(host)
-      const session = new ManagedTerminalSession(descriptor, vi.fn())
-      hydrateManagedSession(session)
-      session.attach(host)
-      await flushTerminalStart()
-      await flushUntil(() => session.snapshot().phase === 'open')
-
-      session.takeover()
-      session.takeover()
-      await flushUntil(() => terminalCalls.takeover.mock.calls.length === 2)
-      // Both .then() callbacks have run; the visible attachment
-      // reflects the second response's geometry, not the first's.
-      expect(session.snapshot().attachment).toMatchObject({
-        canonicalCols: 132,
-        canonicalRows: 43,
-        role: 'controller',
-        controllerStatus: 'connected',
-      })
-    })
-
     test('realtime ownership event with phase=restarting overrides a prior takeover response phase', async () => {
       terminalCalls.attach.mockResolvedValueOnce(
         attachResult('session-1', {
@@ -1926,65 +1880,6 @@ describe('ManagedTerminalSession', () => {
         phase: 'restarting',
       })
       expect(session.snapshot().phase).toBe('restarting')
-    })
-  })
-
-  // Contract: geometry (canonicalSize follows the request, not the
-  // prior session). The single geometric invariant the takeover
-  // atomicity work changed.
-  describe('geometry contract (canonicalSize follows the request)', () => {
-    test('realtime ownership event with different geometry overrides takeover response geometry', async () => {
-      // The takeover response is authoritative for the takeover
-      // path. The realtime `ownership` event is authoritative for
-      // the non-takeover paths. A realtime event with *different*
-      // geometry arriving after a successful takeover must win —
-      // both surfaces apply the same atomic patch, and the most
-      // recent write is the visible state.
-      terminalCalls.attach.mockResolvedValueOnce(
-        attachResult('session-1', {
-          controller: { attachmentId: 'attachment_remote', status: 'connected' },
-          canonicalCols: 120,
-          canonicalRows: 40,
-        }),
-      )
-      terminalCalls.takeover.mockResolvedValueOnce(
-        takeoverResult('session-1', {
-          controller: { attachmentId: 'attachment_local', status: 'connected' },
-          canonicalCols: 101,
-          canonicalRows: 31,
-        }),
-      )
-      const host = document.createElement('div')
-      document.body.appendChild(host)
-      const session = new ManagedTerminalSession(descriptor, vi.fn())
-      hydrateManagedSession(session)
-      session.attach(host)
-      await flushTerminalStart()
-      await flushUntil(() => session.snapshot().phase === 'open')
-
-      session.takeover()
-      await flushUntil(() => terminalCalls.takeover.mock.calls.length > 0)
-      expect(session.snapshot().attachment).toMatchObject({
-        canonicalCols: 101,
-        canonicalRows: 31,
-      })
-
-      // A subsequent realtime event arrives with a different
-      // geometry (e.g. a second window resized the session). The
-      // runtime applies it; the takeover response's geometry is no
-      // longer the latest write.
-      session.handleOwnership({
-        sessionId: 'session-1',
-        role: 'controller',
-        controllerStatus: 'connected',
-        canonicalCols: 132,
-        canonicalRows: 43,
-        phase: 'open',
-      })
-      expect(session.snapshot().attachment).toMatchObject({
-        canonicalCols: 132,
-        canonicalRows: 43,
-      })
     })
   })
 })
