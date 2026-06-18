@@ -9,6 +9,6 @@ Use these docs for app-level product and architecture decisions:
 - `renderer-model.md`: renderer model
 - `realtime.md`: realtime rules
 - `terminal.md`: terminal system design
-- `terminal-first-frame-fix.md`: terminal first-frame bug fix note
+- `terminal-session-lifecycle.md`: terminal session lifecycle correctness (first-frame protocol, durable close, `session-closed` broadcast, empty-state CTA)
 - `terminal-roadmap.md`: terminal refactor roadmap
 - `terminal-target-model.md`: terminal target lifecycle and ownership model
