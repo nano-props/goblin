@@ -10,6 +10,8 @@
 import { BrowserWindow, app, screen } from 'electron'
 import { loadWindowState, setWindowBounds, type WindowBounds } from '#/main/window-state.ts'
 import { attachRendererSurfaceWindow, detachRendererSurfaceWindow } from '#/main/renderer-surface.ts'
+import { plantEmbedAuthCookie } from '#/main/cookie-bootstrap.ts'
+import { getEmbeddedServerRuntime } from '#/main/server-manager.ts'
 import {
   defaultTitleBarStyle,
   macTrafficLightPosition,
@@ -121,6 +123,26 @@ async function createMainWindow(): Promise<BrowserWindow> {
   attachRendererSurfaceWindow(win, { logLabel: 'window', surface: MAIN_WINDOW_SURFACE })
   const { url } = createRendererEntryUrl({ routePath: '/' })
   allowRendererWindowEntryUrl(win, url.toString())
+  // Plant the auth cookie on the renderer's session BEFORE
+  // `loadURL` so the very first request the renderer fires
+  // (the `useAccessTokenStatus` whoami probe) already
+  // authenticates and clears the token gate. The window's
+  // `webContents.session` is a per-window cookie store in
+  // Electron — sharing the default session across windows would
+  // leak the cookie into popups. See `cookie-bootstrap.ts` for
+  // the full rationale.
+  const runtime = getEmbeddedServerRuntime()
+  if (runtime?.accessToken) {
+    try {
+      await plantEmbedAuthCookie({
+        accessToken: runtime.accessToken,
+        url: url.toString(),
+        webContents: win.webContents,
+      })
+    } catch (err) {
+      windowNodeLog.warn({ err }, 'failed to plant embed auth cookie; falling back to token gate')
+    }
+  }
   // Persist bounds. We listen on both `resize` and `move` because the
   // user can do either independently. `getNormalBounds` returns the
   // pre-maximize size so a maximized window doesn't overwrite the

@@ -212,3 +212,25 @@ contextBridge.exposeInMainWorld('goblinNative', {
     }
   },
 })
+
+// Auth model: the renderer is identical in every runtime. The
+// embedded Electron main plants the auth cookie on the renderer's
+// `webContents.session` BEFORE the URL loads, so the renderer's
+// first request (the `useAccessTokenStatus` whoami probe) already
+// carries the cookie and clears the gate without user input. The
+// web path skips the gate entirely — the user pastes the token
+// once and `useAccessTokenStatus` exchanges it for the same
+// cookie. After that, both paths look identical: the renderer
+// calls `fetchServerJson('/api/whoami')`, the browser attaches
+// the cookie, the server returns 200.
+//
+// The preload does NOT seed `window.__GOBLIN_BOOTSTRAP__` with
+// anything — the bootstrap is empty on first paint in every
+// runtime, and the renderer fetches host info, i18n, and settings
+// from the dedicated `/api/*` endpoints during
+// `useAppBootstrap.hydrate()`. The embedded path used to also seed
+// homeDir + platform via `goblin:get-home-dir` /
+// `goblin:get-platform` IPC; those channels were removed when
+// host info moved to the public `/api/host` endpoint, so the
+// preload is now strictly an IPC bridge for browser-missing
+// capabilities (open settings window, send IPC requests, etc.).

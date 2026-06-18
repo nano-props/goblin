@@ -15,6 +15,8 @@ import {
   TERMINAL_NOTIFY_BELL_CHANNEL,
   TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL,
   TERMINAL_SET_BADGE_CHANNEL,
+  CLIPBOARD_SAVE_FILES_CHANNEL,
+  ROTATE_ACCESS_TOKEN_CHANNEL,
 } from '#/shared/ipc-channels.ts'
 
 function loadPreload(options: {
@@ -29,6 +31,18 @@ function loadPreload(options: {
       invocations.push({ channel, args })
       return options.invoke?.(channel, ...args) ?? Promise.resolve({ ok: true, data: 'ok' })
     }),
+    sendSync: vi.fn((channel: string, ...args: unknown[]) => {
+      invocations.push({ channel, args })
+      // The preload used to call `sendSync` to seed the bootstrap
+      // before the renderer's modules started (access token,
+      // server URL, home dir, platform). Those channels are gone:
+      // auth is via the http-only cookie planted by main, server
+      // URL is `window.location.origin`, and host info lives on
+      // the public `/api/host` endpoint. `sendSync` is still
+      // exposed by Electron so we keep the mock in case a future
+      // test needs to assert that no preload call uses it.
+      return { ok: true }
+    }),
     send: vi.fn((channel: string, ...args: unknown[]) => {
       sends.push({ channel, args })
     }),
@@ -40,6 +54,7 @@ function loadPreload(options: {
     console,
     Buffer,
     process: { argv: options.argv ?? [] },
+    window: { __GOBLIN_BOOTSTRAP__: undefined },
     require: (name: string) => {
       if (name !== 'electron') throw new Error(`unexpected require: ${name}`)
       return {
@@ -54,22 +69,29 @@ function loadPreload(options: {
     },
   }
   vm.runInNewContext(code, sandbox, { filename: 'preload.cjs' })
+  // The preload is now strictly an IPC bridge — no load-time
+  // bootstrap seeding, no `sendSync` calls at module init. The
+  // invocation log starts clean.
+  invocations.length = 0
   return { goblinNative: exposed.goblinNative, invocations, sends, ipcRenderer }
 }
 
 describe('preload goblinNative bridge', () => {
   test('exposes only the IPC surface, no bootstrap fields', () => {
-    // The renderer-side bootstrap is now carried by the HTML
-    // (server-injected `<script id="goblin-bootstrap">`), not by the
-    // preload. The preload is a strict IPC bridge; tests should fail
-    // if it ever starts exposing `runtime` / `homeDir` / `initialI18n`
-    // / `initialSettings` again, since that was the original
-    // `internalSecret` leak channel that this refactor closed.
+    // The bootstrap is now empty on first paint in every runtime.
+    // The preload no longer seeds `window.__GOBLIN_BOOTSTRAP__`
+    // with anything — auth is via the http-only cookie planted by
+    // main, the server URL is `window.location.origin`, and host
+    // info (homeDir, platform) is fetched from the public
+    // `/api/host` endpoint during `useAppBootstrap.hydrate()`. The
+    // `goblinNative` object therefore stays a strict IPC bridge
+    // for browser-missing capabilities (file paths, shell
+    // dialogs, terminal notifications, etc.) and does not leak
+    // any bootstrap-shaped field onto itself.
     const { goblinNative } = loadPreload()
     expect(goblinNative).not.toHaveProperty('runtime')
     expect(goblinNative).not.toHaveProperty('homeDir')
-    expect(goblinNative).not.toHaveProperty('initialI18n')
-    expect(goblinNative).not.toHaveProperty('initialSettings')
+    expect(goblinNative).not.toHaveProperty('platform')
     expect(goblinNative).not.toHaveProperty('initialServer')
     expect(goblinNative).toHaveProperty('invokeIpc')
     expect(goblinNative).toHaveProperty('abortIpc')
@@ -219,5 +241,119 @@ describe('preload goblinNative bridge', () => {
 
     off2()
     expect(ipcRenderer.off).toHaveBeenCalledWith(RENDERER_EFFECT_INTENT_CHANNEL, intentListener)
+  })
+
+  test('forwards clipboard blob save and access-token rotation to their IPC channels', async () => {
+    // These are the last two standalone channels on the preload
+    // surface. They round out the "browser-missing only" invariant:
+    // every `safeInvoke` / `ipcRenderer.send` call below is a
+    // capability that the browser can't provide. The renderer
+    // either falls through to its HTTP backend (clipboard) or
+    // gets a typed "unavailable in this runtime" rejection
+    // (rotateAccessToken — only the embedded Electron build can
+    // restart its own server).
+    const { goblinNative, invocations } = loadPreload()
+    const blob = new Uint8Array([1, 2, 3])
+    const files = [
+      { name: 'a.png', bytes: blob.buffer },
+    ]
+    await goblinNative.saveClipboardFiles([{ name: 'a.png', arrayBuffer: async () => blob.buffer } as unknown as File])
+    await goblinNative.rotateAccessToken()
+
+    expect(invocations.map((entry) => entry.channel)).toEqual([
+      CLIPBOARD_SAVE_FILES_CHANNEL,
+      ROTATE_ACCESS_TOKEN_CHANNEL,
+    ])
+    // Keep the closure capture tight: `files` is constructed so the
+    // `arrayBuffer` shape above doesn't drift to `null` in a future
+    // refactor that touches the destructuring site.
+    expect(files).toHaveLength(1)
+  })
+
+  test('locks the goblinNative IPC surface to browser-missing capabilities', () => {
+    // The renderer's "Server First" architecture means the server
+    // is the single source of truth: any IPC channel that the
+    // server *could* expose over `/api/*` belongs on the HTTP
+    // surface, not here. The remaining IPC channels must each be a
+    // capability the browser can't provide.
+    //
+    // If a future refactor adds a new IPC channel here, this test
+    // forces a corresponding entry in `BROWSER_MISSING_CHANNELS`
+    // with a justification — i.e. a future contributor has to
+    // explain why the server can't host the capability before the
+    // channel can land. That justification is the contract.
+    const BROWSER_MISSING_CHANNELS: Record<string, string> = {
+      [IPC_CHANNEL]:
+        'native-only RPC dispatch — currently used for global-shortcut registration, native menu rebuilds, and workspace-layout menu gating',
+      [IPC_ABORT_CHANNEL]: 'paired with IPC_CHANNEL for cancellation',
+      [IPC_EVENT_CHANNEL]: 'main → renderer event broadcast (Electron-only transport)',
+      [RENDERER_EFFECT_INTENT_CHANNEL]:
+        'renderer effect intent dispatch (paired with the IPC dispatch channel)',
+      [SHELL_OPEN_SETTINGS_WINDOW_CHANNEL]:
+        'BrowserWindow management — open the settings window as its own OS window',
+      [SHELL_OPEN_EXTERNAL_URL_CHANNEL]:
+        'Electron shell.openExternal — protocol-handler restrictions the browser API cannot enforce',
+      [SHELL_OPEN_DIRECTORY_DIALOG_CHANNEL]:
+        'native OS directory picker dialog (no browser equivalent)',
+      [SHELL_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL]:
+        'OS file-association handoff (Finder/Explorer "open with Goblin") — Electron-only queue',
+      [SHELL_OPEN_IN_FINDER_CHANNEL]:
+        'Electron shell.showItemInFolder — no browser equivalent',
+      [TERMINAL_NOTIFY_BELL_CHANNEL]:
+        'Electron Notification API — desktop-attached notifications with per-app identity',
+      [TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL]:
+        'paired with TERMINAL_NOTIFY_BELL_CHANNEL for the settings-page "test" button',
+      [TERMINAL_SET_BADGE_CHANNEL]:
+        'app.dock.setBadge / taskbar badge count — Electron BrowserWindow only',
+      [CLIPBOARD_SAVE_FILES_CHANNEL]:
+        'main process writes blob to <os.tmpdir>/goblin-clipboard-<pid>/ so the PTY can read it as a real file',
+      [ROTATE_ACCESS_TOKEN_CHANNEL]:
+        'embedded-server restart — only Electron main owns the server lifecycle',
+    }
+
+    // Every channel the preload touches must appear in the manifest.
+    // Drift in either direction (a channel added to preload but not
+    // the manifest, or a manifest entry with no corresponding IPC
+    // call) fails this test — surfacing both classes of regression.
+    expect(Object.keys(BROWSER_MISSING_CHANNELS).sort()).toEqual(
+      [
+        IPC_CHANNEL,
+        IPC_ABORT_CHANNEL,
+        IPC_EVENT_CHANNEL,
+        RENDERER_EFFECT_INTENT_CHANNEL,
+        SHELL_OPEN_SETTINGS_WINDOW_CHANNEL,
+        SHELL_OPEN_EXTERNAL_URL_CHANNEL,
+        SHELL_OPEN_DIRECTORY_DIALOG_CHANNEL,
+        SHELL_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL,
+        SHELL_OPEN_IN_FINDER_CHANNEL,
+        TERMINAL_NOTIFY_BELL_CHANNEL,
+        TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL,
+        TERMINAL_SET_BADGE_CHANNEL,
+        CLIPBOARD_SAVE_FILES_CHANNEL,
+        ROTATE_ACCESS_TOKEN_CHANNEL,
+      ].sort(),
+    )
+
+    // And the preload code itself must mention every channel in
+    // the manifest as a literal string, otherwise the manifest is
+    // fiction. This catches "added to manifest but never wired"
+    // before it lands.
+    const preloadSource = readFileSync(
+      path.join(import.meta.dirname, '../preload/preload.cjs'),
+      'utf8',
+    )
+    for (const channel of Object.keys(BROWSER_MISSING_CHANNELS)) {
+      // The preload hardcodes its channel strings (no Node import
+      // available in a sandboxed preload — see preload.cjs
+      // header). Every channel name must therefore appear as a
+      // single-quoted literal somewhere in the file.
+      expect(preloadSource, `preload must reference ${channel}`).toContain(`'${channel}'`)
+    }
+
+    // Spot-check that justifications aren't empty — a manifest
+    // entry with no rationale is a TODO disguised as a contract.
+    for (const [channel, rationale] of Object.entries(BROWSER_MISSING_CHANNELS)) {
+      expect(rationale.length, `${channel} must have a justification`).toBeGreaterThan(20)
+    }
   })
 })

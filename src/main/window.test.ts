@@ -226,12 +226,14 @@ describe('main window navigation boundaries', () => {
     expect(mocks.windowOptions[0]?.webPreferences?.preload).toBe('/app/dist/preload/preload-0.1.0-testhash.cjs')
   })
 
-  test('uses the renderer dev server origin in bootstrap server config during development', async () => {
-    // The bootstrap payload is now built by the embedded server
-    // (see `#/server/app-factory.ts:buildWebBootstrap`) and rendered
-    // into the HTML response, not ferried via preload IPC. The dev-URL
-    // override flows through `webDevUrl` in the same place; the
-    // server-side test in `app-factory.test.ts` covers it.
+  test('uses the renderer dev server origin in window URL during development', async () => {
+    // The bootstrap (access token, server URL, home dir, platform)
+    // is ferried from the main process to the preload via IPC; the
+    // `webDevUrl` env override just changes which URL the renderer
+    // window is pointed at (Vite vs the embedded server's static
+    // file route). The dev-URL override flows through
+    // `createRendererEntryUrl`; the bootstrap-IPC behavior is
+    // covered by the IPC handler tests.
     process.env.GOBLIN_WEB_DEV_URL = 'http://127.0.0.1:5173/'
     const { getOrCreateMainWindow } = await import('#/main/window.ts')
 
