@@ -2,10 +2,13 @@
 
 > **Status**: combined bug-fix and design note.
 > All four roots described here are implemented on `main` as of
-> `694c68c`. The document is retained as the authoritative contract
-> and as a record of why the implementation is shaped the way it is.
+> `694c68c`. The type-level atomicity follow-up #1 (§Type-level
+> atomicity) landed on top. The document is retained as the
+> authoritative contract and as a record of why the implementation
+> is shaped the way it is.
 >
-> - R0 first-frame atomicity — `d020cd5`.
+> - R0 first-frame atomicity — `d020cd5`, type-level tightening
+>   in §Type-level atomicity.
 > - R1 durable close, R2 `session-closed` broadcast, R3 empty-state
 >   CTA — landed together in `fa67adb` (the "wip: snapshot
 >   uncommitted tree" baseline; the commit name is from the
@@ -175,14 +178,38 @@ lags the created session, the renderer now:
 2. synthesizes temporary projection data if needed,
 3. lets later session-sync / reconciliation catch up normally.
 
-### Transitional type shape (known follow-up)
+### Type-level atomicity (follow-up #1)
 
-`TerminalCatalogMutationResult` is currently in a transitional state:
-the new first-frame fields are surfaced through a partial
-attach-like shape, with the renderer enforcing them at runtime.
-A follow-up should tighten the shared type so the first-frame fields
-are required at the type level, not only by renderer-side validation.
-Tracked in §Suggested follow-ups.
+Follow-up #1 from §Suggested follow-ups landed: the shared protocol
+types now require the first-frame fields at the type level, so a
+forgotten field surfaces as a compile error rather than a runtime
+crash. Two changes:
+
+1. A new `TerminalFirstFrame` interface
+   (`src/shared/terminal-types.ts`) is the single source of truth for
+   the first-frame handshake. It lifts every field that R0 made
+   required (`sessionId`, `processName`, `canonicalTitle`, `phase`,
+   `message`, `snapshot`, `snapshotSeq`, `controller`, `canonicalCols`,
+   `canonicalRows`).
+2. `TerminalAttachResult` no longer accepts `canonicalCols?` /
+   `canonicalRows?` — both are required. The internal server-side
+   `EnsureTerminalCatalogResult` shape was tightened to match.
+3. `TerminalCatalogMutationResult` intersects with `TerminalFirstFrame`
+   instead of `Partial<Extract<TerminalAttachResult, { ok: true }>>`,
+   so every `create` success carries the full first-frame payload at
+   the type level. The renderer's runtime "missing sessionId" check
+   is now redundant for the type-checked paths (and stays as a
+   belt-and-suspenders guard against `unknown`/JSON-blob shapes
+   arriving from the bridge layer).
+
+The renderer-side fabrication path in `performCreateTerminal` is
+removed: if the server claims `action: 'created'` but the catalog
+`sessions[]` does not echo that session, the create is rejected with
+`error.terminal-create-failed` instead of silently inventing a
+synthetic session entry. The first-frame payload is now the source
+of truth — fabrication was hiding real protocol mismatches
+(half-applied creates that committed the session row but skipped the
+catalog append).
 
 ---
 
@@ -583,9 +610,9 @@ any individual implementation:
 
 ## Suggested follow-ups
 
-1. Tighten the shared `TerminalCatalogMutationResult` type so the
-   first-frame fields are required at the type level, not only by
-   renderer-side validation. (R0 transitional state.)
+1. **Done** — tighten the shared `TerminalCatalogMutationResult`
+   type so the first-frame fields are required at the type level,
+   not only by renderer-side validation. (See §Type-level atomicity.)
 2. Decide explicitly whether the same-session snapshot reapply
    patch (broadened `ManagedTerminalSession.hydrate()`) should stay
    as a supported repair path.
