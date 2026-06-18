@@ -56,10 +56,14 @@ function capabilitiesFromBridge(bridge: NonNullable<Window['goblinNative']>): Re
 function readServerTerminalConfig(): RendererServerTerminalConfig | null {
   // Two paths can populate the bootstrap's `initialServer`:
   //
-  //  - QR-code URL bootstrap (`?accessToken=…&goblinServerClientId=…`)
-  //    drops a token + client id on the URL before first paint;
-  //    `useAccessTokenStatus` consumes the token for the cookie and
-  //    the client id is kept around for the WS upgrade.
+  //  - QR-code URL bootstrap (`?accessToken=…`) drops a token on
+  //    the URL before first paint; `useAccessTokenStatus` consumes
+  //    the token for the cookie. The `goblinServerClientId=` query
+  //    is still accepted for backward compatibility (older Goblin
+  //    builds emitted it) but is now optional — the server derives
+  //    its `ownerId` from the access token, not from `clientId`,
+  //    so the cross-browser takeover case no longer needs a
+  //    pre-shared `clientId`. See `identity.ts`.
   //
   // Everything else (Electron embedded, standalone web, Vite-served
   // dev) authenticates via the http-only cookie set by either

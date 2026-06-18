@@ -28,8 +28,8 @@ import type { TerminalRealtimeBroker } from '#/server/terminal/terminal-realtime
 import { isValidTerminalWriteData, type TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 
 interface TerminalCatalogLike {
-  create(clientId: string, input: TerminalCreateInput): Promise<TerminalCatalogMutationResult>
-  prune(clientId: string, repoRoot: string): Promise<{ pruned: number; remaining: number }>
+  create(clientId: string, ownerId: string, input: TerminalCreateInput): Promise<TerminalCatalogMutationResult>
+  prune(clientId: string, ownerId: string, repoRoot: string): Promise<{ pruned: number; remaining: number }>
   listSessions(repoRoot: string): Promise<TerminalSessionSummary[]>
 }
 
@@ -41,11 +41,23 @@ interface TerminalRuntimeActionDependencies {
   resolveAttachmentConnected(clientId: string, attachmentId?: string): boolean | undefined
 }
 
+// Manager-facing calls (attachSession/takeoverSession/...) take
+// `ownerId` so the in-memory session store is partitioned by token
+// identity, not by per-tab routing id. The broker's
+// `attachmentIsConnected` lookup is clientId-keyed because it
+// answers "is this WS connection alive for this (clientId,
+// attachmentId) pair?" — that's the right granularity for the
+// connection check, even though the *partition* lives under
+// `ownerId`.
 export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependencies) {
   const { manager, broker, catalog, isValidTerminalClientId, resolveAttachmentConnected } = deps
 
   return {
-    async attach(clientId: string, input: TerminalAttachInput): Promise<TerminalAttachResult> {
+    async attach(
+      clientId: string,
+      ownerId: string,
+      input: TerminalAttachInput,
+    ): Promise<TerminalAttachResult> {
       if (
         !isValidTerminalClientId(clientId) ||
         !isValidTerminalSessionId(input?.sessionId) ||
@@ -55,7 +67,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         return { ok: false, message: 'error.invalid-arguments' }
       }
       const result = manager.attachSession(
-        clientId,
+        ownerId,
         input.sessionId,
         input.cols,
         input.rows,
@@ -65,8 +77,12 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       return result
     },
 
-    async restart(clientId: string, input: TerminalRestartInput): Promise<TerminalAttachResult> {
-      const repoRoot = manager.getSession(clientId, input.sessionId)?.scope
+    async restart(
+      clientId: string,
+      ownerId: string,
+      input: TerminalRestartInput,
+    ): Promise<TerminalAttachResult> {
+      const repoRoot = manager.getSession(ownerId, input.sessionId)?.scope
       if (
         !isValidTerminalClientId(clientId) ||
         !isValidTerminalSessionId(input?.sessionId) ||
@@ -76,7 +92,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         return { ok: false, message: 'error.invalid-arguments' }
       }
       const result = await manager.restartSession(
-        clientId,
+        ownerId,
         input.sessionId,
         input.cols,
         input.rows,
@@ -87,15 +103,23 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       return result
     },
 
-    async create(clientId: string, input: TerminalCreateInput): Promise<TerminalCatalogMutationResult> {
-      return await catalog.create(clientId, input)
+    async create(
+      clientId: string,
+      ownerId: string,
+      input: TerminalCreateInput,
+    ): Promise<TerminalCatalogMutationResult> {
+      return await catalog.create(clientId, ownerId, input)
     },
 
-    async prune(clientId: string, repoRoot: string): Promise<{ pruned: number; remaining: number }> {
-      return await catalog.prune(clientId, repoRoot)
+    async prune(
+      clientId: string,
+      ownerId: string,
+      repoRoot: string,
+    ): Promise<{ pruned: number; remaining: number }> {
+      return await catalog.prune(clientId, ownerId, repoRoot)
     },
 
-    write(clientId: string, input: TerminalWriteInput): TerminalMutationResult {
+    write(clientId: string, ownerId: string, input: TerminalWriteInput): TerminalMutationResult {
       if (!isValidTerminalClientId(clientId)) return false
       if (
         !isValidTerminalSessionId(input?.sessionId) ||
@@ -104,10 +128,10 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       ) {
         return false
       }
-      return manager.writeSession(clientId, input.sessionId, input.data, input.attachmentId)
+      return manager.writeSession(ownerId, input.sessionId, input.data, input.attachmentId)
     },
 
-    resize(clientId: string, input: TerminalResizeInput): TerminalMutationResult {
+    resize(clientId: string, ownerId: string, input: TerminalResizeInput): TerminalMutationResult {
       if (!isValidTerminalClientId(clientId)) return false
       if (
         !isValidTerminalSessionId(input?.sessionId) ||
@@ -117,7 +141,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         return false
       }
       return manager.resizeSession(
-        clientId,
+        ownerId,
         input.sessionId,
         input.cols,
         input.rows,
@@ -126,7 +150,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       )
     },
 
-    close(clientId: string, input: TerminalSessionInput): TerminalMutationResult {
+    close(clientId: string, ownerId: string, input: TerminalSessionInput): TerminalMutationResult {
       if (!isValidTerminalClientId(clientId)) return false
       // Look up the session BEFORE closing so we know its scope
       // (for the per-session broadcast). The session is gone after
@@ -134,10 +158,10 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       // always miss. The lookup is also gated on validity so a
       // malformed input never throws inside the action.
       const repoRoot = isValidTerminalSessionId(input?.sessionId)
-        ? manager.getSession(clientId, input.sessionId)?.scope
+        ? manager.getSession(ownerId, input.sessionId)?.scope
         : undefined
       const closed = isValidTerminalSessionId(input?.sessionId)
-        ? manager.closeOwnedSession(clientId, input.sessionId)
+        ? manager.closeOwnedSession(ownerId, input.sessionId)
         : false
       if (closed && repoRoot) {
         // `sessions-changed` keeps the full repo list in sync for
@@ -158,7 +182,11 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       return closed
     },
 
-    takeover(clientId: string, input: TerminalTakeoverInput): TerminalTakeoverResult {
+    takeover(
+      clientId: string,
+      ownerId: string,
+      input: TerminalTakeoverInput,
+    ): TerminalTakeoverResult {
       if (!isValidTerminalClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
       if (
         !isValidTerminalSessionId(input?.sessionId) ||
@@ -168,7 +196,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         return { ok: false, message: 'error.invalid-arguments' }
       }
       return manager.takeoverSession(
-        clientId,
+        ownerId,
         input.sessionId,
         input.cols,
         input.rows,
@@ -177,19 +205,27 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       )
     },
 
-    async listSessions(clientId: string, repoRoot: string): Promise<TerminalSessionSummary[]> {
+    async listSessions(
+      clientId: string,
+      ownerId: string,
+      repoRoot: string,
+    ): Promise<TerminalSessionSummary[]> {
       if (!isValidTerminalClientId(clientId)) return []
       if (!isValidRepoLocator(repoRoot)) return []
       return await catalog.listSessions(repoRoot)
     },
 
-    getSessionSnapshot(clientId: string, input: TerminalSessionSnapshotInput): TerminalSessionSnapshot | null {
+    getSessionSnapshot(
+      clientId: string,
+      ownerId: string,
+      input: TerminalSessionSnapshotInput,
+    ): TerminalSessionSnapshot | null {
       if (!isValidTerminalClientId(clientId)) return null
       if (!isValidTerminalSessionId(input?.sessionId)) return null
       return manager.snapshotSession(input.sessionId)
     },
 
-    reorder(clientId: string, input: TerminalReorderInput): TerminalMutationResult {
+    reorder(clientId: string, ownerId: string, input: TerminalReorderInput): TerminalMutationResult {
       if (!isValidTerminalClientId(clientId)) return false
       if (!isValidRepoLocator(input?.repoRoot)) return false
       if (typeof input?.worktreePath !== 'string' || input.worktreePath.length === 0) return false

@@ -26,7 +26,6 @@ import {
   isValidTerminalClientId,
   isValidTerminalId,
   isValidTerminalSocketAttachmentId,
-  resolveAttachmentConnected,
 } from '#/server/terminal/terminal-runtime-support.ts'
 import { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 import { type PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
@@ -52,20 +51,26 @@ export interface ServerTerminalRuntime {
 export function createServerTerminalRuntime(options: ServerTerminalRuntimeOptions): ServerTerminalRuntime {
   const { ptySupervisor } = options
 
+  // Sink callbacks fan out to every clientId that shares the
+  // session's ownerId. The manager passes `ownerId` (a string
+  // derived from the access token) rather than `clientId`, so a
+  // live output event reaches a sibling tab (different `clientId`,
+  // same `ownerId`) without an extra attach roundtrip. See
+  // `identity.ts` for the model.
   const manager = new TerminalSessionManager<string>(ptySupervisor, {
-    onOutput(clientId, event) {
-      broker.broadcast(clientId, { type: 'output', event })
+    onOutput(ownerId, event) {
+      broker.broadcastOwner(ownerId, { type: 'output', event })
     },
-    onTitle(clientId, event) {
-      broker.broadcast(clientId, { type: 'title', event })
+    onTitle(ownerId, event) {
+      broker.broadcastOwner(ownerId, { type: 'title', event })
     },
-    onExit(clientId, event) {
-      const repoRoot = manager.getSession(clientId, event.sessionId)?.scope
-      broker.broadcast(clientId, { type: 'exit', event })
+    onExit(ownerId, event) {
+      const repoRoot = manager.getSession(ownerId, event.sessionId)?.scope
+      broker.broadcastOwner(ownerId, { type: 'exit', event })
       if (repoRoot) broker.broadcastGlobal({ type: 'sessions-changed', repoRoot })
     },
-    onOwnership(clientId, event) {
-      broker.broadcast(clientId, { type: 'ownership', event })
+    onOwnership(ownerId, event) {
+      broker.broadcastOwner(ownerId, { type: 'ownership', event })
     },
   })
   const { broker, connectionState } = createTerminalRuntimeCoordinator({
@@ -92,7 +97,17 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     broker,
     catalog,
     isValidTerminalClientId,
-    resolveAttachmentConnected,
+    // The previous stub returned `true` whenever an attachmentId
+    // was present (see `resolveAttachmentConnected` before this
+    // plan), which made the takeover path "work" for the first
+    // browser tab but masked the fact that we never asked the
+    // broker. Replacing with the broker check ensures a takeover
+    // request from a brand-new tab (the cross-browser scenario)
+    // only counts the attachment as connected if the WS is
+    // actually alive for the (clientId, attachmentId) pair.
+    resolveAttachmentConnected(clientId, attachmentId) {
+      return broker.attachmentIsConnected(clientId, attachmentId) ?? false
+    },
   })
 
   const host: ServerTerminalHost = {
@@ -112,70 +127,103 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         maxRingBufferChars: bufferStats.maxBufferChars,
       }
     },
-    registerSocket(clientId, attachmentId, socket) {
-      if (!isValidTerminalClientId(clientId) || !isValidTerminalSocketAttachmentId(attachmentId)) {
+    registerSocket(clientId, attachmentId, ownerId, socket) {
+      if (
+        !isValidTerminalClientId(clientId) ||
+        !isValidTerminalSocketAttachmentId(attachmentId) ||
+        !ownerId
+      ) {
         socket.close(1008, 'invalid client id')
         return
       }
       const buffered = new BufferedTerminalSocket(socket as TerminalRealtimeSocket)
       bufferedSocketByRawSocket.set(socket as TerminalRealtimeSocket, buffered)
-      broker.registerSocket(clientId, attachmentId, buffered)
+      broker.registerSocket(clientId, attachmentId, ownerId, buffered)
     },
-    unregisterSocket(clientId, attachmentId, socket) {
+    unregisterSocket(clientId, attachmentId, ownerId, socket) {
       const buffered =
         bufferedSocketByRawSocket.get(socket as TerminalRealtimeSocket) ?? (socket as TerminalRealtimeSocket)
       if (buffered instanceof BufferedTerminalSocket) buffered.deactivate()
-      broker.unregisterSocket(clientId, attachmentId, buffered)
+      broker.unregisterSocket(clientId, attachmentId, ownerId, buffered)
       bufferedSocketByRawSocket.delete(socket as TerminalRealtimeSocket)
     },
-    async attach(clientId, input) {
-      return await actions.attach(clientId, input)
+    async attach(clientId, ownerId, input) {
+      return await actions.attach(clientId, ownerId, input)
     },
-    async restart(clientId, input) {
-      return await actions.restart(clientId, input)
+    async restart(clientId, ownerId, input) {
+      return await actions.restart(clientId, ownerId, input)
     },
-    write(clientId, input) {
-      return actions.write(clientId, input)
+    write(clientId, ownerId, input) {
+      return actions.write(clientId, ownerId, input)
     },
-    resize(clientId, input) {
-      return actions.resize(clientId, input)
+    resize(clientId, ownerId, input) {
+      return actions.resize(clientId, ownerId, input)
     },
-    takeover(clientId, input) {
-      return actions.takeover(clientId, input)
+    takeover(clientId, ownerId, input) {
+      return actions.takeover(clientId, ownerId, input)
     },
-    close(clientId, input) {
-      return actions.close(clientId, input)
+    close(clientId, ownerId, input) {
+      return actions.close(clientId, ownerId, input)
     },
-    async listSessions(clientId, repoRoot) {
-      return await actions.listSessions(clientId, repoRoot)
+    async listSessions(clientId, ownerId, repoRoot) {
+      return await actions.listSessions(clientId, ownerId, repoRoot)
     },
-    async create(clientId, input) {
-      return await actions.create(clientId, input)
+    async create(clientId, ownerId, input) {
+      return await actions.create(clientId, ownerId, input)
     },
-    async prune(clientId, repoRoot) {
-      return await actions.prune(clientId, repoRoot)
+    async prune(clientId, ownerId, repoRoot) {
+      return await actions.prune(clientId, ownerId, repoRoot)
     },
-    getSessionSnapshot(clientId, input) {
-      return actions.getSessionSnapshot(clientId, input)
+    getSessionSnapshot(clientId, ownerId, input) {
+      return actions.getSessionSnapshot(clientId, ownerId, input)
     },
-    reorder(clientId, input) {
-      return actions.reorder(clientId, input)
+    reorder(clientId, ownerId, input) {
+      return actions.reorder(clientId, ownerId, input)
     },
-    handleRealtimeMessage(clientId, attachmentId, socket, payload) {
-      if (!isValidTerminalClientId(clientId) || !isValidTerminalSocketAttachmentId(attachmentId)) return
+    handleRealtimeMessage(clientId, attachmentId, ownerId, socket, payload) {
+      // Log invalid identifier/parse drops so a stuck takeover
+      // (e.g. an old clientId pattern that the WS validator
+      // missed) is observable in production logs. We still
+      // return early without rejecting the WS — the message is
+      // just unprocessable for this socket.
+      if (!isValidTerminalClientId(clientId) || !isValidTerminalSocketAttachmentId(attachmentId)) {
+        terminalRuntimeLogger.warn(
+          { clientId, attachmentId },
+          'invalid realtime message: missing/invalid identifiers',
+        )
+        return
+      }
+      if (!ownerId) {
+        terminalRuntimeLogger.warn(
+          { clientId, attachmentId },
+          'invalid realtime message: missing ownerId from auth context',
+        )
+        return
+      }
       let message: TerminalClientMessage | null = null
       try {
         message = normalizeTerminalClientMessage(JSON.parse(payload))
-      } catch {
+      } catch (err) {
+        terminalRuntimeLogger.warn(
+          { clientId, attachmentId, err },
+          'invalid realtime message: parse/normalize failed',
+        )
         return
       }
-      if (!message) return
+      if (!message) {
+        terminalRuntimeLogger.warn(
+          { clientId, attachmentId },
+          'invalid realtime message: null after normalize',
+        )
+        return
+      }
       const bufferedSocket = bufferedSocketByRawSocket.get(socket as TerminalRealtimeSocket)
       if (shouldPauseRealtimeRequest(message.action)) bufferedSocket?.pause()
       void handleTerminalRealtimeRequestMessage(
         realtimeHandlers,
         clientId,
         attachmentId,
+        ownerId,
         socket as TerminalRealtimeSocket,
         bufferedSocket,
         message,

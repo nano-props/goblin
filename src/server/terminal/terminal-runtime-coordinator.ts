@@ -18,33 +18,40 @@ export function createTerminalRuntimeCoordinator(
 ): TerminalRuntimeCoordinator {
   const { manager, ownershipGraceMs, detachedTtlMs } = options
 
+  // The connection-state timers key by (clientId, attachmentId)
+  // because they are per-WS-connection lifecycles. The callbacks
+  // carry `ownerId` so the manager (which is ownerId-partitioned
+  // under method 2) can be reached without re-deriving identity.
   const connectionState = new TerminalConnectionState({
     ownershipGraceMs,
     detachedTtlMs,
-    onAttachmentExpired(clientId, attachmentId) {
-      manager.expireAttachment(clientId, attachmentId)
+    onAttachmentExpired(_clientId, attachmentId, ownerId) {
+      manager.expireAttachment(ownerId, attachmentId)
     },
-    onClientExpired(clientId) {
-      manager.closeOwner(clientId)
+    onClientExpired(_clientId, ownerId) {
+      manager.closeOwner(ownerId)
     },
   })
 
   const broker = new TerminalRealtimeBroker({
-    onAttachmentConnected(clientId, attachmentId) {
+    onAttachmentConnected(clientId, attachmentId, ownerId) {
       connectionState.clearClientDisconnect(clientId)
       connectionState.clearAttachmentDisconnect(clientId, attachmentId)
-      manager.setAttachmentConnected(clientId, attachmentId, true)
+      manager.setAttachmentConnected(ownerId, attachmentId, true)
     },
-    onAttachmentDisconnected(clientId, attachmentId) {
-      manager.setAttachmentConnected(clientId, attachmentId, false)
+    onAttachmentDisconnected(clientId, attachmentId, ownerId) {
+      manager.setAttachmentConnected(ownerId, attachmentId, false)
       connectionState.scheduleOwnershipRelease(
         clientId,
         attachmentId,
+        ownerId,
         () => broker.attachmentIsConnected(clientId, attachmentId) === true,
       )
     },
-    onClientDisconnected(clientId) {
-      connectionState.scheduleClientDisconnect(clientId, () => broker.hasClientSockets(clientId))
+    onClientDisconnected(clientId, ownerId) {
+      connectionState.scheduleClientDisconnect(clientId, ownerId, () =>
+        broker.hasClientSockets(clientId),
+      )
     },
   })
 

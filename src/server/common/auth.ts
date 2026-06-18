@@ -2,6 +2,7 @@ import type { Context, MiddlewareHandler } from 'hono'
 import { getCookie } from 'hono/cookie'
 import { safeEqualString } from '#/server/common/timing-safe.ts'
 import { errorJson } from '#/server/common/responses.ts'
+import { deriveOwnerId } from '#/server/common/identity.ts'
 import { ACCESS_TOKEN_COOKIE, ACCESS_TOKEN_HEADER, ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
 
 /**
@@ -14,6 +15,11 @@ import { ACCESS_TOKEN_COOKIE, ACCESS_TOKEN_HEADER, ACCESS_TOKEN_QUERY } from '#/
  * the canonical channel for the embedded Electron renderer.
  * Query is the fallback for WebSocket clients (browsers can't set
  * WS headers; non-browser clients don't have a cookie jar).
+ *
+ * On success the middleware stashes an `ownerId` derived from the
+ * token on the Hono context so downstream handlers can partition
+ * in-memory state by token identity (rather than by per-tab
+ * `clientId`). See `identity.ts` for the full model.
  */
 export function createAccessTokenMiddleware(token: string): MiddlewareHandler {
   return async (c, next) => {
@@ -28,9 +34,18 @@ export function createAccessTokenMiddleware(token: string): MiddlewareHandler {
     const queryValue = c.req.query(ACCESS_TOKEN_QUERY) ?? ''
     // Order matters only for the observability of which channel
     // matched; the security guarantee comes from safeEqualString.
-    if (cookieValue && safeEqualString(cookieValue, token)) return next()
-    if (headerValue && safeEqualString(headerValue, token)) return next()
-    if (queryValue && safeEqualString(queryValue, token)) return next()
+    if (cookieValue && safeEqualString(cookieValue, token)) {
+      c.set('ownerId', deriveOwnerId(token))
+      return next()
+    }
+    if (headerValue && safeEqualString(headerValue, token)) {
+      c.set('ownerId', deriveOwnerId(token))
+      return next()
+    }
+    if (queryValue && safeEqualString(queryValue, token)) {
+      c.set('ownerId', deriveOwnerId(token))
+      return next()
+    }
     return errorJson(c, 'FORBIDDEN', 'Unauthorized', 401)
   }
 }

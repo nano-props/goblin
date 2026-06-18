@@ -78,23 +78,47 @@ export interface ServerTerminalHostDiagnostics {
 export interface ServerTerminalHost {
   isValidClientId(value: unknown): value is string
   getDiagnostics(): ServerTerminalHostDiagnostics
-  registerSocket(clientId: string, attachmentId: string, socket: ServerTerminalSocket): void
-  unregisterSocket(clientId: string, attachmentId: string, socket: ServerTerminalSocket): void
-  attach(clientId: string, input: TerminalAttachInput): MaybePromise<TerminalAttachResult>
-  restart(clientId: string, input: TerminalRestartInput): MaybePromise<TerminalAttachResult>
-  write(clientId: string, input: TerminalWriteInput): MaybePromise<TerminalMutationResult>
-  resize(clientId: string, input: TerminalResizeInput): MaybePromise<TerminalMutationResult>
-  takeover(clientId: string, input: TerminalTakeoverInput): MaybePromise<TerminalTakeoverResult>
-  close(clientId: string, input: TerminalSessionInput): MaybePromise<TerminalMutationResult>
-  listSessions(clientId: string, repoRoot: string): MaybePromise<TerminalSessionSummary[]>
-  create(clientId: string, input: TerminalCreateInput): MaybePromise<TerminalCatalogMutationResult>
-  prune(clientId: string, repoRoot: string): MaybePromise<{ pruned: number; remaining: number }>
+  // `clientId` is a per-tab routing identifier (broker key, WS
+  // query param, localStorage value). `ownerId` is a per-token
+  // identity derived from the access token; it partitions the
+  // in-memory session store so the same token shared across
+  // browsers sees the same terminals. See `identity.ts` for the
+  // full model. Both must be threaded explicitly at the host
+  // boundary so the two identifiers cannot be conflated.
+  registerSocket(
+    clientId: string,
+    attachmentId: string,
+    ownerId: string,
+    socket: ServerTerminalSocket,
+  ): void
+  unregisterSocket(
+    clientId: string,
+    attachmentId: string,
+    ownerId: string,
+    socket: ServerTerminalSocket,
+  ): void
+  attach(clientId: string, ownerId: string, input: TerminalAttachInput): MaybePromise<TerminalAttachResult>
+  restart(clientId: string, ownerId: string, input: TerminalRestartInput): MaybePromise<TerminalAttachResult>
+  write(clientId: string, ownerId: string, input: TerminalWriteInput): MaybePromise<TerminalMutationResult>
+  resize(clientId: string, ownerId: string, input: TerminalResizeInput): MaybePromise<TerminalMutationResult>
+  takeover(clientId: string, ownerId: string, input: TerminalTakeoverInput): MaybePromise<TerminalTakeoverResult>
+  close(clientId: string, ownerId: string, input: TerminalSessionInput): MaybePromise<TerminalMutationResult>
+  listSessions(clientId: string, ownerId: string, repoRoot: string): MaybePromise<TerminalSessionSummary[]>
+  create(clientId: string, ownerId: string, input: TerminalCreateInput): MaybePromise<TerminalCatalogMutationResult>
+  prune(clientId: string, ownerId: string, repoRoot: string): MaybePromise<{ pruned: number; remaining: number }>
   getSessionSnapshot(
     clientId: string,
+    ownerId: string,
     input: TerminalSessionSnapshotInput,
   ): MaybePromise<TerminalSessionSnapshot | null>
-  reorder(clientId: string, input: TerminalReorderInput): MaybePromise<TerminalMutationResult>
+  reorder(clientId: string, ownerId: string, input: TerminalReorderInput): MaybePromise<TerminalMutationResult>
   /** Handle an incoming realtime message from a client socket. */
-  handleRealtimeMessage(clientId: string, attachmentId: string, socket: ServerTerminalSocket, message: string): void
+  handleRealtimeMessage(
+    clientId: string,
+    attachmentId: string,
+    ownerId: string,
+    socket: ServerTerminalSocket,
+    message: string,
+  ): void
   shutdown(): void
 }

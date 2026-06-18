@@ -86,7 +86,11 @@ class TerminalCatalog {
     this.options = options
   }
 
-  async ensureOrRestore(clientId: string, input: EnsureTerminalCatalogInput): Promise<EnsureTerminalCatalogResult> {
+  async ensureOrRestore(
+    clientId: string,
+    ownerId: string,
+    input: EnsureTerminalCatalogInput,
+  ): Promise<EnsureTerminalCatalogResult> {
     if (!this.options.isValidClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidRepoLocator(input.repoRoot)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidBranch(input.branch)) return { ok: false, message: 'error.invalid-arguments' }
@@ -116,17 +120,21 @@ class TerminalCatalog {
       : 'created'
 
     if (isRemoteRepoId(input.repoRoot)) {
-      return await this.ensureRemote(clientId, input, { terminalId, cols, rows, targetSessionKey, action })
+      return await this.ensureRemote(clientId, ownerId, input, { terminalId, cols, rows, targetSessionKey, action })
     }
-    return await this.ensureLocal(clientId, input, { cols, rows, targetSessionKey, action })
+    return await this.ensureLocal(clientId, ownerId, input, { cols, rows, targetSessionKey, action })
   }
 
-  async create(clientId: string, input: TerminalCreateInput): Promise<TerminalCatalogMutationResult> {
+  async create(
+    clientId: string,
+    ownerId: string,
+    input: TerminalCreateInput,
+  ): Promise<TerminalCatalogMutationResult> {
     if (!this.options.isValidClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidRepoLocator(input.repoRoot)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidTerminalAttachmentId(input?.attachmentId)) return { ok: false, message: 'error.invalid-arguments' }
 
-    const createResult = await this.ensureOrRestore(clientId, {
+    const createResult = await this.ensureOrRestore(clientId, ownerId, {
       ...input,
       terminalId:
         input.kind === 'primary' ? 'terminal-1' : await this.nextTerminalId(input.repoRoot, input.worktreePath),
@@ -155,7 +163,11 @@ class TerminalCatalog {
     return await this.options.manager.listSessions(terminalSessionScope(repoRoot))
   }
 
-  async prune(clientId: string, repoRoot: string): Promise<{ pruned: number; remaining: number }> {
+  async prune(
+    clientId: string,
+    _ownerId: string,
+    repoRoot: string,
+  ): Promise<{ pruned: number; remaining: number }> {
     if (!this.options.isValidClientId(clientId)) return { pruned: 0, remaining: 0 }
     if (!isValidRepoLocator(repoRoot)) return { pruned: 0, remaining: 0 }
 
@@ -198,6 +210,7 @@ class TerminalCatalog {
 
   private async ensureRemote(
     clientId: string,
+    ownerId: string,
     input: EnsureTerminalCatalogInput,
     context: {
       terminalId: string
@@ -220,7 +233,7 @@ class TerminalCatalog {
       rows: context.rows,
     })
     const result = await this.options.manager.ensureSession({
-      ownerId: clientId,
+      ownerId,
       scope: input.repoRoot,
       key: context.targetSessionKey,
       cwd: process.cwd(),
@@ -239,6 +252,7 @@ class TerminalCatalog {
 
   private async ensureLocal(
     clientId: string,
+    ownerId: string,
     input: EnsureTerminalCatalogInput,
     context: {
       cols: number
@@ -254,7 +268,7 @@ class TerminalCatalog {
     const repoRoot = path.resolve(input.repoRoot)
     const worktreePath = path.resolve(resolved.path)
     const result = await this.options.manager.ensureSession({
-      ownerId: clientId,
+      ownerId,
       scope: repoRoot,
       key: context.targetSessionKey,
       cwd: worktreePath,

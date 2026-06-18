@@ -6,6 +6,7 @@ import {
   unregisterInvalidationSocket,
 } from '#/server/modules/invalidation-broker.ts'
 import { createAccessTokenMiddleware } from '#/server/common/auth.ts'
+import { ownerIdFromContext } from '#/server/common/identity.ts'
 import { errorJson } from '#/server/common/responses.ts'
 import { TERMINAL_WS_MESSAGE_LIMIT_BYTES } from '#/shared/terminal-validators.ts'
 import type { ServerTerminalHost, ServerTerminalSocket } from '#/server/terminal/terminal-host.ts'
@@ -28,7 +29,10 @@ interface RealtimeRouteOptions {
 export function createRealtimeRoutes({ accessToken, terminalHost }: RealtimeRouteOptions) {
   // The shared middleware accepts cookie, header, or `?t=` query, so
   // browser clients (cookie), embedded Electron clients (`?t=`),
-  // and LAN CLI clients (any of the three) all work.
+  // and LAN CLI clients (any of the three) all work. The middleware
+  // stashes an `ownerId` derived from the access token on the
+  // Hono context; the WS upgrade reads it and threads it into the
+  // host calls. See `identity.ts` for the model.
   const auth = createAccessTokenMiddleware(accessToken)
 
   const app = new Hono()
@@ -42,6 +46,13 @@ export function createRealtimeRoutes({ accessToken, terminalHost }: RealtimeRout
       }
       if (!c.req.query('attachmentId')) {
         return errorJson(c, 'BAD_REQUEST', 'Missing attachment id')
+      }
+      // Defense in depth: the auth middleware above always sets
+      // `ownerId` on success, but refuse the upgrade if the value
+      // ever goes missing — a single empty ownerId would silently
+      // merge unrelated sessions in the manager.
+      if (!ownerIdFromContext(c)) {
+        return errorJson(c, 'INTERNAL', 'Owner id missing from auth context', 500)
       }
       await next()
     },
@@ -78,9 +89,20 @@ export function createRealtimeRoutes({ accessToken, terminalHost }: RealtimeRout
     upgradeWebSocket((c) => {
       const clientId = c.req.query('clientId') ?? ''
       const attachmentId = c.req.query('attachmentId') ?? ''
+      const ownerId = ownerIdFromContext(c) ?? ''
       return {
         onOpen(_event, ws) {
-          terminalHost.registerSocket(clientId, attachmentId, ws as ServerTerminalSocket)
+          if (!ownerId) {
+            // Belt-and-suspenders: the pre-upgrade validator above
+            // should have caught this. Close before we hand the
+            // socket to the broker so it never enters a half-registered
+            // state.
+            try {
+              ws.close(1008, 'unauthorized')
+            } catch {}
+            return
+          }
+          terminalHost.registerSocket(clientId, attachmentId, ownerId, ws as ServerTerminalSocket)
         },
         onMessage(event, ws) {
           if (typeof event.data === 'string') {
@@ -90,14 +112,22 @@ export function createRealtimeRoutes({ accessToken, terminalHost }: RealtimeRout
               } catch {}
               return
             }
-            terminalHost.handleRealtimeMessage(clientId, attachmentId, ws as ServerTerminalSocket, event.data)
+            terminalHost.handleRealtimeMessage(
+              clientId,
+              attachmentId,
+              ownerId,
+              ws as ServerTerminalSocket,
+              event.data,
+            )
           }
         },
         onClose(_event, ws) {
-          terminalHost.unregisterSocket(clientId, attachmentId, ws as ServerTerminalSocket)
+          if (!ownerId) return
+          terminalHost.unregisterSocket(clientId, attachmentId, ownerId, ws as ServerTerminalSocket)
         },
         onError(_event, ws) {
-          terminalHost.unregisterSocket(clientId, attachmentId, ws as ServerTerminalSocket)
+          if (!ownerId) return
+          terminalHost.unregisterSocket(clientId, attachmentId, ownerId, ws as ServerTerminalSocket)
         },
       }
     }),

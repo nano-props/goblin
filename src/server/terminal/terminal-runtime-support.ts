@@ -15,6 +15,11 @@ export function isValidTerminalSocketAttachmentId(value: unknown): value is stri
   return typeof value === 'string' && isValidTerminalAttachmentId(value)
 }
 
-export function resolveAttachmentConnected(_clientId: string, attachmentId?: string): boolean | undefined {
-  return attachmentId ? true : undefined
-}
+// `resolveAttachmentConnected` previously lived here as a stub
+// that returned `true` whenever an attachmentId was present. The
+// runtime now wires a real broker-backed check via dependency
+// injection into `createTerminalRuntimeActions` — see
+// `terminal-runtime.ts` for the call site. The previous code smell
+// is fixed there, not here, because the broker reference is owned
+// by the runtime's coordinator and can't be reached from this
+// module without a circular import.

@@ -7,6 +7,7 @@ import type {
   TerminalAttachInput,
   TerminalOutputEvent,
   TerminalRestartInput,
+  TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 import { setTerminalFocused } from '#/web/terminal-focus.ts'
@@ -254,9 +255,16 @@ export class ManagedTerminalSession {
           this.destroyActiveView({ preserveTransientState: true })
         }
       } else if (!wasController && isController) {
-        if (this.view.isConnected() && !this.view.currentTerminal()) {
-          this.start()
-        }
+        // Bug E: a viewer → controller transition must always
+        // notify, even when the xterm view is already mounted.
+        // The previous gate (`!this.view.currentTerminal()`) only
+        // repainted on first start; for the cross-browser takeover
+        // case the view is mounted (the tab has been a viewer) and
+        // the role banner / input-readiness hint has to refresh.
+        // The `start()` path is also entered even with an existing
+        // view, so any role-driven render diff lands on the next
+        // paint via the metadata notify below.
+        if (this.view.isConnected()) this.start()
         if (this.view.isVisible()) this.view.focus()
       }
     }
@@ -310,8 +318,28 @@ export class ManagedTerminalSession {
     // cross-clientId partition described in the takeover bug.
     const attachmentId = readOrCreateWebTerminalAttachmentId()
     if (this.runtime.setTakeoverPending(true)) this.notify('metadata')
-    return terminalBridge
-      .takeover({ sessionId, cols: size.cols, rows: size.rows, attachmentId })
+    // Bug F: `setTakeoverPending` runs *before* the `.then` chain
+    // attaches its `.finally`. If `terminalBridge.takeover` throws
+    // synchronously (e.g. the bridge is unset, a bad request id
+    // pattern slips through, a future test mock throws from the
+    // implementation), the rejection path's `.finally` will still
+    // run, but only if a microtask boundary exists between the
+    // throw and the catch. Wrap the bridge call in a defensive
+    // `try/finally` so a sync throw still clears the pending flag.
+    let bridgeCall: Promise<TerminalTakeoverResult>
+    try {
+      bridgeCall = terminalBridge.takeover({
+        sessionId,
+        cols: size.cols,
+        rows: size.rows,
+        attachmentId,
+      })
+    } catch (err) {
+      terminalLog.warn('takeover bridge call threw synchronously', { sessionId, err })
+      this.clearTakeoverPendingWithNotify()
+      return Promise.resolve(false)
+    }
+    return bridgeCall
       .then((result) => {
         if (!result.ok) {
           terminalLog.warn('takeover rejected by server', { sessionId, message: result.message })
@@ -335,10 +363,14 @@ export class ManagedTerminalSession {
         // the only path to clear the flag — the success branch
         // above already applied the new state, so this is purely
         // the failure / timeout fallback.
-        if (this.runtime.isTakeoverPending()) {
-          if (this.runtime.setTakeoverPending(false)) this.notify('metadata')
-        }
+        this.clearTakeoverPendingWithNotify()
       })
+  }
+
+  private clearTakeoverPendingWithNotify(): void {
+    if (this.runtime.isTakeoverPending()) {
+      if (this.runtime.setTakeoverPending(false)) this.notify('metadata')
+    }
   }
 
   private start(): void {

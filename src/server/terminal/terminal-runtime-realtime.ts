@@ -12,48 +12,52 @@ import type { TerminalRealtimeSocket } from '#/server/terminal/terminal-realtime
 type MaybePromise<T> = T | Promise<T>
 
 // Action → handler table. The handler receives the union-shaped input
-// and the WS request's `clientId`/`attachmentId` (the latter is used
-// by handlers that need to merge it into the input — see `create`).
+// and the WS request's `clientId`/`attachmentId`/`ownerId`. The
+// first two are merged into the input (e.g. `create` needs the
+// `attachmentId` it didn't ask the client to provide); `ownerId`
+// is threaded through to the host unchanged. See `identity.ts` for
+// the routing-vs-identity distinction.
 export function createTerminalRealtimeHandlers(host: ServerTerminalHost): {
   [TAction in TerminalSocketRequestAction]: (
     clientId: string,
     attachmentId: string,
+    ownerId: string,
     input: TerminalSocketRequestInputs[TAction],
   ) => MaybePromise<TerminalSocketResponseOutputs[TAction]>
 } {
   return {
-    attach(clientId, attachmentId, input) {
-      return host.attach(clientId, { ...input, attachmentId })
+    attach(clientId, attachmentId, ownerId, input) {
+      return host.attach(clientId, ownerId, { ...input, attachmentId })
     },
-    restart(clientId, attachmentId, input) {
-      return host.restart(clientId, { ...input, attachmentId })
+    restart(clientId, attachmentId, ownerId, input) {
+      return host.restart(clientId, ownerId, { ...input, attachmentId })
     },
-    write(clientId, attachmentId, input) {
-      return host.write(clientId, { ...input, attachmentId })
+    write(clientId, attachmentId, ownerId, input) {
+      return host.write(clientId, ownerId, { ...input, attachmentId })
     },
-    resize(clientId, attachmentId, input) {
-      return host.resize(clientId, { ...input, attachmentId })
+    resize(clientId, attachmentId, ownerId, input) {
+      return host.resize(clientId, ownerId, { ...input, attachmentId })
     },
-    takeover(clientId, attachmentId, input) {
-      return host.takeover(clientId, { ...input, attachmentId })
+    takeover(clientId, attachmentId, ownerId, input) {
+      return host.takeover(clientId, ownerId, { ...input, attachmentId })
     },
-    close(clientId, _attachmentId, input) {
-      return host.close(clientId, input)
+    close(clientId, _attachmentId, ownerId, input) {
+      return host.close(clientId, ownerId, input)
     },
-    'list-sessions'(clientId, _attachmentId, input) {
-      return host.listSessions(clientId, input.repoRoot)
+    'list-sessions'(clientId, _attachmentId, ownerId, input) {
+      return host.listSessions(clientId, ownerId, input.repoRoot)
     },
-    create(clientId, attachmentId, input) {
-      return host.create(clientId, { ...input, attachmentId })
+    create(clientId, attachmentId, ownerId, input) {
+      return host.create(clientId, ownerId, { ...input, attachmentId })
     },
-    prune(clientId, _attachmentId, input) {
-      return host.prune(clientId, input.repoRoot)
+    prune(clientId, _attachmentId, ownerId, input) {
+      return host.prune(clientId, ownerId, input.repoRoot)
     },
-    'session-snapshot'(clientId, _attachmentId, input) {
-      return host.getSessionSnapshot(clientId, input)
+    'session-snapshot'(clientId, _attachmentId, ownerId, input) {
+      return host.getSessionSnapshot(clientId, ownerId, input)
     },
-    reorder(clientId, _attachmentId, input) {
-      return host.reorder(clientId, input)
+    reorder(clientId, _attachmentId, ownerId, input) {
+      return host.reorder(clientId, ownerId, input)
     },
   }
 }
@@ -63,11 +67,13 @@ export async function handleTerminalRealtimeRequestMessage(
     [TAction in TerminalSocketRequestAction]: (
       clientId: string,
       attachmentId: string,
+      ownerId: string,
       input: TerminalSocketRequestInputs[TAction],
     ) => MaybePromise<TerminalSocketResponseOutputs[TAction]>
   },
   clientId: string,
   attachmentId: string,
+  ownerId: string,
   socket: TerminalRealtimeSocket,
   bufferedSocket: BufferedTerminalSocket | undefined,
   message: TerminalClientMessage,
@@ -77,9 +83,10 @@ export async function handleTerminalRealtimeRequestMessage(
     const handler = handlers[message.action] as (
       clientId: string,
       attachmentId: string,
+      ownerId: string,
       input: TerminalSocketRequestInputs[typeof message.action],
     ) => MaybePromise<TerminalSocketResponseOutputs[typeof message.action]>
-    const payload = await handler(clientId, attachmentId, message.input)
+    const payload = await handler(clientId, attachmentId, ownerId, message.input)
     response = {
       type: 'response',
       requestId: message.requestId,

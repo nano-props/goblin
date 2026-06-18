@@ -100,7 +100,10 @@ describe('createRealtimeRoutes — terminal message forwarding', () => {
     const handle = vi.fn()
     const host = makeTerminalHost({ handleRealtimeMessage: handle })
     const socket = {} as ServerTerminalSocket
-    host.handleRealtimeMessage('c1', 'a1', socket, 'ls -la\n')
-    expect(handle).toHaveBeenCalledWith('c1', 'a1', socket, 'ls -la\n')
+    // Method 2 adds `ownerId` between `attachmentId` and `socket`.
+    // Tests verify the host receives the value the auth middleware
+    // derived from the access token.
+    host.handleRealtimeMessage('c1', 'a1', 'owner_test', socket, 'ls -la\n')
+    expect(handle).toHaveBeenCalledWith('c1', 'a1', 'owner_test', socket, 'ls -la\n')
   })
 })

@@ -246,7 +246,21 @@ export class TerminalSessionManager<TOwner extends string | number> {
       if (!isAuthoritative(session, attachmentId, 'takeover')) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
-      this.applyOwnershipEffect(session, claimTerminalAttachmentControl(session, attachmentId))
+      const effect = claimTerminalAttachmentControl(session, attachmentId)
+      this.applyOwnershipEffect(session, effect)
+      // Bug D: when the attachment isn't `connected`, the effect
+      // is empty (no resize, no ownership event) — the caller is
+      // known but not authoritative yet (the WS hasn't been
+      // observed as alive for this attachment). Surfacing `ok:
+      // true` here would tell the renderer it became controller
+      // when nothing actually changed; the existing
+      // `takeoverResult()` would still hardcode
+      // `role: 'controller'` and `controllerStatus: 'connected'`,
+      // masking the no-op. Reject with the same key the renderer
+      // maps to "session lost" so the user can retry.
+      if (!effect.emitOwnership && !effect.resizeTo) {
+        return { ok: false, message: 'error.unavailable' }
+      }
       return this.takeoverResult(session)
     }
     return { ok: false, message: 'error.invalid-arguments' }

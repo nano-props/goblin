@@ -4,21 +4,26 @@ import { describe, expect, test, vi } from 'vitest'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
 
 const CLIENT_ID = 'client_terminal_actions'
+// Identity is ownerId-keyed under method 2: the runtime derives
+// ownerId from the access token and threads it through to the
+// manager. The test stub uses a fixed value so the assertions
+// don't have to mock the derivation helper.
+const OWNER_ID = 'owner_terminal_actions'
 // 16+ alphanumerics, matches TERMINAL_SESSION_ID_RE in
 // shared/terminal-validators.ts.
 const SESSION_ID = 'session_aaaaaaaaaaaaaa'
 
 function makeActions(options: {
-  closeOwnedSession: (clientId: string, sessionId: string) => boolean
-  getSessionScope?: (clientId: string, sessionId: string) => string | undefined
+  closeOwnedSession: (ownerId: string, sessionId: string) => boolean
+  getSessionScope?: (ownerId: string, sessionId: string) => string | undefined
   isValidTerminalClientId?: (value: unknown) => value is string
   broadcasts?: ReturnType<typeof vi.fn>
 } = { closeOwnedSession: () => false }) {
   const broadcasts = options.broadcasts ?? vi.fn()
   const manager = {
     // The close path only reads `scope` off the session record.
-    getSession: vi.fn((_clientId: string, sessionId: string) =>
-      options.getSessionScope ? { scope: options.getSessionScope(_clientId, sessionId) } : undefined,
+    getSession: vi.fn((_ownerId: string, sessionId: string) =>
+      options.getSessionScope ? { scope: options.getSessionScope(_ownerId, sessionId) } : undefined,
     ),
     closeOwnedSession: vi.fn(options.closeOwnedSession),
     // The other manager methods are unused by `close`, but the
@@ -64,10 +69,10 @@ describe('terminal-runtime-actions close broadcast', () => {
       getSessionScope: () => '/repo',
     })
 
-    const closed = actions.close(CLIENT_ID, { sessionId: SESSION_ID })
+    const closed = actions.close(CLIENT_ID, OWNER_ID, { sessionId: SESSION_ID })
 
     expect(closed).toBe(true)
-    expect(close).toHaveBeenCalledWith(CLIENT_ID, SESSION_ID)
+    expect(close).toHaveBeenCalledWith(OWNER_ID, SESSION_ID)
     expect(broadcasts).toHaveBeenCalledTimes(2)
     expect(broadcasts).toHaveBeenNthCalledWith(1, {
       type: 'sessions-changed',
@@ -88,7 +93,7 @@ describe('terminal-runtime-actions close broadcast', () => {
       getSessionScope: () => '/repo',
     })
 
-    const closed = actions.close(CLIENT_ID, { sessionId: SESSION_ID })
+    const closed = actions.close(CLIENT_ID, OWNER_ID, { sessionId: SESSION_ID })
 
     expect(closed).toBe(false)
     expect(broadcasts).not.toHaveBeenCalled()
@@ -103,7 +108,7 @@ describe('terminal-runtime-actions close broadcast', () => {
       getSessionScope: () => undefined,
     })
 
-    const closed = actions.close(CLIENT_ID, { sessionId: SESSION_ID })
+    const closed = actions.close(CLIENT_ID, OWNER_ID, { sessionId: SESSION_ID })
 
     expect(closed).toBe(true)
     expect(broadcasts).not.toHaveBeenCalled()
@@ -117,7 +122,7 @@ describe('terminal-runtime-actions close broadcast', () => {
       closeOwnedSession: () => true,
     })
 
-    const closed = actions.close(CLIENT_ID, { sessionId: '' })
+    const closed = actions.close(CLIENT_ID, OWNER_ID, { sessionId: '' })
 
     expect(closed).toBe(false)
     expect(broadcasts).not.toHaveBeenCalled()
@@ -134,7 +139,7 @@ describe('terminal-runtime-actions close broadcast', () => {
       getSessionScope: () => '/repo',
     })
 
-    const closed = actions.close('not_a_client', { sessionId: SESSION_ID })
+    const closed = actions.close('not_a_client', OWNER_ID, { sessionId: SESSION_ID })
 
     expect(closed).toBe(false)
     expect(close).not.toHaveBeenCalled()
