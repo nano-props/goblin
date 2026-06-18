@@ -214,7 +214,6 @@ export class ManagedTerminalSession {
 
   hydrate(input: TerminalSessionHydrationInput): void {
     const previousSessionId = this.runtime.currentSessionId()
-    const previousHydratedSnapshot = this.hydratedSnapshot
     this.hydratedSnapshot = { snapshot: input.snapshot, snapshotSeq: input.snapshotSeq }
     const changed = this.runtime.hydrateSession({
       sessionId: input.sessionId,
@@ -227,10 +226,7 @@ export class ManagedTerminalSession {
       canonicalCols: input.canonicalCols,
       canonicalRows: input.canonicalRows,
     })
-    const snapshotChanged =
-      previousHydratedSnapshot.snapshotSeq !== input.snapshotSeq || previousHydratedSnapshot.snapshot !== input.snapshot
     if (previousSessionId && previousSessionId !== input.sessionId) this.applyHydratedSnapshotToActiveView()
-    else if (this.view.currentTerminal() && input.snapshot.length > 0 && snapshotChanged) this.applyHydratedSnapshotToActiveView()
     if (changed) this.notify('metadata')
   }
 

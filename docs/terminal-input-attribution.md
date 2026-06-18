@@ -1,0 +1,200 @@
+# Terminal: input attribution and replay-side effects
+
+> **Status**: incident note + forward design.
+>
+> Current `main` intentionally keeps a **minimal rollback / hotfix** for the
+> Claude Code input pollution issue. The long-term input-attribution design in
+> this document is **not implemented yet**.
+
+## Why this document exists
+
+A terminal regression appeared after the session-lifecycle work landed: when a
+user opened Claude Code inside Goblin's embedded terminal, switched to another
+page, and then switched back, Claude Code's input box could suddenly contain raw
+text such as:
+
+```text
+10;rgb:1d1d/1d1d/1f1f11;rgb:fbfb/fbfb/fdfd
+```
+
+That string is not ordinary shell output. It is the visible tail of an OSC 10 / OSC 11
+color-query response that should have stayed inside the terminal protocol path.
+
+The bug was fixed on `main` with a small rollback so users are unblocked, but the
+incident exposed a deeper design weakness: the renderer currently treats all
+terminal-emitted input as though it were real user stdin.
+
+This note records:
+
+- what happened,
+- why the hotfix works,
+- why the hotfix is intentionally not the final architecture, and
+- what the future input-attribution design should do.
+
+## User-visible symptom
+
+Repro shape:
+
+1. Open Claude Code in the embedded terminal.
+2. Switch to another page/view inside the app.
+3. Switch back to the terminal page.
+4. Observe unexpected text injected into Claude Code's input.
+
+Observed payloads looked like truncated OSC color replies, for example:
+
+```text
+10;rgb:1d1d/1d1d/1f1f11;rgb:fbfb/fbfb/fdfd
+```
+
+The issue was especially confusing because the text looked like it had been
+"typed" by the user, but it was actually protocol traffic leaking back into the
+PTY stdin path.
+
+## Root cause
+
+The failure required three ingredients:
+
+### 1. Same-session snapshot replay on hydrate
+
+A recent renderer change broadened `ManagedTerminalSession.hydrate()` so an
+already-open xterm could be reset and rewritten when the server sent a newer
+snapshot for the **same** session id.
+
+That made focus/sync/reconcile on page return capable of replaying raw terminal
+bytes into a live xterm instance even though the session itself had not changed.
+
+### 2. Raw snapshot replay can trigger terminal-emulator replies
+
+Server snapshots are stored as raw PTY output. Replaying them is equivalent to
+feeding historical terminal bytes back through the emulator.
+
+Some byte streams can cause the emulator to emit protocol replies, including
+OSC-based color-query responses.
+
+### 3. The renderer does not currently attribute terminal input by source
+
+The embedded terminal pipeline effectively conflates several different kinds of
+input:
+
+- real user keystrokes,
+- toolbar / paste / drop initiated writes,
+- emulator-generated protocol replies, and
+- replay side effects caused by locally rewriting historical bytes.
+
+Because these cases are not modeled separately, replay-induced protocol replies
+can ride the same write path as legitimate user stdin and reach the PTY.
+
+## Why the current hotfix works
+
+The current fix is deliberately small:
+
+- keep replay when `hydrate()` switches to a **different** `sessionId`,
+- stop replaying the active xterm when the session id is unchanged and only the
+  hydrated snapshot changed.
+
+That removes the trigger that was firing on page return.
+
+### Why this was the right immediate move
+
+- It is easy to reason about.
+- It has a narrow blast radius.
+- It resolves the user-facing regression without reopening the terminal input
+  model under pressure.
+- It preserves the pre-regression behavior for live same-session focus recovery.
+
+### Why this is not the final design
+
+The rollback solves the incident by avoiding a dangerous replay case. It does
+**not** solve the deeper modeling problem.
+
+If Goblin later needs same-session active-view correction again, reintroducing it
+naively would risk the same class of bug unless input attribution is fixed first.
+
+## Short-term contract on `main`
+
+Until the longer design lands, the renderer should follow this rule:
+
+> For an already-open terminal view, `hydrate()` may replay a snapshot when the
+> backing session id changes, but it must not rewrite the active xterm merely
+> because the same session's hydrated snapshot changed during sync/reconcile.
+
+This is a product-safety rule, not the long-term target model.
+
+## Future direction: input attribution (B plan)
+
+The long-term fix is to model input provenance explicitly instead of treating all
+terminal-emitted bytes as equivalent.
+
+### Design goal
+
+The renderer should be able to distinguish at least these classes:
+
+1. **User intent**
+   - physical keyboard input
+   - toolbar helper keys
+   - paste / drag-and-drop resolved writes
+   - explicit command injections owned by UI affordances
+
+2. **Terminal-emulator output routed back as input**
+   - protocol replies generated by the emulator during normal live operation
+
+3. **Replay-side effects**
+   - protocol replies caused only because the renderer locally replayed a raw
+     historical snapshot
+
+The key rule is:
+
+> Replay-side effects must never be forwarded to the PTY as though they were
+> real user stdin.
+
+### Why provenance matters
+
+Without provenance, the system has to rely on fragile heuristics such as:
+
+- "this byte pattern looks like OSC 10 / 11",
+- "this callback happened while a snapshot write was in flight",
+- "this probably came from the user rather than the emulator".
+
+Those heuristics may be useful as temporary guards, but they are not a clean
+ownership model.
+
+### Practical implementation direction
+
+A future implementation should introduce an internal terminal-input envelope that
+carries both:
+
+- the bytes to write, and
+- the origin / provenance of those bytes.
+
+For example, the write path should eventually be able to distinguish between:
+
+- UI/user-initiated writes,
+- emulator-generated replies, and
+- replay-side-effect replies.
+
+A replay boundary can then make an explicit routing decision instead of reusing
+raw `string` writes everywhere.
+
+## Expected migration strategy
+
+When this design is implemented, the migration should proceed in stages:
+
+1. Add internal input attribution types and propagate them through renderer-side
+   terminal input APIs.
+2. Mark replay windows explicitly.
+3. Prevent replay-side-effect replies from reaching PTY stdin.
+4. Only after that, reconsider whether same-session hydrated snapshot replay is
+   safe to re-enable for active views.
+
+## Non-goal
+
+This document does **not** propose changing the server-side PTY snapshot format.
+The issue is not that raw snapshots exist; the issue is that replay-induced
+local side effects are not currently isolated from the stdin write path.
+
+## Decision record
+
+- **Current user-facing fix**: keep the minimal rollback.
+- **Do not** implement the broader B plan as part of the incident hotfix.
+- **Do** retain this document so future replay work does not accidentally remove
+  the safety context and reintroduce the bug.
