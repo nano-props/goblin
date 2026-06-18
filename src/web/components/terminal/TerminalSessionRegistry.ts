@@ -51,6 +51,25 @@ const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
 // renderer-side name.
 export const parseServerSessionKey = parseTerminalSessionKey
 
+/**
+ * Renderer-level authority for terminal session state.
+ *
+ * **Lifetime**: renderer-level singleton — one instance per renderer
+ * process, created on first access via `getTerminalSessionRegistry(...)`,
+ * lives until the process tears down. The class is intentionally
+ * Provider-independent: `TerminalSessionProvider` is just a wiring
+ * adapter that forwards bridge events into the singleton and exposes
+ * its API via React context. A dev-mode React StrictMode re-mount of
+ * the Provider must NOT recreate the registry — see
+ * `terminal-roadmap.md` P1.7.
+ *
+ * **Why singleton**: the terminal feature owns cross-cutting state
+ * (parking root, per-worktree session lists, bell controller, geometry
+ * cache, snapshot caches, pending create/close queues) that has no
+ * natural React tree boundary. The previous Provider-owned lifetime
+ * required a `pendingRegistryDestroyRef + setTimeout(0)` debounce to
+ * survive StrictMode; the singleton removes that dance entirely.
+ */
 export class TerminalSessionRegistry {
   private repoIndex: TerminalRepoIndex = {}
   private parkingRoot: HTMLDivElement | null = null
@@ -142,6 +161,25 @@ export class TerminalSessionRegistry {
     this.parkingRoot = root
   }
 
+  /**
+   * Test-only / explicit-teardown path.
+   *
+   * Production code does NOT call this. The registry is a renderer-
+   * level singleton and is meant to live for the renderer's entire
+   * lifetime. The Provider never invokes `destroy()` on unmount; the
+   * `pendingRegistryDestroyRef + setTimeout` debounce that used to
+   * gate a Provider-unmount destroy has been removed.
+   *
+   * Tests use `destroy()` on a per-test local instance to drain
+   * pending promises and clear listener maps before the test seam
+   * (`setTerminalSessionRegistryForTests`) resets the singleton slot.
+   *
+   * Real production callers should only reach for this in narrowly
+   * justified scenarios: a forced reset action in a dev menu, or a
+   * `before-quit` handler that wants to reject in-flight creates/
+   * closes. If you're tempted to call this from a Provider effect,
+   * stop — the singleton already outlives that effect.
+   */
   destroy(): void {
     setTerminalFocused(false)
     for (const pending of this.pendingCreateByWorktree.values())
@@ -894,4 +932,47 @@ export class TerminalSessionRegistry {
         return orderA - orderB || a.descriptor.index - b.descriptor.index
       })
   }
+}
+
+export interface TerminalSessionRegistryDeps {
+  getCurrentRepoId: () => string | null
+  onSelectedWorktreeChange: (worktreeTerminalKey: string, key: string | null) => void
+}
+
+let registryInstance: TerminalSessionRegistry | null = null
+
+/**
+ * Lazy getter for the renderer-level terminal session registry.
+ *
+ * First call constructs the singleton with `deps` (only the first
+ * call's deps are honored — subsequent calls return the existing
+ * instance even if deps differ, because the singleton is meant to
+ * outlive any Provider remount). The Provider is the canonical
+ * caller; tests inject via `setTerminalSessionRegistryForTests`.
+ *
+ * Mirrors the `getRendererBridge()` shape at
+ * `src/web/renderer-bridge.ts`.
+ */
+export function getTerminalSessionRegistry(deps: TerminalSessionRegistryDeps): TerminalSessionRegistry {
+  if (!registryInstance) {
+    registryInstance = new TerminalSessionRegistry(deps.getCurrentRepoId, deps.onSelectedWorktreeChange)
+  }
+  return registryInstance
+}
+
+/**
+ * Test seam: install or clear the singleton slot. Tests should:
+ *
+ * 1. In `beforeEach`: construct a fresh `TerminalSessionRegistry` and
+ *    install it with `setTerminalSessionRegistryForTests(instance)`.
+ * 2. In `afterEach`: call `setTerminalSessionRegistryForTests(null)`.
+ *    If the per-test instance needs to drain pending promises or
+ *    clear listener maps, call `registry.destroy()` on the local
+ *    reference before clearing the slot.
+ *
+ * Production code never calls this. Mirrors
+ * `setRendererBridgeForTests()` at `src/web/renderer-bridge.ts`.
+ */
+export function setTerminalSessionRegistryForTests(instance: TerminalSessionRegistry | null): void {
+  registryInstance = instance
 }
