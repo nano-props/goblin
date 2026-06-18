@@ -6,6 +6,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CloneRepositoryDialog } from '#/web/components/CloneRepositoryDialog.tsx'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { CloneRepoResult } from '#/shared/api-types.ts'
 
@@ -31,11 +32,17 @@ beforeEach(() => {
       bridgeVersion: RENDERER_BRIDGE_VERSION,
       capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
     },
-    homeDir: '/Users/tester',
-    initialI18n: null,
-    initialSettings: null,
     initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
   }
+  // Host info used to live in the bootstrap payload; it now
+  // lives on the public `/api/host` endpoint and the renderer-side
+  // `useHostInfoStore`. Seed the store directly so the dialog's
+  // default parent dir (`~/Developer`) resolves correctly without
+  // mocking `fetch('/api/host')`.
+  useHostInfoStore.setState({
+    snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test', pid: 1 },
+    hydrated: true,
+  })
   // Use `defineProperty` with `writable: true` so a previous test that
   // installed a read-only descriptor (via `defineProperty` without writable)
   // doesn't leave this assignment throwing `Cannot assign to read only
@@ -50,7 +57,6 @@ beforeEach(() => {
         bridgeVersion: RENDERER_BRIDGE_VERSION,
         capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
       },
-      homeDir: '/Users/tester',
       pathForFile: () => '',
       invokeIpc: async (request: { path: string; input?: unknown }) => {
         ipcCalls.push(request)

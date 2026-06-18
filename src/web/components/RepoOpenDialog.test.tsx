@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoOpenDialog } from '#/web/components/RepoOpenDialog.tsx'
 import { MainWindowNavigationProvider, type MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { resetReposStore } from '#/web/stores/repos/test-utils.ts'
 
@@ -22,17 +23,17 @@ beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
   setRendererBridgeForTests(null)
-  // The bootstrap is the source of truth for `homeDir`; the
-  // preload only exposes IPC. Set both so the bridge detects
-  // Electron and the path-tilde resolution gets the right prefix.
+  // The bootstrap is the source of truth for the tiny renderer
+  // payload (runtime kind, initial server handoff). The preload
+  // only exposes IPC. Host info (homeDir, platform) used to live
+  // in the bootstrap; it now lives on the public `/api/host`
+  // endpoint and the renderer-side `useHostInfoStore` — seed
+  // that store directly so the dialog's tilde resolution and
+  // platform branching work without mocking `fetch`.
   Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
     configurable: true,
     value: {
       runtime: { kind: 'electron', bridgeVersion: 1, capabilities: [] },
-      homeDir: '/Users/tester',
-      platform: 'darwin',
-      initialI18n: null,
-      initialSettings: null,
       initialServer: null,
     },
   })
@@ -44,6 +45,10 @@ beforeEach(() => {
       abortIpc: async () => true,
       onEvent: () => () => {},
     },
+  })
+  useHostInfoStore.setState({
+    snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test', pid: 1 },
+    hydrated: true,
   })
 })
 

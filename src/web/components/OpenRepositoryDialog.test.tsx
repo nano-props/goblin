@@ -6,6 +6,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { OpenRepositoryDialog } from '#/web/components/OpenRepositoryDialog.tsx'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
 
 let container: HTMLDivElement | null = null
@@ -23,14 +24,18 @@ beforeEach(() => {
   setRendererBridgeForTests(null)
   testWindow.__GOBLIN_BOOTSTRAP__ = {
     runtime: { kind: 'electron', bridgeVersion: 1, capabilities: [] },
-    homeDir: '/Users/tester',
-    platform: 'darwin',
-    initialI18n: null,
-    initialSettings: null,
     initialServer: null,
   }
+  // Host info used to live in the bootstrap payload; it now lives
+  // on the public `/api/host` endpoint and the renderer-side
+  // `useHostInfoStore`. Seed the store directly so the dialog's
+  // tilde resolution and platform branching work without
+  // mocking `fetch`.
+  useHostInfoStore.setState({
+    snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test', pid: 1 },
+    hydrated: true,
+  })
   testWindow.goblinNative = {
-    homeDir: '/Users/tester',
     pathForFile: () => '',
     shell: {
       openDirectoryDialog: async () => '/Users/tester/Developer/repo',

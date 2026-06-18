@@ -21,14 +21,9 @@ beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   testWindow.__GOBLIN_BOOTSTRAP__ = {
     runtime: { kind: 'electron', bridgeVersion: 1, capabilities: [] },
-    homeDir: '/Users/tester',
-    platform: 'darwin',
-    initialI18n: null,
-    initialSettings: null,
     initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
   }
   testWindow.goblinNative = {
-    homeDir: '/Users/tester',
     initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     pathForFile: () => '',
     invokeIpc: async () => null,
