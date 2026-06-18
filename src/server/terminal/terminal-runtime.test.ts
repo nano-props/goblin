@@ -1063,4 +1063,42 @@ describe('server terminal runtime', () => {
       shutdown()
     }
   })
+
+  // Contract: geometry (canonicalSize follows the request, not the
+  // prior session). The single geometric invariant the takeover
+  // atomicity work changed — a regression that re-introduces
+  // "canonical follows session.cols, not the request" would
+  // silently render at the wrong size post-takeover.
+  test('takeover canonical geometry matches the request, not the prior controller size', async () => {
+    const { host, shutdown } = buildRuntime()
+    const socketA = { send: vi.fn(), close: vi.fn() }
+    const socketB = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_1', 'attachment_a', socketA)
+    // createTerminalSession uses the terminal defaults (80x24) for
+    // cols/rows — so the prior controller's geometry differs from
+    // the takeover request (132x43).
+    const sessionId = await createTerminalSession(host, 'client_1')
+    host.registerSocket('client_1', 'attachment_b', socketB)
+
+    const result = host.takeover('client_1', {
+      sessionId,
+      cols: 132,
+      rows: 43,
+      attachmentId: 'attachment_b',
+    })
+
+    expect(result).toMatchObject({
+      ok: true,
+      canonicalCols: 132,
+      canonicalRows: 43,
+    })
+    // The underlying PTY was resized to the requested size, not the
+    // prior size. This is the mechanism that must hold for the
+    // response to be honest.
+    expect(mockPtys[0]?.resize).toHaveBeenLastCalledWith(132, 43)
+
+    host.unregisterSocket('client_1', 'attachment_a', socketA)
+    host.unregisterSocket('client_1', 'attachment_b', socketB)
+    shutdown()
+  })
 })
