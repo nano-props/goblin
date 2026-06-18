@@ -1,9 +1,16 @@
 # Terminal: session lifecycle correctness
 
 > **Status**: combined bug-fix and design note.
-> Covers the `create` first-frame protocol (already implemented in `d020cd5`),
-> the durable-close + `session-closed` broadcast rework (planned),
-> and the empty-state CTA (planned).
+> All four roots described here are implemented on `main` as of
+> `694c68c`. The document is retained as the authoritative contract
+> and as a record of why the implementation is shaped the way it is.
+>
+> - R0 first-frame atomicity — `d020cd5`.
+> - R1 durable close, R2 `session-closed` broadcast, R3 empty-state
+>   CTA — landed together in `fa67adb` (the "wip: snapshot
+>   uncommitted tree" baseline; the commit name is from the
+>   code-review prep step, the code itself is the stable fix set
+>   this document describes).
 >
 > Replaces the narrower `terminal-first-frame-fix.md` note, which only
 > described the first-frame atomicity slice of this same symptom family.
@@ -183,7 +190,13 @@ Tracked in §Suggested follow-ups.
 
 ### Status
 
-Planned. Not yet implemented.
+Implemented on `main` (landed via `fa67adb`). Registry state
+`pendingCloseBySessionId` (`TerminalSessionRegistry.ts:88`),
+`enqueueDurableClose` (488), `flushPendingClosesForRepo` (517),
+`destroy` rejection (149–160), and the `ManagedTerminalSession.dispose`
+rewire (851). Coverage in
+`TerminalSessionRegistry.create.test.ts` (durable close describe
+block, lines 215 onward).
 
 ### Why
 
@@ -283,7 +296,16 @@ registry.enqueueDurableClose({ sessionId, worktreeTerminalKey }).catch((err) => 
 
 ### Status
 
-Planned. Not yet implemented.
+Implemented on `main` (landed via `fa67adb`). Protocol variant in
+`src/shared/terminal-socket.ts:30-37`. Server emit in
+`terminal-runtime-actions.ts:144-156`. Renderer dispatcher branch
+in `renderer-terminal-bridge.ts:186`. Registry handler
+`handleSessionClosed` in
+`TerminalSessionRegistry.ts:210`. Coverage in
+`terminal-runtime-actions.test.ts` (emits both broadcasts on
+successful close; non-owner close does not leak a phantom
+event) and `TerminalSessionRegistry.create.test.ts`
+(handleSessionClosed drops the matching local session).
 
 ### Why
 
@@ -360,7 +382,17 @@ a coherent event across the system, not just a local view teardown.
 
 ### Status
 
-Planned. Not yet implemented.
+Implemented on `main` (landed via `fa67adb`). `EmptyTerminalCta`
+component (`TerminalSlot.tsx:471-509`) renders the overlay with
+`terminal.empty` title and `terminal.new` button when
+`slotMode === 'opening' && !hasSessions`. The button's
+`creating` local state guards against double-click; on failure the
+slot toasts `error.terminal-create-failed`. i18n keys present in
+all four locales (`en` 331, `zh` 311, `ja` 326, `ko` 319 for
+`terminal.new`; `en` 335, `zh` 315, `ja` 330, `ko` 323 for
+`terminal.empty`). Coverage in `TerminalSlot.test.tsx` (success
+path renders the CTA + click triggers createTerminal; failure
+path toasts).
 
 ### Why
 
@@ -399,99 +431,104 @@ report.
 
 ---
 
-## Implementation priority
+## Implementation history
 
-These three fixes have very different blast radii and dependencies.
-Do not land them in one commit.
+All four roots landed on `main`:
 
-### P0 — Already done
+- **R0** (first-frame atomicity) — `d020cd5`.
+- **R1, R2, R3** landed together in `fa67adb`. The commit name is
+  "wip: snapshot uncommitted tree"; that is a code-review prep
+  label (the commit message says "Captures everything in the
+  working tree at the start of the code-review pass so subsequent
+  fixes (#15-#23) can be reviewed as atomic commits against this
+  baseline"). The R1/R2/R3 code in `fa67adb` is the stable fix
+  set this document describes — it is not a draft. Treat those
+  three as implemented at `fa67adb` for any forward-looking
+  planning.
 
-R0 (first-frame atomicity). Landed in `d020cd5`.
+For reference, the notional landing order *had* this fix set been
+split into separate commits (it was not, due to the wip-snapshot
+baseline):
 
-### P1 — Land first (lowest risk, smallest surface)
+### P1 — Renderer-only, lowest risk
 
 R3: empty-state CTA.
 
 - Renderer-only. No protocol change, no registry change.
-- i18n key already defined in most locales.
+- i18n key already defined in all four locales.
 - No risk of regressing existing terminal flows.
 - Visible UX win on its own.
 
-### P2 — Land second (protocol addition)
+### P2 — Protocol addition
 
 R2: `session-closed` broadcast.
 
 - Adds a new `TerminalRealtimeMessage` variant. Additive — old
   subscribers ignore the new variant.
-- Requires bumping the renderer-bridge manifest entry for the new
-  channel and updating `extractIpcChannelLiterals` lockdown test
-  to include it.
 - Cross-window behavior change but no behavior regression.
 
-### P3 — Land last (largest blast radius)
+### P3 — Largest blast radius
 
 R1: durable close.
 
-- Requires injecting the registry into `ManagedTerminalSession`'s
+- Required injecting the registry into `ManagedTerminalSession`'s
   constructor.
-- Touches `dispose()` semantics — every dispose path now goes
-  through the pending-close map. Existing tests must be updated to
-  await the pending close.
-- The flush-on-create addition is a sequencing change at the
-  registry level. Existing registry tests that race close + create
-  in the same worktree must be reviewed.
+- Changed `dispose()` semantics — every dispose path now goes
+  through the pending-close map. Existing dispose tests had to be
+  updated to await the pending close.
+- Added a sequencing step at the top of `performCreateTerminal`
+  (await `flushPendingClosesForRepo`). Existing registry tests that
+  raced close + create in the same worktree were reviewed in
+  lockstep.
 
-**Suggested order**: R3 → R2 → R1, in three separate commits.
+**Suggested (notional) order had it been split**: R3 → R2 → R1.
 
 ---
 
 ## Verification
 
-### Per fix
+### Per fix — existing coverage
 
-**R0 (done)**: covered by the `TerminalSessionProvider` test mocks
-and the registry's first-frame validation. Manual smoke test:
-`bun dev` → click terminal tab → single prompt, no inverse-video `%`,
-no false failure toast.
+**R0**:
 
-**R1**:
+- `TerminalSessionProvider.test.tsx` test mocks supply the new
+  first-frame hydration fields on both `created` and `reused`
+  paths. Registry-side validation in
+  `TerminalSessionRegistry.create.test.ts` covers the
+  `create.sessionId` + `snapshot` + `snapshotSeq` rule.
 
-- `TerminalSessionRegistry.test.ts`:
-  - `enqueueDurableClose` records an entry; entry is removed after
-    `terminalBridge.close` resolves.
-  - `flushPendingClosesForRepo` awaits the in-flight close; the
-    next `performCreateTerminal` only fires `terminalBridge.create`
-    after the close settles.
-  - `destroy` rejects pending entries — no leaked promises.
-- `ManagedTerminalSession.test.ts`:
-  - Successful `terminalBridge.close` → no pending close, no warn.
-  - Rejected `terminalBridge.close` → entry recorded, `terminalLog.warn`
-    called.
-- `TerminalSessionRegistry.create.test.ts`:
-  - A previous `enqueueDurableClose` for the same worktree is awaited
-    before the create is issued; the create sees fresh `action:
-    'created'`.
+**R1** — `TerminalSessionRegistry.create.test.ts`
+(`describe('durable close')`):
+
+- `awaits an in-flight close for the same worktree before creating`
+  (215).
+- `failures do not block the next create` (264).
+- `deduplicates concurrent enqueues for the same session` (289).
+- `destroys reject pending entries` (318).
+- `handleSessionClosed drops the matching local session` (336).
 
 **R2**:
 
 - `terminal-runtime-actions.test.ts`:
-  - Successful close emits both `sessions-changed` and
-    `session-closed`.
-  - Failed / not-found close emits neither.
-- `renderer-terminal-bridge.test.ts`:
-  - `onSessionClosed` subscribers receive the event.
-- `TerminalSessionProvider.test.tsx`:
-  - `session-closed` for a known key calls
-    `discardLocalSessionAndDismissDetailIfLast`.
+  - `emits BOTH sessions-changed and session-closed on a successful
+    close` (56).
+  - A non-owner close does not leak a phantom `session-closed`
+    event (84).
+  - A failed close path does not synthesize a `session-closed`
+    with a fake repoRoot (100, 129).
+- `TerminalSessionProvider.test.tsx`: `session-closed` mocks feed
+  the registry's `handleSessionClosed` path (already exercised by
+  the R1 durable-close test above).
 
-**R3**:
+**R3** — `TerminalSlot.test.tsx`:
 
-- `TerminalSlot.test.tsx`:
-  - Zero sessions → renders empty-state CTA.
-  - Click CTA → calls stubbed `createTerminal`.
-  - Failed create → `sonner` toast.
+- Renders the empty-state CTA when `!hasSessions` (success path
+  asserts aria-label, title text, and button text match the
+  i18n keys; click triggers `createTerminal` with the right args).
+- `empty-state CTA failure toasts error.terminal-create-failed`
+  (1361).
 
-### Manual smoke (R1 + R2 + R3)
+### Manual smoke (still applicable as a regression check)
 
 1. `bun dev`.
 2. Click terminal tab → empty-state CTA appears (R3). Click CTA →
@@ -508,9 +545,9 @@ no false failure toast.
 
 ### Global
 
-- `bun run test` — all existing tests + the new durable-close
-  / broadcast / CTA tests pass.
-- `bun run typecheck` — clean.
+- `bun run test` — all 1419 tests pass.
+- `bun run typecheck` — clean (architecture + no-html-injection +
+  all 3 tsconfig projects).
 - `bun run lint` (if present) — clean.
 
 ---
