@@ -35,6 +35,7 @@ import { resolveSelectedTerminalKey } from '#/web/components/terminal/terminal-s
 import { buildWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-worktree-snapshot.ts'
 import type {
   TerminalDescriptor,
+  TerminalOwnershipViewModel,
   TerminalRepoIndex,
   WorktreeTerminalSnapshot,
   TerminalSessionBase,
@@ -263,13 +264,7 @@ export class TerminalSessionRegistry {
     this.discardLocalSessionAndDismissDetailIfLast(directKey, session.descriptor)
   }
 
-  handleOwnership(event: {
-    sessionId: string
-    role: 'controller' | 'viewer' | 'unowned'
-    controllerStatus: 'connected' | 'grace' | 'none'
-    canonicalCols: number
-    canonicalRows: number
-  }): void {
+  handleOwnership(event: TerminalOwnershipViewModel): void {
     const directKey = this.sessionKeyBySessionId.get(event.sessionId)
     const directSession = directKey ? this.sessions.get(directKey) : null
     if (directSession) {

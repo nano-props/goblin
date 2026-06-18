@@ -703,7 +703,12 @@ describe('server terminal runtime', () => {
     expect(result).toEqual({
       ok: true,
       sessionId,
+      role: 'controller',
+      controllerStatus: 'connected',
       controller: { attachmentId: 'attachment_b', status: 'connected' },
+      canonicalCols: 120,
+      canonicalRows: 40,
+      phase: 'open',
     })
     expect(mockPtys[0]?.resize).toHaveBeenLastCalledWith(120, 40)
 
@@ -883,7 +888,12 @@ describe('server terminal runtime', () => {
     expect(takeover).toEqual({
       ok: true,
       sessionId,
+      role: 'controller',
+      controllerStatus: 'connected',
       controller: { attachmentId: 'attachment_a', status: 'connected' },
+      canonicalCols: 101,
+      canonicalRows: 31,
+      phase: 'open',
     })
 
     host.unregisterSocket('client_1', 'attachment_b', socketB)

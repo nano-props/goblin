@@ -241,7 +241,12 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           return {
             ok: true as const,
             sessionId: 'session-1',
+            role: 'controller' as const,
+            controllerStatus: 'connected' as const,
             controller: { attachmentId: 'attachment_local', status: 'connected' as const },
+            canonicalCols: 80,
+            canonicalRows: 24,
+            phase: 'open' as const,
           }
         case 'terminal.prune':
           return { pruned: 0, remaining: 0 }

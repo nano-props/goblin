@@ -87,6 +87,7 @@ describe('terminal session geometry helpers', () => {
         canTakeover: false,
         canonicalCols: 90,
         canonicalRows: 30,
+        phase: 'open',
       }),
     })
     expect(geometry).toEqual({ cols: 90, rows: 30 })

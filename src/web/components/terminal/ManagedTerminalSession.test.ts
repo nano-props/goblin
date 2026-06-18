@@ -1278,7 +1278,13 @@ describe('ManagedTerminalSession', () => {
     expect(notify).not.toHaveBeenCalled()
   })
 
-  test('explicit takeover claims control without requiring input', async () => {
+  test('takeover response is the authoritative handshake (no realtime event required)', async () => {
+    // After the takeover atomicity follow-up, the `terminal.takeover`
+    // response carries role/controllerStatus/canonicalCols/Rows/phase
+    // and is applied synchronously. The renderer does NOT have to
+    // wait for a realtime `ownership` event before painting the
+    // post-takeover frame. A subsequent realtime event for the same
+    // session is idempotent.
     terminalCalls.attach.mockResolvedValueOnce(
       attachResult('session-1', {
         controller: { attachmentId: 'attachment_remote', status: 'connected' },
@@ -1289,6 +1295,8 @@ describe('ManagedTerminalSession', () => {
     terminalCalls.takeover.mockResolvedValueOnce(
       takeoverResult('session-1', {
         controller: { attachmentId: 'attachment_local', status: 'connected' },
+        canonicalCols: 101,
+        canonicalRows: 31,
       }),
     )
     const host = document.createElement('div')
@@ -1311,20 +1319,27 @@ describe('ManagedTerminalSession', () => {
     await flushUntil(() => terminalCalls.takeover.mock.calls.length > 0)
 
     expect(terminalCalls.takeover).toHaveBeenCalledWith({ sessionId: 'session-1', cols: 101, rows: 31 })
-    // Before authoritative ownership message arrives, role is still viewer
+    // The takeover response itself is now the authority — without
+    // any `handleOwnership` call, role already flipped to controller
+    // and the canonical size tracks the request (101x31).
     expect(session.snapshot().attachment).toMatchObject({
-      role: 'viewer',
+      role: 'controller',
       controllerStatus: 'connected',
-      canTakeover: true,
+      canTakeover: false,
+      canonicalCols: 101,
+      canonicalRows: 31,
     })
 
-    // Simulate authoritative server ownership event
+    // A later realtime ownership event for the same session is a
+    // benign re-apply — the runtime treats it as idempotent because
+    // every field already matches.
     session.handleOwnership({
       sessionId: 'session-1',
       role: 'controller',
       controllerStatus: 'connected',
       canonicalCols: 101,
       canonicalRows: 31,
+      phase: 'open',
     })
 
     expect(session.snapshot().attachment).toMatchObject({
@@ -1334,7 +1349,87 @@ describe('ManagedTerminalSession', () => {
     })
   })
 
-  test('takeover applies authoritative server ownership instead of optimistic local control', async () => {
+  test('takeover response propagates geometry into the runtime view', async () => {
+    // The response carries canonicalCols/Rows alongside role — the
+    // runtime applies all three in one shot. This is the new atomic-
+    // handshake contract: a viewer who clicks takeover sees the
+    // post-takeover geometry immediately, not after a follow-up
+    // realtime ownership event.
+    terminalCalls.attach.mockResolvedValueOnce(
+      attachResult('session-1', {
+        controller: { attachmentId: 'attachment_remote', status: 'connected' },
+        canonicalCols: 120,
+        canonicalRows: 40,
+      }),
+    )
+    terminalCalls.takeover.mockResolvedValueOnce(
+      takeoverResult('session-1', {
+        controller: { attachmentId: 'attachment_local', status: 'connected' },
+        canonicalCols: 132,
+        canonicalRows: 43,
+      }),
+    )
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    session.takeover()
+    await flushUntil(() => terminalCalls.takeover.mock.calls.length > 0)
+
+    // No handleOwnership call — yet the runtime already reflects the
+    // takeover response's geometry.
+    expect(session.snapshot().attachment).toMatchObject({
+      canonicalCols: 132,
+      canonicalRows: 43,
+      role: 'controller',
+    })
+  })
+
+  test('takeover response propagates phase into the runtime view', async () => {
+    // Companion to the geometry test above. When the server's
+    // takeover response says phase='restarting', the runtime picks
+    // it up synchronously — without waiting for a follow-up realtime
+    // ownership event. Pinning this here so the phase propagation
+    // path through applyTakeover → applyOwnership → setPhaseAndMessage
+    // stays covered.
+    terminalCalls.attach.mockResolvedValueOnce(
+      attachResult('session-1', {
+        controller: { attachmentId: 'attachment_remote', status: 'connected' },
+        canonicalCols: 120,
+        canonicalRows: 40,
+      }),
+    )
+    terminalCalls.takeover.mockResolvedValueOnce(
+      takeoverResult('session-1', {
+        controller: { attachmentId: 'attachment_local', status: 'connected' },
+        phase: 'restarting',
+      }),
+    )
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    session.takeover()
+    await flushUntil(() => terminalCalls.takeover.mock.calls.length > 0)
+
+    expect(session.snapshot().phase).toBe('restarting')
+  })
+
+  test('realtime ownership event is the authority for non-takeover paths', async () => {
+    // The realtime `ownership` event still has a job on the
+    // non-takeover paths: another window crashing, grace expiry,
+    // controller reconnect. For those there is no response to be
+    // authoritative; the event is the truth. This test pins that
+    // contract — the renderer still applies `handleOwnership`
+    // updates without any takeover response on the wire.
     terminalCalls.attach.mockResolvedValueOnce(
       attachResult('session-1', {
         controller: { attachmentId: 'attachment_remote', status: 'connected' },
@@ -1358,19 +1453,16 @@ describe('ManagedTerminalSession', () => {
     session.takeover()
     await flushUntil(() => terminalCalls.takeover.mock.calls.length > 0)
 
-    // Bridge response alone does not change ownership; only authoritative onOwnership does
-    expect(session.snapshot().attachment).toMatchObject({
-      role: 'viewer',
-      controllerStatus: 'connected',
-      canTakeover: true,
-    })
-
+    // The takeover response went through; but a subsequent realtime
+    // ownership event with a different role/state still applies and
+    // is the authority for the non-takeover paths.
     session.handleOwnership({
       sessionId: 'session-1',
       role: 'unowned',
       controllerStatus: 'none',
       canonicalCols: 120,
       canonicalRows: 40,
+      phase: 'open',
     })
 
     expect(session.snapshot().attachment).toMatchObject({
@@ -1404,6 +1496,7 @@ describe('ManagedTerminalSession', () => {
       controllerStatus: 'connected',
       canonicalCols: 101,
       canonicalRows: 31,
+      phase: 'open',
     })
 
     expect(session.snapshot().attachment).toMatchObject({
@@ -1789,7 +1882,12 @@ function takeoverResult(
   return {
     ok: true,
     sessionId,
+    role: 'controller',
+    controllerStatus: 'connected',
     controller: { attachmentId: 'attachment_local', status: 'connected' },
+    canonicalCols: 100,
+    canonicalRows: 30,
+    phase: 'open',
     ...overrides,
   }
 }

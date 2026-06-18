@@ -77,6 +77,7 @@ describe('TerminalSlot', () => {
         canTakeover: true,
         canonicalCols: 120,
         canonicalRows: 40,
+        phase: 'open' as const,
       },
     }
     const context: TerminalSessionContextValue = {
@@ -255,6 +256,7 @@ describe('TerminalSlot', () => {
         canTakeover: true,
         canonicalCols: 120,
         canonicalRows: 40,
+        phase: 'error' as const,
       },
     }
     const context: TerminalSessionContextValue = {
@@ -373,6 +375,7 @@ describe('TerminalSlot', () => {
         canTakeover: true,
         canonicalCols: 120,
         canonicalRows: 40,
+        phase: 'open' as const,
       },
     }
     const context: TerminalSessionContextValue = {
@@ -494,6 +497,7 @@ describe('TerminalSlot', () => {
         canTakeover: false,
         canonicalCols: 120,
         canonicalRows: 40,
+        phase: 'open' as const,
       },
     }
     const context: TerminalSessionContextValue = {
@@ -634,6 +638,7 @@ describe('TerminalSlot', () => {
         canTakeover: true,
         canonicalCols: 120,
         canonicalRows: 40,
+        phase: 'open' as const,
       },
     }
     const context: TerminalSessionContextValue = {
@@ -744,6 +749,7 @@ describe('TerminalSlot', () => {
         canTakeover: false,
         canonicalCols: 120,
         canonicalRows: 40,
+        phase: 'open' as const,
       },
     }
     const context: TerminalSessionContextValue = {
@@ -872,6 +878,7 @@ describe('TerminalSlot', () => {
         canTakeover: false,
         canonicalCols: 120,
         canonicalRows: 40,
+        phase: 'open' as const,
       },
     }
     const context: TerminalSessionContextValue = {
@@ -1002,6 +1009,7 @@ describe('TerminalSlot', () => {
         canTakeover: false,
         canonicalCols: 120,
         canonicalRows: 40,
+        phase: 'open' as const,
       },
     }
     const context: TerminalSessionContextValue = {
@@ -1166,6 +1174,7 @@ describe('TerminalSlot', () => {
         canTakeover: false,
         canonicalCols: 120,
         canonicalRows: 40,
+        phase: 'open' as const,
       },
     }
     const context: TerminalSessionContextValue = {

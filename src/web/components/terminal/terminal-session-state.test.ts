@@ -34,6 +34,7 @@ describe('TerminalSessionState', () => {
         canTakeover: true,
         canonicalCols: 120,
         canonicalRows: 40,
+        phase: 'open',
       },
     })
   })
@@ -99,6 +100,7 @@ describe('TerminalSessionState', () => {
         canTakeover: true,
         canonicalCols: 120,
         canonicalRows: 40,
+        phase: 'open',
       },
     })
   })

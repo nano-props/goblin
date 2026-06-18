@@ -94,6 +94,7 @@ export class TerminalSessionState {
         ...this.runtimeState.attachmentOwnership,
         canonicalCols: this.runtimeState.canonicalSize.cols,
         canonicalRows: this.runtimeState.canonicalSize.rows,
+        phase: this.runtimeState.phase,
       })
     }
     if (this.transientViewState.searchResult) snapshot.search = this.transientViewState.searchResult
@@ -169,6 +170,11 @@ export class TerminalSessionState {
       changed = true
     }
     changed = this.setCanonicalSize(event.canonicalCols, event.canonicalRows) || changed
+    // Phase arrives on the same authority surface as role/geometry
+    // (either the realtime ownership event or the authoritative
+    // takeover response). Apply it consistently so the view model
+    // is shape-uniform regardless of which path updated it.
+    changed = this.setPhaseAndMessage(event.phase, null) || changed
     return changed
   }
 

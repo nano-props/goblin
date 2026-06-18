@@ -23,6 +23,7 @@ import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import type {
   TerminalBellEvent,
   TerminalDescriptor,
+  TerminalOwnershipViewModel,
   TerminalSearchResult,
   TerminalSessionContextValue,
   TerminalSnapshot,
@@ -178,6 +179,7 @@ vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
           canTakeover: input.role !== 'controller',
           canonicalCols: input.canonicalCols,
           canonicalRows: input.canonicalRows,
+          phase: input.phase,
         },
       }
       this.serializeValue = input.snapshot ?? this.serializeValue
@@ -228,15 +230,7 @@ const SECOND_WORKTREE_PATH = '/tmp/gbl-terminal-provider-worktree-2'
 let exitHandler: ((event: TerminalExitEvent) => void) | null = null
 let outputHandler: ((event: TerminalOutputEvent) => void) | null = null
 let titleHandler: ((event: TerminalTitleEvent) => void) | null = null
-let ownershipHandler:
-  | ((event: {
-      sessionId: string
-      role: 'controller' | 'viewer' | 'unowned'
-      controllerStatus: 'connected' | 'grace' | 'none'
-      canonicalCols: number
-      canonicalRows: number
-    }) => void)
-  | null = null
+let ownershipHandler: ((event: TerminalOwnershipViewModel) => void) | null = null
 let sessionsChangedHandler: ((repoRoot: string) => void) | null = null
 let sessionClosedHandler: ((event: { sessionId: string; repoRoot: string }) => void) | null = null
 const listSessionsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<TerminalSessionSummary[]>>(
@@ -412,9 +406,12 @@ beforeEach(() => {
         takeover: vi.fn(async () => ({
           ok: true as const,
           sessionId: 'session-1',
+          role: 'controller' as const,
+          controllerStatus: 'connected' as const,
           controller: { attachmentId: 'attachment_local', status: 'connected' as const },
           canonicalCols: 80,
           canonicalRows: 24,
+          phase: 'open' as const,
         })),
         close: closeMock,
         notifyBell: vi.fn(async () => true),
@@ -437,13 +434,7 @@ beforeEach(() => {
         }),
         onOwnership: vi.fn(
           (
-            cb: (event: {
-              sessionId: string
-              role: 'controller' | 'viewer' | 'unowned'
-              controllerStatus: 'connected' | 'grace' | 'none'
-              canonicalCols: number
-              canonicalRows: number
-            }) => void,
+            cb: (event: TerminalOwnershipViewModel) => void,
           ) => {
             ownershipHandler = cb
             return () => {}
@@ -503,9 +494,12 @@ beforeEach(() => {
       takeover: vi.fn(async () => ({
         ok: true as const,
         sessionId: 'session-1',
+        role: 'controller' as const,
+        controllerStatus: 'connected' as const,
         controller: { attachmentId: 'attachment_local', status: 'connected' as const },
         canonicalCols: 80,
         canonicalRows: 24,
+        phase: 'open' as const,
       })),
       close: closeMock,
       create: createTerminalMock,
@@ -532,13 +526,7 @@ beforeEach(() => {
       }),
       onOwnership: vi.fn(
         (
-          cb: (event: {
-            sessionId: string
-            role: 'controller' | 'viewer' | 'unowned'
-            controllerStatus: 'connected' | 'grace' | 'none'
-            canonicalCols: number
-            canonicalRows: number
-          }) => void,
+          cb: (event: TerminalOwnershipViewModel) => void,
         ) => {
           ownershipHandler = cb
           return () => {}
@@ -730,6 +718,7 @@ describe('TerminalSessionProvider', () => {
           controllerStatus: 'connected',
           canonicalCols: 100,
           canonicalRows: 30,
+          phase: 'open',
         })
       })
 
@@ -749,6 +738,7 @@ describe('TerminalSessionProvider', () => {
         controllerStatus: 'connected',
         canonicalCols: 100,
         canonicalRows: 30,
+        phase: 'open',
       })
       expect(first.handleOwnership).not.toHaveBeenCalled()
     } finally {

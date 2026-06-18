@@ -192,6 +192,12 @@ export function createServerTerminalBridge(options: {
           ...resolveTerminalOwnership(message.event.controller, attachmentId),
           canonicalCols: message.event.cols,
           canonicalRows: message.event.rows,
+          // Phase arrives from the server's realtime ownership event
+          // (non-takeover paths). Takeover itself carries phase on
+          // its response (see `TerminalTakeoverResult`) and applies
+          // it synchronously via `runtime.applyTakeover` — the event
+          // here is the authority for the other paths only.
+          phase: message.event.phase,
         }
         for (const subscriber of ownershipSubscribers) subscriber(ownershipEvent)
       }

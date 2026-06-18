@@ -40,12 +40,22 @@ export interface TerminalAttachmentSnapshot extends TerminalAttachmentOwnershipV
   canTakeover: boolean
   canonicalCols: number | null
   canonicalRows: number | null
+  phase: TerminalPhase
 }
 
+/**
+ * Ownership state delivered by either the realtime `ownership` event
+ * (controller crash / grace expiry / controller reconnect) or the
+ * `terminal.takeover` response (now an authoritative handshake — see
+ * `TerminalTakeoverResult` in `src/shared/terminal-types.ts`). Both
+ * surfaces carry the same fields so the renderer can apply either
+ * without re-checking the shape.
+ */
 export interface TerminalOwnershipViewModel extends TerminalAttachmentOwnershipViewModel {
   sessionId: string
   canonicalCols: number
   canonicalRows: number
+  phase: TerminalPhase
 }
 
 export interface TerminalSessionHydrationInput extends TerminalOwnershipViewModel {
@@ -172,6 +182,7 @@ export function createTerminalAttachmentSnapshot(input: {
   controllerStatus: TerminalControllerStatus
   canonicalCols: number
   canonicalRows: number
+  phase: TerminalPhase
 }): TerminalAttachmentSnapshot {
   const active = input.role === 'controller'
   return {
@@ -181,5 +192,6 @@ export function createTerminalAttachmentSnapshot(input: {
     canTakeover: !active,
     canonicalCols: input.canonicalCols || null,
     canonicalRows: input.canonicalRows || null,
+    phase: input.phase,
   }
 }

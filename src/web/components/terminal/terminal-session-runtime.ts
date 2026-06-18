@@ -1,4 +1,9 @@
-import type { TerminalAttachResult, TerminalOutputEvent, TerminalSessionPhase } from '#/shared/terminal-types.ts'
+import type {
+  TerminalAttachResult,
+  TerminalOutputEvent,
+  TerminalSessionPhase,
+  TerminalTakeoverResult,
+} from '#/shared/terminal-types.ts'
 import { TerminalSessionState } from '#/web/components/terminal/terminal-session-state.ts'
 import type { TerminalOwnershipViewModel, TerminalSearchResult } from '#/web/components/terminal/types.ts'
 export class TerminalSessionRuntime {
@@ -160,6 +165,32 @@ export class TerminalSessionRuntime {
   handleOwnership(event: TerminalOwnershipViewModel): boolean {
     if (event.sessionId !== this.ptySessionId) return false
     return this.state.applyOwnership(event)
+  }
+
+  /**
+   * Authoritative handshake for the takeover path.
+   *
+   * Replaces the previous "wait for the realtime `ownership` event"
+   * pattern: the `terminal.takeover` response now carries the same
+   * frame fields (`role`, `controllerStatus`, `canonicalCols`,
+   * `canonicalRows`, `phase`) and is applied synchronously. The
+   * later realtime `ownership` event for the same session is
+   * idempotent — re-applying the same values is a no-op.
+   *
+   * Returns `false` if the result is for a different session (the
+   * caller must already have a current sessionId for the takeover
+   * to be valid; this is a defensive guard).
+   */
+  applyTakeover(result: Extract<TerminalTakeoverResult, { ok: true }>): boolean {
+    if (result.sessionId !== this.ptySessionId) return false
+    return this.state.applyOwnership({
+      sessionId: result.sessionId,
+      role: result.role,
+      controllerStatus: result.controllerStatus,
+      canonicalCols: result.canonicalCols,
+      canonicalRows: result.canonicalRows,
+      phase: result.phase,
+    })
   }
 
   setCanonicalTitle(canonicalTitle: string | null): boolean {

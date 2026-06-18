@@ -283,15 +283,35 @@ export class ManagedTerminalSession {
     if (!sessionId) return
     const term = this.view.currentTerminal()
     const size = term ? { cols: term.cols, rows: term.rows } : this.runtime.currentCanonicalSize()
-    // Ownership changes are applied exclusively via authoritative onOwnership realtime messages.
-    // The bridge response is only used to trigger the server-side handoff.
+    // The takeover response is the authoritative handshake for the
+    // new controller's view (see TerminalTakeoverResult in
+    // src/shared/terminal-types.ts). The response carries role,
+    // controllerStatus, canonicalCols/Rows, and phase — we apply
+    // them synchronously so the renderer doesn't have to wait for
+    // the realtime `ownership` event before painting the
+    // post-takeover frame. A later realtime ownership event for the
+    // same session is idempotent.
     if (this.runtime.setTakeoverPending(true)) this.notify('metadata')
     void terminalBridge
       .takeover({ sessionId, cols: size.cols, rows: size.rows })
-      .catch(() => {})
+      .then((result) => {
+        if (!result.ok) return
+        if (this.runtime.applyTakeover(result)) this.notify('metadata')
+      })
+      .catch((err) => {
+        // Mirror the resize rejection pattern: surface the failure
+        // so ops can correlate. The takeover UI stays in
+        // "pending takeover" state until the user retries; the
+        // `.finally` below clears the flag on any settlement.
+        terminalLog.warn('takeover failed for session', { sessionId, err })
+      })
       .finally(() => {
-        // If the server response settles but we never received an ownership event,
-        // clear the pending state so the user can retry.
+        // If the server response settles but we never received an
+        // ownership event, clear the pending state so the user can
+        // retry. After this plan, the realtime event is no longer
+        // the only path to clear the flag — the success branch
+        // above already applied the new state, so this is purely
+        // the failure / timeout fallback.
         if (this.runtime.isTakeoverPending()) {
           if (this.runtime.setTakeoverPending(false)) this.notify('metadata')
         }
