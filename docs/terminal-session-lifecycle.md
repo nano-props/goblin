@@ -3,6 +3,7 @@
 > **Status**: combined bug-fix and design note.
 > All four roots described here are implemented on `main` as of
 > `694c68c`. The type-level atomicity follow-up #1 (§Type-level
+> atomicity) and the takeover atomicity follow-up #5 (§Takeover
 > atomicity) landed on top. The document is retained as the
 > authoritative contract and as a record of why the implementation
 > is shaped the way it is.
@@ -458,7 +459,7 @@ report.
 
 ---
 
-## Takeover atomicity (follow-up #2)
+## Takeover atomicity (follow-up #5)
 
 ### Status
 
@@ -600,11 +601,11 @@ All four roots landed on `main`:
   three as implemented at `fa67adb` for any forward-looking
   planning.
 
-Follow-up #2 from §Suggested follow-ups also landed: takeover's
+Follow-up #5 from §Suggested follow-ups also landed: takeover's
 two-step handshake (response + realtime `ownership` event) was
 collapsed into a single authoritative handshake, with the realtime
 event kept as the authority only on the non-takeover paths. See
-§Takeover atomicity (follow-up #2).
+§Takeover atomicity (follow-up #5).
 
 For reference, the notional landing order *had* this fix set been
 split into separate commits (it was not, due to the wip-snapshot
@@ -746,24 +747,28 @@ any individual implementation:
 1. **Done** — tighten the shared `TerminalCatalogMutationResult`
    type so the first-frame fields are required at the type level,
    not only by renderer-side validation. (See §Type-level atomicity.)
-2. **Done** — collapse the takeover two-step handshake (response +
+2. **Done (rolled back via `282ea76`)** — Decide explicitly whether
+   the same-session snapshot reapply patch (broadened
+   `ManagedTerminalSession.hydrate()`) should stay as a supported
+   repair path. The broadened hydrate was rolled back: it
+   re-painted xterm mid-session and caused terminal-emulator
+   protocol replies (OSC color queries) to leak into the PTY
+   stdin path as input pollution. Incident recorded in
+   `docs/terminal-input-attribution.md`. The first-frame
+   `applyOpenResult` path is the only re-apply route now; same-
+   session re-hydration is a no-op.
+3. **Done (P1.7)** — Decide explicitly whether the delayed
+   provider-destroy heuristic (one-macrotask delay on
+   `TerminalSessionProvider` cleanup) should remain until P1.7
+   lands. P1.7 (`ebb88ef`) supersedes it — the registry is now a
+   renderer-level singleton, so per-provider destroy debouncing is
+   not needed. The debounce was removed in `f19eba1`.
+4. **Done (P1.7)** — Move `TerminalSessionRegistry` to a renderer-
+   level singleton lifetime. (See `terminal-roadmap.md` P1.7.)
+5. **Done** — collapse the takeover two-step handshake (response +
    realtime `ownership` event) into a single authoritative
    handshake, keeping the realtime event as authority only on the
    non-takeover paths. (See §Takeover atomicity.)
-3. **Done (P1.7)** — Move `TerminalSessionRegistry` to a renderer-
-   level singleton lifetime. Tracked as `terminal-roadmap.md` P1.7.
-4. **Done** — Decide explicitly whether the same-session snapshot
-   reapply patch (broadened `ManagedTerminalSession.hydrate()`)
-   should stay as a supported repair path. The same-session
-   reapply stays; the broadened hydrate is part of the first-
-   frame patch set and serves the takeover path's "idempotent
-   re-apply" contract.
-5. **Done** — Decide explicitly whether the delayed provider-
-   destroy heuristic (one-macrotask delay on
-   `TerminalSessionProvider` cleanup) should remain until P1.7
-   lands. P1.7 supersedes it — the registry is now a renderer-
-   level singleton, so the per-provider destroy heuristic is no
-   longer needed.
 6. Add a contract-test pass over the terminal invariants listed in
    `terminal-roadmap.md` P2.
 
