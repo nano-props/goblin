@@ -100,7 +100,10 @@ vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
   return { ManagedTerminalSession: MockManagedTerminalSession }
 })
 
-import { TerminalSessionRegistry } from '#/web/components/terminal/TerminalSessionRegistry.ts'
+import {
+  TerminalSessionRegistry,
+  setTerminalSessionRegistryForTests,
+} from '#/web/components/terminal/TerminalSessionRegistry.ts'
 
 const REPO_ROOT = '/repo'
 const WORKTREE_PATH = '/repo'
@@ -163,10 +166,12 @@ describe('TerminalSessionRegistry create flow', () => {
     mocks.attachmentIdMock.mockClear()
     registry = new TerminalSessionRegistry(() => REPO_ROOT)
     registry.setRepoIndex(makeRepoIndex())
+    setTerminalSessionRegistryForTests(registry)
   })
 
   afterEach(() => {
     registry.destroy()
+    setTerminalSessionRegistryForTests(null)
     document.body.innerHTML = ''
   })
 

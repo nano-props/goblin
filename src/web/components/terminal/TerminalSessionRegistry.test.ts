@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { TerminalSessionRegistry } from '#/web/components/terminal/TerminalSessionRegistry.ts'
+import {
+  TerminalSessionRegistry,
+  getTerminalSessionRegistry,
+  setTerminalSessionRegistryForTests,
+} from '#/web/components/terminal/TerminalSessionRegistry.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import type { TerminalDescriptor, TerminalRepoIndex } from '#/web/components/terminal/types.ts'
 
@@ -70,10 +74,20 @@ describe('TerminalSessionRegistry', () => {
       () => REPO_ROOT,
       (worktreeTerminalKey, key) => selectedChanges.push({ worktreeTerminalKey, key }),
     )
+    // Install into the singleton slot so any code that reaches the
+    // registry via `getTerminalSessionRegistry()` (e.g., a Provider
+    // mounted inside a sub-component) sees the same instance this
+    // test constructed.
+    setTerminalSessionRegistryForTests(registry)
   })
 
   afterEach(() => {
+    // Drain pending state and clear listener maps on the per-test
+    // instance, then release the singleton slot so the next test
+    // starts clean. Mirrors the production singleton-vs-test
+    // contract documented at `setTerminalSessionRegistryForTests`.
     registry.destroy()
+    setTerminalSessionRegistryForTests(null)
   })
 
   describe('event dispatch', () => {
@@ -443,6 +457,63 @@ describe('TerminalSessionRegistry', () => {
       ;(registry as any).notifySession(key, 'metadata')
       const s2 = registry.snapshot(key)
       expect(s1).not.toBe(s2)
+    })
+  })
+
+  describe('singleton lifetime (P1.7)', () => {
+    test('getTerminalSessionRegistry returns the same instance across calls with the same deps', () => {
+      // The slot was filled by `beforeEach` with the per-test
+      // `registry`. The getter must return that exact instance, not
+      // construct a new one.
+      const first = getTerminalSessionRegistry({
+        getCurrentRepoId: () => REPO_ROOT,
+        onSelectedWorktreeChange: () => {},
+      })
+      const second = getTerminalSessionRegistry({
+        getCurrentRepoId: () => REPO_ROOT,
+        onSelectedWorktreeChange: () => {},
+      })
+      expect(first).toBe(second)
+      expect(first).toBe(registry)
+    })
+
+    test('setTerminalSessionRegistryForTests(null) clears the slot so the next getter constructs a fresh instance', () => {
+      const original = registry
+      setTerminalSessionRegistryForTests(null)
+      const fresh = getTerminalSessionRegistry({
+        getCurrentRepoId: () => REPO_ROOT,
+        onSelectedWorktreeChange: () => {},
+      })
+      expect(fresh).not.toBe(original)
+      // Re-install for `afterEach` cleanup.
+      setTerminalSessionRegistryForTests(registry)
+    })
+
+    test('state added before a synthetic remount survives in the singleton slot', () => {
+      // Simulates the production invariant: Provider remounts
+      // (StrictMode, route round-trip) reuse the singleton, so any
+      // state injected before the remount is still visible after.
+      registry.setRepoIndex(makeRepoIndex())
+      const descriptor = makeDescriptor('terminal-1', 1)
+      // Add a session via the internal API (no real WS, no
+      // ManagedTerminalSession — just the registry bookkeeping).
+      ;(registry as any).sessions.set(descriptor.key, {
+        descriptor,
+        snapshot: () => ({ phase: 'open', message: null, processName: 'zsh', canonicalTitle: null }),
+        currentSessionId: () => 'session-1',
+        dispose: () => {},
+      })
+      // Synthesize a remount: re-fetch the singleton via the
+      // getter (the Provider's mount effect does exactly this).
+      const after = getTerminalSessionRegistry({
+        getCurrentRepoId: () => REPO_ROOT,
+        onSelectedWorktreeChange: () => {},
+      })
+      expect(after).toBe(registry)
+      // The session we injected is still in the registry's map —
+      // i.e. the state survived the synthetic remount.
+      const stored = (after as any).sessions.get(descriptor.key) as { descriptor: TerminalDescriptor } | undefined
+      expect(stored?.descriptor.terminalId).toBe('terminal-1')
     })
   })
 })
