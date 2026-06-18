@@ -69,6 +69,8 @@ describe('Topbar', () => {
     expect(useReposStore.getState().detailFocusMode).toBe(true)
     expect(useReposStore.getState().detailCollapsed).toBe(false)
     expect(branchListToggle()?.getAttribute('aria-pressed')).toBe('true')
+    expect(branchListToggle()?.classList.contains('bg-accent')).toBe(false)
+    expect(branchListToggle()?.classList.contains('shadow-xs')).toBe(false)
 
     act(() => {
       branchListToggle()?.click()
@@ -76,6 +78,22 @@ describe('Topbar', () => {
 
     expect(useReposStore.getState().detailFocusMode).toBe(false)
     expect(branchListToggle()?.getAttribute('aria-pressed')).toBe('false')
+  })
+
+  test('uses the previous pane icon for the current workspace layout', () => {
+    render(
+      <Topbar repoId="/tmp/repo" onOpenSettings={() => {}}>
+        <div />
+      </Topbar>,
+    )
+
+    expect(branchListToggleIcon()?.classList.contains('lucide-panel-left')).toBe(true)
+
+    act(() => {
+      useReposStore.setState({ workspaceLayout: 'top-bottom' })
+    })
+
+    expect(branchListToggleIcon()?.classList.contains('lucide-panel-top')).toBe(true)
   })
 })
 
@@ -87,4 +105,8 @@ function render(element: ReactNode) {
 
 function branchListToggle(): HTMLButtonElement | null {
   return container?.querySelector('button[aria-label="workspace.branch-list-toggle-label"]') ?? null
+}
+
+function branchListToggleIcon(): SVGElement | null {
+  return branchListToggle()?.querySelector('svg') ?? null
 }
