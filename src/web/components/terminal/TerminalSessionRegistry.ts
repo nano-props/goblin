@@ -408,24 +408,19 @@ export class TerminalSessionRegistry {
     if (!snapshotSessionId || typeof result.snapshot !== 'string' || typeof result.snapshotSeq !== 'number') {
       throw new Error('error.terminal-create-failed')
     }
-    const serverSessions = result.sessions.some((session) => session.key === result.key && session.sessionId === snapshotSessionId)
-      ? result.sessions
-      : [
-          ...result.sessions,
-          {
-            sessionId: snapshotSessionId,
-            key: result.key,
-            cwd: base.worktreePath,
-            controller: result.controller ?? null,
-            processName: result.processName ?? 'terminal',
-            canonicalTitle: result.canonicalTitle ?? null,
-            phase: result.phase ?? 'open',
-            message: result.message ?? null,
-            cols: result.canonicalCols ?? geometry.cols,
-            rows: result.canonicalRows ?? geometry.rows,
-            displayOrder: this.sortedSessionsForWorktree(terminalWorktreeKey).length,
-          },
-        ]
+    // First-frame contract: when the server reports `action: 'created'`,
+    // the catalog must echo that session in `sessions[]`. The first-frame
+    // payload is the source of truth — fabricates below this point would
+    // hide a real protocol mismatch (e.g., a half-applied create that
+    // committed the session row but skipped the catalog append). Reject
+    // and let the operator restart the create.
+    const createdSession = result.sessions.find(
+      (session) => session.key === result.key && session.sessionId === snapshotSessionId,
+    )
+    if (!createdSession) {
+      throw new Error('error.terminal-create-failed')
+    }
+    const serverSessions = result.sessions
     this.setPreferredSelectedTerminalKey(terminalWorktreeKey, result.key)
     this.reconcileServerSessions(
       base.repoRoot,
