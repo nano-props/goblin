@@ -39,6 +39,7 @@ export class ManagedTerminalSession {
   descriptor: TerminalDescriptor
   private readonly notify: (reason: TerminalNotifyReason) => void
   private readonly onBell: ((descriptor: TerminalDescriptor, event: TerminalBellEvent) => void) | null
+  private readonly requestDurableClose: (sessionId: string) => Promise<void>
   private readonly runtime = new TerminalSessionRuntime()
   private readonly view: TerminalSessionView
   private startToken = 0
@@ -60,10 +61,19 @@ export class ManagedTerminalSession {
     descriptor: TerminalDescriptor,
     notify: (reason: TerminalNotifyReason) => void,
     onBell: ((descriptor: TerminalDescriptor, event: TerminalBellEvent) => void) | null = null,
+    // Durable close hook. The registry passes this in so dispose() can
+    // hand the close to a queue (drained on the next create for the
+    // same worktree) instead of firing `terminalBridge.close` as a
+    // fire-and-forget. The old `void … .catch(() => {})` path could
+    // drop the request if the WebSocket was already closing, leaving
+    // the server PTY alive and the next create reattaching to the
+    // orphan. See `TerminalSessionRegistry.pendingCloseBySessionId`.
+    requestDurableClose: (sessionId: string) => Promise<void> = () => Promise.resolve(),
   ) {
     this.descriptor = descriptor
     this.notify = notify
     this.onBell = onBell
+    this.requestDurableClose = requestDurableClose
     this.view = new TerminalSessionView({
       onInput: (data) => this.writeInput(data),
       onBell: () => this.handleBell(),
@@ -113,7 +123,22 @@ export class ManagedTerminalSession {
     this.view.blurIfFocused()
     const sessionIds = this.runtime.disposeSessionIds()
     if (options.closeSession !== false) {
-      for (const sessionId of sessionIds) void terminalBridge.close({ sessionId }).catch(() => {})
+      // Hand the close to the registry's durable queue instead of
+      // firing `terminalBridge.close` directly. The queue fires the
+      // close in the background and the next `createTerminal` for
+      // this worktree awaits it, so the next PTY can't reattach to
+      // the still-alive orphan. Failures are logged inside the queue
+      // — the old `void … .catch(() => {})` path silently swallowed
+      // the rejection and let the bug hide.
+      for (const sessionId of sessionIds) {
+        void this.requestDurableClose(sessionId).catch(() => {
+          // Already logged at the queue site. Swallow here so a
+          // misbehaving registry hook can never bubble out of
+          // dispose() — the user has already navigated away and a
+          // rejection would just land in an unhandled-rejection log
+          // with no context.
+        })
+      }
     }
     this.destroyActiveView()
     this.view.disposeFrame()
@@ -188,8 +213,9 @@ export class ManagedTerminalSession {
   }
 
   hydrate(input: TerminalSessionHydrationInput): void {
-    this.hydratedSnapshot = { snapshot: input.snapshot, snapshotSeq: input.snapshotSeq }
     const previousSessionId = this.runtime.currentSessionId()
+    const previousHydratedSnapshot = this.hydratedSnapshot
+    this.hydratedSnapshot = { snapshot: input.snapshot, snapshotSeq: input.snapshotSeq }
     const changed = this.runtime.hydrateSession({
       sessionId: input.sessionId,
       phase: input.phase,
@@ -201,7 +227,10 @@ export class ManagedTerminalSession {
       canonicalCols: input.canonicalCols,
       canonicalRows: input.canonicalRows,
     })
+    const snapshotChanged =
+      previousHydratedSnapshot.snapshotSeq !== input.snapshotSeq || previousHydratedSnapshot.snapshot !== input.snapshot
     if (previousSessionId && previousSessionId !== input.sessionId) this.applyHydratedSnapshotToActiveView()
+    else if (this.view.currentTerminal() && input.snapshot.length > 0 && snapshotChanged) this.applyHydratedSnapshotToActiveView()
     if (changed) this.notify('metadata')
   }
 

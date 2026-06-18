@@ -237,6 +237,7 @@ let ownershipHandler:
     }) => void)
   | null = null
 let sessionsChangedHandler: ((repoRoot: string) => void) | null = null
+let sessionClosedHandler: ((event: { sessionId: string; repoRoot: string }) => void) | null = null
 const listSessionsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<TerminalSessionSummary[]>>(
   async () => [],
 )
@@ -268,6 +269,7 @@ beforeEach(() => {
   titleHandler = null
   ownershipHandler = null
   sessionsChangedHandler = null
+  sessionClosedHandler = null
   mockSessions.length = 0
   managedServerSessions = []
   listSessionsMock.mockReset()
@@ -481,9 +483,9 @@ beforeEach(() => {
       kickReconnect: vi.fn(() => {}),
       getSessionSnapshot: getSessionSnapshotMock,
       reorder: vi.fn(async () => true),
-      notifyBell: window.goblinNative.terminal.notifyBell,
+      notifyBell: window.goblinNative.terminal.notifyBell ?? vi.fn(async () => true),
       sendTestNotification: vi.fn(async () => true),
-      setBadge: window.goblinNative.terminal.setBadge,
+      setBadge: window.goblinNative.terminal.setBadge ?? vi.fn(() => {}),
       onOutput: vi.fn((cb: (event: TerminalOutputEvent) => void) => {
         outputHandler = cb
         return () => {}
@@ -514,6 +516,12 @@ beforeEach(() => {
         sessionsChangedHandler = cb
         return () => {
           if (sessionsChangedHandler === cb) sessionsChangedHandler = null
+        }
+      }),
+      onSessionClosed: vi.fn((cb: (event: { sessionId: string; repoRoot: string }) => void) => {
+        sessionClosedHandler = cb
+        return () => {
+          if (sessionClosedHandler === cb) sessionClosedHandler = null
         }
       }),
     }),
@@ -1705,6 +1713,7 @@ describe('TerminalSessionProvider', () => {
         onExit: () => () => {},
         onOwnership: () => () => {},
         onSessionsChanged: () => () => {},
+        onSessionClosed: () => () => {},
       }),
     })
 
@@ -1788,6 +1797,7 @@ describe('TerminalSessionProvider', () => {
         onExit: () => () => {},
         onOwnership: () => () => {},
         onSessionsChanged: () => () => {},
+        onSessionClosed: () => () => {},
       }),
     })
 

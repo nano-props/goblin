@@ -128,13 +128,33 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
 
     close(clientId: string, input: TerminalSessionInput): TerminalMutationResult {
       if (!isValidTerminalClientId(clientId)) return false
+      // Look up the session BEFORE closing so we know its scope
+      // (for the per-session broadcast). The session is gone after
+      // `closeOwnedSession` returns, so a post-close lookup would
+      // always miss. The lookup is also gated on validity so a
+      // malformed input never throws inside the action.
       const repoRoot = isValidTerminalSessionId(input?.sessionId)
         ? manager.getSession(clientId, input.sessionId)?.scope
         : undefined
       const closed = isValidTerminalSessionId(input?.sessionId)
         ? manager.closeOwnedSession(clientId, input.sessionId)
         : false
-      if (closed && repoRoot) broker.broadcastGlobal({ type: 'sessions-changed', repoRoot })
+      if (closed && repoRoot) {
+        // `sessions-changed` keeps the full repo list in sync for
+        // observers that only watch that primitive. `session-closed`
+        // is the targeted counterpart for the originating window and
+        // any sibling window that may have a stale local entry: it
+        // drops the local session immediately without waiting for
+        // the next reconcile. Emitting both is the safe choice —
+        // `sessions-changed` is cheap, the consumer's `session-closed`
+        // handler is a no-op when the local map has no entry.
+        broker.broadcastGlobal({ type: 'sessions-changed', repoRoot })
+        broker.broadcastGlobal({
+          type: 'session-closed',
+          sessionId: input.sessionId,
+          repoRoot,
+        })
+      }
       return closed
     },
 

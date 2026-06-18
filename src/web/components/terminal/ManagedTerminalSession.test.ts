@@ -420,7 +420,7 @@ const terminalCalls = {
   takeover: vi.fn<(input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>>(),
   close: vi.fn<(input: TerminalSessionInput) => Promise<TerminalMutationResult>>(),
   notifyBell: vi.fn<(input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>>(),
-  setBadge: vi.fn<Window['goblinNative']['terminal']['setBadge']>(),
+  setBadge: vi.fn<(count: number) => void>(),
 }
 const invokeIpc = vi.fn<Window['goblinNative']['invokeIpc']>()
 const shellOpenExternalUrl = vi.fn<NonNullable<Window['goblinNative']['shell']>['openExternalUrl']>()
@@ -502,9 +502,6 @@ beforeEach(() => {
         bridgeVersion: RENDERER_BRIDGE_VERSION,
         capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
       },
-      homeDir: '/home',
-      initialI18n: null,
-      initialSettings: null,
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
       pathForFile: vi.fn(),
       onEvent: vi.fn(),
@@ -531,6 +528,7 @@ beforeEach(() => {
         onExit: vi.fn(),
         onOwnership: vi.fn(),
         onSessionsChanged: vi.fn(),
+        onSessionClosed: vi.fn(),
       },
     },
   })
@@ -551,10 +549,6 @@ beforeEach(() => {
         bridgeVersion: RENDERER_BRIDGE_VERSION,
         capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
       },
-      homeDir: '/home',
-      platform: 'web',
-      initialI18n: null,
-      initialSettings: null,
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
     }),
     invokeIpc,
@@ -590,6 +584,7 @@ beforeEach(() => {
       onExit: vi.fn(() => () => {}),
       onOwnership: vi.fn(() => () => {}),
       onSessionsChanged: vi.fn(() => () => {}),
+      onSessionClosed: vi.fn(() => () => {}),
     }),
   })
 })
@@ -1510,7 +1505,17 @@ describe('ManagedTerminalSession', () => {
   test('closes pending replacement session when disposed before restart reaches main', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    // The new `requestDurableClose` callback is the seam ManagedTerminalSession
+    // uses to hand a close off to the registry's durable queue. In production
+    // the queue dedupes and the registry awaits it on the next create; in
+    // this test we wire it straight to `terminalCalls.close` so the same
+    // assertions the old test made still hold.
+    const pendingCloses: Array<Promise<unknown>> = []
+    const session = new ManagedTerminalSession(descriptor, vi.fn(), null, async (sessionId) => {
+      const promise = terminalCalls.close({ sessionId })
+      pendingCloses.push(promise)
+      await promise
+    })
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -1518,6 +1523,10 @@ describe('ManagedTerminalSession', () => {
     session.restart()
     session.dispose()
     await flushTerminalStart()
+    // The close is now routed through the durable callback, not the
+    // bridge directly. Awaiting the queue's pending promise is the
+    // equivalent of "the registry's queue settled".
+    await Promise.allSettled(pendingCloses)
 
     expect(terminalCalls.restart).not.toHaveBeenCalled()
     expect(terminalCalls.close).toHaveBeenCalledWith({ sessionId: 'session-1' })
@@ -1528,7 +1537,14 @@ describe('ManagedTerminalSession', () => {
     terminalCalls.restart.mockReturnValueOnce(restart.promise)
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    // See the comment in the previous test for why we wire
+    // `requestDurableClose` to `terminalCalls.close` here.
+    const pendingCloses: Array<Promise<unknown>> = []
+    const session = new ManagedTerminalSession(descriptor, vi.fn(), null, async (sessionId) => {
+      const promise = terminalCalls.close({ sessionId })
+      pendingCloses.push(promise)
+      await promise
+    })
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -1538,6 +1554,7 @@ describe('ManagedTerminalSession', () => {
     session.dispose()
     restart.resolve(attachResult('session-2'))
     await flushTerminalStart()
+    await Promise.allSettled(pendingCloses)
 
     expect(terminalCalls.close).toHaveBeenCalledWith({ sessionId: 'session-1' })
     expect(terminalCalls.close).toHaveBeenCalledWith({ sessionId: 'session-2' })

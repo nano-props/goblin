@@ -17,6 +17,7 @@ import { collectClipboardFiles } from '#/web/clipboard/collect-clipboard-files.t
 import { processDrop, processPaste } from '#/web/clipboard/process.ts'
 import { PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
 import { useT } from '#/web/stores/i18n.ts'
+import { terminalLog } from '#/web/logger.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import {
@@ -53,6 +54,7 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
     writeInput,
     takeover,
     restart,
+    createTerminal,
   } = context
   const terminalWorktreeKey = worktreeTerminalKey(repoRoot, worktreePath)
   useLayoutEffect(() => {
@@ -405,11 +407,33 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
           takeoverPending={snapshot.takeoverPending}
         />
       )}
-      {(slotMode === 'opening' || slotMode === 'restarting') && (
+      {slotMode === 'opening' && !hasSessions ? (
+        // Empty state: the worktree has no terminals yet. The bare
+        // host <div> renders a featureless black box otherwise, which
+        // is what the user reported as "blank screen" on the first
+        // click. Render an explicit CTA so the affordance is
+        // discoverable. The button is disabled while the create is
+        // in flight (we await `createTerminal`'s returned key to
+        // keep double-clicks idempotent — the registry dedupes by
+        // worktree via the pending-create queue, but a visible
+        // loading state is still the right user signal).
+        <EmptyTerminalCta
+          onCreate={async () => {
+            try {
+              await createTerminal({ repoRoot, branch, worktreePath })
+            } catch (err) {
+              terminalLog.warn('empty-state terminal create failed', { err })
+              toast.error(t('error.terminal-create-failed'))
+            }
+          }}
+          emptyLabel={t('terminal.empty')}
+          newTerminalLabel={t('terminal.new')}
+        />
+      ) : slotMode === 'opening' || slotMode === 'restarting' ? (
         <div className="goblin-terminal-slot__status-overlay">
           <span>{t('terminal.opening')}</span>
         </div>
-      )}
+      ) : null}
       {/* Error-state rendering is mode-driven: only the controller sees
           the error chip with a working restart button; a viewer in
           error state must takeover first (the viewer overlay covers
@@ -442,6 +466,46 @@ interface ViewerOverlayProps {
   takeoverKey: string | null
   onTakeover: (key: string) => void
   takeoverPending?: boolean
+}
+
+interface EmptyTerminalCtaProps {
+  onCreate: () => Promise<void> | void
+  emptyLabel: string
+  newTerminalLabel: string
+}
+
+// Empty-state CTA. Rendered when the worktree has no terminal
+// sessions yet. The button is the only way for the user to
+// materialize a session on a fresh worktree without reaching for
+// the per-worktree "+" affordance in the tab strip — the slot's
+// bare host <div> would otherwise be a featureless black box, which
+// is the "blank screen" symptom the user reported on first click.
+//
+// `creating` is local to the button so double-clicks don't enqueue
+// a second create while the first one is in flight. The registry's
+// pending-create queue would dedupe the second call by worktree
+// key, but a visible loading state is still the right user signal.
+function EmptyTerminalCta({ onCreate, emptyLabel, newTerminalLabel }: EmptyTerminalCtaProps) {
+  const [creating, setCreating] = useState(false)
+  const handleClick = useCallback(async () => {
+    if (creating) return
+    setCreating(true)
+    try {
+      await onCreate()
+    } finally {
+      setCreating(false)
+    }
+  }, [creating, onCreate])
+  return (
+    <div className="goblin-terminal-slot__empty-cta" role="region" aria-label={emptyLabel}>
+      <div className="goblin-terminal-slot__empty-message">
+        <span className="goblin-terminal-slot__empty-title">{emptyLabel}</span>
+      </div>
+      <Button type="button" size="sm" variant="secondary" onClick={handleClick} disabled={creating}>
+        {creating ? `${newTerminalLabel}…` : newTerminalLabel}
+      </Button>
+    </div>
+  )
 }
 
 function ViewerOverlay({

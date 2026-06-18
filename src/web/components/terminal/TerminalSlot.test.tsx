@@ -1272,4 +1272,165 @@ describe('TerminalSlot', () => {
       container.remove()
     }
   })
+
+  test('empty worktree shows a New terminal CTA that calls createTerminal', async () => {
+    // Regression for the "blank screen on first click" symptom: when
+    // a worktree has no sessions yet, the slot renders a CTA so the
+    // user doesn't see a featureless black box and can discover the
+    // affordance without reaching for the per-worktree "+" tab.
+    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root: Root = createRoot(container)
+    const createTerminal = vi.fn(async () => 'terminal-1')
+    const emptyWorktreeSnapshot = {
+      worktreeTerminalKey: '/repo\0/worktree',
+      selectedDescriptor: null,
+      sessions: [],
+      count: 0,
+      pendingCreate: false,
+    }
+    const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
+    const context: TerminalSessionContextValue = {
+      createTerminal,
+      registerHost: vi.fn(),
+      unregisterHost: vi.fn(),
+      selectTerminal: vi.fn(),
+      scrollToBottom: vi.fn(),
+      scrollLines: vi.fn(),
+      clearBell: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(() => []),
+      attach: vi.fn(),
+      detach: vi.fn(),
+      restart: vi.fn(),
+      isTerminalFocusTarget: vi.fn(() => false),
+      findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      clearSearch: vi.fn(),
+      writeInput: vi.fn(),
+      takeover: vi.fn(),
+      reorderSessions: vi.fn(async () => true),
+      serialize: vi.fn(() => ''),
+    }
+    const readContext: TerminalSessionReadContextValue = {
+      worktreeSnapshot: () => emptyWorktreeSnapshot,
+      subscribeWorktree: () => () => {},
+      snapshot: () => emptySnapshot,
+      subscribeSnapshot: () => () => {},
+    }
+
+    await act(async () => {
+      root.render(
+        <TerminalSessionContext.Provider value={context}>
+          <TerminalSessionReadContext.Provider value={readContext}>
+            <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+          </TerminalSessionReadContext.Provider>
+        </TerminalSessionContext.Provider>,
+      )
+    })
+
+    try {
+      // The empty-state CTA is present, with the i18n key as its
+      // accessible label and the create button visible.
+      const cta = container.querySelector('.goblin-terminal-slot__empty-cta')
+      expect(cta).toBeTruthy()
+      expect(cta?.getAttribute('aria-label')).toBe('terminal.empty')
+      const title = container.querySelector('.goblin-terminal-slot__empty-title')
+      expect(title?.textContent).toBe('terminal.empty')
+      const button = Array.from(container.querySelectorAll('button')).find(
+        (node) => node.textContent === 'terminal.new',
+      )
+      expect(button).toBeDefined()
+
+      await act(async () => {
+        button?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+
+      expect(createTerminal).toHaveBeenCalledTimes(1)
+      expect(createTerminal).toHaveBeenCalledWith({
+        repoRoot: '/repo',
+        branch: 'feature',
+        worktreePath: '/worktree',
+      })
+    } finally {
+      await act(async () => root.unmount())
+      container.remove()
+    }
+  })
+
+  test('empty-state CTA failure toasts error.terminal-create-failed', async () => {
+    // Locks the failure path of the new empty-state CTA. The create
+    // throws (e.g., server rejected with error.terminal-create-failed),
+    // and the slot surfaces that to the user via sonner.error so they
+    // can retry instead of staring at a still-empty slot.
+    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root: Root = createRoot(container)
+    const createTerminal = vi.fn(async () => {
+      throw new Error('error.terminal-create-failed')
+    })
+    const { toast } = await import('sonner')
+    const emptyWorktreeSnapshot = {
+      worktreeTerminalKey: '/repo\0/worktree',
+      selectedDescriptor: null,
+      sessions: [],
+      count: 0,
+      pendingCreate: false,
+    }
+    const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
+    const context: TerminalSessionContextValue = {
+      createTerminal,
+      registerHost: vi.fn(),
+      unregisterHost: vi.fn(),
+      selectTerminal: vi.fn(),
+      scrollToBottom: vi.fn(),
+      scrollLines: vi.fn(),
+      clearBell: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(() => []),
+      attach: vi.fn(),
+      detach: vi.fn(),
+      restart: vi.fn(),
+      isTerminalFocusTarget: vi.fn(() => false),
+      findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      clearSearch: vi.fn(),
+      writeInput: vi.fn(),
+      takeover: vi.fn(),
+      reorderSessions: vi.fn(async () => true),
+      serialize: vi.fn(() => ''),
+    }
+    const readContext: TerminalSessionReadContextValue = {
+      worktreeSnapshot: () => emptyWorktreeSnapshot,
+      subscribeWorktree: () => () => {},
+      snapshot: () => emptySnapshot,
+      subscribeSnapshot: () => () => {},
+    }
+
+    await act(async () => {
+      root.render(
+        <TerminalSessionContext.Provider value={context}>
+          <TerminalSessionReadContext.Provider value={readContext}>
+            <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+          </TerminalSessionReadContext.Provider>
+        </TerminalSessionContext.Provider>,
+      )
+    })
+
+    try {
+      vi.mocked(toast.error).mockClear()
+      const button = Array.from(container.querySelectorAll('button')).find(
+        (node) => node.textContent === 'terminal.new',
+      )
+      expect(button).toBeDefined()
+      await act(async () => {
+        button?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        await new Promise((r) => setTimeout(r, 0))
+      })
+      expect(toast.error).toHaveBeenCalledWith('error.terminal-create-failed')
+    } finally {
+      await act(async () => root.unmount())
+      container.remove()
+    }
+  })
 })

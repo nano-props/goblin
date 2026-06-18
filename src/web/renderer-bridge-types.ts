@@ -64,6 +64,16 @@ export interface RendererTerminalBridge {
   onExit: (cb: (event: TerminalExitEvent) => void) => () => void
   onOwnership: (cb: (event: TerminalOwnershipViewModel) => void) => () => void
   onSessionsChanged: (cb: (repoRoot: string) => void) => () => void
+  /**
+   * Subscribe to per-session close broadcasts from the server. Emitted
+   * after a successful `close` IPC alongside the broader
+   * `sessions-changed` event. The `TerminalSessionRegistry` uses this
+   * to drop a stale local entry immediately, without waiting for the
+   * next reconcile — the critical fix for the "open new terminal and
+   * see the previous shell's `Restored session: …` line print twice"
+   * bug, where a lost close request left the server PTY alive.
+   */
+  onSessionClosed: (cb: (event: { sessionId: string; repoRoot: string }) => void) => () => void
 }
 
 export interface RendererShellBridge {

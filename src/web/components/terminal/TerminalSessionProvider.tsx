@@ -34,6 +34,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   const selectedTerminalByWorktree = useReposStore((s) => s.selectedTerminalByWorktree)
   const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
   const parkingRootRef = useRef<HTMLDivElement | null>(null)
+  const pendingRegistryDestroyRef = useRef<number | null>(null)
   const currentRepoIdRef = useRef(currentRepoId)
   currentRepoIdRef.current = currentRepoId
   const repoIndexRef = useRef(repoIndex)
@@ -162,6 +163,10 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
 
   // Registry lifecycle (event listeners + bridge + destroy)
   useEffect(() => {
+    if (pendingRegistryDestroyRef.current !== null) {
+      window.clearTimeout(pendingRegistryDestroyRef.current)
+      pendingRegistryDestroyRef.current = null
+    }
     const offOutput = terminalBridge.onOutput((event) => {
       registry.handleOutput(event)
     })
@@ -173,6 +178,15 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     })
     const offOwnership = terminalBridge.onOwnership((event) => {
       registry.handleOwnership(event)
+    })
+    // Per-session close broadcast. When the server confirms a close,
+    // drop the matching local entry immediately so a sibling window
+    // (or a stale local entry from a lost close in the current
+    // window) doesn't reattach to the orphan. The originating window
+    // already disposed the local entry, so the handler is a no-op
+    // there — the broadcast is multi-window safe by construction.
+    const offSessionClosed = terminalBridge.onSessionClosed((event) => {
+      registry.handleSessionClosed(event.sessionId)
     })
 
     setTerminalSessionCommandBridge({
@@ -186,7 +200,14 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       offTitle()
       offExit()
       offOwnership()
-      registry.destroy()
+      offSessionClosed()
+      if (pendingRegistryDestroyRef.current !== null) {
+        window.clearTimeout(pendingRegistryDestroyRef.current)
+      }
+      pendingRegistryDestroyRef.current = window.setTimeout(() => {
+        pendingRegistryDestroyRef.current = null
+        registry.destroy()
+      }, 0)
     }
   }, [registry])
 

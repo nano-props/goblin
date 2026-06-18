@@ -1,4 +1,5 @@
 import { setTerminalFocused } from '#/web/terminal-focus.ts'
+import { terminalSessionProviderLog } from '#/web/logger.ts'
 import { ManagedTerminalSession } from '#/web/components/terminal/ManagedTerminalSession.ts'
 import { createTerminalBellController } from '#/web/components/terminal/terminal-bell-controller.ts'
 import { terminalDescriptor } from '#/web/components/terminal/terminal-descriptor.ts'
@@ -69,6 +70,30 @@ export class TerminalSessionRegistry {
       reject: (error: unknown) => void
     }
   >()
+  // Durable close queue. `ManagedTerminalSession.dispose` used to fire
+  // `terminalBridge.close({ sessionId })` as a `void ... .catch(() => {})`
+  // — if the WebSocket was already closing (or `closeSocketIfIdle` raced
+  // the request), the request was rejected before the server saw it and
+  // the PTY stayed alive. The next `createTerminal` then reattached to
+  // the orphan and printed the previous shell's `Restored session: …`
+  // line a second time.
+  //
+  // The queue mirrors the `pendingCreateByWorktree` triple: enqueue
+  // stores a promise, the background close settles it, and the next
+  // `performCreateTerminal` for the same worktree `await`s the queue
+  // so the orphan is dead before the catalog can reattach to it.
+  // Failures are logged (the old path swallowed them silently) so any
+  // future regression is visible in `terminalLog` rather than invisible
+  // shell ghosts in the buffer.
+  private readonly pendingCloseBySessionId = new Map<
+    string,
+    {
+      worktreeTerminalKey: string
+      promise: Promise<void>
+      resolve: () => void
+      reject: (error: unknown) => void
+    }
+  >()
   private readonly snapshotCache = new Map<string, TerminalSnapshot>()
   // Safety-net hard cap. The expected cleanup is the server-exit
   // event (handleExit), with removeSession / destroy as secondary
@@ -121,6 +146,8 @@ export class TerminalSessionRegistry {
     setTerminalFocused(false)
     for (const pending of this.pendingCreateByWorktree.values())
       pending.reject(new Error('terminal registry destroyed'))
+    for (const pending of this.pendingCloseBySessionId.values())
+      pending.reject(new Error('terminal registry destroyed'))
     for (const session of this.sessions.values()) session.dispose({ closeSession: false })
     this.sessions.clear()
     this.sessionKeyBySessionId.clear()
@@ -130,6 +157,7 @@ export class TerminalSessionRegistry {
     this.hostByWorktree.clear()
     this.geometryByWorktree.clear()
     this.pendingCreateByWorktree.clear()
+    this.pendingCloseBySessionId.clear()
     this.snapshotCache.clear()
     this.reattachSnapshotCache.clear()
     this.worktreeSnapshotCache.clear()
@@ -177,6 +205,24 @@ export class TerminalSessionRegistry {
       // the next reattach may still hydrate from it.
       this.discardLocalSessionAndDismissDetailIfLast(directKey, directSession.descriptor)
     }
+  }
+
+  // Targeted drop on a server-side `session-closed` broadcast. Mirrors
+  // `handleExit` but for the close path: the originating window has
+  // already disposed the local entry, so the no-op case is the
+  // common one. Sibling windows with a stale local entry get
+  // consistent state within one network roundtrip instead of waiting
+  // for the broader `sessions-changed` list-rescan. We route through
+  // `discardLocalSessionAndDismissDetailIfLast` (rather than
+  // `closeTerminal`) because the server has already killed the PTY
+  // — calling `close` again would no-op the `closeOwnedSession` check
+  // on the server and add a useless WS roundtrip.
+  handleSessionClosed(sessionId: string): void {
+    const directKey = this.sessionKeyBySessionId.get(sessionId)
+    if (!directKey) return
+    const session = this.sessions.get(directKey)
+    if (!session) return
+    this.discardLocalSessionAndDismissDetailIfLast(directKey, session.descriptor)
   }
 
   handleOwnership(event: {
@@ -312,6 +358,14 @@ export class TerminalSessionRegistry {
 
   createTerminal = async (base: TerminalSessionBase): Promise<string> => {
     const terminalWorktreeKey = worktreeTerminalKey(base.repoRoot, base.worktreePath)
+    // Drain any in-flight close for this worktree before we issue a
+    // new create. The close is what kills the orphan PTY; if the
+    // request was lost on the previous dispose, awaiting it here
+    // guarantees the catalog sees a clean slate and returns
+    // `action: 'created'` instead of `'restored'` reattaching to
+    // the still-alive orphan. See `pendingCloseBySessionId` for the
+    // full failure mode this guards against.
+    await this.flushPendingClosesForWorktree(terminalWorktreeKey)
     const geometry = await this.resolveCreateGeometry(terminalWorktreeKey)
     if (!geometry) return await this.enqueuePendingCreate(base, terminalWorktreeKey)
     return await this.performCreateTerminal(base, geometry)
@@ -350,15 +404,34 @@ export class TerminalSessionRegistry {
     if (!result.ok) {
       throw new Error(result.message)
     }
-    if (!result.sessions.some((session) => session.key === result.key)) {
+    const snapshotSessionId = result.sessionId
+    if (!snapshotSessionId || typeof result.snapshot !== 'string' || typeof result.snapshotSeq !== 'number') {
       throw new Error('error.terminal-create-failed')
     }
+    const serverSessions = result.sessions.some((session) => session.key === result.key && session.sessionId === snapshotSessionId)
+      ? result.sessions
+      : [
+          ...result.sessions,
+          {
+            sessionId: snapshotSessionId,
+            key: result.key,
+            cwd: base.worktreePath,
+            controller: result.controller ?? null,
+            processName: result.processName ?? 'terminal',
+            canonicalTitle: result.canonicalTitle ?? null,
+            phase: result.phase ?? 'open',
+            message: result.message ?? null,
+            cols: result.canonicalCols ?? geometry.cols,
+            rows: result.canonicalRows ?? geometry.rows,
+            displayOrder: this.sortedSessionsForWorktree(terminalWorktreeKey).length,
+          },
+        ]
     this.setPreferredSelectedTerminalKey(terminalWorktreeKey, result.key)
     this.reconcileServerSessions(
       base.repoRoot,
-      result.sessions,
+      serverSessions,
       attachmentId,
-      new Map<string, TerminalSessionSnapshot>(),
+      new Map<string, TerminalSessionSnapshot>([[snapshotSessionId, result as TerminalSessionSnapshot]]),
     )
     return result.key
   }
@@ -399,6 +472,72 @@ export class TerminalSessionRegistry {
       pending.resolve(await this.performCreateTerminal(pending.base, geometry))
     } catch (error) {
       pending.reject(error)
+    }
+  }
+
+  // --- Durable close --------------------------------------------------------
+
+  // Queue a close against the server. Returns immediately with a
+  // promise the caller can ignore; the close fires in the background
+  // and the entry is removed when it settles (resolve or reject).
+  //
+  // Returning a stable promise (deduped per sessionId) is intentional:
+  // a `restart` and a `dispose` can both call this for the same
+  // sessionId in quick succession. The first call owns the request;
+  // the second is a no-op and just observes the same outcome.
+  enqueueDurableClose(input: { sessionId: string; worktreeTerminalKey: string }): Promise<void> {
+    const existing = this.pendingCloseBySessionId.get(input.sessionId)
+    if (existing) return existing.promise
+
+    let resolve!: () => void
+    let reject!: (error: unknown) => void
+    const promise = new Promise<void>((innerResolve, innerReject) => {
+      resolve = innerResolve
+      reject = innerReject
+    })
+    this.pendingCloseBySessionId.set(input.sessionId, {
+      worktreeTerminalKey: input.worktreeTerminalKey,
+      promise,
+      resolve,
+      reject,
+    })
+
+    void this.performDurableClose(input.sessionId)
+    return promise
+  }
+
+  // Awaited at the top of `createTerminal` for the same worktree.
+  // Drains every in-flight close targeting `worktreeTerminalKey` so
+  // the catalog sees a clean slate. Failures are swallowed at this
+  // seam: the user is about to create, and a stuck close should not
+  // block them — the failure is already logged inside
+  // `performDurableClose` and the user can `pruneTerminals` from the
+  // UI to recover if the orphan ever resurfaces.
+  private async flushPendingClosesForWorktree(worktreeTerminalKey: string): Promise<void> {
+    if (this.pendingCloseBySessionId.size === 0) return
+    const pendingForWorktree = Array.from(this.pendingCloseBySessionId.entries()).filter(
+      ([, entry]) => entry.worktreeTerminalKey === worktreeTerminalKey,
+    )
+    if (pendingForWorktree.length === 0) return
+    await Promise.allSettled(pendingForWorktree.map(([, entry]) => entry.promise))
+  }
+
+  private async performDurableClose(sessionId: string): Promise<void> {
+    try {
+      await terminalBridge.close({ sessionId })
+      const entry = this.pendingCloseBySessionId.get(sessionId)
+      this.pendingCloseBySessionId.delete(sessionId)
+      entry?.resolve()
+    } catch (err) {
+      const entry = this.pendingCloseBySessionId.get(sessionId)
+      this.pendingCloseBySessionId.delete(sessionId)
+      // The old fire-and-forget path swallowed this rejection. Loud
+      // logging is intentional: the failure mode (orphan PTY surviving
+      // a tab close) is otherwise invisible to operators and surfaces
+      // only as a confused user re-opening a tab and seeing the prior
+      // shell's `Restored session: …` line print twice.
+      terminalSessionProviderLog.warn('durable close failed for terminal session', { sessionId, err })
+      entry?.reject(err)
     }
   }
 
@@ -709,6 +848,7 @@ export class TerminalSessionRegistry {
       descriptor,
       (reason) => this.notifySession(descriptor.key, reason),
       this.bellController.handleBell,
+      (sessionId) => this.enqueueDurableClose({ sessionId, worktreeTerminalKey: descriptor.worktreeTerminalKey }),
     )
     this.sessions.set(descriptor.key, session)
     this.syncSessionIdIndex(descriptor.key, session.currentSessionId())

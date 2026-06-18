@@ -47,8 +47,15 @@ const TERMINAL_REQUEST_TIMEOUT_MS = 30_000
 export function createServerTerminalBridge(options: {
   getServerConfig: () => RendererServerTerminalConfig
   getAttachmentId: () => string
-  notifyBell?: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>
-  sendTestNotification?: () => Promise<boolean>
+  // `notifyBell` returning `undefined` (rather than a `Promise<false>`)
+  // is the *deliberate* signal to fall through to the bridge's
+  // built-in browser-notification path. The renderer-bridge wrapper
+  // uses that distinction so the web-runtime bell events get the
+  // full Notification API + click handler — collapsing both paths
+  // to `Promise.resolve(false)` would make the bell click test
+  // indistinguishable from "notification dismissed".
+  notifyBell?: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult> | undefined
+  sendTestNotification?: () => Promise<boolean> | undefined
   setBadge?: (count: number) => void
 }): RendererTerminalBridge {
   type PendingSocketRequest = {
@@ -62,6 +69,7 @@ export function createServerTerminalBridge(options: {
   const exitSubscribers = new Set<(event: TerminalExitEvent) => void>()
   const ownershipSubscribers = new Set<(event: TerminalOwnershipViewModel) => void>()
   const sessionsChangedSubscribers = new Set<(repoRoot: string) => void>()
+  const sessionClosedSubscribers = new Set<(event: { sessionId: string; repoRoot: string }) => void>()
   const attachmentId = options.getAttachmentId()
   let socket: WebSocket | null = null
   let reconnectTimer: number | null = null
@@ -76,7 +84,8 @@ export function createServerTerminalBridge(options: {
       titleSubscribers.size > 0 ||
       exitSubscribers.size > 0 ||
       ownershipSubscribers.size > 0 ||
-      sessionsChangedSubscribers.size > 0
+      sessionsChangedSubscribers.size > 0 ||
+      sessionClosedSubscribers.size > 0
     )
   }
 
@@ -174,6 +183,9 @@ export function createServerTerminalBridge(options: {
         for (const subscriber of exitSubscribers) subscriber(message.event)
       } else if (message.type === 'sessions-changed') {
         for (const subscriber of sessionsChangedSubscribers) subscriber(message.repoRoot)
+      } else if (message.type === 'session-closed') {
+        for (const subscriber of sessionClosedSubscribers)
+          subscriber({ sessionId: message.sessionId, repoRoot: message.repoRoot })
       } else {
         const ownershipEvent = {
           sessionId: message.event.sessionId,
@@ -287,13 +299,23 @@ export function createServerTerminalBridge(options: {
       return requestOverSocket('reorder', input satisfies TerminalReorderInput)
     },
     notifyBell(input) {
-      if (options.notifyBell) return options.notifyBell(input)
+      // First check whether the wrapper has a native handler at all
+      // (the renderer-bridge wrapper is always present, so this is
+      // the "Electron preload registered" case). Then call it and
+      // inspect the *result*: `undefined` means "no native bridge
+      // right now, fall through to the browser notification path".
+      if (options.notifyBell) {
+        const native = options.notifyBell(input)
+        if (native !== undefined) return native
+      }
       return showBrowserNotification(input.title, input.body, () => {
         emitRendererLocalEvent({ type: 'terminal-bell-click', repoRoot: input.repoRoot, key: input.key })
       })
     },
     sendTestNotification() {
-      return options.sendTestNotification?.() ?? showBrowserNotification('Goblin', 'Test notification')
+      const native = options.sendTestNotification?.()
+      if (native !== undefined) return native
+      return showBrowserNotification('Goblin', 'Test notification')
     },
     setBadge(count) {
       options.setBadge?.(count)
@@ -340,6 +362,15 @@ export function createServerTerminalBridge(options: {
       ensureSocket()
       return () => {
         sessionsChangedSubscribers.delete(cb)
+        closeSocketIfIdle()
+      }
+    },
+    onSessionClosed(cb) {
+      sessionClosedSubscribers.add(cb)
+      manualSocketClose = false
+      ensureSocket()
+      return () => {
+        sessionClosedSubscribers.delete(cb)
         closeSocketIfIdle()
       }
     },

@@ -26,9 +26,6 @@ beforeEach(() => {
   Object.defineProperty(window, 'goblinNative', {
     configurable: true,
     value: {
-      homeDir: '/Users/test',
-      initialI18n: null,
-      initialSettings: null,
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
       invokeIpc: vi.fn(),
       abortIpc: vi.fn(),
@@ -43,9 +40,6 @@ beforeEach(() => {
   Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
     configurable: true,
     value: {
-      homeDir: '/Users/test',
-      initialI18n: null,
-      initialSettings: null,
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
     },
   })

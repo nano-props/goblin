@@ -11,6 +11,7 @@ import {
   type TerminalCatalogMutationResult,
   type TerminalControllerStatus,
   type TerminalCreateInput,
+  type TerminalSessionPhase,
   type TerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
 import { formatTerminalId, parseTerminalIdIndex } from '#/shared/terminal-ids.ts'
@@ -40,6 +41,8 @@ type EnsureTerminalCatalogResult =
       action: TerminalCatalogAction
       processName: string
       canonicalTitle: string | null
+      phase: TerminalSessionPhase
+      message: string | null
       snapshot: string
       snapshotSeq: number
       controller: { attachmentId: string; status: Exclude<TerminalControllerStatus, 'none'> } | null
@@ -133,6 +136,16 @@ class TerminalCatalog {
       ok: true,
       action: createResult.action,
       key: createResult.key,
+      sessionId: createResult.sessionId,
+      processName: createResult.processName,
+      canonicalTitle: createResult.canonicalTitle,
+      phase: createResult.phase,
+      message: createResult.message,
+      snapshot: createResult.snapshot,
+      snapshotSeq: createResult.snapshotSeq,
+      controller: createResult.controller,
+      canonicalCols: createResult.canonicalCols,
+      canonicalRows: createResult.canonicalRows,
       sessions: await this.listSessions(input.repoRoot),
     }
   }
@@ -269,6 +282,8 @@ function toEnsureResult(
     action,
     processName: snapshotResult.processName,
     canonicalTitle: snapshotResult.canonicalTitle,
+    phase: snapshotResult.phase,
+    message: snapshotResult.message,
     snapshot: snapshotResult.snapshot,
     snapshotSeq: snapshotResult.snapshotSeq,
     controller: snapshotResult.controller,

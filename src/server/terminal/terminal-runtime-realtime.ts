@@ -112,19 +112,15 @@ function sendRealtimeResponse(socket: TerminalRealtimeSocket, message: TerminalS
 }
 
 // Pause the buffered socket while an action's response is being prepared
-// when the action's response may carry a replay buffer. Without this, the
-// live `output` events that arrive between the request and the response
-// would stream to the client before the replay, leaving the snapshot
-// applied twice (once from the response, once from the queued output).
+// when the action's response carries the authoritative first frame for
+// a terminal view. Without this, live `output` events that arrive during
+// the request can race ahead of the snapshot-bearing response and split
+// the initial prompt across replay and realtime delivery.
 //
-// The set is exactly the actions whose response shape includes a
-// `replay` field: `attach` and `restart`. `session-snapshot` returns
-// a `{ sessionId, snapshot, snapshotSeq }` payload that looks
-// similar but is deliberately **excluded** — the snapshot is
-// consumed later by `ManagedTerminalSession.preloadHydratedSnapshot`,
-// long after the realtime round-trip, and the renderer has no live
-// xterm to apply queued `output` events to in the meantime. Pausing
-// here would needlessly buffer events that get dropped anyway.
+// `attach`, `restart`, and now `create` all return snapshot hydration
+// data that the renderer applies as one boundary. `session-snapshot`
+// still remains excluded because that payload is consumed as a later
+// reconciliation path rather than the primary first-frame handshake.
 export function shouldPauseRealtimeRequest(action: TerminalSocketRequestAction): boolean {
-  return action === 'attach' || action === 'restart'
+  return action === 'attach' || action === 'restart' || action === 'create'
 }

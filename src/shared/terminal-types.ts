@@ -70,12 +70,12 @@ export type TerminalAttachResult =
 export type TerminalCatalogAction = 'created' | 'restored' | 'reused'
 
 export type TerminalCatalogMutationResult =
-  | {
+  | ({
       ok: true
       action: TerminalCatalogAction
       key: string
       sessions: TerminalSessionSummary[]
-    }
+    } & Partial<Extract<TerminalAttachResult, { ok: true }>>)
   | { ok: false; message: string }
 
 export interface TerminalWriteInput {

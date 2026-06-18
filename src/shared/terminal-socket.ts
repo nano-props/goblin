@@ -27,6 +27,14 @@ export type TerminalRealtimeMessage =
   | { type: 'exit'; event: TerminalExitEvent }
   | { type: 'ownership'; event: TerminalOwnershipEvent }
   | { type: 'sessions-changed'; repoRoot: string }
+  // Targeted per-session close. Emitted by the server after a
+  // successful `close` request, alongside the existing
+  // `sessions-changed` global broadcast. Multi-window clients use
+  // this to drop the local session immediately, without waiting for
+  // a full list-rescan. The `repoRoot` is included so the renderer
+  // can route the event to the right worktree without a manager
+  // lookup.
+  | { type: 'session-closed'; sessionId: string; repoRoot: string }
 
 export interface TerminalSocketRequestInputs {
   attach: TerminalAttachInput

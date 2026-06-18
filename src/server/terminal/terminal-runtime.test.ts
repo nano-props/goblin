@@ -614,6 +614,63 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
+  test('realtime create returns snapshot hydration fields in its response payload', async () => {
+    const { host, shutdown } = buildRuntime()
+    const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_1', 'attachment_a', socket)
+
+    host.handleRealtimeMessage(
+      'client_1',
+      'attachment_a',
+      socket,
+      JSON.stringify({
+        type: 'request',
+        requestId: 'req_create',
+        action: 'create',
+        input: {
+          repoRoot: '/repo',
+          branch: 'feature',
+          worktreePath: '/repo-linked',
+          kind: 'primary',
+          cols: 80,
+          rows: 24,
+        },
+      }),
+    )
+
+    await vi.waitFor(() => {
+      expect(
+        socket.send.mock.calls.some(([payload]) => {
+          const message = JSON.parse(String(payload))
+          return message.type === 'response' && message.requestId === 'req_create'
+        }),
+      ).toBe(true)
+    })
+
+    const response = socket.send.mock.calls
+      .map(([payload]) => JSON.parse(String(payload)))
+      .find((message) => message.type === 'response' && message.requestId === 'req_create')
+    expect(response).toMatchObject({
+      type: 'response',
+      requestId: 'req_create',
+      ok: true,
+      action: 'create',
+      payload: {
+        ok: true,
+        action: 'created',
+        sessionId: expect.any(String),
+        processName: 'zsh',
+        snapshot: expect.any(String),
+        snapshotSeq: expect.any(Number),
+        canonicalCols: 80,
+        canonicalRows: 24,
+      },
+    })
+
+    host.unregisterSocket('client_1', 'attachment_a', socket)
+    shutdown()
+  })
+
   test('rejects terminal IPC calls from untrusted senders', async () => {
     const { host, shutdown } = buildRuntime()
     const result = await host.create('client_with_$pecial!chars' as never, {
