@@ -454,10 +454,23 @@ export class TerminalSessionManager<TOwner extends string | number> {
   }
 
   private takeoverResult(session: TerminalSession<TOwner>): TerminalTakeoverResult {
+    // By the time we get here, `applyOwnershipEffect` has already
+    // executed in `takeoverSession()` — the requesting attachment
+    // is the controller and `session.cols`/`session.rows` reflect
+    // any resize effect that ran during the ownership claim. We
+    // surface all four frame fields synchronously so the renderer
+    // doesn't have to wait for a follow-up realtime `ownership`
+    // event before painting the post-takeover frame. See
+    // `docs/terminal-session-lifecycle.md` §Takeover atomicity.
     return {
       ok: true,
       sessionId: session.id,
+      role: 'controller',
+      controllerStatus: 'connected',
       controller: cloneTerminalController(session.controller),
+      canonicalCols: session.cols,
+      canonicalRows: session.rows,
+      phase: session.phase,
     }
   }
 
@@ -487,6 +500,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
       controller: cloneTerminalController(session.controller),
       cols: session.cols,
       rows: session.rows,
+      phase: session.phase,
     })
   }
 

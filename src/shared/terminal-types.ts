@@ -36,11 +36,35 @@ export interface TerminalRestartInput {
   attachmentId?: string
 }
 
+/**
+ * Successful `takeover` result.
+ *
+ * First-frame contract: takeover is the authoritative handshake for
+ * the new controller's view. The renderer applies the response
+ * synchronously and does not need to wait for a follow-up realtime
+ * `ownership` event before painting the post-takeover frame. The
+ * fields mirror `TerminalFirstFrame` minus the snapshot fields
+ * (`snapshot`, `snapshotSeq`) — takeover does not return a fresh
+ * snapshot because the new controller keeps the buffer the viewer
+ * was already showing (no re-fetch needed).
+ *
+ * The realtime `ownership` event still has a real job on the
+ * non-takeover ownership-change paths (controller crash, grace
+ * expiry, etc.). For those paths there is no response to be
+ * authoritative; the event remains the source of truth. Both
+ * surfaces now carry the same fields so the renderer can apply
+ * either without re-checking what shape arrived.
+ */
 export type TerminalTakeoverResult =
   | {
       ok: true
       sessionId: string
+      role: 'controller' | 'viewer' | 'unowned'
+      controllerStatus: 'connected' | 'grace' | 'none'
       controller: TerminalController | null
+      canonicalCols: number
+      canonicalRows: number
+      phase: TerminalSessionPhase
     }
   | { ok: false; message: string }
 
@@ -183,9 +207,17 @@ export interface TerminalExitEvent {
   sessionId: string
 }
 
+/**
+ * Realtime ownership-change event (controller crash, grace expiry,
+ * controller reconnect, etc.). For takeover specifically, see
+ * `TerminalTakeoverResult` — that response is authoritative and
+ * carries the same fields so the renderer can apply either without
+ * re-checking the shape.
+ */
 export interface TerminalOwnershipEvent {
   sessionId: string
   controller: TerminalController | null
   cols: number
   rows: number
+  phase: TerminalSessionPhase
 }

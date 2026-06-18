@@ -135,6 +135,7 @@ const TerminalOwnershipEventSchema = v.object({
   controller: v.nullable(TerminalControllerSchema),
   cols: v.number(),
   rows: v.number(),
+  phase: v.picklist(TERMINAL_SESSION_PHASE_VALUES),
 })
 const TerminalRealtimeMessageVariants = [
   v.object({ type: v.literal('output'), event: TerminalOutputEventSchema }),
