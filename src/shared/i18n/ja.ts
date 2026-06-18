@@ -226,10 +226,6 @@ export const ja: Record<DictKey, string> = {
   'branch-detail.collapse-title': '詳細パネルを折りたたむ (⌘J)',
   'branch-detail.expand': '詳細パネルを展開',
   'branch-detail.expand-title': '詳細パネルを展開 (⌘J)',
-  'branch-detail.focus': 'ブランチ詳細に集中',
-  'branch-detail.focus-title': 'ブランチ詳細に集中',
-  'branch-detail.exit-focus': 'ブランチ詳細の集中を終了',
-  'branch-detail.exit-focus-title': 'ブランチ詳細の集中を終了',
 
   // ---- Branches list -----------------------------------------------------
   'branches.empty': 'このリポジトリにブランチがありません。',
@@ -241,9 +237,9 @@ export const ja: Record<DictKey, string> = {
   'branches.filter.worktrees': 'ワークツリー',
   'branches.filter-tooltip.all': 'すべて',
   'branches.filter-tooltip.worktrees': 'ワークツリー',
-  'workspace.layout-label': 'ワークスペースレイアウト',
-  'workspace.layout-tooltip.top-bottom': '上下レイアウトを使用',
-  'workspace.layout-tooltip.left-right': '左右レイアウトを使用',
+  'workspace.branch-list-toggle-label': 'Branch List View を切り替え',
+  'workspace.branch-list-toggle-tooltip.hide': 'Branch List View を非表示',
+  'workspace.branch-list-toggle-tooltip.show': 'Branch List View を表示',
   'workspace.compact-mask.title': '左右レイアウトは小さい画面では使用できません',
   'workspace.compact-mask.description': '作業を続けるには上下レイアウトに切り替えてください。',
   'workspace.compact-mask.button': '上下レイアウトに切り替え',

@@ -75,7 +75,7 @@ export interface RendererEffectIntentStoreActions extends Pick<
 
 export interface BranchDetailToolbarStoreActions extends Pick<
   ReposStore,
-  'setDetailCollapsed' | 'toggleDetailCollapsed' | 'toggleDetailFocusMode'
+  'setDetailCollapsed' | 'toggleDetailCollapsed'
 > {}
 
 export interface DetailPanelStoreActions extends Pick<ReposStore, 'setDetailCollapsed'> {}
@@ -285,19 +285,15 @@ export function rendererEffectIntentStoreActionsFromStore(
 }
 
 export function branchDetailToolbarStoreActionsFromStore(
-  state: Pick<ReposStore, 'setDetailCollapsed' | 'toggleDetailCollapsed' | 'toggleDetailFocusMode'>,
+  state: Pick<ReposStore, 'setDetailCollapsed' | 'toggleDetailCollapsed'>,
 ): BranchDetailToolbarStoreActions {
   const detailVisibility = restorableWorkspaceDetailVisibilityStoreActionsFromStore({
     setDetailCollapsed: state.setDetailCollapsed,
     toggleDetailCollapsed: state.toggleDetailCollapsed,
   })
-  const detailFocus = restorableWorkspaceDetailFocusStoreActionsFromStore({
-    toggleDetailFocusMode: state.toggleDetailFocusMode,
-  })
   return {
     setDetailCollapsed: detailVisibility.setDetailCollapsed,
     toggleDetailCollapsed: detailVisibility.toggleDetailCollapsed,
-    toggleDetailFocusMode: detailFocus.toggleDetailFocusMode,
   }
 }
 
@@ -344,11 +340,7 @@ export function branchDetailToolbarStoreActionsEqual(
   a: BranchDetailToolbarStoreActions,
   b: BranchDetailToolbarStoreActions,
 ): boolean {
-  return (
-    a.setDetailCollapsed === b.setDetailCollapsed &&
-    a.toggleDetailCollapsed === b.toggleDetailCollapsed &&
-    a.toggleDetailFocusMode === b.toggleDetailFocusMode
-  )
+  return a.setDetailCollapsed === b.setDetailCollapsed && a.toggleDetailCollapsed === b.toggleDetailCollapsed
 }
 
 export function detailPanelStoreActionsEqual(a: DetailPanelStoreActions, b: DetailPanelStoreActions): boolean {

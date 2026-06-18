@@ -17,4 +17,12 @@ describe('repoWorkspaceBehavior', () => {
       branchListActionsVisible: true,
     })
   })
+
+  test('uses focus mode to hide the branch list in left-right layout', () => {
+    expect(repoWorkspaceBehavior('left-right', false, true)).toMatchObject({
+      mode: 'focus',
+      detailFocusMode: true,
+      branchListActionsVisible: false,
+    })
+  })
 })

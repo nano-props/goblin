@@ -88,7 +88,7 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
 
     setDetailFocusMode(focused: boolean) {
       set((s) => {
-        const detailFocusMode = s.workspaceLayout === 'top-bottom' && focused
+        const detailFocusMode = focused
         const detailCollapsed = detailFocusMode ? false : s.detailCollapsed
         return s.detailFocusMode === detailFocusMode && s.detailCollapsed === detailCollapsed
           ? s
@@ -98,7 +98,6 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
 
     toggleDetailFocusMode() {
       set((s) => {
-        if (s.workspaceLayout !== 'top-bottom') return s
         const detailFocusMode = !s.detailFocusMode
         const detailCollapsed = detailFocusMode ? false : s.detailCollapsed
         return { detailFocusMode, detailCollapsed }
@@ -110,8 +109,8 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
       let previousLayout: RepoWorkspaceLayout | undefined
       set((s) => {
         previousLayout = s.workspaceLayout
-        const detailFocusMode = layout === 'top-bottom' ? s.detailFocusMode : false
-        const detailCollapsed = effectiveDetailCollapsed(layout, s.detailCollapsed)
+        const detailFocusMode = s.detailFocusMode
+        const detailCollapsed = detailFocusMode ? false : effectiveDetailCollapsed(layout, s.detailCollapsed)
         if (
           s.workspaceLayout === layout &&
           s.detailCollapsed === detailCollapsed &&

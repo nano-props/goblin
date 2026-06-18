@@ -8,11 +8,9 @@ export interface RepoWorkspaceBehavior {
   mode: RepoWorkspaceMode
   detailCollapsed: boolean
   detailCollapseAllowed: boolean
-  detailFocusAllowed: boolean
-  /** The normalized focus-toggle preference/pressed state for top-bottom
-   *  layouts. This can stay true while `mode` is `collapsed`, so callers
-   *  should not treat it as proof that the workspace is currently rendering
-   *  in focus mode. */
+  /** The normalized focus-toggle preference/pressed state. This can stay
+   *  true while `mode` is `collapsed`, so callers should not treat it as
+   *  proof that the workspace is currently rendering in focus mode. */
   detailFocusMode: boolean
   branchListActionsVisible: boolean
   prTooltipSide: 'right' | 'bottom'
@@ -31,7 +29,7 @@ const REPO_WORKSPACE_BEHAVIOR = {
   WorkspaceLayout,
   Omit<
     RepoWorkspaceBehavior,
-    'detailCollapsed' | 'detailCollapseAllowed' | 'detailFocusAllowed' | 'detailFocusMode' | 'mode'
+    'detailCollapsed' | 'detailCollapseAllowed' | 'detailFocusMode' | 'mode'
   >
 >
 
@@ -41,16 +39,13 @@ export function repoWorkspaceBehavior(
   detailFocusMode = false,
 ): RepoWorkspaceBehavior {
   const detailCollapsedEffective = effectiveDetailCollapsed(layout, detailCollapsed)
-  const detailFocusAllowed = layout === 'top-bottom'
-  const detailFocusModeEffective = detailFocusAllowed && detailFocusMode
-  const mode: RepoWorkspaceMode = detailCollapsedEffective ? 'collapsed' : detailFocusModeEffective ? 'focus' : 'split'
+  const mode: RepoWorkspaceMode = detailCollapsedEffective ? 'collapsed' : detailFocusMode ? 'focus' : 'split'
   const baseBehavior = REPO_WORKSPACE_BEHAVIOR[layout]
   return {
     ...baseBehavior,
     mode,
     detailCollapseAllowed: workspaceLayoutAllowsDetailCollapse(layout),
-    detailFocusAllowed,
-    detailFocusMode: detailFocusModeEffective,
+    detailFocusMode,
     detailCollapsed: detailCollapsedEffective,
     branchListActionsVisible: baseBehavior.branchListActionsVisible && mode !== 'focus',
   }

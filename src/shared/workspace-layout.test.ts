@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { DEFAULT_DETAIL_PANE_SIZES, normalizeWorkspaceSessionLayoutState } from '#/shared/workspace-layout.ts'
 
 describe('normalizeWorkspaceSessionLayoutState', () => {
-  test('disables detail focus mode and collapse when the layout does not support them', () => {
+  test('preserves focus mode and disables detail collapse in left-right layout', () => {
     expect(
       normalizeWorkspaceSessionLayoutState({
         workspaceLayout: 'left-right',
@@ -13,7 +13,7 @@ describe('normalizeWorkspaceSessionLayoutState', () => {
     ).toEqual({
       workspaceLayout: 'left-right',
       detailCollapsed: false,
-      detailFocusMode: false,
+      detailFocusMode: true,
       detailPaneSizes: { 'top-bottom': 55, 'left-right': 45 },
     })
   })

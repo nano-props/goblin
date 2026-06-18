@@ -1,5 +1,5 @@
 // Top app bar with embedded tab strip, a per-repo actions group,
-// a workspace layout toggle, and a global settings button.
+// a branch-list visibility toggle, and a global settings button.
 //   • tab strip (children) — repo tabs + the "open new repo"
 //     dropdown + the "more" overflow.
 //   • repo actions (when `repoId` is set) — Refresh, the worktree
@@ -7,23 +7,17 @@
 //     live in a dedicated RepoToolbar above the branch list; they
 //     moved up here so the workspace's vertical chrome collapses
 //     to just the branch list itself.
-//   • workspace layout toggle — flips between `top-bottom` and
-//     `left-right`. The icon reflects the *current* layout
-//     (PanelTop / PanelLeft) so the user can read the state at
-//     a glance, and the tooltip describes the action (the
-//     layout that a click will switch to). Hidden in compact
-//     mode: the workspace already shows a full-bleed overlay
-//     prompting the user to switch to `top-bottom` there, and
-//     a topbar toggle would only compete with that CTA. It
-//     was dropped from the topbar in commit 4a99c7e when the
-//     layout became a single default; this reinstates it as a
-//     direct button now that the same default-flip rationale
-//     no longer applies.
+//   • Branch List visibility toggle — enters/exits detail focus,
+//     hiding or showing the Branch List View without changing the
+//     user's workspace layout. Hidden in compact mode: the
+//     workspace already shows a full-bleed overlay prompting the
+//     user to switch to `top-bottom` there, and a topbar toggle
+//     would only compete with that CTA.
 //   • Settings button (always shown) — navigates to the app
 //     settings page.
 //
 // All five right-side controls (Refresh / Filter / CreateWorktree
-// when a repo is open, the workspace layout toggle outside
+// when a repo is open, the Branch List visibility toggle outside
 // compact mode, and Settings) share `variant="ghost"` +
 // `size="icon-lg"` and sit as direct children of the topbar
 // (no DropdownMenu wrapper, no inline-flex span), so the
@@ -34,7 +28,7 @@
 // (set globally on `button` and any element with `data-interactive`).
 
 import type { ReactNode } from 'react'
-import { PanelLeft, PanelTop, Settings } from 'lucide-react'
+import { Maximize2, Minimize2, Settings } from 'lucide-react'
 import { useT } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { Button } from '#/web/components/ui/button.tsx'
@@ -42,7 +36,8 @@ import { Tip } from '#/web/components/Tip.tsx'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { RepoToolbarActions } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
 import { WINDOW_TOPBAR_HEIGHT_PX } from '#/shared/window-chrome.ts'
-import type { WorkspaceLayout } from '#/shared/workspace-layout.ts'
+import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
+import { cn } from '#/web/lib/cn.ts'
 
 interface Props {
   onOpenSettings: () => void
@@ -67,7 +62,7 @@ export function Topbar({ onOpenSettings, repoId, children }: Props) {
     >
       {children}
       {repoId && <RepoToolbarActions repoId={repoId} />}
-      {!compact && <WorkspaceLayoutToggle />}
+      {repoId !== null && !compact && <BranchListVisibilityToggle />}
       <SettingsButton onClick={onOpenSettings} />
     </div>
   )
@@ -82,29 +77,33 @@ function SettingsButton({ onClick }: { onClick: () => void }) {
   )
 }
 
-// Single-button workspace layout toggle. The icon shows the
-// *current* layout so the state is readable at a glance, and the
-// tooltip describes the action (the layout a click will switch
-// to) so the affordance is unambiguous. A click flips between
-// the two layouts via the repos store action.
-function WorkspaceLayoutToggle() {
+// Single-button Branch List visibility toggle. It reuses the
+// workspace's detail focus state: when the Branch List is visible,
+// a click enters focus mode and hides it; when hidden, a click exits
+// focus mode and restores the current layout.
+function BranchListVisibilityToggle() {
   const t = useT()
+  const detailCollapsed = useReposStore((s) => s.detailCollapsed)
+  const detailFocusMode = useReposStore((s) => s.detailFocusMode)
   const workspaceLayout = useReposStore((s) => s.workspaceLayout)
-  const setWorkspaceLayout = useReposStore((s) => s.setWorkspaceLayout)
-  const isTopBottom = workspaceLayout === 'top-bottom'
-  const Icon: typeof PanelTop = isTopBottom ? PanelTop : PanelLeft
-  // Tooltip describes the action, not the current state: when
-  // the current layout is left-right, the tooltip says "use
-  // top-bottom" (the layout a click will produce).
-  const tooltipKey: WorkspaceLayout = isTopBottom ? 'left-right' : 'top-bottom'
+  const setDetailFocusMode = useReposStore((s) => s.setDetailFocusMode)
+  const branchListHidden = repoWorkspaceBehavior(workspaceLayout, detailCollapsed, detailFocusMode).mode === 'focus'
+  const Icon = branchListHidden ? Minimize2 : Maximize2
+  const tooltipKey = branchListHidden
+    ? 'workspace.branch-list-toggle-tooltip.show'
+    : 'workspace.branch-list-toggle-tooltip.hide'
   return (
-    <Tip label={t(`workspace.layout-tooltip.${tooltipKey}`)}>
+    <Tip label={t(tooltipKey)}>
       <Button
         variant="ghost"
         size="icon-lg"
-        aria-label={t('workspace.layout-label')}
-        aria-pressed={isTopBottom}
-        onClick={() => setWorkspaceLayout(isTopBottom ? 'left-right' : 'top-bottom')}
+        aria-label={t('workspace.branch-list-toggle-label')}
+        aria-pressed={branchListHidden}
+        onClick={() => setDetailFocusMode(!branchListHidden)}
+        className={cn(
+          branchListHidden &&
+            'bg-accent text-accent-foreground shadow-xs hover:bg-accent hover:text-accent-foreground',
+        )}
       >
         <Icon />
       </Button>
