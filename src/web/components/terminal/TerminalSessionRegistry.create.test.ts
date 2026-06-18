@@ -61,7 +61,7 @@ vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
     scrollToBottom(): void {}
     scrollLines(): void {}
     writeInput(): void {}
-    takeover(): void {}
+    takeover(): Promise<boolean> { return Promise.resolve(true) }
     serialize(): string {
       return this.serializeValue
     }

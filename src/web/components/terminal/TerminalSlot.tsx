@@ -403,7 +403,26 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
           takeoverLabel={t('terminal.takeover')}
           snapshot={snapshot}
           takeoverKey={key}
-          onTakeover={takeover}
+          onTakeover={(takeoverKey) => {
+            // `takeover` returns `false` when the server rejected the
+            // request — most commonly because the session is owned by
+            // a different Goblin client (separate clientId). The user
+            // clicked 「接管」 expecting to gain control; without this
+            // toast the failure is silent and looks like a bug.
+            //
+            // We can't reliably tell "session vanished" from
+            // "cross-clientId partition" on the renderer side — both
+            // fail with `error.invalid-arguments` server-side. The
+            // fallback hint points the user at the actual cause (the
+            // other Goblin client window), which is right in the
+            // dominant case and harmless in the rare one.
+            void takeover(takeoverKey).then((ok) => {
+              if (ok) return
+              toast.error(t('action.result-error'), {
+                description: t('terminal.takeover-failed'),
+              })
+            })
+          }}
           takeoverPending={snapshot.takeoverPending}
         />
       )}
@@ -464,7 +483,7 @@ interface ViewerOverlayProps {
   takeoverLabel: string
   snapshot: ReturnType<typeof useTerminalSnapshot>
   takeoverKey: string | null
-  onTakeover: (key: string) => void
+  onTakeover: (key: string) => unknown
   takeoverPending?: boolean
 }
 

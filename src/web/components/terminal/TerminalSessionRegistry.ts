@@ -711,8 +711,10 @@ export class TerminalSessionRegistry {
     this.sessions.get(key)?.writeInput(data)
   }
 
-  takeover = (key: string): void => {
-    this.sessions.get(key)?.takeover()
+  takeover = (key: string): Promise<boolean> => {
+    const session = this.sessions.get(key)
+    if (!session) return Promise.resolve(false)
+    return session.takeover()
   }
 
   serialize = (key: string): string => {

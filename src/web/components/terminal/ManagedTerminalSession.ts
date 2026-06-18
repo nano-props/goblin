@@ -277,9 +277,9 @@ export class ManagedTerminalSession {
     return true
   }
 
-  takeover(): void {
+  takeover(): Promise<boolean> {
     const sessionId = this.runtime.currentSessionId()
-    if (!sessionId) return
+    if (!sessionId) return Promise.resolve(false)
     const term = this.view.currentTerminal()
     const size = term ? { cols: term.cols, rows: term.rows } : this.runtime.currentCanonicalSize()
     // The takeover response is the authoritative handshake for the
@@ -301,13 +301,24 @@ export class ManagedTerminalSession {
     // attach (`readOrCreateWebTerminalAttachmentId`); reuse it here so
     // the same id the server saw on attach is the one it sees on
     // takeover.
+    //
+    // The promise resolves with `true` on success and `false` on
+    // failure so callers (e.g. `TerminalSlot`) can surface a toast
+    // explaining *why* the takeover didn't take — a user who clicks
+    // 「接管」 and sees nothing happen doesn't know whether the
+    // session vanished, the server rejected them, or they hit the
+    // cross-clientId partition described in the takeover bug.
     const attachmentId = readOrCreateWebTerminalAttachmentId()
     if (this.runtime.setTakeoverPending(true)) this.notify('metadata')
-    void terminalBridge
+    return terminalBridge
       .takeover({ sessionId, cols: size.cols, rows: size.rows, attachmentId })
       .then((result) => {
-        if (!result.ok) return
+        if (!result.ok) {
+          terminalLog.warn('takeover rejected by server', { sessionId, message: result.message })
+          return false
+        }
         if (this.runtime.applyTakeover(result)) this.notify('metadata')
+        return true
       })
       .catch((err) => {
         // Mirror the resize rejection pattern: surface the failure
@@ -315,6 +326,7 @@ export class ManagedTerminalSession {
         // "pending takeover" state until the user retries; the
         // `.finally` below clears the flag on any settlement.
         terminalLog.warn('takeover failed for session', { sessionId, err })
+        return false
       })
       .finally(() => {
         // If the server response settles but we never received an

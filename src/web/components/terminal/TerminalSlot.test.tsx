@@ -37,7 +37,7 @@ describe('TerminalSlot', () => {
     const container = document.createElement('div')
     document.body.appendChild(container)
     const root: Root = createRoot(container)
-    const takeover = vi.fn()
+    const takeover = vi.fn().mockResolvedValue(true)
     const summaries = [
       {
         key: 'terminal-1',
@@ -216,7 +216,7 @@ describe('TerminalSlot', () => {
     const container = document.createElement('div')
     document.body.appendChild(container)
     const root: Root = createRoot(container)
-    const takeover = vi.fn()
+    const takeover = vi.fn().mockResolvedValue(true)
     const restart = vi.fn()
     const descriptor = {
       key: 'terminal-1',

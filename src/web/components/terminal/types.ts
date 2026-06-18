@@ -137,7 +137,7 @@ export interface TerminalSessionContextValue {
   findPrevious: (key: string, term: string) => TerminalSearchResult
   clearSearch: (key: string) => void
   writeInput: (key: string, data: string) => void
-  takeover: (key: string) => void
+  takeover: (key: string) => Promise<boolean>
   /** Reorder terminal sessions within a worktree. */
   reorderSessions: (worktreeTerminalKey: string, orderedKeys: string[]) => Promise<boolean>
   /** Serializes xterm framebuffer state as VT sequences; not plain-text output for copy UI. */
