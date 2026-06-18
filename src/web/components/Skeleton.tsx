@@ -95,7 +95,6 @@ export function BranchDetailSkeleton({
         </div>
         <div aria-hidden="true" className="min-w-2 flex-1 self-stretch" />
         <div className="flex shrink-0 items-center gap-1">
-          {behavior.detailFocusAllowed && <Skeleton className="h-7 w-7" />}
           {behavior.detailCollapseAllowed && <Skeleton className="h-7 w-7" />}
         </div>
       </Toolbar>

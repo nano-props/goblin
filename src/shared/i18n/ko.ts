@@ -219,10 +219,6 @@ export const ko: Record<DictKey, string> = {
   'branch-detail.collapse-title': '세부 패널 접기 (⌘J)',
   'branch-detail.expand': '세부 패널 펼치기',
   'branch-detail.expand-title': '세부 패널 펼치기 (⌘J)',
-  'branch-detail.focus': '브랜치 세부 정보 집중',
-  'branch-detail.focus-title': '브랜치 세부 정보 집중',
-  'branch-detail.exit-focus': '브랜치 세부 정보 집중 종료',
-  'branch-detail.exit-focus-title': '브랜치 세부 정보 집중 종료',
 
   // ---- Branches list -----------------------------------------------------
   'branches.empty': '이 리포지토리에 브랜치가 없습니다.',
@@ -234,9 +230,9 @@ export const ko: Record<DictKey, string> = {
   'branches.filter.worktrees': '워크트리',
   'branches.filter-tooltip.all': '전체',
   'branches.filter-tooltip.worktrees': '워크트리',
-  'workspace.layout-label': '작업 영역 레이아웃',
-  'workspace.layout-tooltip.top-bottom': '상하 레이아웃 사용',
-  'workspace.layout-tooltip.left-right': '좌우 레이아웃 사용',
+  'workspace.branch-list-toggle-label': 'Branch List View 전환',
+  'workspace.branch-list-toggle-tooltip.hide': 'Branch List View 숨기기',
+  'workspace.branch-list-toggle-tooltip.show': 'Branch List View 보이기',
   'workspace.compact-mask.title': '좌우 레이아웃은 작은 화면에서 사용할 수 없습니다',
   'workspace.compact-mask.description': '계속하려면 상하 레이아웃으로 전환하세요.',
   'workspace.compact-mask.button': '상하 레이아웃으로 전환',

@@ -211,10 +211,6 @@ export const zh: Record<DictKey, string> = {
   'branch-detail.collapse-title': '收起详情面板 (⌘J)',
   'branch-detail.expand': '展开详情面板',
   'branch-detail.expand-title': '展开详情面板 (⌘J)',
-  'branch-detail.focus': '专注分支详情',
-  'branch-detail.focus-title': '专注分支详情',
-  'branch-detail.exit-focus': '退出分支详情专注',
-  'branch-detail.exit-focus-title': '退出分支详情专注',
 
   // ---- Branches list -----------------------------------------------------
   'branches.empty': '该仓库暂无分支。',
@@ -226,9 +222,9 @@ export const zh: Record<DictKey, string> = {
   'branches.filter.worktrees': '工作树',
   'branches.filter-tooltip.all': '全部',
   'branches.filter-tooltip.worktrees': '工作树',
-  'workspace.layout-label': '工作区布局',
-  'workspace.layout-tooltip.top-bottom': '使用上下布局',
-  'workspace.layout-tooltip.left-right': '使用左右布局',
+  'workspace.branch-list-toggle-label': '切换 Branch List View',
+  'workspace.branch-list-toggle-tooltip.hide': '隐藏 Branch List View',
+  'workspace.branch-list-toggle-tooltip.show': '显示 Branch List View',
   'workspace.compact-mask.title': '小屏幕不支持左右布局',
   'workspace.compact-mask.description': '切换到上下布局以继续工作。',
   'workspace.compact-mask.button': '切换到上下布局',

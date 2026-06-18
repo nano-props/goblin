@@ -231,10 +231,6 @@ export const en = {
   'branch-detail.collapse-title': 'Collapse detail panel (⌘J)',
   'branch-detail.expand': 'Expand detail panel',
   'branch-detail.expand-title': 'Expand detail panel (⌘J)',
-  'branch-detail.focus': 'Focus branch detail',
-  'branch-detail.focus-title': 'Focus branch detail',
-  'branch-detail.exit-focus': 'Exit branch detail focus',
-  'branch-detail.exit-focus-title': 'Exit branch detail focus',
 
   // ---- Branches list ------------------------------------------------------
   'branches.empty': 'No branches found in this repository.',
@@ -246,9 +242,9 @@ export const en = {
   'branches.filter.worktrees': 'Worktrees',
   'branches.filter-tooltip.all': 'All',
   'branches.filter-tooltip.worktrees': 'Worktrees',
-  'workspace.layout-label': 'Workspace layout',
-  'workspace.layout-tooltip.top-bottom': 'Use top/bottom layout',
-  'workspace.layout-tooltip.left-right': 'Use left/right layout',
+  'workspace.branch-list-toggle-label': 'Toggle Branch List View',
+  'workspace.branch-list-toggle-tooltip.hide': 'Hide Branch List View',
+  'workspace.branch-list-toggle-tooltip.show': 'Show Branch List View',
   'workspace.compact-mask.title': 'Side-by-side layout is not available on small screens',
   'workspace.compact-mask.description': 'Switch to top-bottom layout to continue working.',
   'workspace.compact-mask.button': 'Switch to top-bottom layout',

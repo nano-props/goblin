@@ -348,12 +348,10 @@ describe('repo selectors', () => {
         branchDetailToolbarStoreActionsFromStore({
           setDetailCollapsed: fnA as never,
           toggleDetailCollapsed: fnA as never,
-          toggleDetailFocusMode: fnA as never,
         }),
         branchDetailToolbarStoreActionsFromStore({
           setDetailCollapsed: fnA as never,
           toggleDetailCollapsed: fnB as never,
-          toggleDetailFocusMode: fnA as never,
         }),
       ),
     ).toBe(false)

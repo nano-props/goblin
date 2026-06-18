@@ -1,4 +1,4 @@
-import { ArrowUp, Maximize2, Minimize2, Minus } from 'lucide-react'
+import { ArrowUp, Minus } from 'lucide-react'
 import type { KeyboardEvent } from 'react'
 import { useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
@@ -42,7 +42,7 @@ interface Props {
 
 export function BranchDetailToolbar({ repo, detail, detailId, contentId, collapsed, detailFocusMode, layout }: Props) {
   const t = useT()
-  const { setDetailCollapsed, toggleDetailCollapsed, toggleDetailFocusMode } = useStoreWithEqualityFn(
+  const { setDetailCollapsed, toggleDetailCollapsed } = useStoreWithEqualityFn(
     useReposStore,
     branchDetailToolbarStoreActionsFromStore,
     branchDetailToolbarStoreActionsEqual,
@@ -172,7 +172,6 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
         ? 'branch-detail.expand-title'
         : 'branch-detail.collapse-title',
   )
-  const focusTogglePressed = behavior.detailFocusMode
 
   return (
     <Toolbar variant="detail">
@@ -280,22 +279,6 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
       />
       <div className="flex shrink-0 items-center gap-1">
         {layout === 'top-bottom' && <div className="mx-1 h-4 w-px bg-separator/70" aria-hidden="true" />}
-        {behavior.detailFocusAllowed && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleDetailFocusMode}
-            aria-label={t(focusTogglePressed ? 'branch-detail.exit-focus' : 'branch-detail.focus')}
-            title={t(focusTogglePressed ? 'branch-detail.exit-focus-title' : 'branch-detail.focus-title')}
-            aria-pressed={focusTogglePressed}
-            className={cn(
-              focusTogglePressed &&
-                'bg-accent text-accent-foreground shadow-xs hover:bg-accent hover:text-accent-foreground',
-            )}
-          >
-            {focusTogglePressed ? <Minimize2 /> : <Maximize2 />}
-          </Button>
-        )}
         {behavior.detailCollapseAllowed && (
           <Button
             variant="ghost"
