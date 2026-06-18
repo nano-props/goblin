@@ -1,15 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
-import type { InitialSettingsSnapshot, RendererBootstrapSnapshot } from '#/shared/bootstrap.ts'
+import type { RendererBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 
 function webBootstrap(overrides: Partial<RendererBootstrapSnapshot> = {}): RendererBootstrapSnapshot {
   return {
     runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
-    homeDir: '',
-    platform: 'web',
-    initialI18n: null,
-    initialSettings: null,
     initialServer: null,
     ...overrides,
   }
@@ -22,10 +18,6 @@ function electronBootstrap(overrides: Partial<RendererBootstrapSnapshot> = {}): 
       bridgeVersion: RENDERER_BRIDGE_VERSION,
       capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
     },
-    homeDir: '/Users/test',
-    platform: 'web',
-    initialI18n: null,
-    initialSettings: null,
     initialServer: null,
     ...overrides,
   }
@@ -40,31 +32,17 @@ describe('renderer bootstrap', () => {
   })
 
   test('reads bootstrap snapshots from the goblin bridge', async () => {
-    const initialSettings: InitialSettingsSnapshot = {
-      fetchIntervalSec: 120,
-      terminalNotificationsEnabled: false,
-      shortcutsDisabled: false,
-      globalShortcutDisabled: false,
-      swapCloseShortcuts: false,
-      toggleDetailOnActionBarBlankClick: false,
-      globalShortcut: 'CommandOrControl+Shift+G',
-      globalShortcutRegistered: false,
-      terminalApp: 'auto',
-      editorApp: 'windsurf',
-      lanEnabled: false,
-    }
     const bootstrap: RendererBootstrapSnapshot = electronBootstrap({
-      initialI18n: { lang: 'ko', pref: 'ko', dict: { hello: '안녕' } },
-      initialSettings,
-      initialServer: null,
+      initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     })
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
-        // The bootstrap is now the single source of truth — the
-        // server renders it into `<script id="goblin-bootstrap">`
-        // (or sets `__GOBLIN_BOOTSTRAP__` in test mocks). The preload
-        // does not carry the snapshot anymore.
+        // The bootstrap is now the single source of truth for the
+        // tiny renderer-state payload (runtime kind, initial server
+        // handoff). Host info (homeDir, platform) and i18n live
+        // on dedicated `/api/*` endpoints fetched by
+        // `useAppBootstrap.hydrate()`, not in the bootstrap.
         __GOBLIN_BOOTSTRAP__: bootstrap,
       },
     })
@@ -77,43 +55,31 @@ describe('renderer bootstrap', () => {
     const { getInitialBootstrap } = await import('#/web/bootstrap.ts')
     expect(getInitialBootstrap()).toEqual({
       runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
-      homeDir: '',
-      platform: 'web',
-      initialI18n: null,
-      initialSettings: null,
       initialServer: null,
     })
   })
 
   test('replaces a partial web bootstrap once the bridge populates fully', async () => {
-    // Regression for the 5-field-empty gate: the previous version
-    // only re-read on a fully-empty snapshot, so a partial read
-    // (e.g. `homeDir` set, `initialI18n` still null) would lock
-    // the cache and never pick up the populated version. The
-    // new gate re-reads while ANY optional field is missing.
+    // Regression for the "all-defaults lock" gate: the previous
+    // version only re-read on a fully-empty snapshot, so a partial
+    // read (e.g. initialServer still null) would lock the cache
+    // and never pick up the populated version. The new gate
+    // re-reads while the snapshot is "all default" (no initial
+    // server handoff yet).
     const { getInitialBootstrap } = await import('#/web/bootstrap.ts')
     expect(getInitialBootstrap()).toEqual({
       runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
-      homeDir: '',
-      platform: 'web',
-      initialI18n: null,
-      initialSettings: null,
       initialServer: null,
     })
 
     // A later read returns a fully populated snapshot. The next
     // call must converge on it, even though the cached value is
-    // only partially empty (none of the fields populated, in this
-    // case — picked up as the "all default" snapshot above).
+    // the "all default" snapshot above.
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
         __GOBLIN_BOOTSTRAP__: {
           runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
-          homeDir: '/Users/partial',
-          platform: 'web',
-          initialI18n: { lang: 'en', pref: 'en', dict: { hello: 'hi' } },
-          initialSettings: null,
           initialServer: null,
         },
         location: { href: 'http://127.0.0.1:32100/', origin: 'http://127.0.0.1:32100', search: '' },
@@ -122,10 +88,6 @@ describe('renderer bootstrap', () => {
 
     expect(getInitialBootstrap()).toEqual({
       runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
-      homeDir: '/Users/partial',
-      platform: 'web',
-      initialI18n: { lang: 'en', pref: 'en', dict: { hello: 'hi' } },
-      initialSettings: null,
       initialServer: null,
     })
   })
@@ -134,30 +96,18 @@ describe('renderer bootstrap', () => {
     const { getInitialBootstrap } = await import('#/web/bootstrap.ts')
     expect(getInitialBootstrap()).toEqual({
       runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
-      homeDir: '',
-      platform: 'web',
-      initialI18n: null,
-      initialSettings: null,
       initialServer: null,
     })
 
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
-        // The bootstrap is now the source of truth for renderer state;
-        // the bridge only contributes IPC. After the first read returns
-        // an empty default, a populated `__GOBLIN_BOOTSTRAP__` should
-        // be picked up on the next read.
         __GOBLIN_BOOTSTRAP__: {
           runtime: {
             kind: 'electron',
             bridgeVersion: RENDERER_BRIDGE_VERSION,
             capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
           },
-          homeDir: '/Users/later',
-          platform: 'web',
-          initialI18n: null,
-          initialSettings: null,
           initialServer: null,
         },
         goblinNative: {
@@ -190,17 +140,12 @@ describe('renderer bootstrap', () => {
         bridgeVersion: RENDERER_BRIDGE_VERSION,
         capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
       },
-      homeDir: '/Users/later',
-      platform: 'web',
-      initialI18n: null,
-      initialSettings: null,
       initialServer: null,
     })
   })
 
   test('prefers the configured renderer bridge over directly reading window.goblinNative', async () => {
     const bootstrap: RendererBootstrapSnapshot = webBootstrap({
-      homeDir: '/Users/host',
       initialServer: { url: 'http://127.0.0.1:32100', accessToken: 'secret', clientId: 'client_sharedterminal' },
     })
     const bridgeModule = await import('#/web/renderer-bridge.ts')
@@ -240,6 +185,7 @@ describe('renderer bootstrap', () => {
         onExit: () => () => {},
         onOwnership: () => () => {},
         onSessionsChanged: () => () => {},
+        onSessionClosed: () => () => {},
       }),
     })
 
@@ -265,8 +211,6 @@ describe('renderer bootstrap', () => {
 
   test('reads injected web bootstrap from the html json script when the Electron bridge is unavailable', async () => {
     const bootstrap: RendererBootstrapSnapshot = webBootstrap({
-      homeDir: '/Users/tester',
-      initialI18n: { lang: 'ko', pref: 'ko', dict: { hello: '안녕' } },
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
     })
     Object.defineProperty(globalThis, 'window', {
@@ -306,10 +250,6 @@ describe('renderer bootstrap', () => {
     const { getInitialBootstrap } = await import('#/web/bootstrap.ts')
     expect(getInitialBootstrap()).toEqual({
       runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
-      homeDir: '',
-      platform: 'web',
-      initialI18n: null,
-      initialSettings: null,
       initialServer: {
         url: 'http://127.0.0.1:32100/',
         accessToken: 'test-secret',

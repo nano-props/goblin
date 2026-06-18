@@ -1,6 +1,5 @@
 import { DEFAULT_GLOBAL_SHORTCUT } from '#/shared/accelerator.ts'
 import { DEFAULT_COLOR_THEME, type ColorTheme } from '#/shared/color-theme.ts'
-import type { InitialSettingsSnapshot } from '#/shared/bootstrap.ts'
 import type {
   EditorPref,
   LangPref,
@@ -70,43 +69,6 @@ export function defaultSettingsSnapshot(overrides: Partial<SettingsSnapshot> = {
     session: overrides.session ?? defaultSessionState(),
     recentRepos: overrides.recentRepos ?? [],
   }
-}
-
-export function initialSettingsFromSnapshot(
-  snapshot: Pick<
-    SettingsSnapshot,
-    | 'fetchIntervalSec'
-    | 'terminalNotificationsEnabled'
-    | 'shortcutsDisabled'
-    | 'globalShortcutDisabled'
-    | 'swapCloseShortcuts'
-    | 'toggleDetailOnActionBarBlankClick'
-    | 'globalShortcut'
-    | 'globalShortcutRegistered'
-    | 'terminalApp'
-    | 'editorApp'
-    | 'lanEnabled'
-  >,
-): InitialSettingsSnapshot {
-  return {
-    fetchIntervalSec: snapshot.fetchIntervalSec,
-    terminalNotificationsEnabled: snapshot.terminalNotificationsEnabled,
-    shortcutsDisabled: snapshot.shortcutsDisabled,
-    globalShortcutDisabled: snapshot.globalShortcutDisabled,
-    swapCloseShortcuts: snapshot.swapCloseShortcuts,
-    toggleDetailOnActionBarBlankClick: snapshot.toggleDetailOnActionBarBlankClick,
-    globalShortcut: snapshot.globalShortcut,
-    globalShortcutRegistered: snapshot.globalShortcutRegistered,
-    terminalApp: snapshot.terminalApp,
-    editorApp: snapshot.editorApp,
-    lanEnabled: snapshot.lanEnabled,
-  }
-}
-
-export function defaultInitialSettingsSnapshot(
-  overrides: Partial<InitialSettingsSnapshot> = {},
-): InitialSettingsSnapshot {
-  return initialSettingsFromSnapshot(defaultSettingsSnapshot(overrides))
 }
 
 export { DEFAULT_COLOR_THEME, DEFAULT_GLOBAL_SHORTCUT }

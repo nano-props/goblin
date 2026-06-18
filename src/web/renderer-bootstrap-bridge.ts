@@ -1,18 +1,17 @@
-import type { RendererBootstrapSnapshot, RendererPlatform, RendererRuntimeSnapshot } from '#/shared/bootstrap.ts'
+import type { RendererBootstrapSnapshot, RendererRuntimeSnapshot } from '#/shared/bootstrap.ts'
 import { RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { ACCESS_TOKEN_URL_PARAM } from '#/shared/access-token.ts'
 
 /**
- * Web-hosted renderers have no host OS, so we fall back to a sentinel
- * 'web' platform. Settings pages branch on this to hide OS-specific
- * entries (e.g. Windows Terminal) in the browser preview build.
+ * Bootstrap for a web-hosted renderer with no host OS. The bootstrap
+ * is now a tiny 3-field payload: `runtime` (kind, bridge version,
+ * capabilities), `initialServer` (only populated for QR-code
+ * logins), and nothing else. Host info (homeDir / platform) moved
+ * to the public `/api/host` endpoint and lives in
+ * `#/web/stores/host-info.ts`; i18n lives in `#/web/stores/i18n.ts`.
  */
 const EMPTY_BOOTSTRAP: RendererBootstrapSnapshot = {
   runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
-  homeDir: '',
-  platform: 'web',
-  initialI18n: null,
-  initialSettings: null,
   initialServer: null,
 }
 
@@ -27,33 +26,10 @@ function isRendererRuntimeSnapshot(value: unknown): value is RendererRuntimeSnap
   )
 }
 
-function isRendererPlatform(value: unknown): value is RendererPlatform {
-  if (typeof value !== 'string') return false
-  // Mirror the union in shared/bootstrap.ts. Kept as a runtime allowlist
-  // so a stale or hand-edited bootstrap.json can't slip an arbitrary
-  // value past the type check.
-  return (
-    value === 'aix' ||
-    value === 'android' ||
-    value === 'cygwin' ||
-    value === 'darwin' ||
-    value === 'freebsd' ||
-    value === 'haiku' ||
-    value === 'linux' ||
-    value === 'netbsd' ||
-    value === 'openbsd' ||
-    value === 'sunos' ||
-    value === 'win32' ||
-    value === 'web'
-  )
-}
-
-export { isRendererPlatform }
-
 function isRendererBootstrapSnapshot(value: unknown): value is RendererBootstrapSnapshot {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<RendererBootstrapSnapshot>
-  // `runtime` is now optional in the validation: the bridge layer
+  // `runtime` is optional in the validation: the bridge layer
   // detects Electron vs web by the presence of `window.goblinNative`,
   // not by `bootstrap.runtime.kind`. Tests that previously had the
   // runtime carried via the preload (and never in the bootstrap)
@@ -62,9 +38,6 @@ function isRendererBootstrapSnapshot(value: unknown): value is RendererBootstrap
   // sensible default when the field is missing.
   return (
     (candidate.runtime === undefined || isRendererRuntimeSnapshot(candidate.runtime)) &&
-    typeof candidate.homeDir === 'string' &&
-    'initialI18n' in candidate &&
-    'initialSettings' in candidate &&
     'initialServer' in candidate
   )
 }

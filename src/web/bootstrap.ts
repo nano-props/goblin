@@ -1,5 +1,6 @@
 import type { RendererBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { emptyRendererBridgeBootstrap, getRendererBridge } from '#/web/renderer-bridge.ts'
+
 function readInitialBootstrap(): RendererBootstrapSnapshot {
   try {
     return getRendererBridge().getBootstrap()
@@ -23,16 +24,19 @@ function readInitialBootstrap(): RendererBootstrapSnapshot {
 // A bare cache (no re-read at all) would lock the renderer into
 // the first read forever, which is the bug this function exists
 // to prevent.
+//
+// The "partial" check looks at `initialServer` only — homeDir and
+// platform moved to the public `/api/host` endpoint and are no
+// longer carried in the bootstrap (see `#/web/stores/host-info.ts`).
+// The bootstrap is now a tiny 3-field payload (`runtime`,
+// `initialServer`, nothing else), so the partiality check is
+// effectively "do we have a real initial server yet?" — relevant
+// for QR-code logins that drop the bootstrap late.
 
 let initialBootstrap = readInitialBootstrap()
 
 function isPartial(b: RendererBootstrapSnapshot): boolean {
-  return (
-    b.homeDir.length === 0 ||
-    b.initialI18n === null ||
-    b.initialSettings === null ||
-    b.initialServer === null
-  )
+  return b.initialServer === null
 }
 
 export function getInitialBootstrap(): RendererBootstrapSnapshot {
