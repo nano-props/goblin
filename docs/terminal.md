@@ -198,6 +198,22 @@ The system supports replay and snapshot hydration so users can reattach to runni
 - Hydration should help the user see the latest known state quickly, but authoritative session state still comes from the server.
 - Replay should not redefine ownership or session identity.
 
+### First-frame mutation contract
+
+`create`, `attach`, and `restart` all produce a terminal frame the user may immediately see.
+They should therefore share the same high-level rule:
+
+- the mutation response itself should carry the authoritative first-frame hydration payload
+- the renderer should hydrate from that response instead of reconstructing first paint from a race between live output, list updates, and later snapshot fetches
+- projection data returned alongside the mutation should not be used as the success criterion for first paint
+
+For `create` specifically:
+
+- `sessionId` plus `snapshot` / `snapshotSeq` are the authoritative created-session handshake
+- any returned `sessions` list is useful for tab-strip and projection updates, but is not the created session's primary truth source
+
+This keeps `create`, `attach`, and `restart` aligned and prevents blank first paint, prompt tearing, and false create failures caused by projection lag.
+
 ## Realtime model
 
 The terminal feature uses realtime transport for continuous, UX-critical flows.

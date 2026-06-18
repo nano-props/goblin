@@ -105,6 +105,14 @@ This is manageable now, but it will become a maintenance bottleneck as the featu
 - terminal mutation handlers / write paths
 - realtime request dispatch adapter
 
+## P1.7: Decouple terminal runtime lifetime from React provider lifetime
+
+Keep `TerminalSessionRegistry` / shared terminal runtime state on a renderer-level lifetime rather than a provider-owned lifetime. This remains the preferred next-stage cleanup, but it should not block the current first-frame protocol fix. See `docs/terminal-first-frame-fix.md` for the bug analysis and why this work is related but separate.
+
+## P1.8: Make create deliver an atomic first frame
+
+`create` should follow the same first-frame contract shape as `attach` / `restart`: return snapshot hydration data directly, and let the renderer treat that payload as the authoritative first-frame handshake. `create.sessions` should remain projection data only. See `docs/terminal-first-frame-fix.md` for the detailed bug write-up and contract rules.
+
 ## P2: Further tighten renderer projection boundaries
 
 ### Outcome
