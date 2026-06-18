@@ -1,6 +1,7 @@
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { SettingsSurface } from '#/web/components/SettingsSurface.tsx'
+import { Tip } from '#/web/components/Tip.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { SETTINGS_PAGE_CONFIG } from '#/shared/settings-pages.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
@@ -21,16 +22,18 @@ export function SettingsPageScreen({ page, onBack, onPageChange }: SettingsPageS
         className="topbar grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-separator/70 bg-background text-sm"
         style={{ height: WINDOW_TOPBAR_HEIGHT_PX }}
       >
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="justify-self-start gap-1.5 px-2"
-          onClick={onBack}
-        >
-          <ArrowLeft className="size-4" />
-          {t('settings.back')}
-        </Button>
+        <Tip label={t('settings.back')}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-lg"
+            className="justify-self-start"
+            aria-label={t('settings.back')}
+            onClick={onBack}
+          >
+            <ArrowLeft />
+          </Button>
+        </Tip>
         <div className="truncate text-center text-sm font-semibold text-foreground">{pageTitle}</div>
         {/* Mirror the left column so the title sits in the topbar's true geometric center. */}
         <div aria-hidden />
