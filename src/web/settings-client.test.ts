@@ -7,10 +7,6 @@ import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
 function webBootstrap(overrides: Partial<RendererBootstrapSnapshot> = {}): RendererBootstrapSnapshot {
   return {
     runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
-    homeDir: '',
-    platform: 'web',
-    initialI18n: null,
-    initialSettings: null,
     initialServer: null,
     ...overrides,
   }
@@ -23,10 +19,6 @@ function electronBootstrap(overrides: Partial<RendererBootstrapSnapshot> = {}): 
       bridgeVersion: RENDERER_BRIDGE_VERSION,
       capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
     },
-    homeDir: '/Users/test',
-    platform: 'web',
-    initialI18n: null,
-    initialSettings: null,
     initialServer: null,
     ...overrides,
   }
@@ -151,7 +143,7 @@ describe('settings-client', () => {
     const { getI18nSnapshot } = await import('#/web/settings-client.ts')
     await expect(getI18nSnapshot()).resolves.toEqual({ lang: 'ko', pref: 'auto', dict: { hello: '안녕' } })
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:32100/api/settings/i18n',
+      'http://127.0.0.1:32100/api/i18n',
       expect.objectContaining({
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
       }),
@@ -172,8 +164,6 @@ describe('settings-client', () => {
             bridgeVersion: RENDERER_BRIDGE_VERSION,
             capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
           },
-          homeDir: '/Users/test',
-          platform: 'web',
           invokeIpc,
           abortIpc: async () => true,
           onEvent: () => () => {},
@@ -218,8 +208,6 @@ describe('settings-client', () => {
             bridgeVersion: RENDERER_BRIDGE_VERSION,
             capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
           },
-          homeDir: '/Users/test',
-          platform: 'web',
           invokeIpc,
           abortIpc: async () => true,
           onEvent: () => () => {},
@@ -295,8 +283,6 @@ describe('settings-client', () => {
             bridgeVersion: RENDERER_BRIDGE_VERSION,
             capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
           },
-          homeDir: '/Users/test',
-          platform: 'web',
           invokeIpc,
           abortIpc: async () => true,
           onEvent: () => () => {},
@@ -359,8 +345,6 @@ describe('settings-client', () => {
             bridgeVersion: RENDERER_BRIDGE_VERSION,
             capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
           },
-          homeDir: '/Users/test',
-          platform: 'web',
           invokeIpc,
           abortIpc: async () => true,
           onEvent: () => () => {},
@@ -517,8 +501,6 @@ describe('settings-client', () => {
             bridgeVersion: RENDERER_BRIDGE_VERSION,
             capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
           },
-          homeDir: '/Users/test',
-          platform: 'web',
           invokeIpc,
           abortIpc: async () => true,
           onEvent: () => () => {},

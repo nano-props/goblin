@@ -60,9 +60,6 @@ beforeEach(() => {
       bridgeVersion: RENDERER_BRIDGE_VERSION,
       capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
     },
-    homeDir: '/Users/test',
-    initialI18n: null,
-    initialSettings: null,
     initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
   }
   Object.defineProperty(window, 'goblinNative', {
@@ -73,7 +70,6 @@ beforeEach(() => {
         bridgeVersion: RENDERER_BRIDGE_VERSION,
         capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
       },
-      homeDir: '/Users/test',
       pathForFile: () => '',
       invokeIpc: async () => null,
       abortIpc: async () => true,

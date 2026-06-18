@@ -10,9 +10,6 @@ describe('repo web transport helpers', () => {
       value: {
         __GOBLIN_BOOTSTRAP__: {
           runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
-          homeDir: '',
-          initialI18n: null,
-          initialSettings: null,
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         },
         location: {
@@ -78,9 +75,6 @@ describe('repo web transport helpers', () => {
       value: {
         __GOBLIN_BOOTSTRAP__: {
           runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
-          homeDir: '',
-          initialI18n: null,
-          initialSettings: null,
           initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         },
         location: {

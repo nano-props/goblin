@@ -6,6 +6,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { SettingsSurface } from '#/web/components/SettingsSurface.tsx'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
+import { useHostInfoStore } from '#/web/stores/host-info.ts'
 
 const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),
@@ -114,6 +115,14 @@ beforeEach(() => {
   )
   fetchMock.mockClear()
   vi.stubGlobal('fetch', fetchMock)
+  // Host info used to live in the bootstrap payload; it now lives
+  // on the public `/api/host` endpoint and the renderer-side
+  // `useHostInfoStore`. Seed the store directly so tests don't
+  // have to mock `fetch('/api/host')` for every scenario.
+  useHostInfoStore.setState({
+    snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test', pid: 1 },
+    hydrated: true,
+  })
   testWindow.__GOBLIN_BOOTSTRAP__ = {
     runtime: {
       kind: 'electron',
@@ -129,40 +138,9 @@ beforeEach(() => {
         'terminal-badge',
       ],
     },
-    homeDir: '/Users/tester',
-    initialI18n: null,
-    initialSettings: {
-      fetchIntervalSec: 60,
-      terminalNotificationsEnabled: false,
-      shortcutsDisabled: false,
-      globalShortcutDisabled: false,
-      swapCloseShortcuts: false,
-      toggleDetailOnActionBarBlankClick: false,
-      globalShortcut: 'CommandOrControl+Shift+G',
-      globalShortcutRegistered: true,
-      terminalApp: 'auto',
-      editorApp: 'auto',
-      lanEnabled: false,
-    },
     initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
   }
   testWindow.goblinNative = {
-    homeDir: '/Users/tester',
-    initialI18n: null,
-    initialSettings: {
-      fetchIntervalSec: 60,
-      terminalNotificationsEnabled: false,
-      shortcutsDisabled: false,
-      globalShortcutDisabled: false,
-      swapCloseShortcuts: false,
-      toggleDetailOnActionBarBlankClick: false,
-      globalShortcut: 'CommandOrControl+Shift+G',
-      globalShortcutRegistered: true,
-      terminalApp: 'auto',
-      editorApp: 'auto',
-      lanEnabled: false,
-    },
-    initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     pathForFile: () => '',
     invokeIpc,
     abortIpc: async () => true,
@@ -222,7 +200,7 @@ describe('SettingsSurface', () => {
     })
 
     expect(toastMocks.error).toHaveBeenCalledWith('settings.terminal-notifications-test-failed', {
-      description: 'settings.terminal-notifications-test-failed-hint',
+      description: 'settings.terminal-notifications-test-failed-hint.mac',
     })
   })
 

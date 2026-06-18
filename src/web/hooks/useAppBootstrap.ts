@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { normalizeWorkspaceSessionLayoutState } from '#/shared/workspace-layout.ts'
 import { restoreRestorableWorkspaceStateFromSession } from '#/web/restorable-workspace-state.ts'
+import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useSessionRestoreStore } from '#/web/stores/session-restore.ts'
@@ -26,6 +27,15 @@ export function useAppBootstrap() {
           useThemeStore.getState().hydrate(),
           useSessionRestoreStore.getState().hydrate(),
           useI18nStore.getState().hydrate(),
+          // Host info (home dir, platform) is fetched in parallel
+          // with i18n. Both are public endpoints and both have
+          // safe defaults for the brief pre-hydrate window, so
+          // running them together is strictly better than
+          // serialising the work. `useHostInfoStore` is built
+          // with a `getPlatform` fallback to `'web'` and a
+          // `homeDirectory` fallback to `''` so the settings
+          // page can render during the fetch.
+          useHostInfoStore.getState().hydrate(),
         ])
         const session = useSessionRestoreStore.getState().consumeBootSessionSnapshot()
         const normalizedLayout = normalizeWorkspaceSessionLayoutState(session)

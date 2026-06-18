@@ -1,44 +1,35 @@
-// Renderer-side i18n. Hydrate at boot pulls the dictionary; setPref
-// writes through and the broadcast keeps every window in sync.
-// React components read translations through react-i18next, while this
-// Zustand store keeps the language preference/snapshot available to
-// non-hook call sites (Settings controls, ErrorBoundary fallback).
+// Renderer-side i18n. Hydrate at boot pulls the dictionary from
+// the public `/api/i18n` endpoint via
+// `useAppBootstrap.hydrate()`; setPref writes through and the
+// broadcast keeps every window in sync. React components read
+// translations through react-i18next, while this Zustand store
+// keeps the language preference/snapshot available to non-hook
+// call sites (Settings controls, ErrorBoundary fallback).
+//
+// No initial dictionary is read from the bootstrap: the server
+// stopped inlining it into HTML, so the renderer always starts
+// with an empty English resource and waits for the hydrate call
+// to replace it with the user's preferred language. The `hydrated`
+// flag flips to true on the first successful snapshot commit, so
+// UI that depends on translated strings (the auth gate, error
+// toasts) can block on it instead of flashing raw keys. The
+// trade-off is a brief loading state on first paint — much
+// better than a 200ms flash of `auth.gate.title` everywhere.
 
 import i18next from 'i18next'
 import { initReactI18next, useTranslation } from 'react-i18next'
 import { create, type StoreApi } from 'zustand'
 import type { I18nSnapshot, Lang, LangPref } from '#/shared/api-types.ts'
-import { getInitialBootstrap } from '#/web/bootstrap.ts'
 import { getI18nSnapshot, setI18nPref } from '#/web/settings-client.ts'
 import { subscribeSettingsInvalidationRefetch } from '#/web/settings-invalidation-refetch.ts'
 
 export type { Lang, LangPref }
 export type Dict = Record<string, string>
 
-interface InitialI18n {
-  lang: Lang
-  pref: LangPref
-  dict: Dict
-}
-
-function getInitialI18n(): InitialI18n | null {
-  try {
-    const raw = getInitialBootstrap().initialI18n
-    if (raw && typeof raw === 'object' && 'lang' in raw && 'pref' in raw && 'dict' in raw) {
-      return raw as InitialI18n
-    }
-  } catch {
-    // ignore
-  }
-  return null
-}
-
-const initial = getInitialI18n()
-
 void i18next.use(initReactI18next).init({
-  lng: initial?.lang ?? 'en',
+  lng: 'en',
   fallbackLng: 'en',
-  resources: initial ? { [initial.lang]: { translation: { ...initial.dict } } } : { en: { translation: {} } },
+  resources: { en: { translation: {} } },
   defaultNS: 'translation',
   keySeparator: false,
   interpolation: {
@@ -51,14 +42,17 @@ void i18next.use(initReactI18next).init({
   },
 })
 
-if (initial && typeof document !== 'undefined') {
-  document.documentElement.setAttribute('lang', initial.lang)
-}
-
 interface I18nState {
   lang: Lang
   pref: LangPref
   dict: Dict
+  /**
+   * True once `hydrate()` has applied at least one snapshot from
+   * `/api/i18n`. UI surfaces that depend on translated
+   * strings (the auth gate, the settings pages) gate on this so
+   * they never paint with raw i18n keys.
+   */
+  hydrated: boolean
   hydrate: () => Promise<void>
   setPref: (pref: LangPref) => Promise<void>
 }
@@ -75,9 +69,10 @@ function clearI18nSubscription() {
 }
 
 export const useI18nStore = create<I18nState>((set) => ({
-  lang: initial?.lang ?? 'en',
-  pref: initial?.pref ?? 'auto',
-  dict: initial?.dict ?? {},
+  lang: 'en',
+  pref: 'auto',
+  dict: {},
+  hydrated: false,
 
   async hydrate() {
     const version = ++hydrateVersion
@@ -117,7 +112,9 @@ async function commitSnapshotNow(set: I18nSet, snapshot: I18nSnapshot): Promise<
   const current = useI18nStore.getState()
   if (sameSnapshot(current, snapshot)) return
   await applySnapshot(snapshot)
-  set((s) => (sameSnapshot(s, snapshot) ? s : { lang: snapshot.lang, pref: snapshot.pref, dict: snapshot.dict }))
+  set((s) =>
+    sameSnapshot(s, snapshot) ? s : { lang: snapshot.lang, pref: snapshot.pref, dict: snapshot.dict, hydrated: true },
+  )
   document.documentElement.setAttribute('lang', snapshot.lang)
 }
 

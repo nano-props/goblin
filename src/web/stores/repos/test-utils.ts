@@ -125,15 +125,11 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       __GOBLIN_BOOTSTRAP__: {
         homeDir: '/Users/test',
         platform: 'web',
-        initialI18n: null,
-        initialSettings: null,
         initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       },
       goblinNative: {
         homeDir: '/Users/test',
         platform: 'web',
-        initialI18n: null,
-        initialSettings: null,
         initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         invokeIpc: ({ path, input }: { path: string; input?: unknown }) => {
           const handler = handlers[path]
@@ -354,8 +350,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       },
       homeDir: '/Users/test',
       platform: 'web',
-      initialI18n: null,
-      initialSettings: null,
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
     }),
     invokeIpc: async ({ path, input }: { path: string; input?: unknown }) => {
@@ -391,6 +385,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       onExit: () => () => {},
       onOwnership: () => () => {},
       onSessionsChanged: () => () => {},
+      onSessionClosed: () => () => {},
     }),
   })
   vi.stubGlobal(
@@ -408,7 +403,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       }
       const result = (() => {
         if (url.pathname === '/api/settings') return call('settings.get', undefined)
-        if (url.pathname === '/api/settings/i18n') return call('i18n.get', undefined)
+        if (url.pathname === '/api/i18n') return call('i18n.get', undefined)
         if (url.pathname === '/api/settings/github-cli') {
           const hosts = url.searchParams.getAll('host')
           return call('githubCli.get', hosts.length > 0 ? { hosts } : undefined)

@@ -6,7 +6,7 @@ import { SettingsGroup, SettingsList, SettingsRow } from '#/web/components/setti
 import { useFetchSettingsController, useRuntimeFetchSettings } from '#/web/runtime-settings-fetch.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { terminalBridge } from '#/web/terminal.ts'
-import { getInitialBootstrap } from '#/web/bootstrap.ts'
+import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { settingsLog } from '#/web/logger.ts'
 export function NotificationSettings() {
   const t = useT()
@@ -15,8 +15,8 @@ export function NotificationSettings() {
   const [testingTerminalNotification, setTestingTerminalNotification] = useState(false)
   // Pick the OS-specific hint at render time so the settings UI doesn't
   // hand a Windows user a macOS-flavored "System Settings → Notifications"
-  // path. The renderer doesn't have `process.platform`; the bootstrap
-  // payload main hands us carries the host platform.
+  // path. The renderer doesn't have `process.platform`; the host-info
+  // store carries the value the server returns from `/api/host`.
   const hintKey = notificationsHintKey()
 
   const testTerminalNotification = () => {
@@ -93,7 +93,7 @@ function notificationsHintKey():
   | 'settings.terminal-notifications-test-failed-hint.mac'
   | 'settings.terminal-notifications-test-failed-hint.win'
   | 'settings.terminal-notifications-test-failed-hint' {
-  const platform = getInitialBootstrap().platform
+  const platform = useHostInfoStore.getState().snapshot?.platform ?? 'web'
   if (platform === 'darwin') return 'settings.terminal-notifications-test-failed-hint.mac'
   if (platform === 'win32') return 'settings.terminal-notifications-test-failed-hint.win'
   return 'settings.terminal-notifications-test-failed-hint'

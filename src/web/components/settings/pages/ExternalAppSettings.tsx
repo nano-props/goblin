@@ -17,7 +17,7 @@ import {
   SettingsList,
   SettingsRow,
 } from '#/web/components/settings/SettingsPrimitives.tsx'
-import { getInitialBootstrap } from '#/web/bootstrap.ts'
+import { useHostInfoStore, type RendererPlatform } from '#/web/stores/host-info.ts'
 import { useExternalAppsQuery } from '#/web/settings-queries.ts'
 import { useExternalAppSettingsController } from '#/web/runtime-settings-external-apps.ts'
 import { useT } from '#/web/stores/i18n.ts'
@@ -77,7 +77,7 @@ const ALL_TERMINAL_OPTIONS: { value: TerminalPref; labelKey: string }[] = [
  * host platform. Mirrors the union in `shared/bootstrap.ts`; add new
  * platforms here when they get a Windows-Terminal-shaped backend.
  */
-type BootstrapPlatform = ReturnType<typeof getInitialBootstrap>['platform']
+type BootstrapPlatform = RendererPlatform
 const PLATFORM_TERMINAL_IDS: Record<BootstrapPlatform, ReadonlySet<string>> = {
   win32: new Set(['windowsTerminal']),
   darwin: new Set(['ghostty', 'terminal']),
@@ -168,10 +168,13 @@ export function ExternalAppSettings() {
   const editorApp = data.editor.pref
   const editorAppAvailability = data.editor.appAvailability
   const { refreshExternalApps, refreshing, setTerminalApp, setEditorApp } = useExternalAppSettingsController()
-  // Read the platform from the bootstrap snapshot, not `process.platform`:
+  // Read the platform from the host-info store, not `process.platform`:
   // the renderer is sandboxed and does not have `process` at runtime, so
-  // the only reliable source is what main handed us through the preload.
-  const visibleTerminalIds = PLATFORM_TERMINAL_IDS[getInitialBootstrap().platform]
+  // the only reliable source is the public `/api/host` endpoint fetched
+  // during `useAppBootstrap.hydrate()`. The store falls back to `'web'`
+  // (which hides every OS-specific terminal entry) until the hydrate
+  // resolves — the settings page is gated behind login anyway.
+  const visibleTerminalIds = PLATFORM_TERMINAL_IDS[useHostInfoStore((s) => s.snapshot?.platform ?? 'web')]
   const terminalApps = ALL_TERMINAL_APPS.filter((item) => visibleTerminalIds.has(item.id))
   const terminalOptions = ALL_TERMINAL_OPTIONS.filter(
     (opt) => opt.value === 'auto' || visibleTerminalIds.has(opt.value),

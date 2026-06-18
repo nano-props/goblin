@@ -8,16 +8,37 @@ interface EmbeddedServerConfig {
 }
 
 function getEmbeddedServer(): EmbeddedServerConfig | null {
-  const server = getInitialBootstrap().initialServer
-  if (!server?.url) return null
-  // `accessToken` is only present when the server inlined it into the
-  // bootstrap (embedded Electron runtime, or `bun run dev` with the
-  // dev flag set). In standalone `serve.sh` mode the field is absent
-  // and the renderer authenticates via the http-only cookie set by
-  // `POST /api/login`; in that case this function returns `''` for
-  // the token, and the caller must NOT attach the header — the
-  // browser will send the cookie automatically.
-  return { url: server.url, accessToken: server.accessToken ?? '' }
+  // Three paths can populate the bootstrap's `initialServer`:
+  //
+  //  1. **Electron embedded renderer** — the preload's IIFE in
+  //     `preload.cjs` calls `goblin:get-embedded-server-url` and
+  //     `goblin:get-access-token` IPC, then writes the result to
+  //     `window.__GOBLIN_BOOTSTRAP__`. The token is sent as the
+  //     `x-goblin-access-token` header on every fetch.
+  //
+  //  2. **QR-code URL bootstrap** — `?accessToken=…` on first
+  //     load; `useAccessTokenStatus` POSTs it to `/api/login` to
+  //     set the cookie, then strips the param from the URL. After
+  //     the first paint the token is gone and the renderer
+  //     authenticates via the cookie.
+  //
+  //  3. **Standalone browser / `serve.sh`** — no preload, no URL
+  //     token. The bootstrap's `initialServer.url` is empty and
+  //     the renderer falls back to `window.location.origin` here.
+  //     The renderer authenticates via the http-only cookie set
+  //     by `POST /api/login`.
+  //
+  // The `accessToken` field is only set in path (1). Paths (2) and
+  // (3) leave it empty; the caller MUST NOT attach the header in
+  // that case — the browser will send the cookie automatically.
+  const fromBootstrap = getInitialBootstrap().initialServer
+  if (fromBootstrap?.url) {
+    return { url: fromBootstrap.url, accessToken: fromBootstrap.accessToken ?? '' }
+  }
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return { url: window.location.origin, accessToken: '' }
+  }
+  return null
 }
 
 function requireEmbeddedServer(): EmbeddedServerConfig {

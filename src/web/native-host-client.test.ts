@@ -12,8 +12,6 @@ function installBridge(calls: Array<{ path: string; input?: unknown }>, result =
           bridgeVersion: RENDERER_BRIDGE_VERSION,
           capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
         },
-        homeDir: '/Users/test',
-        platform: 'web',
         invokeIpc: ({ path, input }: { path: string; input?: unknown }) => {
           calls.push({ path, input })
           return result

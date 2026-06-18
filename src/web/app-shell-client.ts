@@ -1,7 +1,7 @@
-import { getInitialBootstrap } from '#/web/bootstrap.ts'
 import type { SettingsPage } from '#/shared/api-types.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import { getRendererBridge } from '#/web/renderer-bridge.ts'
+import { homeDirectory as hostInfoHomeDirectory } from '#/web/stores/host-info.ts'
 const PROJECT_GITHUB_URL = 'https://github.com/nano-props/goblin'
 
 function nativeShell() {
@@ -41,7 +41,12 @@ export function canUseGlobalShortcutSettings(): boolean {
 }
 
 export function homeDirectory(): string {
-  return getInitialBootstrap().homeDir
+  // Host info is fetched once at boot via `useHostInfoStore.hydrate()`.
+  // The store returns `''` before the hydrate resolves, which is
+  // the same fallback the pre-refactor bootstrap carried — the
+  // directory picker and `tildifyPath` both treat an empty home as
+  // "no expansion, return the raw path."
+  return hostInfoHomeDirectory()
 }
 
 export function pathForDroppedFile(file: File): string {

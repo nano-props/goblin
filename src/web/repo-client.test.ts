@@ -7,10 +7,6 @@ import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
 function webBootstrap(overrides: Partial<RendererBootstrapSnapshot> = {}): RendererBootstrapSnapshot {
   return {
     runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
-    homeDir: '',
-    platform: 'web',
-    initialI18n: null,
-    initialSettings: null,
     initialServer: null,
     ...overrides,
   }
@@ -23,10 +19,6 @@ function electronBootstrap(overrides: Partial<RendererBootstrapSnapshot> = {}): 
       bridgeVersion: RENDERER_BRIDGE_VERSION,
       capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
     },
-    homeDir: '/Users/test',
-    platform: 'web',
-    initialI18n: null,
-    initialSettings: null,
     initialServer: null,
     ...overrides,
   }
@@ -163,8 +155,6 @@ describe('repo-client', () => {
             bridgeVersion: RENDERER_BRIDGE_VERSION,
             capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
           },
-          homeDir: '/Users/test',
-          platform: 'web',
           invokeIpc: vi.fn(),
           abortIpc: async () => true,
           onEvent: () => () => {},

@@ -69,10 +69,6 @@ function installWebBootstrap(bootstrap: RendererBootstrapSnapshot): void {
 function webBootstrap(overrides: Partial<RendererBootstrapSnapshot> = {}): RendererBootstrapSnapshot {
   return {
     runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
-    homeDir: '',
-    platform: 'web',
-    initialI18n: null,
-    initialSettings: null,
     initialServer: null,
     ...overrides,
   }
@@ -213,7 +209,7 @@ describe('web invalidation sync', () => {
       vi.fn(async (input: string) => ({
         ok: true,
         json: async () => {
-          if (input.endsWith('/api/settings/i18n')) {
+          if (input.endsWith('/api/i18n')) {
             i18nReadCount++
             return i18nReadCount > 1
               ? { lang: 'ja', pref: 'ja', dict: { hello: 'こんにちは' } }

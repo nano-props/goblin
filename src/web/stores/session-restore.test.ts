@@ -7,17 +7,9 @@ function installBridge(sessionOverrides: Record<string, unknown> = {}) {
     configurable: true,
     value: {
       __GOBLIN_BOOTSTRAP__: {
-        homeDir: '/Users/test',
-        platform: 'web',
-        initialI18n: null,
-        initialSettings: null,
         initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       },
       goblinNative: {
-        homeDir: '/Users/test',
-        platform: 'web',
-        initialI18n: null,
-        initialSettings: null,
         initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
         invokeIpc: vi.fn(({ path }: { path: string }) => {
           if (path !== 'settings.get') throw new Error(`Unhandled IPC path: ${path}`)

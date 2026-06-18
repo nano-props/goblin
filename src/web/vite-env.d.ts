@@ -27,9 +27,15 @@ interface GoblinNativeBridge {
     openInFinder: (input: { path: string }) => Promise<ExecResult>
   }
   terminal: {
-    notifyBell: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>
-    sendTestNotification: () => Promise<boolean>
-    setBadge: (count: number) => void
+    // Methods are typed as optional to reflect the fact that an
+    // older preload (or a non-Electron runtime that for some
+    // reason still exposes `goblinNative` without the full
+    // surface) may omit one or more of them. The renderer-side
+    // `capabilitiesFromBridge` projects these into capability
+    // flags so the UI can hide controls the bridge can't satisfy.
+    notifyBell?: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>
+    sendTestNotification?: () => Promise<boolean>
+    setBadge?: (count: number) => void
   }
   /**
    * Persist clipboard / drop file blobs through the main process.

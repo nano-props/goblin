@@ -7,6 +7,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoTabTooltipLayer } from '#/web/components/repo-tabs/RepoTabTooltipLayer.tsx'
 import type { RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
+import { useHostInfoStore } from '#/web/stores/host-info.ts'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
@@ -21,19 +22,21 @@ beforeEach(() => {
   }
   testWindow.__GOBLIN_BOOTSTRAP__ = {
     runtime: { kind: 'electron', bridgeVersion: 1, capabilities: [] },
-    homeDir: '/Users/tester',
-    platform: 'darwin',
-    initialI18n: null,
-    initialSettings: null,
     initialServer: null,
   }
   testWindow.goblinNative = {
-    homeDir: '/Users/tester',
     pathForFile: () => '',
     invokeIpc: async () => null,
     abortIpc: async () => true,
     onEvent: () => () => {},
   }
+  // Host info moved from the bootstrap to the public `/api/host`
+  // endpoint. Seed the store directly so this test doesn't have
+  // to mock `fetch` for the tooltip's tilde expansion.
+  useHostInfoStore.setState({
+    snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test', pid: 1 },
+    hydrated: true,
+  })
 })
 
 afterEach(() => {

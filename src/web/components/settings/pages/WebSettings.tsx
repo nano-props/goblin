@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Copy, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
-import { ACCESS_TOKEN_URL_PARAM } from '#/shared/access-token.ts'
 import { SettingsGroup, SettingsList, SettingsRow } from '#/web/components/settings/SettingsPrimitives.tsx'
 import { Switch } from '#/web/components/ui/switch.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
@@ -10,7 +9,7 @@ import { getRendererBridge } from '#/web/renderer-bridge.ts'
 import { useLanInfoQuery } from '#/web/settings-queries.ts'
 import { useLanSettingsController, useRuntimeLanSettings } from '#/web/runtime-settings-lan.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { fetchServerJson, postServerJson } from '#/web/lib/server-fetch.ts'
+import { fetchServerJson } from '#/web/lib/server-fetch.ts'
 
 /**
  * Settings page for everything related to the embedded / standalone
@@ -87,28 +86,18 @@ export function WebSettings() {
     try {
       const { accessToken: next } = await bridge.rotateAccessToken()
       setFetchedToken(next)
-      // The old cookie is bound to the now-defunct old token. Clearing
-      // it + replaying the URL-token flow is the only way to get the
-      // gate to re-evaluate against the new server in-memory token:
-      // the cookie path is unauthenticated and just deletes it; the
-      // `?accessToken=...` path then auto-fills the gate form via
-      // `useAccessTokenStatus`, POSTs to `/api/login`, sets the new
-      // cookie, and strips the URL. After the next tick the user is
-      // logged in with the new token — no manual paste required.
-      try {
-        await postServerJson('/api/logout', {})
-      } catch {
-        // Best-effort: the cookie may already be invalid against the
-        // new server, so a logout 401 is expected. The URL-token
-        // path below will replace the cookie.
-      }
-      try {
-        window.history.replaceState(
-          window.history.state,
-          '',
-          `${window.location.pathname}?${ACCESS_TOKEN_URL_PARAM}=${encodeURIComponent(next)}${window.location.hash}`,
-        )
-      } catch {}
+      // The main process replants the embedded renderer's auth
+      // cookie with the new token before this IPC returns, so the
+      // cookie path is now self-consistent. A full reload is still
+      // required because the preload's `__GOBLIN_BOOTSTRAP__` was
+      // captured once with the OLD token; the renderer's HTTP
+      // client (`server-fetch`) prefers the bootstrap header when
+      // present. After the reload the preload runs again, captures
+      // the new token via IPC, and the gate stays clear.
+      //
+      // The URL-token path is no longer required — kept commented
+      // as a historical breadcrumb in case the cookie replant
+      // regresses and the user re-reports the bug.
       window.location.reload()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('settings.web.token-rotate-failed'))

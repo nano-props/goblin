@@ -1,27 +1,17 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { InitialSettingsSnapshot } from '#/shared/bootstrap.ts'
 import type { I18nSnapshot } from '#/shared/api-types.ts'
 
-function installBridge(
-  overrides: {
-    initialI18n?: I18nSnapshot | null
-    initialSettings?: InitialSettingsSnapshot | null
-  } = {},
-) {
-  // The bootstrap is now the source of truth for renderer-side
-  // state (i18n, settings, server URL). The preload no longer
-  // ferries these via `goblinNative`; it just exposes the IPC
-  // surface. We set `__GOBLIN_BOOTSTRAP__` for state and a
-  // minimal `goblinNative` to satisfy the bridge detection.
+function installBridge() {
+  // The bootstrap is now just the Electron preload's IPC seed
+  // (homeDir, platform, initialServer). i18n and settings are
+  // fetched on boot from `/api/settings/*` — they no longer live
+  // on the bootstrap. We set `__GOBLIN_BOOTSTRAP__` for state and
+  // a minimal `goblinNative` to satisfy the bridge detection.
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
     value: {
       __GOBLIN_BOOTSTRAP__: {
         runtime: { kind: 'electron', bridgeVersion: 1, capabilities: [] },
-        homeDir: '/Users/test',
-        platform: 'web',
-        initialI18n: overrides.initialI18n ?? null,
-        initialSettings: overrides.initialSettings ?? null,
         initialServer: null,
       },
       goblinNative: {
@@ -40,53 +30,34 @@ describe('renderer bootstrap seeding', () => {
   })
 
   test('settings store no longer mirrors preload settings payload', async () => {
-    installBridge({
-      initialSettings: {
-        fetchIntervalSec: 300,
-        terminalNotificationsEnabled: true,
-        shortcutsDisabled: true,
-        globalShortcutDisabled: true,
-        swapCloseShortcuts: true,
-        toggleDetailOnActionBarBlankClick: true,
-        globalShortcut: 'CommandOrControl+Alt+G',
-        globalShortcutRegistered: true,
-        terminalApp: 'ghostty',
-        editorApp: 'cursor',
-        lanEnabled: false,
-      },
-    })
+    installBridge()
 
     const { useSessionRestoreStore } = await import('#/web/stores/session-restore.ts')
 
     expect(useSessionRestoreStore.getState()).toMatchObject({ bootSessionSnapshot: null })
   })
 
-  test('seeds i18n store from preload bootstrap including pref', async () => {
-    installBridge({
-      initialI18n: {
-        lang: 'ja',
-        pref: 'ja',
-        dict: { 'settings.title': '設定' },
-      },
-    })
-
+  test('i18n store starts empty and waits for hydrate from /api/i18n', async () => {
+    installBridge()
     const { useI18nStore } = await import('#/web/stores/i18n.ts')
 
+    // The store used to read `initialI18n` from the bootstrap and
+    // seed itself synchronously. The server no longer inlines i18n
+    // into HTML, so the store always starts with the default
+    // English / auto / empty-dict placeholder. `hydrate()` (called
+    // by useAppBootstrap) populates it from `/api/i18n`.
     expect(useI18nStore.getState()).toMatchObject({
-      lang: 'ja',
-      pref: 'ja',
-      dict: { 'settings.title': '設定' },
+      lang: 'en',
+      pref: 'auto',
+      dict: {},
     })
   })
 
-  test('switches away from and back to a frozen initial dictionary without mutating shared objects', async () => {
-    installBridge({
-      initialI18n: {
-        lang: 'zh',
-        pref: 'auto',
-        dict: Object.freeze({ hello: '你好' }),
-      },
-    })
+  test('setPref updates the dictionary from a snapshot returned by /api/i18n', async () => {
+    installBridge()
+    // `commitSnapshotNow` writes the active language to the html
+    // element so screen readers and CSS `:lang()` selectors pick up
+    // the new value. Stand up a stub before the store module loads.
     Object.defineProperty(globalThis, 'document', {
       configurable: true,
       value: {
