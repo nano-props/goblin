@@ -1318,7 +1318,7 @@ describe('ManagedTerminalSession', () => {
     session.takeover()
     await flushUntil(() => terminalCalls.takeover.mock.calls.length > 0)
 
-    expect(terminalCalls.takeover).toHaveBeenCalledWith({ sessionId: 'session-1', cols: 101, rows: 31 })
+    expect(terminalCalls.takeover).toHaveBeenCalledWith({ sessionId: 'session-1', cols: 101, rows: 31, attachmentId: 'attachment_local' })
     // The takeover response itself is now the authority — without
     // any `handleOwnership` call, role already flipped to controller
     // and the canonical size tracks the request (101x31).
@@ -1552,7 +1552,7 @@ describe('ManagedTerminalSession', () => {
     session.handleOutput({ sessionId: 'session-1', data: 'first', seq: 1, processName: 'zsh' })
     session.handleOutput({ sessionId: 'session-1', data: 'second', seq: 2, processName: 'zsh' })
 
-    // Controller mode: outputSummary is not accumulated, so no notify
+    // Controller mode: metadata doesn't change (processName was already set during attach)
     expect(notify).toHaveBeenCalledTimes(0)
     expect(xtermMocks.terminals[0]!.write).not.toHaveBeenCalled()
     await flushTerminalStart()

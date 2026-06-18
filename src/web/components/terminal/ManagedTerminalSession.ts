@@ -33,7 +33,7 @@ import type {
 } from '#/web/components/terminal/types.ts'
 const EMPTY_SEARCH_RESULT: TerminalSearchResult = { resultIndex: -1, resultCount: 0, found: false }
 
-export type TerminalNotifyReason = 'metadata' | 'outputSummary'
+export type TerminalNotifyReason = 'metadata'
 
 export class ManagedTerminalSession {
   descriptor: TerminalDescriptor
@@ -233,7 +233,6 @@ export class ManagedTerminalSession {
   handleOutput(event: TerminalOutputEvent): void {
     const result = this.runtime.handleOutput(event)
     if (result.changed) this.notify('metadata')
-    if (result.summaryChanged) this.scheduleSummaryNotify()
     if (result.output && this.runtime.canResize()) this.queueOutput(result.output)
   }
 
@@ -291,9 +290,21 @@ export class ManagedTerminalSession {
     // the realtime `ownership` event before painting the
     // post-takeover frame. A later realtime ownership event for the
     // same session is idempotent.
+    //
+    // `attachmentId` must be passed: the server-side `takeoverSession`
+    // rejects with `error.invalid-arguments` when the caller isn't a
+    // known attachment (see `isAuthoritative` in
+    // `src/server/terminal/terminal-ownership.ts`). Without it the
+    // browser-side takeover silently no-ops — the button click lands
+    // and the pending state clears, but the renderer never becomes the
+    // controller. The renderer already self-issues an attachment id on
+    // attach (`readOrCreateWebTerminalAttachmentId`); reuse it here so
+    // the same id the server saw on attach is the one it sees on
+    // takeover.
+    const attachmentId = readOrCreateWebTerminalAttachmentId()
     if (this.runtime.setTakeoverPending(true)) this.notify('metadata')
     void terminalBridge
-      .takeover({ sessionId, cols: size.cols, rows: size.rows })
+      .takeover({ sessionId, cols: size.cols, rows: size.rows, attachmentId })
       .then((result) => {
         if (!result.ok) return
         if (this.runtime.applyTakeover(result)) this.notify('metadata')
@@ -627,10 +638,6 @@ export class ManagedTerminalSession {
     this.startToken += 1
     if (!options?.preserveTransientState) this.runtime.resetTransientState()
     this.view.destroyTerminal()
-  }
-
-  private scheduleSummaryNotify(): void {
-    this.notify('outputSummary')
   }
 
   private currentStart(token: number, term: XTermTerminal): boolean {
