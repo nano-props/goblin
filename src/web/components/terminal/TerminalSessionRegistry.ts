@@ -490,11 +490,23 @@ export class TerminalSessionRegistry {
   }
 
   private async flushPendingCreate(worktreeTerminalKey: string): Promise<void> {
+    // Atomically claim the pending entry. Concurrent flushes (one from
+    // `enqueuePendingCreate`, one from `registerHost`, and possibly a
+    // StrictMode double-invoked effect) all await `resolveCreateGeometry`
+    // in parallel; without this claim, every concurrent caller observes
+    // the same pending entry and races into `performCreateTerminal`,
+    // spawning duplicate sessions. The first `delete` wins; the rest see
+    // `false` and bail.
     const pending = this.pendingCreateByWorktree.get(worktreeTerminalKey)
     if (!pending) return
+    if (!this.pendingCreateByWorktree.delete(worktreeTerminalKey)) return
     const geometry = await this.resolveCreateGeometry(worktreeTerminalKey)
-    if (!geometry) return
-    this.pendingCreateByWorktree.delete(worktreeTerminalKey)
+    if (!geometry) {
+      // No geometry yet (host not mounted). Put the entry back so the
+      // next mount-driven flush can claim it.
+      this.pendingCreateByWorktree.set(worktreeTerminalKey, pending)
+      return
+    }
     this.notifyWorktree(worktreeTerminalKey)
     try {
       pending.resolve(await this.performCreateTerminal(pending.base, geometry))
