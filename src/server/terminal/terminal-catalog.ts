@@ -46,8 +46,8 @@ type EnsureTerminalCatalogResult =
       snapshot: string
       snapshotSeq: number
       controller: { attachmentId: string; status: Exclude<TerminalControllerStatus, 'none'> } | null
-      canonicalCols?: number
-      canonicalRows?: number
+      canonicalCols: number
+      canonicalRows: number
     }
   | { ok: false; message: string }
 

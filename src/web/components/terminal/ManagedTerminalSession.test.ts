@@ -567,8 +567,20 @@ beforeEach(() => {
       close: terminalCalls.close.mockResolvedValue(true),
       create: vi.fn(async (input?: { kind?: string }) =>
         input?.kind === 'primary'
-          ? { ok: true as const, action: 'reused' as const, key: 'repo\0worktree\0terminal-1', sessions: [] }
-          : { ok: true as const, action: 'created' as const, key: 'repo\0worktree\0terminal-2', sessions: [] },
+          ? {
+              action: 'reused' as const,
+              key: 'repo\0worktree\0terminal-1',
+              sessions: [],
+              ...createFirstFrame('terminal-1'),
+              ok: true as const,
+            }
+          : {
+              action: 'created' as const,
+              key: 'repo\0worktree\0terminal-2',
+              sessions: [],
+              ...createFirstFrame('terminal-2'),
+              ok: true as const,
+            },
       ),
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       listSessions: vi.fn(async () => []),
@@ -1729,12 +1741,11 @@ describe('ManagedTerminalSession', () => {
   })
 })
 
-function attachResult(
+function createFirstFrame(
   sessionId: string,
-  overrides: Partial<Extract<TerminalAttachResult, { ok: true }>> = {},
-): TerminalAttachResult {
+  overrides: Partial<Omit<Extract<TerminalAttachResult, { ok: true }>, 'ok'>> = {},
+): Extract<TerminalAttachResult, { ok: true }> {
   return {
-    ok: true,
     sessionId,
     snapshot: '',
     snapshotSeq: 0,
@@ -1743,8 +1754,32 @@ function attachResult(
     phase: 'open',
     message: null,
     controller: { attachmentId: 'attachment_local', status: 'connected' },
+    canonicalCols: 100,
+    canonicalRows: 30,
     ...overrides,
+    ok: true as const,
   }
+}
+
+function attachResult(
+  sessionId: string,
+  overrides: Partial<Omit<Extract<TerminalAttachResult, { ok: true }>, 'ok'>> = {},
+): TerminalAttachResult {
+  const result: Extract<TerminalAttachResult, { ok: true }> = {
+    sessionId,
+    snapshot: '',
+    snapshotSeq: 0,
+    processName: 'zsh',
+    canonicalTitle: null,
+    phase: 'open',
+    message: null,
+    canonicalCols: 100,
+    canonicalRows: 30,
+    controller: { attachmentId: 'attachment_local', status: 'connected' },
+    ...overrides,
+    ok: true as const,
+  }
+  return result
 }
 
 function takeoverResult(

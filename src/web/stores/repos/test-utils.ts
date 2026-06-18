@@ -251,11 +251,22 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           return null
         case 'terminal.create': {
           const terminalKind = (payload as { kind?: string } | undefined)?.kind
+          const sessionId = terminalKind === 'primary' ? 'terminal-1' : 'terminal-2'
           return {
             ok: true,
             action: terminalKind === 'primary' ? 'reused' : 'created',
             key: terminalKind === 'primary' ? 'repo\0worktree\0terminal-1' : 'repo\0worktree\0terminal-2',
             sessions: [],
+            sessionId,
+            snapshot: '',
+            snapshotSeq: 0,
+            processName: 'zsh',
+            canonicalTitle: null,
+            phase: 'open',
+            message: null,
+            controller: { attachmentId: 'attachment_local', status: 'connected' },
+            canonicalCols: 80,
+            canonicalRows: 24,
           }
         }
       }

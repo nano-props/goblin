@@ -50,6 +50,14 @@ export type TerminalTakeoverResult =
  * `snapshot`/`snapshotSeq` are the session's server-side render buffer
  * and its monotonic sequence number. The renderer hydrates from these
  * and re-replays any post-snapshot events the runtime captures.
+ *
+ * First-frame contract: a successful `attach`/`restart` response is
+ * the authoritative handshake for that session's frame state. All
+ * fields are required at the type level — the server must populate
+ * them on every success path, and the renderer can hydrate the UI
+ * without waiting for any follow-up event. This mirrors the R0
+ * first-frame atomicity contract for `create` (see
+ * `docs/terminal-session-lifecycle.md` §R0).
  */
 export type TerminalAttachResult =
   | {
@@ -62,12 +70,31 @@ export type TerminalAttachResult =
       snapshot: string
       snapshotSeq: number
       controller: TerminalController | null
-      canonicalCols?: number
-      canonicalRows?: number
+      canonicalCols: number
+      canonicalRows: number
     }
   | { ok: false; message: string }
 
 export type TerminalCatalogAction = 'created' | 'restored' | 'reused'
+
+/**
+ * `create` carries the same first-frame fields as `attach`/`restart`
+ * — the renderer must be able to paint without a follow-up snapshot
+ * fetch. The shared `TerminalFirstFrame` shape below is the single
+ * source of truth for the first-frame contract.
+ */
+export interface TerminalFirstFrame {
+  sessionId: string
+  processName: string
+  canonicalTitle: string | null
+  phase: TerminalSessionPhase
+  message: string | null
+  snapshot: string
+  snapshotSeq: number
+  controller: TerminalController | null
+  canonicalCols: number
+  canonicalRows: number
+}
 
 export type TerminalCatalogMutationResult =
   | ({
@@ -75,7 +102,7 @@ export type TerminalCatalogMutationResult =
       action: TerminalCatalogAction
       key: string
       sessions: TerminalSessionSummary[]
-    } & Partial<Extract<TerminalAttachResult, { ok: true }>>)
+    } & TerminalFirstFrame)
   | { ok: false; message: string }
 
 export interface TerminalWriteInput {

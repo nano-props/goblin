@@ -259,6 +259,8 @@ function attachResult(): TerminalAttachResult {
     phase: 'open',
     message: null,
     controller: { attachmentId: 'attachment_local', status: 'connected' },
+    canonicalCols: 80,
+    canonicalRows: 24,
   }
 }
 
@@ -1650,10 +1652,20 @@ describe('TerminalSessionProvider', () => {
       detailTab: 'terminal',
     })
     createTerminalMock.mockResolvedValueOnce({
-      ok: true,
-      action: 'created',
-      key: `${REPO_ID}\u0000${WORKTREE_PATH}\u0000terminal-1`,
+      ok: true as const,
+      action: 'created' as const,
+      key: `${REPO_ID} ${WORKTREE_PATH} terminal-1`,
       sessions: [],
+      sessionId: 'terminal-1',
+      snapshot: '',
+      snapshotSeq: 0,
+      processName: 'zsh',
+      canonicalTitle: null,
+      phase: 'open' as const,
+      message: null,
+      controller: { attachmentId: 'attachment_local', status: 'connected' as const },
+      canonicalCols: 80,
+      canonicalRows: 24,
     })
     const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
