@@ -254,7 +254,7 @@ export class TerminalSessionRegistry {
   // for the broader `sessions-changed` list-rescan. We route through
   // `discardLocalSessionAndDismissDetailIfLast` (rather than
   // `closeTerminal`) because the server has already killed the PTY
-  // — calling `close` again would no-op the `closeOwnedSession` check
+  // — calling `close` again would no-op the `closeSessionForOwner` check
   // on the server and add a useless WS roundtrip.
   handleSessionClosed(sessionId: string): void {
     const directKey = this.sessionKeyBySessionId.get(sessionId)

@@ -321,7 +321,8 @@ export const ko: Record<DictKey, string> = {
   'terminal.mirror-controlled': '다른 창이나 탭이 현재 이 터미널을 제어하고 있습니다.',
   'terminal.unowned': '현재 이 터미널을 제어하는 창이 없습니다.',
   'terminal.takeover': '터미널 제어 가져오기',
-  'terminal.takeover-failed': '터미널을 제어할 수 없습니다. 다른 Goblin 클라이언트에서 생성된 터미널일 수 있습니다. 생성한 창에서 다시 시도하세요.',
+  'terminal.takeover-failed':
+    '터미널을 제어할 수 없습니다. 터미널이 닫혔거나 연결이 아직 준비되지 않았을 수 있습니다. 다시 시도하세요.',
   'terminal.takeover-failed-generic': '터미널 제어 가져오기에 실패했습니다.',
   'terminal.takeover-session-gone': '더 이상 사용할 수 없는 터미널입니다.',
   'terminal.index-title': '터미널 {index}',
@@ -552,14 +553,16 @@ export const ko: Record<DictKey, string> = {
   'settings.web.url': '서버 URL',
   'settings.web.url-hint': '브라우저가 내장 서버에 접근하는 데 사용하는 주소입니다.',
   'settings.web.token': '접근 토큰',
-  'settings.web.token-hint': '25자 base36 문자열. 새 브라우저에서 한 번 로그인할 때 필요하며, 이후에는 http-only 쿠키로 저장됩니다.',
+  'settings.web.token-hint':
+    '25자 base36 문자열. 새 브라우저에서 한 번 로그인할 때 필요하며, 이후에는 http-only 쿠키로 저장됩니다.',
   'settings.web.token-copy': '토큰 복사',
   'settings.web.token-copied': '토큰이 클립보드에 복사되었습니다.',
   'settings.web.token-copy-failed': '클립보드에 복사하지 못했습니다.',
   'settings.web.token-rotate': '토큰 회전',
   'settings.web.token-rotated': '토큰이 회전되었습니다. 계속하려면 다시 인증하세요.',
   'settings.web.token-rotate-failed': '토큰 회전에 실패했습니다.',
-  'settings.web.token-rotation-hint': '아래 QR 코드에는 이 토큰이 포함되어 있습니다. 스캔하면 대상 기기의 게이트에 자동으로 채워집니다.',
+  'settings.web.token-rotation-hint':
+    '아래 QR 코드에는 이 토큰이 포함되어 있습니다. 스캔하면 대상 기기의 게이트에 자동으로 채워집니다.',
   'settings.web.lan': '네트워크',
   'settings.web.qr': 'QR 코드',
   'settings.web.qr-scan': 'QR 코드',
@@ -686,7 +689,8 @@ export const ko: Record<DictKey, string> = {
   // ---- 인증 게이트 (쿠키/헤더/토큰이 없을 때 표시되는 로그인 폼) -------------
   'auth.gate.loading': '불러오는 중…',
   'auth.gate.title': '접근 토큰 입력',
-  'auth.gate.description': '서버 시작 시 출력된 접근 토큰을 붙여넣으세요. 토큰은 이 기기에 http-only 쿠키로 저장됩니다.',
+  'auth.gate.description':
+    '서버 시작 시 출력된 접근 토큰을 붙여넣으세요. 토큰은 이 기기에 http-only 쿠키로 저장됩니다.',
   'auth.gate.token-label': '접근 토큰',
   'auth.gate.token-placeholder': '25자 base36 토큰',
   'auth.gate.sign-in': '로그인',

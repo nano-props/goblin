@@ -141,7 +141,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
       allowImplicitAttachControl: true,
       phase: 'opening',
       message: null,
-      displayOrder: this.nextDisplayOrder(input.scope, parseWorktreePathFromKey(input.key) ?? input.key),
+      displayOrder: this.nextDisplayOrder(ownerId, input.scope, parseWorktreePathFromKey(input.key) ?? input.key),
       inputQueue: [],
       inputFlushScheduled: false,
     }
@@ -298,7 +298,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     return result
   }
 
-  closeOwnedSession(ownerId: TOwner, sessionId: string): boolean {
+  closeSessionForOwner(ownerId: TOwner, sessionId: string): boolean {
     if (!this.getSession(ownerId, sessionId)) return false
     this.closeSession(sessionId)
     return true
@@ -314,13 +314,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     this.disposeSessionResources(session)
   }
 
-  closeKey(key: string): void {
-    for (const session of Array.from(this.sessionsById.values())) {
-      if (session.key === key || session.key.startsWith(`${key}\0`)) this.closeSession(session.id)
-    }
-  }
-
-  closeOwner(ownerId: TOwner): void {
+  closeSessionsForOwner(ownerId: TOwner): void {
     for (const session of Array.from(this.sessionsById.values())) {
       if (session.ownerId === ownerId) this.closeSession(session.id)
     }
@@ -346,18 +340,18 @@ export class TerminalSessionManager<TOwner extends string | number> {
     for (const sessionId of Array.from(this.sessionsById.keys())) this.closeSession(sessionId)
   }
 
-  snapshotSession(sessionId: string): TerminalSessionSnapshot | null {
-    const session = this.sessionsById.get(sessionId)
+  getSessionSnapshot(ownerId: TOwner, sessionId: string): TerminalSessionSnapshot | null {
+    const session = this.getSession(ownerId, sessionId)
     if (!session) return null
     const snap = takeSnapshot(session.render)
     if (!snap) return null
     return { sessionId, snapshot: snap.snapshot, snapshotSeq: snap.snapshotSeq }
   }
 
-  async listSessions(scope: string): Promise<TerminalSessionSummary[]> {
+  async listSessionsForOwner(ownerId: TOwner, scope: string): Promise<TerminalSessionSummary[]> {
     const sessions: TerminalSessionSummary[] = []
     for (const session of Array.from(this.sessionsById.values())) {
-      if (session.scope === scope) {
+      if (session.ownerId === ownerId && session.scope === scope) {
         sessions.push({
           sessionId: session.id,
           key: session.key,
@@ -377,10 +371,10 @@ export class TerminalSessionManager<TOwner extends string | number> {
     return sessions
   }
 
-  reorderSessions(scope: string, worktreePath: string, orderedKeys: string[]): boolean {
+  reorderSessionsForOwner(ownerId: TOwner, scope: string, worktreePath: string, orderedKeys: string[]): boolean {
     const worktreePrefix = `${scope}\0${worktreePath}\0`
     const sessionsInWorktree = Array.from(this.sessionsById.values()).filter(
-      (s) => s.scope === scope && s.key.startsWith(worktreePrefix),
+      (s) => s.ownerId === ownerId && s.scope === scope && s.key.startsWith(worktreePrefix),
     )
     const keySet = new Set(sessionsInWorktree.map((s) => s.key))
     const orderedKeySet = new Set(orderedKeys)
@@ -396,11 +390,11 @@ export class TerminalSessionManager<TOwner extends string | number> {
     return true
   }
 
-  private nextDisplayOrder(scope: string, worktreePath: string): number {
+  private nextDisplayOrder(ownerId: TOwner, scope: string, worktreePath: string): number {
     const worktreePrefix = `${scope}\0${worktreePath}\0`
     let max = -1
     for (const session of this.sessionsById.values()) {
-      if (session.scope === scope && session.key.startsWith(worktreePrefix)) {
+      if (session.ownerId === ownerId && session.scope === scope && session.key.startsWith(worktreePrefix)) {
         if (session.displayOrder > max) max = session.displayOrder
       }
     }

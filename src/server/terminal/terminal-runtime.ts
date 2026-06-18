@@ -59,18 +59,18 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   // `identity.ts` for the model.
   const manager = new TerminalSessionManager<string>(ptySupervisor, {
     onOutput(ownerId, event) {
-      broker.broadcastOwner(ownerId, { type: 'output', event })
+      broker.broadcastToOwner(ownerId, { type: 'output', event })
     },
     onTitle(ownerId, event) {
-      broker.broadcastOwner(ownerId, { type: 'title', event })
+      broker.broadcastToOwner(ownerId, { type: 'title', event })
     },
     onExit(ownerId, event) {
       const repoRoot = manager.getSession(ownerId, event.sessionId)?.scope
-      broker.broadcastOwner(ownerId, { type: 'exit', event })
-      if (repoRoot) broker.broadcastGlobal({ type: 'sessions-changed', repoRoot })
+      broker.broadcastToOwner(ownerId, { type: 'exit', event })
+      if (repoRoot) broker.broadcastToOwner(ownerId, { type: 'sessions-changed', repoRoot })
     },
     onOwnership(ownerId, event) {
-      broker.broadcastOwner(ownerId, { type: 'ownership', event })
+      broker.broadcastToOwner(ownerId, { type: 'ownership', event })
     },
   })
   const { broker, connectionState } = createTerminalRuntimeCoordinator({
@@ -82,11 +82,11 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     isValidClientId: isValidTerminalClientId,
     isValidTerminalId,
     manager,
-    attachmentIsConnected(clientId, attachmentId) {
-      return broker.attachmentIsConnected(clientId, attachmentId)
+    isAttachmentConnected(ownerId, attachmentId) {
+      return broker.isAttachmentConnected(ownerId, attachmentId)
     },
-    broadcastSessionsChanged(repoRoot) {
-      broker.broadcastGlobal({ type: 'sessions-changed', repoRoot })
+    broadcastSessionsChanged(ownerId, repoRoot) {
+      broker.broadcastToOwner(ownerId, { type: 'sessions-changed', repoRoot })
     },
   })
 
@@ -104,9 +104,9 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     // broker. Replacing with the broker check ensures a takeover
     // request from a brand-new tab (the cross-browser scenario)
     // only counts the attachment as connected if the WS is
-    // actually alive for the (clientId, attachmentId) pair.
-    resolveAttachmentConnected(clientId, attachmentId) {
-      return broker.attachmentIsConnected(clientId, attachmentId) ?? false
+    // actually alive for the (ownerId, attachmentId) pair.
+    resolveAttachmentConnected(ownerId, attachmentId) {
+      return broker.isAttachmentConnected(ownerId, attachmentId) ?? false
     },
   })
 
@@ -128,11 +128,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       }
     },
     registerSocket(clientId, attachmentId, ownerId, socket) {
-      if (
-        !isValidTerminalClientId(clientId) ||
-        !isValidTerminalSocketAttachmentId(attachmentId) ||
-        !ownerId
-      ) {
+      if (!isValidTerminalClientId(clientId) || !isValidTerminalSocketAttachmentId(attachmentId) || !ownerId) {
         socket.close(1008, 'invalid client id')
         return
       }
@@ -140,11 +136,11 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       bufferedSocketByRawSocket.set(socket as TerminalRealtimeSocket, buffered)
       broker.registerSocket(clientId, attachmentId, ownerId, buffered)
     },
-    unregisterSocket(clientId, attachmentId, ownerId, socket) {
+    unregisterSocket(_clientId, _attachmentId, _ownerId, socket) {
       const buffered =
         bufferedSocketByRawSocket.get(socket as TerminalRealtimeSocket) ?? (socket as TerminalRealtimeSocket)
       if (buffered instanceof BufferedTerminalSocket) buffered.deactivate()
-      broker.unregisterSocket(clientId, attachmentId, ownerId, buffered)
+      broker.unregisterSocket(buffered)
       bufferedSocketByRawSocket.delete(socket as TerminalRealtimeSocket)
     },
     async attach(clientId, ownerId, input) {
@@ -187,10 +183,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       // return early without rejecting the WS — the message is
       // just unprocessable for this socket.
       if (!isValidTerminalClientId(clientId) || !isValidTerminalSocketAttachmentId(attachmentId)) {
-        terminalRuntimeLogger.warn(
-          { clientId, attachmentId },
-          'invalid realtime message: missing/invalid identifiers',
-        )
+        terminalRuntimeLogger.warn({ clientId, attachmentId }, 'invalid realtime message: missing/invalid identifiers')
         return
       }
       if (!ownerId) {
@@ -204,17 +197,11 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       try {
         message = normalizeTerminalClientMessage(JSON.parse(payload))
       } catch (err) {
-        terminalRuntimeLogger.warn(
-          { clientId, attachmentId, err },
-          'invalid realtime message: parse/normalize failed',
-        )
+        terminalRuntimeLogger.warn({ clientId, attachmentId, err }, 'invalid realtime message: parse/normalize failed')
         return
       }
       if (!message) {
-        terminalRuntimeLogger.warn(
-          { clientId, attachmentId },
-          'invalid realtime message: null after normalize',
-        )
+        terminalRuntimeLogger.warn({ clientId, attachmentId }, 'invalid realtime message: null after normalize')
         return
       }
       const bufferedSocket = bufferedSocketByRawSocket.get(socket as TerminalRealtimeSocket)

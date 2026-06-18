@@ -240,7 +240,7 @@ Two problems:
 
 - `.catch(() => {})` swallows rejections. A WebSocket mid-request
   teardown (`renderer-terminal-bridge.ts:104
-  rejectPendingSocketRequests`, called from `handleSocketDisconnection`)
+rejectPendingSocketRequests`, called from `handleSocketDisconnection`)
   or a race with `closeSocketIfIdle` can drop the close before the
   server sees it.
 - The dispose path is not awaited. A subsequent create in the same
@@ -315,7 +315,7 @@ registry.enqueueDurableClose({ sessionId, worktreeTerminalKey }).catch((err) => 
   owner.
 - The create path does not change; it only waits for the close path
   to settle before issuing. The catalog can still return `action:
-  'restored'` — that is correct behavior when an orphan exists; the
+'restored'` — that is correct behavior when an orphan exists; the
   bug is that the orphan exists when it should not.
 
 ---
@@ -354,18 +354,20 @@ Add to `TerminalRealtimeMessage` in `src/shared/terminal-socket.ts`:
 
 ### Server emit
 
-In `terminal-runtime-actions.ts`, after `manager.closeOwnedSession(...)`
+In `terminal-runtime-actions.ts`, after `manager.closeSessionForOwner(...)`
 returns `true`:
 
 ```ts
-broker.broadcastGlobal({
+broker.broadcastToOwner(ownerId, {
   type: 'session-closed',
   sessionId: input.sessionId,
-  repoRoot: input.repoRoot ?? '',
+  repoRoot,
 })
 ```
 
-The `repoRoot` is derived from the session's scope — the manager
+The `repoRoot` is derived from the session's scope. The message is
+sent only to sockets for the same `ownerId`; other owners never see
+the closed session id. The manager
 returns it on the close result, or we look it up via
 `manager.findSessionById(sessionId)` before closing.
 
@@ -466,7 +468,7 @@ report.
 Implemented on `main`. The `terminal.takeover` response is now
 the authoritative handshake for the new controller's view; the
 realtime `ownership` event keeps the same shape (and the same
-authority role) for the *other* ownership-change paths
+authority role) for the _other_ ownership-change paths
 (controller crash, grace expiry, fresh attach). The renderer no
 longer waits for a follow-up `ownership` event before painting
 the post-takeover frame.
@@ -533,13 +535,13 @@ response.
    conversion in `renderer-terminal-bridge.ts` were aligned to
    carry the new `phase` field through.
 
-### What is *not* changed
+### What is _not_ changed
 
 The realtime `ownership` event keeps its authority role on the
 non-takeover paths (controller crash, grace expiry, controller
 reconnect). For those, ownership-event-as-authority is the only
 choice — there is no response to be authoritative. A subsequent
-realtime event for the *same* sessionId after a successful
+realtime event for the _same_ sessionId after a successful
 takeover is treated as a benign re-apply with identical values
 (no-op).
 
@@ -607,7 +609,7 @@ collapsed into a single authoritative handshake, with the realtime
 event kept as the authority only on the non-takeover paths. See
 §Takeover atomicity (follow-up #5).
 
-For reference, the notional landing order *had* this fix set been
+For reference, the notional landing order _had_ this fix set been
 split into separate commits (it was not, due to the wip-snapshot
 baseline):
 
@@ -672,7 +674,7 @@ R1: durable close.
 
 - `terminal-runtime-actions.test.ts`:
   - `emits BOTH sessions-changed and session-closed on a successful
-    close` (56).
+close` (56).
   - A non-owner close does not leak a phantom `session-closed`
     event (84).
   - A failed close path does not synthesize a `session-closed`

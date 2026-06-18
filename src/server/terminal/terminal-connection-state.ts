@@ -1,89 +1,76 @@
 interface TerminalConnectionStateOptions {
   ownershipGraceMs: number
   detachedTtlMs: number
-  // Timer callbacks now carry `ownerId` so the coordinator can
-  // reach the ownerId-partitioned session manager without having
-  // to re-derive identity from the (clientId, attachmentId) key
-  // that the timer is indexed under.
-  onAttachmentExpired(clientId: string, attachmentId: string, ownerId: string): void
-  onClientExpired(clientId: string, ownerId: string): void
+  onAttachmentExpired(ownerId: string, attachmentId: string): void
+  onOwnerExpired(ownerId: string): void
 }
 
 type TimerHandle = ReturnType<typeof setTimeout>
 
 interface OwnershipTimerEntry {
   timer: TimerHandle
-  clientId: string
-  attachmentId: string
   ownerId: string
+  attachmentId: string
 }
 
-interface ClientTimerEntry {
+interface OwnerTimerEntry {
   timer: TimerHandle
-  clientId: string
   ownerId: string
 }
 
 export class TerminalConnectionState {
   private readonly options: TerminalConnectionStateOptions
   private readonly ownershipTimerByAttachmentKey = new Map<string, OwnershipTimerEntry>()
-  private readonly disconnectTimerByClientId = new Map<string, ClientTimerEntry>()
+  private readonly disconnectTimerByOwnerId = new Map<string, OwnerTimerEntry>()
 
   constructor(options: TerminalConnectionStateOptions) {
     this.options = options
   }
 
-  clearAttachmentDisconnect(clientId: string, attachmentId: string): void {
-    this.clearOwnershipTimerByKey(terminalAttachmentKey(clientId, attachmentId))
+  clearAttachmentDisconnect(ownerId: string, attachmentId: string): void {
+    this.clearOwnershipTimerByKey(ownerAttachmentKey(ownerId, attachmentId))
   }
 
-  clearClientDisconnect(clientId: string): void {
-    const entry = this.disconnectTimerByClientId.get(clientId)
+  clearOwnerDisconnect(ownerId: string): void {
+    const entry = this.disconnectTimerByOwnerId.get(ownerId)
     if (!entry) return
     clearTimeout(entry.timer)
-    this.disconnectTimerByClientId.delete(clientId)
+    this.disconnectTimerByOwnerId.delete(ownerId)
   }
 
-  scheduleOwnershipRelease(
-    clientId: string,
-    attachmentId: string,
-    ownerId: string,
-    stillConnected: () => boolean,
-  ): void {
-    const attachmentKey = terminalAttachmentKey(clientId, attachmentId)
+  scheduleOwnershipRelease(ownerId: string, attachmentId: string, stillConnected: () => boolean): void {
+    const attachmentKey = ownerAttachmentKey(ownerId, attachmentId)
     this.clearOwnershipTimerByKey(attachmentKey)
     const entry: OwnershipTimerEntry = {
-      clientId,
-      attachmentId,
       ownerId,
+      attachmentId,
       timer: setTimeout(() => {
         this.ownershipTimerByAttachmentKey.delete(attachmentKey)
         if (stillConnected()) return
-        this.options.onAttachmentExpired(clientId, attachmentId, ownerId)
+        this.options.onAttachmentExpired(ownerId, attachmentId)
       }, this.options.ownershipGraceMs),
     }
     this.ownershipTimerByAttachmentKey.set(attachmentKey, entry)
   }
 
-  scheduleClientDisconnect(clientId: string, ownerId: string, hasSockets: () => boolean): void {
-    this.clearClientDisconnect(clientId)
-    const entry: ClientTimerEntry = {
-      clientId,
+  scheduleOwnerDisconnect(ownerId: string, hasSockets: () => boolean): void {
+    this.clearOwnerDisconnect(ownerId)
+    const entry: OwnerTimerEntry = {
       ownerId,
       timer: setTimeout(() => {
-        this.disconnectTimerByClientId.delete(clientId)
+        this.disconnectTimerByOwnerId.delete(ownerId)
         if (hasSockets()) return
-        this.options.onClientExpired(clientId, ownerId)
+        this.options.onOwnerExpired(ownerId)
       }, this.options.detachedTtlMs),
     }
-    this.disconnectTimerByClientId.set(clientId, entry)
+    this.disconnectTimerByOwnerId.set(ownerId, entry)
   }
 
   shutdown(): void {
     for (const entry of this.ownershipTimerByAttachmentKey.values()) clearTimeout(entry.timer)
-    for (const entry of this.disconnectTimerByClientId.values()) clearTimeout(entry.timer)
+    for (const entry of this.disconnectTimerByOwnerId.values()) clearTimeout(entry.timer)
     this.ownershipTimerByAttachmentKey.clear()
-    this.disconnectTimerByClientId.clear()
+    this.disconnectTimerByOwnerId.clear()
   }
 
   private clearOwnershipTimerByKey(attachmentKey: string): void {
@@ -94,6 +81,6 @@ export class TerminalConnectionState {
   }
 }
 
-function terminalAttachmentKey(clientId: string, attachmentId: string): string {
-  return `${clientId}\0${attachmentId}`
+function ownerAttachmentKey(ownerId: string, attachmentId: string): string {
+  return `${ownerId}\0${attachmentId}`
 }

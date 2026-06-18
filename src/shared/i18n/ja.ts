@@ -328,7 +328,8 @@ export const ja: Record<DictKey, string> = {
   'terminal.mirror-controlled': '現在このターミナルは別のウィンドウまたはタブが操作しています。',
   'terminal.unowned': '現在このターミナルを操作しているウィンドウはありません。',
   'terminal.takeover': 'ターミナルを引き継ぐ',
-  'terminal.takeover-failed': 'ターミナルを引き継げませんでした。別の Goblin クライアントで作成された可能性があります。作成元のウィンドウで再度お試しください。',
+  'terminal.takeover-failed':
+    'ターミナルを引き継げませんでした。閉じられたか、接続の準備ができていない可能性があります。もう一度お試しください。',
   'terminal.takeover-failed-generic': 'ターミナルの引き継ぎに失敗しました。',
   'terminal.takeover-session-gone': 'ターミナルは既に利用できません。',
   'terminal.index-title': 'ターミナル {index}',
@@ -560,14 +561,16 @@ export const ja: Record<DictKey, string> = {
   'settings.web.url': 'サーバーURL',
   'settings.web.url-hint': 'ブラウザが組み込みサーバーにアクセスするためのアドレス。',
   'settings.web.token': 'アクセストークン',
-  'settings.web.token-hint': '25文字のbase36文字列。新しいブラウザからログインする際に一度だけ必要で、その後はhttp-only Cookieとして保存されます。',
+  'settings.web.token-hint':
+    '25文字のbase36文字列。新しいブラウザからログインする際に一度だけ必要で、その後はhttp-only Cookieとして保存されます。',
   'settings.web.token-copy': 'トークンをコピー',
   'settings.web.token-copied': 'トークンをクリップボードにコピーしました。',
   'settings.web.token-copy-failed': 'クリップボードへのコピーに失敗しました。',
   'settings.web.token-rotate': 'トークンを再生成',
   'settings.web.token-rotated': 'トークンを再生成しました。続行するには再認証してください。',
   'settings.web.token-rotate-failed': 'トークンの再生成に失敗しました。',
-  'settings.web.token-rotation-hint': '下のQRコードにはこのトークンが含まれています。スキャンすると対象デバイスのゲートに自動入力されます。',
+  'settings.web.token-rotation-hint':
+    '下のQRコードにはこのトークンが含まれています。スキャンすると対象デバイスのゲートに自動入力されます。',
   'settings.web.lan': 'ネットワーク',
   'settings.web.qr': 'QRコード',
   'settings.web.qr-scan': 'QRコード',
@@ -694,7 +697,8 @@ export const ja: Record<DictKey, string> = {
   // ---- 認証ゲート（cookie / ヘッダー / token がない時に表示するログインフォーム）
   'auth.gate.loading': '読み込み中…',
   'auth.gate.title': 'アクセストークンを入力',
-  'auth.gate.description': 'サーバー起動時に表示されたアクセストークンを貼り付けてください。トークンはこの端末に http-only cookie として保存されます。',
+  'auth.gate.description':
+    'サーバー起動時に表示されたアクセストークンを貼り付けてください。トークンはこの端末に http-only cookie として保存されます。',
   'auth.gate.token-label': 'アクセストークン',
   'auth.gate.token-placeholder': '25 文字の base36 トークン',
   'auth.gate.sign-in': 'サインイン',

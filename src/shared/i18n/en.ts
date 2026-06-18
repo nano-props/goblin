@@ -333,7 +333,8 @@ export const en = {
   'terminal.mirror-controlled': 'Another window or tab is currently controlling this terminal.',
   'terminal.unowned': 'This terminal currently has no controller.',
   'terminal.takeover': 'Take over terminal',
-  'terminal.takeover-failed': 'Could not take over the terminal. It may belong to another Goblin client — try again in the window that created it.',
+  'terminal.takeover-failed':
+    'Could not take over the terminal. It may have closed or the connection may not be ready; try again.',
   'terminal.takeover-failed-generic': 'Failed to take over the terminal.',
   'terminal.takeover-session-gone': 'Terminal is no longer available.',
   'terminal.index-title': 'Terminal {index}',
@@ -567,14 +568,16 @@ export const en = {
   'settings.web.url': 'Server URL',
   'settings.web.url-hint': 'The address your browser uses to reach the embedded server.',
   'settings.web.token': 'Access token',
-  'settings.web.token-hint': 'A 25-character base36 string. Required once to log in from a new browser; saved as an http-only cookie after that.',
+  'settings.web.token-hint':
+    'A 25-character base36 string. Required once to log in from a new browser; saved as an http-only cookie after that.',
   'settings.web.token-copy': 'Copy token',
   'settings.web.token-copied': 'Token copied to clipboard.',
   'settings.web.token-copy-failed': 'Could not copy to clipboard.',
   'settings.web.token-rotate': 'Rotate token',
   'settings.web.token-rotated': 'Token rotated. Re-authenticate to continue.',
   'settings.web.token-rotate-failed': 'Token rotation failed.',
-  'settings.web.token-rotation-hint': 'The QR codes below include this token. Scanning them auto-fills the gate on the target device.',
+  'settings.web.token-rotation-hint':
+    'The QR codes below include this token. Scanning them auto-fills the gate on the target device.',
   'settings.web.lan': 'Network',
   'settings.web.qr': 'QR codes',
   'settings.web.qr-scan': 'QR code',
@@ -701,7 +704,8 @@ export const en = {
   // ---- Auth gate (browser login form shown when no cookie/header/token) ---
   'auth.gate.loading': 'Loading…',
   'auth.gate.title': 'Enter access token',
-  'auth.gate.description': 'Paste the access token printed when the server started. The token is saved as an http-only cookie on this device.',
+  'auth.gate.description':
+    'Paste the access token printed when the server started. The token is saved as an http-only cookie on this device.',
   'auth.gate.token-label': 'Access token',
   'auth.gate.token-placeholder': '25-character base36 token',
   'auth.gate.sign-in': 'Sign in',

@@ -22,6 +22,7 @@ import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 // a fixed value so the assertions don't have to mock the
 // derivation helper.
 const OWNER_1 = 'owner_terminal_runtime'
+const OWNER_2 = 'owner_terminal_runtime_second'
 
 vi.mock('#/system/git/worktrees.ts', () => ({
   getWorktrees: vi.fn(async () => [{ path: '/repo-linked', branch: 'feature', isBare: false, isPrimary: false }]),
@@ -106,8 +107,9 @@ async function createTerminalSession(
   host: ServerTerminalHost,
   clientId: string,
   attachmentId?: string,
+  ownerId = OWNER_1,
 ): Promise<string> {
-  const result = await host.create(clientId, OWNER_1, {
+  const result = await host.create(clientId, ownerId, {
     repoRoot: '/repo',
     branch: 'feature',
     worktreePath: '/repo-linked',
@@ -780,7 +782,7 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('lists repo sessions across clients and broadcasts lifecycle invalidations globally', async () => {
+  test('lists repo sessions across clients sharing an owner and broadcasts lifecycle invalidations to that owner', async () => {
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
     const socketB = { send: vi.fn(), close: vi.fn() }
@@ -804,6 +806,72 @@ describe('server terminal runtime', () => {
 
     host.unregisterSocket('client_1', 'attachment_a', OWNER_1, socketA)
     host.unregisterSocket('client_2', 'attachment_b', OWNER_1, socketB)
+    shutdown()
+  })
+
+  test('isolates terminal catalog reads and lifecycle broadcasts by ownerId', async () => {
+    const { host, shutdown } = buildRuntime()
+    const ownerASocket = { send: vi.fn(), close: vi.fn() }
+    const ownerBSocket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_shared', 'attachment_a', OWNER_1, ownerASocket)
+    host.registerSocket('client_shared', 'attachment_b', OWNER_2, ownerBSocket)
+
+    const ownerACreate = await host.create('client_shared', OWNER_1, {
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'additional',
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_a',
+    })
+    expect(ownerACreate.ok).toBe(true)
+    if (!ownerACreate.ok) return
+    const ownerASession = ownerACreate.sessions[0]
+    if (!ownerASession) throw new Error('expected owner A session')
+
+    expect(await host.listSessions('client_shared', OWNER_2, '/repo')).toEqual([])
+    expect(host.getSessionSnapshot('client_shared', OWNER_2, { sessionId: ownerASession.sessionId })).toBeNull()
+    expect(host.close('client_shared', OWNER_2, { sessionId: ownerASession.sessionId })).toBe(false)
+    expect(
+      host.reorder('client_shared', OWNER_2, {
+        repoRoot: '/repo',
+        worktreePath: '/repo-linked',
+        orderedKeys: [ownerASession.key],
+      }),
+    ).toBe(false)
+    expect(
+      ownerBSocket.send.mock.calls.some(([payload]) => {
+        const parsed = JSON.parse(String(payload))
+        return parsed.type === 'sessions-changed' && parsed.repoRoot === '/repo'
+      }),
+    ).toBe(false)
+
+    const ownerBCreate = await host.create('client_shared', OWNER_2, {
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'additional',
+      cols: 100,
+      rows: 30,
+      attachmentId: 'attachment_b',
+    })
+    expect(ownerBCreate.ok).toBe(true)
+    if (!ownerBCreate.ok) return
+    const ownerBSession = ownerBCreate.sessions[0]
+    if (!ownerBSession) throw new Error('expected owner B session')
+
+    expect(ownerBSession.key).toBe(ownerASession.key)
+    expect(ownerBSession.sessionId).not.toBe(ownerASession.sessionId)
+    expect(await host.listSessions('client_shared', OWNER_1, '/repo')).toEqual([
+      expect.objectContaining({ sessionId: ownerASession.sessionId, key: ownerASession.key }),
+    ])
+    expect(await host.listSessions('client_shared', OWNER_2, '/repo')).toEqual([
+      expect.objectContaining({ sessionId: ownerBSession.sessionId, key: ownerBSession.key }),
+    ])
+
+    host.unregisterSocket('client_shared', 'attachment_a', OWNER_1, ownerASocket)
+    host.unregisterSocket('client_shared', 'attachment_b', OWNER_2, ownerBSocket)
     shutdown()
   })
 

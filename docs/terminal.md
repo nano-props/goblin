@@ -110,10 +110,11 @@ Closing a session should be an explicit business action or the result of server-
 
 ## Identity model
 
-The terminal system relies on three identity scopes:
+The terminal system relies on four identity scopes:
 
-- **clientId**: the logical renderer client / session owner.
-- **attachmentId**: one attachment under that client.
+- **ownerId**: the server-side terminal owner derived from the authenticated access token. Session visibility, lifecycle cleanup, and realtime fanout are partitioned by this id.
+- **clientId**: the logical renderer client for one browser tab or Electron renderer. It validates and routes requests, but it does not own terminal sessions.
+- **attachmentId**: one terminal view/socket attachment under an owner.
 - **sessionId**: the server-owned identifier for one live terminal session.
 
 In addition, terminal keys encode repo and worktree scope so the system can reason about:

@@ -313,7 +313,7 @@ export const zh: Record<DictKey, string> = {
   'terminal.mirror-controlled': '其他窗口或标签页正在控制终端',
   'terminal.unowned': '当前终端没有控制者',
   'terminal.takeover': '接管',
-  'terminal.takeover-failed': '无法接管终端。该终端可能属于另一个 Goblin 客户端,请在创建它的窗口中重试。',
+  'terminal.takeover-failed': '无法接管终端。终端可能已关闭，或当前连接尚未准备好，请重试。',
   'terminal.takeover-failed-generic': '接管终端失败。',
   'terminal.takeover-session-gone': '终端已关闭,无法接管。',
   'terminal.index-title': '终端 {index}',

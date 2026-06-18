@@ -18,40 +18,36 @@ export function createTerminalRuntimeCoordinator(
 ): TerminalRuntimeCoordinator {
   const { manager, ownershipGraceMs, detachedTtlMs } = options
 
-  // The connection-state timers key by (clientId, attachmentId)
-  // because they are per-WS-connection lifecycles. The callbacks
-  // carry `ownerId` so the manager (which is ownerId-partitioned
-  // under method 2) can be reached without re-deriving identity.
+  // The connection-state timers key by owner, not clientId. clientId
+  // is only the per-tab routing id; terminal lifetime is owned by
+  // the access-token-derived ownerId.
   const connectionState = new TerminalConnectionState({
     ownershipGraceMs,
     detachedTtlMs,
-    onAttachmentExpired(_clientId, attachmentId, ownerId) {
+    onAttachmentExpired(ownerId, attachmentId) {
       manager.expireAttachment(ownerId, attachmentId)
     },
-    onClientExpired(_clientId, ownerId) {
-      manager.closeOwner(ownerId)
+    onOwnerExpired(ownerId) {
+      manager.closeSessionsForOwner(ownerId)
     },
   })
 
   const broker = new TerminalRealtimeBroker({
-    onAttachmentConnected(clientId, attachmentId, ownerId) {
-      connectionState.clearClientDisconnect(clientId)
-      connectionState.clearAttachmentDisconnect(clientId, attachmentId)
+    onAttachmentConnected(_clientId, attachmentId, ownerId) {
+      connectionState.clearOwnerDisconnect(ownerId)
+      connectionState.clearAttachmentDisconnect(ownerId, attachmentId)
       manager.setAttachmentConnected(ownerId, attachmentId, true)
     },
-    onAttachmentDisconnected(clientId, attachmentId, ownerId) {
+    onAttachmentDisconnected(_clientId, attachmentId, ownerId) {
       manager.setAttachmentConnected(ownerId, attachmentId, false)
       connectionState.scheduleOwnershipRelease(
-        clientId,
-        attachmentId,
         ownerId,
-        () => broker.attachmentIsConnected(clientId, attachmentId) === true,
+        attachmentId,
+        () => broker.isAttachmentConnected(ownerId, attachmentId) === true,
       )
     },
-    onClientDisconnected(clientId, ownerId) {
-      connectionState.scheduleClientDisconnect(clientId, ownerId, () =>
-        broker.hasClientSockets(clientId),
-      )
+    onOwnerDisconnected(ownerId) {
+      connectionState.scheduleOwnerDisconnect(ownerId, () => broker.hasOwnerSockets(ownerId))
     },
   })
 

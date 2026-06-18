@@ -314,8 +314,8 @@ export class ManagedTerminalSession {
     // failure so callers (e.g. `TerminalSlot`) can surface a toast
     // explaining *why* the takeover didn't take — a user who clicks
     // 「接管」 and sees nothing happen doesn't know whether the
-    // session vanished, the server rejected them, or they hit the
-    // cross-clientId partition described in the takeover bug.
+    // session vanished, the server rejected them, or the attachment
+    // websocket was not connected yet.
     const attachmentId = readOrCreateWebTerminalAttachmentId()
     if (this.runtime.setTakeoverPending(true)) this.notify('metadata')
     // Bug F: `setTakeoverPending` runs *before* the `.then` chain

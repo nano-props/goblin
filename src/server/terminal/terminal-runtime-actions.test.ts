@@ -13,19 +13,21 @@ const OWNER_ID = 'owner_terminal_actions'
 // shared/terminal-validators.ts.
 const SESSION_ID = 'session_aaaaaaaaaaaaaa'
 
-function makeActions(options: {
-  closeOwnedSession: (ownerId: string, sessionId: string) => boolean
-  getSessionScope?: (ownerId: string, sessionId: string) => string | undefined
-  isValidTerminalClientId?: (value: unknown) => value is string
-  broadcasts?: ReturnType<typeof vi.fn>
-} = { closeOwnedSession: () => false }) {
+function makeActions(
+  options: {
+    closeSessionForOwner: (ownerId: string, sessionId: string) => boolean
+    getSessionScope?: (ownerId: string, sessionId: string) => string | undefined
+    isValidTerminalClientId?: (value: unknown) => value is string
+    broadcasts?: ReturnType<typeof vi.fn>
+  } = { closeSessionForOwner: () => false },
+) {
   const broadcasts = options.broadcasts ?? vi.fn()
   const manager = {
     // The close path only reads `scope` off the session record.
     getSession: vi.fn((_ownerId: string, sessionId: string) =>
       options.getSessionScope ? { scope: options.getSessionScope(_ownerId, sessionId) } : undefined,
     ),
-    closeOwnedSession: vi.fn(options.closeOwnedSession),
+    closeSessionForOwner: vi.fn(options.closeSessionForOwner),
     // The other manager methods are unused by `close`, but the
     // `TerminalSessionManager` type is required by the deps
     // interface. Stub them with `vi.fn()` so TypeScript stays happy.
@@ -34,16 +36,17 @@ function makeActions(options: {
     writeSession: vi.fn(() => false),
     resizeSession: vi.fn(() => false),
     takeoverSession: vi.fn(),
-    snapshotSession: vi.fn(() => null),
-    reorderSessions: vi.fn(() => false),
+    getSessionSnapshot: vi.fn(() => null),
+    reorderSessionsForOwner: vi.fn(() => false),
   } as any
-  const broker = { broadcastGlobal: broadcasts as unknown as (message: unknown) => void }
+  const broker = { broadcastToOwner: broadcasts as unknown as (ownerId: string, message: unknown) => void }
   const catalog = {
     create: vi.fn(),
     prune: vi.fn(),
     listSessions: vi.fn(),
   }
-  const isValidTerminalClientId = options.isValidTerminalClientId ?? ((value: unknown): value is string => value === CLIENT_ID)
+  const isValidTerminalClientId =
+    options.isValidTerminalClientId ?? ((value: unknown): value is string => value === CLIENT_ID)
   return {
     actions: createTerminalRuntimeActions({
       manager,
@@ -65,7 +68,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     // immediately instead of waiting for the next reconcile.
     const close = vi.fn(() => true)
     const { actions, broadcasts } = makeActions({
-      closeOwnedSession: close,
+      closeSessionForOwner: close,
       getSessionScope: () => '/repo',
     })
 
@@ -74,11 +77,11 @@ describe('terminal-runtime-actions close broadcast', () => {
     expect(closed).toBe(true)
     expect(close).toHaveBeenCalledWith(OWNER_ID, SESSION_ID)
     expect(broadcasts).toHaveBeenCalledTimes(2)
-    expect(broadcasts).toHaveBeenNthCalledWith(1, {
+    expect(broadcasts).toHaveBeenNthCalledWith(1, OWNER_ID, {
       type: 'sessions-changed',
       repoRoot: '/repo',
     })
-    expect(broadcasts).toHaveBeenNthCalledWith(2, {
+    expect(broadcasts).toHaveBeenNthCalledWith(2, OWNER_ID, {
       type: 'session-closed',
       sessionId: SESSION_ID,
       repoRoot: '/repo',
@@ -89,7 +92,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     // A non-owner close must not leak a phantom session-closed to
     // sibling windows. The guard is `if (closed && repoRoot)`.
     const { actions, broadcasts } = makeActions({
-      closeOwnedSession: () => false,
+      closeSessionForOwner: () => false,
       getSessionScope: () => '/repo',
     })
 
@@ -104,7 +107,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     // was already removed server-side by a parallel path), the close
     // path must not synthesize a session-closed with a fake repoRoot.
     const { actions, broadcasts } = makeActions({
-      closeOwnedSession: () => true,
+      closeSessionForOwner: () => true,
       getSessionScope: () => undefined,
     })
 
@@ -119,7 +122,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     // (16+ alphanumerics) is rejected by the validator; the action
     // returns false and the broker is not consulted.
     const { actions, broadcasts } = makeActions({
-      closeOwnedSession: () => true,
+      closeSessionForOwner: () => true,
     })
 
     const closed = actions.close(CLIENT_ID, OWNER_ID, { sessionId: '' })
@@ -130,12 +133,12 @@ describe('terminal-runtime-actions close broadcast', () => {
 
   test('rejects an invalid clientId without emitting', async () => {
     // The `isValidTerminalClientId` guard is the first check. A bad
-    // clientId must never reach `closeOwnedSession` (which would
+    // clientId must never reach `closeSessionForOwner` (which would
     // also reject it) and must not emit a session-closed with a
     // stale sessionId.
     const close = vi.fn(() => true)
     const { actions, broadcasts } = makeActions({
-      closeOwnedSession: close,
+      closeSessionForOwner: close,
       getSessionScope: () => '/repo',
     })
 

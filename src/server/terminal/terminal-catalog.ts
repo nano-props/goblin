@@ -67,7 +67,7 @@ interface TerminalCatalogEnsureSessionInput {
 
 interface TerminalCatalogManager {
   ensureSession(input: TerminalCatalogEnsureSessionInput): Promise<TerminalAttachResult>
-  listSessions(repoRoot: string): Promise<TerminalSessionSummary[]>
+  listSessionsForOwner(ownerId: string, repoRoot: string): Promise<TerminalSessionSummary[]>
   closeSession(sessionId: string): void
 }
 
@@ -75,8 +75,8 @@ interface TerminalCatalogOptions {
   isValidClientId(value: unknown): value is string
   isValidTerminalId(value: unknown): value is string
   manager: TerminalCatalogManager
-  attachmentIsConnected(clientId: string, attachmentId?: string): boolean | undefined
-  broadcastSessionsChanged(repoRoot: string): void
+  isAttachmentConnected(ownerId: string, attachmentId?: string): boolean | undefined
+  broadcastSessionsChanged(ownerId: string, repoRoot: string): void
 }
 
 class TerminalCatalog {
@@ -103,10 +103,11 @@ class TerminalCatalog {
     if (!isValidTerminalSize(cols, rows)) return { ok: false, message: 'error.invalid-arguments' }
 
     const sessionScope = terminalSessionScope(input.repoRoot)
-    const existingSessions = await this.options.manager.listSessions(sessionScope)
+    const existingSessions = await this.options.manager.listSessionsForOwner(ownerId, sessionScope)
     // Build the target session key from the same form the manager uses
-    // to scope listSessions — see the comment on `terminalSessionScope`
-    // in server/terminal/terminal-session-scope.ts for the normalization rationale.
+    // to scope owner-scoped session lists — see the comment on
+    // `terminalSessionScope` in server/terminal/terminal-session-scope.ts
+    // for the normalization rationale.
     const targetSessionKey = formatTerminalSessionKey(
       sessionScope,
       isRemoteRepoId(input.repoRoot) ? input.worktreePath : path.resolve(input.worktreePath),
@@ -120,16 +121,12 @@ class TerminalCatalog {
       : 'created'
 
     if (isRemoteRepoId(input.repoRoot)) {
-      return await this.ensureRemote(clientId, ownerId, input, { terminalId, cols, rows, targetSessionKey, action })
+      return await this.ensureRemote(ownerId, input, { terminalId, cols, rows, targetSessionKey, action })
     }
-    return await this.ensureLocal(clientId, ownerId, input, { cols, rows, targetSessionKey, action })
+    return await this.ensureLocal(ownerId, input, { cols, rows, targetSessionKey, action })
   }
 
-  async create(
-    clientId: string,
-    ownerId: string,
-    input: TerminalCreateInput,
-  ): Promise<TerminalCatalogMutationResult> {
+  async create(clientId: string, ownerId: string, input: TerminalCreateInput): Promise<TerminalCatalogMutationResult> {
     if (!this.options.isValidClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidRepoLocator(input.repoRoot)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidTerminalAttachmentId(input?.attachmentId)) return { ok: false, message: 'error.invalid-arguments' }
@@ -137,7 +134,9 @@ class TerminalCatalog {
     const createResult = await this.ensureOrRestore(clientId, ownerId, {
       ...input,
       terminalId:
-        input.kind === 'primary' ? 'terminal-1' : await this.nextTerminalId(input.repoRoot, input.worktreePath),
+        input.kind === 'primary'
+          ? 'terminal-1'
+          : await this.nextTerminalId(ownerId, input.repoRoot, input.worktreePath),
     })
     if (!createResult.ok) return { ok: false, message: createResult.message }
     return {
@@ -154,25 +153,21 @@ class TerminalCatalog {
       controller: createResult.controller,
       canonicalCols: createResult.canonicalCols,
       canonicalRows: createResult.canonicalRows,
-      sessions: await this.listSessions(input.repoRoot),
+      sessions: await this.listSessions(ownerId, input.repoRoot),
     }
   }
 
-  async listSessions(repoRoot: string): Promise<TerminalSessionSummary[]> {
+  async listSessions(ownerId: string, repoRoot: string): Promise<TerminalSessionSummary[]> {
     if (!isValidRepoLocator(repoRoot)) return []
-    return await this.options.manager.listSessions(terminalSessionScope(repoRoot))
+    return await this.options.manager.listSessionsForOwner(ownerId, terminalSessionScope(repoRoot))
   }
 
-  async prune(
-    clientId: string,
-    _ownerId: string,
-    repoRoot: string,
-  ): Promise<{ pruned: number; remaining: number }> {
+  async prune(clientId: string, ownerId: string, repoRoot: string): Promise<{ pruned: number; remaining: number }> {
     if (!this.options.isValidClientId(clientId)) return { pruned: 0, remaining: 0 }
     if (!isValidRepoLocator(repoRoot)) return { pruned: 0, remaining: 0 }
 
     const sessionScope = terminalSessionScope(repoRoot)
-    const allSessions = await this.options.manager.listSessions(sessionScope)
+    const allSessions = await this.options.manager.listSessionsForOwner(ownerId, sessionScope)
     if (isRemoteRepoId(repoRoot)) return { pruned: 0, remaining: allSessions.length }
 
     const worktrees = await getWorktrees(repoRoot, { includeStatus: false })
@@ -186,17 +181,19 @@ class TerminalCatalog {
       this.options.manager.closeSession(session.sessionId)
       pruned += 1
     }
-    if (pruned > 0) this.options.broadcastSessionsChanged(repoRoot)
-    const remaining = await this.options.manager.listSessions(sessionScope).then((sessions) => sessions.length)
+    if (pruned > 0) this.options.broadcastSessionsChanged(ownerId, repoRoot)
+    const remaining = await this.options.manager
+      .listSessionsForOwner(ownerId, sessionScope)
+      .then((sessions) => sessions.length)
     return { pruned, remaining }
   }
 
-  async nextTerminalId(repoRoot: string, worktreePath: string): Promise<string> {
+  async nextTerminalId(ownerId: string, repoRoot: string, worktreePath: string): Promise<string> {
     // Compare against the canonical form so a forward-slash Windows path
     // matches the resolved back-slash form used as the session key prefix.
     const scopedRepoRoot = terminalSessionScope(repoRoot)
     const scopedWorktreePath = isRemoteRepoId(repoRoot) ? worktreePath : path.resolve(worktreePath)
-    const sessions = await this.options.manager.listSessions(scopedRepoRoot)
+    const sessions = await this.options.manager.listSessionsForOwner(ownerId, scopedRepoRoot)
     let maxIndex = 0
     for (const session of sessions) {
       const parsed = parseTerminalSessionKey(session.key)
@@ -209,7 +206,6 @@ class TerminalCatalog {
   }
 
   private async ensureRemote(
-    clientId: string,
     ownerId: string,
     input: EnsureTerminalCatalogInput,
     context: {
@@ -240,18 +236,17 @@ class TerminalCatalog {
       cols: context.cols,
       rows: context.rows,
       attachmentId: input.attachmentId,
-      attachmentConnected: this.options.attachmentIsConnected(clientId, input.attachmentId),
+      attachmentConnected: this.options.isAttachmentConnected(ownerId, input.attachmentId),
       forceNew: context.action === 'created',
       command: invocation.command,
       args: invocation.args,
     })
     if (!result.ok) return { ok: false, message: result.message }
-    this.options.broadcastSessionsChanged(input.repoRoot)
+    this.options.broadcastSessionsChanged(ownerId, input.repoRoot)
     return toEnsureResult(context.targetSessionKey, context.action, result)
   }
 
   private async ensureLocal(
-    clientId: string,
     ownerId: string,
     input: EnsureTerminalCatalogInput,
     context: {
@@ -275,11 +270,11 @@ class TerminalCatalog {
       cols: context.cols,
       rows: context.rows,
       attachmentId: input.attachmentId,
-      attachmentConnected: this.options.attachmentIsConnected(clientId, input.attachmentId),
+      attachmentConnected: this.options.isAttachmentConnected(ownerId, input.attachmentId),
       forceNew: context.action === 'created',
     })
     if (!result.ok) return { ok: false, message: result.message }
-    this.options.broadcastSessionsChanged(input.repoRoot)
+    this.options.broadcastSessionsChanged(ownerId, input.repoRoot)
     return toEnsureResult(context.targetSessionKey, context.action, result)
   }
 }

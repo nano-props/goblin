@@ -30,34 +30,26 @@ import { isValidTerminalWriteData, type TerminalSessionManager } from '#/server/
 interface TerminalCatalogLike {
   create(clientId: string, ownerId: string, input: TerminalCreateInput): Promise<TerminalCatalogMutationResult>
   prune(clientId: string, ownerId: string, repoRoot: string): Promise<{ pruned: number; remaining: number }>
-  listSessions(repoRoot: string): Promise<TerminalSessionSummary[]>
+  listSessions(ownerId: string, repoRoot: string): Promise<TerminalSessionSummary[]>
 }
 
 interface TerminalRuntimeActionDependencies {
   manager: TerminalSessionManager<string>
-  broker: Pick<TerminalRealtimeBroker, 'broadcastGlobal'>
+  broker: Pick<TerminalRealtimeBroker, 'broadcastToOwner'>
   catalog: TerminalCatalogLike
   isValidTerminalClientId(value: unknown): value is string
-  resolveAttachmentConnected(clientId: string, attachmentId?: string): boolean | undefined
+  resolveAttachmentConnected(ownerId: string, attachmentId?: string): boolean | undefined
 }
 
-// Manager-facing calls (attachSession/takeoverSession/...) take
-// `ownerId` so the in-memory session store is partitioned by token
-// identity, not by per-tab routing id. The broker's
-// `attachmentIsConnected` lookup is clientId-keyed because it
-// answers "is this WS connection alive for this (clientId,
-// attachmentId) pair?" — that's the right granularity for the
-// connection check, even though the *partition* lives under
-// `ownerId`.
+// Manager, broker, and catalog all use `ownerId` as the terminal
+// partition. `clientId` remains a per-tab request validator/routing
+// identifier, but it must not decide session visibility or lifecycle
+// fanout.
 export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependencies) {
   const { manager, broker, catalog, isValidTerminalClientId, resolveAttachmentConnected } = deps
 
   return {
-    async attach(
-      clientId: string,
-      ownerId: string,
-      input: TerminalAttachInput,
-    ): Promise<TerminalAttachResult> {
+    async attach(clientId: string, ownerId: string, input: TerminalAttachInput): Promise<TerminalAttachResult> {
       if (
         !isValidTerminalClientId(clientId) ||
         !isValidTerminalSessionId(input?.sessionId) ||
@@ -72,16 +64,12 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         input.cols,
         input.rows,
         input.attachmentId,
-        resolveAttachmentConnected(clientId, input.attachmentId),
+        resolveAttachmentConnected(ownerId, input.attachmentId),
       )
       return result
     },
 
-    async restart(
-      clientId: string,
-      ownerId: string,
-      input: TerminalRestartInput,
-    ): Promise<TerminalAttachResult> {
+    async restart(clientId: string, ownerId: string, input: TerminalRestartInput): Promise<TerminalAttachResult> {
       const repoRoot = manager.getSession(ownerId, input.sessionId)?.scope
       if (
         !isValidTerminalClientId(clientId) ||
@@ -97,9 +85,9 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         input.cols,
         input.rows,
         input.attachmentId,
-        resolveAttachmentConnected(clientId, input.attachmentId),
+        resolveAttachmentConnected(ownerId, input.attachmentId),
       )
-      if (repoRoot) broker.broadcastGlobal({ type: 'sessions-changed', repoRoot })
+      if (repoRoot) broker.broadcastToOwner(ownerId, { type: 'sessions-changed', repoRoot })
       return result
     },
 
@@ -111,11 +99,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       return await catalog.create(clientId, ownerId, input)
     },
 
-    async prune(
-      clientId: string,
-      ownerId: string,
-      repoRoot: string,
-    ): Promise<{ pruned: number; remaining: number }> {
+    async prune(clientId: string, ownerId: string, repoRoot: string): Promise<{ pruned: number; remaining: number }> {
       return await catalog.prune(clientId, ownerId, repoRoot)
     },
 
@@ -146,7 +130,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         input.cols,
         input.rows,
         input.attachmentId,
-        resolveAttachmentConnected(clientId, input.attachmentId),
+        resolveAttachmentConnected(ownerId, input.attachmentId),
       )
     },
 
@@ -154,26 +138,23 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       if (!isValidTerminalClientId(clientId)) return false
       // Look up the session BEFORE closing so we know its scope
       // (for the per-session broadcast). The session is gone after
-      // `closeOwnedSession` returns, so a post-close lookup would
+      // `closeSessionForOwner` returns, so a post-close lookup would
       // always miss. The lookup is also gated on validity so a
       // malformed input never throws inside the action.
       const repoRoot = isValidTerminalSessionId(input?.sessionId)
         ? manager.getSession(ownerId, input.sessionId)?.scope
         : undefined
       const closed = isValidTerminalSessionId(input?.sessionId)
-        ? manager.closeOwnedSession(ownerId, input.sessionId)
+        ? manager.closeSessionForOwner(ownerId, input.sessionId)
         : false
       if (closed && repoRoot) {
         // `sessions-changed` keeps the full repo list in sync for
         // observers that only watch that primitive. `session-closed`
-        // is the targeted counterpart for the originating window and
-        // any sibling window that may have a stale local entry: it
-        // drops the local session immediately without waiting for
-        // the next reconcile. Emitting both is the safe choice —
-        // `sessions-changed` is cheap, the consumer's `session-closed`
-        // handler is a no-op when the local map has no entry.
-        broker.broadcastGlobal({ type: 'sessions-changed', repoRoot })
-        broker.broadcastGlobal({
+        // is the immediate invalidation for any sibling window under
+        // the same owner. Other owners must not hear about this
+        // session id.
+        broker.broadcastToOwner(ownerId, { type: 'sessions-changed', repoRoot })
+        broker.broadcastToOwner(ownerId, {
           type: 'session-closed',
           sessionId: input.sessionId,
           repoRoot,
@@ -182,11 +163,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       return closed
     },
 
-    takeover(
-      clientId: string,
-      ownerId: string,
-      input: TerminalTakeoverInput,
-    ): TerminalTakeoverResult {
+    takeover(clientId: string, ownerId: string, input: TerminalTakeoverInput): TerminalTakeoverResult {
       if (!isValidTerminalClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
       if (
         !isValidTerminalSessionId(input?.sessionId) ||
@@ -201,18 +178,14 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         input.cols,
         input.rows,
         input.attachmentId,
-        resolveAttachmentConnected(clientId, input.attachmentId),
+        resolveAttachmentConnected(ownerId, input.attachmentId),
       )
     },
 
-    async listSessions(
-      clientId: string,
-      ownerId: string,
-      repoRoot: string,
-    ): Promise<TerminalSessionSummary[]> {
+    async listSessions(clientId: string, ownerId: string, repoRoot: string): Promise<TerminalSessionSummary[]> {
       if (!isValidTerminalClientId(clientId)) return []
       if (!isValidRepoLocator(repoRoot)) return []
-      return await catalog.listSessions(repoRoot)
+      return await catalog.listSessions(ownerId, repoRoot)
     },
 
     getSessionSnapshot(
@@ -222,7 +195,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     ): TerminalSessionSnapshot | null {
       if (!isValidTerminalClientId(clientId)) return null
       if (!isValidTerminalSessionId(input?.sessionId)) return null
-      return manager.snapshotSession(input.sessionId)
+      return manager.getSessionSnapshot(ownerId, input.sessionId)
     },
 
     reorder(clientId: string, ownerId: string, input: TerminalReorderInput): TerminalMutationResult {
@@ -232,14 +205,14 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       if (!Array.isArray(input?.orderedKeys)) return false
       if (!input.orderedKeys.every((k) => typeof k === 'string' && k.length > 0)) return false
       // Normalize the scope/worktreePath the same way the catalog does, so
-      // manager.reorderSessions sees the canonical forms it stored on
+      // manager.reorderSessionsForOwner sees the canonical forms it stored on
       // each session. Without this, Windows forward-slash paths never
       // match the resolved back-slash form and the reorder silently
       // no-ops.
       const scope = terminalSessionScope(input.repoRoot)
       const worktreePath = isRemoteRepoId(input.repoRoot) ? input.worktreePath : path.resolve(input.worktreePath)
-      const reordered = manager.reorderSessions(scope, worktreePath, input.orderedKeys)
-      if (reordered) broker.broadcastGlobal({ type: 'sessions-changed', repoRoot: input.repoRoot })
+      const reordered = manager.reorderSessionsForOwner(ownerId, scope, worktreePath, input.orderedKeys)
+      if (reordered) broker.broadcastToOwner(ownerId, { type: 'sessions-changed', repoRoot: input.repoRoot })
       return reordered
     },
   }
