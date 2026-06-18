@@ -24,7 +24,6 @@ import {
 export function createSettingsRoutes(settingsState: ServerSettingsState) {
   const app = createRouteApp()
   app.get('/', async (c) => c.json(await getSettingsSnapshot(settingsState)))
-  app.get('/i18n', async (c) => c.json(await getServerI18nSnapshot(c.req.header('accept-language'))))
   app.get('/github-cli', async (c) => {
     const hosts = (c.req.queries('host') ?? []).filter(
       (host): host is string => typeof host === 'string' && host.length > 0,

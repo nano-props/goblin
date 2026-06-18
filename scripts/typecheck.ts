@@ -13,23 +13,21 @@ const tscBinCandidates =
 const tscBin = tscBinCandidates.find((candidate) => existsSync(candidate)) ?? tscBinCandidates[0]
 const bunBin = process.execPath
 
-function runArchitectureCheck(): Promise<void> {
+function runPreflightCheck(script: string, label: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    console.log('[typecheck] [preflight] starting architecture boundary check')
-    const child = spawn(bunBin, [path.join(repoRoot, 'scripts/check-architecture.ts')], {
+    console.log(`[typecheck] [preflight] starting ${label}`)
+    const child = spawn(bunBin, [path.join(repoRoot, script)], {
       cwd: repoRoot,
       stdio: 'inherit',
     })
     child.on('error', reject)
     child.on('exit', (code, signal) => {
       if (code === 0) {
-        console.log('[typecheck] [preflight] finished architecture boundary check')
+        console.log(`[typecheck] [preflight] finished ${label}`)
         resolve()
         return
       }
-      reject(
-        new Error(`architecture boundary check failed with ${signal ? `signal ${signal}` : `exit code ${code ?? 1}`}`),
-      )
+      reject(new Error(`${label} failed with ${signal ? `signal ${signal}` : `exit code ${code ?? 1}`}`))
     })
   })
 }
@@ -62,7 +60,8 @@ function runTypeScript(project: (typeof PROJECTS)[number], index: number): Promi
   })
 }
 
-await runArchitectureCheck()
+await runPreflightCheck('scripts/check-architecture.ts', 'architecture boundary check')
+await runPreflightCheck('scripts/check-no-html-injection.ts', 'no-html-injection check')
 
 for (const [index, project] of PROJECTS.entries()) {
   await runTypeScript(project, index)

@@ -9,7 +9,14 @@ const webDevPort = parsePort(process.env.GOBLIN_WEB_DEV_PORT) ?? 5173
 const webDevUrl = `http://${webDevHost}:${webDevPort}/`
 const embeddedServerPort = await chooseEmbeddedServerPort(webDevHost)
 const viteArgs = [localBin('vite'), '--host', webDevHost, '--port', String(webDevPort), '--strictPort']
-const electronArgs = [localBin('electron'), '.']
+const electronArgs = [
+  localBin('electron'),
+  '.',
+  // Optional Chrome DevTools Protocol port for agent-browser. Off
+  // by default; `AGENT_BROWSER_CDP_PORT=9222 bun run dev` enables
+  // it. Only used for end-to-end testing.
+  ...(process.env.AGENT_BROWSER_CDP_PORT ? [`--remote-debugging-port=${process.env.AGENT_BROWSER_CDP_PORT}`] : []),
+]
 const watchedPaths = ['src/main', 'src/preload', 'src/server', 'src/shared', 'vite.config.ts'].map((target) =>
   path.join(repoRoot, target),
 )
@@ -26,16 +33,10 @@ const viteProc = Bun.spawn(viteArgs, {
   stdin: 'inherit',
   stdout: 'inherit',
   stderr: 'inherit',
-  // In dev the Vite-served renderer (different origin from the
-  // embedded server) can't share cookies. Set this so the server
-  // inlines the access token in the HTML bootstrap; the renderer
-  // then attaches it as the `x-goblin-access-token` header on
-  // every fetch. See `#/server/app-factory.ts:shouldInlineAccessTokenInBootstrap`.
   env: {
     ...process.env,
     GOBLIN_SERVER_HOST: webDevHost,
     GOBLIN_SERVER_PORT: String(embeddedServerPort),
-    GOBLIN_DEV_BOOTSTRAP_INCLUDES_TOKEN: '1',
   },
 })
 

@@ -20,6 +20,8 @@
     "build:electron": "electron-builder",
     "install:app": "bun install.ts",
     "check:architecture": "bun scripts/check-architecture.ts",
+    "check:no-html-injection": "bun scripts/check-no-html-injection.ts",
+    "check": "bun run check:architecture && bun run check:no-html-injection",
     "typecheck": "bun scripts/typecheck.ts",
     "test": "vitest run",
     "test:watch": "vitest",
