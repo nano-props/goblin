@@ -236,9 +236,9 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
               focusRegistry={terminalTabFocusRegistry}
               emptyFocusKey={EMPTY_TERMINAL_TAB_FOCUS_KEY}
               // T6.1: while the first server-side session list is in
-              // flight (mount or repo switch), show 3 placeholder chips
-              // instead of the lone "+ New" button — the user gets a
-              // visible signal that the strip is loading, not broken.
+              // flight (mount or repo switch), show a single placeholder
+              // chip instead of the lone "+ New" button — the user gets
+              // a visible signal that the strip is loading, not broken.
               isLoading={isInitialSyncInFlight}
               onNew={handleNewTerminal}
               onSelect={handleSelectTerminal}

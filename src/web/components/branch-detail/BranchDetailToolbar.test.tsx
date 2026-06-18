@@ -280,16 +280,16 @@ describe('BranchDetailToolbar', () => {
     expect(document.activeElement).toBe(statusTab)
   })
 
-  test('T6.1: renders 3 skeleton placeholder chips while the initial session sync is in flight', async () => {
+  test('T6.1: renders a single skeleton placeholder chip while the initial session sync is in flight', async () => {
     const { container: c } = renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({}),
       loading: true,
     })
 
-    // The skeleton markers are present; the real button is not.
+    // The skeleton marker is present; the real button is not.
     expect(c.querySelector('[data-terminal-skeleton-strip=""]')).not.toBeNull()
-    expect(c.querySelectorAll('[data-terminal-skeleton-chip=""]')).toHaveLength(3)
+    expect(c.querySelectorAll('[data-terminal-skeleton-chip=""]')).toHaveLength(1)
     expect(c.querySelector('#detail-terminal-tab')).toBeNull()
     // role="status" + aria-busy for assistive tech.
     const strip = c.querySelector('[role="status"][aria-busy="true"]')
@@ -316,7 +316,7 @@ function renderToolbar(options: {
   /**
    * T6.1: when true, do NOT mark the repo ready before mounting.
    * The toolbar reads `isInitialSyncInFlight` from the store and
-   * renders the 3-skeleton-chip loading state instead of the
+   * renders the single-skeleton-chip loading state instead of the
    * "+ New" button. The T6.1 test uses this; all other tests use
    * the default (false) so the existing assertions still find
    * `#detail-terminal-tab`.
@@ -333,7 +333,7 @@ function renderToolbar(options: {
   }
 } {
   // T6.1: mark the repo as already-synced so the toolbar renders
-  // the "+ New" button instead of the 3 placeholder skeleton chips.
+  // the "+ New" button instead of the single placeholder skeleton chip.
   // The T6.1 skeleton test passes `loading: true` to skip this and
   // exercise the loading state.
   if (!options.loading) {
