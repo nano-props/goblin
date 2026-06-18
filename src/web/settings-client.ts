@@ -64,12 +64,26 @@ async function updateSettingsPrefsPatch(settings: Record<string, unknown>): Prom
   })
   const patch = pickNativeSettingsProjectionPatch(settings as Partial<SettingsPrefs>)
   if (!patch || !canUseNativeIpcBridge()) return result
-  await invokeNativeIpcPath<void>('settings.applyShellProjection', {
-    prefs: {
-      patch,
-      settings: nativeSettingsProjectionStateFromSettings(result.settings),
-    },
-  })
+  // The embedded server is the authority for settings — the
+  // renderer just mirrors them to the native menu. A projection
+  // IPC failure here must NOT reject the caller's promise: the
+  // server write already succeeded (otherwise `result` would
+  // have thrown), the user-facing preference is committed, and
+  // the menu will catch up on the next rebuild. Log and move on
+  // so a transient menu IPC failure doesn't surface as a
+  // settings-write failure to the UI.
+  try {
+    await invokeNativeIpcPath<void>('settings.applyShellProjection', {
+      prefs: {
+        patch,
+        settings: nativeSettingsProjectionStateFromSettings(result.settings),
+      },
+    })
+  } catch (err) {
+    sessionLog.warn('settings.applyShellProjection failed; server write committed, menu will catch up on next rebuild', {
+      err,
+    })
+  }
   return result
 }
 
@@ -128,9 +142,19 @@ export async function addRecentRepo(repo: RepoSessionEntry): Promise<RecentRepos
     '/api/settings/recent-repos/add',
     { repo },
   )
-  if (canUseNativeIpcBridge()) {
+  if (!canUseNativeIpcBridge()) return result
+  // See `updateSettingsPrefsPatch` for the rationale: the server
+  // is authoritative, the projection is best-effort. A rejected
+  // IPC here would previously bubble up as "failed to add recent
+  // repo" even though the server write succeeded — the user
+  // would see the toast, refresh, and find the repo in the list.
+  try {
     await invokeNativeIpcPath<void>('settings.applyShellProjection', {
       recentRepos: { recentRepos: result.recentRepos },
+    })
+  } catch (err) {
+    sessionLog.warn('recent-repos projection IPC failed; server list committed, menu will catch up on next rebuild', {
+      err,
     })
   }
   return result
@@ -139,9 +163,19 @@ export async function addRecentRepo(repo: RepoSessionEntry): Promise<RecentRepos
 export async function clearRecentRepos(): Promise<void> {
   await postServerJson<{}, { ok: boolean }>('/api/settings/recent-repos/clear', {})
   if (!canUseNativeIpcBridge()) return
-  await invokeNativeIpcPath<void>('settings.applyShellProjection', {
-    recentRepos: { recentRepos: [] },
-  })
+  // Same projection-best-effort contract as the two paths above:
+  // the server has already cleared the list by the time we get
+  // here, so an IPC failure must not reject the caller's promise
+  // — the user already saw the optimistic "cleared" state.
+  try {
+    await invokeNativeIpcPath<void>('settings.applyShellProjection', {
+      recentRepos: { recentRepos: [] },
+    })
+  } catch (err) {
+    sessionLog.warn('clear-recent-repos projection IPC failed; server list cleared, menu will catch up on next rebuild', {
+      err,
+    })
+  }
 }
 
 export async function saveSession(session: SessionState): Promise<SessionState> {

@@ -49,11 +49,14 @@ export interface EmbedAuthCookieOptions {
    */
   accessToken: string
   /**
-   * The URL the renderer is about to load. The cookie's scope is
-   * the host of this URL (cookies don't carry port). Pass the
-   * Vite URL in dev (`http://127.0.0.1:5173/`) and the embedded
-   * server URL in production — the cookie is set on the host the
-   * page actually loads from, not on the server's bind address.
+   * The URL the renderer is about to load. The cookie is set on
+   * the *exact* origin the page will fetch from — port included —
+   * because Chromium's `cookies.set` matches the cookie's URL
+   * against the request URL host *and* port. Pass the Vite URL in
+   * dev (`http://127.0.0.1:5173/`) and the embedded server URL in
+   * production; Vite's proxy forwards the cookie to the real
+   * server, so scoping it to the Vite origin in dev is what makes
+   * the renderer/whoami probe succeed on first paint.
    */
   url: string
   webContents: WebContents
@@ -74,9 +77,26 @@ export async function plantEmbedAuthCookie({
   url,
   webContents,
 }: EmbedAuthCookieOptions): Promise<void> {
+  // Pass the URL's origin (protocol + host + port) through,
+  // dropping any query string. Chromium scopes the cookie to
+  // host *and* port, so a port-stripped URL (`http://127.0.0.1`)
+  // would set the cookie against the default port (80) and the
+  // browser would refuse to send it on requests to `127.0.0.1:5173`
+  // (Vite dev) or `127.0.0.1:32100` (embedded server). The first
+  // request the renderer fires would then fail the whoami probe
+  // and the token gate would re-appear. The earlier implementation
+  // did `new URL(url).hostname` here, which silently dropped the
+  // port in both dev and prod.
+  //
+  // Query params (`?theme=light&colorTheme=macos`) are dropped
+  // because cookies are origin-scoped — the query has no effect
+  // on cookie behavior — and stripping them keeps the cookies.set
+  // payload stable so the test suite can assert on a canonical URL.
   const parsed = new URL(url)
+  parsed.search = ''
+  const cookieUrl = parsed.toString()
   await webContents.session.cookies.set({
-    url: `${parsed.protocol}//${parsed.hostname}`,
+    url: cookieUrl,
     name: ACCESS_TOKEN_COOKIE,
     value: accessToken,
     httpOnly: true,

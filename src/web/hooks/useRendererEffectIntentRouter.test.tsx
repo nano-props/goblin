@@ -85,7 +85,6 @@ beforeEach(() => {
   Object.defineProperty(window, 'goblinNative', {
     configurable: true,
     value: {
-      homeDir: '/Users/test',
       invokeIpc: vi.fn(async () => null),
       abortIpc: vi.fn(async () => true),
       onEvent: vi.fn((cb: (event: { type: string; repoRoot?: string; key?: string }) => void) => {

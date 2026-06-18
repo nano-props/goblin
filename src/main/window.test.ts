@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => {
     isFullScreen: vi.fn(() => false),
     isMaximized: vi.fn(() => false),
     isMinimized: vi.fn(() => false),
+    cookieSetMock: vi.fn(),
     getEmbeddedServerRuntime: vi.fn<() => { url: string; accessToken: string; clientId: string } | null>(() => ({
       url: 'http://127.0.0.1:32100/',
       accessToken: 'secret',
@@ -37,6 +38,12 @@ const mocks = vi.hoisted(() => {
           setWindowOpenHandler: state.setWindowOpenHandler,
           isDestroyed: () => false,
           once: vi.fn(),
+          // Mirror Electron's per-window session shape so the
+          // cookie-bootstrap call in `createMainWindow` can plant
+          // the auth cookie on `webContents.session.cookies`. The
+          // mock records every `set` call so the window test can
+          // verify the dev/prod URL distinction.
+          session: { cookies: { set: state.cookieSetMock } },
         },
         isDestroyed: () => false,
         isVisible: () => true,
@@ -132,6 +139,8 @@ describe('main window navigation boundaries', () => {
     mocks.readFileSync.mockReturnValue(JSON.stringify({ file: 'preload-0.1.0-testhash.cjs' }))
     mocks.getSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
     mocks.loadWindowState.mockReturnValue(Promise.resolve({ windowBounds: null }))
+    mocks.cookieSetMock.mockReset()
+    mocks.cookieSetMock.mockResolvedValue(undefined)
   })
 
   test('prevents renderer navigation away from the packaged app page', async () => {
@@ -206,6 +215,49 @@ describe('main window navigation boundaries', () => {
     await getOrCreateMainWindow()
 
     expect(mocks.loadURL).toHaveBeenCalledWith('http://127.0.0.1:5173/?theme=light&colorTheme=macos')
+  })
+
+  test('plants the auth cookie scoped to the Vite dev origin (port 5173)', async () => {
+    // Regression: the cookie bootstrap used to strip the port
+    // when computing the cookie URL, which silently defaulted
+    // the cookie to port 80. In dev the renderer loads from Vite
+    // (5173), so the cookie must be scoped to that origin —
+    // otherwise the very first whoami probe fails and the token
+    // gate reappears on every fresh dev run.
+    process.env.GOBLIN_WEB_DEV_URL = 'http://127.0.0.1:5173/'
+    const { getOrCreateMainWindow } = await import('#/main/window.ts')
+
+    await getOrCreateMainWindow()
+
+    expect(mocks.cookieSetMock).toHaveBeenCalledTimes(1)
+    expect(mocks.cookieSetMock.mock.calls[0]?.[0]).toMatchObject({
+      url: 'http://127.0.0.1:5173/',
+      name: 'goblin_access_token',
+      value: 'secret',
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+    })
+  })
+
+  test('plants the auth cookie scoped to the embedded server origin (port 32100) in production', async () => {
+    // Mirror of the dev test above for the packaged build path:
+    // the cookie must carry the embedded server's port, not the
+    // default port 80.
+    mocks.isPackaged = true
+    const { getOrCreateMainWindow } = await import('#/main/window.ts')
+
+    await getOrCreateMainWindow()
+
+    expect(mocks.cookieSetMock).toHaveBeenCalledTimes(1)
+    expect(mocks.cookieSetMock.mock.calls[0]?.[0]).toMatchObject({
+      url: 'http://127.0.0.1:32100/',
+      name: 'goblin_access_token',
+      value: 'secret',
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+    })
   })
 
   test('uses the source preload path while unpackaged', async () => {

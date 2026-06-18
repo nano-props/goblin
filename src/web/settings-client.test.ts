@@ -542,4 +542,143 @@ describe('settings-client', () => {
       }),
     )
   })
+
+  // Best-effort projection IPC: the server is the authority, the
+  // native bridge projection is a mirror for the menu state. A
+  // projection IPC failure must not reject the caller's promise —
+  // the server write already committed (otherwise `result` would
+  // have thrown). Rejecting here would surface a misleading
+  // "settings write failed" toast on top of a successful write.
+  test('keeps the server-side setting committed when the native projection IPC rejects', async () => {
+    const invokeIpc = vi.fn(async () => {
+      throw new Error('native bridge wedged')
+    })
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {
+        __GOBLIN_BOOTSTRAP__: electronBootstrap({
+          initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
+        }),
+        goblinNative: {
+          runtime: {
+            kind: 'electron',
+            bridgeVersion: RENDERER_BRIDGE_VERSION,
+            capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+          },
+          invokeIpc,
+          abortIpc: async () => true,
+          onEvent: () => () => {},
+          pathForFile: () => '',
+        },
+        location: {
+          href: 'http://127.0.0.1:32100/',
+          origin: 'http://127.0.0.1:32100',
+          search: '',
+        },
+        matchMedia: vi.fn(() => ({ matches: true })),
+      },
+    })
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        settings: {
+          theme: 'dark',
+          colorTheme: 'macos',
+          shortcutsDisabled: false,
+          globalShortcutDisabled: false,
+          swapCloseShortcuts: false,
+        },
+      }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { setThemePref } = await import('#/web/settings-client.ts')
+    await expect(setThemePref('dark')).resolves.toMatchObject({ pref: 'dark' })
+    expect(invokeIpc).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  test('keeps recent repos committed when the projection IPC rejects', async () => {
+    const invokeIpc = vi.fn(async () => {
+      throw new Error('projection IPC rejected')
+    })
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {
+        __GOBLIN_BOOTSTRAP__: electronBootstrap({
+          initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
+        }),
+        goblinNative: {
+          runtime: {
+            kind: 'electron',
+            bridgeVersion: RENDERER_BRIDGE_VERSION,
+            capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+          },
+          invokeIpc,
+          abortIpc: async () => true,
+          onEvent: () => () => {},
+          pathForFile: () => '',
+        },
+        location: {
+          href: 'http://127.0.0.1:32100/',
+          origin: 'http://127.0.0.1:32100',
+          search: '',
+        },
+        matchMedia: vi.fn(() => ({ matches: true })),
+      },
+    })
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        recentRepos: [{ kind: 'local', id: '/persisted' }],
+        addedRepo: { kind: 'local', id: '/persisted' },
+      }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { addRecentRepo } = await import('#/web/settings-client.ts')
+    await expect(addRecentRepo({ kind: 'local', id: '/persisted' })).resolves.toMatchObject({
+      recentRepos: [{ kind: 'local', id: '/persisted' }],
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  test('keeps the cleared recent-repos list when the projection IPC rejects', async () => {
+    const invokeIpc = vi.fn(async () => {
+      throw new Error('projection IPC rejected')
+    })
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {
+        __GOBLIN_BOOTSTRAP__: electronBootstrap({
+          initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
+        }),
+        goblinNative: {
+          runtime: {
+            kind: 'electron',
+            bridgeVersion: RENDERER_BRIDGE_VERSION,
+            capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
+          },
+          invokeIpc,
+          abortIpc: async () => true,
+          onEvent: () => () => {},
+          pathForFile: () => '',
+        },
+        location: {
+          href: 'http://127.0.0.1:32100/',
+          origin: 'http://127.0.0.1:32100',
+          search: '',
+        },
+        matchMedia: vi.fn(() => ({ matches: true })),
+      },
+    })
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({ ok: true }) }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { clearRecentRepos } = await import('#/web/settings-client.ts')
+    await expect(clearRecentRepos()).resolves.toBeUndefined()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
 })

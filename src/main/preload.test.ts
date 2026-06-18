@@ -2,6 +2,31 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
 import { describe, expect, test, vi } from 'vitest'
+
+/**
+ * Pull every single-quoted string literal out of `preload.cjs` that
+ * matches the shape of an IPC channel name. The preload hardcodes
+ * its channels as string literals (the sandboxed `require` cannot
+ * resolve a Node-side enum at preload time, see the file header),
+ * so scanning for `'foo:bar'` literals is a reliable proxy for
+ * "channels this preload actually invokes". The manifest lockdown
+ * test compares this set against `BROWSER_MISSING_CHANNELS` in
+ * both directions.
+ *
+ * The literal regex requires a `:` so it doesn't pick up unrelated
+ * identifiers like `'goblinNative'` (the contextBridge key) or
+ * `'IpcError'` (a class name) — those don't have a namespace prefix
+ * because IPC channels always do (`goblin:event`, `shell:open-external-url`, …).
+ */
+function extractIpcChannelLiterals(source: string): string[] {
+  const literal = /'([a-z][a-z0-9-]*:[a-z0-9-]+)'/gi
+  const seen = new Set<string>()
+  let match: RegExpExecArray | null
+  while ((match = literal.exec(source)) !== null) {
+    seen.add(match[1])
+  }
+  return [...seen]
+}
 import {
   RENDERER_EFFECT_INTENT_CHANNEL,
   IPC_ABORT_CHANNEL,
@@ -315,45 +340,66 @@ describe('preload goblinNative bridge', () => {
     // Drift in either direction (a channel added to preload but not
     // the manifest, or a manifest entry with no corresponding IPC
     // call) fails this test — surfacing both classes of regression.
-    expect(Object.keys(BROWSER_MISSING_CHANNELS).sort()).toEqual(
-      [
-        IPC_CHANNEL,
-        IPC_ABORT_CHANNEL,
-        IPC_EVENT_CHANNEL,
-        RENDERER_EFFECT_INTENT_CHANNEL,
-        SHELL_OPEN_SETTINGS_WINDOW_CHANNEL,
-        SHELL_OPEN_EXTERNAL_URL_CHANNEL,
-        SHELL_OPEN_DIRECTORY_DIALOG_CHANNEL,
-        SHELL_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL,
-        SHELL_OPEN_IN_FINDER_CHANNEL,
-        TERMINAL_NOTIFY_BELL_CHANNEL,
-        TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL,
-        TERMINAL_SET_BADGE_CHANNEL,
-        CLIPBOARD_SAVE_FILES_CHANNEL,
-        ROTATE_ACCESS_TOKEN_CHANNEL,
-      ].sort(),
-    )
-
-    // And the preload code itself must mention every channel in
-    // the manifest as a literal string, otherwise the manifest is
-    // fiction. This catches "added to manifest but never wired"
-    // before it lands.
+    //
+    // The check is deliberately *bi-directional*: it parses every
+    // single-quoted literal that looks like an IPC channel out of
+    // `preload.cjs` and asserts that set equals the manifest. The
+    // earlier version of this assertion compared the manifest's
+    // keys to a hardcoded list and then asserted each manifest
+    // key was referenced in preload.cjs — that was tautological
+    // (the hardcoded list duplicated the manifest) and only
+    // one-way (a brand-new channel could land in preload.cjs and
+    // the test would still pass).
     const preloadSource = readFileSync(
       path.join(import.meta.dirname, '../preload/preload.cjs'),
       'utf8',
     )
+    const channelsUsedByPreload = extractIpcChannelLiterals(preloadSource)
+
+    // Forward: every manifest entry must be referenced by preload.
     for (const channel of Object.keys(BROWSER_MISSING_CHANNELS)) {
-      // The preload hardcodes its channel strings (no Node import
-      // available in a sandboxed preload — see preload.cjs
-      // header). Every channel name must therefore appear as a
-      // single-quoted literal somewhere in the file.
-      expect(preloadSource, `preload must reference ${channel}`).toContain(`'${channel}'`)
+      expect(channelsUsedByPreload, `manifest channel ${channel} missing from preload.cjs`).toContain(channel)
     }
+
+    // Reverse: every channel preload actually uses must be in the
+    // manifest. This is the half the old test was missing — a new
+    // `safeInvoke('brand-new-channel', …)` would have slipped
+    // through silently. Now it fails until the contributor adds a
+    // manifest entry with a real justification.
+    const manifestKeys = Object.keys(BROWSER_MISSING_CHANNELS)
+    const orphanChannels = channelsUsedByPreload.filter((channel) => !manifestKeys.includes(channel))
+    expect(
+      orphanChannels,
+      `preload.cjs uses channels not in BROWSER_MISSING_CHANNELS: ${orphanChannels.join(', ')}`,
+    ).toEqual([])
 
     // Spot-check that justifications aren't empty — a manifest
     // entry with no rationale is a TODO disguised as a contract.
     for (const [channel, rationale] of Object.entries(BROWSER_MISSING_CHANNELS)) {
       expect(rationale.length, `${channel} must have a justification`).toBeGreaterThan(20)
     }
+  })
+
+  test('the channel-extraction helper detects unwired channels (self-check)', () => {
+    // Sanity-check on `extractIpcChannelLiterals`: pretend preload
+    // just grew a new IPC call. The helper should surface it as
+    // "unwired" so the lockdown test above fails fast. If this
+    // assertion ever stops failing on the synthetic input, the
+    // helper has rotted and the lockdown test is no longer
+    // bi-directional.
+    const synthetic = `
+      safeInvoke('goblin:ipc', payload)
+      safeInvoke('shell:brand-new-channel', payload)
+      const api = 'goblinNative'
+      const errorName = 'IpcError'
+    `
+    const detected = extractIpcChannelLiterals(synthetic)
+    expect(detected).toContain('goblin:ipc')
+    expect(detected).toContain('shell:brand-new-channel')
+    // TypeScript-style identifiers without `:` must NOT match — the
+    // lockdown test relies on this so contextBridge keys and class
+    // names don't pollute the channel set.
+    expect(detected).not.toContain('goblinNative')
+    expect(detected).not.toContain('IpcError')
   })
 })

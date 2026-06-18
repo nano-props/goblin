@@ -294,7 +294,26 @@ beforeEach(() => {
     const key = `${input.repoRoot}\u0000${input.worktreePath}\u0000${terminalId}`
     if (input.kind === 'primary' && currentSessions.some((session) => session.key === key)) {
       managedServerSessions = currentSessions
-      return { ok: true, action: 'reused', key, sessions: managedServerSessions }
+      const reused = currentSessions.find((session) => session.key === key)
+      // Reused session also has to supply first-frame hydration
+      // fields — the registry validates them on every successful
+      // `create` response, not just newly-created ones.
+      return {
+        ok: true,
+        action: 'reused',
+        key,
+        sessions: managedServerSessions,
+        sessionId: reused?.sessionId ?? 'terminal-1',
+        snapshot: '',
+        snapshotSeq: 0,
+        processName: reused?.processName ?? 'zsh',
+        canonicalTitle: reused?.canonicalTitle ?? null,
+        phase: reused?.phase ?? 'open',
+        message: reused?.message ?? null,
+        controller: reused?.controller ?? null,
+        canonicalCols: reused?.cols ?? 80,
+        canonicalRows: reused?.rows ?? 24,
+      }
     }
     const controller = input.attachmentId ? { attachmentId: input.attachmentId, status: 'connected' as const } : null
     managedServerSessions = [
@@ -318,7 +337,29 @@ beforeEach(() => {
         displayOrder: 1,
       },
     ]
-    return { ok: true, action: 'created', key, sessions: managedServerSessions }
+    // New first-frame hydration contract: `create` returns
+    // `sessionId` + `snapshot` + `snapshotSeq` directly so the
+    // renderer can paint without a follow-up snapshot fetch.
+    // The fields are still optional on the shared type (transitional
+    // shape — see docs/terminal-first-frame-fix.md) but the
+    // registry validates them at runtime, so the test mock has to
+    // supply them.
+    return {
+      ok: true,
+      action: 'created',
+      key,
+      sessions: managedServerSessions,
+      sessionId: terminalId,
+      snapshot: '',
+      snapshotSeq: 0,
+      processName: 'zsh',
+      canonicalTitle: null,
+      phase: 'open',
+      message: null,
+      controller,
+      canonicalCols: 80,
+      canonicalRows: 24,
+    }
   })
   resetReposStore()
   useRepoSyncStore.setState(useRepoSyncStore.getInitialState())
@@ -337,10 +378,6 @@ beforeEach(() => {
         bridgeVersion: RENDERER_BRIDGE_VERSION,
         capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
       },
-      homeDir: '/Users/test',
-      platform: 'web',
-      initialI18n: null,
-      initialSettings: null,
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
       invokeIpc: vi.fn(async () => []),
       abortIpc: vi.fn(),
@@ -426,10 +463,6 @@ beforeEach(() => {
         bridgeVersion: RENDERER_BRIDGE_VERSION,
         capabilities: [],
       },
-      homeDir: '/Users/test',
-      platform: 'web',
-      initialI18n: null,
-      initialSettings: null,
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
     },
   })
@@ -450,10 +483,6 @@ beforeEach(() => {
         bridgeVersion: RENDERER_BRIDGE_VERSION,
         capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
       },
-      homeDir: '/Users/test',
-      platform: 'web',
-      initialI18n: null,
-      initialSettings: null,
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
     }),
     invokeIpc: vi.fn(async () => []),
@@ -1678,11 +1707,7 @@ describe('TerminalSessionProvider', () => {
           bridgeVersion: RENDERER_BRIDGE_VERSION,
           capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
         },
-        homeDir: '/home',
-        platform: 'web',
-        initialI18n: null,
-        initialSettings: null,
-        initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret', clientId: 'client_sharedterminal' },
+        initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
       }),
       invokeIpc: vi.fn(async () => null),
       abortIpc: vi.fn(async () => false),
@@ -1698,7 +1723,22 @@ describe('TerminalSessionProvider', () => {
         resize: vi.fn(async () => false),
         takeover: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
         close: vi.fn(async () => false),
-        create: vi.fn(async () => ({ ok: true as const, action: 'created' as const, key: 'k', sessions: [] })),
+        create: vi.fn(async () => ({
+          ok: true as const,
+          action: 'created' as const,
+          key: 'k',
+          sessions: [],
+          sessionId: 'session-1',
+          snapshot: '',
+          snapshotSeq: 0,
+          processName: 'zsh',
+          canonicalTitle: null,
+          phase: 'open' as const,
+          message: null,
+          controller: null,
+          canonicalCols: 80,
+          canonicalRows: 24,
+        })),
         pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
         listSessions: vi.fn(async () => []),
         prewarm,
@@ -1762,11 +1802,7 @@ describe('TerminalSessionProvider', () => {
           bridgeVersion: RENDERER_BRIDGE_VERSION,
           capabilities: [...ELECTRON_RENDERER_CAPABILITIES],
         },
-        homeDir: '/home',
-        platform: 'web',
-        initialI18n: null,
-        initialSettings: null,
-        initialServer: { url: 'http://127.0.0.1:32100/', secret: 'secret', clientId: 'client_sharedterminal' },
+        initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
       }),
       invokeIpc: vi.fn(async () => null),
       abortIpc: vi.fn(async () => false),
@@ -1782,7 +1818,22 @@ describe('TerminalSessionProvider', () => {
         resize: vi.fn(async () => false),
         takeover: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
         close: vi.fn(async () => false),
-        create: vi.fn(async () => ({ ok: true as const, action: 'created' as const, key: 'k', sessions: [] })),
+        create: vi.fn(async () => ({
+          ok: true as const,
+          action: 'created' as const,
+          key: 'k',
+          sessions: [],
+          sessionId: 'session-1',
+          snapshot: '',
+          snapshotSeq: 0,
+          processName: 'zsh',
+          canonicalTitle: null,
+          phase: 'open' as const,
+          message: null,
+          controller: null,
+          canonicalCols: 80,
+          canonicalRows: 24,
+        })),
         pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
         listSessions: vi.fn(async () => []),
         prewarm: vi.fn(async () => {}),

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { normalizeWorkspaceSessionLayoutState } from '#/shared/workspace-layout.ts'
+import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
 import { restoreRestorableWorkspaceStateFromSession } from '#/web/restorable-workspace-state.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
@@ -7,6 +8,9 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useSessionRestoreStore } from '#/web/stores/session-restore.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { bootstrapLog } from '#/web/logger.ts'
+import { getExternalAppsSnapshot, getSettingsSnapshot } from '#/web/settings-client.ts'
+import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings-queries.ts'
+
 export function useAppBootstrap() {
   const hydratedRef = useRef(false)
 
@@ -23,6 +27,18 @@ export function useAppBootstrap() {
     hydratedRef.current = true
     void (async () => {
       try {
+        // Prime the settings query cache concurrently with the
+        // boot stores. Fire-and-forget: the page will retry the
+        // auto-fetch on first use if priming fails or hasn't
+        // completed yet, and TanStack Query dedupes concurrent
+        // fetches on the same key. We don't `await` here because
+        // the settings fetch rides on a public endpoint that
+        // may legitimately be slow under load — the rest of
+        // the boot (theme, i18n, session restore, host info)
+        // must not be gated on it.
+        void primeSettingsQueryCache().catch((err) => {
+          bootstrapLog.warn('settings priming failed', { err })
+        })
         await Promise.all([
           useThemeStore.getState().hydrate(),
           useSessionRestoreStore.getState().hydrate(),
@@ -60,4 +76,37 @@ export function useAppBootstrap() {
       }
     })()
   }, [])
+}
+
+/**
+ * Prime the settings and external-apps query cache from the public
+ * `/api/settings` + `/api/settings/external-apps` endpoints so the
+ * settings pages render with their persisted values on first paint
+ * instead of flashing the defaults. Each call sites its own error
+ * log on failure — the renderer's boot must not be blocked by a
+ * settings fetch outage.
+ */
+async function primeSettingsQueryCache(): Promise<void> {
+  // `getSettingsSnapshot()` / `getExternalAppsSnapshot()` can throw
+  // synchronously when the bootstrap is missing (the request never
+  // reaches `fetch`). Wrap each one individually so the other can
+  // still succeed and so a synchronous throw doesn't propagate up
+  // and abort the rest of the boot.
+  const fetchAndPrime = async (
+    fetcher: () => Promise<unknown>,
+    queryKey: readonly unknown[],
+  ): Promise<void> => {
+    try {
+      const snapshot = await fetcher()
+      mainWindowQueryClient.setQueryData(queryKey, snapshot)
+    } catch {
+      // Settings fetch failure must not block boot — the page will
+      // retry the auto-fetch on first use. The empty cache is the
+      // same state the renderer had before this priming pass.
+    }
+  }
+  await Promise.all([
+    fetchAndPrime(getSettingsSnapshot, settingsSnapshotQueryKey()),
+    fetchAndPrime(getExternalAppsSnapshot, externalAppsQueryKey()),
+  ])
 }

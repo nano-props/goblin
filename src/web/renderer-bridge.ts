@@ -122,15 +122,6 @@ function getOrCreateTerminalBridge(): RendererTerminalBridge {
   return memoizedTerminalBridge
 }
 
-export function resetMemoizedTerminalBridgeForTests(): void {
-  // Test escape hatch: force the next `getOrCreateTerminalBridge()`
-  // call to allocate a fresh bridge. The WebSocket in the old
-  // bridge is now disconnected by `app-lifecycle`, so it's safe to
-  // drop the reference; GC will collect it once the test's own
-  // subscriber teardown finishes. Production code never calls this.
-  memoizedTerminalBridge = null
-}
-
 /**
  * The single renderer bridge. Replaces the previous
  * `electronBridge()` / `webBridge()` pair: there is no longer a
