@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { SettingsSurface } from '#/web/components/SettingsSurface.tsx'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
+import { resetReposStore } from '#/web/stores/repos/test-utils.ts'
 
 const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),
@@ -106,6 +108,7 @@ const fetchMock = vi.fn(async (input: string | URL) => {
 beforeEach(() => {
   setRendererBridgeForTests(null)
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
+  resetReposStore()
   sendTestNotification.mockClear()
   toastMocks.success.mockClear()
   toastMocks.error.mockClear()
@@ -178,6 +181,24 @@ afterEach(() => {
 })
 
 describe('SettingsSurface', () => {
+  test('shows the workspace layout selector on the general page', async () => {
+    useReposStore.setState({ workspaceLayout: 'top-bottom' })
+    await render(<SettingsSurface page="general" onPageChange={() => {}} />)
+
+    const trigger = document.getElementById('settings-workspace-layout')
+    expect(trigger).toBeInstanceOf(HTMLButtonElement)
+    expect(document.body.textContent).toContain('settings.workspace-layout')
+    expect(document.body.textContent).toContain('settings.workspace-layout-hint')
+    expect(trigger?.textContent).toContain('menu.view.layout-top-bottom')
+
+    await act(async () => {
+      useReposStore.getState().setWorkspaceLayout('left-right')
+      await Promise.resolve()
+    })
+
+    expect(document.getElementById('settings-workspace-layout')?.textContent).toContain('menu.view.layout-left-right')
+  })
+
   test('can trigger a test terminal notification from settings', async () => {
     await render(<SettingsSurface page="notifications" onPageChange={() => {}} />)
 

@@ -1,8 +1,13 @@
-export const WORKSPACE_LAYOUTS = ['top-bottom', 'left-right'] as const
+export const WORKSPACE_LAYOUTS = ['left-right', 'top-bottom'] as const
 
 export type WorkspaceLayout = (typeof WORKSPACE_LAYOUTS)[number]
 export type WorkspaceLayoutAxis = 'rows' | 'columns'
 export type WorkspaceDetailPaneSizes = Record<WorkspaceLayout, number>
+
+export const WORKSPACE_LAYOUT_LABEL_KEYS = {
+  'left-right': 'menu.view.layout-left-right',
+  'top-bottom': 'menu.view.layout-top-bottom',
+} as const satisfies Record<WorkspaceLayout, string>
 
 export const DEFAULT_WORKSPACE_LAYOUT: WorkspaceLayout = 'left-right'
 export const DEFAULT_DETAIL_COLLAPSED = true

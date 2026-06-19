@@ -503,6 +503,8 @@ export const ja: Record<DictKey, string> = {
   'settings.lang.ko': '한국어',
   'settings.lang.ja': '日本語',
   'settings.back': '戻る',
+  'settings.workspace-layout': 'ワークスペースレイアウト',
+  'settings.workspace-layout-hint': '大きい画面でのブランチ一覧と詳細の配置を選びます。',
   'settings.action-bar-blank-toggle': 'アクションバーの空白で詳細を折りたたむ/展開',
   'settings.action-bar-blank-toggle-hint':
     '上下レイアウトでのみ有効です。アクションバーの空白をクリックして詳細を表示/非表示にします。',

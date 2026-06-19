@@ -28,16 +28,14 @@
 // (set globally on `button` and any element with `data-interactive`).
 
 import type { ReactNode } from 'react'
-import { Maximize2, Minimize2, Settings } from 'lucide-react'
+import { PanelLeft, PanelTop, Settings } from 'lucide-react'
 import { useT } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { Button } from '#/web/components/ui/button.tsx'
-import { Tip } from '#/web/components/Tip.tsx'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { RepoToolbarActions } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
 import { WINDOW_TOPBAR_HEIGHT_PX } from '#/shared/window-chrome.ts'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
-import { cn } from '#/web/lib/cn.ts'
 
 interface Props {
   onOpenSettings: () => void
@@ -88,25 +86,16 @@ function BranchListVisibilityToggle() {
   const workspaceLayout = useReposStore((s) => s.workspaceLayout)
   const setDetailFocusMode = useReposStore((s) => s.setDetailFocusMode)
   const branchListHidden = repoWorkspaceBehavior(workspaceLayout, detailCollapsed, detailFocusMode).mode === 'focus'
-  const Icon = branchListHidden ? Minimize2 : Maximize2
-  const tooltipKey = branchListHidden
-    ? 'workspace.branch-list-toggle-tooltip.show'
-    : 'workspace.branch-list-toggle-tooltip.hide'
+  const Icon: typeof PanelTop = workspaceLayout === 'top-bottom' ? PanelTop : PanelLeft
   return (
-    <Tip label={t(tooltipKey)}>
-      <Button
-        variant="ghost"
-        size="icon-lg"
-        aria-label={t('workspace.branch-list-toggle-label')}
-        aria-pressed={branchListHidden}
-        onClick={() => setDetailFocusMode(!branchListHidden)}
-        className={cn(
-          branchListHidden &&
-            'bg-accent text-accent-foreground shadow-xs hover:bg-accent hover:text-accent-foreground',
-        )}
-      >
-        <Icon />
-      </Button>
-    </Tip>
+    <Button
+      variant="ghost"
+      size="icon-lg"
+      aria-label={t('workspace.branch-list-toggle-label')}
+      aria-pressed={branchListHidden}
+      onClick={() => setDetailFocusMode(!branchListHidden)}
+    >
+      <Icon />
+    </Button>
   )
 }
