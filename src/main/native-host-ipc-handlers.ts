@@ -11,8 +11,7 @@ export function createNativeHostIpcHandlers(): NativeIpcHandlers {
       // running (it owns the store; main's menu reflects it). Push from
       // the renderer keeps the menu's `view-toggle-detail` `enabled`
       // predicate — and therefore the CmdOrCtrl+J accelerator — in sync
-      // with the actual layout, even after the user toggles via the
-      // in-app toolbar rather than the native radio menu.
+      // with the actual layout after the user toggles via in-app UI.
       setWorkspaceLayout: async (input: { workspaceLayout: WorkspaceLayout }) => {
         return applyMenuWorkspaceLayout(input.workspaceLayout)
       },

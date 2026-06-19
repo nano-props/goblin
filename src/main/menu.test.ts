@@ -278,17 +278,14 @@ describe('app menu actions', () => {
     })
   })
 
-  test('orders workspace layout menu items left-right before top-bottom', async () => {
+  test('does not expose workspace layout switching in the view menu', async () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
 
     buildAppMenu()
 
     const viewMenu = mocks.template.find((entry) => entry.label === 'menu.view')
     const workspaceLayoutItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.workspace-layout')
-    expect(workspaceLayoutItem?.submenu?.map((entry: any) => entry.label)).toEqual([
-      'menu.view.layout-left-right',
-      'menu.view.layout-top-bottom',
-    ])
+    expect(workspaceLayoutItem).toBeUndefined()
   })
 
   test('includes standard edit roles in the menu', async () => {
@@ -444,12 +441,11 @@ describe('app menu actions', () => {
     })
 
     test('a renderer-pushed layout change updates runtime state and re-enables the accelerator', async () => {
-      // Simulates: the user clicked the native radio to switch to
+      // Simulates: the renderer changed the persisted layout to
       // `left-right` (Cmd+J went grey), then flipped back to `top-bottom`
-      // via the in-app toolbar. The renderer's `setWorkspaceLayout`
-      // action pushes the new value via `applyMenuWorkspaceLayout`, which
-      // must update the runtime state and rebuild the menu so Cmd+J
-      // comes back to life — no orphan optimistic snapshot allowed.
+      // from in-app UI. The renderer's `setWorkspaceLayout` action pushes
+      // the new value via `applyMenuWorkspaceLayout`, which must update
+      // the runtime state and rebuild the menu so Cmd+J comes back to life.
       mocks.readMenuRuntimeState.mockReturnValue({
         ...defaultMenuRuntimeState(),
         workspaceLayout: 'left-right',
