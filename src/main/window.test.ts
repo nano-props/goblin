@@ -1,9 +1,12 @@
+import { createHash } from 'node:crypto'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
 const mocks = vi.hoisted(() => {
+  const rendererIndexHtml = '<!doctype html><script type="module" src="./assets/index-testhash.js"></script>'
   const state = {
     isPackaged: false,
+    rendererIndexHtml,
     windows: [] as any[],
     windowOptions: [] as any[],
     webContentsOn: vi.fn(),
@@ -27,7 +30,11 @@ const mocks = vi.hoisted(() => {
       accessToken: 'secret',
       clientId: 'client_sharedterminal',
     })),
-    readFileSync: vi.fn(() => JSON.stringify({ file: 'preload-0.1.0-testhash.cjs' })),
+    readFileSync: vi.fn((filePath: string) =>
+      filePath.endsWith('/dist/web/index.html')
+        ? rendererIndexHtml
+        : JSON.stringify({ file: 'preload-0.1.0-testhash.cjs' }),
+    ),
   }
   const BrowserWindow = Object.assign(
     vi.fn(function BrowserWindow(options: any) {
@@ -81,6 +88,7 @@ vi.mock('electron', () => ({
     },
     getAppPath: () => '/app',
     getPath: () => '/home/user',
+    getVersion: () => '0.1.0',
     whenReady: () => Promise.resolve(),
     show: vi.fn(),
     focus: vi.fn(),
@@ -136,7 +144,11 @@ describe('main window navigation boundaries', () => {
     mocks.windows.length = 0
     mocks.windowOptions.length = 0
     mocks.readFileSync.mockReset()
-    mocks.readFileSync.mockReturnValue(JSON.stringify({ file: 'preload-0.1.0-testhash.cjs' }))
+    mocks.readFileSync.mockImplementation((filePath: string) =>
+      filePath.endsWith('/dist/web/index.html')
+        ? mocks.rendererIndexHtml
+        : JSON.stringify({ file: 'preload-0.1.0-testhash.cjs' }),
+    )
     mocks.getSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
     mocks.loadWindowState.mockReturnValue(Promise.resolve({ windowBounds: null }))
     mocks.cookieSetMock.mockReset()
@@ -215,6 +227,21 @@ describe('main window navigation boundaries', () => {
     await getOrCreateMainWindow()
 
     expect(mocks.loadURL).toHaveBeenCalledWith('http://127.0.0.1:5173/?theme=light&colorTheme=macos')
+  })
+
+  test('adds a renderer build cache key to the embedded server URL', async () => {
+    mocks.isPackaged = true
+    const { getOrCreateMainWindow } = await import('#/main/window.ts')
+
+    await getOrCreateMainWindow()
+
+    const loadedUrl = new URL(mocks.loadURL.mock.calls[0]?.[0])
+    const expectedBuild = createHash('sha256').update(mocks.rendererIndexHtml).digest('hex').slice(0, 12)
+    expect(loadedUrl.origin).toBe('http://127.0.0.1:32100')
+    expect(loadedUrl.searchParams.get('appBuild')).toBe(expectedBuild)
+    expect(loadedUrl.searchParams.get('theme')).toBe('light')
+    expect(loadedUrl.searchParams.get('colorTheme')).toBe('macos')
+    expect(mocks.readFileSync).toHaveBeenCalledWith('/app/dist/web/index.html')
   })
 
   test('plants the auth cookie scoped to the Vite dev origin (port 5173)', async () => {

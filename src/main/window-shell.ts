@@ -8,6 +8,7 @@
 //   window-registry.ts / renderer-surface.ts.
 
 import { app, type BrowserWindow, type BrowserWindowConstructorOptions } from 'electron'
+import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { openHttpExternal } from '#/main/external-url.ts'
@@ -52,6 +53,18 @@ function resolvePreloadPath(): string {
   return path.join(PRELOAD_DIST_DIR, manifest.file)
 }
 
+function resolveRendererBuildCacheKey(): string | null {
+  if (webDevUrl) return null
+  try {
+    return createHash('sha256')
+      .update(readFileSync(path.join(WEB_DIST_DIR, 'index.html')))
+      .digest('hex')
+      .slice(0, 12)
+  } catch {
+    return app.getVersion()
+  }
+}
+
 interface RendererEntryUrlOptions {
   entryHtml?: string
   routePath?: string
@@ -83,6 +96,8 @@ export function createRendererEntryUrl({ entryHtml = 'index.html', routePath = '
     baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`,
   )
   const { resolved, colorTheme } = getTheme()
+  const rendererBuild = resolveRendererBuildCacheKey()
+  if (rendererBuild) url.searchParams.set('appBuild', rendererBuild)
   registerTrustedAppUrl(url.toString())
   url.searchParams.set('theme', resolved)
   url.searchParams.set('colorTheme', colorTheme || DEFAULT_COLOR_THEME)

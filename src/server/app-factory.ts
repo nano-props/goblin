@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
 import { bodyLimit } from 'hono/body-limit'
 import { serveStatic } from '@hono/node-server/serve-static'
@@ -60,6 +60,25 @@ const HEALTH_BODY_LIMIT_BYTES = 1024
 
 const WEB_DIST_DIR = path.resolve(import.meta.dirname, '../../dist/web')
 
+const HASHED_WEB_ASSET_CACHE_CONTROL = 'public, max-age=31536000, immutable'
+const ENTRY_WEB_ASSET_CACHE_CONTROL = 'no-store'
+
+export function webStaticCacheControl(requestPath: string, response: Response): string {
+  const contentType = response.headers.get('content-type') ?? ''
+  const isHashedAsset =
+    response.status === 200 && requestPath.startsWith('/assets/') && !contentType.toLowerCase().includes('text/html')
+  return isHashedAsset ? HASHED_WEB_ASSET_CACHE_CONTROL : ENTRY_WEB_ASSET_CACHE_CONTROL
+}
+
+function applyWebStaticCacheHeaders(c: Context): void {
+  c.header('Cache-Control', webStaticCacheControl(c.req.path, c.res))
+}
+
+function isServerRoutePath(requestPath: string): boolean {
+  return (
+    requestPath === '/api' || requestPath.startsWith('/api/') || requestPath === '/ws' || requestPath.startsWith('/ws/')
+  )
+}
 
 export function createApp(options: ServerAppOptions): Hono {
   const settingsState = createServerSettingsState()
@@ -210,9 +229,7 @@ export function createApp(options: ServerAppOptions): Hono {
   // interval keeps the event loop alive.
   const periodic = setInterval(
     () => {
-      void import('#/server/modules/clipboard-write-paths.ts').then((m) =>
-        m.pruneStaleClipboardTempDirs(),
-      )
+      void import('#/server/modules/clipboard-write-paths.ts').then((m) => m.pruneStaleClipboardTempDirs())
     },
     60 * 60 * 1000,
   )
@@ -228,13 +245,17 @@ export function createApp(options: ServerAppOptions): Hono {
   // found` on every server boot.
   if (existsSync(WEB_DIST_DIR)) {
     const webIndexHtmlPath = path.join(WEB_DIST_DIR, 'index.html')
+    app.use('*', async (c, next) => {
+      await next()
+      if (!isServerRoutePath(c.req.path)) applyWebStaticCacheHeaders(c)
+    })
     app.use('/*', serveStatic({ root: WEB_DIST_DIR }))
     // SPA fallback: deep links that don't match a real static file
     // (e.g. `/repos/abc123/changes`) get the raw `index.html` so
     // React Router can take over. `/api/*` and `/ws/*` requests
     // fall through to the JSON `notFound` handler below.
     app.get('*', async (c) => {
-      if (c.req.path.startsWith('/api/') || c.req.path.startsWith('/ws/')) {
+      if (isServerRoutePath(c.req.path)) {
         return errorJson(c, 'NOT_FOUND', `No route for ${c.req.method} ${c.req.path}`)
       }
       try {

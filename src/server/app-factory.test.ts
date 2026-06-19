@@ -166,6 +166,45 @@ describe('server app html static', () => {
     vi.clearAllMocks()
   })
 
+  test('uses no-store for entry files and immutable caching for hashed assets', async () => {
+    const { webStaticCacheControl } = await import('#/server/app-factory.ts')
+
+    expect(webStaticCacheControl('/index.html', new Response('', { headers: { 'content-type': 'text/html' } }))).toBe(
+      'no-store',
+    )
+    expect(
+      webStaticCacheControl('/boot.js', new Response('', { headers: { 'content-type': 'text/javascript' } })),
+    ).toBe('no-store')
+    expect(
+      webStaticCacheControl(
+        '/assets/index-abc123.js',
+        new Response('', { headers: { 'content-type': 'text/javascript' } }),
+      ),
+    ).toBe('public, max-age=31536000, immutable')
+    expect(
+      webStaticCacheControl('/assets/missing.js', new Response('', { headers: { 'content-type': 'text/html' } })),
+    ).toBe('no-store')
+    expect(webStaticCacheControl('/assets/missing.js', new Response('', { status: 404 }))).toBe('no-store')
+  })
+
+  test('does not immutable-cache SPA fallback responses for missing asset paths', async () => {
+    const { createApp } = await import('#/server/app-factory.ts')
+    const app = createApp({
+      version: '0.1.0',
+      startedAt: Date.now(),
+      accessToken: 'secret',
+      terminalHost: terminalHostStub,
+    })
+
+    const response = await app.request(new Request('http://127.0.0.1:32100/assets/missing-old-build.js'))
+    const html = await response.text()
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+    expect(html).toContain('<div id="root"></div>')
+    expect(response.headers.get('content-type')).toMatch(/text\/html/)
+  })
+
   test('serves the index html as plain static (no bootstrap injection, no token)', async () => {
     const { createApp } = await import('#/server/app-factory.ts')
     const app = createApp({
@@ -185,6 +224,7 @@ describe('server app html static', () => {
 
     const html = await response.text()
     expect(response.status).toBe(200)
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
     // The HTML is the raw dist/web/index.html (mocked above) with
     // no `<script id="goblin-bootstrap">` injection and no token in
     // the response. The renderer reads i18n from
@@ -208,6 +248,7 @@ describe('server app html static', () => {
       const response = await app.request(new Request(`http://127.0.0.1:32100${path}`))
       const html = await response.text()
       expect(response.status).toBe(200)
+      expect(response.headers.get('Cache-Control')).toBe('no-store')
       expect(html).toContain('<div id="root"></div>')
       expect(html).not.toContain('goblin-bootstrap')
     }
