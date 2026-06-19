@@ -29,6 +29,8 @@ const xtermMocks = vi.hoisted(() => {
   const webLinkAddons: any[] = []
   const imageAddons: any[] = []
   const progressAddons: any[] = []
+  const deferredWriteCallbacks: Array<() => void> = []
+  let deferWriteCallbacks = false
   const addonFailures = {
     search: false,
     serialize: false,
@@ -56,24 +58,42 @@ const xtermMocks = vi.hoisted(() => {
       scrollOnUserInput?: boolean
     }
     element: HTMLDivElement | null = null
-    modes = { applicationCursorKeysMode: false }
+    modes = { applicationCursorKeysMode: false, bracketedPasteMode: false }
     refresh = vi.fn()
     write = vi.fn((_data: string, callback?: () => void) => {
-      if (callback) queueMicrotask(callback)
+      if (!callback) return
+      if (deferWriteCallbacks) {
+        deferredWriteCallbacks.push(callback)
+        return
+      }
+      queueMicrotask(callback)
     })
     reset = vi.fn()
     scrollToBottom = vi.fn()
     dispose = vi.fn()
     focus = vi.fn(() => this.textarea?.focus())
     customKeyEventHandler: ((event: KeyboardEvent) => boolean) | null = null
+    private coreUserInputHandlers: Array<() => void> = []
     _core = {
       _charSizeService: { measure: vi.fn() },
       _renderService: { clear: vi.fn() },
+      coreService: {
+        onUserInput: vi.fn((cb: () => void) => {
+          this.coreUserInputHandlers.push(cb)
+          return {
+            dispose: vi.fn(
+              () =>
+                (this.coreUserInputHandlers = this.coreUserInputHandlers.filter((handler) => handler !== cb)),
+            ),
+          }
+        }),
+      },
     }
     private textarea: HTMLTextAreaElement | null = null
     private resizeHandlers: Array<(size: { cols: number; rows: number }) => void> = []
     private dataHandlers: Array<(data: string) => void> = []
     private binaryHandlers: Array<(data: string) => void> = []
+    private keyHandlers: Array<(event: { key: string; domEvent: KeyboardEvent }) => void> = []
     private bellHandlers: Array<() => void> = []
     private titleHandlers: Array<(title: string) => void> = []
 
@@ -132,6 +152,11 @@ const xtermMocks = vi.hoisted(() => {
       return { dispose: vi.fn(() => (this.binaryHandlers = this.binaryHandlers.filter((handler) => handler !== cb))) }
     }
 
+    onKey(cb: (event: { key: string; domEvent: KeyboardEvent }) => void) {
+      this.keyHandlers.push(cb)
+      return { dispose: vi.fn(() => (this.keyHandlers = this.keyHandlers.filter((handler) => handler !== cb))) }
+    }
+
     onResize(cb: (size: { cols: number; rows: number }) => void) {
       this.resizeHandlers.push(cb)
       return { dispose: vi.fn(() => (this.resizeHandlers = this.resizeHandlers.filter((handler) => handler !== cb))) }
@@ -159,6 +184,22 @@ const xtermMocks = vi.hoisted(() => {
 
     emitData(data: string) {
       for (const handler of this.dataHandlers) handler(data)
+    }
+
+    emitUserData(data: string) {
+      const domEvent = new KeyboardEvent('keydown')
+      for (const handler of this.coreUserInputHandlers) handler()
+      for (const handler of this.keyHandlers) handler({ key: data, domEvent })
+      this.emitData(data)
+    }
+
+    emitCoreUserData(data: string) {
+      for (const handler of this.coreUserInputHandlers) handler()
+      this.emitData(data)
+    }
+
+    emitBinary(data: string) {
+      for (const handler of this.binaryHandlers) handler(data)
     }
 
     emitBell() {
@@ -314,6 +355,15 @@ const xtermMocks = vi.hoisted(() => {
     imageAddons,
     progressAddons,
     addonFailures,
+    deferWriteCallbacks(value: boolean) {
+      deferWriteCallbacks = value
+    },
+    flushDeferredWriteCallbacks() {
+      for (const callback of deferredWriteCallbacks.splice(0)) callback()
+    },
+    flushNextDeferredWriteCallback() {
+      deferredWriteCallbacks.shift()?.()
+    },
     MockTerminal,
     MockFitAddon,
     MockSearchAddon,
@@ -450,6 +500,8 @@ beforeEach(() => {
   xtermMocks.webLinkAddons.length = 0
   xtermMocks.imageAddons.length = 0
   xtermMocks.progressAddons.length = 0
+  xtermMocks.deferWriteCallbacks(false)
+  xtermMocks.flushDeferredWriteCallbacks()
   Object.assign(xtermMocks.addonFailures, {
     search: false,
     serialize: false,
@@ -1209,6 +1261,89 @@ describe('ManagedTerminalSession', () => {
     expect(session.currentSessionId()).toBe('session-remote')
   })
 
+  test('does not rewrite an existing terminal view when hydrate refreshes the same session snapshot', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    const term = xtermMocks.terminals[0]!
+    term.reset.mockClear()
+    term.write.mockClear()
+
+    session.hydrate({
+      sessionId: 'session-1',
+      phase: 'open',
+      message: null,
+      processName: 'node',
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalCols: 100,
+      canonicalRows: 30,
+      snapshot: 'fresher-same-session-screen',
+      snapshotSeq: 99,
+    })
+    await flushTerminalStart()
+
+    expect(term.reset).not.toHaveBeenCalled()
+    expect(term.write).not.toHaveBeenCalled()
+    expect(session.currentSessionId()).toBe('session-1')
+  })
+
+  test('stale active hydrate replay callback does not close a newer replay boundary', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    const term = xtermMocks.terminals[0]!
+    term.reset.mockClear()
+    term.write.mockClear()
+    terminalCalls.write.mockClear()
+    xtermMocks.deferWriteCallbacks(true)
+
+    session.hydrate({
+      sessionId: 'session-2',
+      phase: 'open',
+      message: null,
+      processName: 'node',
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalCols: 100,
+      canonicalRows: 30,
+      snapshot: 'older-replay',
+      snapshotSeq: 10,
+    })
+    session.hydrate({
+      sessionId: 'session-3',
+      phase: 'open',
+      message: null,
+      processName: 'node',
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalCols: 100,
+      canonicalRows: 30,
+      snapshot: 'newer-replay',
+      snapshotSeq: 11,
+    })
+
+    xtermMocks.flushNextDeferredWriteCallback()
+    term.emitData('\x1b]10;rgb:1d1d/1d1d/1f1f\x1b\\')
+    await flushTerminalStart()
+    await flushResizeDispatch()
+
+    expect(terminalCalls.write).not.toHaveBeenCalled()
+
+    xtermMocks.flushNextDeferredWriteCallback()
+    xtermMocks.deferWriteCallbacks(false)
+  })
+
   test('does not notify on ordinary input while already attached', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
@@ -1508,8 +1643,9 @@ describe('ManagedTerminalSession', () => {
     })
   })
 
-  test('forwards user input while replay is being written', async () => {
+  test('drops terminal-emulator input while replay is being written', async () => {
     terminalCalls.attach.mockResolvedValueOnce(attachResult('session-1', { snapshot: 'history', snapshotSeq: 1 }))
+    xtermMocks.deferWriteCallbacks(true)
     const host = document.createElement('div')
     document.body.appendChild(host)
     const session = new ManagedTerminalSession(descriptor, vi.fn())
@@ -1517,11 +1653,51 @@ describe('ManagedTerminalSession', () => {
     session.attach(host)
     await flushUntil(() => xtermMocks.terminals[0]?.write.mock.calls.some((call: unknown[]) => call[0] === 'history'))
 
-    xtermMocks.terminals[0]!.emitData('input during replay')
+    xtermMocks.terminals[0]!.emitData('\x1b]10;rgb:1d1d/1d1d/1f1f\x1b\\')
+    xtermMocks.flushDeferredWriteCallbacks()
+    xtermMocks.deferWriteCallbacks(false)
+    await flushUntil(() => session.snapshot().phase === 'open')
+    await flushTerminalStart()
+
+    expect(terminalCalls.write).not.toHaveBeenCalled()
+  })
+
+  test('forwards xterm core-attributed user input while replay is being written', async () => {
+    terminalCalls.attach.mockResolvedValueOnce(attachResult('session-1', { snapshot: 'history', snapshotSeq: 1 }))
+    xtermMocks.deferWriteCallbacks(true)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushUntil(() => xtermMocks.terminals[0]?.write.mock.calls.some((call: unknown[]) => call[0] === 'history'))
+
+    xtermMocks.terminals[0]!.emitCoreUserData('input during replay')
+    xtermMocks.flushDeferredWriteCallbacks()
+    xtermMocks.deferWriteCallbacks(false)
     await flushUntil(() => session.snapshot().phase === 'open')
     await flushTerminalStart()
 
     expect(terminalCalls.write).toHaveBeenCalledWith({ sessionId: 'session-1', data: 'input during replay' })
+  })
+
+  test('forwards xterm binary mouse input while replay is being written', async () => {
+    terminalCalls.attach.mockResolvedValueOnce(attachResult('session-1', { snapshot: 'history', snapshotSeq: 1 }))
+    xtermMocks.deferWriteCallbacks(true)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushUntil(() => xtermMocks.terminals[0]?.write.mock.calls.some((call: unknown[]) => call[0] === 'history'))
+
+    xtermMocks.terminals[0]!.emitBinary('\x1b[M ##')
+    xtermMocks.flushDeferredWriteCallbacks()
+    xtermMocks.deferWriteCallbacks(false)
+    await flushUntil(() => session.snapshot().phase === 'open')
+    await flushTerminalStart()
+
+    expect(terminalCalls.write).toHaveBeenCalledWith({ sessionId: 'session-1', data: '\x1b[M ##' })
   })
 
   test('resets the terminal before replaying the snapshot', async () => {

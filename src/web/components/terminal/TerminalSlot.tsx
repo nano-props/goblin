@@ -247,13 +247,13 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
     if (!(relatedTarget instanceof Node) || !event.currentTarget.contains(relatedTarget)) setDragOver(false)
   }, [])
   const writeResolutionToPty = useCallback(
-    (paths: string[], failed: number, sessionKey: string) => {
+    (paths: string[], failed: number, sessionKey: string, source: 'paste' | 'drop') => {
       if (paths.length === 0) {
         toast.error(t('terminal.paste-file-failed'))
         return
       }
       const escaped = paths.map(shellEscapePath).join(' ')
-      writeInput(sessionKey, escaped)
+      writeInput(sessionKey, escaped, source)
       if (failed > 0) toast.error(t('terminal.paste-file-partial'))
     },
     [t, writeInput],
@@ -282,7 +282,7 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
         // `processDrop` can only return `files` or `too-large`.
         // `handlePasteCapture` uses the same if-narrowing shape.
         if (outcome.kind === 'files') {
-          writeResolutionToPty(outcome.resolution.paths, outcome.resolution.failed, sessionKey)
+          writeResolutionToPty(outcome.resolution.paths, outcome.resolution.failed, sessionKey, 'drop')
           return
         }
         if (outcome.kind === 'too-large') {
@@ -317,7 +317,7 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
         void processPaste({ files }).then((outcome) => {
           if (keyRef.current !== sessionKey) return
           if (outcome.kind === 'files') {
-            writeResolutionToPty(outcome.resolution.paths, outcome.resolution.failed, sessionKey)
+            writeResolutionToPty(outcome.resolution.paths, outcome.resolution.failed, sessionKey, 'paste')
             return
           }
           if (outcome.kind === 'too-large') {
@@ -393,7 +393,7 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
       {isMobileDevice() && isController && key && (
         <MobileTerminalToolbar
           className="goblin-terminal-mobile-toolbar--floating"
-          onInput={(data) => writeInput(key, data)}
+          onInput={(data) => writeInput(key, data, 'toolbar')}
           onScrollLines={(amount) => scrollLines(key, amount)}
         />
       )}

@@ -38,9 +38,11 @@ export class TerminalSessionState {
   private replayBufferState: {
     replayBoundarySeq: number | null
     replayPendingOutput: TerminalOutputEvent[]
+    replayGeneration: number
   } = {
     replayBoundarySeq: null,
     replayPendingOutput: [],
+    replayGeneration: 0,
   }
   /** Renderer-only terminal UI state such as search/progress. This is safe
    *  to discard when the active terminal view is torn down. */
@@ -181,8 +183,10 @@ export class TerminalSessionState {
   // seq) followed by a post-attach window (new snapshot's seq)
   // shares the same buffer; the post-attach `finishReplay` filters
   // by the new boundary.
-  beginReplay(replaySeq: number): void {
+  beginReplay(replaySeq: number): number {
     this.replayBufferState.replayBoundarySeq = replaySeq
+    this.replayBufferState.replayGeneration += 1
+    return this.replayBufferState.replayGeneration
   }
 
   captureReplayOutput(event: TerminalOutputEvent): boolean {
@@ -191,7 +195,17 @@ export class TerminalSessionState {
     return true
   }
 
-  finishReplay(): TerminalOutputEvent[] {
+  isReplaying(): boolean {
+    return this.replayBufferState.replayBoundarySeq !== null
+  }
+
+  finishReplay(replayGeneration?: number): TerminalOutputEvent[] {
+    if (
+      replayGeneration !== undefined &&
+      this.replayBufferState.replayGeneration !== replayGeneration
+    ) {
+      return []
+    }
     const replaySeq = this.replayBufferState.replayBoundarySeq
     const pendingOutput = this.replayBufferState.replayPendingOutput.splice(0)
     this.replayBufferState.replayBoundarySeq = null
@@ -202,7 +216,13 @@ export class TerminalSessionState {
   // Clears the replay buffer and boundary without queueing to the
   // term or appending to the output summary. Cheaper than
   // `finishReplay` because it skips the splice + filter.
-  discardReplay(): void {
+  discardReplay(replayGeneration?: number): void {
+    if (
+      replayGeneration !== undefined &&
+      this.replayBufferState.replayGeneration !== replayGeneration
+    ) {
+      return
+    }
     this.replayBufferState.replayBoundarySeq = null
     this.replayBufferState.replayPendingOutput = []
   }

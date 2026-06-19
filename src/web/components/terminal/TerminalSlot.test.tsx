@@ -573,7 +573,7 @@ describe('TerminalSlot', () => {
       // quotes — if the escape regresses to plain concat this
       // assertion catches it.
       expect(writeInput).toHaveBeenCalledTimes(1)
-      expect(writeInput).toHaveBeenCalledWith('terminal-1', "'/resolved/shot with space.png'")
+      expect(writeInput).toHaveBeenCalledWith('terminal-1', "'/resolved/shot with space.png'", 'drop')
       // The path-attempt tier succeeded, so the blob-save backend
       // was never consulted.
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
@@ -821,6 +821,7 @@ describe('TerminalSlot', () => {
       expect(writeInput).toHaveBeenCalledWith(
         'terminal-1',
         "'/resolved/weird name & space.png'",
+        'paste',
       )
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
     } finally {
@@ -1084,7 +1085,7 @@ describe('TerminalSlot', () => {
       // the order the resolver returns them (path-attempt tier first,
       // then blob-save). paste-file-partial toasts once.
       expect(writeInput).toHaveBeenCalledTimes(1)
-      expect(writeInput).toHaveBeenCalledWith('terminal-1', '/abs/a.png /tmp/b.png')
+      expect(writeInput).toHaveBeenCalledWith('terminal-1', '/abs/a.png /tmp/b.png', 'drop')
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-partial')
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
     } finally {

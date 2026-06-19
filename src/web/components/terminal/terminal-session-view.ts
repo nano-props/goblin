@@ -28,6 +28,12 @@ import {
   isMacNavigatorPlatform,
   terminalInputForMacOptionArrow,
 } from '#/web/components/terminal/terminal-keyboard.ts'
+import {
+  terminalEmulatorInput,
+  userTerminalInput,
+  type TerminalInput,
+  type TerminalUserInputSource,
+} from '#/web/components/terminal/terminal-input.ts'
 import { terminalLog } from '#/web/logger.ts'
 const DEFAULT_PARKING_WIDTH = 800
 const DEFAULT_PARKING_HEIGHT = 400
@@ -53,9 +59,11 @@ export class TerminalSessionView {
   private pinToBottomFrame: number | null = null
   private host: HTMLElement | null = null
   private readonly safariShiftKeyResolver = new SafariShiftKeyResolver()
+  private pendingCoreUserInput = 0
+  private pendingFallbackUserInput: Array<{ data: string; source: TerminalUserInputSource }> = []
 
   constructor(handlers: {
-    onInput: (data: string) => void
+    onInput: (input: TerminalInput) => void
     onBell: () => void
     onResize: (size: { cols: number; rows: number }) => void
     onSearchResult: (event: ISearchResultChangeEvent) => void
@@ -73,7 +81,7 @@ export class TerminalSessionView {
   }
 
   private readonly handlers: {
-    onInput: (data: string) => void
+    onInput: (input: TerminalInput) => void
     onBell: () => void
     onResize: (size: { cols: number; rows: number }) => void
     onSearchResult: (event: ISearchResultChangeEvent) => void
@@ -133,7 +141,7 @@ export class TerminalSessionView {
 
   openTerminal(
     geometry: { cols: number; rows: number },
-    onMacOptionInput: (input: string) => void,
+    onMacOptionInput: (input: TerminalInput) => void,
   ): XTermTerminal {
     const theme = terminalThemeForCurrentDocument()
     const term = new Terminal({
@@ -162,8 +170,10 @@ export class TerminalSessionView {
     this.disposeThemeObserver = observeTerminalTheme((nextTheme) => {
       this.applyTerminalTheme(term, nextTheme)
     })
-    this.disposables.push(term.onData((data) => this.handlers.onInput(data)))
-    this.disposables.push(term.onBinary((data) => this.handlers.onInput(data)))
+    const hasCoreUserInputAttribution = this.installCoreUserInputAttribution(term)
+    if (!hasCoreUserInputAttribution) this.installFallbackUserInputAttribution(term)
+    this.disposables.push(term.onData((data) => this.handlers.onInput(this.inputFromXtermData(data, 'data'))))
+    this.disposables.push(term.onBinary((data) => this.handlers.onInput(this.inputFromXtermData(data, 'binary'))))
     this.disposables.push(term.onBell(() => this.handlers.onBell()))
     this.disposables.push(term.onResize((size) => this.handlers.onResize(size)))
     term.open(this.xtermHost)
@@ -241,6 +251,8 @@ export class TerminalSessionView {
     this.cancelFontFit()
     this.cancelPinToBottom()
     this.safariShiftKeyResolver.reset()
+    this.pendingCoreUserInput = 0
+    this.pendingFallbackUserInput = []
     this.fitAddon = null
     this.searchAddon = null
     this.serializeAddon = null
@@ -252,7 +264,7 @@ export class TerminalSessionView {
     if (!this.frame.contains(this.xtermHost)) this.frame.appendChild(this.xtermHost)
   }
 
-  private installKeyboardHandlers(term: XTermTerminal, onInput: (input: string) => void): void {
+  private installKeyboardHandlers(term: XTermTerminal, onInput: (input: TerminalInput) => void): void {
     const isMac = isMacNavigatorPlatform(globalThis.navigator?.platform ?? '')
     const safariShiftKeyResolver = this.safariShiftKeyResolver
     term.attachCustomKeyEventHandler((event) => {
@@ -263,18 +275,79 @@ export class TerminalSessionView {
       if (optionInput) {
         event.preventDefault()
         event.stopPropagation()
-        onInput(optionInput)
+        onInput(userTerminalInput(optionInput, 'keyboard'))
         return false
       }
       const safariShiftInput = safariShiftKeyResolver.inputForEvent(event)
       if (safariShiftInput) {
         event.preventDefault()
         event.stopPropagation()
-        onInput(safariShiftInput)
+        onInput(userTerminalInput(safariShiftInput, 'keyboard'))
         return false
       }
       return true
     })
+  }
+
+  private installCoreUserInputAttribution(term: XTermTerminal): boolean {
+    const coreService = xtermCoreUserInputService(term)
+    if (!coreService) return false
+    this.disposables.push(
+      coreService.onUserInput(() => {
+        this.pendingCoreUserInput += 1
+      }),
+    )
+    return true
+  }
+
+  private installFallbackUserInputAttribution(term: XTermTerminal): void {
+    this.disposables.push(term.onKey(({ key }) => this.queueFallbackUserInput(key, 'keyboard')))
+    const markPaste = (event: ClipboardEvent) => {
+      if (event.defaultPrevented) return
+      const text = event.clipboardData?.getData('text/plain')
+      if (text) this.queueFallbackUserInput(textForTerminalPaste(text, term.modes.bracketedPasteMode), 'paste')
+    }
+    const markTextInput = (event: Event) => {
+      if (!(event instanceof InputEvent)) return
+      if (event.data && event.inputType === 'insertText') this.queueFallbackUserInput(event.data, 'keyboard')
+    }
+    this.xtermHost.addEventListener('paste', markPaste, true)
+    this.xtermHost.addEventListener('input', markTextInput, true)
+    this.disposables.push({
+      dispose: () => {
+        this.xtermHost.removeEventListener('paste', markPaste, true)
+        this.xtermHost.removeEventListener('input', markTextInput, true)
+      },
+    })
+  }
+
+  private inputFromXtermData(data: string, source: 'data' | 'binary'): TerminalInput {
+    // xterm uses onBinary for DEFAULT mouse reports and does not pair it with onUserInput.
+    if (source === 'binary') return userTerminalInput(data, 'xterm')
+    if (source === 'data' && this.pendingCoreUserInput > 0) {
+      this.pendingCoreUserInput -= 1
+      return userTerminalInput(data, 'xterm')
+    }
+    const fallback = source === 'data' ? this.consumeFallbackUserInput(data) : null
+    if (fallback) return userTerminalInput(data, fallback.source)
+    return terminalEmulatorInput(data, source)
+  }
+
+  private queueFallbackUserInput(data: string, source: TerminalUserInputSource): void {
+    if (!data) return
+    const entry = { data, source }
+    this.pendingFallbackUserInput.push(entry)
+    window.setTimeout(() => {
+      const index = this.pendingFallbackUserInput.indexOf(entry)
+      if (index !== -1) this.pendingFallbackUserInput.splice(index, 1)
+    }, 0)
+  }
+
+  private consumeFallbackUserInput(data: string): { data: string; source: TerminalUserInputSource } | null {
+    const index = this.pendingFallbackUserInput.findIndex((entry) => entry.data === data)
+    if (index === -1) return null
+    const [entry] = this.pendingFallbackUserInput.splice(index, 1)
+    return entry ?? null
   }
 
   private installOptionalAddons(term: XTermTerminal): void {
@@ -419,6 +492,24 @@ export class TerminalSessionView {
     cancelScheduledAnimationFrame(this.pinToBottomFrame)
     this.pinToBottomFrame = null
   }
+}
+
+interface XtermCoreUserInputService {
+  onUserInput: (listener: () => void) => { dispose: () => void }
+}
+
+function xtermCoreUserInputService(term: XTermTerminal): XtermCoreUserInputService | null {
+  const coreService = (term as unknown as { _core?: { coreService?: { onUserInput?: unknown } } })._core?.coreService
+  const onUserInput = coreService?.onUserInput
+  if (!coreService || typeof onUserInput !== 'function') return null
+  return {
+    onUserInput: (listener) => onUserInput.call(coreService, listener) as { dispose: () => void },
+  }
+}
+
+function textForTerminalPaste(text: string, bracketedPasteMode: boolean): string {
+  const normalized = text.replace(/\r?\n/g, '\r')
+  return bracketedPasteMode ? `\x1b[200~${normalized}\x1b[201~` : normalized
 }
 
 function terminalSearchOptions(incremental?: boolean): ISearchOptions {

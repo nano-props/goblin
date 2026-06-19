@@ -755,10 +755,11 @@ any individual implementation:
    repair path. The broadened hydrate was rolled back: it
    re-painted xterm mid-session and caused terminal-emulator
    protocol replies (OSC color queries) to leak into the PTY
-   stdin path as input pollution. Incident recorded in
-   `docs/terminal-input-attribution.md`. The first-frame
-   `applyOpenResult` path is the only re-apply route now; same-
-   session re-hydration is a no-op.
+   stdin path as input pollution. The long-term rule now lives in
+   `docs/terminal.md`: replay side effects are local rendering
+   artifacts and must not be forwarded as user stdin. The first-frame
+   `applyOpenResult` path is the only re-apply route now; same-session
+   re-hydration is a no-op.
 3. **Done (P1.7)** — Decide explicitly whether the delayed
    provider-destroy heuristic (one-macrotask delay on
    `TerminalSessionProvider` cleanup) should remain until P1.7
