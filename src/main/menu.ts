@@ -21,7 +21,12 @@ import { menuNodeLog } from '#/node/logger.ts'
 import { openDataFolderMenuKey, t } from '#/main/i18n/index.ts'
 import { sendRendererEffectIntent } from '#/main/renderer-surface-events.ts'
 import { getTheme } from '#/main/theme.ts'
-import { normalizeWorkspaceLayout, type WorkspaceLayout } from '#/shared/workspace-layout.ts'
+import {
+  normalizeWorkspaceLayout,
+  WORKSPACE_LAYOUT_LABEL_KEYS,
+  WORKSPACE_LAYOUTS,
+  type WorkspaceLayout,
+} from '#/shared/workspace-layout.ts'
 import { tildifyPath } from '#/shared/paths.ts'
 import type { LangPref, ThemePref } from '#/shared/api-types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
@@ -68,10 +73,10 @@ const LANGUAGE_MENU_OPTIONS = [
   { pref: 'ja', labelKey: 'settings.lang.ja' },
 ] as const
 
-const WORKSPACE_LAYOUT_MENU_OPTIONS = [
-  { layout: 'top-bottom', labelKey: 'menu.view.layout-top-bottom' },
-  { layout: 'left-right', labelKey: 'menu.view.layout-left-right' },
-] as const
+const WORKSPACE_LAYOUT_MENU_OPTIONS = WORKSPACE_LAYOUTS.map((layout) => ({
+  layout,
+  labelKey: WORKSPACE_LAYOUT_LABEL_KEYS[layout],
+}))
 
 function send(intent: RendererEffectIntent): void {
   void sendRendererIntent(intent)

@@ -481,6 +481,8 @@ export const zh: Record<DictKey, string> = {
   'settings.lang.ko': '한국어',
   'settings.lang.ja': '日本語',
   'settings.back': '返回',
+  'settings.workspace-layout': '工作区布局',
+  'settings.workspace-layout-hint': '选择大屏幕上分支列表和详情的排列方式。',
   'settings.action-bar-blank-toggle': '点击操作栏空白处展开/收起详情',
   'settings.action-bar-blank-toggle-hint': '仅上下布局生效。点击操作栏空白处展开或收起详情。',
   'settings.terminal-notifications': '终端 bell 通知',

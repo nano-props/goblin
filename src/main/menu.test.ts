@@ -278,6 +278,19 @@ describe('app menu actions', () => {
     })
   })
 
+  test('orders workspace layout menu items left-right before top-bottom', async () => {
+    const { buildAppMenu } = await import('#/main/menu.ts')
+
+    buildAppMenu()
+
+    const viewMenu = mocks.template.find((entry) => entry.label === 'menu.view')
+    const workspaceLayoutItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.workspace-layout')
+    expect(workspaceLayoutItem?.submenu?.map((entry: any) => entry.label)).toEqual([
+      'menu.view.layout-left-right',
+      'menu.view.layout-top-bottom',
+    ])
+  })
+
   test('includes standard edit roles in the menu', async () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
 

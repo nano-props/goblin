@@ -506,6 +506,8 @@ export const en = {
   'settings.lang.zh': '中文',
   'settings.lang.ko': '한국어',
   'settings.lang.ja': '日本語',
+  'settings.workspace-layout': 'Workspace layout',
+  'settings.workspace-layout-hint': 'Choose how the branch list and details are arranged on larger screens.',
   'settings.action-bar-blank-toggle': 'Toggle details from action bar',
   'settings.action-bar-blank-toggle-hint':
     'Top/bottom layout only. Click empty action bar space to show or hide details.',

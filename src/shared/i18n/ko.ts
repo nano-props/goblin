@@ -495,6 +495,8 @@ export const ko: Record<DictKey, string> = {
   'settings.lang.ko': '한국어',
   'settings.lang.ja': '日本語',
   'settings.back': '뒤로',
+  'settings.workspace-layout': '작업 영역 레이아웃',
+  'settings.workspace-layout-hint': '큰 화면에서 브랜치 목록과 세부 정보의 배치를 선택합니다.',
   'settings.action-bar-blank-toggle': '작업 막대 빈 영역으로 세부 패널 접기/펼치기',
   'settings.action-bar-blank-toggle-hint':
     '상하 레이아웃에서만 작동합니다. 작업 막대 빈 공간을 클릭해 세부 정보를 표시하거나 숨깁니다.',
