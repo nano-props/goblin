@@ -17,6 +17,10 @@ import {
   type ReattachSnapshotCacheEntry,
 } from '#/web/components/terminal/terminal-session-projection.ts'
 import {
+  userTerminalInput,
+  type TerminalUserInputSource,
+} from '#/web/components/terminal/terminal-input.ts'
+import {
   applyDisplayOrder,
   restoreDisplayOrder,
   snapshotDisplayOrder,
@@ -707,8 +711,8 @@ export class TerminalSessionRegistry {
     this.sessions.get(key)?.clearSearch()
   }
 
-  writeInput = (key: string, data: string): void => {
-    this.sessions.get(key)?.writeInput(data)
+  writeInput = (key: string, data: string, source: TerminalUserInputSource = 'command'): void => {
+    this.sessions.get(key)?.writeInput(userTerminalInput(data, source))
   }
 
   takeover = (key: string): Promise<boolean> => {

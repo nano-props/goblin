@@ -4,6 +4,7 @@ import type {
   TerminalExitEvent,
   TerminalOutputEvent,
 } from '#/shared/terminal-types.ts'
+import type { TerminalInput, TerminalUserInputSource } from '#/web/components/terminal/terminal-input.ts'
 export type TerminalPhase = 'opening' | 'restarting' | 'open' | 'error' | 'closed'
 
 export interface TerminalDescriptor {
@@ -136,7 +137,7 @@ export interface TerminalSessionContextValue {
   findNext: (key: string, term: string, incremental?: boolean) => TerminalSearchResult
   findPrevious: (key: string, term: string) => TerminalSearchResult
   clearSearch: (key: string) => void
-  writeInput: (key: string, data: string) => void
+  writeInput: (key: string, data: string, source?: TerminalUserInputSource) => void
   takeover: (key: string) => Promise<boolean>
   /** Reorder terminal sessions within a worktree. */
   reorderSessions: (worktreeTerminalKey: string, orderedKeys: string[]) => Promise<boolean>
@@ -165,7 +166,7 @@ export interface ManagedTerminalSessionLike {
   clearSearch: () => void
   scrollToBottom: () => void
   scrollLines: (amount: number) => void
-  writeInput: (data: string) => void
+  writeInput: (input: TerminalInput) => void
   takeover: () => void
   handleOwnership: (event: TerminalOwnershipViewModel) => void
   /** Serializes xterm framebuffer state as VT sequences; not plain-text output for copy UI. */

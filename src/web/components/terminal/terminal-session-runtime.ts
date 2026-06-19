@@ -202,19 +202,23 @@ export class TerminalSessionRuntime {
     return true
   }
 
-  beginReplay(replaySeq: number): void {
-    this.state.beginReplay(replaySeq)
+  beginReplay(replaySeq: number): number {
+    return this.state.beginReplay(replaySeq)
   }
 
-  finishReplay(): TerminalOutputEvent[] {
-    return this.state.finishReplay()
+  finishReplay(replayGeneration?: number): TerminalOutputEvent[] {
+    return this.state.finishReplay(replayGeneration)
+  }
+
+  isReplaying(): boolean {
+    return this.state.isReplaying()
   }
 
   // Drops the replay buffer for the error / cancellation paths. The
   // success path uses `finishReplay` instead, which appends to the
   // summary under the new role.
-  drainReplay(): void {
-    this.state.discardReplay()
+  drainReplay(replayGeneration?: number): void {
+    this.state.discardReplay(replayGeneration)
   }
 
   acknowledgeResize(cols: number, rows: number): void {

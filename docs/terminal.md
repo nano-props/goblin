@@ -52,6 +52,12 @@ Only one attachment may control the session at a time.
 - Input and resize authority belong to the current controller only.
 - Takeover is an explicit handoff flow, not implicit behavior triggered by random input.
 
+### Attributed input
+
+- PTY writes must carry renderer-side provenance before they cross the terminal bridge.
+- User intent, terminal-emulator replies, and replay side effects are different classes of input.
+- Replay side effects are local rendering artifacts and must never be forwarded as user stdin.
+
 ### Geometry is part of correctness
 
 - Terminal size is not a cosmetic concern.
@@ -84,6 +90,7 @@ The terminal feature spans `shared`, `server`, and `web`, but it still behaves a
 - Maintains the renderer-local projection of live sessions, selection, bells, and local reattach state.
 - Coordinates create, attach, detach, select, restart, takeover, and local session lifecycle.
 - Treats the bridge as the transport to server truth, not as the source of truth itself.
+- Owns input provenance before writes are sent to the server.
 
 ### Renderer view layer
 
@@ -198,6 +205,19 @@ The system supports replay and snapshot hydration so users can reattach to runni
 - Replay is a rendering concern built on top of server-owned session state.
 - Hydration should help the user see the latest known state quickly, but authoritative session state still comes from the server.
 - Replay should not redefine ownership or session identity.
+- Replay must run inside an explicit local boundary so any terminal-emulator replies it causes can be identified as replay side effects.
+- Same-session active-view replay is not a generic repair mechanism; re-enable it only when the attribution boundary can prove replay side effects cannot reach PTY stdin.
+
+### Input attribution during replay
+
+Server snapshots are raw terminal bytes. Replaying those bytes through xterm can legitimately cause the emulator to emit protocol replies such as device, cursor-position, focus, mouse, or color reports. During live operation those replies are part of the terminal protocol and may need to reach the PTY. During local snapshot replay they are renderer-created side effects of redrawing history, not user input.
+
+The renderer input pipeline therefore uses an internal envelope:
+
+- **user intent**: keyboard input, text paste, file paste/drop resolution, mobile toolbar helpers, and explicit UI command writes
+- **terminal-emulator input**: data emitted by xterm as terminal protocol traffic
+
+Replay boundaries suppress terminal-emulator input while replay is in progress, but still allow attributed user intent. This keeps replay a rendering operation instead of a hidden stdin writer.
 
 ### First-frame mutation contract
 

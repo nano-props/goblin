@@ -70,6 +70,26 @@ describe('TerminalSessionState', () => {
     expect(state.captureReplayOutput({ sessionId: 'session-1', data: 'live', seq: 5, processName: 'zsh' })).toBe(false)
   })
 
+  test('ignores stale replay generation cleanup', () => {
+    const state = new TerminalSessionState()
+
+    const staleGeneration = state.beginReplay(1)
+    expect(state.captureReplayOutput({ sessionId: 'session-1', data: 'old-window', seq: 2, processName: 'zsh' })).toBe(
+      true,
+    )
+    const currentGeneration = state.beginReplay(2)
+
+    state.discardReplay(staleGeneration)
+    expect(state.isReplaying()).toBe(true)
+    expect(
+      state.captureReplayOutput({ sessionId: 'session-1', data: 'current-window', seq: 3, processName: 'zsh' }),
+    ).toBe(true)
+
+    expect(state.finishReplay(staleGeneration)).toEqual([])
+    expect(state.isReplaying()).toBe(true)
+    expect(state.finishReplay(currentGeneration).map((event) => event.data)).toEqual(['current-window'])
+  })
+
   test('resetTransientState clears transient state without overwriting ownership', () => {
     const state = new TerminalSessionState()
 

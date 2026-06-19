@@ -23,6 +23,7 @@ import {
 } from '#/web/components/terminal/terminal-session-projection.ts'
 import { TerminalSessionRuntime } from '#/web/components/terminal/terminal-session-runtime.ts'
 import { TerminalSessionView } from '#/web/components/terminal/terminal-session-view.ts'
+import { isTerminalEmulatorInput, type TerminalInput } from '#/web/components/terminal/terminal-input.ts'
 import { readOrCreateWebTerminalAttachmentId } from '#/web/renderer-terminal-bridge.ts'
 import { terminalLog } from '#/web/logger.ts'
 import type {
@@ -153,10 +154,11 @@ export class ManagedTerminalSession {
     return this.view.isTerminalFocusTarget(target)
   }
 
-  writeInput(data: string): void {
+  writeInput(input: TerminalInput): void {
     const sessionId = this.runtime.currentSessionId()
     if (!sessionId || !this.runtime.canResize()) return
-    this.pendingWriteBuffer += data
+    if (this.runtime.isReplaying() && isTerminalEmulatorInput(input)) return
+    this.pendingWriteBuffer += input.data
     this.scheduleInputFlush()
   }
 
@@ -381,20 +383,23 @@ export class ManagedTerminalSession {
   }
 
   private async startAsync(token: number): Promise<void> {
+    let preloadReplayGeneration: number | null = null
     try {
-      const { term, preloaded } = await this.openPhase(token)
+      const opened = await this.openPhase(token)
+      const { term } = opened
+      preloadReplayGeneration = opened.preloadReplayGeneration
       const result = await this.ipcPhase(token, term)
       if (result.phase === 'error') {
         // The attach failed. Drop the replay window the preload
         // started so the boundary and captured events don't leak
         // into the next start.
-        this.runtime.drainReplay()
+        if (preloadReplayGeneration !== null) this.runtime.drainReplay(preloadReplayGeneration)
         const changed = this.runtime.applyAttachResult(result, { cols: term.cols, rows: term.rows })
         this.destroyActiveView()
         if (changed) this.notify('metadata')
         return
       }
-      await this.replayPhase(token, term, result, preloaded)
+      await this.replayPhase(token, term, result)
       this.finalizePhase(token, term)
     } catch (err) {
       if (err instanceof StartCancelledError) {
@@ -402,7 +407,7 @@ export class ManagedTerminalSession {
         // window the cancelled preload opened, so the next start's
         // beginReplay doesn't inherit events captured against the
         // cancelled term.
-        this.runtime.drainReplay()
+        if (preloadReplayGeneration !== null) this.runtime.drainReplay(preloadReplayGeneration)
         return
       }
       this.closeReplacingPtySession()
@@ -412,58 +417,66 @@ export class ManagedTerminalSession {
     }
   }
 
-  private async openPhase(token: number): Promise<{ term: XTermTerminal; preloaded: boolean }> {
+  private async openPhase(token: number): Promise<{ term: XTermTerminal; preloadReplayGeneration: number | null }> {
+    let preloadReplayGeneration: number | null = null
     if (this.disposed || this.startToken !== token || this.view.currentTerminal()) throw new StartCancelledError()
-    await preloadTerminalFont()
-    // The preload await can yield long enough for the session to be disposed
-    // (React unmount, user navigation). Without this guard the orchestrator
-    // would proceed to waitForMeasurableHost with a detached host, leaking a
-    // ResizeObserver and hanging the promise indefinitely.
-    if (this.disposed || this.startToken !== token) throw new StartCancelledError()
-    // The orchestrator owns the geometry wait. The view never falls back to
-    // a default — if the host never becomes measurable, this attach fails
-    // and the user can retry by re-selecting the terminal. See
-    // docs/terminal.md "Geometry and layout model".
-    const geometryAbortController = new AbortController()
-    this.geometryAbortController?.abort()
-    this.geometryAbortController = geometryAbortController
-    let geometry: { cols: number; rows: number }
     try {
-      geometry = await waitForMeasurableHost(this.view.measurableHost(), {
-        signal: geometryAbortController.signal,
-      })
-    } catch (err) {
-      if (err instanceof TerminalHostNotMeasurableError || geometryAbortController.signal.aborted) {
-        terminalLog.warn('terminal host did not become measurable; failing attach', { err })
-        // The wait may have been aborted by a newer start() or by dispose().
-        // In that case a fresh attach is already in flight and we must not
-        // tear its transient state down. Tear down only if our start token
-        // is still current.
-        if (this.currentToken(token)) {
-          this.destroyActiveView()
-          if (this.runtime.failAttachAttempt('error.terminal-host-not-measurable')) this.notify('metadata')
+      await preloadTerminalFont()
+      // The preload await can yield long enough for the session to be disposed
+      // (React unmount, user navigation). Without this guard the orchestrator
+      // would proceed to waitForMeasurableHost with a detached host, leaking a
+      // ResizeObserver and hanging the promise indefinitely.
+      if (this.disposed || this.startToken !== token) throw new StartCancelledError()
+      // The orchestrator owns the geometry wait. The view never falls back to
+      // a default — if the host never becomes measurable, this attach fails
+      // and the user can retry by re-selecting the terminal. See
+      // docs/terminal.md "Geometry and layout model".
+      const geometryAbortController = new AbortController()
+      this.geometryAbortController?.abort()
+      this.geometryAbortController = geometryAbortController
+      let geometry: { cols: number; rows: number }
+      try {
+        geometry = await waitForMeasurableHost(this.view.measurableHost(), {
+          signal: geometryAbortController.signal,
+        })
+      } catch (err) {
+        if (err instanceof TerminalHostNotMeasurableError || geometryAbortController.signal.aborted) {
+          terminalLog.warn('terminal host did not become measurable; failing attach', { err })
+          // The wait may have been aborted by a newer start() or by dispose().
+          // In that case a fresh attach is already in flight and we must not
+          // tear its transient state down. Tear down only if our start token
+          // is still current.
+          if (this.currentToken(token)) {
+            this.destroyActiveView()
+            if (this.runtime.failAttachAttempt('error.terminal-host-not-measurable')) this.notify('metadata')
+          }
+          throw new StartCancelledError()
         }
-        throw new StartCancelledError()
+        throw err
+      }
+      if (this.geometryAbortController === geometryAbortController) this.geometryAbortController = null
+      const term = this.view.openTerminal(geometry, (input) => this.writeInput(input))
+      preloadReplayGeneration = await this.preloadHydratedSnapshot(token, term)
+      await waitForTerminalLayout()
+      this.guardStart(token, term)
+      this.view.fitNow()
+      // The post-fitNow rAF barrier is intentionally concurrent with the
+      // subsequent ipcPhase.attach: view.fitNow() is synchronous, so
+      // term.cols/term.rows are correct the moment we return from openPhase,
+      // and the attach IPC reads them synchronously when ipcPhase runs.
+      // The rAF settles the *layout paint* for measurement accuracy in
+      // later operations, but the attach roundtrip doesn't need that
+      // paint to have completed. A future refactor that turns attach into
+      // a local cache lookup MUST restore the blocking wait.
+      void waitForTerminalLayout()
+      this.guardStart(token, term)
+      return { term, preloadReplayGeneration }
+    } catch (err) {
+      if (err instanceof StartCancelledError && preloadReplayGeneration !== null) {
+        this.runtime.drainReplay(preloadReplayGeneration)
       }
       throw err
     }
-    if (this.geometryAbortController === geometryAbortController) this.geometryAbortController = null
-    const term = this.view.openTerminal(geometry, (input) => this.writeInput(input))
-    const preloaded = await this.preloadHydratedSnapshot(token, term)
-    await waitForTerminalLayout()
-    this.guardStart(token, term)
-    this.view.fitNow()
-    // The post-fitNow rAF barrier is intentionally concurrent with the
-    // subsequent ipcPhase.attach: view.fitNow() is synchronous, so
-    // term.cols/term.rows are correct the moment we return from openPhase,
-    // and the attach IPC reads them synchronously when ipcPhase runs.
-    // The rAF settles the *layout paint* for measurement accuracy in
-    // later operations, but the attach roundtrip doesn't need that
-    // paint to have completed. A future refactor that turns attach into
-    // a local cache lookup MUST restore the blocking wait.
-    void waitForTerminalLayout()
-    this.guardStart(token, term)
-    return { term, preloaded }
   }
 
   private async ipcPhase(token: number, term: XTermTerminal): Promise<TerminalAttachResultWithOwnership> {
@@ -496,7 +509,6 @@ export class ManagedTerminalSession {
     token: number,
     term: XTermTerminal,
     result: TerminalAttachResultWithOwnership,
-    preloaded: boolean,
   ): Promise<void> {
     let changed = this.runtime.applyAttachResult(result, { cols: term.cols, rows: term.rows })
     if (!this.runtime.canResize()) {
@@ -546,41 +558,48 @@ export class ManagedTerminalSession {
   }
 
   private async replayActiveView(token: number, term: XTermTerminal, replay: string, replaySeq: number): Promise<void> {
-    this.runtime.beginReplay(replaySeq)
+    const replayGeneration = this.runtime.beginReplay(replaySeq)
     try {
       term.reset()
       if (replay) await termWrite(term, replay)
     } finally {
       if (this.currentStart(token, term)) {
-        for (const event of this.runtime.finishReplay()) this.queueOutput(event.data)
+        for (const event of this.runtime.finishReplay(replayGeneration)) this.queueOutput(event.data)
+      } else {
+        this.runtime.drainReplay(replayGeneration)
       }
     }
   }
 
-  private async preloadHydratedSnapshot(token: number, term: XTermTerminal): Promise<boolean> {
+  private async preloadHydratedSnapshot(token: number, term: XTermTerminal): Promise<number | null> {
     const hydratedSnapshot = this.hydratedSnapshot
     // An empty snapshot is the "no preload" sentinel — the hydration
     // input always carries the field, but producers use '' when they
     // have no buffer to seed. Resetting/writing on empty would clobber
     // the term for nothing.
-    if (hydratedSnapshot.snapshot.length === 0 || !this.currentStart(token, term)) return false
+    if (hydratedSnapshot.snapshot.length === 0 || !this.currentStart(token, term)) return null
     // Open the replay window — see state.beginReplay for the preload+post-attach contract.
-    this.runtime.beginReplay(hydratedSnapshot.snapshotSeq)
+    const replayGeneration = this.runtime.beginReplay(hydratedSnapshot.snapshotSeq)
     try {
       term.reset()
       if (hydratedSnapshot.snapshot) await termWrite(term, hydratedSnapshot.snapshot)
+      const stillCurrent = this.currentStart(token, term)
       // Identity check: a concurrent hydrate() between termWrite start
       // and resolve may have already replaced this.hydratedSnapshot
       // with a fresher value. Clearing in that case would discard it;
       // we leave the new value for its own write path to clear.
-      if (this.hydratedSnapshot === hydratedSnapshot) {
+      if (stillCurrent && this.hydratedSnapshot === hydratedSnapshot) {
         this.hydratedSnapshot = { snapshot: '', snapshotSeq: 0 }
       }
-      return this.currentStart(token, term)
+      if (!stillCurrent) {
+        this.runtime.drainReplay(replayGeneration)
+        return null
+      }
+      return replayGeneration
     } catch (err) {
       // Term write failed — drop the replay window so the boundary
       // and buffer don't leak into the next start.
-      this.runtime.drainReplay()
+      this.runtime.drainReplay(replayGeneration)
       throw err
     }
   }
@@ -589,17 +608,39 @@ export class ManagedTerminalSession {
     const term = this.view.currentTerminal()
     const hydratedSnapshot = this.hydratedSnapshot
     if (!term) return
-    term.reset()
-    if (hydratedSnapshot.snapshot.length === 0) return
-    term.write(hydratedSnapshot.snapshot, () => {
-      // Identity check: see preloadHydratedSnapshot. A concurrent
-      // hydrate() may have replaced this.hydratedSnapshot since we
-      // captured the local reference; only clear if it still points
-      // at the snapshot we just wrote.
-      if (this.hydratedSnapshot === hydratedSnapshot) {
-        this.hydratedSnapshot = { snapshot: '', snapshotSeq: 0 }
+    const replayGeneration = this.runtime.beginReplay(hydratedSnapshot.snapshotSeq)
+    try {
+      term.reset()
+      if (hydratedSnapshot.snapshot.length === 0) {
+        this.finishActiveHydratedSnapshotReplay(term, hydratedSnapshot, replayGeneration)
+        return
       }
-    })
+      term.write(hydratedSnapshot.snapshot, () => {
+        this.finishActiveHydratedSnapshotReplay(term, hydratedSnapshot, replayGeneration)
+      })
+    } catch (err) {
+      this.runtime.drainReplay(replayGeneration)
+      throw err
+    }
+  }
+
+  private finishActiveHydratedSnapshotReplay(
+    term: XTermTerminal,
+    hydratedSnapshot: { snapshot: string; snapshotSeq: number },
+    replayGeneration: number,
+  ): void {
+    if (this.view.currentTerminal() === term) {
+      for (const event of this.runtime.finishReplay(replayGeneration)) this.queueOutput(event.data)
+    } else {
+      this.runtime.drainReplay(replayGeneration)
+    }
+    // Identity check: see preloadHydratedSnapshot. A concurrent
+    // hydrate() may have replaced this.hydratedSnapshot since we
+    // captured the local reference; only clear if it still points
+    // at the snapshot we just wrote.
+    if (this.hydratedSnapshot === hydratedSnapshot) {
+      this.hydratedSnapshot = { snapshot: '', snapshotSeq: 0 }
+    }
   }
 
   private queueResize(cols: number, rows: number): void {
