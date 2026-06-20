@@ -67,6 +67,8 @@
   --color-danger-rgb: var(--goblin-status-danger-rgb);
   --color-danger-surface: var(--goblin-status-danger-surface);
   --color-danger-border: var(--goblin-status-danger-border);
+  --color-notification: var(--goblin-status-notification);
+  --color-notification-foreground: var(--goblin-status-notification-foreground);
   --color-selected-muted-foreground: var(--goblin-text-selected-secondary, var(--goblin-text-secondary));
 
   /* Type / shadows / radius — shadcn radius scale, project shadow

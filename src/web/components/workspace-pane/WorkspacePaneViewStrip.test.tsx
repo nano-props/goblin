@@ -270,6 +270,8 @@ describe('WorkspacePaneViewStrip', () => {
     const tab = document.body.querySelector('#detail-workspace-pane-view')
     expect(tab?.getAttribute('aria-label')).toContain('~/repo/worktree — npm run dev')
     expect(tab?.getAttribute('aria-label')).toContain('terminal.bell-unread')
+    expect(tab?.querySelector('.bg-notification')).not.toBeNull()
+    expect(tab?.querySelector('.bg-attention')).toBeNull()
   })
 
   test('moves focus across the full terminal view strip and only navigates out at arrow-key edges', () => {

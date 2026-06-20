@@ -138,6 +138,58 @@ describe('BranchRow', () => {
     const badge = document.querySelector('[aria-label="3 个未读终端提醒"]')
     expect(badge?.textContent).toBe('3')
   })
+
+  test('keeps the branch icon when there are no unread terminal bells', () => {
+    const repo = emptyRepo('/tmp/repo', 'repo')
+    const branch = createRepoBranch('feature/a')
+
+    render(
+      <ul>
+        <BranchRow
+          repo={repo}
+          branch={branch}
+          selected={null}
+          onSelectBranch={vi.fn()}
+          onOpenBranchStatus={vi.fn()}
+          selectedRef={createRef<HTMLLIElement>()}
+          showActions={false}
+        />
+      </ul>,
+    )
+
+    expect(document.querySelector('[data-testid="branch-summary-icon"]')).not.toBeNull()
+    expect(document.querySelector('[aria-label="0 个未读终端提醒"]')).toBeNull()
+  })
+
+  test('replaces the branch icon with the terminal bell badge', () => {
+    const repo = emptyRepo('/tmp/repo', 'repo')
+    const branch = createRepoBranch('feature/a')
+
+    render(
+      <ul>
+        <BranchRow
+          repo={repo}
+          branch={branch}
+          selected={null}
+          onSelectBranch={vi.fn()}
+          onOpenBranchStatus={vi.fn()}
+          selectedRef={createRef<HTMLLIElement>()}
+          showActions={false}
+          terminalBellCount={3}
+        />
+      </ul>,
+    )
+
+    const badge = document.querySelector('[aria-label="3 个未读终端提醒"]')
+    const branchIcon = document.querySelector('[data-testid="branch-summary-icon"]')
+    const branchLabel = Array.from(document.querySelectorAll('span')).find((node) => node.textContent === 'feature/a')
+
+    expect(badge).not.toBeNull()
+    expect(badge?.className).toContain('bg-notification')
+    expect(branchIcon).toBeNull()
+    expect(branchLabel).not.toBeUndefined()
+    expect(badge!.compareDocumentPosition(branchLabel!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
 })
 
 function render(element: React.ReactNode) {

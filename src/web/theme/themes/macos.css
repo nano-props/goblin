@@ -46,6 +46,8 @@ html[data-color-theme='macos'][data-theme='light'] {
   --goblin-status-danger-rgb: 215 0 21;
   --goblin-status-danger-surface: rgb(var(--goblin-status-danger-rgb) / 0.09);
   --goblin-status-danger-border: rgb(var(--goblin-status-danger-rgb) / 0.4);
+  --goblin-status-notification: #d70015;
+  --goblin-status-notification-foreground: #ffffff;
 
   --color-overlay-scrim: rgb(0 0 0 / 0.4);
   --goblin-shadow-xs: 0 1px 1px rgb(10 10 10 / 0.03);
@@ -127,6 +129,8 @@ html[data-color-theme='macos'][data-theme='dark'] {
   --goblin-status-danger-rgb: 255 69 58;
   --goblin-status-danger-surface: rgb(var(--goblin-status-danger-rgb) / 0.09);
   --goblin-status-danger-border: rgb(var(--goblin-status-danger-rgb) / 0.45);
+  --goblin-status-notification: #ff453a;
+  --goblin-status-notification-foreground: #1a0606;
 
   --color-overlay-scrim: rgb(0 0 0 / 0.48);
   --goblin-shadow-xs: 0 1px 1px rgb(0 0 0 / 0.22);

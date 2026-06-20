@@ -242,7 +242,7 @@ function WorkspacePaneViewSwitcherPopover({
                     <span className="min-w-0 flex-1 truncate">{item.label}</span>
                     {isTerminalWorkspacePaneTabItem(item) && item.view.hasBell && (
                       <>
-                        <span className="h-2 w-2 shrink-0 rounded-full bg-attention" aria-hidden="true" />
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-notification" aria-hidden="true" />
                         <span className="sr-only">{t('terminal.bell-unread')}</span>
                       </>
                     )}
@@ -753,8 +753,8 @@ function WorkspacePaneViewChrome({
       {isTerminalWorkspacePaneTabItem(item) && item.view.hasBell && (
         <>
           <span className="relative flex h-2 w-2 shrink-0">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-attention opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-attention" />
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-notification opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-notification" />
           </span>
           <span className="sr-only">{t('terminal.bell-unread')}</span>
         </>

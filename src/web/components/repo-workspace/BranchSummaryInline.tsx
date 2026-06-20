@@ -105,7 +105,7 @@ export function BranchSummaryIcon({
   selected: boolean
 }) {
   return (
-    <span className="flex w-4 shrink-0 items-center justify-center">
+    <span data-testid="branch-summary-icon" className="flex w-4 shrink-0 items-center justify-center">
       {hasWorktree ? (
         <FolderTree size={14} className={worktreeDirty ? 'text-attention' : 'text-brand-text'} />
       ) : (
@@ -182,7 +182,7 @@ function BranchTerminalBellBadge({ count }: { count: number }) {
     <span
       aria-label={label}
       title={label}
-      className="inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-attention px-1 font-mono text-[10px] font-semibold leading-none text-background tabular-nums"
+      className="inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-notification px-1 font-mono text-[10px] font-semibold leading-none text-notification-foreground tabular-nums"
     >
       {displayCount}
     </span>
@@ -204,7 +204,13 @@ export function BranchSummaryInline({
 
   return (
     <div title={title} className={cn('flex min-w-0 items-center gap-2', className)}>
-      <BranchSummaryIcon hasWorktree={hasWorktree} worktreeDirty={worktreeDirty} selected={selected} />
+      {terminalBellCount > 0 ? (
+        <span className="flex w-4 shrink-0 items-center justify-center">
+          <BranchTerminalBellBadge count={terminalBellCount} />
+        </span>
+      ) : (
+        <BranchSummaryIcon hasWorktree={hasWorktree} worktreeDirty={worktreeDirty} selected={selected} />
+      )}
       <span className="flex min-w-0 items-center gap-2 overflow-hidden">
         <span
           className={cn(
@@ -214,7 +220,6 @@ export function BranchSummaryInline({
         >
           {branch.name}
         </span>
-        <BranchTerminalBellBadge count={terminalBellCount} />
         <BranchSummaryMeta repo={repo} branch={branch} selected={selected} />
       </span>
     </div>
