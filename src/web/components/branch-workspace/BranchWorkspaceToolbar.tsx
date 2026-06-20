@@ -1,5 +1,4 @@
-import { GitBranch } from 'lucide-react'
-import { useCallback, useMemo, type KeyboardEvent } from 'react'
+import { useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
 import type { RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
@@ -12,31 +11,22 @@ import { useTerminalSessionContext } from '#/web/components/terminal/terminal-se
 import {
   WorkspacePaneViewStrip,
   EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY,
+  createBranchWorkspacePaneTabItem,
+  createWorktreeWorkspacePaneTabItem,
+  isTerminalWorkspacePaneTabItem,
+  isWorktreeWorkspacePaneTabItem,
+  type WorkspacePaneTabItem,
+  type WorkspacePaneWorktreeTabItem,
 } from '#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx'
-import { ToolbarClosableTab } from '#/web/components/tab-strip/ToolbarClosableTab.tsx'
-import { ToolbarTabList } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
-import {
-  toolbarTabButtonClassName,
-  toolbarTabChromeClassName,
-  toolbarTabIconClassName,
-} from '#/web/components/tab-strip/tab-variants.ts'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
-import type { WorkspacePaneView, WorkspacePaneViewOrderEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneViewOrderEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneViewSummary, TerminalSessionBase } from '#/web/components/terminal/types.ts'
-import {
-  activeWorkspacePaneViewIdentity,
-  workspacePaneViewIdentity,
-  nextWorkspacePaneViewAfterClose,
-  staticWorkspacePaneViewIdentity,
-  terminalWorkspacePaneViewIdentity,
-} from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
 import type {
   BranchWorkspaceRepo,
   SelectedBranchWorkspacePresentation,
 } from '#/web/components/branch-workspace/model.ts'
 import {
   BRANCH_LEVEL_WORKSPACE_PANE_VIEWS,
-  branchLevelWorkspacePaneViewButtonId,
   branchWorkspacePaneViewCloseLabel,
   branchWorkspacePaneViewLabel,
   branchWorkspacePaneViewTooltip,
@@ -45,7 +35,7 @@ import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useEffectiveWorkspacePaneView } from '#/web/components/branch-workspace/useEffectiveWorkspacePaneView.ts'
 import { useIsInitialSyncInFlight } from '#/web/stores/repo-sync.ts'
-import { isWorktreeLevelWorkspacePaneView, type BranchLevelWorkspacePaneView } from '#/web/lib/workspace-pane-view.ts'
+import { isWorktreeLevelWorkspacePaneView } from '#/web/lib/workspace-pane-view.ts'
 
 interface Props {
   repo: Pick<BranchWorkspaceRepo, 'id' | 'ui' | 'data'>
@@ -80,12 +70,10 @@ export function BranchWorkspaceToolbar({ repo, detail, detailId }: Props) {
   } = useTerminalSessionContext()
 
   const worktreeSnapshot = useWorktreeTerminalSnapshot(terminalWorktreeKey)
-  const terminalSessions = worktreeSnapshot.sessions
   const worktreeWorkspacePaneViews = useMemo(
     () => worktreeSnapshot.workspacePaneViews.filter((tab) => isWorktreeLevelWorkspacePaneView(tab.type)),
     [worktreeSnapshot.workspacePaneViews],
   )
-  const activeTabIdentity = activeWorkspacePaneViewIdentity(worktreeWorkspacePaneViews, effectiveTab)
   const workspacePaneTabFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()
 
   const terminalBase = useMemo<TerminalSessionBase | null>(
@@ -118,14 +106,18 @@ export function BranchWorkspaceToolbar({ repo, detail, detailId }: Props) {
     })
   }, [createTerminal, terminalBase, enterTerminalTab, t])
 
-  const handleSelectWorkspacePaneView = useCallback(
-    (worktreeKey: string, tab: WorkspacePaneViewSummary) => {
-      if (tab.type === 'terminal') {
-        enterTerminalTab()
-        selectTerminal(worktreeKey, tab.key)
+  const showWorkspacePaneTabItem = useCallback(
+    (item: WorkspacePaneTabItem) => {
+      if (!isWorktreeWorkspacePaneTabItem(item)) {
+        navigation.showRepoWorkspacePaneView(repo.id, item.branchViewType)
         return
       }
-      navigation.showRepoWorkspacePaneView(repo.id, tab.type)
+      if (item.view.type === 'terminal') {
+        enterTerminalTab()
+        selectTerminal(item.view.worktreeTerminalKey, item.view.key)
+        return
+      }
+      navigation.showRepoWorkspacePaneView(repo.id, item.view.type)
     },
     [enterTerminalTab, navigation, repo.id, selectTerminal],
   )
@@ -136,44 +128,6 @@ export function BranchWorkspaceToolbar({ repo, detail, detailId }: Props) {
       scrollToBottom(key)
     },
     [enterTerminalTab, scrollToBottom],
-  )
-
-  const handleCloseWorkspacePaneView = useCallback(
-    (tab: WorkspacePaneViewSummary) => {
-      const closingIdentity = workspacePaneViewIdentity(tab)
-      const nextTab = nextWorkspacePaneViewAfterClose(worktreeWorkspacePaneViews, closingIdentity)
-      const isActive = activeTabIdentity === closingIdentity
-
-      if (tab.type === 'terminal') {
-        if (!terminalBase) return
-        closeTerminalByDescriptor(tab.key, terminalBase)
-      } else {
-        if (!terminalWorktreeKey) return
-        void closeWorkspacePaneView(terminalWorktreeKey, tab.type)
-      }
-
-      if (isActive && nextTab) {
-        if (nextTab.type === 'terminal') {
-          navigation.showRepoWorkspacePaneView(repo.id, 'terminal')
-          selectTerminal(nextTab.worktreeTerminalKey, nextTab.key)
-        } else {
-          navigation.showRepoWorkspacePaneView(repo.id, nextTab.type)
-        }
-      } else if (isActive) {
-        navigation.showRepoWorkspacePaneView(repo.id, 'status')
-      }
-    },
-    [
-      activeTabIdentity,
-      closeWorkspacePaneView,
-      closeTerminalByDescriptor,
-      navigation,
-      repo.id,
-      selectTerminal,
-      terminalBase,
-      terminalWorktreeKey,
-      worktreeWorkspacePaneViews,
-    ],
   )
 
   const handleReorderWorkspacePaneViewStrip = useCallback(
@@ -201,101 +155,102 @@ export function BranchWorkspaceToolbar({ repo, detail, detailId }: Props) {
     (tab: WorkspacePaneViewSummary) => branchWorkspacePaneViewCloseLabel(tab, t),
     [t],
   )
+  const workspacePaneTabItems = useMemo<WorkspacePaneTabItem[]>(
+    () => [
+      ...(showBranchLevelTabs
+        ? BRANCH_LEVEL_WORKSPACE_PANE_VIEWS.map((tab) => {
+            const label = t(tab.labelKey)
+            return createBranchWorkspacePaneTabItem({
+              type: tab.type,
+              label,
+              tooltip: label,
+              panelId: `${detailId}-${tab.type}-panel`,
+            })
+          })
+        : []),
+      ...worktreeWorkspacePaneViews.map((tab) =>
+        createWorktreeWorkspacePaneTabItem({
+          view: tab,
+          label: labelForWorkspacePaneView(tab),
+          tooltip: tooltipForWorkspacePaneView(tab),
+          closeLabel: closeLabelForWorkspacePaneView(tab),
+          panelId: `${detailId}-${tab.type}-panel`,
+        }),
+      ),
+    ],
+    [
+      closeLabelForWorkspacePaneView,
+      detailId,
+      labelForWorkspacePaneView,
+      showBranchLevelTabs,
+      t,
+      tooltipForWorkspacePaneView,
+      worktreeWorkspacePaneViews,
+    ],
+  )
+  const activeTabIdentity = useMemo(() => {
+    const activeItem = workspacePaneTabItems.find((item) => {
+      if (effectiveTab === 'terminal') return isTerminalWorkspacePaneTabItem(item) && item.view.selected
+      return item.type === effectiveTab
+    })
+    return activeItem?.identity ?? null
+  }, [effectiveTab, workspacePaneTabItems])
+  const handleSelectWorkspacePaneTabItem = useCallback(
+    (item: WorkspacePaneTabItem) => {
+      if (
+        isWorktreeWorkspacePaneTabItem(item) &&
+        item.view.type === 'terminal' &&
+        item.identity === activeTabIdentity
+      ) {
+        handleScrollToBottom(item.view.key)
+        return
+      }
+      showWorkspacePaneTabItem(item)
+    },
+    [activeTabIdentity, handleScrollToBottom, showWorkspacePaneTabItem],
+  )
+  const handleCloseWorkspacePaneView = useCallback(
+    (item: WorkspacePaneWorktreeTabItem) => {
+      const nextItem = nextWorkspacePaneTabItemAfterClose(workspacePaneTabItems, item.identity)
+      const isActive = activeTabIdentity === item.identity
+
+      if (item.view.type === 'terminal') {
+        if (!terminalBase) return
+        closeTerminalByDescriptor(item.view.key, terminalBase)
+      } else {
+        if (!terminalWorktreeKey) return
+        void closeWorkspacePaneView(terminalWorktreeKey, item.view.type)
+      }
+
+      if (isActive && nextItem) {
+        showWorkspacePaneTabItem(nextItem)
+      } else if (isActive) {
+        navigation.showRepoWorkspacePaneView(repo.id, 'status')
+      }
+    },
+    [
+      activeTabIdentity,
+      closeTerminalByDescriptor,
+      closeWorkspacePaneView,
+      navigation,
+      repo.id,
+      showWorkspacePaneTabItem,
+      terminalBase,
+      terminalWorktreeKey,
+      workspacePaneTabItems,
+    ],
+  )
 
   // No selected branch means there is no tab/action target; BranchWorkspaceContent renders the empty state.
   if (!detail.branch) return null
-
-  const focusedTerminalSession = terminalSessions.find((session) => session.selected) ?? terminalSessions[0] ?? null
-
-  function focusBranchLevelTab(type: BranchLevelWorkspacePaneView = 'status') {
-    workspacePaneTabFocusRegistry.focus(staticWorkspacePaneViewIdentity(type))
-  }
-
-  function focusWorktreeWorkspacePaneView(tab: WorkspacePaneViewSummary | null) {
-    if (!tab) {
-      workspacePaneTabFocusRegistry.focus(EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY)
-      return
-    }
-    workspacePaneTabFocusRegistry.focus(workspacePaneViewIdentity(tab))
-  }
-
-  function selectWorktreeWorkspacePaneView(tab: WorkspacePaneViewSummary | null) {
-    if (!tab) {
-      focusWorktreeWorkspacePaneView(null)
-      return
-    }
-    handleSelectWorkspacePaneView(tab.worktreeTerminalKey, tab)
-    focusWorktreeWorkspacePaneView(tab)
-  }
-
-  function handleBranchLevelTabKeyDown(e: KeyboardEvent<HTMLButtonElement>, type: BranchLevelWorkspacePaneView) {
-    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Home' && e.key !== 'End') return
-    e.preventDefault()
-    const branchTabs = BRANCH_LEVEL_WORKSPACE_PANE_VIEWS
-    const index = branchTabs.findIndex((tab) => tab.type === type)
-    const hasWorktreeViews = !!terminalWorktreeKey
-
-    if (e.key === 'Home') {
-      const firstBranchTab = branchTabs[0]?.type ?? 'status'
-      navigation.showRepoWorkspacePaneView(repo.id, firstBranchTab)
-      focusBranchLevelTab(firstBranchTab)
-      return
-    }
-    if (e.key === 'End') {
-      if (hasWorktreeViews) {
-        selectWorktreeWorkspacePaneView(worktreeWorkspacePaneViews[worktreeWorkspacePaneViews.length - 1] ?? null)
-        return
-      }
-      const lastBranchTab = branchTabs[branchTabs.length - 1]?.type ?? 'status'
-      navigation.showRepoWorkspacePaneView(repo.id, lastBranchTab)
-      focusBranchLevelTab(lastBranchTab)
-      return
-    }
-
-    const direction = e.key === 'ArrowRight' ? 1 : -1
-    const nextBranchTab = branchTabs[index + direction]
-    if (nextBranchTab) {
-      navigation.showRepoWorkspacePaneView(repo.id, nextBranchTab.type)
-      focusBranchLevelTab(nextBranchTab.type)
-      return
-    }
-    if (hasWorktreeViews) {
-      selectWorktreeWorkspacePaneView(
-        direction === 1
-          ? (worktreeWorkspacePaneViews[0] ?? null)
-          : (worktreeWorkspacePaneViews[worktreeWorkspacePaneViews.length - 1] ?? null),
-      )
-    }
-  }
-
-  function focusActiveWorkspacePaneView() {
-    const key =
-      effectiveTab === 'terminal' && focusedTerminalSession
-        ? terminalWorkspacePaneViewIdentity(focusedTerminalSession.key)
-        : effectiveTab === 'status'
-          ? staticWorkspacePaneViewIdentity(effectiveTab)
-          : effectiveTab === 'changes'
-            ? (activeTabIdentity ?? EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY)
-            : EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY
-    workspacePaneTabFocusRegistry.focus(key)
-  }
 
   return (
     <Toolbar variant="detail">
       <div className="flex h-full min-w-0 items-center gap-1 overflow-hidden">
         {showBranchLevelTabs && (
-          <BranchLevelWorkspacePaneTabs
-            detailId={detailId}
-            activeView={effectiveTab}
-            focusRegistry={workspacePaneTabFocusRegistry}
-            onSelect={(type) => navigation.showRepoWorkspacePaneView(repo.id, type)}
-            onKeyDown={handleBranchLevelTabKeyDown}
-          />
-        )}
-        {terminalWorktreeKey && (
           <WorkspacePaneViewStrip
             worktreeTerminalKey={terminalWorktreeKey}
-            views={worktreeWorkspacePaneViews}
+            items={workspacePaneTabItems}
             detailId={detailId}
             activeTabIdentity={activeTabIdentity}
             responsiveCompact={compact}
@@ -308,21 +263,11 @@ export function BranchWorkspaceToolbar({ repo, detail, detailId }: Props) {
             // a visible signal that the strip is loading, not broken.
             isLoading={isInitialSyncInFlight}
             onNew={handleNewTerminal}
-            onSelect={handleSelectWorkspacePaneView}
+            onSelect={handleSelectWorkspacePaneTabItem}
             onScrollToBottom={handleScrollToBottom}
             onClose={handleCloseWorkspacePaneView}
             onReorder={handleReorderWorkspacePaneViewStrip}
-            getLabel={labelForWorkspacePaneView}
-            getTooltip={tooltipForWorkspacePaneView}
-            getCloseLabel={closeLabelForWorkspacePaneView}
-            onNavigateOut={(direction) => {
-              if (direction === 'prev' || direction === 'first' || direction === 'next') {
-                navigation.showRepoWorkspacePaneView(repo.id, 'status')
-                focusBranchLevelTab('status')
-                return
-              }
-              if (direction === 'last') focusActiveWorkspacePaneView()
-            }}
+            activateCrossScopeKeyboardNavigation
           />
         )}
       </div>
@@ -331,49 +276,11 @@ export function BranchWorkspaceToolbar({ repo, detail, detailId }: Props) {
   )
 }
 
-function BranchLevelWorkspacePaneTabs({
-  detailId,
-  activeView,
-  focusRegistry,
-  onSelect,
-  onKeyDown,
-}: {
-  detailId: string
-  activeView: WorkspacePaneView
-  focusRegistry: ReturnType<typeof useFocusRegistry<string, HTMLButtonElement>>
-  onSelect: (type: BranchLevelWorkspacePaneView) => void
-  onKeyDown: (event: KeyboardEvent<HTMLButtonElement>, type: BranchLevelWorkspacePaneView) => void
-}) {
-  const t = useT()
-
-  return (
-    <ToolbarTabList role="tablist" aria-label={t('workspace-pane-views.tabs')} aria-orientation="horizontal">
-      {BRANCH_LEVEL_WORKSPACE_PANE_VIEWS.map((tab) => {
-        const active = activeView === tab.type
-        const label = t(tab.labelKey)
-        return (
-          <ToolbarClosableTab
-            key={tab.type}
-            containerClassName={toolbarTabChromeClassName({ variant: 'detail', active })}
-            buttonRef={focusRegistry.setRef(staticWorkspacePaneViewIdentity(tab.type))}
-            buttonProps={{
-              role: 'tab',
-              id: branchLevelWorkspacePaneViewButtonId(detailId, tab.type),
-              'aria-selected': active,
-              'aria-controls': `${detailId}-${tab.type}-panel`,
-              'aria-label': label,
-              tabIndex: active ? 0 : -1,
-              onClick: () => onSelect(tab.type),
-              onKeyDown: (event) => onKeyDown(event, tab.type),
-            }}
-            buttonClassName={toolbarTabButtonClassName('detail')}
-            closeButton={false}
-          >
-            <GitBranch size={13} className={toolbarTabIconClassName(active)} />
-            <span className="truncate">{label}</span>
-          </ToolbarClosableTab>
-        )
-      })}
-    </ToolbarTabList>
-  )
+function nextWorkspacePaneTabItemAfterClose(
+  items: WorkspacePaneTabItem[],
+  closingIdentity: string,
+): WorkspacePaneTabItem | null {
+  const index = items.findIndex((item) => item.identity === closingIdentity)
+  if (index === -1) return items[0] ?? null
+  return items[index + 1] ?? items[index - 1] ?? null
 }

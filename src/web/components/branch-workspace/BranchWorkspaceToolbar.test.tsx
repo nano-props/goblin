@@ -123,8 +123,64 @@ describe('BranchWorkspaceToolbar', () => {
     expect(emptyButton?.getAttribute('aria-label')).toBe('terminal.new')
     expect(emptyButton?.getAttribute('title')).toBe('terminal.new')
     expect(c.querySelector('#detail-workspace-pane-view')).toBeNull()
-    expect(c.querySelector('[data-workspace-pane-view-tooltip-id="status:status"]')).toBeNull()
+    expect(c.querySelector('[data-workspace-pane-view-tooltip-id="status:status"]')).not.toBeNull()
     expect(c.querySelector('[data-workspace-pane-view-tooltip-id="changes:changes"]')).toBeNull()
+  })
+
+  test('renders status and terminal views in one workspace tab strip with a separator', () => {
+    const { container: c } = renderToolbar({
+      terminalCount: 1,
+      navigation: navigationWith({}),
+    })
+
+    const tablist = c.querySelector('[role="tablist"][aria-label="workspace-pane-views.tabs"]')
+    expect(tablist).not.toBeNull()
+    expect(c.querySelectorAll('[role="tablist"][aria-label="workspace-pane-views.tabs"]')).toHaveLength(1)
+    expect(tablist?.querySelector('#detail-status-tab')).not.toBeNull()
+    expect(tablist?.querySelector('#detail-workspace-pane-view')).not.toBeNull()
+
+    const statusChrome = c.querySelector('[data-workspace-pane-view-tooltip-id="status:status"]')
+    expect(statusChrome?.querySelector(':scope > .pointer-events-none.border-r.border-separator')).not.toBeNull()
+  })
+
+  test('compact workspace view popover merges status and terminal views', async () => {
+    compactUi = true
+    const { container: c } = renderToolbar({
+      terminalCount: 1,
+      workspacePaneView: 'terminal',
+      navigation: navigationWith({}),
+    })
+
+    expect(c.querySelectorAll('[role="tab"]')).toHaveLength(1)
+    expect(c.querySelector('#detail-status-tab')).toBeNull()
+
+    const trigger = c.querySelector<HTMLButtonElement>('button[aria-label="workspace-pane-views.tabs"]')
+    if (!trigger) throw new Error('missing workspace view popover trigger')
+
+    await act(async () => {
+      trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+      trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
+      await Promise.resolve()
+    })
+
+    const list = document.body.querySelector('[role="list"]')
+    expect(list?.textContent).toContain('tab.status')
+    expect(list?.textContent).toContain('term-1')
+    expect(document.body.textContent).toContain('terminal.new')
+  })
+
+  test('compact workspace view shows terminal sync loading before offering new terminal', () => {
+    compactUi = true
+    const { container: c } = renderToolbar({
+      terminalCount: 0,
+      navigation: navigationWith({}),
+      loading: true,
+    })
+
+    expect(c.querySelectorAll('[role="tab"]')).toHaveLength(1)
+    expect(c.querySelector('[data-workspace-pane-skeleton-chip=""]')).not.toBeNull()
+    expect(c.querySelector('button[aria-label="terminal.new"]')).toBeNull()
+    expect(c.querySelector('button[aria-label="workspace-pane-views.tabs"]')).toBeNull()
   })
 
   test('clicking the new-terminal button navigates and creates a terminal', async () => {

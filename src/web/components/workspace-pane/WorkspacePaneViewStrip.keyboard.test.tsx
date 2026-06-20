@@ -5,10 +5,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { terminalWorkspacePaneViewIdentity } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
 import type { WorkspacePaneViewOrderEntry } from '#/shared/workspace-pane.ts'
-import type {
-  WorkspacePaneViewSummary,
-  TerminalSessionSummary,
-} from '#/web/components/terminal/types.ts'
+import type { WorkspacePaneViewSummary, TerminalSessionSummary } from '#/web/components/terminal/types.ts'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
@@ -72,8 +69,8 @@ afterEach(() => {
 describe('WorkspacePaneViewStrip keyboard dnd wiring', () => {
   test('keeps selected styling while the active tab is dragging', async () => {
     sortableDragging = true
-    const { WorkspacePaneViewStrip } = await import('#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx')
-    const TestWorkspacePaneViewStrip = makeWorkspacePaneViewStrip(WorkspacePaneViewStrip)
+    const workspacePaneViewStripModule = await import('#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx')
+    const TestWorkspacePaneViewStrip = makeWorkspacePaneViewStrip(workspacePaneViewStripModule)
 
     container = document.createElement('div')
     document.body.append(container)
@@ -102,8 +99,8 @@ describe('WorkspacePaneViewStrip keyboard dnd wiring', () => {
   })
 
   test('registers a KeyboardSensor and preserves sortable onKeyDown listeners', async () => {
-    const { WorkspacePaneViewStrip } = await import('#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx')
-    const TestWorkspacePaneViewStrip = makeWorkspacePaneViewStrip(WorkspacePaneViewStrip)
+    const workspacePaneViewStripModule = await import('#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx')
+    const TestWorkspacePaneViewStrip = makeWorkspacePaneViewStrip(workspacePaneViewStripModule)
 
     container = document.createElement('div')
     document.body.append(container)
@@ -144,8 +141,10 @@ describe('WorkspacePaneViewStrip keyboard dnd wiring', () => {
 })
 
 function makeWorkspacePaneViewStrip(
-  WorkspacePaneViewStrip: typeof import('#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx').WorkspacePaneViewStrip,
+  workspacePaneViewStripModule: typeof import('#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx'),
 ) {
+  const { WorkspacePaneViewStrip, createWorktreeWorkspacePaneTabItem, isWorktreeWorkspacePaneTabItem } =
+    workspacePaneViewStripModule
   return function TestWorkspacePaneViewStrip(props: {
     worktreeTerminalKey: string
     sessions: TerminalSessionSummary[]
@@ -159,14 +158,23 @@ function makeWorkspacePaneViewStrip(
   }) {
     const selected = props.sessions.find((candidate) => candidate.selected) ?? props.sessions[0]
     const { sessions, ...workspacePaneProps } = props
+    const items = sessions.map((tab) =>
+      createWorktreeWorkspacePaneTabItem({
+        view: tab,
+        label: tab.originalTitle ?? tab.fullTitle ?? tab.title,
+        tooltip: tab.originalTitle ?? tab.fullTitle ?? tab.title,
+        closeLabel: `close ${tab.title}`,
+      }),
+    )
     return (
       <WorkspacePaneViewStrip
         {...workspacePaneProps}
-        views={sessions}
+        items={items}
         activeTabIdentity={selected ? terminalWorkspacePaneViewIdentity(selected.key) : null}
-        getTooltip={(tab) => ('originalTitle' in tab ? (tab.originalTitle ?? tab.fullTitle ?? tab.title) : tab.id)}
-        getLabel={(tab) => ('originalTitle' in tab ? (tab.originalTitle ?? tab.fullTitle ?? tab.title) : tab.id)}
-        getCloseLabel={(tab) => `close ${'title' in tab ? tab.title : tab.id}`}
+        onSelect={(item) => {
+          if (isWorktreeWorkspacePaneTabItem(item)) props.onSelect(props.worktreeTerminalKey, item.view)
+        }}
+        onClose={(item) => props.onClose(item.view)}
       />
     )
   }

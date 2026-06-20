@@ -4,7 +4,11 @@ import { act } from 'react'
 import type { ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { WorkspacePaneViewStrip } from '#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx'
+import {
+  WorkspacePaneViewStrip,
+  createWorktreeWorkspacePaneTabItem,
+  isWorktreeWorkspacePaneTabItem,
+} from '#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx'
 import { terminalWorkspacePaneViewIdentity } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
 import type { WorkspacePaneViewOrderEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneViewSummary, TerminalSessionSummary } from '#/web/components/terminal/types.ts'
@@ -630,14 +634,23 @@ function TestWorkspacePaneViewStrip(props: {
 }) {
   const selected = props.sessions.find((candidate) => candidate.selected) ?? props.sessions[0]
   const { sessions, ...workspacePaneProps } = props
+  const items = sessions.map((tab) =>
+    createWorktreeWorkspacePaneTabItem({
+      view: tab,
+      label: tab.originalTitle ?? tab.fullTitle ?? tab.title,
+      tooltip: tab.originalTitle ?? tab.fullTitle ?? tab.title,
+      closeLabel: `close ${tab.title}`,
+    }),
+  )
   return (
     <WorkspacePaneViewStrip
       {...workspacePaneProps}
-      views={sessions}
+      items={items}
       activeTabIdentity={selected ? terminalWorkspacePaneViewIdentity(selected.key) : null}
-      getTooltip={(tab) => ('originalTitle' in tab ? (tab.originalTitle ?? tab.fullTitle ?? tab.title) : tab.id)}
-      getLabel={(tab) => ('originalTitle' in tab ? (tab.originalTitle ?? tab.fullTitle ?? tab.title) : tab.id)}
-      getCloseLabel={(tab) => `close ${'title' in tab ? tab.title : tab.id}`}
+      onSelect={(item) => {
+        if (isWorktreeWorkspacePaneTabItem(item)) props.onSelect(props.worktreeTerminalKey, item.view)
+      }}
+      onClose={(item) => props.onClose(item.view)}
     />
   )
 }
