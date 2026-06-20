@@ -151,6 +151,11 @@ const TerminalTitleEventSchema = v.object({
 const TerminalExitEventSchema = v.object({
   sessionId: v.string(),
 })
+const TerminalSessionClosedEventSchema = v.object({
+  type: v.literal('session-closed'),
+  sessionId: v.string(),
+  repoRoot: v.string(),
+})
 
 export function isValidTerminalSessionId(value: unknown): value is string {
   return typeof value === 'string' && TERMINAL_SESSION_ID_RE.test(value)
@@ -168,6 +173,7 @@ const TerminalRealtimeMessageVariants = [
   v.object({ type: v.literal('exit'), event: TerminalExitEventSchema }),
   v.object({ type: v.literal('ownership'), event: TerminalOwnershipEventSchema }),
   v.object({ type: v.literal('sessions-changed'), repoRoot: v.string() }),
+  TerminalSessionClosedEventSchema,
 ] as const
 const TerminalRealtimeMessageSchema = v.variant('type', TerminalRealtimeMessageVariants)
 const TerminalSocketServerMessageSchema = v.variant('type', [

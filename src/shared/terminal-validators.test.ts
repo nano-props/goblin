@@ -89,4 +89,18 @@ describe('shared terminal validators', () => {
       }),
     ).toBeNull()
   })
+
+  test('normalizes targeted session-closed realtime messages', () => {
+    expect(
+      normalizeTerminalSocketServerMessage({
+        type: 'session-closed',
+        sessionId: 'session-1',
+        repoRoot: '/repo',
+      }),
+    ).toEqual({
+      type: 'session-closed',
+      sessionId: 'session-1',
+      repoRoot: '/repo',
+    })
+  })
 })
