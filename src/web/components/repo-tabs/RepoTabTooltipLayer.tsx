@@ -3,6 +3,7 @@ import type { ComponentPropsWithoutRef } from 'react'
 import { cn } from '#/web/lib/cn.ts'
 import { DelegatedTooltipLayer, DELEGATED_TOOLTIP_DEFAULTS } from '#/web/components/DelegatedTooltipLayer.tsx'
 import { formatRepoLocator } from '#/web/lib/paths.ts'
+import { formatRelativeTime } from '#/web/lib/dates.ts'
 import { remoteRepoLifecycleTarget } from '#/shared/remote-repo.ts'
 import type { RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
 import { ToolbarTabList } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
@@ -11,7 +12,7 @@ import {
   TOOLTIP_STACK_MD_CLASS,
   TOOLTIP_STACK_SM_CLASS,
 } from '#/web/components/ui/tooltip.tsx'
-import { useT } from '#/web/stores/i18n.ts'
+import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 
 interface RepoTabTooltipLayerProps extends ComponentPropsWithoutRef<'div'> {
   repos: RepoTabSummary[]
@@ -50,15 +51,33 @@ export function RepoTabTooltipLayer({
 
 function RepoTabTooltipContent({ repo }: { repo: RepoTabSummary }) {
   const t = useT()
+  const lang = useI18nStore((s) => s.lang)
   // The tooltip shows the remote locator (alias@host:path) for
   // ready/failed remote repos with a retained target. Connecting
   // remotes and local repos fall back to a plain repo-id render.
   const remoteTarget = remoteRepoLifecycleTarget(repo.lifecycle)
+  const syncedAtDate = repo.lastSyncedAt === null ? null : new Date(repo.lastSyncedAt)
+  const syncedAtIso = syncedAtDate?.toISOString() ?? null
+  const syncedAtLabel = syncedAtIso ? formatRelativeTime(syncedAtIso, lang) : t('repo-tabs.tooltip.not-synced')
   return (
     <>
       <div className="truncate text-xs font-semibold text-foreground">{repo.name}</div>
       <div className={cn('mt-0.5 truncate font-mono', TOOLTIP_META_TEXT_CLASS)}>
         {formatRepoLocator(repo.id, remoteTarget)}
+      </div>
+      <div className={cn('mt-1 flex min-w-0 items-center gap-1.5', TOOLTIP_META_TEXT_CLASS)}>
+        <span className="shrink-0 text-muted-foreground/60">{t('repo-tabs.tooltip.last-sync-label')}</span>
+        {syncedAtIso ? (
+          <time
+            dateTime={syncedAtIso}
+            title={syncedAtDate?.toLocaleString()}
+            className="min-w-0 truncate text-muted-foreground/80"
+          >
+            {syncedAtLabel}
+          </time>
+        ) : (
+          <span className="min-w-0 truncate text-muted-foreground/60">{syncedAtLabel}</span>
+        )}
       </div>
       {repo.remoteDetails.length > 0 && (
         <div className={cn('mt-2 border-t border-border/40 pt-2', TOOLTIP_STACK_MD_CLASS)}>

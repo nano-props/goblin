@@ -154,6 +154,8 @@ export const zh: Record<DictKey, string> = {
   'repo-tabs.open-remote-path-absolute': '路径必须以 / 或 ~/ 开头',
   'repo-tabs.open-remote-home-unavailable': '无法解析远程主目录',
   'repo-tabs.tooltip.no-remotes': '没有远端',
+  'repo-tabs.tooltip.last-sync-label': '上次同步',
+  'repo-tabs.tooltip.not-synced': '尚未同步',
   'repo-tabs.connecting-title': '正在连接 SSH…',
   'repo-unavailable.title': '仓库路径不可用',
   'repo-unavailable.body': 'Goblin 无法把这个路径作为 Git 仓库读取。请恢复文件夹或重新创建 .git 后重试。',

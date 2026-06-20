@@ -12,12 +12,19 @@ import type { RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
 import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
 import { useRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { repoTabStoreActionsEqual, repoTabStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
+import type { RepoState } from '#/web/stores/repos/types.ts'
 
 interface RepoTabsProps {
   currentRepoId: string | null
   onOpenRepoPathDialog: () => void
   onOpenRemote: () => void
   onClone: () => void
+}
+
+export function latestRepoSyncTime(repo: Pick<RepoState, 'projection' | 'resources'>): number | null {
+  const snapshotLoadedAt = repo.projection.source === 'fresh' ? repo.resources.snapshot.loadedAt : null
+  const times = [repo.resources.fetch.loadedAt, snapshotLoadedAt].filter((time): time is number => time !== null)
+  return times.length === 0 ? null : Math.max(...times)
 }
 
 export function RepoTabs({ currentRepoId, onOpenRepoPathDialog, onOpenRemote, onClone }: RepoTabsProps) {
@@ -41,6 +48,7 @@ export function RepoTabs({ currentRepoId, onOpenRepoPathDialog, onOpenRemote, on
             id: r.id,
             name: r.name,
             remoteDetails: r.remote.remoteDetails ?? [],
+            lastSyncedAt: latestRepoSyncTime(r),
             lifecycle: r.remote.lifecycle,
           }
         })
