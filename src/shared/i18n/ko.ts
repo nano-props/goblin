@@ -315,7 +315,6 @@ export const ko: Record<DictKey, string> = {
   'terminal.search-next': '다음',
   'terminal.search-close': '닫기',
   'terminal.sessions': '터미널',
-  'terminal.label': '터미널',
   'terminal.new': '새 터미널',
   'terminal.close': '터미널 닫기',
   'terminal.close-named': '터미널 {name} 닫기',

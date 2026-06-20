@@ -327,7 +327,6 @@ export const en = {
   'terminal.search-next': 'Next',
   'terminal.search-close': 'Close',
   'terminal.sessions': 'Terminals',
-  'terminal.label': 'Terminal',
   'terminal.new': 'New terminal',
   'terminal.close': 'Close terminal',
   'terminal.close-named': 'Close terminal {name}',

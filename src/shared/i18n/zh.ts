@@ -307,7 +307,6 @@ export const zh: Record<DictKey, string> = {
   'terminal.search-next': '下一个',
   'terminal.search-close': '关闭',
   'terminal.sessions': '终端',
-  'terminal.label': '终端',
   'terminal.new': '新终端',
   'terminal.close': '关闭终端',
   'terminal.close-named': '关闭终端 {name}',

@@ -89,12 +89,18 @@ describe('BranchDetailToolbar', () => {
 
     const tabs = Array.from(c.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [])
     expect(tabs.map((tab) => tab.id)).toEqual([])
-    expect(c.querySelector('#detail-workspace-pane-view-empty')?.textContent).toContain('terminal.label')
+    // The empty state is a plus icon button — no text label, just an aria-label/tooltip
+    // describing the action. `useT` is mocked to return the key string, so checking that
+    // textContent does not contain "terminal.label" guards against regressing back to
+    // the old text-only button that rendered `t('terminal.label')` as its label.
+    const emptyButton = c.querySelector<HTMLButtonElement>('#detail-workspace-pane-view-empty')
+    expect(emptyButton).not.toBeNull()
+    expect(emptyButton?.textContent ?? '').not.toContain('terminal.label')
+    expect(emptyButton?.getAttribute('aria-label')).toBe('terminal.new')
+    expect(emptyButton?.getAttribute('title')).toBe('terminal.new')
     expect(c.querySelector('#detail-workspace-pane-view')).toBeNull()
     expect(c.querySelector('[data-workspace-pane-view-tooltip-id="status:status"]')).toBeNull()
     expect(c.querySelector('[data-workspace-pane-view-tooltip-id="changes:changes"]')).toBeNull()
-    // useT is mocked to return the i18n key, so we assert against the key here.
-    expect(c.querySelector('#detail-workspace-pane-view-empty')?.textContent).toContain('terminal.label')
   })
 
   test('clicking the new-terminal button navigates and creates a terminal', async () => {

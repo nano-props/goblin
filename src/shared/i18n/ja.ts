@@ -322,7 +322,6 @@ export const ja: Record<DictKey, string> = {
   'terminal.search-next': '次へ',
   'terminal.search-close': '閉じる',
   'terminal.sessions': 'ターミナル',
-  'terminal.label': 'ターミナル',
   'terminal.new': '新しいターミナル',
   'terminal.close': 'ターミナルを閉じる',
   'terminal.close-named': 'ターミナル {name} を閉じる',

@@ -269,13 +269,14 @@ export function WorkspacePaneViewStrip({
         ref={focusRegistry.setRef(emptyFocusKey)}
         type="button"
         variant="ghost"
-        className="h-7 border border-separator px-2.5 text-sm font-normal text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+        size="icon"
+        className="h-7 w-7 shrink-0"
         id={`${detailId}-workspace-pane-view-empty`}
         onClick={onNew}
         aria-label={t('terminal.new')}
         title={t('terminal.new')}
       >
-        {t('terminal.label')}
+        <Plus size={14} />
       </Button>
     )
   }
