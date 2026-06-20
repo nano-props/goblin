@@ -17,6 +17,8 @@ import {
   workspacePaneViewIdentity,
 } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
+import { isWorktreeLevelWorkspacePaneView } from '#/web/lib/workspace-pane-view.ts'
+import { branchLevelWorkspacePaneViewButtonId } from '#/web/components/branch-detail/workspace-pane-views.ts'
 interface Props {
   repo: Pick<BranchDetailRepo, 'id' | 'data' | 'ui'> & {
     data: BranchDetailRepo['data'] & Pick<BranchDetailRepo['data'], 'statusLoaded'>
@@ -47,19 +49,25 @@ export function BranchDetailContent({ repo, detail, detailId, contentId, layout 
   const { branch } = detail
   const terminalWorktreeKey = branch?.worktree?.path ? worktreeTerminalKey(repo.id, branch.worktree.path) : null
   const worktreeSnapshot = useWorktreeTerminalSnapshot(terminalWorktreeKey)
-  const activeTabIdentity = activeWorkspacePaneViewIdentity(worktreeSnapshot.workspacePaneViews, effectiveTab)
+  const worktreeWorkspacePaneViews = worktreeSnapshot.workspacePaneViews.filter((tab) =>
+    isWorktreeLevelWorkspacePaneView(tab.type),
+  )
+  const activeTabIdentity = activeWorkspacePaneViewIdentity(worktreeWorkspacePaneViews, effectiveTab)
   const activeTabIndex = activeTabIdentity
-    ? worktreeSnapshot.workspacePaneViews.findIndex((tab) => workspacePaneViewIdentity(tab) === activeTabIdentity)
+    ? worktreeWorkspacePaneViews.findIndex((tab) => workspacePaneViewIdentity(tab) === activeTabIdentity)
     : -1
   const activeTabLabelledById =
-    activeTabIndex >= 0
+    effectiveTab === 'status'
+      ? branchLevelWorkspacePaneViewButtonId(detailId, 'status')
+      : activeTabIndex >= 0
       ? workspacePaneViewButtonId(detailId, compact ? 0 : activeTabIndex)
       : workspacePaneViewButtonId(detailId, 0)
   const terminalPendingCreate = effectiveTab === 'terminal' && worktreeSnapshot.pendingCreate
+  const branchStatusTabActive = effectiveTab === 'status'
   if (!branch)
     return <EmptyState title={t(repo.data.branches.length === 0 ? 'branches.empty' : 'branches.filter-empty')} />
 
-  if (!activeTabIdentity && !terminalPendingCreate) {
+  if (!activeTabIdentity && !terminalPendingCreate && !branchStatusTabActive) {
     return (
       <div id={contentId} className="flex min-h-0 flex-1 flex-col">
         <EmptyState title={t('workspace-pane-views.empty')} />

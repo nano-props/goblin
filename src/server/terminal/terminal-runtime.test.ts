@@ -655,19 +655,19 @@ describe('server terminal runtime', () => {
     const opened = host.openView('client_1', OWNER_1, {
       repoRoot: '/repo',
       worktreePath: '/repo-linked',
-      type: 'status',
+      type: 'changes',
     })
     expect(opened).toBe(true)
 
     const tabs = await host.listViews('client_1', OWNER_1, '/repo')
     expect(tabs).toHaveLength(1)
-    expect(tabs[0]).toEqual(expect.objectContaining({ type: 'status', id: 'status', worktreePath: '/repo-linked' }))
+    expect(tabs[0]).toEqual(expect.objectContaining({ type: 'changes', id: 'changes', worktreePath: '/repo-linked' }))
     expect(tabs[0]!.displayOrder).toBeGreaterThan(Math.max(...sessions.map((session) => session.displayOrder)))
 
     const closed = host.closeView('client_1', OWNER_1, {
       repoRoot: '/repo',
       worktreePath: '/repo-linked',
-      type: 'status',
+      type: 'changes',
     })
     expect(closed).toBe(true)
     expect(await host.listViews('client_1', OWNER_1, '/repo')).toEqual([])
@@ -685,7 +685,7 @@ describe('server terminal runtime', () => {
       host.openView('client_1', OWNER_1, {
         repoRoot: '/repo',
         worktreePath: '/repo-linked',
-        type: 'status',
+        type: 'changes',
       }),
     ).toBe(true)
     expect(
@@ -701,7 +701,7 @@ describe('server terminal runtime', () => {
     await expect(host.prune('client_1', OWNER_1, '/repo')).resolves.toEqual({ pruned: 0, remaining: 0 })
 
     expect(await host.listViews('client_1', OWNER_1, '/repo')).toEqual([
-      expect.objectContaining({ type: 'status', worktreePath: '/repo-linked' }),
+      expect.objectContaining({ type: 'changes', worktreePath: '/repo-linked' }),
     ])
     expect(socket.send.mock.calls.map(([payload]) => JSON.parse(String(payload)))).toContainEqual({
       type: 'sessions-changed',

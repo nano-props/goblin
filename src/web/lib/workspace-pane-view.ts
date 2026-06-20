@@ -1,7 +1,29 @@
 import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 
+export type WorkspacePaneViewScope = 'branch' | 'worktree'
+export type BranchLevelWorkspacePaneView = Extract<WorkspacePaneView, 'status'>
+export type WorktreeLevelWorkspacePaneView = Exclude<WorkspacePaneView, BranchLevelWorkspacePaneView>
+
+const WORKSPACE_PANE_VIEW_SCOPE: Record<WorkspacePaneView, WorkspacePaneViewScope> = {
+  status: 'branch',
+  changes: 'worktree',
+  terminal: 'worktree',
+}
+
 export function isWorkspacePaneView(value: string | null | undefined): value is WorkspacePaneView {
   return value === 'status' || value === 'changes' || value === 'terminal'
+}
+
+export function workspacePaneViewScope(view: WorkspacePaneView): WorkspacePaneViewScope {
+  return WORKSPACE_PANE_VIEW_SCOPE[view]
+}
+
+export function isBranchLevelWorkspacePaneView(view: WorkspacePaneView): view is BranchLevelWorkspacePaneView {
+  return workspacePaneViewScope(view) === 'branch'
+}
+
+export function isWorktreeLevelWorkspacePaneView(view: WorkspacePaneView): view is WorktreeLevelWorkspacePaneView {
+  return workspacePaneViewScope(view) === 'worktree'
 }
 
 /**
@@ -25,7 +47,7 @@ export interface WorkspacePaneViewContext {
  *
  * The repos store holds the user's preferred view (the persisted intent).
  * Whether that preference is renderable depends on the live context:
- *  - `hasWorktree` describes whether the branch can host a terminal view
+ *  - `hasWorktree` describes whether the branch can host worktree-scoped views
  *  - `terminalSessionCount` + `terminalSyncReady` come from the
  *    TerminalSessionRegistry (live terminal context)
  *
@@ -34,10 +56,14 @@ export interface WorkspacePaneViewContext {
  * `terminal` preference is preserved. Once the first sync settles, an
  * empty worktree dismisses the `terminal` preference.
  *
+ * A branch without a worktree still has branch-level status, but no
+ * worktree-scoped changes or terminal view; those preferences resolve to
+ * `status` at render time.
+ *
  * Pure function so it can be unit-tested without React.
  */
 export function computeEffectiveWorkspacePaneView(preferred: WorkspacePaneView, context: WorkspacePaneViewContext): WorkspacePaneView {
-  if (!context.hasWorktree && preferred === 'terminal') return 'status'
+  if (!context.hasWorktree && isWorktreeLevelWorkspacePaneView(preferred)) return 'status'
   if (preferred !== 'terminal') return preferred
   if (!context.terminalSyncReady) return 'terminal'
   return context.terminalSessionCount > 0 || context.terminalPendingCreate ? 'terminal' : 'status'

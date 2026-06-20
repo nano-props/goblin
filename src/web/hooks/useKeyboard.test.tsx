@@ -139,14 +139,6 @@ function worktreeSnapshot(): WorktreeTerminalSnapshot {
     },
     staticWorkspacePaneViews: [
       {
-        type: 'status',
-        id: 'status',
-        key: 'status',
-        worktreeTerminalKey: WORKTREE_KEY,
-        worktreePath: WORKTREE_PATH,
-        displayOrder: 0,
-      },
-      {
         type: 'changes',
         id: 'changes',
         key: 'changes',
@@ -171,14 +163,6 @@ function worktreeSnapshot(): WorktreeTerminalSnapshot {
       },
     ],
     workspacePaneViews: [
-      {
-        type: 'status',
-        id: 'status',
-        key: 'status',
-        worktreeTerminalKey: WORKTREE_KEY,
-        worktreePath: WORKTREE_PATH,
-        displayOrder: 0,
-      },
       {
         type: 'terminal',
         id: 'terminal-1',

@@ -75,13 +75,13 @@ describe('shared terminal validators', () => {
         type: 'request',
         requestId: 'req_1',
         action: 'workspace-pane:open-view',
-        input: { repoRoot: '/repo', worktreePath: '/repo', type: 'status' },
+        input: { repoRoot: '/repo', worktreePath: '/repo', type: 'changes' },
       }),
     ).toEqual({
       type: 'request',
       requestId: 'req_1',
       action: 'workspace-pane:open-view',
-      input: { repoRoot: '/repo', worktreePath: '/repo', type: 'status' },
+      input: { repoRoot: '/repo', worktreePath: '/repo', type: 'changes' },
     })
   })
 

@@ -1,5 +1,6 @@
-export type WorkspacePaneStaticViewType = 'status' | 'changes'
-export type WorkspacePaneViewType = WorkspacePaneStaticViewType | 'terminal'
+export type WorkspacePaneBranchViewType = 'status'
+export type WorkspacePaneStaticViewType = 'changes'
+export type WorkspacePaneViewType = WorkspacePaneBranchViewType | WorkspacePaneStaticViewType | 'terminal'
 export type WorkspacePaneView = WorkspacePaneViewType
 
 export interface WorkspacePaneViewOrderEntry {

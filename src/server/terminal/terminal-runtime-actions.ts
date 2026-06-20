@@ -269,7 +269,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     if (!isValidTerminalClientId(clientId)) return null
     if (!isValidRepoLocator(input?.repoRoot)) return null
     if (typeof input?.worktreePath !== 'string' || input.worktreePath.length === 0) return null
-    if (input.type !== 'status' && input.type !== 'changes') return null
+    if (!['changes'].includes(input.type)) return null
     return {
       scope: terminalSessionScope(input.repoRoot),
       worktreePath: isRemoteRepoId(input.repoRoot) ? input.worktreePath : path.resolve(input.worktreePath),

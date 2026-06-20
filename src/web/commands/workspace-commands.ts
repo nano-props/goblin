@@ -23,7 +23,20 @@ export function runShowWorkspacePaneViewCommand({
   navigation,
 }: ShowWorkspacePaneViewCommandOptions): boolean {
   if (!repoId) return false
-  if (tab === 'status' || tab === 'changes') {
+  if (tab === 'status') {
+    const target = selectedBranchWorkspaceTarget(repoId)
+    if (target) {
+      openWorkspacePaneView({
+        repoId,
+        branchName: target.branchName,
+        worktreePath: target.worktreePath,
+        type: 'status',
+        navigation,
+      })
+      return true
+    }
+  }
+  if (tab === 'changes') {
     const base = selectedTerminalBase(repoId)
     if (base) {
       openWorkspacePaneView({
@@ -65,14 +78,19 @@ export async function runTerminalPrimaryActionCommand({
 }
 
 function selectedTerminalBase(repoId: string): TerminalSessionBase | null {
+  const target = selectedBranchWorkspaceTarget(repoId)
+  if (!target?.worktreePath) return null
+  return {
+    repoRoot: repoId,
+    branch: target.branchName,
+    worktreePath: target.worktreePath,
+  }
+}
+
+function selectedBranchWorkspaceTarget(repoId: string): { branchName: string; worktreePath: string | null } | null {
   const repo = useReposStore.getState().repos[repoId]
   if (!repo?.ui.selectedBranch) return null
   const branch = repo.data.branches.find((candidate) => candidate.name === repo.ui.selectedBranch)
-  const worktreePath = branch?.worktree?.path
-  if (!worktreePath) return null
-  return {
-    repoRoot: repo.id,
-    branch: branch.name,
-    worktreePath,
-  }
+  if (!branch) return null
+  return { branchName: branch.name, worktreePath: branch.worktree?.path ?? null }
 }

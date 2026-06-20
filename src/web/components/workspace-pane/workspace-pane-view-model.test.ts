@@ -7,14 +7,6 @@ import type { WorkspacePaneViewSummary } from '#/web/components/terminal/types.t
 
 const tabs: WorkspacePaneViewSummary[] = [
   {
-    type: 'status',
-    id: 'status',
-    key: 'status',
-    worktreeTerminalKey: 'repo\0worktree',
-    worktreePath: 'worktree',
-    displayOrder: 0,
-  },
-  {
     type: 'terminal',
     id: 'terminal-1',
     key: 'terminal-1',
@@ -41,17 +33,16 @@ describe('adjacentWorkspacePaneView', () => {
   test('moves through the actual workspace pane view order', () => {
     expect(adjacentWorkspacePaneView(tabs, 'status', 1)?.type).toBe('terminal')
     expect(adjacentWorkspacePaneView(tabs, 'terminal', 1)?.type).toBe('changes')
-    expect(adjacentWorkspacePaneView(tabs, 'changes', 1)?.type).toBe('status')
+    expect(adjacentWorkspacePaneView(tabs, 'changes', 1)?.type).toBe('terminal')
   })
 
   test('uses the selected terminal as the active terminal view', () => {
-    expect(adjacentWorkspacePaneView(tabs, 'terminal', -1)?.type).toBe('status')
+    expect(adjacentWorkspacePaneView(tabs, 'terminal', -1)?.type).toBe('changes')
   })
 })
 
 describe('nextWorkspacePaneViewAfterClose', () => {
   test('prefers the next tab and falls back to the previous tab', () => {
-    expect(nextWorkspacePaneViewAfterClose(tabs, 'status:status')?.type).toBe('terminal')
     expect(nextWorkspacePaneViewAfterClose(tabs, 'terminal:terminal-1')?.type).toBe('changes')
     expect(nextWorkspacePaneViewAfterClose(tabs, 'changes:changes')?.type).toBe('terminal')
   })

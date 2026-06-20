@@ -21,7 +21,7 @@ import { branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import type { BrowserRemoteProvider } from '#/web/types.ts'
 import { useRuntimeExternalAppSettings } from '#/web/runtime-settings-external-apps.ts'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
-import type { WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneBranchViewType, WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
 import { openWorkspacePaneView } from '#/web/components/branch-detail/open-workspace-pane-view.ts'
 export interface BranchActionItem {
   id: BranchActionItemId
@@ -113,7 +113,7 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
     return t('settings.editor.windsurf')
   })()
 
-  const openStaticWorkspacePaneView = (type: WorkspacePaneStaticViewType) => {
+  const openStaticWorkspacePaneView = (type: WorkspacePaneBranchViewType | WorkspacePaneStaticViewType) => {
     openWorkspacePaneView({
       repoId: repo.id,
       branchName: branch.name,
@@ -128,7 +128,7 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
       id: 'status',
       label: t('tab.status'),
       disabled,
-      visible: !!branch.worktree?.path,
+      visible: true,
       icon: createElement(GitBranch),
       onSelect: () => openStaticWorkspacePaneView('status'),
     },

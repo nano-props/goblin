@@ -1,5 +1,5 @@
-import { ArrowLeft } from 'lucide-react'
-import { useCallback, useMemo } from 'react'
+import { ArrowLeft, GitBranch } from 'lucide-react'
+import { useCallback, useMemo, type KeyboardEvent } from 'react'
 import { toast } from 'sonner'
 import type { RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
@@ -11,8 +11,15 @@ import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-
 import { useWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-store.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { WorkspacePaneViewStrip, EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY } from '#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx'
+import { ToolbarClosableTab } from '#/web/components/tab-strip/ToolbarClosableTab.tsx'
+import { ToolbarTabList } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
+import {
+  toolbarTabButtonClassName,
+  toolbarTabChromeClassName,
+  toolbarTabIconClassName,
+} from '#/web/components/tab-strip/tab-variants.ts'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
-import type { WorkspacePaneViewOrderEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneView, WorkspacePaneViewOrderEntry } from '#/shared/workspace-pane.ts'
 import type {
   WorkspacePaneViewSummary,
   TerminalSessionBase,
@@ -26,6 +33,8 @@ import {
 } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
 import type { BranchDetailRepo, SelectedBranchDetailPresentation } from '#/web/components/branch-detail/model.ts'
 import {
+  BRANCH_LEVEL_WORKSPACE_PANE_VIEWS,
+  branchLevelWorkspacePaneViewButtonId,
   branchWorkspacePaneViewCloseLabel,
   branchWorkspacePaneViewLabel,
   branchWorkspacePaneViewTooltip,
@@ -34,6 +43,11 @@ import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useEffectiveWorkspacePaneView } from '#/web/components/branch-detail/useEffectiveWorkspacePaneView.ts'
 import { useIsInitialSyncInFlight } from '#/web/stores/repo-sync.ts'
+import {
+  isWorktreeLevelWorkspacePaneView,
+  type BranchLevelWorkspacePaneView,
+} from '#/web/lib/workspace-pane-view.ts'
+
 interface Props {
   repo: Pick<BranchDetailRepo, 'id' | 'ui' | 'data'>
   detail: SelectedBranchDetailPresentation
@@ -56,6 +70,7 @@ export function BranchDetailToolbar({ repo, detail, detailId, onBack }: Props) {
   const terminalWorktreeKey = detail.branch?.worktree?.path
     ? worktreeTerminalKey(repo.id, detail.branch.worktree.path)
     : null
+  const showBranchLevelTabs = !!detail.branch
 
   const {
     createTerminal,
@@ -68,7 +83,11 @@ export function BranchDetailToolbar({ repo, detail, detailId, onBack }: Props) {
 
   const worktreeSnapshot = useWorktreeTerminalSnapshot(terminalWorktreeKey)
   const terminalSessions = worktreeSnapshot.sessions
-  const activeTabIdentity = activeWorkspacePaneViewIdentity(worktreeSnapshot.workspacePaneViews, effectiveTab)
+  const worktreeWorkspacePaneViews = useMemo(
+    () => worktreeSnapshot.workspacePaneViews.filter((tab) => isWorktreeLevelWorkspacePaneView(tab.type)),
+    [worktreeSnapshot.workspacePaneViews],
+  )
+  const activeTabIdentity = activeWorkspacePaneViewIdentity(worktreeWorkspacePaneViews, effectiveTab)
   const workspacePaneTabFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()
 
   const terminalBase = useMemo<TerminalSessionBase | null>(
@@ -124,7 +143,7 @@ export function BranchDetailToolbar({ repo, detail, detailId, onBack }: Props) {
   const handleCloseWorkspacePaneView = useCallback(
     (tab: WorkspacePaneViewSummary) => {
       const closingIdentity = workspacePaneViewIdentity(tab)
-      const nextTab = nextWorkspacePaneViewAfterClose(worktreeSnapshot.workspacePaneViews, closingIdentity)
+      const nextTab = nextWorkspacePaneViewAfterClose(worktreeWorkspacePaneViews, closingIdentity)
       const isActive = activeTabIdentity === closingIdentity
 
       if (tab.type === 'terminal') {
@@ -142,6 +161,8 @@ export function BranchDetailToolbar({ repo, detail, detailId, onBack }: Props) {
         } else {
           navigation.showRepoWorkspacePaneView(repo.id, nextTab.type)
         }
+      } else if (isActive) {
+        navigation.showRepoWorkspacePaneView(repo.id, 'status')
       }
     },
     [
@@ -153,7 +174,7 @@ export function BranchDetailToolbar({ repo, detail, detailId, onBack }: Props) {
       selectTerminal,
       terminalBase,
       terminalWorktreeKey,
-      worktreeSnapshot.workspacePaneViews,
+      worktreeWorkspacePaneViews,
     ],
   )
 
@@ -188,12 +209,75 @@ export function BranchDetailToolbar({ repo, detail, detailId, onBack }: Props) {
 
   const focusedTerminalSession = terminalSessions.find((session) => session.selected) ?? terminalSessions[0] ?? null
 
+  function focusBranchLevelTab(type: BranchLevelWorkspacePaneView = 'status') {
+    workspacePaneTabFocusRegistry.focus(staticWorkspacePaneViewIdentity(type))
+  }
+
+  function focusWorktreeWorkspacePaneView(tab: WorkspacePaneViewSummary | null) {
+    if (!tab) {
+      workspacePaneTabFocusRegistry.focus(EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY)
+      return
+    }
+    workspacePaneTabFocusRegistry.focus(workspacePaneViewIdentity(tab))
+  }
+
+  function selectWorktreeWorkspacePaneView(tab: WorkspacePaneViewSummary | null) {
+    if (!tab) {
+      focusWorktreeWorkspacePaneView(null)
+      return
+    }
+    handleSelectWorkspacePaneView(tab.worktreeTerminalKey, tab)
+    focusWorktreeWorkspacePaneView(tab)
+  }
+
+  function handleBranchLevelTabKeyDown(e: KeyboardEvent<HTMLButtonElement>, type: BranchLevelWorkspacePaneView) {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Home' && e.key !== 'End') return
+    e.preventDefault()
+    const branchTabs = BRANCH_LEVEL_WORKSPACE_PANE_VIEWS
+    const index = branchTabs.findIndex((tab) => tab.type === type)
+    const hasWorktreeViews = !!terminalWorktreeKey
+
+    if (e.key === 'Home') {
+      const firstBranchTab = branchTabs[0]?.type ?? 'status'
+      navigation.showRepoWorkspacePaneView(repo.id, firstBranchTab)
+      focusBranchLevelTab(firstBranchTab)
+      return
+    }
+    if (e.key === 'End') {
+      if (hasWorktreeViews) {
+        selectWorktreeWorkspacePaneView(worktreeWorkspacePaneViews[worktreeWorkspacePaneViews.length - 1] ?? null)
+        return
+      }
+      const lastBranchTab = branchTabs[branchTabs.length - 1]?.type ?? 'status'
+      navigation.showRepoWorkspacePaneView(repo.id, lastBranchTab)
+      focusBranchLevelTab(lastBranchTab)
+      return
+    }
+
+    const direction = e.key === 'ArrowRight' ? 1 : -1
+    const nextBranchTab = branchTabs[index + direction]
+    if (nextBranchTab) {
+      navigation.showRepoWorkspacePaneView(repo.id, nextBranchTab.type)
+      focusBranchLevelTab(nextBranchTab.type)
+      return
+    }
+    if (hasWorktreeViews) {
+      selectWorktreeWorkspacePaneView(
+        direction === 1
+          ? (worktreeWorkspacePaneViews[0] ?? null)
+          : (worktreeWorkspacePaneViews[worktreeWorkspacePaneViews.length - 1] ?? null),
+      )
+    }
+  }
+
   function focusActiveWorkspacePaneView() {
     const key =
       effectiveTab === 'terminal' && focusedTerminalSession
         ? terminalWorkspacePaneViewIdentity(focusedTerminalSession.key)
-        : effectiveTab === 'status' || effectiveTab === 'changes'
+        : effectiveTab === 'status'
           ? staticWorkspacePaneViewIdentity(effectiveTab)
+          : effectiveTab === 'changes'
+            ? (activeTabIdentity ?? EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY)
           : EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY
     workspacePaneTabFocusRegistry.focus(key)
   }
@@ -213,11 +297,22 @@ export function BranchDetailToolbar({ repo, detail, detailId, onBack }: Props) {
             <ArrowLeft />
           </Button>
         )}
-        {onBack && terminalWorktreeKey && <div aria-hidden="true" className="h-5 w-px shrink-0 bg-separator" />}
+        {onBack && (terminalWorktreeKey || showBranchLevelTabs) && (
+          <div aria-hidden="true" className="h-5 w-px shrink-0 bg-separator" />
+        )}
+        {showBranchLevelTabs && (
+          <BranchLevelWorkspacePaneTabs
+            detailId={detailId}
+            activeView={effectiveTab}
+            focusRegistry={workspacePaneTabFocusRegistry}
+            onSelect={(type) => navigation.showRepoWorkspacePaneView(repo.id, type)}
+            onKeyDown={handleBranchLevelTabKeyDown}
+          />
+        )}
         {terminalWorktreeKey && (
           <WorkspacePaneViewStrip
             worktreeTerminalKey={terminalWorktreeKey}
-            views={worktreeSnapshot.workspacePaneViews}
+            views={worktreeWorkspacePaneViews}
             detailId={detailId}
             activeTabIdentity={activeTabIdentity}
             responsiveCompact={compact}
@@ -238,7 +333,12 @@ export function BranchDetailToolbar({ repo, detail, detailId, onBack }: Props) {
             getTooltip={tooltipForWorkspacePaneView}
             getCloseLabel={closeLabelForWorkspacePaneView}
             onNavigateOut={(direction) => {
-              if (direction === 'first' || direction === 'last') focusActiveWorkspacePaneView()
+              if (direction === 'prev' || direction === 'first' || direction === 'next') {
+                navigation.showRepoWorkspacePaneView(repo.id, 'status')
+                focusBranchLevelTab('status')
+                return
+              }
+              if (direction === 'last') focusActiveWorkspacePaneView()
             }}
           />
         )}
@@ -248,5 +348,55 @@ export function BranchDetailToolbar({ repo, detail, detailId, onBack }: Props) {
         className={cn('min-w-2 flex-1 self-stretch', compact && 'hidden')}
       />
     </Toolbar>
+  )
+}
+
+function BranchLevelWorkspacePaneTabs({
+  detailId,
+  activeView,
+  focusRegistry,
+  onSelect,
+  onKeyDown,
+}: {
+  detailId: string
+  activeView: WorkspacePaneView
+  focusRegistry: ReturnType<typeof useFocusRegistry<string, HTMLButtonElement>>
+  onSelect: (type: BranchLevelWorkspacePaneView) => void
+  onKeyDown: (event: KeyboardEvent<HTMLButtonElement>, type: BranchLevelWorkspacePaneView) => void
+}) {
+  const t = useT()
+
+  return (
+    <ToolbarTabList role="tablist" aria-label={t('workspace-pane-views.tabs')} aria-orientation="horizontal">
+      {BRANCH_LEVEL_WORKSPACE_PANE_VIEWS.map((tab) => {
+        const active = activeView === tab.type
+        const label = t(tab.labelKey)
+        return (
+          <ToolbarClosableTab
+            key={tab.type}
+            containerClassName={toolbarTabChromeClassName({ variant: 'detail', active })}
+            buttonRef={focusRegistry.setRef(staticWorkspacePaneViewIdentity(tab.type))}
+            buttonProps={{
+              role: 'tab',
+              id: branchLevelWorkspacePaneViewButtonId(detailId, tab.type),
+              'aria-selected': active,
+              'aria-controls': `${detailId}-${tab.type}-panel`,
+              'aria-label': label,
+              tabIndex: active ? 0 : -1,
+              onClick: () => onSelect(tab.type),
+              onKeyDown: (event) => onKeyDown(event, tab.type),
+            }}
+            buttonClassName={toolbarTabButtonClassName('detail')}
+            closeButton={false}
+            closeLabel={t('workspace-pane-views.close-named', { name: label })}
+            closeVisible={false}
+            onClose={() => {}}
+          >
+            <GitBranch size={13} className={toolbarTabIconClassName(active)} />
+            <span className="truncate">{label}</span>
+          </ToolbarClosableTab>
+        )
+      })}
+    </ToolbarTabList>
   )
 }

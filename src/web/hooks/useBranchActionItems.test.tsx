@@ -99,20 +99,43 @@ describe('useBranchActionItems', () => {
     ])
   })
 
-  async function renderHookHost(onReady: (actions: ReturnType<typeof useBranchActionItems>) => void) {
+  test('keeps status visible for a branch without a worktree but hides changes', async () => {
+    let actionIds: string[] = []
+
+    await renderHookHost(
+      (actions) => {
+        actionIds = visibleBranchActionItems(actions).map((item) => item.id)
+      },
+      { branch: { ...branch(), worktree: undefined } },
+    )
+
+    expect(actionIds).toContain('status')
+    expect(actionIds).not.toContain('changes')
+  })
+
+  async function renderHookHost(
+    onReady: (actions: ReturnType<typeof useBranchActionItems>) => void,
+    options: { branch?: RepoBranchState } = {},
+  ) {
     container = document.createElement('div')
     document.body.append(container)
     root = createRoot(container)
 
     await act(async () => {
-      root!.render(<HookHost onReady={onReady} />)
+      root!.render(<HookHost onReady={onReady} branch={options.branch} />)
       await Promise.resolve()
     })
   }
 })
 
-function HookHost({ onReady }: { onReady: (actions: ReturnType<typeof useBranchActionItems>) => void }) {
-  onReady(useBranchActionItems(repo(), branch()))
+function HookHost({
+  onReady,
+  branch: inputBranch,
+}: {
+  onReady: (actions: ReturnType<typeof useBranchActionItems>) => void
+  branch?: RepoBranchState
+}) {
+  onReady(useBranchActionItems(repo(), inputBranch ?? branch()))
   return null
 }
 

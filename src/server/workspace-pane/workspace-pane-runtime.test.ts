@@ -12,13 +12,13 @@ describe('workspace pane runtime', () => {
       id: 'terminal-key-1',
     })
 
-    expect(runtime.openStaticView('owner-a', '/repo', '/repo-linked', 'status')).toBe(true)
+    expect(runtime.openStaticView('owner-a', '/repo', '/repo-linked', 'changes')).toBe(true)
 
     expect(runtime.viewDisplayOrder(view('terminal', 'terminal-key-1'))).toBe(0)
     expect(runtime.listStaticViews('owner-a', '/repo')).toEqual([
       {
-        type: 'status',
-        id: 'status',
+        type: 'changes',
+        id: 'changes',
         worktreePath: '/repo-linked',
         displayOrder: 1,
       },
@@ -78,11 +78,11 @@ describe('workspace pane runtime', () => {
     const runtime = createWorkspacePaneRuntime<string>()
     runtime.registerTerminalView({ ownerId: 'owner-a', scope: '/repo', worktreePath: '/repo-linked', id: 'terminal-1' })
     runtime.registerTerminalView({ ownerId: 'owner-b', scope: '/repo', worktreePath: '/repo-linked', id: 'terminal-1' })
-    runtime.openStaticView('owner-b', '/repo', '/repo-linked', 'status')
+    runtime.openStaticView('owner-b', '/repo', '/repo-linked', 'changes')
 
     expect(
       runtime.reorderViews('owner-a', '/repo', '/repo-linked', [
-        { type: 'status', id: 'status' },
+        { type: 'changes', id: 'changes' },
         { type: 'terminal', id: 'terminal-1' },
       ]),
     ).toBe(false)
@@ -98,19 +98,19 @@ describe('workspace pane runtime', () => {
       worktreePath: '/repo-removed',
       id: 'terminal-1',
     })
-    runtime.openStaticView('owner-a', '/repo', '/repo-live', 'status')
+    runtime.openStaticView('owner-a', '/repo', '/repo-live', 'changes')
     runtime.openStaticView('owner-a', '/repo', '/repo-removed', 'changes')
-    runtime.openStaticView('owner-b', '/repo', '/repo-removed', 'status')
+    runtime.openStaticView('owner-b', '/repo', '/repo-removed', 'changes')
 
     const pruned = runtime.pruneStaticViewsForOwner('owner-a', '/repo', new Set(['/repo-live']))
 
     expect(pruned).toBe(1)
     expect(runtime.listStaticViews('owner-a', '/repo')).toEqual([
-      { type: 'status', id: 'status', worktreePath: '/repo-live', displayOrder: 0 },
+      { type: 'changes', id: 'changes', worktreePath: '/repo-live', displayOrder: 0 },
     ])
     expect(runtime.viewDisplayOrder(view('terminal', 'terminal-1', '/repo-removed'))).toBe(0)
     expect(runtime.listStaticViews('owner-b', '/repo')).toEqual([
-      { type: 'status', id: 'status', worktreePath: '/repo-removed', displayOrder: 0 },
+      { type: 'changes', id: 'changes', worktreePath: '/repo-removed', displayOrder: 0 },
     ])
   })
 })

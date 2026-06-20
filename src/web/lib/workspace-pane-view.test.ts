@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'vitest'
 import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
-import { computeEffectiveWorkspacePaneView, type WorkspacePaneViewContext } from '#/web/lib/workspace-pane-view.ts'
+import {
+  computeEffectiveWorkspacePaneView,
+  isBranchLevelWorkspacePaneView,
+  isWorktreeLevelWorkspacePaneView,
+  workspacePaneViewScope,
+  type WorkspacePaneViewContext,
+} from '#/web/lib/workspace-pane-view.ts'
 
 function ctx(overrides: Partial<WorkspacePaneViewContext> = {}): WorkspacePaneViewContext {
   return {
@@ -22,7 +28,8 @@ describe('computeEffectiveWorkspacePaneView', () => {
     expect(computeEffectiveWorkspacePaneView('changes', ctx({ terminalSessionCount: 7 }))).toBe('changes')
   })
 
-  test('falls back to status when no worktree exists for a terminal preference', () => {
+  test('falls back to status when no worktree exists', () => {
+    expect(computeEffectiveWorkspacePaneView('changes', ctx({ hasWorktree: false }))).toBe('status')
     expect(computeEffectiveWorkspacePaneView('terminal', ctx({ hasWorktree: false }))).toBe('status')
     expect(computeEffectiveWorkspacePaneView('terminal', ctx({ hasWorktree: false, terminalSessionCount: 5 }))).toBe('status')
   })
@@ -55,7 +62,7 @@ describe('computeEffectiveWorkspacePaneView', () => {
       ['status', ctx(), 'status'],
       ['status', ctx({ hasWorktree: false, terminalSyncReady: false }), 'status'],
       ['changes', ctx(), 'changes'],
-      ['changes', ctx({ hasWorktree: false }), 'changes'],
+      ['changes', ctx({ hasWorktree: false }), 'status'],
       ['terminal', ctx({ hasWorktree: false }), 'status'],
       ['terminal', ctx({ terminalSyncReady: false }), 'terminal'],
       ['terminal', ctx({ terminalSessionCount: 0 }), 'status'],
@@ -65,5 +72,16 @@ describe('computeEffectiveWorkspacePaneView', () => {
     for (const [preferred, context, expected] of cases) {
       expect(computeEffectiveWorkspacePaneView(preferred, context)).toBe(expected)
     }
+  })
+})
+
+describe('workspacePaneViewScope', () => {
+  test('classifies status as branch-level and changes/terminal as worktree-level', () => {
+    expect(workspacePaneViewScope('status')).toBe('branch')
+    expect(isBranchLevelWorkspacePaneView('status')).toBe(true)
+    expect(workspacePaneViewScope('changes')).toBe('worktree')
+    expect(workspacePaneViewScope('terminal')).toBe('worktree')
+    expect(isWorktreeLevelWorkspacePaneView('changes')).toBe(true)
+    expect(isWorktreeLevelWorkspacePaneView('terminal')).toBe(true)
   })
 })

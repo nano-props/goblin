@@ -2,7 +2,12 @@ import type {
   WorkspacePaneViewSummary,
   TerminalSessionSummary,
 } from '#/web/components/terminal/types.ts'
-import type { WorkspacePaneViewOrderEntry } from '#/shared/workspace-pane.ts'
+import type {
+  WorkspacePaneBranchViewType,
+  WorkspacePaneStaticViewType,
+  WorkspacePaneView,
+  WorkspacePaneViewOrderEntry,
+} from '#/shared/workspace-pane.ts'
 
 export function workspacePaneViewIdentity(tab: WorkspacePaneViewSummary): string {
   return `${tab.type}:${tab.id}`
@@ -16,7 +21,7 @@ export function terminalWorkspacePaneViewIdentity(sessionKey: string): string {
   return `terminal:${sessionKey}`
 }
 
-export function staticWorkspacePaneViewIdentity(type: 'status' | 'changes'): string {
+export function staticWorkspacePaneViewIdentity(type: WorkspacePaneBranchViewType | WorkspacePaneStaticViewType): string {
   return `${type}:${type}`
 }
 
@@ -26,7 +31,7 @@ export function workspacePaneViewButtonId(detailId: string, index: number): stri
 
 export function activeWorkspacePaneViewIdentity(
   tabs: WorkspacePaneViewSummary[],
-  activeType: WorkspacePaneViewSummary['type'],
+  activeType: WorkspacePaneView,
 ): string | null {
   if (activeType === 'terminal') {
     const selectedTerminal = tabs.find(isSelectedTerminalWorkspacePaneView)
@@ -38,7 +43,7 @@ export function activeWorkspacePaneViewIdentity(
 
 export function adjacentWorkspacePaneView(
   tabs: WorkspacePaneViewSummary[],
-  activeType: WorkspacePaneViewSummary['type'],
+  activeType: WorkspacePaneView,
   direction: 1 | -1,
 ): WorkspacePaneViewSummary | null {
   if (tabs.length === 0) return null

@@ -16,8 +16,8 @@ const SESSION_ID = 'session_aaaaaaaaaaaaaa'
 function makeActions(
   options: {
     closeSessionForOwner: (ownerId: string, sessionId: string) => boolean
-    openStaticView?: (ownerId: string, scope: string, worktreePath: string, type: 'status' | 'changes') => boolean
-    closeStaticView?: (ownerId: string, scope: string, worktreePath: string, type: 'status' | 'changes') => boolean
+    openStaticView?: (ownerId: string, scope: string, worktreePath: string, type: 'changes') => boolean
+    closeStaticView?: (ownerId: string, scope: string, worktreePath: string, type: 'changes') => boolean
     getSessionScope?: (ownerId: string, sessionId: string) => string | undefined
     isValidTerminalClientId?: (value: unknown) => value is string
     broadcasts?: ReturnType<typeof vi.fn>
@@ -170,11 +170,11 @@ describe('terminal-runtime-actions static workspace pane views', () => {
     const opened = actions.openView(CLIENT_ID, OWNER_ID, {
       repoRoot: '/repo',
       worktreePath: '/repo-linked',
-      type: 'status',
+      type: 'changes',
     })
 
     expect(opened).toBe(true)
-    expect(workspacePane.openStaticView).toHaveBeenCalledWith(OWNER_ID, '/repo', '/repo-linked', 'status')
+    expect(workspacePane.openStaticView).toHaveBeenCalledWith(OWNER_ID, '/repo', '/repo-linked', 'changes')
     expect(broadcasts).toHaveBeenCalledWith(OWNER_ID, { type: 'sessions-changed', repoRoot: '/repo' })
     expect(broadcasts).toHaveBeenCalledWith(OWNER_ID, { type: 'workspace-pane-changed', repoRoot: '/repo' })
   })

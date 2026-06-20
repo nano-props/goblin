@@ -369,12 +369,12 @@ describe('terminal web host bridge', () => {
         requestId: request?.requestId,
         ok: true,
         action: 'workspace-pane:list-views',
-        payload: [{ type: 'status', id: 'status', worktreePath: '/tmp/repo', displayOrder: 0 }],
+        payload: [{ type: 'changes', id: 'changes', worktreePath: '/tmp/repo', displayOrder: 0 }],
       }),
     )
 
     await expect(listPromise).resolves.toEqual([
-      { type: 'status', id: 'status', worktreePath: '/tmp/repo', displayOrder: 0 },
+      { type: 'changes', id: 'changes', worktreePath: '/tmp/repo', displayOrder: 0 },
     ])
     expect(fetchMock).not.toHaveBeenCalled()
     dispose()

@@ -50,8 +50,13 @@ const TERMINAL_SESSION_PHASE_VALUES = [
   'error',
   'closed',
 ] satisfies TerminalSessionPhase[]
-const WORKSPACE_PANE_STATIC_VIEW_TYPES = ['status', 'changes'] as const
-const WORKSPACE_PANE_VIEW_TYPES = [...WORKSPACE_PANE_STATIC_VIEW_TYPES, 'terminal'] as const
+const WORKSPACE_PANE_BRANCH_VIEW_TYPES = ['status'] as const
+const WORKSPACE_PANE_STATIC_VIEW_TYPES = ['changes'] as const
+const WORKSPACE_PANE_VIEW_TYPES = [
+  ...WORKSPACE_PANE_BRANCH_VIEW_TYPES,
+  ...WORKSPACE_PANE_STATIC_VIEW_TYPES,
+  'terminal',
+] as const
 const TerminalSessionIdSchema = v.pipe(v.string(), v.regex(TERMINAL_SESSION_ID_RE))
 const TerminalAttachmentIdSchema = v.pipe(v.string(), v.regex(TERMINAL_ATTACHMENT_ID_RE))
 const TerminalRequestIdSchema = v.pipe(v.string(), v.regex(TERMINAL_REQUEST_ID_RE))

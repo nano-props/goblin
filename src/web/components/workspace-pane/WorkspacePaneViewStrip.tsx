@@ -1,4 +1,4 @@
-import { Check, ChevronDown, FileText, GitBranch, Loader2, Plus, Terminal, X } from 'lucide-react'
+import { Check, ChevronDown, FileText, Loader2, Plus, Terminal, X } from 'lucide-react'
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ComponentPropsWithoutRef } from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
@@ -772,7 +772,6 @@ function WorkspacePaneViewTooltipLayer({ tabs, getTooltip, children, ...props }:
 
 function WorkspacePaneViewIcon({ tab, active }: { tab: WorkspacePaneViewSummary; active: boolean }) {
   const className = toolbarTabIconClassName(active)
-  if (tab.type === 'status') return <GitBranch size={13} className={className} />
   if (tab.type === 'changes') return <FileText size={13} className={className} />
   return <Terminal size={13} className={className} />
 }

@@ -38,9 +38,8 @@ function compareWorkspacePaneViewStrip(a: WorkspacePaneViewSummary, b: Workspace
 }
 
 function typeRank(type: WorkspacePaneViewSummary['type']): number {
-  if (type === 'status') return 0
-  if (type === 'changes') return 1
-  return 2
+  if (type === 'changes') return 0
+  return 1
 }
 
 function buildTerminalSessionSummaries(input: {

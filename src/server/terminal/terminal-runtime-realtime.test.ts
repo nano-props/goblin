@@ -52,21 +52,21 @@ describe('createTerminalRealtimeHandlers', () => {
       handlers['workspace-pane:open-view']('client_1', 'attachment_1', 'owner_1', {
         repoRoot: '/repo',
         worktreePath: '/repo',
-        type: 'status',
+        type: 'changes',
       }),
     ).resolves.toBe(true)
     await expect(
       handlers['workspace-pane:close-view']('client_1', 'attachment_1', 'owner_1', {
         repoRoot: '/repo',
         worktreePath: '/repo',
-        type: 'status',
+        type: 'changes',
       }),
     ).resolves.toBe(true)
     await expect(
       handlers['workspace-pane:reorder-views']('client_1', 'attachment_1', 'owner_1', {
         repoRoot: '/repo',
         worktreePath: '/repo',
-        orderedViews: [{ type: 'status', id: 'status' }],
+        orderedViews: [{ type: 'changes', id: 'changes' }],
       }),
     ).resolves.toBe(true)
 
@@ -74,17 +74,17 @@ describe('createTerminalRealtimeHandlers', () => {
     expect(host.openView).toHaveBeenCalledWith('client_1', 'owner_1', {
       repoRoot: '/repo',
       worktreePath: '/repo',
-      type: 'status',
+      type: 'changes',
     })
     expect(host.closeView).toHaveBeenCalledWith('client_1', 'owner_1', {
       repoRoot: '/repo',
       worktreePath: '/repo',
-      type: 'status',
+      type: 'changes',
     })
     expect(host.reorderViews).toHaveBeenCalledWith('client_1', 'owner_1', {
       repoRoot: '/repo',
       worktreePath: '/repo',
-      orderedViews: [{ type: 'status', id: 'status' }],
+      orderedViews: [{ type: 'changes', id: 'changes' }],
     })
   })
 })

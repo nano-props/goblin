@@ -373,18 +373,26 @@ describe('TerminalSessionRegistry create flow', () => {
   test('opens a static workspace pane view through the workspace pane bridge action', async () => {
     registry.reconcileServerSessions(REPO_ROOT, makeCreateResult().sessions as any, 'attachment_local', new Map())
 
-    await expect(registry.openWorkspacePaneView(WORKTREE_KEY, 'status')).resolves.toBe(true)
+    await expect(registry.openWorkspacePaneView(WORKTREE_KEY, 'changes')).resolves.toBe(true)
 
     expect(mocks.openViewMock).toHaveBeenCalledWith({
       repoRoot: REPO_ROOT,
       worktreePath: WORKTREE_PATH,
-      type: 'status',
+      type: 'changes',
     })
     expect(mocks.reorderMock).not.toHaveBeenCalled()
     expect(registry.worktreeSnapshot(WORKTREE_KEY).workspacePaneViews.map((tab) => `${tab.type}:${tab.id}`)).toEqual([
       'terminal:/repo\0/repo\0terminal-1',
-      'status:status',
+      'changes:changes',
     ])
+  })
+
+  test('rejects branch-level static workspace pane views', async () => {
+    await expect(registry.openWorkspacePaneView(WORKTREE_KEY, 'status' as never)).resolves.toBe(false)
+    await expect(registry.closeWorkspacePaneView(WORKTREE_KEY, 'status' as never)).resolves.toBe(false)
+
+    expect(mocks.openViewMock).not.toHaveBeenCalled()
+    expect(mocks.closeViewMock).not.toHaveBeenCalled()
   })
 
   test('rolls back optimistic static workspace pane view open when the bridge rejects it', async () => {
@@ -396,14 +404,14 @@ describe('TerminalSessionRegistry create flow', () => {
   })
 
   test('closes a static workspace pane view through the workspace pane bridge action', async () => {
-    await registry.openWorkspacePaneView(WORKTREE_KEY, 'status')
+    await registry.openWorkspacePaneView(WORKTREE_KEY, 'changes')
 
-    await expect(registry.closeWorkspacePaneView(WORKTREE_KEY, 'status')).resolves.toBe(true)
+    await expect(registry.closeWorkspacePaneView(WORKTREE_KEY, 'changes')).resolves.toBe(true)
 
     expect(mocks.closeViewMock).toHaveBeenCalledWith({
       repoRoot: REPO_ROOT,
       worktreePath: WORKTREE_PATH,
-      type: 'status',
+      type: 'changes',
     })
     expect(mocks.reorderMock).not.toHaveBeenCalled()
     expect(registry.worktreeSnapshot(WORKTREE_KEY).staticWorkspacePaneViews).toEqual([])
@@ -427,19 +435,19 @@ describe('TerminalSessionRegistry create flow', () => {
   test('rolls back optimistic workspace pane view reorder when the bridge throws', async () => {
     const terminalKey = `${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-1`
     registry.reconcileServerSessions(REPO_ROOT, makeCreateResult().sessions as any, 'attachment_local', new Map())
-    await registry.openWorkspacePaneView(WORKTREE_KEY, 'status')
+    await registry.openWorkspacePaneView(WORKTREE_KEY, 'changes')
     mocks.reorderMock.mockRejectedValueOnce(new Error('Terminal socket closed'))
 
     await expect(
       registry.reorderWorkspacePaneViews(WORKTREE_KEY, [
-        { type: 'status', id: 'status' },
+        { type: 'changes', id: 'changes' },
         { type: 'terminal', id: terminalKey },
       ]),
     ).resolves.toBe(false)
 
     expect(registry.worktreeSnapshot(WORKTREE_KEY).workspacePaneViews.map((tab) => `${tab.type}:${tab.id}`)).toEqual([
       `terminal:${terminalKey}`,
-      'status:status',
+      'changes:changes',
     ])
   })
 })
