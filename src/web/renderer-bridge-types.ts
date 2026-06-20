@@ -72,6 +72,7 @@ export interface RendererTerminalBridge {
   onExit: (cb: (event: TerminalExitEvent) => void) => () => void
   onOwnership: (cb: (event: TerminalOwnershipViewModel) => void) => () => void
   onSessionsChanged: (cb: (repoRoot: string) => void) => () => void
+  onWorkspacePaneChanged: (cb: (repoRoot: string) => void) => () => void
   /**
    * Subscribe to per-session close broadcasts from the server. Emitted
    * after a successful `close` IPC alongside the broader

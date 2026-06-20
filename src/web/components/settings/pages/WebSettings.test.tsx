@@ -128,6 +128,7 @@ function seedElectronBootstrap() {
       onExit: () => () => {},
       onOwnership: () => () => {},
       onSessionsChanged: () => () => {},
+      onWorkspacePaneChanged: () => () => {},
       onSessionClosed: () => () => {},
     }),
     rotateAccessToken: vi.fn(async () => ({ accessToken: 'rotated-secret' })),
@@ -200,6 +201,7 @@ function seedWebBootstrap() {
       onExit: () => () => {},
       onOwnership: () => () => {},
       onSessionsChanged: () => () => {},
+      onWorkspacePaneChanged: () => () => {},
       onSessionClosed: () => () => {},
     }),
   })

@@ -232,6 +232,7 @@ let outputHandler: ((event: TerminalOutputEvent) => void) | null = null
 let titleHandler: ((event: TerminalTitleEvent) => void) | null = null
 let ownershipHandler: ((event: TerminalOwnershipViewModel) => void) | null = null
 let sessionsChangedHandler: ((repoRoot: string) => void) | null = null
+let workspacePaneChangedHandler: ((repoRoot: string) => void) | null = null
 let sessionClosedHandler: ((event: { sessionId: string; repoRoot: string }) => void) | null = null
 type TestTerminalSessionSummary = Omit<TerminalSessionSummary, 'viewType' | 'viewId'> &
   Partial<Pick<TerminalSessionSummary, 'viewType' | 'viewId'>>
@@ -257,6 +258,24 @@ function completeServerSessions(sessions: TestTerminalSessionSummary[]): Termina
   return sessions.map(completeServerSession)
 }
 
+async function emitSessionsChanged(repoRoot = REPO_ID): Promise<void> {
+  await act(async () => {
+    sessionsChangedHandler?.(repoRoot)
+    await waitForScheduledServerSync()
+  })
+}
+
+async function emitWorkspacePaneChanged(repoRoot = REPO_ID): Promise<void> {
+  await act(async () => {
+    workspacePaneChangedHandler?.(repoRoot)
+    await waitForScheduledServerSync()
+  })
+}
+
+async function waitForScheduledServerSync(): Promise<void> {
+  await new Promise<void>((resolve) => window.setTimeout(resolve, 0))
+}
+
 function attachResult(): TerminalAttachResult {
   return {
     ok: true,
@@ -280,6 +299,7 @@ beforeEach(() => {
   titleHandler = null
   ownershipHandler = null
   sessionsChangedHandler = null
+  workspacePaneChangedHandler = null
   sessionClosedHandler = null
   mockSessions.length = 0
   managedServerSessions = []
@@ -457,6 +477,12 @@ beforeEach(() => {
             if (sessionsChangedHandler === cb) sessionsChangedHandler = null
           }
         }),
+        onWorkspacePaneChanged: vi.fn((cb: (repoRoot: string) => void) => {
+          workspacePaneChangedHandler = cb
+          return () => {
+            if (workspacePaneChangedHandler === cb) workspacePaneChangedHandler = null
+          }
+        }),
       },
     },
   })
@@ -546,6 +572,12 @@ beforeEach(() => {
         sessionsChangedHandler = cb
         return () => {
           if (sessionsChangedHandler === cb) sessionsChangedHandler = null
+        }
+      }),
+      onWorkspacePaneChanged: vi.fn((cb: (repoRoot: string) => void) => {
+        workspacePaneChangedHandler = cb
+        return () => {
+          if (workspacePaneChangedHandler === cb) workspacePaneChangedHandler = null
         }
       }),
       onSessionClosed: vi.fn((cb: (event: { sessionId: string; repoRoot: string }) => void) => {
@@ -850,10 +882,7 @@ describe('TerminalSessionProvider', () => {
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
-      await act(async () => {
-        sessionsChangedHandler?.(REPO_ID)
-        await Promise.resolve()
-      })
+      await emitSessionsChanged()
 
       expect(getProbe().summaries).toEqual([
         expect.objectContaining({ terminalId: 'terminal-1', title: 'zsh', phase: 'open' }),
@@ -873,12 +902,35 @@ describe('TerminalSessionProvider', () => {
       )
 
       listSessionsMock.mockResolvedValue([])
-      await act(async () => {
-        sessionsChangedHandler?.(REPO_ID)
-        await Promise.resolve()
-      })
+      await emitSessionsChanged()
 
       expect(getProbe().summaries).toEqual([])
+    } finally {
+      await unmount()
+    }
+  })
+
+  test('coalesces compatibility session and workspace pane change broadcasts', async () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      workspacePaneView: 'terminal',
+    })
+    const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
+    const { unmount } = await renderProviderWithProbe(terminalWorktreeKey)
+
+    try {
+      await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
+      listSessionsMock.mockClear()
+
+      await act(async () => {
+        sessionsChangedHandler?.(REPO_ID)
+        workspacePaneChangedHandler?.(REPO_ID)
+        await waitForScheduledServerSync()
+      })
+
+      expect(listSessionsMock).toHaveBeenCalledTimes(1)
     } finally {
       await unmount()
     }
@@ -911,10 +963,7 @@ describe('TerminalSessionProvider', () => {
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
-      await act(async () => {
-        sessionsChangedHandler?.(REPO_ID)
-        await Promise.resolve()
-      })
+      await emitSessionsChanged()
       expect(getProbe().summaries.map((session) => [session.terminalId, session.selected])).toEqual([
         ['terminal-1', true],
       ])
@@ -928,10 +977,7 @@ describe('TerminalSessionProvider', () => {
         ['terminal-2', true],
       ])
 
-      await act(async () => {
-        sessionsChangedHandler?.(REPO_ID)
-        await Promise.resolve()
-      })
+      await emitSessionsChanged()
 
       expect(getProbe().summaries.map((session) => [session.terminalId, session.selected])).toEqual([
         ['terminal-1', false],
@@ -987,10 +1033,7 @@ describe('TerminalSessionProvider', () => {
     const { getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
-      await act(async () => {
-        sessionsChangedHandler?.(REPO_ID)
-        await Promise.resolve()
-      })
+      await emitSessionsChanged()
 
       expect(getProbe().summaries.map((session) => [session.terminalId, session.selected])).toEqual([
         ['terminal-1', true],
@@ -1164,10 +1207,7 @@ describe('TerminalSessionProvider', () => {
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
-      await act(async () => {
-        sessionsChangedHandler?.(REPO_ID)
-        await Promise.resolve()
-      })
+      await emitSessionsChanged()
 
       let createdKey = ''
       await act(async () => {
@@ -1211,10 +1251,7 @@ describe('TerminalSessionProvider', () => {
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
-      await act(async () => {
-        sessionsChangedHandler?.(REPO_ID)
-        await Promise.resolve()
-      })
+      await emitSessionsChanged()
 
       const key = getProbe().summaries[0]?.key
       if (!key) throw new Error('missing terminal key')
@@ -1242,10 +1279,7 @@ describe('TerminalSessionProvider', () => {
       getSessionSnapshotMock.mockClear()
       getSessionSnapshotMock.mockResolvedValueOnce(null)
 
-      await act(async () => {
-        sessionsChangedHandler?.(REPO_ID)
-        await Promise.resolve()
-      })
+      await emitSessionsChanged()
 
       expect(session.hydrate).toHaveBeenLastCalledWith(
         expect.objectContaining({
@@ -1284,10 +1318,7 @@ describe('TerminalSessionProvider', () => {
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
-      await act(async () => {
-        sessionsChangedHandler?.(REPO_ID)
-        await Promise.resolve()
-      })
+      await emitSessionsChanged()
 
       const key = getProbe().summaries[0]?.key
       if (!key) throw new Error('missing terminal key')
@@ -1304,10 +1335,7 @@ describe('TerminalSessionProvider', () => {
         snapshotSeq: 8,
       })
 
-      await act(async () => {
-        sessionsChangedHandler?.(REPO_ID)
-        await Promise.resolve()
-      })
+      await emitSessionsChanged()
 
       expect(getSessionSnapshotMock).toHaveBeenCalledWith({ sessionId: 'server_session_live' })
       expect(session.hydrate).toHaveBeenLastCalledWith(
@@ -1356,10 +1384,7 @@ describe('TerminalSessionProvider', () => {
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
-      await act(async () => {
-        sessionsChangedHandler?.(REPO_ID)
-        await Promise.resolve()
-      })
+      await emitSessionsChanged()
 
       const key = getProbe().summaries[0]?.key
       if (!key) throw new Error('missing terminal key')
@@ -1385,10 +1410,7 @@ describe('TerminalSessionProvider', () => {
         },
       ])
 
-      await act(async () => {
-        sessionsChangedHandler?.(REPO_ID)
-        await Promise.resolve()
-      })
+      await emitSessionsChanged()
 
       expect(session.hydrate).toHaveBeenLastCalledWith(
         expect.not.objectContaining({
@@ -1431,10 +1453,7 @@ describe('TerminalSessionProvider', () => {
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
-      await act(async () => {
-        sessionsChangedHandler?.(REPO_ID)
-        await Promise.resolve()
-      })
+      await emitSessionsChanged()
 
       const session = mockSessions.find((item) => item.descriptor.terminalId === 'terminal-1')
       if (!session) throw new Error('missing terminal mock session')
@@ -1462,10 +1481,7 @@ describe('TerminalSessionProvider', () => {
         },
       ])
 
-      await act(async () => {
-        sessionsChangedHandler?.(REPO_ID)
-        await Promise.resolve()
-      })
+      await emitSessionsChanged()
 
       expect(getProbe().summaries).toEqual([expect.objectContaining({ terminalId: 'terminal-1' })])
       expect(getSessionSnapshotMock).toHaveBeenCalledTimes(1)
@@ -1510,10 +1526,7 @@ describe('TerminalSessionProvider', () => {
     getSessionSnapshotMock.mockClear()
 
     try {
-      await act(async () => {
-        sessionsChangedHandler?.(REPO_ID)
-        await Promise.resolve()
-      })
+      await emitSessionsChanged()
 
       expect(getSessionSnapshotMock).toHaveBeenCalledTimes(1)
       getSessionSnapshotMock.mockClear()
@@ -1523,10 +1536,7 @@ describe('TerminalSessionProvider', () => {
         snapshotSeq: 8,
       })
 
-      await act(async () => {
-        sessionsChangedHandler?.(REPO_ID)
-        await Promise.resolve()
-      })
+      await emitSessionsChanged()
       expect(getSessionSnapshotMock).toHaveBeenCalledTimes(1)
 
       getSessionSnapshotMock.mockClear()
@@ -1536,10 +1546,7 @@ describe('TerminalSessionProvider', () => {
         snapshotSeq: 9,
       })
 
-      await act(async () => {
-        sessionsChangedHandler?.(REPO_ID)
-        await Promise.resolve()
-      })
+      await emitSessionsChanged()
       expect(getSessionSnapshotMock).toHaveBeenCalledTimes(1)
     } finally {
       await unmount()
@@ -1597,10 +1604,7 @@ describe('TerminalSessionProvider', () => {
 
     const { unmount } = await renderProvider()
     try {
-      await act(async () => {
-        sessionsChangedHandler?.(REPO_ID)
-        await Promise.resolve()
-      })
+      await emitSessionsChanged()
 
       const okSession = mockSessions.find((item) => item.descriptor.terminalId === 'terminal-2')
       if (!okSession) throw new Error('missing terminal-2 mock session')
@@ -1776,6 +1780,7 @@ describe('TerminalSessionProvider', () => {
         onExit: () => () => {},
         onOwnership: () => () => {},
         onSessionsChanged: () => () => {},
+        onWorkspacePaneChanged: () => () => {},
         onSessionClosed: () => () => {},
       }),
     })
@@ -1874,6 +1879,7 @@ describe('TerminalSessionProvider', () => {
         onExit: () => () => {},
         onOwnership: () => () => {},
         onSessionsChanged: () => () => {},
+        onWorkspacePaneChanged: () => () => {},
         onSessionClosed: () => () => {},
       }),
     })

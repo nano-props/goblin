@@ -14,6 +14,7 @@ import type { TerminalClientMessage } from '#/shared/terminal-socket.ts'
 import { normalizeTerminalClientMessage } from '#/shared/terminal-validators.ts'
 import { serverLogger } from '#/server/logger.ts'
 import { createTerminalCatalog } from '#/server/terminal/terminal-catalog.ts'
+import { createWorkspacePaneRuntime } from '#/server/workspace-pane/workspace-pane-runtime.ts'
 import type { TerminalRealtimeSocket } from '#/server/terminal/terminal-realtime-broker.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
 import { createTerminalRuntimeCoordinator } from '#/server/terminal/terminal-runtime-coordinator.ts'
@@ -52,6 +53,7 @@ export interface ServerTerminalRuntime {
 
 export function createServerTerminalRuntime(options: ServerTerminalRuntimeOptions): ServerTerminalRuntime {
   const { ptySupervisor } = options
+  const workspacePane = createWorkspacePaneRuntime<string>()
 
   // Sink callbacks fan out to every clientId that shares the
   // session's ownerId. The manager passes `ownerId` (a string
@@ -59,24 +61,29 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   // live output event reaches a sibling tab (different `clientId`,
   // same `ownerId`) without an extra attach roundtrip. See
   // `identity.ts` for the model.
-  const manager = new TerminalSessionManager<string>(ptySupervisor, {
-    onOutput(ownerId, event) {
-      broker.broadcastToOwner(ownerId, { type: 'output', event })
+  const manager = new TerminalSessionManager<string>(
+    ptySupervisor,
+    {
+      onOutput(ownerId, event) {
+        broker.broadcastToOwner(ownerId, { type: 'output', event })
+      },
+      onTitle(ownerId, event) {
+        broker.broadcastToOwner(ownerId, { type: 'title', event })
+      },
+      onExit(ownerId, event) {
+        const repoRoot = manager.getSession(ownerId, event.sessionId)?.scope
+        broker.broadcastToOwner(ownerId, { type: 'exit', event })
+        if (repoRoot) broadcastRepoWorkspacePaneChanged(ownerId, repoRoot)
+      },
+      onOwnership(ownerId, event) {
+        broker.broadcastToOwner(ownerId, { type: 'ownership', event })
+      },
     },
-    onTitle(ownerId, event) {
-      broker.broadcastToOwner(ownerId, { type: 'title', event })
-    },
-    onExit(ownerId, event) {
-      const repoRoot = manager.getSession(ownerId, event.sessionId)?.scope
-      broker.broadcastToOwner(ownerId, { type: 'exit', event })
-      if (repoRoot) broker.broadcastToOwner(ownerId, { type: 'sessions-changed', repoRoot })
-    },
-    onOwnership(ownerId, event) {
-      broker.broadcastToOwner(ownerId, { type: 'ownership', event })
-    },
-  })
+    workspacePane,
+  )
   const { broker, connectionState } = createTerminalRuntimeCoordinator({
     manager,
+    workspacePane,
     ownershipGraceMs: TERMINAL_OWNERSHIP_GRACE_MS,
     detachedTtlMs: TERMINAL_DETACHED_TTL_MS,
   })
@@ -84,11 +91,12 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     isValidClientId: isValidTerminalClientId,
     isValidTerminalId,
     manager,
+    workspacePane,
     isAttachmentConnected(ownerId, attachmentId) {
       return broker.isAttachmentConnected(ownerId, attachmentId)
     },
     broadcastSessionsChanged(ownerId, repoRoot) {
-      broker.broadcastToOwner(ownerId, { type: 'sessions-changed', repoRoot })
+      broadcastRepoWorkspacePaneChanged(ownerId, repoRoot)
     },
     gCommand: options.gCommand,
   })
@@ -97,6 +105,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   let shuttingDown = false
   const actions = createTerminalRuntimeActions({
     manager,
+    workspacePane,
     broker,
     catalog,
     isValidTerminalClientId,
@@ -247,5 +256,10 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     shutdown() {
       host.shutdown()
     },
+  }
+
+  function broadcastRepoWorkspacePaneChanged(ownerId: string, repoRoot: string): void {
+    broker.broadcastToOwner(ownerId, { type: 'sessions-changed', repoRoot })
+    broker.broadcastToOwner(ownerId, { type: 'workspace-pane-changed', repoRoot })
   }
 }

@@ -234,13 +234,29 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     }
     window.addEventListener('focus', handleFocus)
 
-    const offSessionsChanged = terminalBridge.onSessionsChanged((repoRoot) => {
-      void syncServerSessions(repoRoot)
-    })
+    const pendingRepoRoots = new Set<string>()
+    let syncTimer: number | null = null
+    let disposed = false
+    const scheduleServerSync = (repoRoot: string) => {
+      pendingRepoRoots.add(repoRoot)
+      if (syncTimer !== null) return
+      syncTimer = window.setTimeout(() => {
+        syncTimer = null
+        if (disposed) return
+        const repoRoots = Array.from(pendingRepoRoots)
+        pendingRepoRoots.clear()
+        for (const nextRepoRoot of repoRoots) void syncServerSessions(nextRepoRoot)
+      }, 0)
+    }
+    const offSessionsChanged = terminalBridge.onSessionsChanged(scheduleServerSync)
+    const offWorkspacePaneChanged = terminalBridge.onWorkspacePaneChanged(scheduleServerSync)
 
     return () => {
+      disposed = true
+      if (syncTimer !== null) window.clearTimeout(syncTimer)
       window.removeEventListener('focus', handleFocus)
       offSessionsChanged()
+      offWorkspacePaneChanged()
     }
   }, [currentRepoId, currentRepoInstanceToken, syncServerSessions])
 

@@ -31,13 +31,13 @@ const TERMINAL_SOCKET_ACTIONS = [
   'takeover',
   'close',
   'list-sessions',
-  'list-views',
-  'open-view',
-  'close-view',
+  'workspace-pane:list-views',
+  'workspace-pane:open-view',
+  'workspace-pane:close-view',
   'create',
   'prune',
   'session-snapshot',
-  'reorder-views',
+  'workspace-pane:reorder-views',
 ] as const satisfies TerminalSocketRequestAction[]
 const TERMINAL_CONNECTED_CONTROLLER_STATUS_VALUES = ['connected', 'grace'] satisfies Exclude<
   TerminalControllerStatus,
@@ -173,6 +173,7 @@ const TerminalRealtimeMessageVariants = [
   v.object({ type: v.literal('exit'), event: TerminalExitEventSchema }),
   v.object({ type: v.literal('ownership'), event: TerminalOwnershipEventSchema }),
   v.object({ type: v.literal('sessions-changed'), repoRoot: v.string() }),
+  v.object({ type: v.literal('workspace-pane-changed'), repoRoot: v.string() }),
   TerminalSessionClosedEventSchema,
 ] as const
 const TerminalRealtimeMessageSchema = v.variant('type', TerminalRealtimeMessageVariants)
@@ -239,19 +240,19 @@ const TerminalClientMessageSchema = v.variant('type', [
   v.object({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
-    action: v.literal('list-views'),
+    action: v.literal('workspace-pane:list-views'),
     input: WorkspacePaneListViewsInputSchema,
   }),
   v.object({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
-    action: v.literal('open-view'),
+    action: v.literal('workspace-pane:open-view'),
     input: WorkspacePaneStaticViewInputSchema,
   }),
   v.object({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
-    action: v.literal('close-view'),
+    action: v.literal('workspace-pane:close-view'),
     input: WorkspacePaneStaticViewInputSchema,
   }),
   v.object({
@@ -275,7 +276,7 @@ const TerminalClientMessageSchema = v.variant('type', [
   v.object({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
-    action: v.literal('reorder-views'),
+    action: v.literal('workspace-pane:reorder-views'),
     input: WorkspacePaneReorderInputSchema,
   }),
 ])

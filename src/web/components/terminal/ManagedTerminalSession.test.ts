@@ -82,8 +82,7 @@ const xtermMocks = vi.hoisted(() => {
           this.coreUserInputHandlers.push(cb)
           return {
             dispose: vi.fn(
-              () =>
-                (this.coreUserInputHandlers = this.coreUserInputHandlers.filter((handler) => handler !== cb)),
+              () => (this.coreUserInputHandlers = this.coreUserInputHandlers.filter((handler) => handler !== cb)),
             ),
           }
         }),
@@ -580,6 +579,7 @@ beforeEach(() => {
         onExit: vi.fn(),
         onOwnership: vi.fn(),
         onSessionsChanged: vi.fn(),
+        onWorkspacePaneChanged: vi.fn(),
         onSessionClosed: vi.fn(),
       },
     },
@@ -651,6 +651,7 @@ beforeEach(() => {
       onExit: vi.fn(() => () => {}),
       onOwnership: vi.fn(() => () => {}),
       onSessionsChanged: vi.fn(() => () => {}),
+      onWorkspacePaneChanged: vi.fn(() => () => {}),
       onSessionClosed: vi.fn(() => () => {}),
     }),
   })
