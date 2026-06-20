@@ -1,6 +1,6 @@
 import { Loader2 } from 'lucide-react'
 import { AsyncButton } from '#/web/components/AsyncButton.tsx'
-import { BranchActionsDropdown } from '#/web/components/BranchActionsMenu.tsx'
+import { BranchActionsPopover } from '#/web/components/BranchActionsMenu.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import {
   type BranchActionItem,
@@ -21,17 +21,11 @@ export function BranchActionControls({ actions, variant = 'bar' }: BranchActionC
   const visibleItems = visibleBranchActionItems(actions)
 
   if (variant === 'menu') {
-    return <BranchActionsDropdown mainItems={mainItems} destructiveItems={destructiveItems} />
+    return <BranchActionsPopover mainItems={mainItems} destructiveItems={destructiveItems} />
   }
 
   if (variant === 'auto') {
-    return (
-      <BranchActionAuto
-        visibleItems={visibleItems}
-        mainItems={mainItems}
-        destructiveItems={destructiveItems}
-      />
-    )
+    return <BranchActionAuto visibleItems={visibleItems} mainItems={mainItems} destructiveItems={destructiveItems} />
   }
 
   return <BranchActionButtonScroller visibleItems={visibleItems} />
@@ -52,7 +46,7 @@ function BranchActionAuto({
   return (
     <div ref={containerRef} className="relative flex min-w-0 flex-1 justify-end">
       {collapsed ? (
-        <BranchActionsDropdown mainItems={mainItems} destructiveItems={destructiveItems} />
+        <BranchActionsPopover mainItems={mainItems} destructiveItems={destructiveItems} />
       ) : (
         <BranchActionButtonScroller visibleItems={visibleItems} />
       )}

@@ -39,7 +39,7 @@ afterEach(() => {
 })
 
 describe('RepoTabStrip', () => {
-  test('keeps the overflow menu trigger outside the tablist on small screens', () => {
+  test('keeps the overflow popover trigger outside the tablist on small screens', () => {
     render(
       <RepoTabStrip
         repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
@@ -62,7 +62,7 @@ describe('RepoTabStrip', () => {
     expect(document.body.querySelector('button[aria-label="More"]')).not.toBeNull()
   })
 
-  test('shows the active repo in the small-screen dropdown with selected styling', async () => {
+  test('shows the active repo in the repo switcher popover with selected styling', async () => {
     render(
       <RepoTabStrip
         repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
@@ -86,13 +86,14 @@ describe('RepoTabStrip', () => {
       await Promise.resolve()
     })
 
-    const selectedItem = [...document.body.querySelectorAll('[role="menuitem"]')].find((item) =>
+    const selectedItem = [...document.body.querySelectorAll('button[aria-current="true"]')].find((item) =>
       item.textContent?.includes('repo-a'),
     )
-    expect(selectedItem?.getAttribute('aria-current')).toBe('true')
+    expect(selectedItem).not.toBeNull()
+    expect(selectedItem?.className).toContain('bg-selected')
   })
 
-  test('renders only the active repo tab when multiple repos are open, with the rest in the overflow dropdown', () => {
+  test('renders only the active repo tab when multiple repos are open, with the rest in the overflow popover', () => {
     vi.stubGlobal('matchMedia', createMatchMedia(false))
 
     render(
@@ -109,12 +110,46 @@ describe('RepoTabStrip', () => {
       />,
     )
 
-    // Only the active repo is rendered as a tab — every other repo lives
-    // behind the overflow trigger.
+    // Only the active repo is rendered as a tab; every other repo lives
+    // behind the overflow popover trigger.
     expect(document.body.querySelector('[data-repo-tab-id="/tmp/repo-b"]')).not.toBeNull()
     expect(document.body.querySelector('[data-repo-tab-id="/tmp/repo-a"]')).toBeNull()
     expect(document.body.querySelector('[data-repo-tab-id="/tmp/repo-c"]')).toBeNull()
     expect(document.body.querySelector('button[aria-label="More"]')).not.toBeNull()
+  })
+
+  test('keeps repo tab chrome passive while leaving close action in the repo switcher popover', async () => {
+    render(
+      <RepoTabStrip
+        repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
+        activeId="/tmp/repo-a"
+        labels={labels}
+        onActivate={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+        onOpenLocal={() => {}}
+        onOpenRemote={() => {}}
+        onClone={() => {}}
+      />,
+    )
+
+    const tab = document.body.querySelector('[data-repo-tab-id="/tmp/repo-a"]')
+    if (!(tab instanceof HTMLButtonElement)) throw new Error('missing repo tab')
+
+    const tabChrome = tab.closest('[role="presentation"]')
+    expect(tabChrome?.className).not.toContain('hover:')
+    expect(tabChrome?.querySelector('button[aria-label="Close repo-a"]')).toBeNull()
+
+    const trigger = document.body.querySelector('button[aria-label="More"]')
+    if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing more trigger')
+
+    await act(async () => {
+      trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+      trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
+      await Promise.resolve()
+    })
+
+    expect(document.body.querySelector('button[aria-label="Close repo-a"]')).not.toBeNull()
   })
 })
 
