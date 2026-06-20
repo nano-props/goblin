@@ -74,13 +74,14 @@ export const ja: Record<DictKey, string> = {
   'topbar.open': '開く',
   'topbar.menu': 'メニュー',
   'topbar.settings': '設定 (⌘,)',
+  'topbar.settings-tooltip': '設定',
 
   // ---- Dependencies ------------------------------------------------------
 
   // ---- Repository tabs ---------------------------------------------------
   'repo-tabs.repos': 'リポジトリ',
   'repo-tabs.close-named': '{name} を閉じる',
-  'repo-tabs.more': 'その他のタブ',
+  'repo-tabs.more': 'すべてのリポジトリ',
   'repo-tabs.open-local': 'ローカルリポジトリを開く…',
   'repo-tabs.open-remote': 'リモートリポジトリを開く…',
   'repo-tabs.open-title': 'ローカルリポジトリを開く',
@@ -229,10 +230,10 @@ export const ja: Record<DictKey, string> = {
   'branches.switch': 'ブランチを切り替え',
   'branches.filter.all': 'すべて',
   'branches.filter.worktrees': 'ワークツリー',
-  'branches.filter-tooltip.all': 'すべて',
-  'branches.filter-tooltip.worktrees': 'ワークツリー',
+  'branches.filter-tooltip.all': 'すべてのブランチ',
+  'branches.filter-tooltip.worktrees': 'ワークツリーブランチ',
   'workspace.focus-toggle-label': 'Focus Mode を切り替え',
-  'workspace.focus-toggle-tooltip.enable': 'Focus Mode を有効化',
+  'workspace.focus-toggle-tooltip.enable': '集中モード',
   'workspace.focus-toggle-tooltip.disable': 'Focus Mode を無効化',
   'workspace.compact-back': 'Branch View に戻る',
   'branches.gone': '消失',
@@ -397,7 +398,7 @@ export const ja: Record<DictKey, string> = {
     'このローカルブランチが安全にマージ済みか確認できず、上流が消失している可能性があります。',
   'action.confirm-force-delete-branch-confirm': 'ワークツリーを削除してブランチを強制削除',
   'action.create-worktree': '新しいワークツリー',
-  'action.create-worktree-title': '新しいワークツリーを作成',
+  'action.create-worktree-title': '新しいワークツリー',
   'action.create-worktree-creating-title': 'ワークツリーを作成中…',
   'action.create-worktree-queued-title': 'ワークツリー作成待機中…',
   'action.create-worktree-hint': 'ワークツリーの作成方法を選び、ブランチまたはリモート参照を選択します。',

@@ -67,13 +67,14 @@ export const ko: Record<DictKey, string> = {
   'topbar.open': '열기',
   'topbar.menu': '메뉴',
   'topbar.settings': '설정 (⌘,)',
+  'topbar.settings-tooltip': '설정',
 
   // ---- Dependencies ------------------------------------------------------
 
   // ---- Repository tabs ---------------------------------------------------
   'repo-tabs.repos': '리포지토리',
   'repo-tabs.close-named': '{name} 닫기',
-  'repo-tabs.more': '더 많은 탭',
+  'repo-tabs.more': '모든 리포지토리',
   'repo-tabs.open-local': '로컬 리포지토리 열기…',
   'repo-tabs.open-remote': '원격 리포지토리 열기…',
   'repo-tabs.open-title': '로컬 리포지토리 열기',
@@ -222,10 +223,10 @@ export const ko: Record<DictKey, string> = {
   'branches.switch': '브랜치 전환',
   'branches.filter.all': '전체',
   'branches.filter.worktrees': '워크트리',
-  'branches.filter-tooltip.all': '전체',
-  'branches.filter-tooltip.worktrees': '워크트리',
+  'branches.filter-tooltip.all': '모든 브랜치',
+  'branches.filter-tooltip.worktrees': '워크트리 브랜치',
   'workspace.focus-toggle-label': 'Focus Mode 전환',
-  'workspace.focus-toggle-tooltip.enable': 'Focus Mode 켜기',
+  'workspace.focus-toggle-tooltip.enable': '집중 모드',
   'workspace.focus-toggle-tooltip.disable': 'Focus Mode 끄기',
   'workspace.compact-back': 'Branch View로 돌아가기',
   'branches.gone': '원격 사라짐',
@@ -389,7 +390,7 @@ export const ko: Record<DictKey, string> = {
     '이 로컬 브랜치가 안전하게 병합되었는지 확인할 수 없고 업스트림이 사라졌을 수 있습니다.',
   'action.confirm-force-delete-branch-confirm': '워크트리 제거 및 브랜치 강제 삭제',
   'action.create-worktree': '새 워크트리',
-  'action.create-worktree-title': '새 워크트리 만들기',
+  'action.create-worktree-title': '새 워크트리',
   'action.create-worktree-creating-title': '워크트리를 만드는 중…',
   'action.create-worktree-queued-title': '워크트리 만들기 대기 중…',
   'action.create-worktree-hint': '워크트리 생성 방식을 선택한 다음 브랜치나 원격 참조를 선택하세요.',

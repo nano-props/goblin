@@ -109,8 +109,10 @@ function WorkspaceFocusToggle() {
 function SettingsButton({ onClick }: { onClick: () => void }) {
   const t = useT()
   return (
-    <Button variant="ghost" size="icon-lg" aria-label={t('topbar.settings')} onClick={onClick}>
-      <Settings />
-    </Button>
+    <Tip label={t('topbar.settings-tooltip')}>
+      <Button variant="ghost" size="icon-lg" aria-label={t('topbar.settings')} onClick={onClick}>
+        <Settings />
+      </Button>
+    </Tip>
   )
 }
