@@ -41,8 +41,8 @@ describe('RepoWorkspaceSkeleton', () => {
     render(<RepoWorkspaceSkeleton />)
 
     expect(container?.querySelectorAll('li')).toHaveLength(14)
-    expect(container?.querySelectorAll('[data-testid="branch-list-skeleton-action"]')).toHaveLength(6)
-    expect(container?.querySelector('[data-testid="branch-detail-skeleton-action"]')).toBeNull()
+    expect(container?.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(6)
+    expect(container?.querySelector('[data-testid="branch-workspace-skeleton-action"]')).toBeNull()
     // The per-repo toolbar moved up to the Topbar, so the
     // workspace skeleton no longer carries its own toolbar —
     // including the worktree-filter and layout-control slots.
@@ -55,15 +55,15 @@ describe('RepoWorkspaceSkeleton', () => {
     render(<RepoWorkspaceSkeleton layout="left-right" />)
 
     expect(container?.querySelectorAll('li')).toHaveLength(14)
-    expect(container?.querySelectorAll('[data-testid="branch-list-skeleton-action"]')).toHaveLength(6)
+    expect(container?.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(6)
     expect(container?.querySelector('[data-testid="mock-split-pane"]')).not.toBeNull()
   })
 
-  test('renders a single Branch View skeleton in single-pane mode', () => {
+  test('renders a single Branch Navigator skeleton in single-pane mode', () => {
     render(<RepoWorkspaceSkeleton singlePane />)
 
     expect(container?.querySelectorAll('li')).toHaveLength(6)
-    expect(container?.querySelectorAll('[data-testid="branch-list-skeleton-action"]')).toHaveLength(6)
+    expect(container?.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(6)
     expect(container?.querySelector('[data-testid="mock-split-pane"]')).toBeNull()
   })
 })

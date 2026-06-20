@@ -16,7 +16,7 @@
 //                branches that own a worktree path render)
 //   unpressed → branchViewMode === 'all'       (no filter)
 // The underlying store action `setBranchViewMode` is unchanged;
-// BranchList / persistence / refresh continue to read
+// BranchNavigator / persistence / refresh continue to read
 // `repo.ui.branchViewMode` as before.
 
 import { FolderTree, ListTree, type LucideIcon } from 'lucide-react'
@@ -55,8 +55,7 @@ export function BranchViewModeControl({ value, disabled = false, onChange }: Pro
           // read as one family. `hover:bg-accent`
           // sticks while pressed so the active state doesn't
           // flicker back to ghost on mouse-over.
-          worktreesOnly &&
-            'bg-accent text-accent-foreground shadow-xs hover:bg-accent hover:text-accent-foreground',
+          worktreesOnly && 'bg-accent text-accent-foreground shadow-xs hover:bg-accent hover:text-accent-foreground',
         )}
       >
         <Icon />

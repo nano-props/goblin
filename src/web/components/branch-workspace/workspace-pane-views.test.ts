@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   branchWorkspacePaneViewCloseLabel,
   branchWorkspacePaneViewLabel,
-} from '#/web/components/branch-detail/workspace-pane-views.ts'
+} from '#/web/components/branch-workspace/workspace-pane-views.ts'
 import type { WorkspacePaneViewSummary } from '#/web/components/terminal/types.ts'
 
 const changesTab: WorkspacePaneViewSummary = {

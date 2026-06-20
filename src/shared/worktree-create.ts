@@ -9,7 +9,7 @@
 //
 // We deliberately exclude the `detached` mode here — detached worktrees
 // would land in `worktreesByPath` but have no matching `BranchSnapshotInfo`,
-// which leaves them invisible in the BranchList. Reintroducing the mode
+// which leaves them invisible in the BranchNavigator. Reintroducing the mode
 // should be a paired change with a detached-worktree row in the list.
 
 import { isSafeBranchName } from '#/shared/refnames.ts'

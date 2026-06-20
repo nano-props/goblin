@@ -1,13 +1,13 @@
 // Active-repo body. The per-repo actions (Refresh, worktree
 // filter, new worktree) live in the Topbar — see `Topbar.tsx`
 // and `App.tsx` — so the workspace below the topbar is just the
-// branch list and the workspace pane.
+// branch navigator and the branch workspace pane.
 
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
-import { BranchList } from '#/web/components/BranchList.tsx'
-import { BranchDetail } from '#/web/components/BranchDetail.tsx'
+import { BranchNavigator } from '#/web/components/BranchNavigator.tsx'
+import { BranchWorkspace } from '#/web/components/BranchWorkspace.tsx'
 import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
 import { RepoWorkspace, RepoWorkspacePane } from '#/web/components/Layout.tsx'
 import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
@@ -43,7 +43,6 @@ export function RepoView({ repoId }: Props) {
       a.workspacePaneSizes['left-right'] === b.workspacePaneSizes['left-right'],
   )
   const setWorkspacePaneSize = useReposStore((s) => s.setWorkspacePaneSize)
-  const clearSelectedBranch = useReposStore((s) => s.clearSelectedBranch)
   const repo = useReposStore((s) => s.repos[repoId])
   useRepoToasts(repoId)
 
@@ -55,9 +54,6 @@ export function RepoView({ repoId }: Props) {
   })
 
   const workspacePaneSize = view.workspacePaneSizes[layout]
-  const handleBackToBranchView = () => {
-    clearSelectedBranch(repoId)
-  }
 
   if (!view.exists || !repo) return <div />
   if (isRepoUnavailable(repo)) return <UnavailableRepoView repo={repo} />
@@ -65,44 +61,32 @@ export function RepoView({ repoId }: Props) {
     return <RepoWorkspaceSkeleton layout={layout} singlePane={behavior.singlePane} />
   }
 
-  const workspacePane = (
+  const branchWorkspacePane = (
     <RepoWorkspacePane>
-      <BranchDetail
-        repoId={repoId}
-        layout={layout}
-        onBack={compact ? handleBackToBranchView : undefined}
-      />
+      <BranchWorkspace repoId={repoId} layout={layout} />
     </RepoWorkspacePane>
   )
-  const branchPane = (
+  const branchNavigatorPane = (
     <RepoWorkspacePane>
-      <BranchList
-        repoId={repoId}
-        showActions={behavior.branchListActionsVisible}
-      />
+      <BranchNavigator repoId={repoId} showActions={behavior.branchNavigatorActionsVisible} />
     </RepoWorkspacePane>
   )
 
-  const singlePane = repo.ui.selectedBranch ? 'workspace' : 'branch'
-  const singlePaneWorkspaceBody = singlePane === 'workspace' ? workspacePane : branchPane
+  const singlePane = repo.ui.selectedBranch ? 'workspace' : 'navigator'
+  const singlePaneBody = singlePane === 'workspace' ? branchWorkspacePane : branchNavigatorPane
 
-  const workspaceBody =
-    behavior.singlePane ? (
-      singlePaneWorkspaceBody
-    ) : (
-      <RepoWorkspace
-        layout={layout}
-        mode="split"
-        workspacePaneSize={workspacePaneSize}
-        onWorkspacePaneSizeChange={(size) => setWorkspacePaneSize(layout, size)}
-        branchPane={branchPane}
-        workspacePane={workspacePane}
-      />
-    )
-
-  return (
-    <section className="relative flex min-w-0 flex-1 flex-col">
-      {workspaceBody}
-    </section>
+  const workspaceBody = behavior.singlePane ? (
+    singlePaneBody
+  ) : (
+    <RepoWorkspace
+      layout={layout}
+      mode="split"
+      workspacePaneSize={workspacePaneSize}
+      onWorkspacePaneSizeChange={(size) => setWorkspacePaneSize(layout, size)}
+      branchNavigatorPane={branchNavigatorPane}
+      branchWorkspacePane={branchWorkspacePane}
+    />
   )
+
+  return <section className="relative flex min-w-0 flex-1 flex-col">{workspaceBody}</section>
 }

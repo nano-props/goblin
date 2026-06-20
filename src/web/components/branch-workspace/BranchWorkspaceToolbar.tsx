@@ -1,16 +1,18 @@
-import { ArrowLeft, GitBranch } from 'lucide-react'
+import { GitBranch } from 'lucide-react'
 import { useCallback, useMemo, type KeyboardEvent } from 'react'
 import { toast } from 'sonner'
 import type { RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { Button } from '#/web/components/ui/button.tsx'
 import { Toolbar } from '#/web/components/Layout.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { terminalLog } from '#/web/logger.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import { useWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-store.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
-import { WorkspacePaneViewStrip, EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY } from '#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx'
+import {
+  WorkspacePaneViewStrip,
+  EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY,
+} from '#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx'
 import { ToolbarClosableTab } from '#/web/components/tab-strip/ToolbarClosableTab.tsx'
 import { ToolbarTabList } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
 import {
@@ -20,10 +22,7 @@ import {
 } from '#/web/components/tab-strip/tab-variants.ts'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import type { WorkspacePaneView, WorkspacePaneViewOrderEntry } from '#/shared/workspace-pane.ts'
-import type {
-  WorkspacePaneViewSummary,
-  TerminalSessionBase,
-} from '#/web/components/terminal/types.ts'
+import type { WorkspacePaneViewSummary, TerminalSessionBase } from '#/web/components/terminal/types.ts'
 import {
   activeWorkspacePaneViewIdentity,
   workspacePaneViewIdentity,
@@ -31,33 +30,32 @@ import {
   staticWorkspacePaneViewIdentity,
   terminalWorkspacePaneViewIdentity,
 } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
-import type { BranchDetailRepo, SelectedBranchDetailPresentation } from '#/web/components/branch-detail/model.ts'
+import type {
+  BranchWorkspaceRepo,
+  SelectedBranchWorkspacePresentation,
+} from '#/web/components/branch-workspace/model.ts'
 import {
   BRANCH_LEVEL_WORKSPACE_PANE_VIEWS,
   branchLevelWorkspacePaneViewButtonId,
   branchWorkspacePaneViewCloseLabel,
   branchWorkspacePaneViewLabel,
   branchWorkspacePaneViewTooltip,
-} from '#/web/components/branch-detail/workspace-pane-views.ts'
+} from '#/web/components/branch-workspace/workspace-pane-views.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
-import { useEffectiveWorkspacePaneView } from '#/web/components/branch-detail/useEffectiveWorkspacePaneView.ts'
+import { useEffectiveWorkspacePaneView } from '#/web/components/branch-workspace/useEffectiveWorkspacePaneView.ts'
 import { useIsInitialSyncInFlight } from '#/web/stores/repo-sync.ts'
-import {
-  isWorktreeLevelWorkspacePaneView,
-  type BranchLevelWorkspacePaneView,
-} from '#/web/lib/workspace-pane-view.ts'
+import { isWorktreeLevelWorkspacePaneView, type BranchLevelWorkspacePaneView } from '#/web/lib/workspace-pane-view.ts'
 
 interface Props {
-  repo: Pick<BranchDetailRepo, 'id' | 'ui' | 'data'>
-  detail: SelectedBranchDetailPresentation
+  repo: Pick<BranchWorkspaceRepo, 'id' | 'ui' | 'data'>
+  detail: SelectedBranchWorkspacePresentation
   detailId: string
   contentId: string
   layout: RepoWorkspaceLayout
-  onBack?: () => void
 }
 
-export function BranchDetailToolbar({ repo, detail, detailId, onBack }: Props) {
+export function BranchWorkspaceToolbar({ repo, detail, detailId }: Props) {
   const t = useT()
   const navigation = useMainWindowNavigation()
   const compact = useIsCompactUi()
@@ -204,7 +202,7 @@ export function BranchDetailToolbar({ repo, detail, detailId, onBack }: Props) {
     [t],
   )
 
-  // No selected branch means there is no tab/action target; BranchDetailContent renders the empty state.
+  // No selected branch means there is no tab/action target; BranchWorkspaceContent renders the empty state.
   if (!detail.branch) return null
 
   const focusedTerminalSession = terminalSessions.find((session) => session.selected) ?? terminalSessions[0] ?? null
@@ -278,28 +276,13 @@ export function BranchDetailToolbar({ repo, detail, detailId, onBack }: Props) {
           ? staticWorkspacePaneViewIdentity(effectiveTab)
           : effectiveTab === 'changes'
             ? (activeTabIdentity ?? EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY)
-          : EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY
+            : EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY
     workspacePaneTabFocusRegistry.focus(key)
   }
 
   return (
     <Toolbar variant="detail">
       <div className="flex h-full min-w-0 items-center gap-1 overflow-hidden">
-        {onBack && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onBack}
-            aria-label={t('workspace.compact-back')}
-            title={t('workspace.compact-back')}
-            className="shrink-0"
-          >
-            <ArrowLeft />
-          </Button>
-        )}
-        {onBack && (terminalWorktreeKey || showBranchLevelTabs) && (
-          <div aria-hidden="true" className="h-5 w-px shrink-0 bg-separator" />
-        )}
         {showBranchLevelTabs && (
           <BranchLevelWorkspacePaneTabs
             detailId={detailId}
@@ -343,10 +326,7 @@ export function BranchDetailToolbar({ repo, detail, detailId, onBack }: Props) {
           />
         )}
       </div>
-      <div
-        aria-hidden="true"
-        className={cn('min-w-2 flex-1 self-stretch', compact && 'hidden')}
-      />
+      <div aria-hidden="true" className={cn('min-w-2 flex-1 self-stretch', compact && 'hidden')} />
     </Toolbar>
   )
 }

@@ -203,7 +203,7 @@ export const en = {
 
   // ---- Workspace pane views ----------------------------------------------
   'tab.branches': 'Branches',
-  'tab.branch-detail': 'Branch detail',
+  'tab.branch-workspace': 'Branch workspace',
   'tab.status': 'Status',
   'tab.changes': 'Changes',
   'tab.changes-with-count': 'Changes · {count}',
@@ -240,7 +240,7 @@ export const en = {
   'workspace.focus-toggle-label': 'Toggle Focus Mode',
   'workspace.focus-toggle-tooltip.enable': 'Focus Mode',
   'workspace.focus-toggle-tooltip.disable': 'Disable Focus Mode',
-  'workspace.compact-back': 'Back to Branch View',
+  'workspace.back-to-branch-navigator': 'Back to Branch Navigator',
   'branches.gone': 'gone',
   'branches.dirty': 'dirty',
   'branches.worktree': 'worktree',

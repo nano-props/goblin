@@ -6,7 +6,7 @@ export interface RepoWorkspaceBehavior {
   singlePane: boolean
   compact: boolean
   workspaceFocused: boolean
-  branchListActionsVisible: boolean
+  branchNavigatorActionsVisible: boolean
   prTooltipSide: 'right' | 'bottom'
 }
 
@@ -25,7 +25,7 @@ export function repoWorkspaceBehavior({
     singlePane,
     compact,
     workspaceFocused,
-    branchListActionsVisible: true,
+    branchNavigatorActionsVisible: true,
     prTooltipSide: 'bottom',
   }
 }

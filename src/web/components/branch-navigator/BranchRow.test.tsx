@@ -3,7 +3,7 @@
 import { act, createRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { BranchRow } from '#/web/components/branch-list/BranchRow.tsx'
+import { BranchRow } from '#/web/components/branch-navigator/BranchRow.tsx'
 import { emptyRepo } from '#/web/stores/repos/helpers.ts'
 import { createRepoBranch } from '#/web/stores/repos/test-utils.ts'
 

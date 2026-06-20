@@ -5,10 +5,13 @@ import type { RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import { StatusListSkeleton } from '#/web/components/Skeleton.tsx'
 import { StatusList } from '#/web/components/StatusList.tsx'
-import { BranchStatus } from '#/web/components/branch-detail/BranchStatus.tsx'
+import { BranchStatus } from '#/web/components/branch-workspace/BranchStatus.tsx'
 import { TerminalSlot } from '#/web/components/terminal/TerminalSlot.tsx'
-import type { BranchDetailRepo, SelectedBranchDetailPresentation } from '#/web/components/branch-detail/model.ts'
-import { useEffectiveWorkspacePaneView } from '#/web/components/branch-detail/useEffectiveWorkspacePaneView.ts'
+import type {
+  BranchWorkspaceRepo,
+  SelectedBranchWorkspacePresentation,
+} from '#/web/components/branch-workspace/model.ts'
+import { useEffectiveWorkspacePaneView } from '#/web/components/branch-workspace/useEffectiveWorkspacePaneView.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import { useWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-store.ts'
 import {
@@ -18,12 +21,12 @@ import {
 } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { isWorktreeLevelWorkspacePaneView } from '#/web/lib/workspace-pane-view.ts'
-import { branchLevelWorkspacePaneViewButtonId } from '#/web/components/branch-detail/workspace-pane-views.ts'
+import { branchLevelWorkspacePaneViewButtonId } from '#/web/components/branch-workspace/workspace-pane-views.ts'
 interface Props {
-  repo: Pick<BranchDetailRepo, 'id' | 'data' | 'ui'> & {
-    data: BranchDetailRepo['data'] & Pick<BranchDetailRepo['data'], 'statusLoaded'>
+  repo: Pick<BranchWorkspaceRepo, 'id' | 'data' | 'ui'> & {
+    data: BranchWorkspaceRepo['data'] & Pick<BranchWorkspaceRepo['data'], 'statusLoaded'>
   }
-  detail: SelectedBranchDetailPresentation
+  detail: SelectedBranchWorkspacePresentation
   detailId: string
   contentId: string
   layout: RepoWorkspaceLayout
@@ -36,13 +39,13 @@ interface TabPanelProps {
   children: ReactNode
 }
 
-type BranchDetailBranch = NonNullable<SelectedBranchDetailPresentation['branch']>
+type BranchWorkspaceBranch = NonNullable<SelectedBranchWorkspacePresentation['branch']>
 
 // Pure view: the renderable tab is derived from the repos store's
 // user-preferred tab and the live terminal session truth via
 // `useEffectiveWorkspacePaneView`. The store never re-projects on snapshot
 // refresh, branch switch, or session restore; this component is read-only.
-export function BranchDetailContent({ repo, detail, detailId, contentId, layout }: Props) {
+export function BranchWorkspaceContent({ repo, detail, detailId, contentId, layout }: Props) {
   const t = useT()
   const compact = useIsCompactUi()
   const effectiveTab = useEffectiveWorkspacePaneView(repo)
@@ -60,8 +63,8 @@ export function BranchDetailContent({ repo, detail, detailId, contentId, layout 
     effectiveTab === 'status'
       ? branchLevelWorkspacePaneViewButtonId(detailId, 'status')
       : activeTabIndex >= 0
-      ? workspacePaneViewButtonId(detailId, compact ? 0 : activeTabIndex)
-      : workspacePaneViewButtonId(detailId, 0)
+        ? workspacePaneViewButtonId(detailId, compact ? 0 : activeTabIndex)
+        : workspacePaneViewButtonId(detailId, 0)
   const terminalPendingCreate = effectiveTab === 'terminal' && worktreeSnapshot.pendingCreate
   const branchStatusTabActive = effectiveTab === 'status'
   if (!branch)
@@ -128,7 +131,7 @@ function BranchStatusTab({
 }: {
   detailId: string
   labelledById: string
-  detail: SelectedBranchDetailPresentation
+  detail: SelectedBranchWorkspacePresentation
   layout: RepoWorkspaceLayout
   busy?: boolean
 }) {
@@ -150,7 +153,7 @@ function BranchTerminalTab({
   detailId: string
   labelledById: string
   repoId: string
-  branch: BranchDetailBranch
+  branch: BranchWorkspaceBranch
 }) {
   if (!branch.worktree?.path) return null
   return (
@@ -173,8 +176,8 @@ function BranchChangesTab({
   detailId: string
   labelledById: string
   repo: Props['repo']
-  branch: BranchDetailBranch
-  selectedStatus: SelectedBranchDetailPresentation['selectedStatus']
+  branch: BranchWorkspaceBranch
+  selectedStatus: SelectedBranchWorkspacePresentation['selectedStatus']
   statusLoading: boolean
   statusError: string | null
   statusStale: boolean

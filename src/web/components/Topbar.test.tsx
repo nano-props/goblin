@@ -96,7 +96,7 @@ describe('Topbar', () => {
     expect(focusModeToggle()).toBeNull()
   })
 
-  test('renders large-screen workspace back before repo tabs while focused on a selected branch', () => {
+  test('renders branch workspace back before repo tabs on large screens while focused on a selected branch', () => {
     seedRepoState({
       id: '/tmp/repo',
       branches: [createRepoBranch('main'), createRepoBranch('feature/a')],
@@ -110,7 +110,7 @@ describe('Topbar', () => {
       </Topbar>,
     )
 
-    const back = workspaceBackButton()
+    const back = branchWorkspaceBackButton()
     const repoTabs = container?.querySelector('[data-testid="repo-tabs"]')
     expect(back).not.toBeNull()
     expect(back?.nextElementSibling?.className).toContain('bg-separator')
@@ -124,14 +124,13 @@ describe('Topbar', () => {
     expect(useReposStore.getState().repos['/tmp/repo']?.ui.selectedBranch).toBeNull()
   })
 
-  test('hides large-screen workspace back on compact screens', () => {
+  test('renders branch workspace back before repo tabs on compact screens without Focus Mode', () => {
     responsiveMocks.compact = true
     seedRepoState({
       id: '/tmp/repo',
       branches: [createRepoBranch('main'), createRepoBranch('feature/a')],
       selectedBranch: 'feature/a',
     })
-    useReposStore.getState().setWorkspaceFocused(true)
 
     render(
       <Topbar repoId="/tmp/repo" onOpenSettings={() => {}}>
@@ -139,7 +138,34 @@ describe('Topbar', () => {
       </Topbar>,
     )
 
-    expect(workspaceBackButton()).toBeNull()
+    const back = branchWorkspaceBackButton()
+    const repoTabs = container?.querySelector('[data-testid="repo-tabs"]')
+    expect(back).not.toBeNull()
+    expect(back?.nextElementSibling?.className).toContain('bg-separator')
+    expect(back?.nextElementSibling?.nextElementSibling).toBe(repoTabs)
+
+    act(() => {
+      back?.click()
+    })
+
+    expect(useReposStore.getState().workspaceFocused).toBe(false)
+    expect(useReposStore.getState().repos['/tmp/repo']?.ui.selectedBranch).toBeNull()
+  })
+
+  test('hides branch workspace back on large screens outside Focus Mode', () => {
+    seedRepoState({
+      id: '/tmp/repo',
+      branches: [createRepoBranch('main'), createRepoBranch('feature/a')],
+      selectedBranch: 'feature/a',
+    })
+
+    render(
+      <Topbar repoId="/tmp/repo" onOpenSettings={() => {}}>
+        <div data-testid="repo-tabs" />
+      </Topbar>,
+    )
+
+    expect(branchWorkspaceBackButton()).toBeNull()
   })
 })
 
@@ -157,6 +183,6 @@ function settingsButton(): HTMLButtonElement | null {
   return container?.querySelector('button[aria-label="topbar.settings"]') ?? null
 }
 
-function workspaceBackButton(): HTMLButtonElement | null {
-  return container?.querySelector('button[aria-label="workspace.compact-back"]') ?? null
+function branchWorkspaceBackButton(): HTMLButtonElement | null {
+  return container?.querySelector('button[aria-label="workspace.back-to-branch-navigator"]') ?? null
 }

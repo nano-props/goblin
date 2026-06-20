@@ -7,7 +7,7 @@ describe('repoWorkspaceBehavior', () => {
       mode: 'split',
       singlePane: false,
       workspaceFocused: false,
-      branchListActionsVisible: true,
+      branchNavigatorActionsVisible: true,
     })
   })
 
@@ -16,7 +16,7 @@ describe('repoWorkspaceBehavior', () => {
       mode: 'single-pane',
       singlePane: true,
       workspaceFocused: true,
-      branchListActionsVisible: true,
+      branchNavigatorActionsVisible: true,
     })
   })
 
@@ -26,7 +26,7 @@ describe('repoWorkspaceBehavior', () => {
       singlePane: true,
       compact: true,
       workspaceFocused: false,
-      branchListActionsVisible: true,
+      branchNavigatorActionsVisible: true,
     })
   })
 })

@@ -3,14 +3,14 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { BranchDetailContent } from '#/web/components/branch-detail/BranchDetailContent.tsx'
-import { getSelectedBranchDetailPresentation } from '#/web/components/branch-detail/model.ts'
+import { BranchWorkspaceContent } from '#/web/components/branch-workspace/BranchWorkspaceContent.tsx'
+import { getSelectedBranchWorkspacePresentation } from '#/web/components/branch-workspace/model.ts'
 import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionReadContextValue, WorktreeTerminalSnapshot } from '#/web/components/terminal/types.ts'
 import { DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 
-const REPO_ID = '/tmp/gbl-branch-detail-content-repo'
+const REPO_ID = '/tmp/gbl-branch-workspace-content-repo'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
@@ -34,7 +34,7 @@ afterEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
-describe('BranchDetailContent', () => {
+describe('BranchWorkspaceContent', () => {
   test('renders branch status for a selected branch without a worktree', () => {
     const repo = seedRepoState({
       id: REPO_ID,
@@ -50,12 +50,12 @@ describe('BranchDetailContent', () => {
       selectedBranch: 'feature/no-worktree',
       workspacePaneView: 'status',
     })
-    const detail = getSelectedBranchDetailPresentation(repo)
+    const detail = getSelectedBranchWorkspacePresentation(repo)
 
     act(() => {
       root!.render(
         <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-          <BranchDetailContent
+          <BranchWorkspaceContent
             repo={repo}
             detail={detail}
             detailId="detail"

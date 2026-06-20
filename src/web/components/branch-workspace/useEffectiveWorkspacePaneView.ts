@@ -22,7 +22,9 @@ type EffectiveWorkspacePaneViewRepo = {
  * carries the user's preferred view type; the live view list remains the
  * source of truth for opened status/changes/terminal views.
  */
-export function useEffectiveWorkspacePaneView(repo: EffectiveWorkspacePaneViewRepo | null | undefined): WorkspacePaneView {
+export function useEffectiveWorkspacePaneView(
+  repo: EffectiveWorkspacePaneViewRepo | null | undefined,
+): WorkspacePaneView {
   const repoId = repo?.id ?? null
   const syncReady = useTerminalRepoSyncReady(repoId)
   const selectedBranch = repo?.ui.selectedBranch ?? null

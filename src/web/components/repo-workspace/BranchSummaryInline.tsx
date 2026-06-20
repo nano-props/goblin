@@ -1,4 +1,4 @@
-// Read-only branch "status strip" used in two places: the branch list
+// Read-only branch "status strip" used in two places: the branch navigator
 // rows (BranchRow). It is
 // intentionally non-interactive; clicking the row selects the branch in
 // the list.
@@ -68,7 +68,7 @@ export function computeBranchSummaryState(branch: RepoBranchState, repo: BranchS
 type BranchSummaryState = ReturnType<typeof computeBranchSummaryState>
 
 // Comma-joined `title` attribute. Mirrors the visible body so the hover
-// tooltip stays consistent across the branch list.
+// tooltip stays consistent across the branch navigator.
 export function buildBranchSummaryTitle(
   state: BranchSummaryState,
   branch: RepoBranchState,
@@ -153,11 +153,7 @@ export function BranchSummaryMeta({
         <Delta direction="ahead" count={branch.ahead} label={t('branch-status.sync.ahead', { n: branch.ahead })} />
       )}
       {branch.behind > 0 && (
-        <Delta
-          direction="behind"
-          count={branch.behind}
-          label={t('branch-status.sync.behind', { n: branch.behind })}
-        />
+        <Delta direction="behind" count={branch.behind} label={t('branch-status.sync.behind', { n: branch.behind })} />
       )}
       {commitMeta && (
         <span
@@ -183,11 +179,7 @@ export function BranchSummaryInline({ repo, branch, selected = false, className 
 
   return (
     <div title={title} className={cn('flex min-w-0 items-center gap-2', className)}>
-      <BranchSummaryIcon
-        hasWorktree={hasWorktree}
-        worktreeDirty={worktreeDirty}
-        selected={selected}
-      />
+      <BranchSummaryIcon hasWorktree={hasWorktree} worktreeDirty={worktreeDirty} selected={selected} />
       <span className="flex min-w-0 items-center gap-2 overflow-hidden">
         <span
           className={cn(
