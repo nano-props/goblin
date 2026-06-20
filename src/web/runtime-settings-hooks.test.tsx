@@ -10,7 +10,6 @@ import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
 import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings-queries.ts'
 import { useRuntimeExternalAppSettings } from '#/web/runtime-settings-external-apps.ts'
 import { useRuntimeFetchSettings } from '#/web/runtime-settings-fetch.ts'
-import { useRuntimeGeneralSettings } from '#/web/runtime-settings-general.ts'
 import { useRuntimeLanSettings } from '#/web/runtime-settings-lan.ts'
 import { useRuntimeRecentRepos } from '#/web/settings-read-projection.ts'
 import { useRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
@@ -101,27 +100,6 @@ describe('runtime settings hooks', () => {
       lan: {
         lanEnabled: true,
       },
-    })
-  })
-
-  test('reads general runtime settings from the settings snapshot', async () => {
-    mainWindowQueryClient.setQueryData(
-      settingsSnapshotQueryKey(),
-      defaultSettingsSnapshot({
-        toggleDetailOnActionBarBlankClick: true,
-      }),
-    )
-    let result: ReturnType<typeof useRuntimeGeneralSettings> | undefined
-
-    function HookHost() {
-      result = useRuntimeGeneralSettings()
-      return null
-    }
-
-    await renderWithMainWindowQueryClient(<HookHost />)
-
-    expect(result).toMatchObject({
-      toggleDetailOnActionBarBlankClick: true,
     })
   })
 

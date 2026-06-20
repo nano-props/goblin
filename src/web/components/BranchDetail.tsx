@@ -15,8 +15,8 @@ import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShor
 interface Props {
   repoId: string
   layout?: RepoWorkspaceLayout
-  collapsed?: boolean
-  detailFocusMode?: boolean
+  workspacePaneFocusMode?: boolean
+  onBack?: () => void
 }
 
 // Keep this equality in sync with fields read by BranchDetail children.
@@ -49,8 +49,8 @@ function branchDetailRepoEqual(a: BranchDetailRepo | undefined, b: BranchDetailR
 export function BranchDetail({
   repoId,
   layout = DEFAULT_WORKSPACE_LAYOUT,
-  collapsed = false,
-  detailFocusMode = false,
+  workspacePaneFocusMode = false,
+  onBack,
 }: Props) {
   const detailId = useId()
   const repo = useStoreWithEqualityFn(
@@ -97,7 +97,7 @@ export function BranchDetail({
   const detail = getSelectedBranchDetailPresentation(repo)
   const contentId = `${detailId}-content`
 
-  const focusMode = layout === 'top-bottom' && detailFocusMode
+  const focusMode = workspacePaneFocusMode
 
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
@@ -109,9 +109,9 @@ export function BranchDetail({
           branch={detail.branch}
           detailId={detailId}
           contentId={contentId}
-          collapsed={collapsed}
-          detailFocusMode={detailFocusMode}
+          workspacePaneFocusMode={workspacePaneFocusMode}
           layout={layout}
+          onBack={onBack}
         />
       ) : (
         <>
@@ -120,19 +120,17 @@ export function BranchDetail({
             detail={detail}
             detailId={detailId}
             contentId={contentId}
-            collapsed={collapsed}
-            detailFocusMode={detailFocusMode}
+            workspacePaneFocusMode={workspacePaneFocusMode}
+            layout={layout}
+            onBack={onBack}
+          />
+          <BranchDetailContent
+            repo={repo}
+            detail={detail}
+            detailId={detailId}
+            contentId={contentId}
             layout={layout}
           />
-          {!collapsed && (
-            <BranchDetailContent
-              repo={repo}
-              detail={detail}
-              detailId={detailId}
-              contentId={contentId}
-              layout={layout}
-            />
-          )}
         </>
       )}
     </section>
@@ -145,9 +143,9 @@ interface BranchShortcutHandlerProps {
   branch: NonNullable<SelectedBranchDetailPresentation['branch']>
   detailId: string
   contentId: string
-  collapsed: boolean
-  detailFocusMode: boolean
+  workspacePaneFocusMode: boolean
   layout: RepoWorkspaceLayout
+  onBack?: () => void
 }
 
 function BranchShortcutHandler({
@@ -156,9 +154,9 @@ function BranchShortcutHandler({
   branch,
   detailId,
   contentId,
-  collapsed,
-  detailFocusMode,
+  workspacePaneFocusMode,
   layout,
+  onBack,
 }: BranchShortcutHandlerProps) {
   const actions = useBranchActionItems(repo, branch)
   useBranchActionShortcutRegistry(actions)
@@ -170,14 +168,12 @@ function BranchShortcutHandler({
         detail={detail}
         detailId={detailId}
         contentId={contentId}
-        collapsed={collapsed}
-        detailFocusMode={detailFocusMode}
+        workspacePaneFocusMode={workspacePaneFocusMode}
         layout={layout}
+        onBack={onBack}
       />
       {actions.dialogs}
-      {!collapsed && (
-        <BranchDetailContent repo={repo} detail={detail} detailId={detailId} contentId={contentId} layout={layout} />
-      )}
+      <BranchDetailContent repo={repo} detail={detail} detailId={detailId} contentId={contentId} layout={layout} />
     </>
   )
 }

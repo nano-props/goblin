@@ -20,7 +20,6 @@ export function buildRuntimeSettingsSnapshot(input: {
     shortcutsDisabled: input.prefs.shortcutsDisabled,
     globalShortcutDisabled: input.prefs.globalShortcutDisabled,
     swapCloseShortcuts: input.prefs.swapCloseShortcuts,
-    toggleDetailOnActionBarBlankClick: input.prefs.toggleDetailOnActionBarBlankClick,
     globalShortcut: input.prefs.globalShortcut,
     globalShortcutRegistered: input.globalShortcutRegistered,
     terminalApp: input.prefs.terminalApp,
@@ -62,7 +61,6 @@ export function runtimeSettingsSnapshotFromSettingsSnapshot(
     | 'shortcutsDisabled'
     | 'globalShortcutDisabled'
     | 'swapCloseShortcuts'
-    | 'toggleDetailOnActionBarBlankClick'
     | 'globalShortcut'
     | 'globalShortcutRegistered'
     | 'terminalApp'
@@ -79,7 +77,6 @@ export function runtimeSettingsSnapshotFromSettingsSnapshot(
     shortcutsDisabled: snapshot.shortcutsDisabled,
     globalShortcutDisabled: snapshot.globalShortcutDisabled,
     swapCloseShortcuts: snapshot.swapCloseShortcuts,
-    toggleDetailOnActionBarBlankClick: snapshot.toggleDetailOnActionBarBlankClick,
     globalShortcut: snapshot.globalShortcut,
     globalShortcutRegistered: snapshot.globalShortcutRegistered,
     terminalApp: snapshot.terminalApp,

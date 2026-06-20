@@ -28,7 +28,6 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { PROTECTED_BRANCHES, branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import type { SelectedBranchDetail } from '#/web/components/branch-detail/model.ts'
 import type { RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
-import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 interface Props {
   detail: SelectedBranchDetail
   layout: RepoWorkspaceLayout
@@ -77,12 +76,11 @@ function SyncValue({
   )
 }
 
-export function BranchStatus({ detail, layout }: Props) {
+export function BranchStatus({ detail }: Props) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
   const compact = useIsCompactUi()
   const { branch, statusCount } = detail
-  const behavior = repoWorkspaceBehavior(layout, false)
   if (!branch) return <EmptyState title={t('branches.empty')} />
 
   const protectedBranch = PROTECTED_BRANCHES.has(branch.name)
@@ -250,7 +248,7 @@ export function BranchStatus({ detail, layout }: Props) {
           tone={mergeTone}
         />
       )}
-      <PullRequestStatusRow pullRequest={pullRequest} tooltipSide={compact ? 'top' : behavior.prTooltipSide} />
+      <PullRequestStatusRow pullRequest={pullRequest} tooltipSide={compact ? 'top' : 'bottom'} />
     </StatusRows>
   )
 }

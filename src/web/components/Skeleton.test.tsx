@@ -37,8 +37,8 @@ afterEach(() => {
 })
 
 describe('RepoWorkspaceSkeleton', () => {
-  test('shows compact branch rows with list actions in top-bottom split mode', () => {
-    render(<RepoWorkspaceSkeleton layout="top-bottom" detailCollapsed={false} detailFocusMode={false} />)
+  test('shows branch rows with list actions in split mode', () => {
+    render(<RepoWorkspaceSkeleton workspacePaneFocusMode={false} />)
 
     expect(container?.querySelectorAll('li')).toHaveLength(14)
     expect(container?.querySelectorAll('[data-testid="branch-list-skeleton-action"]')).toHaveLength(6)
@@ -52,15 +52,15 @@ describe('RepoWorkspaceSkeleton', () => {
   })
 
   test('renders split workspace with list actions in left-right mode', () => {
-    render(<RepoWorkspaceSkeleton layout="left-right" detailCollapsed={false} detailFocusMode={false} />)
+    render(<RepoWorkspaceSkeleton layout="left-right" workspacePaneFocusMode={false} />)
 
     expect(container?.querySelectorAll('li')).toHaveLength(14)
     expect(container?.querySelectorAll('[data-testid="branch-list-skeleton-action"]')).toHaveLength(6)
     expect(container?.querySelector('[data-testid="mock-split-pane"]')).not.toBeNull()
   })
 
-  test('hides the branch pane entirely in top-bottom focus mode', () => {
-    render(<RepoWorkspaceSkeleton layout="top-bottom" detailCollapsed={false} detailFocusMode />)
+  test('hides the branch pane entirely in focus mode', () => {
+    render(<RepoWorkspaceSkeleton layout="left-right" workspacePaneFocusMode />)
 
     expect(container?.querySelectorAll('li')).toHaveLength(8)
     expect(container?.querySelectorAll('[data-testid="branch-list-skeleton-action"]')).toHaveLength(0)

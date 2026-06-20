@@ -3,14 +3,10 @@ import { selectedBranchForViewMode } from '#/web/stores/repos/branch-view-mode.t
 import { isRepoUnavailable, replaceRepo, replaceRepoState } from '#/web/stores/repos/helpers.ts'
 import { persistRestorableRepoSnapshot } from '#/web/stores/repos/persistence.ts'
 import {
-  DEFAULT_DETAIL_COLLAPSED,
-  DEFAULT_DETAIL_PANE_SIZES,
-  DEFAULT_WORKSPACE_LAYOUT,
-  effectiveDetailCollapsed,
-  normalizeDetailPaneSize,
-  normalizeDetailPaneSizes,
+  DEFAULT_WORKSPACE_PANE_SIZES,
+  normalizeWorkspacePaneSize,
+  normalizeWorkspacePaneSizes,
   normalizeWorkspaceSessionLayoutState,
-  workspaceLayoutAllowsDetailCollapse,
 } from '#/shared/workspace-layout.ts'
 import type {
   BranchViewMode,
@@ -20,25 +16,21 @@ import type {
   ReposStore,
 } from '#/web/stores/repos/types.ts'
 import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
-import type { WorkspaceDetailPaneSizes } from '#/shared/workspace-layout.ts'
+import type { WorkspacePaneSizes } from '#/shared/workspace-layout.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
-import { pushWorkspaceLayoutToNativeMenu } from '#/web/settings-client.ts'
 
 type RestorableWorkspaceSelectionActions = Pick<
   ReposStore,
   | 'setActive'
   | 'reorderRepos'
   | 'cycleActive'
-  | 'setDetailCollapsed'
-  | 'toggleDetailCollapsed'
-  | 'setDetailFocusMode'
-  | 'toggleDetailFocusMode'
-  | 'setWorkspaceLayout'
+  | 'setWorkspacePaneFocusMode'
+  | 'toggleWorkspacePaneFocusMode'
   | 'applySessionLayoutState'
   | 'applySessionSelectedTerminalState'
   | 'applySessionWorkspacePaneViewByRepo'
-  | 'setDetailPaneSize'
-  | 'setDetailPaneSizes'
+  | 'setWorkspacePaneSize'
+  | 'setWorkspacePaneSizes'
   | 'resetLayout'
   | 'setSelectedTerminal'
 >
@@ -72,86 +64,34 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
       if (next && next !== activeId) set({ activeId: next })
     },
 
-    setDetailCollapsed(collapsed: boolean) {
+    setWorkspacePaneFocusMode(focused: boolean) {
       set((s) => {
-        const next = effectiveDetailCollapsed(s.workspaceLayout, collapsed)
-        return s.detailCollapsed === next ? s : { detailCollapsed: next }
+        const workspacePaneFocusMode = focused
+        return s.workspacePaneFocusMode === workspacePaneFocusMode ? s : { workspacePaneFocusMode }
       })
     },
 
-    toggleDetailCollapsed() {
+    toggleWorkspacePaneFocusMode() {
       set((s) => {
-        if (!workspaceLayoutAllowsDetailCollapse(s.workspaceLayout)) return s
-        return { detailCollapsed: !s.detailCollapsed }
+        const workspacePaneFocusMode = !s.workspacePaneFocusMode
+        return { workspacePaneFocusMode }
       })
-    },
-
-    setDetailFocusMode(focused: boolean) {
-      set((s) => {
-        const detailFocusMode = focused
-        const detailCollapsed = detailFocusMode ? false : s.detailCollapsed
-        return s.detailFocusMode === detailFocusMode && s.detailCollapsed === detailCollapsed
-          ? s
-          : { detailFocusMode, detailCollapsed }
-      })
-    },
-
-    toggleDetailFocusMode() {
-      set((s) => {
-        const detailFocusMode = !s.detailFocusMode
-        const detailCollapsed = detailFocusMode ? false : s.detailCollapsed
-        return { detailFocusMode, detailCollapsed }
-      })
-    },
-
-    setWorkspaceLayout(layout: RepoWorkspaceLayout) {
-      let layoutChanged = false
-      let previousLayout: RepoWorkspaceLayout | undefined
-      set((s) => {
-        previousLayout = s.workspaceLayout
-        const detailFocusMode = s.detailFocusMode
-        const detailCollapsed = detailFocusMode ? false : effectiveDetailCollapsed(layout, s.detailCollapsed)
-        if (
-          s.workspaceLayout === layout &&
-          s.detailCollapsed === detailCollapsed &&
-          s.detailFocusMode === detailFocusMode
-        ) {
-          return s
-        }
-        layoutChanged = true
-        return { workspaceLayout: layout, detailCollapsed, detailFocusMode }
-      })
-      // Push the new layout to main so the native menu's
-      // `view-toggle-detail` `enabled` predicate — and therefore the
-      // CmdOrCtrl+J accelerator — stays in sync with the renderer's
-      // store in the same tick, not after the session save lands.
-      // Fire-and-forget; transient IPC failures are caught and logged
-      // inside the helper.
-      if (layoutChanged && previousLayout !== layout) {
-        void pushWorkspaceLayoutToNativeMenu(layout)
-      }
     },
 
     applySessionLayoutState(layoutState: Parameters<ReposStore['applySessionLayoutState']>[0]) {
       // One-shot boot/session restore of restorable layout fields. Runtime
-      // layout edits still originate from the renderer and are persisted later
-      // through useSessionPersistence.
+      // edits are persisted later through useSessionPersistence.
       set((s) => {
         const next = normalizeWorkspaceSessionLayoutState(layoutState)
         if (
-          s.workspaceLayout === next.workspaceLayout &&
-          s.detailCollapsed === next.detailCollapsed &&
-          s.detailFocusMode === next.detailFocusMode &&
-          s.detailPaneSizes['top-bottom'] === next.detailPaneSizes['top-bottom'] &&
-          s.detailPaneSizes['left-right'] === next.detailPaneSizes['left-right']
+          s.workspacePaneFocusMode === next.workspacePaneFocusMode &&
+          s.workspacePaneSizes['left-right'] === next.workspacePaneSizes['left-right']
         ) {
           return s
         }
         return {
-          workspaceLayout: next.workspaceLayout,
-          detailCollapsed: next.detailCollapsed,
-          detailFocusMode: next.detailFocusMode,
-          detailPaneSizes: next.detailPaneSizes,
+          workspacePaneFocusMode: next.workspacePaneFocusMode,
+          workspacePaneSizes: next.workspacePaneSizes,
         }
       })
     },
@@ -195,56 +135,37 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
       })
     },
 
-    setDetailPaneSize(layout: RepoWorkspaceLayout, size: number) {
+    setWorkspacePaneSize(layout: RepoWorkspaceLayout, size: number) {
       set((s) => {
-        const next = normalizeDetailPaneSize(layout, size)
-        if (s.detailPaneSizes[layout] === next) return s
-        return { detailPaneSizes: { ...s.detailPaneSizes, [layout]: next } }
+        const next = normalizeWorkspacePaneSize(layout, size)
+        if (s.workspacePaneSizes[layout] === next) return s
+        return { workspacePaneSizes: { ...s.workspacePaneSizes, [layout]: next } }
       })
     },
 
-    setDetailPaneSizes(sizes: WorkspaceDetailPaneSizes) {
+    setWorkspacePaneSizes(sizes: WorkspacePaneSizes) {
       set((s) => {
-        const next = normalizeDetailPaneSizes(sizes)
-        if (
-          s.detailPaneSizes['top-bottom'] === next['top-bottom'] &&
-          s.detailPaneSizes['left-right'] === next['left-right']
-        ) {
+        const next = normalizeWorkspacePaneSizes(sizes)
+        if (s.workspacePaneSizes['left-right'] === next['left-right']) {
           return s
         }
-        return { detailPaneSizes: next }
+        return { workspacePaneSizes: next }
       })
     },
 
     resetLayout() {
-      let layoutChanged = false
-      let previousLayout: RepoWorkspaceLayout | undefined
       set((s) => {
-        previousLayout = s.workspaceLayout
-        const detailCollapsed = effectiveDetailCollapsed(DEFAULT_WORKSPACE_LAYOUT, DEFAULT_DETAIL_COLLAPSED)
         if (
-          s.workspaceLayout === DEFAULT_WORKSPACE_LAYOUT &&
-          s.detailCollapsed === detailCollapsed &&
-          !s.detailFocusMode &&
-          s.detailPaneSizes['top-bottom'] === DEFAULT_DETAIL_PANE_SIZES['top-bottom'] &&
-          s.detailPaneSizes['left-right'] === DEFAULT_DETAIL_PANE_SIZES['left-right']
+          !s.workspacePaneFocusMode &&
+          s.workspacePaneSizes['left-right'] === DEFAULT_WORKSPACE_PANE_SIZES['left-right']
         ) {
           return s
         }
-        layoutChanged = true
         return {
-          workspaceLayout: DEFAULT_WORKSPACE_LAYOUT,
-          detailCollapsed,
-          detailFocusMode: false,
-          detailPaneSizes: DEFAULT_DETAIL_PANE_SIZES,
+          workspacePaneFocusMode: false,
+          workspacePaneSizes: DEFAULT_WORKSPACE_PANE_SIZES,
         }
       })
-      // Same main-sync reason as `setWorkspaceLayout`: the native menu
-      // must rebuild so the CmdOrCtrl+J accelerator re-enables when the
-      // user resets out of `left-right`.
-      if (layoutChanged && previousLayout !== DEFAULT_WORKSPACE_LAYOUT) {
-        void pushWorkspaceLayoutToNativeMenu(DEFAULT_WORKSPACE_LAYOUT)
-      }
     },
 
     setSelectedTerminal(worktreeTerminalKey: string, key: string | null) {

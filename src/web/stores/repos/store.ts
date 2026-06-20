@@ -23,10 +23,7 @@ import { createSelectionActions } from '#/web/stores/repos/selection.ts'
 import { reposLog } from '#/web/logger.ts'
 import { normalizeRestorableRepoCache } from '#/web/stores/repos/persistence.ts'
 import {
-  DEFAULT_DETAIL_COLLAPSED,
-  DEFAULT_DETAIL_PANE_SIZES,
-  DEFAULT_WORKSPACE_LAYOUT,
-  effectiveDetailCollapsed,
+  DEFAULT_WORKSPACE_PANE_SIZES,
 } from '#/shared/workspace-layout.ts'
 import type { RestorableRepoSnapshot, ReposStore } from '#/web/stores/repos/types.ts'
 
@@ -106,10 +103,8 @@ export const useReposStore = create<ReposStore>()(
       // Restorable workspace state.
       order: [],
       activeId: null,
-      detailCollapsed: effectiveDetailCollapsed(DEFAULT_WORKSPACE_LAYOUT, DEFAULT_DETAIL_COLLAPSED),
-      detailFocusMode: false,
-      workspaceLayout: DEFAULT_WORKSPACE_LAYOUT,
-      detailPaneSizes: DEFAULT_DETAIL_PANE_SIZES,
+      workspacePaneFocusMode: false,
+      workspacePaneSizes: DEFAULT_WORKSPACE_PANE_SIZES,
       selectedTerminalByWorktree: {},
       workspacePaneViewByRepo: {},
 

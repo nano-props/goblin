@@ -8,14 +8,14 @@ import type {
   WorktreeStatus,
 } from '#/web/types.ts'
 import type { RemoteRepoLifecycle, RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { WorkspaceDetailPaneSizes, WorkspaceLayout } from '#/shared/workspace-layout.ts'
+import type { WorkspacePaneSizes } from '#/shared/workspace-layout.ts'
 import type { SessionState } from '#/shared/api-types.ts'
 import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/repos/branch-action-types.ts'
 import type { RepoOperationsState } from '#/web/stores/repos/operations.ts'
 import type { RepoResourcesState } from '#/web/stores/repos/resources.ts'
 export type BranchViewMode = 'all' | 'worktrees'
-export type RepoWorkspaceLayout = WorkspaceLayout
+export type RepoWorkspaceLayout = 'left-right'
 export type RepoDataSource = 'cache' | 'fresh'
 // Renderer branches keep only the worktree reference; metadata lives in worktreesByPath.
 export type RepoBranchState = Omit<BranchSnapshotInfo, 'worktree'> & {
@@ -65,7 +65,7 @@ export interface RepoUiState {
   selectedBranch: string | null
   branchViewMode: BranchViewMode
   /** The user-preferred workspace pane view type. This is persisted intent; the
-   *  rendered detail pane is resolved at read time from this preference plus
+   *  rendered workspace pane is resolved at read time from this preference plus
    *  live worktree, terminal, and opened workspace pane view state. The store never
    *  adjusts this on snapshot/branch changes, preserving the user's
    *  preference across them. */
@@ -150,17 +150,14 @@ export interface RestorableWorkspaceState {
   order: string[]
   /** Active workspace tab restored from SessionState.activeRepo. */
   activeId: string | null
-  detailCollapsed: boolean
-  /** Persisted focus-toggle preference for the top-bottom detail pane. This
+  /** Persisted branch-list focus-toggle preference. This
    *  is not itself proof that the workspace is currently rendering in focus
-   *  mode — a collapsed top-bottom layout preserves the preference while the
-   *  effective layout mode remains collapsed. */
-  detailFocusMode: boolean
-  workspaceLayout: RepoWorkspaceLayout
-  detailPaneSizes: WorkspaceDetailPaneSizes
+   *  mode; callers should derive the effective workspace behavior. */
+  workspacePaneFocusMode: boolean
+  workspacePaneSizes: WorkspacePaneSizes
   /** Per worktree terminal selection restored from SessionState.selectedTerminalByWorktree. */
   selectedTerminalByWorktree: Record<string, string>
-  /** Per-repo workspace pane view selection, restored alongside detailCollapsed. */
+  /** Per-repo workspace pane view selection, restored with the session. */
   workspacePaneViewByRepo: Record<string, WorkspacePaneView>
 }
 
@@ -176,23 +173,20 @@ export interface RestorableWorkspaceActions {
   setActive: (id: string) => void
   /** Reorder the tab strip so `fromId` lands at `toId`'s position, using
    *  the same shift semantics as dnd-kit's `arrayMove` (the rest of the
-   *  list closes the gap; later items shift up if `from < to`, down if
-   *  `from > to`). No-op if either id is unknown or they're identical. */
+  *  list closes the gap; later items shift up if `from < to`, down if
+  *  `from > to`). No-op if either id is unknown or they're identical. */
   reorderRepos: (fromId: string, toId: string) => void
-  setDetailCollapsed: (collapsed: boolean) => void
-  toggleDetailCollapsed: () => void
-  /** Update the persisted top-bottom focus-toggle preference. The effective
+  /** Update the persisted branch-list focus-toggle preference. The effective
    *  rendered layout mode should be derived from `repoWorkspaceBehavior()`. */
-  setDetailFocusMode: (focused: boolean) => void
-  toggleDetailFocusMode: () => void
-  setWorkspaceLayout: (layout: RepoWorkspaceLayout) => void
+  setWorkspacePaneFocusMode: (focused: boolean) => void
+  toggleWorkspacePaneFocusMode: () => void
   applySessionLayoutState: (
-    layout: Pick<SessionState, 'workspaceLayout' | 'detailCollapsed' | 'detailFocusMode' | 'detailPaneSizes'>,
+    layout: Pick<SessionState, 'workspacePaneFocusMode' | 'workspacePaneSizes'>,
   ) => void
   applySessionSelectedTerminalState: (selectedTerminalByWorktree: Record<string, string>) => void
   applySessionWorkspacePaneViewByRepo: (workspacePaneViewByRepo: Record<string, WorkspacePaneView>) => void
-  setDetailPaneSize: (layout: RepoWorkspaceLayout, size: number) => void
-  setDetailPaneSizes: (sizes: WorkspaceDetailPaneSizes) => void
+  setWorkspacePaneSize: (layout: RepoWorkspaceLayout, size: number) => void
+  setWorkspacePaneSizes: (sizes: WorkspacePaneSizes) => void
   resetLayout: () => void
   setSelectedTerminal: (worktreeTerminalKey: string, key: string | null) => void
   cycleActive: (direction: 1 | -1) => void

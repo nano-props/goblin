@@ -214,10 +214,7 @@ describe('main process startup lifecycle', () => {
       ...snapshot,
       globalShortcutDisabled: true,
       globalShortcut: 'Alt+K',
-      session: {
-        ...snapshot.session,
-        detailCollapsed: false,
-      },
+      session: snapshot.session,
     })
 
     await import('#/main/main.ts')

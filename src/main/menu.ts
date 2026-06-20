@@ -21,10 +21,6 @@ import { menuNodeLog } from '#/node/logger.ts'
 import { openDataFolderMenuKey, t } from '#/main/i18n/index.ts'
 import { sendRendererEffectIntent } from '#/main/renderer-surface-events.ts'
 import { getTheme } from '#/main/theme.ts'
-import {
-  normalizeWorkspaceLayout,
-  type WorkspaceLayout,
-} from '#/shared/workspace-layout.ts'
 import { tildifyPath } from '#/shared/paths.ts'
 import type { LangPref, ThemePref } from '#/shared/api-types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
@@ -52,10 +48,9 @@ interface AppMenuState {
   swapCloseShortcuts: boolean
   themePref: ThemePref
   langPref: LangPref
-  workspaceLayout: WorkspaceLayout
 }
 
-type AppMenuCommandContext = Pick<AppMenuState, 'swapCloseShortcuts' | 'workspaceLayout'>
+type AppMenuCommandContext = Pick<AppMenuState, 'swapCloseShortcuts'>
 
 const APPEARANCE_MENU_OPTIONS = [
   { pref: 'auto', labelKey: 'settings.appearance.auto' },
@@ -88,23 +83,6 @@ function separator(): MenuItemConstructorOptions {
   return { type: 'separator' }
 }
 
-/**
- * Apply a new workspace layout to the menu's runtime state.
- *
- * Single source of truth for the menu's view of `workspaceLayout` is
- * `MenuRuntimeState.workspaceLayout`, seeded from the persisted session at
- * boot and updated by the renderer's IPC push after in-app layout changes.
- * No parallel optimistic snapshot — menu state mirrors the renderer-owned
- * workspace layout.
- */
-export function applyMenuWorkspaceLayout(layout: WorkspaceLayout): boolean {
-  const next = normalizeWorkspaceLayout(layout)
-  if (readMenuRuntimeState().workspaceLayout === next) return false
-  applyMenuRuntimeState({ workspaceLayout: next })
-  buildAppMenu()
-  return true
-}
-
 export function buildAppMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate(createAppMenuTemplate(readMenuState())))
 }
@@ -119,7 +97,6 @@ function readMenuState(): AppMenuState {
     swapCloseShortcuts: runtimeState.swapCloseShortcuts,
     themePref: getTheme().pref,
     langPref: runtimeState.langPref,
-    workspaceLayout: normalizeWorkspaceLayout(runtimeState.workspaceLayout),
   }
 }
 
@@ -241,7 +218,6 @@ function createViewMenu(state: AppMenuState): MenuItemConstructorOptions {
       // tab, focus the first existing session, or create one when the
       // worktree has no terminals yet.
       createRendererCommandMenuItem(state, 'view-terminal'),
-      createRendererCommandMenuItem(state, 'view-toggle-detail'),
       ...(state.isMac ? [] : [separator(), createAppearanceMenu(state.themePref), createLanguageMenu(state.langPref)]),
       separator(),
       createRendererCommandMenuItem(state, 'view-refresh'),
@@ -358,7 +334,6 @@ function closeWindowAccelerator(state: AppMenuState): string {
 function menuCommandContext(state: AppMenuState): AppMenuCommandContext {
   return {
     swapCloseShortcuts: state.swapCloseShortcuts,
-    workspaceLayout: state.workspaceLayout,
   }
 }
 

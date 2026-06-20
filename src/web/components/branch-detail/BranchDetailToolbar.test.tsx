@@ -349,7 +349,7 @@ function renderToolbar(options: {
   navigation: MainWindowNavigationActions
   workspacePaneView?: 'status' | 'changes' | 'terminal'
   staticWorkspaceViewTypes?: WorkspacePaneStaticViewType[]
-  detailFocusMode?: boolean
+  workspacePaneFocusMode?: boolean
   collapsed?: boolean
   layout?: RepoWorkspaceLayout
   /**
@@ -495,8 +495,7 @@ function renderToolbar(options: {
                 detail={detail}
                 detailId="detail"
                 contentId="content"
-                collapsed={options.collapsed ?? false}
-                detailFocusMode={options.detailFocusMode ?? false}
+                workspacePaneFocusMode={options.workspacePaneFocusMode ?? false}
                 layout={options.layout ?? DEFAULT_WORKSPACE_LAYOUT}
               />
             </TerminalSessionReadContext.Provider>

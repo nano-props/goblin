@@ -32,26 +32,22 @@ afterEach(() => {
 })
 
 describe('useAppBootstrap', () => {
-  test('canonicalizes boot session layout before applying it to the repos store', async () => {
+  test('canonicalizes boot session pane state before applying it to the repos store', async () => {
     vi.spyOn(useThemeStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useSessionRestoreStore.getState(), 'hydrate').mockResolvedValue({
       openRepos: [{ kind: 'local', id: '/tmp/repo' }],
       activeRepo: '/tmp/repo',
-      detailCollapsed: true,
-      detailFocusMode: true,
-      workspaceLayout: 'left-right',
-      detailPaneSizes: { 'top-bottom': 55, 'left-right': 45 },
+      workspacePaneFocusMode: true,
+      workspacePaneSizes: { 'left-right': 45 },
       selectedTerminalByWorktree: { '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2' },
     })
     vi.spyOn(useSessionRestoreStore.getState(), 'consumeBootSessionSnapshot').mockReturnValue({
       openRepos: [{ kind: 'local', id: '/tmp/repo' }],
       activeRepo: '/tmp/repo',
-      detailCollapsed: true,
-      detailFocusMode: true,
-      workspaceLayout: 'left-right',
-      detailPaneSizes: { 'top-bottom': 55, 'left-right': 45 },
+      workspacePaneFocusMode: true,
+      workspacePaneSizes: { 'left-right': 45 },
       selectedTerminalByWorktree: { '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2' },
     })
     const hydrateSession = vi.spyOn(useReposStore.getState(), 'hydrateSession').mockResolvedValue(undefined)
@@ -59,10 +55,8 @@ describe('useAppBootstrap', () => {
     await render(<Harness />)
 
     const state = useReposStore.getState()
-    expect(state.workspaceLayout).toBe('left-right')
-    expect(state.detailCollapsed).toBe(false)
-    expect(state.detailFocusMode).toBe(true)
-    expect(state.detailPaneSizes).toEqual({ 'top-bottom': 55, 'left-right': 45 })
+    expect(state.workspacePaneFocusMode).toBe(true)
+    expect(state.workspacePaneSizes).toEqual({ 'left-right': 45 })
     expect(state.selectedTerminalByWorktree).toEqual({
       '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2',
     })

@@ -79,11 +79,8 @@ describe('settings routes', () => {
     const session = {
       openRepos: [],
       activeRepo: null,
-      detailCollapsed: true,
-      detailFocusMode: false,
-      workspaceLayout: 'top-bottom',
-      detailPaneSizes: {
-        'top-bottom': 40,
+      workspacePaneFocusMode: false,
+      workspacePaneSizes: {
         'left-right': 50,
       },
       selectedTerminalByWorktree: {},

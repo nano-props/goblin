@@ -7,7 +7,6 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { SettingsSurface } from '#/web/components/SettingsSurface.tsx'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
 import { resetReposStore } from '#/web/stores/repos/test-utils.ts'
 
 const toastMocks = vi.hoisted(() => ({
@@ -39,7 +38,6 @@ function defaultIpcResult(path: string, input?: unknown) {
       shortcutsDisabled: false,
       globalShortcutDisabled: false,
       swapCloseShortcuts: false,
-      toggleDetailOnActionBarBlankClick: false,
       globalShortcut: 'CommandOrControl+Shift+G',
       globalShortcutRegistered: true,
       terminalApp: 'auto',
@@ -48,10 +46,8 @@ function defaultIpcResult(path: string, input?: unknown) {
       session: {
         openRepos: [],
         activeRepo: null,
-        detailCollapsed: true,
-        detailFocusMode: false,
-        workspaceLayout: { left: ['sidebar'], center: ['repo'], right: ['detail'] },
-        detailPaneSizes: [50, 50],
+        workspacePaneFocusMode: false,
+        workspacePaneSizes: { 'left-right': 50 },
       },
       recentRepos: [],
     }
@@ -181,22 +177,12 @@ afterEach(() => {
 })
 
 describe('SettingsSurface', () => {
-  test('shows the workspace layout selector on the general page', async () => {
-    useReposStore.setState({ workspaceLayout: 'top-bottom' })
+  test('does not show the removed workspace layout selector on the general page', async () => {
     await render(<SettingsSurface page="general" onPageChange={() => {}} />)
 
-    const trigger = document.getElementById('settings-workspace-layout')
-    expect(trigger).toBeInstanceOf(HTMLButtonElement)
-    expect(document.body.textContent).toContain('settings.workspace-layout')
-    expect(document.body.textContent).toContain('settings.workspace-layout-hint')
-    expect(trigger?.textContent).toContain('menu.view.layout-top-bottom')
-
-    await act(async () => {
-      useReposStore.getState().setWorkspaceLayout('left-right')
-      await Promise.resolve()
-    })
-
-    expect(document.getElementById('settings-workspace-layout')?.textContent).toContain('menu.view.layout-left-right')
+    expect(document.getElementById('settings-workspace-layout')).toBeNull()
+    expect(document.body.textContent).not.toContain('settings.workspace-layout')
+    expect(document.body.textContent).not.toContain('settings.workspace-layout-hint')
   })
 
   test('can trigger a test terminal notification from settings', async () => {

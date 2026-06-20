@@ -21,7 +21,6 @@ describe('settings snapshot partitions', () => {
           shortcutsDisabled: true,
           globalShortcutDisabled: false,
           swapCloseShortcuts: true,
-          toggleDetailOnActionBarBlankClick: true,
           globalShortcut: 'CommandOrControl+Shift+K',
           terminalApp: 'ghostty',
           editorApp: 'cursor',
@@ -38,7 +37,6 @@ describe('settings snapshot partitions', () => {
       shortcutsDisabled: true,
       globalShortcutDisabled: false,
       swapCloseShortcuts: true,
-      toggleDetailOnActionBarBlankClick: true,
       globalShortcut: 'CommandOrControl+Shift+K',
       globalShortcutRegistered: true,
       terminalApp: 'ghostty',
@@ -68,7 +66,6 @@ describe('settings snapshot partitions', () => {
         shortcutsDisabled: false,
         globalShortcutDisabled: true,
         swapCloseShortcuts: false,
-        toggleDetailOnActionBarBlankClick: false,
         globalShortcut: 'CommandOrControl+Shift+G',
         terminalApp: 'auto',
         editorApp: 'auto',
@@ -79,10 +76,8 @@ describe('settings snapshot partitions', () => {
       session: {
         openRepos: [{ kind: 'local', id: '/tmp/repo-b' }],
         activeRepo: '/tmp/repo-b',
-        detailCollapsed: false,
-        detailFocusMode: true,
-        workspaceLayout: 'top-bottom',
-        detailPaneSizes: { 'top-bottom': 40, 'left-right': 50 },
+        workspacePaneFocusMode: true,
+        workspacePaneSizes: { 'left-right': 50 },
         selectedTerminalByWorktree: { '/tmp/repo-b\0/tmp/repo-b': 'terminal-1' },
       },
     })
@@ -96,10 +91,8 @@ describe('settings snapshot partitions', () => {
     expect(restorableSessionStateFromSettingsSnapshot(snapshot)).toEqual({
       openRepos: [{ kind: 'local', id: '/tmp/repo-b' }],
       activeRepo: '/tmp/repo-b',
-      detailCollapsed: false,
-      detailFocusMode: true,
-      workspaceLayout: 'top-bottom',
-      detailPaneSizes: { 'top-bottom': 40, 'left-right': 50 },
+      workspacePaneFocusMode: true,
+      workspacePaneSizes: { 'left-right': 50 },
       selectedTerminalByWorktree: { '/tmp/repo-b\0/tmp/repo-b': 'terminal-1' },
     })
   })

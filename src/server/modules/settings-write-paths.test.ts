@@ -54,7 +54,6 @@ describe('settings write paths', () => {
       shortcutsDisabled: false,
       globalShortcutDisabled: false,
       swapCloseShortcuts: false,
-      toggleDetailOnActionBarBlankClick: false,
       globalShortcut: 'CommandOrControl+Shift+G',
       terminalApp: 'auto',
       editorApp: 'auto',
@@ -88,7 +87,6 @@ describe('settings write paths', () => {
       shortcutsDisabled: false,
       globalShortcutDisabled: false,
       swapCloseShortcuts: false,
-      toggleDetailOnActionBarBlankClick: false,
       globalShortcut: 'CommandOrControl+Shift+G',
       terminalApp: 'ghostty',
       editorApp: 'cursor',
@@ -133,11 +131,8 @@ describe('settings write paths', () => {
     const session: SessionState = {
       openRepos: [],
       activeRepo: null,
-      detailCollapsed: true,
-      detailFocusMode: false,
-      workspaceLayout: 'top-bottom',
-      detailPaneSizes: {
-        'top-bottom': 40,
+      workspacePaneFocusMode: false,
+      workspacePaneSizes: {
         'left-right': 50,
       },
       selectedTerminalByWorktree: {},
@@ -183,7 +178,7 @@ describe('settings write paths', () => {
       },
     })
     // Defaults fill in the omitted keys.
-    expect(parsed.session.detailCollapsed).toBe(true)
-    expect(parsed.session.workspaceLayout).toBe('left-right')
+    expect(parsed.session.workspacePaneFocusMode).toBe(false)
+    expect(parsed.session.workspacePaneSizes).toEqual({ 'left-right': 61.8 })
   })
 })

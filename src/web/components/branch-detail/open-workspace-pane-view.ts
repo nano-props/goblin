@@ -9,7 +9,6 @@ export function openWorkspacePaneView(input: {
   worktreePath: string | null | undefined
   type: WorkspacePaneStaticViewType
   navigation: Pick<MainWindowNavigationActions, 'showRepoBranchWorkspacePaneView' | 'showRepoWorkspacePaneView'>
-  setDetailCollapsed: (collapsed: boolean) => void
 }): void {
   if (!input.worktreePath) return
   const worktreeKey = worktreeTerminalKey(input.repoId, input.worktreePath)
@@ -19,5 +18,4 @@ export function openWorkspacePaneView(input: {
   } else {
     input.navigation.showRepoWorkspacePaneView(input.repoId, input.type)
   }
-  input.setDetailCollapsed(false)
 }

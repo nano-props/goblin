@@ -44,10 +44,7 @@ export function useRendererEffectIntentRouter({
   // the handler/plan helpers so components do not subscribe independently.
   const {
     ensureWorkspaceOpen,
-    setDetailCollapsed,
     setSelectedTerminal,
-    setWorkspaceLayout,
-    toggleDetailCollapsed,
     resetLayout,
   } = useStoreWithEqualityFn(
     useReposStore,
@@ -85,10 +82,7 @@ export function useRendererEffectIntentRouter({
       isOverlayOpen: () => isOverlayOpenRef.current(),
       isWorkspaceShortcutSuppressed: () => isWorkspaceShortcutSuppressedRef.current(),
       ensureWorkspaceOpen: async (input: string | RepoSessionEntry) => await ensureWorkspaceOpenRef.current(input),
-      setDetailCollapsed,
       setSelectedTerminal,
-      setWorkspaceLayout,
-      toggleDetailCollapsed,
       resetLayout,
       t: (key: string) => tRef.current(key),
     })
@@ -133,10 +127,7 @@ export function useRendererEffectIntentRouter({
     openRemoteRepo,
     openRepoPathDialog,
     resetLayout,
-    setDetailCollapsed,
     setSelectedTerminal,
-    setWorkspaceLayout,
     t,
-    toggleDetailCollapsed,
   ])
 }

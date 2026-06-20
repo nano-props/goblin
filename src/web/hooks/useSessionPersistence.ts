@@ -9,10 +9,8 @@ const SESSION_SAVE_DEBOUNCE_MS = 200
 export function useSessionPersistence() {
   const activeId = useReposStore((s) => s.activeId)
   const order = useReposStore((s) => s.order)
-  const detailCollapsed = useReposStore((s) => s.detailCollapsed)
-  const detailFocusMode = useReposStore((s) => s.detailFocusMode)
-  const workspaceLayout = useReposStore((s) => s.workspaceLayout)
-  const detailPaneSizes = useReposStore((s) => s.detailPaneSizes)
+  const workspacePaneFocusMode = useReposStore((s) => s.workspacePaneFocusMode)
+  const workspacePaneSizes = useReposStore((s) => s.workspacePaneSizes)
   const selectedTerminalByWorktree = useReposStore((s) => s.selectedTerminalByWorktree)
   const workspacePaneViewByRepo = useReposStore((s) => s.workspacePaneViewByRepo)
   const sessionReady = useReposStore((s) => s.sessionReady)
@@ -27,13 +25,11 @@ export function useSessionPersistence() {
     if (!sessionReady) return
     const session = sessionStateFromRestorableWorkspaceState({
       repos,
-      restorableWorkspaceState: restorableWorkspaceStateFromStore({
-        order,
-        activeId,
-        detailCollapsed,
-        detailFocusMode,
-        workspaceLayout,
-        detailPaneSizes,
+        restorableWorkspaceState: restorableWorkspaceStateFromStore({
+          order,
+          activeId,
+          workspacePaneFocusMode,
+        workspacePaneSizes,
         selectedTerminalByWorktree,
         workspacePaneViewByRepo,
       }),
@@ -42,9 +38,7 @@ export function useSessionPersistence() {
     const immediateKey = JSON.stringify({
       openRepos: session.openRepos,
       activeRepo: session.activeRepo,
-      detailCollapsed,
-      detailFocusMode,
-      workspaceLayout,
+      workspacePaneFocusMode,
       selectedTerminalByWorktree: session.selectedTerminalByWorktree,
     })
     const immediate = lastImmediateKeyRef.current !== immediateKey
@@ -67,10 +61,8 @@ export function useSessionPersistence() {
     sessionReady,
     order,
     activeId,
-    detailCollapsed,
-    detailFocusMode,
-    workspaceLayout,
-    detailPaneSizes,
+    workspacePaneFocusMode,
+    workspacePaneSizes,
     selectedTerminalByWorktree,
     repos,
   ])

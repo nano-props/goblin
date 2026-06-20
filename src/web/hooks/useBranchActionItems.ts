@@ -21,7 +21,6 @@ import { branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import type { BrowserRemoteProvider } from '#/web/types.ts'
 import { useRuntimeExternalAppSettings } from '#/web/runtime-settings-external-apps.ts'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
-import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
 import { openWorkspacePaneView } from '#/web/components/branch-detail/open-workspace-pane-view.ts'
 export interface BranchActionItem {
@@ -76,7 +75,6 @@ function browserRemoteIcon(provider: BrowserRemoteProvider | undefined) {
 export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchState): BranchActionItemGroups {
   const t = useT()
   const navigation = useMainWindowNavigation()
-  const setDetailCollapsed = useReposStore((s) => s.setDetailCollapsed)
   const { terminalApp, resolvedTerminalApp, terminalAvailable, editorApp, resolvedEditorApp, editorAvailable } =
     useRuntimeExternalAppSettings()
   const { blocked, busyAction, capabilities, actions, dialogs } = useBranchActions(repo, branch)
@@ -124,7 +122,6 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
       worktreePath: branch.worktree?.path,
       type,
       navigation,
-      setDetailCollapsed,
     })
   }
 

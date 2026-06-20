@@ -18,12 +18,12 @@ import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
-import { detailPanelStoreActionsEqual, detailPanelStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
 import { openWorkspacePaneView } from '#/web/components/branch-detail/open-workspace-pane-view.ts'
 
 interface Props {
   repoId: string
   showActions?: boolean
+  onBranchActivated?: () => void
 }
 
 type OpenActionMenu = { repoId: string; branch: string }
@@ -61,21 +61,17 @@ function branchListRepoEqual(a: BranchListRepo | undefined, b: BranchListRepo | 
   )
 }
 
-export function BranchList({ repoId, showActions = true }: Props) {
+export function BranchList({ repoId, showActions = true, onBranchActivated }: Props) {
   const t = useT()
-  const { setDetailCollapsed } = useStoreWithEqualityFn(
-    useReposStore,
-    detailPanelStoreActionsFromStore,
-    detailPanelStoreActionsEqual,
-  )
   const navigation = useMainWindowNavigation()
   const selectedRef = useRef<HTMLLIElement | null>(null)
   const [openActionMenu, setOpenActionMenu] = useState<OpenActionMenu | null>(null)
   const handleSelectBranch = useCallback(
     (branch: string) => {
       navigation.selectRepoBranch(repoId, branch)
+      onBranchActivated?.()
     },
-    [navigation, repoId],
+    [navigation, onBranchActivated, repoId],
   )
   const repo = useStoreWithEqualityFn(
     useReposStore,
@@ -133,13 +129,12 @@ export function BranchList({ repoId, showActions = true }: Props) {
         worktreePath: branch.worktree.path,
         type: 'status',
         navigation,
-        setDetailCollapsed,
       })
+      onBranchActivated?.()
       return
     }
     handleSelectBranch(branchName)
     navigation.showRepoWorkspacePaneView(repoId, 'status')
-    setDetailCollapsed(false)
   }
   useEffect(() => {
     if (!openActionMenu) return

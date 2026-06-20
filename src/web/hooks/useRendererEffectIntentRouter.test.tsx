@@ -159,7 +159,6 @@ describe('useRendererEffectIntentRouter', () => {
     const state = useReposStore.getState()
     expect(state.activeId).toBe(repo.id)
     expect(state.repos[repo.id]?.ui.preferredWorkspacePaneView).toBe('terminal')
-    expect(state.detailCollapsed).toBe(false)
   })
 
   test('terminal bell clicks switch to the emitting worktree branch and selected terminal', async () => {
@@ -333,7 +332,6 @@ describe('useRendererEffectIntentRouter', () => {
 
     const state = useReposStore.getState()
     expect(state.repos[repo.id]?.ui.preferredWorkspacePaneView).toBe('status')
-    expect(state.detailCollapsed).toBe(before.detailCollapsed)
     expect(closeRepoSpy).not.toHaveBeenCalled()
   })
 

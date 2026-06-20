@@ -1,6 +1,5 @@
 import { type ReactNode } from 'react'
-import { Laptop, Moon, PanelLeft, PanelTop, Sun } from 'lucide-react'
-import { Switch } from '#/web/components/ui/switch.tsx'
+import { Laptop, Moon, Sun } from 'lucide-react'
 import {
   SettingsGroup,
   SettingsCard,
@@ -8,16 +7,11 @@ import {
   SettingsRow,
   SettingsSelect,
 } from '#/web/components/settings/SettingsPrimitives.tsx'
-import { useRuntimeGeneralSettings } from '#/web/runtime-settings-general.ts'
-import { useGeneralSettingsController } from '#/web/runtime-settings-general.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
 import { COLOR_THEMES } from '#/shared/color-theme.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
-import { WORKSPACE_LAYOUT_LABEL_KEYS, WORKSPACE_LAYOUTS } from '#/shared/workspace-layout.ts'
-import type { WorkspaceLayout } from '#/shared/workspace-layout.ts'
 import type { LangPref, ThemePref } from '#/shared/api-types.ts'
 
 export function GeneralSettings() {
@@ -28,10 +22,6 @@ export function GeneralSettings() {
   const setColorTheme = useThemeStore((s) => s.setColorTheme)
   const langPref = useI18nStore((s) => s.pref)
   const setLangPref = useI18nStore((s) => s.setPref)
-  const workspaceLayout = useReposStore((s) => s.workspaceLayout)
-  const setWorkspaceLayout = useReposStore((s) => s.setWorkspaceLayout)
-  const { toggleDetailOnActionBarBlankClick } = useRuntimeGeneralSettings()
-  const { setToggleDetailOnActionBarBlankClick } = useGeneralSettingsController()
   const appearanceOptions: { value: ThemePref; labelKey: string; icon: ReactNode }[] = [
     { value: 'auto', labelKey: 'settings.appearance.auto', icon: <Laptop className="size-4" /> },
     { value: 'light', labelKey: 'settings.appearance.light', icon: <Sun className="size-4" /> },
@@ -48,15 +38,6 @@ export function GeneralSettings() {
     { value: 'ko', labelKey: 'settings.lang.ko', emoji: '🇰🇷' },
     { value: 'ja', labelKey: 'settings.lang.ja', emoji: '🇯🇵' },
   ]
-  const layoutIcons: Record<WorkspaceLayout, ReactNode> = {
-    'left-right': <PanelLeft className="size-4" />,
-    'top-bottom': <PanelTop className="size-4" />,
-  }
-  const workspaceLayoutOptions = WORKSPACE_LAYOUTS.map((value) => ({
-    value,
-    labelKey: WORKSPACE_LAYOUT_LABEL_KEYS[value],
-    icon: layoutIcons[value],
-  }))
   return (
     <>
       <SettingsGroup label={t('settings.group.general')}>
@@ -94,32 +75,6 @@ export function GeneralSettings() {
                 value={langPref}
                 options={langOptions.map((o) => ({ value: o.value, label: `${o.emoji} ${t(o.labelKey)}` }))}
                 onChange={(v) => void setLangPref(v)}
-              />
-            }
-          />
-          <SettingsRow
-            controlId="settings-workspace-layout"
-            label={t('settings.workspace-layout')}
-            hint={t('settings.workspace-layout-hint')}
-            control={
-              <SettingsSelect
-                id="settings-workspace-layout"
-                value={workspaceLayout}
-                options={workspaceLayoutOptions.map((o) => ({ value: o.value, label: t(o.labelKey), icon: o.icon }))}
-                onChange={setWorkspaceLayout}
-              />
-            }
-          />
-          <SettingsRow
-            controlId="settings-action-bar-blank-toggle"
-            label={t('settings.action-bar-blank-toggle')}
-            hint={t('settings.action-bar-blank-toggle-hint')}
-            control={
-              <Switch
-                id="settings-action-bar-blank-toggle"
-                checked={toggleDetailOnActionBarBlankClick}
-                onCheckedChange={(enabled) => void setToggleDetailOnActionBarBlankClick(enabled)}
-                aria-label={t('settings.action-bar-blank-toggle')}
               />
             }
           />

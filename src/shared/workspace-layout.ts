@@ -1,80 +1,40 @@
-export const WORKSPACE_LAYOUTS = ['left-right', 'top-bottom'] as const
-
-export type WorkspaceLayout = (typeof WORKSPACE_LAYOUTS)[number]
-export type WorkspaceLayoutAxis = 'rows' | 'columns'
-export type WorkspaceDetailPaneSizes = Record<WorkspaceLayout, number>
-
-export const WORKSPACE_LAYOUT_LABEL_KEYS = {
-  'left-right': 'menu.view.layout-left-right',
-  'top-bottom': 'menu.view.layout-top-bottom',
-} as const satisfies Record<WorkspaceLayout, string>
+export type WorkspaceLayout = 'left-right'
+export type WorkspacePaneSizes = Record<WorkspaceLayout, number>
 
 export const DEFAULT_WORKSPACE_LAYOUT: WorkspaceLayout = 'left-right'
-export const DEFAULT_DETAIL_COLLAPSED = true
-export const DEFAULT_DETAIL_FOCUS_MODE = false
-export const DEFAULT_DETAIL_PANE_SIZES: WorkspaceDetailPaneSizes = { 'top-bottom': 61.8, 'left-right': 61.8 }
+export const DEFAULT_WORKSPACE_PANE_FOCUS_MODE = false
+export const DEFAULT_WORKSPACE_PANE_SIZES: WorkspacePaneSizes = { 'left-right': 61.8 }
 
-const MIN_DETAIL_PANE_SIZE = 10
-const MAX_DETAIL_PANE_SIZE = 90
-
-const WORKSPACE_LAYOUT_META = {
-  'top-bottom': { axis: 'rows', detailCollapseAllowed: true },
-  // Side-by-side layout always keeps both panes visible; collapsing the
-  // detail pane would leave the branch list without its companion pane.
-  'left-right': { axis: 'columns', detailCollapseAllowed: false },
-} satisfies Record<WorkspaceLayout, { axis: WorkspaceLayoutAxis; detailCollapseAllowed: boolean }>
+const MIN_WORKSPACE_PANE_SIZE = 10
+const MAX_WORKSPACE_PANE_SIZE = 90
 
 export function normalizeWorkspaceLayout(value: unknown): WorkspaceLayout {
-  if (value === 'top-bottom' || value === 'left-right') return value
+  if (value === 'left-right') return value
   return DEFAULT_WORKSPACE_LAYOUT
 }
 
-export function workspaceLayoutAxis(layout: WorkspaceLayout): WorkspaceLayoutAxis {
-  return WORKSPACE_LAYOUT_META[layout].axis
+export function normalizeWorkspacePaneSize(layout: WorkspaceLayout, value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_WORKSPACE_PANE_SIZES[layout]
+  return Math.max(MIN_WORKSPACE_PANE_SIZE, Math.min(MAX_WORKSPACE_PANE_SIZE, Math.round(value * 10) / 10))
 }
 
-export function workspaceLayoutAllowsDetailCollapse(layout: WorkspaceLayout): boolean {
-  return WORKSPACE_LAYOUT_META[layout].detailCollapseAllowed
-}
-
-export function effectiveDetailCollapsed(layout: WorkspaceLayout, detailCollapsed: boolean): boolean {
-  return workspaceLayoutAllowsDetailCollapse(layout) && detailCollapsed
-}
-
-export function normalizeDetailPaneSize(layout: WorkspaceLayout, value: unknown): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_DETAIL_PANE_SIZES[layout]
-  return Math.max(MIN_DETAIL_PANE_SIZE, Math.min(MAX_DETAIL_PANE_SIZE, Math.round(value * 10) / 10))
-}
-
-export function normalizeDetailPaneSizes(value: unknown): WorkspaceDetailPaneSizes {
+export function normalizeWorkspacePaneSizes(value: unknown): WorkspacePaneSizes {
   const sizes = value && typeof value === 'object' ? (value as Partial<Record<WorkspaceLayout, unknown>>) : {}
   return {
-    'top-bottom': normalizeDetailPaneSize('top-bottom', sizes['top-bottom']),
-    'left-right': normalizeDetailPaneSize('left-right', sizes['left-right']),
+    'left-right': normalizeWorkspacePaneSize('left-right', sizes['left-right']),
   }
 }
 
 export function normalizeWorkspaceSessionLayoutState(value: {
-  workspaceLayout?: unknown
-  detailCollapsed?: unknown
-  detailFocusMode?: unknown
-  detailPaneSizes?: unknown
+  workspacePaneFocusMode?: unknown
+  workspacePaneSizes?: unknown
 }): {
-  workspaceLayout: WorkspaceLayout
-  detailCollapsed: boolean
-  detailFocusMode: boolean
-  detailPaneSizes: WorkspaceDetailPaneSizes
+  workspacePaneFocusMode: boolean
+  workspacePaneSizes: WorkspacePaneSizes
 } {
-  const workspaceLayout = normalizeWorkspaceLayout(value.workspaceLayout)
-  const detailCollapsed = effectiveDetailCollapsed(
-    workspaceLayout,
-    typeof value.detailCollapsed === 'boolean' ? value.detailCollapsed : DEFAULT_DETAIL_COLLAPSED,
-  )
-  const detailFocusMode = typeof value.detailFocusMode === 'boolean' ? value.detailFocusMode : DEFAULT_DETAIL_FOCUS_MODE
+  const workspacePaneFocusMode = typeof value.workspacePaneFocusMode === 'boolean' ? value.workspacePaneFocusMode : DEFAULT_WORKSPACE_PANE_FOCUS_MODE
   return {
-    workspaceLayout,
-    detailCollapsed: detailFocusMode ? false : detailCollapsed,
-    detailFocusMode,
-    detailPaneSizes: normalizeDetailPaneSizes(value.detailPaneSizes),
+    workspacePaneFocusMode,
+    workspacePaneSizes: normalizeWorkspacePaneSizes(value.workspacePaneSizes),
   }
 }

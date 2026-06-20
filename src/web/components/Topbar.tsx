@@ -8,11 +8,9 @@
 //     moved up here so the workspace's vertical chrome collapses
 //     to just the branch list itself.
 //   • Branch List visibility toggle — enters/exits detail focus,
-//     hiding or showing the Branch List View without changing the
-//     user's workspace layout. Hidden in compact mode: the
-//     workspace already shows a full-bleed overlay prompting the
-//     user to switch to `top-bottom` there, and a topbar toggle
-//     would only compete with that CTA.
+//     hiding or showing the Branch List View on full-size layouts.
+//     Hidden in compact mode because compact navigation switches
+//     between Branch View and Workspace Pane inside the workspace.
 //   • Settings button (always shown) — navigates to the app
 //     settings page.
 //
@@ -28,14 +26,13 @@
 // (set globally on `button` and any element with `data-interactive`).
 
 import type { ReactNode } from 'react'
-import { PanelLeft, PanelTop, Settings } from 'lucide-react'
+import { PanelLeft, Settings } from 'lucide-react'
 import { useT } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { RepoToolbarActions } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
 import { WINDOW_TOPBAR_HEIGHT_PX } from '#/shared/window-chrome.ts'
-import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 
 interface Props {
   onOpenSettings: () => void
@@ -46,11 +43,6 @@ interface Props {
 }
 
 export function Topbar({ onOpenSettings, repoId, children }: Props) {
-  // Compact mode (small screen with `left-right` layout) shows a
-  // full-bleed overlay prompting the user to switch to
-  // `top-bottom` — see `App.tsx` / `compactLeftRight`. The
-  // layout toggle is therefore redundant there, and visually
-  // competes with the overlay's "switch to top-bottom" CTA.
   const compact = useIsCompactUi()
 
   return (
@@ -78,24 +70,21 @@ function SettingsButton({ onClick }: { onClick: () => void }) {
 // Single-button Branch List visibility toggle. It reuses the
 // workspace's detail focus state: when the Branch List is visible,
 // a click enters focus mode and hides it; when hidden, a click exits
-// focus mode and restores the current layout.
+// focus mode and restores the split workspace.
 function BranchListVisibilityToggle() {
   const t = useT()
-  const detailCollapsed = useReposStore((s) => s.detailCollapsed)
-  const detailFocusMode = useReposStore((s) => s.detailFocusMode)
-  const workspaceLayout = useReposStore((s) => s.workspaceLayout)
-  const setDetailFocusMode = useReposStore((s) => s.setDetailFocusMode)
-  const branchListHidden = repoWorkspaceBehavior(workspaceLayout, detailCollapsed, detailFocusMode).mode === 'focus'
-  const Icon: typeof PanelTop = workspaceLayout === 'top-bottom' ? PanelTop : PanelLeft
+  const workspacePaneFocusMode = useReposStore((s) => s.workspacePaneFocusMode)
+  const setWorkspacePaneFocusMode = useReposStore((s) => s.setWorkspacePaneFocusMode)
+  const branchListHidden = workspacePaneFocusMode
   return (
     <Button
       variant="ghost"
       size="icon-lg"
       aria-label={t('workspace.branch-list-toggle-label')}
       aria-pressed={branchListHidden}
-      onClick={() => setDetailFocusMode(!branchListHidden)}
+      onClick={() => setWorkspacePaneFocusMode(!branchListHidden)}
     >
-      <Icon />
+      <PanelLeft />
     </Button>
   )
 }

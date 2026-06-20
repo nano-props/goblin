@@ -1,6 +1,5 @@
 import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
 import type { DictKey } from '#/shared/i18n/dictionaries.ts'
-import type { WorkspaceLayout } from '#/shared/workspace-layout.ts'
 
 export type BranchActionShortcutAction = 'pull' | 'push' | 'terminal' | 'editor' | 'remote'
 export type RendererNavigationShortcutAction = 'next-branch' | 'prev-branch' | 'next-workspace-pane-view' | 'prev-workspace-pane-view'
@@ -20,7 +19,6 @@ export type RendererMenuCommandId =
   | 'view-status'
   | 'view-changes'
   | 'view-terminal'
-  | 'view-toggle-detail'
   | 'view-refresh'
   | 'window-next-repo'
   | 'window-prev-repo'
@@ -46,7 +44,6 @@ export interface AcceleratorShortcutDefinition {
 
 export interface RendererMenuCommandContext {
   swapCloseShortcuts: boolean
-  workspaceLayout: WorkspaceLayout
 }
 
 export interface RendererMenuCommandDefinition {
@@ -187,16 +184,6 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
     },
   ),
   rendererMenuCommand(
-    'view-toggle-detail',
-    'menu.view.toggle-detail',
-    { type: 'toggle-detail-requested' },
-    {
-      helpLabelKey: 'help.row.toggle-detail',
-      accelerator: 'CmdOrCtrl+J',
-      enabled: (context) => context.workspaceLayout === 'top-bottom',
-    },
-  ),
-  rendererMenuCommand(
     'view-refresh',
     'menu.view.refresh',
     { type: 'repo-refresh-requested' },
@@ -223,7 +210,7 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
       accelerator: 'CmdOrCtrl+[',
     },
   ),
-  rendererMenuCommand('window-reset-layout', 'menu.window.reset-layout', { type: 'workspace-layout-reset-requested' }),
+  rendererMenuCommand('window-reset-layout', 'menu.window.reset-layout', { type: 'layout-reset-requested' }),
   rendererMenuCommand('help-shortcuts', 'menu.help.shortcuts', { type: 'open-settings-requested', page: 'shortcuts' }),
 ]
 
@@ -242,7 +229,6 @@ export const VIEW_SHORTCUTS: AcceleratorShortcutDefinition[] = rendererMenuAccel
   'view-status',
   'view-changes',
   'view-terminal',
-  'view-toggle-detail',
 ])
 
 export const RENDERER_KEYBOARD_SHORTCUTS: RendererKeyboardShortcutDefinition[] = [
@@ -354,7 +340,6 @@ function rendererMenuAcceleratorShortcuts(ids: RendererMenuCommandId[]): Acceler
     const command = rendererMenuCommandById(id)
     const accelerator = resolveRendererMenuCommandAccelerator(command, {
       swapCloseShortcuts: false,
-      workspaceLayout: 'top-bottom',
     })
     if (!accelerator || !command.helpLabelKey)
       throw new Error(`Renderer menu command ${id} is missing help shortcut metadata`)

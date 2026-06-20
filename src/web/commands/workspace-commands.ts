@@ -10,25 +10,17 @@ interface ShowWorkspacePaneViewCommandOptions {
   repoId: string | null
   tab: WorkspacePaneView
   navigation: MainWindowNavigationActions
-  setDetailCollapsed: (collapsed: boolean) => void
-}
-
-interface ToggleDetailCommandOptions {
-  repoId: string | null
-  toggleDetailCollapsed: () => void
 }
 
 interface TerminalPrimaryActionCommandOptions {
   repoId: string | null
   navigation: MainWindowNavigationActions
-  setDetailCollapsed: (collapsed: boolean) => void
 }
 
 export function runShowWorkspacePaneViewCommand({
   repoId,
   tab,
   navigation,
-  setDetailCollapsed,
 }: ShowWorkspacePaneViewCommandOptions): boolean {
   if (!repoId) return false
   if (tab === 'status' || tab === 'changes') {
@@ -40,29 +32,20 @@ export function runShowWorkspacePaneViewCommand({
         worktreePath: base.worktreePath,
         type: tab,
         navigation,
-        setDetailCollapsed,
       })
       return true
     }
   }
   navigation.showRepoWorkspacePaneView(repoId, tab)
-  setDetailCollapsed(false)
-  return true
-}
-
-export function runToggleDetailCommand({ repoId, toggleDetailCollapsed }: ToggleDetailCommandOptions): boolean {
-  if (!repoId) return false
-  toggleDetailCollapsed()
   return true
 }
 
 export async function runTerminalPrimaryActionCommand({
   repoId,
   navigation,
-  setDetailCollapsed,
 }: TerminalPrimaryActionCommandOptions): Promise<boolean> {
   if (!repoId) return false
-  runShowWorkspacePaneViewCommand({ repoId, tab: 'terminal', navigation, setDetailCollapsed })
+  runShowWorkspacePaneViewCommand({ repoId, tab: 'terminal', navigation })
   const base = selectedTerminalBase(repoId)
   if (!base) return true
   const bridge = readTerminalSessionCommandBridge()

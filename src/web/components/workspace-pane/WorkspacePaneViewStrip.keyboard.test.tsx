@@ -158,10 +158,10 @@ function makeWorkspacePaneViewStrip(
     onReorder: (worktreeTerminalKey: string, orderedViews: WorkspacePaneViewOrderEntry[]) => void
   }) {
     const selected = props.sessions.find((candidate) => candidate.selected) ?? props.sessions[0]
-    const { sessions, ...detailPaneProps } = props
+    const { sessions, ...workspacePaneProps } = props
     return (
       <WorkspacePaneViewStrip
-        {...detailPaneProps}
+        {...workspacePaneProps}
         views={sessions}
         activeTabIdentity={selected ? terminalWorkspacePaneViewIdentity(selected.key) : null}
         getTooltip={(tab) => ('originalTitle' in tab ? (tab.originalTitle ?? tab.fullTitle ?? tab.title) : tab.id)}

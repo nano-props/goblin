@@ -10,22 +10,19 @@ import type {
   ThemePref,
 } from '#/shared/api-types.ts'
 import {
-  DEFAULT_DETAIL_COLLAPSED,
-  DEFAULT_DETAIL_FOCUS_MODE,
-  DEFAULT_DETAIL_PANE_SIZES,
-  DEFAULT_WORKSPACE_LAYOUT,
+  DEFAULT_WORKSPACE_PANE_FOCUS_MODE,
+  DEFAULT_WORKSPACE_PANE_SIZES,
 } from '#/shared/workspace-layout.ts'
 
 export const DEFAULT_FETCH_INTERVAL_SEC = 120
 export const MAX_RECENT_REPOS = 10
 export const DEFAULT_LANG_PREF: LangPref = 'auto'
 export const DEFAULT_THEME_PREF: ThemePref = 'auto'
-export const DEFAULT_SESSION_DETAIL_FOCUS_MODE = DEFAULT_DETAIL_FOCUS_MODE
+export const DEFAULT_SESSION_WORKSPACE_PANE_FOCUS_MODE = DEFAULT_WORKSPACE_PANE_FOCUS_MODE
 export const DEFAULT_TERMINAL_NOTIFICATIONS_ENABLED = false
 export const DEFAULT_SHORTCUTS_DISABLED = false
 export const DEFAULT_GLOBAL_SHORTCUT_DISABLED = false
 export const DEFAULT_SWAP_CLOSE_SHORTCUTS = false
-export const DEFAULT_TOGGLE_DETAIL_ON_ACTION_BAR_BLANK_CLICK = false
 export const DEFAULT_TERMINAL_APP: TerminalPref = 'auto'
 export const DEFAULT_EDITOR_APP: EditorPref = 'auto'
 export const DEFAULT_LAN_ENABLED = false
@@ -34,10 +31,8 @@ export function defaultSessionState(): SessionState {
   return {
     openRepos: [],
     activeRepo: null,
-    detailCollapsed: DEFAULT_DETAIL_COLLAPSED,
-    detailFocusMode: DEFAULT_DETAIL_FOCUS_MODE,
-    workspaceLayout: DEFAULT_WORKSPACE_LAYOUT,
-    detailPaneSizes: { ...DEFAULT_DETAIL_PANE_SIZES },
+    workspacePaneFocusMode: DEFAULT_WORKSPACE_PANE_FOCUS_MODE,
+    workspacePaneSizes: { ...DEFAULT_WORKSPACE_PANE_SIZES },
     selectedTerminalByWorktree: {},
   }
 }
@@ -52,8 +47,6 @@ export function defaultSettingsPrefs(overrides: Partial<SettingsPrefs> = {}): Se
     shortcutsDisabled: overrides.shortcutsDisabled ?? DEFAULT_SHORTCUTS_DISABLED,
     globalShortcutDisabled: overrides.globalShortcutDisabled ?? DEFAULT_GLOBAL_SHORTCUT_DISABLED,
     swapCloseShortcuts: overrides.swapCloseShortcuts ?? DEFAULT_SWAP_CLOSE_SHORTCUTS,
-    toggleDetailOnActionBarBlankClick:
-      overrides.toggleDetailOnActionBarBlankClick ?? DEFAULT_TOGGLE_DETAIL_ON_ACTION_BAR_BLANK_CLICK,
     globalShortcut: overrides.globalShortcut ?? DEFAULT_GLOBAL_SHORTCUT,
     terminalApp: overrides.terminalApp ?? DEFAULT_TERMINAL_APP,
     editorApp: overrides.editorApp ?? DEFAULT_EDITOR_APP,

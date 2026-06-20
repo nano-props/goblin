@@ -120,7 +120,6 @@ async function initializeRuntimeState(settingsSnapshot: SettingsSnapshot): Promi
     shortcutsDisabled: settingsSnapshot.shortcutsDisabled,
     swapCloseShortcuts: settingsSnapshot.swapCloseShortcuts,
     langPref: settingsSnapshot.lang,
-    workspaceLayout: settingsSnapshot.session.workspaceLayout,
   })
   setCurrentLang(resolveLang(settingsSnapshot.lang))
   syncRecentRepos(settingsSnapshot.recentRepos)

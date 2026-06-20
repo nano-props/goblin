@@ -1,11 +1,11 @@
 // Active-repo body. The per-repo actions (Refresh, worktree
 // filter, new worktree) live in the Topbar — see `Topbar.tsx`
 // and `App.tsx` — so the workspace below the topbar is just the
-// branch list (split/collapsed) or the detail pane (focus). In
+// branch list (split) or the workspace pane (focus). In
 // focus mode the selected-branch info bar (BranchInfoBar) caps
-// the section above the detail pane.
+// the section above the workspace pane.
 
-import { Smartphone } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
@@ -15,20 +15,22 @@ import { BranchInfoBar } from '#/web/components/repo-toolbar/BranchInfoBar.tsx'
 import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
 import { RepoWorkspace, RepoWorkspacePane } from '#/web/components/Layout.tsx'
 import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
-import { useT } from '#/web/stores/i18n.ts'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 import { getRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
 import { UnavailableRepoView } from '#/web/components/UnavailableRepoView.tsx'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
-import { Button } from '#/web/components/ui/button.tsx'
+import { DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 
 interface Props {
   repoId: string
 }
 
+type CompactWorkspacePane = 'branch' | 'workspace'
+
 export function RepoView({ repoId }: Props) {
-  const t = useT()
   const uiMode = useResponsiveUiMode()
+  const compact = uiMode === 'compact'
+  const [compactPane, setCompactPane] = useState<CompactWorkspacePane>('branch')
   const view = useStoreWithEqualityFn(
     useReposStore,
     (s) => {
@@ -37,30 +39,27 @@ export function RepoView({ repoId }: Props) {
       return {
         exists: presentation.exists,
         initialLoading: presentation.initialLoading,
-        detailCollapsed: s.detailCollapsed,
-        detailFocusMode: s.detailFocusMode,
-        workspaceLayout: s.workspaceLayout,
-        detailPaneSizes: s.detailPaneSizes,
+        workspacePaneFocusMode: s.workspacePaneFocusMode,
+        workspacePaneSizes: s.workspacePaneSizes,
       }
     },
     (a, b) =>
       a.exists === b.exists &&
       a.initialLoading === b.initialLoading &&
-      a.detailCollapsed === b.detailCollapsed &&
-      a.detailFocusMode === b.detailFocusMode &&
-      a.workspaceLayout === b.workspaceLayout &&
-      a.detailPaneSizes['top-bottom'] === b.detailPaneSizes['top-bottom'] &&
-      a.detailPaneSizes['left-right'] === b.detailPaneSizes['left-right'],
+      a.workspacePaneFocusMode === b.workspacePaneFocusMode &&
+      a.workspacePaneSizes['left-right'] === b.workspacePaneSizes['left-right'],
   )
-  const setDetailPaneSize = useReposStore((s) => s.setDetailPaneSize)
-  const setWorkspaceLayout = useReposStore((s) => s.setWorkspaceLayout)
+  const setWorkspacePaneSize = useReposStore((s) => s.setWorkspacePaneSize)
   const repo = useReposStore((s) => s.repos[repoId])
   useRepoToasts(repoId)
 
-  const layout = view.workspaceLayout
-  const behavior = repoWorkspaceBehavior(layout, view.detailCollapsed, view.detailFocusMode)
-  const detailPaneSize = view.detailPaneSizes[layout]
-  const compactLeftRight = uiMode === 'compact' && view.workspaceLayout === 'left-right'
+  useEffect(() => {
+    if (compact) setCompactPane('branch')
+  }, [compact, repoId])
+
+  const layout = DEFAULT_WORKSPACE_LAYOUT
+  const behavior = repoWorkspaceBehavior(layout, compact ? false : view.workspacePaneFocusMode)
+  const workspacePaneSize = view.workspacePaneSizes[layout]
 
   if (!view.exists || !repo) return <div />
   if (isRepoUnavailable(repo)) return <UnavailableRepoView repo={repo} />
@@ -68,56 +67,52 @@ export function RepoView({ repoId }: Props) {
     return (
       <RepoWorkspaceSkeleton
         layout={layout}
-        detailCollapsed={behavior.detailCollapsed}
-        detailFocusMode={behavior.detailFocusMode}
+        workspacePaneFocusMode={behavior.workspacePaneFocusMode}
       />
     )
   }
 
-  const detailPane = (
+  const workspacePane = (
     <RepoWorkspacePane>
       <BranchDetail
         repoId={repoId}
         layout={layout}
-        collapsed={behavior.detailCollapsed}
-        detailFocusMode={behavior.detailFocusMode}
+        workspacePaneFocusMode={behavior.workspacePaneFocusMode}
+        onBack={compact ? () => setCompactPane('branch') : undefined}
       />
     </RepoWorkspacePane>
   )
-  const workspaceMode = behavior.mode === 'collapsed' ? 'collapsed' : 'split'
+  const branchPane = (
+    <RepoWorkspacePane>
+      <BranchList
+        repoId={repoId}
+        showActions={behavior.branchListActionsVisible}
+        onBranchActivated={compact ? () => setCompactPane('workspace') : undefined}
+      />
+    </RepoWorkspacePane>
+  )
+
+  const compactWorkspaceBody = compactPane === 'workspace' ? workspacePane : branchPane
 
   const workspaceBody =
-    behavior.mode === 'focus' ? (
-      detailPane
+    compact ? (
+      compactWorkspaceBody
+    ) : behavior.mode === 'focus' ? (
+      workspacePane
     ) : (
       <RepoWorkspace
         layout={layout}
-        mode={workspaceMode}
-        detailSize={detailPaneSize}
-        onDetailSizeChange={(size) => setDetailPaneSize(layout, size)}
-        branchPane={
-          <RepoWorkspacePane>
-            <BranchList repoId={repoId} showActions={behavior.branchListActionsVisible} />
-          </RepoWorkspacePane>
-        }
-        detailPane={detailPane}
+        mode="split"
+        workspacePaneSize={workspacePaneSize}
+        onWorkspacePaneSizeChange={(size) => setWorkspacePaneSize(layout, size)}
+        branchPane={branchPane}
+        workspacePane={workspacePane}
       />
     )
 
   return (
     <section className="relative flex min-w-0 flex-1 flex-col">
-      {behavior.mode === 'focus' && <BranchInfoBar repoId={repoId} />}
-
-      {compactLeftRight && (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-background/95 p-6 text-center">
-          <Smartphone className="mb-4 h-10 w-10 text-muted-foreground" />
-          <div className="text-sm font-medium text-foreground">{t('workspace.compact-mask.title')}</div>
-          <div className="mt-1 text-xs text-muted-foreground">{t('workspace.compact-mask.description')}</div>
-          <Button className="mt-4" onClick={() => setWorkspaceLayout('top-bottom')}>
-            {t('workspace.compact-mask.button')}
-          </Button>
-        </div>
-      )}
+      {!compact && behavior.mode === 'focus' && <BranchInfoBar repoId={repoId} />}
       {workspaceBody}
     </section>
   )

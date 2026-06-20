@@ -66,8 +66,7 @@ describe('Topbar', () => {
       button?.click()
     })
 
-    expect(useReposStore.getState().detailFocusMode).toBe(true)
-    expect(useReposStore.getState().detailCollapsed).toBe(false)
+    expect(useReposStore.getState().workspacePaneFocusMode).toBe(true)
     expect(branchListToggle()?.getAttribute('aria-pressed')).toBe('true')
     expect(branchListToggle()?.classList.contains('bg-accent')).toBe(false)
     expect(branchListToggle()?.classList.contains('shadow-xs')).toBe(false)
@@ -76,11 +75,11 @@ describe('Topbar', () => {
       branchListToggle()?.click()
     })
 
-    expect(useReposStore.getState().detailFocusMode).toBe(false)
+    expect(useReposStore.getState().workspacePaneFocusMode).toBe(false)
     expect(branchListToggle()?.getAttribute('aria-pressed')).toBe('false')
   })
 
-  test('uses the previous pane icon for the current workspace layout', () => {
+  test('uses the left pane icon for the Branch List toggle', () => {
     render(
       <Topbar repoId="/tmp/repo" onOpenSettings={() => {}}>
         <div />
@@ -88,12 +87,6 @@ describe('Topbar', () => {
     )
 
     expect(branchListToggleIcon()?.classList.contains('lucide-panel-left')).toBe(true)
-
-    act(() => {
-      useReposStore.setState({ workspaceLayout: 'top-bottom' })
-    })
-
-    expect(branchListToggleIcon()?.classList.contains('lucide-panel-top')).toBe(true)
   })
 })
 

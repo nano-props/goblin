@@ -59,7 +59,7 @@ describe('BranchInfoBar', () => {
       currentBranch: 'main',
       selectedBranch: 'feature/a',
     })
-    useReposStore.setState({ workspaceLayout: 'top-bottom', detailCollapsed: false, detailFocusMode: true })
+    useReposStore.setState({ workspacePaneFocusMode: true })
 
     renderBar(navigationWith({}))
 
@@ -86,7 +86,7 @@ describe('BranchInfoBar', () => {
       currentBranch: 'main',
       selectedBranch: 'feature/a',
     })
-    useReposStore.setState({ workspaceLayout: 'top-bottom', detailCollapsed: false, detailFocusMode: true })
+    useReposStore.setState({ workspacePaneFocusMode: true })
 
     renderBar(navigationWith({}))
 
@@ -107,7 +107,7 @@ describe('BranchInfoBar', () => {
       currentBranch: 'main',
       selectedBranch: 'feature/a',
     })
-    useReposStore.setState({ workspaceLayout: 'top-bottom', detailCollapsed: false, detailFocusMode: true })
+    useReposStore.setState({ workspacePaneFocusMode: true })
 
     renderBar(navigationWith({}))
 
@@ -138,7 +138,7 @@ describe('BranchInfoBar', () => {
       currentBranch: 'main',
       selectedBranch: 'main',
     })
-    useReposStore.setState({ workspaceLayout: 'top-bottom', detailCollapsed: false, detailFocusMode: false })
+    useReposStore.setState({ workspacePaneFocusMode: false })
 
     renderBar(navigationWith({}))
 

@@ -160,22 +160,15 @@ export const REPO_QUERY_SCHEMAS = {
 // validates with these, then passes the parsed object directly to the
 // module layer.
 import {
-  DEFAULT_DETAIL_COLLAPSED,
-  DEFAULT_DETAIL_FOCUS_MODE,
-  DEFAULT_DETAIL_PANE_SIZES,
-  DEFAULT_WORKSPACE_LAYOUT,
-  WORKSPACE_LAYOUTS,
-  type WorkspaceLayout,
+  DEFAULT_WORKSPACE_PANE_FOCUS_MODE,
+  DEFAULT_WORKSPACE_PANE_SIZES,
 } from '#/shared/workspace-layout.ts'
 
 const SessionStateSchema = v.object({
   openRepos: v.array(RepoSessionEntrySchema),
   activeRepo: v.nullable(v.string()),
-  detailCollapsed: v.boolean(),
-  detailFocusMode: v.boolean(),
-  workspaceLayout: v.picklist<readonly WorkspaceLayout[]>(WORKSPACE_LAYOUTS),
-  detailPaneSizes: v.object({
-    'top-bottom': v.number(),
+  workspacePaneFocusMode: v.boolean(),
+  workspacePaneSizes: v.object({
     'left-right': v.number(),
   }),
   selectedTerminalByWorktree: v.optional(v.record(v.string(), v.string())),
@@ -185,15 +178,12 @@ const SessionStateSchema = v.object({
 const SessionStateSchemaWithDefaults = v.object({
   openRepos: v.array(RepoSessionEntrySchema),
   activeRepo: v.nullable(v.string()),
-  detailCollapsed: v.optional(v.boolean(), DEFAULT_DETAIL_COLLAPSED),
-  detailFocusMode: v.optional(v.boolean(), DEFAULT_DETAIL_FOCUS_MODE),
-  workspaceLayout: v.optional(v.picklist<readonly WorkspaceLayout[]>(WORKSPACE_LAYOUTS), DEFAULT_WORKSPACE_LAYOUT),
-  detailPaneSizes: v.optional(
+  workspacePaneFocusMode: v.optional(v.boolean(), DEFAULT_WORKSPACE_PANE_FOCUS_MODE),
+  workspacePaneSizes: v.optional(
     v.object({
-      'top-bottom': v.number(),
       'left-right': v.number(),
     }),
-    DEFAULT_DETAIL_PANE_SIZES,
+    DEFAULT_WORKSPACE_PANE_SIZES,
   ),
   selectedTerminalByWorktree: v.optional(v.record(v.string(), v.string())),
   workspacePaneViewByRepo: v.optional(v.record(v.string(), v.picklist(['status', 'changes', 'terminal']))),
@@ -225,13 +215,5 @@ export const NATIVE_IPC_PROCEDURE_SCHEMAS = {
   settings: {
     setGlobalShortcut: v.object({ accelerator: v.string() }),
     applyShellProjection: NativeShellProjectionSchema,
-  },
-  session: {
-    // Renderer-side session state that the menu depends on. Mirrors the
-    // relevant subset of SessionState — currently only `workspaceLayout`,
-    // which gates the CmdOrCtrl+J toggle shortcut's `enabled` predicate.
-    setWorkspaceLayout: v.object({
-      workspaceLayout: v.picklist<readonly WorkspaceLayout[]>(WORKSPACE_LAYOUTS),
-    }),
   },
 } as const
