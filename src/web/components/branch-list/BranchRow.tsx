@@ -35,7 +35,7 @@ export function BranchRow({
       onClick={() => onSelectBranch(branch.name)}
       onDoubleClick={() => onOpenBranchStatus(branch.name)}
       className={cn(
-        'relative grid min-h-9 items-stretch cursor-pointer',
+        'relative grid min-h-9 items-stretch cursor-pointer rounded-md',
         showActions ? 'grid-cols-[minmax(0,1fr)_auto]' : 'grid-cols-1',
         'transition-colors duration-100',
         isSelected ? 'bg-selected text-selected-foreground hover:bg-selected' : 'hover:bg-muted',

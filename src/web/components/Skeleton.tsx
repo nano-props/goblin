@@ -27,7 +27,11 @@ interface WorkspaceSkeletonProps {
 
 export function BranchListSkeleton({ rows = 6, showBranchActions = false }: BranchListSkeletonProps) {
   return (
-    <SkeletonList rows={rows} renderRow={(i) => <BranchListSkeletonRow key={i} showActions={showBranchActions} />} />
+    <SkeletonList
+      rows={rows}
+      className="flex flex-1 flex-col gap-1 p-1.5"
+      renderRow={(i) => <BranchListSkeletonRow key={i} showActions={showBranchActions} />}
+    />
   )
 }
 
@@ -89,15 +93,26 @@ export function BranchDetailSkeleton({
   )
 }
 
-function SkeletonList({ rows, renderRow }: { rows: number; renderRow: (index: number) => ReactNode }) {
-  return (
-    <ul className="flex-1 divide-y divide-separator">{Array.from({ length: rows }).map((_, i) => renderRow(i))}</ul>
-  )
+function SkeletonList({
+  rows,
+  className = 'flex-1 divide-y divide-separator',
+  renderRow,
+}: {
+  rows: number
+  className?: string
+  renderRow: (index: number) => ReactNode
+}) {
+  return <ul className={className}>{Array.from({ length: rows }).map((_, i) => renderRow(i))}</ul>
 }
 
 function BranchListSkeletonRow({ showActions }: { showActions: boolean }) {
   return (
-    <li className={cn('grid min-h-9 items-stretch', showActions ? 'grid-cols-[minmax(0,1fr)_auto]' : 'grid-cols-1')}>
+    <li
+      className={cn(
+        'grid min-h-9 items-stretch rounded-md bg-muted/35',
+        showActions ? 'grid-cols-[minmax(0,1fr)_auto]' : 'grid-cols-1',
+      )}
+    >
       <div className="flex min-w-0 items-center gap-3 px-4">
         <Skeleton className="h-4 w-4 rounded-full" />
         <Skeleton className="h-4 w-3/5" />
