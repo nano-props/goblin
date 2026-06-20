@@ -210,7 +210,7 @@ The system supports replay and snapshot hydration so users can reattach to runni
 
 ### Input attribution during replay
 
-Server snapshots are raw terminal bytes. Replaying those bytes through xterm can legitimately cause the emulator to emit protocol replies such as device, cursor-position, focus, mouse, or color reports. During live operation those replies are part of the terminal protocol and may need to reach the PTY. During local snapshot replay they are renderer-created side effects of redrawing history, not user input.
+Server snapshots are serialized from the server-side headless xterm screen. Hydrating a renderer still means writing terminal-control sequences into local xterm, and those sequences can legitimately cause the emulator to emit protocol replies such as device, cursor-position, focus, mouse, or color reports. During live operation those replies are part of the terminal protocol and may need to reach the PTY. During local snapshot hydration they are renderer-created side effects of redrawing a server-authored screen, not user input.
 
 The renderer input pipeline therefore uses an internal envelope:
 
