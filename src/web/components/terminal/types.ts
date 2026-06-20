@@ -139,6 +139,7 @@ export interface WorktreeTerminalSnapshot {
   staticWorkspacePaneViews: WorkspacePaneStaticViewSummary[]
   workspacePaneViews: WorkspacePaneViewSummary[]
   count: number
+  bellCount: number
   pendingCreate: boolean
 }
 
@@ -163,7 +164,10 @@ export interface TerminalSessionContextValue {
   openWorkspacePaneView: (worktreeTerminalKey: string, type: WorkspacePaneStaticViewType) => Promise<boolean>
   closeWorkspacePaneView: (worktreeTerminalKey: string, type: WorkspacePaneStaticViewType) => Promise<boolean>
   /** Reorder all workspace pane views (static views + terminal views) within a worktree. */
-  reorderWorkspacePaneViews: (worktreeTerminalKey: string, orderedViews: WorkspacePaneViewOrderEntry[]) => Promise<boolean>
+  reorderWorkspacePaneViews: (
+    worktreeTerminalKey: string,
+    orderedViews: WorkspacePaneViewOrderEntry[],
+  ) => Promise<boolean>
   /** Serializes xterm framebuffer state as VT sequences; not plain-text output for copy UI. */
   serialize: (key: string) => string
 }

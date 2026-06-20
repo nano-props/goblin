@@ -12,13 +12,15 @@ import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { visibleBranches } from '#/web/stores/repos/branch-view-mode.ts'
-import { BranchRow } from '#/web/components/branch-navigator/BranchRow.tsx'
+import { BranchRow, type BranchRowProps } from '#/web/components/branch-navigator/BranchRow.tsx'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 import { openWorkspacePaneView } from '#/web/components/branch-workspace/open-workspace-pane-view.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
+import { useWorktreeTerminalBellCount } from '#/web/components/terminal/terminal-session-store.ts'
 
 interface Props {
   repoId: string
@@ -152,7 +154,7 @@ export function BranchNavigator({ repoId, showActions = true }: Props) {
     <ul className="flex flex-col gap-1 p-1.5">
       {branches.map((branch) => {
         return (
-          <BranchRow
+          <BranchNavigatorRow
             key={branch.name}
             repo={repo}
             branch={branch}
@@ -178,4 +180,12 @@ export function BranchNavigator({ repoId, showActions = true }: Props) {
   )
 
   return <ScrollArea className="min-h-0 flex-1">{list}</ScrollArea>
+}
+
+function BranchNavigatorRow(props: BranchRowProps) {
+  const terminalKey = props.branch.worktree?.path
+    ? worktreeTerminalKey(props.repo.id, props.branch.worktree.path)
+    : null
+  const terminalBellCount = useWorktreeTerminalBellCount(terminalKey)
+  return <BranchRow {...props} terminalBellCount={terminalBellCount} />
 }

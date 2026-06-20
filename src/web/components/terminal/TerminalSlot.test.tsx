@@ -40,10 +40,14 @@ afterEach(() => {
 type TestTerminalSummary = Omit<TerminalSessionSummary, 'type' | 'id' | 'displayOrder'> &
   Partial<Pick<TerminalSessionSummary, 'type' | 'id' | 'displayOrder'>>
 
-type TestWorktreeSnapshot = Omit<WorktreeTerminalSnapshot, 'sessions' | 'staticWorkspacePaneViews' | 'workspacePaneViews'> & {
+type TestWorktreeSnapshot = Omit<
+  WorktreeTerminalSnapshot,
+  'sessions' | 'staticWorkspacePaneViews' | 'workspacePaneViews' | 'bellCount'
+> & {
   sessions: TestTerminalSummary[]
   staticWorkspacePaneViews?: WorkspacePaneStaticViewSummary[]
   workspacePaneViews?: WorktreeTerminalSnapshot['workspacePaneViews']
+  bellCount?: number
 }
 
 function completeWorktreeSnapshot(snapshot: TestWorktreeSnapshot): WorktreeTerminalSnapshot {
@@ -59,6 +63,7 @@ function completeWorktreeSnapshot(snapshot: TestWorktreeSnapshot): WorktreeTermi
     sessions,
     staticWorkspacePaneViews,
     workspacePaneViews: snapshot.workspacePaneViews ?? [...staticWorkspacePaneViews, ...sessions],
+    bellCount: snapshot.bellCount ?? sessions.filter((session) => session.hasBell).length,
   }
 }
 

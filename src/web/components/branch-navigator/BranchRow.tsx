@@ -4,7 +4,7 @@ import { BranchActionsMenu } from '#/web/components/BranchActionsMenu.tsx'
 import { BranchSummaryInline } from '#/web/components/repo-workspace/BranchSummaryInline.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
-interface BranchRowProps {
+export interface BranchRowProps {
   repo: BranchActionRepo
   branch: RepoBranchState
   selected: string | null
@@ -14,6 +14,7 @@ interface BranchRowProps {
   showActions?: boolean
   actionMenuOpen?: boolean
   onActionMenuOpenChange?: (open: boolean) => void
+  terminalBellCount?: number
 }
 
 export function BranchRow({
@@ -26,6 +27,7 @@ export function BranchRow({
   showActions = true,
   actionMenuOpen,
   onActionMenuOpenChange,
+  terminalBellCount = 0,
 }: BranchRowProps) {
   const isSelected = branch.name === selected
 
@@ -42,7 +44,7 @@ export function BranchRow({
       )}
     >
       <div className="pointer-events-none relative z-10 flex min-w-0 items-center px-4 py-1.5">
-        <BranchSummaryInline repo={repo} branch={branch} selected={isSelected} />
+        <BranchSummaryInline repo={repo} branch={branch} selected={isSelected} terminalBellCount={terminalBellCount} />
       </div>
       {showActions && (
         <div className="pointer-events-none relative z-20 flex shrink-0 items-center py-1.5 pr-4">
