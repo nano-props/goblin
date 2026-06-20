@@ -7,10 +7,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { WorkspacePaneViewStrip } from '#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx'
 import { terminalWorkspacePaneViewIdentity } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
 import type { WorkspacePaneViewOrderEntry } from '#/shared/workspace-pane.ts'
-import type {
-  WorkspacePaneViewSummary,
-  TerminalSessionSummary,
-} from '#/web/components/terminal/types.ts'
+import type { WorkspacePaneViewSummary, TerminalSessionSummary } from '#/web/components/terminal/types.ts'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
@@ -102,7 +99,7 @@ describe('WorkspacePaneViewStrip', () => {
     expect(tooltip?.textContent).not.toContain('~/Developer/goblin')
   })
 
-  test('keeps the selected terminal in the collapsed dropdown and still offers new terminal', async () => {
+  test('keeps the selected terminal in the collapsed popover list and still offers new terminal', async () => {
     render(
       <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
@@ -121,7 +118,7 @@ describe('WorkspacePaneViewStrip', () => {
     )
 
     const trigger = document.body.querySelector('button[aria-label="workspace-pane-views.tabs"]')
-    if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing terminal menu trigger')
+    if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing terminal popover trigger')
 
     await act(async () => {
       trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
@@ -129,11 +126,13 @@ describe('WorkspacePaneViewStrip', () => {
       await Promise.resolve()
     })
 
-    const selectedItem = [...document.body.querySelectorAll('[role="menuitem"]')].find((item) =>
+    const selectedItem = [...document.body.querySelectorAll('button[aria-current="true"]')].find((item) =>
       item.textContent?.includes('term-2'),
     )
-    expect(selectedItem?.getAttribute('aria-current')).toBe('true')
+    expect(selectedItem).not.toBeNull()
+    expect(selectedItem?.className).toContain('bg-selected')
     expect(document.body.textContent).toContain('terminal.new')
+    expect(document.body.querySelector('button[aria-label="close term-2"]')).not.toBeNull()
   })
 
   test('collapsed terminal view only navigates out on arrow keys', () => {
@@ -560,7 +559,7 @@ describe('WorkspacePaneViewStrip', () => {
 
     expect(document.body.querySelectorAll('[role="tab"]').length).toBe(1)
     // Compact mode pins the tab one step tighter than the default fixed width
-    // to fit narrow toolbars alongside the dropdown trigger.
+    // to fit narrow toolbars alongside the popover trigger.
     expect(document.body.querySelector('[data-workspace-pane-view-tooltip-id]')?.className).toContain('w-32')
     expect(document.body.querySelector('[data-workspace-pane-view-tooltip-id]')?.className).not.toContain('w-36')
 
@@ -585,10 +584,10 @@ describe('WorkspacePaneViewStrip', () => {
 function TestWorkspacePaneViewStrip(props: {
   worktreeTerminalKey: string
   sessions: TerminalSessionSummary[]
-	  detailId: string
-	  responsiveCompact?: boolean
-	  panelActive?: boolean
-	  isLoading?: boolean
+  detailId: string
+  responsiveCompact?: boolean
+  panelActive?: boolean
+  isLoading?: boolean
   onNew: () => void
   onSelect: (worktreeTerminalKey: string, tab: WorkspacePaneViewSummary) => void
   onScrollToBottom: (key: string) => void

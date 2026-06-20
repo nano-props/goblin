@@ -17,7 +17,6 @@ interface RepoTabProps {
   total: number
   showSeparator: boolean
   focusRegistry?: FocusRegistry<string, HTMLButtonElement>
-  onHoverChange: (id: string | null) => void
   onActivate: (id: string) => void
   onClose: (id: string) => void
   onKeyboardNavigate: (id: string, direction: 'prev' | 'next' | 'first' | 'last') => void
@@ -36,7 +35,6 @@ export function RepoTab({
   total,
   showSeparator,
   focusRegistry,
-  onHoverChange,
   onActivate,
   onClose,
   onKeyboardNavigate,
@@ -68,14 +66,13 @@ export function RepoTab({
         'data-interactive': true,
         'data-repo-tab-tooltip-id': repo.id,
         role: 'presentation',
-        onPointerEnter: () => onHoverChange(repo.id),
-        onPointerLeave: () => onHoverChange(null),
       }}
       containerClassName={toolbarTabChromeClassName({
         variant: 'repo',
         active: isActive,
         dragging: sortable.isDragging,
         compact,
+        hoverable: false,
       })}
       overlay={
         showSeparator ? (
@@ -109,6 +106,7 @@ export function RepoTab({
       buttonClassName={toolbarTabButtonClassName('repo')}
       closeLabel={closeLabel(repo.name)}
       closeVisible={false}
+      closeButton={false}
       onClose={(e) => {
         e.stopPropagation()
         onClose(repo.id)

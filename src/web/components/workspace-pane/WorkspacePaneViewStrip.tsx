@@ -1,15 +1,9 @@
-import { FileText, GitBranch, Plus, Terminal, X, ChevronDown, Loader2 } from 'lucide-react'
-import { useCallback, useLayoutEffect, useMemo, useRef, type ComponentPropsWithoutRef } from 'react'
+import { Check, ChevronDown, FileText, GitBranch, Loader2, Plus, Terminal, X } from 'lucide-react'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ComponentPropsWithoutRef } from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
+import { cn } from '#/web/lib/cn.ts'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  SelectedDropdownMenuItem,
-} from '#/web/components/ui/dropdown-menu.tsx'
+import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
 import {
   DndContext,
   type DragEndEvent,
@@ -75,6 +69,129 @@ interface WorkspacePaneViewStripProps {
 export const EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY = '__workspace-pane-empty__'
 
 const WORKSPACE_PANE_VIEW_TOOLTIP_SELECTOR = '[data-workspace-pane-view-tooltip-id]'
+
+interface WorkspacePaneViewSwitcherPopoverProps {
+  tabs: WorkspacePaneViewSummary[]
+  activeTabIdentity: string | null
+  label: string
+  newLabel: string
+  onNew: () => void
+  onSelect: (identity: string) => void
+  onClose: (event: React.MouseEvent, identity: string) => void
+  getTooltip: (tab: WorkspacePaneViewSummary) => string
+  getLabel: (tab: WorkspacePaneViewSummary) => string
+  getCloseLabel: (tab: WorkspacePaneViewSummary) => string
+  t: (key: string, params?: Record<string, string | number>) => string
+}
+
+function WorkspacePaneViewSwitcherPopover({
+  tabs,
+  activeTabIdentity,
+  label,
+  newLabel,
+  onNew,
+  onSelect,
+  onClose,
+  getTooltip,
+  getLabel,
+  getCloseLabel,
+  t,
+}: WorkspacePaneViewSwitcherPopoverProps) {
+  const [open, setOpen] = useState(false)
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  const selectView = (identity: string) => {
+    setOpen(false)
+    onSelect(identity)
+  }
+
+  const selectNew = () => {
+    setOpen(false)
+    onNew()
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label={label} title={label}>
+          <ChevronDown size={14} />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="bottom"
+        align="start"
+        className="flex w-max min-w-48 max-w-72 flex-col overflow-hidden p-0"
+        aria-label={label}
+        ref={contentRef}
+        tabIndex={-1}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault()
+          contentRef.current?.focus({ preventScroll: true })
+        }}
+      >
+        <ScrollArea className="max-h-64" scrollbarMode="compact">
+          <div className="space-y-0.5 p-1" role="list">
+            {tabs.map((tab) => {
+              const identity = workspacePaneViewIdentity(tab)
+              const selected = identity === activeTabIdentity
+              const itemLabel = getLabel(tab)
+              return (
+                <div key={identity} className="group relative flex items-center" role="listitem">
+                  <button
+                    type="button"
+                    className={cn(
+                      'flex h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-sm py-1 pl-2 pr-8 text-left text-sm outline-none transition-colors duration-100 hover:bg-accent hover:text-accent-foreground',
+                      selected &&
+                        'bg-selected text-selected-foreground hover:bg-selected hover:text-selected-foreground',
+                    )}
+                    onClick={() => selectView(identity)}
+                    aria-label={getTooltip(tab)}
+                    aria-current={selected ? 'true' : undefined}
+                  >
+                    <span className="flex size-3.5 shrink-0 items-center justify-center">
+                      {selected ? <Check size={13} aria-hidden /> : <WorkspacePaneViewIcon tab={tab} active={false} />}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{itemLabel}</span>
+                    {tab.type === 'terminal' && tab.hasBell && (
+                      <>
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-attention" aria-hidden="true" />
+                        <span className="sr-only">{t('terminal.bell-unread')}</span>
+                      </>
+                    )}
+                  </button>
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="ghost"
+                    className="absolute right-1 top-1/2 size-6 -translate-y-1/2 text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={(event) => onClose(event, identity)}
+                    title={getCloseLabel(tab)}
+                    aria-label={getCloseLabel(tab)}
+                  >
+                    <X size={13} />
+                  </Button>
+                </div>
+              )
+            })}
+          </div>
+        </ScrollArea>
+        <div className="border-t border-separator p-1">
+          <button
+            type="button"
+            className="flex h-7 w-full cursor-pointer items-center gap-2 rounded-sm px-2 text-left text-sm text-popover-foreground outline-none transition-colors duration-100 hover:bg-accent hover:text-accent-foreground"
+            onClick={selectNew}
+          >
+            <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
+              <Plus size={14} />
+            </span>
+            <span className="min-w-0 flex-1 truncate">{newLabel}</span>
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
 
 export function WorkspacePaneViewStrip({
   worktreeTerminalKey,
@@ -305,57 +422,19 @@ export function WorkspacePaneViewStrip({
             getCloseLabel={getCloseLabel}
           />
         </WorkspacePaneViewTooltipLayer>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label={t('workspace-pane-views.tabs')}>
-              <ChevronDown size={14} />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="flex w-max flex-col !overflow-hidden">
-            <ScrollArea className="max-h-[200px]" scrollbarMode="compact">
-              {tabs.map((tab) => {
-                const identity = workspacePaneViewIdentity(tab)
-                const label = getLabel(tab)
-                return (
-                  <div key={identity} className="group relative flex items-center">
-                    <SelectedDropdownMenuItem
-                      selected={workspacePaneViewIdentity(tab) === activeTabIdentity}
-                      className="min-w-0 flex-1 gap-2 pr-8"
-                      onSelect={() => handleSelect(identity)}
-                      aria-label={getTooltip(tab)}
-                      aria-current={workspacePaneViewIdentity(tab) === activeTabIdentity ? 'true' : undefined}
-                    >
-                      <span className="min-w-0 flex-1 truncate">{label}</span>
-                      {tab.type === 'terminal' && tab.hasBell && (
-                        <>
-                          <span className="h-2 w-2 shrink-0 rounded-full bg-attention" aria-hidden="true" />
-                          <span className="sr-only">{t('terminal.bell-unread')}</span>
-                        </>
-                      )}
-                    </SelectedDropdownMenuItem>
-                    <Button
-                      type="button"
-                      size="icon-sm"
-                      variant="ghost"
-                      className="absolute right-1 h-6 w-6 text-muted-foreground"
-                      onPointerDown={(event) => event.stopPropagation()}
-                      onClick={(event) => handleClose(event, identity)}
-                      title={getCloseLabel(tab)}
-                      aria-label={getCloseLabel(tab)}
-                    >
-                      <X size={14} />
-                    </Button>
-                  </div>
-                )
-              })}
-            </ScrollArea>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="gap-2" onSelect={onNew}>
-              <Plus size={14} />
-              {t('terminal.new')}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <WorkspacePaneViewSwitcherPopover
+          tabs={tabs}
+          activeTabIdentity={activeTabIdentity}
+          label={t('workspace-pane-views.tabs')}
+          newLabel={t('terminal.new')}
+          onNew={onNew}
+          onSelect={handleSelect}
+          onClose={handleClose}
+          getTooltip={getTooltip}
+          getLabel={getLabel}
+          getCloseLabel={getCloseLabel}
+          t={t}
+        />
       </ToolbarTabStripBody>
     )
   }
@@ -617,12 +696,7 @@ interface WorkspacePaneViewTooltipLayerProps extends ComponentPropsWithoutRef<'d
   getTooltip: (tab: WorkspacePaneViewSummary) => string
 }
 
-function WorkspacePaneViewTooltipLayer({
-  tabs,
-  getTooltip,
-  children,
-  ...props
-}: WorkspacePaneViewTooltipLayerProps) {
+function WorkspacePaneViewTooltipLayer({ tabs, getTooltip, children, ...props }: WorkspacePaneViewTooltipLayerProps) {
   return (
     <DelegatedTooltipLayer
       items={tabs}

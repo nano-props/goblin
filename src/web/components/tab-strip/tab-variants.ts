@@ -11,8 +11,9 @@ export function toolbarTabChromeClassName(options: {
   // changes don't shift neighbouring tabs; compact strips
   // live in narrow toolbars and pin one step tighter.
   compact?: boolean
+  hoverable?: boolean
 }): string {
-  const { variant, active, dragging = false, compact = false } = options
+  const { variant, active, dragging = false, compact = false, hoverable = true } = options
   // Compact repo strips render only the active tab, so the "active" chrome
   // would be visually misleading — collapse it to the unselected chrome
   // (matching the look of an idle tab on the expanded strip).
@@ -29,8 +30,8 @@ export function toolbarTabChromeClassName(options: {
       ? active && !treatAsUnselected
         ? 'border-input bg-card text-foreground'
         : compact
-          ? 'border-separator text-muted-foreground hover:bg-accent/70 hover:text-foreground'
-          : 'border-transparent text-muted-foreground hover:bg-accent/70 hover:text-foreground'
+          ? cn('border-separator text-muted-foreground', hoverable && 'hover:bg-accent/70 hover:text-foreground')
+          : cn('border-transparent text-muted-foreground', hoverable && 'hover:bg-accent/70 hover:text-foreground')
       : active
         ? 'border-transparent bg-selected text-selected-foreground'
         : 'border-separator text-muted-foreground hover:bg-accent/50 hover:text-foreground',

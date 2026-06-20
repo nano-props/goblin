@@ -1,5 +1,5 @@
 import { type ReactNode, type Ref, useCallback, useMemo, useRef, useState } from 'react'
-import { ChevronDown, Download, FolderOpen, Plus, Server, X } from 'lucide-react'
+import { Check, ChevronDown, Download, FolderGit2, FolderOpen, Plus, Server, X } from 'lucide-react'
 import {
   DndContext,
   type DragEndEvent,
@@ -11,36 +11,28 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, horizontalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { Button } from '#/web/components/ui/button.tsx'
+import { cn } from '#/web/lib/cn.ts'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
 import { ToolbarTabStrip, ToolbarTabStripBody } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
 import { createRestrictToTabStripBounds } from '#/web/components/tab-strip/drag-bounds.ts'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuTrigger,
-  SelectedDropdownMenuItem,
-} from '#/web/components/ui/dropdown-menu.tsx'
+import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
 import { RepoTab } from '#/web/components/repo-tabs/RepoTab.tsx'
 import { RepoTabTooltipLayer } from '#/web/components/repo-tabs/RepoTabTooltipLayer.tsx'
 import { useFocusRegistry, type FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import type { RepoTabStripLabels, RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
+import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 
 function shouldShowInactiveSeparator({
   leftId,
   rightId,
   activeId,
-  hoveredId,
 }: {
   leftId: string
   rightId: string | undefined
   activeId: string | null
-  hoveredId: string | null
 }): boolean {
-  return !!rightId && leftId !== activeId && rightId !== activeId && leftId !== hoveredId && rightId !== hoveredId
+  return !!rightId && leftId !== activeId && rightId !== activeId
 }
 
 function navigatedRepoTabId(
@@ -78,10 +70,8 @@ interface RepoTabStripProps {
 interface RepoTabsContentProps {
   repos: RepoTabSummary[]
   activeId: string | null
-  hoveredId: string | null
   labels: RepoTabStripLabels
   focusRegistry: FocusRegistry<string, HTMLButtonElement>
-  onHoverChange: (id: string | null) => void
   onActivate: (id: string) => void
   onClose: (id: string) => void
   onKeyboardNavigate: (id: string, direction: 'prev' | 'next' | 'first' | 'last') => void
@@ -109,30 +99,216 @@ function RepoTabEdgeAction({
   )
 }
 
-function OpenRepoMenuItems({
+function RepoSwitcherAction({
+  icon,
+  label,
+  shortcut,
+  onSelect,
+}: {
+  icon: ReactNode
+  label: string
+  shortcut: string | null
+  onSelect: () => void
+}) {
+  return (
+    <button
+      type="button"
+      className="flex h-7 w-full cursor-pointer items-center gap-2 rounded-sm px-2 text-left text-sm text-popover-foreground outline-none transition-colors duration-100 hover:bg-accent hover:text-accent-foreground"
+      onClick={onSelect}
+    >
+      <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">{icon}</span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {shortcut && (
+        <span className="ml-auto min-w-6 pl-8 text-right text-xs tracking-widest text-muted-foreground">
+          {shortcut}
+        </span>
+      )}
+    </button>
+  )
+}
+
+function OpenRepoPopover({
   labels,
   onOpenLocal,
   onOpenRemote,
   onClone,
 }: Pick<RepoTabStripProps, 'labels' | 'onOpenLocal' | 'onOpenRemote' | 'onClone'>) {
+  const [open, setOpen] = useState(false)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const selectAction = (action: () => void) => {
+    setOpen(false)
+    action()
+  }
+
   return (
-    <>
-      <DropdownMenuItem className="whitespace-nowrap" onSelect={onOpenLocal}>
-        <FolderOpen />
-        {labels.openLocal}
-        {labels.openLocalShortcut && <DropdownMenuShortcut>{labels.openLocalShortcut}</DropdownMenuShortcut>}
-      </DropdownMenuItem>
-      <DropdownMenuItem className="whitespace-nowrap" onSelect={onOpenRemote}>
-        <Server />
-        {labels.openRemote}
-        {labels.openRemoteShortcut && <DropdownMenuShortcut>{labels.openRemoteShortcut}</DropdownMenuShortcut>}
-      </DropdownMenuItem>
-      <DropdownMenuItem className="whitespace-nowrap" onSelect={onClone}>
-        <Download />
-        {labels.clone}
-        {labels.cloneShortcut && <DropdownMenuShortcut>{labels.cloneShortcut}</DropdownMenuShortcut>}
-      </DropdownMenuItem>
-    </>
+    <Popover open={open} onOpenChange={setOpen}>
+      <Tip label={labels.open}>
+        <PopoverTrigger asChild>
+          <Button variant="ghost" size="icon" className="size-8 shrink-0" aria-label={labels.open}>
+            <Plus />
+          </Button>
+        </PopoverTrigger>
+      </Tip>
+      <PopoverContent
+        side="bottom"
+        align="start"
+        className="flex w-max min-w-48 max-w-72 flex-col overflow-hidden p-0"
+        ref={contentRef}
+        tabIndex={-1}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault()
+          contentRef.current?.focus({ preventScroll: true })
+        }}
+      >
+        <div className="flex h-8 items-center border-b border-separator px-2.5">
+          <span className="min-w-0 truncate text-xs font-medium text-popover-foreground">{labels.open}</span>
+        </div>
+        <div className="p-1">
+          <RepoSwitcherAction
+            icon={<FolderOpen size={14} />}
+            label={labels.openLocal}
+            shortcut={labels.openLocalShortcut}
+            onSelect={() => selectAction(onOpenLocal)}
+          />
+          <RepoSwitcherAction
+            icon={<Server size={14} />}
+            label={labels.openRemote}
+            shortcut={labels.openRemoteShortcut}
+            onSelect={() => selectAction(onOpenRemote)}
+          />
+          <RepoSwitcherAction
+            icon={<Download size={14} />}
+            label={labels.clone}
+            shortcut={labels.cloneShortcut}
+            onSelect={() => selectAction(onClone)}
+          />
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+function RepoSwitcherPopover({
+  repos,
+  activeId,
+  labels,
+  onActivate,
+  onClose,
+  onOpenLocal,
+  onOpenRemote,
+  onClone,
+}: {
+  repos: RepoTabSummary[]
+  activeId: string | null
+  labels: RepoTabStripLabels
+  onActivate: (id: string) => void
+  onClose: (id: string) => void
+  onOpenLocal: () => void
+  onOpenRemote: () => void
+  onClone: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  const selectRepo = (id: string) => {
+    setOpen(false)
+    onActivate(id)
+  }
+
+  const selectAction = (action: () => void) => {
+    setOpen(false)
+    action()
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <Tip label={labels.more}>
+        <PopoverTrigger asChild>
+          <Button variant="ghost" size="icon" className="size-8 shrink-0" aria-label={labels.more}>
+            <ChevronDown />
+          </Button>
+        </PopoverTrigger>
+      </Tip>
+      <PopoverContent
+        side="bottom"
+        align="start"
+        className="flex w-max min-w-48 max-w-72 flex-col overflow-hidden p-0"
+        aria-label={labels.repositories}
+        ref={contentRef}
+        tabIndex={-1}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault()
+          contentRef.current?.focus({ preventScroll: true })
+        }}
+      >
+        <ScrollArea className="max-h-64" scrollbarMode="compact">
+          <div className="space-y-0.5 p-1" role="list">
+            {repos.map((repo) => {
+              const selected = repo.id === activeId
+              const RepoIcon = isRemoteRepoId(repo.id) ? Server : FolderGit2
+              return (
+                <div key={repo.id} className="group relative flex items-center" role="listitem">
+                  <button
+                    type="button"
+                    className={cn(
+                      'flex h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-sm py-1 pl-2 pr-8 text-left text-sm outline-none transition-colors duration-100 hover:bg-accent hover:text-accent-foreground',
+                      selected &&
+                        'bg-selected text-selected-foreground hover:bg-selected hover:text-selected-foreground',
+                    )}
+                    onClick={() => selectRepo(repo.id)}
+                    aria-current={selected ? 'true' : undefined}
+                  >
+                    <span className="flex size-3.5 shrink-0 items-center justify-center">
+                      {selected ? (
+                        <Check size={13} aria-hidden />
+                      ) : (
+                        <RepoIcon size={13} className="text-muted-foreground" aria-hidden />
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate font-medium">{repo.name}</span>
+                  </button>
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="ghost"
+                    className="absolute right-1 top-1/2 size-6 -translate-y-1/2 text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onClose(repo.id)
+                    }}
+                    title={labels.closeWithName(repo.name)}
+                    aria-label={labels.closeWithName(repo.name)}
+                  >
+                    <X size={13} />
+                  </Button>
+                </div>
+              )
+            })}
+          </div>
+        </ScrollArea>
+        <div className="border-t border-separator p-1">
+          <RepoSwitcherAction
+            icon={<FolderOpen size={14} />}
+            label={labels.openLocal}
+            shortcut={labels.openLocalShortcut}
+            onSelect={() => selectAction(onOpenLocal)}
+          />
+          <RepoSwitcherAction
+            icon={<Server size={14} />}
+            label={labels.openRemote}
+            shortcut={labels.openRemoteShortcut}
+            onSelect={() => selectAction(onOpenRemote)}
+          />
+          <RepoSwitcherAction
+            icon={<Download size={14} />}
+            label={labels.clone}
+            shortcut={labels.cloneShortcut}
+            onSelect={() => selectAction(onClone)}
+          />
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -140,9 +316,7 @@ function CompactRepoTabs({
   visibleRepos,
   allRepos,
   activeId,
-  hoveredId,
   labels,
-  onHoverChange,
   onActivate,
   onClose,
   onKeyboardNavigate,
@@ -152,9 +326,7 @@ function CompactRepoTabs({
   visibleRepos: RepoTabSummary[]
   allRepos: RepoTabSummary[]
   activeId: string | null
-  hoveredId: string | null
   labels: RepoTabStripLabels
-  onHoverChange: (id: string | null) => void
   onActivate: (id: string) => void
   onClose: (id: string) => void
   onKeyboardNavigate: (id: string, direction: 'prev' | 'next' | 'first' | 'last') => void
@@ -162,7 +334,7 @@ function CompactRepoTabs({
   moreMenu: ReactNode
 }) {
   const lastVisibleRepo = visibleRepos[visibleRepos.length - 1]
-  const showMoreSeparator = !!lastVisibleRepo && lastVisibleRepo.id !== activeId && lastVisibleRepo.id !== hoveredId
+  const showMoreSeparator = !!lastVisibleRepo && lastVisibleRepo.id !== activeId
 
   return (
     <ToolbarTabStripBody>
@@ -176,7 +348,6 @@ function CompactRepoTabs({
             total={allRepos.length}
             showSeparator={false}
             focusRegistry={focusRegistry}
-            onHoverChange={onHoverChange}
             onActivate={onActivate}
             onClose={onClose}
             onKeyboardNavigate={onKeyboardNavigate}
@@ -194,9 +365,7 @@ function CompactRepoTabs({
 function ScrollableRepoTabs({
   repos,
   activeId,
-  hoveredId,
   labels,
-  onHoverChange,
   onActivate,
   onClose,
   onKeyboardNavigate,
@@ -237,9 +406,7 @@ function ScrollableRepoTabs({
                     leftId: repo.id,
                     rightId: next?.id,
                     activeId,
-                    hoveredId,
                   })}
-                  onHoverChange={onHoverChange}
                   onActivate={onActivate}
                   onClose={onClose}
                   onKeyboardNavigate={onKeyboardNavigate}
@@ -267,7 +434,6 @@ export function RepoTabStrip({
   onOpenRemote,
   onClone,
 }: RepoTabStripProps) {
-  const [hoveredId, setHoveredId] = useState<string | null>(null)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -304,29 +470,17 @@ export function RepoTabStrip({
 
   const ids = repos.map((repo) => repo.id)
   const lastRepo = repos[repos.length - 1]
-  const showOpenSeparator = !!lastRepo && lastRepo.id !== activeId && lastRepo.id !== hoveredId
+  const showOpenSeparator = !!lastRepo && lastRepo.id !== activeId
 
   const activeRepo = repos.find((r) => r.id === activeId)
-  // Compact mode is always one + dropdown: the active tab is the only tab
+  // Compact mode is always one + popover: the active tab is the only tab
   // visible in the strip, and every repo (including the active one) lives
-  // in the overflow menu so the user can switch with a single click.
+  // in the overflow popover so the user can switch with a single click.
   const visibleRepos = activeRepo ? [activeRepo] : repos.slice(0, 1)
-  const dropdownRepos = repos
 
   const openMenu = (
     <RepoTabEdgeAction actionRef={openMenuRef} showSeparator={showOpenSeparator}>
-      <DropdownMenu>
-        <Tip label={labels.open}>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-8 shrink-0" aria-label={labels.open}>
-              <Plus />
-            </Button>
-          </DropdownMenuTrigger>
-        </Tip>
-        <DropdownMenuContent side="bottom" align="start" className="w-max">
-          <OpenRepoMenuItems labels={labels} onOpenLocal={onOpenLocal} onOpenRemote={onOpenRemote} onClone={onClone} />
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <OpenRepoPopover labels={labels} onOpenLocal={onOpenLocal} onOpenRemote={onOpenRemote} onClone={onClone} />
     </RepoTabEdgeAction>
   )
 
@@ -342,61 +496,22 @@ export function RepoTabStrip({
               visibleRepos={visibleRepos}
               allRepos={repos}
               activeId={activeId}
-              hoveredId={hoveredId}
               labels={labels}
               focusRegistry={focusRegistry}
-              onHoverChange={setHoveredId}
               onActivate={onActivate}
               onClose={handleClose}
               onKeyboardNavigate={handleKeyboardNavigate}
               moreMenu={
-                <DropdownMenu>
-                  <Tip label={labels.more}>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="size-8 shrink-0" aria-label={labels.more}>
-                        <ChevronDown />
-                      </Button>
-                    </DropdownMenuTrigger>
-                  </Tip>
-                  <DropdownMenuContent side="bottom" align="start" className="flex w-max flex-col !overflow-hidden">
-                    <ScrollArea className="max-h-[200px]" scrollbarMode="compact">
-                      {dropdownRepos.map((repo) => (
-                        <div key={repo.id} className="group relative flex items-center">
-                          <SelectedDropdownMenuItem
-                            selected={repo.id === activeId}
-                            className="min-w-0 flex-1 gap-2 pr-8"
-                            onSelect={() => onActivate(repo.id)}
-                            aria-current={repo.id === activeId ? 'true' : undefined}
-                          >
-                            <span className="truncate">{repo.name}</span>
-                          </SelectedDropdownMenuItem>
-                          <Button
-                            type="button"
-                            size="icon-sm"
-                            variant="ghost"
-                            className="absolute right-1 h-6 w-6 text-muted-foreground"
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleClose(repo.id)
-                            }}
-                            title={labels.closeWithName(repo.name)}
-                            aria-label={labels.closeWithName(repo.name)}
-                          >
-                            <X size={14} />
-                          </Button>
-                        </div>
-                      ))}
-                    </ScrollArea>
-                    {dropdownRepos.length > 0 && <DropdownMenuSeparator />}
-                    <OpenRepoMenuItems
-                      labels={labels}
-                      onOpenLocal={onOpenLocal}
-                      onOpenRemote={onOpenRemote}
-                      onClone={onClone}
-                    />
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <RepoSwitcherPopover
+                  repos={repos}
+                  activeId={activeId}
+                  labels={labels}
+                  onActivate={onActivate}
+                  onClose={handleClose}
+                  onOpenLocal={onOpenLocal}
+                  onOpenRemote={onOpenRemote}
+                  onClone={onClone}
+                />
               }
             />
           }
@@ -404,10 +519,8 @@ export function RepoTabStrip({
             <ScrollableRepoTabs
               repos={repos}
               activeId={activeId}
-              hoveredId={hoveredId}
               labels={labels}
               focusRegistry={focusRegistry}
-              onHoverChange={setHoveredId}
               onActivate={onActivate}
               onClose={handleClose}
               onKeyboardNavigate={handleKeyboardNavigate}

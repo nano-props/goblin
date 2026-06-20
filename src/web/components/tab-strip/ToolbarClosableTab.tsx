@@ -20,6 +20,7 @@ interface ToolbarClosableTabProps {
   buttonClassName?: string
   closeLabel: string
   closeVisible: boolean
+  closeButton?: boolean
   onClose: (event: React.MouseEvent<HTMLButtonElement>) => void
   children: ReactNode
 }
@@ -34,6 +35,7 @@ export function ToolbarClosableTab({
   buttonClassName,
   closeLabel,
   closeVisible,
+  closeButton = true,
   onClose,
   children,
 }: ToolbarClosableTabProps) {
@@ -51,20 +53,22 @@ export function ToolbarClosableTab({
       >
         {children}
       </button>
-      <button
-        type="button"
-        tabIndex={-1}
-        aria-label={closeLabel}
-        onPointerDown={(event) => event.stopPropagation()}
-        onClick={onClose}
-        className={cn(
-          'cursor-pointer rounded border-0 bg-transparent p-0.5 text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-accent-foreground',
-          closeVisible ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
-        )}
-        title={closeLabel}
-      >
-        <X size={14} />
-      </button>
+      {closeButton && (
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label={closeLabel}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={onClose}
+          className={cn(
+            'cursor-pointer rounded border-0 bg-transparent p-0.5 text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-accent-foreground',
+            closeVisible ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
+          )}
+          title={closeLabel}
+        >
+          <X size={14} />
+        </button>
+      )}
     </div>
   )
 }
