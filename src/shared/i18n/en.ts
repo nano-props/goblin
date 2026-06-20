@@ -206,7 +206,7 @@ export const en = {
   'drop.body': 'Drop a Git repository folder anywhere in Goblin.',
   'drop.open-failed': 'Could not open local repository',
 
-  // ---- Detail tabs --------------------------------------------------------
+  // ---- Workspace pane views ----------------------------------------------
   'tab.branches': 'Branches',
   'tab.branch-detail': 'Branch detail',
   'tab.status': 'Status',

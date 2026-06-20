@@ -184,7 +184,7 @@ describe('terminal-runtime-actions static workspace pane views', () => {
     expect(broadcasts).toHaveBeenCalledWith(OWNER_ID, { type: 'sessions-changed', repoRoot: '/repo' })
   })
 
-  test('rejects malformed static tab input before touching the manager', () => {
+  test('rejects malformed static workspace pane view input before touching the manager', () => {
     const { actions, broadcasts, manager } = makeActions({ closeSessionForOwner: () => false })
 
     const opened = actions.openView(CLIENT_ID, OWNER_ID, {

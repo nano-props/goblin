@@ -387,7 +387,7 @@ describe('TerminalSessionRegistry create flow', () => {
     ])
   })
 
-  test('rolls back optimistic static tab open when the bridge rejects it', async () => {
+  test('rolls back optimistic static workspace pane view open when the bridge rejects it', async () => {
     mocks.openViewMock.mockResolvedValueOnce(false)
 
     await expect(registry.openWorkspacePaneView(WORKTREE_KEY, 'changes')).resolves.toBe(false)

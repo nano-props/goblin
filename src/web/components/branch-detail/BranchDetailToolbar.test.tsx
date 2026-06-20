@@ -287,7 +287,7 @@ describe('BranchDetailToolbar', () => {
     expect(document.activeElement).toBe(statusTab)
   })
 
-  test('selects the adjacent static tab after closing the active terminal view', async () => {
+  test('selects the adjacent static workspace pane view after closing the active terminal view', async () => {
     const showRepoWorkspacePaneView = vi.fn()
     const { container: c, mocks } = renderToolbar({
       terminalCount: 1,

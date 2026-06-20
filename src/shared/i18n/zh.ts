@@ -186,7 +186,7 @@ export const zh: Record<DictKey, string> = {
   'drop.body': '把 Git 仓库文件夹拖到 Goblin 任意位置。',
   'drop.open-failed': '无法打开本地仓库',
 
-  // ---- Detail tabs -------------------------------------------------------
+  // ---- Workspace pane views ---------------------------------------------
   'tab.branches': '分支',
   'tab.branch-detail': '分支详情',
   'tab.status': '状态',
