@@ -208,6 +208,35 @@ describe('WorkspacePaneViewStrip', () => {
     expect(firstTab?.getAttribute('aria-setsize')).toBe('3')
   })
 
+  test('uses the last tab separator for the new terminal boundary while hovering new terminal', () => {
+    render(
+      <TestWorkspacePaneViewStrip
+        worktreeTerminalKey="/repo\0/repo/worktree"
+        detailId="detail"
+        panelActive
+        sessions={[session({ key: 't1', selected: true }), session({ key: 't2', selected: false })]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    const terminalTwo = document.body.querySelector('[data-workspace-pane-view-tooltip-id="terminal:t2"]')
+    const newButton = document.body.querySelector('button[aria-label="terminal.new"]')
+    if (!(terminalTwo instanceof HTMLElement)) throw new Error('missing terminal view')
+    if (!(newButton instanceof HTMLButtonElement)) throw new Error('missing new terminal button')
+
+    expect(terminalTwo.querySelector(':scope > .pointer-events-none.border-r.border-separator')).not.toBeNull()
+
+    act(() => {
+      newButton.dispatchEvent(new MouseEvent('pointerover', { bubbles: true }))
+    })
+
+    expect(terminalTwo.querySelector(':scope > .pointer-events-none.border-r.border-separator')).not.toBeNull()
+  })
+
   test('uses the full terminal title and unread state in the tab aria-label', () => {
     render(
       <TestWorkspacePaneViewStrip

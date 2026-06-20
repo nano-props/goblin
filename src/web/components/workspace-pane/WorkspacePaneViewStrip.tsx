@@ -69,6 +69,21 @@ interface WorkspacePaneViewStripProps {
 export const EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY = '__workspace-pane-empty__'
 
 const WORKSPACE_PANE_VIEW_TOOLTIP_SELECTOR = '[data-workspace-pane-view-tooltip-id]'
+const WORKSPACE_PANE_NEW_ACTION_ID = '__workspace-pane-new-action__'
+
+function shouldShowWorkspacePaneViewSeparator({
+  leftId,
+  rightId,
+  activeId,
+  hoveredId,
+}: {
+  leftId: string
+  rightId: string | undefined
+  activeId: string | null
+  hoveredId: string | null
+}): boolean {
+  return !!rightId && leftId !== activeId && rightId !== activeId && leftId !== hoveredId && rightId !== hoveredId
+}
 
 interface WorkspacePaneViewSwitcherPopoverProps {
   tabs: WorkspacePaneViewSummary[]
@@ -222,6 +237,7 @@ export function WorkspacePaneViewStrip({
   const viewportRef = useRef<HTMLDivElement>(null)
   const prevTabCountRef = useRef(views.length)
   const newButtonRef = useRef<HTMLButtonElement>(null)
+  const [hoveredTabIdentity, setHoveredTabIdentity] = useState<string | null>(null)
 
   useLayoutEffect(() => {
     if (views.length <= prevTabCountRef.current) {
@@ -283,6 +299,7 @@ export function WorkspacePaneViewStrip({
         (tabs[idx + 1] ? workspacePaneViewIdentity(tabs[idx + 1]) : null) ??
         (tabs[idx - 1] ? workspacePaneViewIdentity(tabs[idx - 1]) : null)
 
+      setHoveredTabIdentity(null)
       onClose(tab)
 
       if (isActive && nextKey) {
@@ -440,6 +457,8 @@ export function WorkspacePaneViewStrip({
   }
 
   function renderScrollableTabsBody() {
+    const activeVisualIdentity = panelActive ? activeTabIdentity : null
+
     return (
       <DndContext
         sensors={sensors}
@@ -455,25 +474,37 @@ export function WorkspacePaneViewStrip({
               aria-label={t('workspace-pane-views.tabs')}
               getTooltip={getTooltip}
             >
-              {tabs.map((tab, index) => (
-                <SortableWorkspacePaneView
-                  key={workspacePaneViewIdentity(tab)}
-                  tab={tab}
-                  isActive={!!panelActive && workspacePaneViewIdentity(tab) === activeTabIdentity}
-                  isSelected={workspacePaneViewIdentity(tab) === activeTabIdentity}
-                  index={index}
-                  total={views.length}
-                  tabId={workspacePaneViewButtonId(detailId, index)}
-                  focusRegistry={focusRegistry}
-                  onSelect={handleSelect}
-                  onClose={handleClose}
-                  onKeyDown={handleTabKeyDown}
-                  t={t}
-                  compact={showCollapsedTabs}
-                  getLabel={getLabel}
-                  getCloseLabel={getCloseLabel}
-                />
-              ))}
+              {tabs.map((tab, index) => {
+                const identity = workspacePaneViewIdentity(tab)
+                const nextTab = tabs[index + 1]
+                const rightId = nextTab ? workspacePaneViewIdentity(nextTab) : WORKSPACE_PANE_NEW_ACTION_ID
+                return (
+                  <SortableWorkspacePaneView
+                    key={identity}
+                    tab={tab}
+                    isActive={!!panelActive && identity === activeTabIdentity}
+                    isSelected={identity === activeTabIdentity}
+                    index={index}
+                    total={views.length}
+                    tabId={workspacePaneViewButtonId(detailId, index)}
+                    focusRegistry={focusRegistry}
+                    showSeparator={shouldShowWorkspacePaneViewSeparator({
+                      leftId: identity,
+                      rightId,
+                      activeId: activeVisualIdentity,
+                      hoveredId: hoveredTabIdentity,
+                    })}
+                    onHoverChange={setHoveredTabIdentity}
+                    onSelect={handleSelect}
+                    onClose={handleClose}
+                    onKeyDown={handleTabKeyDown}
+                    t={t}
+                    compact={showCollapsedTabs}
+                    getLabel={getLabel}
+                    getCloseLabel={getCloseLabel}
+                  />
+                )
+              })}
             </WorkspacePaneViewTooltipLayer>
           </SortableContext>
           <Button
@@ -516,6 +547,8 @@ interface WorkspacePaneViewProps {
   onKeyDown: (e: React.KeyboardEvent<HTMLButtonElement>, identity: string) => void
   t: (key: string, params?: Record<string, string | number>) => string
   compact?: boolean
+  showSeparator?: boolean
+  onHoverChange?: (identity: string | null) => void
   getLabel: (tab: WorkspacePaneViewSummary) => string
   getCloseLabel: (tab: WorkspacePaneViewSummary) => string
 }
@@ -535,6 +568,8 @@ interface WorkspacePaneViewChromeProps {
   onKeyDown: (e: React.KeyboardEvent<HTMLButtonElement>, identity: string) => void
   t: (key: string, params?: Record<string, string | number>) => string
   compact?: boolean
+  showSeparator?: boolean
+  onHoverChange?: (identity: string | null) => void
   getLabel: (tab: WorkspacePaneViewSummary) => string
   getCloseLabel: (tab: WorkspacePaneViewSummary) => string
 }
@@ -554,6 +589,8 @@ function WorkspacePaneViewChrome({
   onKeyDown,
   t,
   compact = false,
+  showSeparator = false,
+  onHoverChange,
   getLabel,
   getCloseLabel,
 }: WorkspacePaneViewChromeProps) {
@@ -569,13 +606,22 @@ function WorkspacePaneViewChrome({
       : {}
   return (
     <ToolbarClosableTab
-      containerProps={{ 'data-workspace-pane-view-tooltip-id': identity }}
+      containerProps={{
+        'data-workspace-pane-view-tooltip-id': identity,
+        onPointerEnter: () => onHoverChange?.(identity),
+        onPointerLeave: () => onHoverChange?.(null),
+      }}
       containerClassName={toolbarTabChromeClassName({
         variant: 'detail',
         active: isActive,
         dragging: isDragging,
         compact,
       })}
+      overlay={
+        showSeparator ? (
+          <span className="pointer-events-none absolute right-0 top-1/2 h-4 -translate-y-1/2 border-r border-separator" />
+        ) : null
+      }
       buttonRef={buttonRef}
       buttonProps={{
         ...buttonProps,
@@ -621,6 +667,8 @@ function WorkspacePaneView({
   onKeyDown,
   t,
   compact,
+  showSeparator,
+  onHoverChange,
   getLabel,
   getCloseLabel,
 }: WorkspacePaneViewProps) {
@@ -638,6 +686,8 @@ function WorkspacePaneView({
       onKeyDown={onKeyDown}
       t={t}
       compact={compact}
+      showSeparator={showSeparator}
+      onHoverChange={onHoverChange}
       getLabel={getLabel}
       getCloseLabel={getCloseLabel}
     />
@@ -657,6 +707,8 @@ function SortableWorkspacePaneView({
   onKeyDown,
   t,
   compact,
+  showSeparator,
+  onHoverChange,
   getLabel,
   getCloseLabel,
 }: WorkspacePaneViewProps) {
@@ -684,6 +736,8 @@ function SortableWorkspacePaneView({
         }}
         t={t}
         compact={compact}
+        showSeparator={showSeparator}
+        onHoverChange={onHoverChange}
         getLabel={getLabel}
         getCloseLabel={getCloseLabel}
       />
