@@ -388,9 +388,6 @@ function BranchLevelWorkspacePaneTabs({
             }}
             buttonClassName={toolbarTabButtonClassName('detail')}
             closeButton={false}
-            closeLabel={t('workspace-pane-views.close-named', { name: label })}
-            closeVisible={false}
-            onClose={() => {}}
           >
             <GitBranch size={13} className={toolbarTabIconClassName(active)} />
             <span className="truncate">{label}</span>
