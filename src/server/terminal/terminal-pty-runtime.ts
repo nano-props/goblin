@@ -16,6 +16,7 @@ export interface SpawnTerminalPtyRuntimeInput {
   cwd: string
   cols: number
   rows: number
+  env?: Record<string, string>
 }
 
 export type SpawnTerminalPtyRuntimeResult = { ok: true; runtime: TerminalPtyRuntime } | { ok: false; message: string }
@@ -23,7 +24,7 @@ export type SpawnTerminalPtyRuntimeResult = { ok: true; runtime: TerminalPtyRunt
 export function spawnTerminalPtyRuntime(input: SpawnTerminalPtyRuntimeInput): SpawnTerminalPtyRuntimeResult {
   try {
     const shell = resolveLocalShell(input)
-    const env = { ...process.env, TERM: 'xterm-256color' }
+    const env = { ...process.env, ...input.env, TERM: 'xterm-256color' }
     const term = pty.spawn(shell.command, shell.args, {
       name: 'xterm-256color',
       cols: input.cols,

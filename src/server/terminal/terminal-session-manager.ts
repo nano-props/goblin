@@ -63,6 +63,7 @@ export interface TerminalEnsureSessionInput<TOwner extends string | number> {
   forceNew?: boolean
   command?: string
   args?: string[]
+  env?: Record<string, string>
 }
 
 interface TerminalSession<TOwner extends string | number> {
@@ -73,6 +74,7 @@ interface TerminalSession<TOwner extends string | number> {
   cwd: string
   command?: string
   args?: string[]
+  env?: Record<string, string>
   cols: number
   rows: number
   pty: PtyHandle | null
@@ -148,6 +150,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
       cwd,
       command: input.command,
       args: input.args,
+      env: input.env,
       cols: size.cols,
       rows: size.rows,
       pty: null,
@@ -681,6 +684,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
         cwd: session.cwd,
         cols: session.cols,
         rows: session.rows,
+        env: session.env,
       })
     } catch (err) {
       return { ok: false, message: err instanceof Error ? err.message : 'error.unknown' }

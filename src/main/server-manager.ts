@@ -154,6 +154,7 @@ export async function startEmbeddedServer(): Promise<EmbeddedServerRuntime | nul
         // backed by the `runtime.accessToken` field above.
         GOBLIN_SERVER_ACCESS_TOKEN: accessToken,
         GOBLIN_SERVER_DATA_DIR: app.getPath('userData'),
+        GOBLIN_COMMAND_BIN_DIR: path.join(serverWorkingDirectory(), 'terminal-bin'),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     })

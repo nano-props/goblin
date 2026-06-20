@@ -74,6 +74,7 @@ describe('server runtime', () => {
     expect(mocks.createServerTerminalRuntime).toHaveBeenCalledTimes(1)
     expect(mocks.createServerTerminalRuntime).toHaveBeenCalledWith({
       ptySupervisor: expect.objectContaining({ mode: 'in-process' }),
+      gCommand: undefined,
     })
     expect(runtime.terminalHost).toBe(mocks.createServerTerminalRuntime.mock.results[0]?.value.host)
     expect(mocks.createApp).toHaveBeenCalledWith({
@@ -113,5 +114,31 @@ describe('server runtime', () => {
     expect(mocks.stopBackgroundSync).toHaveBeenCalledTimes(1)
     expect(terminalHost.shutdown).toHaveBeenCalledTimes(1)
     expect(events).toEqual(['background-sync', 'terminal'])
+  })
+
+  test('wires the g command runtime when an entrypoint is available', async () => {
+    const { createServerRuntime } = await import('#/server/runtime.ts')
+
+    createServerRuntime({
+      version: '0.1.0',
+      startedAt: 1,
+      accessToken: 'secret',
+      serverHost: '0.0.0.0',
+      serverPort: 32100,
+      gCommandEntry: '/app/dist/server/g-command.js',
+      gCommandBinDir: '/app/terminal-bin',
+      gCommandNodePath: '/app/electron',
+    })
+
+    expect(mocks.createServerTerminalRuntime).toHaveBeenCalledWith({
+      ptySupervisor: expect.objectContaining({ mode: 'in-process' }),
+      gCommand: {
+        serverUrl: 'http://127.0.0.1:32100',
+        accessToken: 'secret',
+        entryPath: '/app/dist/server/g-command.js',
+        binDir: '/app/terminal-bin',
+        nodePath: '/app/electron',
+      },
+    })
   })
 })

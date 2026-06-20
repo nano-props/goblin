@@ -15,6 +15,9 @@ export interface ServerRuntimeOptions extends Omit<ServerAppOptions, 'terminalHo
    * hosts PTY sessions in-process (cheap, useful for tests).
    */
   ptyWorkerEntry?: string
+  gCommandEntry?: string
+  gCommandBinDir?: string
+  gCommandNodePath?: string
   serverHost: string
   serverPort: number
 }
@@ -26,13 +29,31 @@ export interface ServerRuntime {
 }
 
 export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntime {
-  const { terminalHost: providedTerminalHost, ptyWorkerEntry, serverHost, serverPort, ...appOptions } = options
+  const {
+    terminalHost: providedTerminalHost,
+    ptyWorkerEntry,
+    gCommandEntry,
+    gCommandBinDir,
+    gCommandNodePath,
+    serverHost,
+    serverPort,
+    ...appOptions
+  } = options
   const runtime = providedTerminalHost
     ? null
     : createServerTerminalRuntime({
         ptySupervisor: ptyWorkerEntry
           ? new WorkerBackedPtySupervisor({ workerEntry: ptyWorkerEntry })
           : createInProcessPtySupervisor(),
+        gCommand: gCommandEntry
+          ? {
+              serverUrl: localServerUrl(serverHost, serverPort),
+              accessToken: appOptions.accessToken,
+              entryPath: gCommandEntry,
+              binDir: gCommandBinDir,
+              nodePath: gCommandNodePath,
+            }
+          : undefined,
       })
   const terminalHost = providedTerminalHost ?? (runtime?.host as ServerTerminalHost)
   // `appOptions` carries `accessToken` (renamed from the pre-PR
@@ -53,4 +74,12 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
       }
     },
   }
+}
+
+function localServerUrl(host: string, port: number): string {
+  let accessHost = host
+  if (accessHost === '0.0.0.0') accessHost = '127.0.0.1'
+  else if (accessHost === '::') accessHost = '[::1]'
+  else if (accessHost.includes(':') && !accessHost.startsWith('[')) accessHost = `[${accessHost}]`
+  return `http://${accessHost}:${port}`
 }
