@@ -18,7 +18,7 @@
 // `ExternalAppSettings`) don't have to thread an `await` through.
 // Before the hydrate completes they return safe defaults (`''` /
 // `'web'`) — the settings page and clone dialog both mount after
-// the first paint, by which point `useAppBootstrap` has resolved
+// the first paint, by which point `usePublicAppBootstrap` has resolved
 // the host-info promise. The original preload used `sendSync` to
 // populate these synchronously, but the only consumer that
 // actually needed the value during the very first paint was the

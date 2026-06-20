@@ -42,7 +42,7 @@ describe('renderer bootstrap', () => {
         // tiny renderer-state payload (runtime kind, initial server
         // handoff). Host info (homeDir, platform) and i18n live
         // on dedicated `/api/*` endpoints fetched by
-        // `useAppBootstrap.hydrate()`, not in the bootstrap.
+        // the renderer bootstrap hooks, not in the bootstrap.
         __GOBLIN_BOOTSTRAP__: bootstrap,
       },
     })

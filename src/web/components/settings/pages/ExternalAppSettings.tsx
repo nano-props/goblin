@@ -171,7 +171,7 @@ export function ExternalAppSettings() {
   // Read the platform from the host-info store, not `process.platform`:
   // the renderer is sandboxed and does not have `process` at runtime, so
   // the only reliable source is the public `/api/host` endpoint fetched
-  // during `useAppBootstrap.hydrate()`. The store falls back to `'web'`
+  // during public bootstrap. The store falls back to `'web'`
   // (which hides every OS-specific terminal entry) until the hydrate
   // resolves — the settings page is gated behind login anyway.
   const visibleTerminalIds = PLATFORM_TERMINAL_IDS[useHostInfoStore((s) => s.snapshot?.platform ?? 'web')]

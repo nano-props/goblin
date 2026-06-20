@@ -10,15 +10,21 @@
 
 import { create, type StoreApi } from 'zustand'
 import { DEFAULT_COLOR_THEME, isColorTheme } from '#/shared/color-theme.ts'
-import type { ResolvedTheme, ThemePref, ThemeState } from '#/shared/api-types.ts'
+import type { ResolvedTheme, SettingsSnapshot, ThemePref, ThemeState } from '#/shared/api-types.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
-import { getThemeState, setThemeColorTheme, setThemePref } from '#/web/settings-client.ts'
+import {
+  getThemeState,
+  resolveThemeStateFromSettings,
+  setThemeColorTheme,
+  setThemePref,
+} from '#/web/settings-client.ts'
 import { subscribeSettingsInvalidationRefetch } from '#/web/settings-invalidation-refetch.ts'
 
 interface ThemeStore extends ThemeState {
   setPref: (pref: ThemePref) => Promise<void>
   setColorTheme: (colorTheme: ColorTheme) => Promise<void>
   hydrate: () => Promise<void>
+  hydrateFromSettingsSnapshot: (snapshot: Pick<SettingsSnapshot, 'theme' | 'colorTheme'>) => Promise<void>
 }
 
 // `set` / `get` aliases keep helper signatures aligned with the
@@ -103,6 +109,25 @@ function installMediaQueryListener(set: ThemeSet, get: ThemeGet): void {
   mediaQueryListenerDisposer = () => mql.removeEventListener('change', handleOsThemeChange)
 }
 
+function commitHydratedThemeState(set: ThemeSet, get: ThemeGet, version: number, state: ThemeState): void {
+  if (version !== hydrateVersion) return
+  commitThemeState(set, state)
+  if (version !== hydrateVersion) return
+  const nextUnsubscribe = subscribeSettingsInvalidationRefetch({
+    scope: 'theme',
+    fetch: getThemeState,
+    label: 'theme',
+    apply: (next) => commitThemeState(set, next),
+  })
+  if (version !== hydrateVersion) {
+    nextUnsubscribe()
+    return
+  }
+  clearThemeSubscription()
+  unsubscribe = nextUnsubscribe
+  installMediaQueryListener(set, get)
+}
+
 export const useThemeStore = create<ThemeStore>((set, get) => ({
   // index.html's boot script sets theme attrs before stylesheets
   // load — read it back here so the initial render doesn't disagree
@@ -114,22 +139,12 @@ export const useThemeStore = create<ThemeStore>((set, get) => ({
   async hydrate() {
     const version = ++hydrateVersion
     const state = await getThemeState()
-    if (version !== hydrateVersion) return
-    commitThemeState(set, state)
-    if (version !== hydrateVersion) return
-    const nextUnsubscribe = subscribeSettingsInvalidationRefetch({
-      scope: 'theme',
-      fetch: getThemeState,
-      label: 'theme',
-      apply: (next) => commitThemeState(set, next),
-    })
-    if (version !== hydrateVersion) {
-      nextUnsubscribe()
-      return
-    }
-    clearThemeSubscription()
-    unsubscribe = nextUnsubscribe
-    installMediaQueryListener(set, get)
+    commitHydratedThemeState(set, get, version, state)
+  },
+
+  async hydrateFromSettingsSnapshot(snapshot) {
+    const version = ++hydrateVersion
+    commitHydratedThemeState(set, get, version, resolveThemeStateFromSettings(snapshot))
   },
 
   async setPref(pref) {

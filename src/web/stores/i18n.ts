@@ -1,6 +1,6 @@
 // Renderer-side i18n. Hydrate at boot pulls the dictionary from
 // the public `/api/i18n` endpoint via
-// `useAppBootstrap.hydrate()`; setPref writes through and the
+// `usePublicAppBootstrap`; setPref writes through and the
 // broadcast keeps every window in sync. React components read
 // translations through react-i18next, while this Zustand store
 // keeps the language preference/snapshot available to non-hook
@@ -53,7 +53,10 @@ interface I18nState {
    * they never paint with raw i18n keys.
    */
   hydrated: boolean
-  hydrate: () => Promise<void>
+  hydrate: (options?: {
+    /** False for public bootstrap: fetch `/api/i18n` without opening the auth-gated invalidation socket. */
+    subscribe?: boolean
+  }) => Promise<void>
   setPref: (pref: LangPref) => Promise<void>
 }
 
@@ -74,12 +77,13 @@ export const useI18nStore = create<I18nState>((set) => ({
   dict: {},
   hydrated: false,
 
-  async hydrate() {
+  async hydrate(options) {
     const version = ++hydrateVersion
     const snapshot = await getI18nSnapshot()
     if (version !== hydrateVersion) return
     await commitSnapshot(set, snapshot)
     if (version !== hydrateVersion) return
+    if (options?.subscribe === false) return
     const nextUnsubscribe = subscribeSettingsInvalidationRefetch({
       scope: 'i18n',
       fetch: getI18nSnapshot,
