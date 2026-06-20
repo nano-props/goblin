@@ -1,6 +1,8 @@
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { requestVisibleRepoStatusRefresh } from '#/web/stores/repos/refresh-coordinator.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
 
 export function openWorkspacePaneView(input: {
@@ -18,4 +20,5 @@ export function openWorkspacePaneView(input: {
   } else {
     input.navigation.showRepoWorkspacePaneView(input.repoId, input.type)
   }
+  requestVisibleRepoStatusRefresh(useReposStore.getState, input.repoId)
 }
