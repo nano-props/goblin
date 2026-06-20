@@ -96,7 +96,12 @@ describe('runRemoteRepoLifecycle', () => {
           branchAction: idle(),
           pullRequestsByBranch: {},
         },
-        ui: { selectedBranch: null, branchViewMode: 'all', preferredWorkspacePaneView: 'status' },
+        ui: {
+          selectedBranch: null,
+          branchViewMode: 'all',
+          openBranchWorkspacePaneViews: ['status'],
+          preferredWorkspacePaneView: 'status',
+        },
         projection: { source: 'fresh', savedAt: null },
         remote: {
           lifecycle: { kind: 'connecting' },
@@ -138,7 +143,12 @@ describe('runRemoteRepoLifecycle', () => {
         data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
         resources: emptyResources(),
         operations: emptyOperations(),
-        ui: { selectedBranch: null, branchViewMode: 'all', preferredWorkspacePaneView: 'status' },
+        ui: {
+          selectedBranch: null,
+          branchViewMode: 'all',
+          openBranchWorkspacePaneViews: ['status'],
+          preferredWorkspacePaneView: 'status',
+        },
         projection: { source: 'fresh', savedAt: null },
         remote: {
           lifecycle: { kind: 'connecting' },
@@ -180,7 +190,12 @@ describe('runRemoteRepoLifecycle', () => {
         data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
         resources: emptyResources(),
         operations: emptyOperations(),
-        ui: { selectedBranch: null, branchViewMode: 'all', preferredWorkspacePaneView: 'status' },
+        ui: {
+          selectedBranch: null,
+          branchViewMode: 'all',
+          openBranchWorkspacePaneViews: ['status'],
+          preferredWorkspacePaneView: 'status',
+        },
         projection: { source: 'fresh', savedAt: null },
         remote: {
           lifecycle: { kind: 'connecting' },
@@ -222,7 +237,12 @@ describe('runRemoteRepoLifecycle', () => {
         data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
         resources: emptyResources(),
         operations: emptyOperations(),
-        ui: { selectedBranch: null, branchViewMode: 'all', preferredWorkspacePaneView: 'status' },
+        ui: {
+          selectedBranch: null,
+          branchViewMode: 'all',
+          openBranchWorkspacePaneViews: ['status'],
+          preferredWorkspacePaneView: 'status',
+        },
         projection: { source: 'fresh', savedAt: null },
         remote: {
           lifecycle: { kind: 'failed', reason: 'unreachable' },
@@ -297,7 +317,12 @@ describe('runRemoteRepoLifecycle', () => {
         data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
         resources: emptyResources(),
         operations: emptyOperations(),
-        ui: { selectedBranch: null, branchViewMode: 'all', preferredWorkspacePaneView: 'status' },
+        ui: {
+          selectedBranch: null,
+          branchViewMode: 'all',
+          openBranchWorkspacePaneViews: ['status'],
+          preferredWorkspacePaneView: 'status',
+        },
         projection: { source: 'fresh', savedAt: null },
         remote: {
           lifecycle: { kind: 'connecting' },
@@ -359,7 +384,12 @@ describe('runRemoteRepoLifecycle', () => {
           data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
           resources: emptyResources(),
           operations: emptyOperations(),
-          ui: { selectedBranch: null, branchViewMode: 'all', preferredWorkspacePaneView: 'status' },
+          ui: {
+            selectedBranch: null,
+            branchViewMode: 'all',
+            openBranchWorkspacePaneViews: ['status'],
+            preferredWorkspacePaneView: 'status',
+          },
           projection: { source: 'fresh', savedAt: null },
           remote: {
             lifecycle: null,

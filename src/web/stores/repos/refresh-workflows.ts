@@ -21,7 +21,13 @@ function pullRequestRefreshFailed(get: ReposGet, id: string, token: number): boo
 
 function visibleDetailPullRequestPending(get: ReposGet, id: string, token: number): boolean {
   const repo = get().repos[id]
-  if (!repo || repo.instanceToken !== token || repo.ui.preferredWorkspacePaneView !== 'status' || !repo.ui.selectedBranch)
+  if (
+    !repo ||
+    repo.instanceToken !== token ||
+    repo.ui.preferredWorkspacePaneView !== 'status' ||
+    !repo.ui.openBranchWorkspacePaneViews.includes('status') ||
+    !repo.ui.selectedBranch
+  )
     return false
   const branch = repo.data.branches.find((entry) => entry.name === repo.ui.selectedBranch)
   return pullRequestMergeStatusPending(branch?.pullRequest)
@@ -29,7 +35,13 @@ function visibleDetailPullRequestPending(get: ReposGet, id: string, token: numbe
 
 async function refreshVisibleDetailPullRequest(get: ReposGet, id: string, token: number): Promise<void> {
   const repo = get().repos[id]
-  if (!repo || repo.instanceToken !== token || repo.ui.preferredWorkspacePaneView !== 'status' || !repo.ui.selectedBranch)
+  if (
+    !repo ||
+    repo.instanceToken !== token ||
+    repo.ui.preferredWorkspacePaneView !== 'status' ||
+    !repo.ui.openBranchWorkspacePaneViews.includes('status') ||
+    !repo.ui.selectedBranch
+  )
     return
   await get().refreshPullRequests(id, [repo.ui.selectedBranch], { token, mode: 'full' })
 }

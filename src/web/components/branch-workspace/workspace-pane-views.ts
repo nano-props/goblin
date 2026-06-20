@@ -15,6 +15,16 @@ export function branchLevelWorkspacePaneViewButtonId(detailId: string, type: Bra
   return `${detailId}-${type}-tab`
 }
 
+export function branchLevelWorkspacePaneViewLabel(tab: BranchLevelWorkspacePaneView, t: T): string {
+  if (tab === 'status') return t('tab.status')
+  const exhaustive: never = tab
+  return exhaustive
+}
+
+export function branchLevelWorkspacePaneViewCloseLabel(tab: BranchLevelWorkspacePaneView, t: T): string {
+  return t('workspace-pane-views.close-named', { name: branchLevelWorkspacePaneViewLabel(tab, t) })
+}
+
 export function branchWorkspacePaneViewLabel(tab: WorkspacePaneViewSummary, t: T, statusCount?: number): string {
   if (tab.type === 'changes') {
     if (statusCount && statusCount > 0) return t('tab.changes-with-count', { count: statusCount })

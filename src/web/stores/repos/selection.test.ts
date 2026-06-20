@@ -286,6 +286,27 @@ describe('setWorkspacePaneView', () => {
     expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
   })
 
+  test('opens the branch-level status view when reselecting a closed status tab', () => {
+    seedRepo({ selectedBranch: 'main', workspacePaneView: 'status' })
+    useReposStore.getState().closeBranchWorkspacePaneView(REPO_ID, 'status')
+
+    useReposStore.getState().setWorkspacePaneView(REPO_ID, 'status')
+
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual(['status'])
+  })
+
+  test('opens and closes branch-level workspace pane views independently of branch selection', () => {
+    seedRepo({ selectedBranch: 'main', workspacePaneView: 'status' })
+
+    useReposStore.getState().closeBranchWorkspacePaneView(REPO_ID, 'status')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBe('main')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual([])
+
+    useReposStore.getState().openBranchWorkspacePaneView(REPO_ID, 'status')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBe('main')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual(['status'])
+  })
+
   test('persists the changes tab immediately', async () => {
     seedRepo({ selectedBranch: 'main', workspacePaneView: 'status' })
 

@@ -143,6 +143,43 @@ describe('BranchWorkspaceToolbar', () => {
     expect(statusChrome?.querySelector(':scope > .pointer-events-none.border-r.border-separator')).not.toBeNull()
   })
 
+  test('closes the branch-level status tab through the shared tab close control', async () => {
+    const { container: c } = renderToolbar({
+      terminalCount: 0,
+      navigation: navigationWith({}),
+    })
+
+    const statusCloseButton = closeButtonFor(c, 'status:status')
+    expect(statusCloseButton).not.toBeNull()
+
+    act(() => {
+      statusCloseButton?.click()
+    })
+    await flush()
+
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual([])
+  })
+
+  test('selects the adjacent terminal tab after closing the active status tab', async () => {
+    const showRepoWorkspacePaneView = vi.fn()
+    const { container: c, mocks } = renderToolbar({
+      terminalCount: 1,
+      navigation: navigationWith({ showRepoWorkspacePaneView }),
+    })
+
+    const statusCloseButton = closeButtonFor(c, 'status:status')
+    expect(statusCloseButton).not.toBeNull()
+
+    act(() => {
+      statusCloseButton?.click()
+    })
+    await flush()
+
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual([])
+    expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'terminal')
+    expect(mocks.selectTerminal).toHaveBeenCalledWith(`${REPO_ID}\0${WORKTREE_PATH}`, 't1')
+  })
+
   test('compact workspace view popover merges status and terminal views', async () => {
     compactUi = true
     const { container: c } = renderToolbar({
@@ -620,4 +657,14 @@ function navigationWith(overrides: Partial<MainWindowNavigationActions>): MainWi
 
 async function flush() {
   await new Promise((resolve) => setTimeout(resolve, 0))
+}
+
+function closeButtonFor(container: HTMLElement, identity: string): HTMLButtonElement | null {
+  const chrome = container.querySelector(`[data-workspace-pane-view-tooltip-id="${identity}"]`)
+  if (!chrome) return null
+  return (
+    Array.from(chrome.querySelectorAll<HTMLButtonElement>('button')).find((button) =>
+      button.getAttribute('aria-label')?.startsWith('workspace-pane-views.close-named'),
+    ) ?? null
+  )
 }

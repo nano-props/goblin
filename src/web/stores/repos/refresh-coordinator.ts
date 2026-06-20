@@ -26,6 +26,7 @@ export interface RepoStatusRefreshSnapshot {
   id: string
   token: number
   workspacePaneView: WorkspacePaneView
+  statusViewOpen: boolean
   unavailable: boolean
   statusPhase: 'idle' | 'loading' | 'refreshing'
 }
@@ -35,6 +36,7 @@ export function repoStatusRefreshSnapshot(repo: RepoState): RepoStatusRefreshSna
     id: repo.id,
     token: repo.instanceToken,
     workspacePaneView: repo.ui.preferredWorkspacePaneView,
+    statusViewOpen: repo.ui.openBranchWorkspacePaneViews.includes('status'),
     unavailable: isRepoUnavailable(repo),
     statusPhase: repo.resources.status.phase,
   }

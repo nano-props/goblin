@@ -71,6 +71,42 @@ describe('BranchWorkspaceContent', () => {
     expect(container?.textContent).toContain('branch-status.worktree.none')
     expect(container?.textContent).not.toContain('workspace-pane-views.empty')
   })
+
+  test('shows the workspace empty state when the status tab is closed', () => {
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [
+        createRepoBranch('feature/no-worktree', {
+          tracking: 'origin/feature/no-worktree',
+          lastCommitHash: 'abc1234',
+          lastCommitMessage: 'Update placeholder branch',
+          lastCommitAuthor: 'Example Author',
+          lastCommitDate: '2026-01-01T00:00:00.000Z',
+        }),
+      ],
+      selectedBranch: 'feature/no-worktree',
+      workspacePaneView: 'status',
+      openBranchWorkspacePaneViews: [],
+    })
+    const detail = getSelectedBranchWorkspacePresentation(repo)
+
+    act(() => {
+      root!.render(
+        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+          <BranchWorkspaceContent
+            repo={repo}
+            detail={detail}
+            detailId="detail"
+            contentId="content"
+            layout={DEFAULT_WORKSPACE_LAYOUT}
+          />
+        </TerminalSessionReadContext.Provider>,
+      )
+    })
+
+    expect(container?.querySelector('#detail-status-panel')).toBeNull()
+    expect(container?.textContent).toContain('workspace-pane-views.empty')
+  })
 })
 
 const emptyWorktreeSnapshot: WorktreeTerminalSnapshot = {

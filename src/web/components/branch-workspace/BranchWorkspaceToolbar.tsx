@@ -13,10 +13,10 @@ import {
   EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY,
   createBranchWorkspacePaneTabItem,
   createWorktreeWorkspacePaneTabItem,
+  isBranchWorkspacePaneTabItem,
   isTerminalWorkspacePaneTabItem,
   isWorktreeWorkspacePaneTabItem,
   type WorkspacePaneTabItem,
-  type WorkspacePaneWorktreeTabItem,
 } from '#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import type { WorkspacePaneViewOrderEntry } from '#/shared/workspace-pane.ts'
@@ -27,6 +27,8 @@ import type {
 } from '#/web/components/branch-workspace/model.ts'
 import {
   BRANCH_LEVEL_WORKSPACE_PANE_VIEWS,
+  branchLevelWorkspacePaneViewCloseLabel,
+  branchLevelWorkspacePaneViewLabel,
   branchWorkspacePaneViewCloseLabel,
   branchWorkspacePaneViewLabel,
   branchWorkspacePaneViewTooltip,
@@ -36,6 +38,7 @@ import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts
 import { useEffectiveWorkspacePaneView } from '#/web/components/branch-workspace/useEffectiveWorkspacePaneView.ts'
 import { useIsInitialSyncInFlight } from '#/web/stores/repo-sync.ts'
 import { isWorktreeLevelWorkspacePaneView } from '#/web/lib/workspace-pane-view.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
 
 interface Props {
   repo: Pick<BranchWorkspaceRepo, 'id' | 'ui' | 'data'>
@@ -158,12 +161,15 @@ export function BranchWorkspaceToolbar({ repo, detail, detailId }: Props) {
   const workspacePaneTabItems = useMemo<WorkspacePaneTabItem[]>(
     () => [
       ...(showBranchLevelTabs
-        ? BRANCH_LEVEL_WORKSPACE_PANE_VIEWS.map((tab) => {
-            const label = t(tab.labelKey)
+        ? BRANCH_LEVEL_WORKSPACE_PANE_VIEWS.filter((tab) =>
+            repo.ui.openBranchWorkspacePaneViews.includes(tab.type),
+          ).map((tab) => {
+            const label = branchLevelWorkspacePaneViewLabel(tab.type, t)
             return createBranchWorkspacePaneTabItem({
               type: tab.type,
               label,
               tooltip: label,
+              closeLabel: branchLevelWorkspacePaneViewCloseLabel(tab.type, t),
               panelId: `${detailId}-${tab.type}-panel`,
             })
           })
@@ -182,6 +188,7 @@ export function BranchWorkspaceToolbar({ repo, detail, detailId }: Props) {
       closeLabelForWorkspacePaneView,
       detailId,
       labelForWorkspacePaneView,
+      repo.ui.openBranchWorkspacePaneViews,
       showBranchLevelTabs,
       t,
       tooltipForWorkspacePaneView,
@@ -210,11 +217,13 @@ export function BranchWorkspaceToolbar({ repo, detail, detailId }: Props) {
     [activeTabIdentity, handleScrollToBottom, showWorkspacePaneTabItem],
   )
   const handleCloseWorkspacePaneView = useCallback(
-    (item: WorkspacePaneWorktreeTabItem) => {
+    (item: WorkspacePaneTabItem) => {
       const nextItem = nextWorkspacePaneTabItemAfterClose(workspacePaneTabItems, item.identity)
       const isActive = activeTabIdentity === item.identity
 
-      if (item.view.type === 'terminal') {
+      if (isBranchWorkspacePaneTabItem(item)) {
+        useReposStore.getState().closeBranchWorkspacePaneView(repo.id, item.branchViewType)
+      } else if (item.view.type === 'terminal') {
         if (!terminalBase) return
         closeTerminalByDescriptor(item.view.key, terminalBase)
       } else {
@@ -224,15 +233,12 @@ export function BranchWorkspaceToolbar({ repo, detail, detailId }: Props) {
 
       if (isActive && nextItem) {
         showWorkspacePaneTabItem(nextItem)
-      } else if (isActive) {
-        navigation.showRepoWorkspacePaneView(repo.id, 'status')
       }
     },
     [
       activeTabIdentity,
       closeTerminalByDescriptor,
       closeWorkspacePaneView,
-      navigation,
       repo.id,
       showWorkspacePaneTabItem,
       terminalBase,
