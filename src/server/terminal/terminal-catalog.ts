@@ -22,6 +22,7 @@ import {
   buildGoblinTerminalCommandEnvironment,
   type GoblinTerminalCommandRuntime,
 } from '#/server/terminal/g-command.ts'
+import type { WorkspacePaneRuntime } from '#/server/workspace-pane/workspace-pane-runtime.ts'
 
 interface EnsureTerminalCatalogInput {
   repoRoot: string
@@ -74,13 +75,13 @@ interface TerminalCatalogManager {
   ensureSession(input: TerminalCatalogEnsureSessionInput): Promise<TerminalAttachResult>
   listSessionsForOwner(ownerId: string, repoRoot: string): Promise<TerminalSessionSummary[]>
   closeSession(sessionId: string): void
-  pruneStaticViewsForOwner(ownerId: string, scope: string, liveWorktreePaths: ReadonlySet<string>): number
 }
 
 interface TerminalCatalogOptions {
   isValidClientId(value: unknown): value is string
   isValidTerminalId(value: unknown): value is string
   manager: TerminalCatalogManager
+  workspacePane: Pick<WorkspacePaneRuntime<string>, 'pruneStaticViewsForOwner'>
   isAttachmentConnected(ownerId: string, attachmentId?: string): boolean | undefined
   broadcastSessionsChanged(ownerId: string, repoRoot: string): void
   gCommand?: GoblinTerminalCommandRuntime
@@ -179,7 +180,11 @@ class TerminalCatalog {
 
     const worktrees = await getWorktrees(repoRoot, { includeStatus: false })
     const liveWorktreePaths = new Set(worktrees.map((worktree) => path.resolve(worktree.path)))
-    const staticViewsPruned = this.options.manager.pruneStaticViewsForOwner(ownerId, sessionScope, liveWorktreePaths)
+    const staticViewsPruned = this.options.workspacePane.pruneStaticViewsForOwner(
+      ownerId,
+      sessionScope,
+      liveWorktreePaths,
+    )
     let pruned = 0
     for (const session of allSessions) {
       const parsed = parseTerminalSessionKey(session.key)
@@ -271,11 +276,11 @@ class TerminalCatalog {
     const repoRoot = path.resolve(input.repoRoot)
     const worktreePath = path.resolve(resolved.path)
     const env = this.options.gCommand
-      ? buildGoblinTerminalCommandEnvironment({
+      ? (buildGoblinTerminalCommandEnvironment({
           ...this.options.gCommand,
           repoRoot,
           worktreePath,
-        }) ?? undefined
+        }) ?? undefined)
       : undefined
     const result = await this.options.manager.ensureSession({
       ownerId,

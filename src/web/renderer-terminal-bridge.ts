@@ -75,6 +75,7 @@ export function createServerTerminalBridge(options: {
   const exitSubscribers = new Set<(event: TerminalExitEvent) => void>()
   const ownershipSubscribers = new Set<(event: TerminalOwnershipViewModel) => void>()
   const sessionsChangedSubscribers = new Set<(repoRoot: string) => void>()
+  const workspacePaneChangedSubscribers = new Set<(repoRoot: string) => void>()
   const sessionClosedSubscribers = new Set<(event: { sessionId: string; repoRoot: string }) => void>()
   const attachmentId = options.getAttachmentId()
   let socket: WebSocket | null = null
@@ -91,6 +92,7 @@ export function createServerTerminalBridge(options: {
       exitSubscribers.size > 0 ||
       ownershipSubscribers.size > 0 ||
       sessionsChangedSubscribers.size > 0 ||
+      workspacePaneChangedSubscribers.size > 0 ||
       sessionClosedSubscribers.size > 0
     )
   }
@@ -189,6 +191,8 @@ export function createServerTerminalBridge(options: {
         for (const subscriber of exitSubscribers) subscriber(message.event)
       } else if (message.type === 'sessions-changed') {
         for (const subscriber of sessionsChangedSubscribers) subscriber(message.repoRoot)
+      } else if (message.type === 'workspace-pane-changed') {
+        for (const subscriber of workspacePaneChangedSubscribers) subscriber(message.repoRoot)
       } else if (message.type === 'session-closed') {
         for (const subscriber of sessionClosedSubscribers)
           subscriber({ sessionId: message.sessionId, repoRoot: message.repoRoot })
@@ -288,17 +292,17 @@ export function createServerTerminalBridge(options: {
       })
     },
     listViews(input) {
-      return requestOverSocket('list-views', input).then((value) => {
+      return requestOverSocket('workspace-pane:list-views', input).then((value) => {
         const views = normalizeWorkspacePaneStaticViewSummaryList(value)
         if (!views) throw new Error('Terminal socket response failed: invalid workspace pane views response')
         return views
       })
     },
     openView(input) {
-      return requestOverSocket('open-view', input satisfies WorkspacePaneStaticViewInput)
+      return requestOverSocket('workspace-pane:open-view', input satisfies WorkspacePaneStaticViewInput)
     },
     closeView(input) {
-      return requestOverSocket('close-view', input satisfies WorkspacePaneStaticViewInput)
+      return requestOverSocket('workspace-pane:close-view', input satisfies WorkspacePaneStaticViewInput)
     },
     prewarm() {
       // T1.2: pay the WebSocket handshake cost when the user enters
@@ -321,7 +325,7 @@ export function createServerTerminalBridge(options: {
       })
     },
     reorderViews(input) {
-      return requestOverSocket('reorder-views', input satisfies WorkspacePaneReorderInput)
+      return requestOverSocket('workspace-pane:reorder-views', input satisfies WorkspacePaneReorderInput)
     },
     notifyBell(input) {
       // First check whether the wrapper has a native handler at all
@@ -390,6 +394,15 @@ export function createServerTerminalBridge(options: {
         closeSocketIfIdle()
       }
     },
+    onWorkspacePaneChanged(cb) {
+      workspacePaneChangedSubscribers.add(cb)
+      manualSocketClose = false
+      ensureSocket()
+      return () => {
+        workspacePaneChangedSubscribers.delete(cb)
+        closeSocketIfIdle()
+      }
+    },
     onSessionClosed(cb) {
       sessionClosedSubscribers.add(cb)
       manualSocketClose = false
@@ -426,12 +439,15 @@ export function createServerTerminalBridge(options: {
     input: { repoRoot: string },
   ): Promise<TerminalSessionSummary[]>
   async function requestOverSocket(
-    action: 'list-views',
+    action: 'workspace-pane:list-views',
     input: WorkspacePaneListViewsInput,
   ): Promise<WorkspacePaneStaticViewSummary[]>
-  async function requestOverSocket(action: 'open-view', input: WorkspacePaneStaticViewInput): Promise<TerminalMutationResult>
   async function requestOverSocket(
-    action: 'close-view',
+    action: 'workspace-pane:open-view',
+    input: WorkspacePaneStaticViewInput,
+  ): Promise<TerminalMutationResult>
+  async function requestOverSocket(
+    action: 'workspace-pane:close-view',
     input: WorkspacePaneStaticViewInput,
   ): Promise<TerminalMutationResult>
   async function requestOverSocket(
@@ -455,8 +471,8 @@ export function createServerTerminalBridge(options: {
     input: TerminalSocketRequestInputs['close'],
   ): Promise<TerminalMutationResult>
   async function requestOverSocket(
-    action: 'reorder-views',
-    input: TerminalSocketRequestInputs['reorder-views'],
+    action: 'workspace-pane:reorder-views',
+    input: TerminalSocketRequestInputs['workspace-pane:reorder-views'],
   ): Promise<TerminalMutationResult>
   async function requestOverSocket<TAction extends TerminalSocketRequestAction>(
     action: TAction,

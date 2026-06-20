@@ -63,15 +63,15 @@ function terminalHandlerNameForSocketAction(action: string): keyof TerminalBridg
       return 'terminal.prune'
     case 'list-sessions':
       return 'terminal.listSessions'
-    case 'list-views':
+    case 'workspace-pane:list-views':
       return 'terminal.listViews'
-    case 'open-view':
+    case 'workspace-pane:open-view':
       return 'terminal.openView'
-    case 'close-view':
+    case 'workspace-pane:close-view':
       return 'terminal.closeView'
     case 'session-snapshot':
       return 'terminal.getSessionSnapshot'
-    case 'reorder-views':
+    case 'workspace-pane:reorder-views':
       return 'terminal.reorderViews'
     default:
       return null
@@ -429,6 +429,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       onExit: () => () => {},
       onOwnership: () => () => {},
       onSessionsChanged: () => () => {},
+      onWorkspacePaneChanged: () => () => {},
       onSessionClosed: () => () => {},
     }),
   })

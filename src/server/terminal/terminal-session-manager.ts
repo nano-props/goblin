@@ -11,15 +11,11 @@ import {
   type TerminalSessionSummary,
   type TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
-import type {
-  WorkspacePaneStaticViewSummary,
-  WorkspacePaneStaticViewType,
-  WorkspacePaneViewOrderEntry,
-} from '#/shared/workspace-pane.ts'
 import { cloneTerminalController } from '#/shared/terminal-ownership.ts'
 import { isValidTerminalSessionId, normalizeTerminalSize } from '#/shared/terminal-validators.ts'
 import { parseTerminalSessionKey } from '#/shared/terminal-session-key.ts'
 import { serverLogger } from '#/server/logger.ts'
+import type { WorkspacePaneRuntime } from '#/server/workspace-pane/workspace-pane-runtime.ts'
 import {
   attachTerminalAttachment,
   claimTerminalAttachmentControl,
@@ -51,6 +47,11 @@ import type { PtyHandle, PtySupervisor } from '#/server/terminal/pty-supervisor.
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 const sessionManagerLogger = serverLogger.child({ module: 'terminal-session-manager' })
 
+type TerminalWorkspacePaneRuntime<TOwner extends string | number> = Pick<
+  WorkspacePaneRuntime<TOwner>,
+  'registerTerminalView' | 'unregisterTerminalView' | 'viewDisplayOrder'
+>
+
 export interface TerminalEnsureSessionInput<TOwner extends string | number> {
   ownerId: TOwner
   scope: string
@@ -71,6 +72,7 @@ interface TerminalSession<TOwner extends string | number> {
   ownerId: TOwner
   scope: string
   key: string
+  worktreePath: string
   cwd: string
   command?: string
   args?: string[]
@@ -85,20 +87,10 @@ interface TerminalSession<TOwner extends string | number> {
   allowImplicitAttachControl: boolean
   phase: TerminalSessionPhase
   message: string | null
-  /** Display order within the worktree workspace pane view strip. */
-  displayOrder: number
   /** Input queue ensures ordered PTY writes even with multiple concurrent callers. */
   inputQueue: string[]
   /** True when a microtask flush has already been scheduled for this session. */
   inputFlushScheduled: boolean
-}
-
-interface WorkspacePaneStaticViewState<TOwner extends string | number> {
-  ownerId: TOwner
-  scope: string
-  worktreePath: string
-  type: WorkspacePaneStaticViewType
-  displayOrder: number
 }
 
 export interface TerminalEventSink<TOwner extends string | number> {
@@ -111,16 +103,18 @@ export interface TerminalEventSink<TOwner extends string | number> {
 export class TerminalSessionManager<TOwner extends string | number> {
   private readonly sessionsById = new Map<string, TerminalSession<TOwner>>()
   private readonly sessionIdByOwnerKey = new Map<string, string>()
-  private readonly staticWorkspaceViewsByWorktree = new Map<
-    string,
-    Map<WorkspacePaneStaticViewType, WorkspacePaneStaticViewState<TOwner>>
-  >()
   private readonly sink: TerminalEventSink<TOwner>
   private readonly ptySupervisor: PtySupervisor
+  private readonly workspacePane: TerminalWorkspacePaneRuntime<TOwner>
 
-  constructor(ptySupervisor: PtySupervisor, sink: TerminalEventSink<TOwner>) {
+  constructor(
+    ptySupervisor: PtySupervisor,
+    sink: TerminalEventSink<TOwner>,
+    workspacePane: TerminalWorkspacePaneRuntime<TOwner>,
+  ) {
     this.ptySupervisor = ptySupervisor
     this.sink = sink
+    this.workspacePane = workspacePane
   }
 
   async ensureSession(input: TerminalEnsureSessionInput<TOwner>): Promise<TerminalAttachResult> {
@@ -135,18 +129,26 @@ export class TerminalSessionManager<TOwner extends string | number> {
     const existingId = this.sessionIdByOwnerKey.get(ownerKey)
     const existing = existingId ? this.sessionsById.get(existingId) : undefined
     if (existing) {
+      this.workspacePane.registerTerminalView({
+        ownerId,
+        scope: existing.scope,
+        worktreePath: existing.worktreePath,
+        id: existing.key,
+      })
       if (input.attachmentId) {
         registerTerminalAttachment(existing, input.attachmentId, size.cols, size.rows, input.attachmentConnected)
       }
       return this.attachResult(existing)
     }
 
+    const worktreePath = parseWorktreePathFromKey(input.key) ?? input.key
     const id = createSessionId()
     const session: TerminalSession<TOwner> = {
       id,
       ownerId,
       scope: input.scope,
       key: input.key,
+      worktreePath,
       cwd,
       command: input.command,
       args: input.args,
@@ -161,12 +163,17 @@ export class TerminalSessionManager<TOwner extends string | number> {
       allowImplicitAttachControl: true,
       phase: 'opening',
       message: null,
-      displayOrder: this.nextDisplayOrder(ownerId, input.scope, parseWorktreePathFromKey(input.key) ?? input.key),
       inputQueue: [],
       inputFlushScheduled: false,
     }
     this.sessionsById.set(id, session)
     this.sessionIdByOwnerKey.set(ownerKey, id)
+    this.workspacePane.registerTerminalView({
+      ownerId,
+      scope: input.scope,
+      worktreePath,
+      id: input.key,
+    })
     if (input.attachmentId) {
       registerTerminalAttachment(session, input.attachmentId, size.cols, size.rows, input.attachmentConnected ?? true)
       session.controller = session.attachments.get(input.attachmentId)?.connected
@@ -331,16 +338,18 @@ export class TerminalSessionManager<TOwner extends string | number> {
     this.sessionsById.delete(sessionId)
     const ownerKey = this.sessionOwnerKey(session.ownerId, session.key)
     if (this.sessionIdByOwnerKey.get(ownerKey) === sessionId) this.sessionIdByOwnerKey.delete(ownerKey)
+    this.workspacePane.unregisterTerminalView({
+      ownerId: session.ownerId,
+      scope: session.scope,
+      worktreePath: session.worktreePath,
+      id: session.key,
+    })
     this.disposeSessionResources(session)
   }
 
   closeSessionsForOwner(ownerId: TOwner): void {
     for (const session of Array.from(this.sessionsById.values())) {
       if (session.ownerId === ownerId) this.closeSession(session.id)
-    }
-    for (const [key, views] of Array.from(this.staticWorkspaceViewsByWorktree.entries())) {
-      const ownerMatches = Array.from(views.values()).some((view) => view.ownerId === ownerId)
-      if (ownerMatches) this.staticWorkspaceViewsByWorktree.delete(key)
     }
   }
 
@@ -389,147 +398,12 @@ export class TerminalSessionManager<TOwner extends string | number> {
           message: session.message,
           cols: session.cols,
           rows: session.rows,
-          displayOrder: session.displayOrder,
+          displayOrder: this.terminalViewDisplayOrder(session),
         })
       }
     }
     sessions.sort((a, b) => a.displayOrder - b.displayOrder)
     return sessions
-  }
-
-  listStaticViews(ownerId: TOwner, scope: string): WorkspacePaneStaticViewSummary[] {
-    const summaries: WorkspacePaneStaticViewSummary[] = []
-    for (const views of this.staticWorkspaceViewsByWorktree.values()) {
-      for (const view of views.values()) {
-        if (view.ownerId !== ownerId || view.scope !== scope) continue
-        summaries.push({
-          type: view.type,
-          id: view.type,
-          worktreePath: view.worktreePath,
-          displayOrder: view.displayOrder,
-        })
-      }
-    }
-    summaries.sort(
-      (a, b) =>
-        a.worktreePath.localeCompare(b.worktreePath) || a.displayOrder - b.displayOrder || a.type.localeCompare(b.type),
-    )
-    return summaries
-  }
-
-  openStaticView(ownerId: TOwner, scope: string, worktreePath: string, type: WorkspacePaneStaticViewType): boolean {
-    const staticKey = this.staticWorkspaceViewWorktreeKey(ownerId, scope, worktreePath)
-    const views = this.staticWorkspaceViewsByWorktree.get(staticKey) ?? new Map()
-    if (views.has(type)) return true
-    views.set(type, {
-      ownerId,
-      scope,
-      worktreePath,
-      type,
-      displayOrder: this.nextDisplayOrder(ownerId, scope, worktreePath),
-    })
-    this.staticWorkspaceViewsByWorktree.set(staticKey, views)
-    return true
-  }
-
-  closeStaticView(ownerId: TOwner, scope: string, worktreePath: string, type: WorkspacePaneStaticViewType): boolean {
-    const staticKey = this.staticWorkspaceViewWorktreeKey(ownerId, scope, worktreePath)
-    const views = this.staticWorkspaceViewsByWorktree.get(staticKey)
-    if (!views) return true
-    views.delete(type)
-    if (views.size === 0) this.staticWorkspaceViewsByWorktree.delete(staticKey)
-    return true
-  }
-
-  pruneStaticViewsForOwner(ownerId: TOwner, scope: string, liveWorktreePaths: ReadonlySet<string>): number {
-    let pruned = 0
-    for (const [key, views] of Array.from(this.staticWorkspaceViewsByWorktree.entries())) {
-      for (const [type, view] of Array.from(views.entries())) {
-        if (view.ownerId !== ownerId || view.scope !== scope) continue
-        if (liveWorktreePaths.has(path.resolve(view.worktreePath))) continue
-        views.delete(type)
-        pruned += 1
-      }
-      if (views.size === 0) this.staticWorkspaceViewsByWorktree.delete(key)
-    }
-    return pruned
-  }
-
-  reorderViews(ownerId: TOwner, scope: string, worktreePath: string, orderedViews: WorkspacePaneViewOrderEntry[]): boolean {
-    const worktreePrefix = `${scope}\0${worktreePath}\0`
-    const sessionsInWorktree = Array.from(this.sessionsById.values()).filter(
-      (s) => s.ownerId === ownerId && s.scope === scope && s.key.startsWith(worktreePrefix),
-    )
-    const keySet = new Set(sessionsInWorktree.map((s) => s.key))
-    const staticKey = this.staticWorkspaceViewWorktreeKey(ownerId, scope, worktreePath)
-    const currentStaticViews = this.staticWorkspaceViewsByWorktree.get(staticKey) ?? new Map()
-    const seen = new Set<string>()
-    const terminalEntries: string[] = []
-    const staticEntries: Array<{ type: WorkspacePaneStaticViewType; displayOrder: number }> = []
-    for (let i = 0; i < orderedViews.length; i++) {
-      const view = orderedViews[i]
-      const identity = `${view.type}\0${view.id}`
-      if (seen.has(identity)) return false
-      seen.add(identity)
-      if (view.type === 'terminal') {
-        if (!keySet.has(view.id)) return false
-        terminalEntries.push(view.id)
-        continue
-      }
-      if (view.id !== view.type) return false
-      if (!currentStaticViews.has(view.type)) return false
-      staticEntries.push({ type: view.type, displayOrder: i })
-    }
-    if (terminalEntries.length !== sessionsInWorktree.length) return false
-    if (new Set(terminalEntries).size !== terminalEntries.length) return false
-    if (staticEntries.length !== currentStaticViews.size) return false
-    const sessionByKey = new Map<string, TerminalSession<TOwner>>()
-    for (const s of sessionsInWorktree) sessionByKey.set(s.key, s)
-    for (let i = 0; i < orderedViews.length; i++) {
-      const view = orderedViews[i]
-      if (view.type !== 'terminal') continue
-      const session = sessionByKey.get(view.id)
-      if (session) session.displayOrder = i
-    }
-    if (staticEntries.length === 0) {
-      this.staticWorkspaceViewsByWorktree.delete(staticKey)
-    } else {
-      const nextStaticViews = new Map<WorkspacePaneStaticViewType, WorkspacePaneStaticViewState<TOwner>>()
-      for (const entry of staticEntries) {
-        nextStaticViews.set(entry.type, {
-          ownerId,
-          scope,
-          worktreePath,
-          type: entry.type,
-          displayOrder: entry.displayOrder,
-        })
-      }
-      this.staticWorkspaceViewsByWorktree.set(staticKey, nextStaticViews)
-    }
-    return true
-  }
-
-  private nextDisplayOrder(ownerId: TOwner, scope: string, worktreePath: string): number {
-    const worktreePrefix = `${scope}\0${worktreePath}\0`
-    let max = -1
-    for (const session of this.sessionsById.values()) {
-      if (session.ownerId === ownerId && session.scope === scope && session.key.startsWith(worktreePrefix)) {
-        if (session.displayOrder > max) max = session.displayOrder
-      }
-    }
-    const staticWorkspacePaneViews = this.staticWorkspaceViewsByWorktree.get(
-      this.staticWorkspaceViewWorktreeKey(ownerId, scope, worktreePath),
-    )
-    if (staticWorkspacePaneViews) {
-      for (const view of staticWorkspacePaneViews.values()) {
-        if (view.displayOrder > max) max = view.displayOrder
-      }
-    }
-    return max + 1
-  }
-
-  private staticWorkspaceViewWorktreeKey(ownerId: TOwner, scope: string, worktreePath: string): string {
-    return `${String(ownerId)}\0${scope}\0${worktreePath}`
   }
 
   // Look up a session by id and verify it belongs to the given
@@ -565,6 +439,18 @@ export class TerminalSessionManager<TOwner extends string | number> {
   private closeOwnerKey(ownerId: TOwner, key: string): void {
     const id = this.sessionIdByOwnerKey.get(this.sessionOwnerKey(ownerId, key))
     if (id) this.closeSession(id)
+  }
+
+  private terminalViewDisplayOrder(session: TerminalSession<TOwner>): number {
+    return (
+      this.workspacePane.viewDisplayOrder({
+        ownerId: session.ownerId,
+        scope: session.scope,
+        worktreePath: session.worktreePath,
+        type: 'terminal',
+        id: session.key,
+      }) ?? Number.MAX_SAFE_INTEGER
+    )
   }
 
   // Sends SIGWINCH to the child PTY. The shell responds by re-painting

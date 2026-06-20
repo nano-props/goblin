@@ -218,6 +218,7 @@ describe('renderer bootstrap', () => {
         onExit: () => () => {},
         onOwnership: () => () => {},
         onSessionsChanged: () => () => {},
+        onWorkspacePaneChanged: () => () => {},
         onSessionClosed: () => () => {},
       }),
     })

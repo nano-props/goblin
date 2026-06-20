@@ -39,11 +39,13 @@ function makeActions(
     resizeSession: vi.fn(() => false),
     takeoverSession: vi.fn(),
     getSessionSnapshot: vi.fn(() => null),
+  } as any
+  const workspacePane = {
     listStaticViews: vi.fn(() => []),
     openStaticView: vi.fn(options.openStaticView ?? (() => true)),
     closeStaticView: vi.fn(options.closeStaticView ?? (() => true)),
     reorderViews: vi.fn(() => false),
-  } as any
+  }
   const broker = { broadcastToOwner: broadcasts as unknown as (ownerId: string, message: unknown) => void }
   const catalog = {
     create: vi.fn(),
@@ -55,6 +57,7 @@ function makeActions(
   return {
     actions: createTerminalRuntimeActions({
       manager,
+      workspacePane,
       broker,
       catalog,
       isValidTerminalClientId,
@@ -62,11 +65,12 @@ function makeActions(
     }),
     broadcasts,
     manager,
+    workspacePane,
   }
 }
 
 describe('terminal-runtime-actions close broadcast', () => {
-  test('emits BOTH sessions-changed and session-closed on a successful close', async () => {
+  test('emits repo, workspace pane, and targeted close broadcasts on a successful close', async () => {
     // The new sibling-window broadcast rides alongside the existing
     // `sessions-changed` list-rescan. The session-closed event is the
     // targeted counterpart; sibling windows drop the local entry
@@ -81,12 +85,16 @@ describe('terminal-runtime-actions close broadcast', () => {
 
     expect(closed).toBe(true)
     expect(close).toHaveBeenCalledWith(OWNER_ID, SESSION_ID)
-    expect(broadcasts).toHaveBeenCalledTimes(2)
+    expect(broadcasts).toHaveBeenCalledTimes(3)
     expect(broadcasts).toHaveBeenNthCalledWith(1, OWNER_ID, {
       type: 'sessions-changed',
       repoRoot: '/repo',
     })
     expect(broadcasts).toHaveBeenNthCalledWith(2, OWNER_ID, {
+      type: 'workspace-pane-changed',
+      repoRoot: '/repo',
+    })
+    expect(broadcasts).toHaveBeenNthCalledWith(3, OWNER_ID, {
       type: 'session-closed',
       sessionId: SESSION_ID,
       repoRoot: '/repo',
@@ -156,8 +164,8 @@ describe('terminal-runtime-actions close broadcast', () => {
 })
 
 describe('terminal-runtime-actions static workspace pane views', () => {
-  test('opens a static workspace pane view through the manager and broadcasts sessions-changed', () => {
-    const { actions, broadcasts, manager } = makeActions({ closeSessionForOwner: () => false })
+  test('opens a static workspace pane view through the workspace pane runtime and broadcasts pane changes', () => {
+    const { actions, broadcasts, workspacePane } = makeActions({ closeSessionForOwner: () => false })
 
     const opened = actions.openView(CLIENT_ID, OWNER_ID, {
       repoRoot: '/repo',
@@ -166,12 +174,13 @@ describe('terminal-runtime-actions static workspace pane views', () => {
     })
 
     expect(opened).toBe(true)
-    expect(manager.openStaticView).toHaveBeenCalledWith(OWNER_ID, '/repo', '/repo-linked', 'status')
+    expect(workspacePane.openStaticView).toHaveBeenCalledWith(OWNER_ID, '/repo', '/repo-linked', 'status')
     expect(broadcasts).toHaveBeenCalledWith(OWNER_ID, { type: 'sessions-changed', repoRoot: '/repo' })
+    expect(broadcasts).toHaveBeenCalledWith(OWNER_ID, { type: 'workspace-pane-changed', repoRoot: '/repo' })
   })
 
-  test('closes a static workspace pane view through the manager and broadcasts sessions-changed', () => {
-    const { actions, broadcasts, manager } = makeActions({ closeSessionForOwner: () => false })
+  test('closes a static workspace pane view through the workspace pane runtime and broadcasts pane changes', () => {
+    const { actions, broadcasts, workspacePane } = makeActions({ closeSessionForOwner: () => false })
 
     const closed = actions.closeView(CLIENT_ID, OWNER_ID, {
       repoRoot: '/repo',
@@ -180,12 +189,13 @@ describe('terminal-runtime-actions static workspace pane views', () => {
     })
 
     expect(closed).toBe(true)
-    expect(manager.closeStaticView).toHaveBeenCalledWith(OWNER_ID, '/repo', '/repo-linked', 'changes')
+    expect(workspacePane.closeStaticView).toHaveBeenCalledWith(OWNER_ID, '/repo', '/repo-linked', 'changes')
     expect(broadcasts).toHaveBeenCalledWith(OWNER_ID, { type: 'sessions-changed', repoRoot: '/repo' })
+    expect(broadcasts).toHaveBeenCalledWith(OWNER_ID, { type: 'workspace-pane-changed', repoRoot: '/repo' })
   })
 
   test('rejects malformed static workspace pane view input before touching the manager', () => {
-    const { actions, broadcasts, manager } = makeActions({ closeSessionForOwner: () => false })
+    const { actions, broadcasts, workspacePane } = makeActions({ closeSessionForOwner: () => false })
 
     const opened = actions.openView(CLIENT_ID, OWNER_ID, {
       repoRoot: '/repo',
@@ -194,7 +204,7 @@ describe('terminal-runtime-actions static workspace pane views', () => {
     } as never)
 
     expect(opened).toBe(false)
-    expect(manager.openStaticView).not.toHaveBeenCalled()
+    expect(workspacePane.openStaticView).not.toHaveBeenCalled()
     expect(broadcasts).not.toHaveBeenCalled()
   })
 })

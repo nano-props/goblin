@@ -32,6 +32,7 @@ export type TerminalRealtimeMessage =
   | { type: 'exit'; event: TerminalExitEvent }
   | { type: 'ownership'; event: TerminalOwnershipEvent }
   | { type: 'sessions-changed'; repoRoot: string }
+  | { type: 'workspace-pane-changed'; repoRoot: string }
   // Targeted per-session close. Emitted by the server after a
   // successful `close` request, alongside the existing
   // `sessions-changed` global broadcast. Multi-window clients use
@@ -49,13 +50,13 @@ export interface TerminalSocketRequestInputs {
   takeover: TerminalTakeoverInput
   close: TerminalSessionInput
   'list-sessions': TerminalListSessionsInput
-  'list-views': WorkspacePaneListViewsInput
-  'open-view': WorkspacePaneStaticViewInput
-  'close-view': WorkspacePaneStaticViewInput
+  'workspace-pane:list-views': WorkspacePaneListViewsInput
+  'workspace-pane:open-view': WorkspacePaneStaticViewInput
+  'workspace-pane:close-view': WorkspacePaneStaticViewInput
   create: TerminalCreateInput
   prune: { repoRoot: string }
   'session-snapshot': TerminalSessionSnapshotInput
-  'reorder-views': WorkspacePaneReorderInput
+  'workspace-pane:reorder-views': WorkspacePaneReorderInput
 }
 
 export interface TerminalSocketResponseOutputs {
@@ -66,13 +67,13 @@ export interface TerminalSocketResponseOutputs {
   takeover: TerminalTakeoverResult
   close: TerminalMutationResult
   'list-sessions': TerminalSessionSummary[]
-  'list-views': WorkspacePaneStaticViewSummary[]
-  'open-view': TerminalMutationResult
-  'close-view': TerminalMutationResult
+  'workspace-pane:list-views': WorkspacePaneStaticViewSummary[]
+  'workspace-pane:open-view': TerminalMutationResult
+  'workspace-pane:close-view': TerminalMutationResult
   create: TerminalCatalogMutationResult
   prune: { pruned: number; remaining: number }
   'session-snapshot': TerminalSessionSnapshot | null
-  'reorder-views': TerminalMutationResult
+  'workspace-pane:reorder-views': TerminalMutationResult
 }
 
 export type TerminalSocketRequestAction = keyof TerminalSocketRequestInputs

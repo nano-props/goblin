@@ -370,7 +370,7 @@ describe('TerminalSessionRegistry create flow', () => {
     expect(registry.worktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
   })
 
-  test('opens a static workspace pane view through the open-view bridge action', async () => {
+  test('opens a static workspace pane view through the workspace pane bridge action', async () => {
     registry.reconcileServerSessions(REPO_ROOT, makeCreateResult().sessions as any, 'attachment_local', new Map())
 
     await expect(registry.openWorkspacePaneView(WORKTREE_KEY, 'status')).resolves.toBe(true)
@@ -395,7 +395,7 @@ describe('TerminalSessionRegistry create flow', () => {
     expect(registry.worktreeSnapshot(WORKTREE_KEY).staticWorkspacePaneViews).toEqual([])
   })
 
-  test('closes a static workspace pane view through the close-view bridge action', async () => {
+  test('closes a static workspace pane view through the workspace pane bridge action', async () => {
     await registry.openWorkspacePaneView(WORKTREE_KEY, 'status')
 
     await expect(registry.closeWorkspacePaneView(WORKTREE_KEY, 'status')).resolves.toBe(true)
