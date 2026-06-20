@@ -224,36 +224,38 @@ describe('remote fetch timestamps', () => {
   })
 
   test('branch write actions run through branch operation state and refresh after completion', async () => {
-    const token = seedRepo([branch('feature/a')])
-    let resolveCheckout!: (value: { ok: true; message: string }) => void
+    const token = seedRepo([branch('main'), branch('feature/a')])
+    let resolveDelete!: (value: { ok: true; message: string }) => void
     let snapshotCount = 0
-    ipcHandlers['repo.checkout'] = () =>
+    ipcHandlers['repo.deleteBranch'] = () =>
       new Promise<{ ok: true; message: string }>((resolve) => {
-        resolveCheckout = resolve
+        resolveDelete = resolve
       })
     ipcHandlers['repo.snapshot'] = async () => {
       snapshotCount += 1
-      return { branches: [branch('feature/a')], current: 'feature/a' }
+      return { branches: [branch('main')], current: 'main' }
     }
     // Post-write branch action refresh goes through composite in
     // `runCoreDataRefreshWorkflow` now.
     ipcHandlers['repo.composite'] = async () => {
       snapshotCount += 1
-      return { snapshot: { branches: [branch('feature/a')], current: 'feature/a' }, status: [], pullRequests: null }
+      return { snapshot: { branches: [branch('main')], current: 'main' }, status: [], pullRequests: null }
     }
 
-    const work = useReposStore.getState().runBranchAction(REPO_ID, { kind: 'checkout', branch: 'feature/a' }, { token })
+    const work = useReposStore
+      .getState()
+      .runBranchAction(REPO_ID, { kind: 'deleteBranch', branch: 'feature/a' }, { token })
 
     const runningRepo = useReposStore.getState().repos[REPO_ID]
     expect(runningRepo?.operations.branchAction.phase).toBe('running')
     expect(canStartRemoteFetch(runningRepo)).toBe(false)
 
-    resolveCheckout({ ok: true, message: 'ok' })
+    resolveDelete({ ok: true, message: 'ok' })
     await work
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.operations.branchAction.phase).toBe('idle')
-    expect(repo?.data.currentBranch).toBe('feature/a')
+    expect(repo?.data.branches.map((b) => b.name)).toEqual(['main'])
     expect(snapshotCount).toBe(1)
   })
 
@@ -345,7 +347,7 @@ describe('remote fetch timestamps', () => {
   test('branch action failures refresh by default', async () => {
     const token = seedRepo([branch('feature/a')])
     let snapshotCount = 0
-    ipcHandlers['repo.checkout'] = async () => ({ ok: false, message: 'error.checkout-failed' })
+    ipcHandlers['repo.deleteBranch'] = async () => ({ ok: false, message: 'error.delete-branch-failed' })
     ipcHandlers['repo.snapshot'] = async () => {
       snapshotCount += 1
       return { branches: [branch('feature/a')], current: 'feature/a' }
@@ -357,13 +359,13 @@ describe('remote fetch timestamps', () => {
 
     const result = await useReposStore
       .getState()
-      .runBranchAction(REPO_ID, { kind: 'checkout', branch: 'feature/a' }, { token })
+      .runBranchAction(REPO_ID, { kind: 'deleteBranch', branch: 'feature/a' }, { token })
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(result).toEqual({ ok: false, message: 'error.checkout-failed' })
+    expect(result).toEqual({ ok: false, message: 'error.delete-branch-failed' })
     expect(repo?.events.at(-1)).toMatchObject({
       kind: 'result',
-      result: { ok: false, message: 'error.checkout-failed' },
+      result: { ok: false, message: 'error.delete-branch-failed' },
     })
     expect(snapshotCount).toBe(1)
   })

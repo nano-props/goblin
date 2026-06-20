@@ -5,7 +5,6 @@ export type BranchActionItemId =
   | 'status'
   | 'changes'
   | 'copyPatch'
-  | 'checkout'
   | 'pull'
   | 'push'
   | 'remote'
@@ -31,8 +30,6 @@ export function isBranchActionBlocked(repo: Pick<BranchActionRepo, 'operations'>
 
 export function branchActionItemIdFromKind(kind: RepoBranchActionKind): BranchActionItemId | null {
   switch (kind) {
-    case 'checkout':
-      return 'checkout'
     case 'pull':
       return 'pull'
     case 'push':

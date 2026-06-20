@@ -141,16 +141,6 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
       onSelect: () => openStaticWorkspacePaneView('changes'),
     },
     {
-      id: 'checkout',
-      label: branchActionLabel('checkout', 'action.checkout', 'action.checkout-loading', 'action.checkout-queued'),
-      disabled,
-      busy: busy('checkout'),
-      visible: !capabilities.isCurrent && !capabilities.checkedOutInAnotherWorktree,
-      shortcut: '↩',
-      icon: createElement(GitBranch),
-      onSelect: actions.checkout,
-    },
-    {
       id: 'pull',
       label: branchActionLabel('pull', 'action.pull', 'action.pull-loading', 'action.pull-queued'),
       disabled,

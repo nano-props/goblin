@@ -56,15 +56,6 @@ export async function fetchRepository(
   return await postServerJson('/api/repo/fetch', kind ? { cwd, kind, sourceToken } : { cwd, sourceToken }, { signal })
 }
 
-export async function checkoutRepositoryBranch(
-  cwd: string,
-  branch: string,
-  signal?: AbortSignal,
-  sourceToken?: string,
-): Promise<ExecResult> {
-  return await postServerJson('/api/repo/checkout', { cwd, branch, sourceToken }, { signal })
-}
-
 export async function pullRepositoryBranch(
   cwd: string,
   branch: string,

@@ -155,8 +155,29 @@ describe('branch action capabilities', () => {
 
     expect(branch.worktree).toEqual({ path: REPO_ID })
     expect(getBranchActionCapabilities(repo, branch)).toMatchObject({
-      checkedOutInAnotherWorktree: true,
       canRemoveWorktree: false,
+    })
+  })
+
+  test('allows removing the current branch when it belongs to a linked worktree', () => {
+    const worktreePath = '/tmp/gbl-current-linked-worktree'
+    const branch = createRepoBranch('feature/current-linked', { worktree: { path: worktreePath } })
+    const repo = seedRepoState({
+      id: worktreePath,
+      branches: [branch],
+      currentBranch: 'feature/current-linked',
+      worktreesByPath: {
+        [worktreePath]: {
+          path: worktreePath,
+          branch: 'feature/current-linked',
+          isMain: false,
+        },
+      },
+    })
+
+    expect(getBranchActionCapabilities(repo, branch)).toMatchObject({
+      canRemoveWorktree: true,
+      isRegularBranch: false,
     })
   })
 
@@ -268,19 +289,22 @@ describe('branch action capabilities', () => {
 
 describe('runBranchAction', () => {
   test('blocks local branch actions while remote fetch resource is busy', async () => {
-    let checkoutCalls = 0
+    let deleteCalls = 0
     installGoblinTestBridge({
-      'repo.checkout': async () => {
-        checkoutCalls += 1
+      'repo.deleteBranch': async () => {
+        deleteCalls += 1
         return { ok: true, message: 'ok' }
       },
     })
     markRepoOperationTargets(REPO_ID, nextRepoOperationId(REPO_ID), [{ key: 'fetch', reason: 'fetch' }], 'running')
 
-    const result = await useReposStore.getState().runBranchAction(REPO_ID, { kind: 'checkout', branch: 'feature/a' })
+    const result = await useReposStore.getState().runBranchAction(REPO_ID, {
+      kind: 'deleteBranch',
+      branch: 'feature/a',
+    })
 
     expect(result).toEqual({ ok: false, message: 'error.network-op-in-progress' })
-    expect(checkoutCalls).toBe(0)
+    expect(deleteCalls).toBe(0)
   })
 
   test('blocks branch actions while a foreground fetch is running', async () => {
@@ -347,15 +371,15 @@ describe('runBranchAction', () => {
   })
 
   test('does not run a queued local branch action after the repo is reopened', async () => {
-    let checkoutCalls = 0
+    let deleteCalls = 0
     let resolveStatus!: (value: never[]) => void
     installGoblinTestBridge({
       'repo.status': () =>
         new Promise((resolve) => {
           resolveStatus = () => resolve([])
         }),
-      'repo.checkout': async () => {
-        checkoutCalls += 1
+      'repo.deleteBranch': async () => {
+        deleteCalls += 1
         return { ok: true, message: 'ok' }
       },
       'repo.snapshot': async () => ({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
@@ -364,15 +388,15 @@ describe('runBranchAction', () => {
 
     const statusWork = useReposStore.getState().refreshStatus(REPO_ID)
     await flushAsyncWork()
-    const checkoutWork = useReposStore.getState().runBranchAction(REPO_ID, {
-      kind: 'checkout',
+    const deleteWork = useReposStore.getState().runBranchAction(REPO_ID, {
+      kind: 'deleteBranch',
       branch: 'feature/a',
     })
     await flushAsyncWork()
 
     expect(useReposStore.getState().repos[REPO_ID]?.operations.branchAction).toMatchObject({
       phase: 'queued',
-      reason: 'branch:checkout',
+      reason: 'branch:deleteBranch',
       target: 'feature/a',
     })
 
@@ -384,10 +408,10 @@ describe('runBranchAction', () => {
     })
 
     resolveStatus([])
-    await Promise.all([statusWork, checkoutWork])
+    await Promise.all([statusWork, deleteWork])
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(checkoutCalls).toBe(0)
+    expect(deleteCalls).toBe(0)
     expect(repo?.instanceToken).toBe(2)
     expect(repo?.operations.branchAction).toMatchObject({
       phase: 'idle',
@@ -397,11 +421,11 @@ describe('runBranchAction', () => {
   })
 
   test('times out queued branch actions that wait too long for core refreshes', async () => {
-    let checkoutCalls = 0
+    let deleteCalls = 0
     installGoblinTestBridge({
       'repo.status': () => new Promise(() => {}),
-      'repo.checkout': async () => {
-        checkoutCalls += 1
+      'repo.deleteBranch': async () => {
+        deleteCalls += 1
         return { ok: true, message: 'ok' }
       },
       'repo.snapshot': async () => ({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
@@ -413,19 +437,19 @@ describe('runBranchAction', () => {
     const result = await useReposStore.getState().runBranchAction(
       REPO_ID,
       {
-        kind: 'checkout',
+        kind: 'deleteBranch',
         branch: 'feature/a',
       },
       { waitTimeoutMs: 1 },
     )
 
     expect(result).toEqual({ ok: false, message: 'error.branch-action-wait-timeout' })
-    expect(checkoutCalls).toBe(0)
+    expect(deleteCalls).toBe(0)
     expect(useReposStore.getState().repos[REPO_ID]?.events.at(-1)).toMatchObject({
       kind: 'result',
       result: { ok: false, message: 'error.branch-action-wait-timeout' },
       action: {
-        kind: 'checkout',
+        kind: 'deleteBranch',
         branch: 'feature/a',
       },
     })
@@ -527,7 +551,6 @@ describe('runBranchAction', () => {
   })
 
   test.each([
-    ['checkout', { kind: 'checkout', branch: 'feature/a' }, 'repo.checkout'],
     [
       'createWorktree',
       {

@@ -19,8 +19,6 @@ vi.mock('#/web/stores/i18n.ts', () => ({
         return '默认'
       case 'branches.gone':
         return '已失联'
-      case 'branch-status.current':
-        return '当前'
       case 'branch-status.worktree-dirty':
         return `${params?.n ?? 0} 个改动`
       case 'branch-status.sync.ahead':

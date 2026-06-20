@@ -3,7 +3,7 @@ import type { DictKey } from '#/shared/i18n/dictionaries.ts'
 
 export type BranchActionShortcutAction = 'pull' | 'push' | 'terminal' | 'editor' | 'remote'
 export type RendererNavigationShortcutAction = 'next-branch' | 'prev-branch' | 'next-workspace-pane-view' | 'prev-workspace-pane-view'
-export type RendererAppShortcutAction = 'checkout-selected' | 'show-help' | 'dismiss'
+export type RendererAppShortcutAction = 'show-help' | 'dismiss'
 export type RendererKeyboardShortcutAction =
   | BranchActionShortcutAction
   | RendererNavigationShortcutAction
@@ -87,7 +87,6 @@ export const BRANCH_ACTION_SHORTCUTS: BranchActionShortcutDefinition[] = [
 ]
 
 export const RENDERER_APP_SHORTCUTS: RendererKeyboardShortcutDefinition<RendererAppShortcutAction>[] = [
-  keyboardShortcut([{ key: 'Enter' }], 'checkout-selected', [['Enter']], 'help.row.checkout'),
   keyboardShortcut([{ key: '?' }], 'show-help', [['?']], 'help.row.this-help'),
   keyboardShortcut([{ key: 'Escape' }], 'dismiss', [['Esc']], 'help.row.dismiss'),
 ]

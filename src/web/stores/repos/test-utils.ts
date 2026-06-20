@@ -499,7 +499,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         if (url.pathname === '/api/repo/fetch') return call('repo.fetch', body)
         if (url.pathname === '/api/repo/clone') return call('repo.clone', body)
         if (url.pathname === '/api/repo/abort-clone') return call('repo.abortClone', body)
-        if (url.pathname === '/api/repo/checkout') return call('repo.checkout', body)
         if (url.pathname === '/api/repo/pull') return call('repo.pull', body)
         if (url.pathname === '/api/repo/push') return call('repo.push', body)
         if (url.pathname === '/api/repo/create-worktree') return call('repo.createWorktree', body)

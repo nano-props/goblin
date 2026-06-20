@@ -1,7 +1,6 @@
 import path from 'node:path'
 import { checkGitAvailable } from '#/system/git/helper.ts'
 import {
-  checkoutBranch,
   deleteBranch,
   deleteUpstreamBranch,
   getBranches,
@@ -30,6 +29,7 @@ import {
   type ExecResult,
   type PullRequestFetchMode,
   type PullRequestInfo,
+  type WorktreeInfo,
   type WorktreeStatus,
 } from '#/shared/git-types.ts'
 import { resolveKnownWorktree, resolveRemovableWorktree } from '#/shared/worktree-guards.ts'
@@ -40,7 +40,6 @@ import { resolveRemoteTarget as resolveSshRemoteTarget } from '#/system/ssh/conf
 import { testRemoteRepository } from '#/system/ssh/diagnostics.ts'
 import { SSH_BOOT_PROBE_TIMEOUT_MS } from '#/system/ssh/commands.ts'
 import {
-  checkoutRemoteBranch,
   createRemoteWorktree,
   deleteRemoteBranch,
   fetchRemoteRepository,
@@ -63,8 +62,17 @@ import {
   type RemoteRepoTarget,
   type RepoSnapshot,
 } from '#/shared/api-types.ts'
+import { normalizeRemoteRepoRef } from '#/shared/remote-repo.ts'
 
 type ProbeAvailability = { ok: true } | { ok: false; message: string }
+
+export interface RepoMutationResult extends ExecResult {
+  /**
+   * Repo session ids whose repo snapshot changed even when the final
+   * command result is a partial failure after an earlier write succeeded.
+   */
+  affectedRepoIds?: readonly string[]
+}
 
 export interface RepoBackend {
   id: string
@@ -78,7 +86,6 @@ export interface RepoBackend {
   ): Promise<PullRequestEntry[] | null>
   getRemoteBranches(signal?: AbortSignal): Promise<string[]>
   fetch(signal: AbortSignal): Promise<{ ok: boolean; message: string }>
-  checkout(branch: string, signal?: AbortSignal): Promise<ExecResult>
   pull(branch: string, worktreePath?: string, signal?: AbortSignal): Promise<ExecResult>
   push(branch: string, signal?: AbortSignal): Promise<ExecResult>
   createWorktree(input: CreateWorktreeInput, signal?: AbortSignal): Promise<ExecResult>
@@ -96,7 +103,7 @@ export interface RepoBackend {
       alsoDeleteUpstream?: boolean
     },
     signal?: AbortSignal,
-  ): Promise<ExecResult>
+  ): Promise<RepoMutationResult>
   getPatch(worktreePath: string, signal?: AbortSignal): Promise<ExecResult>
   getBrowserRemoteUrl(branch?: string, signal?: AbortSignal): Promise<string | null>
 }
@@ -120,6 +127,23 @@ export async function runWithRepoBackend<T>(
 
 export async function resolveRepoBackend(repoId: string): Promise<RepoBackend> {
   return isRemoteRepoId(repoId) ? await createRemoteRepoBackend(repoId) : createLocalRepoBackend(repoId)
+}
+
+function withAffectedRepoIds(result: ExecResult, affectedRepoIds: readonly string[]): RepoMutationResult {
+  const unique = Array.from(new Set(affectedRepoIds.filter((repoId) => repoId.length > 0)))
+  return unique.length > 0 ? { ...result, affectedRepoIds: unique } : result
+}
+
+function localWorktreeRepoIds(worktrees: WorktreeInfo[]): string[] {
+  return worktrees.filter((worktree) => !worktree.isBare).map((worktree) => worktree.path)
+}
+
+function remoteWorktreeRepoIds(target: RemoteRepoTarget, worktreePaths: readonly string[] | undefined): string[] {
+  if (!worktreePaths) return []
+  return worktreePaths.flatMap((remotePath) => {
+    const ref = normalizeRemoteRepoRef({ alias: target.alias, remotePath })
+    return ref ? [ref.id] : []
+  })
 }
 
 async function probeReadableDirectory(cwd: string): Promise<ProbeAvailability> {
@@ -161,17 +185,18 @@ function createLocalRepoBackend(repoId: string): RepoBackend {
     },
     signal?: AbortSignal,
     ignoredWorktreePath?: string,
+    gitCwd = repoId,
   ): Promise<ExecResult | null> {
-    const current = await getCurrentBranch(repoId, { signal })
-    const worktrees = await getWorktrees(repoId, { includeStatus: false, signal })
+    const current = await getCurrentBranch(gitCwd, { signal })
+    const worktrees = await getWorktrees(gitCwd, { includeStatus: false, signal })
     const ignoredPath = ignoredWorktreePath ? path.resolve(ignoredWorktreePath) : null
     const isCheckedOutElsewhere = worktrees.some((wt) => {
       if (wt.branch !== branch) return false
       return ignoredPath ? path.resolve(wt.path) !== ignoredPath : true
     })
-    const mergedToCurrent = !options?.force && current ? await isAncestor(repoId, branch, current, signal) : false
-    const upstream = !options?.force ? await getUpstream(repoId, branch, signal) : null
-    const mergedToUpstream = !options?.force && upstream ? await isAncestor(repoId, branch, upstream, signal) : false
+    const mergedToCurrent = !options?.force && current ? await isAncestor(gitCwd, branch, current, signal) : false
+    const upstream = !options?.force ? await getUpstream(gitCwd, branch, signal) : null
+    const mergedToUpstream = !options?.force && upstream ? await isAncestor(gitCwd, branch, upstream, signal) : false
     return validateBranchDeletionPolicy({
       branch,
       currentBranch: current,
@@ -187,13 +212,14 @@ function createLocalRepoBackend(repoId: string): RepoBackend {
     branch: string,
     options?: { force?: boolean; alsoDeleteUpstream?: boolean },
     signal?: AbortSignal,
+    gitCwd = repoId,
   ): Promise<ExecResult> {
-    const upstream = options?.alsoDeleteUpstream ? await getUpstream(repoId, branch, signal) : null
-    const deleted = await deleteBranch(repoId, branch, { force: options?.force, signal })
+    const upstream = options?.alsoDeleteUpstream ? await getUpstream(gitCwd, branch, signal) : null
+    const deleted = await deleteBranch(gitCwd, branch, { force: options?.force, signal })
     if (!deleted.ok || !upstream) return deleted
     const slash = upstream.indexOf('/')
     if (slash <= 0) return deleted
-    return await deleteUpstreamBranch(repoId, upstream.slice(0, slash), upstream.slice(slash + 1), signal)
+    return await deleteUpstreamBranch(gitCwd, upstream.slice(0, slash), upstream.slice(slash + 1), signal)
   }
 
   return {
@@ -258,10 +284,6 @@ function createLocalRepoBackend(repoId: string): RepoBackend {
       if (!available.ok) return available
       return await fetchAll(repoId, signal)
     },
-    async checkout(branch, signal) {
-      if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
-      return await checkoutBranch(repoId, branch, signal)
-    },
     async pull(branch, worktreePath, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
       return await pullBranch(repoId, branch, worktreePath, signal)
@@ -283,8 +305,12 @@ function createLocalRepoBackend(repoId: string): RepoBackend {
     async removeWorktree(input, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
       const worktrees = await getWorktrees(repoId, { signal })
-      const removable = resolveRemovableWorktree(worktrees, input.branch, input.worktreePath, repoId)
+      const affectedRepoIds = localWorktreeRepoIds(worktrees)
+      const mainWorktreePath = worktrees.find((wt) => wt.isPrimary)?.path ?? worktrees[0]?.path ?? ''
+      const removable = resolveRemovableWorktree(worktrees, input.branch, input.worktreePath, mainWorktreePath)
       if (!removable.ok) return { ok: false, message: removable.message }
+      const mutationCwd =
+        path.resolve(removable.target.path) === path.resolve(repoId) && mainWorktreePath ? mainWorktreePath : repoId
       const invalid = validateRemovableWorktreeState(removable.target)
       if (invalid) return invalid
       if (input.alsoDeleteBranch) {
@@ -293,15 +319,21 @@ function createLocalRepoBackend(repoId: string): RepoBackend {
           { force: input.forceDeleteBranch, notMergedMessage: 'error.cannot-remove-unpushed-worktree' },
           signal,
           removable.target.path,
+          mutationCwd,
         )
         if (validation) return validation
       }
-      const removed = await removeWorktree(repoId, removable.target.path, signal)
-      if (!removed.ok || !input.alsoDeleteBranch) return removed
-      return await deleteBranchAfterValidation(
-        input.branch,
-        { force: input.forceDeleteBranch, alsoDeleteUpstream: input.alsoDeleteUpstream },
-        signal,
+      const removed = await removeWorktree(mutationCwd, removable.target.path, signal)
+      if (!removed.ok) return removed
+      if (!input.alsoDeleteBranch) return withAffectedRepoIds(removed, affectedRepoIds)
+      return withAffectedRepoIds(
+        await deleteBranchAfterValidation(
+          input.branch,
+          { force: input.forceDeleteBranch, alsoDeleteUpstream: input.alsoDeleteUpstream },
+          signal,
+          mutationCwd,
+        ),
+        affectedRepoIds,
       )
     },
     async getPatch(worktreePath, signal) {
@@ -359,9 +391,6 @@ async function createRemoteRepoBackend(repoId: string): Promise<RepoBackend> {
     async fetch(signal) {
       return await fetchRemoteRepository(target, { signal })
     },
-    async checkout(branch, signal) {
-      return await checkoutRemoteBranch(target, branch, undefined, { signal })
-    },
     async pull(branch, worktreePath, signal) {
       return await pullRemoteBranch(target, branch, worktreePath, { signal })
     },
@@ -375,7 +404,8 @@ async function createRemoteRepoBackend(repoId: string): Promise<RepoBackend> {
       return await deleteRemoteBranch(target, { branch, force: options?.force, signal })
     },
     async removeWorktree(input, signal) {
-      return await removeRemoteWorktree(target, { ...input, signal })
+      const result = await removeRemoteWorktree(target, { ...input, signal })
+      return withAffectedRepoIds(result, remoteWorktreeRepoIds(target, result.affectedWorktreePaths))
     },
     async getPatch(worktreePath, signal) {
       return await getRemotePatch(target, worktreePath, { signal })

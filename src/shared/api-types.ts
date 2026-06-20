@@ -236,7 +236,6 @@ export interface AppIpcHandlers {
     }) => Promise<PullRequestEntry[] | null>
     status: (input: { cwd: string }) => Promise<WorktreeStatus[]>
     patch: (input: { cwd: string; worktreePath: string }) => Promise<ExecResult>
-    checkout: (input: { cwd: string; branch: string }) => Promise<ExecResult>
     deleteBranch: (input: {
       cwd: string
       branch: string

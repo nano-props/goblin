@@ -22,7 +22,7 @@ function repo(overrides: RepoOverrides = {}): RepoState {
     markRepoOperationTargets(
       base.id,
       nextRepoOperationId(base.id),
-      [{ key: 'branchAction', reason: 'branch:checkout', target: 'feature/a' }],
+      [{ key: 'branchAction', reason: 'branch:pull', target: 'feature/a' }],
       'running',
     )
   }
@@ -59,7 +59,7 @@ describe('canStartRemoteFetch', () => {
     (key) => {
       const r = repo()
       const operationId = nextRepoOperationId(r.id)
-      const target: RepoRuntimeOperationTarget = { key, reason: key === 'branchAction' ? 'branch:checkout' : key }
+      const target: RepoRuntimeOperationTarget = { key, reason: key === 'branchAction' ? 'branch:pull' : key }
 
       markRepoOperationTargets(r.id, operationId, [target], 'running')
 

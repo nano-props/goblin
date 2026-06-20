@@ -22,27 +22,6 @@ describe('repo web transport helpers', () => {
     })
   })
 
-  test('checkout uses embedded server route in web host mode', async () => {
-    const fetchMock = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ ok: true, message: '' }),
-    }))
-    vi.stubGlobal('fetch', fetchMock)
-    const { checkoutRepositoryBranch } = await import('#/web/repo-client.ts')
-
-    await expect(checkoutRepositoryBranch('/tmp/repo', 'feature/a')).resolves.toEqual({ ok: true, message: '' })
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:32100/api/repo/checkout',
-      expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({
-          'content-type': 'application/json',
-          'x-goblin-access-token': 'secret',
-        }),
-      }),
-    )
-  })
-
   test('copy-patch helper uses embedded server route in web host mode', async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,

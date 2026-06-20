@@ -1,6 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
 import {
-  checkoutRemoteBranch,
   createRemoteWorktree,
   deleteRemoteBranch,
   getRemoteBrowserUrl,
@@ -21,6 +20,13 @@ const TARGET = normalizeRemoteTarget({
   user: 'alice',
   port: 22,
   remotePath: '/srv/repo',
+})!
+const LINKED_TARGET = normalizeRemoteTarget({
+  alias: 'prod',
+  host: 'example.com',
+  user: 'alice',
+  port: 22,
+  remotePath: '/srv/repo-feature',
 })!
 
 describe('remote git helpers', () => {
@@ -192,7 +198,11 @@ describe('remote git helpers', () => {
       run: run as any,
     })
 
-    expect(result).toEqual({ ok: true, message: 'Deleted branch feature/test' })
+    expect(result).toEqual({
+      ok: true,
+      message: 'Deleted branch feature/test',
+      affectedWorktreePaths: ['/srv/repo', '/srv/repo-feature'],
+    })
     expect(run).toHaveBeenCalledWith(
       { type: 'gitWorktreeRemove', path: '/srv/repo', worktreePath: '/srv/repo-feature' },
       TARGET,
@@ -205,13 +215,87 @@ describe('remote git helpers', () => {
     )
   })
 
-  test('checkoutRemoteBranch rejects invalid branch names before running remote commands', async () => {
-    const run = vi.fn()
+  test('removeRemoteWorktree removes the currently opened linked worktree from the primary path', async () => {
+    const run = vi.fn(
+      async (command: {
+        type: string
+        path?: string
+        descendant?: string
+        worktreePath?: string
+        branch?: string
+        force?: boolean
+      }) => {
+        switch (command.type) {
+          case 'gitWorktreeList':
+            return okRemoteResult(
+              [
+                'worktree /srv/repo',
+                'HEAD f00ba4',
+                'branch refs/heads/main',
+                '',
+                'worktree /srv/repo-feature',
+                'HEAD ba5eba1',
+                'branch refs/heads/feature/test',
+              ].join('\n'),
+            )
+          case 'gitStatus':
+            return okRemoteResult('')
+          case 'gitSnapshot':
+            return command.path === '/srv/repo'
+              ? okRemoteResult(
+                  [
+                    '__GOBLIN_REMOTE_CURRENT__',
+                    'main',
+                    '__GOBLIN_REMOTE_DEFAULT__',
+                    'main',
+                    '__GOBLIN_REMOTE_BRANCHES__',
+                    '',
+                  ].join('\n'),
+                )
+              : failRemoteResult('removed cwd should not be used')
+          case 'gitIsAncestor':
+            return command.path === '/srv/repo' && command.descendant === 'main'
+              ? okRemoteResult('')
+              : failRemoteResult('not merged')
+          case 'gitUpstream':
+            return failRemoteResult('no upstream')
+          case 'gitWorktreeRemove':
+            return okRemoteResult('Removed worktree')
+          case 'gitBranchDelete':
+            return okRemoteResult('Deleted branch feature/test')
+          default:
+            return okRemoteResult('')
+        }
+      },
+    )
 
-    const result = await checkoutRemoteBranch(TARGET, '-bad', undefined, { run: run as any })
+    const result = await removeRemoteWorktree(LINKED_TARGET, {
+      branch: 'feature/test',
+      worktreePath: '/srv/repo-feature',
+      alsoDeleteBranch: true,
+      run: run as any,
+    })
 
-    expect(result).toEqual({ ok: false, message: 'error.invalid-arguments' })
-    expect(run).not.toHaveBeenCalled()
+    expect(result).toEqual({
+      ok: true,
+      message: 'Deleted branch feature/test',
+      affectedWorktreePaths: ['/srv/repo', '/srv/repo-feature'],
+    })
+    expect(run).toHaveBeenCalledWith(
+      { type: 'gitSnapshot', path: '/srv/repo' },
+      LINKED_TARGET,
+      { signal: undefined },
+    )
+    expect(run).toHaveBeenCalledWith(
+      { type: 'gitWorktreeRemove', path: '/srv/repo', worktreePath: '/srv/repo-feature' },
+      LINKED_TARGET,
+      { signal: undefined, timeoutMs: 180_000 },
+    )
+    expect(run).toHaveBeenCalledWith(
+      { type: 'gitBranchDelete', path: '/srv/repo', branch: 'feature/test', force: false },
+      LINKED_TARGET,
+      { signal: undefined, timeoutMs: 180_000 },
+    )
   })
 
   test('createRemoteWorktree rejects relative paths before running remote commands', async () => {

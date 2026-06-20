@@ -1,7 +1,7 @@
 // Read-only branch "status strip" used in two places: the branch list
 // rows (BranchRow). It is
-// intentionally non-interactive — the affordance for switching branches
-// lives on the caller; clicking the row selects the branch in the list.
+// intentionally non-interactive; clicking the row selects the branch in
+// the list.
 //
 // Layout (left to right):
 //   [icon]  [name]  [meta…]  <badges · deltas · last-commit author/time>
@@ -11,7 +11,7 @@
 // can reuse the visual primitives without re-deriving the branch-state
 // predicates.
 
-import { ArrowDown, ArrowUp, Check, FolderTree, GitBranch } from 'lucide-react'
+import { ArrowDown, ArrowUp, FolderTree, GitBranch } from 'lucide-react'
 import { useI18nStore, useT, type Lang } from '#/web/stores/i18n.ts'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 import { Badge } from '#/web/components/ui/badge.tsx'
@@ -20,7 +20,7 @@ import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
 import { getBranchWorktreeState, type BranchWorktreeRepo } from '#/web/stores/repos/worktree-state.ts'
 
 export type BranchSummaryInlineRepo = BranchWorktreeRepo & {
-  data: BranchWorktreeRepo['data'] & { currentBranch: string }
+  data: BranchWorktreeRepo['data']
 }
 
 interface BranchSummaryInlineProps {
@@ -53,9 +53,7 @@ function Delta({ direction, count, label }: { direction: 'ahead' | 'behind'; cou
 // meta strip, and the outer title — recomputing these in three places
 // is what originally kept this file sprawling.
 export function computeBranchSummaryState(branch: RepoBranchState, repo: BranchSummaryInlineRepo, lang: Lang) {
-  const isCurrent = branch.name === repo.data.currentBranch
   const hasWorktree = !!branch.worktree?.path
-  const isWorktree = hasWorktree && !isCurrent
   const worktreeState = getBranchWorktreeState(repo, branch)
   const worktreeDirty = worktreeState?.dirty ?? false
   const commitTime = formatRelativeTimeOrNull(branch.lastCommitDate, lang)
@@ -64,7 +62,7 @@ export function computeBranchSummaryState(branch: RepoBranchState, repo: BranchS
       ? `${branch.lastCommitAuthor} · ${commitTime}`
       : commitTime
     : null
-  return { isCurrent, hasWorktree, isWorktree, worktreeDirty, commitMeta }
+  return { hasWorktree, worktreeDirty, commitMeta }
 }
 
 type BranchSummaryState = ReturnType<typeof computeBranchSummaryState>
@@ -78,7 +76,6 @@ export function buildBranchSummaryTitle(
 ): string {
   return [
     branch.name,
-    state.isCurrent ? t('branch-status.current') : null,
     branch.isDefault ? t('branches.default') : null,
     state.hasWorktree ? t(state.worktreeDirty ? 'branches.dirty' : 'branches.worktree') : null,
     branch.trackingGone ? t('branches.gone') : null,
@@ -90,26 +87,23 @@ export function buildBranchSummaryTitle(
     .join(', ')
 }
 
-// The status icon on the leading edge of a branch row. Tri-state:
-// checked (HEAD), folder-tree (worktree branch), or plain branch glyph.
+// The status icon on the leading edge of a branch row. Worktree
+// branches use a folder-tree glyph; regular local branches use the
+// plain branch glyph.
 // Kept as a 4-wide column so the name column has a stable left margin
 // even when the icon kind changes.
 export function BranchSummaryIcon({
-  isCurrent,
-  isWorktree,
+  hasWorktree,
   worktreeDirty,
   selected,
 }: {
-  isCurrent: boolean
-  isWorktree: boolean
+  hasWorktree: boolean
   worktreeDirty: boolean
   selected: boolean
 }) {
   return (
     <span className="flex w-4 shrink-0 items-center justify-center">
-      {isCurrent ? (
-        <Check size={14} className="text-success" />
-      ) : isWorktree ? (
+      {hasWorktree ? (
         <FolderTree size={14} className={worktreeDirty ? 'text-attention' : 'text-brand-text'} />
       ) : (
         <GitBranch size={14} className={selected ? 'text-selected-muted-foreground' : 'text-muted-foreground'} />
@@ -129,7 +123,7 @@ export function BranchSummaryMeta({
 }: Pick<BranchSummaryInlineProps, 'repo' | 'branch' | 'selected'>) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
-  const { hasWorktree, isWorktree, worktreeDirty, commitMeta } = computeBranchSummaryState(branch, repo, lang)
+  const { hasWorktree, worktreeDirty, commitMeta } = computeBranchSummaryState(branch, repo, lang)
 
   return (
     <span
@@ -148,7 +142,7 @@ export function BranchSummaryMeta({
           <FolderTree size={10} />
           {t('branches.dirty')}
         </Badge>
-      ) : isWorktree ? (
+      ) : hasWorktree ? (
         <Badge variant="outline" className="gap-1 text-muted-foreground">
           <FolderTree size={10} />
           {t('branches.worktree')}
@@ -184,14 +178,13 @@ export function BranchSummaryInline({ repo, branch, selected = false, className 
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
   const state = computeBranchSummaryState(branch, repo, lang)
-  const { isCurrent, hasWorktree, isWorktree, worktreeDirty, commitMeta } = state
+  const { hasWorktree, worktreeDirty } = state
   const title = buildBranchSummaryTitle(state, branch, t)
 
   return (
     <div title={title} className={cn('flex min-w-0 items-center gap-2', className)}>
       <BranchSummaryIcon
-        isCurrent={isCurrent}
-        isWorktree={isWorktree}
+        hasWorktree={hasWorktree}
         worktreeDirty={worktreeDirty}
         selected={selected}
       />

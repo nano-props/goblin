@@ -72,7 +72,7 @@ describe('CreateWorktreeDialog', () => {
     deferred.resolve()
   })
 
-  test('switches to existingBranch mode and submits a checkout', () => {
+  test('switches to existingBranch mode and submits the selected branch', () => {
     const onClose = vi.fn()
     const onCreate = vi.fn(async () => {})
 

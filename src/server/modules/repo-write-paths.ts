@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { runServerCancellable, abortServerNetworkOp } from '#/server/common/network-ops.ts'
 import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
-import { resolveRepoBackend, runWithRepoBackend } from '#/server/modules/repo-backend.ts'
+import { resolveRepoBackend, runWithRepoBackend, type RepoMutationResult } from '#/server/modules/repo-backend.ts'
 import { getServerSettingsPrefs } from '#/server/modules/settings-source.ts'
 import { cloneRepository as cloneGitRepository } from '#/system/git/clone.ts'
 import { openInPreferredEditor } from '#/system/editors.ts'
@@ -106,12 +106,28 @@ function publishRepoSnapshotInvalidation(cwd: string, sourceToken?: string): voi
 
 async function publishSnapshotInvalidationAfterMutation(
   cwd: string,
-  result: ExecResult,
+  result: RepoMutationResult,
   sourceToken?: string,
 ): Promise<ExecResult> {
-  if (!result.ok) return result
-  publishRepoSnapshotInvalidation(cwd, sourceToken)
-  return result
+  const affectedRepoIds = result.affectedRepoIds ?? []
+  if (!result.ok && affectedRepoIds.length === 0) return execResultOnly(result)
+  publishRepoSnapshotInvalidations(cwd, affectedRepoIds, sourceToken)
+  return execResultOnly(result)
+}
+
+function publishRepoSnapshotInvalidations(
+  cwd: string,
+  affectedRepoIds: readonly string[],
+  sourceToken?: string,
+): void {
+  const uniqueRepoIds = Array.from(new Set([cwd, ...affectedRepoIds].filter((repoId) => repoId.length > 0)))
+  for (const repoId of uniqueRepoIds) {
+    publishRepoSnapshotInvalidation(repoId, repoId === cwd ? sourceToken : undefined)
+  }
+}
+
+function execResultOnly(result: ExecResult): ExecResult {
+  return { ok: result.ok, message: result.message }
 }
 
 async function withMergedAbortSignal<T>(
@@ -217,17 +233,6 @@ export async function fetchRepository(
   })
   activeBackgroundFetches.set(cwd, backgroundFetch)
   return await backgroundFetch
-}
-
-export async function checkoutRepositoryBranch(
-  cwd: string,
-  branch: string,
-  signal?: AbortSignal,
-  sourceToken?: string,
-): Promise<ExecResult> {
-  return await runWithRepoBackend(cwd, async (backend) => {
-    return await publishSnapshotInvalidationAfterMutation(cwd, await backend.checkout(branch, signal), sourceToken)
-  })
 }
 
 export async function pullRepositoryBranch(

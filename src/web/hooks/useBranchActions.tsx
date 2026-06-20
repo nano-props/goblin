@@ -36,8 +36,6 @@ const SILENT_SUCCESS_OPS = new Set<BranchActionItemId>(['remote', 'terminal', 'e
 type LocalBranchActionItemId = 'copyPatch' | 'remote' | 'terminal' | 'editor'
 
 export interface BranchActionCapabilities {
-  isCurrent: boolean
-  checkedOutInAnotherWorktree: boolean
   canRemoveWorktree: boolean
   isRegularBranch: boolean
   canCopyPatch: boolean
@@ -50,15 +48,12 @@ export interface BranchActionCapabilities {
 
 export function getBranchActionCapabilities(repo: BranchActionRepo, branch: RepoBranchState): BranchActionCapabilities {
   const isCurrent = branch.name === repo.data.currentBranch
-  const checkedOutInAnotherWorktree = !!branch.worktree?.path && !isCurrent
   const isProtected = PROTECTED_BRANCHES.has(branch.name)
   const isRegularBranch = !isCurrent && !branch.worktree?.path && !isProtected
   const worktreeState = getBranchWorktreeState(repo, branch)
-  const canRemoveWorktree = checkedOutInAnotherWorktree && !worktreeState?.isMain
+  const canRemoveWorktree = !!branch.worktree?.path && !worktreeState?.isMain
   const canCopyPatch = !!branch.worktree?.path && (worktreeState?.dirty ?? false)
   return {
-    isCurrent,
-    checkedOutInAnotherWorktree,
     canRemoveWorktree,
     isRegularBranch,
     canCopyPatch,
@@ -134,10 +129,6 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
       }
       return { ok: true, message: 'status.copy-patch-ok' }
     })
-  }
-
-  function checkout() {
-    void runRepoAction({ kind: 'checkout', branch: branch.name })
   }
 
   function pull() {
@@ -268,7 +259,6 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
     capabilities,
     actions: {
       copyPatch,
-      checkout,
       pull,
       push,
       openTerminal,

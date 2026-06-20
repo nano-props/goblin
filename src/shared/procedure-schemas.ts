@@ -63,7 +63,6 @@ export const REPO_PROCEDURE_SCHEMAS = {
     directoryName: v.string(),
   }),
   abortClone: v.object({ operationId: v.string() }),
-  checkout: v.object({ cwd: v.string(), branch: v.string(), sourceToken: SourceToken }),
   pull: v.object({
     cwd: v.string(),
     branch: v.string(),

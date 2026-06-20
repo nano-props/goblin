@@ -1,5 +1,5 @@
 // Confirm dialog for destructive operations (push to a protected
-// branch, checkout with dirty tree). Built on shadcn/ui AlertDialog
+// branch, delete branch, remove worktree). Built on shadcn/ui AlertDialog
 // rather than Dialog so it gets the right semantics for AT users:
 //   - role=alertdialog (vs role=dialog)
 //   - focus lands on the cancel action by default, not the confirm

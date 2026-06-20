@@ -10,7 +10,7 @@
 //             surrounding controls.
 //   Create  — open the new-worktree dialog for the active repo.
 //
-// Branch-scoped operations (Checkout / Pull / Push / Open in Terminal
+// Branch-scoped operations (Pull / Push / Open in Terminal
 // / Open in GitHub) live with the selected-branch detail, not here —
 // those need a branch context to be meaningful.
 

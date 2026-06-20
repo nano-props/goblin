@@ -23,7 +23,6 @@ export type RepoBranchState = Omit<BranchSnapshotInfo, 'worktree'> & {
 }
 
 export type RepoEventAction =
-  | { kind: 'checkout'; branch: string }
   | { kind: 'pull'; branch: string }
   | { kind: 'push'; branch: string }
   | { kind: 'createWorktree'; branch: string; worktreePath: string }
@@ -237,10 +236,6 @@ export interface RuntimeCoherentRepoProjectionActions {
 }
 
 export interface RepoMutationActions {
-  checkoutSelectedInRepo: (id: string) => Promise<void>
-  /** Keyboard-driven checkout of the active repo's selected branch.
-   *  Centralizes the eligibility checks the keyboard hook used to do. */
-  checkoutSelected: () => Promise<void>
   runBranchAction: (
     id: string,
     action: RepoBranchAction,

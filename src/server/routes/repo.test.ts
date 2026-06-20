@@ -11,7 +11,6 @@ const mocks = vi.hoisted(() => ({
   fetchRepository: vi.fn(),
   cloneRepository: vi.fn(),
   abortCloneOperation: vi.fn(),
-  checkoutRepositoryBranch: vi.fn(),
   pullRepositoryBranch: vi.fn(),
   pushRepositoryBranch: vi.fn(),
   createRepositoryWorktree: vi.fn(),
@@ -42,7 +41,6 @@ vi.mock('#/server/modules/repo-read-paths.ts', () => ({
 vi.mock('#/server/modules/repo-write-paths.ts', () => ({
   cloneRepository: mocks.cloneRepository,
   abortCloneOperation: mocks.abortCloneOperation,
-  checkoutRepositoryBranch: mocks.checkoutRepositoryBranch,
   pullRepositoryBranch: mocks.pullRepositoryBranch,
   pushRepositoryBranch: mocks.pushRepositoryBranch,
   createRepositoryWorktree: mocks.createRepositoryWorktree,

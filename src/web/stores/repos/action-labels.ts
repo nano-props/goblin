@@ -6,7 +6,6 @@ export interface RepoActionLabel {
 }
 
 const BRANCH_ACTION_LOADING_LABEL_KEYS: Record<RepoBranchActionKind, string> = {
-  checkout: 'action.checkout-loading',
   pull: 'action.pull-loading',
   push: 'action.push-loading',
   createWorktree: 'action.create-worktree-creating-title',
@@ -15,7 +14,6 @@ const BRANCH_ACTION_LOADING_LABEL_KEYS: Record<RepoBranchActionKind, string> = {
 }
 
 const BRANCH_ACTION_QUEUED_LABEL_KEYS: Record<RepoBranchActionKind, string> = {
-  checkout: 'action.checkout-queued',
   pull: 'action.pull-queued',
   push: 'action.push-queued',
   createWorktree: 'action.create-worktree-queued-title',
@@ -48,7 +46,6 @@ export function repoEventActionSuccessLabel(action: RepoEventAction | undefined)
       }
     case 'deleteBranch':
       return { labelKey: 'action.delete-branch-deleted-title' }
-    case 'checkout':
     case 'pull':
     case 'push':
       return null

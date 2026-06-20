@@ -95,7 +95,7 @@ export function BranchStatus({ detail }: Props) {
   const worktreeChangeCount = detail.worktreeState?.changeCount ?? statusCount
   const pullRequest =
     branch.pullRequest && branchPullRequestBelongsToBranch(branch, branch.pullRequest) ? branch.pullRequest : undefined
-  const hasRole = branch.isCurrent || branch.isDefault || protectedBranch
+  const hasRole = branch.isDefault || protectedBranch
   const hasWorktreeChanges = !!branch.worktree?.path && (detail.worktreeState?.dirty || worktreeChangeCount > 0)
   const mergeKnown = branch.isDefault || branch.mergedToDefault !== undefined
   const showMerged = !branch.isDefault
@@ -150,7 +150,6 @@ export function BranchStatus({ detail }: Props) {
 
   const roleChips = hasRole ? (
     <>
-      {branch.isCurrent && <StatusChip tone="success">{t('branch-status.current')}</StatusChip>}
       {branch.isDefault && <StatusChip>{t('branches.default')}</StatusChip>}
       {protectedBranch && <StatusChip>{t('branch-status.protected')}</StatusChip>}
     </>
@@ -169,7 +168,7 @@ export function BranchStatus({ detail }: Props) {
         }
         after={roleChips}
         valueLayout="inline"
-        tone={branch.isCurrent ? 'success' : branch.isDefault ? 'brand' : 'neutral'}
+        tone={branch.isDefault ? 'brand' : 'neutral'}
       />
       <StatusRow
         icon={<FolderTree size={14} />}

@@ -158,11 +158,6 @@ export async function getLog(
   }
 }
 
-export async function checkoutBranch(cwd: string, name: string, signal?: AbortSignal): Promise<ExecResult> {
-  if (!isSafeBranchName(name)) return { ok: false, message: 'error.invalid-arguments' }
-  return gitResultWithOptions(cwd, { signal }, 'switch', '--', name)
-}
-
 export async function deleteBranch(
   cwd: string,
   name: string,

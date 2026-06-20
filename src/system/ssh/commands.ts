@@ -63,7 +63,6 @@ export type RemoteCommandKind =
   | { type: 'gitFetchRemote'; path: string; remote: string }
   | { type: 'gitStatusAll'; path: string }
   | { type: 'gitDiffNoIndex'; path: string; filePath: string }
-  | { type: 'gitCheckout'; path: string; branch: string }
   | { type: 'gitPullCurrent'; path: string }
   | { type: 'gitFetchBranch'; path: string; remote: string; remoteBranch: string; branch: string }
   | { type: 'gitPush'; path: string; remote: string; branch: string; targetBranch: string; setUpstream: boolean }
@@ -243,8 +242,6 @@ function scriptForCommand(command: RemoteCommandKind): string {
         '--',
       ].join(' ')
     }
-    case 'gitCheckout':
-      return `git -C ${shellQuote(command.path)} switch -- ${shellQuote(command.branch)}`
     case 'gitFetchAll':
       return `git -C ${shellQuote(command.path)} fetch --all --prune`
     case 'gitFetchRemote':

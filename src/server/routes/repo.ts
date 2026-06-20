@@ -11,7 +11,6 @@ import {
 import {
   abortCloneOperation,
   abortRepositoryOperation,
-  checkoutRepositoryBranch,
   cloneRepository,
   createRepositoryWorktree,
   deleteRepositoryBranch,
@@ -113,16 +112,6 @@ export function createRepoRoutes() {
   app.post('/abort-clone', async (c) => {
     const { operationId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.abortClone, c)
     return c.json(await jsonOr(async () => abortCloneOperation(operationId), false, 'abort-clone'))
-  })
-  app.post('/checkout', async (c) => {
-    const { cwd, branch, sourceToken } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.checkout, c)
-    return c.json(
-      await jsonOr(
-        () => checkoutRepositoryBranch(cwd, branch, c.req.raw.signal, sourceToken),
-        READ_REPO_ERROR,
-        'checkout',
-      ),
-    )
   })
   app.post('/pull', async (c) => {
     const { cwd, branch, worktreePath, sourceToken } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.pull, c)

@@ -26,7 +26,6 @@ import type { ExecResult } from '#/web/types.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import { runWithRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
 import {
-  checkoutRepositoryBranch,
   createRepositoryWorktree,
   deleteRepositoryBranch,
   pullRepositoryBranch,
@@ -38,7 +37,6 @@ const BRANCH_NETWORK_OPERATION_KEY = 'branch-network-action'
 const BRANCH_ACTION_WAIT_TIMEOUT_MS = 30_000
 const BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE = 'error.branch-action-wait-timeout'
 const BRANCH_ACTION_REASON_BY_KIND: Record<RepoBranchActionKind, RepoBranchActionReason> = {
-  checkout: 'branch:checkout',
   pull: 'branch:pull',
   push: 'branch:push',
   createWorktree: 'branch:createWorktree',
@@ -62,7 +60,6 @@ function branchActionReason(action: RepoBranchAction): RepoBranchActionReason {
 
 function branchActionOperationTarget(action: RepoBranchAction): string | null {
   switch (action.kind) {
-    case 'checkout':
     case 'pull':
     case 'push':
     case 'deleteBranch':
@@ -90,7 +87,6 @@ function createWorktreeTargetBranch(input: CreateWorktreeInput): string {
 
 function branchActionEventAction(action: RepoBranchAction): RepoEventAction {
   switch (action.kind) {
-    case 'checkout':
     case 'pull':
     case 'push':
     case 'deleteBranch':
@@ -216,8 +212,6 @@ function runBranchActionIpc(
   sourceToken?: string,
 ): Promise<ExecResult> {
   switch (action.kind) {
-    case 'checkout':
-      return checkoutRepositoryBranch(repoId, action.branch, signal, sourceToken)
     case 'pull':
       return pullRepositoryBranch(repoId, action.branch, action.worktreePath, signal, sourceToken)
     case 'push':

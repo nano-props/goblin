@@ -66,7 +66,6 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('#/system/git/branches.ts', () => ({
-  checkoutBranch: vi.fn(),
   deleteBranch: vi.fn(),
   getBranches: vi.fn(),
   getCurrentBranch: vi.fn(),

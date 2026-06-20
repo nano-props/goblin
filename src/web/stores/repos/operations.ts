@@ -9,7 +9,6 @@ export type RepoOperationKey =
   | 'branchAction'
   | `pullRequest:${string}`
 export type RepoBranchActionReason =
-  | 'branch:checkout'
   | 'branch:pull'
   | 'branch:push'
   | 'branch:createWorktree'

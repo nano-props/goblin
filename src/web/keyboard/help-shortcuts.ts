@@ -38,12 +38,7 @@ export function helpShortcutSections(
     },
     {
       titleKey: 'help.section.branch-actions',
-      rows: [
-        helpRowFromKeyboardDefinition(
-          RENDERER_APP_SHORTCUTS.find((shortcut) => shortcut.action === 'checkout-selected')!,
-        ),
-        ...BRANCH_ACTION_SHORTCUTS.map(helpRowFromKeyboardDefinition),
-      ],
+      rows: BRANCH_ACTION_SHORTCUTS.map(helpRowFromKeyboardDefinition),
     },
     {
       titleKey: 'help.section.views',
@@ -60,9 +55,7 @@ export function helpShortcutSections(
           combos: [acceleratorToKeyLabelsForHelp(isMac ? SETTINGS_SHORTCUT_MAC : SETTINGS_SHORTCUT_NON_MAC, isMac)],
           labelKey: 'help.row.settings',
         },
-        ...RENDERER_APP_SHORTCUTS.filter((shortcut) => shortcut.action !== 'checkout-selected').map(
-          helpRowFromKeyboardDefinition,
-        ),
+        ...RENDERER_APP_SHORTCUTS.map(helpRowFromKeyboardDefinition),
       ],
     },
   ]

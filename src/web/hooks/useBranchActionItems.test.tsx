@@ -53,7 +53,6 @@ describe('useBranchActionItems', () => {
       busyAction: null,
       capabilities: allVisibleCapabilities(),
       actions: {
-        checkout: vi.fn(),
         pull: vi.fn(),
         push: vi.fn(),
         copyPatch: vi.fn(),
@@ -87,7 +86,6 @@ describe('useBranchActionItems', () => {
     expect(actionIds).toEqual([
       'status',
       'changes',
-      'checkout',
       'pull',
       'push',
       'copyPatch',
@@ -143,8 +141,6 @@ function allVisibleCapabilities(): BranchActionCapabilities {
   // Ordering is cross-state UI policy, so this intentionally enables every
   // conditional action instead of modeling one real Git branch state.
   return {
-    isCurrent: false,
-    checkedOutInAnotherWorktree: false,
     canRemoveWorktree: true,
     isRegularBranch: true,
     canCopyPatch: true,

@@ -1,6 +1,6 @@
 import { arrayMove } from '@dnd-kit/sortable'
 import { selectedBranchForViewMode } from '#/web/stores/repos/branch-view-mode.ts'
-import { isRepoUnavailable, replaceRepo, replaceRepoState } from '#/web/stores/repos/helpers.ts'
+import { replaceRepo, replaceRepoState } from '#/web/stores/repos/helpers.ts'
 import { persistRestorableRepoSnapshot } from '#/web/stores/repos/persistence.ts'
 import {
   DEFAULT_WORKSPACE_FOCUSED,
@@ -40,8 +40,6 @@ type RuntimeCoherentSelectionActions = Pick<
   ReposStore,
   'setBranchViewMode' | 'setWorkspacePaneView' | 'selectBranch' | 'clearSelectedBranch'
 >
-
-type RepoMutationSelectionActions = Pick<ReposStore, 'checkoutSelectedInRepo' | 'checkoutSelected'>
 
 function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet): RestorableWorkspaceSelectionActions {
   return {
@@ -276,33 +274,9 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
   }
 }
 
-function createRepoMutationSelectionActions(set: ReposSet, get: ReposGet): RepoMutationSelectionActions {
-  return {
-    async checkoutSelectedInRepo(id: string) {
-      const state = get()
-      const repo = state.repos[id]
-      if (!repo) return
-      if (isRepoUnavailable(repo)) return
-      const token = repo.instanceToken
-      const branch = repo.ui.selectedBranch
-      if (!branch || branch === repo.data.currentBranch) return
-      const branchInfo = repo.data.branches.find((b) => b.name === branch)
-      if (!branchInfo || branchInfo.worktree?.path) return
-      await get().runBranchAction(id, { kind: 'checkout', branch }, { token })
-    },
-
-    async checkoutSelected() {
-      const id = get().activeId
-      if (!id) return
-      await get().checkoutSelectedInRepo(id)
-    },
-  }
-}
-
 export function createSelectionActions(set: ReposSet, get: ReposGet) {
   return {
     ...createRestorableWorkspaceSelectionActions(set, get),
     ...createRuntimeCoherentSelectionActions(set, get),
-    ...createRepoMutationSelectionActions(set, get),
   }
 }

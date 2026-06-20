@@ -184,12 +184,6 @@ export function useKeyboard({
           if (nextTab.type === 'terminal') bridge?.selectTerminal(worktreeKey, nextTab.key)
           break
         }
-        case 'checkout-selected': {
-          if (overlayOpen || !repo) break
-          e.preventDefault()
-          void state.checkoutSelectedInRepo(repo.id)
-          break
-        }
       }
     }
     window.addEventListener('keydown', onKey)
