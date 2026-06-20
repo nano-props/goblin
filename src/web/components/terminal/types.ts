@@ -4,6 +4,11 @@ import type {
   TerminalExitEvent,
   TerminalOutputEvent,
 } from '#/shared/terminal-types.ts'
+import type {
+  WorkspacePaneStaticViewSummary as ServerWorkspacePaneStaticViewSummary,
+  WorkspacePaneStaticViewType,
+  WorkspacePaneViewOrderEntry,
+} from '#/shared/workspace-pane.ts'
 import type { TerminalInput, TerminalUserInputSource } from '#/web/components/terminal/terminal-input.ts'
 export type TerminalPhase = 'opening' | 'restarting' | 'open' | 'error' | 'closed'
 
@@ -101,10 +106,13 @@ export interface TerminalRepoSnapshot {
 export type TerminalRepoIndex = Record<string, TerminalRepoSnapshot>
 
 export interface TerminalSessionSummary {
+  type: 'terminal'
+  id: string
   key: string
   worktreeTerminalKey: string
   terminalId: string
   index: number
+  displayOrder: number
   title: string
   fullTitle?: string
   originalTitle?: string | null
@@ -113,10 +121,23 @@ export interface TerminalSessionSummary {
   hasBell: boolean
 }
 
+export interface WorkspacePaneStaticViewSummary {
+  type: WorkspacePaneStaticViewType
+  id: WorkspacePaneStaticViewType
+  key: WorkspacePaneStaticViewType
+  worktreeTerminalKey: string
+  worktreePath: string
+  displayOrder: number
+}
+
+export type WorkspacePaneViewSummary = WorkspacePaneStaticViewSummary | TerminalSessionSummary
+
 export interface WorktreeTerminalSnapshot {
   worktreeTerminalKey: string
   selectedDescriptor: TerminalDescriptor | null
   sessions: TerminalSessionSummary[]
+  staticWorkspacePaneViews: WorkspacePaneStaticViewSummary[]
+  workspacePaneViews: WorkspacePaneViewSummary[]
   count: number
   pendingCreate: boolean
 }
@@ -139,8 +160,10 @@ export interface TerminalSessionContextValue {
   clearSearch: (key: string) => void
   writeInput: (key: string, data: string, source?: TerminalUserInputSource) => void
   takeover: (key: string) => Promise<boolean>
-  /** Reorder terminal sessions within a worktree. */
-  reorderSessions: (worktreeTerminalKey: string, orderedKeys: string[]) => Promise<boolean>
+  openWorkspacePaneView: (worktreeTerminalKey: string, type: WorkspacePaneStaticViewType) => Promise<boolean>
+  closeWorkspacePaneView: (worktreeTerminalKey: string, type: WorkspacePaneStaticViewType) => Promise<boolean>
+  /** Reorder all workspace pane views (static views + terminal views) within a worktree. */
+  reorderWorkspacePaneViews: (worktreeTerminalKey: string, orderedViews: WorkspacePaneViewOrderEntry[]) => Promise<boolean>
   /** Serializes xterm framebuffer state as VT sequences; not plain-text output for copy UI. */
   serialize: (key: string) => string
 }

@@ -5,7 +5,7 @@ describe('createMainWindowNavigationActions', () => {
   test('mutates store directly for repo branch detail navigation', () => {
     const setActive = vi.fn()
     const selectBranch = vi.fn()
-    const setDetailTab = vi.fn()
+    const setWorkspacePaneView = vi.fn()
     const actions = createMainWindowNavigationActions({
       activeId: '/tmp/repo-a',
       order: ['/tmp/repo-a', '/tmp/repo-b'],
@@ -13,15 +13,15 @@ describe('createMainWindowNavigationActions', () => {
       closeRepo: vi.fn(),
       cycleActive: vi.fn(),
       selectBranch,
-      setDetailTab,
+      setWorkspacePaneView,
       onOpenSettings: vi.fn(),
     })
 
-    actions.showRepoBranchDetailTab('/tmp/repo-b', 'feature/test', 'terminal')
+    actions.showRepoBranchWorkspacePaneView('/tmp/repo-b', 'feature/test', 'terminal')
 
     expect(setActive).toHaveBeenCalledWith('/tmp/repo-b')
     expect(selectBranch).toHaveBeenCalledWith('/tmp/repo-b', 'feature/test')
-    expect(setDetailTab).toHaveBeenCalledWith('/tmp/repo-b', 'terminal')
+    expect(setWorkspacePaneView).toHaveBeenCalledWith('/tmp/repo-b', 'terminal')
   })
 
   test('cycles repos through the store action', () => {
@@ -33,7 +33,7 @@ describe('createMainWindowNavigationActions', () => {
       closeRepo: vi.fn(),
       cycleActive,
       selectBranch: vi.fn(),
-      setDetailTab: vi.fn(),
+      setWorkspacePaneView: vi.fn(),
     })
 
     actions.cycleRepo(1)
@@ -50,7 +50,7 @@ describe('createMainWindowNavigationActions', () => {
       closeRepo,
       cycleActive: vi.fn(),
       selectBranch: vi.fn(),
-      setDetailTab: vi.fn(),
+      setWorkspacePaneView: vi.fn(),
     })
 
     actions.closeRepo('/tmp/repo-b')

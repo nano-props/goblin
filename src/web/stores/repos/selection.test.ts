@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { replaceRepo } from '#/web/stores/repos/helpers.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { DetailTab, RepoState } from '#/web/stores/repos/types.ts'
+import type { RepoState } from '#/web/stores/repos/types.ts'
+import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import * as settingsClient from '#/web/settings-client.ts'
 import {
   createRepoBranch as branch,
@@ -17,7 +18,7 @@ const ipcHandlers: Record<string, (input: any) => unknown> = {}
 function seedRepo(options: {
   selectedBranch?: string | null
   currentBranch?: string
-  detailTab?: DetailTab
+  workspacePaneView?: WorkspacePaneView
   branches?: BranchSnapshotInfo[]
 }) {
   seedRepoState({
@@ -29,7 +30,7 @@ function seedRepo(options: {
     ],
     currentBranch: options.currentBranch ?? 'main',
     selectedBranch: options.selectedBranch ?? 'feature/plain',
-    detailTab: options.detailTab ?? 'status',
+    workspacePaneView: options.workspacePaneView ?? 'status',
     remote: {
       remotes: ['origin'],
       hasRemotes: true,
@@ -109,7 +110,7 @@ describe('setBranchViewMode', () => {
   })
 
   test('passes the current repo token to follow-up refreshes', () => {
-    seedRepo({ selectedBranch: 'feature/plain', detailTab: 'status' })
+    seedRepo({ selectedBranch: 'feature/plain', workspacePaneView: 'status' })
     const token = useReposStore.getState().repos[REPO_ID]!.instanceToken
     const pullRequestCalls: Parameters<ReturnType<typeof useReposStore.getState>['refreshPullRequests']>[] = []
     const restore = stubRefreshActions({
@@ -146,7 +147,7 @@ describe('setBranchViewMode', () => {
     // never re-projected. The UI hook decides what's actually renderable.
     seedRepo({
       selectedBranch: 'feature/plain',
-      detailTab: 'terminal',
+      workspacePaneView: 'terminal',
       branches: [branch('main', { worktree: { path: '/repo' } }), branch('feature/plain')],
     })
 
@@ -154,7 +155,7 @@ describe('setBranchViewMode', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.selectedBranch).toBe('main')
-    expect(repo?.ui.preferredDetailTab).toBe('terminal')
+    expect(repo?.ui.preferredWorkspacePaneView).toBe('terminal')
   })
 })
 
@@ -179,7 +180,7 @@ describe('selectBranch', () => {
   })
 
   test('passes the current repo token to selected branch refreshes', () => {
-    seedRepo({ selectedBranch: 'feature/plain', detailTab: 'status' })
+    seedRepo({ selectedBranch: 'feature/plain', workspacePaneView: 'status' })
     const token = useReposStore.getState().repos[REPO_ID]!.instanceToken
     const pullRequestCalls: Parameters<ReturnType<typeof useReposStore.getState>['refreshPullRequests']>[] = []
     const restore = stubRefreshActions({
@@ -230,43 +231,43 @@ describe('selectBranch', () => {
     // selectBranch updates `selectedBranch` only; the preferred tab is
     // preserved verbatim. The UI hook resolves the effective tab from
     // the active branch's worktree and the terminal session count.
-    seedRepo({ selectedBranch: 'feature/worktree', detailTab: 'terminal' })
+    seedRepo({ selectedBranch: 'feature/worktree', workspacePaneView: 'terminal' })
 
     useReposStore.getState().selectBranch(REPO_ID, 'feature/plain')
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.selectedBranch).toBe('feature/plain')
-    expect(repo?.ui.preferredDetailTab).toBe('terminal')
+    expect(repo?.ui.preferredWorkspacePaneView).toBe('terminal')
   })
 })
 
-describe('setDetailTab', () => {
-  test('persists the selected detail tab immediately', () => {
-    seedRepo({ selectedBranch: 'feature/worktree', detailTab: 'status' })
+describe('setWorkspacePaneView', () => {
+  test('persists the selected workspace pane view immediately', () => {
+    seedRepo({ selectedBranch: 'feature/worktree', workspacePaneView: 'status' })
 
-    useReposStore.getState().setDetailTab(REPO_ID, 'terminal')
+    useReposStore.getState().setWorkspacePaneView(REPO_ID, 'terminal')
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredDetailTab).toBe('terminal')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('terminal')
   })
 
   test('does not refresh when reselecting the current tab', () => {
-    seedRepo({ selectedBranch: 'main', detailTab: 'status' })
+    seedRepo({ selectedBranch: 'main', workspacePaneView: 'status' })
     const before = useReposStore.getState().repos[REPO_ID]
-    useReposStore.getState().setDetailTab(REPO_ID, 'status')
+    useReposStore.getState().setWorkspacePaneView(REPO_ID, 'status')
     expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
   })
 
   test('persists the changes tab immediately', async () => {
-    seedRepo({ selectedBranch: 'main', detailTab: 'status' })
+    seedRepo({ selectedBranch: 'main', workspacePaneView: 'status' })
 
-    useReposStore.getState().setDetailTab(REPO_ID, 'changes')
+    useReposStore.getState().setWorkspacePaneView(REPO_ID, 'changes')
     await flushAsyncWork()
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredDetailTab).toBe('changes')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('changes')
   })
 
-  test('passes the current repo token to detail tab refreshes', () => {
-    seedRepo({ selectedBranch: 'main', detailTab: 'terminal' })
+  test('passes the current repo token to workspace pane view refreshes', () => {
+    seedRepo({ selectedBranch: 'main', workspacePaneView: 'terminal' })
     const token = useReposStore.getState().repos[REPO_ID]!.instanceToken
     const pullRequestCalls: Parameters<ReturnType<typeof useReposStore.getState>['refreshPullRequests']>[] = []
     const restore = stubRefreshActions({
@@ -276,7 +277,7 @@ describe('setDetailTab', () => {
     })
 
     try {
-      useReposStore.getState().setDetailTab(REPO_ID, 'status')
+      useReposStore.getState().setWorkspacePaneView(REPO_ID, 'status')
 
       expect(pullRequestCalls[0]).toEqual([REPO_ID, ['main'], { token, mode: 'full' }])
     } finally {
@@ -290,33 +291,33 @@ describe('setDetailTab', () => {
       calls.push(branches ?? [])
       return []
     }
-    seedRepo({ selectedBranch: 'main', detailTab: 'terminal' })
+    seedRepo({ selectedBranch: 'main', workspacePaneView: 'terminal' })
 
-    useReposStore.getState().setDetailTab(REPO_ID, 'status')
+    useReposStore.getState().setWorkspacePaneView(REPO_ID, 'status')
     await flushAsyncWork()
 
     expect(calls).toEqual([['main']])
   })
 
   test('sets the terminal preference regardless of worktree presence', () => {
-    // setDetailTab is a pure preference write. Whether `terminal` is
-    // *renderable* is decided at read time by `computeEffectiveDetailTab`,
-    // which inspects the active branch's worktree + terminal session count.
-    seedRepo({ selectedBranch: 'feature/plain', detailTab: 'status' })
+    // setWorkspacePaneView is a pure preference write. Whether `terminal` is
+    // *renderable* is decided at read time from the active branch worktree,
+    // terminal session count, and opened workspace pane views.
+    seedRepo({ selectedBranch: 'feature/plain', workspacePaneView: 'status' })
 
-    useReposStore.getState().setDetailTab(REPO_ID, 'terminal')
+    useReposStore.getState().setWorkspacePaneView(REPO_ID, 'terminal')
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredDetailTab).toBe('terminal')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('terminal')
   })
 
   test('preserves the terminal preference even when no worktree exists for the active branch', () => {
     // Previously the store would re-project to `status` here. With the
     // derived-value pattern the preference is preserved; the UI hook
     // returns `status` for the rendered tab.
-    seedRepo({ selectedBranch: 'feature/plain', detailTab: 'terminal' })
-    useReposStore.getState().setDetailTab(REPO_ID, 'terminal')
+    seedRepo({ selectedBranch: 'feature/plain', workspacePaneView: 'terminal' })
+    useReposStore.getState().setWorkspacePaneView(REPO_ID, 'terminal')
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredDetailTab).toBe('terminal')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('terminal')
   })
 })
 

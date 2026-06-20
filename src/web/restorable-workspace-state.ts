@@ -4,7 +4,7 @@ import { persistedOpenWorkspaceEntries } from '#/web/open-workspace-state.ts'
 import {
   persistedActiveRepoIdForSession,
   persistedSelectedTerminalByWorktreeForSession,
-  persistedDetailTabByRepoForSession,
+  persistedWorkspacePaneViewByRepoForSession,
 } from '#/web/session-persistence-state.ts'
 
 export function sessionStateFromRestorableWorkspaceState(input: {
@@ -23,7 +23,7 @@ export function sessionStateFromRestorableWorkspaceState(input: {
       restorableWorkspaceState.selectedTerminalByWorktree,
       repos,
     ),
-    detailTabByRepo: persistedDetailTabByRepoForSession(repos, restorableWorkspaceState.order),
+    workspacePaneViewByRepo: persistedWorkspacePaneViewByRepoForSession(repos, restorableWorkspaceState.order),
   }
 }
 
@@ -41,7 +41,7 @@ export function restoreRestorableWorkspaceStateFromSession(
   | 'workspaceLayout'
   | 'detailPaneSizes'
   | 'selectedTerminalByWorktree'
-  | 'detailTabByRepo'
+  | 'workspacePaneViewByRepo'
 > {
   return {
     activeId,
@@ -50,6 +50,6 @@ export function restoreRestorableWorkspaceStateFromSession(
     workspaceLayout: session.workspaceLayout,
     detailPaneSizes: session.detailPaneSizes,
     selectedTerminalByWorktree: session.selectedTerminalByWorktree ?? {},
-    detailTabByRepo: session.detailTabByRepo ?? {},
+    workspacePaneViewByRepo: session.workspacePaneViewByRepo ?? session.detailTabByRepo ?? {},
   }
 }

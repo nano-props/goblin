@@ -802,12 +802,12 @@ describe('core refresh request ordering', () => {
 
   test('snapshot refresh preserves the terminal preference when the selected branch has no worktree', async () => {
     // The store never re-projects the preferred tab. Whether the terminal
-    // tab is renderable is decided at read time by `useEffectiveDetailTab`,
+    // tab is renderable is decided at read time by `useEffectiveWorkspacePaneView`,
     // which inspects the active branch's worktree + terminal session count.
     const token = seedRepo([branch('main', undefined, { worktree: { path: '/repo' } }), branch('feature/a')])
     updateRepoForTest((repo) => {
       repo.ui.selectedBranch = 'feature/a'
-      repo.ui.preferredDetailTab = 'terminal'
+      repo.ui.preferredWorkspacePaneView = 'terminal'
     })
     ipcHandlers['repo.snapshot'] = async () => ({ branches: [branch('feature/a')], current: 'feature/a' })
 
@@ -815,7 +815,7 @@ describe('core refresh request ordering', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.selectedBranch).toBe('feature/a')
-    expect(repo?.ui.preferredDetailTab).toBe('terminal')
+    expect(repo?.ui.preferredWorkspacePaneView).toBe('terminal')
   })
 
   test('snapshot refresh prunes terminal sessions to current worktree paths', async () => {

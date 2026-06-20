@@ -2,6 +2,8 @@ import type { RepoBranchActionKind } from '#/web/stores/repos/branch-action-type
 import { branchActionKindFromReason, isBranchActionReason } from '#/web/stores/repos/operations.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 export type BranchActionItemId =
+  | 'status'
+  | 'changes'
   | 'copyPatch'
   | 'checkout'
   | 'pull'

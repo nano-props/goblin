@@ -1,26 +1,5 @@
-import type {
-  TerminalAttachInput,
-  TerminalAttachResult,
-  TerminalCatalogMutationResult,
-  TerminalCreateInput,
-  TerminalExitEvent,
-  TerminalMutationResult,
-  TerminalNotifyBellInput,
-  TerminalOutputEvent,
-  TerminalResizeInput,
-  TerminalRestartInput,
-  TerminalSessionSnapshot,
-  TerminalSessionSnapshotInput,
-  TerminalSessionSummary,
-  TerminalSessionInput,
-  TerminalTakeoverInput,
-  TerminalTakeoverResult,
-  TerminalTitleEvent,
-  TerminalWriteInput,
-} from '#/shared/terminal-types.ts'
 import { getRendererBridge } from '#/web/renderer-bridge.ts'
 import type { RendererTerminalBridge } from '#/web/renderer-bridge-types.ts'
-import type { TerminalOwnershipViewModel } from '#/web/components/terminal/types.ts'
 
 function getTerminalBridge(): RendererTerminalBridge {
   return getRendererBridge().terminal()
@@ -45,10 +24,13 @@ export const terminalBridge: RendererTerminalBridge = {
   create: bindTerminalMethod('create'),
   pruneTerminals: bindTerminalMethod('pruneTerminals'),
   listSessions: bindTerminalMethod('listSessions'),
+  listViews: bindTerminalMethod('listViews'),
+  openView: bindTerminalMethod('openView'),
+  closeView: bindTerminalMethod('closeView'),
   prewarm: bindTerminalMethod('prewarm'),
   kickReconnect: bindTerminalMethod('kickReconnect'),
   getSessionSnapshot: bindTerminalMethod('getSessionSnapshot'),
-  reorder: bindTerminalMethod('reorder'),
+  reorderViews: bindTerminalMethod('reorderViews'),
   notifyBell: bindTerminalMethod('notifyBell'),
   sendTestNotification: bindTerminalMethod('sendTestNotification'),
   setBadge: bindTerminalMethod('setBadge'),

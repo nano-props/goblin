@@ -59,7 +59,7 @@ export function useAppBootstrap() {
           hydrateSession,
           applySessionLayoutState,
           applySessionSelectedTerminalState,
-          applySessionDetailTabByRepo,
+          applySessionWorkspacePaneViewByRepo,
         } = useReposStore.getState()
         // Apply layout prefs before repo probing finishes so the first
         // restored paint uses the saved geometry. useSessionPersistence
@@ -69,7 +69,7 @@ export function useAppBootstrap() {
         applySessionLayoutState(normalizedLayout)
         applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalByWorktree)
         await hydrateSession(session.openRepos, session.activeRepo)
-        applySessionDetailTabByRepo(restoredWorkspaceState.detailTabByRepo)
+        applySessionWorkspacePaneViewByRepo(restoredWorkspaceState.workspacePaneViewByRepo)
       } catch (err) {
         bootstrapLog.warn('failed', { err })
         useReposStore.setState({ sessionReady: true })

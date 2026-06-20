@@ -48,7 +48,7 @@ export function Layout() {
 
   const activeId = useReposStore((s) => s.activeId)
   const order = useReposStore((s) => s.order)
-  const { setActive, closeRepo, cycleActive, selectBranch, setDetailTab } = useStoreWithEqualityFn(
+  const { setActive, closeRepo, cycleActive, selectBranch, setWorkspacePaneView } = useStoreWithEqualityFn(
     useReposStore,
     mainWindowNavigationStoreActionsFromStore,
     mainWindowNavigationStoreActionsEqual,
@@ -62,10 +62,10 @@ export function Layout() {
         closeRepo,
         cycleActive,
         selectBranch,
-        setDetailTab,
+        setWorkspacePaneView,
         onOpenSettings: (page) => void navigate({ to: `/settings/${page}` }),
       }),
-    [activeId, closeRepo, cycleActive, navigate, order, selectBranch, setActive, setDetailTab],
+    [activeId, closeRepo, cycleActive, navigate, order, selectBranch, setActive, setWorkspacePaneView],
   )
 
   const workspaceShortcutsSuppressed = modalOpen || isSettingsOpen

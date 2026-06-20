@@ -12,7 +12,7 @@ describe('restorable-workspace-state', () => {
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
-      detailTab: 'terminal',
+      workspacePaneView: 'terminal',
     })
 
     expect(
@@ -28,7 +28,7 @@ describe('restorable-workspace-state', () => {
           selectedTerminalByWorktree: {
             '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2',
           },
-          detailTabByRepo: {},
+          workspacePaneViewByRepo: {},
         },
       }),
     ).toEqual({
@@ -41,7 +41,7 @@ describe('restorable-workspace-state', () => {
       selectedTerminalByWorktree: {
         '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2',
       },
-      detailTabByRepo: { '/tmp/repo': 'terminal' },
+      workspacePaneViewByRepo: { '/tmp/repo': 'terminal' },
     })
   })
 
@@ -67,7 +67,7 @@ describe('restorable-workspace-state', () => {
       selectedTerminalByWorktree: {
         '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-1',
       },
-      detailTabByRepo: {},
+      workspacePaneViewByRepo: {},
     })
   })
 })

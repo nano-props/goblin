@@ -1,9 +1,16 @@
-import type { WorktreeTerminalSnapshot, TerminalSessionBase } from '#/web/components/terminal/types.ts'
+import type {
+  WorktreeTerminalSnapshot,
+  TerminalSessionBase,
+} from '#/web/components/terminal/types.ts'
+import type { WorkspacePaneStaticViewType, WorkspacePaneViewOrderEntry } from '#/shared/workspace-pane.ts'
 
 interface TerminalSessionCommandBridge {
   worktreeSnapshot: (worktreeTerminalKey: string) => WorktreeTerminalSnapshot
   createTerminal: (base: TerminalSessionBase) => Promise<string>
   selectTerminal: (worktreeTerminalKey: string, key: string) => void
+  openWorkspacePaneView: (worktreeTerminalKey: string, type: WorkspacePaneStaticViewType) => Promise<boolean>
+  closeWorkspacePaneView: (worktreeTerminalKey: string, type: WorkspacePaneStaticViewType) => Promise<boolean>
+  reorderWorkspacePaneViews: (worktreeTerminalKey: string, orderedViews: WorkspacePaneViewOrderEntry[]) => Promise<boolean>
 }
 
 let bridge: TerminalSessionCommandBridge | null = null

@@ -2,6 +2,7 @@ import { emitRendererLocalEvent } from '#/web/local-events.ts'
 import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
 import { ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
 import {
+  normalizeWorkspacePaneStaticViewSummaryList,
   normalizeTerminalSocketServerMessage,
   normalizeTerminalSessionSnapshot,
   normalizeTerminalSessionSummaryList,
@@ -23,7 +24,6 @@ import type {
   TerminalMutationResult,
   TerminalNotifyBellInput,
   TerminalOutputEvent,
-  TerminalReorderInput,
   TerminalSessionSnapshot,
   TerminalSessionSnapshotInput,
   TerminalSessionSummary,
@@ -31,6 +31,12 @@ import type {
   TerminalTitleEvent,
   TerminalRestartInput,
 } from '#/shared/terminal-types.ts'
+import type {
+  WorkspacePaneListViewsInput,
+  WorkspacePaneReorderInput,
+  WorkspacePaneStaticViewInput,
+  WorkspacePaneStaticViewSummary,
+} from '#/shared/workspace-pane.ts'
 import type { RendererTerminalBridge } from '#/web/renderer-bridge-types.ts'
 import type { TerminalOwnershipViewModel } from '#/web/components/terminal/types.ts'
 import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'
@@ -281,9 +287,22 @@ export function createServerTerminalBridge(options: {
         return sessions
       })
     },
+    listViews(input) {
+      return requestOverSocket('list-views', input).then((value) => {
+        const views = normalizeWorkspacePaneStaticViewSummaryList(value)
+        if (!views) throw new Error('Terminal socket response failed: invalid workspace pane views response')
+        return views
+      })
+    },
+    openView(input) {
+      return requestOverSocket('open-view', input satisfies WorkspacePaneStaticViewInput)
+    },
+    closeView(input) {
+      return requestOverSocket('close-view', input satisfies WorkspacePaneStaticViewInput)
+    },
     prewarm() {
       // T1.2: pay the WebSocket handshake cost when the user enters
-      // a repo so the first real IPC after they click a terminal tab
+      // a repo so the first real IPC after they click a terminal view
       // doesn't have to. waitForSocketOpen() resolves immediately if
       // the socket is already OPEN; otherwise it calls ensureSocket()
       // and waits for the 'open' event. Swallow failures — this is
@@ -301,8 +320,8 @@ export function createServerTerminalBridge(options: {
         return snapshot
       })
     },
-    reorder(input) {
-      return requestOverSocket('reorder', input satisfies TerminalReorderInput)
+    reorderViews(input) {
+      return requestOverSocket('reorder-views', input satisfies WorkspacePaneReorderInput)
     },
     notifyBell(input) {
       // First check whether the wrapper has a native handler at all
@@ -407,6 +426,15 @@ export function createServerTerminalBridge(options: {
     input: { repoRoot: string },
   ): Promise<TerminalSessionSummary[]>
   async function requestOverSocket(
+    action: 'list-views',
+    input: WorkspacePaneListViewsInput,
+  ): Promise<WorkspacePaneStaticViewSummary[]>
+  async function requestOverSocket(action: 'open-view', input: WorkspacePaneStaticViewInput): Promise<TerminalMutationResult>
+  async function requestOverSocket(
+    action: 'close-view',
+    input: WorkspacePaneStaticViewInput,
+  ): Promise<TerminalMutationResult>
+  async function requestOverSocket(
     action: 'session-snapshot',
     input: TerminalSessionSnapshotInput,
   ): Promise<TerminalSessionSnapshot | null>
@@ -427,8 +455,8 @@ export function createServerTerminalBridge(options: {
     input: TerminalSocketRequestInputs['close'],
   ): Promise<TerminalMutationResult>
   async function requestOverSocket(
-    action: 'reorder',
-    input: TerminalSocketRequestInputs['reorder'],
+    action: 'reorder-views',
+    input: TerminalSocketRequestInputs['reorder-views'],
   ): Promise<TerminalMutationResult>
   async function requestOverSocket<TAction extends TerminalSocketRequestAction>(
     action: TAction,

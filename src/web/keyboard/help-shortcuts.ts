@@ -27,7 +27,7 @@ export function helpShortcutSections(
   swapCloseShortcuts = false,
   isMac = inferIsMacPlatform(),
 ): HelpShortcutSection[] {
-  const { closeTab, closeWindow } = closeShortcutAccelerators(swapCloseShortcuts)
+  const { closeView, closeWindow } = closeShortcutAccelerators(swapCloseShortcuts)
   return [
     {
       titleKey: 'help.section.nav',
@@ -54,7 +54,7 @@ export function helpShortcutSections(
       rows: [
         ...APP_SHORTCUTS.map((shortcut) => helpRowFromAccelerator(shortcut, isMac)),
         { combos: [acceleratorToKeyLabels(globalShortcut)], labelKey: 'help.row.activate-window' },
-        { combos: [acceleratorToKeyLabelsForHelp(closeTab, isMac)], labelKey: 'help.row.close-repo' },
+        { combos: [acceleratorToKeyLabelsForHelp(closeView, isMac)], labelKey: 'help.row.close-repo' },
         { combos: [acceleratorToKeyLabelsForHelp(closeWindow, isMac)], labelKey: 'help.row.close-window' },
         {
           combos: [acceleratorToKeyLabelsForHelp(isMac ? SETTINGS_SHORTCUT_MAC : SETTINGS_SHORTCUT_NON_MAC, isMac)],

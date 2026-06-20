@@ -14,7 +14,10 @@ import {
 import { readOrCreateWebTerminalAttachmentId } from '#/web/renderer-terminal-bridge.ts'
 import { preloadTerminalFont } from '#/web/components/terminal/terminal-geometry.ts'
 import { loadTerminalSessions } from '#/web/terminal-session-queries.ts'
-import { TerminalSessionRegistry, getTerminalSessionRegistry } from '#/web/components/terminal/TerminalSessionRegistry.ts'
+import {
+  TerminalSessionRegistry,
+  getTerminalSessionRegistry,
+} from '#/web/components/terminal/TerminalSessionRegistry.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { repoIndexEqual, repoIndexFromRepos } from '#/web/components/terminal/terminal-repo-index.ts'
 import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
@@ -50,7 +53,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   }, [])
 
   // T1.2: pay the WebSocket handshake cost when the user enters a repo,
-  // before they click a terminal tab. The bridge maintains a single
+  // before they click a terminal view. The bridge maintains a single
   // shared socket, so watching currentRepoId (not worktreeTerminalKey)
   // is the right granularity: one handshake per repo visit, not one per
   // worktree tab. The prewarm is fire-and-forget — failures are
@@ -111,9 +114,13 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       if (!repoRoot || !repoIndexRef.current[repoRoot]) return
       try {
         const attachmentId = readOrCreateWebTerminalAttachmentId()
-        const serverSessions = await loadTerminalSessions(repoRoot)
+        const [serverSessions, staticWorkspacePaneViews] = await Promise.all([
+          loadTerminalSessions(repoRoot),
+          terminalBridge.listViews({ repoRoot }),
+        ])
         const snapshotsBySessionId = await loadMissingSnapshots(serverSessions)
         if (!repoIndexRef.current[repoRoot]) return
+        registry.reconcileServerStaticViews(repoRoot, staticWorkspacePaneViews)
         registry.reconcileServerSessions(repoRoot, serverSessions, attachmentId, snapshotsBySessionId)
       } catch (err) {
         terminalSessionProviderLog.debug('failed to sync server sessions', { err })
@@ -169,47 +176,50 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   }, [])
 
   // Registry event wiring (singleton lifecycle, see terminal-roadmap.md P1.7).
-// The registry is renderer-level; we only subscribe / unsubscribe bridge
-// events on mount/unmount. We do NOT destroy the registry — the singleton
-// outlives the Provider. StrictMode re-mounts simply re-register the same
-// listeners against the same instance.
-useEffect(() => {
-  const offOutput = terminalBridge.onOutput((event) => {
-    registry.handleOutput(event)
-  })
-  const offTitle = terminalBridge.onTitle((event) => {
-    registry.handleServerTitle(event)
-  })
-  const offExit = terminalBridge.onExit((event) => {
-    registry.handleExit(event)
-  })
-  const offOwnership = terminalBridge.onOwnership((event) => {
-    registry.handleOwnership(event)
-  })
-  // Per-session close broadcast. When the server confirms a close,
-  // drop the matching local entry immediately so a sibling window
-  // (or a stale local entry from a lost close in the current
-  // window) doesn't reattach to the orphan. The originating window
-  // already disposed the local entry, so the handler is a no-op
-  // there — the broadcast is multi-window safe by construction.
-  const offSessionClosed = terminalBridge.onSessionClosed((event) => {
-    registry.handleSessionClosed(event.sessionId)
-  })
+  // The registry is renderer-level; we only subscribe / unsubscribe bridge
+  // events on mount/unmount. We do NOT destroy the registry — the singleton
+  // outlives the Provider. StrictMode re-mounts simply re-register the same
+  // listeners against the same instance.
+  useEffect(() => {
+    const offOutput = terminalBridge.onOutput((event) => {
+      registry.handleOutput(event)
+    })
+    const offTitle = terminalBridge.onTitle((event) => {
+      registry.handleServerTitle(event)
+    })
+    const offExit = terminalBridge.onExit((event) => {
+      registry.handleExit(event)
+    })
+    const offOwnership = terminalBridge.onOwnership((event) => {
+      registry.handleOwnership(event)
+    })
+    // Per-session close broadcast. When the server confirms a close,
+    // drop the matching local entry immediately so a sibling window
+    // (or a stale local entry from a lost close in the current
+    // window) doesn't reattach to the orphan. The originating window
+    // already disposed the local entry, so the handler is a no-op
+    // there — the broadcast is multi-window safe by construction.
+    const offSessionClosed = terminalBridge.onSessionClosed((event) => {
+      registry.handleSessionClosed(event.sessionId)
+    })
 
-  setTerminalSessionCommandBridge({
-    worktreeSnapshot: registry.worktreeSnapshot,
-    createTerminal: registry.createTerminal,
-    selectTerminal: registry.selectTerminal,
-  })
+    setTerminalSessionCommandBridge({
+      worktreeSnapshot: registry.worktreeSnapshot,
+      createTerminal: registry.createTerminal,
+      selectTerminal: registry.selectTerminal,
+      openWorkspacePaneView: registry.openWorkspacePaneView,
+      closeWorkspacePaneView: registry.closeWorkspacePaneView,
+      reorderWorkspacePaneViews: registry.reorderWorkspacePaneViews,
+    })
 
-  return () => {
-    offOutput()
-    offTitle()
-    offExit()
-    offOwnership()
-    offSessionClosed()
-  }
-}, [registry])
+    return () => {
+      offOutput()
+      offTitle()
+      offExit()
+      offOwnership()
+      offSessionClosed()
+    }
+  }, [registry])
 
   // Server sync (initial + focus + external session changes)
   useEffect(() => {
@@ -253,7 +263,9 @@ useEffect(() => {
       clearSearch: registry.clearSearch,
       writeInput: registry.writeInput,
       takeover: registry.takeover,
-      reorderSessions: registry.reorderSessions,
+      openWorkspacePaneView: registry.openWorkspacePaneView,
+      closeWorkspacePaneView: registry.closeWorkspacePaneView,
+      reorderWorkspacePaneViews: registry.reorderWorkspacePaneViews,
       serialize: registry.serialize,
     }),
     [registry],

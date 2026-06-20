@@ -38,7 +38,7 @@ describe('useSessionPersistence', () => {
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
-      detailTab: 'terminal',
+      workspacePaneView: 'terminal',
     })
     useReposStore.setState({
       repos: { [repo.id]: repo },

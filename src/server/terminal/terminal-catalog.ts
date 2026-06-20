@@ -69,6 +69,7 @@ interface TerminalCatalogManager {
   ensureSession(input: TerminalCatalogEnsureSessionInput): Promise<TerminalAttachResult>
   listSessionsForOwner(ownerId: string, repoRoot: string): Promise<TerminalSessionSummary[]>
   closeSession(sessionId: string): void
+  pruneStaticViewsForOwner(ownerId: string, scope: string, liveWorktreePaths: ReadonlySet<string>): number
 }
 
 interface TerminalCatalogOptions {
@@ -172,6 +173,7 @@ class TerminalCatalog {
 
     const worktrees = await getWorktrees(repoRoot, { includeStatus: false })
     const liveWorktreePaths = new Set(worktrees.map((worktree) => path.resolve(worktree.path)))
+    const staticViewsPruned = this.options.manager.pruneStaticViewsForOwner(ownerId, sessionScope, liveWorktreePaths)
     let pruned = 0
     for (const session of allSessions) {
       const parsed = parseTerminalSessionKey(session.key)
@@ -181,7 +183,7 @@ class TerminalCatalog {
       this.options.manager.closeSession(session.sessionId)
       pruned += 1
     }
-    if (pruned > 0) this.options.broadcastSessionsChanged(ownerId, repoRoot)
+    if (pruned > 0 || staticViewsPruned > 0) this.options.broadcastSessionsChanged(ownerId, repoRoot)
     const remaining = await this.options.manager
       .listSessionsForOwner(ownerId, sessionScope)
       .then((sessions) => sessions.length)

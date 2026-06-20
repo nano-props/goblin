@@ -35,7 +35,7 @@ export interface RuntimeCoherentRepoOpenStoreActions extends Pick<ReposStore, 'e
 
 export interface RuntimeCoherentRepoNavigationStoreActions extends Pick<
   ReposStore,
-  'closeRepo' | 'selectBranch' | 'setDetailTab'
+  'closeRepo' | 'selectBranch' | 'setWorkspacePaneView'
 > {}
 
 export interface RestorableWorkspaceStoreActions extends Pick<
@@ -53,12 +53,12 @@ export interface RestorableWorkspaceStoreActions extends Pick<
 
 export interface RuntimeCoherentRepoProjectionStoreActions extends Pick<
   ReposStore,
-  'ensureWorkspaceOpen' | 'closeRepo' | 'selectBranch' | 'setDetailTab'
+  'ensureWorkspaceOpen' | 'closeRepo' | 'selectBranch' | 'setWorkspacePaneView'
 > {}
 
 export interface MainWindowNavigationStoreActions extends Pick<
   ReposStore,
-  'setActive' | 'closeRepo' | 'cycleActive' | 'selectBranch' | 'setDetailTab'
+  'setActive' | 'closeRepo' | 'cycleActive' | 'selectBranch' | 'setWorkspacePaneView'
 > {}
 
 export interface RepoTabStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen' | 'reorderRepos'> {}
@@ -116,12 +116,12 @@ export function runtimeCoherentRepoOpenStoreActionsFromStore(
 }
 
 export function runtimeCoherentRepoNavigationStoreActionsFromStore(
-  state: Pick<ReposStore, 'closeRepo' | 'selectBranch' | 'setDetailTab'>,
+  state: Pick<ReposStore, 'closeRepo' | 'selectBranch' | 'setWorkspacePaneView'>,
 ): RuntimeCoherentRepoNavigationStoreActions {
   return {
     closeRepo: state.closeRepo,
     selectBranch: state.selectBranch,
-    setDetailTab: state.setDetailTab,
+    setWorkspacePaneView: state.setWorkspacePaneView,
   }
 }
 
@@ -201,24 +201,24 @@ export function restorableWorkspaceStoreActionsFromStore(
 }
 
 export function runtimeCoherentRepoProjectionStoreActionsFromStore(
-  state: Pick<ReposStore, 'ensureWorkspaceOpen' | 'closeRepo' | 'selectBranch' | 'setDetailTab'>,
+  state: Pick<ReposStore, 'ensureWorkspaceOpen' | 'closeRepo' | 'selectBranch' | 'setWorkspacePaneView'>,
 ): RuntimeCoherentRepoProjectionStoreActions {
   const open = runtimeCoherentRepoOpenStoreActionsFromStore({ ensureWorkspaceOpen: state.ensureWorkspaceOpen })
   const navigation = runtimeCoherentRepoNavigationStoreActionsFromStore({
     closeRepo: state.closeRepo,
     selectBranch: state.selectBranch,
-    setDetailTab: state.setDetailTab,
+    setWorkspacePaneView: state.setWorkspacePaneView,
   })
   return {
     ensureWorkspaceOpen: open.ensureWorkspaceOpen,
     closeRepo: navigation.closeRepo,
     selectBranch: navigation.selectBranch,
-    setDetailTab: navigation.setDetailTab,
+    setWorkspacePaneView: navigation.setWorkspacePaneView,
   }
 }
 
 export function mainWindowNavigationStoreActionsFromStore(
-  state: Pick<ReposStore, 'setActive' | 'cycleActive' | 'closeRepo' | 'selectBranch' | 'setDetailTab'>,
+  state: Pick<ReposStore, 'setActive' | 'cycleActive' | 'closeRepo' | 'selectBranch' | 'setWorkspacePaneView'>,
 ): MainWindowNavigationStoreActions {
   const restorable = restorableWorkspaceViewportStoreActionsFromStore({
     setActive: state.setActive,
@@ -227,14 +227,14 @@ export function mainWindowNavigationStoreActionsFromStore(
   const runtimeCoherent = runtimeCoherentRepoNavigationStoreActionsFromStore({
     closeRepo: state.closeRepo,
     selectBranch: state.selectBranch,
-    setDetailTab: state.setDetailTab,
+    setWorkspacePaneView: state.setWorkspacePaneView,
   })
   return {
     setActive: restorable.setActive,
     closeRepo: runtimeCoherent.closeRepo,
     cycleActive: restorable.cycleActive,
     selectBranch: runtimeCoherent.selectBranch,
-    setDetailTab: runtimeCoherent.setDetailTab,
+    setWorkspacePaneView: runtimeCoherent.setWorkspacePaneView,
   }
 }
 
@@ -314,7 +314,7 @@ export function mainWindowNavigationStoreActionsEqual(
     a.closeRepo === b.closeRepo &&
     a.cycleActive === b.cycleActive &&
     a.selectBranch === b.selectBranch &&
-    a.setDetailTab === b.setDetailTab
+    a.setWorkspacePaneView === b.setWorkspacePaneView
   )
 }
 

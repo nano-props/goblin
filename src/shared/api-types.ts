@@ -14,6 +14,7 @@ import type {
   WorktreeStatus,
 } from '#/shared/git-types.ts'
 import type { WorkspaceDetailPaneSizes, WorkspaceLayout } from '#/shared/workspace-layout.ts'
+import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type {
@@ -80,8 +81,6 @@ export interface ThemeState {
   colorTheme: ColorTheme
 }
 
-export type DetailTab = 'status' | 'changes' | 'terminal'
-
 export interface SessionState {
   /** Repo entries that were open, in tab order. */
   openRepos: RepoSessionEntry[]
@@ -92,8 +91,10 @@ export interface SessionState {
   workspaceLayout: WorkspaceLayout
   detailPaneSizes: WorkspaceDetailPaneSizes
   selectedTerminalByWorktree?: Record<string, string>
-  /** Per-repo detail tab selection, restored alongside detailCollapsed. */
-  detailTabByRepo?: Record<string, DetailTab>
+  /** Per-repo workspace pane view preference, restored alongside detailCollapsed. */
+  workspacePaneViewByRepo?: Record<string, WorkspacePaneView>
+  /** @deprecated Legacy session key; read for migration, write workspacePaneViewByRepo. */
+  detailTabByRepo?: Record<string, WorkspacePaneView>
 }
 
 export interface RuntimeSettingsSnapshot extends SettingsPrefs {

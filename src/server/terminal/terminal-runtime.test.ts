@@ -6,9 +6,6 @@
 // `ServerTerminalHost` surface so the wiring between the supervisor,
 // manager, broker, and catalog stays in lockstep with the shared
 // protocol types in `shared/terminal-types.ts`.
-// `ServerTerminalHost` surface so the wiring between the supervisor,
-// manager, broker, and catalog stays in lockstep with the shared
-// protocol types in `shared/terminal-types.ts`.
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { getWorktrees } from '#/system/git/worktrees.ts'
@@ -540,10 +537,14 @@ describe('server terminal runtime', () => {
     const sessionsBefore = await host.listSessions('client_1', OWNER_1, '/repo')
     expect(sessionsBefore).toHaveLength(3)
 
-    const result = host.reorder('client_1', OWNER_1, {
+    const result = host.reorderViews('client_1', OWNER_1, {
       repoRoot: '/repo',
       worktreePath: '/repo-linked',
-      orderedKeys: [sessionsBefore[0]!.key, sessionsBefore[1]!.key, sessionsBefore[1]!.key],
+      orderedViews: [
+        { type: 'terminal', id: sessionsBefore[0]!.key },
+        { type: 'terminal', id: sessionsBefore[1]!.key },
+        { type: 'terminal', id: sessionsBefore[1]!.key },
+      ],
     })
 
     expect(result).toBe(false)
@@ -564,10 +565,14 @@ describe('server terminal runtime', () => {
     if (!first || !second || !third) throw new Error('expected three sessions')
     socket.send.mockClear()
 
-    const result = host.reorder('client_1', OWNER_1, {
+    const result = host.reorderViews('client_1', OWNER_1, {
       repoRoot: '/repo',
       worktreePath: '/repo-linked',
-      orderedKeys: [third.key, first.key, second.key],
+      orderedViews: [
+        { type: 'terminal', id: third.key },
+        { type: 'terminal', id: first.key },
+        { type: 'terminal', id: second.key },
+      ],
     })
     expect(result).toBe(true)
 
@@ -581,6 +586,110 @@ describe('server terminal runtime', () => {
         return parsed.type === 'sessions-changed' && parsed.repoRoot === '/repo'
       }),
     ).toBe(true)
+
+    host.unregisterSocket('client_1', 'attachment_a', OWNER_1, socket)
+    shutdown()
+  })
+
+  test('rejects reorder payloads that would create unopened static views', async () => {
+    const { host, shutdown } = buildRuntime()
+    const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_1', 'attachment_a', OWNER_1, socket)
+    await createTerminalSession(host, 'client_1')
+    await createTerminalSession(host, 'client_1')
+
+    const sessionsBefore = await host.listSessions('client_1', OWNER_1, '/repo')
+    expect(sessionsBefore).toHaveLength(2)
+    const [first, second] = sessionsBefore
+    if (!first || !second) throw new Error('expected two sessions')
+    socket.send.mockClear()
+
+    const result = host.reorderViews('client_1', OWNER_1, {
+      repoRoot: '/repo',
+      worktreePath: '/repo-linked',
+      orderedViews: [
+        { type: 'status', id: 'status' },
+        { type: 'terminal', id: second.key },
+        { type: 'terminal', id: first.key },
+      ],
+    })
+
+    expect(result).toBe(false)
+    expect(await host.listViews('client_1', OWNER_1, '/repo')).toEqual([])
+    expect((await host.listSessions('client_1', OWNER_1, '/repo')).map((session) => session.key)).toEqual([
+      first.key,
+      second.key,
+    ])
+    expect(socket.send).not.toHaveBeenCalled()
+
+    host.unregisterSocket('client_1', 'attachment_a', OWNER_1, socket)
+    shutdown()
+  })
+
+  test('opens and closes static views without requiring a full reorder payload', async () => {
+    const { host, shutdown } = buildRuntime()
+    await createTerminalSession(host, 'client_1')
+    await createTerminalSession(host, 'client_1')
+
+    const sessions = await host.listSessions('client_1', OWNER_1, '/repo')
+    expect(sessions).toHaveLength(2)
+    expect(await host.listViews('client_1', OWNER_1, '/repo')).toEqual([])
+
+    const opened = host.openView('client_1', OWNER_1, {
+      repoRoot: '/repo',
+      worktreePath: '/repo-linked',
+      type: 'status',
+    })
+    expect(opened).toBe(true)
+
+    const tabs = await host.listViews('client_1', OWNER_1, '/repo')
+    expect(tabs).toHaveLength(1)
+    expect(tabs[0]).toEqual(expect.objectContaining({ type: 'status', id: 'status', worktreePath: '/repo-linked' }))
+    expect(tabs[0]!.displayOrder).toBeGreaterThan(Math.max(...sessions.map((session) => session.displayOrder)))
+
+    const closed = host.closeView('client_1', OWNER_1, {
+      repoRoot: '/repo',
+      worktreePath: '/repo-linked',
+      type: 'status',
+    })
+    expect(closed).toBe(true)
+    expect(await host.listViews('client_1', OWNER_1, '/repo')).toEqual([])
+    expect(await host.listSessions('client_1', OWNER_1, '/repo')).toHaveLength(2)
+
+    shutdown()
+  })
+
+  test('prunes static workspace pane views for removed local worktrees', async () => {
+    const { host, shutdown } = buildRuntime()
+    const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_1', 'attachment_a', OWNER_1, socket)
+
+    expect(
+      host.openView('client_1', OWNER_1, {
+        repoRoot: '/repo',
+        worktreePath: '/repo-linked',
+        type: 'status',
+      }),
+    ).toBe(true)
+    expect(
+      host.openView('client_1', OWNER_1, {
+        repoRoot: '/repo',
+        worktreePath: '/repo-removed',
+        type: 'changes',
+      }),
+    ).toBe(true)
+    expect(await host.listViews('client_1', OWNER_1, '/repo')).toHaveLength(2)
+    socket.send.mockClear()
+
+    await expect(host.prune('client_1', OWNER_1, '/repo')).resolves.toEqual({ pruned: 0, remaining: 0 })
+
+    expect(await host.listViews('client_1', OWNER_1, '/repo')).toEqual([
+      expect.objectContaining({ type: 'status', worktreePath: '/repo-linked' }),
+    ])
+    expect(socket.send.mock.calls.map(([payload]) => JSON.parse(String(payload)))).toContainEqual({
+      type: 'sessions-changed',
+      repoRoot: '/repo',
+    })
 
     host.unregisterSocket('client_1', 'attachment_a', OWNER_1, socket)
     shutdown()
@@ -834,10 +943,10 @@ describe('server terminal runtime', () => {
     expect(host.getSessionSnapshot('client_shared', OWNER_2, { sessionId: ownerASession.sessionId })).toBeNull()
     expect(host.close('client_shared', OWNER_2, { sessionId: ownerASession.sessionId })).toBe(false)
     expect(
-      host.reorder('client_shared', OWNER_2, {
+      host.reorderViews('client_shared', OWNER_2, {
         repoRoot: '/repo',
         worktreePath: '/repo-linked',
-        orderedKeys: [ownerASession.key],
+        orderedViews: [{ type: 'terminal', id: ownerASession.key }],
       }),
     ).toBe(false)
     expect(

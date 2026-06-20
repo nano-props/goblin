@@ -11,7 +11,6 @@ import type {
   TerminalMutationResult,
   TerminalNotifyBellInput,
   TerminalOutputEvent,
-  TerminalReorderInput,
   TerminalResizeInput,
   TerminalRestartInput,
   TerminalSessionSnapshot,
@@ -23,6 +22,12 @@ import type {
   TerminalTitleEvent,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
+import type {
+  WorkspacePaneListViewsInput,
+  WorkspacePaneReorderInput,
+  WorkspacePaneStaticViewInput,
+  WorkspacePaneStaticViewSummary,
+} from '#/shared/workspace-pane.ts'
 import type { TerminalOwnershipViewModel } from '#/web/components/terminal/types.ts'
 
 export interface RendererTerminalBridge {
@@ -35,11 +40,14 @@ export interface RendererTerminalBridge {
   create: (input: TerminalCreateInput) => Promise<TerminalCatalogMutationResult>
   pruneTerminals: (repoRoot: string) => Promise<{ pruned: number; remaining: number }>
   listSessions: (input: { repoRoot: string }) => Promise<TerminalSessionSummary[]>
+  listViews: (input: WorkspacePaneListViewsInput) => Promise<WorkspacePaneStaticViewSummary[]>
+  openView: (input: WorkspacePaneStaticViewInput) => Promise<TerminalMutationResult>
+  closeView: (input: WorkspacePaneStaticViewInput) => Promise<TerminalMutationResult>
   /**
    * Open the underlying WebSocket (if not already open) and resolve
    * once it reaches the OPEN state. Used as a T1.2 prewarm when the
    * user enters a repo so they pay the DNS+TCP+TLS+WS handshake
-   * before clicking a terminal tab. Idempotent (already-open socket
+   * before clicking a terminal view. Idempotent (already-open socket
    * resolves immediately) and best-effort (failures are swallowed;
    * the next real `listSessions`/`attach` will retry and surface a
    * real error if the server is unreachable). No parameters: the
@@ -55,7 +63,7 @@ export interface RendererTerminalBridge {
    */
   kickReconnect: () => void
   getSessionSnapshot: (input: TerminalSessionSnapshotInput) => Promise<TerminalSessionSnapshot | null>
-  reorder: (input: TerminalReorderInput) => Promise<TerminalMutationResult>
+  reorderViews: (input: WorkspacePaneReorderInput) => Promise<TerminalMutationResult>
   notifyBell: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>
   sendTestNotification: () => Promise<boolean>
   setBadge: (count: number) => void

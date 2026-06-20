@@ -36,7 +36,7 @@ let currentRepoId: string | null = null
 let navigation!: MainWindowNavigationActions
 const activateRepoSpy = vi.fn()
 const closeRepoSpy = vi.fn()
-const showRepoBranchDetailTabSpy = vi.fn()
+const showRepoBranchWorkspacePaneViewSpy = vi.fn()
 const consumeExternalOpenPathsSpy = vi.fn<() => Promise<string[]>>(async () => [])
 
 beforeEach(() => {
@@ -46,7 +46,7 @@ beforeEach(() => {
   closeAllOverlays.mockClear()
   activateRepoSpy.mockClear()
   closeRepoSpy.mockClear()
-  showRepoBranchDetailTabSpy.mockClear()
+  showRepoBranchWorkspacePaneViewSpy.mockClear()
   appDataClientMocks.clearRecentRepoHistory.mockClear()
   consumeExternalOpenPathsSpy.mockReset()
   consumeExternalOpenPathsSpy.mockResolvedValue([])
@@ -68,17 +68,17 @@ beforeEach(() => {
       state.setActive(repoId)
       state.selectBranch(repoId, branch)
     },
-    showRepoDetailTab: (repoId, tab) => {
+    showRepoWorkspacePaneView: (repoId, tab) => {
       const state = useReposStore.getState()
       state.setActive(repoId)
-      state.setDetailTab(repoId, tab)
+      state.setWorkspacePaneView(repoId, tab)
     },
-    showRepoBranchDetailTab: (repoId, branch, tab) => {
-      showRepoBranchDetailTabSpy(repoId, branch, tab)
+    showRepoBranchWorkspacePaneView: (repoId, branch, tab) => {
+      showRepoBranchWorkspacePaneViewSpy(repoId, branch, tab)
       const state = useReposStore.getState()
       state.setActive(repoId)
       state.selectBranch(repoId, branch)
-      state.setDetailTab(repoId, tab)
+      state.setWorkspacePaneView(repoId, tab)
     },
     openSettings: () => {},
   }
@@ -137,12 +137,12 @@ afterEach(() => {
 })
 
 describe('useRendererEffectIntentRouter', () => {
-  test('terminal bell clicks close all overlays and focus the repo terminal tab', async () => {
+  test('terminal bell clicks close all overlays and focus the repo terminal view', async () => {
     const repo = seedRepoState({
       id: '/tmp/repo',
       currentBranch: 'main',
       selectedBranch: 'main',
-      detailTab: 'status',
+      workspacePaneView: 'status',
       branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
     })
     currentRepoId = repo.id
@@ -158,7 +158,7 @@ describe('useRendererEffectIntentRouter', () => {
     expect(closeAllOverlays).toHaveBeenCalledTimes(1)
     const state = useReposStore.getState()
     expect(state.activeId).toBe(repo.id)
-    expect(state.repos[repo.id]?.ui.preferredDetailTab).toBe('terminal')
+    expect(state.repos[repo.id]?.ui.preferredWorkspacePaneView).toBe('terminal')
     expect(state.detailCollapsed).toBe(false)
   })
 
@@ -167,7 +167,7 @@ describe('useRendererEffectIntentRouter', () => {
       id: '/tmp/repo',
       currentBranch: 'main',
       selectedBranch: 'main',
-      detailTab: 'status',
+      workspacePaneView: 'status',
       branchSnapshots: [
         createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-main' } }),
         createBranchSnapshot('feature/test', { worktree: { path: '/tmp/repo-feature' } }),
@@ -184,20 +184,20 @@ describe('useRendererEffectIntentRouter', () => {
     })
 
     const state = useReposStore.getState()
-    expect(showRepoBranchDetailTabSpy).toHaveBeenCalledWith(repo.id, 'feature/test', 'terminal')
+    expect(showRepoBranchWorkspacePaneViewSpy).toHaveBeenCalledWith(repo.id, 'feature/test', 'terminal')
     expect(state.repos[repo.id]?.ui.selectedBranch).toBe('feature/test')
-    expect(state.repos[repo.id]?.ui.preferredDetailTab).toBe('terminal')
+    expect(state.repos[repo.id]?.ui.preferredWorkspacePaneView).toBe('terminal')
     expect(state.selectedTerminalByWorktree).toMatchObject({
       [worktreeTerminalKey(repo.id, '/tmp/repo-feature')]: key,
     })
   })
 
-  test('terminal bell clicks combine branch and terminal tab navigation in a single route-driven action', async () => {
+  test('terminal bell clicks combine branch and terminal view navigation in a single route-driven action', async () => {
     const repo = seedRepoState({
       id: '/tmp/repo',
       currentBranch: 'main',
       selectedBranch: 'main',
-      detailTab: 'status',
+      workspacePaneView: 'status',
       branchSnapshots: [
         createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-main' } }),
         createBranchSnapshot('feature/test', { worktree: { path: '/tmp/repo-feature' } }),
@@ -207,8 +207,8 @@ describe('useRendererEffectIntentRouter', () => {
     navigation = {
       ...navigation,
       selectRepoBranch: vi.fn(),
-      showRepoDetailTab: vi.fn(),
-      showRepoBranchDetailTab: (repoId, branch, tab) => {
+      showRepoWorkspacePaneView: vi.fn(),
+      showRepoBranchWorkspacePaneView: (repoId, branch, tab) => {
         routeNavigationCalls.push({ repoId, branch, tab })
       },
     }
@@ -312,7 +312,7 @@ describe('useRendererEffectIntentRouter', () => {
       id: '/tmp/repo',
       currentBranch: 'main',
       selectedBranch: 'main',
-      detailTab: 'status',
+      workspacePaneView: 'status',
       branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
     })
     currentRepoId = repo.id
@@ -323,7 +323,7 @@ describe('useRendererEffectIntentRouter', () => {
 
     await act(async () => {
       for (const listener of intentListeners) {
-        listener({ type: 'show-detail-tab-requested', tab: 'terminal' })
+        listener({ type: 'show-workspace-pane-view-requested', tab: 'terminal' })
         listener({ type: 'toggle-detail-requested' })
         listener({ type: 'terminal-primary-action-requested' })
         listener({ type: 'close-repo-requested' })
@@ -332,7 +332,7 @@ describe('useRendererEffectIntentRouter', () => {
     })
 
     const state = useReposStore.getState()
-    expect(state.repos[repo.id]?.ui.preferredDetailTab).toBe('status')
+    expect(state.repos[repo.id]?.ui.preferredWorkspacePaneView).toBe('status')
     expect(state.detailCollapsed).toBe(before.detailCollapsed)
     expect(closeRepoSpy).not.toHaveBeenCalled()
   })

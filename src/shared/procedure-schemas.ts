@@ -179,6 +179,7 @@ const SessionStateSchema = v.object({
     'left-right': v.number(),
   }),
   selectedTerminalByWorktree: v.optional(v.record(v.string(), v.string())),
+  workspacePaneViewByRepo: v.optional(v.record(v.string(), v.picklist(['status', 'changes', 'terminal']))),
   detailTabByRepo: v.optional(v.record(v.string(), v.picklist(['status', 'changes', 'terminal']))),
 })
 const SessionStateSchemaWithDefaults = v.object({
@@ -195,6 +196,7 @@ const SessionStateSchemaWithDefaults = v.object({
     DEFAULT_DETAIL_PANE_SIZES,
   ),
   selectedTerminalByWorktree: v.optional(v.record(v.string(), v.string())),
+  workspacePaneViewByRepo: v.optional(v.record(v.string(), v.picklist(['status', 'changes', 'terminal']))),
   detailTabByRepo: v.optional(v.record(v.string(), v.picklist(['status', 'changes', 'terminal']))),
 })
 

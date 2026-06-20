@@ -3,7 +3,7 @@ import { terminalSessionProviderLog } from '#/web/logger.ts'
 import { ManagedTerminalSession } from '#/web/components/terminal/ManagedTerminalSession.ts'
 import { createTerminalBellController } from '#/web/components/terminal/terminal-bell-controller.ts'
 import { terminalDescriptor } from '#/web/components/terminal/terminal-descriptor.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
+import { parseWorktreeTerminalKey, worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 import { readOrCreateWebTerminalAttachmentId } from '#/web/renderer-terminal-bridge.ts'
 import { parseTerminalSessionKey } from '#/shared/terminal-session-key.ts'
@@ -11,6 +11,11 @@ import type {
   TerminalSessionSnapshot,
   TerminalSessionSummary as ServerTerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
+import type {
+  WorkspacePaneStaticViewSummary as ServerWorkspacePaneStaticViewSummary,
+  WorkspacePaneStaticViewType,
+  WorkspacePaneViewOrderEntry,
+} from '#/shared/workspace-pane.ts'
 import { branchForTerminalWorktree } from '#/web/components/terminal/terminal-repo-index.ts'
 import {
   projectServerTerminalSession,
@@ -21,7 +26,6 @@ import {
   type TerminalUserInputSource,
 } from '#/web/components/terminal/terminal-input.ts'
 import {
-  applyDisplayOrder,
   restoreDisplayOrder,
   snapshotDisplayOrder,
   terminalSessionDisplayOrder,
@@ -38,6 +42,7 @@ import { syncTerminalSessionIdIndex } from '#/web/components/terminal/terminal-s
 import { resolveSelectedTerminalKey } from '#/web/components/terminal/terminal-session-selection.ts'
 import { buildWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-worktree-snapshot.ts'
 import type {
+  WorkspacePaneStaticViewSummary,
   TerminalDescriptor,
   TerminalOwnershipViewModel,
   TerminalRepoIndex,
@@ -76,6 +81,8 @@ export const parseServerSessionKey = parseTerminalSessionKey
  * survive StrictMode; the singleton removes that dance entirely.
  */
 export class TerminalSessionRegistry {
+  private readonly getCurrentRepoId: () => string | null
+  private readonly onSelectedWorktreeChange: (worktreeTerminalKey: string, key: string | null) => void
   private repoIndex: TerminalRepoIndex = {}
   private parkingRoot: HTMLDivElement | null = null
   private readonly sessions = new Map<string, ManagedTerminalSession>()
@@ -137,6 +144,7 @@ export class TerminalSessionRegistry {
   private static readonly REATTACH_SNAPSHOT_CACHE_HARD_CAP = 8
   private readonly reattachSnapshotCache = new Map<string, ReattachSnapshotCacheEntry>()
   private readonly worktreeSnapshotCache = new Map<string, WorktreeTerminalSnapshot>()
+  private readonly staticWorkspaceViewsByWorktree = new Map<string, WorkspacePaneStaticViewSummary[]>()
   private readonly worktreeListeners = new Map<string, Set<() => void>>()
   private readonly snapshotListeners = new Map<string, Set<() => void>>()
   private readonly displayOrderByKey = new Map<string, number>()
@@ -153,9 +161,12 @@ export class TerminalSessionRegistry {
   )
 
   constructor(
-    private readonly getCurrentRepoId: () => string | null,
-    private readonly onSelectedWorktreeChange: (worktreeTerminalKey: string, key: string | null) => void = () => {},
-  ) {}
+    getCurrentRepoId: () => string | null,
+    onSelectedWorktreeChange: (worktreeTerminalKey: string, key: string | null) => void = () => {},
+  ) {
+    this.getCurrentRepoId = getCurrentRepoId
+    this.onSelectedWorktreeChange = onSelectedWorktreeChange
+  }
 
   setRepoIndex(repoIndex: TerminalRepoIndex): void {
     this.repoIndex = repoIndex
@@ -204,6 +215,7 @@ export class TerminalSessionRegistry {
     this.snapshotCache.clear()
     this.reattachSnapshotCache.clear()
     this.worktreeSnapshotCache.clear()
+    this.staticWorkspaceViewsByWorktree.clear()
     this.worktreeListeners.clear()
     this.snapshotListeners.clear()
     this.bellController.reset()
@@ -298,6 +310,40 @@ export class TerminalSessionRegistry {
     for (const worktreeTerminalKey of displayOrderChangedWorktrees) {
       this.notifyWorktree(worktreeTerminalKey)
     }
+  }
+
+  reconcileServerStaticViews(repoRoot: string, tabs: ServerWorkspacePaneStaticViewSummary[]): void {
+    if (!this.repoIndex[repoRoot]) return
+    const previousWorktrees = new Set(
+      Array.from(this.staticWorkspaceViewsByWorktree.keys()).filter((key) => key.startsWith(`${repoRoot}\0`)),
+    )
+    const nextByWorktree = new Map<string, WorkspacePaneStaticViewSummary[]>()
+
+    for (const tab of tabs) {
+      const terminalWorktreeKey = worktreeTerminalKey(repoRoot, tab.worktreePath)
+      const summary: WorkspacePaneStaticViewSummary = {
+        type: tab.type,
+        id: tab.type,
+        key: tab.type,
+        worktreeTerminalKey: terminalWorktreeKey,
+        worktreePath: tab.worktreePath,
+        displayOrder: tab.displayOrder,
+      }
+      const current = nextByWorktree.get(terminalWorktreeKey) ?? []
+      current.push(summary)
+      nextByWorktree.set(terminalWorktreeKey, current)
+    }
+
+    const changedWorktrees = new Set<string>(previousWorktrees)
+    for (const [terminalWorktreeKey, nextTabs] of nextByWorktree) {
+      nextTabs.sort((a, b) => a.displayOrder - b.displayOrder || a.type.localeCompare(b.type))
+      this.staticWorkspaceViewsByWorktree.set(terminalWorktreeKey, nextTabs)
+      changedWorktrees.add(terminalWorktreeKey)
+    }
+    for (const worktreeKey of previousWorktrees) {
+      if (!nextByWorktree.has(worktreeKey)) this.staticWorkspaceViewsByWorktree.delete(worktreeKey)
+    }
+    for (const worktreeKey of changedWorktrees) this.notifyWorktree(worktreeKey)
   }
 
   // Phase 1: for each server session, ensure a local ManagedTerminalSession
@@ -614,11 +660,13 @@ export class TerminalSessionRegistry {
       worktreeTerminalKey,
       selectedDescriptor: this.selectedDescriptor(worktreeTerminalKey),
       pendingCreate: this.pendingCreateByWorktree.has(worktreeTerminalKey),
+      staticWorkspacePaneViews: this.staticWorkspaceViewsByWorktree.get(worktreeTerminalKey) ?? [],
       sessions: this.sortedSessionsForWorktree(worktreeTerminalKey),
       selectedKey: this.selectedKeyByWorktree.get(worktreeTerminalKey) ?? null,
       getCachedSnapshot: (key) => this.snapshotCache.get(key) ?? null,
       cacheSnapshot: (key, nextSnapshot) => this.snapshotCache.set(key, nextSnapshot),
       hasBell: (key) => this.bellController.hasBell(key),
+      getDisplayOrder: (session) => terminalSessionDisplayOrder(session.descriptor, this.displayOrderByKey),
     })
     this.worktreeSnapshotCache.set(worktreeTerminalKey, snapshot)
     return snapshot
@@ -725,31 +773,157 @@ export class TerminalSessionRegistry {
     return this.sessions.get(key)?.serialize() ?? ''
   }
 
-  reorderSessions = async (scope: string, orderedKeys: string[]): Promise<boolean> => {
-    if (orderedKeys.length === 0) return true
-    if (new Set(orderedKeys).size !== orderedKeys.length) return false
-    let parsed: { repoRoot: string; worktreePath: string; terminalId: string } | null = null
-    for (const key of orderedKeys) {
-      const item = parseServerSessionKey(key)
-      if (!item) return false
-      if (worktreeTerminalKey(item.repoRoot, item.worktreePath) !== scope) return false
-      if (!parsed) parsed = item
+  reorderWorkspacePaneViews = async (worktreeKey: string, orderedViews: WorkspacePaneViewOrderEntry[]): Promise<boolean> => {
+    const parsedWorktree = parseWorktreeTerminalKey(worktreeKey)
+    if (!parsedWorktree) return false
+    if (new Set(orderedViews.map((tab) => `${tab.type}\0${tab.id}`)).size !== orderedViews.length) return false
+
+    const existingTerminalKeys = this.sortedSessionsForWorktree(worktreeKey).map((session) => session.descriptor.key)
+    const orderedTerminalKeys = orderedViews.filter((tab) => tab.type === 'terminal').map((tab) => tab.id)
+    if (orderedTerminalKeys.length !== existingTerminalKeys.length) return false
+    const existingTerminalKeySet = new Set(existingTerminalKeys)
+    if (!orderedTerminalKeys.every((key) => existingTerminalKeySet.has(key))) return false
+
+    const existingStaticTypes = new Set((this.staticWorkspaceViewsByWorktree.get(worktreeKey) ?? []).map((tab) => tab.type))
+    const orderedStaticTypes: WorkspacePaneStaticViewType[] = []
+    for (const tab of orderedViews) {
+      if (tab.type !== 'terminal') orderedStaticTypes.push(tab.type)
     }
-    if (!parsed) return false
-    // Snapshot current order so we can roll back if the server rejects the reorder.
-    const previousOrder = snapshotDisplayOrder(orderedKeys, this.displayOrderByKey)
-    applyDisplayOrder(this.displayOrderByKey, orderedKeys)
-    this.notifyWorktree(scope)
-    const result = await terminalBridge.reorder({
-      repoRoot: parsed.repoRoot,
-      worktreePath: parsed.worktreePath,
-      orderedKeys,
-    })
+    if (orderedStaticTypes.length !== existingStaticTypes.size) return false
+    if (!orderedStaticTypes.every((type) => existingStaticTypes.has(type))) return false
+
+    for (const tab of orderedViews) {
+      if (tab.type === 'terminal') continue
+      if (tab.id !== tab.type) return false
+    }
+
+    const previousOrder = snapshotDisplayOrder(orderedTerminalKeys, this.displayOrderByKey)
+    const previousStaticViews = this.staticWorkspaceViewsByWorktree.get(worktreeKey)?.slice() ?? []
+    this.applyOptimisticWorkspacePaneViewOrder(worktreeKey, orderedViews)
+    this.notifyWorktree(worktreeKey)
+
+    let result = false
+    try {
+      result = await terminalBridge.reorderViews({
+        repoRoot: parsedWorktree.repoRoot,
+        worktreePath: parsedWorktree.worktreePath,
+        orderedViews,
+      })
+    } catch (err) {
+      terminalSessionProviderLog.warn('failed to reorder workspace pane views', { worktreeKey, err })
+    }
     if (!result) {
       restoreDisplayOrder(this.displayOrderByKey, previousOrder)
-      this.notifyWorktree(scope)
+      if (previousStaticViews.length > 0) this.staticWorkspaceViewsByWorktree.set(worktreeKey, previousStaticViews)
+      else this.staticWorkspaceViewsByWorktree.delete(worktreeKey)
+      this.notifyWorktree(worktreeKey)
     }
     return result
+  }
+
+  openWorkspacePaneView = async (worktreeKey: string, type: WorkspacePaneStaticViewType): Promise<boolean> => {
+    const parsedWorktree = parseWorktreeTerminalKey(worktreeKey)
+    if (!parsedWorktree) return false
+
+    const previousStaticViews = this.staticWorkspaceViewsByWorktree.get(worktreeKey)?.slice() ?? []
+    this.applyOptimisticStaticWorkspacePaneViewOpen(worktreeKey, type)
+    this.notifyWorktree(worktreeKey)
+
+    let result = false
+    try {
+      result = await terminalBridge.openView({
+        repoRoot: parsedWorktree.repoRoot,
+        worktreePath: parsedWorktree.worktreePath,
+        type,
+      })
+    } catch (err) {
+      terminalSessionProviderLog.warn('failed to open workspace pane view', { worktreeKey, type, err })
+    }
+    if (!result) {
+      this.restoreStaticWorkspacePaneViews(worktreeKey, previousStaticViews)
+      this.notifyWorktree(worktreeKey)
+    }
+    return result
+  }
+
+  closeWorkspacePaneView = async (worktreeKey: string, type: WorkspacePaneStaticViewType): Promise<boolean> => {
+    const parsedWorktree = parseWorktreeTerminalKey(worktreeKey)
+    if (!parsedWorktree) return false
+
+    const previousStaticViews = this.staticWorkspaceViewsByWorktree.get(worktreeKey)?.slice() ?? []
+    this.applyOptimisticStaticWorkspacePaneViewClose(worktreeKey, type)
+    this.notifyWorktree(worktreeKey)
+
+    let result = false
+    try {
+      result = await terminalBridge.closeView({
+        repoRoot: parsedWorktree.repoRoot,
+        worktreePath: parsedWorktree.worktreePath,
+        type,
+      })
+    } catch (err) {
+      terminalSessionProviderLog.warn('failed to close workspace pane view', { worktreeKey, type, err })
+    }
+    if (!result) {
+      this.restoreStaticWorkspacePaneViews(worktreeKey, previousStaticViews)
+      this.notifyWorktree(worktreeKey)
+    }
+    return result
+  }
+
+  private applyOptimisticWorkspacePaneViewOrder(worktreeKey: string, orderedViews: WorkspacePaneViewOrderEntry[]): void {
+    const parsedWorktree = parseWorktreeTerminalKey(worktreeKey)
+    if (!parsedWorktree) return
+    const staticWorkspacePaneViews: WorkspacePaneStaticViewSummary[] = []
+    for (let i = 0; i < orderedViews.length; i++) {
+      const tab = orderedViews[i]
+      if (tab.type === 'terminal') {
+        this.displayOrderByKey.set(tab.id, i)
+        continue
+      }
+      staticWorkspacePaneViews.push({
+        type: tab.type,
+        id: tab.type,
+        key: tab.type,
+        worktreeTerminalKey: worktreeKey,
+        worktreePath: parsedWorktree.worktreePath,
+        displayOrder: i,
+      })
+    }
+    if (staticWorkspacePaneViews.length > 0) this.staticWorkspaceViewsByWorktree.set(worktreeKey, staticWorkspacePaneViews)
+    else this.staticWorkspaceViewsByWorktree.delete(worktreeKey)
+  }
+
+  private applyOptimisticStaticWorkspacePaneViewOpen(worktreeKey: string, type: WorkspacePaneStaticViewType): void {
+    const parsedWorktree = parseWorktreeTerminalKey(worktreeKey)
+    if (!parsedWorktree) return
+    const currentStaticViews = this.staticWorkspaceViewsByWorktree.get(worktreeKey) ?? []
+    if (currentStaticViews.some((tab) => tab.type === type)) return
+    const currentTabs = this.worktreeSnapshot(worktreeKey).workspacePaneViews
+    const displayOrder = currentTabs.reduce((max, tab) => Math.max(max, tab.displayOrder), -1) + 1
+    this.staticWorkspaceViewsByWorktree.set(worktreeKey, [
+      ...currentStaticViews,
+      {
+        type,
+        id: type,
+        key: type,
+        worktreeTerminalKey: worktreeKey,
+        worktreePath: parsedWorktree.worktreePath,
+        displayOrder,
+      },
+    ])
+  }
+
+  private applyOptimisticStaticWorkspacePaneViewClose(worktreeKey: string, type: WorkspacePaneStaticViewType): void {
+    const currentStaticViews = this.staticWorkspaceViewsByWorktree.get(worktreeKey) ?? []
+    const nextStaticViews = currentStaticViews.filter((tab) => tab.type !== type)
+    if (nextStaticViews.length > 0) this.staticWorkspaceViewsByWorktree.set(worktreeKey, nextStaticViews)
+    else this.staticWorkspaceViewsByWorktree.delete(worktreeKey)
+  }
+
+  private restoreStaticWorkspacePaneViews(worktreeKey: string, staticWorkspacePaneViews: WorkspacePaneStaticViewSummary[]): void {
+    if (staticWorkspacePaneViews.length > 0) this.staticWorkspaceViewsByWorktree.set(worktreeKey, staticWorkspacePaneViews)
+    else this.staticWorkspaceViewsByWorktree.delete(worktreeKey)
   }
 
   private notifyWorktree(worktreeTerminalKey: string): void {

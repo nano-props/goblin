@@ -14,12 +14,12 @@ import {
 } from '#/shared/workspace-layout.ts'
 import type {
   BranchViewMode,
-  DetailTab,
   RepoWorkspaceLayout,
   ReposGet,
   ReposSet,
   ReposStore,
 } from '#/web/stores/repos/types.ts'
+import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { WorkspaceDetailPaneSizes } from '#/shared/workspace-layout.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import { pushWorkspaceLayoutToNativeMenu } from '#/web/settings-client.ts'
@@ -36,14 +36,14 @@ type RestorableWorkspaceSelectionActions = Pick<
   | 'setWorkspaceLayout'
   | 'applySessionLayoutState'
   | 'applySessionSelectedTerminalState'
-  | 'applySessionDetailTabByRepo'
+  | 'applySessionWorkspacePaneViewByRepo'
   | 'setDetailPaneSize'
   | 'setDetailPaneSizes'
   | 'resetLayout'
   | 'setSelectedTerminal'
 >
 
-type RuntimeCoherentSelectionActions = Pick<ReposStore, 'setBranchViewMode' | 'setDetailTab' | 'selectBranch'>
+type RuntimeCoherentSelectionActions = Pick<ReposStore, 'setBranchViewMode' | 'setWorkspacePaneView' | 'selectBranch'>
 
 type RepoMutationSelectionActions = Pick<ReposStore, 'checkoutSelectedInRepo' | 'checkoutSelected'>
 
@@ -173,22 +173,22 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
       })
     },
 
-    applySessionDetailTabByRepo(detailTabByRepo: Record<string, DetailTab>) {
-      // One-shot boot/session restore of per-repo user-preferred detail tab.
+    applySessionWorkspacePaneViewByRepo(workspacePaneViewByRepo: Record<string, WorkspacePaneView>) {
+      // One-shot boot/session restore of per-repo user-preferred workspace pane view.
       // The store does not project against terminal session count or
-      // worktree presence — `useEffectiveDetailTab` handles that at read
+      // worktree presence — `useEffectiveWorkspacePaneView` handles that at read
       // time, which keeps the restored preference intact even if a
       // worktree later confirms zero sessions.
       set((s) => {
         let changed = false
         const repos = { ...s.repos }
-        for (const [id, tab] of Object.entries(detailTabByRepo)) {
+        for (const [id, tab] of Object.entries(workspacePaneViewByRepo)) {
           const repo = repos[id]
           if (!repo) continue
-          if (repo.ui.preferredDetailTab === tab) continue
+          if (repo.ui.preferredWorkspacePaneView === tab) continue
           changed = true
           repos[id] = replaceRepo(repo, (r) => {
-            r.ui.preferredDetailTab = tab
+            r.ui.preferredWorkspacePaneView = tab
           })
         }
         return changed ? { repos } : s
@@ -264,7 +264,7 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
 }
 
 function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): RuntimeCoherentSelectionActions {
-  // Shared post-write effects for actions that may have updated detailTab/branch:
+  // Shared post-write effects for actions that may have updated workspacePaneView/branch:
   // persist the warm-restore snapshot and refresh the visible branch's pull
   // request. Centralized so every selection-changing action stays consistent.
   function afterSelectionChange(id: string, token: number, branchForPullRequest: string | null): void {
@@ -300,27 +300,27 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
       if (changed && token !== undefined) afterSelectionChange(id, token, selectedForPullRequest)
     },
 
-    setDetailTab(id: string, tab: DetailTab) {
-      // Persists the user's preferred tab verbatim. The store does *not*
-      // project against worktree presence or terminal session count — the UI
-      // computes the effective tab from this preference + live terminal
-      // runtime via `computeEffectiveDetailTab`. This preserves user intent
-      // across session restore, branch switches, and the transient zero-
-      // session window between handleNewTerminal and createTerminal.
+    setWorkspacePaneView(id: string, tab: WorkspacePaneView) {
+      // Persists the user's preferred view type verbatim. The store does *not*
+      // project against worktree presence, terminal session count, or opened
+      // workspace pane views — the UI resolves the active pane from this preference and
+      // live terminal runtime state. This preserves user intent across session
+      // restore, branch switches, and the transient zero-session window between
+      // handleNewTerminal and createTerminal.
       let changed = false
       let token: number | undefined
       set((s) => {
         const repo = s.repos[id]
-        if (!repo || repo.ui.preferredDetailTab === tab) return s
+        if (!repo || repo.ui.preferredWorkspacePaneView === tab) return s
         changed = true
         token = repo.instanceToken
         return replaceRepoState(s, repo, (r) => {
-          r.ui.preferredDetailTab = tab
+          r.ui.preferredWorkspacePaneView = tab
         })
       })
       if (!changed || token === undefined) return
       const repo = get().repos[id]
-      afterSelectionChange(id, token, repo?.ui.preferredDetailTab === 'status' ? repo.ui.selectedBranch : null)
+      afterSelectionChange(id, token, repo?.ui.preferredWorkspacePaneView === 'status' ? repo.ui.selectedBranch : null)
     },
 
     selectBranch(id: string, branch: string) {

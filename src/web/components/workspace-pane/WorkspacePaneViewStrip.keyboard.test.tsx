@@ -3,7 +3,12 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
+import { terminalWorkspacePaneViewIdentity } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
+import type { WorkspacePaneViewOrderEntry } from '#/shared/workspace-pane.ts'
+import type {
+  WorkspacePaneViewSummary,
+  TerminalSessionSummary,
+} from '#/web/components/terminal/types.ts'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
@@ -64,17 +69,18 @@ afterEach(() => {
   vi.doUnmock('@dnd-kit/sortable')
 })
 
-describe('TerminalTabs keyboard dnd wiring', () => {
+describe('WorkspacePaneViewStrip keyboard dnd wiring', () => {
   test('keeps selected styling while the active tab is dragging', async () => {
     sortableDragging = true
-    const { TerminalTabs } = await import('#/web/components/terminal/TerminalTabs.tsx')
+    const { WorkspacePaneViewStrip } = await import('#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx')
+    const TestWorkspacePaneViewStrip = makeWorkspacePaneViewStrip(WorkspacePaneViewStrip)
 
     container = document.createElement('div')
     document.body.append(container)
     root = createRoot(container)
     act(() => {
       root!.render(
-        <TerminalTabs
+        <TestWorkspacePaneViewStrip
           worktreeTerminalKey="/repo\0/repo/worktree"
           detailId="detail"
           panelActive
@@ -88,22 +94,23 @@ describe('TerminalTabs keyboard dnd wiring', () => {
       )
     })
 
-    const tabChrome = document.body.querySelector('[data-terminal-tab-tooltip-id="t1"]')
-    if (!(tabChrome instanceof HTMLDivElement)) throw new Error('missing terminal tab')
+    const tabChrome = document.body.querySelector('[data-workspace-pane-view-tooltip-id="terminal:t1"]')
+    if (!(tabChrome instanceof HTMLDivElement)) throw new Error('missing terminal view')
     expect(tabChrome.className).toContain('bg-selected')
     expect(tabChrome.className).toContain('cursor-grabbing')
     expect(tabChrome.className).not.toContain('bg-card')
   })
 
   test('registers a KeyboardSensor and preserves sortable onKeyDown listeners', async () => {
-    const { TerminalTabs } = await import('#/web/components/terminal/TerminalTabs.tsx')
+    const { WorkspacePaneViewStrip } = await import('#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx')
+    const TestWorkspacePaneViewStrip = makeWorkspacePaneViewStrip(WorkspacePaneViewStrip)
 
     container = document.createElement('div')
     document.body.append(container)
     root = createRoot(container)
     act(() => {
       root!.render(
-        <TerminalTabs
+        <TestWorkspacePaneViewStrip
           worktreeTerminalKey="/repo\0/repo/worktree"
           detailId="detail"
           sessions={[
@@ -125,8 +132,8 @@ describe('TerminalTabs keyboard dnd wiring', () => {
       expect.objectContaining({ coordinateGetter: expect.any(Function) }),
     )
 
-    const tab = document.body.querySelector('#detail-terminal-tab')
-    if (!(tab instanceof HTMLButtonElement)) throw new Error('missing terminal tab')
+    const tab = document.body.querySelector('#detail-workspace-pane-view')
+    if (!(tab instanceof HTMLButtonElement)) throw new Error('missing terminal view')
 
     act(() => {
       tab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', bubbles: true }))
@@ -136,18 +143,51 @@ describe('TerminalTabs keyboard dnd wiring', () => {
   })
 })
 
+function makeWorkspacePaneViewStrip(
+  WorkspacePaneViewStrip: typeof import('#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx').WorkspacePaneViewStrip,
+) {
+  return function TestWorkspacePaneViewStrip(props: {
+    worktreeTerminalKey: string
+    sessions: TerminalSessionSummary[]
+    detailId: string
+    panelActive?: boolean
+    onNew: () => void
+    onSelect: (worktreeTerminalKey: string, tab: WorkspacePaneViewSummary) => void
+    onScrollToBottom: (key: string) => void
+    onClose: (tab: WorkspacePaneViewSummary) => void
+    onReorder: (worktreeTerminalKey: string, orderedViews: WorkspacePaneViewOrderEntry[]) => void
+  }) {
+    const selected = props.sessions.find((candidate) => candidate.selected) ?? props.sessions[0]
+    const { sessions, ...detailPaneProps } = props
+    return (
+      <WorkspacePaneViewStrip
+        {...detailPaneProps}
+        views={sessions}
+        activeTabIdentity={selected ? terminalWorkspacePaneViewIdentity(selected.key) : null}
+        getTooltip={(tab) => ('originalTitle' in tab ? (tab.originalTitle ?? tab.fullTitle ?? tab.title) : tab.id)}
+        getLabel={(tab) => ('originalTitle' in tab ? (tab.originalTitle ?? tab.fullTitle ?? tab.title) : tab.id)}
+        getCloseLabel={(tab) => `close ${'title' in tab ? tab.title : tab.id}`}
+      />
+    )
+  }
+}
+
 function session(overrides: Partial<TerminalSessionSummary> = {}): TerminalSessionSummary {
+  const key = overrides.key ?? 't1'
+  const title = overrides.title ?? 'term-1'
   return {
-    key: 't1',
-    worktreeTerminalKey: '/repo\0/repo/worktree',
-    terminalId: 'terminal-1',
-    index: 1,
-    title: 'term-1',
-    fullTitle: 'term-1',
-    originalTitle: 'term-1',
-    phase: 'open',
-    selected: true,
-    hasBell: false,
-    ...overrides,
+    type: 'terminal',
+    id: overrides.id ?? key,
+    key,
+    worktreeTerminalKey: overrides.worktreeTerminalKey ?? '/repo\0/repo/worktree',
+    terminalId: overrides.terminalId ?? 'terminal-1',
+    index: overrides.index ?? 1,
+    displayOrder: overrides.displayOrder ?? 1,
+    title,
+    fullTitle: overrides.fullTitle ?? title,
+    originalTitle: overrides.originalTitle ?? title,
+    phase: overrides.phase ?? 'open',
+    selected: overrides.selected ?? true,
+    hasBell: overrides.hasBell ?? false,
   }
 }

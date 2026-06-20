@@ -11,7 +11,7 @@ import { consumeExternalOpenPaths } from '#/web/app-shell-client.ts'
 import { openRepoPaths } from '#/web/lib/open-repo-paths.ts'
 import { externalOpenLog } from '#/web/logger.ts'
 import {
-  runShowDetailTabCommand,
+  runShowWorkspacePaneViewCommand,
   runTerminalPrimaryActionCommand,
   runToggleDetailCommand,
 } from '#/web/commands/workspace-commands.ts'
@@ -68,11 +68,11 @@ export function handleTerminalBellClickIntent(
   switch (plan.kind) {
     case 'show-worktree-terminal':
       deps.setSelectedTerminal(plan.worktreeTerminalKey, plan.key)
-      deps.navigation.showRepoBranchDetailTab(plan.repoId, plan.branch, 'terminal')
+      deps.navigation.showRepoBranchWorkspacePaneView(plan.repoId, plan.branch, 'terminal')
       deps.setDetailCollapsed(false)
       return
     case 'show-repo-terminal':
-      deps.navigation.showRepoDetailTab(plan.repoId, 'terminal')
+      deps.navigation.showRepoWorkspacePaneView(plan.repoId, 'terminal')
       deps.setDetailCollapsed(false)
       return
   }
@@ -167,8 +167,8 @@ export async function handleWorkspaceRendererIntent(
         token: plan.token,
       })
       return true
-    case 'show-detail-tab':
-      runShowDetailTabCommand({
+    case 'show-workspace-pane-view':
+      runShowWorkspacePaneViewCommand({
         repoId: plan.repoId,
         tab: plan.tab,
         navigation: deps.navigation,

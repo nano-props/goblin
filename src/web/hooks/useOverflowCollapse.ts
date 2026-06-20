@@ -3,7 +3,7 @@ import { useLayoutEffect, useRef, useState } from 'react'
 /**
  * Detect when a set of children overflow their container and should collapse
  * into a compact representation. Mirrors the pattern used in both
- * BranchActionControls and TerminalTabs.
+ * BranchActionControls and WorkspacePaneViewStrip.
  *
  * @param layoutKey A string that changes when the measured content changes
  *                  (e.g. items.map(i => i.id).join('|')).

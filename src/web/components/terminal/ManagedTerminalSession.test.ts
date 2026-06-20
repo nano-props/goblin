@@ -572,7 +572,7 @@ beforeEach(() => {
         takeover: terminalCalls.takeover.mockResolvedValue(takeoverResult('session-1')),
         close: terminalCalls.close.mockResolvedValue(true),
         notifyBell: terminalCalls.notifyBell.mockResolvedValue(true),
-        reorder: vi.fn(),
+        reorderViews: vi.fn(),
         create: vi.fn(),
         pruneTerminals: vi.fn(),
         onOutput: vi.fn(),
@@ -636,10 +636,13 @@ beforeEach(() => {
       ),
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       listSessions: vi.fn(async () => []),
+      listViews: vi.fn(async () => []),
+      openView: vi.fn(async () => true),
+      closeView: vi.fn(async () => true),
       prewarm: vi.fn(async () => {}),
       kickReconnect: vi.fn(() => {}),
       getSessionSnapshot: vi.fn(async () => null),
-      reorder: vi.fn(async () => true),
+      reorderViews: vi.fn(async () => true),
       notifyBell: terminalCalls.notifyBell.mockResolvedValue(true),
       sendTestNotification: vi.fn(async () => true),
       setBadge: terminalCalls.setBadge,
@@ -1453,7 +1456,12 @@ describe('ManagedTerminalSession', () => {
     session.takeover()
     await flushUntil(() => terminalCalls.takeover.mock.calls.length > 0)
 
-    expect(terminalCalls.takeover).toHaveBeenCalledWith({ sessionId: 'session-1', cols: 101, rows: 31, attachmentId: 'attachment_local' })
+    expect(terminalCalls.takeover).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      cols: 101,
+      rows: 31,
+      attachmentId: 'attachment_local',
+    })
     // The takeover response itself is now the authority — without
     // any `handleOwnership` call, role already flipped to controller
     // and the canonical size tracks the request (101x31).

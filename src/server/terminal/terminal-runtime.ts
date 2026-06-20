@@ -164,6 +164,15 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     async listSessions(clientId, ownerId, repoRoot) {
       return await actions.listSessions(clientId, ownerId, repoRoot)
     },
+    listViews(clientId, ownerId, repoRoot) {
+      return actions.listViews(clientId, ownerId, repoRoot)
+    },
+    openView(clientId, ownerId, input) {
+      return actions.openView(clientId, ownerId, input)
+    },
+    closeView(clientId, ownerId, input) {
+      return actions.closeView(clientId, ownerId, input)
+    },
     async create(clientId, ownerId, input) {
       return await actions.create(clientId, ownerId, input)
     },
@@ -173,8 +182,8 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     getSessionSnapshot(clientId, ownerId, input) {
       return actions.getSessionSnapshot(clientId, ownerId, input)
     },
-    reorder(clientId, ownerId, input) {
-      return actions.reorder(clientId, ownerId, input)
+    reorderViews(clientId, ownerId, input) {
+      return actions.reorderViews(clientId, ownerId, input)
     },
     handleRealtimeMessage(clientId, attachmentId, ownerId, socket, payload) {
       // Log invalid identifier/parse drops so a stuck takeover
