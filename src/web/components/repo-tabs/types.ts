@@ -5,6 +5,11 @@ export interface RepoTabSummary {
   name: string
   remoteDetails: GitRemoteInfo[]
   /**
+   * Last time this renderer refreshed repo data after a sync/invalidation.
+   * Null until snapshot/fetch resources have completed at least once.
+   */
+  lastSyncedAt: number | null
+  /**
    * Single source-of-truth lifecycle for a remote repo tab. `null`
    * for local repos. The tab UI reads `lifecycle.kind` directly
    * to decide which badge to show.

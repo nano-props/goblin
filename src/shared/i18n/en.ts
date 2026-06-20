@@ -168,6 +168,8 @@ export const en = {
   'repo-tabs.open-remote-path-absolute': 'Path must start with / or ~/',
   'repo-tabs.open-remote-home-unavailable': 'Could not resolve the remote home directory',
   'repo-tabs.tooltip.no-remotes': 'No remotes',
+  'repo-tabs.tooltip.last-sync-label': 'Last synced',
+  'repo-tabs.tooltip.not-synced': 'Not synced yet',
   'repo-tabs.connecting-title': 'Connecting to SSH…',
   'repo-unavailable.title': 'Repository path unavailable',
   'repo-unavailable.body':

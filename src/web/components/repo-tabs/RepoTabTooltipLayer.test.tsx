@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoTabTooltipLayer } from '#/web/components/repo-tabs/RepoTabTooltipLayer.tsx'
 import type { RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
+import { useI18nStore } from '#/web/stores/i18n.ts'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
@@ -37,6 +38,7 @@ beforeEach(() => {
     snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test', pid: 1 },
     hydrated: true,
   })
+  useI18nStore.setState({ lang: 'en', pref: 'auto', dict: {}, hydrated: false })
 })
 
 afterEach(() => {
@@ -87,6 +89,8 @@ describe('RepoTabTooltipLayer', () => {
     const text = document.body.textContent ?? ''
     expect(text).toContain('goblin')
     expect(text).toContain('~/Developer/goblin')
+    expect(text).toContain('repo-tabs.tooltip.last-sync-label')
+    expect(text).toContain('repo-tabs.tooltip.not-synced')
     expect(text).toContain('origin')
     expect(text).toContain('https://github.com/nano-props/goblin.git')
     expect(text).toContain('upstream')
@@ -105,6 +109,31 @@ describe('RepoTabTooltipLayer', () => {
     await flushTimers()
 
     expect(document.body.textContent).toContain('repo-tabs.tooltip.no-remotes')
+  })
+
+  test('shows the relative last sync time when repo data has refreshed', async () => {
+    vi.setSystemTime(new Date('2026-06-20T12:00:00.000Z'))
+    render(
+      <RepoTabTooltipLayer
+        repos={[
+          {
+            ...repo('repo', '/Users/tester/Developer/repo', []),
+            lastSyncedAt: Date.parse('2026-06-20T11:58:00.000Z'),
+          },
+        ]}
+        delayMs={0}
+      >
+        <div data-repo-tab-tooltip-id="/Users/tester/Developer/repo">repo</div>
+      </RepoTabTooltipLayer>,
+    )
+
+    hoverTab('/Users/tester/Developer/repo')
+    await flushTimers()
+
+    const text = document.body.textContent ?? ''
+    expect(text).toContain('repo-tabs.tooltip.last-sync-label')
+    expect(text).toContain('2 minutes ago')
+    expect(text).not.toContain('repo-tabs.tooltip.not-synced')
   })
 
   test('uses the provided tablist element as the tooltip root without an extra wrapper', () => {
@@ -238,7 +267,7 @@ describe('RepoTabTooltipLayer', () => {
 })
 
 function repo(name: string, id: string, remoteDetails: RepoTabSummary['remoteDetails']): RepoTabSummary {
-  return { id, name, remoteDetails, lifecycle: null }
+  return { id, name, remoteDetails, lastSyncedAt: null, lifecycle: null }
 }
 
 function render(element: ReactNode) {

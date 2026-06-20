@@ -165,6 +165,8 @@ export const ja: Record<DictKey, string> = {
   'repo-tabs.open-remote-path-absolute': 'パスは / または ~/ で始まる必要があります',
   'repo-tabs.open-remote-home-unavailable': 'リモートのホームディレクトリを解決できませんでした',
   'repo-tabs.tooltip.no-remotes': 'リモートなし',
+  'repo-tabs.tooltip.last-sync-label': '最終同期',
+  'repo-tabs.tooltip.not-synced': '未同期',
   'repo-tabs.connecting-title': 'SSH に接続中…',
   'repo-unavailable.title': 'リポジトリパスを利用できません',
   'repo-unavailable.body':

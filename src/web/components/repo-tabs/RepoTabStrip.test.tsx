@@ -168,7 +168,7 @@ function render(element: React.ReactNode) {
 }
 
 function repo(name: string, id: string): RepoTabSummary {
-  return { id, name, remoteDetails: [], lifecycle: null }
+  return { id, name, remoteDetails: [], lastSyncedAt: null, lifecycle: null }
 }
 
 const labels = {

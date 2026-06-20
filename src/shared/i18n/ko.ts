@@ -158,6 +158,8 @@ export const ko: Record<DictKey, string> = {
   'repo-tabs.open-remote-path-absolute': '경로는 / 또는 ~/로 시작해야 합니다',
   'repo-tabs.open-remote-home-unavailable': '원격 홈 디렉터리를 확인할 수 없습니다',
   'repo-tabs.tooltip.no-remotes': '원격 없음',
+  'repo-tabs.tooltip.last-sync-label': '마지막 동기화',
+  'repo-tabs.tooltip.not-synced': '아직 동기화되지 않음',
   'repo-tabs.connecting-title': 'SSH에 연결 중…',
   'repo-unavailable.title': '리포지토리 경로를 사용할 수 없음',
   'repo-unavailable.body':
