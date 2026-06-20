@@ -525,6 +525,7 @@ function renderToolbar(options: {
     staticWorkspacePaneViews,
     workspacePaneViews: [...staticWorkspacePaneViews, ...sessions],
     count: options.terminalCount,
+    bellCount: sessions.filter((session) => session.hasBell).length,
     pendingCreate: false,
   }
   const terminalSnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }

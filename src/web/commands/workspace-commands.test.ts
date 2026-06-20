@@ -1,10 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import {
-  runShowWorkspacePaneViewCommand,
-  runTerminalPrimaryActionCommand,
-} from '#/web/commands/workspace-commands.ts'
+import { runShowWorkspacePaneViewCommand, runTerminalPrimaryActionCommand } from '#/web/commands/workspace-commands.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -39,6 +36,7 @@ describe('workspace commands', () => {
         workspacePaneViews: [],
         sessions: [],
         count: 0,
+        bellCount: 0,
         pendingCreate: false,
       }),
       createTerminal: vi.fn(async () => 'terminal-1'),
@@ -71,6 +69,7 @@ describe('workspace commands', () => {
         workspacePaneViews: [],
         sessions: [],
         count: 0,
+        bellCount: 0,
         pendingCreate: false,
       }),
       createTerminal: vi.fn(async () => 'terminal-1'),
@@ -103,6 +102,7 @@ describe('workspace commands', () => {
         workspacePaneViews: [],
         sessions: [],
         count: 0,
+        bellCount: 0,
         pendingCreate: false,
       }),
       createTerminal: vi.fn(async () => 'terminal-1'),
@@ -135,6 +135,7 @@ describe('workspace commands', () => {
         workspacePaneViews: [],
         sessions: [],
         count: 0,
+        bellCount: 0,
         pendingCreate: false,
       }),
       createTerminal,
@@ -226,6 +227,7 @@ describe('workspace commands', () => {
           },
         ],
         count: 2,
+        bellCount: 0,
         pendingCreate: false,
       }),
       createTerminal,

@@ -22,6 +22,7 @@ export function buildWorktreeTerminalSnapshot(input: {
 }): WorktreeTerminalSnapshot {
   const sessions = buildTerminalSessionSummaries(input)
   const workspacePaneViews = [...input.staticWorkspacePaneViews, ...sessions].sort(compareWorkspacePaneViewStrip)
+  const bellCount = sessions.reduce((count, session) => count + (session.hasBell ? 1 : 0), 0)
   return {
     worktreeTerminalKey: input.worktreeTerminalKey,
     selectedDescriptor: input.selectedDescriptor,
@@ -29,6 +30,7 @@ export function buildWorktreeTerminalSnapshot(input: {
     staticWorkspacePaneViews: input.staticWorkspacePaneViews,
     workspacePaneViews,
     count: sessions.length,
+    bellCount,
     pendingCreate: input.pendingCreate,
   }
 }

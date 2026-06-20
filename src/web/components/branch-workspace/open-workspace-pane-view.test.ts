@@ -125,6 +125,7 @@ function setWorkspacePaneBridge(
       workspacePaneViews: [],
       sessions: [],
       count: 0,
+      bellCount: 0,
       pendingCreate: false,
     }),
     createTerminal: vi.fn(async () => 'terminal-1'),

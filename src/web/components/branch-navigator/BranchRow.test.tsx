@@ -19,6 +19,8 @@ vi.mock('#/web/stores/i18n.ts', () => ({
         return '默认'
       case 'branches.gone':
         return '已失联'
+      case 'terminal.bell-unread-count':
+        return `${params?.count ?? 0} 个未读终端提醒`
       case 'branch-status.worktree-dirty':
         return `${params?.n ?? 0} 个改动`
       case 'branch-status.sync.ahead':
@@ -112,6 +114,29 @@ describe('BranchRow', () => {
     )
 
     expect(document.body.textContent).toContain('有改动')
+  })
+
+  test('shows a terminal bell count badge for branches with unread terminal bells', () => {
+    const repo = emptyRepo('/tmp/repo', 'repo')
+    const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
+
+    render(
+      <ul>
+        <BranchRow
+          repo={repo}
+          branch={branch}
+          selected={null}
+          onSelectBranch={vi.fn()}
+          onOpenBranchStatus={vi.fn()}
+          selectedRef={createRef<HTMLLIElement>()}
+          showActions={false}
+          terminalBellCount={3}
+        />
+      </ul>,
+    )
+
+    const badge = document.querySelector('[aria-label="3 个未读终端提醒"]')
+    expect(badge?.textContent).toBe('3')
   })
 })
 

@@ -96,6 +96,7 @@ describe('terminal session worktree snapshot helper', () => {
         }),
       ],
       count: 1,
+      bellCount: 1,
       pendingCreate: false,
     })
     expect(session.snapshotSpy).toHaveBeenCalledTimes(1)

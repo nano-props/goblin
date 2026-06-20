@@ -27,6 +27,7 @@ interface BranchSummaryInlineProps {
   repo: BranchSummaryInlineRepo
   branch: RepoBranchState
   selected?: boolean
+  terminalBellCount?: number
   className?: string
 }
 
@@ -73,11 +74,13 @@ export function buildBranchSummaryTitle(
   state: BranchSummaryState,
   branch: RepoBranchState,
   t: (key: string, params?: Record<string, string | number>) => string,
+  terminalBellCount = 0,
 ): string {
   return [
     branch.name,
     branch.isDefault ? t('branches.default') : null,
     state.hasWorktree ? t(state.worktreeDirty ? 'branches.dirty' : 'branches.worktree') : null,
+    terminalBellCount > 0 ? t('terminal.bell-unread-count', { count: terminalBellCount }) : null,
     branch.trackingGone ? t('branches.gone') : null,
     branch.ahead > 0 ? t('branch-status.sync.ahead', { n: branch.ahead }) : null,
     branch.behind > 0 ? t('branch-status.sync.behind', { n: branch.behind }) : null,
@@ -170,12 +173,34 @@ export function BranchSummaryMeta({
   )
 }
 
-export function BranchSummaryInline({ repo, branch, selected = false, className }: BranchSummaryInlineProps) {
+function BranchTerminalBellBadge({ count }: { count: number }) {
+  const t = useT()
+  if (count <= 0) return null
+  const label = t('terminal.bell-unread-count', { count })
+  const displayCount = count > 99 ? '99+' : String(count)
+  return (
+    <span
+      aria-label={label}
+      title={label}
+      className="inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-attention px-1 font-mono text-[10px] font-semibold leading-none text-background tabular-nums"
+    >
+      {displayCount}
+    </span>
+  )
+}
+
+export function BranchSummaryInline({
+  repo,
+  branch,
+  selected = false,
+  terminalBellCount = 0,
+  className,
+}: BranchSummaryInlineProps) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
   const state = computeBranchSummaryState(branch, repo, lang)
   const { hasWorktree, worktreeDirty } = state
-  const title = buildBranchSummaryTitle(state, branch, t)
+  const title = buildBranchSummaryTitle(state, branch, t, terminalBellCount)
 
   return (
     <div title={title} className={cn('flex min-w-0 items-center gap-2', className)}>
@@ -183,12 +208,13 @@ export function BranchSummaryInline({ repo, branch, selected = false, className 
       <span className="flex min-w-0 items-center gap-2 overflow-hidden">
         <span
           className={cn(
-            'shrink-0 truncate text-sm font-medium',
+            'min-w-0 truncate text-sm font-medium',
             selected ? 'text-selected-foreground' : 'text-foreground',
           )}
         >
           {branch.name}
         </span>
+        <BranchTerminalBellBadge count={terminalBellCount} />
         <BranchSummaryMeta repo={repo} branch={branch} selected={selected} />
       </span>
     </div>

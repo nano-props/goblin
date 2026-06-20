@@ -80,6 +80,7 @@ const emptyWorktreeSnapshot: WorktreeTerminalSnapshot = {
   staticWorkspacePaneViews: [],
   workspacePaneViews: [],
   count: 0,
+  bellCount: 0,
   pendingCreate: false,
 }
 

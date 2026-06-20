@@ -186,6 +186,7 @@ function worktreeSnapshot(): WorktreeTerminalSnapshot {
       },
     ],
     count: 1,
+    bellCount: 0,
     pendingCreate: false,
   }
 }

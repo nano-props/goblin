@@ -16,6 +16,7 @@ const EMPTY_WORKTREE_TERMINAL_SNAPSHOT: WorktreeTerminalSnapshot = {
   staticWorkspacePaneViews: [],
   workspacePaneViews: [],
   count: 0,
+  bellCount: 0,
   pendingCreate: false,
 }
 
@@ -42,6 +43,19 @@ export function useWorktreeTerminalCount(worktreeTerminalKey: string | null): nu
   )
   const getSnapshot = useCallback(
     () => (worktreeTerminalKey ? worktreeSnapshot(worktreeTerminalKey).count : 0),
+    [worktreeTerminalKey, worktreeSnapshot],
+  )
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+}
+
+export function useWorktreeTerminalBellCount(worktreeTerminalKey: string | null): number {
+  const { worktreeSnapshot, subscribeWorktree } = useTerminalSessionReadContext()
+  const subscribe = useCallback(
+    (listener: () => void) => (worktreeTerminalKey ? subscribeWorktree(worktreeTerminalKey, listener) : () => {}),
+    [worktreeTerminalKey, subscribeWorktree],
+  )
+  const getSnapshot = useCallback(
+    () => (worktreeTerminalKey ? worktreeSnapshot(worktreeTerminalKey).bellCount : 0),
     [worktreeTerminalKey, worktreeSnapshot],
   )
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
