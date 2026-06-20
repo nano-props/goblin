@@ -16,14 +16,14 @@ const changesTab: WorkspacePaneViewSummary = {
 
 const t = (key: string, params?: Record<string, string | number>) => {
   if (key === 'tab.changes') return '变更'
-  if (key === 'tab.changes-with-count') return `变更 · ${params?.count}个改动`
+  if (key === 'tab.changes-with-count') return `变更 · ${params?.count}个`
   if (key === 'workspace-pane-views.close-named') return `关闭${params?.name}`
   return key
 }
 
 describe('branchWorkspacePaneViewLabel', () => {
   test('shows the changes count inline when present', () => {
-    expect(branchWorkspacePaneViewLabel(changesTab, t, 3)).toBe('变更 · 3个改动')
+    expect(branchWorkspacePaneViewLabel(changesTab, t, 3)).toBe('变更 · 3个')
   })
 
   test('keeps the plain changes label when there are no changes', () => {

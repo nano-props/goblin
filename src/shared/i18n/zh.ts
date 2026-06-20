@@ -187,7 +187,7 @@ export const zh: Record<DictKey, string> = {
   'tab.branch-detail': '分支详情',
   'tab.status': '状态',
   'tab.changes': '变更',
-  'tab.changes-with-count': '变更 · {count}个改动',
+  'tab.changes-with-count': '变更 · {count}个',
   'tab.log': '历史',
   'tab.terminal': '终端',
   'tab.fetching': '同步',
