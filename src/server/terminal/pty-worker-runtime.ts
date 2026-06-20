@@ -128,7 +128,7 @@ function createSessionId(): string {
 function defaultSpawnPty(input: PtySpawnInput): PtySpawnOutcome {
   try {
     const shell = resolveLocalShell(input)
-    const env = { ...process.env, TERM: 'xterm-256color' }
+    const env = { ...process.env, ...input.env, TERM: 'xterm-256color' }
     // node-pty's own spawn handles failures synchronously by throwing;
     // resolveLocalShell does too. The try/catch here means the worker
     // surfaces a structured pty-spawn-result on every failure path

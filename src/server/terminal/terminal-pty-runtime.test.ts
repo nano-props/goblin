@@ -155,6 +155,33 @@ describe('spawnTerminalPtyRuntime', () => {
     expect(userInfo).not.toHaveBeenCalled()
   })
 
+  test('merges caller env into the spawned PTY environment while keeping terminal TERM', () => {
+    spawnMock.mockReturnValue(ptyStub())
+
+    spawnTerminalPtyRuntime({
+      cwd: '/repo',
+      cols: 80,
+      rows: 24,
+      env: {
+        PATH: '/g/bin:/usr/bin',
+        GOBLIN_TERMINAL: '1',
+        TERM: 'bad-term',
+      },
+    })
+
+    expect(spawnMock).toHaveBeenCalledWith(
+      '/bin/zsh',
+      ['-l'],
+      expect.objectContaining({
+        env: expect.objectContaining({
+          PATH: '/g/bin:/usr/bin',
+          GOBLIN_TERMINAL: '1',
+          TERM: 'xterm-256color',
+        }),
+      }),
+    )
+  })
+
   test('falls back to os.userInfo().shell when SHELL is not set (CI / devcontainer)', () => {
     vi.mocked(userInfo).mockReturnValue({ shell: '/usr/bin/zsh' } as ReturnType<typeof userInfo>)
 

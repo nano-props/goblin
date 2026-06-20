@@ -20,6 +20,7 @@ export interface PtySpawnInput {
   cwd: string
   cols: number
   rows: number
+  env?: Record<string, string>
 }
 
 export type PtySpawnResult = { ok: true; handle: PtyHandle; processName: string } | { ok: false; message: string }

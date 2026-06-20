@@ -18,6 +18,10 @@ import { formatTerminalId, parseTerminalIdIndex } from '#/shared/terminal-ids.ts
 import { isValidTerminalAttachmentId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import { formatTerminalSessionKey, parseTerminalSessionKey } from '#/shared/terminal-session-key.ts'
 import { terminalSessionScope } from '#/server/terminal/terminal-session-scope.ts'
+import {
+  buildGoblinTerminalCommandEnvironment,
+  type GoblinTerminalCommandRuntime,
+} from '#/server/terminal/g-command.ts'
 
 interface EnsureTerminalCatalogInput {
   repoRoot: string
@@ -63,6 +67,7 @@ interface TerminalCatalogEnsureSessionInput {
   forceNew?: boolean
   command?: string
   args?: string[]
+  env?: Record<string, string>
 }
 
 interface TerminalCatalogManager {
@@ -77,6 +82,7 @@ interface TerminalCatalogOptions {
   manager: TerminalCatalogManager
   isAttachmentConnected(ownerId: string, attachmentId?: string): boolean | undefined
   broadcastSessionsChanged(ownerId: string, repoRoot: string): void
+  gCommand?: GoblinTerminalCommandRuntime
 }
 
 class TerminalCatalog {
@@ -262,6 +268,13 @@ class TerminalCatalog {
 
     const repoRoot = path.resolve(input.repoRoot)
     const worktreePath = path.resolve(resolved.path)
+    const env = this.options.gCommand
+      ? buildGoblinTerminalCommandEnvironment({
+          ...this.options.gCommand,
+          repoRoot,
+          worktreePath,
+        }) ?? undefined
+      : undefined
     const result = await this.options.manager.ensureSession({
       ownerId,
       scope: repoRoot,
@@ -272,6 +285,7 @@ class TerminalCatalog {
       attachmentId: input.attachmentId,
       attachmentConnected: this.options.isAttachmentConnected(ownerId, input.attachmentId),
       forceNew: context.action === 'created',
+      env,
     })
     if (!result.ok) return { ok: false, message: result.message }
     this.options.broadcastSessionsChanged(ownerId, input.repoRoot)

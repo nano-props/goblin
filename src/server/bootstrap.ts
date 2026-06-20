@@ -25,6 +25,8 @@ export interface BootstrappedServer {
 export interface BootstrapServerOptions {
   /** Path to the bundled PTY worker entry. Enables subprocess PTY isolation. */
   ptyWorkerEntry?: string
+  /** Path to the Node entrypoint used by the built-in `g` terminal command. */
+  gCommandEntry?: string
   exit?: (code: number) => void
 }
 
@@ -50,6 +52,7 @@ export async function bootstrapServer(options: BootstrapServerOptions = {}): Pro
     startedAt,
     accessToken,
     ptyWorkerEntry: options.ptyWorkerEntry,
+    gCommandEntry: options.gCommandEntry,
     serverHost: hostname,
     serverPort: port,
   })

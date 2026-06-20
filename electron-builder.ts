@@ -26,6 +26,7 @@ const config: Configuration = {
     '!src/**/*.test.ts',
     '!**/*.map',
   ],
+  extraResources: [{ from: 'resources/terminal-bin', to: 'terminal-bin' }],
   asarUnpack: ['node_modules/node-pty/prebuilds/**/*'],
   win: {
     // Windows requires a multi-resolution .ico for proper taskbar and

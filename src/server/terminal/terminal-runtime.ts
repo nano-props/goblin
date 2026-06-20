@@ -30,6 +30,7 @@ import {
 import { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 import { type PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { type ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
+import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.ts'
 
 // Intentionally long TTL: we want terminals to survive as long as possible in
 // the background so users can leave builds or long-running tasks unattended.
@@ -41,6 +42,7 @@ const terminalRuntimeLogger = serverLogger.child({ module: 'terminal-runtime' })
 
 export interface ServerTerminalRuntimeOptions {
   ptySupervisor: PtySupervisor
+  gCommand?: GoblinTerminalCommandRuntime
 }
 
 export interface ServerTerminalRuntime {
@@ -88,6 +90,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     broadcastSessionsChanged(ownerId, repoRoot) {
       broker.broadcastToOwner(ownerId, { type: 'sessions-changed', repoRoot })
     },
+    gCommand: options.gCommand,
   })
 
   const bufferedSocketByRawSocket = new WeakMap<TerminalRealtimeSocket, BufferedTerminalSocket>()

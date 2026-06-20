@@ -351,6 +351,11 @@ if (!existsSync(ptyWorkerDistEntry)) {
   console.error(`Error: PTY worker build artifact missing: ${ptyWorkerDistEntry}`)
   process.exit(1)
 }
+const gCommandDistEntry = path.join(repoRoot, 'dist/server/g-command.js')
+if (!existsSync(gCommandDistEntry)) {
+  console.error(`Error: g command build artifact missing: ${gCommandDistEntry}`)
+  process.exit(1)
+}
 
 // Skip @electron/rebuild when native prebuilds are already in place
 // (bun install fetched them and the plan verified them above). Saves a
