@@ -12,7 +12,7 @@ import type {
 import { terminalBridge } from '#/web/terminal.ts'
 import { setTerminalFocused } from '#/web/terminal-focus.ts'
 import { openExternalUrl } from '#/web/app-shell-client.ts'
-import { preloadTerminalFont } from '#/web/components/terminal/terminal-geometry.ts'
+import { preloadTerminalFont, proposeTerminalGeometry } from '#/web/components/terminal/terminal-geometry.ts'
 import {
   TerminalHostNotMeasurableError,
   waitForMeasurableHost,
@@ -287,11 +287,9 @@ export class ManagedTerminalSession {
     return true
   }
 
-  takeover(): Promise<boolean> {
+  async takeover(): Promise<boolean> {
     const sessionId = this.runtime.currentSessionId()
-    if (!sessionId) return Promise.resolve(false)
-    const term = this.view.currentTerminal()
-    const size = term ? { cols: term.cols, rows: term.rows } : this.runtime.currentCanonicalSize()
+    if (!sessionId) return false
     // The takeover response is the authoritative handshake for the
     // new controller's view (see TerminalTakeoverResult in
     // src/shared/terminal-types.ts). The response carries role,
@@ -320,6 +318,11 @@ export class ManagedTerminalSession {
     // websocket was not connected yet.
     const attachmentId = readOrCreateWebTerminalAttachmentId()
     if (this.runtime.setTakeoverPending(true)) this.notify('metadata')
+    const size = await this.resolveTakeoverSize(sessionId)
+    if (this.disposed || this.runtime.currentSessionId() !== sessionId) {
+      this.clearTakeoverPendingWithNotify()
+      return false
+    }
     // Bug F: `setTakeoverPending` runs *before* the `.then` chain
     // attaches its `.finally`. If `terminalBridge.takeover` throws
     // synchronously (e.g. the bridge is unset, a bad request id
@@ -339,40 +342,61 @@ export class ManagedTerminalSession {
     } catch (err) {
       terminalLog.warn('takeover bridge call threw synchronously', { sessionId, err })
       this.clearTakeoverPendingWithNotify()
-      return Promise.resolve(false)
+      return false
     }
-    return bridgeCall
-      .then((result) => {
-        if (!result.ok) {
-          terminalLog.warn('takeover rejected by server', { sessionId, message: result.message })
-          return false
-        }
-        if (this.runtime.applyTakeover(result)) this.notify('metadata')
-        return true
-      })
-      .catch((err) => {
-        // Mirror the resize rejection pattern: surface the failure
-        // so ops can correlate. The takeover UI stays in
-        // "pending takeover" state until the user retries; the
-        // `.finally` below clears the flag on any settlement.
-        terminalLog.warn('takeover failed for session', { sessionId, err })
+    try {
+      const result = await bridgeCall
+      if (!result.ok) {
+        terminalLog.warn('takeover rejected by server', { sessionId, message: result.message })
         return false
-      })
-      .finally(() => {
-        // If the server response settles but we never received an
-        // ownership event, clear the pending state so the user can
-        // retry. After this plan, the realtime event is no longer
-        // the only path to clear the flag — the success branch
-        // above already applied the new state, so this is purely
-        // the failure / timeout fallback.
-        this.clearTakeoverPendingWithNotify()
-      })
+      }
+      const wasController = this.runtime.canResize()
+      const changed = this.runtime.applyTakeover(result)
+      if (!wasController && this.runtime.canResize()) this.ensureControllerViewStarted()
+      if (changed) this.notify('metadata')
+      return true
+    } catch (err) {
+      // Mirror the resize rejection pattern: surface the failure
+      // so ops can correlate. The takeover UI stays in
+      // "pending takeover" state until the user retries; the
+      // `finally` below clears the flag on any settlement.
+      terminalLog.warn('takeover failed for session', { sessionId, err })
+      return false
+    } finally {
+      // If the server response settles but we never received an
+      // ownership event, clear the pending state so the user can
+      // retry. After this plan, the realtime event is no longer
+      // the only path to clear the flag — the success branch
+      // above already applied the new state, so this is purely
+      // the failure / timeout fallback.
+      this.clearTakeoverPendingWithNotify()
+    }
   }
 
   private clearTakeoverPendingWithNotify(): void {
     if (this.runtime.isTakeoverPending()) {
       if (this.runtime.setTakeoverPending(false)) this.notify('metadata')
     }
+  }
+
+  private async resolveTakeoverSize(sessionId: string): Promise<{ cols: number; rows: number }> {
+    const term = this.view.currentTerminal()
+    if (term) return { cols: term.cols, rows: term.rows }
+    const fallback = this.runtime.currentCanonicalSize()
+    if (!this.view.isConnected()) return fallback
+    try {
+      await preloadTerminalFont()
+      return proposeTerminalGeometry(this.view.measurableHost()) ?? fallback
+    } catch (err) {
+      terminalLog.warn('failed to measure terminal host for takeover; using canonical size', { sessionId, err })
+      return fallback
+    }
+  }
+
+  private ensureControllerViewStarted(): void {
+    if (!this.runtime.canResize()) return
+    if (this.view.isConnected()) this.start()
+    if (this.view.isVisible()) this.view.focus()
   }
 
   private start(): void {

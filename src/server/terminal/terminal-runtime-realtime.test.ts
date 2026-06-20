@@ -1,6 +1,9 @@
 import { describe, expect, test, vi } from 'vitest'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
-import { createTerminalRealtimeHandlers } from '#/server/terminal/terminal-runtime-realtime.ts'
+import {
+  createTerminalRealtimeHandlers,
+  shouldPauseRealtimeRequest,
+} from '#/server/terminal/terminal-runtime-realtime.ts'
 
 function makeHost(overrides: Partial<ServerTerminalHost>): ServerTerminalHost {
   return {
@@ -29,6 +32,15 @@ function makeHost(overrides: Partial<ServerTerminalHost>): ServerTerminalHost {
 }
 
 describe('createTerminalRealtimeHandlers', () => {
+  test('pauses every authoritative terminal frame request, including takeover', () => {
+    expect(shouldPauseRealtimeRequest('attach')).toBe(true)
+    expect(shouldPauseRealtimeRequest('restart')).toBe(true)
+    expect(shouldPauseRealtimeRequest('create')).toBe(true)
+    expect(shouldPauseRealtimeRequest('takeover')).toBe(true)
+    expect(shouldPauseRealtimeRequest('session-snapshot')).toBe(false)
+    expect(shouldPauseRealtimeRequest('resize')).toBe(false)
+  })
+
   test('routes workspace pane actions through workspace pane host methods', async () => {
     const host = makeHost({})
     const handlers = createTerminalRealtimeHandlers(host)
