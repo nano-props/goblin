@@ -151,6 +151,41 @@ describe('repo lifecycle', () => {
     expect(calls.recent).toEqual([remoteRepoSessionEntry(target!)])
   })
 
+  test('ensureWorkspaceOpen uses the canonical remote name instead of a stale cached name', async () => {
+    const target = normalizeRemoteTarget({
+      alias: 'example',
+      host: 'example.com',
+      user: 'alice',
+      port: 22,
+      remotePath: '/srv/repo',
+      displayName: 'example:/',
+    })
+    expect(target).not.toBeNull()
+    useReposStore.setState({
+      restorableRepoCache: {
+        [target!.id]: {
+          savedAt: Date.now(),
+          name: 'example:/',
+          data: {
+            branches: [branchSnapshot('cached')],
+            currentBranch: 'cached',
+          },
+          ui: {
+            selectedBranch: 'cached',
+            branchViewMode: 'all',
+          },
+        },
+      },
+    })
+    installGoblin()
+
+    const result = await useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(target!))
+
+    expect(result).toEqual({ ok: true, id: target!.id })
+    expect(useReposStore.getState().repos[target!.id]?.name).toBe('example:repo')
+    expect(useReposStore.getState().repos[target!.id]?.data.branches.map((branch) => branch.name)).toEqual(['cached'])
+  })
+
   test('ensureWorkspaceOpen refreshes when a remote target changes between opens', async () => {
     const oldTarget = normalizeRemoteTarget({
       alias: 'example',

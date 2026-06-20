@@ -115,13 +115,19 @@ function buildNewRepo(
   const cached = s.restorableRepoCache[id]
   const hint = nameHints.find((value): value is string => !!value)
   const name = hint ?? cached?.name ?? lastPathSegment(id)
-  return restoreRepoProjectionFromSnapshot(emptyRepo(id, name), cached)
+  const repo = restoreRepoProjectionFromSnapshot(emptyRepo(id, name), cached)
+  return hint ? { ...repo, name: hint } : repo
 }
 
 function remoteTargetsEqual(a: RemoteRepoTarget | undefined | null, b: RemoteRepoTarget | undefined): boolean {
   if (!a || !b) return false
   return (
-    a.alias === b.alias && a.host === b.host && a.user === b.user && a.port === b.port && a.remotePath === b.remotePath
+    a.alias === b.alias &&
+    a.host === b.host &&
+    a.user === b.user &&
+    a.port === b.port &&
+    a.remotePath === b.remotePath &&
+    a.displayName === b.displayName
   )
 }
 
@@ -182,19 +188,21 @@ export function addResolvedRepo(
       return repo
     },
     update: (existing) => {
-      // No target means the probe couldn't pin down a concrete host;
-      // the existing target (placeholder or stale) stays as-is, but
-      // the placeholder → resolved transition is still represented
-      // by the absence of a change. A matching target is also a no-op
-      // — the resolved probe reaffirmed what we already had.
+      const nameChanged = resolvedRepo.name.length > 0 && existing.name !== resolvedRepo.name
       if (!resolvedRepo.target) return null
-      if (remoteTargetsEqual(remoteRepoLifecycleTarget(existing.remote.lifecycle), resolvedRepo.target)) return null
-      // Promote the existing remote repo from 'connecting' (or
-      // 'failed' with a stale target) to 'ready' with the new
-      // concrete target. Phase 4 dropped the legacy `target`
-      // field; the lifecycle union owns the target now.
+      const lifecycleReady = existing.remote.lifecycle?.kind === 'ready'
+      const targetChanged = !remoteTargetsEqual(
+        remoteRepoLifecycleTarget(existing.remote.lifecycle),
+        resolvedRepo.target,
+      )
+      if (!nameChanged && lifecycleReady && !targetChanged) return null
+      // Promote the existing remote repo from 'connecting' or
+      // 'failed' to 'ready' even when the retained target is the
+      // same. The converged lifecycle result is authoritative; target
+      // equality alone does not prove the repo is already ready.
       const next: RepoState = {
         ...existing,
+        name: nameChanged ? resolvedRepo.name : existing.name,
         remote: { ...existing.remote },
       }
       markRemoteLifecycleReady(next, resolvedRepo.target)

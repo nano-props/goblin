@@ -116,7 +116,7 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
       return {
         kind: 'failed',
         repoId,
-        name: probeResult.name ?? repoId,
+        name: failureTarget?.displayName ?? 'example:repo',
         lifecycle: {
           kind: 'failed',
           reason: toRemoteRepoFailureReason(probeResult.message ?? 'unknown'),
@@ -140,7 +140,7 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
     return {
       kind: 'ready',
       repoId,
-      name: probeResult?.name ?? target.displayName,
+      name: target.displayName,
       lifecycle: { kind: 'ready', target },
     }
   }

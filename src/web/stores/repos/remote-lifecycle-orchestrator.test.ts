@@ -39,6 +39,7 @@ vi.mock('#/web/remote-client.ts', async (importActual) => {
 
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import { runRemoteRepoLifecycle } from '#/web/stores/repos/remote-lifecycle-orchestrator.ts'
+import { emptyRepo } from '#/web/stores/repos/helpers.ts'
 import { installGoblin, resetLifecycleTest } from '#/web/stores/repos/lifecycle-test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
@@ -249,6 +250,24 @@ describe('runRemoteRepoLifecycle', () => {
     const second = await runRemoteRepoLifecycle(useReposStore.setState, useReposStore.getState, REMOTE_ID)
     expect(second?.kind).toBe('ready')
     expect(useReposStore.getState().repos[REMOTE_ID]?.remote.lifecycle?.kind).toBe('ready')
+  })
+
+  test('ready settlement updates stale names and clears failed state even when target is unchanged', async () => {
+    const target = remoteTargetFixture()
+    installGoblin()
+    useReposStore.setState((s) => {
+      const repo = emptyRepo(REMOTE_ID, 'example:/')
+      repo.remote.lifecycle = { kind: 'failed', reason: 'unreachable', target }
+      repo.availability = { phase: 'unavailable', reason: 'unreachable', checkedAt: 0 }
+      return { ...s, repos: { ...s.repos, [REMOTE_ID]: repo }, order: [REMOTE_ID] }
+    })
+
+    const outcome = await runRemoteRepoLifecycle(useReposStore.setState, useReposStore.getState, REMOTE_ID)
+
+    expect(outcome?.kind).toBe('ready')
+    const final = useReposStore.getState().repos[REMOTE_ID]
+    expect(final?.name).toBe('example:repo')
+    expect(final?.remote.lifecycle).toEqual({ kind: 'ready', target })
   })
 
   test("a superseded run does not overwrite the newer run's writes", async () => {

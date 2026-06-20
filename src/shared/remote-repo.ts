@@ -271,15 +271,11 @@ export function normalizeRemoteRepoRef(input: RemoteRepoRefInput): RemoteRepoRef
   const fields = remoteRefFields(input)
   if (!fields) return null
   const id = normalizeRemoteRepoId(fields)
-  const displayName =
-    typeof input.displayName === 'string' && safeText(input.displayName)
-      ? input.displayName.trim()
-      : remoteDisplayName(fields)
   return {
     id,
     alias: fields.alias,
     remotePath: fields.remotePath,
-    displayName,
+    displayName: remoteDisplayName(fields),
   }
 }
 
@@ -314,7 +310,8 @@ export function remoteDisplayName(target: Pick<RemoteRepoTargetInput, 'alias' | 
 export function isRemoteRepoTarget(value: unknown): value is RemoteRepoTarget {
   if (!value || typeof value !== 'object') return false
   const target = value as RemoteRepoTarget
-  return normalizeRemoteTarget(target)?.id === target.id
+  const normalized = normalizeRemoteTarget(target)
+  return !!normalized && normalized.id === target.id && normalized.displayName === target.displayName
 }
 
 export function repoSessionEntryId(entry: RepoSessionEntry): string {
@@ -358,12 +355,9 @@ export function parseRemoteRepoId(repoId: string): Pick<RemoteRepoRef, 'alias' |
 }
 
 export function remoteRepoRefFromTarget(target: RemoteRepoTarget): RemoteRepoRef {
-  return {
-    id: target.id,
-    alias: target.alias,
-    remotePath: target.remotePath,
-    displayName: target.displayName,
-  }
+  const ref = normalizeRemoteRepoRef(target)
+  if (!ref) throw new TypeError('Invalid remote repository target')
+  return ref
 }
 
 function remoteTargetFields(input: RemoteRepoTargetInput): Pick<RemoteRepoTarget, 'host' | 'user' | 'port'> | null {
