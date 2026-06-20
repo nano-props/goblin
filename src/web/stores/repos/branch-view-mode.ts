@@ -27,6 +27,7 @@ export function selectedBranchForBranchSet({
   viewMode,
 }: BranchSelectionInput): string | null {
   const visible = branches.filter((branch) => branchMatchesViewMode(branch, viewMode))
+  if (selectedBranch === null) return null
   if (selectedBranch && visible.some((branch) => branch.name === selectedBranch)) return selectedBranch
   return visible.find((branch) => branch.name === currentBranch)?.name ?? visible[0]?.name ?? null
 }

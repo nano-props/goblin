@@ -47,6 +47,8 @@ export function RepoView({ repoId }: Props) {
       a.workspacePaneSizes['left-right'] === b.workspacePaneSizes['left-right'],
   )
   const setWorkspacePaneSize = useReposStore((s) => s.setWorkspacePaneSize)
+  const setBranchListPaneVisible = useReposStore((s) => s.setBranchListPaneVisible)
+  const clearSelectedBranch = useReposStore((s) => s.clearSelectedBranch)
   const repo = useReposStore((s) => s.repos[repoId])
   useRepoToasts(repoId)
 
@@ -58,6 +60,21 @@ export function RepoView({ repoId }: Props) {
   const branchListPaneVisible = compact ? true : view.branchListPaneVisible
   const behavior = repoWorkspaceBehavior(layout, branchListPaneVisible)
   const workspacePaneSize = view.workspacePaneSizes[layout]
+  const handleBackToBranchView = () => {
+    clearSelectedBranch(repoId)
+    if (compact) {
+      setCompactPane('branch')
+      return
+    }
+    setBranchListPaneVisible(true)
+  }
+  const handleBranchActivated = () => {
+    if (compact) {
+      setCompactPane('workspace')
+      return
+    }
+    setBranchListPaneVisible(false)
+  }
 
   if (!view.exists || !repo) return <div />
   if (isRepoUnavailable(repo)) return <UnavailableRepoView repo={repo} />
@@ -70,7 +87,7 @@ export function RepoView({ repoId }: Props) {
       <BranchDetail
         repoId={repoId}
         layout={layout}
-        onBack={compact ? () => setCompactPane('branch') : undefined}
+        onBack={compact || !branchListPaneVisible ? handleBackToBranchView : undefined}
       />
     </RepoWorkspacePane>
   )
@@ -79,7 +96,7 @@ export function RepoView({ repoId }: Props) {
       <BranchList
         repoId={repoId}
         showActions={behavior.branchListActionsVisible}
-        onBranchActivated={compact ? () => setCompactPane('workspace') : undefined}
+        onBranchActivated={handleBranchActivated}
       />
     </RepoWorkspacePane>
   )

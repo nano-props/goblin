@@ -31,7 +31,7 @@ function seedRepo(options: {
       branch('feature/plain'),
     ],
     currentBranch: options.currentBranch ?? 'main',
-    selectedBranch: options.selectedBranch ?? 'feature/plain',
+    selectedBranch: options.selectedBranch === undefined ? 'feature/plain' : options.selectedBranch,
     workspacePaneView: options.workspacePaneView ?? 'status',
     remote: {
       remotes: ['origin'],
@@ -240,6 +240,33 @@ describe('selectBranch', () => {
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.selectedBranch).toBe('feature/plain')
     expect(repo?.ui.preferredWorkspacePaneView).toBe('terminal')
+  })
+})
+
+describe('clearSelectedBranch', () => {
+  test('clears selection, persists the empty selection, and skips pull request refresh', async () => {
+    let calls = 0
+    ipcHandlers['repo.pullRequests'] = async () => {
+      calls += 1
+      return []
+    }
+    seedRepo({ selectedBranch: 'feature/plain' })
+
+    useReposStore.getState().clearSelectedBranch(REPO_ID)
+    await flushAsyncWork()
+
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBeNull()
+    expect(useReposStore.getState().restorableRepoCache[REPO_ID]?.ui.selectedBranch).toBeNull()
+    expect(calls).toBe(0)
+  })
+
+  test('does nothing when there is no selected branch', () => {
+    seedRepo({ selectedBranch: null })
+    const before = useReposStore.getState().repos[REPO_ID]
+
+    useReposStore.getState().clearSelectedBranch(REPO_ID)
+
+    expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
   })
 })
 

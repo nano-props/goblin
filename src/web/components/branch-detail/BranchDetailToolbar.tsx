@@ -210,6 +210,7 @@ export function BranchDetailToolbar({ repo, detail, detailId, onBack }: Props) {
             <ArrowLeft />
           </Button>
         )}
+        {onBack && terminalWorktreeKey && <div aria-hidden="true" className="h-5 w-px shrink-0 bg-separator" />}
         {terminalWorktreeKey && (
           <WorkspacePaneViewStrip
             worktreeTerminalKey={terminalWorktreeKey}

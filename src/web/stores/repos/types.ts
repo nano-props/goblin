@@ -207,6 +207,7 @@ export interface RuntimeCoherentRepoProjectionActions {
   setWorkspacePaneView: (id: string, tab: WorkspacePaneView) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
   selectBranch: (id: string, branch: string) => void
+  clearSelectedBranch: (id: string) => void
   refreshSnapshot: (id: string, options?: { skipLogBackfill?: boolean; token?: number }) => Promise<void>
   refreshSnapshotAndStatus: (id: string, options?: { skipLogBackfill?: boolean; token?: number }) => Promise<void>
   refreshPullRequests: (

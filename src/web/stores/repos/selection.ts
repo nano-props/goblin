@@ -36,7 +36,10 @@ type RestorableWorkspaceSelectionActions = Pick<
   | 'setSelectedTerminal'
 >
 
-type RuntimeCoherentSelectionActions = Pick<ReposStore, 'setBranchViewMode' | 'setWorkspacePaneView' | 'selectBranch'>
+type RuntimeCoherentSelectionActions = Pick<
+  ReposStore,
+  'setBranchViewMode' | 'setWorkspacePaneView' | 'selectBranch' | 'clearSelectedBranch'
+>
 
 type RepoMutationSelectionActions = Pick<ReposStore, 'checkoutSelectedInRepo' | 'checkoutSelected'>
 
@@ -254,6 +257,21 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         })
       })
       if (changed && token !== undefined) afterSelectionChange(id, token, branch)
+    },
+
+    clearSelectedBranch(id: string) {
+      let changed = false
+      let token: number | undefined
+      set((s) => {
+        const repo = s.repos[id]
+        if (!repo || repo.ui.selectedBranch === null) return s
+        changed = true
+        token = repo.instanceToken
+        return replaceRepoState(s, repo, (r) => {
+          r.ui.selectedBranch = null
+        })
+      })
+      if (changed && token !== undefined) afterSelectionChange(id, token, null)
     },
   }
 }
