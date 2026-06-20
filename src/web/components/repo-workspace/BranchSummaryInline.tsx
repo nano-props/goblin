@@ -214,7 +214,7 @@ export function BranchSummaryInline({
       <span className="flex min-w-0 items-center gap-2 overflow-hidden">
         <span
           className={cn(
-            'min-w-0 truncate text-sm font-medium',
+            'shrink-0 truncate text-sm font-medium',
             selected ? 'text-selected-foreground' : 'text-foreground',
           )}
         >
