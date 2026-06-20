@@ -7,7 +7,7 @@ import type {
 
 export interface MainWindowWorkspaceState extends Pick<
   ReposStore,
-  'activeId' | 'order' | 'sessionReady' | 'branchListPaneVisible'
+  'activeId' | 'order' | 'sessionReady' | 'workspaceFocused'
 > {}
 
 export interface MainWindowNavigationState extends Pick<ReposStore, 'activeId' | 'order'> {}
@@ -18,7 +18,7 @@ export interface KeyboardRuntimeState {
 
 export interface RestorableWorkspaceViewportState extends Pick<
   ReposStore,
-  'activeId' | 'order' | 'branchListPaneVisible'
+  'activeId' | 'order' | 'workspaceFocused'
 > {}
 
 export interface RestorableWorkspaceNavigationState extends Pick<ReposStore, 'activeId' | 'order'> {}
@@ -36,7 +36,7 @@ export function restorableWorkspaceStateFromStore(
     ReposStore,
     | 'order'
     | 'activeId'
-    | 'branchListPaneVisible'
+    | 'workspaceFocused'
     | 'workspacePaneSizes'
     | 'selectedTerminalByWorktree'
     | 'workspacePaneViewByRepo'
@@ -45,7 +45,7 @@ export function restorableWorkspaceStateFromStore(
   return {
     order: state.order,
     activeId: state.activeId,
-    branchListPaneVisible: state.branchListPaneVisible,
+    workspaceFocused: state.workspaceFocused,
     workspacePaneSizes: state.workspacePaneSizes,
     selectedTerminalByWorktree: state.selectedTerminalByWorktree,
     workspacePaneViewByRepo: state.workspacePaneViewByRepo ?? {},
@@ -53,12 +53,12 @@ export function restorableWorkspaceStateFromStore(
 }
 
 function restorableWorkspaceViewportStateFromStore(
-  state: Pick<ReposStore, 'activeId' | 'order' | 'branchListPaneVisible'>,
+  state: Pick<ReposStore, 'activeId' | 'order' | 'workspaceFocused'>,
 ): RestorableWorkspaceViewportState {
   return {
     activeId: state.activeId,
     order: state.order,
-    branchListPaneVisible: state.branchListPaneVisible,
+    workspaceFocused: state.workspaceFocused,
   }
 }
 
@@ -72,13 +72,13 @@ export function restorableWorkspaceNavigationStateFromStore(
 }
 
 export function mainWindowWorkspaceStateFromStore(
-  state: Pick<ReposStore, 'activeId' | 'order' | 'sessionReady' | 'branchListPaneVisible'>,
+  state: Pick<ReposStore, 'activeId' | 'order' | 'sessionReady' | 'workspaceFocused'>,
 ): MainWindowWorkspaceState {
   const restorable = restorableWorkspaceViewportStateFromStore(state)
   return {
     activeId: restorable.activeId,
     order: restorable.order,
-    branchListPaneVisible: restorable.branchListPaneVisible,
+    workspaceFocused: restorable.workspaceFocused,
     sessionReady: state.sessionReady,
   }
 }
@@ -97,7 +97,7 @@ export function mainWindowWorkspaceStateEqual(a: MainWindowWorkspaceState, b: Ma
   return (
     a.activeId === b.activeId &&
     a.sessionReady === b.sessionReady &&
-    a.branchListPaneVisible === b.branchListPaneVisible &&
+    a.workspaceFocused === b.workspaceFocused &&
     arraysEqual(a.order, b.order)
   )
 }

@@ -39,14 +39,14 @@ describe('useAppBootstrap', () => {
     vi.spyOn(useSessionRestoreStore.getState(), 'hydrate').mockResolvedValue({
       openRepos: [{ kind: 'local', id: '/tmp/repo' }],
       activeRepo: '/tmp/repo',
-      branchListPaneVisible: false,
+      workspaceFocused: false,
       workspacePaneSizes: { 'left-right': 45 },
       selectedTerminalByWorktree: { '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2' },
     })
     vi.spyOn(useSessionRestoreStore.getState(), 'consumeBootSessionSnapshot').mockReturnValue({
       openRepos: [{ kind: 'local', id: '/tmp/repo' }],
       activeRepo: '/tmp/repo',
-      branchListPaneVisible: false,
+      workspaceFocused: false,
       workspacePaneSizes: { 'left-right': 45 },
       selectedTerminalByWorktree: { '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2' },
     })
@@ -55,7 +55,7 @@ describe('useAppBootstrap', () => {
     await render(<Harness />)
 
     const state = useReposStore.getState()
-    expect(state.branchListPaneVisible).toBe(false)
+    expect(state.workspaceFocused).toBe(false)
     expect(state.workspacePaneSizes).toEqual({ 'left-right': 45 })
     expect(state.selectedTerminalByWorktree).toEqual({
       '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2',

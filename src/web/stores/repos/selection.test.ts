@@ -11,7 +11,7 @@ import {
 } from '#/web/stores/repos/test-utils.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
 import {
-  DEFAULT_BRANCH_LIST_PANE_VISIBLE,
+  DEFAULT_WORKSPACE_FOCUSED,
   DEFAULT_WORKSPACE_PANE_SIZES,
 } from '#/shared/workspace-layout.ts'
 const REPO_ID = '/tmp/gbl-selection-test-repo'
@@ -353,66 +353,46 @@ describe('setWorkspacePaneView', () => {
 describe('workspace pane layout state', () => {
   test('applies session pane state atomically with shared normalization rules', () => {
     useReposStore.getState().applySessionLayoutState({
-      branchListPaneVisible: false,
+      workspaceFocused: true,
       workspacePaneSizes: { 'left-right': 45 },
     })
 
     expect(useReposStore.getState()).toMatchObject({
-      branchListPaneVisible: false,
+      workspaceFocused: true,
       workspacePaneSizes: { 'left-right': 45 },
     })
   })
 
-  test('keeps compact pane local to navigation instead of session layout', () => {
-    seedRepo({ selectedBranch: 'feature/plain' })
-    useReposStore.setState({ activeId: null, compactWorkspacePane: 'workspace' })
-
-    useReposStore.getState().setActive(REPO_ID)
-
-    expect(useReposStore.getState().compactWorkspacePane).toBe('branch')
-
-    useReposStore.getState().setCompactWorkspacePane('workspace')
-
-    expect(useReposStore.getState().compactWorkspacePane).toBe('workspace')
-  })
-
-  test('does not leave compact Workspace View armed without a selected branch', () => {
-    seedRepo({ selectedBranch: null })
-
-    useReposStore.getState().setCompactWorkspacePane('workspace')
-
-    expect(useReposStore.getState().compactWorkspacePane).toBe('branch')
-  })
 })
 
-describe('setBranchListPaneVisible', () => {
-  test('hides the large-screen Branch View', () => {
-    useReposStore.getState().setBranchListPaneVisible(false)
+describe('setWorkspaceFocused', () => {
+  test('enables large-screen Focus Mode', () => {
+    useReposStore.getState().setWorkspaceFocused(true)
 
-    expect(useReposStore.getState().branchListPaneVisible).toBe(false)
+    expect(useReposStore.getState().workspaceFocused).toBe(true)
   })
 
-  test('can show the large-screen Branch View again', () => {
-    useReposStore.getState().setBranchListPaneVisible(false)
-    useReposStore.getState().setBranchListPaneVisible(true)
+  test('can disable large-screen Focus Mode again', () => {
+    useReposStore.getState().setWorkspaceFocused(true)
+    useReposStore.getState().setWorkspaceFocused(false)
 
-    expect(useReposStore.getState().branchListPaneVisible).toBe(true)
+    expect(useReposStore.getState().workspaceFocused).toBe(false)
   })
 
-  test('toggles the large-screen Branch View visibility', () => {
-    useReposStore.getState().toggleBranchListPaneVisible()
+  test('toggles large-screen Focus Mode', () => {
+    useReposStore.getState().toggleWorkspaceFocused()
 
-    expect(useReposStore.getState().branchListPaneVisible).toBe(false)
+    expect(useReposStore.getState().workspaceFocused).toBe(true)
   })
 
-  test('preserves large-screen visibility when filtering leaves no selected branch', () => {
+  test('preserves large-screen Focus Mode when filtering leaves no selected branch', () => {
     seedRepo({ selectedBranch: 'main', branches: [branch('main')] })
-    useReposStore.getState().setBranchListPaneVisible(false)
+    useReposStore.getState().setWorkspaceFocused(true)
 
     useReposStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBeNull()
-    expect(useReposStore.getState().branchListPaneVisible).toBe(false)
+    expect(useReposStore.getState().workspaceFocused).toBe(true)
   })
 })
 
@@ -435,13 +415,13 @@ describe('setWorkspacePaneSize', () => {
 describe('resetLayout', () => {
   test('restores the initial workspace layout defaults', () => {
     useReposStore.setState({
-      branchListPaneVisible: false,
+      workspaceFocused: true,
       workspacePaneSizes: { 'left-right': 70 },
     })
 
     useReposStore.getState().resetLayout()
 
-    expect(useReposStore.getState().branchListPaneVisible).toBe(DEFAULT_BRANCH_LIST_PANE_VISIBLE)
+    expect(useReposStore.getState().workspaceFocused).toBe(DEFAULT_WORKSPACE_FOCUSED)
     expect(useReposStore.getState().workspacePaneSizes).toBe(DEFAULT_WORKSPACE_PANE_SIZES)
   })
 

@@ -7,12 +7,12 @@ import { create } from 'zustand'
 import type { SessionState } from '#/shared/api-types.ts'
 import { restorableSessionStateFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
 import { getSettingsSnapshot } from '#/web/settings-client.ts'
-import { DEFAULT_WORKSPACE_PANE_SIZES } from '#/shared/workspace-layout.ts'
+import { DEFAULT_WORKSPACE_FOCUSED, DEFAULT_WORKSPACE_PANE_SIZES } from '#/shared/workspace-layout.ts'
 
 export const DEFAULT_RESTORABLE_SESSION_STATE: SessionState = {
   openRepos: [],
   activeRepo: null,
-  branchListPaneVisible: true,
+  workspaceFocused: DEFAULT_WORKSPACE_FOCUSED,
   workspacePaneSizes: DEFAULT_WORKSPACE_PANE_SIZES,
   selectedTerminalByWorktree: {},
 }

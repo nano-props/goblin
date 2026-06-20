@@ -56,32 +56,35 @@ describe('Topbar', () => {
     expect(settingsButton()).not.toBeNull()
   })
 
-  test('renders a Branch List visibility toggle on large screens', () => {
+  test('renders a Focus Mode toggle on large screens', () => {
     render(
       <Topbar repoId="/tmp/repo" onOpenSettings={() => {}}>
         <div />
       </Topbar>,
     )
 
-    expect(branchListToggle()).not.toBeNull()
+    expect(focusModeToggle()).not.toBeNull()
   })
 
-  test('toggles the large-screen Branch List pane visibility', () => {
+  test('toggles large-screen Focus Mode', () => {
     render(
       <Topbar repoId="/tmp/repo" onOpenSettings={() => {}}>
         <div />
       </Topbar>,
     )
+
+    expect(useReposStore.getState().workspaceFocused).toBe(false)
+    expect(focusModeToggle()?.getAttribute('aria-pressed')).toBe('false')
 
     act(() => {
-      branchListToggle()?.click()
+      focusModeToggle()?.click()
     })
 
-    expect(useReposStore.getState().branchListPaneVisible).toBe(false)
-    expect(branchListToggle()?.getAttribute('aria-pressed')).toBe('true')
+    expect(useReposStore.getState().workspaceFocused).toBe(true)
+    expect(focusModeToggle()?.getAttribute('aria-pressed')).toBe('true')
   })
 
-  test('hides the Branch List visibility toggle on compact screens', () => {
+  test('hides the Focus Mode toggle on compact screens', () => {
     responsiveMocks.compact = true
 
     render(
@@ -90,7 +93,7 @@ describe('Topbar', () => {
       </Topbar>,
     )
 
-    expect(branchListToggle()).toBeNull()
+    expect(focusModeToggle()).toBeNull()
   })
 })
 
@@ -100,8 +103,8 @@ function render(element: ReactNode) {
   })
 }
 
-function branchListToggle(): HTMLButtonElement | null {
-  return container?.querySelector('button[aria-label="workspace.branch-list-toggle-label"]') ?? null
+function focusModeToggle(): HTMLButtonElement | null {
+  return container?.querySelector('button[aria-label="workspace.focus-toggle-label"]') ?? null
 }
 
 function settingsButton(): HTMLButtonElement | null {

@@ -1,21 +1,31 @@
 import type { WorkspaceLayout } from '#/shared/workspace-layout.ts'
-export type RepoWorkspaceMode = 'split' | 'workspace-only'
+export type RepoWorkspaceMode = 'split' | 'single-pane'
 
 export interface RepoWorkspaceBehavior {
   mode: RepoWorkspaceMode
-  branchListPaneVisible: boolean
+  singlePane: boolean
+  compact: boolean
+  workspaceFocused: boolean
   branchListActionsVisible: boolean
   prTooltipSide: 'right' | 'bottom'
 }
 
-export function repoWorkspaceBehavior(
-  _layout: WorkspaceLayout,
-  branchListPaneVisible = true,
-): RepoWorkspaceBehavior {
+export function repoWorkspaceBehavior({
+  layout: _layout,
+  compact = false,
+  workspaceFocused = false,
+}: {
+  layout: WorkspaceLayout
+  compact?: boolean
+  workspaceFocused?: boolean
+}): RepoWorkspaceBehavior {
+  const singlePane = compact || workspaceFocused
   return {
-    mode: branchListPaneVisible ? 'split' : 'workspace-only',
-    branchListPaneVisible,
-    branchListActionsVisible: branchListPaneVisible,
+    mode: singlePane ? 'single-pane' : 'split',
+    singlePane,
+    compact,
+    workspaceFocused,
+    branchListActionsVisible: true,
     prTooltipSide: 'bottom',
   }
 }

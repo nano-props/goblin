@@ -48,7 +48,7 @@ export function Layout() {
 
   const activeId = useReposStore((s) => s.activeId)
   const order = useReposStore((s) => s.order)
-  const { setActive, closeRepo, cycleActive, selectBranch, setWorkspacePaneView, setCompactWorkspacePane } =
+  const { setActive, closeRepo, cycleActive, selectBranch, setWorkspacePaneView } =
     useStoreWithEqualityFn(
       useReposStore,
       mainWindowNavigationStoreActionsFromStore,
@@ -64,7 +64,6 @@ export function Layout() {
         cycleActive,
         selectBranch,
         setWorkspacePaneView,
-        setCompactWorkspacePane,
         onOpenSettings: (page) => void navigate({ to: `/settings/${page}` }),
       }),
     [
@@ -76,7 +75,6 @@ export function Layout() {
       selectBranch,
       setActive,
       setWorkspacePaneView,
-      setCompactWorkspacePane,
     ],
   )
 

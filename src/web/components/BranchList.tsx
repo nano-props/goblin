@@ -23,7 +23,6 @@ import { openWorkspacePaneView } from '#/web/components/branch-detail/open-works
 interface Props {
   repoId: string
   showActions?: boolean
-  onBranchActivated?: () => void
 }
 
 type OpenActionMenu = { repoId: string; branch: string }
@@ -61,7 +60,7 @@ function branchListRepoEqual(a: BranchListRepo | undefined, b: BranchListRepo | 
   )
 }
 
-export function BranchList({ repoId, showActions = true, onBranchActivated }: Props) {
+export function BranchList({ repoId, showActions = true }: Props) {
   const t = useT()
   const navigation = useMainWindowNavigation()
   const selectedRef = useRef<HTMLLIElement | null>(null)
@@ -69,9 +68,8 @@ export function BranchList({ repoId, showActions = true, onBranchActivated }: Pr
   const handleSelectBranch = useCallback(
     (branch: string) => {
       navigation.selectRepoBranch(repoId, branch)
-      onBranchActivated?.()
     },
-    [navigation, onBranchActivated, repoId],
+    [navigation, repoId],
   )
   const repo = useStoreWithEqualityFn(
     useReposStore,
@@ -130,7 +128,6 @@ export function BranchList({ repoId, showActions = true, onBranchActivated }: Pr
         type: 'status',
         navigation,
       })
-      onBranchActivated?.()
       return
     }
     handleSelectBranch(branchName)

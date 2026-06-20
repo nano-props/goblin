@@ -1,5 +1,5 @@
 // Top app bar with embedded tab strip, a per-repo actions group,
-// a large-screen Branch View toggle, and a global settings button.
+// a large-screen Focus Mode toggle, and a global settings button.
 //   • tab strip (children) — repo tabs + the "open new repo"
 //     dropdown + the "more" overflow.
 //   • repo actions (when `repoId` is set) — Refresh, the worktree
@@ -7,7 +7,7 @@
 //     live in a dedicated RepoToolbar above the branch list; they
 //     moved up here so the workspace's vertical chrome collapses
 //     to the branch list and workspace pane.
-//   • Branch View toggle — hidden in compact mode, because compact
+//   • Focus Mode toggle — hidden in compact mode, because compact
 //     navigation switches between Branch View and Workspace View
 //     inside the workspace itself.
 //   • Settings button (always shown) — navigates to the app
@@ -50,32 +50,32 @@ export function Topbar({ onOpenSettings, repoId, children }: Props) {
     >
       {children}
       {repoId && <RepoToolbarActions repoId={repoId} />}
-      {repoId && !compact && <BranchListVisibilityToggle />}
+      {repoId && !compact && <WorkspaceFocusToggle />}
       <SettingsButton onClick={onOpenSettings} />
     </div>
   )
 }
 
-function BranchListVisibilityToggle() {
+function WorkspaceFocusToggle() {
   const t = useT()
-  const branchListPaneVisible = useReposStore((s) => s.branchListPaneVisible)
-  const toggleBranchListPaneVisible = useReposStore((s) => s.toggleBranchListPaneVisible)
+  const workspaceFocused = useReposStore((s) => s.workspaceFocused)
+  const toggleWorkspaceFocused = useReposStore((s) => s.toggleWorkspaceFocused)
   const label = t(
-    branchListPaneVisible
-      ? 'workspace.branch-list-toggle-tooltip.hide'
-      : 'workspace.branch-list-toggle-tooltip.show',
+    workspaceFocused
+      ? 'workspace.focus-toggle-tooltip.disable'
+      : 'workspace.focus-toggle-tooltip.enable',
   )
   return (
     <Tip label={label}>
       <Button
         variant="ghost"
         size="icon-lg"
-        onClick={toggleBranchListPaneVisible}
-        aria-pressed={!branchListPaneVisible}
-        aria-label={t('workspace.branch-list-toggle-label')}
+        onClick={toggleWorkspaceFocused}
+        aria-pressed={workspaceFocused}
+        aria-label={t('workspace.focus-toggle-label')}
         title={label}
         className={cn(
-          !branchListPaneVisible &&
+          workspaceFocused &&
             'bg-accent text-accent-foreground shadow-xs hover:bg-accent hover:text-accent-foreground',
         )}
       >

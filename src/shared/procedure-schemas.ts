@@ -162,7 +162,7 @@ export const REPO_QUERY_SCHEMAS = {
 const SessionStateSchema = v.object({
   openRepos: v.array(RepoSessionEntrySchema),
   activeRepo: v.nullable(v.string()),
-  branchListPaneVisible: v.boolean(),
+  workspaceFocused: v.boolean(),
   workspacePaneSizes: v.object({
     'left-right': v.number(),
   }),

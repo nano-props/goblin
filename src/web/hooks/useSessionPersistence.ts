@@ -9,7 +9,7 @@ const SESSION_SAVE_DEBOUNCE_MS = 200
 export function useSessionPersistence() {
   const activeId = useReposStore((s) => s.activeId)
   const order = useReposStore((s) => s.order)
-  const branchListPaneVisible = useReposStore((s) => s.branchListPaneVisible)
+  const workspaceFocused = useReposStore((s) => s.workspaceFocused)
   const workspacePaneSizes = useReposStore((s) => s.workspacePaneSizes)
   const selectedTerminalByWorktree = useReposStore((s) => s.selectedTerminalByWorktree)
   const workspacePaneViewByRepo = useReposStore((s) => s.workspacePaneViewByRepo)
@@ -28,7 +28,7 @@ export function useSessionPersistence() {
       restorableWorkspaceState: restorableWorkspaceStateFromStore({
         order,
         activeId,
-        branchListPaneVisible,
+        workspaceFocused,
         workspacePaneSizes,
         selectedTerminalByWorktree,
         workspacePaneViewByRepo,
@@ -38,7 +38,7 @@ export function useSessionPersistence() {
     const immediateKey = JSON.stringify({
       openRepos: session.openRepos,
       activeRepo: session.activeRepo,
-      branchListPaneVisible: session.branchListPaneVisible,
+      workspaceFocused: session.workspaceFocused,
       selectedTerminalByWorktree: session.selectedTerminalByWorktree,
     })
     const immediate = lastImmediateKeyRef.current !== immediateKey
@@ -62,7 +62,7 @@ export function useSessionPersistence() {
     order,
     activeId,
     workspacePaneSizes,
-    branchListPaneVisible,
+    workspaceFocused,
     selectedTerminalByWorktree,
     workspacePaneViewByRepo,
     repos,

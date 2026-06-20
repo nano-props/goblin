@@ -131,7 +131,7 @@ describe('settings write paths', () => {
     const session: SessionState = {
       openRepos: [],
       activeRepo: null,
-      branchListPaneVisible: true,
+      workspaceFocused: true,
       workspacePaneSizes: {
         'left-right': 50,
       },
@@ -175,11 +175,11 @@ describe('settings write paths', () => {
       session: {
         openRepos: [],
         activeRepo: null,
-        branchListPaneVisible: true,
+        workspaceFocused: true,
         workspacePaneSizes: { 'left-right': 61.8 },
       },
     })
-    expect(parsed.session.branchListPaneVisible).toBe(true)
+    expect(parsed.session.workspaceFocused).toBe(true)
     expect(parsed.session.workspacePaneSizes).toEqual({ 'left-right': 61.8 })
   })
 })

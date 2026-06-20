@@ -11,12 +11,12 @@ export interface RestorableWorkspaceOrderStoreActions extends Pick<ReposStore, '
 
 export interface RestorableWorkspaceLayoutStoreActions extends Pick<
   ReposStore,
-  'resetLayout' | 'setSelectedTerminal' | 'toggleBranchListPaneVisible'
+  'resetLayout' | 'setSelectedTerminal' | 'toggleWorkspaceFocused'
 > {}
 
 export interface RestorableWorkspaceLayoutPreferenceStoreActions extends Pick<
   ReposStore,
-  'resetLayout' | 'setSelectedTerminal' | 'toggleBranchListPaneVisible'
+  'resetLayout' | 'setSelectedTerminal' | 'toggleWorkspaceFocused'
 > {}
 
 export interface RuntimeCoherentRepoOpenStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen'> {}
@@ -33,7 +33,7 @@ export interface RestorableWorkspaceStoreActions extends Pick<
   | 'cycleActive'
   | 'resetLayout'
   | 'setSelectedTerminal'
-  | 'toggleBranchListPaneVisible'
+  | 'toggleWorkspaceFocused'
 > {}
 
 export interface RuntimeCoherentRepoProjectionStoreActions extends Pick<
@@ -43,7 +43,7 @@ export interface RuntimeCoherentRepoProjectionStoreActions extends Pick<
 
 export interface MainWindowNavigationStoreActions extends Pick<
   ReposStore,
-  'setActive' | 'closeRepo' | 'cycleActive' | 'selectBranch' | 'setWorkspacePaneView' | 'setCompactWorkspacePane'
+  'setActive' | 'closeRepo' | 'cycleActive' | 'selectBranch' | 'setWorkspacePaneView'
 > {}
 
 export interface RepoTabStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen' | 'reorderRepos'> {}
@@ -99,22 +99,22 @@ export function runtimeCoherentRepoNavigationStoreActionsFromStore(
 }
 
 export function restorableWorkspaceLayoutStoreActionsFromStore(
-  state: Pick<ReposStore, 'resetLayout' | 'setSelectedTerminal' | 'toggleBranchListPaneVisible'>,
+  state: Pick<ReposStore, 'resetLayout' | 'setSelectedTerminal' | 'toggleWorkspaceFocused'>,
 ): RestorableWorkspaceLayoutStoreActions {
   return {
     resetLayout: state.resetLayout,
     setSelectedTerminal: state.setSelectedTerminal,
-    toggleBranchListPaneVisible: state.toggleBranchListPaneVisible,
+    toggleWorkspaceFocused: state.toggleWorkspaceFocused,
   }
 }
 
 export function restorableWorkspaceLayoutPreferenceStoreActionsFromStore(
-  state: Pick<ReposStore, 'resetLayout' | 'setSelectedTerminal' | 'toggleBranchListPaneVisible'>,
+  state: Pick<ReposStore, 'resetLayout' | 'setSelectedTerminal' | 'toggleWorkspaceFocused'>,
 ): RestorableWorkspaceLayoutPreferenceStoreActions {
   return {
     resetLayout: state.resetLayout,
     setSelectedTerminal: state.setSelectedTerminal,
-    toggleBranchListPaneVisible: state.toggleBranchListPaneVisible,
+    toggleWorkspaceFocused: state.toggleWorkspaceFocused,
   }
 }
 
@@ -126,7 +126,7 @@ export function restorableWorkspaceStoreActionsFromStore(
     | 'cycleActive'
     | 'resetLayout'
     | 'setSelectedTerminal'
-    | 'toggleBranchListPaneVisible'
+    | 'toggleWorkspaceFocused'
   >,
 ): RestorableWorkspaceStoreActions {
   return {
@@ -135,7 +135,7 @@ export function restorableWorkspaceStoreActionsFromStore(
     cycleActive: state.cycleActive,
     resetLayout: state.resetLayout,
     setSelectedTerminal: state.setSelectedTerminal,
-    toggleBranchListPaneVisible: state.toggleBranchListPaneVisible,
+    toggleWorkspaceFocused: state.toggleWorkspaceFocused,
   }
 }
 
@@ -159,7 +159,7 @@ export function runtimeCoherentRepoProjectionStoreActionsFromStore(
 export function mainWindowNavigationStoreActionsFromStore(
   state: Pick<
     ReposStore,
-    'setActive' | 'cycleActive' | 'closeRepo' | 'selectBranch' | 'setWorkspacePaneView' | 'setCompactWorkspacePane'
+    'setActive' | 'cycleActive' | 'closeRepo' | 'selectBranch' | 'setWorkspacePaneView'
   >,
 ): MainWindowNavigationStoreActions {
   const restorable = restorableWorkspaceViewportStoreActionsFromStore({
@@ -177,7 +177,6 @@ export function mainWindowNavigationStoreActionsFromStore(
     cycleActive: restorable.cycleActive,
     selectBranch: runtimeCoherent.selectBranch,
     setWorkspacePaneView: runtimeCoherent.setWorkspacePaneView,
-    setCompactWorkspacePane: state.setCompactWorkspacePane,
   }
 }
 
@@ -216,8 +215,7 @@ export function mainWindowNavigationStoreActionsEqual(
     a.closeRepo === b.closeRepo &&
     a.cycleActive === b.cycleActive &&
     a.selectBranch === b.selectBranch &&
-    a.setWorkspacePaneView === b.setWorkspacePaneView &&
-    a.setCompactWorkspacePane === b.setCompactWorkspacePane
+    a.setWorkspacePaneView === b.setWorkspacePaneView
   )
 }
 

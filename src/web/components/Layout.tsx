@@ -80,7 +80,7 @@ export function RepoWorkspace({
   workspacePaneSize = DEFAULT_WORKSPACE_PANE_SIZES[layout],
   onWorkspacePaneSizeChange,
 }: RepoWorkspaceProps) {
-  if (mode === 'workspace-only') return <div className="flex min-h-0 flex-1">{workspacePane}</div>
+  if (mode === 'single-pane') return <div className="flex min-h-0 flex-1">{workspacePane}</div>
 
   return (
     <SplitPane

@@ -4,7 +4,7 @@ import { toSafeRepoLocator, toSafeSessionRepoEntry } from '#/shared/input-valida
 import { serverDataFile } from '#/shared/data-dir.ts'
 import type { EditorPref, LangPref, SessionState, SettingsPrefs, TerminalPref, ThemePref } from '#/shared/api-types.ts'
 import {
-  DEFAULT_BRANCH_LIST_PANE_VISIBLE,
+  DEFAULT_WORKSPACE_FOCUSED,
   normalizeWorkspacePaneSizes,
 } from '#/shared/workspace-layout.ts'
 import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
@@ -168,10 +168,10 @@ function normalizeSession(value: unknown): SessionState {
   return {
     openRepos,
     activeRepo: activeRepo && openRepos.some((entry) => repoSessionEntryId(entry) === activeRepo) ? activeRepo : null,
-    branchListPaneVisible:
-      typeof partial.branchListPaneVisible === 'boolean'
-        ? partial.branchListPaneVisible
-        : DEFAULT_BRANCH_LIST_PANE_VISIBLE,
+    workspaceFocused:
+      typeof partial.workspaceFocused === 'boolean'
+        ? partial.workspaceFocused
+        : DEFAULT_WORKSPACE_FOCUSED,
     workspacePaneSizes: normalizeWorkspacePaneSizes(partial.workspacePaneSizes),
     selectedTerminalByWorktree: normalizeSelectedTerminalByWorktree(partial.selectedTerminalByWorktree),
     workspacePaneViewByRepo: normalizeWorkspacePaneViewByRepo(partial.workspacePaneViewByRepo, openRepos),

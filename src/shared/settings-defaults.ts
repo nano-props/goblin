@@ -10,7 +10,7 @@ import type {
   ThemePref,
 } from '#/shared/api-types.ts'
 import {
-  DEFAULT_BRANCH_LIST_PANE_VISIBLE,
+  DEFAULT_WORKSPACE_FOCUSED,
   DEFAULT_WORKSPACE_PANE_SIZES,
 } from '#/shared/workspace-layout.ts'
 
@@ -30,7 +30,7 @@ export function defaultSessionState(): SessionState {
   return {
     openRepos: [],
     activeRepo: null,
-    branchListPaneVisible: DEFAULT_BRANCH_LIST_PANE_VISIBLE,
+    workspaceFocused: DEFAULT_WORKSPACE_FOCUSED,
     workspacePaneSizes: { ...DEFAULT_WORKSPACE_PANE_SIZES },
     selectedTerminalByWorktree: {},
   }

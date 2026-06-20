@@ -6,7 +6,6 @@ describe('createMainWindowNavigationActions', () => {
     const setActive = vi.fn()
     const selectBranch = vi.fn()
     const setWorkspacePaneView = vi.fn()
-    const setCompactWorkspacePane = vi.fn()
     const actions = createMainWindowNavigationActions({
       activeId: '/tmp/repo-a',
       order: ['/tmp/repo-a', '/tmp/repo-b'],
@@ -15,7 +14,6 @@ describe('createMainWindowNavigationActions', () => {
       cycleActive: vi.fn(),
       selectBranch,
       setWorkspacePaneView,
-      setCompactWorkspacePane,
       onOpenSettings: vi.fn(),
     })
 
@@ -24,12 +22,10 @@ describe('createMainWindowNavigationActions', () => {
     expect(setActive).toHaveBeenCalledWith('/tmp/repo-b')
     expect(selectBranch).toHaveBeenCalledWith('/tmp/repo-b', 'feature/test')
     expect(setWorkspacePaneView).toHaveBeenCalledWith('/tmp/repo-b', 'terminal')
-    expect(setCompactWorkspacePane).toHaveBeenCalledWith('workspace')
   })
 
-  test('workspace pane navigation requests the compact Workspace View', () => {
+  test('workspace pane navigation updates the preferred workspace pane view', () => {
     const setWorkspacePaneView = vi.fn()
-    const setCompactWorkspacePane = vi.fn()
     const actions = createMainWindowNavigationActions({
       activeId: '/tmp/repo-a',
       order: ['/tmp/repo-a'],
@@ -38,13 +34,11 @@ describe('createMainWindowNavigationActions', () => {
       cycleActive: vi.fn(),
       selectBranch: vi.fn(),
       setWorkspacePaneView,
-      setCompactWorkspacePane,
     })
 
     actions.showRepoWorkspacePaneView('/tmp/repo-a', 'changes')
 
     expect(setWorkspacePaneView).toHaveBeenCalledWith('/tmp/repo-a', 'changes')
-    expect(setCompactWorkspacePane).toHaveBeenCalledWith('workspace')
   })
 
   test('cycles repos through the store action', () => {

@@ -3,7 +3,7 @@ import { selectedBranchForViewMode } from '#/web/stores/repos/branch-view-mode.t
 import { isRepoUnavailable, replaceRepo, replaceRepoState } from '#/web/stores/repos/helpers.ts'
 import { persistRestorableRepoSnapshot } from '#/web/stores/repos/persistence.ts'
 import {
-  DEFAULT_BRANCH_LIST_PANE_VISIBLE,
+  DEFAULT_WORKSPACE_FOCUSED,
   DEFAULT_WORKSPACE_PANE_SIZES,
   normalizeWorkspacePaneSize,
   normalizeWorkspacePaneSizes,
@@ -11,7 +11,6 @@ import {
 } from '#/shared/workspace-layout.ts'
 import type {
   BranchViewMode,
-  CompactWorkspacePane,
   RepoWorkspaceLayout,
   ReposGet,
   ReposSet,
@@ -29,15 +28,13 @@ type RestorableWorkspaceSelectionActions = Pick<
   | 'applySessionLayoutState'
   | 'applySessionSelectedTerminalState'
   | 'applySessionWorkspacePaneViewByRepo'
-  | 'setBranchListPaneVisible'
-  | 'toggleBranchListPaneVisible'
+  | 'setWorkspaceFocused'
+  | 'toggleWorkspaceFocused'
   | 'setWorkspacePaneSize'
   | 'setWorkspacePaneSizes'
   | 'resetLayout'
   | 'setSelectedTerminal'
 >
-
-type LocalWorkspaceSelectionActions = Pick<ReposStore, 'setCompactWorkspacePane'>
 
 type RuntimeCoherentSelectionActions = Pick<
   ReposStore,
@@ -49,7 +46,7 @@ type RepoMutationSelectionActions = Pick<ReposStore, 'checkoutSelectedInRepo' | 
 function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet): RestorableWorkspaceSelectionActions {
   return {
     setActive(id: string) {
-      set((s) => (s.repos[id] && s.activeId !== id ? { activeId: id, compactWorkspacePane: 'branch' } : s))
+      set((s) => (s.repos[id] && s.activeId !== id ? { activeId: id } : s))
     },
 
     reorderRepos(fromId: string, toId: string) {
@@ -68,7 +65,7 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
       const idx = activeId ? order.indexOf(activeId) : -1
       const nextIdx = idx === -1 ? 0 : (idx + direction + order.length) % order.length
       const next = order[nextIdx]
-      if (next && next !== activeId) set({ activeId: next, compactWorkspacePane: 'branch' })
+      if (next && next !== activeId) set({ activeId: next })
     },
 
     applySessionLayoutState(layoutState: Parameters<ReposStore['applySessionLayoutState']>[0]) {
@@ -77,13 +74,13 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
       set((s) => {
         const next = normalizeWorkspaceSessionLayoutState(layoutState)
         if (
-          s.branchListPaneVisible === next.branchListPaneVisible &&
+          s.workspaceFocused === next.workspaceFocused &&
           s.workspacePaneSizes['left-right'] === next.workspacePaneSizes['left-right']
         ) {
           return s
         }
         return {
-          branchListPaneVisible: next.branchListPaneVisible,
+          workspaceFocused: next.workspaceFocused,
           workspacePaneSizes: next.workspacePaneSizes,
         }
       })
@@ -128,12 +125,12 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
       })
     },
 
-    setBranchListPaneVisible(visible: boolean) {
-      set((s) => (s.branchListPaneVisible === visible ? s : { branchListPaneVisible: visible }))
+    setWorkspaceFocused(enabled: boolean) {
+      set((s) => (s.workspaceFocused === enabled ? s : { workspaceFocused: enabled }))
     },
 
-    toggleBranchListPaneVisible() {
-      set((s) => ({ branchListPaneVisible: !s.branchListPaneVisible }))
+    toggleWorkspaceFocused() {
+      set((s) => ({ workspaceFocused: !s.workspaceFocused }))
     },
 
     setWorkspacePaneSize(layout: RepoWorkspaceLayout, size: number) {
@@ -157,13 +154,13 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
     resetLayout() {
       set((s) => {
         if (
-          s.branchListPaneVisible === DEFAULT_BRANCH_LIST_PANE_VISIBLE &&
+          s.workspaceFocused === DEFAULT_WORKSPACE_FOCUSED &&
           s.workspacePaneSizes['left-right'] === DEFAULT_WORKSPACE_PANE_SIZES['left-right']
         ) {
           return s
         }
         return {
-          branchListPaneVisible: DEFAULT_BRANCH_LIST_PANE_VISIBLE,
+          workspaceFocused: DEFAULT_WORKSPACE_FOCUSED,
           workspacePaneSizes: DEFAULT_WORKSPACE_PANE_SIZES,
         }
       })
@@ -180,18 +177,6 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
         const selectedTerminalByWorktree = { ...s.selectedTerminalByWorktree }
         delete selectedTerminalByWorktree[worktreeTerminalKey]
         return { selectedTerminalByWorktree }
-      })
-    },
-  }
-}
-
-function createLocalWorkspaceSelectionActions(set: ReposSet): LocalWorkspaceSelectionActions {
-  return {
-    setCompactWorkspacePane(pane: CompactWorkspacePane) {
-      set((s) => {
-        const repo = s.activeId ? s.repos[s.activeId] : null
-        const next = pane === 'workspace' && !repo?.ui.selectedBranch ? 'branch' : pane
-        return s.compactWorkspacePane === next ? s : { compactWorkspacePane: next }
       })
     },
   }
@@ -317,7 +302,6 @@ function createRepoMutationSelectionActions(set: ReposSet, get: ReposGet): RepoM
 export function createSelectionActions(set: ReposSet, get: ReposGet) {
   return {
     ...createRestorableWorkspaceSelectionActions(set, get),
-    ...createLocalWorkspaceSelectionActions(set),
     ...createRuntimeCoherentSelectionActions(set, get),
     ...createRepoMutationSelectionActions(set, get),
   }

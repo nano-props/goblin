@@ -2,19 +2,31 @@ import { describe, expect, test } from 'vitest'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 
 describe('repoWorkspaceBehavior', () => {
-  test('renders the split workspace behavior when Branch View is visible', () => {
-    expect(repoWorkspaceBehavior('left-right', true)).toMatchObject({
+  test('renders split behavior when neither compact nor Focus Mode is active', () => {
+    expect(repoWorkspaceBehavior({ layout: 'left-right', compact: false, workspaceFocused: false })).toMatchObject({
       mode: 'split',
-      branchListPaneVisible: true,
+      singlePane: false,
+      workspaceFocused: false,
       branchListActionsVisible: true,
     })
   })
 
-  test('renders only the workspace pane when Branch View is hidden', () => {
-    expect(repoWorkspaceBehavior('left-right', false)).toMatchObject({
-      mode: 'workspace-only',
-      branchListPaneVisible: false,
-      branchListActionsVisible: false,
+  test('uses single-pane behavior when large-screen Focus Mode is active', () => {
+    expect(repoWorkspaceBehavior({ layout: 'left-right', compact: false, workspaceFocused: true })).toMatchObject({
+      mode: 'single-pane',
+      singlePane: true,
+      workspaceFocused: true,
+      branchListActionsVisible: true,
+    })
+  })
+
+  test('uses single-pane behavior in compact mode even when Focus Mode is off', () => {
+    expect(repoWorkspaceBehavior({ layout: 'left-right', compact: true, workspaceFocused: false })).toMatchObject({
+      mode: 'single-pane',
+      singlePane: true,
+      compact: true,
+      workspaceFocused: false,
+      branchListActionsVisible: true,
     })
   })
 })

@@ -3,7 +3,6 @@
 // and `App.tsx` — so the workspace below the topbar is just the
 // branch list and the workspace pane.
 
-import { useEffect } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
@@ -33,55 +32,37 @@ export function RepoView({ repoId }: Props) {
       return {
         exists: presentation.exists,
         initialLoading: presentation.initialLoading,
-        branchListPaneVisible: s.branchListPaneVisible,
+        workspaceFocused: s.workspaceFocused,
         workspacePaneSizes: s.workspacePaneSizes,
-        compactWorkspacePane: s.compactWorkspacePane,
       }
     },
     (a, b) =>
       a.exists === b.exists &&
       a.initialLoading === b.initialLoading &&
-      a.branchListPaneVisible === b.branchListPaneVisible &&
-      a.workspacePaneSizes['left-right'] === b.workspacePaneSizes['left-right'] &&
-      a.compactWorkspacePane === b.compactWorkspacePane,
+      a.workspaceFocused === b.workspaceFocused &&
+      a.workspacePaneSizes['left-right'] === b.workspacePaneSizes['left-right'],
   )
   const setWorkspacePaneSize = useReposStore((s) => s.setWorkspacePaneSize)
-  const setBranchListPaneVisible = useReposStore((s) => s.setBranchListPaneVisible)
-  const setCompactWorkspacePane = useReposStore((s) => s.setCompactWorkspacePane)
   const clearSelectedBranch = useReposStore((s) => s.clearSelectedBranch)
   const repo = useReposStore((s) => s.repos[repoId])
   useRepoToasts(repoId)
 
-  useEffect(() => {
-    if (compact && !repo?.ui.selectedBranch && view.compactWorkspacePane !== 'branch') {
-      setCompactWorkspacePane('branch')
-    }
-  }, [compact, repo?.ui.selectedBranch, setCompactWorkspacePane, view.compactWorkspacePane])
-
   const layout = DEFAULT_WORKSPACE_LAYOUT
-  const branchListPaneVisible = compact ? true : view.branchListPaneVisible
-  const behavior = repoWorkspaceBehavior(layout, branchListPaneVisible)
+  const behavior = repoWorkspaceBehavior({
+    layout,
+    compact,
+    workspaceFocused: view.workspaceFocused,
+  })
+
   const workspacePaneSize = view.workspacePaneSizes[layout]
   const handleBackToBranchView = () => {
     clearSelectedBranch(repoId)
-    if (compact) {
-      setCompactWorkspacePane('branch')
-      return
-    }
-    setBranchListPaneVisible(true)
-  }
-  const handleBranchActivated = () => {
-    if (compact) {
-      setCompactWorkspacePane('workspace')
-      return
-    }
-    setBranchListPaneVisible(false)
   }
 
   if (!view.exists || !repo) return <div />
   if (isRepoUnavailable(repo)) return <UnavailableRepoView repo={repo} />
   if (view.initialLoading) {
-    return <RepoWorkspaceSkeleton layout={layout} branchListPaneVisible={branchListPaneVisible} />
+    return <RepoWorkspaceSkeleton layout={layout} singlePane={behavior.singlePane} />
   }
 
   const workspacePane = (
@@ -89,7 +70,7 @@ export function RepoView({ repoId }: Props) {
       <BranchDetail
         repoId={repoId}
         layout={layout}
-        onBack={compact || !branchListPaneVisible ? handleBackToBranchView : undefined}
+        onBack={behavior.singlePane ? handleBackToBranchView : undefined}
       />
     </RepoWorkspacePane>
   )
@@ -98,21 +79,20 @@ export function RepoView({ repoId }: Props) {
       <BranchList
         repoId={repoId}
         showActions={behavior.branchListActionsVisible}
-        onBranchActivated={handleBranchActivated}
       />
     </RepoWorkspacePane>
   )
 
-  const compactPane = repo.ui.selectedBranch && view.compactWorkspacePane === 'workspace' ? 'workspace' : 'branch'
-  const compactWorkspaceBody = compactPane === 'workspace' ? workspacePane : branchPane
+  const singlePane = repo.ui.selectedBranch ? 'workspace' : 'branch'
+  const singlePaneWorkspaceBody = singlePane === 'workspace' ? workspacePane : branchPane
 
   const workspaceBody =
-    compact ? (
-      compactWorkspaceBody
+    behavior.singlePane ? (
+      singlePaneWorkspaceBody
     ) : (
       <RepoWorkspace
         layout={layout}
-        mode={behavior.mode}
+        mode="split"
         workspacePaneSize={workspacePaneSize}
         onWorkspacePaneSizeChange={(size) => setWorkspacePaneSize(layout, size)}
         branchPane={branchPane}

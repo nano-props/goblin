@@ -10,7 +10,6 @@ import { Skeleton } from '#/web/components/ui/skeleton.tsx'
 import { RepoWorkspace, RepoWorkspacePane, Toolbar } from '#/web/components/Layout.tsx'
 import { DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 import type { RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
-import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 
 interface BranchListSkeletonProps {
   rows?: number
@@ -23,7 +22,7 @@ interface RowCountProps {
 
 interface WorkspaceSkeletonProps {
   layout?: RepoWorkspaceLayout
-  branchListPaneVisible?: boolean
+  singlePane?: boolean
 }
 
 export function BranchListSkeleton({ rows = 6, showBranchActions = false }: BranchListSkeletonProps) {
@@ -41,9 +40,8 @@ export function StatusListSkeleton({ rows = 6 }: RowCountProps) {
 // so the workspace skeleton just shows the panes.
 export function RepoWorkspaceSkeleton({
   layout = DEFAULT_WORKSPACE_LAYOUT,
-  branchListPaneVisible = true,
+  singlePane = false,
 }: WorkspaceSkeletonProps) {
-  const behavior = repoWorkspaceBehavior(layout, branchListPaneVisible)
   const workspacePane = (
     <RepoWorkspacePane>
       <BranchDetailSkeleton layout={layout} />
@@ -51,13 +49,17 @@ export function RepoWorkspaceSkeleton({
   )
   const branchPane = (
     <RepoWorkspacePane>
-      <BranchListSkeleton showBranchActions={behavior.branchListActionsVisible} />
+      <BranchListSkeleton showBranchActions />
     </RepoWorkspacePane>
   )
 
+  if (singlePane) {
+    return <section className="flex min-w-0 flex-1 flex-col">{branchPane}</section>
+  }
+
   return (
     <section className="flex min-w-0 flex-1 flex-col">
-      <RepoWorkspace layout={layout} mode={behavior.mode} branchPane={branchPane} workspacePane={workspacePane} />
+      <RepoWorkspace layout={layout} mode="split" branchPane={branchPane} workspacePane={workspacePane} />
     </section>
   )
 }

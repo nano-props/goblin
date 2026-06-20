@@ -15,7 +15,6 @@ import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/repo
 import type { RepoOperationsState } from '#/web/stores/repos/operations.ts'
 import type { RepoResourcesState } from '#/web/stores/repos/resources.ts'
 export type BranchViewMode = 'all' | 'worktrees'
-export type CompactWorkspacePane = 'branch' | 'workspace'
 export type RepoWorkspaceLayout = 'left-right'
 export type RepoDataSource = 'cache' | 'fresh'
 // Renderer branches keep only the worktree reference; metadata lives in worktreesByPath.
@@ -151,8 +150,8 @@ export interface RestorableWorkspaceState {
   order: string[]
   /** Active workspace tab restored from SessionState.activeRepo. */
   activeId: string | null
-  /** Large-screen Branch List visibility restored from SessionState. Compact UI always shows one pane at a time. */
-  branchListPaneVisible: boolean
+  /** Large-screen Focus Mode restored from SessionState. Compact UI is stronger and always shows one pane at a time. */
+  workspaceFocused: boolean
   workspacePaneSizes: WorkspacePaneSizes
   /** Per worktree terminal selection restored from SessionState.selectedTerminalByWorktree. */
   selectedTerminalByWorktree: Record<string, string>
@@ -166,13 +165,6 @@ export interface LocalWorkspaceState {
   /** Hydration flag — true once boot session is restored, so we don't
    *  overwrite the saved session with an empty one before restore. */
   sessionReady: boolean
-  /** Compact UI route: Branch View or Workspace View. This is local-only so
-   *  small-screen navigation does not leak into restored large-screen layout. */
-  compactWorkspacePane: CompactWorkspacePane
-}
-
-export interface LocalWorkspaceActions {
-  setCompactWorkspacePane: (pane: CompactWorkspacePane) => void
 }
 
 export interface RestorableWorkspaceActions {
@@ -182,11 +174,11 @@ export interface RestorableWorkspaceActions {
   *  list closes the gap; later items shift up if `from < to`, down if
   *  `from > to`). No-op if either id is unknown or they're identical. */
   reorderRepos: (fromId: string, toId: string) => void
-  applySessionLayoutState: (layout: Pick<SessionState, 'branchListPaneVisible' | 'workspacePaneSizes'>) => void
+  applySessionLayoutState: (layout: Pick<SessionState, 'workspaceFocused' | 'workspacePaneSizes'>) => void
   applySessionSelectedTerminalState: (selectedTerminalByWorktree: Record<string, string>) => void
   applySessionWorkspacePaneViewByRepo: (workspacePaneViewByRepo: Record<string, WorkspacePaneView>) => void
-  setBranchListPaneVisible: (visible: boolean) => void
-  toggleBranchListPaneVisible: () => void
+  setWorkspaceFocused: (enabled: boolean) => void
+  toggleWorkspaceFocused: () => void
   setWorkspacePaneSize: (layout: RepoWorkspaceLayout, size: number) => void
   setWorkspacePaneSizes: (sizes: WorkspacePaneSizes) => void
   resetLayout: () => void
@@ -267,7 +259,6 @@ export interface ReposStore
     RestorableWorkspaceState,
     LocalWorkspaceState,
     RestorableWorkspaceActions,
-    LocalWorkspaceActions,
     RuntimeCoherentRepoProjectionActions,
     RepoMutationActions {}
 

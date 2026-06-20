@@ -23,7 +23,7 @@ import { createSelectionActions } from '#/web/stores/repos/selection.ts'
 import { reposLog } from '#/web/logger.ts'
 import { normalizeRestorableRepoCache } from '#/web/stores/repos/persistence.ts'
 import {
-  DEFAULT_BRANCH_LIST_PANE_VISIBLE,
+  DEFAULT_WORKSPACE_FOCUSED,
   DEFAULT_WORKSPACE_PANE_SIZES,
 } from '#/shared/workspace-layout.ts'
 import type { RestorableRepoSnapshot, ReposStore } from '#/web/stores/repos/types.ts'
@@ -104,14 +104,13 @@ export const useReposStore = create<ReposStore>()(
       // Restorable workspace state.
       order: [],
       activeId: null,
-      branchListPaneVisible: DEFAULT_BRANCH_LIST_PANE_VISIBLE,
+      workspaceFocused: DEFAULT_WORKSPACE_FOCUSED,
       workspacePaneSizes: DEFAULT_WORKSPACE_PANE_SIZES,
       selectedTerminalByWorktree: {},
       workspacePaneViewByRepo: {},
 
       // Local renderer-only state.
       sessionReady: false,
-      compactWorkspacePane: 'branch',
 
       ...createLifecycleActions(set, get),
       ...createSelectionActions(set, get),

@@ -401,7 +401,6 @@ export function createRuntimeRepoLifecycleActions(
           selectedTerminalByWorktree,
           order,
           activeId,
-          compactWorkspacePane: activeId !== s.activeId ? 'branch' : s.compactWorkspacePane,
         }
       })
     },

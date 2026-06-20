@@ -49,7 +49,7 @@ describe('repo selectors', () => {
       mainWindowWorkspaceStateFromStore({
         activeId: '/tmp/repo',
         order: ['/tmp/repo'],
-        branchListPaneVisible: true,
+        workspaceFocused: true,
         sessionReady: true,
       }),
     ).toMatchObject({
@@ -62,7 +62,7 @@ describe('repo selectors', () => {
       restorableWorkspaceStateFromStore({
         order: ['/tmp/repo'],
         activeId: '/tmp/repo',
-        branchListPaneVisible: false,
+        workspaceFocused: false,
         workspacePaneSizes: {
           'left-right': 50,
         },
@@ -74,7 +74,7 @@ describe('repo selectors', () => {
     ).toEqual({
       order: ['/tmp/repo'],
       activeId: '/tmp/repo',
-      branchListPaneVisible: false,
+      workspaceFocused: false,
       workspacePaneSizes: {
         'left-right': 50,
       },
@@ -103,13 +103,13 @@ describe('repo selectors', () => {
         mainWindowWorkspaceStateFromStore({
           activeId: '/tmp/repo-a',
           order: ['/tmp/repo-a', '/tmp/repo-b'],
-          branchListPaneVisible: false,
+          workspaceFocused: false,
           sessionReady: true,
         }),
         mainWindowWorkspaceStateFromStore({
           activeId: '/tmp/repo-a',
           order: ['/tmp/repo-a', '/tmp/repo-b'],
-          branchListPaneVisible: false,
+          workspaceFocused: false,
           sessionReady: true,
         }),
       ),
@@ -155,7 +155,7 @@ describe('repo selectors', () => {
         setActive: fnA as never,
         reorderRepos: fnA as never,
         cycleActive: fnA as never,
-        toggleBranchListPaneVisible: fnA as never,
+        toggleWorkspaceFocused: fnA as never,
         resetLayout: fnA as never,
         setSelectedTerminal: fnA as never,
       }),
@@ -163,7 +163,7 @@ describe('repo selectors', () => {
       setActive: fnA,
       reorderRepos: fnA,
       cycleActive: fnA,
-      toggleBranchListPaneVisible: fnA,
+      toggleWorkspaceFocused: fnA,
       resetLayout: fnA,
       setSelectedTerminal: fnA,
     })
@@ -196,23 +196,23 @@ describe('repo selectors', () => {
     })
     expect(
       restorableWorkspaceLayoutStoreActionsFromStore({
-        toggleBranchListPaneVisible: fnA as never,
+        toggleWorkspaceFocused: fnA as never,
         resetLayout: fnA as never,
         setSelectedTerminal: fnA as never,
       }),
     ).toEqual({
-      toggleBranchListPaneVisible: fnA,
+      toggleWorkspaceFocused: fnA,
       resetLayout: fnA,
       setSelectedTerminal: fnA,
     })
     expect(
       restorableWorkspaceLayoutPreferenceStoreActionsFromStore({
-        toggleBranchListPaneVisible: fnA as never,
+        toggleWorkspaceFocused: fnA as never,
         resetLayout: fnA as never,
         setSelectedTerminal: fnA as never,
       }),
     ).toEqual({
-      toggleBranchListPaneVisible: fnA,
+      toggleWorkspaceFocused: fnA,
       resetLayout: fnA,
       setSelectedTerminal: fnA,
     })
@@ -255,7 +255,6 @@ describe('repo selectors', () => {
           cycleActive: fnA,
           selectBranch: fnA,
           setWorkspacePaneView: fnA,
-          setCompactWorkspacePane: fnA,
         }),
         mainWindowNavigationStoreActionsFromStore({
           setActive: fnA,
@@ -263,7 +262,6 @@ describe('repo selectors', () => {
           cycleActive: fnA,
           selectBranch: fnA,
           setWorkspacePaneView: fnA,
-          setCompactWorkspacePane: fnA,
         }),
       ),
     ).toBe(true)

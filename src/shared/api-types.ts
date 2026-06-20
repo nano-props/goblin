@@ -85,7 +85,7 @@ export interface SessionState {
   openRepos: RepoSessionEntry[]
   /** The active tab id — null when no repos were open. */
   activeRepo: string | null
-  branchListPaneVisible: boolean
+  workspaceFocused: boolean
   workspacePaneSizes: WorkspacePaneSizes
   selectedTerminalByWorktree?: Record<string, string>
   /** Per-repo workspace pane view preference, restored with the session. */

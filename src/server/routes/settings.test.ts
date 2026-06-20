@@ -79,7 +79,7 @@ describe('settings routes', () => {
     const session = {
       openRepos: [],
       activeRepo: null,
-      branchListPaneVisible: true,
+      workspaceFocused: true,
       workspacePaneSizes: {
         'left-right': 50,
       },

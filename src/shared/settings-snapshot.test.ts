@@ -76,7 +76,7 @@ describe('settings snapshot partitions', () => {
       session: {
         openRepos: [{ kind: 'local', id: '/tmp/repo-b' }],
         activeRepo: '/tmp/repo-b',
-        branchListPaneVisible: false,
+        workspaceFocused: false,
         workspacePaneSizes: { 'left-right': 50 },
         selectedTerminalByWorktree: { '/tmp/repo-b\0/tmp/repo-b': 'terminal-1' },
       },
@@ -91,7 +91,7 @@ describe('settings snapshot partitions', () => {
     expect(restorableSessionStateFromSettingsSnapshot(snapshot)).toEqual({
       openRepos: [{ kind: 'local', id: '/tmp/repo-b' }],
       activeRepo: '/tmp/repo-b',
-      branchListPaneVisible: false,
+      workspaceFocused: false,
       workspacePaneSizes: { 'left-right': 50 },
       selectedTerminalByWorktree: { '/tmp/repo-b\0/tmp/repo-b': 'terminal-1' },
     })

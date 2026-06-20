@@ -59,11 +59,11 @@ describe('RepoWorkspaceSkeleton', () => {
     expect(container?.querySelector('[data-testid="mock-split-pane"]')).not.toBeNull()
   })
 
-  test('renders only the workspace pane when the large-screen Branch View pane is hidden', () => {
-    render(<RepoWorkspaceSkeleton branchListPaneVisible={false} />)
+  test('renders a single Branch View skeleton in single-pane mode', () => {
+    render(<RepoWorkspaceSkeleton singlePane />)
 
-    expect(container?.querySelectorAll('li')).toHaveLength(8)
-    expect(container?.querySelectorAll('[data-testid="branch-list-skeleton-action"]')).toHaveLength(0)
+    expect(container?.querySelectorAll('li')).toHaveLength(6)
+    expect(container?.querySelectorAll('[data-testid="branch-list-skeleton-action"]')).toHaveLength(6)
     expect(container?.querySelector('[data-testid="mock-split-pane"]')).toBeNull()
   })
 })

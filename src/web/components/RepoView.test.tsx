@@ -23,19 +23,12 @@ vi.mock('#/web/hooks/useRepoToasts.tsx', () => ({
 }))
 
 vi.mock('#/web/components/BranchList.tsx', () => ({
-  BranchList: ({
-    repoId,
-    onBranchActivated,
-  }: {
-    repoId: string
-    onBranchActivated?: () => void
-  }) => (
+  BranchList: ({ repoId }: { repoId: string }) => (
     <button
       type="button"
       data-testid="branch-list"
       onClick={() => {
         branchListMocks.activate(repoId)
-        onBranchActivated?.()
       }}
     >
       branch
@@ -61,12 +54,12 @@ vi.mock('#/web/components/Layout.tsx', () => ({
     branchPane,
     workspacePane,
   }: {
-    mode?: 'split' | 'workspace-only'
+    mode?: 'split' | 'single-pane'
     branchPane: React.ReactNode
     workspacePane: React.ReactNode
   }) => (
     <div data-testid="repo-workspace" data-mode={mode ?? 'split'}>
-      {mode === 'workspace-only' ? workspacePane : (
+      {mode === 'single-pane' ? workspacePane : (
         <>
           {branchPane}
           {workspacePane}
@@ -111,7 +104,7 @@ afterEach(() => {
 })
 
 describe('RepoView workspace navigation', () => {
-  test('large-screen branch activation enters workspace-only mode and back returns without list selection', () => {
+  test('large-screen branch activation keeps the Branch View visible', () => {
     render(<RepoView repoId={REPO_ID} />)
 
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBeNull()
@@ -122,17 +115,36 @@ describe('RepoView workspace navigation', () => {
     })
 
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBe('feature/a')
+    expect(branchList()).not.toBeNull()
+    expect(workspace()?.dataset.mode).toBe('split')
+    expect(branchDetail()?.dataset.hasBack).toBe('false')
+  })
+
+  test('large-screen Focus Mode uses Branch View until a branch opens Workspace View', () => {
+    useReposStore.getState().setWorkspaceFocused(true)
+    render(<RepoView repoId={REPO_ID} />)
+
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBeNull()
+    expect(branchList()).not.toBeNull()
+    expect(branchDetail()).toBeNull()
+    expect(workspace()).toBeNull()
+
+    act(() => {
+      branchList()?.click()
+    })
+
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBe('feature/a')
     expect(branchList()).toBeNull()
-    expect(workspace()?.dataset.mode).toBe('workspace-only')
     expect(branchDetail()?.dataset.hasBack).toBe('true')
 
     act(() => {
       backButton()?.click()
     })
 
-    expect(workspace()?.dataset.mode).toBe('split')
-    expect(branchList()).not.toBeNull()
+    expect(useReposStore.getState().workspaceFocused).toBe(true)
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBeNull()
+    expect(branchList()).not.toBeNull()
+    expect(branchDetail()).toBeNull()
   })
 
   test('compact branch activation and back keep Branch View unselected', () => {
@@ -159,7 +171,7 @@ describe('RepoView workspace navigation', () => {
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBeNull()
   })
 
-  test('compact workspace navigation request enters Workspace View without a list click', () => {
+  test('compact mode derives Workspace View from an existing selected branch', () => {
     responsiveMocks.mode = 'compact'
     render(<RepoView repoId={REPO_ID} />)
 
@@ -167,11 +179,24 @@ describe('RepoView workspace navigation', () => {
       useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     })
 
-    expect(branchList()).not.toBeNull()
-    expect(branchDetail()).toBeNull()
+    expect(branchList()).toBeNull()
+    expect(branchDetail()?.dataset.hasBack).toBe('true')
+  })
+
+  test('resizing from split large-screen mode to compact shows Workspace View when a branch is selected', () => {
+    render(<RepoView repoId={REPO_ID} />)
 
     act(() => {
-      useReposStore.getState().setCompactWorkspacePane('workspace')
+      branchList()?.click()
+    })
+
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBe('feature/a')
+    expect(branchList()).not.toBeNull()
+    expect(branchDetail()?.dataset.hasBack).toBe('false')
+
+    act(() => {
+      responsiveMocks.mode = 'compact'
+      root!.render(<RepoView repoId={REPO_ID} />)
     })
 
     expect(branchList()).toBeNull()
