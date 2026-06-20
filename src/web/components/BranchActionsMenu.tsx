@@ -25,12 +25,11 @@ interface Props {
 }
 
 export function BranchActionsMenu({ repo, branch, open, onOpenChange }: Props) {
-  const { patchItems, mainItems, destructiveItems, dialogs } = useBranchActionItems(repo, branch)
+  const { mainItems, destructiveItems, dialogs } = useBranchActionItems(repo, branch)
 
   return (
     <>
       <BranchActionsDropdown
-        patchItems={patchItems}
         mainItems={mainItems}
         destructiveItems={destructiveItems}
         open={open}
@@ -43,21 +42,19 @@ export function BranchActionsMenu({ repo, branch, open, onOpenChange }: Props) {
 }
 
 export function BranchActionsDropdown({
-  patchItems,
   mainItems,
   destructiveItems,
   open,
   onOpenChange,
-}: Pick<BranchActionItemGroups, 'patchItems' | 'mainItems' | 'destructiveItems'> & {
+}: Pick<BranchActionItemGroups, 'mainItems' | 'destructiveItems'> & {
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }) {
   const t = useT()
   const { pending: pendingAction, run } = useAsyncPending<BranchActionItem['id']>()
-  const visiblePatchItems = patchItems.filter((item) => item.visible)
   const visibleMainItems = mainItems.filter((item) => item.visible)
   const visibleDestructiveItems = destructiveItems.filter((item) => item.visible)
-  const visibleItems = [...visiblePatchItems, ...visibleMainItems, ...visibleDestructiveItems]
+  const visibleItems = [...visibleMainItems, ...visibleDestructiveItems]
   const busyAction = pendingAction ?? visibleItems.find((item) => item.busy)?.id ?? null
 
   function runItem(item: BranchActionItem) {
@@ -82,14 +79,6 @@ export function BranchActionsDropdown({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-        {visiblePatchItems.length > 0 && (
-          <>
-            {visiblePatchItems.map((item) => (
-              <BranchActionMenuItem key={item.id} item={item} busy={busyAction} onSelect={() => runItem(item)} />
-            ))}
-            <DropdownMenuSeparator />
-          </>
-        )}
         {visibleMainItems.map((item) => (
           <BranchActionMenuItem key={item.id} item={item} busy={busyAction} onSelect={() => runItem(item)} />
         ))}

@@ -30,7 +30,6 @@ describe('useBranchActionShortcutRegistry', () => {
     const onPull = vi.fn()
 
     await renderHookHost({
-      patchItems: [],
       mainItems: [
         {
           id: 'pull',
@@ -57,7 +56,6 @@ describe('useBranchActionShortcutRegistry', () => {
     const disabledPush = vi.fn()
 
     await renderHookHost({
-      patchItems: [],
       mainItems: [
         {
           id: 'pull',
@@ -137,7 +135,6 @@ function HookHost({ actions }: { actions: BranchActionItemGroups }) {
 
 function actionsWith(onPull: () => void): BranchActionItemGroups {
   return {
-    patchItems: [],
     mainItems: [
       {
         id: 'pull',

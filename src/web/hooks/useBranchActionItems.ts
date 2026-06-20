@@ -38,18 +38,16 @@ export interface BranchActionItem {
 }
 
 export interface BranchActionItemGroups {
-  patchItems: BranchActionItem[]
   mainItems: BranchActionItem[]
   destructiveItems: BranchActionItem[]
   dialogs: ReactNode
 }
 
 export function visibleBranchActionItems({
-  patchItems,
   mainItems,
   destructiveItems,
-}: Pick<BranchActionItemGroups, 'patchItems' | 'mainItems' | 'destructiveItems'>): BranchActionItem[] {
-  return [...patchItems, ...mainItems, ...destructiveItems].filter((item) => item.visible)
+}: Pick<BranchActionItemGroups, 'mainItems' | 'destructiveItems'>): BranchActionItem[] {
+  return [...mainItems, ...destructiveItems].filter((item) => item.visible)
 }
 
 export function branchBrowserRemoteProvider(
@@ -125,22 +123,6 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
     })
   }
 
-  const patchItems: BranchActionItem[] = capabilities.canCopyPatch
-    ? [
-        {
-          id: 'copyPatch',
-          label: t('status.copy-patch'),
-          title: t('status.copy-patch-title'),
-          ariaLabel: t('status.copy-patch-title'),
-          disabled,
-          busy: busy('copyPatch'),
-          visible: true,
-          icon: createElement(ClipboardCopy),
-          onSelect: actions.copyPatch,
-        },
-      ]
-    : []
-
   const mainItems: BranchActionItem[] = [
     {
       id: 'status',
@@ -188,6 +170,21 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
       icon: createElement(ArrowUp),
       onSelect: actions.push,
     },
+    ...(capabilities.canCopyPatch
+      ? [
+          {
+            id: 'copyPatch' as const,
+            label: t('status.copy-patch'),
+            title: t('status.copy-patch-title'),
+            ariaLabel: t('status.copy-patch-title'),
+            disabled,
+            busy: busy('copyPatch'),
+            visible: true,
+            icon: createElement(ClipboardCopy),
+            onSelect: actions.copyPatch,
+          },
+        ]
+      : []),
     ...(showTerminalAction
       ? [
           {
@@ -269,5 +266,5 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
       : []),
   ]
 
-  return { patchItems, mainItems, destructiveItems, dialogs }
+  return { mainItems, destructiveItems, dialogs }
 }

@@ -17,18 +17,17 @@ interface BranchActionControlsProps {
 }
 
 export function BranchActionControls({ actions, variant = 'bar' }: BranchActionControlsProps) {
-  const { patchItems, mainItems, destructiveItems } = actions
+  const { mainItems, destructiveItems } = actions
   const visibleItems = visibleBranchActionItems(actions)
 
   if (variant === 'menu') {
-    return <BranchActionsDropdown patchItems={patchItems} mainItems={mainItems} destructiveItems={destructiveItems} />
+    return <BranchActionsDropdown mainItems={mainItems} destructiveItems={destructiveItems} />
   }
 
   if (variant === 'auto') {
     return (
       <BranchActionAuto
         visibleItems={visibleItems}
-        patchItems={patchItems}
         mainItems={mainItems}
         destructiveItems={destructiveItems}
       />
@@ -40,12 +39,10 @@ export function BranchActionControls({ actions, variant = 'bar' }: BranchActionC
 
 function BranchActionAuto({
   visibleItems,
-  patchItems,
   mainItems,
   destructiveItems,
 }: {
   visibleItems: BranchActionItem[]
-  patchItems: BranchActionItem[]
   mainItems: BranchActionItem[]
   destructiveItems: BranchActionItem[]
 }) {
@@ -55,7 +52,7 @@ function BranchActionAuto({
   return (
     <div ref={containerRef} className="relative flex min-w-0 flex-1 justify-end">
       {collapsed ? (
-        <BranchActionsDropdown patchItems={patchItems} mainItems={mainItems} destructiveItems={destructiveItems} />
+        <BranchActionsDropdown mainItems={mainItems} destructiveItems={destructiveItems} />
       ) : (
         <BranchActionButtonScroller visibleItems={visibleItems} />
       )}
