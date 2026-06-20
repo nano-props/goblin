@@ -15,6 +15,7 @@ import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/repo
 import type { RepoOperationsState } from '#/web/stores/repos/operations.ts'
 import type { RepoResourcesState } from '#/web/stores/repos/resources.ts'
 export type BranchViewMode = 'all' | 'worktrees'
+export type CompactWorkspacePane = 'branch' | 'workspace'
 export type RepoWorkspaceLayout = 'left-right'
 export type RepoDataSource = 'cache' | 'fresh'
 // Renderer branches keep only the worktree reference; metadata lives in worktreesByPath.
@@ -165,6 +166,13 @@ export interface LocalWorkspaceState {
   /** Hydration flag — true once boot session is restored, so we don't
    *  overwrite the saved session with an empty one before restore. */
   sessionReady: boolean
+  /** Compact UI route: Branch View or Workspace View. This is local-only so
+   *  small-screen navigation does not leak into restored large-screen layout. */
+  compactWorkspacePane: CompactWorkspacePane
+}
+
+export interface LocalWorkspaceActions {
+  setCompactWorkspacePane: (pane: CompactWorkspacePane) => void
 }
 
 export interface RestorableWorkspaceActions {
@@ -259,6 +267,7 @@ export interface ReposStore
     RestorableWorkspaceState,
     LocalWorkspaceState,
     RestorableWorkspaceActions,
+    LocalWorkspaceActions,
     RuntimeCoherentRepoProjectionActions,
     RepoMutationActions {}
 

@@ -255,6 +255,7 @@ describe('repo selectors', () => {
           cycleActive: fnA,
           selectBranch: fnA,
           setWorkspacePaneView: fnA,
+          setCompactWorkspacePane: fnA,
         }),
         mainWindowNavigationStoreActionsFromStore({
           setActive: fnA,
@@ -262,6 +263,7 @@ describe('repo selectors', () => {
           cycleActive: fnA,
           selectBranch: fnA,
           setWorkspacePaneView: fnA,
+          setCompactWorkspacePane: fnA,
         }),
       ),
     ).toBe(true)

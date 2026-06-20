@@ -396,7 +396,13 @@ export function createRuntimeRepoLifecycleActions(
         }
         const order = s.order.filter((x) => x !== id)
         const activeId = nextActiveRepoIdAfterWorkspaceClose(s.order, s.activeId, id)
-        return { repos, selectedTerminalByWorktree, order, activeId }
+        return {
+          repos,
+          selectedTerminalByWorktree,
+          order,
+          activeId,
+          compactWorkspacePane: activeId !== s.activeId ? 'branch' : s.compactWorkspacePane,
+        }
       })
     },
 

@@ -114,6 +114,7 @@ export function resetReposStore(): void {
     workspacePaneSizes: DEFAULT_WORKSPACE_PANE_SIZES,
     selectedTerminalByWorktree: {},
     workspacePaneViewByRepo: {},
+    compactWorkspacePane: 'branch',
   })
 }
 
@@ -599,6 +600,7 @@ export function seedRepoState(options: {
     branchListPaneVisible: DEFAULT_BRANCH_LIST_PANE_VISIBLE,
     workspacePaneSizes: DEFAULT_WORKSPACE_PANE_SIZES,
     workspacePaneViewByRepo: {},
+    compactWorkspacePane: 'branch',
   })
   return repo
 }

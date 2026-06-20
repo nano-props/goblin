@@ -3,7 +3,7 @@
 // and `App.tsx` — so the workspace below the topbar is just the
 // branch list and the workspace pane.
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
@@ -22,12 +22,9 @@ interface Props {
   repoId: string
 }
 
-type CompactWorkspacePane = 'branch' | 'workspace'
-
 export function RepoView({ repoId }: Props) {
   const uiMode = useResponsiveUiMode()
   const compact = uiMode === 'compact'
-  const [compactPane, setCompactPane] = useState<CompactWorkspacePane>('branch')
   const view = useStoreWithEqualityFn(
     useReposStore,
     (s) => {
@@ -38,23 +35,28 @@ export function RepoView({ repoId }: Props) {
         initialLoading: presentation.initialLoading,
         branchListPaneVisible: s.branchListPaneVisible,
         workspacePaneSizes: s.workspacePaneSizes,
+        compactWorkspacePane: s.compactWorkspacePane,
       }
     },
     (a, b) =>
       a.exists === b.exists &&
       a.initialLoading === b.initialLoading &&
       a.branchListPaneVisible === b.branchListPaneVisible &&
-      a.workspacePaneSizes['left-right'] === b.workspacePaneSizes['left-right'],
+      a.workspacePaneSizes['left-right'] === b.workspacePaneSizes['left-right'] &&
+      a.compactWorkspacePane === b.compactWorkspacePane,
   )
   const setWorkspacePaneSize = useReposStore((s) => s.setWorkspacePaneSize)
   const setBranchListPaneVisible = useReposStore((s) => s.setBranchListPaneVisible)
+  const setCompactWorkspacePane = useReposStore((s) => s.setCompactWorkspacePane)
   const clearSelectedBranch = useReposStore((s) => s.clearSelectedBranch)
   const repo = useReposStore((s) => s.repos[repoId])
   useRepoToasts(repoId)
 
   useEffect(() => {
-    if (compact) setCompactPane('branch')
-  }, [compact, repoId])
+    if (compact && !repo?.ui.selectedBranch && view.compactWorkspacePane !== 'branch') {
+      setCompactWorkspacePane('branch')
+    }
+  }, [compact, repo?.ui.selectedBranch, setCompactWorkspacePane, view.compactWorkspacePane])
 
   const layout = DEFAULT_WORKSPACE_LAYOUT
   const branchListPaneVisible = compact ? true : view.branchListPaneVisible
@@ -63,14 +65,14 @@ export function RepoView({ repoId }: Props) {
   const handleBackToBranchView = () => {
     clearSelectedBranch(repoId)
     if (compact) {
-      setCompactPane('branch')
+      setCompactWorkspacePane('branch')
       return
     }
     setBranchListPaneVisible(true)
   }
   const handleBranchActivated = () => {
     if (compact) {
-      setCompactPane('workspace')
+      setCompactWorkspacePane('workspace')
       return
     }
     setBranchListPaneVisible(false)
@@ -101,6 +103,7 @@ export function RepoView({ repoId }: Props) {
     </RepoWorkspacePane>
   )
 
+  const compactPane = repo.ui.selectedBranch && view.compactWorkspacePane === 'workspace' ? 'workspace' : 'branch'
   const compactWorkspaceBody = compactPane === 'workspace' ? workspacePane : branchPane
 
   const workspaceBody =

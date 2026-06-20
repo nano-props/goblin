@@ -111,6 +111,7 @@ export const useReposStore = create<ReposStore>()(
 
       // Local renderer-only state.
       sessionReady: false,
+      compactWorkspacePane: 'branch',
 
       ...createLifecycleActions(set, get),
       ...createSelectionActions(set, get),

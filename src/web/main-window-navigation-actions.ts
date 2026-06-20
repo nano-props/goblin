@@ -1,5 +1,6 @@
 import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
+import type { CompactWorkspacePane } from '#/web/stores/repos/types.ts'
 
 export interface MainWindowNavigationActions {
   activateRepo: (repoId: string) => void
@@ -19,6 +20,7 @@ interface CreateMainWindowNavigationActionsOptions {
   cycleActive: (direction: 1 | -1) => void
   selectBranch: (repoId: string, branch: string) => void
   setWorkspacePaneView: (repoId: string, tab: WorkspacePaneView) => void
+  setCompactWorkspacePane?: (pane: CompactWorkspacePane) => void
   onOpenSettings?: (page: SettingsPage) => void
 }
 
@@ -30,6 +32,7 @@ export function createMainWindowNavigationActions({
   cycleActive,
   selectBranch,
   setWorkspacePaneView,
+  setCompactWorkspacePane,
   onOpenSettings,
 }: CreateMainWindowNavigationActionsOptions): MainWindowNavigationActions {
   return {
@@ -49,11 +52,13 @@ export function createMainWindowNavigationActions({
     showRepoWorkspacePaneView(repoId, tab) {
       if (repoId !== activeId) setActive(repoId)
       setWorkspacePaneView(repoId, tab)
+      setCompactWorkspacePane?.('workspace')
     },
     showRepoBranchWorkspacePaneView(repoId, branch, tab) {
       if (repoId !== activeId) setActive(repoId)
       selectBranch(repoId, branch)
       setWorkspacePaneView(repoId, tab)
+      setCompactWorkspacePane?.('workspace')
     },
     openSettings(page) {
       onOpenSettings?.(page)

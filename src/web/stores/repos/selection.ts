@@ -11,6 +11,7 @@ import {
 } from '#/shared/workspace-layout.ts'
 import type {
   BranchViewMode,
+  CompactWorkspacePane,
   RepoWorkspaceLayout,
   ReposGet,
   ReposSet,
@@ -36,6 +37,8 @@ type RestorableWorkspaceSelectionActions = Pick<
   | 'setSelectedTerminal'
 >
 
+type LocalWorkspaceSelectionActions = Pick<ReposStore, 'setCompactWorkspacePane'>
+
 type RuntimeCoherentSelectionActions = Pick<
   ReposStore,
   'setBranchViewMode' | 'setWorkspacePaneView' | 'selectBranch' | 'clearSelectedBranch'
@@ -46,7 +49,7 @@ type RepoMutationSelectionActions = Pick<ReposStore, 'checkoutSelectedInRepo' | 
 function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet): RestorableWorkspaceSelectionActions {
   return {
     setActive(id: string) {
-      set((s) => (s.repos[id] && s.activeId !== id ? { activeId: id } : s))
+      set((s) => (s.repos[id] && s.activeId !== id ? { activeId: id, compactWorkspacePane: 'branch' } : s))
     },
 
     reorderRepos(fromId: string, toId: string) {
@@ -65,7 +68,7 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
       const idx = activeId ? order.indexOf(activeId) : -1
       const nextIdx = idx === -1 ? 0 : (idx + direction + order.length) % order.length
       const next = order[nextIdx]
-      if (next && next !== activeId) set({ activeId: next })
+      if (next && next !== activeId) set({ activeId: next, compactWorkspacePane: 'branch' })
     },
 
     applySessionLayoutState(layoutState: Parameters<ReposStore['applySessionLayoutState']>[0]) {
@@ -177,6 +180,18 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
         const selectedTerminalByWorktree = { ...s.selectedTerminalByWorktree }
         delete selectedTerminalByWorktree[worktreeTerminalKey]
         return { selectedTerminalByWorktree }
+      })
+    },
+  }
+}
+
+function createLocalWorkspaceSelectionActions(set: ReposSet): LocalWorkspaceSelectionActions {
+  return {
+    setCompactWorkspacePane(pane: CompactWorkspacePane) {
+      set((s) => {
+        const repo = s.activeId ? s.repos[s.activeId] : null
+        const next = pane === 'workspace' && !repo?.ui.selectedBranch ? 'branch' : pane
+        return s.compactWorkspacePane === next ? s : { compactWorkspacePane: next }
       })
     },
   }
@@ -302,6 +317,7 @@ function createRepoMutationSelectionActions(set: ReposSet, get: ReposGet): RepoM
 export function createSelectionActions(set: ReposSet, get: ReposGet) {
   return {
     ...createRestorableWorkspaceSelectionActions(set, get),
+    ...createLocalWorkspaceSelectionActions(set),
     ...createRuntimeCoherentSelectionActions(set, get),
     ...createRepoMutationSelectionActions(set, get),
   }

@@ -362,6 +362,27 @@ describe('workspace pane layout state', () => {
       workspacePaneSizes: { 'left-right': 45 },
     })
   })
+
+  test('keeps compact pane local to navigation instead of session layout', () => {
+    seedRepo({ selectedBranch: 'feature/plain' })
+    useReposStore.setState({ activeId: null, compactWorkspacePane: 'workspace' })
+
+    useReposStore.getState().setActive(REPO_ID)
+
+    expect(useReposStore.getState().compactWorkspacePane).toBe('branch')
+
+    useReposStore.getState().setCompactWorkspacePane('workspace')
+
+    expect(useReposStore.getState().compactWorkspacePane).toBe('workspace')
+  })
+
+  test('does not leave compact Workspace View armed without a selected branch', () => {
+    seedRepo({ selectedBranch: null })
+
+    useReposStore.getState().setCompactWorkspacePane('workspace')
+
+    expect(useReposStore.getState().compactWorkspacePane).toBe('branch')
+  })
 })
 
 describe('setBranchListPaneVisible', () => {

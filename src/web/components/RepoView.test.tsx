@@ -158,6 +158,25 @@ describe('RepoView workspace navigation', () => {
     expect(branchDetail()).toBeNull()
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBeNull()
   })
+
+  test('compact workspace navigation request enters Workspace View without a list click', () => {
+    responsiveMocks.mode = 'compact'
+    render(<RepoView repoId={REPO_ID} />)
+
+    act(() => {
+      useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
+    })
+
+    expect(branchList()).not.toBeNull()
+    expect(branchDetail()).toBeNull()
+
+    act(() => {
+      useReposStore.getState().setCompactWorkspacePane('workspace')
+    })
+
+    expect(branchList()).toBeNull()
+    expect(branchDetail()?.dataset.hasBack).toBe('true')
+  })
 })
 
 function render(element: React.ReactNode) {
