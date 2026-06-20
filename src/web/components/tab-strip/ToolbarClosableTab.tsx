@@ -10,7 +10,7 @@ type ToolbarClosableTabContainerProps = Omit<ComponentPropsWithoutRef<'div'>, 'c
 type ToolbarClosableTabButtonProps = Omit<ComponentPropsWithoutRef<'button'>, 'children' | 'className' | 'ref'> &
   DataAttributes
 
-interface ToolbarClosableTabProps {
+interface ToolbarClosableTabBaseProps {
   containerRef?: Ref<HTMLDivElement>
   containerProps?: ToolbarClosableTabContainerProps
   containerClassName: string
@@ -18,12 +18,24 @@ interface ToolbarClosableTabProps {
   buttonRef?: Ref<HTMLButtonElement>
   buttonProps?: ToolbarClosableTabButtonProps
   buttonClassName?: string
-  closeLabel: string
-  closeVisible: boolean
-  closeButton?: boolean
-  onClose: (event: React.MouseEvent<HTMLButtonElement>) => void
   children: ReactNode
 }
+
+type ToolbarClosableTabProps = ToolbarClosableTabBaseProps &
+  (
+    | {
+        closeLabel: string
+        closeVisible: boolean
+        closeButton?: true
+        onClose: (event: React.MouseEvent<HTMLButtonElement>) => void
+      }
+    | {
+        closeButton: false
+        closeLabel?: never
+        closeVisible?: never
+        onClose?: never
+      }
+  )
 
 export function ToolbarClosableTab({
   containerRef,
@@ -33,11 +45,8 @@ export function ToolbarClosableTab({
   buttonRef,
   buttonProps,
   buttonClassName,
-  closeLabel,
-  closeVisible,
-  closeButton = true,
-  onClose,
   children,
+  ...closeProps
 }: ToolbarClosableTabProps) {
   return (
     <div ref={containerRef} {...containerProps} className={containerClassName}>
@@ -53,18 +62,18 @@ export function ToolbarClosableTab({
       >
         {children}
       </button>
-      {closeButton && (
+      {closeProps.closeButton !== false && (
         <button
           type="button"
           tabIndex={-1}
-          aria-label={closeLabel}
+          aria-label={closeProps.closeLabel}
           onPointerDown={(event) => event.stopPropagation()}
-          onClick={onClose}
+          onClick={closeProps.onClose}
           className={cn(
             'cursor-pointer rounded border-0 bg-transparent p-0.5 text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-accent-foreground',
-            closeVisible ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
+            closeProps.closeVisible ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
           )}
-          title={closeLabel}
+          title={closeProps.closeLabel}
         >
           <X size={14} />
         </button>

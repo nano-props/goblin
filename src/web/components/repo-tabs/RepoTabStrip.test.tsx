@@ -47,7 +47,6 @@ describe('RepoTabStrip', () => {
         labels={labels}
         onActivate={() => {}}
         onClose={() => {}}
-        onReorder={() => {}}
         onOpenLocal={() => {}}
         onOpenRemote={() => {}}
         onClone={() => {}}
@@ -70,7 +69,6 @@ describe('RepoTabStrip', () => {
         labels={labels}
         onActivate={() => {}}
         onClose={() => {}}
-        onReorder={() => {}}
         onOpenLocal={() => {}}
         onOpenRemote={() => {}}
         onClone={() => {}}
@@ -103,7 +101,6 @@ describe('RepoTabStrip', () => {
         labels={labels}
         onActivate={() => {}}
         onClose={() => {}}
-        onReorder={() => {}}
         onOpenLocal={() => {}}
         onOpenRemote={() => {}}
         onClone={() => {}}
@@ -126,7 +123,6 @@ describe('RepoTabStrip', () => {
         labels={labels}
         onActivate={() => {}}
         onClose={() => {}}
-        onReorder={() => {}}
         onOpenLocal={() => {}}
         onOpenRemote={() => {}}
         onClone={() => {}}
@@ -145,7 +141,9 @@ describe('RepoTabStrip', () => {
 
     const trigger = document.body.querySelector('button[aria-label="More"]')
     if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing more trigger')
-    expect(trigger.parentElement?.querySelector(':scope > .pointer-events-none.border-l.border-separator')).not.toBeNull()
+    expect(
+      trigger.parentElement?.querySelector(':scope > .pointer-events-none.border-l.border-separator'),
+    ).not.toBeNull()
 
     await act(async () => {
       trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
@@ -170,14 +168,13 @@ function render(element: React.ReactNode) {
 }
 
 function repo(name: string, id: string): RepoTabSummary {
-  return { id, name, remoteDetails: [], lifecycle: null, unavailable: false }
+  return { id, name, remoteDetails: [], lifecycle: null }
 }
 
 const labels = {
   repositories: 'Repositories',
   closeWithName: (name: string) => `Close ${name}`,
   more: 'More',
-  dragToReorder: 'Drag to reorder',
   open: 'Open',
   openLocal: 'Open local repository…',
   openLocalShortcut: '⌘O',

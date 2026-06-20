@@ -7,25 +7,15 @@ export interface RepoTabSummary {
   /**
    * Single source-of-truth lifecycle for a remote repo tab. `null`
    * for local repos. The tab UI reads `lifecycle.kind` directly
-   * to decide which badge to show. The legacy `unavailable`
-   * boolean and `remoteTarget` field were removed in Phase 4 of
-   * the remote-repo refactor.
+   * to decide which badge to show.
    */
   lifecycle: RemoteRepoLifecycle | null
-  /**
-   * Whether the repo is in a terminal "cannot be operated on"
-   * state. Computed via `isRepoUnavailable(repo)`:
-   *   - local repo: `availability.phase === 'unavailable'`
-   *   - remote repo: `remote.lifecycle.kind === 'failed'`
-   */
-  unavailable: boolean
 }
 
 export interface RepoTabStripLabels {
   repositories: string
   closeWithName: (name: string) => string
   more: string
-  dragToReorder: string
   open: string
   openLocal: string
   openLocalShortcut: string | null

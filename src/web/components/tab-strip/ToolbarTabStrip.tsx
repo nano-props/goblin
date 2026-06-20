@@ -10,9 +10,6 @@ interface ToolbarTabStripProps {
 }
 
 // Shared toolbar tab-strip shell:
-// compact mode keeps a single toolbar-height row,
-// expanded mode owns the horizontal ScrollArea and scrollbar semantics.
-// Shared toolbar tab-strip shell:
 // - compact mode keeps a single flex row in the toolbar height
 // - expanded mode owns the horizontal ScrollArea + compact scrollbar semantics
 export function ToolbarTabStrip({ compact, compactContent, scrollContent, viewportRef }: ToolbarTabStripProps) {
@@ -38,8 +35,6 @@ interface ToolbarTabStripBodyProps extends ComponentPropsWithoutRef<'div'> {
 }
 
 // Shared row wrapper used by repo/terminal strips.
-// `scroll` adds the width contract that creates horizontal overflow inside ScrollArea.
-// Shared row wrapper used by repo/terminal strips.
 // `scroll` adds the width contract required to create horizontal overflow inside ScrollArea.
 export function ToolbarTabStripBody({ scroll = false, className, ...props }: ToolbarTabStripBodyProps) {
   return (
@@ -47,7 +42,6 @@ export function ToolbarTabStripBody({ scroll = false, className, ...props }: Too
   )
 }
 
-// Shared tablist layout contract; callers still provide semantic role/aria-label.
 // Shared tablist layout contract. Consumers still provide the semantic role/aria-label.
 export function ToolbarTabList({ className, ...props }: ComponentPropsWithoutRef<'div'>) {
   return <div className={cn('flex h-full min-w-0 items-center gap-1', className)} {...props} />
