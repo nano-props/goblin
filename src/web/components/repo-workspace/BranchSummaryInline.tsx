@@ -1,15 +1,13 @@
 // Read-only branch "status strip" used in two places: the branch list
-// rows (BranchRow) and the focus-mode toolbar (BranchInfoBar). It is
+// rows (BranchRow). It is
 // intentionally non-interactive — the affordance for switching branches
-// lives on the caller. BranchInfoBar wires a dropdown trigger around
-// the branch name; BranchRow does not (clicking the row selects the
-// branch in the list).
+// lives on the caller; clicking the row selects the branch in the list.
 //
 // Layout (left to right):
 //   [icon]  [name]  [meta…]  <badges · deltas · last-commit author/time>
 //
 // The icon and meta are exported as standalone subcomponents so callers
-// that need a different name trigger (e.g. BranchInfoBar's dropdown)
+// that need a different name trigger
 // can reuse the visual primitives without re-deriving the branch-state
 // predicates.
 
@@ -72,9 +70,7 @@ export function computeBranchSummaryState(branch: RepoBranchState, repo: BranchS
 type BranchSummaryState = ReturnType<typeof computeBranchSummaryState>
 
 // Comma-joined `title` attribute. Mirrors the visible body so the hover
-// tooltip stays consistent across the branch list and the focus-mode
-// toolbar (where the icon and the meta are non-clickable but still
-// useful to inspect).
+// tooltip stays consistent across the branch list.
 export function buildBranchSummaryTitle(
   state: BranchSummaryState,
   branch: RepoBranchState,
@@ -125,9 +121,7 @@ export function BranchSummaryIcon({
 // The trailing metadata strip: optional badges (default / dirty /
 // worktree / gone), ahead/behind deltas, and the last-commit author +
 // relative time. Read-only by design — none of the inner spans are
-// interactive. BranchInfoBar composes this next to a custom branch-name
-// trigger (e.g. a dropdown); BranchRow renders it as part of
-// BranchSummaryInline.
+// interactive. BranchRow renders it as part of BranchSummaryInline.
 export function BranchSummaryMeta({
   repo,
   branch,

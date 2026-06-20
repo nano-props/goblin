@@ -585,11 +585,10 @@ describe('WorkspacePaneViewStrip', () => {
 function TestWorkspacePaneViewStrip(props: {
   worktreeTerminalKey: string
   sessions: TerminalSessionSummary[]
-  detailId: string
-  responsiveCompact?: boolean
-  panelActive?: boolean
-  focusMode?: boolean
-  isLoading?: boolean
+	  detailId: string
+	  responsiveCompact?: boolean
+	  panelActive?: boolean
+	  isLoading?: boolean
   onNew: () => void
   onSelect: (worktreeTerminalKey: string, tab: WorkspacePaneViewSummary) => void
   onScrollToBottom: (key: string) => void

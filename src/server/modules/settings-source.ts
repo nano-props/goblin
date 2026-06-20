@@ -4,9 +4,11 @@ import { toSafeRepoLocator, toSafeSessionRepoEntry } from '#/shared/input-valida
 import { serverDataFile } from '#/shared/data-dir.ts'
 import type { EditorPref, LangPref, SessionState, SettingsPrefs, TerminalPref, ThemePref } from '#/shared/api-types.ts'
 import {
+  DEFAULT_BRANCH_LIST_PANE_VISIBLE,
   normalizeWorkspacePaneSizes,
 } from '#/shared/workspace-layout.ts'
 import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import { normalizeGlobalShortcut } from '#/shared/accelerator.ts'
 import { isColorTheme, type ColorTheme } from '#/shared/color-theme.ts'
 import {
@@ -16,7 +18,6 @@ import {
   DEFAULT_GLOBAL_SHORTCUT,
   DEFAULT_GLOBAL_SHORTCUT_DISABLED,
   DEFAULT_LANG_PREF,
-  DEFAULT_SESSION_WORKSPACE_PANE_FOCUS_MODE,
   DEFAULT_SHORTCUTS_DISABLED,
   DEFAULT_SWAP_CLOSE_SHORTCUTS,
   DEFAULT_TERMINAL_APP,
@@ -141,24 +142,39 @@ function normalizeSelectedTerminalByWorktree(value: unknown): Record<string, str
   return normalized
 }
 
+function normalizeWorkspacePaneViewByRepo(value: unknown, openRepos: RepoSessionEntry[]): Record<string, WorkspacePaneView> {
+  if (!value || typeof value !== 'object') return {}
+  const openRepoIds = new Set(openRepos.map(repoSessionEntryId))
+  const normalized: Record<string, WorkspacePaneView> = {}
+  for (const [repoId, paneView] of Object.entries(value)) {
+    const safeRepoId = toSafeRepoLocator(repoId)
+    if (!safeRepoId || !openRepoIds.has(safeRepoId)) continue
+    if (paneView === 'status' || paneView === 'changes' || paneView === 'terminal') {
+      normalized[safeRepoId] = paneView
+    }
+  }
+  return normalized
+}
+
 function normalizeSession(value: unknown): SessionState {
   if (!value || typeof value !== 'object') return defaultSession()
-  const partial = value as Partial<SessionState> & { activeTerminalByGroup?: unknown }
+  const partial = value as Partial<SessionState>
   const openRepos = Array.isArray(partial.openRepos)
     ? dedupeRepoEntries(
         partial.openRepos.map(toSafeSessionRepoEntry).filter((entry): entry is RepoSessionEntry => entry !== null),
       )
     : []
   const activeRepo = toSafeRepoLocator(partial.activeRepo)
-  const workspacePaneFocusMode = partial.workspacePaneFocusMode === true ? true : DEFAULT_SESSION_WORKSPACE_PANE_FOCUS_MODE
   return {
     openRepos,
     activeRepo: activeRepo && openRepos.some((entry) => repoSessionEntryId(entry) === activeRepo) ? activeRepo : null,
-    workspacePaneFocusMode,
+    branchListPaneVisible:
+      typeof partial.branchListPaneVisible === 'boolean'
+        ? partial.branchListPaneVisible
+        : DEFAULT_BRANCH_LIST_PANE_VISIBLE,
     workspacePaneSizes: normalizeWorkspacePaneSizes(partial.workspacePaneSizes),
-    selectedTerminalByWorktree: normalizeSelectedTerminalByWorktree(
-      partial.selectedTerminalByWorktree ?? partial.activeTerminalByGroup,
-    ),
+    selectedTerminalByWorktree: normalizeSelectedTerminalByWorktree(partial.selectedTerminalByWorktree),
+    workspacePaneViewByRepo: normalizeWorkspacePaneViewByRepo(partial.workspacePaneViewByRepo, openRepos),
   }
 }
 

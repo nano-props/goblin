@@ -159,35 +159,15 @@ export const REPO_QUERY_SCHEMAS = {
 // `#/server/modules/settings-write-paths.ts` — the route layer
 // validates with these, then passes the parsed object directly to the
 // module layer.
-import {
-  DEFAULT_WORKSPACE_PANE_FOCUS_MODE,
-  DEFAULT_WORKSPACE_PANE_SIZES,
-} from '#/shared/workspace-layout.ts'
-
 const SessionStateSchema = v.object({
   openRepos: v.array(RepoSessionEntrySchema),
   activeRepo: v.nullable(v.string()),
-  workspacePaneFocusMode: v.boolean(),
+  branchListPaneVisible: v.boolean(),
   workspacePaneSizes: v.object({
     'left-right': v.number(),
   }),
   selectedTerminalByWorktree: v.optional(v.record(v.string(), v.string())),
   workspacePaneViewByRepo: v.optional(v.record(v.string(), v.picklist(['status', 'changes', 'terminal']))),
-  detailTabByRepo: v.optional(v.record(v.string(), v.picklist(['status', 'changes', 'terminal']))),
-})
-const SessionStateSchemaWithDefaults = v.object({
-  openRepos: v.array(RepoSessionEntrySchema),
-  activeRepo: v.nullable(v.string()),
-  workspacePaneFocusMode: v.optional(v.boolean(), DEFAULT_WORKSPACE_PANE_FOCUS_MODE),
-  workspacePaneSizes: v.optional(
-    v.object({
-      'left-right': v.number(),
-    }),
-    DEFAULT_WORKSPACE_PANE_SIZES,
-  ),
-  selectedTerminalByWorktree: v.optional(v.record(v.string(), v.string())),
-  workspacePaneViewByRepo: v.optional(v.record(v.string(), v.picklist(['status', 'changes', 'terminal']))),
-  detailTabByRepo: v.optional(v.record(v.string(), v.picklist(['status', 'changes', 'terminal']))),
 })
 
 export const SETTINGS_PROCEDURE_SCHEMAS = {
@@ -202,7 +182,7 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
 // object at the perimeter.
 export const SETTINGS_PATCH_SCHEMAS = {
   prefs: v.object({ settings: v.record(v.string(), v.unknown()) }),
-  session: v.object({ session: SessionStateSchemaWithDefaults }),
+  session: v.object({ session: SessionStateSchema }),
 } as const
 
 export const GITHUB_CLI_REFRESH_SCHEMA = v.object({

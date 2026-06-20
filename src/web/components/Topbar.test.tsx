@@ -5,15 +5,19 @@ import type { ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { Topbar } from '#/web/components/Topbar.tsx'
-import { useReposStore } from '#/web/stores/repos/store.ts'
 import { resetReposStore } from '#/web/stores/repos/test-utils.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
+
+const responsiveMocks = vi.hoisted(() => ({
+  compact: false,
+}))
 
 vi.mock('#/web/components/repo-toolbar/RepoToolbarActions.tsx', () => ({
   RepoToolbarActions: () => null,
 }))
 
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
-  useIsCompactUi: () => false,
+  useIsCompactUi: () => responsiveMocks.compact,
 }))
 
 let container: HTMLDivElement | null = null
@@ -23,6 +27,7 @@ const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENV
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
+  responsiveMocks.compact = false
   resetReposStore()
   container = document.createElement('div')
   document.body.appendChild(container)
@@ -41,52 +46,51 @@ afterEach(() => {
 })
 
 describe('Topbar', () => {
-  test('hides the Branch List toggle when no repository is active', () => {
+  test('renders the settings button when no repository is active', () => {
     render(
       <Topbar repoId={null} onOpenSettings={() => {}}>
         <div />
       </Topbar>,
     )
 
-    expect(branchListToggle()).toBeNull()
+    expect(settingsButton()).not.toBeNull()
   })
 
-  test('toggles Branch List visibility through detail focus mode', () => {
+  test('renders a Branch List visibility toggle on large screens', () => {
     render(
       <Topbar repoId="/tmp/repo" onOpenSettings={() => {}}>
         <div />
       </Topbar>,
     )
 
-    const button = branchListToggle()
-    expect(button).not.toBeNull()
-    expect(button?.getAttribute('aria-pressed')).toBe('false')
+    expect(branchListToggle()).not.toBeNull()
+  })
 
-    act(() => {
-      button?.click()
-    })
-
-    expect(useReposStore.getState().workspacePaneFocusMode).toBe(true)
-    expect(branchListToggle()?.getAttribute('aria-pressed')).toBe('true')
-    expect(branchListToggle()?.classList.contains('bg-accent')).toBe(false)
-    expect(branchListToggle()?.classList.contains('shadow-xs')).toBe(false)
+  test('toggles the large-screen Branch List pane visibility', () => {
+    render(
+      <Topbar repoId="/tmp/repo" onOpenSettings={() => {}}>
+        <div />
+      </Topbar>,
+    )
 
     act(() => {
       branchListToggle()?.click()
     })
 
-    expect(useReposStore.getState().workspacePaneFocusMode).toBe(false)
-    expect(branchListToggle()?.getAttribute('aria-pressed')).toBe('false')
+    expect(useReposStore.getState().branchListPaneVisible).toBe(false)
+    expect(branchListToggle()?.getAttribute('aria-pressed')).toBe('true')
   })
 
-  test('uses the left pane icon for the Branch List toggle', () => {
+  test('hides the Branch List visibility toggle on compact screens', () => {
+    responsiveMocks.compact = true
+
     render(
       <Topbar repoId="/tmp/repo" onOpenSettings={() => {}}>
         <div />
       </Topbar>,
     )
 
-    expect(branchListToggleIcon()?.classList.contains('lucide-panel-left')).toBe(true)
+    expect(branchListToggle()).toBeNull()
   })
 })
 
@@ -100,6 +104,6 @@ function branchListToggle(): HTMLButtonElement | null {
   return container?.querySelector('button[aria-label="workspace.branch-list-toggle-label"]') ?? null
 }
 
-function branchListToggleIcon(): SVGElement | null {
-  return branchListToggle()?.querySelector('svg') ?? null
+function settingsButton(): HTMLButtonElement | null {
+  return container?.querySelector('button[aria-label="topbar.settings"]') ?? null
 }

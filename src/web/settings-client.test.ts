@@ -87,7 +87,7 @@ describe('settings-client', () => {
           session: {
             openRepos: [],
             activeRepo: null,
-            workspacePaneFocusMode: false,
+            branchListPaneVisible: true,
             workspacePaneSizes: { 'left-right': 50 },
           },
           recentRepos: [],

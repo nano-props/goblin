@@ -9,7 +9,7 @@ const SESSION_SAVE_DEBOUNCE_MS = 200
 export function useSessionPersistence() {
   const activeId = useReposStore((s) => s.activeId)
   const order = useReposStore((s) => s.order)
-  const workspacePaneFocusMode = useReposStore((s) => s.workspacePaneFocusMode)
+  const branchListPaneVisible = useReposStore((s) => s.branchListPaneVisible)
   const workspacePaneSizes = useReposStore((s) => s.workspacePaneSizes)
   const selectedTerminalByWorktree = useReposStore((s) => s.selectedTerminalByWorktree)
   const workspacePaneViewByRepo = useReposStore((s) => s.workspacePaneViewByRepo)
@@ -25,10 +25,10 @@ export function useSessionPersistence() {
     if (!sessionReady) return
     const session = sessionStateFromRestorableWorkspaceState({
       repos,
-        restorableWorkspaceState: restorableWorkspaceStateFromStore({
-          order,
-          activeId,
-          workspacePaneFocusMode,
+      restorableWorkspaceState: restorableWorkspaceStateFromStore({
+        order,
+        activeId,
+        branchListPaneVisible,
         workspacePaneSizes,
         selectedTerminalByWorktree,
         workspacePaneViewByRepo,
@@ -38,7 +38,7 @@ export function useSessionPersistence() {
     const immediateKey = JSON.stringify({
       openRepos: session.openRepos,
       activeRepo: session.activeRepo,
-      workspacePaneFocusMode,
+      branchListPaneVisible: session.branchListPaneVisible,
       selectedTerminalByWorktree: session.selectedTerminalByWorktree,
     })
     const immediate = lastImmediateKeyRef.current !== immediateKey
@@ -61,9 +61,10 @@ export function useSessionPersistence() {
     sessionReady,
     order,
     activeId,
-    workspacePaneFocusMode,
     workspacePaneSizes,
+    branchListPaneVisible,
     selectedTerminalByWorktree,
+    workspacePaneViewByRepo,
     repos,
   ])
 }

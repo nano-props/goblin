@@ -15,7 +15,7 @@ export function sessionStateFromRestorableWorkspaceState(input: {
   return {
     openRepos: persistedOpenWorkspaceEntries(restorableWorkspaceState.order, repos),
     activeRepo: persistedActiveRepoIdForSession(restorableWorkspaceState.activeId),
-    workspacePaneFocusMode: restorableWorkspaceState.workspacePaneFocusMode,
+    branchListPaneVisible: restorableWorkspaceState.branchListPaneVisible,
     workspacePaneSizes: restorableWorkspaceState.workspacePaneSizes,
     selectedTerminalByWorktree: persistedSelectedTerminalByWorktreeForSession(
       restorableWorkspaceState.selectedTerminalByWorktree,
@@ -34,16 +34,16 @@ export function restoreRestorableWorkspaceStateFromSession(
 ): Pick<
   RestorableWorkspaceState,
   | 'activeId'
-  | 'workspacePaneFocusMode'
+  | 'branchListPaneVisible'
   | 'workspacePaneSizes'
   | 'selectedTerminalByWorktree'
   | 'workspacePaneViewByRepo'
 > {
   return {
     activeId,
-    workspacePaneFocusMode: session.workspacePaneFocusMode,
+    branchListPaneVisible: session.branchListPaneVisible,
     workspacePaneSizes: session.workspacePaneSizes,
     selectedTerminalByWorktree: session.selectedTerminalByWorktree ?? {},
-    workspacePaneViewByRepo: session.workspacePaneViewByRepo ?? session.detailTabByRepo ?? {},
+    workspacePaneViewByRepo: session.workspacePaneViewByRepo ?? {},
   }
 }

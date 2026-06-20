@@ -39,12 +39,11 @@ interface Props {
   detail: SelectedBranchDetailPresentation
   detailId: string
   contentId: string
-  workspacePaneFocusMode: boolean
   layout: RepoWorkspaceLayout
   onBack?: () => void
 }
 
-export function BranchDetailToolbar({ repo, detail, detailId, workspacePaneFocusMode, onBack }: Props) {
+export function BranchDetailToolbar({ repo, detail, detailId, onBack }: Props) {
   const t = useT()
   const navigation = useMainWindowNavigation()
   const compact = useIsCompactUi()
@@ -219,7 +218,6 @@ export function BranchDetailToolbar({ repo, detail, detailId, workspacePaneFocus
             activeTabIdentity={activeTabIdentity}
             responsiveCompact={compact}
             panelActive
-            focusMode={workspacePaneFocusMode}
             focusRegistry={workspacePaneTabFocusRegistry}
             emptyFocusKey={EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY}
             // T6.1: while the first server-side session list is in

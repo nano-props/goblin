@@ -2,7 +2,7 @@ export type WorkspaceLayout = 'left-right'
 export type WorkspacePaneSizes = Record<WorkspaceLayout, number>
 
 export const DEFAULT_WORKSPACE_LAYOUT: WorkspaceLayout = 'left-right'
-export const DEFAULT_WORKSPACE_PANE_FOCUS_MODE = false
+export const DEFAULT_BRANCH_LIST_PANE_VISIBLE = true
 export const DEFAULT_WORKSPACE_PANE_SIZES: WorkspacePaneSizes = { 'left-right': 61.8 }
 
 const MIN_WORKSPACE_PANE_SIZE = 10
@@ -26,15 +26,17 @@ export function normalizeWorkspacePaneSizes(value: unknown): WorkspacePaneSizes 
 }
 
 export function normalizeWorkspaceSessionLayoutState(value: {
-  workspacePaneFocusMode?: unknown
+  branchListPaneVisible?: unknown
   workspacePaneSizes?: unknown
 }): {
-  workspacePaneFocusMode: boolean
+  branchListPaneVisible: boolean
   workspacePaneSizes: WorkspacePaneSizes
 } {
-  const workspacePaneFocusMode = typeof value.workspacePaneFocusMode === 'boolean' ? value.workspacePaneFocusMode : DEFAULT_WORKSPACE_PANE_FOCUS_MODE
   return {
-    workspacePaneFocusMode,
+    branchListPaneVisible:
+      typeof value.branchListPaneVisible === 'boolean'
+        ? value.branchListPaneVisible
+        : DEFAULT_BRANCH_LIST_PANE_VISIBLE,
     workspacePaneSizes: normalizeWorkspacePaneSizes(value.workspacePaneSizes),
   }
 }

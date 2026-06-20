@@ -11,14 +11,12 @@ export interface RestorableWorkspaceOrderStoreActions extends Pick<ReposStore, '
 
 export interface RestorableWorkspaceLayoutStoreActions extends Pick<
   ReposStore,
-  'toggleWorkspacePaneFocusMode' | 'resetLayout' | 'setSelectedTerminal'
+  'resetLayout' | 'setSelectedTerminal' | 'toggleBranchListPaneVisible'
 > {}
-
-export interface RestorableWorkspacePaneFocusStoreActions extends Pick<ReposStore, 'toggleWorkspacePaneFocusMode'> {}
 
 export interface RestorableWorkspaceLayoutPreferenceStoreActions extends Pick<
   ReposStore,
-  'resetLayout' | 'setSelectedTerminal'
+  'resetLayout' | 'setSelectedTerminal' | 'toggleBranchListPaneVisible'
 > {}
 
 export interface RuntimeCoherentRepoOpenStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen'> {}
@@ -33,9 +31,9 @@ export interface RestorableWorkspaceStoreActions extends Pick<
   | 'setActive'
   | 'reorderRepos'
   | 'cycleActive'
-  | 'toggleWorkspacePaneFocusMode'
   | 'resetLayout'
   | 'setSelectedTerminal'
+  | 'toggleBranchListPaneVisible'
 > {}
 
 export interface RuntimeCoherentRepoProjectionStoreActions extends Pick<
@@ -101,32 +99,22 @@ export function runtimeCoherentRepoNavigationStoreActionsFromStore(
 }
 
 export function restorableWorkspaceLayoutStoreActionsFromStore(
-  state: Pick<
-    ReposStore,
-    'toggleWorkspacePaneFocusMode' | 'resetLayout' | 'setSelectedTerminal'
-  >,
+  state: Pick<ReposStore, 'resetLayout' | 'setSelectedTerminal' | 'toggleBranchListPaneVisible'>,
 ): RestorableWorkspaceLayoutStoreActions {
   return {
-    toggleWorkspacePaneFocusMode: state.toggleWorkspacePaneFocusMode,
     resetLayout: state.resetLayout,
     setSelectedTerminal: state.setSelectedTerminal,
-  }
-}
-
-export function restorableWorkspacePaneFocusStoreActionsFromStore(
-  state: Pick<ReposStore, 'toggleWorkspacePaneFocusMode'>,
-): RestorableWorkspacePaneFocusStoreActions {
-  return {
-    toggleWorkspacePaneFocusMode: state.toggleWorkspacePaneFocusMode,
+    toggleBranchListPaneVisible: state.toggleBranchListPaneVisible,
   }
 }
 
 export function restorableWorkspaceLayoutPreferenceStoreActionsFromStore(
-  state: Pick<ReposStore, 'resetLayout' | 'setSelectedTerminal'>,
+  state: Pick<ReposStore, 'resetLayout' | 'setSelectedTerminal' | 'toggleBranchListPaneVisible'>,
 ): RestorableWorkspaceLayoutPreferenceStoreActions {
   return {
     resetLayout: state.resetLayout,
     setSelectedTerminal: state.setSelectedTerminal,
+    toggleBranchListPaneVisible: state.toggleBranchListPaneVisible,
   }
 }
 
@@ -136,18 +124,18 @@ export function restorableWorkspaceStoreActionsFromStore(
     | 'setActive'
     | 'reorderRepos'
     | 'cycleActive'
-    | 'toggleWorkspacePaneFocusMode'
     | 'resetLayout'
     | 'setSelectedTerminal'
+    | 'toggleBranchListPaneVisible'
   >,
 ): RestorableWorkspaceStoreActions {
   return {
     setActive: state.setActive,
     reorderRepos: state.reorderRepos,
     cycleActive: state.cycleActive,
-    toggleWorkspacePaneFocusMode: state.toggleWorkspacePaneFocusMode,
     resetLayout: state.resetLayout,
     setSelectedTerminal: state.setSelectedTerminal,
+    toggleBranchListPaneVisible: state.toggleBranchListPaneVisible,
   }
 }
 
@@ -205,17 +193,13 @@ export function repoTabStoreActionsFromStore(
 export function rendererEffectIntentStoreActionsFromStore(
   state: Pick<ReposStore, 'ensureWorkspaceOpen' | 'setSelectedTerminal' | 'resetLayout'>,
 ): RendererEffectIntentStoreActions {
-  const layoutPrefs = restorableWorkspaceLayoutPreferenceStoreActionsFromStore({
-    resetLayout: state.resetLayout,
-    setSelectedTerminal: state.setSelectedTerminal,
-  })
   const runtimeCoherent = runtimeCoherentRepoOpenStoreActionsFromStore({
     ensureWorkspaceOpen: state.ensureWorkspaceOpen,
   })
   return {
     ensureWorkspaceOpen: runtimeCoherent.ensureWorkspaceOpen,
-    setSelectedTerminal: layoutPrefs.setSelectedTerminal,
-    resetLayout: layoutPrefs.resetLayout,
+    setSelectedTerminal: state.setSelectedTerminal,
+    resetLayout: state.resetLayout,
   }
 }
 

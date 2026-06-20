@@ -17,7 +17,7 @@ import type {
 import type { WorkspacePaneStaticViewSummary, WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { BranchSnapshotInfo, PullRequestInfo, WorktreeStatus } from '#/web/types.ts'
 import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
-import { DEFAULT_WORKSPACE_PANE_SIZES } from '#/shared/workspace-layout.ts'
+import { DEFAULT_BRANCH_LIST_PANE_VISIBLE, DEFAULT_WORKSPACE_PANE_SIZES } from '#/shared/workspace-layout.ts'
 export type IpcTestHandler = (input: any) => unknown
 
 interface TerminalBridgeTestOutputs {
@@ -110,9 +110,10 @@ export function resetReposStore(): void {
     order: [],
     activeId: null,
     sessionReady: false,
-    workspacePaneFocusMode: false,
+    branchListPaneVisible: DEFAULT_BRANCH_LIST_PANE_VISIBLE,
     workspacePaneSizes: DEFAULT_WORKSPACE_PANE_SIZES,
     selectedTerminalByWorktree: {},
+    workspacePaneViewByRepo: {},
   })
 }
 
@@ -595,8 +596,9 @@ export function seedRepoState(options: {
     order: [options.id],
     activeId: options.id,
     sessionReady: true,
-    workspacePaneFocusMode: false,
+    branchListPaneVisible: DEFAULT_BRANCH_LIST_PANE_VISIBLE,
     workspacePaneSizes: DEFAULT_WORKSPACE_PANE_SIZES,
+    workspacePaneViewByRepo: {},
   })
   return repo
 }

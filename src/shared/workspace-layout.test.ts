@@ -1,18 +1,19 @@
 import { describe, expect, test } from 'vitest'
 import {
+  DEFAULT_BRANCH_LIST_PANE_VISIBLE,
   DEFAULT_WORKSPACE_PANE_SIZES,
   normalizeWorkspaceSessionLayoutState,
 } from '#/shared/workspace-layout.ts'
 
 describe('normalizeWorkspaceSessionLayoutState', () => {
-  test('preserves focus mode and disables workspace pane collapse in the single layout', () => {
+  test('preserves Branch View visibility and workspace pane sizes', () => {
     expect(
       normalizeWorkspaceSessionLayoutState({
-        workspacePaneFocusMode: true,
+        branchListPaneVisible: false,
         workspacePaneSizes: { 'left-right': 45 },
       }),
     ).toEqual({
-      workspacePaneFocusMode: true,
+      branchListPaneVisible: false,
       workspacePaneSizes: { 'left-right': 45 },
     })
   })
@@ -20,11 +21,11 @@ describe('normalizeWorkspaceSessionLayoutState', () => {
   test('falls back to defaults for invalid input', () => {
     expect(
       normalizeWorkspaceSessionLayoutState({
-        workspacePaneFocusMode: 'focus',
+        branchListPaneVisible: 'bad',
         workspacePaneSizes: { 'left-right': 'bad' },
       }),
     ).toEqual({
-      workspacePaneFocusMode: false,
+      branchListPaneVisible: DEFAULT_BRANCH_LIST_PANE_VISIBLE,
       workspacePaneSizes: DEFAULT_WORKSPACE_PANE_SIZES,
     })
   })

@@ -3,7 +3,7 @@
 // "blue pill" reading of the selected thumb (low-opacity accent
 // tint) only ever landed muddy against the toolbar's gray
 // surroundings. This control is now a single toggle styled the
-// same as `BranchDetailToolbar`'s Focus Mode button
+// same as the rest of the topbar icon toggles
 // (variant="ghost" + size="icon-lg" + bg-accent on press) so the
 // topbar's icon toggles share one visual language: a flat ghost
 // button that paints a subtle accent fill when active. The
@@ -51,8 +51,8 @@ export function BranchViewModeControl({ value, disabled = false, onChange }: Pro
         aria-pressed={worktreesOnly}
         aria-label={t('branches.filter-label')}
         className={cn(
-          // Match the Focus Mode button's pressed treatment so the
-          // topbar's toggles read as one family. `hover:bg-accent`
+          // Match the topbar toggle pressed treatment so the controls
+          // read as one family. `hover:bg-accent`
           // sticks while pressed so the active state doesn't
           // flicker back to ghost on mouse-over.
           worktreesOnly &&

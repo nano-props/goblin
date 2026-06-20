@@ -150,10 +150,8 @@ export interface RestorableWorkspaceState {
   order: string[]
   /** Active workspace tab restored from SessionState.activeRepo. */
   activeId: string | null
-  /** Persisted branch-list focus-toggle preference. This
-   *  is not itself proof that the workspace is currently rendering in focus
-   *  mode; callers should derive the effective workspace behavior. */
-  workspacePaneFocusMode: boolean
+  /** Large-screen Branch List visibility restored from SessionState. Compact UI always shows one pane at a time. */
+  branchListPaneVisible: boolean
   workspacePaneSizes: WorkspacePaneSizes
   /** Per worktree terminal selection restored from SessionState.selectedTerminalByWorktree. */
   selectedTerminalByWorktree: Record<string, string>
@@ -176,15 +174,11 @@ export interface RestorableWorkspaceActions {
   *  list closes the gap; later items shift up if `from < to`, down if
   *  `from > to`). No-op if either id is unknown or they're identical. */
   reorderRepos: (fromId: string, toId: string) => void
-  /** Update the persisted branch-list focus-toggle preference. The effective
-   *  rendered layout mode should be derived from `repoWorkspaceBehavior()`. */
-  setWorkspacePaneFocusMode: (focused: boolean) => void
-  toggleWorkspacePaneFocusMode: () => void
-  applySessionLayoutState: (
-    layout: Pick<SessionState, 'workspacePaneFocusMode' | 'workspacePaneSizes'>,
-  ) => void
+  applySessionLayoutState: (layout: Pick<SessionState, 'branchListPaneVisible' | 'workspacePaneSizes'>) => void
   applySessionSelectedTerminalState: (selectedTerminalByWorktree: Record<string, string>) => void
   applySessionWorkspacePaneViewByRepo: (workspacePaneViewByRepo: Record<string, WorkspacePaneView>) => void
+  setBranchListPaneVisible: (visible: boolean) => void
+  toggleBranchListPaneVisible: () => void
   setWorkspacePaneSize: (layout: RepoWorkspaceLayout, size: number) => void
   setWorkspacePaneSizes: (sizes: WorkspacePaneSizes) => void
   resetLayout: () => void

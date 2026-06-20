@@ -15,7 +15,6 @@ import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShor
 interface Props {
   repoId: string
   layout?: RepoWorkspaceLayout
-  workspacePaneFocusMode?: boolean
   onBack?: () => void
 }
 
@@ -49,7 +48,6 @@ function branchDetailRepoEqual(a: BranchDetailRepo | undefined, b: BranchDetailR
 export function BranchDetail({
   repoId,
   layout = DEFAULT_WORKSPACE_LAYOUT,
-  workspacePaneFocusMode = false,
   onBack,
 }: Props) {
   const detailId = useId()
@@ -97,11 +95,9 @@ export function BranchDetail({
   const detail = getSelectedBranchDetailPresentation(repo)
   const contentId = `${detailId}-content`
 
-  const focusMode = workspacePaneFocusMode
-
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
-      {detail.branch && !focusMode ? (
+      {detail.branch ? (
         <BranchShortcutHandler
           key={`${repo.id}:${detail.branch.name}`}
           repo={repo}
@@ -109,7 +105,6 @@ export function BranchDetail({
           branch={detail.branch}
           detailId={detailId}
           contentId={contentId}
-          workspacePaneFocusMode={workspacePaneFocusMode}
           layout={layout}
           onBack={onBack}
         />
@@ -120,7 +115,6 @@ export function BranchDetail({
             detail={detail}
             detailId={detailId}
             contentId={contentId}
-            workspacePaneFocusMode={workspacePaneFocusMode}
             layout={layout}
             onBack={onBack}
           />
@@ -143,7 +137,6 @@ interface BranchShortcutHandlerProps {
   branch: NonNullable<SelectedBranchDetailPresentation['branch']>
   detailId: string
   contentId: string
-  workspacePaneFocusMode: boolean
   layout: RepoWorkspaceLayout
   onBack?: () => void
 }
@@ -154,7 +147,6 @@ function BranchShortcutHandler({
   branch,
   detailId,
   contentId,
-  workspacePaneFocusMode,
   layout,
   onBack,
 }: BranchShortcutHandlerProps) {
@@ -168,7 +160,6 @@ function BranchShortcutHandler({
         detail={detail}
         detailId={detailId}
         contentId={contentId}
-        workspacePaneFocusMode={workspacePaneFocusMode}
         layout={layout}
         onBack={onBack}
       />

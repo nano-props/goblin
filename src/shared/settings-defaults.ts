@@ -10,7 +10,7 @@ import type {
   ThemePref,
 } from '#/shared/api-types.ts'
 import {
-  DEFAULT_WORKSPACE_PANE_FOCUS_MODE,
+  DEFAULT_BRANCH_LIST_PANE_VISIBLE,
   DEFAULT_WORKSPACE_PANE_SIZES,
 } from '#/shared/workspace-layout.ts'
 
@@ -18,7 +18,6 @@ export const DEFAULT_FETCH_INTERVAL_SEC = 120
 export const MAX_RECENT_REPOS = 10
 export const DEFAULT_LANG_PREF: LangPref = 'auto'
 export const DEFAULT_THEME_PREF: ThemePref = 'auto'
-export const DEFAULT_SESSION_WORKSPACE_PANE_FOCUS_MODE = DEFAULT_WORKSPACE_PANE_FOCUS_MODE
 export const DEFAULT_TERMINAL_NOTIFICATIONS_ENABLED = false
 export const DEFAULT_SHORTCUTS_DISABLED = false
 export const DEFAULT_GLOBAL_SHORTCUT_DISABLED = false
@@ -31,7 +30,7 @@ export function defaultSessionState(): SessionState {
   return {
     openRepos: [],
     activeRepo: null,
-    workspacePaneFocusMode: DEFAULT_WORKSPACE_PANE_FOCUS_MODE,
+    branchListPaneVisible: DEFAULT_BRANCH_LIST_PANE_VISIBLE,
     workspacePaneSizes: { ...DEFAULT_WORKSPACE_PANE_SIZES },
     selectedTerminalByWorktree: {},
   }

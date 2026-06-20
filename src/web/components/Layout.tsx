@@ -16,7 +16,7 @@ interface RepoWorkspaceProps {
   branchPane: ReactNode
   workspacePane: ReactNode
   layout?: RepoWorkspaceLayout
-  mode?: Exclude<RepoWorkspaceMode, 'focus'>
+  mode?: RepoWorkspaceMode
   workspacePaneSize?: number
   onWorkspacePaneSizeChange?: (size: number) => void
 }
@@ -76,9 +76,12 @@ export function RepoWorkspace({
   branchPane,
   workspacePane,
   layout = DEFAULT_WORKSPACE_LAYOUT,
+  mode = 'split',
   workspacePaneSize = DEFAULT_WORKSPACE_PANE_SIZES[layout],
   onWorkspacePaneSizeChange,
 }: RepoWorkspaceProps) {
+  if (mode === 'workspace-only') return <div className="flex min-h-0 flex-1">{workspacePane}</div>
+
   return (
     <SplitPane
       orientation="horizontal"

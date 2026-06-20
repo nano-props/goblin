@@ -12,7 +12,7 @@ import { DEFAULT_WORKSPACE_PANE_SIZES } from '#/shared/workspace-layout.ts'
 export const DEFAULT_RESTORABLE_SESSION_STATE: SessionState = {
   openRepos: [],
   activeRepo: null,
-  workspacePaneFocusMode: false,
+  branchListPaneVisible: true,
   workspacePaneSizes: DEFAULT_WORKSPACE_PANE_SIZES,
   selectedTerminalByWorktree: {},
 }
