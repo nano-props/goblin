@@ -1,7 +1,7 @@
-// Persistent branch list. Each row shows branch name, lightweight
+// Persistent branch navigator. Each row shows branch name, lightweight
 // scan signals, and the head commit subject, author, and relative date. The
 // selected row scrolls into view automatically when the user moves with
-// j/k or arrows so a long branch list doesn't strand the cursor offscreen.
+// j/k or arrows so a long branch navigator doesn't strand the cursor offscreen.
 //
 // Worktree branches use a folder-tree glyph and a compact chip beside the
 // name. We avoid tinting the whole row so selection, hover, and status
@@ -12,13 +12,13 @@ import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { visibleBranches } from '#/web/stores/repos/branch-view-mode.ts'
-import { BranchRow } from '#/web/components/branch-list/BranchRow.tsx'
+import { BranchRow } from '#/web/components/branch-navigator/BranchRow.tsx'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
-import { openWorkspacePaneView } from '#/web/components/branch-detail/open-workspace-pane-view.ts'
+import { openWorkspacePaneView } from '#/web/components/branch-workspace/open-workspace-pane-view.ts'
 
 interface Props {
   repoId: string
@@ -27,7 +27,7 @@ interface Props {
 
 type OpenActionMenu = { repoId: string; branch: string }
 
-type BranchListRepo = BranchActionRepo & {
+type BranchNavigatorRepo = BranchActionRepo & {
   data: BranchActionRepo['data'] & {
     branches: RepoBranchState[]
   }
@@ -37,7 +37,7 @@ type BranchListRepo = BranchActionRepo & {
   }
 }
 
-function branchListRepoEqual(a: BranchListRepo | undefined, b: BranchListRepo | undefined): boolean {
+function branchNavigatorRepoEqual(a: BranchNavigatorRepo | undefined, b: BranchNavigatorRepo | undefined): boolean {
   return (
     a === b ||
     (!!a &&
@@ -60,7 +60,7 @@ function branchListRepoEqual(a: BranchListRepo | undefined, b: BranchListRepo | 
   )
 }
 
-export function BranchList({ repoId, showActions = true }: Props) {
+export function BranchNavigator({ repoId, showActions = true }: Props) {
   const t = useT()
   const navigation = useMainWindowNavigation()
   const selectedRef = useRef<HTMLLIElement | null>(null)
@@ -103,7 +103,7 @@ export function BranchList({ repoId, showActions = true }: Props) {
           }
         : undefined
     },
-    branchListRepoEqual,
+    branchNavigatorRepoEqual,
   )
 
   // Keep the selected row in view as the user navigates with j/k.

@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from 'vitest'
 import { createMainWindowNavigationActions } from '#/web/main-window-navigation-actions.ts'
 
 describe('createMainWindowNavigationActions', () => {
-  test('mutates store directly for repo branch detail navigation', () => {
+  test('mutates store directly for repo branch workspace navigation', () => {
     const setActive = vi.fn()
     const selectBranch = vi.fn()
     const setWorkspacePaneView = vi.fn()

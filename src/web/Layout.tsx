@@ -48,12 +48,11 @@ export function Layout() {
 
   const activeId = useReposStore((s) => s.activeId)
   const order = useReposStore((s) => s.order)
-  const { setActive, closeRepo, cycleActive, selectBranch, setWorkspacePaneView } =
-    useStoreWithEqualityFn(
-      useReposStore,
-      mainWindowNavigationStoreActionsFromStore,
-      mainWindowNavigationStoreActionsEqual,
-    )
+  const { setActive, closeRepo, cycleActive, selectBranch, setWorkspacePaneView } = useStoreWithEqualityFn(
+    useReposStore,
+    mainWindowNavigationStoreActionsFromStore,
+    mainWindowNavigationStoreActionsEqual,
+  )
   const navigation = useMemo(
     () =>
       createMainWindowNavigationActions({
@@ -66,16 +65,7 @@ export function Layout() {
         setWorkspacePaneView,
         onOpenSettings: (page) => void navigate({ to: `/settings/${page}` }),
       }),
-    [
-      activeId,
-      closeRepo,
-      cycleActive,
-      navigate,
-      order,
-      selectBranch,
-      setActive,
-      setWorkspacePaneView,
-    ],
+    [activeId, closeRepo, cycleActive, navigate, order, selectBranch, setActive, setWorkspacePaneView],
   )
 
   const workspaceShortcutsSuppressed = modalOpen || isSettingsOpen
@@ -97,7 +87,7 @@ export function Layout() {
     onShowHelp: () => void navigate({ to: '/settings/shortcuts' }),
     isWorkspaceShortcutSuppressed: () => workspaceShortcutsSuppressed,
     isSettingsOpen: () => isSettingsOpen,
-    onExitSettings: () => void navigate({ to: '/workspace' }),
+    onExitSettings: () => void navigate({ to: '/app' }),
   })
 
   const repoDrop = useRepoDrop({ blocked: modalOpen })

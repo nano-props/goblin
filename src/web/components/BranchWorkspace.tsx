@@ -3,23 +3,22 @@ import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
 import {
-  getSelectedBranchDetailPresentation,
-  type BranchDetailRepo,
-  type SelectedBranchDetailPresentation,
-} from '#/web/components/branch-detail/model.ts'
-import { BranchDetailToolbar } from '#/web/components/branch-detail/BranchDetailToolbar.tsx'
-import { BranchDetailContent } from '#/web/components/branch-detail/BranchDetailContent.tsx'
+  getSelectedBranchWorkspacePresentation,
+  type BranchWorkspaceRepo,
+  type SelectedBranchWorkspacePresentation,
+} from '#/web/components/branch-workspace/model.ts'
+import { BranchWorkspaceToolbar } from '#/web/components/branch-workspace/BranchWorkspaceToolbar.tsx'
+import { BranchWorkspaceContent } from '#/web/components/branch-workspace/BranchWorkspaceContent.tsx'
 import { DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
 interface Props {
   repoId: string
   layout?: RepoWorkspaceLayout
-  onBack?: () => void
 }
 
-// Keep this equality in sync with fields read by BranchDetail children.
-function branchDetailRepoEqual(a: BranchDetailRepo | undefined, b: BranchDetailRepo | undefined): boolean {
+// Keep this equality in sync with fields read by BranchWorkspace children.
+function branchWorkspaceRepoEqual(a: BranchWorkspaceRepo | undefined, b: BranchWorkspaceRepo | undefined): boolean {
   return (
     a === b ||
     (!!a &&
@@ -45,11 +44,7 @@ function branchDetailRepoEqual(a: BranchDetailRepo | undefined, b: BranchDetailR
   )
 }
 
-export function BranchDetail({
-  repoId,
-  layout = DEFAULT_WORKSPACE_LAYOUT,
-  onBack,
-}: Props) {
+export function BranchWorkspace({ repoId, layout = DEFAULT_WORKSPACE_LAYOUT }: Props) {
   const detailId = useId()
   const repo = useStoreWithEqualityFn(
     useReposStore,
@@ -88,11 +83,11 @@ export function BranchDetail({
           }
         : undefined
     },
-    branchDetailRepoEqual,
+    branchWorkspaceRepoEqual,
   )
   if (!repo) return null
 
-  const detail = getSelectedBranchDetailPresentation(repo)
+  const detail = getSelectedBranchWorkspacePresentation(repo)
   const contentId = `${detailId}-content`
 
   return (
@@ -106,19 +101,17 @@ export function BranchDetail({
           detailId={detailId}
           contentId={contentId}
           layout={layout}
-          onBack={onBack}
         />
       ) : (
         <>
-          <BranchDetailToolbar
+          <BranchWorkspaceToolbar
             repo={repo}
             detail={detail}
             detailId={detailId}
             contentId={contentId}
             layout={layout}
-            onBack={onBack}
           />
-          <BranchDetailContent
+          <BranchWorkspaceContent
             repo={repo}
             detail={detail}
             detailId={detailId}
@@ -132,39 +125,23 @@ export function BranchDetail({
 }
 
 interface BranchShortcutHandlerProps {
-  repo: BranchDetailRepo
-  detail: SelectedBranchDetailPresentation
-  branch: NonNullable<SelectedBranchDetailPresentation['branch']>
+  repo: BranchWorkspaceRepo
+  detail: SelectedBranchWorkspacePresentation
+  branch: NonNullable<SelectedBranchWorkspacePresentation['branch']>
   detailId: string
   contentId: string
   layout: RepoWorkspaceLayout
-  onBack?: () => void
 }
 
-function BranchShortcutHandler({
-  repo,
-  detail,
-  branch,
-  detailId,
-  contentId,
-  layout,
-  onBack,
-}: BranchShortcutHandlerProps) {
+function BranchShortcutHandler({ repo, detail, branch, detailId, contentId, layout }: BranchShortcutHandlerProps) {
   const actions = useBranchActionItems(repo, branch)
   useBranchActionShortcutRegistry(actions)
 
   return (
     <>
-      <BranchDetailToolbar
-        repo={repo}
-        detail={detail}
-        detailId={detailId}
-        contentId={contentId}
-        layout={layout}
-        onBack={onBack}
-      />
+      <BranchWorkspaceToolbar repo={repo} detail={detail} detailId={detailId} contentId={contentId} layout={layout} />
       {actions.dialogs}
-      <BranchDetailContent repo={repo} detail={detail} detailId={detailId} contentId={contentId} layout={layout} />
+      <BranchWorkspaceContent repo={repo} detail={detail} detailId={detailId} contentId={contentId} layout={layout} />
     </>
   )
 }

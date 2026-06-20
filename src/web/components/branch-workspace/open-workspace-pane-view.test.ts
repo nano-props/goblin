@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { openWorkspacePaneView } from '#/web/components/branch-detail/open-workspace-pane-view.ts'
+import { openWorkspacePaneView } from '#/web/components/branch-workspace/open-workspace-pane-view.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'

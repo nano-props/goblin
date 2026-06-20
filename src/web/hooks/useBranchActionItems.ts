@@ -22,7 +22,7 @@ import type { BrowserRemoteProvider } from '#/web/types.ts'
 import { useRuntimeExternalAppSettings } from '#/web/runtime-settings-external-apps.ts'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import type { WorkspacePaneBranchViewType, WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
-import { openWorkspacePaneView } from '#/web/components/branch-detail/open-workspace-pane-view.ts'
+import { openWorkspacePaneView } from '#/web/components/branch-workspace/open-workspace-pane-view.ts'
 export interface BranchActionItem {
   id: BranchActionItemId
   label: string

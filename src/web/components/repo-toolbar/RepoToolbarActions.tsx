@@ -11,7 +11,7 @@
 //   Create  — open the new-worktree dialog for the active repo.
 //
 // Branch-scoped operations (Pull / Push / Open in Terminal
-// / Open in GitHub) live with the selected-branch detail, not here —
+// / Open in GitHub) live with the selected-branch workspace, not here —
 // those need a branch context to be meaningful.
 
 import { useEffect, useState } from 'react'

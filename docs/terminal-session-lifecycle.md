@@ -438,7 +438,7 @@ When `!hasSessions && slotMode === 'opening'`, render an overlay
 with a "New terminal" button.
 
 - Reuse `terminal.new` (defined in `en.ts:331`, wired up in
-  `BranchDetailToolbar.tsx`).
+  `BranchWorkspaceToolbar.tsx`).
 - Reuse `terminal.empty` if already defined; add to locales that
   lack it.
 - Compute `terminalBase` from the slot's `repoRoot` / `branch` /
@@ -545,7 +545,7 @@ realtime event for the _same_ sessionId after a successful
 takeover is treated as a benign re-apply with identical values
 (no-op).
 
-`TerminalSlot` and `BranchDetailToolbar` UI are unchanged — they
+`TerminalSlot` and `BranchWorkspaceToolbar` UI are unchanged — they
 read `role` / `controllerStatus` from the runtime and simply see
 the new values arrive one round-trip sooner.
 

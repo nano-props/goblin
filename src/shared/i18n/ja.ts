@@ -198,7 +198,7 @@ export const ja: Record<DictKey, string> = {
 
   // ---- Workspace pane views ---------------------------------------------
   'tab.branches': 'ブランチ',
-  'tab.branch-detail': 'ブランチ詳細',
+  'tab.branch-workspace': 'ブランチワークスペース',
   'tab.status': 'ステータス',
   'tab.changes': '変更',
   'tab.changes-with-count': '変更 · {count}件',
@@ -235,7 +235,7 @@ export const ja: Record<DictKey, string> = {
   'workspace.focus-toggle-label': 'Focus Mode を切り替え',
   'workspace.focus-toggle-tooltip.enable': '集中モード',
   'workspace.focus-toggle-tooltip.disable': 'Focus Mode を無効化',
-  'workspace.compact-back': 'Branch View に戻る',
+  'workspace.back-to-branch-navigator': 'Branch Navigator に戻る',
   'branches.gone': '消失',
   'branches.dirty': '変更あり',
   'branches.worktree': 'ワークツリー',

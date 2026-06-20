@@ -11,10 +11,7 @@ export const BRANCH_LEVEL_WORKSPACE_PANE_VIEWS = [
   labelKey: string
 }[]
 
-export function branchLevelWorkspacePaneViewButtonId(
-  detailId: string,
-  type: BranchLevelWorkspacePaneView,
-): string {
+export function branchLevelWorkspacePaneViewButtonId(detailId: string, type: BranchLevelWorkspacePaneView): string {
   return `${detailId}-${type}-tab`
 }
 

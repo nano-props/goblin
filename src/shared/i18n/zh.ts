@@ -183,7 +183,7 @@ export const zh: Record<DictKey, string> = {
 
   // ---- Workspace pane views ---------------------------------------------
   'tab.branches': '分支',
-  'tab.branch-detail': '分支详情',
+  'tab.branch-workspace': '分支工作区',
   'tab.status': '状态',
   'tab.changes': '变更',
   'tab.changes-with-count': '变更 · {count}个',
@@ -220,7 +220,7 @@ export const zh: Record<DictKey, string> = {
   'workspace.focus-toggle-label': '切换 Focus Mode',
   'workspace.focus-toggle-tooltip.enable': '专注模式',
   'workspace.focus-toggle-tooltip.disable': '关闭 Focus Mode',
-  'workspace.compact-back': '返回 Branch View',
+  'workspace.back-to-branch-navigator': '返回 Branch Navigator',
   'branches.gone': '已失联',
   'branches.dirty': '有改动',
   'branches.worktree': '工作树',

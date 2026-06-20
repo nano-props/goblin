@@ -4,8 +4,8 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { BranchDetailToolbar } from '#/web/components/branch-detail/BranchDetailToolbar.tsx'
-import { getSelectedBranchDetailPresentation } from '#/web/components/branch-detail/model.ts'
+import { BranchWorkspaceToolbar } from '#/web/components/branch-workspace/BranchWorkspaceToolbar.tsx'
+import { getSelectedBranchWorkspacePresentation } from '#/web/components/branch-workspace/model.ts'
 import {
   TerminalSessionContext,
   TerminalSessionReadContext,
@@ -48,8 +48,8 @@ vi.mock('sonner', () => ({
   },
 }))
 
-const REPO_ID = '/tmp/gbl-branch-detail-toolbar-repo'
-const WORKTREE_PATH = '/tmp/gbl-branch-detail-toolbar-worktree'
+const REPO_ID = '/tmp/gbl-branch-workspace-toolbar-repo'
+const WORKTREE_PATH = '/tmp/gbl-branch-workspace-toolbar-worktree'
 compactUi = false
 
 let container: HTMLDivElement | null = null
@@ -83,7 +83,7 @@ afterEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
-describe('BranchDetailToolbar', () => {
+describe('BranchWorkspaceToolbar', () => {
   test('renders a status tab for a selected branch without a worktree', async () => {
     const showRepoWorkspacePaneView = vi.fn()
     const { container: c, terminalTab } = renderToolbar({
@@ -226,7 +226,7 @@ describe('BranchDetailToolbar', () => {
     })
 
     expect(c.querySelector('button[aria-label="action.menu"]')).toBeNull()
-    expect(c.querySelector('[data-testid="branch-detail-toolbar-divider"]')).toBeNull()
+    expect(c.querySelector('[data-testid="branch-workspace-toolbar-divider"]')).toBeNull()
   })
 
   test('keeps terminal focus when pressing End on the compact terminal view', async () => {
@@ -405,10 +405,7 @@ function renderToolbar(options: {
     useRepoSyncStore.getState().markReady(REPO_ID, 0)
   }
   const branchName = options.worktree === false ? 'feature/no-worktree' : 'feature/worktree'
-  const branch = createRepoBranch(
-    branchName,
-    options.worktree === false ? {} : { worktree: { path: WORKTREE_PATH } },
-  )
+  const branch = createRepoBranch(branchName, options.worktree === false ? {} : { worktree: { path: WORKTREE_PATH } })
   const repo = seedRepoState({
     id: REPO_ID,
     branches: [branch],
@@ -431,7 +428,7 @@ function renderToolbar(options: {
         : [],
     statusLoaded: true,
   })
-  const detail = getSelectedBranchDetailPresentation(repo)
+  const detail = getSelectedBranchWorkspacePresentation(repo)
   const staticWorkspacePaneViews = (options.staticWorkspaceViewTypes ?? []).map((type, index) => ({
     type,
     id: type,
@@ -520,7 +517,7 @@ function renderToolbar(options: {
         <MainWindowNavigationProvider value={options.navigation}>
           <TerminalSessionContext.Provider value={commandContext}>
             <TerminalSessionReadContext.Provider value={readContext}>
-              <BranchDetailToolbar
+              <BranchWorkspaceToolbar
                 repo={repo}
                 detail={detail}
                 detailId="detail"

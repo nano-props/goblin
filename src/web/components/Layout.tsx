@@ -13,8 +13,8 @@ interface ShellProps {
 }
 
 interface RepoWorkspaceProps {
-  branchPane: ReactNode
-  workspacePane: ReactNode
+  branchNavigatorPane: ReactNode
+  branchWorkspacePane: ReactNode
   layout?: RepoWorkspaceLayout
   mode?: RepoWorkspaceMode
   workspacePaneSize?: number
@@ -73,20 +73,20 @@ export function ToolbarTitle({ title, description, after }: ToolbarTitleProps) {
 }
 
 export function RepoWorkspace({
-  branchPane,
-  workspacePane,
+  branchNavigatorPane,
+  branchWorkspacePane,
   layout = DEFAULT_WORKSPACE_LAYOUT,
   mode = 'split',
   workspacePaneSize = DEFAULT_WORKSPACE_PANE_SIZES[layout],
   onWorkspacePaneSizeChange,
 }: RepoWorkspaceProps) {
-  if (mode === 'single-pane') return <div className="flex min-h-0 flex-1">{workspacePane}</div>
+  if (mode === 'single-pane') return <div className="flex min-h-0 flex-1">{branchWorkspacePane}</div>
 
   return (
     <SplitPane
       orientation="horizontal"
-      before={branchPane}
-      after={workspacePane}
+      before={branchNavigatorPane}
+      after={branchWorkspacePane}
       afterSize={workspacePaneSize}
       onAfterSizeChange={onWorkspacePaneSizeChange}
       beforeMinSize={LEFT_RIGHT_BRANCH_MIN_SIZE}

@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { EmptyState } from '#/web/components/Layout.tsx'
-import { PullRequestStatusRow } from '#/web/components/branch-detail/PullRequestStatusRow.tsx'
+import { PullRequestStatusRow } from '#/web/components/branch-workspace/PullRequestStatusRow.tsx'
 import {
   CopyableValue,
   MonoValue,
@@ -19,17 +19,17 @@ import {
   StatusRow,
   StatusRows,
   type Tone,
-} from '#/web/components/branch-detail/status-ui.tsx'
+} from '#/web/components/branch-workspace/status-ui.tsx'
 import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { formatWorktreePath } from '#/web/lib/paths.ts'
 import { remoteRepoTarget } from '#/web/stores/repos/helpers.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { PROTECTED_BRANCHES, branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
-import type { SelectedBranchDetail } from '#/web/components/branch-detail/model.ts'
+import type { SelectedBranchWorkspace } from '#/web/components/branch-workspace/model.ts'
 import type { RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
 interface Props {
-  detail: SelectedBranchDetail
+  detail: SelectedBranchWorkspace
   layout: RepoWorkspaceLayout
 }
 

@@ -9,13 +9,13 @@ import {
 } from '#/web/components/ui/tooltip.tsx'
 import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
 import { cn } from '#/web/lib/cn.ts'
-import { prChipTone, visiblePrHealthSignals, type PrHealthSignal } from '#/web/components/branch-detail/pr-status.ts'
+import { prChipTone, visiblePrHealthSignals, type PrHealthSignal } from '#/web/components/branch-workspace/pr-status.ts'
 import {
   STATUS_INLINE_GROUP_CLASS,
   StatusChip,
   StatusRow,
   type Tone,
-} from '#/web/components/branch-detail/status-ui.tsx'
+} from '#/web/components/branch-workspace/status-ui.tsx'
 import type { PullRequestInfo } from '#/shared/git-types.ts'
 import type { Lang } from '#/shared/api-types.ts'
 type TFn = (key: string, params?: Record<string, string | number>) => string

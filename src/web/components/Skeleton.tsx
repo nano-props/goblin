@@ -11,7 +11,7 @@ import { RepoWorkspace, RepoWorkspacePane, Toolbar } from '#/web/components/Layo
 import { DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 import type { RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
 
-interface BranchListSkeletonProps {
+interface BranchNavigatorSkeletonProps {
   rows?: number
   showBranchActions?: boolean
 }
@@ -25,12 +25,12 @@ interface WorkspaceSkeletonProps {
   singlePane?: boolean
 }
 
-export function BranchListSkeleton({ rows = 6, showBranchActions = false }: BranchListSkeletonProps) {
+export function BranchNavigatorSkeleton({ rows = 6, showBranchActions = false }: BranchNavigatorSkeletonProps) {
   return (
     <SkeletonList
       rows={rows}
       className="flex flex-1 flex-col gap-1 p-1.5"
-      renderRow={(i) => <BranchListSkeletonRow key={i} showActions={showBranchActions} />}
+      renderRow={(i) => <BranchNavigatorSkeletonRow key={i} showActions={showBranchActions} />}
     />
   )
 }
@@ -39,40 +39,41 @@ export function StatusListSkeleton({ rows = 6 }: RowCountProps) {
   return <SkeletonList rows={rows} renderRow={(i) => <StatusListSkeletonRow key={i} />} />
 }
 
-// RepoWorkspaceSkeleton renders the branch list + workspace pane while
+// RepoWorkspaceSkeleton renders the branch navigator + workspace pane while
 // a repo is being hydrated. The per-repo toolbar lives in the Topbar,
 // so the workspace skeleton just shows the panes.
 export function RepoWorkspaceSkeleton({
   layout = DEFAULT_WORKSPACE_LAYOUT,
   singlePane = false,
 }: WorkspaceSkeletonProps) {
-  const workspacePane = (
+  const branchWorkspacePane = (
     <RepoWorkspacePane>
-      <BranchDetailSkeleton layout={layout} />
+      <BranchWorkspaceSkeleton layout={layout} />
     </RepoWorkspacePane>
   )
-  const branchPane = (
+  const branchNavigatorPane = (
     <RepoWorkspacePane>
-      <BranchListSkeleton showBranchActions />
+      <BranchNavigatorSkeleton showBranchActions />
     </RepoWorkspacePane>
   )
 
   if (singlePane) {
-    return <section className="flex min-w-0 flex-1 flex-col">{branchPane}</section>
+    return <section className="flex min-w-0 flex-1 flex-col">{branchNavigatorPane}</section>
   }
 
   return (
     <section className="flex min-w-0 flex-1 flex-col">
-      <RepoWorkspace layout={layout} mode="split" branchPane={branchPane} workspacePane={workspacePane} />
+      <RepoWorkspace
+        layout={layout}
+        mode="split"
+        branchNavigatorPane={branchNavigatorPane}
+        branchWorkspacePane={branchWorkspacePane}
+      />
     </section>
   )
 }
 
-export function BranchDetailSkeleton({
-  layout = DEFAULT_WORKSPACE_LAYOUT,
-}: {
-  layout?: RepoWorkspaceLayout
-}) {
+export function BranchWorkspaceSkeleton({ layout = DEFAULT_WORKSPACE_LAYOUT }: { layout?: RepoWorkspaceLayout }) {
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
       <Toolbar variant="detail">
@@ -105,7 +106,7 @@ function SkeletonList({
   return <ul className={className}>{Array.from({ length: rows }).map((_, i) => renderRow(i))}</ul>
 }
 
-function BranchListSkeletonRow({ showActions }: { showActions: boolean }) {
+function BranchNavigatorSkeletonRow({ showActions }: { showActions: boolean }) {
   return (
     <li
       className={cn(
@@ -119,7 +120,7 @@ function BranchListSkeletonRow({ showActions }: { showActions: boolean }) {
       </div>
       {showActions && (
         <div className="flex shrink-0 items-center pr-4">
-          <div data-testid="branch-list-skeleton-action">
+          <div data-testid="branch-navigator-skeleton-action">
             <Skeleton className="h-7 w-16" />
           </div>
         </div>

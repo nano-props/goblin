@@ -25,14 +25,14 @@ const indexRoute = createRoute({
   getParentRoute: () => layoutRoute,
   path: '/',
   beforeLoad: () => {
-    throw redirect({ to: '/workspace' })
+    throw redirect({ to: '/app' })
   },
 })
 
-const workspaceRoute = createRoute({
+const appRoute = createRoute({
   getParentRoute: () => layoutRoute,
-  path: '/workspace',
-  component: WorkspaceRoute,
+  path: '/app',
+  component: AppRoute,
 })
 
 const settingsIndexRoute = createRoute({
@@ -54,7 +54,7 @@ const settingsRoute = createRoute({
   },
 })
 
-function WorkspaceRoute() {
+function AppRoute() {
   const navigate = useNavigate()
   return (
     <App
@@ -73,14 +73,14 @@ function SettingsRoute() {
     <App
       routeSettingsPage={page as SettingsPage}
       onRouteSettingsPageChange={(nextPage) => {
-        void navigate({ to: nextPage ? `/settings/${nextPage}` : '/workspace' })
+        void navigate({ to: nextPage ? `/settings/${nextPage}` : '/app' })
       }}
     />
   )
 }
 
 const mainRouteTree = rootRoute.addChildren([
-  layoutRoute.addChildren([indexRoute, workspaceRoute, settingsIndexRoute, settingsRoute]),
+  layoutRoute.addChildren([indexRoute, appRoute, settingsIndexRoute, settingsRoute]),
 ])
 
 export const mainRouter = createRouter({

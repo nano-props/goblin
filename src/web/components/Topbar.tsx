@@ -1,17 +1,17 @@
 // Top app bar with embedded tab strip, a per-repo actions group,
 // a large-screen Focus Mode toggle, and a global settings button.
-//   • workspace back — shown before repo tabs only in large-screen
-//     Focus Mode when a branch workspace is selected.
+//   • branch workspace back — shown before repo tabs when compact
+//     navigation or large-screen Focus Mode has opened a branch workspace.
 //   • tab strip (children) — repo tabs + the "open new repo"
 //     popover + the "more" overflow.
 //   • repo actions (when `repoId` is set) — Refresh, the worktree
 //     filter toggle, and the new-worktree action. These used to
-//     live in a dedicated RepoToolbar above the branch list; they
+//     live in a dedicated RepoToolbar above the branch navigator; they
 //     moved up here so the workspace's vertical chrome collapses
-//     to the branch list and workspace pane.
+//     to the branch navigator and workspace pane.
 //   • Focus Mode toggle — hidden in compact mode, because compact
-//     navigation switches between Branch View and Workspace View
-//     inside the workspace itself.
+//     navigation uses the same topbar back affordance to return from
+//     Branch Workspace to Branch Navigator.
 //   • Settings button (always shown) — navigates to the app
 //     settings page.
 //
@@ -49,20 +49,20 @@ export function Topbar({ onOpenSettings, repoId, children }: Props) {
   const workspaceFocused = useReposStore((s) => s.workspaceFocused)
   const selectedBranch = useReposStore((s) => (repoId ? (s.repos[repoId]?.ui.selectedBranch ?? null) : null))
   const clearSelectedBranch = useReposStore((s) => s.clearSelectedBranch)
-  const showWorkspaceBack = !!repoId && !compact && workspaceFocused && !!selectedBranch
+  const showBranchWorkspaceBack = !!repoId && !!selectedBranch && (compact || workspaceFocused)
   return (
     <div
       className="topbar relative flex items-center gap-2 border-b border-separator bg-background text-sm"
       style={{ height: WINDOW_TOPBAR_HEIGHT_PX }}
     >
-      {showWorkspaceBack && (
+      {showBranchWorkspaceBack && (
         <>
           <Button
             variant="ghost"
             size="icon-lg"
             onClick={() => clearSelectedBranch(repoId)}
-            aria-label={t('workspace.compact-back')}
-            title={t('workspace.compact-back')}
+            aria-label={t('workspace.back-to-branch-navigator')}
+            title={t('workspace.back-to-branch-navigator')}
           >
             <ArrowLeft />
           </Button>
@@ -81,11 +81,7 @@ function WorkspaceFocusToggle() {
   const t = useT()
   const workspaceFocused = useReposStore((s) => s.workspaceFocused)
   const toggleWorkspaceFocused = useReposStore((s) => s.toggleWorkspaceFocused)
-  const label = t(
-    workspaceFocused
-      ? 'workspace.focus-toggle-tooltip.disable'
-      : 'workspace.focus-toggle-tooltip.enable',
-  )
+  const label = t(workspaceFocused ? 'workspace.focus-toggle-tooltip.disable' : 'workspace.focus-toggle-tooltip.enable')
   return (
     <Tip label={label}>
       <Button
@@ -96,8 +92,7 @@ function WorkspaceFocusToggle() {
         aria-label={t('workspace.focus-toggle-label')}
         title={label}
         className={cn(
-          workspaceFocused &&
-            'bg-accent text-accent-foreground shadow-xs hover:bg-accent hover:text-accent-foreground',
+          workspaceFocused && 'bg-accent text-accent-foreground shadow-xs hover:bg-accent hover:text-accent-foreground',
         )}
       >
         <PanelLeft />
