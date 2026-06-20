@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import type { ILinkHandler } from '@xterm/xterm'
 import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { ManagedTerminalSession } from '#/web/components/terminal/ManagedTerminalSession.ts'
 import { terminalLog } from '#/web/logger.ts'
@@ -51,6 +52,7 @@ const xtermMocks = vi.hoisted(() => {
       fontFamily?: string
       fontSize?: number
       lineHeight?: number
+      linkHandler?: ILinkHandler
       macOptionIsMeta?: boolean
       minimumContrastRatio?: number
       rescaleOverlappingGlyphs?: boolean
@@ -105,6 +107,7 @@ const xtermMocks = vi.hoisted(() => {
       fontFamily?: string
       fontSize?: number
       lineHeight?: number
+      linkHandler?: ILinkHandler
       macOptionIsMeta?: boolean
       minimumContrastRatio?: number
       rescaleOverlappingGlyphs?: boolean
@@ -120,6 +123,7 @@ const xtermMocks = vi.hoisted(() => {
         fontFamily: options.fontFamily,
         fontSize: options.fontSize,
         lineHeight: options.lineHeight,
+        linkHandler: options.linkHandler,
         macOptionIsMeta: options.macOptionIsMeta,
         minimumContrastRatio: options.minimumContrastRatio,
         rescaleOverlappingGlyphs: options.rescaleOverlappingGlyphs,
@@ -934,6 +938,27 @@ describe('ManagedTerminalSession', () => {
     await Promise.resolve()
 
     expect(shellOpenExternalUrl).toHaveBeenCalledWith({ url: 'https://example.com/path', allowHttp: true })
+  })
+
+  test('opens OSC 8 hyperlinks through the safe shell bridge', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+    const event = new MouseEvent('click', { cancelable: true })
+    xtermMocks.terminals[0]!.options.linkHandler!.activate(event, 'https://example.com/osc8', {
+      start: { x: 1, y: 1 },
+      end: { x: 10, y: 1 },
+    })
+    await Promise.resolve()
+
+    expect(event.defaultPrevented).toBe(true)
+    expect(xtermMocks.terminals[0]!.options.linkHandler!.allowNonHttpProtocols).toBe(false)
+    expect(shellOpenExternalUrl).toHaveBeenCalledWith({ url: 'https://example.com/osc8', allowHttp: true })
   })
 
   test('does not send unsafe web links to the app ipc', async () => {
