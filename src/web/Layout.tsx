@@ -10,7 +10,8 @@ import { RepoOpenDialog } from '#/web/components/RepoOpenDialog.tsx'
 import { OpenRemoteRepositoryDialog } from '#/web/components/OpenRemoteRepositoryDialog.tsx'
 import { RepoDropOverlay } from '#/web/components/RepoDropOverlay.tsx'
 import { Toaster } from '#/web/components/ui/sonner.tsx'
-import { useAppBootstrap } from '#/web/hooks/useAppBootstrap.ts'
+import { useAuthenticatedAppBootstrap } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
+import { usePublicAppBootstrap } from '#/web/hooks/usePublicAppBootstrap.ts'
 import { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
 import { useBackgroundFetch } from '#/web/hooks/useBackgroundFetch.ts'
 import { useNetworkReconnect } from '#/web/hooks/useNetworkReconnect.ts'
@@ -36,12 +37,8 @@ export function Layout() {
   const location = useRouterState({ select: (s) => s.location })
   const isSettingsOpen = location.pathname.startsWith('/settings')
 
-  useAppBootstrap()
-  useSessionPersistence()
+  usePublicAppBootstrap()
   useSettingsWriteErrorToast()
-  useBackgroundFetch()
-  useRepoStatusRefresh()
-  useNetworkReconnect()
 
   const overlays = useAppOverlays()
   const modalOpen = overlays.anyOpen
@@ -163,6 +160,11 @@ function MainWindowOverlays({ overlays, repoDrop }: MainWindowOverlaysProps) {
  * other subtree needs the same set of subscriptions.
  */
 function AuthenticatedSideEffects(): null {
+  useAuthenticatedAppBootstrap()
+  useSessionPersistence()
+  useBackgroundFetch()
+  useRepoStatusRefresh()
+  useNetworkReconnect()
   useRepoStoreInvalidationRefresh()
   useSettingsQueryInvalidationSync()
   return null

@@ -45,7 +45,7 @@ describe('renderer bootstrap seeding', () => {
     // seed itself synchronously. The server no longer inlines i18n
     // into HTML, so the store always starts with the default
     // English / auto / empty-dict placeholder. `hydrate()` (called
-    // by useAppBootstrap) populates it from `/api/i18n`.
+    // by the public bootstrap hook) populates it from `/api/i18n`.
     expect(useI18nStore.getState()).toMatchObject({
       lang: 'en',
       pref: 'auto',

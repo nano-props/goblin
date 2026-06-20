@@ -31,8 +31,8 @@ export function settingsSnapshotQueryOptions() {
     queryKey: settingsSnapshotQueryKey(),
     queryFn: getSettingsSnapshot,
     // No initial data from the bootstrap — the server no longer
-    // inlines it. The query starts pending and the first hydrate
-    // pass (useAppBootstrap.hydrate) populates the cache.
+    // inlines it. The query starts pending and the authenticated
+    // bootstrap pass populates the cache.
     staleTime: 0,
     gcTime: 5 * 60_000,
   })
