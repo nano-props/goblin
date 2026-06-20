@@ -164,7 +164,10 @@ export function BranchDetailToolbar({ repo, detail, detailId, onBack }: Props) {
     [reorderWorkspacePaneViews],
   )
 
-  const labelForWorkspacePaneView = useCallback((tab: WorkspacePaneViewSummary) => branchWorkspacePaneViewLabel(tab, t), [t])
+  const labelForWorkspacePaneView = useCallback(
+    (tab: WorkspacePaneViewSummary) => branchWorkspacePaneViewLabel(tab, t, detail.statusCount),
+    [detail.statusCount, t],
+  )
   const tooltipForWorkspacePaneView = useCallback(
     (tab: WorkspacePaneViewSummary) =>
       branchWorkspacePaneViewTooltip({

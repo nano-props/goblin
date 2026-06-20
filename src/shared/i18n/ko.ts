@@ -195,6 +195,7 @@ export const ko: Record<DictKey, string> = {
   'tab.branch-detail': '브랜치 세부 정보',
   'tab.status': '상태',
   'tab.changes': '변경',
+  'tab.changes-with-count': '변경 · {count}개',
   'tab.log': '로그',
   'tab.terminal': '터미널',
   'tab.fetching': '동기화',

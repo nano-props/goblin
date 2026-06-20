@@ -3,9 +3,12 @@ import { isTerminalWorkspacePaneView } from '#/web/components/workspace-pane/wor
 
 type T = (key: string, params?: Record<string, string | number>) => string
 
-export function branchWorkspacePaneViewLabel(tab: WorkspacePaneViewSummary, t: T): string {
+export function branchWorkspacePaneViewLabel(tab: WorkspacePaneViewSummary, t: T, statusCount?: number): string {
   if (tab.type === 'status') return t('tab.status')
-  if (tab.type === 'changes') return t('tab.changes')
+  if (tab.type === 'changes') {
+    if (statusCount && statusCount > 0) return t('tab.changes-with-count', { count: statusCount })
+    return t('tab.changes')
+  }
   if (!isTerminalWorkspacePaneView(tab)) return tab.type
   return tab.title
 }

@@ -207,6 +207,7 @@ export const en = {
   'tab.branch-detail': 'Branch detail',
   'tab.status': 'Status',
   'tab.changes': 'Changes',
+  'tab.changes-with-count': 'Changes · {count}',
   'tab.log': 'Log',
   'tab.terminal': 'Terminal',
   'tab.fetching': 'fetch',
