@@ -135,16 +135,7 @@ describe('RepoView workspace navigation', () => {
 
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBe('feature/a')
     expect(branchList()).toBeNull()
-    expect(branchDetail()?.dataset.hasBack).toBe('true')
-
-    act(() => {
-      backButton()?.click()
-    })
-
-    expect(useReposStore.getState().workspaceFocused).toBe(true)
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBeNull()
-    expect(branchList()).not.toBeNull()
-    expect(branchDetail()).toBeNull()
+    expect(branchDetail()?.dataset.hasBack).toBe('false')
   })
 
   test('compact branch activation and back keep Branch View unselected', () => {

@@ -70,7 +70,7 @@ export function RepoView({ repoId }: Props) {
       <BranchDetail
         repoId={repoId}
         layout={layout}
-        onBack={behavior.singlePane ? handleBackToBranchView : undefined}
+        onBack={compact ? handleBackToBranchView : undefined}
       />
     </RepoWorkspacePane>
   )

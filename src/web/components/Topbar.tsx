@@ -1,7 +1,9 @@
 // Top app bar with embedded tab strip, a per-repo actions group,
 // a large-screen Focus Mode toggle, and a global settings button.
+//   • workspace back — shown before repo tabs only in large-screen
+//     Focus Mode when a branch workspace is selected.
 //   • tab strip (children) — repo tabs + the "open new repo"
-//     dropdown + the "more" overflow.
+//     popover + the "more" overflow.
 //   • repo actions (when `repoId` is set) — Refresh, the worktree
 //     filter toggle, and the new-worktree action. These used to
 //     live in a dedicated RepoToolbar above the branch list; they
@@ -23,7 +25,7 @@
 // (set globally on `button` and any element with `data-interactive`).
 
 import type { ReactNode } from 'react'
-import { PanelLeft, Settings } from 'lucide-react'
+import { ArrowLeft, PanelLeft, Settings } from 'lucide-react'
 import { useT } from '#/web/stores/i18n.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { RepoToolbarActions } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
@@ -43,11 +45,30 @@ interface Props {
 
 export function Topbar({ onOpenSettings, repoId, children }: Props) {
   const compact = useIsCompactUi()
+  const t = useT()
+  const workspaceFocused = useReposStore((s) => s.workspaceFocused)
+  const selectedBranch = useReposStore((s) => (repoId ? (s.repos[repoId]?.ui.selectedBranch ?? null) : null))
+  const clearSelectedBranch = useReposStore((s) => s.clearSelectedBranch)
+  const showWorkspaceBack = !!repoId && !compact && workspaceFocused && !!selectedBranch
   return (
     <div
       className="topbar relative flex items-center gap-2 border-b border-separator bg-background text-sm"
       style={{ height: WINDOW_TOPBAR_HEIGHT_PX }}
     >
+      {showWorkspaceBack && (
+        <>
+          <Button
+            variant="ghost"
+            size="icon-lg"
+            onClick={() => clearSelectedBranch(repoId)}
+            aria-label={t('workspace.compact-back')}
+            title={t('workspace.compact-back')}
+          >
+            <ArrowLeft />
+          </Button>
+          <div aria-hidden="true" className="h-5 w-px shrink-0 bg-separator" />
+        </>
+      )}
       {children}
       {repoId && <RepoToolbarActions repoId={repoId} />}
       {repoId && !compact && <WorkspaceFocusToggle />}

@@ -118,7 +118,7 @@ describe('RepoTabStrip', () => {
     expect(document.body.querySelector('button[aria-label="More"]')).not.toBeNull()
   })
 
-  test('keeps repo tab chrome passive while leaving close action in the repo switcher popover', async () => {
+  test('keeps repo tab chrome borderless with hover while leaving close action in the repo switcher popover', async () => {
     render(
       <RepoTabStrip
         repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
@@ -137,11 +137,15 @@ describe('RepoTabStrip', () => {
     if (!(tab instanceof HTMLButtonElement)) throw new Error('missing repo tab')
 
     const tabChrome = tab.closest('[role="presentation"]')
-    expect(tabChrome?.className).not.toContain('hover:')
+    expect(tabChrome?.className).toContain('border-transparent')
+    expect(tabChrome?.className).not.toContain('border-separator')
+    expect(tabChrome?.className).toContain('hover:bg-accent/70')
+    expect(tabChrome?.className).toContain('hover:text-foreground')
     expect(tabChrome?.querySelector('button[aria-label="Close repo-a"]')).toBeNull()
 
     const trigger = document.body.querySelector('button[aria-label="More"]')
     if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing more trigger')
+    expect(trigger.parentElement?.querySelector(':scope > .pointer-events-none.border-l.border-separator')).not.toBeNull()
 
     await act(async () => {
       trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
@@ -149,7 +153,10 @@ describe('RepoTabStrip', () => {
       await Promise.resolve()
     })
 
-    expect(document.body.querySelector('button[aria-label="Close repo-a"]')).not.toBeNull()
+    const closeButton = document.body.querySelector('button[aria-label="Close repo-a"]')
+    expect(closeButton).not.toBeNull()
+    expect(closeButton?.className).not.toContain('opacity-0')
+    expect(closeButton?.className).not.toContain('group-hover:opacity-100')
   })
 })
 

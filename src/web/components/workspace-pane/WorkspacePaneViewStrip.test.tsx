@@ -132,7 +132,11 @@ describe('WorkspacePaneViewStrip', () => {
     expect(selectedItem).not.toBeNull()
     expect(selectedItem?.className).toContain('bg-selected')
     expect(document.body.textContent).toContain('terminal.new')
-    expect(document.body.querySelector('button[aria-label="close term-2"]')).not.toBeNull()
+    const list = document.body.querySelector('[role="list"]')
+    const closeButton = list?.querySelector('button[aria-label="close term-2"]')
+    expect(closeButton).not.toBeNull()
+    expect(closeButton?.className).not.toContain('opacity-0')
+    expect(closeButton?.className).not.toContain('group-hover:opacity-100')
   })
 
   test('collapsed terminal view only navigates out on arrow keys', () => {

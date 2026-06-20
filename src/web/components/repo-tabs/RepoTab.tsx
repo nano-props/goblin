@@ -72,7 +72,6 @@ export function RepoTab({
         active: isActive,
         dragging: sortable.isDragging,
         compact,
-        hoverable: false,
       })}
       overlay={
         showSeparator ? (

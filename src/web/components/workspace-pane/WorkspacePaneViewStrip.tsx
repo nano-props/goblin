@@ -178,7 +178,7 @@ function WorkspacePaneViewSwitcherPopover({
                     type="button"
                     size="icon-sm"
                     variant="ghost"
-                    className="absolute right-1 top-1/2 size-6 -translate-y-1/2 text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                    className="absolute right-1 top-1/2 size-6 -translate-y-1/2 text-muted-foreground"
                     onPointerDown={(event) => event.stopPropagation()}
                     onClick={(event) => onClose(event, identity)}
                     title={getCloseLabel(tab)}

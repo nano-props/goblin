@@ -30,7 +30,7 @@ export function toolbarTabChromeClassName(options: {
       ? active && !treatAsUnselected
         ? 'border-input bg-card text-foreground'
         : compact
-          ? cn('border-separator text-muted-foreground', hoverable && 'hover:bg-accent/70 hover:text-foreground')
+          ? cn('border-transparent text-muted-foreground', hoverable && 'hover:bg-accent/70 hover:text-foreground')
           : cn('border-transparent text-muted-foreground', hoverable && 'hover:bg-accent/70 hover:text-foreground')
       : active
         ? 'border-transparent bg-selected text-selected-foreground'

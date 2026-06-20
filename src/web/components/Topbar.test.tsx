@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { Topbar } from '#/web/components/Topbar.tsx'
-import { resetReposStore } from '#/web/stores/repos/test-utils.ts'
+import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 
 const responsiveMocks = vi.hoisted(() => ({
@@ -95,6 +95,52 @@ describe('Topbar', () => {
 
     expect(focusModeToggle()).toBeNull()
   })
+
+  test('renders large-screen workspace back before repo tabs while focused on a selected branch', () => {
+    seedRepoState({
+      id: '/tmp/repo',
+      branches: [createRepoBranch('main'), createRepoBranch('feature/a')],
+      selectedBranch: 'feature/a',
+    })
+    useReposStore.getState().setWorkspaceFocused(true)
+
+    render(
+      <Topbar repoId="/tmp/repo" onOpenSettings={() => {}}>
+        <div data-testid="repo-tabs" />
+      </Topbar>,
+    )
+
+    const back = workspaceBackButton()
+    const repoTabs = container?.querySelector('[data-testid="repo-tabs"]')
+    expect(back).not.toBeNull()
+    expect(back?.nextElementSibling?.className).toContain('bg-separator')
+    expect(back?.nextElementSibling?.nextElementSibling).toBe(repoTabs)
+
+    act(() => {
+      back?.click()
+    })
+
+    expect(useReposStore.getState().workspaceFocused).toBe(true)
+    expect(useReposStore.getState().repos['/tmp/repo']?.ui.selectedBranch).toBeNull()
+  })
+
+  test('hides large-screen workspace back on compact screens', () => {
+    responsiveMocks.compact = true
+    seedRepoState({
+      id: '/tmp/repo',
+      branches: [createRepoBranch('main'), createRepoBranch('feature/a')],
+      selectedBranch: 'feature/a',
+    })
+    useReposStore.getState().setWorkspaceFocused(true)
+
+    render(
+      <Topbar repoId="/tmp/repo" onOpenSettings={() => {}}>
+        <div data-testid="repo-tabs" />
+      </Topbar>,
+    )
+
+    expect(workspaceBackButton()).toBeNull()
+  })
 })
 
 function render(element: ReactNode) {
@@ -109,4 +155,8 @@ function focusModeToggle(): HTMLButtonElement | null {
 
 function settingsButton(): HTMLButtonElement | null {
   return container?.querySelector('button[aria-label="topbar.settings"]') ?? null
+}
+
+function workspaceBackButton(): HTMLButtonElement | null {
+  return container?.querySelector('button[aria-label="workspace.compact-back"]') ?? null
 }
