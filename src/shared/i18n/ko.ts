@@ -67,6 +67,7 @@ export const ko: Record<DictKey, string> = {
   'topbar.open': '열기',
   'topbar.menu': '메뉴',
   'topbar.settings': '설정 (⌘,)',
+  'topbar.settings-tooltip': '설정',
 
   // ---- Dependencies ------------------------------------------------------
 

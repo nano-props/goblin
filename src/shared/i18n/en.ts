@@ -77,6 +77,7 @@ export const en = {
   'topbar.open': 'Open',
   'topbar.menu': 'Menu',
   'topbar.settings': 'Settings (⌘,)',
+  'topbar.settings-tooltip': 'Settings',
 
   // ---- Dependencies -------------------------------------------------------
 

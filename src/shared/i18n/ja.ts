@@ -74,6 +74,7 @@ export const ja: Record<DictKey, string> = {
   'topbar.open': '開く',
   'topbar.menu': 'メニュー',
   'topbar.settings': '設定 (⌘,)',
+  'topbar.settings-tooltip': '設定',
 
   // ---- Dependencies ------------------------------------------------------
 

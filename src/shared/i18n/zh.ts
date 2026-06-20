@@ -66,13 +66,14 @@ export const zh: Record<DictKey, string> = {
   'topbar.open': '打开',
   'topbar.menu': '菜单',
   'topbar.settings': '设置 (⌘,)',
+  'topbar.settings-tooltip': '设置',
 
   // ---- Dependencies ------------------------------------------------------
 
   // ---- Repository tabs ---------------------------------------------------
   'repo-tabs.repos': '仓库',
   'repo-tabs.close-named': '关闭 {name}',
-  'repo-tabs.more': '其他标签',
+  'repo-tabs.more': '所有仓库',
   'repo-tabs.open-local': '打开本地仓库…',
   'repo-tabs.open-remote': '打开远程仓库…',
   'repo-tabs.open-title': '打开本地仓库',
@@ -214,10 +215,10 @@ export const zh: Record<DictKey, string> = {
   'branches.switch': '切换分支',
   'branches.filter.all': '全部',
   'branches.filter.worktrees': '工作树',
-  'branches.filter-tooltip.all': '全部',
-  'branches.filter-tooltip.worktrees': '工作树',
+  'branches.filter-tooltip.all': '全部分支',
+  'branches.filter-tooltip.worktrees': '工作树分支',
   'workspace.focus-toggle-label': '切换 Focus Mode',
-  'workspace.focus-toggle-tooltip.enable': '开启 Focus Mode',
+  'workspace.focus-toggle-tooltip.enable': '专注模式',
   'workspace.focus-toggle-tooltip.disable': '关闭 Focus Mode',
   'workspace.compact-back': '返回 Branch View',
   'branches.gone': '已失联',
@@ -377,7 +378,7 @@ export const zh: Record<DictKey, string> = {
   'action.confirm-force-delete-branch-note': '无法确认这个本地分支已安全合并，且上游可能已失联。',
   'action.confirm-force-delete-branch-confirm': '删除工作树并强制删除分支',
   'action.create-worktree': '新工作树',
-  'action.create-worktree-title': '创建新工作树',
+  'action.create-worktree-title': '新工作树',
   'action.create-worktree-creating-title': '正在创建工作树…',
   'action.create-worktree-queued-title': '等待创建工作树…',
   'action.create-worktree-hint': '选择工作树创建方式，然后选择分支或远程引用。',
