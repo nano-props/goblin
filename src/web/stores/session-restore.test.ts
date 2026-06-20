@@ -21,7 +21,6 @@ function installBridge(sessionOverrides: Record<string, unknown> = {}) {
             shortcutsDisabled: false,
             globalShortcutDisabled: false,
             swapCloseShortcuts: false,
-            toggleDetailOnActionBarBlankClick: false,
             globalShortcut: 'CommandOrControl+Shift+G',
             globalShortcutRegistered: false,
             terminalApp: 'auto',
@@ -30,10 +29,8 @@ function installBridge(sessionOverrides: Record<string, unknown> = {}) {
             session: {
               openRepos: [],
               activeRepo: null,
-              detailCollapsed: true,
-              detailFocusMode: false,
-              workspaceLayout: 'top-bottom',
-              detailPaneSizes: { 'top-bottom': 0.5, 'left-right': 0.5 },
+              branchListPaneVisible: true,
+              workspacePaneSizes: { 'left-right': 0.5 },
               selectedTerminalByWorktree: {},
               ...sessionOverrides,
             },
@@ -78,7 +75,7 @@ describe('session restore store', () => {
     expect(useSessionRestoreStore.getState().bootSessionSnapshot).toMatchObject({
       openRepos: [],
       activeRepo: null,
-      workspaceLayout: 'top-bottom',
+      workspacePaneSizes: { 'left-right': 0.5 },
     })
   })
 
@@ -86,8 +83,8 @@ describe('session restore store', () => {
     installBridge({
       openRepos: [{ kind: 'local', id: '/tmp/repo' }],
       activeRepo: '/tmp/repo',
-      workspaceLayout: 'left-right',
-      detailPaneSizes: { 'top-bottom': 0.5, 'left-right': 0.4 },
+      branchListPaneVisible: false,
+      workspacePaneSizes: { 'left-right': 0.4 },
     })
 
     await useSessionRestoreStore.getState().hydrate()
@@ -95,13 +92,15 @@ describe('session restore store', () => {
     expect(useSessionRestoreStore.getState().consumeBootSessionSnapshot()).toMatchObject({
       openRepos: [{ kind: 'local', id: '/tmp/repo' }],
       activeRepo: '/tmp/repo',
-      workspaceLayout: 'left-right',
+      branchListPaneVisible: false,
+      workspacePaneSizes: { 'left-right': 0.4 },
     })
     expect(useSessionRestoreStore.getState().bootSessionSnapshot).toBeNull()
     expect(useSessionRestoreStore.getState().consumeBootSessionSnapshot()).toMatchObject({
       openRepos: [],
       activeRepo: null,
-      workspaceLayout: 'left-right',
+      branchListPaneVisible: true,
+      workspacePaneSizes: { 'left-right': 61.8 },
     })
   })
 })

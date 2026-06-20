@@ -1,14 +1,11 @@
-import { ArrowUp, Minus } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
-import { useStoreWithEqualityFn } from 'zustand/traditional'
-import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { Toolbar } from '#/web/components/Layout.tsx'
 import { cn } from '#/web/lib/cn.ts'
-import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 import { terminalLog } from '#/web/logger.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import { useWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-store.ts'
@@ -33,36 +30,23 @@ import {
   branchWorkspacePaneViewLabel,
   branchWorkspacePaneViewTooltip,
 } from '#/web/components/branch-detail/workspace-pane-views.ts'
-import { useRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useEffectiveWorkspacePaneView } from '#/web/components/branch-detail/useEffectiveWorkspacePaneView.ts'
 import { useIsInitialSyncInFlight } from '#/web/stores/repo-sync.ts'
-import {
-  branchDetailToolbarStoreActionsEqual,
-  branchDetailToolbarStoreActionsFromStore,
-} from '#/web/stores/repos/selector-actions.ts'
 interface Props {
   repo: Pick<BranchDetailRepo, 'id' | 'ui' | 'data'>
   detail: SelectedBranchDetailPresentation
   detailId: string
   contentId: string
-  collapsed: boolean
-  detailFocusMode: boolean
   layout: RepoWorkspaceLayout
+  onBack?: () => void
 }
 
-export function BranchDetailToolbar({ repo, detail, detailId, contentId, collapsed, detailFocusMode, layout }: Props) {
+export function BranchDetailToolbar({ repo, detail, detailId, onBack }: Props) {
   const t = useT()
-  const { setDetailCollapsed, toggleDetailCollapsed } = useStoreWithEqualityFn(
-    useReposStore,
-    branchDetailToolbarStoreActionsFromStore,
-    branchDetailToolbarStoreActionsEqual,
-  )
   const navigation = useMainWindowNavigation()
-  const { shortcutsDisabled, toggleDetailOnActionBarBlankClick } = useRuntimeShortcutSettings()
   const compact = useIsCompactUi()
-  const behavior = repoWorkspaceBehavior(layout, collapsed, detailFocusMode)
   const effectiveTab = useEffectiveWorkspacePaneView(repo)
   // T6.1: while the first server-side session list for this repo is
   // in flight, render skeleton placeholder chips in the tab strip.
@@ -85,7 +69,7 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
   const worktreeSnapshot = useWorktreeTerminalSnapshot(terminalWorktreeKey)
   const terminalSessions = worktreeSnapshot.sessions
   const activeTabIdentity = activeWorkspacePaneViewIdentity(worktreeSnapshot.workspacePaneViews, effectiveTab)
-  const detailPaneTabFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()
+  const workspacePaneTabFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()
 
   const terminalBase = useMemo<TerminalSessionBase | null>(
     () =>
@@ -105,8 +89,7 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
     if (repo.ui.preferredWorkspacePaneView !== 'terminal') {
       navigation.showRepoWorkspacePaneView(repo.id, 'terminal')
     }
-    setDetailCollapsed(false)
-  }, [navigation, repo.id, repo.ui.preferredWorkspacePaneView, setDetailCollapsed])
+  }, [navigation, repo.id, repo.ui.preferredWorkspacePaneView])
 
   const handleNewTerminal = useCallback(() => {
     if (!terminalBase) return
@@ -126,9 +109,8 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
         return
       }
       navigation.showRepoWorkspacePaneView(repo.id, tab.type)
-      setDetailCollapsed(false)
     },
-    [enterTerminalTab, navigation, repo.id, selectTerminal, setDetailCollapsed],
+    [enterTerminalTab, navigation, repo.id, selectTerminal],
   )
 
   const handleScrollToBottom = useCallback(
@@ -210,22 +192,25 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
         : effectiveTab === 'status' || effectiveTab === 'changes'
           ? staticWorkspacePaneViewIdentity(effectiveTab)
           : EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY
-    detailPaneTabFocusRegistry.focus(key)
+    workspacePaneTabFocusRegistry.focus(key)
   }
-
-  const detailToggleTitle = t(
-    shortcutsDisabled
-      ? collapsed
-        ? 'branch-detail.expand'
-        : 'branch-detail.collapse'
-      : collapsed
-        ? 'branch-detail.expand-title'
-        : 'branch-detail.collapse-title',
-  )
 
   return (
     <Toolbar variant="detail">
       <div className="flex h-full min-w-0 items-center gap-1 overflow-hidden">
+        {onBack && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onBack}
+            aria-label={t('workspace.compact-back')}
+            title={t('workspace.compact-back')}
+            className="shrink-0"
+          >
+            <ArrowLeft />
+          </Button>
+        )}
+        {onBack && terminalWorktreeKey && <div aria-hidden="true" className="h-5 w-px shrink-0 bg-separator" />}
         {terminalWorktreeKey && (
           <WorkspacePaneViewStrip
             worktreeTerminalKey={terminalWorktreeKey}
@@ -233,9 +218,8 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
             detailId={detailId}
             activeTabIdentity={activeTabIdentity}
             responsiveCompact={compact}
-            panelActive={!collapsed}
-            focusMode={detailFocusMode}
-            focusRegistry={detailPaneTabFocusRegistry}
+            panelActive
+            focusRegistry={workspacePaneTabFocusRegistry}
             emptyFocusKey={EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY}
             // T6.1: while the first server-side session list is in
             // flight (mount or repo switch), show a single placeholder
@@ -252,7 +236,6 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
             getCloseLabel={closeLabelForWorkspacePaneView}
             onNavigateOut={(direction) => {
               if (direction === 'first' || direction === 'last') focusActiveWorkspacePaneView()
-              setDetailCollapsed(false)
             }}
           />
         )}
@@ -260,26 +243,7 @@ export function BranchDetailToolbar({ repo, detail, detailId, contentId, collaps
       <div
         aria-hidden="true"
         className={cn('min-w-2 flex-1 self-stretch', compact && 'hidden')}
-        onClick={
-          behavior.detailCollapseAllowed && toggleDetailOnActionBarBlankClick ? toggleDetailCollapsed : undefined
-        }
       />
-      <div className="flex shrink-0 items-center gap-1">
-        {layout === 'top-bottom' && <div className="mx-1 h-4 w-px bg-separator/70" aria-hidden="true" />}
-        {behavior.detailCollapseAllowed && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleDetailCollapsed}
-            aria-label={t(collapsed ? 'branch-detail.expand' : 'branch-detail.collapse')}
-            title={detailToggleTitle}
-            aria-expanded={!collapsed}
-            aria-controls={collapsed ? undefined : contentId}
-          >
-            {collapsed ? <ArrowUp /> : <Minus />}
-          </Button>
-        )}
-      </div>
     </Toolbar>
   )
 }

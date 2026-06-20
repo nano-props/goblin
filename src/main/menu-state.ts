@@ -1,4 +1,3 @@
-import { DEFAULT_WORKSPACE_LAYOUT, normalizeWorkspaceLayout, type WorkspaceLayout } from '#/shared/workspace-layout.ts'
 import type { LangPref } from '#/shared/api-types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 
@@ -7,7 +6,6 @@ export interface MenuRuntimeState {
   shortcutsDisabled: boolean
   swapCloseShortcuts: boolean
   langPref: LangPref
-  workspaceLayout: WorkspaceLayout
 }
 
 const DEFAULT_MENU_RUNTIME_STATE: MenuRuntimeState = {
@@ -15,7 +13,6 @@ const DEFAULT_MENU_RUNTIME_STATE: MenuRuntimeState = {
   shortcutsDisabled: false,
   swapCloseShortcuts: false,
   langPref: 'auto',
-  workspaceLayout: DEFAULT_WORKSPACE_LAYOUT,
 }
 
 let state: MenuRuntimeState = { ...DEFAULT_MENU_RUNTIME_STATE }
@@ -26,8 +23,6 @@ function nextMenuRuntimeState(base: MenuRuntimeState, next: Partial<MenuRuntimeS
     shortcutsDisabled: next.shortcutsDisabled ?? base.shortcutsDisabled,
     swapCloseShortcuts: next.swapCloseShortcuts ?? base.swapCloseShortcuts,
     langPref: next.langPref ?? base.langPref,
-    workspaceLayout:
-      next.workspaceLayout === undefined ? base.workspaceLayout : normalizeWorkspaceLayout(next.workspaceLayout),
   }
 }
 
@@ -41,7 +36,6 @@ export function readMenuRuntimeState(): MenuRuntimeState {
     shortcutsDisabled: state.shortcutsDisabled,
     swapCloseShortcuts: state.swapCloseShortcuts,
     langPref: state.langPref,
-    workspaceLayout: state.workspaceLayout,
   }
 }
 

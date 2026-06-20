@@ -585,11 +585,10 @@ describe('WorkspacePaneViewStrip', () => {
 function TestWorkspacePaneViewStrip(props: {
   worktreeTerminalKey: string
   sessions: TerminalSessionSummary[]
-  detailId: string
-  responsiveCompact?: boolean
-  panelActive?: boolean
-  focusMode?: boolean
-  isLoading?: boolean
+	  detailId: string
+	  responsiveCompact?: boolean
+	  panelActive?: boolean
+	  isLoading?: boolean
   onNew: () => void
   onSelect: (worktreeTerminalKey: string, tab: WorkspacePaneViewSummary) => void
   onScrollToBottom: (key: string) => void
@@ -598,10 +597,10 @@ function TestWorkspacePaneViewStrip(props: {
   onNavigateOut?: (direction: 'prev' | 'next' | 'first' | 'last') => void
 }) {
   const selected = props.sessions.find((candidate) => candidate.selected) ?? props.sessions[0]
-  const { sessions, ...detailPaneProps } = props
+  const { sessions, ...workspacePaneProps } = props
   return (
     <WorkspacePaneViewStrip
-      {...detailPaneProps}
+      {...workspacePaneProps}
       views={sessions}
       activeTabIdentity={selected ? terminalWorkspacePaneViewIdentity(selected.key) : null}
       getTooltip={(tab) => ('originalTitle' in tab ? (tab.originalTitle ?? tab.fullTitle ?? tab.title) : tab.id)}

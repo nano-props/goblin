@@ -21,10 +21,8 @@ describe('restorable-workspace-state', () => {
         restorableWorkspaceState: {
           order: [repo.id],
           activeId: repo.id,
-          detailCollapsed: false,
-          detailFocusMode: true,
-          workspaceLayout: 'left-right',
-          detailPaneSizes: { 'top-bottom': 45, 'left-right': 55 },
+          branchListPaneVisible: false,
+          workspacePaneSizes: { 'left-right': 55 },
           selectedTerminalByWorktree: {
             '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2',
           },
@@ -34,10 +32,8 @@ describe('restorable-workspace-state', () => {
     ).toEqual({
       openRepos: [localRepoSessionEntry('/tmp/repo')],
       activeRepo: '/tmp/repo',
-      detailCollapsed: false,
-      detailFocusMode: true,
-      workspaceLayout: 'left-right',
-      detailPaneSizes: { 'top-bottom': 45, 'left-right': 55 },
+      branchListPaneVisible: false,
+      workspacePaneSizes: { 'left-right': 55 },
       selectedTerminalByWorktree: {
         '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2',
       },
@@ -50,20 +46,16 @@ describe('restorable-workspace-state', () => {
       restoreRestorableWorkspaceStateFromSession({
         openRepos: [localRepoSessionEntry('/tmp/repo')],
         activeRepo: '/tmp/repo',
-        detailCollapsed: true,
-        detailFocusMode: false,
-        workspaceLayout: 'top-bottom',
-        detailPaneSizes: { 'top-bottom': 60, 'left-right': 40 },
+        branchListPaneVisible: false,
+        workspacePaneSizes: { 'left-right': 40 },
         selectedTerminalByWorktree: {
           '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-1',
         },
       }),
     ).toEqual({
       activeId: '/tmp/repo',
-      detailCollapsed: true,
-      detailFocusMode: false,
-      workspaceLayout: 'top-bottom',
-      detailPaneSizes: { 'top-bottom': 60, 'left-right': 40 },
+      branchListPaneVisible: false,
+      workspacePaneSizes: { 'left-right': 40 },
       selectedTerminalByWorktree: {
         '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-1',
       },

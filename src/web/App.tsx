@@ -25,9 +25,6 @@ export function App({ routeSettingsPage = null, onRouteSettingsPageChange }: App
   const overlayActions = useContext(LayoutOverlayActions)!
   const activeId = useReposStore((s) => s.activeId)
   const sessionReady = useReposStore((s) => s.sessionReady)
-  const workspaceLayout = useReposStore((s) => s.workspaceLayout)
-  const detailCollapsed = useReposStore((s) => s.detailCollapsed)
-  const detailFocusMode = useReposStore((s) => s.detailFocusMode)
 
   if (routeSettingsPage) {
     return (
@@ -54,11 +51,7 @@ export function App({ routeSettingsPage = null, onRouteSettingsPageChange }: App
           {activeId ? (
             <RepoView repoId={activeId} />
           ) : !sessionReady ? (
-            <RepoWorkspaceSkeleton
-              layout={workspaceLayout}
-              detailCollapsed={detailCollapsed}
-              detailFocusMode={detailFocusMode}
-            />
+            <RepoWorkspaceSkeleton />
           ) : (
             <EmptyState />
           )}

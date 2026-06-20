@@ -18,6 +18,17 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+function selectBranchForTest(branch: string): void {
+  useReposStore.setState((s) => ({
+    repos: {
+      ...s.repos,
+      [REPO_ID]: replaceRepo(s.repos[REPO_ID]!, (repo) => {
+        repo.ui.selectedBranch = branch
+      }),
+    },
+  }))
+}
+
 describe('refreshPullRequests', () => {
   test('snapshot records local-only remote capability and clears stale pull requests', async () => {
     const stale = pullRequest(1)
@@ -105,7 +116,7 @@ describe('refreshPullRequests', () => {
     expect(useReposStore.getState().repos[REPO_ID]?.resources.pullRequests.phase).toBe('idle')
   })
 
-  test('snapshot refresh writes a durable repo cache entry', async () => {
+  test('snapshot refresh writes a durable repo cache entry without selecting a branch implicitly', async () => {
     const token = seedRepo([])
     ipcHandlers['repo.snapshot'] = async () => ({ branches: [branch('feature/a')], current: 'feature/a' })
 
@@ -115,7 +126,7 @@ describe('refreshPullRequests', () => {
     expect(cached?.name).toBe('repo')
     expect(cached?.data.currentBranch).toBe('feature/a')
     expect(cached?.data.branches.map((b) => b.name)).toEqual(['feature/a'])
-    expect(cached?.ui.selectedBranch).toBe('feature/a')
+    expect(cached?.ui.selectedBranch).toBeNull()
   })
 
   test('attaches returned pull requests and clears stale entries for requested branches', async () => {
@@ -311,6 +322,7 @@ describe('refreshPullRequests', () => {
 
   test('snapshot refresh performs summary lookup then selected full lookup for visible detail', async () => {
     const token = seedRepo([branch('feature/a')])
+    selectBranchForTest('feature/a')
     const calls: Array<{ branches?: string[]; mode?: string; loadingAtStart?: boolean }> = []
     ipcHandlers['repo.snapshot'] = async () => ({
       branches: [branch('feature/a'), branch('feature/b')],
@@ -337,6 +349,7 @@ describe('refreshPullRequests', () => {
   test('snapshot refresh retries visible full lookup when merge status is still pending', async () => {
     vi.useFakeTimers()
     const token = seedRepo([branch('feature/a')])
+    selectBranchForTest('feature/a')
     const calls: Array<{ branches?: string[]; mode?: string }> = []
     let fullCalls = 0
     ipcHandlers['repo.snapshot'] = async () => ({

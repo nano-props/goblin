@@ -13,7 +13,6 @@ import { externalOpenLog } from '#/web/logger.ts'
 import {
   runShowWorkspacePaneViewCommand,
   runTerminalPrimaryActionCommand,
-  runToggleDetailCommand,
 } from '#/web/commands/workspace-commands.ts'
 import {
   createAppLevelIntentPlan,
@@ -22,7 +21,6 @@ import {
   createWorkspaceIntentPlan,
 } from '#/web/hooks/renderer-effect-intent-plans.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { WorkspaceLayout } from '#/shared/workspace-layout.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
 import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
@@ -30,7 +28,6 @@ import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
 interface TerminalBellIntentDeps {
   navigation: MainWindowNavigationActions
   closeAllOverlays: () => void
-  setDetailCollapsed: (collapsed: boolean) => void
   setSelectedTerminal: (worktreeKey: string, key: string) => void
 }
 
@@ -44,10 +41,7 @@ interface SharedRendererIntentDeps {
   isOverlayOpen: () => boolean
   isWorkspaceShortcutSuppressed: () => boolean
   ensureWorkspaceOpen: (input: string | RepoSessionEntry) => Promise<OpenRepoResult>
-  setDetailCollapsed: (collapsed: boolean) => void
   setSelectedTerminal: (worktreeKey: string, key: string) => void
-  setWorkspaceLayout: (layout: WorkspaceLayout) => void
-  toggleDetailCollapsed: () => void
   resetLayout: () => void
   t: (key: string) => string
 }
@@ -69,11 +63,9 @@ export function handleTerminalBellClickIntent(
     case 'show-worktree-terminal':
       deps.setSelectedTerminal(plan.worktreeTerminalKey, plan.key)
       deps.navigation.showRepoBranchWorkspacePaneView(plan.repoId, plan.branch, 'terminal')
-      deps.setDetailCollapsed(false)
       return
     case 'show-repo-terminal':
       deps.navigation.showRepoWorkspacePaneView(plan.repoId, 'terminal')
-      deps.setDetailCollapsed(false)
       return
   }
 }
@@ -89,9 +81,6 @@ export async function handleAppLevelRendererIntent(
   if (!plan) return false
   switch (plan.kind) {
     case 'noop':
-      return true
-    case 'set-workspace-layout':
-      deps.setWorkspaceLayout(plan.layout)
       return true
     case 'open-settings':
       deps.navigation.openSettings(plan.page)
@@ -110,7 +99,7 @@ export async function handleAppLevelRendererIntent(
       if (result.ok) deps.navigation.activateRepo(result.id)
       return true
     }
-    case 'reset-workspace-layout':
+    case 'reset-layout':
       deps.resetLayout()
       return true
   }
@@ -172,18 +161,13 @@ export async function handleWorkspaceRendererIntent(
         repoId: plan.repoId,
         tab: plan.tab,
         navigation: deps.navigation,
-        setDetailCollapsed: deps.setDetailCollapsed,
       })
       return true
     case 'terminal-primary-action':
       await runTerminalPrimaryActionCommand({
         repoId: plan.repoId,
         navigation: deps.navigation,
-        setDetailCollapsed: deps.setDetailCollapsed,
       })
-      return true
-    case 'toggle-detail':
-      runToggleDetailCommand({ repoId: plan.repoId, toggleDetailCollapsed: deps.toggleDetailCollapsed })
       return true
   }
 }

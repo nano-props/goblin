@@ -13,7 +13,7 @@ import type {
   RepoRemoteInfo,
   WorktreeStatus,
 } from '#/shared/git-types.ts'
-import type { WorkspaceDetailPaneSizes, WorkspaceLayout } from '#/shared/workspace-layout.ts'
+import type { WorkspacePaneSizes } from '#/shared/workspace-layout.ts'
 import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
@@ -45,7 +45,6 @@ import { type NativeShellProjection } from '#/shared/native-shell-projection.ts'
 import { RemoteAbsolutePathSchema } from '#/shared/remote-repo-schema.ts'
 import type { CreateWorktreeIpcInput } from '#/shared/worktree-create.ts'
 
-export type { WorkspaceLayout } from '#/shared/workspace-layout.ts'
 export type { SettingsPage } from '#/shared/settings-pages.ts'
 export type {
   EditorAppAvailability,
@@ -86,15 +85,11 @@ export interface SessionState {
   openRepos: RepoSessionEntry[]
   /** The active tab id — null when no repos were open. */
   activeRepo: string | null
-  detailCollapsed: boolean
-  detailFocusMode: boolean
-  workspaceLayout: WorkspaceLayout
-  detailPaneSizes: WorkspaceDetailPaneSizes
+  branchListPaneVisible: boolean
+  workspacePaneSizes: WorkspacePaneSizes
   selectedTerminalByWorktree?: Record<string, string>
-  /** Per-repo workspace pane view preference, restored alongside detailCollapsed. */
+  /** Per-repo workspace pane view preference, restored with the session. */
   workspacePaneViewByRepo?: Record<string, WorkspacePaneView>
-  /** @deprecated Legacy session key; read for migration, write workspacePaneViewByRepo. */
-  detailTabByRepo?: Record<string, WorkspacePaneView>
 }
 
 export interface RuntimeSettingsSnapshot extends SettingsPrefs {
@@ -216,7 +211,6 @@ export type IpcEvent =
   | { type: 'shortcuts-disabled-changed'; disabled: boolean }
   | { type: 'global-shortcut-disabled-changed'; disabled: boolean }
   | { type: 'swap-close-shortcuts-changed'; swapped: boolean }
-  | { type: 'toggle-detail-on-action-bar-blank-click-changed'; enabled: boolean }
   | ({ type: 'terminal-app-changed' } & TerminalAppState)
   | ({ type: 'editor-app-changed' } & EditorAppState)
   | { type: 'github-cli-changed'; state: GitHubCliState }
@@ -283,7 +277,6 @@ export interface AppIpcHandlers {
     setShortcutsDisabled: (input: { disabled: boolean }) => Promise<void>
     setGlobalShortcutDisabled: (input: { disabled: boolean }) => Promise<void>
     setSwapCloseShortcuts: (input: { swapped: boolean }) => Promise<void>
-    setToggleDetailOnActionBarBlankClick: (input: { enabled: boolean }) => Promise<void>
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
     setTerminalApp: (input: { pref: TerminalPref }) => Promise<TerminalAppState>
     setEditorApp: (input: { pref: EditorPref }) => Promise<EditorAppState>
@@ -310,13 +303,6 @@ export interface NativeIpcHandlers {
   settings: {
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
     applyShellProjection: (input: NativeShellProjection) => Promise<void>
-  }
-  session: {
-    // Renderer pushes session-level state that affects the native menu
-    // (currently: workspace layout, which gates the CmdOrCtrl+J toggle
-    // shortcut's `enabled` predicate). Returns true when the value
-    // changed and the menu was rebuilt.
-    setWorkspaceLayout: (input: { workspaceLayout: WorkspaceLayout }) => Promise<boolean>
   }
 }
 
@@ -408,11 +394,6 @@ export interface AppRouter {
         input: unknown,
       ) => Promise<Awaited<ReturnType<NativeIpcHandlers['settings'][K]>>>
     }
-    session: {
-      [K in keyof NativeIpcHandlers['session']]: (
-        input: unknown,
-      ) => Promise<Awaited<ReturnType<NativeIpcHandlers['session'][K]>>>
-    }
   }
 }
 
@@ -424,7 +405,6 @@ export function createAppRouter(handlers: NativeIpcHandlers, schemas: NativeIpcP
   return {
     createCaller: () => ({
       settings: createValidatedNamespace(handlers.settings, schemas.settings),
-      session: createValidatedNamespace(handlers.session, schemas.session),
     }),
   }
 }

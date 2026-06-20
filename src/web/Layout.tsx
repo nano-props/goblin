@@ -48,11 +48,12 @@ export function Layout() {
 
   const activeId = useReposStore((s) => s.activeId)
   const order = useReposStore((s) => s.order)
-  const { setActive, closeRepo, cycleActive, selectBranch, setWorkspacePaneView } = useStoreWithEqualityFn(
-    useReposStore,
-    mainWindowNavigationStoreActionsFromStore,
-    mainWindowNavigationStoreActionsEqual,
-  )
+  const { setActive, closeRepo, cycleActive, selectBranch, setWorkspacePaneView, setCompactWorkspacePane } =
+    useStoreWithEqualityFn(
+      useReposStore,
+      mainWindowNavigationStoreActionsFromStore,
+      mainWindowNavigationStoreActionsEqual,
+    )
   const navigation = useMemo(
     () =>
       createMainWindowNavigationActions({
@@ -63,9 +64,20 @@ export function Layout() {
         cycleActive,
         selectBranch,
         setWorkspacePaneView,
+        setCompactWorkspacePane,
         onOpenSettings: (page) => void navigate({ to: `/settings/${page}` }),
       }),
-    [activeId, closeRepo, cycleActive, navigate, order, selectBranch, setActive, setWorkspacePaneView],
+    [
+      activeId,
+      closeRepo,
+      cycleActive,
+      navigate,
+      order,
+      selectBranch,
+      setActive,
+      setWorkspacePaneView,
+      setCompactWorkspacePane,
+    ],
   )
 
   const workspaceShortcutsSuppressed = modalOpen || isSettingsOpen

@@ -65,7 +65,6 @@ describe('useKeyboard', () => {
       selectedBranch: 'feature/worktree',
       workspacePaneView: 'status',
     })
-    resetDetailCollapsed(false)
     const selectTerminal = vi.fn()
     const showRepoWorkspacePaneView = vi.fn()
     setTerminalSessionCommandBridge({
@@ -124,10 +123,6 @@ function navigationWith(overrides: Partial<MainWindowNavigationActions> = {}): M
     openSettings: () => {},
     ...overrides,
   }
-}
-
-function resetDetailCollapsed(detailCollapsed: boolean): void {
-  useReposStore.setState({ detailCollapsed })
 }
 
 function worktreeSnapshot(): WorktreeTerminalSnapshot {

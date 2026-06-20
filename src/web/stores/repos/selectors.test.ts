@@ -11,18 +11,12 @@ import {
   runtimeCoherentRepoProjectionStateFromStore,
 } from '#/web/stores/repos/selector-state.ts'
 import {
-  branchDetailToolbarStoreActionsEqual,
-  branchDetailToolbarStoreActionsFromStore,
-  detailPanelStoreActionsEqual,
-  detailPanelStoreActionsFromStore,
   mainWindowNavigationStoreActionsEqual,
   mainWindowNavigationStoreActionsFromStore,
   rendererEffectIntentStoreActionsEqual,
   rendererEffectIntentStoreActionsFromStore,
   repoTabStoreActionsEqual,
   repoTabStoreActionsFromStore,
-  restorableWorkspaceDetailFocusStoreActionsFromStore,
-  restorableWorkspaceDetailVisibilityStoreActionsFromStore,
   restorableWorkspaceLayoutPreferenceStoreActionsFromStore,
   restorableWorkspaceLayoutStoreActionsFromStore,
   restorableWorkspaceNavigationStoreActionsFromStore,
@@ -55,9 +49,7 @@ describe('repo selectors', () => {
       mainWindowWorkspaceStateFromStore({
         activeId: '/tmp/repo',
         order: ['/tmp/repo'],
-        detailCollapsed: false,
-        detailFocusMode: false,
-        workspaceLayout: 'top-bottom',
+        branchListPaneVisible: true,
         sessionReady: true,
       }),
     ).toMatchObject({
@@ -70,11 +62,8 @@ describe('repo selectors', () => {
       restorableWorkspaceStateFromStore({
         order: ['/tmp/repo'],
         activeId: '/tmp/repo',
-        detailCollapsed: false,
-        detailFocusMode: true,
-        workspaceLayout: 'top-bottom',
-        detailPaneSizes: {
-          'top-bottom': 40,
+        branchListPaneVisible: false,
+        workspacePaneSizes: {
           'left-right': 50,
         },
         selectedTerminalByWorktree: {
@@ -85,11 +74,8 @@ describe('repo selectors', () => {
     ).toEqual({
       order: ['/tmp/repo'],
       activeId: '/tmp/repo',
-      detailCollapsed: false,
-      detailFocusMode: true,
-      workspaceLayout: 'top-bottom',
-      detailPaneSizes: {
-        'top-bottom': 40,
+      branchListPaneVisible: false,
+      workspacePaneSizes: {
         'left-right': 50,
       },
       selectedTerminalByWorktree: {
@@ -117,17 +103,13 @@ describe('repo selectors', () => {
         mainWindowWorkspaceStateFromStore({
           activeId: '/tmp/repo-a',
           order: ['/tmp/repo-a', '/tmp/repo-b'],
-          detailCollapsed: false,
-          detailFocusMode: true,
-          workspaceLayout: 'top-bottom',
+          branchListPaneVisible: false,
           sessionReady: true,
         }),
         mainWindowWorkspaceStateFromStore({
           activeId: '/tmp/repo-a',
           order: ['/tmp/repo-a', '/tmp/repo-b'],
-          detailCollapsed: false,
-          detailFocusMode: true,
-          workspaceLayout: 'top-bottom',
+          branchListPaneVisible: false,
           sessionReady: true,
         }),
       ),
@@ -173,10 +155,7 @@ describe('repo selectors', () => {
         setActive: fnA as never,
         reorderRepos: fnA as never,
         cycleActive: fnA as never,
-        setDetailCollapsed: fnA as never,
-        toggleDetailCollapsed: fnA as never,
-        toggleDetailFocusMode: fnA as never,
-        setWorkspaceLayout: fnA as never,
+        toggleBranchListPaneVisible: fnA as never,
         resetLayout: fnA as never,
         setSelectedTerminal: fnA as never,
       }),
@@ -184,10 +163,7 @@ describe('repo selectors', () => {
       setActive: fnA,
       reorderRepos: fnA,
       cycleActive: fnA,
-      setDetailCollapsed: fnA,
-      toggleDetailCollapsed: fnA,
-      toggleDetailFocusMode: fnA,
-      setWorkspaceLayout: fnA,
+      toggleBranchListPaneVisible: fnA,
       resetLayout: fnA,
       setSelectedTerminal: fnA,
     })
@@ -220,45 +196,23 @@ describe('repo selectors', () => {
     })
     expect(
       restorableWorkspaceLayoutStoreActionsFromStore({
-        setDetailCollapsed: fnA as never,
-        toggleDetailCollapsed: fnA as never,
-        toggleDetailFocusMode: fnA as never,
-        setWorkspaceLayout: fnA as never,
+        toggleBranchListPaneVisible: fnA as never,
         resetLayout: fnA as never,
         setSelectedTerminal: fnA as never,
       }),
     ).toEqual({
-      setDetailCollapsed: fnA,
-      toggleDetailCollapsed: fnA,
-      toggleDetailFocusMode: fnA,
-      setWorkspaceLayout: fnA,
+      toggleBranchListPaneVisible: fnA,
       resetLayout: fnA,
       setSelectedTerminal: fnA,
     })
     expect(
-      restorableWorkspaceDetailVisibilityStoreActionsFromStore({
-        setDetailCollapsed: fnA as never,
-        toggleDetailCollapsed: fnA as never,
-      }),
-    ).toEqual({
-      setDetailCollapsed: fnA,
-      toggleDetailCollapsed: fnA,
-    })
-    expect(
-      restorableWorkspaceDetailFocusStoreActionsFromStore({
-        toggleDetailFocusMode: fnA as never,
-      }),
-    ).toEqual({
-      toggleDetailFocusMode: fnA,
-    })
-    expect(
       restorableWorkspaceLayoutPreferenceStoreActionsFromStore({
-        setWorkspaceLayout: fnA as never,
+        toggleBranchListPaneVisible: fnA as never,
         resetLayout: fnA as never,
         setSelectedTerminal: fnA as never,
       }),
     ).toEqual({
-      setWorkspaceLayout: fnA,
+      toggleBranchListPaneVisible: fnA,
       resetLayout: fnA,
       setSelectedTerminal: fnA,
     })
@@ -301,6 +255,7 @@ describe('repo selectors', () => {
           cycleActive: fnA,
           selectBranch: fnA,
           setWorkspacePaneView: fnA,
+          setCompactWorkspacePane: fnA,
         }),
         mainWindowNavigationStoreActionsFromStore({
           setActive: fnA,
@@ -308,6 +263,7 @@ describe('repo selectors', () => {
           cycleActive: fnA,
           selectBranch: fnA,
           setWorkspacePaneView: fnA,
+          setCompactWorkspacePane: fnA,
         }),
       ),
     ).toBe(true)
@@ -327,41 +283,13 @@ describe('repo selectors', () => {
       rendererEffectIntentStoreActionsEqual(
         rendererEffectIntentStoreActionsFromStore({
           ensureWorkspaceOpen: fnA as never,
-          setDetailCollapsed: fnA as never,
           setSelectedTerminal: fnA as never,
-          setWorkspaceLayout: fnA as never,
-          toggleDetailCollapsed: fnA as never,
           resetLayout: fnA as never,
         }),
         rendererEffectIntentStoreActionsFromStore({
           ensureWorkspaceOpen: fnA as never,
-          setDetailCollapsed: fnA as never,
           setSelectedTerminal: fnA as never,
-          setWorkspaceLayout: fnA as never,
-          toggleDetailCollapsed: fnA as never,
           resetLayout: fnB as never,
-        }),
-      ),
-    ).toBe(false)
-    expect(
-      branchDetailToolbarStoreActionsEqual(
-        branchDetailToolbarStoreActionsFromStore({
-          setDetailCollapsed: fnA as never,
-          toggleDetailCollapsed: fnA as never,
-        }),
-        branchDetailToolbarStoreActionsFromStore({
-          setDetailCollapsed: fnA as never,
-          toggleDetailCollapsed: fnB as never,
-        }),
-      ),
-    ).toBe(false)
-    expect(
-      detailPanelStoreActionsEqual(
-        detailPanelStoreActionsFromStore({
-          setDetailCollapsed: fnA as never,
-        }),
-        detailPanelStoreActionsFromStore({
-          setDetailCollapsed: fnB as never,
         }),
       ),
     ).toBe(false)
@@ -371,7 +299,6 @@ describe('repo selectors', () => {
     expect(
       keyboardRuntimeStateFromStore(
         {
-          detailCollapsed: true,
           repos: {
             '/tmp/repo-a': {
               id: '/tmp/repo-a',
@@ -381,19 +308,16 @@ describe('repo selectors', () => {
         '/tmp/repo-a',
       ),
     ).toMatchObject({
-      detailCollapsed: true,
       repo: { id: '/tmp/repo-a' },
     })
     expect(
       keyboardRuntimeStateFromStore(
         {
-          detailCollapsed: false,
           repos: {},
         },
         null,
       ),
     ).toEqual({
-      detailCollapsed: false,
       repo: null,
     })
   })

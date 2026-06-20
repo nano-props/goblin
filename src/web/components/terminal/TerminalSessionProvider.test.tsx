@@ -605,7 +605,6 @@ describe('TerminalSessionProvider', () => {
       selectedBranch: 'feature/worktree',
       workspacePaneView: 'terminal',
     })
-    useReposStore.setState({ detailCollapsed: false })
     const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
@@ -643,7 +642,6 @@ describe('TerminalSessionProvider', () => {
 
       expect(closeMock).not.toHaveBeenCalled()
       expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('terminal')
-      expect(useReposStore.getState().detailCollapsed).toBe(false)
       expect(getProbe().summaries.map((session) => [session.terminalId, session.selected, session.hasBell])).toEqual([
         ['terminal-1', true, false],
       ])
@@ -659,7 +657,6 @@ describe('TerminalSessionProvider', () => {
 
       expect(closeMock).not.toHaveBeenCalled()
       expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('terminal')
-      expect(useReposStore.getState().detailCollapsed).toBe(false)
     } finally {
       await unmount()
     }

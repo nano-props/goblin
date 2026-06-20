@@ -8,9 +8,9 @@ import type { ReactNode } from 'react'
 import { cn } from '#/web/lib/cn.ts'
 import { Skeleton } from '#/web/components/ui/skeleton.tsx'
 import { RepoWorkspace, RepoWorkspacePane, Toolbar } from '#/web/components/Layout.tsx'
-import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 import { DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 import type { RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
+import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 
 interface BranchListSkeletonProps {
   rows?: number
@@ -23,8 +23,7 @@ interface RowCountProps {
 
 interface WorkspaceSkeletonProps {
   layout?: RepoWorkspaceLayout
-  detailCollapsed?: boolean
-  detailFocusMode?: boolean
+  branchListPaneVisible?: boolean
 }
 
 export function BranchListSkeleton({ rows = 6, showBranchActions = false }: BranchListSkeletonProps) {
@@ -37,52 +36,37 @@ export function StatusListSkeleton({ rows = 6 }: RowCountProps) {
   return <SkeletonList rows={rows} renderRow={(i) => <StatusListSkeletonRow key={i} />} />
 }
 
-// RepoWorkspaceSkeleton renders the branch-list + detail pane while
-// a repo is being hydrated. The per-repo toolbar (and the focus-mode
-// BranchInfoBar) used to live here too, but those moved to the
-// Topbar / BranchInfoBar — the workspace now just shows the panes.
+// RepoWorkspaceSkeleton renders the branch list + workspace pane while
+// a repo is being hydrated. The per-repo toolbar lives in the Topbar,
+// so the workspace skeleton just shows the panes.
 export function RepoWorkspaceSkeleton({
   layout = DEFAULT_WORKSPACE_LAYOUT,
-  detailCollapsed = false,
-  detailFocusMode = false,
+  branchListPaneVisible = true,
 }: WorkspaceSkeletonProps) {
-  const behavior = repoWorkspaceBehavior(layout, detailCollapsed, detailFocusMode)
-  const detailPane = (
+  const behavior = repoWorkspaceBehavior(layout, branchListPaneVisible)
+  const workspacePane = (
     <RepoWorkspacePane>
-      <BranchDetailSkeleton
-        layout={layout}
-        collapsed={behavior.detailCollapsed}
-        detailFocusMode={behavior.detailFocusMode}
-      />
+      <BranchDetailSkeleton layout={layout} />
     </RepoWorkspacePane>
   )
-  const workspaceMode = behavior.mode === 'collapsed' ? 'collapsed' : 'split'
   const branchPane = (
     <RepoWorkspacePane>
       <BranchListSkeleton showBranchActions={behavior.branchListActionsVisible} />
     </RepoWorkspacePane>
   )
-  const workspaceBody =
-    behavior.mode === 'focus' ? (
-      detailPane
-    ) : (
-      <RepoWorkspace layout={layout} mode={workspaceMode} branchPane={branchPane} detailPane={detailPane} />
-    )
 
-  return <section className="flex min-w-0 flex-1 flex-col">{workspaceBody}</section>
+  return (
+    <section className="flex min-w-0 flex-1 flex-col">
+      <RepoWorkspace layout={layout} mode={behavior.mode} branchPane={branchPane} workspacePane={workspacePane} />
+    </section>
+  )
 }
 
 export function BranchDetailSkeleton({
   layout = DEFAULT_WORKSPACE_LAYOUT,
-  collapsed = false,
-  detailFocusMode = false,
 }: {
   layout?: RepoWorkspaceLayout
-  collapsed?: boolean
-  detailFocusMode?: boolean
 }) {
-  const behavior = repoWorkspaceBehavior(layout, collapsed, detailFocusMode)
-
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
       <Toolbar variant="detail">
@@ -94,16 +78,11 @@ export function BranchDetailSkeleton({
           </div>
         </div>
         <div aria-hidden="true" className="min-w-2 flex-1 self-stretch" />
-        <div className="flex shrink-0 items-center gap-1">
-          {behavior.detailCollapseAllowed && <Skeleton className="h-7 w-7" />}
-        </div>
       </Toolbar>
 
-      {!collapsed && (
-        <div className="flex min-h-0 flex-1 flex-col">
-          <StatusListSkeleton rows={8} />
-        </div>
-      )}
+      <div className="flex min-h-0 flex-1 flex-col">
+        <StatusListSkeleton rows={8} />
+      </div>
     </section>
   )
 }

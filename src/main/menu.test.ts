@@ -6,7 +6,6 @@ interface MockMenuRuntimeState {
   shortcutsDisabled: boolean
   swapCloseShortcuts: boolean
   langPref: 'auto' | 'en' | 'zh' | 'ko' | 'ja'
-  workspaceLayout: 'top-bottom' | 'left-right' | 'branches'
 }
 
 function defaultMenuRuntimeState(): MockMenuRuntimeState {
@@ -15,7 +14,6 @@ function defaultMenuRuntimeState(): MockMenuRuntimeState {
     shortcutsDisabled: false,
     swapCloseShortcuts: false,
     langPref: 'auto',
-    workspaceLayout: 'top-bottom',
   }
 }
 
@@ -349,7 +347,7 @@ describe('app menu actions', () => {
     ])
   })
 
-  test('reset layout resets the main window and dispatches the workspace-layout intent', async () => {
+  test('reset layout resets the main window and dispatches the layout reset intent', async () => {
     mocks.getMainWindow.mockReturnValue(mocks.win)
     const { buildAppMenu } = await import('#/main/menu.ts')
     buildAppMenu()
@@ -359,7 +357,7 @@ describe('app menu actions', () => {
 
     expect(mocks.resetMainWindowToDefault).toHaveBeenCalledTimes(1)
     expect(mocks.sendRendererEffectIntent).toHaveBeenCalledWith(mocks.win, {
-      type: 'workspace-layout-reset-requested',
+      type: 'layout-reset-requested',
     })
   })
 
@@ -393,115 +391,6 @@ describe('app menu actions', () => {
     expect(mocks.openHttpExternal).toHaveBeenCalledWith('http://127.0.0.1:32100')
   })
 
-  describe('view-toggle-detail enabled state', () => {
-    // Regression test for the CmdOrCtrl+J disappearance bug:
-    // pre-fix, the menu kept an optimistic `menuWorkspaceLayout` snapshot
-    // that drifted from the renderer's store after the user toggled the
-    // layout through the in-app UI. The native menu's `view-toggle-detail`
-    // `enabled` predicate is gated on `workspaceLayout === 'top-bottom'`,
-    // so a stale snapshot permanently disabled the accelerator. The fix
-    // collapses both states into `MenuRuntimeState.workspaceLayout` and
-    // exposes `applyMenuWorkspaceLayout` for the renderer's IPC push.
-
-    function findToggleDetailItem(): { enabled: boolean | undefined; accelerator: string | undefined } {
-      const viewMenu = mocks.template.find((entry) => entry.label === 'menu.view')
-      const toggleDetailItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.toggle-detail')
-      return {
-        enabled: toggleDetailItem?.enabled,
-        accelerator: toggleDetailItem?.accelerator,
-      }
-    }
-
-    test('starts enabled when the persisted layout is top-bottom', async () => {
-      mocks.readMenuRuntimeState.mockReturnValue({
-        ...defaultMenuRuntimeState(),
-        workspaceLayout: 'top-bottom',
-      })
-      const { buildAppMenu } = await import('#/main/menu.ts')
-
-      buildAppMenu()
-
-      const toggleDetail = findToggleDetailItem()
-      expect(toggleDetail.accelerator).toBe('CmdOrCtrl+J')
-      expect(toggleDetail.enabled).toBe(true)
-    })
-
-    test('is disabled when the runtime state is left-right', async () => {
-      mocks.readMenuRuntimeState.mockReturnValue({
-        ...defaultMenuRuntimeState(),
-        workspaceLayout: 'left-right',
-      })
-      const { buildAppMenu } = await import('#/main/menu.ts')
-
-      buildAppMenu()
-
-      const toggleDetail = findToggleDetailItem()
-      expect(toggleDetail.accelerator).toBe('CmdOrCtrl+J')
-      expect(toggleDetail.enabled).toBe(false)
-    })
-
-    test('a renderer-pushed layout change updates runtime state and re-enables the accelerator', async () => {
-      // Simulates: the renderer changed the persisted layout to
-      // `left-right` (Cmd+J went grey), then flipped back to `top-bottom`
-      // from in-app UI. The renderer's `setWorkspaceLayout` action pushes
-      // the new value via `applyMenuWorkspaceLayout`, which must update
-      // the runtime state and rebuild the menu so Cmd+J comes back to life.
-      mocks.readMenuRuntimeState.mockReturnValue({
-        ...defaultMenuRuntimeState(),
-        workspaceLayout: 'left-right',
-      })
-      const { buildAppMenu, applyMenuWorkspaceLayout } = await import('#/main/menu.ts')
-
-      buildAppMenu()
-      expect(findToggleDetailItem().enabled).toBe(false)
-
-      // Renderer push arrives.
-      mocks.applyMenuRuntimeState.mockClear()
-      mocks.setApplicationMenu.mockClear()
-      const changed = applyMenuWorkspaceLayout('top-bottom')
-
-      expect(changed).toBe(true)
-      expect(mocks.applyMenuRuntimeState).toHaveBeenCalledWith({ workspaceLayout: 'top-bottom' })
-      expect(mocks.setApplicationMenu).toHaveBeenCalledTimes(1)
-
-      // Now the menu reads the updated runtime state.
-      mocks.readMenuRuntimeState.mockReturnValue({
-        ...defaultMenuRuntimeState(),
-        workspaceLayout: 'top-bottom',
-      })
-      buildAppMenu()
-      expect(findToggleDetailItem().enabled).toBe(true)
-    })
-
-    test('is a no-op when the pushed layout already matches the runtime state', async () => {
-      mocks.readMenuRuntimeState.mockReturnValue({
-        ...defaultMenuRuntimeState(),
-        workspaceLayout: 'top-bottom',
-      })
-      const { applyMenuWorkspaceLayout } = await import('#/main/menu.ts')
-
-      mocks.applyMenuRuntimeState.mockClear()
-      mocks.setApplicationMenu.mockClear()
-      const changed = applyMenuWorkspaceLayout('top-bottom')
-
-      expect(changed).toBe(false)
-      expect(mocks.applyMenuRuntimeState).not.toHaveBeenCalled()
-      expect(mocks.setApplicationMenu).not.toHaveBeenCalled()
-    })
-
-    test('normalizes unknown layout values rather than persisting them', async () => {
-      mocks.readMenuRuntimeState.mockReturnValue({
-        ...defaultMenuRuntimeState(),
-        workspaceLayout: 'top-bottom',
-      })
-      const { applyMenuWorkspaceLayout } = await import('#/main/menu.ts')
-
-      const changed = applyMenuWorkspaceLayout('branches' as unknown as 'top-bottom')
-
-      expect(changed).toBe(true)
-      expect(mocks.applyMenuRuntimeState).toHaveBeenCalledWith({ workspaceLayout: 'left-right' })
-    })
-  })
 })
 
 function clickMenuItem(menuLabel: string, itemLabel: string): void {

@@ -1,52 +1,21 @@
-import { effectiveDetailCollapsed, workspaceLayoutAllowsDetailCollapse } from '#/shared/workspace-layout.ts'
 import type { WorkspaceLayout } from '#/shared/workspace-layout.ts'
-export type RepoWorkspaceMode = 'split' | 'collapsed' | 'focus'
+export type RepoWorkspaceMode = 'split' | 'workspace-only'
 
 export interface RepoWorkspaceBehavior {
-  /** The actual rendered workspace layout mode after collapsing/focus rules
-   *  are applied. Layout-specific UI placement should prefer this field. */
   mode: RepoWorkspaceMode
-  detailCollapsed: boolean
-  detailCollapseAllowed: boolean
-  /** The normalized focus-toggle preference/pressed state. This can stay
-   *  true while `mode` is `collapsed`, so callers should not treat it as
-   *  proof that the workspace is currently rendering in focus mode. */
-  detailFocusMode: boolean
+  branchListPaneVisible: boolean
   branchListActionsVisible: boolean
   prTooltipSide: 'right' | 'bottom'
 }
 
-const REPO_WORKSPACE_BEHAVIOR = {
-  'top-bottom': {
-    branchListActionsVisible: true,
-    prTooltipSide: 'right',
-  },
-  'left-right': {
-    branchListActionsVisible: true,
-    prTooltipSide: 'bottom',
-  },
-} satisfies Record<
-  WorkspaceLayout,
-  Omit<
-    RepoWorkspaceBehavior,
-    'detailCollapsed' | 'detailCollapseAllowed' | 'detailFocusMode' | 'mode'
-  >
->
-
 export function repoWorkspaceBehavior(
-  layout: WorkspaceLayout,
-  detailCollapsed: boolean,
-  detailFocusMode = false,
+  _layout: WorkspaceLayout,
+  branchListPaneVisible = true,
 ): RepoWorkspaceBehavior {
-  const detailCollapsedEffective = effectiveDetailCollapsed(layout, detailCollapsed)
-  const mode: RepoWorkspaceMode = detailCollapsedEffective ? 'collapsed' : detailFocusMode ? 'focus' : 'split'
-  const baseBehavior = REPO_WORKSPACE_BEHAVIOR[layout]
   return {
-    ...baseBehavior,
-    mode,
-    detailCollapseAllowed: workspaceLayoutAllowsDetailCollapse(layout),
-    detailFocusMode,
-    detailCollapsed: detailCollapsedEffective,
-    branchListActionsVisible: baseBehavior.branchListActionsVisible && mode !== 'focus',
+    mode: branchListPaneVisible ? 'split' : 'workspace-only',
+    branchListPaneVisible,
+    branchListActionsVisible: branchListPaneVisible,
+    prTooltipSide: 'bottom',
   }
 }

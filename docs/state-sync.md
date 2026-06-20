@@ -60,7 +60,7 @@ Notes:
 Representative examples:
 
 - saved session state
-- workspace layout and detail pane sizes
+- workspace layout and pane sizes
 - active repo and open repo set for next launch
 - `restorableRepoCache` for warm restore
 - boot-only `useSessionRestoreStore`

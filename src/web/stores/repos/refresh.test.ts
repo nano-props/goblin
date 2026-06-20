@@ -144,7 +144,7 @@ describe('remote fetch timestamps', () => {
     expect(snapshotCount).toBe(1)
   })
 
-  test('manual sync refreshes fetch, snapshot, status, and pull request data for the active repo', async () => {
+  test('manual sync refreshes fetch, snapshot, status, and summary pull request data when no branch is selected', async () => {
     const token = seedRepo([branch('feature/a')])
     let fetchCount = 0
     let snapshotCount = 0
@@ -184,7 +184,6 @@ describe('remote fetch timestamps', () => {
     expect(statusCount).toBe(1)
     expect(pullRequestCalls).toEqual([
       { branches: ['feature/a', 'feature/b'], mode: 'summary' },
-      { branches: ['feature/a'], mode: 'full' },
     ])
   })
 

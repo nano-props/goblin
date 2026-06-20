@@ -23,7 +23,6 @@ import {
   setShortcutsDisabled,
   setSwapCloseShortcuts,
   setTerminalNotificationsEnabled,
-  setToggleDetailOnActionBarBlankClick,
 } from '#/web/settings-client.ts'
 import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
 import {
@@ -81,14 +80,6 @@ export async function setGlobalShortcutDisabledPreference(disabled: boolean): Pr
 export async function setSwapCloseShortcutsPreference(swapped: boolean): Promise<void> {
   await setSwapCloseShortcuts(swapped)
   updateRuntimeSettingsSnapshotCache(mainWindowQueryClient, (current) => ({ ...current, swapCloseShortcuts: swapped }))
-}
-
-export async function setToggleDetailOnActionBarBlankClickPreference(enabled: boolean): Promise<void> {
-  await setToggleDetailOnActionBarBlankClick(enabled)
-  updateRuntimeSettingsSnapshotCache(mainWindowQueryClient, (current) => ({
-    ...current,
-    toggleDetailOnActionBarBlankClick: enabled,
-  }))
 }
 
 export async function setGlobalShortcutPreference(accelerator: string): Promise<GlobalShortcutState> {

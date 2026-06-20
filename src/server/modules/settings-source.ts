@@ -4,12 +4,11 @@ import { toSafeRepoLocator, toSafeSessionRepoEntry } from '#/shared/input-valida
 import { serverDataFile } from '#/shared/data-dir.ts'
 import type { EditorPref, LangPref, SessionState, SettingsPrefs, TerminalPref, ThemePref } from '#/shared/api-types.ts'
 import {
-  DEFAULT_DETAIL_COLLAPSED,
-  effectiveDetailCollapsed,
-  normalizeDetailPaneSizes,
-  normalizeWorkspaceLayout,
+  DEFAULT_BRANCH_LIST_PANE_VISIBLE,
+  normalizeWorkspacePaneSizes,
 } from '#/shared/workspace-layout.ts'
 import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import { normalizeGlobalShortcut } from '#/shared/accelerator.ts'
 import { isColorTheme, type ColorTheme } from '#/shared/color-theme.ts'
 import {
@@ -19,13 +18,11 @@ import {
   DEFAULT_GLOBAL_SHORTCUT,
   DEFAULT_GLOBAL_SHORTCUT_DISABLED,
   DEFAULT_LANG_PREF,
-  DEFAULT_SESSION_DETAIL_FOCUS_MODE,
   DEFAULT_SHORTCUTS_DISABLED,
   DEFAULT_SWAP_CLOSE_SHORTCUTS,
   DEFAULT_TERMINAL_APP,
   DEFAULT_TERMINAL_NOTIFICATIONS_ENABLED,
   DEFAULT_THEME_PREF,
-  DEFAULT_TOGGLE_DETAIL_ON_ACTION_BAR_BLANK_CLICK,
   MAX_RECENT_REPOS,
   defaultSessionState,
   defaultSettingsPrefs,
@@ -41,7 +38,6 @@ interface ServerSettingsData {
   shortcutsDisabled: boolean
   globalShortcutDisabled: boolean
   swapCloseShortcuts: boolean
-  toggleDetailOnActionBarBlankClick: boolean
   globalShortcut: string
   terminalApp: TerminalPref
   editorApp: EditorPref
@@ -110,7 +106,6 @@ function settingsPrefsFromData(data: ServerSettingsData): SettingsPrefs {
     shortcutsDisabled: data.shortcutsDisabled,
     globalShortcutDisabled: data.globalShortcutDisabled,
     swapCloseShortcuts: data.swapCloseShortcuts,
-    toggleDetailOnActionBarBlankClick: data.toggleDetailOnActionBarBlankClick,
     globalShortcut: data.globalShortcut,
     terminalApp: data.terminalApp,
     editorApp: data.editorApp,
@@ -147,30 +142,39 @@ function normalizeSelectedTerminalByWorktree(value: unknown): Record<string, str
   return normalized
 }
 
+function normalizeWorkspacePaneViewByRepo(value: unknown, openRepos: RepoSessionEntry[]): Record<string, WorkspacePaneView> {
+  if (!value || typeof value !== 'object') return {}
+  const openRepoIds = new Set(openRepos.map(repoSessionEntryId))
+  const normalized: Record<string, WorkspacePaneView> = {}
+  for (const [repoId, paneView] of Object.entries(value)) {
+    const safeRepoId = toSafeRepoLocator(repoId)
+    if (!safeRepoId || !openRepoIds.has(safeRepoId)) continue
+    if (paneView === 'status' || paneView === 'changes' || paneView === 'terminal') {
+      normalized[safeRepoId] = paneView
+    }
+  }
+  return normalized
+}
+
 function normalizeSession(value: unknown): SessionState {
   if (!value || typeof value !== 'object') return defaultSession()
-  const partial = value as Partial<SessionState> & { activeTerminalByGroup?: unknown }
+  const partial = value as Partial<SessionState>
   const openRepos = Array.isArray(partial.openRepos)
     ? dedupeRepoEntries(
         partial.openRepos.map(toSafeSessionRepoEntry).filter((entry): entry is RepoSessionEntry => entry !== null),
       )
     : []
   const activeRepo = toSafeRepoLocator(partial.activeRepo)
-  const workspaceLayout = normalizeWorkspaceLayout(partial.workspaceLayout)
-  const detailCollapsed =
-    typeof partial.detailCollapsed === 'boolean' ? partial.detailCollapsed : DEFAULT_DETAIL_COLLAPSED
-  const detailFocusMode =
-    workspaceLayout === 'top-bottom' && partial.detailFocusMode === true ? true : DEFAULT_SESSION_DETAIL_FOCUS_MODE
   return {
     openRepos,
     activeRepo: activeRepo && openRepos.some((entry) => repoSessionEntryId(entry) === activeRepo) ? activeRepo : null,
-    detailCollapsed: effectiveDetailCollapsed(workspaceLayout, detailCollapsed),
-    detailFocusMode,
-    workspaceLayout,
-    detailPaneSizes: normalizeDetailPaneSizes(partial.detailPaneSizes),
-    selectedTerminalByWorktree: normalizeSelectedTerminalByWorktree(
-      partial.selectedTerminalByWorktree ?? partial.activeTerminalByGroup,
-    ),
+    branchListPaneVisible:
+      typeof partial.branchListPaneVisible === 'boolean'
+        ? partial.branchListPaneVisible
+        : DEFAULT_BRANCH_LIST_PANE_VISIBLE,
+    workspacePaneSizes: normalizeWorkspacePaneSizes(partial.workspacePaneSizes),
+    selectedTerminalByWorktree: normalizeSelectedTerminalByWorktree(partial.selectedTerminalByWorktree),
+    workspacePaneViewByRepo: normalizeWorkspacePaneViewByRepo(partial.workspacePaneViewByRepo, openRepos),
   }
 }
 
@@ -194,7 +198,6 @@ async function readServerSettingsFile(): Promise<ServerSettingsData | null> {
       shortcutsDisabled: parsed.shortcutsDisabled === true,
       globalShortcutDisabled: parsed.globalShortcutDisabled === true,
       swapCloseShortcuts: parsed.swapCloseShortcuts === true,
-      toggleDetailOnActionBarBlankClick: parsed.toggleDetailOnActionBarBlankClick === true,
       globalShortcut: normalizeGlobalShortcut(parsed.globalShortcut),
       terminalApp: normalizeTerminalPref(parsed.terminalApp),
       editorApp: normalizeEditorPref(parsed.editorApp),
@@ -269,10 +272,6 @@ export async function updateServerSettingsPrefs(patch: ServerSettingsPrefsPatch)
     patch.globalShortcutDisabled === undefined ? data.globalShortcutDisabled : patch.globalShortcutDisabled === true
   const nextSwapCloseShortcuts =
     patch.swapCloseShortcuts === undefined ? data.swapCloseShortcuts : patch.swapCloseShortcuts === true
-  const nextToggleDetailOnActionBarBlankClick =
-    patch.toggleDetailOnActionBarBlankClick === undefined
-      ? data.toggleDetailOnActionBarBlankClick
-      : patch.toggleDetailOnActionBarBlankClick === true
   const nextGlobalShortcut =
     patch.globalShortcut === undefined ? data.globalShortcut : normalizeGlobalShortcut(patch.globalShortcut)
   const nextTerminalApp = patch.terminalApp === undefined ? data.terminalApp : normalizeTerminalPref(patch.terminalApp)
@@ -287,7 +286,6 @@ export async function updateServerSettingsPrefs(patch: ServerSettingsPrefsPatch)
     data.shortcutsDisabled !== nextShortcutsDisabled ||
     data.globalShortcutDisabled !== nextGlobalShortcutDisabled ||
     data.swapCloseShortcuts !== nextSwapCloseShortcuts ||
-    data.toggleDetailOnActionBarBlankClick !== nextToggleDetailOnActionBarBlankClick ||
     data.globalShortcut !== nextGlobalShortcut ||
     data.terminalApp !== nextTerminalApp ||
     data.editorApp !== nextEditorApp ||
@@ -300,7 +298,6 @@ export async function updateServerSettingsPrefs(patch: ServerSettingsPrefsPatch)
   data.shortcutsDisabled = nextShortcutsDisabled
   data.globalShortcutDisabled = nextGlobalShortcutDisabled
   data.swapCloseShortcuts = nextSwapCloseShortcuts
-  data.toggleDetailOnActionBarBlankClick = nextToggleDetailOnActionBarBlankClick
   data.globalShortcut = nextGlobalShortcut
   data.terminalApp = nextTerminalApp
   data.editorApp = nextEditorApp

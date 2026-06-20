@@ -22,7 +22,6 @@ import type {
   ThemeState,
 } from '#/shared/api-types.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
-import type { WorkspaceLayout } from '#/shared/workspace-layout.ts'
 import {
   nativeSettingsProjectionStateFromSettings,
   pickNativeSettingsProjectionPatch,
@@ -186,25 +185,6 @@ export async function saveSession(session: SessionState): Promise<SessionState> 
   return result.session
 }
 
-/**
- * Push the current workspace layout to the native menu so the menu's
- * `view-toggle-detail` `enabled` predicate — and therefore the
- * CmdOrCtrl+J accelerator — stays in sync with the renderer's store.
- *
- * Renderer is the authority for `workspaceLayout`; main only mirrors
- * the value to drive native menu state. Fire-and-forget: a transient
- * IPC failure just means the menu lags by one rebuild, the next push
- * will catch it up.
- */
-export async function pushWorkspaceLayoutToNativeMenu(workspaceLayout: WorkspaceLayout): Promise<void> {
-  if (!canUseNativeIpcBridge()) return
-  try {
-    await invokeNativeIpcPath<boolean>('session.setWorkspaceLayout', { workspaceLayout })
-  } catch (err) {
-    sessionLog.warn('failed to push workspace layout to native menu', { err })
-  }
-}
-
 export async function setSettingsFetchInterval(sec: number): Promise<number> {
   const result = await postServerJson<{ sec: number }, { ok: boolean; fetchIntervalSec: number }>(
     '/api/settings/fetch-interval',
@@ -227,10 +207,6 @@ export async function setGlobalShortcutDisabled(disabled: boolean): Promise<void
 
 export async function setSwapCloseShortcuts(swapped: boolean): Promise<void> {
   await updateSettingsPrefsPatch({ swapCloseShortcuts: swapped })
-}
-
-export async function setToggleDetailOnActionBarBlankClick(enabled: boolean): Promise<void> {
-  await updateSettingsPrefsPatch({ toggleDetailOnActionBarBlankClick: enabled })
 }
 
 export async function setGlobalShortcut(accelerator: string): Promise<GlobalShortcutState> {

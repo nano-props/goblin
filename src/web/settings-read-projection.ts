@@ -57,7 +57,6 @@ export function readRuntimeShortcutSettings(data: RuntimeSettingsSnapshot | unde
     globalShortcutDisabled: data?.globalShortcutDisabled ?? false,
     globalShortcut: data?.globalShortcut ?? 'CommandOrControl+Shift+G',
     globalShortcutRegistered: data?.globalShortcutRegistered ?? false,
-    toggleDetailOnActionBarBlankClick: data?.toggleDetailOnActionBarBlankClick ?? false,
   }
 }
 
@@ -82,12 +81,6 @@ export function readRuntimeExternalAppSettings(data: ExternalAppsSnapshot | unde
     resolvedEditorApp: data?.editor.resolved ?? null,
     editorAvailable: data?.editor.available ?? false,
     editorAppAvailability: data?.editor.appAvailability ?? { vscode: false, cursor: false, windsurf: false },
-  }
-}
-
-export function readRuntimeGeneralSettings(data: RuntimeSettingsSnapshot | undefined) {
-  return {
-    toggleDetailOnActionBarBlankClick: data?.toggleDetailOnActionBarBlankClick ?? false,
   }
 }
 

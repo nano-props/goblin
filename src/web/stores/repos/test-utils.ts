@@ -17,12 +17,7 @@ import type {
 import type { WorkspacePaneStaticViewSummary, WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { BranchSnapshotInfo, PullRequestInfo, WorktreeStatus } from '#/web/types.ts'
 import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
-import {
-  DEFAULT_DETAIL_COLLAPSED,
-  DEFAULT_DETAIL_PANE_SIZES,
-  DEFAULT_WORKSPACE_LAYOUT,
-  effectiveDetailCollapsed,
-} from '#/shared/workspace-layout.ts'
+import { DEFAULT_BRANCH_LIST_PANE_VISIBLE, DEFAULT_WORKSPACE_PANE_SIZES } from '#/shared/workspace-layout.ts'
 export type IpcTestHandler = (input: any) => unknown
 
 interface TerminalBridgeTestOutputs {
@@ -115,11 +110,11 @@ export function resetReposStore(): void {
     order: [],
     activeId: null,
     sessionReady: false,
-    detailCollapsed: effectiveDetailCollapsed(DEFAULT_WORKSPACE_LAYOUT, DEFAULT_DETAIL_COLLAPSED),
-    detailFocusMode: false,
-    workspaceLayout: DEFAULT_WORKSPACE_LAYOUT,
-    detailPaneSizes: DEFAULT_DETAIL_PANE_SIZES,
+    branchListPaneVisible: DEFAULT_BRANCH_LIST_PANE_VISIBLE,
+    workspacePaneSizes: DEFAULT_WORKSPACE_PANE_SIZES,
     selectedTerminalByWorktree: {},
+    workspacePaneViewByRepo: {},
+    compactWorkspacePane: 'branch',
   })
 }
 
@@ -602,10 +597,10 @@ export function seedRepoState(options: {
     order: [options.id],
     activeId: options.id,
     sessionReady: true,
-    detailCollapsed: DEFAULT_DETAIL_COLLAPSED,
-    detailFocusMode: false,
-    workspaceLayout: DEFAULT_WORKSPACE_LAYOUT,
-    detailPaneSizes: DEFAULT_DETAIL_PANE_SIZES,
+    branchListPaneVisible: DEFAULT_BRANCH_LIST_PANE_VISIBLE,
+    workspacePaneSizes: DEFAULT_WORKSPACE_PANE_SIZES,
+    workspacePaneViewByRepo: {},
+    compactWorkspacePane: 'branch',
   })
   return repo
 }

@@ -8,14 +8,15 @@ import type {
   WorktreeStatus,
 } from '#/web/types.ts'
 import type { RemoteRepoLifecycle, RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { WorkspaceDetailPaneSizes, WorkspaceLayout } from '#/shared/workspace-layout.ts'
+import type { WorkspacePaneSizes } from '#/shared/workspace-layout.ts'
 import type { SessionState } from '#/shared/api-types.ts'
 import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/repos/branch-action-types.ts'
 import type { RepoOperationsState } from '#/web/stores/repos/operations.ts'
 import type { RepoResourcesState } from '#/web/stores/repos/resources.ts'
 export type BranchViewMode = 'all' | 'worktrees'
-export type RepoWorkspaceLayout = WorkspaceLayout
+export type CompactWorkspacePane = 'branch' | 'workspace'
+export type RepoWorkspaceLayout = 'left-right'
 export type RepoDataSource = 'cache' | 'fresh'
 // Renderer branches keep only the worktree reference; metadata lives in worktreesByPath.
 export type RepoBranchState = Omit<BranchSnapshotInfo, 'worktree'> & {
@@ -65,7 +66,7 @@ export interface RepoUiState {
   selectedBranch: string | null
   branchViewMode: BranchViewMode
   /** The user-preferred workspace pane view type. This is persisted intent; the
-   *  rendered detail pane is resolved at read time from this preference plus
+   *  rendered workspace pane is resolved at read time from this preference plus
    *  live worktree, terminal, and opened workspace pane view state. The store never
    *  adjusts this on snapshot/branch changes, preserving the user's
    *  preference across them. */
@@ -150,17 +151,12 @@ export interface RestorableWorkspaceState {
   order: string[]
   /** Active workspace tab restored from SessionState.activeRepo. */
   activeId: string | null
-  detailCollapsed: boolean
-  /** Persisted focus-toggle preference for the top-bottom detail pane. This
-   *  is not itself proof that the workspace is currently rendering in focus
-   *  mode — a collapsed top-bottom layout preserves the preference while the
-   *  effective layout mode remains collapsed. */
-  detailFocusMode: boolean
-  workspaceLayout: RepoWorkspaceLayout
-  detailPaneSizes: WorkspaceDetailPaneSizes
+  /** Large-screen Branch List visibility restored from SessionState. Compact UI always shows one pane at a time. */
+  branchListPaneVisible: boolean
+  workspacePaneSizes: WorkspacePaneSizes
   /** Per worktree terminal selection restored from SessionState.selectedTerminalByWorktree. */
   selectedTerminalByWorktree: Record<string, string>
-  /** Per-repo workspace pane view selection, restored alongside detailCollapsed. */
+  /** Per-repo workspace pane view selection, restored with the session. */
   workspacePaneViewByRepo: Record<string, WorkspacePaneView>
 }
 
@@ -170,29 +166,29 @@ export interface LocalWorkspaceState {
   /** Hydration flag — true once boot session is restored, so we don't
    *  overwrite the saved session with an empty one before restore. */
   sessionReady: boolean
+  /** Compact UI route: Branch View or Workspace View. This is local-only so
+   *  small-screen navigation does not leak into restored large-screen layout. */
+  compactWorkspacePane: CompactWorkspacePane
+}
+
+export interface LocalWorkspaceActions {
+  setCompactWorkspacePane: (pane: CompactWorkspacePane) => void
 }
 
 export interface RestorableWorkspaceActions {
   setActive: (id: string) => void
   /** Reorder the tab strip so `fromId` lands at `toId`'s position, using
    *  the same shift semantics as dnd-kit's `arrayMove` (the rest of the
-   *  list closes the gap; later items shift up if `from < to`, down if
-   *  `from > to`). No-op if either id is unknown or they're identical. */
+  *  list closes the gap; later items shift up if `from < to`, down if
+  *  `from > to`). No-op if either id is unknown or they're identical. */
   reorderRepos: (fromId: string, toId: string) => void
-  setDetailCollapsed: (collapsed: boolean) => void
-  toggleDetailCollapsed: () => void
-  /** Update the persisted top-bottom focus-toggle preference. The effective
-   *  rendered layout mode should be derived from `repoWorkspaceBehavior()`. */
-  setDetailFocusMode: (focused: boolean) => void
-  toggleDetailFocusMode: () => void
-  setWorkspaceLayout: (layout: RepoWorkspaceLayout) => void
-  applySessionLayoutState: (
-    layout: Pick<SessionState, 'workspaceLayout' | 'detailCollapsed' | 'detailFocusMode' | 'detailPaneSizes'>,
-  ) => void
+  applySessionLayoutState: (layout: Pick<SessionState, 'branchListPaneVisible' | 'workspacePaneSizes'>) => void
   applySessionSelectedTerminalState: (selectedTerminalByWorktree: Record<string, string>) => void
   applySessionWorkspacePaneViewByRepo: (workspacePaneViewByRepo: Record<string, WorkspacePaneView>) => void
-  setDetailPaneSize: (layout: RepoWorkspaceLayout, size: number) => void
-  setDetailPaneSizes: (sizes: WorkspaceDetailPaneSizes) => void
+  setBranchListPaneVisible: (visible: boolean) => void
+  toggleBranchListPaneVisible: () => void
+  setWorkspacePaneSize: (layout: RepoWorkspaceLayout, size: number) => void
+  setWorkspacePaneSizes: (sizes: WorkspacePaneSizes) => void
   resetLayout: () => void
   setSelectedTerminal: (worktreeTerminalKey: string, key: string | null) => void
   cycleActive: (direction: 1 | -1) => void
@@ -219,6 +215,7 @@ export interface RuntimeCoherentRepoProjectionActions {
   setWorkspacePaneView: (id: string, tab: WorkspacePaneView) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
   selectBranch: (id: string, branch: string) => void
+  clearSelectedBranch: (id: string) => void
   refreshSnapshot: (id: string, options?: { skipLogBackfill?: boolean; token?: number }) => Promise<void>
   refreshSnapshotAndStatus: (id: string, options?: { skipLogBackfill?: boolean; token?: number }) => Promise<void>
   refreshPullRequests: (
@@ -270,6 +267,7 @@ export interface ReposStore
     RestorableWorkspaceState,
     LocalWorkspaceState,
     RestorableWorkspaceActions,
+    LocalWorkspaceActions,
     RuntimeCoherentRepoProjectionActions,
     RepoMutationActions {}
 

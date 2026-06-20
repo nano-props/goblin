@@ -47,7 +47,6 @@ interface WorkspacePaneViewStripProps {
   responsiveCompact?: boolean
   activeTabIdentity: string | null
   panelActive?: boolean
-  focusMode?: boolean
   focusRegistry?: FocusRegistry<string, HTMLButtonElement>
   emptyFocusKey?: string
   /**
@@ -84,7 +83,6 @@ export function WorkspacePaneViewStrip({
   activeTabIdentity,
   responsiveCompact,
   panelActive,
-  focusMode,
   focusRegistry: externalFocusRegistry,
   emptyFocusKey = EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY,
   isLoading = false,
@@ -288,7 +286,6 @@ export function WorkspacePaneViewStrip({
       <ToolbarTabStripBody>
         <WorkspacePaneViewTooltipLayer
           tabs={tabs}
-          focusMode={focusMode}
           role="tablist"
           aria-label={t('workspace-pane-views.tabs')}
           getTooltip={getTooltip}
@@ -375,7 +372,6 @@ export function WorkspacePaneViewStrip({
           <SortableContext items={sortableIds} strategy={horizontalListSortingStrategy}>
             <WorkspacePaneViewTooltipLayer
               tabs={tabs}
-              focusMode={focusMode}
               role="tablist"
               aria-label={t('workspace-pane-views.tabs')}
               getTooltip={getTooltip}
@@ -618,13 +614,11 @@ function SortableWorkspacePaneView({
 
 interface WorkspacePaneViewTooltipLayerProps extends ComponentPropsWithoutRef<'div'> {
   tabs: WorkspacePaneViewSummary[]
-  focusMode?: boolean
   getTooltip: (tab: WorkspacePaneViewSummary) => string
 }
 
 function WorkspacePaneViewTooltipLayer({
   tabs,
-  focusMode,
   getTooltip,
   children,
   ...props
@@ -636,7 +630,7 @@ function WorkspacePaneViewTooltipLayer({
       attributeName="data-workspace-pane-view-tooltip-id"
       getItemId={workspacePaneViewIdentity}
       renderTooltip={(tab) => <div className="truncate text-xs font-semibold text-foreground">{getTooltip(tab)}</div>}
-      placement={focusMode ? 'bottom-start' : 'top-start'}
+      placement="top-start"
       delayMs={DELEGATED_TOOLTIP_DEFAULTS.delayMs}
       tooltipClassName="px-3 py-2"
       asChild

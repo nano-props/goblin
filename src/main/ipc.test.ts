@@ -34,7 +34,6 @@ function settingsPrefs(overrides: Partial<SettingsPrefs> = {}): SettingsPrefs {
     shortcutsDisabled: false,
     globalShortcutDisabled: false,
     swapCloseShortcuts: false,
-    toggleDetailOnActionBarBlankClick: false,
     globalShortcut: '',
     terminalApp: 'auto',
     editorApp: 'auto',

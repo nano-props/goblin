@@ -3,7 +3,6 @@ import { replaceRepo } from '#/web/stores/repos/helpers.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
-import * as settingsClient from '#/web/settings-client.ts'
 import {
   createRepoBranch as branch,
   installGoblinTestBridge,
@@ -11,7 +10,10 @@ import {
   seedRepoState,
 } from '#/web/stores/repos/test-utils.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
-import { DEFAULT_DETAIL_PANE_SIZES } from '#/shared/workspace-layout.ts'
+import {
+  DEFAULT_BRANCH_LIST_PANE_VISIBLE,
+  DEFAULT_WORKSPACE_PANE_SIZES,
+} from '#/shared/workspace-layout.ts'
 const REPO_ID = '/tmp/gbl-selection-test-repo'
 const ipcHandlers: Record<string, (input: any) => unknown> = {}
 
@@ -29,7 +31,7 @@ function seedRepo(options: {
       branch('feature/plain'),
     ],
     currentBranch: options.currentBranch ?? 'main',
-    selectedBranch: options.selectedBranch ?? 'feature/plain',
+    selectedBranch: options.selectedBranch === undefined ? 'feature/plain' : options.selectedBranch,
     workspacePaneView: options.workspacePaneView ?? 'status',
     remote: {
       remotes: ['origin'],
@@ -241,6 +243,33 @@ describe('selectBranch', () => {
   })
 })
 
+describe('clearSelectedBranch', () => {
+  test('clears selection, persists the empty selection, and skips pull request refresh', async () => {
+    let calls = 0
+    ipcHandlers['repo.pullRequests'] = async () => {
+      calls += 1
+      return []
+    }
+    seedRepo({ selectedBranch: 'feature/plain' })
+
+    useReposStore.getState().clearSelectedBranch(REPO_ID)
+    await flushAsyncWork()
+
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBeNull()
+    expect(useReposStore.getState().restorableRepoCache[REPO_ID]?.ui.selectedBranch).toBeNull()
+    expect(calls).toBe(0)
+  })
+
+  test('does nothing when there is no selected branch', () => {
+    seedRepo({ selectedBranch: null })
+    const before = useReposStore.getState().repos[REPO_ID]
+
+    useReposStore.getState().clearSelectedBranch(REPO_ID)
+
+    expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
+  })
+})
+
 describe('setWorkspacePaneView', () => {
   test('persists the selected workspace pane view immediately', () => {
     seedRepo({ selectedBranch: 'feature/worktree', workspacePaneView: 'status' })
@@ -321,199 +350,83 @@ describe('setWorkspacePaneView', () => {
   })
 })
 
-describe('setWorkspaceLayout', () => {
-  test('allows detail collapse changes in top-bottom layout', () => {
-    useReposStore.getState().setWorkspaceLayout('top-bottom')
-    useReposStore.getState().setDetailCollapsed(false)
-    expect(useReposStore.getState().detailCollapsed).toBe(false)
-
-    useReposStore.getState().setDetailCollapsed(true)
-    expect(useReposStore.getState().detailCollapsed).toBe(true)
-  })
-
-  test('expands detail and blocks collapse in left-right layout', () => {
-    useReposStore.getState().setDetailCollapsed(true)
-
-    useReposStore.getState().setWorkspaceLayout('left-right')
-
-    expect(useReposStore.getState().workspaceLayout).toBe('left-right')
-    expect(useReposStore.getState().detailCollapsed).toBe(false)
-
-    useReposStore.getState().setDetailCollapsed(true)
-    expect(useReposStore.getState().detailCollapsed).toBe(false)
-
-    useReposStore.getState().toggleDetailCollapsed()
-    expect(useReposStore.getState().detailCollapsed).toBe(false)
-  })
-
-  test('allows collapse again after returning to top-bottom layout', () => {
-    useReposStore.getState().setWorkspaceLayout('left-right')
-    useReposStore.getState().setWorkspaceLayout('top-bottom')
-
-    useReposStore.getState().toggleDetailCollapsed()
-
-    expect(useReposStore.getState().workspaceLayout).toBe('top-bottom')
-    expect(useReposStore.getState().detailCollapsed).toBe(true)
-  })
-
-  test('applies session layout state atomically with shared normalization rules', () => {
+describe('workspace pane layout state', () => {
+  test('applies session pane state atomically with shared normalization rules', () => {
     useReposStore.getState().applySessionLayoutState({
-      workspaceLayout: 'left-right',
-      detailCollapsed: true,
-      detailFocusMode: true,
-      detailPaneSizes: { 'top-bottom': 55, 'left-right': 45 },
+      branchListPaneVisible: false,
+      workspacePaneSizes: { 'left-right': 45 },
     })
 
     expect(useReposStore.getState()).toMatchObject({
-      workspaceLayout: 'left-right',
-      detailCollapsed: false,
-      detailFocusMode: true,
-      detailPaneSizes: { 'top-bottom': 55, 'left-right': 45 },
+      branchListPaneVisible: false,
+      workspacePaneSizes: { 'left-right': 45 },
     })
   })
 
-  // Regression test for the CmdOrCtrl+J disappearance bug: when the user
-  // toggles the layout through the in-app toolbar (rather than the
-  // native radio menu), the renderer must push the new value to main so
-  // the native menu's `view-toggle-detail` `enabled` predicate — and
-  // therefore the CmdOrCtrl+J accelerator — rebuilds in the same tick.
-  describe('push to native menu', () => {
-    test('forwards the new layout to the native menu when setWorkspaceLayout changes it', () => {
-      const pushSpy = vi.spyOn(settingsClient, 'pushWorkspaceLayoutToNativeMenu').mockResolvedValue(undefined)
+  test('keeps compact pane local to navigation instead of session layout', () => {
+    seedRepo({ selectedBranch: 'feature/plain' })
+    useReposStore.setState({ activeId: null, compactWorkspacePane: 'workspace' })
 
-      useReposStore.getState().setWorkspaceLayout('top-bottom')
-      // The push is fire-and-forget — wait a microtask for the Promise
-      // resolution to settle before asserting.
-      return Promise.resolve().then(() => {
-        expect(pushSpy).toHaveBeenCalledTimes(1)
-        expect(pushSpy).toHaveBeenCalledWith('top-bottom')
-        pushSpy.mockRestore()
-      })
-    })
+    useReposStore.getState().setActive(REPO_ID)
 
-    test('does not forward when the layout is unchanged', () => {
-      const pushSpy = vi.spyOn(settingsClient, 'pushWorkspaceLayoutToNativeMenu').mockResolvedValue(undefined)
+    expect(useReposStore.getState().compactWorkspacePane).toBe('branch')
 
-      // Default layout is 'left-right'; setting it again is a no-op.
-      useReposStore.getState().setWorkspaceLayout('left-right')
+    useReposStore.getState().setCompactWorkspacePane('workspace')
 
-      expect(pushSpy).not.toHaveBeenCalled()
-      pushSpy.mockRestore()
-    })
+    expect(useReposStore.getState().compactWorkspacePane).toBe('workspace')
+  })
 
-    test('forwards the reset back to left-right after a top-bottom detour', () => {
-      const pushSpy = vi.spyOn(settingsClient, 'pushWorkspaceLayoutToNativeMenu').mockResolvedValue(undefined)
+  test('does not leave compact Workspace View armed without a selected branch', () => {
+    seedRepo({ selectedBranch: null })
 
-      useReposStore.getState().setWorkspaceLayout('top-bottom')
-      pushSpy.mockClear()
+    useReposStore.getState().setCompactWorkspacePane('workspace')
 
-      useReposStore.getState().resetLayout()
-
-      expect(pushSpy).toHaveBeenCalledTimes(1)
-      expect(pushSpy).toHaveBeenCalledWith('left-right')
-      pushSpy.mockRestore()
-    })
-
-    test('does not push from resetLayout when already at left-right', () => {
-      const pushSpy = vi.spyOn(settingsClient, 'pushWorkspaceLayoutToNativeMenu').mockResolvedValue(undefined)
-
-      useReposStore.getState().resetLayout()
-
-      expect(pushSpy).not.toHaveBeenCalled()
-      pushSpy.mockRestore()
-    })
+    expect(useReposStore.getState().compactWorkspacePane).toBe('branch')
   })
 })
 
-describe('setDetailFocusMode', () => {
-  test('enables focus mode and expands detail in top-bottom layout', () => {
-    useReposStore.getState().setWorkspaceLayout('top-bottom')
-    useReposStore.getState().setDetailCollapsed(true)
+describe('setBranchListPaneVisible', () => {
+  test('hides the large-screen Branch View', () => {
+    useReposStore.getState().setBranchListPaneVisible(false)
 
-    useReposStore.getState().setDetailFocusMode(true)
-
-    expect(useReposStore.getState().detailFocusMode).toBe(true)
-    expect(useReposStore.getState().detailCollapsed).toBe(false)
+    expect(useReposStore.getState().branchListPaneVisible).toBe(false)
   })
 
-  test('keeps focus mode when detail is collapsed', () => {
-    useReposStore.getState().setWorkspaceLayout('top-bottom')
-    useReposStore.getState().setDetailFocusMode(true)
+  test('can show the large-screen Branch View again', () => {
+    useReposStore.getState().setBranchListPaneVisible(false)
+    useReposStore.getState().setBranchListPaneVisible(true)
 
-    useReposStore.getState().setDetailCollapsed(true)
-
-    expect(useReposStore.getState().detailFocusMode).toBe(true)
-    expect(useReposStore.getState().detailCollapsed).toBe(true)
+    expect(useReposStore.getState().branchListPaneVisible).toBe(true)
   })
 
-  test('exits focus mode without expanding a collapsed detail panel', () => {
-    useReposStore.getState().setWorkspaceLayout('top-bottom')
-    useReposStore.getState().setDetailFocusMode(true)
-    useReposStore.getState().setDetailCollapsed(true)
+  test('toggles the large-screen Branch View visibility', () => {
+    useReposStore.getState().toggleBranchListPaneVisible()
 
-    useReposStore.getState().setDetailFocusMode(false)
-
-    expect(useReposStore.getState().detailFocusMode).toBe(false)
-    expect(useReposStore.getState().detailCollapsed).toBe(true)
+    expect(useReposStore.getState().branchListPaneVisible).toBe(false)
   })
 
-  test('re-expands into focus mode when focus is enabled while collapsed', () => {
-    useReposStore.getState().setWorkspaceLayout('top-bottom')
-    useReposStore.getState().setDetailFocusMode(true)
-    useReposStore.getState().setDetailCollapsed(true)
-
-    useReposStore.getState().toggleDetailCollapsed()
-
-    expect(useReposStore.getState().detailFocusMode).toBe(true)
-    expect(useReposStore.getState().detailCollapsed).toBe(false)
-  })
-
-  test('preserves focus mode when switching to left-right layout', () => {
-    useReposStore.getState().setDetailFocusMode(true)
-
-    useReposStore.getState().setWorkspaceLayout('left-right')
-
-    expect(useReposStore.getState().workspaceLayout).toBe('left-right')
-    expect(useReposStore.getState().detailFocusMode).toBe(true)
-    expect(useReposStore.getState().detailCollapsed).toBe(false)
-  })
-
-  test('enables focus mode in left-right layout', () => {
-    useReposStore.getState().setWorkspaceLayout('left-right')
-
-    useReposStore.getState().setDetailFocusMode(true)
-
-    expect(useReposStore.getState().detailFocusMode).toBe(true)
-    expect(useReposStore.getState().detailCollapsed).toBe(false)
-  })
-
-  test('preserves focus preference when filtering leaves no selected branch', () => {
+  test('preserves large-screen visibility when filtering leaves no selected branch', () => {
     seedRepo({ selectedBranch: 'main', branches: [branch('main')] })
-    useReposStore.getState().setWorkspaceLayout('top-bottom')
-    useReposStore.getState().setDetailFocusMode(true)
+    useReposStore.getState().setBranchListPaneVisible(false)
 
     useReposStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBeNull()
-    expect(useReposStore.getState().detailFocusMode).toBe(true)
-    expect(useReposStore.getState().detailCollapsed).toBe(false)
+    expect(useReposStore.getState().branchListPaneVisible).toBe(false)
   })
 })
 
-describe('setDetailPaneSize', () => {
-  test('stores detail pane sizes per workspace layout', () => {
-    useReposStore.getState().setDetailPaneSize('top-bottom', 37.34)
-    useReposStore.getState().setDetailPaneSize('left-right', 72.28)
+describe('setWorkspacePaneSize', () => {
+  test('stores the workspace pane size for the left-right layout', () => {
+    useReposStore.getState().setWorkspacePaneSize('left-right', 72.28)
 
-    expect(useReposStore.getState().detailPaneSizes).toEqual({ 'top-bottom': 37.3, 'left-right': 72.3 })
+    expect(useReposStore.getState().workspacePaneSizes).toEqual({ 'left-right': 72.3 })
   })
 
   test('normalizes invalid and out-of-range sizes', () => {
-    useReposStore.getState().setDetailPaneSize('top-bottom', Number.NaN)
-    useReposStore.getState().setDetailPaneSize('left-right', 200)
+    useReposStore.getState().setWorkspacePaneSize('left-right', 200)
 
-    expect(useReposStore.getState().detailPaneSizes).toEqual({
-      'top-bottom': DEFAULT_DETAIL_PANE_SIZES['top-bottom'],
+    expect(useReposStore.getState().workspacePaneSizes).toEqual({
       'left-right': 90,
     })
   })
@@ -522,18 +435,14 @@ describe('setDetailPaneSize', () => {
 describe('resetLayout', () => {
   test('restores the initial workspace layout defaults', () => {
     useReposStore.setState({
-      workspaceLayout: 'left-right',
-      detailCollapsed: false,
-      detailFocusMode: true,
-      detailPaneSizes: { 'top-bottom': 35, 'left-right': 70 },
+      branchListPaneVisible: false,
+      workspacePaneSizes: { 'left-right': 70 },
     })
 
     useReposStore.getState().resetLayout()
 
-    expect(useReposStore.getState().workspaceLayout).toBe('left-right')
-    expect(useReposStore.getState().detailCollapsed).toBe(false)
-    expect(useReposStore.getState().detailFocusMode).toBe(false)
-    expect(useReposStore.getState().detailPaneSizes).toBe(DEFAULT_DETAIL_PANE_SIZES)
+    expect(useReposStore.getState().branchListPaneVisible).toBe(DEFAULT_BRANCH_LIST_PANE_VISIBLE)
+    expect(useReposStore.getState().workspacePaneSizes).toBe(DEFAULT_WORKSPACE_PANE_SIZES)
   })
 
   test('is idempotent when layout is already at defaults', () => {

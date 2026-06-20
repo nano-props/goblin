@@ -50,13 +50,11 @@ describe('workspace commands', () => {
         reorderWorkspacePaneViews: vi.fn(async () => true),
       })
       const navigation = navigationWith()
-      const setDetailCollapsed = vi.fn((collapsed: boolean) => useReposStore.getState().setDetailCollapsed(collapsed))
 
-      expect(runShowWorkspacePaneViewCommand({ repoId: REPO_ID, tab, navigation, setDetailCollapsed })).toBe(true)
+      expect(runShowWorkspacePaneViewCommand({ repoId: REPO_ID, tab, navigation })).toBe(true)
 
       expect(openWorkspacePaneView).toHaveBeenCalledWith(WORKTREE_KEY, tab)
       expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe(tab)
-      expect(useReposStore.getState().detailCollapsed).toBe(false)
     },
   )
 
@@ -85,12 +83,10 @@ describe('workspace commands', () => {
       reorderWorkspacePaneViews: vi.fn(async () => true),
     })
     const navigation = navigationWith()
-    const setDetailCollapsed = vi.fn((collapsed: boolean) => useReposStore.getState().setDetailCollapsed(collapsed))
 
-    await runTerminalPrimaryActionCommand({ repoId: REPO_ID, navigation, setDetailCollapsed })
+    await runTerminalPrimaryActionCommand({ repoId: REPO_ID, navigation })
 
     expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('terminal')
-    expect(useReposStore.getState().detailCollapsed).toBe(false)
     expect(createTerminal).toHaveBeenCalledWith({
       repoRoot: REPO_ID,
       branch: 'feature/worktree',
@@ -178,9 +174,8 @@ describe('workspace commands', () => {
       reorderWorkspacePaneViews: vi.fn(async () => true),
     })
     const navigation = navigationWith()
-    const setDetailCollapsed = vi.fn((collapsed: boolean) => useReposStore.getState().setDetailCollapsed(collapsed))
 
-    await runTerminalPrimaryActionCommand({ repoId: REPO_ID, navigation, setDetailCollapsed })
+    await runTerminalPrimaryActionCommand({ repoId: REPO_ID, navigation })
 
     expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('terminal')
     expect(createTerminal).not.toHaveBeenCalled()

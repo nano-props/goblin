@@ -164,7 +164,7 @@ export function useKeyboard({
         }
         case 'next-workspace-pane-view':
         case 'prev-workspace-pane-view': {
-          if (overlayOpen || !repo || !repo.ui.selectedBranch || keyboardState.detailCollapsed) break
+          if (overlayOpen || !repo || !repo.ui.selectedBranch) break
           const selected = repo.data.branches.find((branch) => branch.name === repo.ui.selectedBranch)
           const worktreePath = selected?.worktree?.path
           if (!worktreePath) break

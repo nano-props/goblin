@@ -64,7 +64,6 @@ const appDataClientMocks = vi.hoisted(() => ({
   setShortcutsDisabled: vi.fn(async () => {}),
   setSwapCloseShortcuts: vi.fn(async () => {}),
   setTerminalNotificationsEnabled: vi.fn(async () => {}),
-  setToggleDetailOnActionBarBlankClick: vi.fn(async () => {}),
 }))
 
 vi.mock('#/web/settings-client.ts', () => ({
@@ -82,7 +81,6 @@ vi.mock('#/web/settings-client.ts', () => ({
   setShortcutsDisabled: appDataClientMocks.setShortcutsDisabled,
   setSwapCloseShortcuts: appDataClientMocks.setSwapCloseShortcuts,
   setTerminalNotificationsEnabled: appDataClientMocks.setTerminalNotificationsEnabled,
-  setToggleDetailOnActionBarBlankClick: appDataClientMocks.setToggleDetailOnActionBarBlankClick,
 }))
 
 describe('settings write paths', () => {
@@ -148,8 +146,6 @@ describe('settings write paths', () => {
     appDataClientMocks.setSwapCloseShortcuts.mockResolvedValue(undefined)
     appDataClientMocks.setTerminalNotificationsEnabled.mockReset()
     appDataClientMocks.setTerminalNotificationsEnabled.mockResolvedValue(undefined)
-    appDataClientMocks.setToggleDetailOnActionBarBlankClick.mockReset()
-    appDataClientMocks.setToggleDetailOnActionBarBlankClick.mockResolvedValue(undefined)
   })
 
   test('recordRecentRepo syncs recent repos into the settings snapshot cache', async () => {

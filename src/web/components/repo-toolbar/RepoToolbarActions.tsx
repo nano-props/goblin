@@ -6,8 +6,8 @@
 //             local snapshot (branches, status, log) from disk. Local-only
 //             repositories skip remote sync and refresh from local reads only.
 //   Filter  — single-button toggle for `branchViewMode` (worktrees-only /
-//             all), the same visual idiom as the Focus Mode button in
-//             `BranchDetailToolbar`.
+//             all), using the same topbar icon-button treatment as the
+//             surrounding controls.
 //   Create  — open the new-worktree dialog for the active repo.
 //
 // Branch-scoped operations (Checkout / Pull / Push / Open in Terminal

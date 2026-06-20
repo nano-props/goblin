@@ -20,7 +20,6 @@ export interface SettingsPrefs {
   shortcutsDisabled: boolean
   globalShortcutDisabled: boolean
   swapCloseShortcuts: boolean
-  toggleDetailOnActionBarBlankClick: boolean
   globalShortcut: string
   terminalApp: TerminalPref
   editorApp: EditorPref

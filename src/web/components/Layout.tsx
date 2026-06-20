@@ -2,13 +2,11 @@ import type { HTMLAttributes, ReactNode } from 'react'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { SplitPane } from '#/web/components/SplitPane.tsx'
 import { cn } from '#/web/lib/cn.ts'
-import { DEFAULT_DETAIL_PANE_SIZES, DEFAULT_WORKSPACE_LAYOUT, workspaceLayoutAxis } from '#/shared/workspace-layout.ts'
+import { DEFAULT_WORKSPACE_PANE_SIZES, DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 import type { RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
 import type { RepoWorkspaceMode } from '#/web/lib/workspace-layout.ts'
 const LEFT_RIGHT_BRANCH_MIN_SIZE = '14rem'
-const LEFT_RIGHT_DETAIL_MIN_SIZE = '22rem'
-const TOP_BOTTOM_BRANCH_MIN_SIZE = '10rem'
-const TOP_BOTTOM_DETAIL_MIN_SIZE = '9rem'
+const LEFT_RIGHT_WORKSPACE_MIN_SIZE = '22rem'
 
 interface ShellProps {
   children: ReactNode
@@ -16,11 +14,11 @@ interface ShellProps {
 
 interface RepoWorkspaceProps {
   branchPane: ReactNode
-  detailPane: ReactNode
+  workspacePane: ReactNode
   layout?: RepoWorkspaceLayout
-  mode?: Exclude<RepoWorkspaceMode, 'focus'>
-  detailSize?: number
-  onDetailSizeChange?: (size: number) => void
+  mode?: RepoWorkspaceMode
+  workspacePaneSize?: number
+  onWorkspacePaneSizeChange?: (size: number) => void
 }
 
 interface ToolbarProps extends HTMLAttributes<HTMLDivElement> {
@@ -76,41 +74,27 @@ export function ToolbarTitle({ title, description, after }: ToolbarTitleProps) {
 
 export function RepoWorkspace({
   branchPane,
-  detailPane,
+  workspacePane,
   layout = DEFAULT_WORKSPACE_LAYOUT,
   mode = 'split',
-  detailSize = DEFAULT_DETAIL_PANE_SIZES[layout],
-  onDetailSizeChange,
+  workspacePaneSize = DEFAULT_WORKSPACE_PANE_SIZES[layout],
+  onWorkspacePaneSizeChange,
 }: RepoWorkspaceProps) {
-  const axis = workspaceLayoutAxis(layout)
-  const workspaceMode = axis === 'rows' ? mode : 'split'
-  if (workspaceMode === 'split') {
-    return (
-      <SplitPane
-        orientation={axis === 'columns' ? 'horizontal' : 'vertical'}
-        before={branchPane}
-        after={detailPane}
-        afterSize={detailSize}
-        onAfterSizeChange={onDetailSizeChange}
-        beforeMinSize={axis === 'columns' ? LEFT_RIGHT_BRANCH_MIN_SIZE : TOP_BOTTOM_BRANCH_MIN_SIZE}
-        afterMinSize={axis === 'columns' ? LEFT_RIGHT_DETAIL_MIN_SIZE : TOP_BOTTOM_DETAIL_MIN_SIZE}
-        afterMaxSize="90%"
-        className="flex-1"
-      />
-    )
-  }
-  // Collapsed top/bottom layout keeps only the detail toolbar visible.
-  return (
-    <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_1px_2.25rem]">
-      {branchPane}
-      <WorkspaceSeparator />
-      {detailPane}
-    </div>
-  )
-}
+  if (mode === 'workspace-only') return <div className="flex min-h-0 flex-1">{workspacePane}</div>
 
-function WorkspaceSeparator() {
-  return <div className="bg-separator/70" aria-hidden />
+  return (
+    <SplitPane
+      orientation="horizontal"
+      before={branchPane}
+      after={workspacePane}
+      afterSize={workspacePaneSize}
+      onAfterSizeChange={onWorkspacePaneSizeChange}
+      beforeMinSize={LEFT_RIGHT_BRANCH_MIN_SIZE}
+      afterMinSize={LEFT_RIGHT_WORKSPACE_MIN_SIZE}
+      afterMaxSize="90%"
+      className="flex-1"
+    />
+  )
 }
 
 export function RepoWorkspacePane({ children }: PaneProps) {
