@@ -30,9 +30,11 @@ import {
 import {
   appendOutput,
   createEmptyTerminalRenderState,
+  disposeRender,
   isShellProcessName,
   replaySnapshot,
   resetRender,
+  resizeRender,
   takeSnapshot,
   type TerminalRenderState,
 } from '#/server/terminal/terminal-render-state.ts'
@@ -139,7 +141,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
       if (input.attachmentId) {
         registerTerminalAttachment(existing, input.attachmentId, size.cols, size.rows, input.attachmentConnected)
       }
-      return this.attachResult(existing)
+      return await this.attachResult(existing)
     }
 
     const worktreePath = parseWorktreePathFromKey(input.key) ?? input.key
@@ -158,7 +160,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
       rows: size.rows,
       pty: null,
       disposables: [],
-      render: createEmptyTerminalRenderState(),
+      render: createEmptyTerminalRenderState(size.cols, size.rows),
       attachments: new Map(),
       controller: null,
       allowImplicitAttachControl: true,
@@ -214,14 +216,14 @@ export class TerminalSessionManager<TOwner extends string | number> {
     return true
   }
 
-  attachSession(
+  async attachSession(
     ownerId: TOwner,
     sessionId: string,
     cols: number,
     rows: number,
     attachmentId?: string,
     attachmentConnected?: boolean,
-  ): TerminalAttachResult {
+  ): Promise<TerminalAttachResult> {
     if (!isValidTerminalSessionId(sessionId)) return { ok: false, message: 'error.invalid-arguments' }
     const size = normalizeTerminalSize(cols, rows)
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
@@ -231,7 +233,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
       registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
       this.applyOwnershipEffect(session, attachTerminalAttachment(session, attachmentId))
     }
-    return this.attachResult(session)
+    return await this.attachResult(session)
   }
 
   resizeSession(
@@ -374,10 +376,10 @@ export class TerminalSessionManager<TOwner extends string | number> {
     for (const sessionId of Array.from(this.sessionsById.keys())) this.closeSession(sessionId)
   }
 
-  getSessionSnapshot(ownerId: TOwner, sessionId: string): TerminalSessionSnapshot | null {
+  async getSessionSnapshot(ownerId: TOwner, sessionId: string): Promise<TerminalSessionSnapshot | null> {
     const session = this.getSession(ownerId, sessionId)
     if (!session) return null
-    const snap = takeSnapshot(session.render)
+    const snap = await takeSnapshot(session.render)
     if (!snap) return null
     return { sessionId, snapshot: snap.snapshot, snapshotSeq: snap.snapshotSeq }
   }
@@ -418,12 +420,11 @@ export class TerminalSessionManager<TOwner extends string | number> {
   }
 
   // T4.1: aggregate replay-buffer stats across all live sessions, for
-  // exposure via `ServerTerminalHost.getDiagnostics()`. The per-session
-  // buffer is the source of truth for reattach; the renderer caches
-  // a copy but the server's view is the authoritative memory number.
-  // The char count is a close approximation of bytes for terminal
-  // output (mostly ASCII); full UTF-16 byte count would be
-  // `buffer.length * 2` and is an upper bound.
+  // exposure via `ServerTerminalHost.getDiagnostics()`. The raw buffer is
+  // no longer the reattach source of truth, but it still drives the
+  // authoritative memory number for retained PTY output. The char count is
+  // a close approximation of bytes for terminal output (mostly ASCII); full
+  // UTF-16 byte count would be `buffer.length * 2` and is an upper bound.
   getSessionBufferStats(): { count: number; totalBufferChars: number; maxBufferChars: number } {
     let count = 0
     let totalBufferChars = 0
@@ -454,21 +455,17 @@ export class TerminalSessionManager<TOwner extends string | number> {
     )
   }
 
-  // Sends SIGWINCH to the child PTY. The shell responds by re-painting
-  // its current frame at the new dimensions, and the re-paint bytes
-  // arrive through the regular `onData` path → `appendOutput` →
-  // `session.render.buffer`. If a client attaches between this call
-  // and the re-paint, the snapshot it receives was laid out for the
-  // old size; the live `output` event carrying the re-paint corrects
-  // the visible state as soon as it streams in. This is acceptable
-  // because the window is short (a few hundred ms for typical shells)
-  // and a single terminal state is always the result of decoding the
-  // concatenated stream.
+  // Sends SIGWINCH to the child PTY and queues the same geometry change
+  // into the server-side headless xterm state. The shell's repaint still
+  // arrives through the regular `onData` path, but snapshots taken during
+  // the transition are serialized from a screen model with the canonical
+  // dimensions instead of replaying raw historical bytes into the client.
   private resizeSessionPty(session: TerminalSession<TOwner>, cols: number, rows: number): boolean {
     if (!session.pty) return false
     if (session.cols === cols && session.rows === rows) return true
     try {
       this.ptySupervisor.resize(session.pty, cols, rows)
+      resizeRender(session.render, cols, rows)
       session.cols = cols
       session.rows = rows
       this.emitOwnership(session)
@@ -500,8 +497,9 @@ export class TerminalSessionManager<TOwner extends string | number> {
     }
   }
 
-  private attachResult(session: TerminalSession<TOwner>): Extract<TerminalAttachResult, { ok: true }> {
-    const snap = replaySnapshot(session.render)
+  private async attachResult(session: TerminalSession<TOwner>): Promise<TerminalAttachResult> {
+    const snap = await replaySnapshot(session.render)
+    if (!snap) return { ok: false, message: 'error.unavailable' }
     return {
       ok: true,
       sessionId: session.id,
@@ -550,7 +548,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     session.rows = rows
     if (phase === 'restarting') markTerminalSessionRestarting(session)
     else markTerminalSessionOpening(session)
-    resetRender(session.render)
+    resetRender(session.render, cols, rows)
     session.inputQueue = []
     session.inputFlushScheduled = false
   }
@@ -639,11 +637,12 @@ export class TerminalSessionManager<TOwner extends string | number> {
         this.closeSession(session.id)
       }),
     )
-    return this.attachResult(session)
+    return await this.attachResult(session)
   }
 
   private disposeSessionResources(session: TerminalSession<TOwner>): void {
     disposeSessionListeners(session)
+    disposeRender(session.render)
     if (session.pty) {
       try {
         this.ptySupervisor.kill(session.pty)

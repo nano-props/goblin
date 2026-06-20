@@ -1,27 +1,66 @@
-// Per-session replay state. Owns the raw PTY output stream the server
-// replays to a newly-attached client, plus a sequence counter for
-// client-side dedup. The buffer is the single source of truth — the
-// client writes the replay verbatim into its own local xterm and that
-// is what the user sees.
+import * as xtermHeadlessImport from '@xterm/headless'
+import { SerializeAddon } from '@xterm/addon-serialize'
+import { Unicode11Addon } from '@xterm/addon-unicode11'
+import type {
+  ITerminalAddon,
+  ITerminalInitOnlyOptions,
+  ITerminalOptions,
+  Terminal as HeadlessTerminalInstance,
+} from '@xterm/headless'
+
+// Per-session render state. The raw PTY buffer is retained for diagnostics
+// and bounded-tail recovery, but attach/takeover hydration is generated from
+// the server-side headless xterm state. That keeps "current screen" semantics
+// in xterm's parser instead of replaying historical erase/repaint bytes into
+// each newly-attached renderer.
 
 const MAX_BUFFER_CHARS = 16 * 1024 * 1024
+const DEFAULT_COLS = 80
+const DEFAULT_ROWS = 24
+const HEADLESS_SCROLLBACK_ROWS = 10_000
+
+interface TerminalScreenState {
+  terminal: HeadlessTerminalInstance
+  serializer: SerializeAddon
+  chain: Promise<void>
+  disposePromise: Promise<void>
+  resolveDisposed: () => void
+  appliedSeq: number
+  disposed: boolean
+}
+
+type HeadlessTerminalConstructor = new (
+  options?: ITerminalOptions & ITerminalInitOnlyOptions,
+) => HeadlessTerminalInstance
+
+const headlessModule = (
+  'default' in xtermHeadlessImport ? xtermHeadlessImport.default : xtermHeadlessImport
+) as {
+  Terminal: HeadlessTerminalConstructor
+}
+const HeadlessTerminal = headlessModule.Terminal
 
 export interface TerminalRenderState {
   sequence: number
-  /** Concatenated raw PTY output. The client writes this verbatim into its xterm on attach. */
+  /** Concatenated raw PTY output retained for diagnostics and bounded fallback state. */
   buffer: string
   /** Set to true the first time the buffer is truncated. Stays true for the rest of the session. */
   bufferTruncated: boolean
   /** Last OSC 0 title set by the shell (parsed out of `buffer`). */
   title: string | null
+  screen: TerminalScreenState
 }
 
-export function createEmptyTerminalRenderState(): TerminalRenderState {
-  return { sequence: 0, buffer: '', bufferTruncated: false, title: null }
+export function createEmptyTerminalRenderState(
+  cols: number = DEFAULT_COLS,
+  rows: number = DEFAULT_ROWS,
+): TerminalRenderState {
+  return { sequence: 0, buffer: '', bufferTruncated: false, title: null, screen: createScreenState(cols, rows) }
 }
 
 export function appendOutput(state: TerminalRenderState, data: string): number {
   state.sequence += 1
+  const seq = state.sequence
   state.buffer += data
   if (state.buffer.length > MAX_BUFFER_CHARS) {
     state.buffer = safeTail(state.buffer, MAX_BUFFER_CHARS)
@@ -29,36 +68,136 @@ export function appendOutput(state: TerminalRenderState, data: string): number {
   }
   const newTitle = extractTitle(data)
   if (newTitle !== undefined && newTitle !== state.title) state.title = newTitle
-  return state.sequence
+  queueScreenWrite(state.screen, data, seq)
+  return seq
 }
 
 export interface RenderSnapshot {
-  /** Raw output to write into the client xterm. */
+  /** Serialized current screen to write into the client xterm. */
   snapshot: string
-  /** Sequence at the time the snapshot was taken. Client dedup boundary. */
+  /** Last sequence included in the serialized headless screen. Client dedup boundary. */
   snapshotSeq: number
   /** True iff the buffer was ever truncated; client should reset its xterm. */
   snapshotTruncated: boolean
 }
 
-export function replaySnapshot(state: TerminalRenderState): RenderSnapshot {
-  return {
-    snapshot: cleanReplayBuffer(state.buffer),
-    snapshotSeq: state.sequence,
-    snapshotTruncated: state.bufferTruncated,
+export async function replaySnapshot(state: TerminalRenderState): Promise<RenderSnapshot | null> {
+  for (;;) {
+    const screen = state.screen
+    // Capture a fence instead of waiting for `state.screen.chain` to go
+    // idle forever. Output appended after this point is intentionally left
+    // for the client's seq-based live replay, while `appliedSeq` records
+    // exactly how far the serialized headless screen has parsed.
+    const fence = Promise.race([screen.chain.catch(() => undefined), screen.disposePromise])
+    await fence
+    if (screen !== state.screen) continue
+    if (screen.disposed) return null
+    return {
+      snapshot: screen.serializer.serialize(),
+      snapshotSeq: screen.appliedSeq,
+      snapshotTruncated: state.bufferTruncated,
+    }
   }
 }
 
-export function takeSnapshot(state: TerminalRenderState): RenderSnapshot | null {
+export async function takeSnapshot(state: TerminalRenderState): Promise<RenderSnapshot | null> {
   if (state.sequence === 0) return null
-  return replaySnapshot(state)
+  return await replaySnapshot(state)
 }
 
-export function resetRender(state: TerminalRenderState): void {
+export function resizeRender(state: TerminalRenderState, cols: number, rows: number): void {
+  queueScreenStep(state.screen, (screen) => {
+    screen.terminal.resize(cols, rows)
+  })
+}
+
+export function resetRender(
+  state: TerminalRenderState,
+  cols: number = DEFAULT_COLS,
+  rows: number = DEFAULT_ROWS,
+): void {
+  disposeScreenState(state.screen)
   state.sequence = 0
   state.buffer = ''
   state.bufferTruncated = false
   state.title = null
+  state.screen = createScreenState(cols, rows)
+}
+
+export function disposeRender(state: TerminalRenderState): void {
+  disposeScreenState(state.screen)
+}
+
+function createScreenState(cols: number, rows: number): TerminalScreenState {
+  let resolveDisposed: () => void = () => undefined
+  const disposePromise = new Promise<void>((resolve) => {
+    resolveDisposed = resolve
+  })
+  const terminal = new HeadlessTerminal({
+    allowProposedApi: true,
+    cols,
+    rows,
+    scrollback: HEADLESS_SCROLLBACK_ROWS,
+    rescaleOverlappingGlyphs: true,
+  })
+  terminal.loadAddon(new Unicode11Addon() as ITerminalAddon)
+  terminal.unicode.activeVersion = '11'
+  const serializer = new SerializeAddon()
+  terminal.loadAddon(serializer as unknown as ITerminalAddon)
+  return {
+    terminal,
+    serializer,
+    chain: Promise.resolve(),
+    disposePromise,
+    resolveDisposed,
+    appliedSeq: 0,
+    disposed: false,
+  }
+}
+
+function queueScreenWrite(screen: TerminalScreenState, data: string, seq: number): void {
+  queueScreenStep(screen, (current) => {
+    return Promise.race([
+      new Promise<void>((resolve) => {
+        try {
+          current.terminal.write(data, () => {
+            if (!current.disposed) current.appliedSeq = Math.max(current.appliedSeq, seq)
+            resolve()
+          })
+        } catch {
+          resolve()
+        }
+      }),
+      current.disposePromise,
+    ])
+  })
+}
+
+function queueScreenStep(
+  screen: TerminalScreenState,
+  step: (screen: TerminalScreenState) => void | Promise<void>,
+): void {
+  const previous = screen.chain.catch(() => undefined)
+  screen.chain = Promise.race([previous, screen.disposePromise]).then(async () => {
+    if (screen.disposed) return
+    await step(screen)
+  })
+}
+
+function disposeScreenState(screen: TerminalScreenState): void {
+  if (screen.disposed) return
+  screen.disposed = true
+  screen.resolveDisposed()
+  try {
+    screen.serializer.dispose()
+  } catch {
+    // Best effort: terminal disposal should still run even if an addon throws.
+  }
+  try {
+    screen.terminal.dispose()
+  } catch {
+    // Best effort cleanup during session shutdown/restart.
+  }
 }
 
 // Pull a tail slice off `buffer` that is safe to use as a replay
@@ -121,15 +260,6 @@ function stripLeadingIncompleteAnsi(s: string): string {
   if (c2 >= 0x5c && c2 <= 0x7e) return s
   // Unrecognized or incomplete ESC sequence: drop the leading ESC pair
   return s.slice(2)
-}
-
-const CSI_PATTERN = String.raw`\x1b\[[0-9:;<=>?]*[ -/]*[@-~]`
-const LEADING_ZSH_PROMPT_EOL_MARK_RE = new RegExp(
-  String.raw`^(?:${CSI_PATTERN})*\x1b\[7m%\x1b\[27m(?:${CSI_PATTERN})*[^\S\r\n]*\r ?\r+(?:${CSI_PATTERN})*\x1b\[J`,
-)
-
-function cleanReplayBuffer(buffer: string): string {
-  return buffer.replace(LEADING_ZSH_PROMPT_EOL_MARK_RE, '')
 }
 
 export function isShellProcessName(processName: string): boolean {

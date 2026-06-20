@@ -73,9 +73,10 @@ export type TerminalTakeoverResult =
 /**
  * Successful attach/restart result.
  *
- * `snapshot`/`snapshotSeq` are the session's server-side render buffer
- * and its monotonic sequence number. The renderer hydrates from these
- * and re-replays any post-snapshot events the runtime captures.
+ * `snapshot`/`snapshotSeq` are the session's server-side serialized
+ * xterm screen and the last PTY output sequence included in that screen.
+ * The renderer hydrates from these and re-replays any post-snapshot
+ * events the runtime captures.
  *
  * First-frame contract: a successful `attach`/`restart` response is
  * the authoritative handshake for that session's frame state. All

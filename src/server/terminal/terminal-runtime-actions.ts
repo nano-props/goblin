@@ -67,7 +67,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       ) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
-      const result = manager.attachSession(
+      const result = await manager.attachSession(
         ownerId,
         input.sessionId,
         input.cols,
@@ -219,14 +219,14 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       return closed
     },
 
-    getSessionSnapshot(
+    async getSessionSnapshot(
       clientId: string,
       ownerId: string,
       input: TerminalSessionSnapshotInput,
-    ): TerminalSessionSnapshot | null {
+    ): Promise<TerminalSessionSnapshot | null> {
       if (!isValidTerminalClientId(clientId)) return null
       if (!isValidTerminalSessionId(input?.sessionId)) return null
-      return manager.getSessionSnapshot(ownerId, input.sessionId)
+      return await manager.getSessionSnapshot(ownerId, input.sessionId)
     },
 
     reorderViews(clientId: string, ownerId: string, input: WorkspacePaneReorderInput): TerminalMutationResult {

@@ -966,7 +966,9 @@ describe('server terminal runtime', () => {
     if (!ownerASession) throw new Error('expected owner A session')
 
     expect(await host.listSessions('client_shared', OWNER_2, '/repo')).toEqual([])
-    expect(host.getSessionSnapshot('client_shared', OWNER_2, { sessionId: ownerASession.sessionId })).toBeNull()
+    await expect(
+      host.getSessionSnapshot('client_shared', OWNER_2, { sessionId: ownerASession.sessionId }),
+    ).resolves.toBeNull()
     expect(host.close('client_shared', OWNER_2, { sessionId: ownerASession.sessionId })).toBe(false)
     expect(
       host.reorderViews('client_shared', OWNER_2, {

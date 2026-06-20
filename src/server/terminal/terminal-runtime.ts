@@ -191,8 +191,8 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     async prune(clientId, ownerId, repoRoot) {
       return await actions.prune(clientId, ownerId, repoRoot)
     },
-    getSessionSnapshot(clientId, ownerId, input) {
-      return actions.getSessionSnapshot(clientId, ownerId, input)
+    async getSessionSnapshot(clientId, ownerId, input) {
+      return await actions.getSessionSnapshot(clientId, ownerId, input)
     },
     reorderViews(clientId, ownerId, input) {
       return actions.reorderViews(clientId, ownerId, input)
