@@ -7,9 +7,8 @@ export function toolbarTabChromeClassName(options: {
   variant: ToolbarTabVariant
   active: boolean
   dragging?: boolean
-  // Only meaningful for the detail variant: tabs use a fixed width so title
-  // changes don't shift neighbouring tabs; compact strips
-  // live in narrow toolbars and pin one step tighter.
+  // Detail tabs use a fixed width so title changes don't shift neighbouring
+  // tabs; compact detail strips live in narrow toolbars and pin one step tighter.
   compact?: boolean
   hoverable?: boolean
 }): string {
@@ -29,9 +28,7 @@ export function toolbarTabChromeClassName(options: {
     variant === 'repo'
       ? active && !treatAsUnselected
         ? 'border-input bg-card text-foreground'
-        : compact
-          ? cn('border-transparent text-muted-foreground', hoverable && 'hover:bg-accent/70 hover:text-foreground')
-          : cn('border-transparent text-muted-foreground', hoverable && 'hover:bg-accent/70 hover:text-foreground')
+        : cn('border-transparent text-muted-foreground', hoverable && 'hover:bg-accent/70 hover:text-foreground')
       : active
         ? 'border-transparent bg-selected text-selected-foreground'
         : 'border-transparent text-muted-foreground hover:bg-accent/50 hover:text-foreground',

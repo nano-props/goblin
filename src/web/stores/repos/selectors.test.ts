@@ -269,11 +269,9 @@ describe('repo selectors', () => {
       repoTabStoreActionsEqual(
         repoTabStoreActionsFromStore({
           ensureWorkspaceOpen: fnA as never,
-          reorderRepos: fnA as never,
         }),
         repoTabStoreActionsFromStore({
-          ensureWorkspaceOpen: fnA as never,
-          reorderRepos: fnB as never,
+          ensureWorkspaceOpen: fnB as never,
         }),
       ),
     ).toBe(false)

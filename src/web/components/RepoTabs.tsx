@@ -1,12 +1,7 @@
-// Top repository tab strip — one compact tab per opened repository. Click
-// to focus, hover to reveal the close (×) button. The active tab gets a
-// raised surface treatment so it reads as the selected workspace above the
-// repository body.
-//
-// Drag-to-reorder uses dnd-kit (the de-facto choice in the React/shadcn/
-// tanstack ecosystem). PointerSensor with a small activation distance lets
-// a regular click still focus the repo without triggering a drag; keyboard
-// users use Arrow keys for tab activation.
+// Top repository tab strip — the active repository stays visible in the
+// compact toolbar while every open repository and open/clone action lives
+// in the switcher popover. Keyboard users can still move between repos with
+// Arrow/Home/End from the visible tab.
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
@@ -17,7 +12,6 @@ import type { RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
 import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
 import { useRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { repoTabStoreActionsEqual, repoTabStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
-import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
 
 interface RepoTabsProps {
   currentRepoId: string | null
@@ -48,14 +42,13 @@ export function RepoTabs({ currentRepoId, onOpenRepoPathDialog, onOpenRemote, on
             name: r.name,
             remoteDetails: r.remote.remoteDetails ?? [],
             lifecycle: r.remote.lifecycle,
-            unavailable: isRepoUnavailable(r),
           }
         })
         .filter((x): x is RepoTabSummary => x !== null),
     repoTabSummariesEqual,
   )
   const navigation = useMainWindowNavigation()
-  const { ensureWorkspaceOpen, reorderRepos } = useStoreWithEqualityFn(
+  const { ensureWorkspaceOpen } = useStoreWithEqualityFn(
     useReposStore,
     repoTabStoreActionsFromStore,
     repoTabStoreActionsEqual,
@@ -78,7 +71,6 @@ export function RepoTabs({ currentRepoId, onOpenRepoPathDialog, onOpenRemote, on
         repositories: t('repo-tabs.repos'),
         closeWithName: (name) => t('repo-tabs.close-named', { name }),
         more: t('repo-tabs.more'),
-        dragToReorder: t('repo-tabs.drag-to-reorder'),
         open: t('topbar.open'),
         openLocal: t('repo-tabs.open-local'),
         openLocalShortcut: shortcutsDisabled ? null : '⌘O',
@@ -90,7 +82,6 @@ export function RepoTabs({ currentRepoId, onOpenRepoPathDialog, onOpenRemote, on
       }}
       onActivate={navigation.activateRepo}
       onClose={navigation.closeRepo}
-      onReorder={reorderRepos}
       onOpenLocal={handleOpenLocal}
       onOpenRemote={onOpenRemote}
       onClone={onClone}

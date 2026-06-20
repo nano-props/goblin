@@ -71,10 +71,8 @@ export const zh: Record<DictKey, string> = {
 
   // ---- Repository tabs ---------------------------------------------------
   'repo-tabs.repos': '仓库',
-  'repo-tabs.close': '关闭',
   'repo-tabs.close-named': '关闭 {name}',
   'repo-tabs.more': '其他标签',
-  'repo-tabs.drag-to-reorder': '拖动以重新排序',
   'repo-tabs.open-local': '打开本地仓库…',
   'repo-tabs.open-remote': '打开远程仓库…',
   'repo-tabs.open-title': '打开本地仓库',

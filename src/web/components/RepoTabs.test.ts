@@ -21,7 +21,6 @@ describe('repoTabSummariesEqual', () => {
             displayName: 'example:repo',
           },
         },
-        unavailable: false,
       },
     ]
     const right: RepoTabSummary[] = [
@@ -41,7 +40,6 @@ describe('repoTabSummariesEqual', () => {
             displayName: 'example-renamed:repo',
           },
         },
-        unavailable: false,
       },
     ]
 

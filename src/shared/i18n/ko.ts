@@ -72,10 +72,8 @@ export const ko: Record<DictKey, string> = {
 
   // ---- Repository tabs ---------------------------------------------------
   'repo-tabs.repos': '리포지토리',
-  'repo-tabs.close': '닫기',
   'repo-tabs.close-named': '{name} 닫기',
   'repo-tabs.more': '더 많은 탭',
-  'repo-tabs.drag-to-reorder': '드래그하여 순서 변경',
   'repo-tabs.open-local': '로컬 리포지토리 열기…',
   'repo-tabs.open-remote': '원격 리포지토리 열기…',
   'repo-tabs.open-title': '로컬 리포지토리 열기',
