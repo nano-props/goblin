@@ -41,13 +41,17 @@ export interface RenderSnapshot {
   snapshotTruncated: boolean
 }
 
-export function takeSnapshot(state: TerminalRenderState): RenderSnapshot | null {
-  if (state.sequence === 0) return null
+export function replaySnapshot(state: TerminalRenderState): RenderSnapshot {
   return {
-    snapshot: state.buffer,
+    snapshot: cleanReplayBuffer(state.buffer),
     snapshotSeq: state.sequence,
     snapshotTruncated: state.bufferTruncated,
   }
+}
+
+export function takeSnapshot(state: TerminalRenderState): RenderSnapshot | null {
+  if (state.sequence === 0) return null
+  return replaySnapshot(state)
 }
 
 export function resetRender(state: TerminalRenderState): void {
@@ -117,6 +121,15 @@ function stripLeadingIncompleteAnsi(s: string): string {
   if (c2 >= 0x5c && c2 <= 0x7e) return s
   // Unrecognized or incomplete ESC sequence: drop the leading ESC pair
   return s.slice(2)
+}
+
+const CSI_PATTERN = String.raw`\x1b\[[0-9:;<=>?]*[ -/]*[@-~]`
+const LEADING_ZSH_PROMPT_EOL_MARK_RE = new RegExp(
+  String.raw`^(?:${CSI_PATTERN})*\x1b\[7m%\x1b\[27m(?:${CSI_PATTERN})*[^\S\r\n]*\r ?\r+(?:${CSI_PATTERN})*\x1b\[J`,
+)
+
+function cleanReplayBuffer(buffer: string): string {
+  return buffer.replace(LEADING_ZSH_PROMPT_EOL_MARK_RE, '')
 }
 
 export function isShellProcessName(processName: string): boolean {

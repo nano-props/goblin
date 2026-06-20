@@ -145,15 +145,19 @@ function sendRealtimeResponse(socket: TerminalRealtimeSocket, message: TerminalS
 }
 
 // Pause the buffered socket while an action's response is being prepared
-// when the action's response carries the authoritative first frame for
-// a terminal view. Without this, live `output` events that arrive during
-// the request can race ahead of the snapshot-bearing response and split
-// the initial prompt across replay and realtime delivery.
+// when the action's response carries the authoritative frame transition
+// for a terminal view. Without this, live realtime messages that arrive
+// during the request can race ahead of the authoritative response and
+// split the renderer's transition across two sources.
 //
 // `attach`, `restart`, and now `create` all return snapshot hydration
 // data that the renderer applies as one boundary. `session-snapshot`
 // still remains excluded because that payload is consumed as a later
 // reconciliation path rather than the primary first-frame handshake.
+// `takeover` does not return a fresh snapshot, but its response is still
+// the authoritative ownership/geometry handshake for the new controller;
+// the same socket must not observe the ownership event before that
+// response settles.
 export function shouldPauseRealtimeRequest(action: TerminalSocketRequestAction): boolean {
-  return action === 'attach' || action === 'restart' || action === 'create'
+  return action === 'attach' || action === 'restart' || action === 'create' || action === 'takeover'
 }

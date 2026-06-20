@@ -203,6 +203,23 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
+  test('replay snapshots omit a leading zsh prompt end marker prelude', async () => {
+    const { host, shutdown } = buildRuntime()
+    const sessionId = await createTerminalSession(host, 'client_1')
+    const prompt =
+      '\x1b[1m\x1b[7m%\x1b[27m\x1b[1m\x1b[0m                                                                            \r \r\r\x1b[0m\x1b[27m\x1b[24m\x1b[J👾:~/repo\r\n$ '
+    mockPtys[0]?.emitData(prompt)
+
+    const attach = await host.attach('client_1', OWNER_1, { sessionId, cols: 80, rows: 24 })
+    const snapshot = await host.getSessionSnapshot('client_1', OWNER_1, { sessionId })
+
+    expect(attach.ok).toBe(true)
+    if (!attach.ok) return
+    expect(attach.snapshot).toBe('👾:~/repo\r\n$ ')
+    expect(snapshot?.snapshot).toBe('👾:~/repo\r\n$ ')
+    shutdown()
+  })
+
   test('reattaching the grace controller restores connected ownership and canonical geometry', async () => {
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
@@ -885,6 +902,15 @@ describe('server terminal runtime', () => {
         controller: { attachmentId: 'attachment_b', status: 'connected' },
       },
     })
+    const messages = socketB.send.mock.calls.map(([payload]) => JSON.parse(String(payload)))
+    const responseIndex = messages.findIndex(
+      (message) => message.type === 'response' && message.requestId === 'req_takeover',
+    )
+    const ownershipIndex = messages.findIndex(
+      (message) => message.type === 'ownership' && message.event.sessionId === sessionId,
+    )
+    expect(responseIndex).toBeGreaterThanOrEqual(0)
+    expect(ownershipIndex).toBeGreaterThan(responseIndex)
 
     host.unregisterSocket('client_1', 'attachment_a', OWNER_1, socketA)
     host.unregisterSocket('client_1', 'attachment_b', OWNER_1, socketB)

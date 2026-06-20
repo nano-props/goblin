@@ -388,7 +388,7 @@ vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: xtermMocks.MockWebLink
 // mock the geometry module so the synchronous happy path resolves.
 const geometryMocks = vi.hoisted(() => ({
   preloadTerminalFont: vi.fn(async () => {}),
-  proposeTerminalGeometry: vi.fn(() => ({ cols: 80, rows: 24 })),
+  proposeTerminalGeometry: vi.fn<() => { cols: number; rows: number } | null>(() => ({ cols: 80, rows: 24 })),
 }))
 
 vi.mock('#/web/components/terminal/terminal-geometry.ts', () => ({
@@ -1490,6 +1490,90 @@ describe('ManagedTerminalSession', () => {
       role: 'controller',
       controllerStatus: 'connected',
       canTakeover: false,
+    })
+  })
+
+  test('takeover response starts a controller view for a hydrated viewer without a realtime event', async () => {
+    terminalCalls.takeover.mockResolvedValueOnce(
+      takeoverResult('session-1', {
+        controller: { attachmentId: 'attachment_local', status: 'connected' },
+        canonicalCols: 80,
+        canonicalRows: 24,
+      }),
+    )
+    terminalCalls.attach.mockResolvedValueOnce(
+      attachResult('session-1', {
+        controller: { attachmentId: 'attachment_local', status: 'connected' },
+        canonicalCols: 80,
+        canonicalRows: 24,
+        snapshot: 'post-takeover-screen',
+        snapshotSeq: 8,
+      }),
+    )
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session, {
+      role: 'viewer',
+      controllerStatus: 'connected',
+      canonicalCols: 120,
+      canonicalRows: 40,
+    })
+    session.attach(host)
+
+    expect(xtermMocks.terminals).toHaveLength(0)
+
+    await expect(session.takeover()).resolves.toBe(true)
+    await flushTerminalStart()
+
+    expect(terminalCalls.takeover).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_local',
+    })
+    expect(terminalCalls.attach).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      cols: 100,
+      rows: 30,
+    })
+    expect(xtermMocks.terminals).toHaveLength(1)
+    expect(xtermMocks.terminals[0]!.write).toHaveBeenCalledWith('post-takeover-screen', expect.any(Function))
+    expect(session.snapshot().attachment).toMatchObject({
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalCols: 100,
+      canonicalRows: 30,
+    })
+  })
+
+  test('takeover falls back to canonical size when the host is not immediately measurable', async () => {
+    terminalCalls.takeover.mockResolvedValueOnce(
+      takeoverResult('session-1', {
+        controller: { attachmentId: 'attachment_local', status: 'connected' },
+        canonicalCols: 120,
+        canonicalRows: 40,
+      }),
+    )
+    geometryMocks.proposeTerminalGeometry.mockReturnValueOnce(null)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session, {
+      role: 'viewer',
+      controllerStatus: 'connected',
+      canonicalCols: 120,
+      canonicalRows: 40,
+    })
+    session.attach(host)
+
+    await expect(session.takeover()).resolves.toBe(true)
+
+    expect(terminalCalls.takeover).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      cols: 120,
+      rows: 40,
+      attachmentId: 'attachment_local',
     })
   })
 

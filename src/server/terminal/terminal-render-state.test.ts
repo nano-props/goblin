@@ -159,6 +159,33 @@ describe('terminal-render-state', () => {
       expect(snap).toEqual({ snapshot: 'ab', snapshotSeq: 2, snapshotTruncated: false })
     })
 
+    test('drops a leading zsh prompt end marker erase prelude from replay snapshots', () => {
+      const state = createEmptyTerminalRenderState()
+      appendOutput(
+        state,
+        '\x1b[1m\x1b[7m%\x1b[27m\x1b[1m\x1b[0m                                                                            \r \r\r\x1b[0m\x1b[27m\x1b[24m\x1b[J👾:~/repo\r\n$ ',
+      )
+
+      const snap = takeSnapshot(state)
+
+      expect(snap).toEqual({
+        snapshot: '👾:~/repo\r\n$ ',
+        snapshotSeq: 1,
+        snapshotTruncated: false,
+      })
+    })
+
+    test('does not drop zsh prompt end marker bytes after real output', () => {
+      const state = createEmptyTerminalRenderState()
+      const marker =
+        '\x1b[1m\x1b[7m%\x1b[27m\x1b[1m\x1b[0m                                                                            \r \r\r\x1b[0m\x1b[27m\x1b[24m\x1b[J'
+      appendOutput(state, `command output${marker}next prompt`)
+
+      const snap = takeSnapshot(state)
+
+      expect(snap?.snapshot).toBe(`command output${marker}next prompt`)
+    })
+
     test('includes the truncated flag once the buffer has been truncated', () => {
       const state = createEmptyTerminalRenderState()
       appendOutput(state, 'a'.repeat(20 * 1024 * 1024))

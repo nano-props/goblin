@@ -31,6 +31,7 @@ import {
   appendOutput,
   createEmptyTerminalRenderState,
   isShellProcessName,
+  replaySnapshot,
   resetRender,
   takeSnapshot,
   type TerminalRenderState,
@@ -500,11 +501,12 @@ export class TerminalSessionManager<TOwner extends string | number> {
   }
 
   private attachResult(session: TerminalSession<TOwner>): Extract<TerminalAttachResult, { ok: true }> {
+    const snap = replaySnapshot(session.render)
     return {
       ok: true,
       sessionId: session.id,
-      snapshot: session.render.buffer,
-      snapshotSeq: session.render.sequence,
+      snapshot: snap.snapshot,
+      snapshotSeq: snap.snapshotSeq,
       processName: session.pty ? this.ptySupervisor.processName(session.pty) : 'terminal',
       canonicalTitle: session.render.title,
       phase: session.phase,
