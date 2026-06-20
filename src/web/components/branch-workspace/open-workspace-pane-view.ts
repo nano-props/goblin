@@ -12,6 +12,9 @@ export function openWorkspacePaneView(input: {
   type: WorkspacePaneBranchViewType | WorkspacePaneStaticViewType
   navigation: Pick<MainWindowNavigationActions, 'showRepoBranchWorkspacePaneView' | 'showRepoWorkspacePaneView'>
 }): void {
+  if (input.type === 'status') {
+    useReposStore.getState().openBranchWorkspacePaneView(input.repoId, input.type)
+  }
   if (input.type !== 'status') {
     if (!input.worktreePath) return
     const worktreeKey = worktreeTerminalKey(input.repoId, input.worktreePath)

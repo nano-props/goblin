@@ -63,7 +63,7 @@ interface WorkspacePaneViewStripProps {
   onNew: () => void
   onSelect: (item: WorkspacePaneTabItem) => void
   onScrollToBottom: (key: string) => void
-  onClose: (item: WorkspacePaneWorktreeTabItem) => void
+  onClose: (item: WorkspacePaneTabItem) => void
   onReorder: (worktreeTerminalKey: string, orderedViews: WorkspacePaneViewOrderEntry[]) => void
   onNavigateOut?: (direction: 'prev' | 'next' | 'first' | 'last') => void
   activateCrossScopeKeyboardNavigation?: boolean
@@ -78,6 +78,7 @@ interface WorkspacePaneTabItemBase {
   scope: WorkspacePaneTabScope
   label: string
   tooltip: string
+  closeLabel: string
   icon: WorkspacePaneTabIcon
   panelId?: string
 }
@@ -101,6 +102,7 @@ export function createBranchWorkspacePaneTabItem(input: {
   type: WorkspacePaneBranchViewType
   label: string
   tooltip: string
+  closeLabel: string
   panelId?: string
 }): WorkspacePaneBranchTabItem {
   return {
@@ -110,6 +112,7 @@ export function createBranchWorkspacePaneTabItem(input: {
     branchViewType: input.type,
     label: input.label,
     tooltip: input.tooltip,
+    closeLabel: input.closeLabel,
     icon: input.type,
     panelId: input.panelId,
   }
@@ -215,14 +218,13 @@ function WorkspacePaneViewSwitcherPopover({
           <div className="space-y-0.5 p-1" role="list">
             {items.map((item) => {
               const selected = item.identity === activeTabIdentity
-              const closable = isWorktreeWorkspacePaneTabItem(item)
               return (
                 <div key={item.identity} className="group relative flex items-center" role="listitem">
                   <button
                     type="button"
                     className={cn(
                       'flex h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-sm py-1 pl-2 text-left text-sm outline-none transition-colors duration-100 hover:bg-accent hover:text-accent-foreground',
-                      closable ? 'pr-8' : 'pr-2',
+                      'pr-8',
                       selected &&
                         'bg-selected text-selected-foreground hover:bg-selected hover:text-selected-foreground',
                     )}
@@ -245,20 +247,18 @@ function WorkspacePaneViewSwitcherPopover({
                       </>
                     )}
                   </button>
-                  {closable && (
-                    <Button
-                      type="button"
-                      size="icon-sm"
-                      variant="ghost"
-                      className="absolute right-1 top-1/2 size-6 -translate-y-1/2 text-muted-foreground"
-                      onPointerDown={(event) => event.stopPropagation()}
-                      onClick={(event) => onClose(event, item.identity)}
-                      title={item.closeLabel}
-                      aria-label={item.closeLabel}
-                    >
-                      <X size={13} />
-                    </Button>
-                  )}
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="ghost"
+                    className="absolute right-1 top-1/2 size-6 -translate-y-1/2 text-muted-foreground"
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={(event) => onClose(event, item.identity)}
+                    title={item.closeLabel}
+                    aria-label={item.closeLabel}
+                  >
+                    <X size={13} />
+                  </Button>
                 </div>
               )
             })}
@@ -365,7 +365,7 @@ export function WorkspacePaneViewStrip({
       event.preventDefault()
       event.stopPropagation()
 
-      const item = worktreeItems.find((candidate) => candidate.identity === identity)
+      const item = items.find((candidate) => candidate.identity === identity)
       if (!item) return
       const isActive = item.identity === activeTabIdentity
       const idx = items.findIndex((candidate) => candidate.identity === identity)
@@ -379,7 +379,7 @@ export function WorkspacePaneViewStrip({
         focusRegistry.focus(nextKey)
       }
     },
-    [activeTabIdentity, focusRegistry, items, onClose, worktreeItems],
+    [activeTabIdentity, focusRegistry, items, onClose],
   )
 
   const tabIdForItem = useCallback(
@@ -744,13 +744,9 @@ function WorkspacePaneViewChrome({
         onKeyDown: (e) => onKeyDown(e, item.identity),
       }}
       buttonClassName={toolbarTabButtonClassName('detail')}
-      {...(isWorktreeWorkspacePaneTabItem(item)
-        ? {
-            closeLabel: item.closeLabel,
-            closeVisible: isActive,
-            onClose: (e) => onClose(e, item.identity),
-          }
-        : { closeButton: false })}
+      closeLabel={item.closeLabel}
+      closeVisible={isActive}
+      onClose={(e) => onClose(e, item.identity)}
     >
       <WorkspacePaneViewIcon item={item} active={isActive} />
       <span className="truncate">{item.label}</span>

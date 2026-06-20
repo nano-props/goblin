@@ -15,12 +15,13 @@ type EffectiveWorkspacePaneViewRepo = {
 
 /**
  * Resolve the preferred workspace pane view type after applying worktree and
- * terminal-session fallbacks. Whether a static view of that type is actually
- * open is still checked against the live workspace pane view list by callers.
+ * terminal-session fallbacks. Whether a view of that type is actually open is
+ * still checked by callers against the branch-scope open view state and the
+ * live worktree-scope view list.
  *
  * Use this before resolving an active view identity. The repos store only
- * carries the user's preferred view type; the live view list remains the
- * source of truth for opened status/changes/terminal views.
+ * carries the user's preferred view type; branch-scope open view state owns
+ * status, and the live worktree view list owns changes/terminal.
  */
 export function useEffectiveWorkspacePaneView(
   repo: EffectiveWorkspacePaneViewRepo | null | undefined,

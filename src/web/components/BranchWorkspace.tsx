@@ -32,6 +32,7 @@ function branchWorkspaceRepoEqual(a: BranchWorkspaceRepo | undefined, b: BranchW
       a.data.worktreesByPath === b.data.worktreesByPath &&
       a.ui.selectedBranch === b.ui.selectedBranch &&
       a.ui.preferredWorkspacePaneView === b.ui.preferredWorkspacePaneView &&
+      a.ui.openBranchWorkspacePaneViews === b.ui.openBranchWorkspacePaneViews &&
       a.resources.status === b.resources.status &&
       a.resources.pullRequests === b.resources.pullRequests &&
       a.operations.branchAction === b.operations.branchAction &&
@@ -64,6 +65,7 @@ export function BranchWorkspace({ repoId, layout = DEFAULT_WORKSPACE_LAYOUT }: P
             ui: {
               selectedBranch: repo.ui.selectedBranch,
               preferredWorkspacePaneView: repo.ui.preferredWorkspacePaneView,
+              openBranchWorkspacePaneViews: repo.ui.openBranchWorkspacePaneViews,
             },
             resources: {
               status: repo.resources.status,

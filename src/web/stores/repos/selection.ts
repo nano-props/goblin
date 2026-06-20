@@ -16,7 +16,7 @@ import type {
   ReposSet,
   ReposStore,
 } from '#/web/stores/repos/types.ts'
-import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneBranchViewType, WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneSizes } from '#/shared/workspace-layout.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 
@@ -38,7 +38,12 @@ type RestorableWorkspaceSelectionActions = Pick<
 
 type RuntimeCoherentSelectionActions = Pick<
   ReposStore,
-  'setBranchViewMode' | 'setWorkspacePaneView' | 'selectBranch' | 'clearSelectedBranch'
+  | 'setBranchViewMode'
+  | 'setWorkspacePaneView'
+  | 'openBranchWorkspacePaneView'
+  | 'closeBranchWorkspacePaneView'
+  | 'selectBranch'
+  | 'clearSelectedBranch'
 >
 
 function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet): RestorableWorkspaceSelectionActions {
@@ -197,6 +202,26 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
   }
 
   return {
+    openBranchWorkspacePaneView(id: string, tab: WorkspacePaneBranchViewType) {
+      set((s) => {
+        const repo = s.repos[id]
+        if (!repo || repo.ui.openBranchWorkspacePaneViews.includes(tab)) return s
+        return replaceRepoState(s, repo, (r) => {
+          r.ui.openBranchWorkspacePaneViews.push(tab)
+        })
+      })
+    },
+
+    closeBranchWorkspacePaneView(id: string, tab: WorkspacePaneBranchViewType) {
+      set((s) => {
+        const repo = s.repos[id]
+        if (!repo || !repo.ui.openBranchWorkspacePaneViews.includes(tab)) return s
+        return replaceRepoState(s, repo, (r) => {
+          r.ui.openBranchWorkspacePaneViews = r.ui.openBranchWorkspacePaneViews.filter((view) => view !== tab)
+        })
+      })
+    },
+
     setBranchViewMode(id: string, viewMode: BranchViewMode) {
       let changed = false
       let selectedForPullRequest: string | null = null
@@ -218,20 +243,25 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
     },
 
     setWorkspacePaneView(id: string, tab: WorkspacePaneView) {
-      // Persists the user's preferred view type verbatim. The store does *not*
-      // project against worktree presence, terminal session count, or opened
-      // workspace pane views — the UI resolves the active pane from this preference and
-      // live terminal runtime state. This preserves user intent across session
-      // restore, branch switches, and the transient zero-session window between
-      // handleNewTerminal and createTerminal.
+      // Persists the user's preferred view type verbatim. Branch-scoped views
+      // are reopened here so selecting "Status" restores the tab; worktree
+      // presence, terminal session count, and worktree-scoped open views are
+      // still resolved by the UI from live terminal runtime state. This
+      // preserves user intent across session restore, branch switches, and the
+      // transient zero-session window between handleNewTerminal and
+      // createTerminal.
       let changed = false
       let token: number | undefined
       set((s) => {
         const repo = s.repos[id]
-        if (!repo || repo.ui.preferredWorkspacePaneView === tab) return s
+        const branchViewNeedsOpen = isBranchWorkspacePaneView(tab) && !repo?.ui.openBranchWorkspacePaneViews.includes(tab)
+        if (!repo || (repo.ui.preferredWorkspacePaneView === tab && !branchViewNeedsOpen)) return s
         changed = true
         token = repo.instanceToken
         return replaceRepoState(s, repo, (r) => {
+          if (isBranchWorkspacePaneView(tab) && !r.ui.openBranchWorkspacePaneViews.includes(tab)) {
+            r.ui.openBranchWorkspacePaneViews.push(tab)
+          }
           r.ui.preferredWorkspacePaneView = tab
         })
       })
@@ -279,4 +309,8 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
     ...createRestorableWorkspaceSelectionActions(set, get),
     ...createRuntimeCoherentSelectionActions(set, get),
   }
+}
+
+function isBranchWorkspacePaneView(tab: WorkspacePaneView): tab is WorkspacePaneBranchViewType {
+  return tab === 'status'
 }

@@ -66,7 +66,8 @@ export function BranchWorkspaceContent({ repo, detail, detailId, contentId, layo
         ? workspacePaneViewButtonId(detailId, compact ? 0 : activeTabIndex)
         : workspacePaneViewButtonId(detailId, 0)
   const terminalPendingCreate = effectiveTab === 'terminal' && worktreeSnapshot.pendingCreate
-  const branchStatusTabActive = effectiveTab === 'status'
+  const branchStatusTabActive =
+    effectiveTab === 'status' && repo.ui.openBranchWorkspacePaneViews.includes('status')
   if (!branch)
     return <EmptyState title={t(repo.data.branches.length === 0 ? 'branches.empty' : 'branches.filter-empty')} />
 

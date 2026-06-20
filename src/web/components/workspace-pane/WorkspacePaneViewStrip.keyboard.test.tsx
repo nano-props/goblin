@@ -174,7 +174,9 @@ function makeWorkspacePaneViewStrip(
         onSelect={(item) => {
           if (isWorktreeWorkspacePaneTabItem(item)) props.onSelect(props.worktreeTerminalKey, item.view)
         }}
-        onClose={(item) => props.onClose(item.view)}
+        onClose={(item) => {
+          if (isWorktreeWorkspacePaneTabItem(item)) props.onClose(item.view)
+        }}
       />
     )
   }

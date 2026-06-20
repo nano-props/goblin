@@ -10,7 +10,7 @@ import type {
 import type { RemoteRepoLifecycle, RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspacePaneSizes } from '#/shared/workspace-layout.ts'
 import type { SessionState } from '#/shared/api-types.ts'
-import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneBranchViewType, WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/repos/branch-action-types.ts'
 import type { RepoOperationsState } from '#/web/stores/repos/operations.ts'
 import type { RepoResourcesState } from '#/web/stores/repos/resources.ts'
@@ -63,6 +63,13 @@ export interface RepoWorktreeState {
 export interface RepoUiState {
   selectedBranch: string | null
   branchViewMode: BranchViewMode
+  /**
+   * Branch-scoped workspace pane views opened for the selected branch.
+   * Worktree-scoped views live in the terminal/workspace-pane runtime because
+   * they are keyed by worktreePath; branch-scoped views stay with repo UI
+   * state because they are keyed by selectedBranch.
+   */
+  openBranchWorkspacePaneViews: WorkspacePaneBranchViewType[]
   /** The user-preferred workspace pane view type. This is persisted intent; the
    *  rendered workspace pane is resolved at read time from this preference plus
    *  live worktree, terminal, and opened workspace pane view state. The store never
@@ -204,6 +211,8 @@ export interface RuntimeCoherentRepoProjectionActions {
    *  the UI resolves the active pane at read time so session restore and branch
    *  switches preserve user intent. */
   setWorkspacePaneView: (id: string, tab: WorkspacePaneView) => void
+  openBranchWorkspacePaneView: (id: string, tab: WorkspacePaneBranchViewType) => void
+  closeBranchWorkspacePaneView: (id: string, tab: WorkspacePaneBranchViewType) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
   selectBranch: (id: string, branch: string) => void
   clearSelectedBranch: (id: string) => void

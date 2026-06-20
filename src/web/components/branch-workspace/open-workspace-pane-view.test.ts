@@ -24,6 +24,7 @@ afterEach(() => {
 describe('openWorkspacePaneView', () => {
   test('opens status as a branch-level view without registering a worktree view', () => {
     seedWorktreeRepo('status')
+    useReposStore.getState().closeBranchWorkspacePaneView(REPO_ID, 'status')
     const refreshStatus = vi.fn(async () => {})
     useReposStore.setState({ refreshStatus: refreshStatus as typeof originalRefreshStatus })
     const token = useReposStore.getState().repos[REPO_ID]!.instanceToken
@@ -39,6 +40,7 @@ describe('openWorkspacePaneView', () => {
     })
 
     expect(openStaticView).not.toHaveBeenCalled()
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual(['status'])
     expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('status')
     expect(refreshStatus).toHaveBeenCalledWith(REPO_ID, { token })
   })

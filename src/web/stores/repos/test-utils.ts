@@ -14,7 +14,11 @@ import type {
   TerminalSessionSummary,
   TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
-import type { WorkspacePaneStaticViewSummary, WorkspacePaneView } from '#/shared/workspace-pane.ts'
+import type {
+  WorkspacePaneBranchViewType,
+  WorkspacePaneStaticViewSummary,
+  WorkspacePaneView,
+} from '#/shared/workspace-pane.ts'
 import type { BranchSnapshotInfo, PullRequestInfo, WorktreeStatus } from '#/web/types.ts'
 import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
 import { DEFAULT_WORKSPACE_FOCUSED, DEFAULT_WORKSPACE_PANE_SIZES } from '#/shared/workspace-layout.ts'
@@ -556,6 +560,7 @@ export function seedRepoState(options: {
   currentBranch?: string
   selectedBranch?: string | null
   workspacePaneView?: WorkspacePaneView
+  openBranchWorkspacePaneViews?: WorkspacePaneBranchViewType[]
   instanceToken?: number
   status?: WorktreeStatus[]
   statusLoaded?: boolean
@@ -582,6 +587,8 @@ export function seedRepoState(options: {
     ui: {
       ...base.ui,
       selectedBranch: options.selectedBranch ?? base.ui.selectedBranch,
+      openBranchWorkspacePaneViews:
+        options.openBranchWorkspacePaneViews ?? base.ui.openBranchWorkspacePaneViews,
       preferredWorkspacePaneView: options.workspacePaneView ?? base.ui.preferredWorkspacePaneView,
     },
     remote: {
