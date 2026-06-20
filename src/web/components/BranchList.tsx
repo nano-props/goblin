@@ -149,7 +149,7 @@ export function BranchList({ repoId, showActions = true }: Props) {
   }
 
   const list = (
-    <ul>
+    <ul className="flex flex-col gap-1 p-1.5">
       {branches.map((branch) => {
         return (
           <BranchRow
