@@ -80,7 +80,7 @@ describe('repo selectors', () => {
         selectedTerminalByWorktree: {
           '/tmp/repo\0/tmp/repo': 'terminal-1',
         },
-        detailTabByRepo: {},
+        workspacePaneViewByRepo: {},
       }),
     ).toEqual({
       order: ['/tmp/repo'],
@@ -95,7 +95,7 @@ describe('repo selectors', () => {
       selectedTerminalByWorktree: {
         '/tmp/repo\0/tmp/repo': 'terminal-1',
       },
-      detailTabByRepo: {},
+      workspacePaneViewByRepo: {},
     })
   })
 
@@ -273,25 +273,25 @@ describe('repo selectors', () => {
       runtimeCoherentRepoNavigationStoreActionsFromStore({
         closeRepo: fnA as never,
         selectBranch: fnA as never,
-        setDetailTab: fnA as never,
+        setWorkspacePaneView: fnA as never,
       }),
     ).toEqual({
       closeRepo: fnA,
       selectBranch: fnA,
-      setDetailTab: fnA,
+      setWorkspacePaneView: fnA,
     })
     expect(
       runtimeCoherentRepoProjectionStoreActionsFromStore({
         ensureWorkspaceOpen: fnA as never,
         closeRepo: fnA as never,
         selectBranch: fnA as never,
-        setDetailTab: fnA as never,
+        setWorkspacePaneView: fnA as never,
       }),
     ).toEqual({
       ensureWorkspaceOpen: fnA,
       closeRepo: fnA,
       selectBranch: fnA,
-      setDetailTab: fnA,
+      setWorkspacePaneView: fnA,
     })
     expect(
       mainWindowNavigationStoreActionsEqual(
@@ -300,14 +300,14 @@ describe('repo selectors', () => {
           closeRepo: fnA,
           cycleActive: fnA,
           selectBranch: fnA,
-          setDetailTab: fnA,
+          setWorkspacePaneView: fnA,
         }),
         mainWindowNavigationStoreActionsFromStore({
           setActive: fnA,
           closeRepo: fnA,
           cycleActive: fnA,
           selectBranch: fnA,
-          setDetailTab: fnA,
+          setWorkspacePaneView: fnA,
         }),
       ),
     ).toBe(true)

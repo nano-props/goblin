@@ -12,6 +12,7 @@ import type {
   TerminalSessionSnapshot,
   TerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
+import type { WorkspacePaneStaticViewSummary } from '#/shared/workspace-pane.ts'
 
 const MIN_TERMINAL_COLS = 1
 const MAX_TERMINAL_COLS = 500
@@ -30,10 +31,13 @@ const TERMINAL_SOCKET_ACTIONS = [
   'takeover',
   'close',
   'list-sessions',
+  'list-views',
+  'open-view',
+  'close-view',
   'create',
   'prune',
   'session-snapshot',
-  'reorder',
+  'reorder-views',
 ] as const satisfies TerminalSocketRequestAction[]
 const TERMINAL_CONNECTED_CONTROLLER_STATUS_VALUES = ['connected', 'grace'] satisfies Exclude<
   TerminalControllerStatus,
@@ -46,6 +50,8 @@ const TERMINAL_SESSION_PHASE_VALUES = [
   'error',
   'closed',
 ] satisfies TerminalSessionPhase[]
+const WORKSPACE_PANE_STATIC_VIEW_TYPES = ['status', 'changes'] as const
+const WORKSPACE_PANE_VIEW_TYPES = [...WORKSPACE_PANE_STATIC_VIEW_TYPES, 'terminal'] as const
 const TerminalSessionIdSchema = v.pipe(v.string(), v.regex(TERMINAL_SESSION_ID_RE))
 const TerminalAttachmentIdSchema = v.pipe(v.string(), v.regex(TERMINAL_ATTACHMENT_ID_RE))
 const TerminalRequestIdSchema = v.pipe(v.string(), v.regex(TERMINAL_REQUEST_ID_RE))
@@ -75,6 +81,12 @@ const TerminalSessionInputSchema = v.object({
 const TerminalListSessionsInputSchema = v.object({
   repoRoot: v.string(),
 })
+const WorkspacePaneListViewsInputSchema = TerminalListSessionsInputSchema
+const WorkspacePaneStaticViewInputSchema = v.object({
+  repoRoot: v.string(),
+  worktreePath: v.string(),
+  type: v.picklist(WORKSPACE_PANE_STATIC_VIEW_TYPES),
+})
 const TerminalCreateInputSchema = v.object({
   repoRoot: v.string(),
   branch: v.string(),
@@ -87,10 +99,15 @@ const TerminalCreateInputSchema = v.object({
 const TerminalPruneInputSchema = v.object({
   repoRoot: v.string(),
 })
-const TerminalReorderInputSchema = v.object({
+const WorkspacePaneReorderInputSchema = v.object({
   repoRoot: v.string(),
   worktreePath: v.string(),
-  orderedKeys: v.array(v.string()),
+  orderedViews: v.array(
+    v.object({
+      type: v.picklist(WORKSPACE_PANE_VIEW_TYPES),
+      id: v.string(),
+    }),
+  ),
 })
 const TerminalSessionSnapshotInputSchema = v.object({
   sessionId: TerminalSessionIdSchema,
@@ -98,6 +115,8 @@ const TerminalSessionSnapshotInputSchema = v.object({
 const TerminalSessionSummarySchema = v.object({
   sessionId: v.string(),
   key: v.string(),
+  viewType: v.literal('terminal'),
+  viewId: v.string(),
   cwd: v.string(),
   controller: v.nullable(TerminalControllerSchema),
   processName: v.string(),
@@ -106,6 +125,12 @@ const TerminalSessionSummarySchema = v.object({
   message: v.nullable(v.string()),
   cols: v.number(),
   rows: v.number(),
+  displayOrder: v.number(),
+})
+const WorkspacePaneStaticViewSummarySchema = v.object({
+  type: v.picklist(WORKSPACE_PANE_STATIC_VIEW_TYPES),
+  id: v.string(),
+  worktreePath: v.string(),
   displayOrder: v.number(),
 })
 const TerminalSessionSnapshotSchema = v.object({
@@ -126,6 +151,11 @@ const TerminalTitleEventSchema = v.object({
 const TerminalExitEventSchema = v.object({
   sessionId: v.string(),
 })
+const TerminalSessionClosedEventSchema = v.object({
+  type: v.literal('session-closed'),
+  sessionId: v.string(),
+  repoRoot: v.string(),
+})
 
 export function isValidTerminalSessionId(value: unknown): value is string {
   return typeof value === 'string' && TERMINAL_SESSION_ID_RE.test(value)
@@ -143,6 +173,7 @@ const TerminalRealtimeMessageVariants = [
   v.object({ type: v.literal('exit'), event: TerminalExitEventSchema }),
   v.object({ type: v.literal('ownership'), event: TerminalOwnershipEventSchema }),
   v.object({ type: v.literal('sessions-changed'), repoRoot: v.string() }),
+  TerminalSessionClosedEventSchema,
 ] as const
 const TerminalRealtimeMessageSchema = v.variant('type', TerminalRealtimeMessageVariants)
 const TerminalSocketServerMessageSchema = v.variant('type', [
@@ -208,6 +239,24 @@ const TerminalClientMessageSchema = v.variant('type', [
   v.object({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
+    action: v.literal('list-views'),
+    input: WorkspacePaneListViewsInputSchema,
+  }),
+  v.object({
+    type: v.literal('request'),
+    requestId: TerminalRequestIdSchema,
+    action: v.literal('open-view'),
+    input: WorkspacePaneStaticViewInputSchema,
+  }),
+  v.object({
+    type: v.literal('request'),
+    requestId: TerminalRequestIdSchema,
+    action: v.literal('close-view'),
+    input: WorkspacePaneStaticViewInputSchema,
+  }),
+  v.object({
+    type: v.literal('request'),
+    requestId: TerminalRequestIdSchema,
     action: v.literal('create'),
     input: TerminalCreateInputSchema,
   }),
@@ -226,8 +275,8 @@ const TerminalClientMessageSchema = v.variant('type', [
   v.object({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
-    action: v.literal('reorder'),
-    input: TerminalReorderInputSchema,
+    action: v.literal('reorder-views'),
+    input: WorkspacePaneReorderInputSchema,
   }),
 ])
 
@@ -270,6 +319,11 @@ export function isValidTerminalNotifyBellInput(value: unknown): value is Termina
 export function normalizeTerminalSessionSummaryList(value: unknown): TerminalSessionSummary[] | null {
   const parsed = v.safeParse(v.array(TerminalSessionSummarySchema), value)
   return parsed.success ? parsed.output : null
+}
+
+export function normalizeWorkspacePaneStaticViewSummaryList(value: unknown): WorkspacePaneStaticViewSummary[] | null {
+  const parsed = v.safeParse(v.array(WorkspacePaneStaticViewSummarySchema), value)
+  return parsed.success ? (parsed.output as WorkspacePaneStaticViewSummary[]) : null
 }
 
 export function normalizeTerminalSessionSnapshot(value: unknown): TerminalSessionSnapshot | null {

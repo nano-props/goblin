@@ -1,4 +1,13 @@
-import { ArrowDown, ArrowUp, ClipboardCopy, ExternalLink, GitBranch, GitPullRequest, Trash2 } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowUp,
+  ClipboardCopy,
+  ExternalLink,
+  FileText,
+  GitBranch,
+  GitPullRequest,
+  Trash2,
+} from 'lucide-react'
 import { createElement, type ReactNode } from 'react'
 import { GitHubOutlineIcon } from '#/web/components/GitHubOutlineIcon.tsx'
 import { GitLabLogoIcon } from '#/web/components/GitLabLogoIcon.tsx'
@@ -11,6 +20,10 @@ import { branchActionDisplayPhase, type BranchActionRepo } from '#/web/hooks/bra
 import { branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import type { BrowserRemoteProvider } from '#/web/types.ts'
 import { useRuntimeExternalAppSettings } from '#/web/runtime-settings-external-apps.ts'
+import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
+import { useReposStore } from '#/web/stores/repos/store.ts'
+import type { WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
+import { openWorkspacePaneView } from '#/web/components/branch-detail/open-workspace-pane-view.ts'
 export interface BranchActionItem {
   id: BranchActionItemId
   label: string
@@ -62,6 +75,8 @@ function browserRemoteIcon(provider: BrowserRemoteProvider | undefined) {
 
 export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchState): BranchActionItemGroups {
   const t = useT()
+  const navigation = useMainWindowNavigation()
+  const setDetailCollapsed = useReposStore((s) => s.setDetailCollapsed)
   const { terminalApp, resolvedTerminalApp, terminalAvailable, editorApp, resolvedEditorApp, editorAvailable } =
     useRuntimeExternalAppSettings()
   const { blocked, busyAction, capabilities, actions, dialogs } = useBranchActions(repo, branch)
@@ -102,6 +117,17 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
     return t('settings.editor.windsurf')
   })()
 
+  const openStaticWorkspacePaneView = (type: WorkspacePaneStaticViewType) => {
+    openWorkspacePaneView({
+      repoId: repo.id,
+      branchName: branch.name,
+      worktreePath: branch.worktree?.path,
+      type,
+      navigation,
+      setDetailCollapsed,
+    })
+  }
+
   const patchItems: BranchActionItem[] = capabilities.canCopyPatch
     ? [
         {
@@ -119,6 +145,22 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
     : []
 
   const mainItems: BranchActionItem[] = [
+    {
+      id: 'status',
+      label: t('tab.status'),
+      disabled,
+      visible: !!branch.worktree?.path,
+      icon: createElement(GitBranch),
+      onSelect: () => openStaticWorkspacePaneView('status'),
+    },
+    {
+      id: 'changes',
+      label: t('tab.changes'),
+      disabled,
+      visible: !!branch.worktree?.path,
+      icon: createElement(FileText),
+      onSelect: () => openStaticWorkspacePaneView('changes'),
+    },
     {
       id: 'checkout',
       label: branchActionLabel('checkout', 'action.checkout', 'action.checkout-loading', 'action.checkout-queued'),

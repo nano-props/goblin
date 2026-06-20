@@ -1,13 +1,14 @@
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { openWorkspacePaneView } from '#/web/components/branch-detail/open-workspace-pane-view.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
-import type { DetailTab } from '#/web/stores/repos/types.ts'
+import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
 
-interface ShowDetailTabCommandOptions {
+interface ShowWorkspacePaneViewCommandOptions {
   repoId: string | null
-  tab: DetailTab
+  tab: WorkspacePaneView
   navigation: MainWindowNavigationActions
   setDetailCollapsed: (collapsed: boolean) => void
 }
@@ -23,14 +24,28 @@ interface TerminalPrimaryActionCommandOptions {
   setDetailCollapsed: (collapsed: boolean) => void
 }
 
-export function runShowDetailTabCommand({
+export function runShowWorkspacePaneViewCommand({
   repoId,
   tab,
   navigation,
   setDetailCollapsed,
-}: ShowDetailTabCommandOptions): boolean {
+}: ShowWorkspacePaneViewCommandOptions): boolean {
   if (!repoId) return false
-  navigation.showRepoDetailTab(repoId, tab)
+  if (tab === 'status' || tab === 'changes') {
+    const base = selectedTerminalBase(repoId)
+    if (base) {
+      openWorkspacePaneView({
+        repoId,
+        branchName: base.branch,
+        worktreePath: base.worktreePath,
+        type: tab,
+        navigation,
+        setDetailCollapsed,
+      })
+      return true
+    }
+  }
+  navigation.showRepoWorkspacePaneView(repoId, tab)
   setDetailCollapsed(false)
   return true
 }
@@ -47,7 +62,7 @@ export async function runTerminalPrimaryActionCommand({
   setDetailCollapsed,
 }: TerminalPrimaryActionCommandOptions): Promise<boolean> {
   if (!repoId) return false
-  runShowDetailTabCommand({ repoId, tab: 'terminal', navigation, setDetailCollapsed })
+  runShowWorkspacePaneViewCommand({ repoId, tab: 'terminal', navigation, setDetailCollapsed })
   const base = selectedTerminalBase(repoId)
   if (!base) return true
   const bridge = readTerminalSessionCommandBridge()

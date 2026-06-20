@@ -1,3 +1,5 @@
+import type { WorkspacePaneViewType } from '#/shared/workspace-pane.ts'
+
 export type TerminalControllerStatus = 'connected' | 'grace' | 'none'
 export type TerminalAttachmentRole = 'controller' | 'viewer' | 'unowned'
 export type TerminalSessionPhase = 'opening' | 'restarting' | 'open' | 'error' | 'closed'
@@ -159,15 +161,11 @@ export interface TerminalListSessionsInput {
   repoRoot: string
 }
 
-export interface TerminalReorderInput {
-  repoRoot: string
-  worktreePath: string
-  orderedKeys: string[]
-}
-
 export interface TerminalSessionSummary {
   sessionId: string
   key: string
+  viewType: Extract<WorkspacePaneViewType, 'terminal'>
+  viewId: string
   cwd: string
   controller: TerminalController | null
   processName: string

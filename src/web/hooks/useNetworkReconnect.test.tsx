@@ -197,7 +197,7 @@ function seedRepo(id: string, lifecycle: RemoteRepoLifecycle | null) {
           },
           pullRequestsByBranch: {},
         },
-        ui: { selectedBranch: null, branchViewMode: 'all', preferredDetailTab: 'status' },
+        ui: { selectedBranch: null, branchViewMode: 'all', preferredWorkspacePaneView: 'status' },
         projection: { source: 'fresh', savedAt: null },
         remote: {
           lifecycle,

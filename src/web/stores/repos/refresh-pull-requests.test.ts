@@ -372,7 +372,7 @@ describe('refreshPullRequests', () => {
       repos: {
         ...s.repos,
         [REPO_ID]: replaceRepo(s.repos[REPO_ID]!, (repo) => {
-          repo.ui.preferredDetailTab = 'terminal'
+          repo.ui.preferredWorkspacePaneView = 'terminal'
         }),
       },
     }))

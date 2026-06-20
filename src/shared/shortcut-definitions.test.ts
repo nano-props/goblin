@@ -20,11 +20,11 @@ describe('shortcut definitions', () => {
 
   test('derives close accelerators from the swap preference', () => {
     expect(closeShortcutAccelerators(false)).toEqual({
-      closeTab: 'CmdOrCtrl+Shift+W',
+      closeView: 'CmdOrCtrl+Shift+W',
       closeWindow: 'CmdOrCtrl+W',
     })
     expect(closeShortcutAccelerators(true)).toEqual({
-      closeTab: 'CmdOrCtrl+W',
+      closeView: 'CmdOrCtrl+W',
       closeWindow: 'CmdOrCtrl+Shift+W',
     })
   })
@@ -32,7 +32,7 @@ describe('shortcut definitions', () => {
   test('matches renderer navigation and app shortcuts from keyboard input', () => {
     expect(matchRendererKeyboardShortcut({ key: 'j', code: 'KeyJ', shiftKey: false })).toBe('next-branch')
     expect(matchRendererKeyboardShortcut({ key: 'ArrowLeft', code: 'ArrowLeft', shiftKey: false })).toBe(
-      'prev-detail-tab',
+      'prev-workspace-pane-view',
     )
     expect(matchRendererKeyboardShortcut({ key: 'Enter', code: 'Enter', shiftKey: false })).toBe('checkout-selected')
     expect(matchRendererKeyboardShortcut({ key: '?', code: 'Slash', shiftKey: true })).toBe('show-help')

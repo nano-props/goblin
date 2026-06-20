@@ -1,8 +1,9 @@
 import { parseTerminalSessionKey, worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
-import type { DetailTab, RepoState } from '#/web/stores/repos/types.ts'
+import type { RepoState } from '#/web/stores/repos/types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspaceLayout } from '#/shared/workspace-layout.ts'
+import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type { LangPref, ThemePref } from '#/shared/settings.ts'
 
@@ -15,7 +16,7 @@ type WorkspaceRendererIntent = Extract<
   | { type: 'close-repo-requested' }
   | { type: 'cycle-repo-requested' }
   | { type: 'repo-refresh-requested' }
-  | { type: 'show-detail-tab-requested' }
+  | { type: 'show-workspace-pane-view-requested' }
   | { type: 'terminal-primary-action-requested' }
   | { type: 'toggle-detail-requested' }
 >
@@ -51,7 +52,7 @@ export type WorkspaceIntentPlan =
   | { kind: 'close-window' }
   | { kind: 'cycle-repo'; direction: 1 | -1 }
   | { kind: 'refresh-repo'; repoId: string; token: number }
-  | { kind: 'show-detail-tab'; repoId: string; tab: DetailTab }
+  | { kind: 'show-workspace-pane-view'; repoId: string; tab: WorkspacePaneView }
   | { kind: 'terminal-primary-action'; repoId: string }
   | { kind: 'toggle-detail'; repoId: string }
 
@@ -137,9 +138,9 @@ export function createWorkspaceIntentPlan(
       if (context.workspaceShortcutSuppressed || context.terminalFocused || !context.currentRepo)
         return { kind: 'noop' }
       return { kind: 'refresh-repo', repoId: context.currentRepo.id, token: context.currentRepo.instanceToken }
-    case 'show-detail-tab-requested':
+    case 'show-workspace-pane-view-requested':
       if (context.workspaceShortcutSuppressed || !context.currentRepoId) return { kind: 'noop' }
-      return { kind: 'show-detail-tab', repoId: context.currentRepoId, tab: event.tab }
+      return { kind: 'show-workspace-pane-view', repoId: context.currentRepoId, tab: event.tab }
     case 'terminal-primary-action-requested':
       if (context.workspaceShortcutSuppressed || !context.currentRepoId) return { kind: 'noop' }
       return { kind: 'terminal-primary-action', repoId: context.currentRepoId }
@@ -167,7 +168,7 @@ function isWorkspaceRendererIntent(event: RendererEffectIntent): event is Worksp
     event.type === 'close-repo-requested' ||
     event.type === 'cycle-repo-requested' ||
     event.type === 'repo-refresh-requested' ||
-    event.type === 'show-detail-tab-requested' ||
+    event.type === 'show-workspace-pane-view-requested' ||
     event.type === 'terminal-primary-action-requested' ||
     event.type === 'toggle-detail-requested'
   )

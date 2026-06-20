@@ -244,9 +244,9 @@ describe('app menu actions', () => {
     buildAppMenu()
 
     const fileMenu = mocks.template.find((entry) => entry.label === 'menu.file')
-    const closeTabItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.close-tab')
+    const closeViewItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.close-tab')
     const closeWindowItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.close-window')
-    expect(closeTabItem?.accelerator).toBe('CmdOrCtrl+Shift+W')
+    expect(closeViewItem?.accelerator).toBe('CmdOrCtrl+Shift+W')
     expect(closeWindowItem?.accelerator).toBe('CmdOrCtrl+W')
   })
 

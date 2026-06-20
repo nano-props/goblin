@@ -4,7 +4,6 @@ import type {
   TerminalCatalogMutationResult,
   TerminalCreateInput,
   TerminalMutationResult,
-  TerminalReorderInput,
   TerminalResizeInput,
   TerminalRestartInput,
   TerminalSessionInput,
@@ -15,6 +14,11 @@ import type {
   TerminalTakeoverResult,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
+import type {
+  WorkspacePaneReorderInput,
+  WorkspacePaneStaticViewInput,
+  WorkspacePaneStaticViewSummary,
+} from '#/shared/workspace-pane.ts'
 
 type MaybePromise<T> = T | Promise<T>
 
@@ -85,18 +89,8 @@ export interface ServerTerminalHost {
   // browsers sees the same terminals. See `identity.ts` for the
   // full model. Both must be threaded explicitly at the host
   // boundary so the two identifiers cannot be conflated.
-  registerSocket(
-    clientId: string,
-    attachmentId: string,
-    ownerId: string,
-    socket: ServerTerminalSocket,
-  ): void
-  unregisterSocket(
-    clientId: string,
-    attachmentId: string,
-    ownerId: string,
-    socket: ServerTerminalSocket,
-  ): void
+  registerSocket(clientId: string, attachmentId: string, ownerId: string, socket: ServerTerminalSocket): void
+  unregisterSocket(clientId: string, attachmentId: string, ownerId: string, socket: ServerTerminalSocket): void
   attach(clientId: string, ownerId: string, input: TerminalAttachInput): MaybePromise<TerminalAttachResult>
   restart(clientId: string, ownerId: string, input: TerminalRestartInput): MaybePromise<TerminalAttachResult>
   write(clientId: string, ownerId: string, input: TerminalWriteInput): MaybePromise<TerminalMutationResult>
@@ -104,6 +98,9 @@ export interface ServerTerminalHost {
   takeover(clientId: string, ownerId: string, input: TerminalTakeoverInput): MaybePromise<TerminalTakeoverResult>
   close(clientId: string, ownerId: string, input: TerminalSessionInput): MaybePromise<TerminalMutationResult>
   listSessions(clientId: string, ownerId: string, repoRoot: string): MaybePromise<TerminalSessionSummary[]>
+  listViews(clientId: string, ownerId: string, repoRoot: string): MaybePromise<WorkspacePaneStaticViewSummary[]>
+  openView(clientId: string, ownerId: string, input: WorkspacePaneStaticViewInput): MaybePromise<TerminalMutationResult>
+  closeView(clientId: string, ownerId: string, input: WorkspacePaneStaticViewInput): MaybePromise<TerminalMutationResult>
   create(clientId: string, ownerId: string, input: TerminalCreateInput): MaybePromise<TerminalCatalogMutationResult>
   prune(clientId: string, ownerId: string, repoRoot: string): MaybePromise<{ pruned: number; remaining: number }>
   getSessionSnapshot(
@@ -111,7 +108,7 @@ export interface ServerTerminalHost {
     ownerId: string,
     input: TerminalSessionSnapshotInput,
   ): MaybePromise<TerminalSessionSnapshot | null>
-  reorder(clientId: string, ownerId: string, input: TerminalReorderInput): MaybePromise<TerminalMutationResult>
+  reorderViews(clientId: string, ownerId: string, input: WorkspacePaneReorderInput): MaybePromise<TerminalMutationResult>
   /** Handle an incoming realtime message from a client socket. */
   handleRealtimeMessage(
     clientId: string,

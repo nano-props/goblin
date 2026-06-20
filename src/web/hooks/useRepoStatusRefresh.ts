@@ -2,12 +2,12 @@ import { useEffect, useRef } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { DetailTab } from '#/web/stores/repos/types.ts'
+import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 
 interface ActiveRepoStatusSnapshot {
   id: string
   token: number
-  detailTab: DetailTab
+  workspacePaneView: WorkspacePaneView
   /**
    * Phase 4: the snapshot's `availability` is now derived from
    * the lifecycle union (via `isRepoUnavailable`) so the field
@@ -28,7 +28,7 @@ function activeRepoStatusSnapshotEqual(
       !!b &&
       a.id === b.id &&
       a.token === b.token &&
-      a.detailTab === b.detailTab &&
+      a.workspacePaneView === b.workspacePaneView &&
       a.unavailable === b.unavailable &&
       a.statusPhase === b.statusPhase)
   )
@@ -55,7 +55,7 @@ export function useRepoStatusRefresh() {
       return {
         id: repo.id,
         token: repo.instanceToken,
-        detailTab: repo.ui.preferredDetailTab,
+        workspacePaneView: repo.ui.preferredWorkspacePaneView,
         unavailable: isRepoUnavailable(repo),
         statusPhase: repo.resources.status.phase,
       }
@@ -63,21 +63,21 @@ export function useRepoStatusRefresh() {
     activeRepoStatusSnapshotEqual,
   )
   const previousActiveRepoId = useRef<string | null>(null)
-  const previousDetailTab = useRef<DetailTab | null>(null)
+  const previousWorkspacePaneView = useRef<WorkspacePaneView | null>(null)
 
   useEffect(() => {
     const lastActiveRepoId = previousActiveRepoId.current
-    const lastDetailTab = previousDetailTab.current
+    const lastWorkspacePaneView = previousWorkspacePaneView.current
     const nextActiveRepoId = activeRepo?.id ?? null
-    const nextDetailTab = activeRepo?.detailTab ?? null
+    const nextWorkspacePaneView = activeRepo?.workspacePaneView ?? null
     const activeRepoChanged = nextActiveRepoId !== lastActiveRepoId
     const openedStatusLikeTab =
       !activeRepoChanged &&
       nextActiveRepoId !== null &&
-      (nextDetailTab === 'status' || nextDetailTab === 'changes') &&
-      nextDetailTab !== lastDetailTab
+      (nextWorkspacePaneView === 'status' || nextWorkspacePaneView === 'changes') &&
+      nextWorkspacePaneView !== lastWorkspacePaneView
     previousActiveRepoId.current = nextActiveRepoId
-    previousDetailTab.current = nextDetailTab
+    previousWorkspacePaneView.current = nextWorkspacePaneView
     if (!activeRepo || (!activeRepoChanged && !openedStatusLikeTab)) return
     if (!isRepoStatusRefreshable(activeRepo)) return
     void useReposStore.getState().refreshStatus(activeRepo.id, { token: activeRepo.token })

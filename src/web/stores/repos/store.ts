@@ -111,7 +111,7 @@ export const useReposStore = create<ReposStore>()(
       workspaceLayout: DEFAULT_WORKSPACE_LAYOUT,
       detailPaneSizes: DEFAULT_DETAIL_PANE_SIZES,
       selectedTerminalByWorktree: {},
-      detailTabByRepo: {},
+      workspacePaneViewByRepo: {},
 
       // Local renderer-only state.
       sessionReady: false,

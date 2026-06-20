@@ -25,7 +25,3 @@ export function restoreDisplayOrder(
     else displayOrderByKey.set(key, order)
   }
 }
-
-export function applyDisplayOrder(displayOrderByKey: Map<string, number>, orderedKeys: string[]): void {
-  for (let i = 0; i < orderedKeys.length; i++) displayOrderByKey.set(orderedKeys[i], i)
-}

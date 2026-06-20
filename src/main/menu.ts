@@ -237,7 +237,7 @@ function createViewMenu(state: AppMenuState): MenuItemConstructorOptions {
       createRendererCommandMenuItem(state, 'view-status'),
       createRendererCommandMenuItem(state, 'view-changes'),
       // Single Terminal entry. Clicking it mirrors what happens when the
-      // user clicks the first terminal tab on the page: open the terminal
+      // user clicks the first terminal view on the page: open the terminal
       // tab, focus the first existing session, or create one when the
       // worktree has no terminals yet.
       createRendererCommandMenuItem(state, 'view-terminal'),

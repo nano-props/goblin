@@ -206,7 +206,7 @@ export const en = {
   'drop.body': 'Drop a Git repository folder anywhere in Goblin.',
   'drop.open-failed': 'Could not open local repository',
 
-  // ---- Detail tabs --------------------------------------------------------
+  // ---- Workspace pane views ----------------------------------------------
   'tab.branches': 'Branches',
   'tab.branch-detail': 'Branch detail',
   'tab.status': 'Status',
@@ -223,6 +223,10 @@ export const en = {
   'tab.refreshing-cache': 'Updating cached data',
   'tab.projectiond': 'cached',
   'tab.projectiond-title': 'Showing cached data from {time}. Refreshing in the background.',
+  'workspace-pane-views.tabs': 'Workspace views',
+  'workspace-pane-views.empty': 'No workspace pane view open',
+  'workspace-pane-views.close-named': 'Close {name}',
+  'workspace-pane-views.changes-tooltip': '{count} file changes',
   'tab.local-only': 'local only',
   'tab.local-only-title': 'This repository has no remotes; remote sync and PR checks are skipped.',
   'tab.fetch-failed': 'fetch failed',
@@ -677,7 +681,7 @@ export const en = {
   'help.row.view-changes': 'Changes',
   'help.row.view-log': 'Log',
   'help.row.view-terminal': 'Terminal',
-  'help.row.switch-detail-tab': 'Previous / next detail tab',
+  'help.row.switch-workspace-pane-view': 'Previous / next workspace view',
   'help.row.toggle-detail': 'Collapse / expand detail panel',
   'help.row.checkout': 'Activate selection',
   'help.row.open-local-repo': 'Open local repository',

@@ -4,8 +4,13 @@ import { act } from 'react'
 import type { ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { TerminalTabs } from '#/web/components/terminal/TerminalTabs.tsx'
-import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
+import { WorkspacePaneViewStrip } from '#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx'
+import { terminalWorkspacePaneViewIdentity } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
+import type { WorkspacePaneViewOrderEntry } from '#/shared/workspace-pane.ts'
+import type {
+  WorkspacePaneViewSummary,
+  TerminalSessionSummary,
+} from '#/web/components/terminal/types.ts'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
@@ -49,10 +54,10 @@ afterEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
-describe('TerminalTabs', () => {
+describe('WorkspacePaneViewStrip', () => {
   test('shows terminal tooltip content with only the original title', async () => {
     render(
-      <TerminalTabs
+      <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         detailId="detail"
         panelActive
@@ -71,8 +76,8 @@ describe('TerminalTabs', () => {
       />,
     )
 
-    const tab = document.body.querySelector('[data-terminal-tab-tooltip-id="t1"]')
-    if (!(tab instanceof HTMLElement)) throw new Error('missing terminal tab')
+    const tab = document.body.querySelector('[data-workspace-pane-view-tooltip-id="terminal:t1"]')
+    if (!(tab instanceof HTMLElement)) throw new Error('missing terminal view')
     tab.getBoundingClientRect = () =>
       ({
         left: 12,
@@ -99,7 +104,7 @@ describe('TerminalTabs', () => {
 
   test('keeps the selected terminal in the collapsed dropdown and still offers new terminal', async () => {
     render(
-      <TerminalTabs
+      <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         detailId="detail"
         responsiveCompact
@@ -115,7 +120,7 @@ describe('TerminalTabs', () => {
       />,
     )
 
-    const trigger = document.body.querySelector('button[aria-label="terminal.sessions"]')
+    const trigger = document.body.querySelector('button[aria-label="workspace-pane-views.tabs"]')
     if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing terminal menu trigger')
 
     await act(async () => {
@@ -131,10 +136,10 @@ describe('TerminalTabs', () => {
     expect(document.body.textContent).toContain('terminal.new')
   })
 
-  test('collapsed terminal tab only navigates out on arrow keys', () => {
+  test('collapsed terminal view only navigates out on arrow keys', () => {
     const onNavigateOut = vi.fn()
     render(
-      <TerminalTabs
+      <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         detailId="detail"
         responsiveCompact
@@ -151,8 +156,8 @@ describe('TerminalTabs', () => {
       />,
     )
 
-    const tab = document.body.querySelector('#detail-terminal-tab')
-    if (!(tab instanceof HTMLButtonElement)) throw new Error('missing collapsed terminal tab')
+    const tab = document.body.querySelector('#detail-workspace-pane-view')
+    if (!(tab instanceof HTMLButtonElement)) throw new Error('missing collapsed terminal view')
 
     act(() => {
       tab.focus()
@@ -168,9 +173,9 @@ describe('TerminalTabs', () => {
     expect(tab.getAttribute('aria-setsize')).toBeNull()
   })
 
-  test('keeps all terminal tabs visible in a horizontal scroll area when not in compact mode', () => {
+  test('keeps all terminal views visible in a horizontal scroll area when not in compact mode', () => {
     render(
-      <TerminalTabs
+      <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         detailId="detail"
         sessions={[
@@ -186,27 +191,27 @@ describe('TerminalTabs', () => {
       />,
     )
 
-    const tablist = document.body.querySelector('[role="tablist"][aria-label="terminal.sessions"]')
+    const tablist = document.body.querySelector('[role="tablist"][aria-label="workspace-pane-views.tabs"]')
     expect(tablist).not.toBeNull()
     expect(tablist?.getAttribute('aria-orientation')).toBe('horizontal')
-    expect(document.body.querySelector('button[aria-label="terminal.sessions"]')).toBeNull()
+    expect(document.body.querySelector('button[aria-label="workspace-pane-views.tabs"]')).toBeNull()
     expect(tablist?.className).toContain('h-full')
     expect(tablist?.parentElement?.className).toContain('w-max')
     expect(
-      [...document.body.querySelectorAll('[data-terminal-tab-tooltip-id]')].every(
+      [...document.body.querySelectorAll('[data-workspace-pane-view-tooltip-id]')].every(
         (tab) =>
           tab.className.includes('w-36') && !tab.className.includes('min-w-') && !tab.className.includes('max-w-'),
       ),
     ).toBe(true)
     expect(document.body.querySelectorAll('[role="tab"]').length).toBe(3)
-    const firstTab = document.body.querySelector('#detail-terminal-tab')
+    const firstTab = document.body.querySelector('#detail-workspace-pane-view')
     expect(firstTab?.getAttribute('aria-posinset')).toBe('1')
     expect(firstTab?.getAttribute('aria-setsize')).toBe('3')
   })
 
   test('uses the full terminal title and unread state in the tab aria-label', () => {
     render(
-      <TerminalTabs
+      <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         detailId="detail"
         panelActive
@@ -226,12 +231,12 @@ describe('TerminalTabs', () => {
       />,
     )
 
-    const tab = document.body.querySelector('#detail-terminal-tab')
+    const tab = document.body.querySelector('#detail-workspace-pane-view')
     expect(tab?.getAttribute('aria-label')).toContain('~/repo/worktree — npm run dev')
     expect(tab?.getAttribute('aria-label')).toContain('terminal.bell-unread')
   })
 
-  test('moves focus across the full terminal tab strip and only navigates out at arrow-key edges', () => {
+  test('moves focus across the full terminal view strip and only navigates out at arrow-key edges', () => {
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
       cb(0)
       return 0
@@ -239,7 +244,7 @@ describe('TerminalTabs', () => {
     const onNavigateOut = vi.fn()
 
     render(
-      <TerminalTabs
+      <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         detailId="detail"
         sessions={[
@@ -256,15 +261,15 @@ describe('TerminalTabs', () => {
       />,
     )
 
-    const tab1 = document.body.querySelector('#detail-terminal-tab')
-    const tab2 = document.body.querySelector('#detail-terminal-tab-t2')
-    const tab3 = document.body.querySelector('#detail-terminal-tab-t3')
+    const tab1 = document.body.querySelector('#detail-workspace-pane-view')
+    const tab2 = document.body.querySelector('#detail-workspace-pane-view-1')
+    const tab3 = document.body.querySelector('#detail-workspace-pane-view-2')
     if (
       !(tab1 instanceof HTMLButtonElement) ||
       !(tab2 instanceof HTMLButtonElement) ||
       !(tab3 instanceof HTMLButtonElement)
     ) {
-      throw new Error('missing terminal tabs')
+      throw new Error('missing terminal views')
     }
 
     act(() => {
@@ -293,9 +298,9 @@ describe('TerminalTabs', () => {
     expect(document.activeElement).toBe(tab3)
   })
 
-  test('keeps the selected terminal tab semantically selected even when the panel is inactive', () => {
+  test('keeps the selected terminal view semantically selected even when the panel is inactive', () => {
     render(
-      <TerminalTabs
+      <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         detailId="detail"
         sessions={[
@@ -310,10 +315,10 @@ describe('TerminalTabs', () => {
       />,
     )
 
-    const tab1 = document.body.querySelector('#detail-terminal-tab')
-    const tab2 = document.body.querySelector('#detail-terminal-tab-t2')
+    const tab1 = document.body.querySelector('#detail-workspace-pane-view')
+    const tab2 = document.body.querySelector('#detail-workspace-pane-view-1')
     if (!(tab1 instanceof HTMLButtonElement) || !(tab2 instanceof HTMLButtonElement)) {
-      throw new Error('missing terminal tabs')
+      throw new Error('missing terminal views')
     }
 
     expect(tab1.getAttribute('aria-selected')).toBe('true')
@@ -322,9 +327,9 @@ describe('TerminalTabs', () => {
     expect(tab2.tabIndex).toBe(-1)
   })
 
-  test('scrolls the tab strip to the far right when a new terminal session is added', () => {
+  test('scrolls the view strip to the far right when a new terminal session is added', () => {
     render(
-      <TerminalTabs
+      <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         detailId="detail"
         sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
@@ -343,7 +348,7 @@ describe('TerminalTabs', () => {
     Object.defineProperty(viewport, 'scrollLeft', { value: 0, writable: true, configurable: true })
 
     rerender(
-      <TerminalTabs
+      <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         detailId="detail"
         sessions={[
@@ -364,7 +369,7 @@ describe('TerminalTabs', () => {
 
   test('does not scroll on initial mount', () => {
     render(
-      <TerminalTabs
+      <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         detailId="detail"
         sessions={[
@@ -388,7 +393,7 @@ describe('TerminalTabs', () => {
 
     // Trigger a re-render with the same sessions to confirm the effect does not scroll.
     rerender(
-      <TerminalTabs
+      <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         detailId="detail"
         sessions={[
@@ -407,9 +412,9 @@ describe('TerminalTabs', () => {
     expect(viewport.scrollLeft).toBe(0)
   })
 
-  test('does not scroll when the tab strip does not overflow horizontally', () => {
+  test('does not scroll when the view strip does not overflow horizontally', () => {
     render(
-      <TerminalTabs
+      <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         detailId="detail"
         sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
@@ -430,7 +435,7 @@ describe('TerminalTabs', () => {
     Object.defineProperty(viewport, 'scrollLeft', { value: 0, writable: true, configurable: true })
 
     rerender(
-      <TerminalTabs
+      <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         detailId="detail"
         sessions={[
@@ -456,7 +461,7 @@ describe('TerminalTabs', () => {
     })
 
     render(
-      <TerminalTabs
+      <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         detailId="detail"
         sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
@@ -476,7 +481,7 @@ describe('TerminalTabs', () => {
     Object.defineProperty(viewport, 'scrollLeft', { value: 0, writable: true, configurable: true })
 
     rerender(
-      <TerminalTabs
+      <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         detailId="detail"
         sessions={[
@@ -500,7 +505,7 @@ describe('TerminalTabs', () => {
 
   test('does not scroll when a terminal session is removed', () => {
     render(
-      <TerminalTabs
+      <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         detailId="detail"
         sessions={[
@@ -523,7 +528,7 @@ describe('TerminalTabs', () => {
     Object.defineProperty(viewport, 'scrollLeft', { value: 500, writable: true, configurable: true })
 
     rerender(
-      <TerminalTabs
+      <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         detailId="detail"
         sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
@@ -538,9 +543,9 @@ describe('TerminalTabs', () => {
     expect(viewport.scrollLeft).toBe(500)
   })
 
-  test('restores the full tab strip after leaving compact mode', () => {
+  test('restores the full view strip after leaving compact mode', () => {
     rerender(
-      <TerminalTabs
+      <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         detailId="detail"
         responsiveCompact
@@ -556,11 +561,11 @@ describe('TerminalTabs', () => {
     expect(document.body.querySelectorAll('[role="tab"]').length).toBe(1)
     // Compact mode pins the tab one step tighter than the default fixed width
     // to fit narrow toolbars alongside the dropdown trigger.
-    expect(document.body.querySelector('[data-terminal-tab-tooltip-id]')?.className).toContain('w-32')
-    expect(document.body.querySelector('[data-terminal-tab-tooltip-id]')?.className).not.toContain('w-36')
+    expect(document.body.querySelector('[data-workspace-pane-view-tooltip-id]')?.className).toContain('w-32')
+    expect(document.body.querySelector('[data-workspace-pane-view-tooltip-id]')?.className).not.toContain('w-36')
 
     rerender(
-      <TerminalTabs
+      <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
         detailId="detail"
         sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
@@ -573,9 +578,38 @@ describe('TerminalTabs', () => {
     )
 
     expect(document.body.querySelectorAll('[role="tab"]').length).toBe(2)
-    expect(document.body.querySelector('button[aria-label="terminal.sessions"]')).toBeNull()
+    expect(document.body.querySelector('button[aria-label="workspace-pane-views.tabs"]')).toBeNull()
   })
 })
+
+function TestWorkspacePaneViewStrip(props: {
+  worktreeTerminalKey: string
+  sessions: TerminalSessionSummary[]
+  detailId: string
+  responsiveCompact?: boolean
+  panelActive?: boolean
+  focusMode?: boolean
+  isLoading?: boolean
+  onNew: () => void
+  onSelect: (worktreeTerminalKey: string, tab: WorkspacePaneViewSummary) => void
+  onScrollToBottom: (key: string) => void
+  onClose: (tab: WorkspacePaneViewSummary) => void
+  onReorder: (worktreeTerminalKey: string, orderedViews: WorkspacePaneViewOrderEntry[]) => void
+  onNavigateOut?: (direction: 'prev' | 'next' | 'first' | 'last') => void
+}) {
+  const selected = props.sessions.find((candidate) => candidate.selected) ?? props.sessions[0]
+  const { sessions, ...detailPaneProps } = props
+  return (
+    <WorkspacePaneViewStrip
+      {...detailPaneProps}
+      views={sessions}
+      activeTabIdentity={selected ? terminalWorkspacePaneViewIdentity(selected.key) : null}
+      getTooltip={(tab) => ('originalTitle' in tab ? (tab.originalTitle ?? tab.fullTitle ?? tab.title) : tab.id)}
+      getLabel={(tab) => ('originalTitle' in tab ? (tab.originalTitle ?? tab.fullTitle ?? tab.title) : tab.id)}
+      getCloseLabel={(tab) => `close ${'title' in tab ? tab.title : tab.id}`}
+    />
+  )
+}
 
 function render(element: ReactNode) {
   container = document.createElement('div')
@@ -597,18 +631,22 @@ function rerender(element: ReactNode) {
 }
 
 function session(overrides: Partial<TerminalSessionSummary> = {}): TerminalSessionSummary {
+  const key = overrides.key ?? 't1'
+  const title = overrides.title ?? 'term-1'
   return {
-    key: 't1',
-    worktreeTerminalKey: '/repo\0/repo/worktree',
-    terminalId: 'terminal-1',
-    index: 1,
-    title: 'term-1',
-    fullTitle: 'term-1',
-    originalTitle: 'term-1',
-    phase: 'open',
-    selected: true,
-    hasBell: false,
-    ...overrides,
+    type: 'terminal',
+    id: overrides.id ?? key,
+    key,
+    worktreeTerminalKey: overrides.worktreeTerminalKey ?? '/repo\0/repo/worktree',
+    terminalId: overrides.terminalId ?? 'terminal-1',
+    index: overrides.index ?? 1,
+    displayOrder: overrides.displayOrder ?? 1,
+    title,
+    fullTitle: overrides.fullTitle ?? title,
+    originalTitle: overrides.originalTitle ?? title,
+    phase: overrides.phase ?? 'open',
+    selected: overrides.selected ?? true,
+    hasBell: overrides.hasBell ?? false,
   }
 }
 

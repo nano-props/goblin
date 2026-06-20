@@ -7,7 +7,7 @@ export type SelectedBranchDetailPresentation = ReturnType<typeof getSelectedBran
 
 export interface BranchDetailRepo extends BranchActionRepo {
   data: BranchActionRepo['data'] & Pick<RepoState['data'], 'branches' | 'statusLoaded'>
-  ui: Pick<RepoState['ui'], 'selectedBranch' | 'preferredDetailTab'>
+  ui: Pick<RepoState['ui'], 'selectedBranch' | 'preferredWorkspacePaneView'>
   resources: Pick<RepoState['resources'], 'status' | 'pullRequests'>
   remote: BranchActionRepo['remote'] & Pick<RepoState['remote'], 'lifecycle'>
 }

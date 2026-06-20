@@ -10,6 +10,7 @@ import {
   TerminalSessionContext,
   TerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
+import type { WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
 import type {
   TerminalSessionContextValue,
   TerminalSessionReadContextValue,
@@ -58,6 +59,7 @@ const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENV
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
+  compactUi = false
   resetReposStore()
   setRendererBridgeForTests(null)
   // T6.1: the toolbar reads `isInitialSyncInFlight` from
@@ -82,22 +84,24 @@ afterEach(() => {
 })
 
 describe('BranchDetailToolbar', () => {
-  test('renders status and changes tabs with separator and terminal area', () => {
+  test('renders terminal affordance without default status or changes tabs', () => {
     const { container: c } = renderToolbar({ terminalCount: 0, changeCount: 3, navigation: navigationWith({}) })
 
     const tabs = Array.from(c.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [])
-    expect(tabs.map((tab) => tab.id)).toEqual(['detail-status-tab', 'detail-changes-tab'])
-    expect(c.querySelector('[aria-label="tab.branch-detail"]')?.className).toContain('h-full')
-    expect(c.querySelector('#detail-changes-tab')?.textContent).toContain('3')
+    expect(tabs.map((tab) => tab.id)).toEqual([])
+    expect(c.querySelector('#detail-workspace-pane-view-empty')?.textContent).toContain('terminal.label')
+    expect(c.querySelector('#detail-workspace-pane-view')).toBeNull()
+    expect(c.querySelector('[data-workspace-pane-view-tooltip-id="status:status"]')).toBeNull()
+    expect(c.querySelector('[data-workspace-pane-view-tooltip-id="changes:changes"]')).toBeNull()
     // useT is mocked to return the i18n key, so we assert against the key here.
-    expect(c.querySelector('#detail-terminal-tab')?.textContent).toContain('terminal.label')
+    expect(c.querySelector('#detail-workspace-pane-view-empty')?.textContent).toContain('terminal.label')
   })
 
   test('clicking the new-terminal button navigates and creates a terminal', async () => {
-    const showRepoDetailTab = vi.fn()
+    const showRepoWorkspacePaneView = vi.fn()
     const { terminalTab, mocks } = renderToolbar({
       terminalCount: 0,
-      navigation: navigationWith({ showRepoDetailTab }),
+      navigation: navigationWith({ showRepoWorkspacePaneView }),
     })
 
     act(() => {
@@ -105,14 +109,14 @@ describe('BranchDetailToolbar', () => {
     })
     await flush()
 
-    expect(showRepoDetailTab).toHaveBeenCalledWith(REPO_ID, 'terminal')
+    expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'terminal')
     expect(mocks.createTerminal).toHaveBeenCalledTimes(1)
   })
 
   test('shows an error toast when new terminal creation fails', async () => {
     const { terminalTab, mocks } = renderToolbar({
       terminalCount: 0,
-      detailTab: 'terminal',
+      workspacePaneView: 'terminal',
       navigation: navigationWith({}),
     })
     mocks.createTerminal.mockRejectedValueOnce(new Error('error.terminal-create-failed'))
@@ -128,10 +132,10 @@ describe('BranchDetailToolbar', () => {
   })
 
   test('clicking a selected session tab when not in terminal panel navigates to terminal', async () => {
-    const showRepoDetailTab = vi.fn()
+    const showRepoWorkspacePaneView = vi.fn()
     const { terminalTab, mocks } = renderToolbar({
       terminalCount: 2,
-      navigation: navigationWith({ showRepoDetailTab }),
+      navigation: navigationWith({ showRepoWorkspacePaneView }),
     })
 
     act(() => {
@@ -139,17 +143,17 @@ describe('BranchDetailToolbar', () => {
     })
     await flush()
 
-    expect(showRepoDetailTab).toHaveBeenCalledWith(REPO_ID, 'terminal')
+    expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'terminal')
     expect(mocks.createTerminal).not.toHaveBeenCalled()
     expect(mocks.selectTerminal).toHaveBeenCalledWith(`${REPO_ID}\0${WORKTREE_PATH}`, 't1')
   })
 
   test('clicking a selected session tab in terminal panel scrolls to bottom', async () => {
-    const showRepoDetailTab = vi.fn()
+    const showRepoWorkspacePaneView = vi.fn()
     const { terminalTab, mocks } = renderToolbar({
       terminalCount: 2,
-      detailTab: 'terminal',
-      navigation: navigationWith({ showRepoDetailTab }),
+      workspacePaneView: 'terminal',
+      navigation: navigationWith({ showRepoWorkspacePaneView }),
     })
 
     act(() => {
@@ -157,20 +161,22 @@ describe('BranchDetailToolbar', () => {
     })
     await flush()
 
-    expect(showRepoDetailTab).not.toHaveBeenCalled()
+    expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
     expect(mocks.createTerminal).not.toHaveBeenCalled()
     expect(mocks.selectTerminal).not.toHaveBeenCalled()
     expect(mocks.scrollToBottom).toHaveBeenCalledWith('t1')
   })
 
   test('clicking an unselected session tab navigates and selects it', async () => {
-    const showRepoDetailTab = vi.fn()
+    const showRepoWorkspacePaneView = vi.fn()
     const { container: c, mocks } = renderToolbar({
       terminalCount: 2,
-      navigation: navigationWith({ showRepoDetailTab }),
+      navigation: navigationWith({ showRepoWorkspacePaneView }),
     })
 
-    const unselectedTab = c.querySelector<HTMLButtonElement>('[data-terminal-tab-tooltip-id="t2"] button[role="tab"]')
+    const unselectedTab = c.querySelector<HTMLButtonElement>(
+      '[data-workspace-pane-view-tooltip-id="terminal:t2"] button[role="tab"]',
+    )
     expect(unselectedTab).not.toBeNull()
 
     act(() => {
@@ -178,7 +184,7 @@ describe('BranchDetailToolbar', () => {
     })
     await flush()
 
-    expect(showRepoDetailTab).toHaveBeenCalledWith(REPO_ID, 'terminal')
+    expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'terminal')
     expect(mocks.createTerminal).not.toHaveBeenCalled()
     expect(mocks.selectTerminal).toHaveBeenCalledWith(`${REPO_ID}\0${WORKTREE_PATH}`, 't2')
   })
@@ -193,16 +199,16 @@ describe('BranchDetailToolbar', () => {
     expect(c.querySelector('[data-testid="branch-detail-toolbar-divider"]')).toBeNull()
   })
 
-  test('keeps terminal focus when pressing End on the compact terminal tab', async () => {
+  test('keeps terminal focus when pressing End on the compact terminal view', async () => {
     compactUi = true
-    const showRepoDetailTab = vi.fn()
+    const showRepoWorkspacePaneView = vi.fn()
     const { container: c } = renderToolbar({
       terminalCount: 2,
-      detailTab: 'terminal',
-      navigation: navigationWith({ showRepoDetailTab }),
+      workspacePaneView: 'terminal',
+      navigation: navigationWith({ showRepoWorkspacePaneView }),
     })
 
-    const terminalTab = c.querySelector<HTMLButtonElement>('#detail-terminal-tab')
+    const terminalTab = c.querySelector<HTMLButtonElement>('#detail-workspace-pane-view')
     expect(terminalTab).not.toBeNull()
 
     act(() => {
@@ -210,58 +216,59 @@ describe('BranchDetailToolbar', () => {
     })
     await flush()
 
-    expect(showRepoDetailTab).not.toHaveBeenCalled()
-    expect(document.activeElement?.id).toBe('detail-terminal-tab')
+    expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
+    expect(document.activeElement?.id).toBe('detail-workspace-pane-view')
   })
 
-  test('moves focus across status, changes, and terminal tabs with keyboard navigation', async () => {
-    const showRepoDetailTab = vi.fn()
+  test('moves focus across opened status, changes, and terminal views with keyboard navigation', async () => {
+    const showRepoWorkspacePaneView = vi.fn()
     const { container: c } = renderToolbar({
       terminalCount: 2,
       changeCount: 1,
-      navigation: navigationWith({ showRepoDetailTab }),
+      staticWorkspaceViewTypes: ['status', 'changes'],
+      navigation: navigationWith({ showRepoWorkspacePaneView }),
     })
 
-    const statusTab = c.querySelector<HTMLButtonElement>('#detail-status-tab')
-    const changesTab = c.querySelector<HTMLButtonElement>('#detail-changes-tab')
-    const terminalTab = c.querySelector<HTMLButtonElement>('#detail-terminal-tab')
-    if (!statusTab || !changesTab || !terminalTab) throw new Error('missing branch detail tabs')
+    const statusTab = c.querySelector<HTMLButtonElement>('#detail-workspace-pane-view')
+    const changesTab = c.querySelector<HTMLButtonElement>('#detail-workspace-pane-view-1')
+    const terminalTab = c.querySelector<HTMLButtonElement>('#detail-workspace-pane-view-2')
+    if (!statusTab || !changesTab || !terminalTab) throw new Error('missing branch workspace pane views')
 
     act(() => {
       statusTab.focus()
       statusTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
     })
     await flush()
-    expect(showRepoDetailTab).toHaveBeenNthCalledWith(1, REPO_ID, 'changes')
+    expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
     expect(document.activeElement).toBe(changesTab)
 
     act(() => {
       changesTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
     })
     await flush()
-    expect(showRepoDetailTab).toHaveBeenNthCalledWith(2, REPO_ID, 'terminal')
+    expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
     expect(document.activeElement).toBe(terminalTab)
 
     act(() => {
       terminalTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
     })
     await flush()
-    expect(showRepoDetailTab).toHaveBeenNthCalledWith(3, REPO_ID, 'changes')
+    expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
     expect(document.activeElement).toBe(changesTab)
   })
 
-  test('skips the changes tab in keyboard navigation when the worktree is clean', async () => {
-    const showRepoDetailTab = vi.fn()
+  test('skips the changes tab in keyboard navigation when it is not open', async () => {
+    const showRepoWorkspacePaneView = vi.fn()
     const { container: c } = renderToolbar({
       terminalCount: 2,
-      // no changeCount — worktree is clean
-      navigation: navigationWith({ showRepoDetailTab }),
+      staticWorkspaceViewTypes: ['status'],
+      navigation: navigationWith({ showRepoWorkspacePaneView }),
     })
 
-    expect(c.querySelector('#detail-changes-tab')).toBeNull()
-    const statusTab = c.querySelector<HTMLButtonElement>('#detail-status-tab')
-    const terminalTab = c.querySelector<HTMLButtonElement>('#detail-terminal-tab')
-    if (!statusTab || !terminalTab) throw new Error('missing branch detail tabs')
+    expect(c.querySelector('[data-workspace-pane-view-tooltip-id="changes:changes"]')).toBeNull()
+    const statusTab = c.querySelector<HTMLButtonElement>('#detail-workspace-pane-view')
+    const terminalTab = c.querySelector<HTMLButtonElement>('#detail-workspace-pane-view-1')
+    if (!statusTab || !terminalTab) throw new Error('missing branch workspace pane views')
 
     act(() => {
       statusTab.focus()
@@ -269,15 +276,40 @@ describe('BranchDetailToolbar', () => {
     })
     await flush()
     // No changes tab to land on — ArrowRight from status jumps to terminal.
-    expect(showRepoDetailTab).toHaveBeenLastCalledWith(REPO_ID, 'terminal')
+    expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
     expect(document.activeElement).toBe(terminalTab)
 
     act(() => {
       terminalTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
     })
     await flush()
-    expect(showRepoDetailTab).toHaveBeenLastCalledWith(REPO_ID, 'status')
+    expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
     expect(document.activeElement).toBe(statusTab)
+  })
+
+  test('selects the adjacent static workspace pane view after closing the active terminal view', async () => {
+    const showRepoWorkspacePaneView = vi.fn()
+    const { container: c, mocks } = renderToolbar({
+      terminalCount: 1,
+      staticWorkspaceViewTypes: ['status', 'changes'],
+      workspacePaneView: 'terminal',
+      navigation: navigationWith({ showRepoWorkspacePaneView }),
+    })
+
+    const terminalCloseButton = c.querySelector<HTMLButtonElement>('button[aria-label^="terminal.close-named"]')
+    expect(terminalCloseButton).not.toBeNull()
+
+    act(() => {
+      terminalCloseButton?.click()
+    })
+    await flush()
+
+    expect(mocks.closeTerminalByDescriptor).toHaveBeenCalledWith('t1', {
+      repoRoot: REPO_ID,
+      branch: 'feature/worktree',
+      worktreePath: WORKTREE_PATH,
+    })
+    expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'changes')
   })
 
   test('T6.1: renders a single skeleton placeholder chip while the initial session sync is in flight', async () => {
@@ -288,9 +320,9 @@ describe('BranchDetailToolbar', () => {
     })
 
     // The skeleton marker is present; the real button is not.
-    expect(c.querySelector('[data-terminal-skeleton-strip=""]')).not.toBeNull()
-    expect(c.querySelectorAll('[data-terminal-skeleton-chip=""]')).toHaveLength(1)
-    expect(c.querySelector('#detail-terminal-tab')).toBeNull()
+    expect(c.querySelector('[data-workspace-pane-skeleton-strip=""]')).not.toBeNull()
+    expect(c.querySelectorAll('[data-workspace-pane-skeleton-chip=""]')).toHaveLength(1)
+    expect(c.querySelector('#detail-workspace-pane-view')).toBeNull()
     // role="status" + aria-busy for assistive tech.
     const strip = c.querySelector('[role="status"][aria-busy="true"]')
     expect(strip).not.toBeNull()
@@ -300,8 +332,8 @@ describe('BranchDetailToolbar', () => {
     // skeleton disappears and the real button appears.
     useRepoSyncStore.getState().markReady(REPO_ID, 0)
     await flush()
-    expect(c.querySelector('[data-terminal-skeleton-strip=""]')).toBeNull()
-    expect(c.querySelector('#detail-terminal-tab')).not.toBeNull()
+    expect(c.querySelector('[data-workspace-pane-skeleton-strip=""]')).toBeNull()
+    expect(c.querySelector('#detail-workspace-pane-view-empty')).not.toBeNull()
   })
 })
 
@@ -309,7 +341,8 @@ function renderToolbar(options: {
   terminalCount: number
   changeCount?: number
   navigation: MainWindowNavigationActions
-  detailTab?: 'status' | 'changes' | 'terminal'
+  workspacePaneView?: 'status' | 'changes' | 'terminal'
+  staticWorkspaceViewTypes?: WorkspacePaneStaticViewType[]
   detailFocusMode?: boolean
   collapsed?: boolean
   layout?: RepoWorkspaceLayout
@@ -319,7 +352,7 @@ function renderToolbar(options: {
    * renders the single-skeleton-chip loading state instead of the
    * "+ New" button. The T6.1 test uses this; all other tests use
    * the default (false) so the existing assertions still find
-   * `#detail-terminal-tab`.
+   * `#detail-workspace-pane-view-empty`.
    */
   loading?: boolean
 }): {
@@ -329,7 +362,8 @@ function renderToolbar(options: {
     createTerminal: ReturnType<typeof vi.fn>
     selectTerminal: ReturnType<typeof vi.fn>
     scrollToBottom: ReturnType<typeof vi.fn>
-    showRepoDetailTab: ReturnType<typeof vi.fn>
+    closeTerminalByDescriptor: ReturnType<typeof vi.fn>
+    showRepoWorkspacePaneView: ReturnType<typeof vi.fn>
   }
 } {
   // T6.1: mark the repo as already-synced so the toolbar renders
@@ -343,7 +377,7 @@ function renderToolbar(options: {
     id: REPO_ID,
     branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
     selectedBranch: 'feature/worktree',
-    detailTab: options.detailTab ?? 'status',
+    workspacePaneView: options.workspacePaneView ?? 'status',
     status:
       options.changeCount && options.changeCount > 0
         ? [
@@ -362,11 +396,22 @@ function renderToolbar(options: {
     statusLoaded: true,
   })
   const detail = getSelectedBranchDetailPresentation(repo)
+  const staticWorkspacePaneViews = (options.staticWorkspaceViewTypes ?? []).map((type, index) => ({
+    type,
+    id: type,
+    key: type,
+    worktreeTerminalKey: `${REPO_ID}\0${WORKTREE_PATH}`,
+    worktreePath: WORKTREE_PATH,
+    displayOrder: index + 1,
+  }))
   const sessions: TerminalSessionSummary[] = Array.from({ length: options.terminalCount }, (_, index) => ({
+    type: 'terminal',
+    id: `t${index + 1}`,
     key: `t${index + 1}`,
     worktreeTerminalKey: `${REPO_ID}\0${WORKTREE_PATH}`,
     terminalId: `t${index + 1}`,
     index: index + 1,
+    displayOrder: staticWorkspacePaneViews.length + index + 1,
     title: `term-${index + 1}`,
     fullTitle: `full-term-${index + 1}`,
     phase: 'open' as const,
@@ -388,6 +433,8 @@ function renderToolbar(options: {
     worktreeTerminalKey: `${REPO_ID}\0${WORKTREE_PATH}`,
     selectedDescriptor,
     sessions,
+    staticWorkspacePaneViews,
+    workspacePaneViews: [...staticWorkspacePaneViews, ...sessions],
     count: options.terminalCount,
     pendingCreate: false,
   }
@@ -401,7 +448,8 @@ function renderToolbar(options: {
   const createTerminal = vi.fn(async () => 'key')
   const selectTerminal = vi.fn()
   const scrollToBottom = vi.fn()
-  const showRepoDetailTab = vi.fn(options.navigation.showRepoDetailTab)
+  const closeTerminalByDescriptor = vi.fn()
+  const showRepoWorkspacePaneView = vi.fn(options.navigation.showRepoWorkspacePaneView)
   const commandContext: TerminalSessionContextValue = {
     createTerminal,
     registerHost: vi.fn(),
@@ -410,7 +458,7 @@ function renderToolbar(options: {
     scrollToBottom,
     scrollLines: vi.fn(),
     clearBell: vi.fn(() => false),
-    closeTerminalByDescriptor: vi.fn(() => []),
+    closeTerminalByDescriptor,
     attach: vi.fn(),
     detach: vi.fn(),
     restart: vi.fn(),
@@ -420,7 +468,9 @@ function renderToolbar(options: {
     clearSearch: vi.fn(),
     writeInput: vi.fn(),
     takeover: vi.fn(),
-    reorderSessions: vi.fn(async () => true),
+    openWorkspacePaneView: vi.fn(async () => true),
+    closeWorkspacePaneView: vi.fn(async () => true),
+    reorderWorkspacePaneViews: vi.fn(async () => true),
     serialize: vi.fn(() => ''),
   }
 
@@ -450,8 +500,8 @@ function renderToolbar(options: {
     )
   })
 
-  const tab = container.querySelector<HTMLButtonElement>('#detail-terminal-tab')
-  if (!tab && !options.loading) throw new Error('missing terminal tab')
+  const tab = container.querySelector<HTMLButtonElement>('#detail-workspace-pane-view-empty, #detail-workspace-pane-view')
+  if (!tab && !options.loading) throw new Error('missing terminal view')
   return {
     container,
     terminalTab: tab as HTMLButtonElement,
@@ -459,7 +509,8 @@ function renderToolbar(options: {
       createTerminal,
       selectTerminal,
       scrollToBottom,
-      showRepoDetailTab,
+      closeTerminalByDescriptor,
+      showRepoWorkspacePaneView,
     },
   }
 }
@@ -470,8 +521,8 @@ function navigationWith(overrides: Partial<MainWindowNavigationActions>): MainWi
     closeRepo: () => {},
     cycleRepo: () => {},
     selectRepoBranch: () => {},
-    showRepoDetailTab: () => {},
-    showRepoBranchDetailTab: () => {},
+    showRepoWorkspacePaneView: () => {},
+    showRepoBranchWorkspacePaneView: () => {},
     openSettings: () => {},
     ...overrides,
   }

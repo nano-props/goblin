@@ -8,6 +8,7 @@ import {
 } from '#/web/components/terminal/TerminalSessionRegistry.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import type { TerminalDescriptor, TerminalRepoIndex } from '#/web/components/terminal/types.ts'
+import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
 
 const REPO_ROOT = '/repo'
 const WORKTREE_PATH = '/repo'
@@ -48,10 +49,13 @@ function makeServerSession(
     rows: number
     displayOrder: number
   }> = {},
-) {
+): TerminalSessionSummary {
+  const key = `${REPO_ROOT}\0${WORKTREE_PATH}\0${terminalId}`
   return {
     sessionId,
-    key: `${REPO_ROOT}\0${WORKTREE_PATH}\0${terminalId}`,
+    key,
+    viewType: 'terminal',
+    viewId: key,
     cwd: WORKTREE_PATH,
     controller: overrides.controller ?? null,
     processName: overrides.processName ?? 'bash',

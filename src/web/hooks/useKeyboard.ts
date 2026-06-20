@@ -14,8 +14,6 @@ import { useEffect, useRef } from 'react'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { visibleBranches } from '#/web/stores/repos/branch-view-mode.ts'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
-import { adjacentDetailTab } from '#/web/lib/detail-tabs.ts'
-import { branchWorktreeHasChanges } from '#/web/stores/repos/worktree-state.ts'
 import { runBranchActionShortcut } from '#/web/keyboard/branch-action-shortcuts.ts'
 import { matchRendererKeyboardShortcut } from '#/shared/shortcut-definitions.ts'
 import { isTerminalFocused } from '#/web/terminal-focus.ts'
@@ -23,6 +21,9 @@ import type { MainWindowNavigationActions } from '#/web/main-window-navigation.t
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import { getRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { keyboardRuntimeStateFromStore } from '#/web/stores/repos/selector-state.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
+import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { adjacentWorkspacePaneView } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
 
 type MoveDirection = 1 | -1
 const INTERACTIVE_SHORTCUT_TARGET_SELECTOR =
@@ -161,23 +162,26 @@ export function useKeyboard({
           if (moveBranchSelection({ repo, selectBranch: state.selectBranch }, -1, navigation)) e.preventDefault()
           break
         }
-        case 'next-detail-tab':
-        case 'prev-detail-tab': {
+        case 'next-workspace-pane-view':
+        case 'prev-workspace-pane-view': {
           if (overlayOpen || !repo || !repo.ui.selectedBranch || keyboardState.detailCollapsed) break
-          e.preventDefault()
           const selected = repo.data.branches.find((branch) => branch.name === repo.ui.selectedBranch)
-          // Global shortcuts do not own tab focus; a missing branch is treated as "no worktree".
-          // Navigates from the user's preferred tab — `useEffectiveDetailTab` resolves the
-          // actual rendered tab at read time.
-          navigation.showRepoDetailTab(
-            repo.id,
-            adjacentDetailTab(
-              repo.ui.preferredDetailTab,
-              action === 'next-detail-tab' ? 1 : -1,
-              !!selected?.worktree?.path,
-              selected ? branchWorktreeHasChanges(repo, selected) : false,
-            ),
-          )
+          const worktreePath = selected?.worktree?.path
+          if (!worktreePath) break
+          const worktreeKey = worktreeTerminalKey(repo.id, worktreePath)
+          const bridge = readTerminalSessionCommandBridge()
+          const snapshot = bridge?.worktreeSnapshot(worktreeKey)
+          const nextTab = snapshot
+            ? adjacentWorkspacePaneView(
+                snapshot.workspacePaneViews,
+                repo.ui.preferredWorkspacePaneView,
+                action === 'next-workspace-pane-view' ? 1 : -1,
+              )
+            : null
+          if (!nextTab) break
+          e.preventDefault()
+          navigation.showRepoWorkspacePaneView(repo.id, nextTab.type)
+          if (nextTab.type === 'terminal') bridge?.selectTerminal(worktreeKey, nextTab.key)
           break
         }
         case 'checkout-selected': {

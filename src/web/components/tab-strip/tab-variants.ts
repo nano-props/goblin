@@ -1,14 +1,14 @@
 import { cn } from '#/web/lib/cn.ts'
 import { compositeFocusRing } from '#/web/components/ui/focus.ts'
 
-type ToolbarTabVariant = 'repo' | 'terminal'
+type ToolbarTabVariant = 'repo' | 'detail'
 
 export function toolbarTabChromeClassName(options: {
   variant: ToolbarTabVariant
   active: boolean
   dragging?: boolean
-  // Only meaningful for the 'terminal' variant: terminal tabs use a fixed width
-  // so PTY-driven title changes don't shift neighbouring tabs; compact strips
+  // Only meaningful for the detail variant: tabs use a fixed width so title
+  // changes don't shift neighbouring tabs; compact strips
   // live in narrow toolbars and pin one step tighter.
   compact?: boolean
 }): string {

@@ -23,7 +23,7 @@ export function useMainWindowNavigation(): MainWindowNavigationActions {
     navigationWorkspaceStateFromStore,
     navigationWorkspaceStateEqual,
   )
-  const { setActive, closeRepo, cycleActive, selectBranch, setDetailTab } = useStoreWithEqualityFn(
+  const { setActive, closeRepo, cycleActive, selectBranch, setWorkspacePaneView } = useStoreWithEqualityFn(
     useReposStore,
     mainWindowNavigationStoreActionsFromStore,
     mainWindowNavigationStoreActionsEqual,
@@ -37,9 +37,9 @@ export function useMainWindowNavigation(): MainWindowNavigationActions {
         closeRepo,
         cycleActive,
         selectBranch,
-        setDetailTab,
+        setWorkspacePaneView,
       }),
-    [activeId, closeRepo, cycleActive, order, selectBranch, setActive, setDetailTab],
+    [activeId, closeRepo, cycleActive, order, selectBranch, setActive, setWorkspacePaneView],
   )
 
   return context ?? fallbackNavigation

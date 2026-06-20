@@ -1,4 +1,4 @@
-import type { DetailTab } from '#/web/stores/repos/types.ts'
+import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 
 export interface MainWindowNavigationActions {
@@ -6,8 +6,8 @@ export interface MainWindowNavigationActions {
   closeRepo: (repoId: string) => void
   cycleRepo: (direction: 1 | -1) => void
   selectRepoBranch: (repoId: string, branch: string) => void
-  showRepoDetailTab: (repoId: string, tab: DetailTab) => void
-  showRepoBranchDetailTab: (repoId: string, branch: string, tab: DetailTab) => void
+  showRepoWorkspacePaneView: (repoId: string, tab: WorkspacePaneView) => void
+  showRepoBranchWorkspacePaneView: (repoId: string, branch: string, tab: WorkspacePaneView) => void
   openSettings: (page: SettingsPage) => void
 }
 
@@ -18,7 +18,7 @@ interface CreateMainWindowNavigationActionsOptions {
   closeRepo: (repoId: string) => void
   cycleActive: (direction: 1 | -1) => void
   selectBranch: (repoId: string, branch: string) => void
-  setDetailTab: (repoId: string, tab: DetailTab) => void
+  setWorkspacePaneView: (repoId: string, tab: WorkspacePaneView) => void
   onOpenSettings?: (page: SettingsPage) => void
 }
 
@@ -29,7 +29,7 @@ export function createMainWindowNavigationActions({
   closeRepo,
   cycleActive,
   selectBranch,
-  setDetailTab,
+  setWorkspacePaneView,
   onOpenSettings,
 }: CreateMainWindowNavigationActionsOptions): MainWindowNavigationActions {
   return {
@@ -46,14 +46,14 @@ export function createMainWindowNavigationActions({
       if (repoId !== activeId) setActive(repoId)
       selectBranch(repoId, branch)
     },
-    showRepoDetailTab(repoId, tab) {
+    showRepoWorkspacePaneView(repoId, tab) {
       if (repoId !== activeId) setActive(repoId)
-      setDetailTab(repoId, tab)
+      setWorkspacePaneView(repoId, tab)
     },
-    showRepoBranchDetailTab(repoId, branch, tab) {
+    showRepoBranchWorkspacePaneView(repoId, branch, tab) {
       if (repoId !== activeId) setActive(repoId)
       selectBranch(repoId, branch)
-      setDetailTab(repoId, tab)
+      setWorkspacePaneView(repoId, tab)
     },
     openSettings(page) {
       onOpenSettings?.(page)

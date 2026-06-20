@@ -19,6 +19,7 @@ import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 import { detailPanelStoreActionsEqual, detailPanelStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
+import { openWorkspacePaneView } from '#/web/components/branch-detail/open-workspace-pane-view.ts'
 
 interface Props {
   repoId: string
@@ -76,14 +77,6 @@ export function BranchList({ repoId, showActions = true }: Props) {
     },
     [navigation, repoId],
   )
-  const handleOpenBranchStatus = useCallback(
-    (branch: string) => {
-      handleSelectBranch(branch)
-      navigation.showRepoDetailTab(repoId, 'status')
-      setDetailCollapsed(false)
-    },
-    [repoId, handleSelectBranch, navigation, setDetailCollapsed],
-  )
   const repo = useStoreWithEqualityFn(
     useReposStore,
     (s) => {
@@ -131,6 +124,23 @@ export function BranchList({ repoId, showActions = true }: Props) {
     branches: repo.data.branches,
     viewMode: repo.ui.branchViewMode,
   })
+  const handleOpenBranchStatus = (branchName: string) => {
+    const branch = repo.data.branches.find((candidate) => candidate.name === branchName)
+    if (branch?.worktree?.path) {
+      openWorkspacePaneView({
+        repoId: repo.id,
+        branchName,
+        worktreePath: branch.worktree.path,
+        type: 'status',
+        navigation,
+        setDetailCollapsed,
+      })
+      return
+    }
+    handleSelectBranch(branchName)
+    navigation.showRepoWorkspacePaneView(repoId, 'status')
+    setDetailCollapsed(false)
+  }
   useEffect(() => {
     if (!openActionMenu) return
     if (

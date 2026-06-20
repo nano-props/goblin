@@ -9,8 +9,8 @@ import type {
 } from '#/web/types.ts'
 import type { RemoteRepoLifecycle, RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspaceDetailPaneSizes, WorkspaceLayout } from '#/shared/workspace-layout.ts'
-import type { SessionState, DetailTab } from '#/shared/api-types.ts'
-export type { DetailTab }
+import type { SessionState } from '#/shared/api-types.ts'
+import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/repos/branch-action-types.ts'
 import type { RepoOperationsState } from '#/web/stores/repos/operations.ts'
 import type { RepoResourcesState } from '#/web/stores/repos/resources.ts'
@@ -64,13 +64,12 @@ export interface RepoWorktreeState {
 export interface RepoUiState {
   selectedBranch: string | null
   branchViewMode: BranchViewMode
-  /** The user-preferred detail tab. This is the persisted intent; what the
-   *  user actually sees is `computeEffectiveDetailTab(preferred, context)`
-   *  evaluated at read time, where `context` carries the worktree, dirty
-   *  state, and terminal session truth. The store never adjusts this on
-   *  snapshot/branch changes — the derived value handles those cases,
-   *  preserving the user's preference across them. */
-  preferredDetailTab: DetailTab
+  /** The user-preferred workspace pane view type. This is persisted intent; the
+   *  rendered detail pane is resolved at read time from this preference plus
+   *  live worktree, terminal, and opened workspace pane view state. The store never
+   *  adjusts this on snapshot/branch changes, preserving the user's
+   *  preference across them. */
+  preferredWorkspacePaneView: WorkspacePaneView
 }
 
 export interface RepoProjectionMeta {
@@ -161,8 +160,8 @@ export interface RestorableWorkspaceState {
   detailPaneSizes: WorkspaceDetailPaneSizes
   /** Per worktree terminal selection restored from SessionState.selectedTerminalByWorktree. */
   selectedTerminalByWorktree: Record<string, string>
-  /** Per-repo detail tab selection, restored alongside detailCollapsed. */
-  detailTabByRepo: Record<string, DetailTab>
+  /** Per-repo workspace pane view selection, restored alongside detailCollapsed. */
+  workspacePaneViewByRepo: Record<string, WorkspacePaneView>
 }
 
 export interface LocalWorkspaceState {
@@ -191,7 +190,7 @@ export interface RestorableWorkspaceActions {
     layout: Pick<SessionState, 'workspaceLayout' | 'detailCollapsed' | 'detailFocusMode' | 'detailPaneSizes'>,
   ) => void
   applySessionSelectedTerminalState: (selectedTerminalByWorktree: Record<string, string>) => void
-  applySessionDetailTabByRepo: (detailTabByRepo: Record<string, DetailTab>) => void
+  applySessionWorkspacePaneViewByRepo: (workspacePaneViewByRepo: Record<string, WorkspacePaneView>) => void
   setDetailPaneSize: (layout: RepoWorkspaceLayout, size: number) => void
   setDetailPaneSizes: (sizes: WorkspaceDetailPaneSizes) => void
   resetLayout: () => void
@@ -213,11 +212,11 @@ export interface RuntimeCoherentRepoProjectionActions {
    * Returns the new outcome, or `null` for non-remote ids.
    */
   retryRemoteRepoLifecycle: (id: string) => Promise<{ ok: boolean; reason?: string } | null>
-  /** Updates the user-preferred detail tab. The store does not project
-   *  against terminal session count or worktree presence — the UI computes
-   *  the effective tab via `computeEffectiveDetailTab` at read time, which
-   *  preserves user intent across session restore and branch switches. */
-  setDetailTab: (id: string, tab: DetailTab) => void
+  /** Updates the user-preferred workspace pane view type. The store does not project
+   *  against terminal session count, worktree presence, or opened workspace pane views;
+   *  the UI resolves the active pane at read time so session restore and branch
+   *  switches preserve user intent. */
+  setWorkspacePaneView: (id: string, tab: WorkspacePaneView) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
   selectBranch: (id: string, branch: string) => void
   refreshSnapshot: (id: string, options?: { skipLogBackfill?: boolean; token?: number }) => Promise<void>

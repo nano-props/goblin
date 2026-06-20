@@ -14,8 +14,9 @@ import type {
   TerminalSessionSummary,
   TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
+import type { WorkspacePaneStaticViewSummary, WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { BranchSnapshotInfo, PullRequestInfo, WorktreeStatus } from '#/web/types.ts'
-import type { DetailTab, RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
+import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
 import {
   DEFAULT_DETAIL_COLLAPSED,
   DEFAULT_DETAIL_PANE_SIZES,
@@ -34,8 +35,11 @@ interface TerminalBridgeTestOutputs {
   'terminal.create': TerminalCatalogMutationResult
   'terminal.prune': { pruned: number; remaining: number }
   'terminal.listSessions': TerminalSessionSummary[]
+  'terminal.listViews': WorkspacePaneStaticViewSummary[]
+  'terminal.openView': TerminalMutationResult
+  'terminal.closeView': TerminalMutationResult
   'terminal.getSessionSnapshot': TerminalSessionSnapshot | null
-  'terminal.reorder': TerminalMutationResult
+  'terminal.reorderViews': TerminalMutationResult
   'terminal.notifyBell': TerminalMutationResult
 }
 
@@ -59,10 +63,16 @@ function terminalHandlerNameForSocketAction(action: string): keyof TerminalBridg
       return 'terminal.prune'
     case 'list-sessions':
       return 'terminal.listSessions'
+    case 'list-views':
+      return 'terminal.listViews'
+    case 'open-view':
+      return 'terminal.openView'
+    case 'close-view':
+      return 'terminal.closeView'
     case 'session-snapshot':
       return 'terminal.getSessionSnapshot'
-    case 'reorder':
-      return 'terminal.reorder'
+    case 'reorder-views':
+      return 'terminal.reorderViews'
     default:
       return null
   }
@@ -206,6 +216,18 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     payload: unknown,
   ): TerminalBridgeTestOutputs['terminal.listSessions']
   function callTerminalHandler(
+    name: 'terminal.listViews',
+    payload: unknown,
+  ): TerminalBridgeTestOutputs['terminal.listViews']
+  function callTerminalHandler(
+    name: 'terminal.openView',
+    payload: unknown,
+  ): TerminalBridgeTestOutputs['terminal.openView']
+  function callTerminalHandler(
+    name: 'terminal.closeView',
+    payload: unknown,
+  ): TerminalBridgeTestOutputs['terminal.closeView']
+  function callTerminalHandler(
     name: 'terminal.getSessionSnapshot',
     payload: unknown,
   ): TerminalBridgeTestOutputs['terminal.getSessionSnapshot']
@@ -214,9 +236,9 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     payload: unknown,
   ): TerminalBridgeTestOutputs['terminal.notifyBell']
   function callTerminalHandler(
-    name: 'terminal.reorder',
+    name: 'terminal.reorderViews',
     payload: unknown,
-  ): TerminalBridgeTestOutputs['terminal.reorder']
+  ): TerminalBridgeTestOutputs['terminal.reorderViews']
   function callTerminalHandler(
     name: keyof TerminalBridgeTestOutputs,
     payload: unknown,
@@ -234,7 +256,9 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         case 'terminal.write':
         case 'terminal.resize':
         case 'terminal.close':
-        case 'terminal.reorder':
+        case 'terminal.openView':
+        case 'terminal.closeView':
+        case 'terminal.reorderViews':
         case 'terminal.notifyBell':
           return true satisfies TerminalMutationResult
         case 'terminal.takeover':
@@ -251,6 +275,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         case 'terminal.prune':
           return { pruned: 0, remaining: 0 }
         case 'terminal.listSessions':
+        case 'terminal.listViews':
           return []
         case 'terminal.getSessionSnapshot':
           return null
@@ -389,10 +414,13 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       create: async (input) => callTerminalHandler('terminal.create', input),
       pruneTerminals: async (repoRoot) => callTerminalHandler('terminal.prune', { repoRoot }),
       listSessions: async (input) => callTerminalHandler('terminal.listSessions', input),
+      listViews: async (input) => callTerminalHandler('terminal.listViews', input),
+      openView: async (input) => callTerminalHandler('terminal.openView', input),
+      closeView: async (input) => callTerminalHandler('terminal.closeView', input),
       prewarm: async () => {},
       kickReconnect: () => {},
       getSessionSnapshot: async (input) => callTerminalHandler('terminal.getSessionSnapshot', input),
-      reorder: async (input) => callTerminalHandler('terminal.reorder', input),
+      reorderViews: async (input) => callTerminalHandler('terminal.reorderViews', input),
       notifyBell: async (input) => callTerminalHandler('terminal.notifyBell', input),
       sendTestNotification: async () => true,
       setBadge: () => {},
@@ -533,7 +561,7 @@ export function seedRepoState(options: {
   branchSnapshots?: BranchSnapshotInfo[]
   currentBranch?: string
   selectedBranch?: string | null
-  detailTab?: DetailTab
+  workspacePaneView?: WorkspacePaneView
   instanceToken?: number
   status?: WorktreeStatus[]
   statusLoaded?: boolean
@@ -560,7 +588,7 @@ export function seedRepoState(options: {
     ui: {
       ...base.ui,
       selectedBranch: options.selectedBranch ?? base.ui.selectedBranch,
-      preferredDetailTab: options.detailTab ?? base.ui.preferredDetailTab,
+      preferredWorkspacePaneView: options.workspacePaneView ?? base.ui.preferredWorkspacePaneView,
     },
     remote: {
       ...base.remote,

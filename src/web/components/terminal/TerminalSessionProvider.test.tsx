@@ -233,7 +233,9 @@ let titleHandler: ((event: TerminalTitleEvent) => void) | null = null
 let ownershipHandler: ((event: TerminalOwnershipViewModel) => void) | null = null
 let sessionsChangedHandler: ((repoRoot: string) => void) | null = null
 let sessionClosedHandler: ((event: { sessionId: string; repoRoot: string }) => void) | null = null
-const listSessionsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<TerminalSessionSummary[]>>(
+type TestTerminalSessionSummary = Omit<TerminalSessionSummary, 'viewType' | 'viewId'> &
+  Partial<Pick<TerminalSessionSummary, 'viewType' | 'viewId'>>
+const listSessionsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<TestTerminalSessionSummary[]>>(
   async () => [],
 )
 const getSessionSnapshotMock = vi.fn<
@@ -241,7 +243,19 @@ const getSessionSnapshotMock = vi.fn<
 >(async () => null)
 const closeMock = vi.fn(async () => true)
 const createTerminalMock = vi.fn<(input: TerminalCreateInput) => Promise<TerminalCatalogMutationResult>>()
-let managedServerSessions: TerminalSessionSummary[] = []
+let managedServerSessions: TestTerminalSessionSummary[] = []
+
+function completeServerSession(session: TestTerminalSessionSummary): TerminalSessionSummary {
+  return {
+    ...session,
+    viewType: session.viewType ?? 'terminal',
+    viewId: session.viewId ?? session.key,
+  }
+}
+
+function completeServerSessions(sessions: TestTerminalSessionSummary[]): TerminalSessionSummary[] {
+  return sessions.map(completeServerSession)
+}
 
 function attachResult(): TerminalAttachResult {
   return {
@@ -299,7 +313,7 @@ beforeEach(() => {
         ok: true,
         action: 'reused',
         key,
-        sessions: managedServerSessions,
+        sessions: completeServerSessions(managedServerSessions),
         sessionId: reused?.sessionId ?? 'terminal-1',
         snapshot: '',
         snapshotSeq: 0,
@@ -345,7 +359,7 @@ beforeEach(() => {
       ok: true,
       action: 'created',
       key,
-      sessions: managedServerSessions,
+      sessions: completeServerSessions(managedServerSessions),
       sessionId: terminalId,
       snapshot: '',
       snapshotSeq: 0,
@@ -418,7 +432,8 @@ beforeEach(() => {
         setBadge: vi.fn(async () => {}),
         create: createTerminalMock,
         pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
-        listSessions: listSessionsMock,
+        listSessions: async (input: { repoRoot: string }) => completeServerSessions(await listSessionsMock(input)),
+        listViews: vi.fn(async () => []),
         getSessionSnapshot: getSessionSnapshotMock,
         onOutput: vi.fn((cb: (event: TerminalOutputEvent) => void) => {
           outputHandler = cb
@@ -432,14 +447,10 @@ beforeEach(() => {
           exitHandler = cb
           return () => {}
         }),
-        onOwnership: vi.fn(
-          (
-            cb: (event: TerminalOwnershipViewModel) => void,
-          ) => {
-            ownershipHandler = cb
-            return () => {}
-          },
-        ),
+        onOwnership: vi.fn((cb: (event: TerminalOwnershipViewModel) => void) => {
+          ownershipHandler = cb
+          return () => {}
+        }),
         onSessionsChanged: vi.fn((cb: (repoRoot: string) => void) => {
           sessionsChangedHandler = cb
           return () => {
@@ -504,11 +515,14 @@ beforeEach(() => {
       close: closeMock,
       create: createTerminalMock,
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
-      listSessions: listSessionsMock,
+      listSessions: async (input) => completeServerSessions(await listSessionsMock(input)),
+      listViews: vi.fn(async () => []),
+      openView: vi.fn(async () => true),
+      closeView: vi.fn(async () => true),
       prewarm: vi.fn(async () => {}),
       kickReconnect: vi.fn(() => {}),
       getSessionSnapshot: getSessionSnapshotMock,
-      reorder: vi.fn(async () => true),
+      reorderViews: vi.fn(async () => true),
       notifyBell: window.goblinNative.terminal.notifyBell ?? vi.fn(async () => true),
       sendTestNotification: vi.fn(async () => true),
       setBadge: window.goblinNative.terminal.setBadge ?? vi.fn(() => {}),
@@ -524,14 +538,10 @@ beforeEach(() => {
         exitHandler = cb
         return () => {}
       }),
-      onOwnership: vi.fn(
-        (
-          cb: (event: TerminalOwnershipViewModel) => void,
-        ) => {
-          ownershipHandler = cb
-          return () => {}
-        },
-      ),
+      onOwnership: vi.fn((cb: (event: TerminalOwnershipViewModel) => void) => {
+        ownershipHandler = cb
+        return () => {}
+      }),
       onSessionsChanged: vi.fn((cb: (repoRoot: string) => void) => {
         sessionsChangedHandler = cb
         return () => {
@@ -561,7 +571,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      detailTab: 'terminal',
+      workspacePaneView: 'terminal',
     })
     useReposStore.setState({ detailCollapsed: false })
     const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
@@ -570,7 +580,7 @@ describe('TerminalSessionProvider', () => {
     try {
       const base = { repoRoot: REPO_ID, branch: 'feature/worktree', worktreePath: WORKTREE_PATH }
       await act(async () => {
-        useReposStore.getState().setDetailTab(REPO_ID, 'terminal')
+        useReposStore.getState().setWorkspacePaneView(REPO_ID, 'terminal')
         await getContext().createTerminal(base)
         await getContext().createTerminal(base)
       })
@@ -600,7 +610,7 @@ describe('TerminalSessionProvider', () => {
       })
 
       expect(closeMock).not.toHaveBeenCalled()
-      expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredDetailTab).toBe('terminal')
+      expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('terminal')
       expect(useReposStore.getState().detailCollapsed).toBe(false)
       expect(getProbe().summaries.map((session) => [session.terminalId, session.selected, session.hasBell])).toEqual([
         ['terminal-1', true, false],
@@ -608,15 +618,15 @@ describe('TerminalSessionProvider', () => {
 
       // With the derived-value pattern, the store never re-projects the
       // preferred tab when terminal sessions go to zero. The user's intent
-      // is preserved; `useEffectiveDetailTab` resolves the rendered tab
-      // at read time (covered by `detail-tabs.test.ts` and
-      // `useEffectiveDetailTab.test.tsx`).
+      // is preserved; `useEffectiveWorkspacePaneView` resolves the rendered tab
+      // at read time (covered by `workspace-pane-views.test.ts` and
+      // `useEffectiveWorkspacePaneView.test.tsx`).
       await act(async () => {
         exitHandler?.({ sessionId: 'terminal-1' })
       })
 
       expect(closeMock).not.toHaveBeenCalled()
-      expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredDetailTab).toBe('terminal')
+      expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('terminal')
       expect(useReposStore.getState().detailCollapsed).toBe(false)
     } finally {
       await unmount()
@@ -628,7 +638,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      detailTab: 'terminal',
+      workspacePaneView: 'terminal',
     })
     mainWindowQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
@@ -693,7 +703,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      detailTab: 'terminal',
+      workspacePaneView: 'terminal',
     })
     const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
@@ -751,7 +761,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      detailTab: 'terminal',
+      workspacePaneView: 'terminal',
     })
     mainWindowQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
@@ -814,7 +824,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      detailTab: 'terminal',
+      workspacePaneView: 'terminal',
     })
     listSessionsMock.mockResolvedValue([
       {
@@ -879,7 +889,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      detailTab: 'terminal',
+      workspacePaneView: 'terminal',
     })
     managedServerSessions = [
       {
@@ -937,7 +947,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      detailTab: 'terminal',
+      workspacePaneView: 'terminal',
     })
     const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
     useReposStore.setState({
@@ -999,7 +1009,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      detailTab: 'terminal',
+      workspacePaneView: 'terminal',
     })
     const secondRepo = {
       ...firstRepo,
@@ -1020,7 +1030,7 @@ describe('TerminalSessionProvider', () => {
       ui: {
         ...firstRepo.ui,
         selectedBranch: 'feature/other',
-        preferredDetailTab: 'terminal',
+        preferredWorkspacePaneView: 'terminal',
       },
     } satisfies typeof firstRepo
     useReposStore.setState((state) => ({
@@ -1046,7 +1056,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      detailTab: 'terminal',
+      workspacePaneView: 'terminal',
     })
     const secondRepo = {
       ...firstRepo,
@@ -1067,7 +1077,7 @@ describe('TerminalSessionProvider', () => {
       ui: {
         ...firstRepo.ui,
         selectedBranch: 'feature/other',
-        preferredDetailTab: 'terminal',
+        preferredWorkspacePaneView: 'terminal',
       },
     } satisfies typeof firstRepo
     useReposStore.setState((state) => ({
@@ -1099,7 +1109,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      detailTab: 'terminal',
+      workspacePaneView: 'terminal',
     })
     const { unmount } = await renderProviderWithProbe(worktreeTerminalKey(REPO_ID, WORKTREE_PATH))
 
@@ -1133,7 +1143,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      detailTab: 'terminal',
+      workspacePaneView: 'terminal',
     })
     listSessionsMock.mockResolvedValue([
       {
@@ -1180,7 +1190,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      detailTab: 'terminal',
+      workspacePaneView: 'terminal',
     })
     listSessionsMock.mockResolvedValue([
       {
@@ -1253,7 +1263,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      detailTab: 'terminal',
+      workspacePaneView: 'terminal',
     })
     listSessionsMock.mockResolvedValue([
       {
@@ -1320,7 +1330,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      detailTab: 'terminal',
+      workspacePaneView: 'terminal',
     })
     listSessionsMock.mockResolvedValue([
       {
@@ -1395,7 +1405,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      detailTab: 'terminal',
+      workspacePaneView: 'terminal',
     })
     listSessionsMock.mockResolvedValue([
       {
@@ -1474,7 +1484,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      detailTab: 'terminal',
+      workspacePaneView: 'terminal',
     })
     listSessionsMock.mockResolvedValue([
       {
@@ -1541,7 +1551,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      detailTab: 'terminal',
+      workspacePaneView: 'terminal',
     })
     listSessionsMock.mockResolvedValue([
       {
@@ -1614,7 +1624,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      detailTab: 'terminal',
+      workspacePaneView: 'terminal',
     })
     const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
@@ -1647,7 +1657,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      detailTab: 'terminal',
+      workspacePaneView: 'terminal',
     })
     createTerminalMock.mockResolvedValueOnce({
       ok: true as const,
@@ -1751,10 +1761,13 @@ describe('TerminalSessionProvider', () => {
         })),
         pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
         listSessions: vi.fn(async () => []),
+        listViews: vi.fn(async () => []),
+        openView: vi.fn(async () => false),
+        closeView: vi.fn(async () => false),
         prewarm,
         kickReconnect: vi.fn(() => {}),
         getSessionSnapshot: vi.fn(async () => null),
-        reorder: vi.fn(async () => false),
+        reorderViews: vi.fn(async () => false),
         notifyBell: vi.fn(async () => false),
         sendTestNotification: vi.fn(async () => false),
         setBadge: () => {},
@@ -1788,7 +1801,7 @@ describe('TerminalSessionProvider', () => {
         id: REPO_ID,
         branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
         selectedBranch: 'feature/worktree',
-        detailTab: 'terminal',
+        workspacePaneView: 'terminal',
       })
       await act(async () => {
         await Promise.resolve()
@@ -1846,10 +1859,13 @@ describe('TerminalSessionProvider', () => {
         })),
         pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
         listSessions: vi.fn(async () => []),
+        listViews: vi.fn(async () => []),
+        openView: vi.fn(async () => false),
+        closeView: vi.fn(async () => false),
         prewarm: vi.fn(async () => {}),
         kickReconnect,
         getSessionSnapshot: vi.fn(async () => null),
-        reorder: vi.fn(async () => false),
+        reorderViews: vi.fn(async () => false),
         notifyBell: vi.fn(async () => false),
         sendTestNotification: vi.fn(async () => false),
         setBadge: () => {},
@@ -1923,7 +1939,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      detailTab: 'terminal',
+      workspacePaneView: 'terminal',
     })
     const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
 

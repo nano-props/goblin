@@ -47,6 +47,15 @@ export function createTerminalRealtimeHandlers(host: ServerTerminalHost): {
     'list-sessions'(clientId, _attachmentId, ownerId, input) {
       return host.listSessions(clientId, ownerId, input.repoRoot)
     },
+    'list-views'(clientId, _attachmentId, ownerId, input) {
+      return host.listViews(clientId, ownerId, input.repoRoot)
+    },
+    'open-view'(clientId, _attachmentId, ownerId, input) {
+      return host.openView(clientId, ownerId, input)
+    },
+    'close-view'(clientId, _attachmentId, ownerId, input) {
+      return host.closeView(clientId, ownerId, input)
+    },
     create(clientId, attachmentId, ownerId, input) {
       return host.create(clientId, ownerId, { ...input, attachmentId })
     },
@@ -56,8 +65,8 @@ export function createTerminalRealtimeHandlers(host: ServerTerminalHost): {
     'session-snapshot'(clientId, _attachmentId, ownerId, input) {
       return host.getSessionSnapshot(clientId, ownerId, input)
     },
-    reorder(clientId, _attachmentId, ownerId, input) {
-      return host.reorder(clientId, ownerId, input)
+    'reorder-views'(clientId, _attachmentId, ownerId, input) {
+      return host.reorderViews(clientId, ownerId, input)
     },
   }
 }

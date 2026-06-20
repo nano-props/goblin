@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest'
 import {
-  applyDisplayOrder,
   restoreDisplayOrder,
   snapshotDisplayOrder,
   terminalSessionDisplayOrder,
@@ -39,13 +38,15 @@ describe('terminal session display order helpers', () => {
     ).toBe(2)
   })
 
-  test('snapshots, applies, and restores optimistic reorder state', () => {
+  test('snapshots and restores optimistic reorder state', () => {
     const orders = new Map<string, number>([
       ['terminal-1', 1],
       ['terminal-2', 0],
     ])
     const previous = snapshotDisplayOrder(['terminal-1', 'terminal-2', 'terminal-3'], orders)
-    applyDisplayOrder(orders, ['terminal-3', 'terminal-1', 'terminal-2'])
+    orders.set('terminal-3', 0)
+    orders.set('terminal-1', 1)
+    orders.set('terminal-2', 2)
     expect(Array.from(orders.entries())).toEqual([
       ['terminal-1', 1],
       ['terminal-2', 2],

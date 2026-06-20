@@ -26,6 +26,8 @@ describe('terminal session projection helpers', () => {
       serverSession: {
         sessionId: 'session_123',
         key: `${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-2`,
+        viewType: 'terminal',
+        viewId: `${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-2`,
         cwd: WORKTREE_PATH,
         controller: { attachmentId: 'attachment_a', status: 'connected' },
         processName: 'zsh',
@@ -76,6 +78,8 @@ describe('terminal session projection helpers', () => {
       serverSession: {
         sessionId: 'session_123',
         key: `${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-1`,
+        viewType: 'terminal',
+        viewId: `${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-1`,
         cwd: WORKTREE_PATH,
         controller: { attachmentId: 'attachment_a', status: 'grace' },
         processName: 'bash',

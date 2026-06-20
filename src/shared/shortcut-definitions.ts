@@ -3,7 +3,7 @@ import type { DictKey } from '#/shared/i18n/dictionaries.ts'
 import type { WorkspaceLayout } from '#/shared/workspace-layout.ts'
 
 export type BranchActionShortcutAction = 'pull' | 'push' | 'terminal' | 'editor' | 'remote'
-export type RendererNavigationShortcutAction = 'next-branch' | 'prev-branch' | 'next-detail-tab' | 'prev-detail-tab'
+export type RendererNavigationShortcutAction = 'next-branch' | 'prev-branch' | 'next-workspace-pane-view' | 'prev-workspace-pane-view'
 export type RendererAppShortcutAction = 'checkout-selected' | 'show-help' | 'dismiss'
 export type RendererKeyboardShortcutAction =
   | BranchActionShortcutAction
@@ -77,8 +77,8 @@ export interface RendererKeyboardShortcutDefinition<
 export const RENDERER_NAVIGATION_SHORTCUTS: RendererKeyboardShortcutDefinition<RendererNavigationShortcutAction>[] = [
   keyboardShortcut([{ key: 'j' }, { key: 'ArrowDown' }], 'next-branch', [['j'], ['↓']], 'help.row.next-branch'),
   keyboardShortcut([{ key: 'k' }, { key: 'ArrowUp' }], 'prev-branch', [['k'], ['↑']], 'help.row.prev-branch'),
-  keyboardShortcut([{ key: 'ArrowRight' }], 'next-detail-tab', [['→']], 'help.row.switch-detail-tab'),
-  keyboardShortcut([{ key: 'ArrowLeft' }], 'prev-detail-tab', [['←']], 'help.row.switch-detail-tab'),
+  keyboardShortcut([{ key: 'ArrowRight' }], 'next-workspace-pane-view', [['→']], 'help.row.switch-workspace-pane-view'),
+  keyboardShortcut([{ key: 'ArrowLeft' }], 'prev-workspace-pane-view', [['←']], 'help.row.switch-workspace-pane-view'),
 ]
 
 export const BRANCH_ACTION_SHORTCUTS: BranchActionShortcutDefinition[] = [
@@ -147,7 +147,7 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
     { type: 'close-repo-requested' },
     {
       helpLabelKey: 'help.row.close-repo',
-      accelerator: (context) => closeShortcutAccelerators(context.swapCloseShortcuts).closeTab,
+      accelerator: (context) => closeShortcutAccelerators(context.swapCloseShortcuts).closeView,
     },
   ),
   rendererMenuCommand(
@@ -162,7 +162,7 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
   rendererMenuCommand(
     'view-status',
     'menu.view.status',
-    { type: 'show-detail-tab-requested', tab: 'status' },
+    { type: 'show-workspace-pane-view-requested', tab: 'status' },
     {
       helpLabelKey: 'help.row.view-status',
       accelerator: 'CmdOrCtrl+1',
@@ -171,7 +171,7 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
   rendererMenuCommand(
     'view-changes',
     'menu.view.changes',
-    { type: 'show-detail-tab-requested', tab: 'changes' },
+    { type: 'show-workspace-pane-view-requested', tab: 'changes' },
     {
       helpLabelKey: 'help.row.view-changes',
       accelerator: 'CmdOrCtrl+2',
@@ -267,12 +267,12 @@ export function matchRendererKeyboardShortcut(input: {
 }
 
 export function closeShortcutAccelerators(swapCloseShortcuts = false): {
-  closeTab: string
+  closeView: string
   closeWindow: string
 } {
   return swapCloseShortcuts
-    ? { closeTab: CLOSE_TAB_SHORTCUT_SWAPPED, closeWindow: CLOSE_WINDOW_SHORTCUT_SWAPPED }
-    : { closeTab: CLOSE_TAB_SHORTCUT_DEFAULT, closeWindow: CLOSE_WINDOW_SHORTCUT_DEFAULT }
+    ? { closeView: CLOSE_TAB_SHORTCUT_SWAPPED, closeWindow: CLOSE_WINDOW_SHORTCUT_SWAPPED }
+    : { closeView: CLOSE_TAB_SHORTCUT_DEFAULT, closeWindow: CLOSE_WINDOW_SHORTCUT_DEFAULT }
 }
 
 export function rendererMenuCommandById(id: RendererMenuCommandId): RendererMenuCommandDefinition {

@@ -1,17 +1,17 @@
-import type { DetailTab } from '#/shared/api-types.ts'
+import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 
 export function persistedActiveRepoIdForSession(activeId: string | null): string | null {
   return activeId
 }
 
-export function persistedDetailTabByRepoForSession(
-  repos: Record<string, { ui: { preferredDetailTab: DetailTab } } | undefined>,
+export function persistedWorkspacePaneViewByRepoForSession(
+  repos: Record<string, { ui: { preferredWorkspacePaneView: WorkspacePaneView } } | undefined>,
   order: string[],
-): Record<string, DetailTab> {
-  const tabs: Record<string, DetailTab> = {}
+): Record<string, WorkspacePaneView> {
+  const tabs: Record<string, WorkspacePaneView> = {}
   for (const id of order) {
     const repo = repos[id]
-    if (repo) tabs[id] = repo.ui.preferredDetailTab
+    if (repo) tabs[id] = repo.ui.preferredWorkspacePaneView
   }
   return tabs
 }

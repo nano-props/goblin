@@ -63,10 +63,12 @@ describe('terminal session worktree snapshot helper', () => {
       worktreeTerminalKey: descriptor.worktreeTerminalKey,
       selectedDescriptor: descriptor,
       pendingCreate: false,
+      staticWorkspacePaneViews: [],
       sessions: [session],
       selectedKey: descriptor.key,
       getCachedSnapshot: (key) => cache.get(key) ?? null,
       cacheSnapshot: (key, value) => cache.set(key, value),
+      getDisplayOrder: () => 1,
       hasBell: () => true,
     })
 
@@ -75,12 +77,22 @@ describe('terminal session worktree snapshot helper', () => {
       selectedDescriptor: descriptor,
       sessions: [
         expect.objectContaining({
+          type: 'terminal',
+          id: descriptor.key,
           key: descriptor.key,
           terminalId: 'terminal-1',
           selected: true,
           hasBell: true,
           phase: 'open',
           originalTitle: 'npm run dev',
+        }),
+      ],
+      staticWorkspacePaneViews: [],
+      workspacePaneViews: [
+        expect.objectContaining({
+          type: 'terminal',
+          id: descriptor.key,
+          key: descriptor.key,
         }),
       ],
       count: 1,
@@ -92,10 +104,12 @@ describe('terminal session worktree snapshot helper', () => {
       worktreeTerminalKey: descriptor.worktreeTerminalKey,
       selectedDescriptor: descriptor,
       pendingCreate: false,
+      staticWorkspacePaneViews: [],
       sessions: [session],
       selectedKey: descriptor.key,
       getCachedSnapshot: (key) => cache.get(key) ?? null,
       cacheSnapshot: (key, value) => cache.set(key, value),
+      getDisplayOrder: () => 1,
       hasBell: () => false,
     })
     expect(session.snapshotSpy).toHaveBeenCalledTimes(1)

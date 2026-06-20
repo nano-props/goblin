@@ -8,7 +8,13 @@ import {
   TerminalSessionContext,
   TerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
-import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
+import type {
+  WorkspacePaneStaticViewSummary,
+  TerminalSessionContextValue,
+  TerminalSessionReadContextValue,
+  TerminalSessionSummary,
+  WorktreeTerminalSnapshot,
+} from '#/web/components/terminal/types.ts'
 
 vi.mock('#/web/stores/i18n.ts', () => ({
   useT: () => (key: string) => key,
@@ -30,6 +36,31 @@ vi.mock('#/web/components/terminal/mobile-detection.ts', () => ({
 afterEach(() => {
   document.body.innerHTML = ''
 })
+
+type TestTerminalSummary = Omit<TerminalSessionSummary, 'type' | 'id' | 'displayOrder'> &
+  Partial<Pick<TerminalSessionSummary, 'type' | 'id' | 'displayOrder'>>
+
+type TestWorktreeSnapshot = Omit<WorktreeTerminalSnapshot, 'sessions' | 'staticWorkspacePaneViews' | 'workspacePaneViews'> & {
+  sessions: TestTerminalSummary[]
+  staticWorkspacePaneViews?: WorkspacePaneStaticViewSummary[]
+  workspacePaneViews?: WorktreeTerminalSnapshot['workspacePaneViews']
+}
+
+function completeWorktreeSnapshot(snapshot: TestWorktreeSnapshot): WorktreeTerminalSnapshot {
+  const staticWorkspacePaneViews = snapshot.staticWorkspacePaneViews ?? []
+  const sessions = snapshot.sessions.map((session, index) => ({
+    ...session,
+    type: 'terminal' as const,
+    id: session.id ?? session.key,
+    displayOrder: session.displayOrder ?? index + 1,
+  }))
+  return {
+    ...snapshot,
+    sessions,
+    staticWorkspacePaneViews,
+    workspacePaneViews: snapshot.workspacePaneViews ?? [...staticWorkspacePaneViews, ...sessions],
+  }
+}
 
 describe('TerminalSlot', () => {
   test('renders mirror attach banner and triggers takeover', async () => {
@@ -98,11 +129,13 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput: vi.fn(),
       takeover,
-      reorderSessions: vi.fn(async () => true),
+      openWorkspacePaneView: vi.fn(async () => true),
+      closeWorkspacePaneView: vi.fn(async () => true),
+      reorderWorkspacePaneViews: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => worktreeSnapshot,
+      worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
@@ -170,11 +203,13 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput: vi.fn(),
       takeover: vi.fn(),
-      reorderSessions: vi.fn(async () => true),
+      openWorkspacePaneView: vi.fn(async () => true),
+      closeWorkspacePaneView: vi.fn(async () => true),
+      reorderWorkspacePaneViews: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => emptyWorktreeSnapshot,
+      worktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => emptySnapshot,
       subscribeSnapshot: () => () => {},
@@ -277,11 +312,13 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput: vi.fn(),
       takeover,
-      reorderSessions: vi.fn(async () => true),
+      openWorkspacePaneView: vi.fn(async () => true),
+      closeWorkspacePaneView: vi.fn(async () => true),
+      reorderWorkspacePaneViews: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => worktreeSnapshot,
+      worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
@@ -396,11 +433,13 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput,
       takeover: vi.fn(),
-      reorderSessions: vi.fn(async () => true),
+      openWorkspacePaneView: vi.fn(async () => true),
+      closeWorkspacePaneView: vi.fn(async () => true),
+      reorderWorkspacePaneViews: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => worktreeSnapshot,
+      worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
@@ -518,11 +557,13 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput,
       takeover: vi.fn(),
-      reorderSessions: vi.fn(async () => true),
+      openWorkspacePaneView: vi.fn(async () => true),
+      closeWorkspacePaneView: vi.fn(async () => true),
+      reorderWorkspacePaneViews: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => worktreeSnapshot,
+      worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
@@ -534,9 +575,7 @@ describe('TerminalSlot', () => {
     // to drive the path-attempt tier and assert the resulting
     // shell-escaped writeInput call.
     const shellClient = await import('#/web/app-shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockImplementation(
-      (file: File) => `/resolved/${file.name}`,
-    )
+    vi.mocked(shellClient.pathForDroppedFile).mockImplementation((file: File) => `/resolved/${file.name}`)
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
 
     try {
@@ -552,7 +591,7 @@ describe('TerminalSlot', () => {
 
       const slotRoot = container.querySelector('.goblin-terminal-slot') as HTMLElement
       expect(slotRoot).toBeTruthy()
-      const file = new File([new Uint8Array([1, 2, 3])], "shot with space.png", { type: 'image/png' })
+      const file = new File([new Uint8Array([1, 2, 3])], 'shot with space.png', { type: 'image/png' })
       const dataTransfer = {
         types: ['Files'],
         files: [file] as unknown as FileList,
@@ -659,11 +698,13 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput,
       takeover: vi.fn(),
-      reorderSessions: vi.fn(async () => true),
+      openWorkspacePaneView: vi.fn(async () => true),
+      closeWorkspacePaneView: vi.fn(async () => true),
+      reorderWorkspacePaneViews: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => worktreeSnapshot,
+      worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
@@ -770,20 +811,20 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput,
       takeover: vi.fn(),
-      reorderSessions: vi.fn(async () => true),
+      openWorkspacePaneView: vi.fn(async () => true),
+      closeWorkspacePaneView: vi.fn(async () => true),
+      reorderWorkspacePaneViews: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => worktreeSnapshot,
+      worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
 
     const shellClient = await import('#/web/app-shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockImplementation(
-      (file: File) => `/resolved/${file.name}`,
-    )
+    vi.mocked(shellClient.pathForDroppedFile).mockImplementation((file: File) => `/resolved/${file.name}`)
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
 
     try {
@@ -798,7 +839,7 @@ describe('TerminalSlot', () => {
       })
 
       const slotRoot = container.querySelector('.goblin-terminal-slot') as HTMLElement
-      const file = new File([new Uint8Array([1, 2, 3])], "weird name & space.png")
+      const file = new File([new Uint8Array([1, 2, 3])], 'weird name & space.png')
       const clipboardData = {
         files: {
           length: 1,
@@ -818,11 +859,7 @@ describe('TerminalSlot', () => {
       // both of which `shellEscapePath` wraps in single quotes — if
       // the escape regresses to plain concat this catches it.
       expect(writeInput).toHaveBeenCalledTimes(1)
-      expect(writeInput).toHaveBeenCalledWith(
-        'terminal-1',
-        "'/resolved/weird name & space.png'",
-        'paste',
-      )
+      expect(writeInput).toHaveBeenCalledWith('terminal-1', "'/resolved/weird name & space.png'", 'paste')
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
     } finally {
       await act(async () => root.unmount())
@@ -900,22 +937,20 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput,
       takeover: vi.fn(),
-      reorderSessions: vi.fn(async () => true),
+      openWorkspacePaneView: vi.fn(async () => true),
+      closeWorkspacePaneView: vi.fn(async () => true),
+      reorderWorkspacePaneViews: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => worktreeSnapshot,
+      worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
 
     const shellClient = await import('#/web/app-shell-client.ts')
-    const oversized = new File(
-      [new Uint8Array(11 * 1024 * 1024)],
-      'huge.bin',
-      { type: 'application/octet-stream' },
-    )
+    const oversized = new File([new Uint8Array(11 * 1024 * 1024)], 'huge.bin', { type: 'application/octet-stream' })
     // size is settable on File in jsdom (the constructor doesn't
     // refuse it), but read it from the object to keep the assertion
     // in sync with the constant.
@@ -1031,11 +1066,13 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput,
       takeover: vi.fn(),
-      reorderSessions: vi.fn(async () => true),
+      openWorkspacePaneView: vi.fn(async () => true),
+      closeWorkspacePaneView: vi.fn(async () => true),
+      reorderWorkspacePaneViews: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => worktreeSnapshot,
+      worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
@@ -1196,12 +1233,14 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput,
       takeover: vi.fn(),
-      reorderSessions: vi.fn(async () => true),
+      openWorkspacePaneView: vi.fn(async () => true),
+      closeWorkspacePaneView: vi.fn(async () => true),
+      reorderWorkspacePaneViews: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     let activeWorktreeSnapshot = worktreeSnapshotA
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => activeWorktreeSnapshot,
+      worktreeSnapshot: () => completeWorktreeSnapshot(activeWorktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshotOpen,
       subscribeSnapshot: () => () => {},
@@ -1215,7 +1254,10 @@ describe('TerminalSlot', () => {
     const shellClient = await import('#/web/app-shell-client.ts')
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
     vi.mocked(shellClient.saveClipboardFiles).mockImplementation(
-      () => new Promise<string[]>((resolve) => { resolveSave = resolve }),
+      () =>
+        new Promise<string[]>((resolve) => {
+          resolveSave = resolve
+        }),
     )
 
     try {
@@ -1254,11 +1296,7 @@ describe('TerminalSlot', () => {
         root.render(
           <TerminalSessionContext.Provider value={context}>
             <TerminalSessionReadContext.Provider value={readContext}>
-              <TerminalSlot
-                repoRoot="/repo"
-                branch="feature"
-                worktreePath="/worktree-other"
-              />
+              <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree-other" />
             </TerminalSessionReadContext.Provider>
           </TerminalSessionContext.Provider>,
         )
@@ -1319,11 +1357,13 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput: vi.fn(),
       takeover: vi.fn(),
-      reorderSessions: vi.fn(async () => true),
+      openWorkspacePaneView: vi.fn(async () => true),
+      closeWorkspacePaneView: vi.fn(async () => true),
+      reorderWorkspacePaneViews: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => emptyWorktreeSnapshot,
+      worktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => emptySnapshot,
       subscribeSnapshot: () => () => {},
@@ -1407,11 +1447,13 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput: vi.fn(),
       takeover: vi.fn(),
-      reorderSessions: vi.fn(async () => true),
+      openWorkspacePaneView: vi.fn(async () => true),
+      closeWorkspacePaneView: vi.fn(async () => true),
+      reorderWorkspacePaneViews: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
-      worktreeSnapshot: () => emptyWorktreeSnapshot,
+      worktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => emptySnapshot,
       subscribeSnapshot: () => () => {},

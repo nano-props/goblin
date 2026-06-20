@@ -7,7 +7,6 @@ import type {
   TerminalMutationResult,
   TerminalOutputEvent,
   TerminalOwnershipEvent,
-  TerminalReorderInput,
   TerminalResizeInput,
   TerminalRestartInput,
   TerminalSessionInput,
@@ -20,6 +19,12 @@ import type {
   TerminalExitEvent,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
+import type {
+  WorkspacePaneListViewsInput,
+  WorkspacePaneReorderInput,
+  WorkspacePaneStaticViewInput,
+  WorkspacePaneStaticViewSummary,
+} from '#/shared/workspace-pane.ts'
 
 export type TerminalRealtimeMessage =
   | { type: 'output'; event: TerminalOutputEvent }
@@ -44,10 +49,13 @@ export interface TerminalSocketRequestInputs {
   takeover: TerminalTakeoverInput
   close: TerminalSessionInput
   'list-sessions': TerminalListSessionsInput
+  'list-views': WorkspacePaneListViewsInput
+  'open-view': WorkspacePaneStaticViewInput
+  'close-view': WorkspacePaneStaticViewInput
   create: TerminalCreateInput
   prune: { repoRoot: string }
   'session-snapshot': TerminalSessionSnapshotInput
-  reorder: TerminalReorderInput
+  'reorder-views': WorkspacePaneReorderInput
 }
 
 export interface TerminalSocketResponseOutputs {
@@ -58,10 +66,13 @@ export interface TerminalSocketResponseOutputs {
   takeover: TerminalTakeoverResult
   close: TerminalMutationResult
   'list-sessions': TerminalSessionSummary[]
+  'list-views': WorkspacePaneStaticViewSummary[]
+  'open-view': TerminalMutationResult
+  'close-view': TerminalMutationResult
   create: TerminalCatalogMutationResult
   prune: { pruned: number; remaining: number }
   'session-snapshot': TerminalSessionSnapshot | null
-  reorder: TerminalMutationResult
+  'reorder-views': TerminalMutationResult
 }
 
 export type TerminalSocketRequestAction = keyof TerminalSocketRequestInputs
