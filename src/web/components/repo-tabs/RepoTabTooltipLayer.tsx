@@ -18,11 +18,13 @@ interface RepoTabTooltipLayerProps extends ComponentPropsWithoutRef<'div'> {
   delayMs?: number
 }
 
+const REPO_TAB_TOOLTIP_DELAY_MS = 200
+
 const REPO_TAB_TOOLTIP_SELECTOR = '[data-repo-tab-tooltip-id]'
 
 export function RepoTabTooltipLayer({
   repos,
-  delayMs = DELEGATED_TOOLTIP_DEFAULTS.delayMs,
+  delayMs = REPO_TAB_TOOLTIP_DELAY_MS,
   children,
   ...props
 }: RepoTabTooltipLayerProps) {

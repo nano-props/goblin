@@ -14,7 +14,7 @@ import {
   useSensors,
 } from '@dnd-kit/core'
 import { SortableContext, horizontalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import { DelegatedTooltipLayer, DELEGATED_TOOLTIP_DEFAULTS } from '#/web/components/DelegatedTooltipLayer.tsx'
+import { DelegatedTooltipLayer } from '#/web/components/DelegatedTooltipLayer.tsx'
 import { createRestrictToTabStripBounds } from '#/web/components/tab-strip/drag-bounds.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import type { WorkspacePaneViewOrderEntry } from '#/shared/workspace-pane.ts'
@@ -759,7 +759,7 @@ function WorkspacePaneViewTooltipLayer({ tabs, getTooltip, children, ...props }:
       getItemId={workspacePaneViewIdentity}
       renderTooltip={(tab) => <div className="truncate text-xs font-semibold text-foreground">{getTooltip(tab)}</div>}
       placement="top-start"
-      delayMs={DELEGATED_TOOLTIP_DEFAULTS.delayMs}
+      delayMs={500}
       tooltipClassName="px-3 py-2"
       asChild
     >
