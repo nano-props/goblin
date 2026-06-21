@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 import { useT } from '#/web/stores/i18n.ts'
 import { Toolbar } from '#/web/components/Layout.tsx'
-import { cn } from '#/web/lib/cn.ts'
 import { terminalLog } from '#/web/logger.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import { useWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-store.ts'
@@ -329,7 +328,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
 
   return (
     <Toolbar variant="workspace">
-      <div className="flex h-full min-w-0 items-center gap-1 overflow-hidden">
+      <div className="flex h-full min-w-0 flex-1 items-center gap-1 overflow-hidden">
         {showBranchLevelTabs && (
           <WorkspacePaneViewStrip
             worktreeTerminalKey={terminalWorktreeKey}
@@ -355,7 +354,6 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
           />
         )}
       </div>
-      <div aria-hidden="true" className={cn('min-w-2 flex-1 self-stretch', compact && 'hidden')} />
     </Toolbar>
   )
 }

@@ -142,6 +142,21 @@ describe('BranchWorkspaceToolbar', () => {
     expect(tablist?.querySelector('#workspace-workspace-pane-view-1')).not.toBeNull()
   })
 
+  test('lets the workspace tab strip reach the toolbar right edge', () => {
+    const { container: c } = renderToolbar({
+      terminalCount: 3,
+      navigation: navigationWith({}),
+    })
+
+    const toolbar = c.firstElementChild
+    if (!(toolbar instanceof HTMLElement)) throw new Error('missing toolbar')
+    const stripHost = toolbar.firstElementChild
+    if (!(stripHost instanceof HTMLElement)) throw new Error('missing workspace tab strip host')
+
+    expect(toolbar.children).toHaveLength(1)
+    expect(stripHost.className).toContain('flex-1')
+  })
+
   test('opens missing worktree branch-level tabs in the saved branch order', async () => {
     const { container: c, mocks } = renderToolbar({
       terminalCount: 0,
