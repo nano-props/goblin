@@ -5,7 +5,7 @@ import { serverDataFile } from '#/shared/data-dir.ts'
 import type { EditorPref, LangPref, SessionState, SettingsPrefs, TerminalPref, ThemePref } from '#/shared/api-types.ts'
 import { DEFAULT_WORKSPACE_FOCUSED, normalizeWorkspacePaneSizes } from '#/shared/workspace-layout.ts'
 import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
+import { isWorkspacePaneViewType, type WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import { normalizeGlobalShortcut } from '#/shared/accelerator.ts'
 import { isColorTheme, type ColorTheme } from '#/shared/color-theme.ts'
 import {
@@ -149,7 +149,7 @@ function normalizeWorkspacePaneViewByRepo(
   for (const [repoId, paneView] of Object.entries(value)) {
     const safeRepoId = toSafeRepoLocator(repoId)
     if (!safeRepoId || !openRepoIds.has(safeRepoId)) continue
-    if (paneView === 'status' || paneView === 'changes' || paneView === 'history' || paneView === 'terminal') {
+    if (isWorkspacePaneViewType(paneView)) {
       normalized[safeRepoId] = paneView
     }
   }

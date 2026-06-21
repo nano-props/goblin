@@ -38,6 +38,7 @@ import { useEffectiveWorkspacePaneView } from '#/web/components/branch-workspace
 import { useIsInitialSyncInFlight } from '#/web/stores/repo-sync.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
+import { isBranchLevelWorkspacePaneView } from '#/web/lib/workspace-pane-view.ts'
 
 interface Props {
   repo: Pick<BranchWorkspaceRepo, 'id' | 'ui' | 'data'>
@@ -85,8 +86,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
     if (!terminalWorktreeKey || !detail.branch?.worktree?.path) return runtimeWorkspacePaneViews
     const openBranchTypes = new Set(openBranchLevelTabs.map((tab) => tab.type))
     const runtimeBranchTypes = runtimeWorkspacePaneViews.flatMap((view) => {
-      const type = branchWorkspacePaneViewType(view.type)
-      return type ? [type] : []
+      return isBranchLevelWorkspacePaneView(view.type) ? [view.type] : []
     })
     const hasSameBranchRuntimeSet =
       runtimeBranchTypes.length === openBranchTypes.size &&
@@ -95,8 +95,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
 
     const runtimeBranchViewsByType = new Map(
       runtimeWorkspacePaneViews.flatMap((view) => {
-        const type = branchWorkspacePaneViewType(view.type)
-        return type ? [[type, view] as const] : []
+        return isBranchLevelWorkspacePaneView(view.type) ? [[view.type, view] as const] : []
       }),
     )
     const branchStaticViews = openBranchLevelTabs.map((tab, index) => {
@@ -113,7 +112,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
     })
     return [
       ...branchStaticViews,
-      ...runtimeWorkspacePaneViews.filter((view) => !branchWorkspacePaneViewType(view.type)),
+      ...runtimeWorkspacePaneViews.filter((view) => !isBranchLevelWorkspacePaneView(view.type)),
     ]
   }, [detail.branch, openBranchLevelTabs, runtimeWorkspacePaneViews, terminalWorktreeKey])
   const workspacePaneTabFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()
@@ -174,7 +173,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
 
   const handleReorderWorkspacePaneViewStrip = useCallback(
     (worktreeKey: string, orderedViews: WorkspacePaneViewOrderEntry[]) => {
-      const branchViews = orderedViews.map((entry) => entry.type).filter(isBranchWorkspacePaneViewType)
+      const branchViews = orderedViews.map((entry) => entry.type).filter(isBranchLevelWorkspacePaneView)
       void reorderWorkspacePaneViews(worktreeKey, orderedViews).then((reordered) => {
         if (reordered && branchName && branchViews.length > 0) {
           useReposStore.getState().reorderBranchWorkspacePaneViews(repo.id, branchViews, branchName)
@@ -285,15 +284,15 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
         if (!terminalBase) return
         closeTerminalByDescriptor(item.view.key, terminalBase)
       } else {
-        const branchViewType = item.view.type === 'status' || item.view.type === 'history' ? item.view.type : null
+        const branchViewType = isBranchLevelWorkspacePaneView(item.view.type) ? item.view.type : null
         const currentRepo = useReposStore.getState().repos[repo.id]
         const previousBranchViews =
           branchViewType && currentRepo && branchName
             ? branchWorkspacePaneViewsForBranch(currentRepo.ui, branchName)
             : []
-        if (item.view.type === 'status' || item.view.type === 'history') {
+        if (branchViewType) {
           if (!branchName) return
-          useReposStore.getState().closeBranchWorkspacePaneView(repo.id, item.view.type, branchName)
+          useReposStore.getState().closeBranchWorkspacePaneView(repo.id, branchViewType, branchName)
         }
         if (!terminalWorktreeKey) return
         void closeWorkspacePaneView(terminalWorktreeKey, item.view.type)
@@ -375,14 +374,6 @@ function branchLevelWorkspacePaneViewDefinitions(openViews: readonly WorkspacePa
     const tab = branchLevelWorkspacePaneViewDefinition(type)
     return tab ? [tab] : []
   })
-}
-
-function isBranchWorkspacePaneViewType(type: WorkspacePaneViewSummary['type']): type is WorkspacePaneBranchViewType {
-  return type === 'status' || type === 'history'
-}
-
-function branchWorkspacePaneViewType(type: WorkspacePaneViewSummary['type']): WorkspacePaneBranchViewType | null {
-  return isBranchWorkspacePaneViewType(type) ? type : null
 }
 
 function restoreBranchWorkspacePaneViews(

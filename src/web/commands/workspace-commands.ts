@@ -5,6 +5,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
+import { isBranchLevelWorkspacePaneView } from '#/web/lib/workspace-pane-view.ts'
 
 interface ShowWorkspacePaneViewCommandOptions {
   repoId: string | null
@@ -23,7 +24,7 @@ export function runShowWorkspacePaneViewCommand({
   navigation,
 }: ShowWorkspacePaneViewCommandOptions): boolean {
   if (!repoId) return false
-  if (tab === 'status' || tab === 'history') {
+  if (isBranchLevelWorkspacePaneView(tab)) {
     const target = selectedBranchWorkspaceTarget(repoId)
     if (target) {
       openWorkspacePaneView({

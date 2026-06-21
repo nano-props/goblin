@@ -17,6 +17,7 @@ import {
   branchWorkspacePaneViewsForBranch,
   branchWorkspacePaneViewsRecordWith,
 } from '#/web/stores/repos/branch-workspace-pane-views.ts'
+import { isBranchLevelWorkspacePaneView } from '#/web/lib/workspace-pane-view.ts'
 
 type RestorableWorkspaceSelectionActions = Pick<
   ReposStore,
@@ -119,12 +120,12 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
           if (!repo) continue
           const openBranchViews = branchWorkspacePaneViewsForBranch(repo.ui, repo.ui.selectedBranch)
           const branchViewNeedsOpen =
-            isBranchWorkspacePaneView(tab) && !!repo.ui.selectedBranch && !openBranchViews.includes(tab)
+            isBranchLevelWorkspacePaneView(tab) && !!repo.ui.selectedBranch && !openBranchViews.includes(tab)
           if (repo.ui.preferredWorkspacePaneView === tab && !branchViewNeedsOpen) continue
           changed = true
           repos[id] = replaceRepo(repo, (r) => {
             const branch = r.ui.selectedBranch
-            if (branch && isBranchWorkspacePaneView(tab)) {
+            if (branch && isBranchLevelWorkspacePaneView(tab)) {
               const current = branchWorkspacePaneViewsForBranch(r.ui, branch)
               if (!current.includes(tab)) {
                 r.ui.openBranchWorkspacePaneViewsByBranch = branchWorkspacePaneViewsRecordWith(r.ui, branch, [
@@ -251,7 +252,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         if (!repo || !branch) return s
         const current = branchWorkspacePaneViewsForBranch(repo.ui, branch)
         if (orderedViews.length !== current.length) return s
-        const next = orderedViews.filter(isBranchWorkspacePaneView)
+        const next = orderedViews.filter(isBranchLevelWorkspacePaneView)
         if (next.length !== orderedViews.length || new Set(next).size !== next.length) return s
         const currentSet = new Set(current)
         if (!next.every((view) => currentSet.has(view))) return s
@@ -296,13 +297,13 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         const repo = s.repos[id]
         const branch = repo?.ui.selectedBranch
         const openBranchViews = repo ? branchWorkspacePaneViewsForBranch(repo.ui, branch) : []
-        const branchViewNeedsOpen = isBranchWorkspacePaneView(tab) && !!branch && !openBranchViews.includes(tab)
+        const branchViewNeedsOpen = isBranchLevelWorkspacePaneView(tab) && !!branch && !openBranchViews.includes(tab)
         if (!repo || (repo.ui.preferredWorkspacePaneView === tab && !branchViewNeedsOpen)) return s
         changed = true
         token = repo.instanceToken
         return replaceRepoState(s, repo, (r) => {
           const selectedBranch = r.ui.selectedBranch
-          if (selectedBranch && isBranchWorkspacePaneView(tab)) {
+          if (selectedBranch && isBranchLevelWorkspacePaneView(tab)) {
             const current = branchWorkspacePaneViewsForBranch(r.ui, selectedBranch)
             if (!current.includes(tab)) {
               r.ui.openBranchWorkspacePaneViewsByBranch = branchWorkspacePaneViewsRecordWith(r.ui, selectedBranch, [
@@ -358,8 +359,4 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
     ...createRestorableWorkspaceSelectionActions(set, get),
     ...createRuntimeCoherentSelectionActions(set, get),
   }
-}
-
-function isBranchWorkspacePaneView(tab: WorkspacePaneView): tab is WorkspacePaneBranchViewType {
-  return tab === 'status' || tab === 'history'
 }

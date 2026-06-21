@@ -1,9 +1,9 @@
 import type {
   WorkspacePaneStaticViewSummary as ServerWorkspacePaneStaticViewSummary,
   WorkspacePaneStaticViewType,
-  WorkspacePaneViewType,
   WorkspacePaneViewOrderEntry,
 } from '#/shared/workspace-pane.ts'
+import { isWorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
 import { worktreeTerminalKey, parseWorktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import type { WorkspacePaneStaticViewSummary, WorkspacePaneViewSummary } from '#/web/components/terminal/types.ts'
 
@@ -145,8 +145,4 @@ export class RendererWorkspacePaneRegistry {
     const nextStaticViews = this.staticViews(worktreeKey).filter((tab) => tab.type !== type)
     this.restoreStaticViews(worktreeKey, nextStaticViews)
   }
-}
-
-function isWorkspacePaneStaticViewType(type: WorkspacePaneViewType): type is WorkspacePaneStaticViewType {
-  return type === 'status' || type === 'changes' || type === 'history'
 }

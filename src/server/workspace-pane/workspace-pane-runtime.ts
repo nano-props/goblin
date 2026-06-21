@@ -5,6 +5,7 @@ import type {
   WorkspacePaneViewOrderEntry,
   WorkspacePaneViewType,
 } from '#/shared/workspace-pane.ts'
+import { isWorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
 
 interface WorkspacePaneViewRecord<TOwner extends string | number> {
   ownerId: TOwner
@@ -48,7 +49,7 @@ export class WorkspacePaneRuntime<TOwner extends string | number> {
     const summaries: WorkspacePaneStaticViewSummary[] = []
     for (const views of this.viewsByWorktree.values()) {
       for (const view of views.values()) {
-        if (view.ownerId !== ownerId || view.scope !== scope || !isStaticWorkspacePaneViewType(view.type)) continue
+        if (view.ownerId !== ownerId || view.scope !== scope || !isWorkspacePaneStaticViewType(view.type)) continue
         summaries.push({
           type: view.type,
           id: view.type,
@@ -85,7 +86,7 @@ export class WorkspacePaneRuntime<TOwner extends string | number> {
     let pruned = 0
     for (const [key, views] of Array.from(this.viewsByWorktree.entries())) {
       for (const [identity, view] of Array.from(views.entries())) {
-        if (view.ownerId !== ownerId || view.scope !== scope || !isStaticWorkspacePaneViewType(view.type)) continue
+        if (view.ownerId !== ownerId || view.scope !== scope || !isWorkspacePaneStaticViewType(view.type)) continue
         if (liveWorktreePaths.has(path.resolve(view.worktreePath))) continue
         views.delete(identity)
         pruned += 1
@@ -177,8 +178,4 @@ function nextDisplayOrder<TOwner extends string | number>(
 
 function viewKey(input: WorkspacePaneViewIdentity): string {
   return `${input.type}\0${input.id}`
-}
-
-function isStaticWorkspacePaneViewType(type: WorkspacePaneViewType): type is WorkspacePaneStaticViewType {
-  return type === 'status' || type === 'changes' || type === 'history'
 }

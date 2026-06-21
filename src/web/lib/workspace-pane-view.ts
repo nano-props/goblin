@@ -1,33 +1,24 @@
-import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
+import {
+  isWorkspacePaneBranchViewType,
+  isWorkspacePaneViewType,
+  type WorkspacePaneBranchViewType,
+  type WorkspacePaneView,
+} from '#/shared/workspace-pane.ts'
 
 export type WorkspacePaneViewScope = 'branch' | 'worktree'
-export type BranchLevelWorkspacePaneView = Extract<WorkspacePaneView, 'status' | 'history'>
+export type BranchLevelWorkspacePaneView = WorkspacePaneBranchViewType
 export type WorktreeLevelWorkspacePaneView = Exclude<WorkspacePaneView, BranchLevelWorkspacePaneView>
 
-const WORKSPACE_PANE_VIEW_SCOPE: Record<WorkspacePaneView, WorkspacePaneViewScope> = {
-  status: 'branch',
-  changes: 'worktree',
-  history: 'branch',
-  terminal: 'worktree',
-}
-
-const WORKSPACE_PANE_VIEW_REQUIRES_WORKTREE: Record<WorkspacePaneView, boolean> = {
-  status: false,
-  changes: true,
-  history: false,
-  terminal: true,
-}
-
 export function isWorkspacePaneView(value: string | null | undefined): value is WorkspacePaneView {
-  return value === 'status' || value === 'changes' || value === 'history' || value === 'terminal'
+  return isWorkspacePaneViewType(value)
 }
 
 export function workspacePaneViewScope(view: WorkspacePaneView): WorkspacePaneViewScope {
-  return WORKSPACE_PANE_VIEW_SCOPE[view]
+  return isWorkspacePaneBranchViewType(view) ? 'branch' : 'worktree'
 }
 
 export function isBranchLevelWorkspacePaneView(view: WorkspacePaneView): view is BranchLevelWorkspacePaneView {
-  return workspacePaneViewScope(view) === 'branch'
+  return isWorkspacePaneBranchViewType(view)
 }
 
 export function isWorktreeLevelWorkspacePaneView(view: WorkspacePaneView): view is WorktreeLevelWorkspacePaneView {
@@ -35,7 +26,7 @@ export function isWorktreeLevelWorkspacePaneView(view: WorkspacePaneView): view 
 }
 
 export function workspacePaneViewRequiresWorktree(view: WorkspacePaneView): boolean {
-  return WORKSPACE_PANE_VIEW_REQUIRES_WORKTREE[view]
+  return workspacePaneViewScope(view) === 'worktree'
 }
 
 /**

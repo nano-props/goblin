@@ -22,6 +22,7 @@ import type {
   WorkspacePaneView,
   WorkspacePaneViewOrderEntry,
 } from '#/shared/workspace-pane.ts'
+import { isWorkspacePaneBranchViewType } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneViewSummary } from '#/web/components/terminal/types.ts'
 import { ToolbarTabList, ToolbarTabStrip, ToolbarTabStripBody } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
 import { ToolbarClosableTab } from '#/web/components/tab-strip/ToolbarClosableTab.tsx'
@@ -894,10 +895,6 @@ function WorkspacePaneViewIcon({ item, active }: { item: WorkspacePaneTabItem; a
 
 export function isBranchWorkspacePaneTabItem(item: WorkspacePaneTabItem): item is WorkspacePaneBranchTabItem {
   return item.scope === 'branch'
-}
-
-function isWorkspacePaneBranchViewType(type: WorkspacePaneView): type is WorkspacePaneBranchViewType {
-  return type === 'status' || type === 'history'
 }
 
 export function isWorktreeWorkspacePaneTabItem(item: WorkspacePaneTabItem): item is WorkspacePaneWorktreeTabItem {
