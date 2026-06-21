@@ -10,6 +10,9 @@ import { useT } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
+import { DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
+import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
+import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 
 // NOTE: App-level lifecycle hooks (bootstrap, session persistence,
 // keyboard, event routing, overlays, file drop) live in the <Layout>
@@ -25,6 +28,13 @@ export function App({ routeSettingsPage = null, onRouteSettingsPageChange }: App
   const overlayActions = useContext(LayoutOverlayActions)!
   const activeId = useReposStore((s) => s.activeId)
   const sessionReady = useReposStore((s) => s.sessionReady)
+  const workspaceFocused = useReposStore((s) => s.workspaceFocused)
+  const uiMode = useResponsiveUiMode()
+  const bootWorkspaceBehavior = repoWorkspaceBehavior({
+    layout: DEFAULT_WORKSPACE_LAYOUT,
+    compact: uiMode === 'compact',
+    workspaceFocused,
+  })
 
   if (routeSettingsPage) {
     return (
@@ -51,7 +61,12 @@ export function App({ routeSettingsPage = null, onRouteSettingsPageChange }: App
           {activeId ? (
             <RepoView repoId={activeId} />
           ) : !sessionReady ? (
-            <RepoWorkspaceSkeleton />
+            <RepoWorkspaceSkeleton
+              layout={DEFAULT_WORKSPACE_LAYOUT}
+              singlePane={bootWorkspaceBehavior.singlePane}
+              singlePaneView="navigator"
+              branchWorkspaceState="empty"
+            />
           ) : (
             <EmptyState />
           )}

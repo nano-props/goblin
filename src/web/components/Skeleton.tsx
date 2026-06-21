@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 // Skeleton placeholders used while a list loads.  We keep the shapes
 // coarse — a few large blocks per row — rather than mirroring every
 // badge, icon, and label.  This matches the shadcn/ui Skeleton style
@@ -23,6 +23,8 @@ interface RowCountProps {
 interface WorkspaceSkeletonProps {
   layout?: RepoWorkspaceLayout
   singlePane?: boolean
+  singlePaneView?: 'navigator' | 'workspace'
+  branchWorkspaceState?: 'empty' | 'content'
 }
 
 export function BranchNavigatorSkeleton({ rows = 6, showBranchActions = false }: BranchNavigatorSkeletonProps) {
@@ -36,7 +38,14 @@ export function BranchNavigatorSkeleton({ rows = 6, showBranchActions = false }:
 }
 
 export function StatusListSkeleton({ rows = 6 }: RowCountProps) {
-  return <SkeletonList rows={rows} renderRow={(i) => <StatusListSkeletonRow key={i} />} />
+  return (
+    <SkeletonList
+      rows={rows}
+      className="flex-1 py-1.5 tracking-wider"
+      style={{ fontFamily: 'var(--font-mono)' }}
+      renderRow={(i) => <StatusListSkeletonRow key={i} />}
+    />
+  )
 }
 
 // RepoWorkspaceSkeleton renders the branch navigator + workspace pane while
@@ -45,10 +54,12 @@ export function StatusListSkeleton({ rows = 6 }: RowCountProps) {
 export function RepoWorkspaceSkeleton({
   layout = DEFAULT_WORKSPACE_LAYOUT,
   singlePane = false,
+  singlePaneView = 'navigator',
+  branchWorkspaceState = 'empty',
 }: WorkspaceSkeletonProps) {
   const branchWorkspacePane = (
     <RepoWorkspacePane>
-      <BranchWorkspaceSkeleton />
+      {branchWorkspaceState === 'content' ? <BranchWorkspaceSkeleton /> : <BranchWorkspaceEmptySkeleton />}
     </RepoWorkspacePane>
   )
   const branchNavigatorPane = (
@@ -58,7 +69,11 @@ export function RepoWorkspaceSkeleton({
   )
 
   if (singlePane) {
-    return <section className="flex min-w-0 flex-1 flex-col">{branchNavigatorPane}</section>
+    return (
+      <section className="flex min-w-0 flex-1 flex-col">
+        {singlePaneView === 'workspace' ? branchWorkspacePane : branchNavigatorPane}
+      </section>
+    )
   }
 
   return (
@@ -75,7 +90,7 @@ export function RepoWorkspaceSkeleton({
 
 export function BranchWorkspaceSkeleton() {
   return (
-    <section className="flex min-h-0 flex-1 flex-col bg-background">
+    <section data-testid="branch-workspace-skeleton" className="flex min-h-0 flex-1 flex-col bg-background">
       <Toolbar variant="workspace">
         <div className="flex min-w-0 flex-1 items-center gap-1">
           <div className="flex shrink-0 gap-1">
@@ -94,16 +109,32 @@ export function BranchWorkspaceSkeleton() {
   )
 }
 
+export function BranchWorkspaceEmptySkeleton() {
+  return (
+    <section data-testid="branch-workspace-empty-skeleton" className="flex min-h-0 flex-1 flex-col bg-background">
+      <div className="flex flex-1 items-center justify-center p-6 text-center">
+        <Skeleton className="mx-auto h-4 w-32" />
+      </div>
+    </section>
+  )
+}
+
 function SkeletonList({
   rows,
   className = 'flex-1 divide-y divide-separator',
+  style,
   renderRow,
 }: {
   rows: number
   className?: string
+  style?: CSSProperties
   renderRow: (index: number) => ReactNode
 }) {
-  return <ul className={className}>{Array.from({ length: rows }).map((_, i) => renderRow(i))}</ul>
+  return (
+    <ul className={className} style={style}>
+      {Array.from({ length: rows }).map((_, i) => renderRow(i))}
+    </ul>
+  )
 }
 
 function BranchNavigatorSkeletonRow({ showActions }: { showActions: boolean }) {
@@ -121,7 +152,7 @@ function BranchNavigatorSkeletonRow({ showActions }: { showActions: boolean }) {
       {showActions && (
         <div className="flex shrink-0 items-center pr-4">
           <div data-testid="branch-navigator-skeleton-action">
-            <Skeleton className="h-7 w-16" />
+            <Skeleton className="h-6 w-7" />
           </div>
         </div>
       )}
@@ -131,8 +162,9 @@ function BranchNavigatorSkeletonRow({ showActions }: { showActions: boolean }) {
 
 function StatusListSkeletonRow() {
   return (
-    <li className="px-4 py-2.5">
-      <Skeleton className="h-4 w-full" />
+    <li className="grid min-h-5 grid-cols-[2ch_minmax(0,1fr)] items-center gap-3 px-1.5">
+      <Skeleton className="h-3.5 w-[2ch] rounded-sm" />
+      <Skeleton className="h-3.5 w-4/5 rounded-sm" />
     </li>
   )
 }

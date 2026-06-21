@@ -62,6 +62,7 @@ vi.mock('#/web/components/Layout.tsx', () => ({
     </div>
   ),
   RepoWorkspacePane: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Toolbar: ({ children }: { children: React.ReactNode }) => <div data-testid="mock-toolbar">{children}</div>,
 }))
 
 const REPO_ID = '/tmp/repo-view-test'
@@ -160,6 +161,29 @@ describe('RepoView workspace navigation', () => {
     expect(branchWorkspace()).not.toBeNull()
   })
 
+  test('large-screen initial loading keeps the workspace pane empty when no branch is selected', () => {
+    setSnapshotLoading(REPO_ID)
+    render(<RepoView repoId={REPO_ID} />)
+
+    expect(workspace()?.dataset.mode).toBe('split')
+    expect(container?.querySelector('[data-testid="branch-workspace-empty-skeleton"]')).not.toBeNull()
+    expect(container?.querySelector('[data-testid="branch-workspace-skeleton"]')).toBeNull()
+    expect(container?.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(6)
+  })
+
+  test('compact initial loading shows the selected Branch Workspace skeleton as the single pane', () => {
+    responsiveMocks.mode = 'compact'
+    useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
+    setSnapshotLoading(REPO_ID)
+
+    render(<RepoView repoId={REPO_ID} />)
+
+    expect(workspace()).toBeNull()
+    expect(container?.querySelector('[data-testid="branch-workspace-skeleton"]')).not.toBeNull()
+    expect(container?.querySelector('[data-testid="branch-workspace-empty-skeleton"]')).toBeNull()
+    expect(container?.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(0)
+  })
+
   test('resizing from split large-screen mode to compact shows Branch Workspace when a branch is selected', () => {
     render(<RepoView repoId={REPO_ID} />)
 
@@ -197,4 +221,26 @@ function branchWorkspace(): HTMLElement | null {
 
 function workspace(): HTMLElement | null {
   return container?.querySelector<HTMLElement>('[data-testid="repo-workspace"]') ?? null
+}
+
+function setSnapshotLoading(repoId: string) {
+  const repo = useReposStore.getState().repos[repoId]
+  if (!repo) throw new Error(`missing repo ${repoId}`)
+  useReposStore.setState({
+    repos: {
+      [repoId]: {
+        ...repo,
+        resources: {
+          ...repo.resources,
+          snapshot: {
+            ...repo.resources.snapshot,
+            phase: 'loading' as const,
+            loadedAt: null,
+            error: null,
+            stale: false,
+          },
+        },
+      },
+    },
+  })
 }

@@ -54,11 +54,19 @@ export function RepoView({ repoId }: Props) {
   })
 
   const workspacePaneSize = view.workspacePaneSizes[layout]
+  const selectedBranch = repo?.ui.selectedBranch ?? null
 
   if (!view.exists || !repo) return <div />
   if (isRepoUnavailable(repo)) return <UnavailableRepoView repo={repo} />
   if (view.initialLoading) {
-    return <RepoWorkspaceSkeleton layout={layout} singlePane={behavior.singlePane} />
+    return (
+      <RepoWorkspaceSkeleton
+        layout={layout}
+        singlePane={behavior.singlePane}
+        singlePaneView={selectedBranch ? 'workspace' : 'navigator'}
+        branchWorkspaceState={selectedBranch ? 'content' : 'empty'}
+      />
+    )
   }
 
   const branchWorkspacePane = (

@@ -14,6 +14,14 @@ vi.mock('#/web/components/SplitPane.tsx', () => ({
   ),
 }))
 
+vi.mock('#/web/components/Layout.tsx', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('#/web/components/Layout.tsx')>()
+  return {
+    ...actual,
+    Toolbar: ({ children }: { children: React.ReactNode }) => <div data-testid="mock-toolbar">{children}</div>,
+  }
+})
+
 let container: HTMLDivElement | null = null
 let root: Root | null = null
 
@@ -37,11 +45,13 @@ afterEach(() => {
 })
 
 describe('RepoWorkspaceSkeleton', () => {
-  test('shows branch rows with list actions in split mode', () => {
+  test('shows branch rows and an empty workspace placeholder by default in split mode', () => {
     render(<RepoWorkspaceSkeleton />)
 
-    expect(container?.querySelectorAll('li')).toHaveLength(14)
+    expect(container?.querySelectorAll('li')).toHaveLength(6)
     expect(container?.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(6)
+    expect(container?.querySelector('[data-testid="branch-workspace-empty-skeleton"]')).not.toBeNull()
+    expect(container?.querySelector('[data-testid="branch-workspace-skeleton"]')).toBeNull()
     expect(container?.querySelector('[data-testid="branch-workspace-skeleton-action"]')).toBeNull()
     // The per-repo toolbar moved up to the Topbar, so the
     // workspace skeleton no longer carries its own toolbar —
@@ -51,12 +61,14 @@ describe('RepoWorkspaceSkeleton', () => {
     expect(container?.querySelector('[data-testid="repo-toolbar-skeleton-pager"]')).toBeNull()
   })
 
-  test('renders split workspace with list actions in left-right mode', () => {
-    render(<RepoWorkspaceSkeleton layout="left-right" />)
+  test('renders split workspace content when a branch workspace is selected', () => {
+    render(<RepoWorkspaceSkeleton layout="left-right" branchWorkspaceState="content" />)
 
     expect(container?.querySelectorAll('li')).toHaveLength(14)
     expect(container?.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(6)
     expect(container?.querySelector('[data-testid="mock-split-pane"]')).not.toBeNull()
+    expect(container?.querySelector('[data-testid="branch-workspace-skeleton"]')).not.toBeNull()
+    expect(container?.querySelector('[data-testid="branch-workspace-empty-skeleton"]')).toBeNull()
   })
 
   test('renders a single Branch Navigator skeleton in single-pane mode', () => {
@@ -65,6 +77,23 @@ describe('RepoWorkspaceSkeleton', () => {
     expect(container?.querySelectorAll('li')).toHaveLength(6)
     expect(container?.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(6)
     expect(container?.querySelector('[data-testid="mock-split-pane"]')).toBeNull()
+  })
+
+  test('renders a single Branch Workspace skeleton in selected single-pane mode', () => {
+    render(<RepoWorkspaceSkeleton singlePane singlePaneView="workspace" branchWorkspaceState="content" />)
+
+    expect(container?.querySelectorAll('li')).toHaveLength(8)
+    expect(container?.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(0)
+    expect(container?.querySelector('[data-testid="branch-workspace-skeleton"]')).not.toBeNull()
+    expect(container?.querySelector('[data-testid="mock-split-pane"]')).toBeNull()
+  })
+
+  test('sizes branch action placeholders like the icon-only action button', () => {
+    render(<RepoWorkspaceSkeleton singlePane />)
+
+    const action = container?.querySelector('[data-testid="branch-navigator-skeleton-action"] > div')
+    expect(action?.className).toContain('h-6')
+    expect(action?.className).toContain('w-7')
   })
 })
 
