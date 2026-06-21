@@ -221,7 +221,6 @@ export const zh: Record<DictKey, string> = {
   'branches.filter-tooltip.worktrees': '工作树分支',
   'workspace.focus-toggle-label': '切换 Focus Mode',
   'workspace.focus-toggle-tooltip.enable': '专注模式',
-  'workspace.focus-toggle-tooltip.disable': '关闭 Focus Mode',
   'workspace.back-to-branch-navigator': '返回 Branch Navigator',
   'branches.gone': '已失联',
   'branches.dirty': '有改动',

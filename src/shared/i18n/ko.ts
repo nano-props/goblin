@@ -229,7 +229,6 @@ export const ko: Record<DictKey, string> = {
   'branches.filter-tooltip.worktrees': '워크트리 브랜치',
   'workspace.focus-toggle-label': 'Focus Mode 전환',
   'workspace.focus-toggle-tooltip.enable': '집중 모드',
-  'workspace.focus-toggle-tooltip.disable': 'Focus Mode 끄기',
   'workspace.back-to-branch-navigator': 'Branch Navigator로 돌아가기',
   'branches.gone': '원격 사라짐',
   'branches.dirty': '변경',

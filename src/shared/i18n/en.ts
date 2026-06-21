@@ -241,7 +241,6 @@ export const en = {
   'branches.filter-tooltip.worktrees': 'Worktree branches',
   'workspace.focus-toggle-label': 'Toggle Focus Mode',
   'workspace.focus-toggle-tooltip.enable': 'Focus Mode',
-  'workspace.focus-toggle-tooltip.disable': 'Disable Focus Mode',
   'workspace.back-to-branch-navigator': 'Back to Branch Navigator',
   'branches.gone': 'gone',
   'branches.dirty': 'dirty',

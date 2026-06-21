@@ -236,7 +236,6 @@ export const ja: Record<DictKey, string> = {
   'branches.filter-tooltip.worktrees': 'ワークツリーブランチ',
   'workspace.focus-toggle-label': 'Focus Mode を切り替え',
   'workspace.focus-toggle-tooltip.enable': '集中モード',
-  'workspace.focus-toggle-tooltip.disable': 'Focus Mode を無効化',
   'workspace.back-to-branch-navigator': 'Branch Navigator に戻る',
   'branches.gone': '消失',
   'branches.dirty': '変更あり',
