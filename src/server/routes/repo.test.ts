@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   probeRepository: vi.fn(),
   getRepositorySnapshot: vi.fn(),
   getRepositoryStatus: vi.fn(),
+  getRepositoryLog: vi.fn(),
   getRepositoryPatch: vi.fn(),
   getRepositoryPullRequests: vi.fn(),
   getRepositoryComposite: vi.fn(),
@@ -34,6 +35,7 @@ vi.mock('#/server/modules/repo-read-paths.ts', () => ({
   probeRepository: mocks.probeRepository,
   getRepositorySnapshot: mocks.getRepositorySnapshot,
   getRepositoryStatus: mocks.getRepositoryStatus,
+  getRepositoryLog: mocks.getRepositoryLog,
   getRepositoryPatch: mocks.getRepositoryPatch,
   getRepositoryPullRequests: mocks.getRepositoryPullRequests,
   getRepositoryComposite: mocks.getRepositoryComposite,
@@ -110,6 +112,20 @@ describe('repo routes — GET query validation', () => {
       '/tmp/repo/.worktrees/feature',
       expect.any(AbortSignal),
     )
+  })
+
+  test('returns an error envelope when repo log reading fails', async () => {
+    mocks.getRepositoryLog.mockRejectedValueOnce(new Error('fatal: bad revision'))
+    const app = createRepoRoutes()
+    const response = await app.request(new Request('http://localhost/log?cwd=/tmp/repo&branch=feature%2Fwork'))
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ ok: false, message: 'error.failed-read-repo' })
+    expect(mocks.getRepositoryLog).toHaveBeenCalledWith('/tmp/repo', 'feature/work', {
+      count: 50,
+      skip: 0,
+      signal: expect.any(AbortSignal),
+    })
   })
 })
 

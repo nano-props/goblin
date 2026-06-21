@@ -85,6 +85,7 @@ describe('useBranchActionItems', () => {
 
     expect(actionIds).toEqual([
       'status',
+      'history',
       'changes',
       'pull',
       'push',
@@ -97,7 +98,7 @@ describe('useBranchActionItems', () => {
     ])
   })
 
-  test('keeps status visible for a branch without a worktree but hides changes', async () => {
+  test('keeps branch-static views visible for a branch without a worktree but hides changes', async () => {
     let actionIds: string[] = []
 
     await renderHookHost(
@@ -108,6 +109,7 @@ describe('useBranchActionItems', () => {
     )
 
     expect(actionIds).toContain('status')
+    expect(actionIds).toContain('history')
     expect(actionIds).not.toContain('changes')
   })
 

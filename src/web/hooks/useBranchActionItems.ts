@@ -6,6 +6,7 @@ import {
   FileText,
   GitBranch,
   GitPullRequest,
+  History,
   Trash2,
 } from 'lucide-react'
 import { createElement, type ReactNode } from 'react'
@@ -131,6 +132,14 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
       visible: true,
       icon: createElement(GitBranch),
       onSelect: () => openStaticWorkspacePaneView('status'),
+    },
+    {
+      id: 'history',
+      label: t('tab.log'),
+      disabled,
+      visible: true,
+      icon: createElement(History),
+      onSelect: () => openStaticWorkspacePaneView('history'),
     },
     {
       id: 'changes',

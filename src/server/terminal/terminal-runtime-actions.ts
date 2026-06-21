@@ -238,7 +238,10 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         !input.orderedViews.every(
           (view) =>
             view &&
-            (view.type === 'status' || view.type === 'changes' || view.type === 'terminal') &&
+            (view.type === 'status' ||
+              view.type === 'changes' ||
+              view.type === 'history' ||
+              view.type === 'terminal') &&
             typeof view.id === 'string' &&
             view.id.length > 0,
         )
@@ -269,7 +272,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     if (!isValidTerminalClientId(clientId)) return null
     if (!isValidRepoLocator(input?.repoRoot)) return null
     if (typeof input?.worktreePath !== 'string' || input.worktreePath.length === 0) return null
-    if (!['changes'].includes(input.type)) return null
+    if (!['status', 'changes', 'history'].includes(input.type)) return null
     return {
       scope: terminalSessionScope(input.repoRoot),
       worktreePath: isRemoteRepoId(input.repoRoot) ? input.worktreePath : path.resolve(input.worktreePath),

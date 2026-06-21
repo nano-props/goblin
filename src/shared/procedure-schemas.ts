@@ -125,6 +125,26 @@ export const REPO_QUERY_SCHEMAS = {
   probe: v.object({ cwd: v.string() }),
   snapshot: v.object({ cwd: v.string() }),
   status: v.object({ cwd: v.string() }),
+  log: v.object({
+    cwd: v.string(),
+    branch: v.string(),
+    count: v.optional(
+      v.pipe(
+        v.union([v.number(), v.pipe(v.string(), v.transform(Number))]),
+        v.integer(),
+        v.minValue(1),
+        v.maxValue(200),
+      ),
+    ),
+    skip: v.optional(
+      v.pipe(
+        v.union([v.number(), v.pipe(v.string(), v.transform(Number))]),
+        v.integer(),
+        v.minValue(0),
+        v.maxValue(100_000),
+      ),
+    ),
+  }),
   patch: v.object({ cwd: v.string(), worktreePath: v.string() }),
   pullRequests: v.object({
     cwd: v.string(),
@@ -166,7 +186,7 @@ const SessionStateSchema = v.object({
     'left-right': v.number(),
   }),
   selectedTerminalByWorktree: v.optional(v.record(v.string(), v.string())),
-  workspacePaneViewByRepo: v.optional(v.record(v.string(), v.picklist(['status', 'changes', 'terminal']))),
+  workspacePaneViewByRepo: v.optional(v.record(v.string(), v.picklist(['status', 'changes', 'history', 'terminal']))),
 })
 
 export const SETTINGS_PROCEDURE_SCHEMAS = {

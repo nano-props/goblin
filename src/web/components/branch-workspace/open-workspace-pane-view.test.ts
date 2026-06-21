@@ -5,6 +5,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import type { WorkspacePaneBranchViewType, WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
+import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
 
 const REPO_ID = '/tmp/workspace-pane-view-repo'
 const WORKTREE_PATH = '/tmp/workspace-pane-view-worktree'
@@ -22,7 +23,7 @@ afterEach(() => {
 })
 
 describe('openWorkspacePaneView', () => {
-  test('opens status as a branch-level view without registering a worktree view', () => {
+  test('opens status as a static workspace pane view when the branch has a worktree', () => {
     seedWorktreeRepo('status')
     useReposStore.getState().closeBranchWorkspacePaneView(REPO_ID, 'status')
     const refreshStatus = vi.fn(async () => {})
@@ -39,8 +40,8 @@ describe('openWorkspacePaneView', () => {
       navigation: navigationWithStoreActions(),
     })
 
-    expect(openStaticView).not.toHaveBeenCalled()
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual(['status'])
+    expect(openStaticView).toHaveBeenCalledWith(WORKTREE_KEY, 'status')
+    expect(openViewsFor('feature/worktree')).toEqual(['status'])
     expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('status')
     expect(refreshStatus).toHaveBeenCalledWith(REPO_ID, { token })
   })
@@ -86,6 +87,27 @@ describe('openWorkspacePaneView', () => {
     expect(openStaticView).not.toHaveBeenCalled()
     expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('status')
   })
+
+  test('opens history as a branch-static workspace pane view', () => {
+    seedWorktreeRepo('history')
+    const refreshStatus = vi.fn(async () => {})
+    useReposStore.setState({ refreshStatus: refreshStatus as typeof originalRefreshStatus })
+    const openStaticView = vi.fn(async () => true)
+    setWorkspacePaneBridge(openStaticView)
+
+    openWorkspacePaneView({
+      repoId: REPO_ID,
+      branchName: 'feature/worktree',
+      worktreePath: WORKTREE_PATH,
+      type: 'history',
+      navigation: navigationWithStoreActions(),
+    })
+
+    expect(openStaticView).toHaveBeenCalledWith(WORKTREE_KEY, 'history')
+    expect(openViewsFor('feature/worktree')).toContain('history')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('history')
+    expect(refreshStatus).not.toHaveBeenCalled()
+  })
 })
 
 function seedWorktreeRepo(workspacePaneView: WorkspacePaneBranchViewType | WorkspacePaneStaticViewType) {
@@ -95,6 +117,11 @@ function seedWorktreeRepo(workspacePaneView: WorkspacePaneBranchViewType | Works
     selectedBranch: 'feature/worktree',
     workspacePaneView,
   })
+}
+
+function openViewsFor(branchName: string): WorkspacePaneBranchViewType[] {
+  const repo = useReposStore.getState().repos[REPO_ID]
+  return repo ? branchWorkspacePaneViewsForBranch(repo.ui, branchName) : []
 }
 
 function navigationWithStoreActions(): Pick<

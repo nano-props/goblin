@@ -102,14 +102,15 @@ describe('parseLog', () => {
 
   test('parses multiple entries', () => {
     const out = [
-      ['fullsha1', 'sha1', 'first', 'Alice', '2026-05-20T10:00:00+08:00'].join(SEP),
-      ['fullsha2', 'sha2', 'second', 'Bob', '2026-05-19T10:00:00+08:00'].join(SEP),
+      ['fullsha1', 'sha1', 'HEAD -> main, origin/main', 'first', 'Alice', '2026-05-20T10:00:00+08:00'].join(SEP),
+      ['fullsha2', 'sha2', '', 'second', 'Bob', '2026-05-19T10:00:00+08:00'].join(SEP),
     ].join('\n')
     const result = parseLog(out)
     expect(result).toHaveLength(2)
     expect(result[0]).toEqual({
       hash: 'fullsha1',
       shortHash: 'sha1',
+      refs: 'HEAD -> main, origin/main',
       message: 'first',
       author: 'Alice',
       date: '2026-05-20T10:00:00+08:00',
@@ -118,7 +119,7 @@ describe('parseLog', () => {
   })
 
   test('subjects with embedded spaces survive', () => {
-    const out = ['h', 'sh', 'feat(scope): hello world', 'a', 'd'].join(SEP)
+    const out = ['h', 'sh', '', 'feat(scope): hello world', 'a', 'd'].join(SEP)
     expect(parseLog(out)[0]?.message).toBe('feat(scope): hello world')
   })
 })

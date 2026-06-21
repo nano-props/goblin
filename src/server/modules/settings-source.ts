@@ -3,12 +3,9 @@ import path from 'node:path'
 import { toSafeRepoLocator, toSafeSessionRepoEntry } from '#/shared/input-validation.ts'
 import { serverDataFile } from '#/shared/data-dir.ts'
 import type { EditorPref, LangPref, SessionState, SettingsPrefs, TerminalPref, ThemePref } from '#/shared/api-types.ts'
-import {
-  DEFAULT_WORKSPACE_FOCUSED,
-  normalizeWorkspacePaneSizes,
-} from '#/shared/workspace-layout.ts'
+import { DEFAULT_WORKSPACE_FOCUSED, normalizeWorkspacePaneSizes } from '#/shared/workspace-layout.ts'
 import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
+import { isWorkspacePaneViewType, type WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import { normalizeGlobalShortcut } from '#/shared/accelerator.ts'
 import { isColorTheme, type ColorTheme } from '#/shared/color-theme.ts'
 import {
@@ -142,14 +139,17 @@ function normalizeSelectedTerminalByWorktree(value: unknown): Record<string, str
   return normalized
 }
 
-function normalizeWorkspacePaneViewByRepo(value: unknown, openRepos: RepoSessionEntry[]): Record<string, WorkspacePaneView> {
+function normalizeWorkspacePaneViewByRepo(
+  value: unknown,
+  openRepos: RepoSessionEntry[],
+): Record<string, WorkspacePaneView> {
   if (!value || typeof value !== 'object') return {}
   const openRepoIds = new Set(openRepos.map(repoSessionEntryId))
   const normalized: Record<string, WorkspacePaneView> = {}
   for (const [repoId, paneView] of Object.entries(value)) {
     const safeRepoId = toSafeRepoLocator(repoId)
     if (!safeRepoId || !openRepoIds.has(safeRepoId)) continue
-    if (paneView === 'status' || paneView === 'changes' || paneView === 'terminal') {
+    if (isWorkspacePaneViewType(paneView)) {
       normalized[safeRepoId] = paneView
     }
   }
@@ -169,9 +169,7 @@ function normalizeSession(value: unknown): SessionState {
     openRepos,
     activeRepo: activeRepo && openRepos.some((entry) => repoSessionEntryId(entry) === activeRepo) ? activeRepo : null,
     workspaceFocused:
-      typeof partial.workspaceFocused === 'boolean'
-        ? partial.workspaceFocused
-        : DEFAULT_WORKSPACE_FOCUSED,
+      typeof partial.workspaceFocused === 'boolean' ? partial.workspaceFocused : DEFAULT_WORKSPACE_FOCUSED,
     workspacePaneSizes: normalizeWorkspacePaneSizes(partial.workspacePaneSizes),
     selectedTerminalByWorktree: normalizeSelectedTerminalByWorktree(partial.selectedTerminalByWorktree),
     workspacePaneViewByRepo: normalizeWorkspacePaneViewByRepo(partial.workspacePaneViewByRepo, openRepos),

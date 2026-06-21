@@ -35,7 +35,7 @@ export function emptyRepo(id: string, name: string): RepoState {
     ui: {
       selectedBranch: null,
       branchViewMode: 'all',
-      openBranchWorkspacePaneViews: ['status'],
+      openBranchWorkspacePaneViewsByBranch: {},
       preferredWorkspacePaneView: 'status',
     },
     projection: {

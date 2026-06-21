@@ -1,4 +1,4 @@
-import { Check, ChevronDown, FileText, GitBranch, Loader2, Plus, Terminal, X } from 'lucide-react'
+import { Check, ChevronDown, FileText, GitBranch, History, Loader2, Plus, Terminal, X } from 'lucide-react'
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ComponentPropsWithoutRef } from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
@@ -22,6 +22,7 @@ import type {
   WorkspacePaneView,
   WorkspacePaneViewOrderEntry,
 } from '#/shared/workspace-pane.ts'
+import { isWorkspacePaneBranchViewType } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneViewSummary } from '#/web/components/terminal/types.ts'
 import { ToolbarTabList, ToolbarTabStrip, ToolbarTabStripBody } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
 import { ToolbarClosableTab } from '#/web/components/tab-strip/ToolbarClosableTab.tsx'
@@ -65,12 +66,13 @@ interface WorkspacePaneViewStripProps {
   onScrollToBottom: (key: string) => void
   onClose: (item: WorkspacePaneTabItem) => void
   onReorder: (worktreeTerminalKey: string, orderedViews: WorkspacePaneViewOrderEntry[]) => void
+  onReorderBranchViews?: (orderedViews: WorkspacePaneBranchViewType[]) => void
   onNavigateOut?: (direction: 'prev' | 'next' | 'first' | 'last') => void
   activateCrossScopeKeyboardNavigation?: boolean
 }
 
 export type WorkspacePaneTabScope = 'branch' | 'worktree'
-type WorkspacePaneTabIcon = 'status' | 'changes' | 'terminal'
+type WorkspacePaneTabIcon = 'status' | 'changes' | 'history' | 'terminal'
 
 interface WorkspacePaneTabItemBase {
   identity: string
@@ -81,6 +83,8 @@ interface WorkspacePaneTabItemBase {
   closeLabel: string
   icon: WorkspacePaneTabIcon
   panelId?: string
+  sortableId: string
+  orderEntry: WorkspacePaneViewOrderEntry
 }
 
 export interface WorkspacePaneBranchTabItem extends WorkspacePaneTabItemBase {
@@ -92,8 +96,6 @@ export interface WorkspacePaneWorktreeTabItem extends WorkspacePaneTabItemBase {
   scope: 'worktree'
   view: WorkspacePaneViewSummary
   closeLabel: string
-  sortableId: string
-  orderEntry: WorkspacePaneViewOrderEntry
 }
 
 export type WorkspacePaneTabItem = WorkspacePaneBranchTabItem | WorkspacePaneWorktreeTabItem
@@ -115,6 +117,8 @@ export function createBranchWorkspacePaneTabItem(input: {
     closeLabel: input.closeLabel,
     icon: input.type,
     panelId: input.panelId,
+    sortableId: staticWorkspacePaneViewIdentity(input.type),
+    orderEntry: { type: input.type, id: input.type },
   }
 }
 
@@ -298,27 +302,34 @@ export function WorkspacePaneViewStrip({
   onScrollToBottom,
   onClose,
   onReorder,
+  onReorderBranchViews,
   onNavigateOut,
   activateCrossScopeKeyboardNavigation = false,
 }: WorkspacePaneViewStripProps) {
   const t = useT()
   const worktreeItems = useMemo(() => items.filter(isWorktreeWorkspacePaneTabItem), [items])
+  const branchItems = useMemo(() => items.filter(isBranchWorkspacePaneTabItem), [items])
+  const hasTerminalItems = useMemo(() => worktreeItems.some(isTerminalWorkspacePaneTabItem), [worktreeItems])
+  const sortableItems = useMemo(
+    () => (worktreeTerminalKey ? worktreeItems : onReorderBranchViews ? branchItems : []),
+    [branchItems, onReorderBranchViews, worktreeItems, worktreeTerminalKey],
+  )
   const canCreateNew = worktreeTerminalKey !== null
   const showCollapsedTabs = !!responsiveCompact
   const selectedItem = items.find((item) => item.identity === activeTabIdentity) ?? items[0]
   const internalFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()
   const focusRegistry = externalFocusRegistry ?? internalFocusRegistry
   const viewportRef = useRef<HTMLDivElement>(null)
-  const prevTabCountRef = useRef(worktreeItems.length)
+  const prevTabCountRef = useRef(items.length)
   const newButtonRef = useRef<HTMLButtonElement>(null)
   const [hoveredTabIdentity, setHoveredTabIdentity] = useState<string | null>(null)
 
   useLayoutEffect(() => {
-    if (worktreeItems.length <= prevTabCountRef.current) {
-      prevTabCountRef.current = worktreeItems.length
+    if (items.length <= prevTabCountRef.current) {
+      prevTabCountRef.current = items.length
       return
     }
-    prevTabCountRef.current = worktreeItems.length
+    prevTabCountRef.current = items.length
     const viewport = viewportRef.current
     if (!viewport) return
     if (viewport.scrollWidth <= viewport.clientWidth) return
@@ -331,7 +342,7 @@ export function WorkspacePaneViewStrip({
       viewport.style.scrollBehavior = ''
     })
     return () => cancelAnimationFrame(frame)
-  }, [worktreeItems.length])
+  }, [items.length])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -345,7 +356,7 @@ export function WorkspacePaneViewStrip({
   // Must be called unconditionally so the hook order stays stable across renders
   // (e.g. when worktree items go from 0 → 1 or back, which would otherwise bypass the
   // helper below and trigger React's "Rendered more hooks than during the previous render").
-  const sortableIds = useMemo(() => worktreeItems.map((item) => item.sortableId), [worktreeItems])
+  const sortableIds = useMemo(() => sortableItems.map((item) => item.sortableId), [sortableItems])
 
   const handleSelect = useCallback(
     (identity: string) => {
@@ -451,23 +462,27 @@ export function WorkspacePaneViewStrip({
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
-      if (!worktreeTerminalKey) return
       const { active, over } = event
       if (!over) return
       const activeId = String(active.id)
       const overId = String(over.id)
       if (activeId === overId) return
-      const oldIndex = worktreeItems.findIndex((item) => item.sortableId === activeId)
-      const newIndex = worktreeItems.findIndex((item) => item.sortableId === overId)
+      const oldIndex = sortableItems.findIndex((item) => item.sortableId === activeId)
+      const newIndex = sortableItems.findIndex((item) => item.sortableId === overId)
       if (oldIndex === -1 || newIndex === -1) return
       const next = arrayMove(
-        worktreeItems.map((item) => item.orderEntry),
+        sortableItems.map((item) => item.orderEntry),
         oldIndex,
         newIndex,
       )
-      onReorder(worktreeTerminalKey, next)
+      if (worktreeTerminalKey) {
+        onReorder(worktreeTerminalKey, next)
+        return
+      }
+      const nextBranchViews = next.map((entry) => entry.type).filter(isWorkspacePaneBranchViewType)
+      if (nextBranchViews.length === next.length) onReorderBranchViews?.(nextBranchViews)
     },
-    [onReorder, worktreeItems, worktreeTerminalKey],
+    [onReorder, onReorderBranchViews, sortableItems, worktreeTerminalKey],
   )
 
   if (items.length === 0) {
@@ -522,7 +537,7 @@ export function WorkspacePaneViewStrip({
             compact={showCollapsedTabs}
           />
         </WorkspacePaneViewTooltipLayer>
-        {isLoading && worktreeItems.length === 0 && canCreateNew ? (
+        {isLoading && !hasTerminalItems && canCreateNew ? (
           <WorkspacePaneLoadingIndicator compact t={t} />
         ) : (
           <WorkspacePaneViewSwitcherPopover
@@ -581,7 +596,7 @@ export function WorkspacePaneViewStrip({
                   t,
                   compact: showCollapsedTabs,
                 }
-                if (isBranchWorkspacePaneTabItem(item)) {
+                if (!sortableIds.includes(item.sortableId)) {
                   return <WorkspacePaneView key={item.identity} {...commonProps} />
                 }
                 return (
@@ -590,7 +605,7 @@ export function WorkspacePaneViewStrip({
               })}
             </WorkspacePaneViewTooltipLayer>
           </SortableContext>
-          {isLoading && worktreeItems.length === 0 && canCreateNew ? (
+          {isLoading && !hasTerminalItems && canCreateNew ? (
             <WorkspacePaneLoadingIndicator t={t} />
           ) : canCreateNew ? (
             <Button
@@ -874,6 +889,7 @@ function WorkspacePaneViewIcon({ item, active }: { item: WorkspacePaneTabItem; a
   const className = toolbarTabIconClassName(active)
   if (item.icon === 'status') return <GitBranch size={13} className={className} />
   if (item.icon === 'changes') return <FileText size={13} className={className} />
+  if (item.icon === 'history') return <History size={13} className={className} />
   return <Terminal size={13} className={className} />
 }
 

@@ -1,28 +1,31 @@
-import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
+import {
+  isWorkspacePaneBranchViewType,
+  isWorkspacePaneViewType,
+  type WorkspacePaneBranchViewType,
+  type WorkspacePaneView,
+} from '#/shared/workspace-pane.ts'
 
 export type WorkspacePaneViewScope = 'branch' | 'worktree'
-export type BranchLevelWorkspacePaneView = Extract<WorkspacePaneView, 'status'>
+export type BranchLevelWorkspacePaneView = WorkspacePaneBranchViewType
 export type WorktreeLevelWorkspacePaneView = Exclude<WorkspacePaneView, BranchLevelWorkspacePaneView>
 
-const WORKSPACE_PANE_VIEW_SCOPE: Record<WorkspacePaneView, WorkspacePaneViewScope> = {
-  status: 'branch',
-  changes: 'worktree',
-  terminal: 'worktree',
-}
-
 export function isWorkspacePaneView(value: string | null | undefined): value is WorkspacePaneView {
-  return value === 'status' || value === 'changes' || value === 'terminal'
+  return isWorkspacePaneViewType(value)
 }
 
 export function workspacePaneViewScope(view: WorkspacePaneView): WorkspacePaneViewScope {
-  return WORKSPACE_PANE_VIEW_SCOPE[view]
+  return isWorkspacePaneBranchViewType(view) ? 'branch' : 'worktree'
 }
 
 export function isBranchLevelWorkspacePaneView(view: WorkspacePaneView): view is BranchLevelWorkspacePaneView {
-  return workspacePaneViewScope(view) === 'branch'
+  return isWorkspacePaneBranchViewType(view)
 }
 
 export function isWorktreeLevelWorkspacePaneView(view: WorkspacePaneView): view is WorktreeLevelWorkspacePaneView {
+  return workspacePaneViewScope(view) === 'worktree'
+}
+
+export function workspacePaneViewRequiresWorktree(view: WorkspacePaneView): boolean {
   return workspacePaneViewScope(view) === 'worktree'
 }
 
@@ -62,8 +65,11 @@ export interface WorkspacePaneViewContext {
  *
  * Pure function so it can be unit-tested without React.
  */
-export function computeEffectiveWorkspacePaneView(preferred: WorkspacePaneView, context: WorkspacePaneViewContext): WorkspacePaneView {
-  if (!context.hasWorktree && isWorktreeLevelWorkspacePaneView(preferred)) return 'status'
+export function computeEffectiveWorkspacePaneView(
+  preferred: WorkspacePaneView,
+  context: WorkspacePaneViewContext,
+): WorkspacePaneView {
+  if (!context.hasWorktree && workspacePaneViewRequiresWorktree(preferred)) return 'status'
   if (preferred !== 'terminal') return preferred
   if (!context.terminalSyncReady) return 'terminal'
   return context.terminalSessionCount > 0 || context.terminalPendingCreate ? 'terminal' : 'status'

@@ -6,6 +6,7 @@ import { emptyRepo, replaceRepo } from '#/web/stores/repos/helpers.ts'
 import { isRepoStatusRefreshable, useRepoStatusRefresh } from '#/web/hooks/useRepoStatusRefresh.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { resetReposStore } from '#/web/stores/repos/test-utils.ts'
+import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 
 const originalRefreshStatus = useReposStore.getState().refreshStatus
 
@@ -17,7 +18,7 @@ function Harness() {
 function createRepo(
   id: string,
   options: {
-    workspacePaneView?: 'status' | 'changes' | 'terminal'
+    workspacePaneView?: WorkspacePaneView
     /**
      * Phase 4: the legacy `availability.phase` field is gone for
      * remote repos. The snapshot's `unavailable` boolean is

@@ -38,7 +38,6 @@ import {
 } from '#/web/components/terminal/terminal-session-eviction.ts'
 import { syncTerminalSessionIdIndex } from '#/web/components/terminal/terminal-session-index.ts'
 import { resolveSelectedTerminalKey } from '#/web/components/terminal/terminal-session-selection.ts'
-import { isWorktreeLevelWorkspacePaneView } from '#/web/lib/workspace-pane-view.ts'
 import { buildWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-worktree-snapshot.ts'
 import type {
   TerminalDescriptor,
@@ -778,7 +777,6 @@ export class TerminalSessionRegistry {
   }
 
   openWorkspacePaneView = async (worktreeKey: string, type: WorkspacePaneStaticViewType): Promise<boolean> => {
-    if (!isWorktreeLevelWorkspacePaneView(type)) return false
     const parsedWorktree = parseWorktreeTerminalKey(worktreeKey)
     if (!parsedWorktree) return false
 
@@ -808,7 +806,6 @@ export class TerminalSessionRegistry {
   }
 
   closeWorkspacePaneView = async (worktreeKey: string, type: WorkspacePaneStaticViewType): Promise<boolean> => {
-    if (!isWorktreeLevelWorkspacePaneView(type)) return false
     const parsedWorktree = parseWorktreeTerminalKey(worktreeKey)
     if (!parsedWorktree) return false
 

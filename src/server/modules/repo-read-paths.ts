@@ -1,5 +1,11 @@
 import { runWithRepoBackend } from '#/server/modules/repo-backend.ts'
-import { type ExecResult, type PullRequestFetchMode, type WorktreeStatus } from '#/shared/git-types.ts'
+import {
+  DEFAULT_REPOSITORY_LOG_COUNT,
+  type ExecResult,
+  type LogEntry,
+  type PullRequestFetchMode,
+  type WorktreeStatus,
+} from '#/shared/git-types.ts'
 import type { ProbeResult, PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
 
 export async function probeRepository(cwd: string): Promise<ProbeResult> {
@@ -37,6 +43,23 @@ export async function getRepositoryPullRequests(
   )
   if (!prs) return null
   return prs
+}
+
+export async function getRepositoryLog(
+  cwd: string,
+  branch: string,
+  options?: { count?: number; skip?: number; signal?: AbortSignal },
+): Promise<LogEntry[]> {
+  if (typeof branch !== 'string' || branch.length === 0) return []
+  return await runWithRepoBackend(
+    cwd,
+    async (backend) =>
+      await backend.getLog(branch, {
+        count: options?.count ?? DEFAULT_REPOSITORY_LOG_COUNT,
+        skip: options?.skip ?? 0,
+        signal: options?.signal,
+      }),
+  )
 }
 
 export async function getRepositoryPatch(cwd: string, worktreePath: string, signal?: AbortSignal): Promise<ExecResult> {

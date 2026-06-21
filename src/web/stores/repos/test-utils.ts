@@ -479,6 +479,11 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           for (const [k, v] of url.searchParams.entries()) payload[k] = v
           return call('repo.status', payload)
         }
+        if (url.pathname === '/api/repo/log') {
+          const payload: Record<string, unknown> = {}
+          for (const [k, v] of url.searchParams.entries()) payload[k] = v
+          return call('repo.log', payload)
+        }
         if (url.pathname === '/api/repo/remote-branches') return call('repo.remoteBranches', body)
         if (url.pathname === '/api/repo/pull-requests') {
           const payload: Record<string, unknown> = { branches: url.searchParams.getAll('branches') }
@@ -561,6 +566,7 @@ export function seedRepoState(options: {
   selectedBranch?: string | null
   workspacePaneView?: WorkspacePaneView
   openBranchWorkspacePaneViews?: WorkspacePaneBranchViewType[]
+  openBranchWorkspacePaneViewsByBranch?: Record<string, WorkspacePaneBranchViewType[]>
   instanceToken?: number
   status?: WorktreeStatus[]
   statusLoaded?: boolean
@@ -571,6 +577,12 @@ export function seedRepoState(options: {
   const branchesWithSnapshotWorktreeMetadata = options.branchSnapshots ?? options.branches ?? base.data.branches
   const branches = options.branches ?? stripBranchWorktreeMetadata(branchesWithSnapshotWorktreeMetadata)
   const status = options.status ?? base.data.status
+  const selectedBranch = options.selectedBranch ?? base.ui.selectedBranch
+  const openBranchWorkspacePaneViewsByBranch =
+    options.openBranchWorkspacePaneViewsByBranch ??
+    (selectedBranch && options.openBranchWorkspacePaneViews !== undefined
+      ? { [selectedBranch]: options.openBranchWorkspacePaneViews }
+      : base.ui.openBranchWorkspacePaneViewsByBranch)
   const repo: RepoState = {
     ...base,
     instanceToken: options.instanceToken ?? base.instanceToken,
@@ -586,9 +598,8 @@ export function seedRepoState(options: {
     },
     ui: {
       ...base.ui,
-      selectedBranch: options.selectedBranch ?? base.ui.selectedBranch,
-      openBranchWorkspacePaneViews:
-        options.openBranchWorkspacePaneViews ?? base.ui.openBranchWorkspacePaneViews,
+      selectedBranch,
+      openBranchWorkspacePaneViewsByBranch,
       preferredWorkspacePaneView: options.workspacePaneView ?? base.ui.preferredWorkspacePaneView,
     },
     remote: {

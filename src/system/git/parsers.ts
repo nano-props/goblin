@@ -101,7 +101,7 @@ export function parseBranches(
 }
 
 /**
- * Parse `git log --format=<%H, %h, %s, %an, %aI joined by FIELD_SEP>`.
+ * Parse `git log --format=<%H, %h, %D, %s, %an, %aI joined by FIELD_SEP>`.
  */
 export function parseLog(output: string): LogEntry[] {
   if (!output) return []
@@ -113,9 +113,10 @@ export function parseLog(output: string): LogEntry[] {
       return {
         hash: parts[0] ?? '',
         shortHash: parts[1] ?? '',
-        message: parts[2] ?? '',
-        author: parts[3] ?? '',
-        date: parts[4] ?? '',
+        refs: parts[2] ?? '',
+        message: parts[3] ?? '',
+        author: parts[4] ?? '',
+        date: parts[5] ?? '',
       }
     })
 }

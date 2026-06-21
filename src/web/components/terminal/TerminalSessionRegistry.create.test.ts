@@ -387,12 +387,17 @@ describe('TerminalSessionRegistry create flow', () => {
     ])
   })
 
-  test('rejects branch-level static workspace pane views', async () => {
-    await expect(registry.openWorkspacePaneView(WORKTREE_KEY, 'status' as never)).resolves.toBe(false)
-    await expect(registry.closeWorkspacePaneView(WORKTREE_KEY, 'status' as never)).resolves.toBe(false)
+  test('opens status through the same static workspace pane bridge action', async () => {
+    await expect(registry.openWorkspacePaneView(WORKTREE_KEY, 'status')).resolves.toBe(true)
 
-    expect(mocks.openViewMock).not.toHaveBeenCalled()
-    expect(mocks.closeViewMock).not.toHaveBeenCalled()
+    expect(mocks.openViewMock).toHaveBeenCalledWith({
+      repoRoot: REPO_ROOT,
+      worktreePath: WORKTREE_PATH,
+      type: 'status',
+    })
+    expect(
+      registry.worktreeSnapshot(WORKTREE_KEY).staticWorkspacePaneViews.map((tab) => `${tab.type}:${tab.id}`),
+    ).toEqual(['status:status'])
   })
 
   test('rolls back optimistic static workspace pane view open when the bridge rejects it', async () => {

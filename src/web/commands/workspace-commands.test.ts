@@ -20,7 +20,7 @@ afterEach(() => {
 })
 
 describe('workspace commands', () => {
-  test('show workspace pane view command opens status as a branch-level view', () => {
+  test('show workspace pane view command opens status as a branch static view when a worktree exists', () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -49,8 +49,41 @@ describe('workspace commands', () => {
 
     expect(runShowWorkspacePaneViewCommand({ repoId: REPO_ID, tab: 'status', navigation })).toBe(true)
 
-    expect(openWorkspacePaneView).not.toHaveBeenCalled()
+    expect(openWorkspacePaneView).toHaveBeenCalledWith(WORKTREE_KEY, 'status')
     expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('status')
+  })
+
+  test('show workspace pane view command opens history without routing through status', () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      workspacePaneView: 'status',
+    })
+    const openWorkspacePaneView = vi.fn(async () => true)
+    setTerminalSessionCommandBridge({
+      worktreeSnapshot: () => ({
+        worktreeTerminalKey: WORKTREE_KEY,
+        selectedDescriptor: null,
+        staticWorkspacePaneViews: [],
+        workspacePaneViews: [],
+        sessions: [],
+        count: 0,
+        bellCount: 0,
+        pendingCreate: false,
+      }),
+      createTerminal: vi.fn(async () => 'terminal-1'),
+      selectTerminal: vi.fn(),
+      openWorkspacePaneView,
+      closeWorkspacePaneView: vi.fn(async () => true),
+      reorderWorkspacePaneViews: vi.fn(async () => true),
+    })
+    const navigation = navigationWith()
+
+    expect(runShowWorkspacePaneViewCommand({ repoId: REPO_ID, tab: 'history', navigation })).toBe(true)
+
+    expect(openWorkspacePaneView).toHaveBeenCalledWith(WORKTREE_KEY, 'history')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('history')
   })
 
   test('show workspace pane view command opens changes as a worktree-level view', () => {
