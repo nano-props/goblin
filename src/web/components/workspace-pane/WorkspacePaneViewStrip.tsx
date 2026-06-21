@@ -42,7 +42,7 @@ import {
 interface WorkspacePaneViewStripProps {
   worktreeTerminalKey: string | null
   items: WorkspacePaneTabItem[]
-  detailId: string
+  workspacePaneId: string
   responsiveCompact?: boolean
   activeTabIdentity: string | null
   panelActive?: boolean
@@ -286,7 +286,7 @@ function WorkspacePaneViewSwitcherPopover({
 export function WorkspacePaneViewStrip({
   worktreeTerminalKey,
   items,
-  detailId,
+  workspacePaneId,
   activeTabIdentity,
   responsiveCompact,
   panelActive,
@@ -384,11 +384,11 @@ export function WorkspacePaneViewStrip({
 
   const tabIdForItem = useCallback(
     (item: WorkspacePaneTabItem) => {
-      if (isBranchWorkspacePaneTabItem(item)) return `${detailId}-${item.branchViewType}-tab`
+      if (isBranchWorkspacePaneTabItem(item)) return `${workspacePaneId}-${item.branchViewType}-tab`
       const index = worktreeItems.findIndex((candidate) => candidate.identity === item.identity)
-      return workspacePaneViewButtonId(detailId, Math.max(0, index))
+      return workspacePaneViewButtonId(workspacePaneId, Math.max(0, index))
     },
-    [detailId, worktreeItems],
+    [workspacePaneId, worktreeItems],
   )
 
   const activateKeyboardNavigationTarget = useCallback(
@@ -489,7 +489,7 @@ export function WorkspacePaneViewStrip({
         variant="ghost"
         size="icon"
         className="h-7 w-7 shrink-0"
-        id={`${detailId}-workspace-pane-view-empty`}
+        id={`${workspacePaneId}-workspace-pane-view-empty`}
         onClick={onNew}
         aria-label={t('terminal.new')}
         title={t('terminal.new')}
@@ -512,7 +512,7 @@ export function WorkspacePaneViewStrip({
             tabId={
               isBranchWorkspacePaneTabItem(selectedItem)
                 ? tabIdForItem(selectedItem)
-                : workspacePaneViewButtonId(detailId, 0)
+                : workspacePaneViewButtonId(workspacePaneId, 0)
             }
             focusRegistry={focusRegistry}
             onSelect={handleSelect}
@@ -599,7 +599,7 @@ export function WorkspacePaneViewStrip({
               variant="ghost"
               size="icon"
               className="h-7 w-7 shrink-0"
-              id={worktreeItems.length === 0 ? `${detailId}-workspace-pane-view-empty` : undefined}
+              id={worktreeItems.length === 0 ? `${workspacePaneId}-workspace-pane-view-empty` : undefined}
               onClick={onNew}
               aria-label={t('terminal.new')}
               title={t('terminal.new')}
@@ -720,7 +720,7 @@ function WorkspacePaneViewChrome({
         onPointerLeave: () => onHoverChange?.(null),
       }}
       containerClassName={toolbarTabChromeClassName({
-        variant: 'detail',
+        variant: 'workspace',
         active: isActive,
         dragging: isDragging,
         compact,
@@ -743,7 +743,7 @@ function WorkspacePaneViewChrome({
         onClick: () => onSelect(item.identity),
         onKeyDown: (e) => onKeyDown(e, item.identity),
       }}
-      buttonClassName={toolbarTabButtonClassName('detail')}
+      buttonClassName={toolbarTabButtonClassName('workspace')}
       closeLabel={item.closeLabel}
       closeVisible={isActive}
       onClose={(e) => onClose(e, item.identity)}

@@ -25,8 +25,8 @@ export function staticWorkspacePaneViewIdentity(type: WorkspacePaneBranchViewTyp
   return `${type}:${type}`
 }
 
-export function workspacePaneViewButtonId(detailId: string, index: number): string {
-  return index <= 0 ? `${detailId}-workspace-pane-view` : `${detailId}-workspace-pane-view-${index}`
+export function workspacePaneViewButtonId(workspacePaneId: string, index: number): string {
+  return index <= 0 ? `${workspacePaneId}-workspace-pane-view` : `${workspacePaneId}-workspace-pane-view-${index}`
 }
 
 export function activeWorkspacePaneViewIdentity(

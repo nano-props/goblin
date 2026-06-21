@@ -1,7 +1,6 @@
 import { useId } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
 import {
   getSelectedBranchWorkspacePresentation,
   type BranchWorkspaceRepo,
@@ -9,12 +8,10 @@ import {
 } from '#/web/components/branch-workspace/model.ts'
 import { BranchWorkspaceToolbar } from '#/web/components/branch-workspace/BranchWorkspaceToolbar.tsx'
 import { BranchWorkspaceContent } from '#/web/components/branch-workspace/BranchWorkspaceContent.tsx'
-import { DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
 interface Props {
   repoId: string
-  layout?: RepoWorkspaceLayout
 }
 
 // Keep this equality in sync with fields read by BranchWorkspace children.
@@ -45,8 +42,8 @@ function branchWorkspaceRepoEqual(a: BranchWorkspaceRepo | undefined, b: BranchW
   )
 }
 
-export function BranchWorkspace({ repoId, layout = DEFAULT_WORKSPACE_LAYOUT }: Props) {
-  const detailId = useId()
+export function BranchWorkspace({ repoId }: Props) {
+  const workspacePaneId = useId()
   const repo = useStoreWithEqualityFn(
     useReposStore,
     (s) => {
@@ -90,7 +87,6 @@ export function BranchWorkspace({ repoId, layout = DEFAULT_WORKSPACE_LAYOUT }: P
   if (!repo) return null
 
   const detail = getSelectedBranchWorkspacePresentation(repo)
-  const contentId = `${detailId}-content`
 
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
@@ -100,25 +96,19 @@ export function BranchWorkspace({ repoId, layout = DEFAULT_WORKSPACE_LAYOUT }: P
           repo={repo}
           detail={detail}
           branch={detail.branch}
-          detailId={detailId}
-          contentId={contentId}
-          layout={layout}
+          workspacePaneId={workspacePaneId}
         />
       ) : (
         <>
           <BranchWorkspaceToolbar
             repo={repo}
             detail={detail}
-            detailId={detailId}
-            contentId={contentId}
-            layout={layout}
+            workspacePaneId={workspacePaneId}
           />
           <BranchWorkspaceContent
             repo={repo}
             detail={detail}
-            detailId={detailId}
-            contentId={contentId}
-            layout={layout}
+            workspacePaneId={workspacePaneId}
           />
         </>
       )}
@@ -130,20 +120,18 @@ interface BranchShortcutHandlerProps {
   repo: BranchWorkspaceRepo
   detail: SelectedBranchWorkspacePresentation
   branch: NonNullable<SelectedBranchWorkspacePresentation['branch']>
-  detailId: string
-  contentId: string
-  layout: RepoWorkspaceLayout
+  workspacePaneId: string
 }
 
-function BranchShortcutHandler({ repo, detail, branch, detailId, contentId, layout }: BranchShortcutHandlerProps) {
+function BranchShortcutHandler({ repo, detail, branch, workspacePaneId }: BranchShortcutHandlerProps) {
   const actions = useBranchActionItems(repo, branch)
   useBranchActionShortcutRegistry(actions)
 
   return (
     <>
-      <BranchWorkspaceToolbar repo={repo} detail={detail} detailId={detailId} contentId={contentId} layout={layout} />
+      <BranchWorkspaceToolbar repo={repo} detail={detail} workspacePaneId={workspacePaneId} />
       {actions.dialogs}
-      <BranchWorkspaceContent repo={repo} detail={detail} detailId={detailId} contentId={contentId} layout={layout} />
+      <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId={workspacePaneId} />
     </>
   )
 }

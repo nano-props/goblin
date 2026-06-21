@@ -27,10 +27,8 @@ import { remoteRepoTarget } from '#/web/stores/repos/helpers.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { PROTECTED_BRANCHES, branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import type { SelectedBranchWorkspace } from '#/web/components/branch-workspace/model.ts'
-import type { RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
 interface Props {
   detail: SelectedBranchWorkspace
-  layout: RepoWorkspaceLayout
 }
 
 function SyncValue({

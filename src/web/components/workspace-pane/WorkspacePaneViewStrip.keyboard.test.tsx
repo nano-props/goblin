@@ -79,7 +79,7 @@ describe('WorkspacePaneViewStrip keyboard dnd wiring', () => {
       root!.render(
         <TestWorkspacePaneViewStrip
           worktreeTerminalKey="/repo\0/repo/worktree"
-          detailId="detail"
+          workspacePaneId="workspace"
           panelActive
           sessions={[session({ key: 't1', selected: true })]}
           onNew={() => {}}
@@ -109,7 +109,7 @@ describe('WorkspacePaneViewStrip keyboard dnd wiring', () => {
       root!.render(
         <TestWorkspacePaneViewStrip
           worktreeTerminalKey="/repo\0/repo/worktree"
-          detailId="detail"
+          workspacePaneId="workspace"
           sessions={[
             session({ key: 't1', selected: true }),
             session({ key: 't2', selected: false, terminalId: 'terminal-2', index: 2 }),
@@ -129,7 +129,7 @@ describe('WorkspacePaneViewStrip keyboard dnd wiring', () => {
       expect.objectContaining({ coordinateGetter: expect.any(Function) }),
     )
 
-    const tab = document.body.querySelector('#detail-workspace-pane-view')
+    const tab = document.body.querySelector('#workspace-workspace-pane-view')
     if (!(tab instanceof HTMLButtonElement)) throw new Error('missing terminal view')
 
     act(() => {
@@ -148,7 +148,7 @@ function makeWorkspacePaneViewStrip(
   return function TestWorkspacePaneViewStrip(props: {
     worktreeTerminalKey: string
     sessions: TerminalSessionSummary[]
-    detailId: string
+    workspacePaneId: string
     panelActive?: boolean
     onNew: () => void
     onSelect: (worktreeTerminalKey: string, tab: WorkspacePaneViewSummary) => void

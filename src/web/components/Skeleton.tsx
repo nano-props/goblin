@@ -48,7 +48,7 @@ export function RepoWorkspaceSkeleton({
 }: WorkspaceSkeletonProps) {
   const branchWorkspacePane = (
     <RepoWorkspacePane>
-      <BranchWorkspaceSkeleton layout={layout} />
+      <BranchWorkspaceSkeleton />
     </RepoWorkspacePane>
   )
   const branchNavigatorPane = (
@@ -73,10 +73,10 @@ export function RepoWorkspaceSkeleton({
   )
 }
 
-export function BranchWorkspaceSkeleton({ layout = DEFAULT_WORKSPACE_LAYOUT }: { layout?: RepoWorkspaceLayout }) {
+export function BranchWorkspaceSkeleton() {
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
-      <Toolbar variant="detail">
+      <Toolbar variant="workspace">
         <div className="flex min-w-0 flex-1 items-center gap-1">
           <div className="flex shrink-0 gap-1">
             <Skeleton className="h-7 w-20" />

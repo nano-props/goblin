@@ -23,9 +23,7 @@ import { emptyRendererBridgeBootstrap, setRendererBridgeForTests } from '#/web/r
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
-import { DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
-import type { RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
 
 let compactUi = false
 
@@ -94,10 +92,10 @@ describe('BranchWorkspaceToolbar', () => {
 
     const tabs = Array.from(c.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [])
     expect(tabs).toHaveLength(1)
-    expect(tabs[0]?.id).toBe('detail-status-tab')
+    expect(tabs[0]?.id).toBe('workspace-status-tab')
     expect(tabs[0]?.textContent).toBe('tab.status')
-    expect(tabs[0]?.getAttribute('aria-controls')).toBe('detail-status-panel')
-    expect(c.querySelector('#detail-workspace-pane-view-empty')).toBeNull()
+    expect(tabs[0]?.getAttribute('aria-controls')).toBe('workspace-status-panel')
+    expect(c.querySelector('#workspace-workspace-pane-view-empty')).toBeNull()
     expect(c.querySelector('button[aria-label="terminal.new"]')).toBeNull()
 
     act(() => {
@@ -112,17 +110,17 @@ describe('BranchWorkspaceToolbar', () => {
     const { container: c } = renderToolbar({ terminalCount: 0, changeCount: 3, navigation: navigationWith({}) })
 
     const tabs = Array.from(c.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [])
-    expect(tabs.map((tab) => tab.id)).toEqual(['detail-status-tab'])
+    expect(tabs.map((tab) => tab.id)).toEqual(['workspace-status-tab'])
     // The empty state is a plus icon button — no text label, just an aria-label/tooltip
     // describing the action. `useT` is mocked to return the key string, so checking that
     // textContent does not contain "terminal.label" guards against regressing back to
     // the old text-only button that rendered `t('terminal.label')` as its label.
-    const emptyButton = c.querySelector<HTMLButtonElement>('#detail-workspace-pane-view-empty')
+    const emptyButton = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-view-empty')
     expect(emptyButton).not.toBeNull()
     expect(emptyButton?.textContent ?? '').not.toContain('terminal.label')
     expect(emptyButton?.getAttribute('aria-label')).toBe('terminal.new')
     expect(emptyButton?.getAttribute('title')).toBe('terminal.new')
-    expect(c.querySelector('#detail-workspace-pane-view')).toBeNull()
+    expect(c.querySelector('#workspace-workspace-pane-view')).toBeNull()
     expect(c.querySelector('[data-workspace-pane-view-tooltip-id="status:status"]')).not.toBeNull()
     expect(c.querySelector('[data-workspace-pane-view-tooltip-id="changes:changes"]')).toBeNull()
   })
@@ -136,8 +134,8 @@ describe('BranchWorkspaceToolbar', () => {
     const tablist = c.querySelector('[role="tablist"][aria-label="workspace-pane-views.tabs"]')
     expect(tablist).not.toBeNull()
     expect(c.querySelectorAll('[role="tablist"][aria-label="workspace-pane-views.tabs"]')).toHaveLength(1)
-    expect(tablist?.querySelector('#detail-status-tab')).not.toBeNull()
-    expect(tablist?.querySelector('#detail-workspace-pane-view')).not.toBeNull()
+    expect(tablist?.querySelector('#workspace-status-tab')).not.toBeNull()
+    expect(tablist?.querySelector('#workspace-workspace-pane-view')).not.toBeNull()
 
     const statusChrome = c.querySelector('[data-workspace-pane-view-tooltip-id="status:status"]')
     expect(statusChrome?.querySelector(':scope > .pointer-events-none.border-r.border-separator')).not.toBeNull()
@@ -189,7 +187,7 @@ describe('BranchWorkspaceToolbar', () => {
     })
 
     expect(c.querySelectorAll('[role="tab"]')).toHaveLength(1)
-    expect(c.querySelector('#detail-status-tab')).toBeNull()
+    expect(c.querySelector('#workspace-status-tab')).toBeNull()
 
     const trigger = c.querySelector<HTMLButtonElement>('button[aria-label="workspace-pane-views.tabs"]')
     if (!trigger) throw new Error('missing workspace view popover trigger')
@@ -312,7 +310,7 @@ describe('BranchWorkspaceToolbar', () => {
     expect(mocks.selectTerminal).toHaveBeenCalledWith(`${REPO_ID}\0${WORKTREE_PATH}`, 't2')
   })
 
-  test('does not show branch actions in the detail bar (actions moved to branch rows)', () => {
+  test('does not show branch actions in the workspace bar (actions moved to branch rows)', () => {
     const { container: c } = renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({}),
@@ -331,7 +329,7 @@ describe('BranchWorkspaceToolbar', () => {
       navigation: navigationWith({ showRepoWorkspacePaneView }),
     })
 
-    const terminalTab = c.querySelector<HTMLButtonElement>('#detail-workspace-pane-view')
+    const terminalTab = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-view')
     expect(terminalTab).not.toBeNull()
 
     act(() => {
@@ -340,7 +338,7 @@ describe('BranchWorkspaceToolbar', () => {
     await flush()
 
     expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
-    expect(document.activeElement?.id).toBe('detail-workspace-pane-view')
+    expect(document.activeElement?.id).toBe('workspace-workspace-pane-view')
   })
 
   test('moves focus across opened status, changes, and terminal views with keyboard navigation', async () => {
@@ -352,9 +350,9 @@ describe('BranchWorkspaceToolbar', () => {
       navigation: navigationWith({ showRepoWorkspacePaneView }),
     })
 
-    const statusTab = c.querySelector<HTMLButtonElement>('#detail-status-tab')
-    const changesTab = c.querySelector<HTMLButtonElement>('#detail-workspace-pane-view')
-    const terminalTab = c.querySelector<HTMLButtonElement>('#detail-workspace-pane-view-1')
+    const statusTab = c.querySelector<HTMLButtonElement>('#workspace-status-tab')
+    const changesTab = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-view')
+    const terminalTab = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-view-1')
     if (!statusTab || !changesTab || !terminalTab) throw new Error('missing branch workspace pane views')
 
     act(() => {
@@ -389,8 +387,8 @@ describe('BranchWorkspaceToolbar', () => {
     })
 
     expect(c.querySelector('[data-workspace-pane-view-tooltip-id="changes:changes"]')).toBeNull()
-    const statusTab = c.querySelector<HTMLButtonElement>('#detail-status-tab')
-    const terminalTab = c.querySelector<HTMLButtonElement>('#detail-workspace-pane-view')
+    const statusTab = c.querySelector<HTMLButtonElement>('#workspace-status-tab')
+    const terminalTab = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-view')
     if (!statusTab || !terminalTab) throw new Error('missing branch workspace pane views')
 
     act(() => {
@@ -446,7 +444,7 @@ describe('BranchWorkspaceToolbar', () => {
     // The skeleton marker is present; the real button is not.
     expect(c.querySelector('[data-workspace-pane-skeleton-strip=""]')).not.toBeNull()
     expect(c.querySelectorAll('[data-workspace-pane-skeleton-chip=""]')).toHaveLength(1)
-    expect(c.querySelector('#detail-workspace-pane-view')).toBeNull()
+    expect(c.querySelector('#workspace-workspace-pane-view')).toBeNull()
     // role="status" + aria-busy for assistive tech.
     const strip = c.querySelector('[role="status"][aria-busy="true"]')
     expect(strip).not.toBeNull()
@@ -457,7 +455,7 @@ describe('BranchWorkspaceToolbar', () => {
     useRepoSyncStore.getState().markReady(REPO_ID, 0)
     await flush()
     expect(c.querySelector('[data-workspace-pane-skeleton-strip=""]')).toBeNull()
-    expect(c.querySelector('#detail-workspace-pane-view-empty')).not.toBeNull()
+    expect(c.querySelector('#workspace-workspace-pane-view-empty')).not.toBeNull()
   })
 })
 
@@ -469,14 +467,13 @@ function renderToolbar(options: {
   staticWorkspaceViewTypes?: WorkspacePaneStaticViewType[]
   worktree?: boolean
   collapsed?: boolean
-  layout?: RepoWorkspaceLayout
   /**
    * T6.1: when true, do NOT mark the repo ready before mounting.
    * The toolbar reads `isInitialSyncInFlight` from the store and
    * renders the single-skeleton-chip loading state instead of the
    * "+ New" button. The T6.1 test uses this; all other tests use
    * the default (false) so the existing assertions still find
-   * `#detail-workspace-pane-view-empty`.
+   * `#workspace-workspace-pane-view-empty`.
    */
   loading?: boolean
 }): {
@@ -614,9 +611,7 @@ function renderToolbar(options: {
               <BranchWorkspaceToolbar
                 repo={repo}
                 detail={detail}
-                detailId="detail"
-                contentId="content"
-                layout={options.layout ?? DEFAULT_WORKSPACE_LAYOUT}
+                workspacePaneId="workspace"
               />
             </TerminalSessionReadContext.Provider>
           </TerminalSessionContext.Provider>
@@ -626,7 +621,9 @@ function renderToolbar(options: {
   })
 
   const tabSelector =
-    options.worktree === false ? '#detail-status-tab' : '#detail-workspace-pane-view-empty, #detail-workspace-pane-view'
+    options.worktree === false
+      ? '#workspace-status-tab'
+      : '#workspace-workspace-pane-view-empty, #workspace-workspace-pane-view'
   const tab = container.querySelector<HTMLButtonElement>(tabSelector)
   if (!tab && !options.loading) throw new Error('missing terminal view')
   return {

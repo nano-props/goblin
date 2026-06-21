@@ -63,7 +63,7 @@ export function RepoView({ repoId }: Props) {
 
   const branchWorkspacePane = (
     <RepoWorkspacePane>
-      <BranchWorkspace repoId={repoId} layout={layout} />
+      <BranchWorkspace repoId={repoId} />
     </RepoWorkspacePane>
   )
   const branchNavigatorPane = (
