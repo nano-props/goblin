@@ -225,6 +225,8 @@ export const en = {
   'workspace-pane-views.empty': 'No workspace pane view open',
   'workspace-pane-views.close-named': 'Close {name}',
   'workspace-pane-views.changes-tooltip': '{count} file changes',
+  'workspace-pane-views.status-tooltip': 'Status · {branch}',
+  'workspace-pane-views.history-tooltip': 'History · {branch}',
   'tab.local-only': 'local only',
   'tab.local-only-title': 'This repository has no remotes; remote sync and PR checks are skipped.',
   'tab.fetch-failed': 'fetch failed',

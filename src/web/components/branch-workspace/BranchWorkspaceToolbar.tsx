@@ -27,6 +27,7 @@ import {
   branchLevelWorkspacePaneViewDefinition,
   branchLevelWorkspacePaneViewCloseLabel,
   branchLevelWorkspacePaneViewLabel,
+  branchLevelWorkspacePaneViewTooltip,
   branchWorkspacePaneViewCloseLabel,
   branchWorkspacePaneViewLabel,
   branchWorkspacePaneViewTooltip,
@@ -204,16 +205,26 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
     (tab: WorkspacePaneViewSummary) =>
       branchWorkspacePaneViewTooltip({
         tab,
-        branchName: detail.branch?.name ?? '',
+        branchName: branchName ?? '',
         statusCount: detail.statusCount,
         t,
       }),
-    [detail.branch?.name, detail.statusCount, t],
+    [branchName, detail.statusCount, t],
   )
   const closeLabelForWorkspacePaneView = useCallback(
     (tab: WorkspacePaneViewSummary) => branchWorkspacePaneViewCloseLabel(tab, t),
     [t],
   )
+  const tooltipForBranchLevelPaneView = useCallback(
+    (tab: WorkspacePaneBranchViewType) =>
+      branchLevelWorkspacePaneViewTooltip({
+        tab,
+        branchName: branchName ?? '',
+        t,
+      }),
+    [branchName, t],
+  )
+
   const workspacePaneTabItems = useMemo<WorkspacePaneTabItem[]>(
     () => [
       ...(showBranchLevelTabs && !terminalWorktreeKey
@@ -222,7 +233,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
             return createBranchWorkspacePaneTabItem({
               type: tab.type,
               label,
-              tooltip: label,
+              tooltip: tooltipForBranchLevelPaneView(tab.type),
               closeLabel: branchLevelWorkspacePaneViewCloseLabel(tab.type, t),
               panelId: `${workspacePaneId}-${tab.type}-panel`,
             })
@@ -245,6 +256,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
       showBranchLevelTabs,
       terminalWorktreeKey,
       t,
+      tooltipForBranchLevelPaneView,
       tooltipForWorkspacePaneView,
       workspacePaneId,
       worktreeWorkspacePaneViews,

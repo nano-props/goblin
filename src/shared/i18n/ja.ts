@@ -220,6 +220,8 @@ export const ja: Record<DictKey, string> = {
   'workspace-pane-views.empty': '開いているワークスペースビューはありません',
   'workspace-pane-views.close-named': '{name} を閉じる',
   'workspace-pane-views.changes-tooltip': '{count} 件のファイル変更',
+  'workspace-pane-views.status-tooltip': 'ステータス · {branch}',
+  'workspace-pane-views.history-tooltip': '履歴 · {branch}',
   'tab.local-only': 'ローカルのみ',
   'tab.local-only-title': 'このリポジトリにはリモートがありません。リモート同期と PR チェックをスキップします。',
   'tab.fetch-failed': 'fetch 失敗',

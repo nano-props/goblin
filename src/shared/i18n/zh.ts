@@ -205,6 +205,8 @@ export const zh: Record<DictKey, string> = {
   'workspace-pane-views.empty': '没有打开的工作区视图',
   'workspace-pane-views.close-named': '关闭{name}',
   'workspace-pane-views.changes-tooltip': '{count} 个文件变更',
+  'workspace-pane-views.status-tooltip': '状态 · {branch}',
+  'workspace-pane-views.history-tooltip': '历史 · {branch}',
   'tab.local-only': '仅本地',
   'tab.local-only-title': '这个仓库没有配置远端；会跳过远端同步和 PR 检查。',
   'tab.fetch-failed': '同步失败',

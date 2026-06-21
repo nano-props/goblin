@@ -873,7 +873,7 @@ function WorkspacePaneViewTooltipLayer({ items, children, ...props }: WorkspaceP
       attributeName="data-workspace-pane-view-tooltip-id"
       getItemId={(item) => item.identity}
       renderTooltip={(item) => <div className="truncate text-xs font-semibold text-foreground">{item.tooltip}</div>}
-      placement="top-start"
+      placement="bottom-start"
       delayMs={500}
       tooltipClassName="px-3 py-2"
       asChild

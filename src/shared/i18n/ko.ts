@@ -213,6 +213,8 @@ export const ko: Record<DictKey, string> = {
   'workspace-pane-views.empty': '열린 워크스페이스 보기가 없습니다',
   'workspace-pane-views.close-named': '{name} 닫기',
   'workspace-pane-views.changes-tooltip': '파일 변경 {count}개',
+  'workspace-pane-views.status-tooltip': '상태 · {branch}',
+  'workspace-pane-views.history-tooltip': '기록 · {branch}',
   'tab.local-only': '로컬 전용',
   'tab.local-only-title': '이 리포지토리에는 원격이 없습니다. 원격 동기화와 PR 확인을 건너뜁니다.',
   'tab.fetch-failed': '동기화 실패',

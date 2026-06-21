@@ -47,17 +47,38 @@ export function branchWorkspacePaneViewLabel(tab: WorkspacePaneViewSummary, t: T
   return tab.type
 }
 
+function branchScopedViewTooltip(input: {
+  kind: 'status' | 'history'
+  branchName: string
+  t: T
+}): string {
+  const fallbackKey = input.kind === 'status' ? 'tab.status' : 'tab.log'
+  if (!input.branchName) return input.t(fallbackKey)
+  return input.t(`workspace-pane-views.${input.kind}-tooltip`, { branch: input.branchName })
+}
+
 export function branchWorkspacePaneViewTooltip(input: {
   tab: WorkspacePaneViewSummary
   branchName: string
   statusCount: number
   t: T
 }): string {
-  if (input.tab.type === 'status') return input.t('tab.status')
-  if (input.tab.type === 'history') return input.t('tab.log')
+  if (input.tab.type === 'status') return branchScopedViewTooltip({ kind: 'status', ...input })
+  if (input.tab.type === 'history') return branchScopedViewTooltip({ kind: 'history', ...input })
   if (input.tab.type === 'changes') return input.t('workspace-pane-views.changes-tooltip', { count: input.statusCount })
   if (isTerminalWorkspacePaneView(input.tab)) return input.tab.originalTitle ?? input.tab.fullTitle ?? input.tab.title
   return input.tab.type
+}
+
+export function branchLevelWorkspacePaneViewTooltip(input: {
+  tab: BranchLevelWorkspacePaneView
+  branchName: string
+  t: T
+}): string {
+  if (input.tab === 'status') return branchScopedViewTooltip({ kind: 'status', ...input })
+  if (input.tab === 'history') return branchScopedViewTooltip({ kind: 'history', ...input })
+  const exhaustive: never = input.tab
+  return exhaustive
 }
 
 export function branchWorkspacePaneViewCloseLabel(tab: WorkspacePaneViewSummary, t: T): string {
