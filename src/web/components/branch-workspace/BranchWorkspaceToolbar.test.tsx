@@ -258,6 +258,38 @@ describe('BranchWorkspaceToolbar', () => {
     expect(document.body.textContent).toContain('terminal.new')
   })
 
+  test('puts compact back at the start of the workspace tab row with a separator', () => {
+    compactUi = true
+    const { container: c } = renderToolbar({
+      terminalCount: 1,
+      workspacePaneView: 'terminal',
+      navigation: navigationWith({}),
+    })
+
+    const back = c.querySelector<HTMLButtonElement>('button[aria-label="workspace.back-to-branch-navigator"]')
+    const tablist = c.querySelector('[role="tablist"][aria-label="workspace-pane-views.tabs"]')
+    const leadingAction = back?.parentElement
+    const compactTab = tablist?.querySelector('[data-workspace-pane-view-tooltip-id]')
+    const separator = () => leadingAction?.querySelector(':scope > .pointer-events-none.border-r.border-separator')
+    expect(back).not.toBeNull()
+    expect(tablist).not.toBeNull()
+    expect(leadingAction?.parentElement?.firstElementChild).toBe(leadingAction)
+    expect(leadingAction?.nextElementSibling).toBe(tablist)
+    expect(separator()).not.toBeNull()
+
+    act(() => {
+      compactTab?.dispatchEvent(new MouseEvent('pointerover', { bubbles: true }))
+    })
+
+    expect(separator()).toBeNull()
+
+    act(() => {
+      back?.click()
+    })
+
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBeNull()
+  })
+
   test('compact workspace view shows terminal sync loading before offering new terminal', () => {
     compactUi = true
     const { container: c } = renderToolbar({

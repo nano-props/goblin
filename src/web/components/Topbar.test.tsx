@@ -128,7 +128,7 @@ describe('Topbar', () => {
     expect(useReposStore.getState().repos['/tmp/repo']?.ui.selectedBranch).toBe('feature/a')
   })
 
-  test('renders branch workspace back before repo tabs on compact screens without Focus Mode', () => {
+  test('does not render branch workspace back in the topbar on compact screens', () => {
     responsiveMocks.compact = true
     seedRepoState({
       id: '/tmp/repo',
@@ -142,18 +142,10 @@ describe('Topbar', () => {
       </Topbar>,
     )
 
-    const back = branchWorkspaceBackButton()
     const repoTabs = container?.querySelector('[data-testid="repo-tabs"]')
-    expect(back).not.toBeNull()
-    expect(back?.nextElementSibling?.className).toContain('bg-separator')
-    expect(back?.nextElementSibling?.nextElementSibling).toBe(repoTabs)
-
-    act(() => {
-      back?.click()
-    })
-
-    expect(useReposStore.getState().workspaceFocused).toBe(false)
-    expect(useReposStore.getState().repos['/tmp/repo']?.ui.selectedBranch).toBeNull()
+    expect(branchWorkspaceBackButton()).toBeNull()
+    expect(repoTabs).not.toBeNull()
+    expect(useReposStore.getState().repos['/tmp/repo']?.ui.selectedBranch).toBe('feature/a')
   })
 
   test('hides branch workspace back on large screens outside Focus Mode', () => {

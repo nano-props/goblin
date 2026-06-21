@@ -1,5 +1,13 @@
 import { Check, ChevronDown, FileText, GitBranch, History, Loader2, Plus, Terminal, X } from 'lucide-react'
-import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ComponentPropsWithoutRef } from 'react'
+import {
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentPropsWithoutRef,
+  type ReactNode,
+} from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
@@ -47,6 +55,7 @@ interface WorkspacePaneViewStripProps {
   responsiveCompact?: boolean
   activeTabIdentity: string | null
   panelActive?: boolean
+  leadingAction?: ReactNode
   focusRegistry?: FocusRegistry<string, HTMLButtonElement>
   emptyFocusKey?: string
   /**
@@ -147,6 +156,8 @@ export function createWorktreeWorkspacePaneTabItem(input: {
 export const EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY = '__workspace-pane-empty__'
 
 const WORKSPACE_PANE_VIEW_TOOLTIP_SELECTOR = '[data-workspace-pane-view-tooltip-id]'
+const WORKSPACE_PANE_LEADING_ACTION_ID = '__workspace-pane-leading-action__'
+const WORKSPACE_PANE_COMPACT_TRAILING_ACTION_ID = '__workspace-pane-compact-trailing-action__'
 const WORKSPACE_PANE_NEW_ACTION_ID = '__workspace-pane-new-action__'
 
 function shouldShowWorkspacePaneViewSeparator({
@@ -294,6 +305,7 @@ export function WorkspacePaneViewStrip({
   activeTabIdentity,
   responsiveCompact,
   panelActive,
+  leadingAction,
   focusRegistry: externalFocusRegistry,
   emptyFocusKey = EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY,
   isLoading = false,
@@ -517,8 +529,25 @@ export function WorkspacePaneViewStrip({
   if (!selectedItem) return null
 
   function renderCompactTabsBody() {
+    // Compact tabs intentionally use muted chrome even when selected, so
+    // selection should not suppress separators; hover still does.
+    const compactActiveVisualIdentity = null
+
     return (
       <ToolbarTabStripBody className="flex-1">
+        {leadingAction && (
+          <WorkspacePaneLeadingAction
+            showSeparator={shouldShowWorkspacePaneViewSeparator({
+              leftId: WORKSPACE_PANE_LEADING_ACTION_ID,
+              rightId: selectedItem.identity,
+              activeId: compactActiveVisualIdentity,
+              hoveredId: hoveredTabIdentity,
+            })}
+            onHoverChange={setHoveredTabIdentity}
+          >
+            {leadingAction}
+          </WorkspacePaneLeadingAction>
+        )}
         <WorkspacePaneViewTooltipLayer
           items={items}
           role="tablist"
@@ -540,11 +569,13 @@ export function WorkspacePaneViewStrip({
             onKeyDown={handleTabKeyDown}
             t={t}
             compact={showCollapsedTabs}
-            // The compact tab is always rendered with the muted chrome
-            // (matching an unselected tab on the expanded strip), so its
-            // right edge needs the same separator that the expanded strip
-            // draws next to idle tabs.
-            showSeparator
+            showSeparator={shouldShowWorkspacePaneViewSeparator({
+              leftId: selectedItem.identity,
+              rightId: WORKSPACE_PANE_COMPACT_TRAILING_ACTION_ID,
+              activeId: compactActiveVisualIdentity,
+              hoveredId: hoveredTabIdentity,
+            })}
+            onHoverChange={setHoveredTabIdentity}
           />
         </WorkspacePaneViewTooltipLayer>
         {isLoading && !hasTerminalItems && canCreateNew ? (
@@ -577,6 +608,19 @@ export function WorkspacePaneViewStrip({
         onDragEnd={handleDragEnd}
       >
         <ToolbarTabStripBody scroll>
+          {leadingAction && (
+            <WorkspacePaneLeadingAction
+              showSeparator={shouldShowWorkspacePaneViewSeparator({
+                leftId: WORKSPACE_PANE_LEADING_ACTION_ID,
+                rightId: items[0]?.identity,
+                activeId: activeVisualIdentity,
+                hoveredId: hoveredTabIdentity,
+              })}
+              onHoverChange={setHoveredTabIdentity}
+            >
+              {leadingAction}
+            </WorkspacePaneLeadingAction>
+          )}
           <SortableContext items={sortableIds} strategy={horizontalListSortingStrategy}>
             <WorkspacePaneViewTooltipLayer items={items} role="tablist" aria-label={t('workspace-pane-views.tabs')}>
               {items.map((item, index) => {
@@ -662,6 +706,29 @@ interface WorkspacePaneViewProps {
   compact?: boolean
   showSeparator?: boolean
   onHoverChange?: (identity: string | null) => void
+}
+
+function WorkspacePaneLeadingAction({
+  children,
+  showSeparator,
+  onHoverChange,
+}: {
+  children: ReactNode
+  showSeparator: boolean
+  onHoverChange: (identity: string | null) => void
+}) {
+  return (
+    <div
+      className="relative flex h-7 shrink-0 items-center pr-1"
+      onPointerEnter={() => onHoverChange(WORKSPACE_PANE_LEADING_ACTION_ID)}
+      onPointerLeave={() => onHoverChange(null)}
+    >
+      {children}
+      {showSeparator && (
+        <span className="pointer-events-none absolute right-0 top-1/2 h-4 -translate-y-1/2 border-r border-separator" />
+      )}
+    </div>
+  )
 }
 
 function WorkspacePaneLoadingIndicator({

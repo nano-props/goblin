@@ -1,7 +1,7 @@
 // Top app bar with embedded tab strip, a per-repo actions group,
 // a large-screen Focus Mode toggle, and a global settings button.
-//   • left-side navigation control — compact navigation keeps the branch
-//     workspace back action here; large screens use this slot for Focus Mode.
+//   • left-side navigation control — large screens use this slot for
+//     Focus Mode; compact branch workspace back lives with workspace tabs.
 //   • tab strip (children) — repo tabs + the "open new repo"
 //     popover + the "more" overflow.
 //   • repo actions (when `repoId` is set) — Refresh, the worktree
@@ -9,9 +9,7 @@
 //     live in a dedicated RepoToolbar above the branch navigator; they
 //     moved up here so the workspace's vertical chrome collapses
 //     to the branch navigator and workspace pane.
-//   • Focus Mode toggle — hidden in compact mode, because compact
-//     navigation uses the same topbar slot to return from Branch Workspace
-//     to Branch Navigator.
+//   • Focus Mode toggle — hidden in compact mode.
 //   • Settings button (always shown) — navigates to the app
 //     settings page.
 //
@@ -25,7 +23,7 @@
 // (set globally on `button` and any element with `data-interactive`).
 
 import type { ReactNode } from 'react'
-import { ArrowLeft, PanelLeft, Settings } from 'lucide-react'
+import { PanelLeft, Settings } from 'lucide-react'
 import { useT } from '#/web/stores/i18n.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { RepoToolbarActions } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
@@ -44,30 +42,12 @@ interface Props {
 
 export function Topbar({ onOpenSettings, repoId, children }: Props) {
   const compact = useIsCompactUi()
-  const t = useT()
-  const selectedBranch = useReposStore((s) => (compact && repoId ? (s.repos[repoId]?.ui.selectedBranch ?? null) : null))
-  const clearSelectedBranch = useReposStore((s) => s.clearSelectedBranch)
-  const showBranchWorkspaceBack = !!repoId && !!selectedBranch && compact
   const showFocusToggle = !!repoId && !compact
   return (
     <div
       className="topbar relative flex items-center gap-2 border-b border-separator bg-background text-sm"
       style={{ height: WINDOW_TOPBAR_HEIGHT_PX }}
     >
-      {showBranchWorkspaceBack && (
-        <>
-          <Button
-            variant="ghost"
-            size="icon-lg"
-            onClick={() => clearSelectedBranch(repoId)}
-            aria-label={t('workspace.back-to-branch-navigator')}
-            title={t('workspace.back-to-branch-navigator')}
-          >
-            <ArrowLeft />
-          </Button>
-          <div aria-hidden="true" className="h-5 w-px shrink-0 bg-separator" />
-        </>
-      )}
       {showFocusToggle && (
         <>
           <WorkspaceFocusToggle />

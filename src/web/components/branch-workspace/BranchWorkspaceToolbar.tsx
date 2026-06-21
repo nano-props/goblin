@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo } from 'react'
+import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '#/web/stores/i18n.ts'
 import { Toolbar } from '#/web/components/Layout.tsx'
+import { Button } from '#/web/components/ui/button.tsx'
+import { Tip } from '#/web/components/Tip.tsx'
 import { terminalLog } from '#/web/logger.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import { useWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-store.ts'
@@ -50,6 +53,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
   const t = useT()
   const navigation = useMainWindowNavigation()
   const compact = useIsCompactUi()
+  const clearSelectedBranch = useReposStore((s) => s.clearSelectedBranch)
   const effectiveTab = useEffectiveWorkspacePaneView(repo)
   // T6.1: while the first server-side session list for this repo is
   // in flight, render skeleton placeholder chips in the tab strip.
@@ -338,6 +342,23 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
   // No selected branch means there is no tab/action target; BranchWorkspaceContent renders the empty state.
   if (!detail.branch) return null
 
+  const backLabel = t('workspace.back-to-branch-navigator')
+  const handleBackToBranchNavigator = () => clearSelectedBranch(repo.id)
+  const branchWorkspaceBackAction = compact ? (
+    <Tip label={backLabel}>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7 shrink-0"
+        onClick={handleBackToBranchNavigator}
+        aria-label={backLabel}
+        title={backLabel}
+      >
+        <ArrowLeft size={14} />
+      </Button>
+    </Tip>
+  ) : null
+
   return (
     <Toolbar variant="workspace">
       <div className="flex h-full min-w-0 flex-1 items-center gap-1 overflow-hidden">
@@ -349,6 +370,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
             activeTabIdentity={activeTabIdentity}
             responsiveCompact={compact}
             panelActive
+            leadingAction={branchWorkspaceBackAction}
             focusRegistry={workspacePaneTabFocusRegistry}
             emptyFocusKey={EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY}
             // T6.1: while the first server-side session list is in
