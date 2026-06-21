@@ -19,7 +19,7 @@ interface RepoTabTooltipLayerProps extends ComponentPropsWithoutRef<'div'> {
   delayMs?: number
 }
 
-const REPO_TAB_TOOLTIP_DELAY_MS = 200
+const REPO_TAB_TOOLTIP_DELAY_MS = 100
 
 const REPO_TAB_TOOLTIP_SELECTOR = '[data-repo-tab-tooltip-id]'
 
