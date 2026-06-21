@@ -2,6 +2,7 @@ import { getBackgroundSyncRepos, setBackgroundSyncRepos } from '#/server/modules
 import { serverRepoNodeLog } from '#/node/logger.ts'
 import {
   getRepositoryComposite,
+  getRepositoryLog,
   getRepositoryPatch,
   getRepositoryPullRequests,
   getRepositorySnapshot,
@@ -26,6 +27,8 @@ import {
 import { getServerFetchIntervalSec } from '#/server/modules/settings-source.ts'
 import { createRouteApp, parseHttpBody, parseHttpQuery } from '#/server/common/http-validate.ts'
 import { REPO_PROCEDURE_SCHEMAS, REPO_QUERY_SCHEMAS } from '#/shared/procedure-schemas.ts'
+import type { RepositoryLogResponse } from '#/shared/api-types.ts'
+import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 
 // Soft-fail envelope returned by `jsonOr` for every repo action that
 // doesn't have a more specific success shape. Keep this in one place
@@ -55,6 +58,21 @@ export function createRepoRoutes() {
   app.get('/status', async (c) => {
     const { cwd } = parseHttpQuery(REPO_QUERY_SCHEMAS.status, c)
     return c.json(await jsonOr(() => getRepositoryStatus(cwd, c.req.raw.signal), [], 'status'))
+  })
+  app.get('/log', async (c) => {
+    const { cwd, branch, count, skip } = parseHttpQuery(REPO_QUERY_SCHEMAS.log, c)
+    return c.json(
+      await jsonOr<RepositoryLogResponse>(
+        () =>
+          getRepositoryLog(cwd, branch, {
+            count: count ?? DEFAULT_REPOSITORY_LOG_COUNT,
+            skip: skip ?? 0,
+            signal: c.req.raw.signal,
+          }),
+        READ_REPO_ERROR,
+        'log',
+      ),
+    )
   })
   app.post('/remote-branches', async (c) => {
     const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.getRemoteBranches, c)

@@ -6,6 +6,7 @@ import path from 'node:path'
 import { execa, ExecaError } from 'execa'
 import { FIELD_SEP } from '#/system/git/parsers.ts'
 import { shellQuote } from '#/system/remote-shell.ts'
+import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 
@@ -230,11 +231,12 @@ function scriptForCommand(command: RemoteCommandKind): string {
     case 'gitStatus':
       return `git -C ${shellQuote(command.path)} status --porcelain -z`
     case 'gitLog': {
-      const count = Math.max(1, Math.min(1000, Math.floor(command.count ?? 100)))
+      const count = Math.max(1, Math.min(1000, Math.floor(command.count ?? DEFAULT_REPOSITORY_LOG_COUNT)))
       const skip = Math.max(0, Math.floor(command.skip ?? 0))
-      const format = ['%H', '%h', '%s', '%an', '%aI'].join(FIELD_SEP)
+      const format = ['%H', '%h', '%D', '%s', '%an', '%aI'].join(FIELD_SEP)
       return [
         `git -C ${shellQuote(command.path)} log`,
+        '--decorate=short',
         `--format=${shellQuote(format)}`,
         `--max-count=${count}`,
         `--skip=${skip}`,

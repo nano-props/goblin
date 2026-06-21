@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { replaceRepo } from '#/web/stores/repos/helpers.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
-import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneBranchViewType, WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import {
   createRepoBranch as branch,
   installGoblinTestBridge,
@@ -10,10 +10,7 @@ import {
   seedRepoState,
 } from '#/web/stores/repos/test-utils.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
-import {
-  DEFAULT_WORKSPACE_FOCUSED,
-  DEFAULT_WORKSPACE_PANE_SIZES,
-} from '#/shared/workspace-layout.ts'
+import { DEFAULT_WORKSPACE_FOCUSED, DEFAULT_WORKSPACE_PANE_SIZES } from '#/shared/workspace-layout.ts'
 const REPO_ID = '/tmp/gbl-selection-test-repo'
 const ipcHandlers: Record<string, (input: any) => unknown> = {}
 
@@ -21,6 +18,7 @@ function seedRepo(options: {
   selectedBranch?: string | null
   currentBranch?: string
   workspacePaneView?: WorkspacePaneView
+  openBranchWorkspacePaneViews?: WorkspacePaneBranchViewType[]
   branches?: BranchSnapshotInfo[]
 }) {
   seedRepoState({
@@ -33,6 +31,7 @@ function seedRepo(options: {
     currentBranch: options.currentBranch ?? 'main',
     selectedBranch: options.selectedBranch === undefined ? 'feature/plain' : options.selectedBranch,
     workspacePaneView: options.workspacePaneView ?? 'status',
+    openBranchWorkspacePaneViews: options.openBranchWorkspacePaneViews,
     remote: {
       remotes: ['origin'],
       hasRemotes: true,
@@ -295,6 +294,23 @@ describe('setWorkspacePaneView', () => {
     expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual(['status'])
   })
 
+  test('opens restored branch-level history during session restore', () => {
+    seedRepo({ selectedBranch: 'main', workspacePaneView: 'status', openBranchWorkspacePaneViews: ['status'] })
+
+    useReposStore.getState().applySessionWorkspacePaneViewByRepo({ [REPO_ID]: 'history' })
+
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('history')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual(['status', 'history'])
+  })
+
+  test('reopens restored branch-level history even when it was already preferred', () => {
+    seedRepo({ selectedBranch: 'main', workspacePaneView: 'history', openBranchWorkspacePaneViews: ['status'] })
+
+    useReposStore.getState().applySessionWorkspacePaneViewByRepo({ [REPO_ID]: 'history' })
+
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual(['status', 'history'])
+  })
+
   test('opens and closes branch-level workspace pane views independently of branch selection', () => {
     seedRepo({ selectedBranch: 'main', workspacePaneView: 'status' })
 
@@ -305,6 +321,23 @@ describe('setWorkspacePaneView', () => {
     useReposStore.getState().openBranchWorkspacePaneView(REPO_ID, 'status')
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBe('main')
     expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual(['status'])
+  })
+
+  test('reorders branch-level workspace pane views without changing the open set', () => {
+    seedRepo({
+      selectedBranch: 'main',
+      workspacePaneView: 'history',
+      openBranchWorkspacePaneViews: ['status', 'history'],
+    })
+
+    useReposStore.getState().reorderBranchWorkspacePaneViews(REPO_ID, ['history', 'status'])
+
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual(['history', 'status'])
+
+    const before = useReposStore.getState().repos[REPO_ID]
+    useReposStore.getState().reorderBranchWorkspacePaneViews(REPO_ID, ['history'])
+    useReposStore.getState().reorderBranchWorkspacePaneViews(REPO_ID, ['history', 'history'])
+    expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
   })
 
   test('persists the changes tab immediately', async () => {
@@ -383,7 +416,6 @@ describe('workspace pane layout state', () => {
       workspacePaneSizes: { 'left-right': 45 },
     })
   })
-
 })
 
 describe('setWorkspaceFocused', () => {

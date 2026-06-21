@@ -9,13 +9,7 @@ import {
   normalizeWorkspacePaneSizes,
   normalizeWorkspaceSessionLayoutState,
 } from '#/shared/workspace-layout.ts'
-import type {
-  BranchViewMode,
-  RepoWorkspaceLayout,
-  ReposGet,
-  ReposSet,
-  ReposStore,
-} from '#/web/stores/repos/types.ts'
+import type { BranchViewMode, RepoWorkspaceLayout, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
 import type { WorkspacePaneBranchViewType, WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneSizes } from '#/shared/workspace-layout.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
@@ -42,6 +36,7 @@ type RuntimeCoherentSelectionActions = Pick<
   | 'setWorkspacePaneView'
   | 'openBranchWorkspacePaneView'
   | 'closeBranchWorkspacePaneView'
+  | 'reorderBranchWorkspacePaneViews'
   | 'selectBranch'
   | 'clearSelectedBranch'
 >
@@ -118,9 +113,14 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
         for (const [id, tab] of Object.entries(workspacePaneViewByRepo)) {
           const repo = repos[id]
           if (!repo) continue
-          if (repo.ui.preferredWorkspacePaneView === tab) continue
+          const branchViewNeedsOpen =
+            isBranchWorkspacePaneView(tab) && !repo.ui.openBranchWorkspacePaneViews.includes(tab)
+          if (repo.ui.preferredWorkspacePaneView === tab && !branchViewNeedsOpen) continue
           changed = true
           repos[id] = replaceRepo(repo, (r) => {
+            if (isBranchWorkspacePaneView(tab) && !r.ui.openBranchWorkspacePaneViews.includes(tab)) {
+              r.ui.openBranchWorkspacePaneViews.push(tab)
+            }
             r.ui.preferredWorkspacePaneView = tab
           })
         }
@@ -222,6 +222,23 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
       })
     },
 
+    reorderBranchWorkspacePaneViews(id: string, orderedViews: WorkspacePaneBranchViewType[]) {
+      set((s) => {
+        const repo = s.repos[id]
+        if (!repo) return s
+        const current = repo.ui.openBranchWorkspacePaneViews
+        if (orderedViews.length !== current.length) return s
+        const next = orderedViews.filter(isBranchWorkspacePaneView)
+        if (next.length !== orderedViews.length || new Set(next).size !== next.length) return s
+        const currentSet = new Set(current)
+        if (!next.every((view) => currentSet.has(view))) return s
+        if (next.every((view, index) => view === current[index])) return s
+        return replaceRepoState(s, repo, (r) => {
+          r.ui.openBranchWorkspacePaneViews = next
+        })
+      })
+    },
+
     setBranchViewMode(id: string, viewMode: BranchViewMode) {
       let changed = false
       let selectedForPullRequest: string | null = null
@@ -254,7 +271,8 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
       let token: number | undefined
       set((s) => {
         const repo = s.repos[id]
-        const branchViewNeedsOpen = isBranchWorkspacePaneView(tab) && !repo?.ui.openBranchWorkspacePaneViews.includes(tab)
+        const branchViewNeedsOpen =
+          isBranchWorkspacePaneView(tab) && !repo?.ui.openBranchWorkspacePaneViews.includes(tab)
         if (!repo || (repo.ui.preferredWorkspacePaneView === tab && !branchViewNeedsOpen)) return s
         changed = true
         token = repo.instanceToken
@@ -312,5 +330,5 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
 }
 
 function isBranchWorkspacePaneView(tab: WorkspacePaneView): tab is WorkspacePaneBranchViewType {
-  return tab === 'status'
+  return tab === 'status' || tab === 'history'
 }

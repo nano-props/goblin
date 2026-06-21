@@ -137,6 +137,25 @@ describe('repo-client', () => {
     )
   })
 
+  test('throws when repository log returns an error envelope', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: false, message: 'error.failed-read-repo' }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { getRepositoryLog } = await import('#/web/repo-client.ts')
+    await expect(getRepositoryLog('/tmp/repo', 'feature/work')).rejects.toThrow('error.failed-read-repo')
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:32100/api/repo/log?cwd=%2Ftmp%2Frepo&branch=feature%2Fwork&count=50&skip=0',
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
+      }),
+    )
+  })
+
   test('opens terminal and editor through embedded server routes even when a native shell exists', async () => {
     const openTerminal = vi.fn(async () => ({ ok: true, message: 'native-terminal' }))
     const openEditor = vi.fn(async () => ({ ok: true, message: 'native-editor' }))

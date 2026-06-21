@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { RepoBackend } from '#/server/modules/repo-backend.ts'
 import type { ProbeResult, PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
-import type { WorktreeStatus } from '#/shared/git-types.ts'
+import type { LogEntry, WorktreeStatus } from '#/shared/git-types.ts'
 
 const mocks = vi.hoisted(() => ({
   runWithRepoBackend: vi.fn(),
@@ -20,7 +20,7 @@ function asRepoBackend(backend: ReadBackend): RepoBackend {
 
 type ReadBackend = Pick<
   RepoBackend,
-  'id' | 'kind' | 'probe' | 'getSnapshot' | 'getStatus' | 'getPullRequests' | 'fetch'
+  'id' | 'kind' | 'probe' | 'getSnapshot' | 'getStatus' | 'getPullRequests' | 'getLog' | 'fetch'
 >
 
 function makeBackend(overrides: Partial<ReadBackend> = {}): ReadBackend {
@@ -31,6 +31,7 @@ function makeBackend(overrides: Partial<ReadBackend> = {}): ReadBackend {
     getSnapshot: () => Promise.resolve<RepoSnapshot | null>(null),
     getStatus: () => Promise.resolve<WorktreeStatus[]>([]),
     getPullRequests: () => Promise.resolve<PullRequestEntry[] | null>(null),
+    getLog: () => Promise.resolve<LogEntry[]>([]),
     fetch: () => Promise.resolve({ ok: true, message: '' }),
   }
   return { ...base, ...overrides }
@@ -43,6 +44,43 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers()
+})
+
+describe('getRepositoryLog', () => {
+  test('reads branch history through the repo backend', async () => {
+    const entries: LogEntry[] = [
+      {
+        hash: '78c150a000000000000000000000000000000000',
+        shortHash: '78c150a',
+        refs: 'HEAD -> fix/w-tab',
+        message: 'Fix branch navigator name truncation',
+        author: 'Example Author',
+        date: '2026-06-21T00:00:00.000Z',
+      },
+    ]
+    const getLog = vi.fn(() => Promise.resolve(entries))
+    mocks.runWithRepoBackend.mockImplementation((_cwd: string, task: BackendTask) =>
+      task(asRepoBackend(makeBackend({ getLog }))),
+    )
+    const { getRepositoryLog } = await import('#/server/modules/repo-read-paths.ts')
+    const signal = new AbortController().signal
+
+    await expect(getRepositoryLog('/tmp/repo', 'feature/work', { count: 30, skip: 0, signal })).resolves.toEqual(
+      entries,
+    )
+    expect(getLog).toHaveBeenCalledWith('feature/work', { count: 30, skip: 0, signal })
+  })
+
+  test('uses the shared default branch history count', async () => {
+    const getLog = vi.fn(() => Promise.resolve<LogEntry[]>([]))
+    mocks.runWithRepoBackend.mockImplementation((_cwd: string, task: BackendTask) =>
+      task(asRepoBackend(makeBackend({ getLog }))),
+    )
+    const { getRepositoryLog } = await import('#/server/modules/repo-read-paths.ts')
+
+    await expect(getRepositoryLog('/tmp/repo', 'feature/work')).resolves.toEqual([])
+    expect(getLog).toHaveBeenCalledWith('feature/work', { count: 50, skip: 0, signal: undefined })
+  })
 })
 
 describe('getRepositoryComposite timeout', () => {

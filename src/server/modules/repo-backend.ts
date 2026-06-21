@@ -7,6 +7,7 @@ import {
   getCurrentBranch,
   getDefaultBranch,
   getHeadHash,
+  getLog as getBranchLog,
   getRepoName,
   getRepoRoot,
   getUpstream,
@@ -27,6 +28,7 @@ import { createWorktree, getWorktrees, removeWorktree } from '#/system/git/workt
 import { getWorktreePatch } from '#/system/git/patch.ts'
 import {
   type ExecResult,
+  type LogEntry,
   type PullRequestFetchMode,
   type PullRequestInfo,
   type WorktreeInfo,
@@ -44,6 +46,7 @@ import {
   deleteRemoteBranch,
   fetchRemoteRepository,
   getRemoteBrowserUrl,
+  getRemoteLog,
   getRemotePatch,
   getRemoteSnapshot,
   getRemoteStatus,
@@ -84,6 +87,7 @@ export interface RepoBackend {
     branches?: string[],
     options?: { mode?: PullRequestFetchMode; signal?: AbortSignal },
   ): Promise<PullRequestEntry[] | null>
+  getLog(branch: string, options?: { count?: number; skip?: number; signal?: AbortSignal }): Promise<LogEntry[]>
   getRemoteBranches(signal?: AbortSignal): Promise<string[]>
   fetch(signal: AbortSignal): Promise<{ ok: boolean; message: string }>
   pull(branch: string, worktreePath?: string, signal?: AbortSignal): Promise<ExecResult>
@@ -274,6 +278,12 @@ function createLocalRepoBackend(repoId: string): RepoBackend {
       const prs = await getBranchPullRequests(repoId, branchSet, { mode: options?.mode, signal: options?.signal })
       return pullRequestEntries(prs)
     },
+    async getLog(branch, options) {
+      if (!isValidCwd(repoId)) return []
+      const available = await probeGitRepository(repoId)
+      if (!available.ok) throw new Error(available.message)
+      return await getBranchLog(repoId, branch, options?.count, options?.skip, { signal: options?.signal })
+    },
     async getRemoteBranches(signal) {
       if (!isValidCwd(repoId)) return []
       return await getLocalRemoteTrackingBranches(repoId, signal)
@@ -384,6 +394,9 @@ async function createRemoteRepoBackend(repoId: string): Promise<RepoBackend> {
         signal: options?.signal,
       })
       return pullRequestEntries(prs)
+    },
+    async getLog(branch, options) {
+      return await getRemoteLog(target, branch, options?.count, options?.skip, { signal: options?.signal })
     },
     async getRemoteBranches(signal) {
       return await getSshRemoteTrackingBranches(target, { signal })

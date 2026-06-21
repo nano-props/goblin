@@ -23,14 +23,14 @@ export function runShowWorkspacePaneViewCommand({
   navigation,
 }: ShowWorkspacePaneViewCommandOptions): boolean {
   if (!repoId) return false
-  if (tab === 'status') {
+  if (tab === 'status' || tab === 'history') {
     const target = selectedBranchWorkspaceTarget(repoId)
     if (target) {
       openWorkspacePaneView({
         repoId,
         branchName: target.branchName,
         worktreePath: target.worktreePath,
-        type: 'status',
+        type: tab,
         navigation,
       })
       return true

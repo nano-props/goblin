@@ -64,10 +64,11 @@ export interface RepoUiState {
   selectedBranch: string | null
   branchViewMode: BranchViewMode
   /**
-   * Branch-scoped workspace pane views opened for the selected branch.
-   * Worktree-scoped views live in the terminal/workspace-pane runtime because
-   * they are keyed by worktreePath; branch-scoped views stay with repo UI
-   * state because they are keyed by selectedBranch.
+   * Branch-scoped workspace pane views opened for the selected branch. When a
+   * selected branch has a worktree, these views are also materialized in the
+   * workspace-pane runtime so they sort with changes/terminal. This array keeps
+   * the branch-level open intent and the fallback order for branches without a
+   * worktree path.
    */
   openBranchWorkspacePaneViews: WorkspacePaneBranchViewType[]
   /** The user-preferred workspace pane view type. This is persisted intent; the
@@ -177,8 +178,8 @@ export interface RestorableWorkspaceActions {
   setActive: (id: string) => void
   /** Reorder the tab strip so `fromId` lands at `toId`'s position, using
    *  the same shift semantics as dnd-kit's `arrayMove` (the rest of the
-  *  list closes the gap; later items shift up if `from < to`, down if
-  *  `from > to`). No-op if either id is unknown or they're identical. */
+   *  list closes the gap; later items shift up if `from < to`, down if
+   *  `from > to`). No-op if either id is unknown or they're identical. */
   reorderRepos: (fromId: string, toId: string) => void
   applySessionLayoutState: (layout: Pick<SessionState, 'workspaceFocused' | 'workspacePaneSizes'>) => void
   applySessionSelectedTerminalState: (selectedTerminalByWorktree: Record<string, string>) => void
@@ -213,6 +214,7 @@ export interface RuntimeCoherentRepoProjectionActions {
   setWorkspacePaneView: (id: string, tab: WorkspacePaneView) => void
   openBranchWorkspacePaneView: (id: string, tab: WorkspacePaneBranchViewType) => void
   closeBranchWorkspacePaneView: (id: string, tab: WorkspacePaneBranchViewType) => void
+  reorderBranchWorkspacePaneViews: (id: string, orderedViews: WorkspacePaneBranchViewType[]) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
   selectBranch: (id: string, branch: string) => void
   clearSelectedBranch: (id: string) => void

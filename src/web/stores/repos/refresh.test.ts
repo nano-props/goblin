@@ -24,6 +24,7 @@ function logEntry(index: number): LogEntry {
   return {
     hash,
     shortHash: hash,
+    refs: '',
     message: `commit ${index}`,
     author: 'Alice',
     date: '2026-01-01T00:00:00+08:00',
@@ -182,9 +183,7 @@ describe('remote fetch timestamps', () => {
     expect(fetchCount).toBe(1)
     expect(snapshotCount).toBe(1)
     expect(statusCount).toBe(1)
-    expect(pullRequestCalls).toEqual([
-      { branches: ['feature/a', 'feature/b'], mode: 'summary' },
-    ])
+    expect(pullRequestCalls).toEqual([{ branches: ['feature/a', 'feature/b'], mode: 'summary' }])
   })
 
   test('manual sync records thrown fetch failures instead of rejecting', async () => {

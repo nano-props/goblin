@@ -180,5 +180,5 @@ function viewKey(input: WorkspacePaneViewIdentity): string {
 }
 
 function isStaticWorkspacePaneViewType(type: WorkspacePaneViewType): type is WorkspacePaneStaticViewType {
-  return type === 'changes'
+  return type === 'status' || type === 'changes' || type === 'history'
 }

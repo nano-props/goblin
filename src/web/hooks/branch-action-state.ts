@@ -3,6 +3,7 @@ import { branchActionKindFromReason, isBranchActionReason } from '#/web/stores/r
 import type { RepoState } from '#/web/stores/repos/types.ts'
 export type BranchActionItemId =
   | 'status'
+  | 'history'
   | 'changes'
   | 'copyPatch'
   | 'pull'

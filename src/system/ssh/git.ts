@@ -117,7 +117,8 @@ export async function getRemoteLog(
   const result = await run({ type: 'gitLog', path: target.remotePath, branch, count, skip }, target, {
     signal: options.signal,
   })
-  if (!result.ok || options.signal?.aborted) return []
+  if (options.signal?.aborted) return []
+  if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
   return parseLog(result.stdout)
 }
 

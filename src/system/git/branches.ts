@@ -1,7 +1,13 @@
 import { git, gitResultWithOptions, NETWORK_TIMEOUT_MS } from '#/system/git/helper.ts'
 import { FIELD_SEP, parseBranches, parseLog } from '#/system/git/parsers.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
-import type { BranchSnapshotInfo, ExecResult, LogEntry, WorktreeInfo } from '#/shared/git-types.ts'
+import {
+  DEFAULT_REPOSITORY_LOG_COUNT,
+  type BranchSnapshotInfo,
+  type ExecResult,
+  type LogEntry,
+  type WorktreeInfo,
+} from '#/shared/git-types.ts'
 
 export async function isGitRepo(cwd: string): Promise<boolean> {
   try {
@@ -143,18 +149,30 @@ export async function getBranches(
 export async function getLog(
   cwd: string,
   branch: string,
-  count = 100,
+  count = DEFAULT_REPOSITORY_LOG_COUNT,
   skip = 0,
   options?: { signal?: AbortSignal },
 ): Promise<LogEntry[]> {
+  if (options?.signal?.aborted) return []
   if (!isSafeBranchName(branch)) return []
   try {
-    const format = ['%H', '%h', '%s', '%an', '%aI'].join(FIELD_SEP)
-    const args = ['log', `--format=${format}`, '-n', String(count), '--skip', String(skip), branch]
+    const format = ['%H', '%h', '%D', '%s', '%an', '%aI'].join(FIELD_SEP)
+    const args = [
+      'log',
+      '--decorate=short',
+      `--format=${format}`,
+      '-n',
+      String(count),
+      '--skip',
+      String(skip),
+      branch,
+      '--',
+    ]
     const output = await git(cwd, args, { signal: options?.signal })
     return parseLog(output)
-  } catch {
-    return []
+  } catch (err) {
+    if (options?.signal?.aborted) return []
+    throw err
   }
 }
 

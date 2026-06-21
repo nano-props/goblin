@@ -10,7 +10,11 @@ import {
   TerminalSessionContext,
   TerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
-import type { WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
+import type {
+  WorkspacePaneBranchViewType,
+  WorkspacePaneStaticViewType,
+  WorkspacePaneView,
+} from '#/shared/workspace-pane.ts'
 import type {
   TerminalSessionContextValue,
   TerminalSessionReadContextValue,
@@ -106,21 +110,20 @@ describe('BranchWorkspaceToolbar', () => {
     expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'status')
   })
 
-  test('renders branch status and terminal affordance without a default changes tab', () => {
+  test('renders status and terminal affordance without a default changes tab', () => {
     const { container: c } = renderToolbar({ terminalCount: 0, changeCount: 3, navigation: navigationWith({}) })
 
     const tabs = Array.from(c.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [])
-    expect(tabs.map((tab) => tab.id)).toEqual(['workspace-status-tab'])
+    expect(tabs.map((tab) => tab.id)).toEqual(['workspace-workspace-pane-view'])
     // The empty state is a plus icon button — no text label, just an aria-label/tooltip
     // describing the action. `useT` is mocked to return the key string, so checking that
     // textContent does not contain "terminal.label" guards against regressing back to
     // the old text-only button that rendered `t('terminal.label')` as its label.
-    const emptyButton = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-view-empty')
+    const emptyButton = c.querySelector<HTMLButtonElement>('button[aria-label="terminal.new"]')
     expect(emptyButton).not.toBeNull()
     expect(emptyButton?.textContent ?? '').not.toContain('terminal.label')
     expect(emptyButton?.getAttribute('aria-label')).toBe('terminal.new')
     expect(emptyButton?.getAttribute('title')).toBe('terminal.new')
-    expect(c.querySelector('#workspace-workspace-pane-view')).toBeNull()
     expect(c.querySelector('[data-workspace-pane-view-tooltip-id="status:status"]')).not.toBeNull()
     expect(c.querySelector('[data-workspace-pane-view-tooltip-id="changes:changes"]')).toBeNull()
   })
@@ -134,11 +137,24 @@ describe('BranchWorkspaceToolbar', () => {
     const tablist = c.querySelector('[role="tablist"][aria-label="workspace-pane-views.tabs"]')
     expect(tablist).not.toBeNull()
     expect(c.querySelectorAll('[role="tablist"][aria-label="workspace-pane-views.tabs"]')).toHaveLength(1)
-    expect(tablist?.querySelector('#workspace-status-tab')).not.toBeNull()
     expect(tablist?.querySelector('#workspace-workspace-pane-view')).not.toBeNull()
+    expect(tablist?.querySelector('#workspace-workspace-pane-view-1')).not.toBeNull()
+  })
 
-    const statusChrome = c.querySelector('[data-workspace-pane-view-tooltip-id="status:status"]')
-    expect(statusChrome?.querySelector(':scope > .pointer-events-none.border-r.border-separator')).not.toBeNull()
+  test('opens missing worktree branch-level tabs in the saved branch order', async () => {
+    const { container: c, mocks } = renderToolbar({
+      terminalCount: 0,
+      workspacePaneView: 'history',
+      openBranchWorkspacePaneViews: ['history', 'status'],
+      navigation: navigationWith({}),
+    })
+    await flush()
+
+    expect(mocks.openWorkspacePaneView.mock.calls.map((call) => call[1])).toEqual(['history', 'status'])
+    const tabs = Array.from(c.querySelectorAll('[data-workspace-pane-view-tooltip-id]')).map((node) =>
+      node.getAttribute('data-workspace-pane-view-tooltip-id'),
+    )
+    expect(tabs.slice(0, 2)).toEqual(['history:history', 'status:status'])
   })
 
   test('closes the branch-level status tab through the shared tab close control', async () => {
@@ -176,6 +192,28 @@ describe('BranchWorkspaceToolbar', () => {
     expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual([])
     expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'terminal')
     expect(mocks.selectTerminal).toHaveBeenCalledWith(`${REPO_ID}\0${WORKTREE_PATH}`, 't1')
+  })
+
+  test('restores branch tab intent and order when closing a worktree static tab fails', async () => {
+    const { container: c, mocks } = renderToolbar({
+      terminalCount: 0,
+      workspacePaneView: 'history',
+      openBranchWorkspacePaneViews: ['history', 'status'],
+      staticWorkspaceViewTypes: ['history', 'status'],
+      closeWorkspacePaneViewResult: false,
+      navigation: navigationWith({}),
+    })
+
+    const historyCloseButton = closeButtonFor(c, 'history:history')
+    expect(historyCloseButton).not.toBeNull()
+
+    act(() => {
+      historyCloseButton?.click()
+    })
+    await flush()
+
+    expect(mocks.closeWorkspacePaneView).toHaveBeenCalledWith(`${REPO_ID}\0${WORKTREE_PATH}`, 'history')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual(['history', 'status'])
   })
 
   test('compact workspace view popover merges status and terminal views', async () => {
@@ -350,9 +388,9 @@ describe('BranchWorkspaceToolbar', () => {
       navigation: navigationWith({ showRepoWorkspacePaneView }),
     })
 
-    const statusTab = c.querySelector<HTMLButtonElement>('#workspace-status-tab')
-    const changesTab = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-view')
-    const terminalTab = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-view-1')
+    const statusTab = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-view')
+    const changesTab = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-view-1')
+    const terminalTab = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-view-2')
     if (!statusTab || !changesTab || !terminalTab) throw new Error('missing branch workspace pane views')
 
     act(() => {
@@ -360,9 +398,8 @@ describe('BranchWorkspaceToolbar', () => {
       statusTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
     })
     await flush()
-    expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'changes')
+    expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
     expect(document.activeElement).toBe(changesTab)
-    showRepoWorkspacePaneView.mockClear()
 
     act(() => {
       changesTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
@@ -387,8 +424,8 @@ describe('BranchWorkspaceToolbar', () => {
     })
 
     expect(c.querySelector('[data-workspace-pane-view-tooltip-id="changes:changes"]')).toBeNull()
-    const statusTab = c.querySelector<HTMLButtonElement>('#workspace-status-tab')
-    const terminalTab = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-view')
+    const statusTab = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-view')
+    const terminalTab = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-view-1')
     if (!statusTab || !terminalTab) throw new Error('missing branch workspace pane views')
 
     act(() => {
@@ -396,16 +433,16 @@ describe('BranchWorkspaceToolbar', () => {
       statusTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
     })
     await flush()
-    // No changes tab to land on — ArrowRight from status jumps to terminal.
-    expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'terminal')
+    // No changes tab to land on: ArrowRight moves focus from status to terminal
+    // within the same sortable workspace-pane strip.
+    expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
     expect(document.activeElement).toBe(terminalTab)
-    showRepoWorkspacePaneView.mockClear()
 
     act(() => {
       terminalTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
     })
     await flush()
-    expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'status')
+    expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
     expect(document.activeElement).toBe(statusTab)
   })
 
@@ -444,7 +481,7 @@ describe('BranchWorkspaceToolbar', () => {
     // The skeleton marker is present; the real button is not.
     expect(c.querySelector('[data-workspace-pane-skeleton-strip=""]')).not.toBeNull()
     expect(c.querySelectorAll('[data-workspace-pane-skeleton-chip=""]')).toHaveLength(1)
-    expect(c.querySelector('#workspace-workspace-pane-view')).toBeNull()
+    expect(c.querySelector('#workspace-workspace-pane-view')).not.toBeNull()
     // role="status" + aria-busy for assistive tech.
     const strip = c.querySelector('[role="status"][aria-busy="true"]')
     expect(strip).not.toBeNull()
@@ -455,7 +492,7 @@ describe('BranchWorkspaceToolbar', () => {
     useRepoSyncStore.getState().markReady(REPO_ID, 0)
     await flush()
     expect(c.querySelector('[data-workspace-pane-skeleton-strip=""]')).toBeNull()
-    expect(c.querySelector('#workspace-workspace-pane-view-empty')).not.toBeNull()
+    expect(c.querySelector('button[aria-label="terminal.new"]')).not.toBeNull()
   })
 })
 
@@ -463,8 +500,10 @@ function renderToolbar(options: {
   terminalCount: number
   changeCount?: number
   navigation: MainWindowNavigationActions
-  workspacePaneView?: 'status' | 'changes' | 'terminal'
+  workspacePaneView?: WorkspacePaneView
+  openBranchWorkspacePaneViews?: WorkspacePaneBranchViewType[]
   staticWorkspaceViewTypes?: WorkspacePaneStaticViewType[]
+  closeWorkspacePaneViewResult?: boolean
   worktree?: boolean
   collapsed?: boolean
   /**
@@ -484,6 +523,9 @@ function renderToolbar(options: {
     selectTerminal: ReturnType<typeof vi.fn>
     scrollToBottom: ReturnType<typeof vi.fn>
     closeTerminalByDescriptor: ReturnType<typeof vi.fn>
+    openWorkspacePaneView: ReturnType<typeof vi.fn>
+    closeWorkspacePaneView: ReturnType<typeof vi.fn>
+    reorderWorkspacePaneViews: ReturnType<typeof vi.fn>
     showRepoWorkspacePaneView: ReturnType<typeof vi.fn>
   }
 } {
@@ -501,6 +543,7 @@ function renderToolbar(options: {
     branches: [branch],
     selectedBranch: branchName,
     workspacePaneView: options.workspacePaneView ?? 'status',
+    openBranchWorkspacePaneViews: options.openBranchWorkspacePaneViews,
     status:
       options.changeCount && options.changeCount > 0
         ? [
@@ -573,6 +616,9 @@ function renderToolbar(options: {
   const selectTerminal = vi.fn()
   const scrollToBottom = vi.fn()
   const closeTerminalByDescriptor = vi.fn()
+  const openWorkspacePaneView = vi.fn(async () => true)
+  const closeWorkspacePaneView = vi.fn(async () => options.closeWorkspacePaneViewResult ?? true)
+  const reorderWorkspacePaneViews = vi.fn(async () => true)
   const showRepoWorkspacePaneView = vi.fn(options.navigation.showRepoWorkspacePaneView)
   const commandContext: TerminalSessionContextValue = {
     createTerminal,
@@ -592,9 +638,9 @@ function renderToolbar(options: {
     clearSearch: vi.fn(),
     writeInput: vi.fn(),
     takeover: vi.fn(),
-    openWorkspacePaneView: vi.fn(async () => true),
-    closeWorkspacePaneView: vi.fn(async () => true),
-    reorderWorkspacePaneViews: vi.fn(async () => true),
+    openWorkspacePaneView,
+    closeWorkspacePaneView,
+    reorderWorkspacePaneViews,
     serialize: vi.fn(() => ''),
   }
 
@@ -623,7 +669,9 @@ function renderToolbar(options: {
   const tabSelector =
     options.worktree === false
       ? '#workspace-status-tab'
-      : '#workspace-workspace-pane-view-empty, #workspace-workspace-pane-view'
+      : options.terminalCount > 0
+        ? '[data-workspace-pane-view-tooltip-id="terminal:t1"] button[role="tab"]'
+        : 'button[aria-label="terminal.new"]'
   const tab = container.querySelector<HTMLButtonElement>(tabSelector)
   if (!tab && !options.loading) throw new Error('missing terminal view')
   return {
@@ -634,6 +682,9 @@ function renderToolbar(options: {
       selectTerminal,
       scrollToBottom,
       closeTerminalByDescriptor,
+      openWorkspacePaneView,
+      closeWorkspacePaneView,
+      reorderWorkspacePaneViews,
       showRepoWorkspacePaneView,
     },
   }

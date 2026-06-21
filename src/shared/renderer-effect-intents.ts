@@ -1,6 +1,7 @@
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { LangPref, ThemePref } from '#/shared/settings.ts'
+import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 
 export type RendererEffectIntent =
   | { type: 'open-repo-requested' }
@@ -11,7 +12,7 @@ export type RendererEffectIntent =
   | { type: 'close-repo-requested' }
   | { type: 'cycle-repo-requested'; direction: 1 | -1 }
   | { type: 'repo-refresh-requested' }
-  | { type: 'show-workspace-pane-view-requested'; tab: 'status' | 'changes' | 'terminal' }
+  | { type: 'show-workspace-pane-view-requested'; tab: WorkspacePaneView }
   | { type: 'terminal-primary-action-requested' }
   | { type: 'layout-reset-requested' }
   | { type: 'open-settings-requested'; page: SettingsPage }

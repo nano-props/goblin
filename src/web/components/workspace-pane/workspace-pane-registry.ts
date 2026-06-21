@@ -1,11 +1,11 @@
 import type {
   WorkspacePaneStaticViewSummary as ServerWorkspacePaneStaticViewSummary,
   WorkspacePaneStaticViewType,
+  WorkspacePaneViewType,
   WorkspacePaneViewOrderEntry,
 } from '#/shared/workspace-pane.ts'
 import { worktreeTerminalKey, parseWorktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import type { WorkspacePaneStaticViewSummary, WorkspacePaneViewSummary } from '#/web/components/terminal/types.ts'
-import { isWorktreeLevelWorkspacePaneView } from '#/web/lib/workspace-pane-view.ts'
 
 export class RendererWorkspacePaneRegistry {
   private readonly staticViewsByWorktree = new Map<string, WorkspacePaneStaticViewSummary[]>()
@@ -34,7 +34,6 @@ export class RendererWorkspacePaneRegistry {
     const nextByWorktree = new Map<string, WorkspacePaneStaticViewSummary[]>()
 
     for (const tab of tabs) {
-      if (!isWorktreeLevelWorkspacePaneView(tab.type)) continue
       const terminalWorktreeKey = worktreeTerminalKey(repoRoot, tab.worktreePath)
       const summary: WorkspacePaneStaticViewSummary = {
         type: tab.type,
@@ -79,7 +78,7 @@ export class RendererWorkspacePaneRegistry {
     const orderedStaticTypes: WorkspacePaneStaticViewType[] = []
     for (const tab of input.orderedViews) {
       if (tab.type === 'terminal') continue
-      if (!isWorktreeLevelWorkspacePaneView(tab.type)) return false
+      if (!isWorkspacePaneStaticViewType(tab.type)) return false
       orderedStaticTypes.push(tab.type)
     }
     if (orderedStaticTypes.length !== existingStaticTypes.size) return false
@@ -106,7 +105,7 @@ export class RendererWorkspacePaneRegistry {
         displayOrderByKey.set(tab.id, i)
         continue
       }
-      if (!isWorktreeLevelWorkspacePaneView(tab.type)) return
+      if (!isWorkspacePaneStaticViewType(tab.type)) return
       staticWorkspacePaneViews.push({
         type: tab.type,
         id: tab.type,
@@ -124,7 +123,6 @@ export class RendererWorkspacePaneRegistry {
     type: WorkspacePaneStaticViewType
     currentWorkspacePaneViews: WorkspacePaneViewSummary[]
   }): void {
-    if (!isWorktreeLevelWorkspacePaneView(input.type)) return
     const parsedWorktree = parseWorktreeTerminalKey(input.worktreeKey)
     if (!parsedWorktree) return
     const currentStaticViews = this.staticViews(input.worktreeKey)
@@ -147,4 +145,8 @@ export class RendererWorkspacePaneRegistry {
     const nextStaticViews = this.staticViews(worktreeKey).filter((tab) => tab.type !== type)
     this.restoreStaticViews(worktreeKey, nextStaticViews)
   }
+}
+
+function isWorkspacePaneStaticViewType(type: WorkspacePaneViewType): type is WorkspacePaneStaticViewType {
+  return type === 'status' || type === 'changes' || type === 'history'
 }

@@ -100,10 +100,13 @@ export interface WorktreeStatus {
 export interface LogEntry {
   hash: string
   shortHash: string
+  refs: string
   message: string
   author: string
   date: string
 }
+
+export const DEFAULT_REPOSITORY_LOG_COUNT = 50
 
 export interface GitRemoteInfo {
   name: string

@@ -1,7 +1,7 @@
-export type WorkspacePaneBranchViewType = 'status'
-export type WorkspacePaneStaticViewType = 'changes'
-export type WorkspacePaneViewType = WorkspacePaneBranchViewType | WorkspacePaneStaticViewType | 'terminal'
+export type WorkspacePaneStaticViewType = 'status' | 'changes' | 'history'
+export type WorkspacePaneViewType = WorkspacePaneStaticViewType | 'terminal'
 export type WorkspacePaneView = WorkspacePaneViewType
+export type WorkspacePaneBranchViewType = Extract<WorkspacePaneStaticViewType, 'status' | 'history'>
 
 export interface WorkspacePaneViewOrderEntry {
   type: WorkspacePaneViewType

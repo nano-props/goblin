@@ -22,7 +22,7 @@ afterEach(() => {
 })
 
 describe('openWorkspacePaneView', () => {
-  test('opens status as a branch-level view without registering a worktree view', () => {
+  test('opens status as a static workspace pane view when the branch has a worktree', () => {
     seedWorktreeRepo('status')
     useReposStore.getState().closeBranchWorkspacePaneView(REPO_ID, 'status')
     const refreshStatus = vi.fn(async () => {})
@@ -39,7 +39,7 @@ describe('openWorkspacePaneView', () => {
       navigation: navigationWithStoreActions(),
     })
 
-    expect(openStaticView).not.toHaveBeenCalled()
+    expect(openStaticView).toHaveBeenCalledWith(WORKTREE_KEY, 'status')
     expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual(['status'])
     expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('status')
     expect(refreshStatus).toHaveBeenCalledWith(REPO_ID, { token })
@@ -85,6 +85,27 @@ describe('openWorkspacePaneView', () => {
 
     expect(openStaticView).not.toHaveBeenCalled()
     expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('status')
+  })
+
+  test('opens history as a branch-static workspace pane view', () => {
+    seedWorktreeRepo('history')
+    const refreshStatus = vi.fn(async () => {})
+    useReposStore.setState({ refreshStatus: refreshStatus as typeof originalRefreshStatus })
+    const openStaticView = vi.fn(async () => true)
+    setWorkspacePaneBridge(openStaticView)
+
+    openWorkspacePaneView({
+      repoId: REPO_ID,
+      branchName: 'feature/worktree',
+      worktreePath: WORKTREE_PATH,
+      type: 'history',
+      navigation: navigationWithStoreActions(),
+    })
+
+    expect(openStaticView).toHaveBeenCalledWith(WORKTREE_KEY, 'history')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toContain('history')
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('history')
+    expect(refreshStatus).not.toHaveBeenCalled()
   })
 })
 

@@ -1,7 +1,8 @@
 import { openExternalUrl } from '#/web/app-shell-client.ts'
 import { getServerJson, postServerJson } from '#/web/lib/server-fetch.ts'
-import type { CloneRepoResult, PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
-import type { ExecResult, PullRequestFetchMode, WorktreeStatus } from '#/shared/git-types.ts'
+import type { CloneRepoResult, PullRequestEntry, RepoSnapshot, RepositoryLogResponse } from '#/shared/api-types.ts'
+import type { ExecResult, LogEntry, PullRequestFetchMode, WorktreeStatus } from '#/shared/git-types.ts'
+import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { ProbeResult } from '#/shared/api-types.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 
@@ -28,6 +29,21 @@ export async function getRepositorySnapshot(cwd: string, signal?: AbortSignal): 
 
 export async function getRepositoryStatus(cwd: string, signal?: AbortSignal): Promise<WorktreeStatus[]> {
   return await getServerJson('/api/repo/status', { cwd }, { signal })
+}
+
+export async function getRepositoryLog(
+  cwd: string,
+  branch: string,
+  options?: { count?: number; skip?: number; signal?: AbortSignal },
+): Promise<LogEntry[]> {
+  const result = await getServerJson(
+    '/api/repo/log',
+    { cwd, branch, count: options?.count ?? DEFAULT_REPOSITORY_LOG_COUNT, skip: options?.skip ?? 0 },
+    { signal: options?.signal },
+  )
+  const log = result as RepositoryLogResponse
+  if (Array.isArray(log)) return log
+  throw new Error(log.message)
 }
 
 export async function getRepositoryRemoteBranches(cwd: string, signal?: AbortSignal): Promise<string[]> {

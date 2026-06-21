@@ -20,6 +20,7 @@ function ctx(overrides: Partial<WorkspacePaneViewContext> = {}): WorkspacePaneVi
 describe('computeEffectiveWorkspacePaneView', () => {
   test('preserves a non-terminal preference verbatim', () => {
     expect(computeEffectiveWorkspacePaneView('status', ctx())).toBe('status')
+    expect(computeEffectiveWorkspacePaneView('history', ctx())).toBe('history')
     expect(computeEffectiveWorkspacePaneView('changes', ctx())).toBe('changes')
   })
 
@@ -31,7 +32,10 @@ describe('computeEffectiveWorkspacePaneView', () => {
   test('falls back to status when no worktree exists', () => {
     expect(computeEffectiveWorkspacePaneView('changes', ctx({ hasWorktree: false }))).toBe('status')
     expect(computeEffectiveWorkspacePaneView('terminal', ctx({ hasWorktree: false }))).toBe('status')
-    expect(computeEffectiveWorkspacePaneView('terminal', ctx({ hasWorktree: false, terminalSessionCount: 5 }))).toBe('status')
+    expect(computeEffectiveWorkspacePaneView('terminal', ctx({ hasWorktree: false, terminalSessionCount: 5 }))).toBe(
+      'status',
+    )
+    expect(computeEffectiveWorkspacePaneView('history', ctx({ hasWorktree: false }))).toBe('history')
   })
 
   test('preserves the terminal preference when sync has not yet settled', () => {
@@ -61,6 +65,8 @@ describe('computeEffectiveWorkspacePaneView', () => {
     const cases: Array<[WorkspacePaneView, WorkspacePaneViewContext, WorkspacePaneView]> = [
       ['status', ctx(), 'status'],
       ['status', ctx({ hasWorktree: false, terminalSyncReady: false }), 'status'],
+      ['history', ctx(), 'history'],
+      ['history', ctx({ hasWorktree: false }), 'history'],
       ['changes', ctx(), 'changes'],
       ['changes', ctx({ hasWorktree: false }), 'status'],
       ['terminal', ctx({ hasWorktree: false }), 'status'],
@@ -76,9 +82,11 @@ describe('computeEffectiveWorkspacePaneView', () => {
 })
 
 describe('workspacePaneViewScope', () => {
-  test('classifies status as branch-level and changes/terminal as worktree-level', () => {
+  test('classifies status/history as branch-level and changes/terminal as worktree-level', () => {
     expect(workspacePaneViewScope('status')).toBe('branch')
     expect(isBranchLevelWorkspacePaneView('status')).toBe(true)
+    expect(workspacePaneViewScope('history')).toBe('branch')
+    expect(isBranchLevelWorkspacePaneView('history')).toBe(true)
     expect(workspacePaneViewScope('changes')).toBe('worktree')
     expect(workspacePaneViewScope('terminal')).toBe('worktree')
     expect(isWorktreeLevelWorkspacePaneView('changes')).toBe(true)

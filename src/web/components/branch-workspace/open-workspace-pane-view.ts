@@ -12,18 +12,21 @@ export function openWorkspacePaneView(input: {
   type: WorkspacePaneBranchViewType | WorkspacePaneStaticViewType
   navigation: Pick<MainWindowNavigationActions, 'showRepoBranchWorkspacePaneView' | 'showRepoWorkspacePaneView'>
 }): void {
-  if (input.type === 'status') {
+  if (input.type === 'status' || input.type === 'history') {
     useReposStore.getState().openBranchWorkspacePaneView(input.repoId, input.type)
   }
-  if (input.type !== 'status') {
-    if (!input.worktreePath) return
+  if (input.worktreePath) {
     const worktreeKey = worktreeTerminalKey(input.repoId, input.worktreePath)
     void readTerminalSessionCommandBridge()?.openWorkspacePaneView(worktreeKey, input.type)
+  } else if (input.type !== 'status' && input.type !== 'history') {
+    return
   }
   if (input.branchName) {
     input.navigation.showRepoBranchWorkspacePaneView(input.repoId, input.branchName, input.type)
   } else {
     input.navigation.showRepoWorkspacePaneView(input.repoId, input.type)
   }
-  requestVisibleRepoStatusRefresh(useReposStore.getState, input.repoId)
+  if (input.type === 'status' || input.type === 'changes') {
+    requestVisibleRepoStatusRefresh(useReposStore.getState, input.repoId)
+  }
 }

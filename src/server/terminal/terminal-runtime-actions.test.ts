@@ -2,6 +2,7 @@
 
 import { describe, expect, test, vi } from 'vitest'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
+import type { WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
 
 const CLIENT_ID = 'client_terminal_actions'
 // Identity is ownerId-keyed under method 2: the runtime derives
@@ -16,8 +17,18 @@ const SESSION_ID = 'session_aaaaaaaaaaaaaa'
 function makeActions(
   options: {
     closeSessionForOwner: (ownerId: string, sessionId: string) => boolean
-    openStaticView?: (ownerId: string, scope: string, worktreePath: string, type: 'changes') => boolean
-    closeStaticView?: (ownerId: string, scope: string, worktreePath: string, type: 'changes') => boolean
+    openStaticView?: (
+      ownerId: string,
+      scope: string,
+      worktreePath: string,
+      type: WorkspacePaneStaticViewType,
+    ) => boolean
+    closeStaticView?: (
+      ownerId: string,
+      scope: string,
+      worktreePath: string,
+      type: WorkspacePaneStaticViewType,
+    ) => boolean
     getSessionScope?: (ownerId: string, sessionId: string) => string | undefined
     isValidTerminalClientId?: (value: unknown) => value is string
     broadcasts?: ReturnType<typeof vi.fn>

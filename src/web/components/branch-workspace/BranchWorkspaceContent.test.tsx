@@ -2,12 +2,20 @@
 
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchWorkspaceContent } from '#/web/components/branch-workspace/BranchWorkspaceContent.tsx'
 import { getSelectedBranchWorkspacePresentation } from '#/web/components/branch-workspace/model.ts'
 import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionReadContextValue, WorktreeTerminalSnapshot } from '#/web/components/terminal/types.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
+
+const repoClientMocks = vi.hoisted(() => ({
+  getRepositoryLog: vi.fn(),
+}))
+
+vi.mock('#/web/repo-client.ts', () => ({
+  getRepositoryLog: repoClientMocks.getRepositoryLog,
+}))
 
 const REPO_ID = '/tmp/gbl-branch-workspace-content-repo'
 
@@ -18,6 +26,7 @@ const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENV
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
+  repoClientMocks.getRepositoryLog.mockResolvedValue([])
   container = document.createElement('div')
   document.body.append(container)
   root = createRoot(container)
@@ -30,6 +39,7 @@ afterEach(() => {
   container?.remove()
   root = null
   container = null
+  repoClientMocks.getRepositoryLog.mockReset()
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
@@ -102,6 +112,130 @@ describe('BranchWorkspaceContent', () => {
     expect(container?.querySelector('#workspace-status-panel')).toBeNull()
     expect(container?.textContent).toContain('workspace-pane-views.empty')
   })
+
+  test('renders branch history as one-line short-hash log entries', async () => {
+    repoClientMocks.getRepositoryLog.mockResolvedValue([
+      {
+        hash: '78c150a000000000000000000000000000000000',
+        shortHash: '78c150a',
+        refs: 'HEAD -> fix/w-tab, origin/main, origin/fix/w-tab, origin/HEAD, main',
+        message: 'Fix branch navigator name truncation',
+        author: 'Example Author',
+        date: '2026-06-21T00:00:00.000Z',
+      },
+    ])
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/history')],
+      selectedBranch: 'feature/history',
+      workspacePaneView: 'history',
+      openBranchWorkspacePaneViews: ['status', 'history'],
+    })
+    const detail = getSelectedBranchWorkspacePresentation(repo)
+
+    act(() => {
+      root!.render(
+        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+          <BranchWorkspaceContent
+            repo={repo}
+            detail={detail}
+            workspacePaneId="workspace"
+          />
+        </TerminalSessionReadContext.Provider>,
+      )
+    })
+    await flushAsyncWork()
+
+    expect(repoClientMocks.getRepositoryLog).toHaveBeenCalledWith(
+      REPO_ID,
+      'feature/history',
+      expect.objectContaining({ count: 50 }),
+    )
+    const row = container?.querySelector(
+      'li[title="78c150a (HEAD -> fix/w-tab, origin/main, origin/fix/w-tab, origin/HEAD, main) Fix branch navigator name truncation"]',
+    )
+    expect(row).not.toBeNull()
+    expect(row?.className).not.toContain('grid')
+    expect(row?.className).toContain('font-mono')
+    expect(row?.className).toContain('text-sm')
+    expect(row?.className).not.toContain('h-7')
+    expect(row?.className).toContain('px-1.5')
+    expect(row?.textContent).toContain('78c150a')
+    expect(row?.textContent).toContain('(HEAD -> fix/w-tab, origin/main, origin/fix/w-tab, origin/HEAD, main)')
+    expect(row?.textContent).toContain('Fix branch navigator name truncation')
+    expect(row?.querySelector('span.block')?.className).toContain('truncate')
+    expect(row?.querySelector('[data-history-log-hash=""]')?.getAttribute('style')).toContain(
+      '--color-terminal-ansi-yellow',
+    )
+    expect(row?.querySelector('[data-history-log-ref-token="HEAD"]')?.getAttribute('style')).toContain(
+      '--color-terminal-ansi-blue',
+    )
+    expect(row?.querySelector('[data-history-log-ref-token="fix/w-tab"]')?.getAttribute('style')).toContain(
+      '--color-terminal-ansi-green',
+    )
+    expect(row?.querySelector('[data-history-log-ref-token="origin/main"]')?.getAttribute('style')).toContain(
+      '--color-terminal-ansi-red',
+    )
+    expect(row?.querySelector('[data-history-log-message=""]')?.textContent).toBe(
+      'Fix branch navigator name truncation',
+    )
+  })
+
+  test('labels worktree history fallback panels with the matching fallback tab id', async () => {
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/history', { worktree: { path: '/tmp/history-worktree' } })],
+      selectedBranch: 'feature/history',
+      workspacePaneView: 'history',
+      openBranchWorkspacePaneViews: ['status', 'history'],
+    })
+    const detail = getSelectedBranchWorkspacePresentation(repo)
+
+    act(() => {
+      root!.render(
+        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+          <BranchWorkspaceContent
+            repo={repo}
+            detail={detail}
+            workspacePaneId="workspace"
+          />
+        </TerminalSessionReadContext.Provider>,
+      )
+    })
+    await flushAsyncWork()
+
+    expect(container?.querySelector('#workspace-history-panel')?.getAttribute('aria-labelledby')).toBe(
+      'workspace-workspace-pane-view-1',
+    )
+  })
+
+  test('shows an error state when branch history cannot be read', async () => {
+    repoClientMocks.getRepositoryLog.mockRejectedValue(new Error('error.failed-read-repo'))
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/history')],
+      selectedBranch: 'feature/history',
+      workspacePaneView: 'history',
+      openBranchWorkspacePaneViews: ['history'],
+    })
+    const detail = getSelectedBranchWorkspacePresentation(repo)
+
+    act(() => {
+      root!.render(
+        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+          <BranchWorkspaceContent
+            repo={repo}
+            detail={detail}
+            workspacePaneId="workspace"
+          />
+        </TerminalSessionReadContext.Provider>,
+      )
+    })
+    await flushAsyncWork()
+
+    expect(container?.textContent).toContain('error.failed-read-repo')
+    expect(container?.textContent).not.toContain('log.empty-for-branch')
+  })
 })
 
 const emptyWorktreeSnapshot: WorktreeTerminalSnapshot = {
@@ -120,4 +254,10 @@ const emptyTerminalReadContext: TerminalSessionReadContextValue = {
   subscribeWorktree: () => () => {},
   snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),
   subscribeSnapshot: () => () => {},
+}
+
+async function flushAsyncWork() {
+  await act(async () => {
+    await Promise.resolve()
+  })
 }
