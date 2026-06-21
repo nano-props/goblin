@@ -597,10 +597,15 @@ describe('WorkspacePaneViewStrip', () => {
     )
 
     expect(document.body.querySelectorAll('[role="tab"]').length).toBe(1)
-    // Compact mode pins the tab one step tighter than the default fixed width
-    // to fit narrow toolbars alongside the popover trigger.
-    expect(document.body.querySelector('[data-workspace-pane-view-tooltip-id]')?.className).toContain('w-32')
-    expect(document.body.querySelector('[data-workspace-pane-view-tooltip-id]')?.className).not.toContain('w-36')
+    const compactTablist = document.body.querySelector('[role="tablist"][aria-label="workspace-pane-views.tabs"]')
+    const compactTab = document.body.querySelector('[data-workspace-pane-view-tooltip-id]')
+    expect(compactTablist?.className).toContain('flex-1')
+    expect(compactTablist?.parentElement?.className).toContain('flex-1')
+    expect(compactTab?.className).toContain('min-w-0')
+    expect(compactTab?.className).toContain('flex-1')
+    expect(compactTab?.className).not.toContain('w-32')
+    expect(compactTab?.className).not.toContain('w-36')
+    expect(document.body.querySelector('button[aria-label="workspace-pane-views.tabs"]')).not.toBeNull()
 
     rerender(
       <TestWorkspacePaneViewStrip
