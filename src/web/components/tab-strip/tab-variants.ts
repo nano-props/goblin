@@ -7,8 +7,8 @@ export function toolbarTabChromeClassName(options: {
   variant: ToolbarTabVariant
   active: boolean
   dragging?: boolean
-  // Workspace tabs use a fixed width so title changes don't shift neighbouring
-  // tabs; compact workspace strips live in narrow toolbars and pin one step tighter.
+  // Expanded workspace tabs use a fixed width so title changes don't shift neighbouring
+  // tabs; compact workspace strips show one tab, so that tab can fill the available row.
   compact?: boolean
   hoverable?: boolean
 }): string {
@@ -18,13 +18,13 @@ export function toolbarTabChromeClassName(options: {
   // (matching the look of an idle tab on the expanded strip).
   const treatAsUnselected = variant === 'repo' && compact
   return cn(
-    'group relative shrink-0 select-none items-center transition-colors duration-100',
+    'group relative select-none items-center transition-colors duration-100',
     compositeFocusRing,
     variant === 'repo'
-      ? 'flex h-8 min-w-36 max-w-56 touch-none gap-1.5 rounded-md border px-2 text-xs'
+      ? 'flex h-8 min-w-36 max-w-56 shrink-0 touch-none gap-1.5 rounded-md border px-2 text-xs'
       : compact
-        ? 'flex h-7 w-32 gap-1 rounded-md border px-2.5 text-sm'
-        : 'flex h-7 w-36 gap-1 rounded-md border px-2.5 text-sm',
+        ? 'flex h-7 min-w-0 flex-1 gap-1 rounded-md border px-2.5 text-sm'
+        : 'flex h-7 w-36 shrink-0 gap-1 rounded-md border px-2.5 text-sm',
     variant === 'repo'
       ? active && !treatAsUnselected
         ? 'border-input bg-card text-foreground'

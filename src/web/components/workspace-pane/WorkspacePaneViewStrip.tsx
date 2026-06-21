@@ -518,8 +518,13 @@ export function WorkspacePaneViewStrip({
 
   function renderCompactTabsBody() {
     return (
-      <ToolbarTabStripBody>
-        <WorkspacePaneViewTooltipLayer items={items} role="tablist" aria-label={t('workspace-pane-views.tabs')}>
+      <ToolbarTabStripBody className="flex-1">
+        <WorkspacePaneViewTooltipLayer
+          items={items}
+          role="tablist"
+          aria-label={t('workspace-pane-views.tabs')}
+          className="flex-1"
+        >
           <WorkspacePaneView
             item={selectedItem}
             isActive={!!panelActive && selectedItem.identity === activeTabIdentity}
