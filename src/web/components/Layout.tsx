@@ -50,7 +50,7 @@ export function Toolbar({ children, className, variant = 'plain', ...props }: To
       className={cn(
         'flex h-9 shrink-0 items-center border-b border-separator/70',
         variant === 'repo' && 'gap-3 bg-card px-4',
-        variant === 'detail' && 'min-w-0 justify-between gap-2 bg-card px-2',
+        variant === 'detail' && 'min-w-0 justify-between gap-2 bg-card px-1',
         className,
       )}
       {...props}
