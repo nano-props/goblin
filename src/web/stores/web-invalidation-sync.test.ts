@@ -56,6 +56,7 @@ function installWebBootstrap(bootstrap: RendererBootstrapSnapshot): void {
       location: {
         href: bootstrap.initialServer?.url ?? 'http://127.0.0.1:32100/',
         origin: bootstrap.initialServer?.url?.replace(/\/$/, '') ?? 'http://127.0.0.1:32100',
+        protocol: 'http:',
         search: '',
       },
       matchMedia: vi.fn(() => ({ matches: false })),
@@ -144,6 +145,34 @@ describe('web invalidation sync', () => {
       expect(useThemeStore.getState()).toMatchObject({ pref: 'dark', resolved: 'dark', colorTheme: 'github' })
       expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
       expect(document.documentElement.getAttribute('data-color-theme')).toBe('github')
+    })
+  })
+
+  test('settings invalidation uses same-origin websocket when bootstrap has no server handoff', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: null }))
+    let settingsReadCount = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => {
+          settingsReadCount++
+          return settingsSnapshotResponse({
+            theme: settingsReadCount > 1 ? 'dark' : 'auto',
+            colorTheme: settingsReadCount > 1 ? 'github' : 'default',
+          })
+        },
+      })),
+    )
+
+    const { useThemeStore } = await import('#/web/stores/theme.ts')
+    await useThemeStore.getState().hydrate()
+
+    expect(latestSocket().url).toBe('ws://127.0.0.1:32100/ws/invalidation')
+    latestSocket().emitMessage({ type: 'settings-invalidated', scopes: ['theme'] })
+
+    await waitUntil(() => {
+      expect(useThemeStore.getState()).toMatchObject({ pref: 'dark', resolved: 'dark', colorTheme: 'github' })
     })
   })
 

@@ -76,6 +76,27 @@ describe('server invalidation source', () => {
     resetServerInvalidationIngressForTests()
   })
 
+  test('opens same-origin invalidation socket when bootstrap has no server handoff', async () => {
+    Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
+      configurable: true,
+      value: {
+        runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+        initialServer: null,
+      },
+    })
+    const { resetServerInvalidationIngressForTests, subscribeServerInvalidationIngress } =
+      await import('#/web/server-invalidation-ingress.ts')
+
+    const dispose = subscribeServerInvalidationIngress(() => {})
+
+    const expectedUrl = new URL('/ws/invalidation', window.location.origin)
+    expectedUrl.protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    expect(MockWebSocket.instances).toHaveLength(1)
+    expect(MockWebSocket.instances[0]?.url).toBe(expectedUrl.toString())
+    dispose()
+    resetServerInvalidationIngressForTests()
+  })
+
   test('ignores stale invalidation socket events after reconnect creates a newer socket', async () => {
     vi.useFakeTimers()
     const { resetServerInvalidationIngressForTests, subscribeServerInvalidationIngress } =

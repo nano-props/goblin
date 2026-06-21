@@ -138,6 +138,40 @@ describe('repo query invalidation source', () => {
     dispose()
   })
 
+  test('uses same-origin invalidation stream when bootstrap has no server handoff', async () => {
+    installWindow({
+      __GOBLIN_BOOTSTRAP__: {
+        runtime: { kind: 'web', bridgeVersion: RENDERER_BRIDGE_VERSION, capabilities: [] },
+        initialServer: null,
+      },
+      location: {
+        href: 'http://127.0.0.1:32100/',
+        origin: 'http://127.0.0.1:32100',
+        protocol: 'http:',
+        search: '',
+      },
+    })
+
+    const listener = vi.fn()
+    const { subscribeRepoQueryInvalidation } = await import('#/web/repo-query-invalidation-ingress.ts')
+    const dispose = subscribeRepoQueryInvalidation(listener)
+
+    expect(FakeWebSocket.instances).toHaveLength(1)
+    expect(FakeWebSocket.instances[0]?.url).toBe('ws://127.0.0.1:32100/ws/invalidation')
+    FakeWebSocket.instances[0]?.emitMessage({
+      type: 'repo-query-invalidated',
+      repoId: '/tmp/repo',
+      query: 'repo-snapshot',
+    })
+
+    expect(listener).toHaveBeenCalledWith({
+      type: 'repo-query-invalidated',
+      repoId: '/tmp/repo',
+      query: 'repo-snapshot',
+    })
+    dispose()
+  })
+
   test('reconnects invalidation socket with a short delay after unexpected close', async () => {
     installWindow({
       __GOBLIN_BOOTSTRAP__: {

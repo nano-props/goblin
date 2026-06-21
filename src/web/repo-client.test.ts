@@ -32,6 +32,7 @@ function installWebBootstrap(bootstrap: RendererBootstrapSnapshot): void {
       location: {
         href: bootstrap.initialServer?.url ?? 'http://127.0.0.1:32100/',
         origin: bootstrap.initialServer?.url?.replace(/\/$/, '') ?? 'http://127.0.0.1:32100',
+        protocol: 'http:',
         search: '',
       },
       matchMedia: vi.fn(() => ({ matches: true })),
