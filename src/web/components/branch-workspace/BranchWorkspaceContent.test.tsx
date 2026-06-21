@@ -113,6 +113,36 @@ describe('BranchWorkspaceContent', () => {
     expect(container?.textContent).toContain('workspace-pane-views.empty')
   })
 
+  test('does not render history on a branch that did not open it', async () => {
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/a'), createRepoBranch('feature/b')],
+      selectedBranch: 'feature/b',
+      workspacePaneView: 'history',
+      openBranchWorkspacePaneViewsByBranch: {
+        'feature/a': ['status', 'history'],
+      },
+    })
+    const detail = getSelectedBranchWorkspacePresentation(repo)
+
+    act(() => {
+      root!.render(
+        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+          <BranchWorkspaceContent
+            repo={repo}
+            detail={detail}
+            workspacePaneId="workspace"
+          />
+        </TerminalSessionReadContext.Provider>,
+      )
+    })
+    await flushAsyncWork()
+
+    expect(container?.querySelector('#workspace-status-panel')).not.toBeNull()
+    expect(container?.querySelector('#workspace-history-panel')).toBeNull()
+    expect(repoClientMocks.getRepositoryLog).not.toHaveBeenCalled()
+  })
+
   test('renders branch history as one-line short-hash log entries', async () => {
     repoClientMocks.getRepositoryLog.mockResolvedValue([
       {

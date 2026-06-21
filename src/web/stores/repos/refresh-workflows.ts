@@ -2,6 +2,7 @@ import { appendRepoEvent, errorEvent, isRepoUnavailable, updateIfFresh } from '#
 import { persistRestorableRepoSnapshot } from '#/web/stores/repos/persistence.ts'
 import { refreshPullRequestsLog, terminalLog } from '#/web/logger.ts'
 import { terminalBridge } from '#/web/terminal.ts'
+import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
 import {
   PULL_REQUEST_UNKNOWN_RETRY_DELAY_MS,
   PULL_REQUEST_UNKNOWN_RETRY_LIMIT,
@@ -21,11 +22,12 @@ function pullRequestRefreshFailed(get: ReposGet, id: string, token: number): boo
 
 function visibleDetailPullRequestPending(get: ReposGet, id: string, token: number): boolean {
   const repo = get().repos[id]
+  if (!repo) return false
+  const openBranchViews = branchWorkspacePaneViewsForBranch(repo.ui, repo.ui.selectedBranch)
   if (
-    !repo ||
     repo.instanceToken !== token ||
     repo.ui.preferredWorkspacePaneView !== 'status' ||
-    !repo.ui.openBranchWorkspacePaneViews.includes('status') ||
+    !openBranchViews.includes('status') ||
     !repo.ui.selectedBranch
   )
     return false
@@ -35,11 +37,12 @@ function visibleDetailPullRequestPending(get: ReposGet, id: string, token: numbe
 
 async function refreshVisibleDetailPullRequest(get: ReposGet, id: string, token: number): Promise<void> {
   const repo = get().repos[id]
+  if (!repo) return
+  const openBranchViews = branchWorkspacePaneViewsForBranch(repo.ui, repo.ui.selectedBranch)
   if (
-    !repo ||
     repo.instanceToken !== token ||
     repo.ui.preferredWorkspacePaneView !== 'status' ||
-    !repo.ui.openBranchWorkspacePaneViews.includes('status') ||
+    !openBranchViews.includes('status') ||
     !repo.ui.selectedBranch
   )
     return

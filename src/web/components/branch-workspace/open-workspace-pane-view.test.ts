@@ -5,6 +5,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import type { WorkspacePaneBranchViewType, WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
+import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
 
 const REPO_ID = '/tmp/workspace-pane-view-repo'
 const WORKTREE_PATH = '/tmp/workspace-pane-view-worktree'
@@ -40,7 +41,7 @@ describe('openWorkspacePaneView', () => {
     })
 
     expect(openStaticView).toHaveBeenCalledWith(WORKTREE_KEY, 'status')
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual(['status'])
+    expect(openViewsFor('feature/worktree')).toEqual(['status'])
     expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('status')
     expect(refreshStatus).toHaveBeenCalledWith(REPO_ID, { token })
   })
@@ -103,7 +104,7 @@ describe('openWorkspacePaneView', () => {
     })
 
     expect(openStaticView).toHaveBeenCalledWith(WORKTREE_KEY, 'history')
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toContain('history')
+    expect(openViewsFor('feature/worktree')).toContain('history')
     expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('history')
     expect(refreshStatus).not.toHaveBeenCalled()
   })
@@ -116,6 +117,11 @@ function seedWorktreeRepo(workspacePaneView: WorkspacePaneBranchViewType | Works
     selectedBranch: 'feature/worktree',
     workspacePaneView,
   })
+}
+
+function openViewsFor(branchName: string): WorkspacePaneBranchViewType[] {
+  const repo = useReposStore.getState().repos[REPO_ID]
+  return repo ? branchWorkspacePaneViewsForBranch(repo.ui, branchName) : []
 }
 
 function navigationWithStoreActions(): Pick<

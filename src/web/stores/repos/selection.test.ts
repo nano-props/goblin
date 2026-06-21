@@ -9,6 +9,7 @@ import {
   resetReposStore,
   seedRepoState,
 } from '#/web/stores/repos/test-utils.ts'
+import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
 import { DEFAULT_WORKSPACE_FOCUSED, DEFAULT_WORKSPACE_PANE_SIZES } from '#/shared/workspace-layout.ts'
 const REPO_ID = '/tmp/gbl-selection-test-repo'
@@ -49,6 +50,11 @@ function updateRepoForTest(mutator: (repo: RepoState) => void) {
     if (!repo) return s
     return { repos: { ...s.repos, [REPO_ID]: replaceRepo(repo, mutator) } }
   })
+}
+
+function openViewsFor(branchName: string): WorkspacePaneBranchViewType[] {
+  const repo = useReposStore.getState().repos[REPO_ID]
+  return repo ? branchWorkspacePaneViewsForBranch(repo.ui, branchName) : []
 }
 
 async function flushAsyncWork() {
@@ -291,7 +297,7 @@ describe('setWorkspacePaneView', () => {
 
     useReposStore.getState().setWorkspacePaneView(REPO_ID, 'status')
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual(['status'])
+    expect(openViewsFor('main')).toEqual(['status'])
   })
 
   test('opens restored branch-level history during session restore', () => {
@@ -300,7 +306,7 @@ describe('setWorkspacePaneView', () => {
     useReposStore.getState().applySessionWorkspacePaneViewByRepo({ [REPO_ID]: 'history' })
 
     expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('history')
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual(['status', 'history'])
+    expect(openViewsFor('main')).toEqual(['status', 'history'])
   })
 
   test('reopens restored branch-level history even when it was already preferred', () => {
@@ -308,7 +314,7 @@ describe('setWorkspacePaneView', () => {
 
     useReposStore.getState().applySessionWorkspacePaneViewByRepo({ [REPO_ID]: 'history' })
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual(['status', 'history'])
+    expect(openViewsFor('main')).toEqual(['status', 'history'])
   })
 
   test('opens and closes branch-level workspace pane views independently of branch selection', () => {
@@ -316,11 +322,11 @@ describe('setWorkspacePaneView', () => {
 
     useReposStore.getState().closeBranchWorkspacePaneView(REPO_ID, 'status')
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBe('main')
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual([])
+    expect(openViewsFor('main')).toEqual([])
 
     useReposStore.getState().openBranchWorkspacePaneView(REPO_ID, 'status')
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBe('main')
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual(['status'])
+    expect(openViewsFor('main')).toEqual(['status'])
   })
 
   test('reorders branch-level workspace pane views without changing the open set', () => {
@@ -332,12 +338,37 @@ describe('setWorkspacePaneView', () => {
 
     useReposStore.getState().reorderBranchWorkspacePaneViews(REPO_ID, ['history', 'status'])
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual(['history', 'status'])
+    expect(openViewsFor('main')).toEqual(['history', 'status'])
 
     const before = useReposStore.getState().repos[REPO_ID]
     useReposStore.getState().reorderBranchWorkspacePaneViews(REPO_ID, ['history'])
     useReposStore.getState().reorderBranchWorkspacePaneViews(REPO_ID, ['history', 'history'])
     expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
+  })
+
+  test('keeps branch-level workspace pane views isolated by branch', () => {
+    seedRepo({ selectedBranch: 'feature/plain' })
+
+    useReposStore.getState().openBranchWorkspacePaneView(REPO_ID, 'history')
+
+    expect(openViewsFor('feature/plain')).toEqual(['status', 'history'])
+    expect(openViewsFor('main')).toEqual(['status'])
+
+    useReposStore.getState().selectBranch(REPO_ID, 'main')
+
+    expect(openViewsFor('main')).toEqual(['status'])
+    expect(openViewsFor('feature/plain')).toEqual(['status', 'history'])
+  })
+
+  test('keeps an explicitly closed status tab closed on its branch', () => {
+    seedRepo({ selectedBranch: 'main' })
+
+    useReposStore.getState().closeBranchWorkspacePaneView(REPO_ID, 'status')
+    useReposStore.getState().selectBranch(REPO_ID, 'feature/plain')
+    useReposStore.getState().openBranchWorkspacePaneView(REPO_ID, 'status')
+
+    expect(openViewsFor('feature/plain')).toEqual(['status'])
+    expect(openViewsFor('main')).toEqual([])
   })
 
   test('persists the changes tab immediately', async () => {

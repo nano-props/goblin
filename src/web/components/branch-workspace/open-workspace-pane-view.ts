@@ -13,7 +13,7 @@ export function openWorkspacePaneView(input: {
   navigation: Pick<MainWindowNavigationActions, 'showRepoBranchWorkspacePaneView' | 'showRepoWorkspacePaneView'>
 }): void {
   if (input.type === 'status' || input.type === 'history') {
-    useReposStore.getState().openBranchWorkspacePaneView(input.repoId, input.type)
+    useReposStore.getState().openBranchWorkspacePaneView(input.repoId, input.type, input.branchName)
   }
   if (input.worktreePath) {
     const worktreeKey = worktreeTerminalKey(input.repoId, input.worktreePath)

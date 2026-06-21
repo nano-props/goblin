@@ -24,6 +24,7 @@ import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { branchLevelWorkspacePaneViewButtonId } from '#/web/components/branch-workspace/workspace-pane-views.ts'
 import type { WorkspacePaneBranchViewType } from '#/shared/workspace-pane.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
+import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
 interface Props {
   repo: Pick<BranchWorkspaceRepo, 'id' | 'data' | 'ui'> & {
     data: BranchWorkspaceRepo['data'] & Pick<BranchWorkspaceRepo['data'], 'statusLoaded'>
@@ -50,9 +51,13 @@ export function BranchWorkspaceContent({ repo, detail, workspacePaneId }: Props)
   const compact = useIsCompactUi()
   const effectiveTab = useEffectiveWorkspacePaneView(repo)
   const { branch } = detail
+  const openBranchWorkspacePaneViews = branchWorkspacePaneViewsForBranch(repo.ui, branch?.name)
   const terminalWorktreeKey = branch?.worktree?.path ? worktreeTerminalKey(repo.id, branch.worktree.path) : null
   const worktreeSnapshot = useWorktreeTerminalSnapshot(terminalWorktreeKey)
-  const worktreeWorkspacePaneViews = worktreeSnapshot.workspacePaneViews
+  const worktreeWorkspacePaneViews = worktreeSnapshot.workspacePaneViews.filter((view) => {
+    const branchViewType = view.type === 'status' || view.type === 'history' ? view.type : null
+    return !branchViewType || openBranchWorkspacePaneViews.includes(branchViewType)
+  })
   const activeTabIdentity = activeWorkspacePaneViewIdentity(worktreeWorkspacePaneViews, effectiveTab)
   const activeTabIndex = activeTabIdentity
     ? worktreeWorkspacePaneViews.findIndex((tab) => workspacePaneViewIdentity(tab) === activeTabIdentity)
@@ -61,9 +66,9 @@ export function BranchWorkspaceContent({ repo, detail, workspacePaneId }: Props)
     (effectiveTab === 'status' || effectiveTab === 'history') &&
     !!terminalWorktreeKey &&
     activeTabIndex === -1 &&
-    repo.ui.openBranchWorkspacePaneViews.includes(effectiveTab)
+    openBranchWorkspacePaneViews.includes(effectiveTab)
   const branchStaticWorktreeFallbackIndex = branchStaticWorktreeFallbackActive
-    ? Math.max(0, repo.ui.openBranchWorkspacePaneViews.indexOf(effectiveTab as WorkspacePaneBranchViewType))
+    ? Math.max(0, openBranchWorkspacePaneViews.indexOf(effectiveTab as WorkspacePaneBranchViewType))
     : 0
   const activeTabLabelledById =
     activeTabIndex >= 0
@@ -76,7 +81,7 @@ export function BranchWorkspaceContent({ repo, detail, workspacePaneId }: Props)
   const terminalPendingCreate = effectiveTab === 'terminal' && worktreeSnapshot.pendingCreate
   const branchStaticTabActive =
     (effectiveTab === 'status' || effectiveTab === 'history') &&
-    (activeTabIndex >= 0 || repo.ui.openBranchWorkspacePaneViews.includes(effectiveTab))
+    (activeTabIndex >= 0 || openBranchWorkspacePaneViews.includes(effectiveTab))
   if (!branch)
     return <EmptyState title={t(repo.data.branches.length === 0 ? 'branches.empty' : 'branches.filter-empty')} />
 

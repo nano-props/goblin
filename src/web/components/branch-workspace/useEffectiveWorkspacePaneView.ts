@@ -1,4 +1,8 @@
-import { computeEffectiveWorkspacePaneView, type WorkspacePaneViewContext } from '#/web/lib/workspace-pane-view.ts'
+import {
+  computeEffectiveWorkspacePaneView,
+  isBranchLevelWorkspacePaneView,
+  type WorkspacePaneViewContext,
+} from '#/web/lib/workspace-pane-view.ts'
 import {
   useTerminalRepoSyncReady,
   useWorktreeTerminalSnapshot,
@@ -6,10 +10,11 @@ import {
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { RepoDataState, RepoState, RepoUiState } from '#/web/stores/repos/types.ts'
+import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
 
 type EffectiveWorkspacePaneViewRepo = {
   id: RepoState['id']
-  ui: Pick<RepoUiState, 'selectedBranch' | 'preferredWorkspacePaneView'>
+  ui: Pick<RepoUiState, 'selectedBranch' | 'preferredWorkspacePaneView' | 'openBranchWorkspacePaneViewsByBranch'>
   data: Pick<RepoDataState, 'branches'>
 }
 
@@ -42,5 +47,10 @@ export function useEffectiveWorkspacePaneView(
     terminalSyncReady: syncReady,
     terminalPendingCreate: terminalSnapshot.pendingCreate,
   }
-  return computeEffectiveWorkspacePaneView(repo.ui.preferredWorkspacePaneView, context)
+  const effective = computeEffectiveWorkspacePaneView(repo.ui.preferredWorkspacePaneView, context)
+  const openBranchViews = branchWorkspacePaneViewsForBranch(repo.ui, selectedBranch)
+  if (isBranchLevelWorkspacePaneView(effective) && !openBranchViews.includes(effective)) {
+    return openBranchViews[0] ?? 'status'
+  }
+  return effective
 }

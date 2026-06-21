@@ -127,7 +127,7 @@ function createRepo(input: {
     ui: {
       selectedBranch: null,
       branchViewMode: 'all',
-      openBranchWorkspacePaneViews: ['status'],
+      openBranchWorkspacePaneViewsByBranch: {},
       preferredWorkspacePaneView: 'status',
     },
     projection: { source: 'fresh', savedAt: null },

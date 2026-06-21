@@ -28,6 +28,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
+import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
 
 let compactUi = false
 
@@ -171,7 +172,7 @@ describe('BranchWorkspaceToolbar', () => {
     })
     await flush()
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual([])
+    expect(openViewsFor('feature/worktree')).toEqual([])
   })
 
   test('selects the adjacent terminal tab after closing the active status tab', async () => {
@@ -189,7 +190,7 @@ describe('BranchWorkspaceToolbar', () => {
     })
     await flush()
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual([])
+    expect(openViewsFor('feature/worktree')).toEqual([])
     expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'terminal')
     expect(mocks.selectTerminal).toHaveBeenCalledWith(`${REPO_ID}\0${WORKTREE_PATH}`, 't1')
   })
@@ -213,7 +214,7 @@ describe('BranchWorkspaceToolbar', () => {
     await flush()
 
     expect(mocks.closeWorkspacePaneView).toHaveBeenCalledWith(`${REPO_ID}\0${WORKTREE_PATH}`, 'history')
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.openBranchWorkspacePaneViews).toEqual(['history', 'status'])
+    expect(openViewsFor('feature/worktree')).toEqual(['history', 'status'])
   })
 
   test('compact workspace view popover merges status and terminal views', async () => {
@@ -715,4 +716,9 @@ function closeButtonFor(container: HTMLElement, identity: string): HTMLButtonEle
       button.getAttribute('aria-label')?.startsWith('workspace-pane-views.close-named'),
     ) ?? null
   )
+}
+
+function openViewsFor(branchName: string): WorkspacePaneBranchViewType[] {
+  const repo = useReposStore.getState().repos[REPO_ID]
+  return repo ? branchWorkspacePaneViewsForBranch(repo.ui, branchName) : []
 }

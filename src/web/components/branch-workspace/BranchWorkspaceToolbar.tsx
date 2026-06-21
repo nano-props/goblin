@@ -37,6 +37,7 @@ import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts
 import { useEffectiveWorkspacePaneView } from '#/web/components/branch-workspace/useEffectiveWorkspacePaneView.ts'
 import { useIsInitialSyncInFlight } from '#/web/stores/repo-sync.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
 
 interface Props {
   repo: Pick<BranchWorkspaceRepo, 'id' | 'ui' | 'data'>
@@ -57,6 +58,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
   const terminalWorktreeKey = detail.branch?.worktree?.path
     ? worktreeTerminalKey(repo.id, detail.branch.worktree.path)
     : null
+  const branchName = detail.branch?.name ?? null
   const showBranchLevelTabs = !!detail.branch
 
   const {
@@ -71,9 +73,13 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
 
   const worktreeSnapshot = useWorktreeTerminalSnapshot(terminalWorktreeKey)
   const runtimeWorkspacePaneViews = worktreeSnapshot.workspacePaneViews
+  const openBranchWorkspacePaneViews = useMemo(
+    () => branchWorkspacePaneViewsForBranch(repo.ui, branchName),
+    [branchName, repo.ui.openBranchWorkspacePaneViewsByBranch],
+  )
   const openBranchLevelTabs = useMemo(
-    () => branchLevelWorkspacePaneViewDefinitions(repo.ui.openBranchWorkspacePaneViews),
-    [repo.ui.openBranchWorkspacePaneViews],
+    () => branchLevelWorkspacePaneViewDefinitions(openBranchWorkspacePaneViews),
+    [openBranchWorkspacePaneViews],
   )
   const worktreeWorkspacePaneViews = useMemo<WorkspacePaneViewSummary[]>(() => {
     if (!terminalWorktreeKey || !detail.branch?.worktree?.path) return runtimeWorkspacePaneViews
@@ -168,15 +174,20 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
 
   const handleReorderWorkspacePaneViewStrip = useCallback(
     (worktreeKey: string, orderedViews: WorkspacePaneViewOrderEntry[]) => {
-      void reorderWorkspacePaneViews(worktreeKey, orderedViews)
+      const branchViews = orderedViews.map((entry) => entry.type).filter(isBranchWorkspacePaneViewType)
+      void reorderWorkspacePaneViews(worktreeKey, orderedViews).then((reordered) => {
+        if (reordered && branchName && branchViews.length > 0) {
+          useReposStore.getState().reorderBranchWorkspacePaneViews(repo.id, branchViews, branchName)
+        }
+      })
     },
-    [reorderWorkspacePaneViews],
+    [branchName, reorderWorkspacePaneViews, repo.id],
   )
   const handleReorderBranchWorkspacePaneViewStrip = useCallback(
     (orderedViews: WorkspacePaneBranchViewType[]) => {
-      useReposStore.getState().reorderBranchWorkspacePaneViews(repo.id, orderedViews)
+      useReposStore.getState().reorderBranchWorkspacePaneViews(repo.id, orderedViews, branchName ?? undefined)
     },
-    [repo.id],
+    [branchName, repo.id],
   )
 
   useEffect(() => {
@@ -268,26 +279,32 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
       const isActive = activeTabIdentity === item.identity
 
       if (isBranchWorkspacePaneTabItem(item)) {
-        useReposStore.getState().closeBranchWorkspacePaneView(repo.id, item.branchViewType)
+        if (!branchName) return
+        useReposStore.getState().closeBranchWorkspacePaneView(repo.id, item.branchViewType, branchName)
       } else if (item.view.type === 'terminal') {
         if (!terminalBase) return
         closeTerminalByDescriptor(item.view.key, terminalBase)
       } else {
         const branchViewType = item.view.type === 'status' || item.view.type === 'history' ? item.view.type : null
-        const previousBranchViews = branchViewType
-          ? [...(useReposStore.getState().repos[repo.id]?.ui.openBranchWorkspacePaneViews ?? [])]
-          : []
+        const currentRepo = useReposStore.getState().repos[repo.id]
+        const previousBranchViews =
+          branchViewType && currentRepo && branchName
+            ? branchWorkspacePaneViewsForBranch(currentRepo.ui, branchName)
+            : []
         if (item.view.type === 'status' || item.view.type === 'history') {
-          useReposStore.getState().closeBranchWorkspacePaneView(repo.id, item.view.type)
+          if (!branchName) return
+          useReposStore.getState().closeBranchWorkspacePaneView(repo.id, item.view.type, branchName)
         }
         if (!terminalWorktreeKey) return
         void closeWorkspacePaneView(terminalWorktreeKey, item.view.type)
           .then((closed) => {
-            if (!closed && branchViewType) restoreBranchWorkspacePaneViews(repo.id, previousBranchViews)
+            if (!closed && branchViewType && branchName) {
+              restoreBranchWorkspacePaneViews(repo.id, branchName, previousBranchViews)
+            }
           })
           .catch((err) => {
             terminalLog.warn('failed to close workspace pane view', { err, type: item.view.type })
-            if (branchViewType) restoreBranchWorkspacePaneViews(repo.id, previousBranchViews)
+            if (branchViewType && branchName) restoreBranchWorkspacePaneViews(repo.id, branchName, previousBranchViews)
           })
       }
 
@@ -299,6 +316,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
       activeTabIdentity,
       closeTerminalByDescriptor,
       closeWorkspacePaneView,
+      branchName,
       repo.id,
       showWorkspacePaneTabItem,
       terminalBase,
@@ -367,11 +385,16 @@ function branchWorkspacePaneViewType(type: WorkspacePaneViewSummary['type']): Wo
   return isBranchWorkspacePaneViewType(type) ? type : null
 }
 
-function restoreBranchWorkspacePaneViews(repoId: string, previousViews: WorkspacePaneBranchViewType[]): void {
+function restoreBranchWorkspacePaneViews(
+  repoId: string,
+  branchName: string,
+  previousViews: WorkspacePaneBranchViewType[],
+): void {
   if (previousViews.length === 0) return
   const store = useReposStore.getState()
+  if (store.repos[repoId]?.ui.selectedBranch !== branchName) return
   for (const view of previousViews) {
-    store.openBranchWorkspacePaneView(repoId, view)
+    store.openBranchWorkspacePaneView(repoId, view, branchName)
   }
-  store.reorderBranchWorkspacePaneViews(repoId, previousViews)
+  store.reorderBranchWorkspacePaneViews(repoId, previousViews, branchName)
 }

@@ -64,13 +64,13 @@ export interface RepoUiState {
   selectedBranch: string | null
   branchViewMode: BranchViewMode
   /**
-   * Branch-scoped workspace pane views opened for the selected branch. When a
-   * selected branch has a worktree, these views are also materialized in the
-   * workspace-pane runtime so they sort with changes/terminal. This array keeps
-   * the branch-level open intent and the fallback order for branches without a
+   * Branch-scoped workspace pane views opened per branch. When a selected
+   * branch has a worktree, its views are also materialized in the workspace-pane
+   * runtime so they sort with changes/terminal. The per-branch array keeps the
+   * branch-level open intent and the fallback order for branches without a
    * worktree path.
    */
-  openBranchWorkspacePaneViews: WorkspacePaneBranchViewType[]
+  openBranchWorkspacePaneViewsByBranch: Record<string, WorkspacePaneBranchViewType[]>
   /** The user-preferred workspace pane view type. This is persisted intent; the
    *  rendered workspace pane is resolved at read time from this preference plus
    *  live worktree, terminal, and opened workspace pane view state. The store never
@@ -212,9 +212,13 @@ export interface RuntimeCoherentRepoProjectionActions {
    *  the UI resolves the active pane at read time so session restore and branch
    *  switches preserve user intent. */
   setWorkspacePaneView: (id: string, tab: WorkspacePaneView) => void
-  openBranchWorkspacePaneView: (id: string, tab: WorkspacePaneBranchViewType) => void
-  closeBranchWorkspacePaneView: (id: string, tab: WorkspacePaneBranchViewType) => void
-  reorderBranchWorkspacePaneViews: (id: string, orderedViews: WorkspacePaneBranchViewType[]) => void
+  openBranchWorkspacePaneView: (id: string, tab: WorkspacePaneBranchViewType, branchName?: string) => void
+  closeBranchWorkspacePaneView: (id: string, tab: WorkspacePaneBranchViewType, branchName?: string) => void
+  reorderBranchWorkspacePaneViews: (
+    id: string,
+    orderedViews: WorkspacePaneBranchViewType[],
+    branchName?: string,
+  ) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
   selectBranch: (id: string, branch: string) => void
   clearSelectedBranch: (id: string) => void
