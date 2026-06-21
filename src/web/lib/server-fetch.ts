@@ -1,54 +1,9 @@
-import { getInitialBootstrap } from '#/web/bootstrap.ts'
 import { resolveApiBaseUrl } from '#/web/lib/websocket-url.ts'
 import { ACCESS_TOKEN_HEADER } from '#/shared/access-token.ts'
-
-interface EmbeddedServerConfig {
-  url: string
-  accessToken: string
-}
-
-function getEmbeddedServer(): EmbeddedServerConfig | null {
-  // Three paths can populate the bootstrap's `initialServer`:
-  //
-  //  1. **Electron embedded renderer** — the preload's IIFE in
-  //     `preload.cjs` calls `goblin:get-embedded-server-url` and
-  //     `goblin:get-access-token` IPC, then writes the result to
-  //     `window.__GOBLIN_BOOTSTRAP__`. The token is sent as the
-  //     `x-goblin-access-token` header on every fetch.
-  //
-  //  2. **QR-code URL bootstrap** — `?accessToken=…` on first
-  //     load; `useAccessTokenStatus` POSTs it to `/api/login` to
-  //     set the cookie, then strips the param from the URL. After
-  //     the first paint the token is gone and the renderer
-  //     authenticates via the cookie.
-  //
-  //  3. **Standalone browser / `serve.sh`** — no preload, no URL
-  //     token. The bootstrap's `initialServer.url` is empty and
-  //     the renderer falls back to `window.location.origin` here.
-  //     The renderer authenticates via the http-only cookie set
-  //     by `POST /api/login`.
-  //
-  // The `accessToken` field is only set in path (1). Paths (2) and
-  // (3) leave it empty; the caller MUST NOT attach the header in
-  // that case — the browser will send the cookie automatically.
-  const fromBootstrap = getInitialBootstrap().initialServer
-  if (fromBootstrap?.url) {
-    return { url: fromBootstrap.url, accessToken: fromBootstrap.accessToken ?? '' }
-  }
-  if (typeof window !== 'undefined' && window.location?.origin) {
-    return { url: window.location.origin, accessToken: '' }
-  }
-  return null
-}
-
-function requireEmbeddedServer(): EmbeddedServerConfig {
-  const server = getEmbeddedServer()
-  if (!server) throw new Error('Embedded server unavailable')
-  return server
-}
+import { requireRendererServerConfig } from '#/web/lib/server-config.ts'
 
 export async function fetchServerJson<T>(path: string | URL, init?: RequestInit): Promise<T> {
-  const server = requireEmbeddedServer()
+  const server = requireRendererServerConfig()
   const url = typeof path === 'string' ? new URL(path, resolveApiBaseUrl(server.url)).toString() : path.toString()
   const { headers: extraHeaders, ...rest } = init ?? {}
   const headers: Record<string, string> = {}
@@ -105,7 +60,7 @@ export async function getServerJson<TParams extends Record<string, QueryParamVal
   params: TParams,
   options?: { signal?: AbortSignal },
 ): Promise<TOutput> {
-  const url = new URL(path, resolveApiBaseUrl(requireEmbeddedServer().url))
+  const url = new URL(path, resolveApiBaseUrl(requireRendererServerConfig().url))
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === null) continue
     if (Array.isArray(value)) {

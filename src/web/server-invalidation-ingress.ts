@@ -1,8 +1,8 @@
-import { getInitialBootstrap } from '#/web/bootstrap.ts'
 import { isServerInvalidationEvent, type ServerInvalidationEvent } from '#/shared/server-invalidation.ts'
 import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'
 import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
 import { ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
+import { resolveRendererServerConfig } from '#/web/lib/server-config.ts'
 
 type Listener = (event: ServerInvalidationEvent) => void
 // Shared server-owned invalidation ingress for browser and Electron renderers.
@@ -41,12 +41,12 @@ function parseInvalidationMessage(data: unknown): ServerInvalidationEvent | null
 }
 
 function ensureSocket(): void {
-  const server = getInitialBootstrap().initialServer
+  const server = resolveRendererServerConfig()
   if (!server || typeof WebSocket === 'undefined' || socket || listeners.size === 0 || isAppQuitting()) return
   clearReconnectTimer()
   manualSocketClose = false
   const generation = (socketGeneration += 1)
-  const currentSocket = new WebSocket(createInvalidationWebSocketUrl(server.url, server.accessToken ?? null))
+  const currentSocket = new WebSocket(createInvalidationWebSocketUrl(server.url, server.accessToken || null))
   socket = currentSocket
   currentSocket.addEventListener('open', () => {
     if (socket !== currentSocket || socketGeneration !== generation) return

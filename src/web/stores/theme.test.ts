@@ -72,6 +72,7 @@ function installWindow(options: InstallWindowOptions = {}): void {
     location: {
       href: 'http://127.0.0.1:32100/',
       origin: 'http://127.0.0.1:32100',
+      protocol: 'http:',
       search: '',
     },
     setInterval,
