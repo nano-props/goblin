@@ -1,10 +1,7 @@
 import * as React from 'react'
 import * as ResizablePrimitive from 'react-resizable-panels'
 import { cn } from '#/web/lib/cn.ts'
-type ResizeDirection = 'horizontal' | 'vertical'
-type ResizableHandleProps = React.ComponentProps<typeof ResizablePrimitive.Separator> & {
-  orientation?: ResizeDirection
-}
+type ResizableHandleProps = React.ComponentProps<typeof ResizablePrimitive.Separator>
 
 // Keep the drag hit target and the visible splitter line separate: the
 // target stays transparent, while the 1px line paints the separator. This
@@ -15,7 +12,6 @@ const resizeHandle = {
     'before:absolute before:z-10 before:content-[""]',
   ].join(' '),
   horizontal: 'h-full w-px cursor-col-resize before:inset-y-0 before:left-1/2 before:w-2 before:-translate-x-1/2',
-  vertical: 'h-px w-full cursor-row-resize before:inset-x-0 before:top-1/2 before:h-2 before:-translate-y-1/2',
   visibleLine: [
     'pointer-events-none absolute z-20 rounded-full bg-separator/70',
     'transition-[background-color,opacity,width,height] duration-100',
@@ -24,8 +20,6 @@ const resizeHandle = {
   ].join(' '),
   lineHorizontal:
     'inset-y-0 left-1/2 w-px -translate-x-1/2 group-data-[separator=hover]:w-0.5 group-focus-visible:w-0.5 group-data-[separator=active]:w-0.5',
-  lineVertical:
-    'inset-x-0 top-1/2 h-px -translate-y-1/2 group-data-[separator=hover]:h-0.5 group-focus-visible:h-0.5 group-data-[separator=active]:h-0.5',
 } as const
 
 function ResizablePanelGroup({ className, ...props }: React.ComponentProps<typeof ResizablePrimitive.Group>) {
@@ -38,20 +32,14 @@ function ResizablePanel(props: React.ComponentProps<typeof ResizablePrimitive.Pa
   return <ResizablePrimitive.Panel data-slot="resizable-panel" {...props} />
 }
 
-function ResizableHandle({ className, orientation = 'horizontal', ...props }: ResizableHandleProps) {
+function ResizableHandle({ className, ...props }: ResizableHandleProps) {
   return (
     <ResizablePrimitive.Separator
       data-slot="resizable-handle"
-      className={cn(resizeHandle.hitTarget, resizeHandle[orientation], className)}
+      className={cn(resizeHandle.hitTarget, resizeHandle.horizontal, className)}
       {...props}
     >
-      <span
-        aria-hidden
-        className={cn(
-          resizeHandle.visibleLine,
-          orientation === 'horizontal' ? resizeHandle.lineHorizontal : resizeHandle.lineVertical,
-        )}
-      />
+      <span aria-hidden className={cn(resizeHandle.visibleLine, resizeHandle.lineHorizontal)} />
     </ResizablePrimitive.Separator>
   )
 }

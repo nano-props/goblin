@@ -43,14 +43,20 @@ vi.mock('#/web/components/BranchWorkspace.tsx', () => ({
 vi.mock('#/web/components/Layout.tsx', () => ({
   RepoWorkspace: ({
     mode,
+    branchNavigatorCollapsed,
     branchNavigatorPane,
     branchWorkspacePane,
   }: {
     mode?: 'split' | 'single-pane'
+    branchNavigatorCollapsed?: boolean
     branchNavigatorPane: React.ReactNode
     branchWorkspacePane: React.ReactNode
   }) => (
-    <div data-testid="repo-workspace" data-mode={mode ?? 'split'}>
+    <div
+      data-testid="repo-workspace"
+      data-mode={mode ?? 'split'}
+      data-branch-navigator-collapsed={branchNavigatorCollapsed ? 'true' : 'false'}
+    >
       {mode === 'single-pane' ? (
         branchWorkspacePane
       ) : (
@@ -115,7 +121,7 @@ describe('RepoView workspace navigation', () => {
     expect(branchWorkspace()).not.toBeNull()
   })
 
-  test('large-screen Focus Mode uses Branch Navigator until a branch opens Branch Workspace', () => {
+  test('large-screen Focus Mode uses Branch Navigator until a branch opens a collapsed split workspace', () => {
     useReposStore.getState().setWorkspaceFocused(true)
     render(<RepoView repoId={REPO_ID} />)
 
@@ -129,7 +135,9 @@ describe('RepoView workspace navigation', () => {
     })
 
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBe('feature/a')
-    expect(branchNavigator()).toBeNull()
+    expect(branchNavigator()).not.toBeNull()
+    expect(workspace()?.dataset.mode).toBe('split')
+    expect(workspace()?.dataset.branchNavigatorCollapsed).toBe('true')
     expect(branchWorkspace()).not.toBeNull()
   })
 

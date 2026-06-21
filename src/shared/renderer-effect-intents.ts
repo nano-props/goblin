@@ -14,6 +14,7 @@ export type RendererEffectIntent =
   | { type: 'repo-refresh-requested' }
   | { type: 'show-workspace-pane-view-requested'; tab: WorkspacePaneView }
   | { type: 'terminal-primary-action-requested' }
+  | { type: 'workspace-focus-toggle-requested' }
   | { type: 'layout-reset-requested' }
   | { type: 'open-settings-requested'; page: SettingsPage }
   | { type: 'theme-pref-set-requested'; pref: ThemePref }
@@ -39,6 +40,7 @@ export function isRendererEffectIntent(event: unknown): event is RendererEffectI
     type === 'repo-refresh-requested' ||
     type === 'show-workspace-pane-view-requested' ||
     type === 'terminal-primary-action-requested' ||
+    type === 'workspace-focus-toggle-requested' ||
     type === 'layout-reset-requested' ||
     type === 'open-settings-requested' ||
     type === 'theme-pref-set-requested' ||

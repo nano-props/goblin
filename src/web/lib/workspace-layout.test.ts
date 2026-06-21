@@ -7,15 +7,34 @@ describe('repoWorkspaceBehavior', () => {
       mode: 'split',
       singlePane: false,
       workspaceFocused: false,
+      branchNavigatorCollapsed: false,
       branchNavigatorActionsVisible: true,
     })
   })
 
-  test('uses single-pane behavior when large-screen Focus Mode is active', () => {
+  test('uses Branch Navigator as the single pane when large-screen Focus Mode has no active branch workspace', () => {
     expect(repoWorkspaceBehavior({ layout: 'left-right', compact: false, workspaceFocused: true })).toMatchObject({
       mode: 'single-pane',
       singlePane: true,
       workspaceFocused: true,
+      branchNavigatorCollapsed: false,
+      branchNavigatorActionsVisible: true,
+    })
+  })
+
+  test('collapses Branch Navigator inside split layout when large-screen Focus Mode has an active branch workspace', () => {
+    expect(
+      repoWorkspaceBehavior({
+        layout: 'left-right',
+        compact: false,
+        workspaceFocused: true,
+        branchWorkspaceActive: true,
+      }),
+    ).toMatchObject({
+      mode: 'split',
+      singlePane: false,
+      workspaceFocused: true,
+      branchNavigatorCollapsed: true,
       branchNavigatorActionsVisible: true,
     })
   })
@@ -26,6 +45,7 @@ describe('repoWorkspaceBehavior', () => {
       singlePane: true,
       compact: true,
       workspaceFocused: false,
+      branchNavigatorCollapsed: false,
       branchNavigatorActionsVisible: true,
     })
   })

@@ -281,11 +281,13 @@ describe('repo selectors', () => {
           ensureWorkspaceOpen: fnA as never,
           setSelectedTerminal: fnA as never,
           resetLayout: fnA as never,
+          toggleWorkspaceFocused: fnA as never,
         }),
         rendererEffectIntentStoreActionsFromStore({
           ensureWorkspaceOpen: fnA as never,
           setSelectedTerminal: fnA as never,
           resetLayout: fnB as never,
+          toggleWorkspaceFocused: fnA as never,
         }),
       ),
     ).toBe(false)

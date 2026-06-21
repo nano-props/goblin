@@ -218,6 +218,7 @@ function createViewMenu(state: AppMenuState): MenuItemConstructorOptions {
       // tab, focus the first existing session, or create one when the
       // worktree has no terminals yet.
       createRendererCommandMenuItem(state, 'view-terminal'),
+      createRendererCommandMenuItem(state, 'view-toggle-focus-mode'),
       ...(state.isMac ? [] : [separator(), createAppearanceMenu(state.themePref), createLanguageMenu(state.langPref)]),
       separator(),
       createRendererCommandMenuItem(state, 'view-refresh'),

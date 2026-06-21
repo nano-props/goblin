@@ -47,10 +47,12 @@ export function RepoView({ repoId }: Props) {
   useRepoToasts(repoId)
 
   const layout = DEFAULT_WORKSPACE_LAYOUT
+  const branchWorkspaceActive = !!repo?.ui.selectedBranch
   const behavior = repoWorkspaceBehavior({
     layout,
     compact,
     workspaceFocused: view.workspaceFocused,
+    branchWorkspaceActive,
   })
 
   const workspacePaneSize = view.workspacePaneSizes[layout]
@@ -91,6 +93,7 @@ export function RepoView({ repoId }: Props) {
       mode="split"
       workspacePaneSize={workspacePaneSize}
       onWorkspacePaneSizeChange={(size) => setWorkspacePaneSize(layout, size)}
+      branchNavigatorCollapsed={behavior.branchNavigatorCollapsed}
       branchNavigatorPane={branchNavigatorPane}
       branchWorkspacePane={branchWorkspacePane}
     />

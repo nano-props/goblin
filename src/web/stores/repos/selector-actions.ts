@@ -45,7 +45,7 @@ export interface RepoTabStoreActions extends Pick<ReposStore, 'ensureWorkspaceOp
 
 export interface RendererEffectIntentStoreActions extends Pick<
   ReposStore,
-  'ensureWorkspaceOpen' | 'setSelectedTerminal' | 'resetLayout'
+  'ensureWorkspaceOpen' | 'setSelectedTerminal' | 'resetLayout' | 'toggleWorkspaceFocused'
 > {}
 
 export function restorableWorkspaceViewportStoreActionsFromStore(
@@ -177,7 +177,7 @@ export function repoTabStoreActionsFromStore(state: Pick<ReposStore, 'ensureWork
 }
 
 export function rendererEffectIntentStoreActionsFromStore(
-  state: Pick<ReposStore, 'ensureWorkspaceOpen' | 'setSelectedTerminal' | 'resetLayout'>,
+  state: Pick<ReposStore, 'ensureWorkspaceOpen' | 'setSelectedTerminal' | 'resetLayout' | 'toggleWorkspaceFocused'>,
 ): RendererEffectIntentStoreActions {
   const runtimeCoherent = runtimeCoherentRepoOpenStoreActionsFromStore({
     ensureWorkspaceOpen: state.ensureWorkspaceOpen,
@@ -186,6 +186,7 @@ export function rendererEffectIntentStoreActionsFromStore(
     ensureWorkspaceOpen: runtimeCoherent.ensureWorkspaceOpen,
     setSelectedTerminal: state.setSelectedTerminal,
     resetLayout: state.resetLayout,
+    toggleWorkspaceFocused: state.toggleWorkspaceFocused,
   }
 }
 
@@ -213,6 +214,7 @@ export function rendererEffectIntentStoreActionsEqual(
   return (
     a.ensureWorkspaceOpen === b.ensureWorkspaceOpen &&
     a.setSelectedTerminal === b.setSelectedTerminal &&
-    a.resetLayout === b.resetLayout
+    a.resetLayout === b.resetLayout &&
+    a.toggleWorkspaceFocused === b.toggleWorkspaceFocused
   )
 }

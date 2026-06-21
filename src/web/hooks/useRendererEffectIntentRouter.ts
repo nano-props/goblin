@@ -42,11 +42,7 @@ export function useRendererEffectIntentRouter({
   // This hook is the single renderer-side subscription point for native effect
   // intents. Routing stays centralized here; intent-specific behavior lives in
   // the handler/plan helpers so components do not subscribe independently.
-  const {
-    ensureWorkspaceOpen,
-    setSelectedTerminal,
-    resetLayout,
-  } = useStoreWithEqualityFn(
+  const { ensureWorkspaceOpen, setSelectedTerminal, resetLayout, toggleWorkspaceFocused } = useStoreWithEqualityFn(
     useReposStore,
     rendererEffectIntentStoreActionsFromStore,
     rendererEffectIntentStoreActionsEqual,
@@ -84,6 +80,7 @@ export function useRendererEffectIntentRouter({
       ensureWorkspaceOpen: async (input: string | RepoSessionEntry) => await ensureWorkspaceOpenRef.current(input),
       setSelectedTerminal,
       resetLayout,
+      toggleWorkspaceFocused,
       t: (key: string) => tRef.current(key),
     })
 
@@ -128,6 +125,7 @@ export function useRendererEffectIntentRouter({
     openRepoPathDialog,
     resetLayout,
     setSelectedTerminal,
+    toggleWorkspaceFocused,
     t,
   ])
 }
