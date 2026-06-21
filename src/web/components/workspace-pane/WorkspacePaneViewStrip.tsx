@@ -540,6 +540,11 @@ export function WorkspacePaneViewStrip({
             onKeyDown={handleTabKeyDown}
             t={t}
             compact={showCollapsedTabs}
+            // The compact tab is always rendered with the muted chrome
+            // (matching an unselected tab on the expanded strip), so its
+            // right edge needs the same separator that the expanded strip
+            // draws next to idle tabs.
+            showSeparator
           />
         </WorkspacePaneViewTooltipLayer>
         {isLoading && !hasTerminalItems && canCreateNew ? (
@@ -765,7 +770,7 @@ function WorkspacePaneViewChrome({
       }}
       buttonClassName={toolbarTabButtonClassName('workspace')}
       closeLabel={item.closeLabel}
-      closeVisible={isActive}
+      closeVisible={isActive && !compact}
       onClose={(e) => onClose(e, item.identity)}
     >
       <WorkspacePaneViewIcon item={item} active={isActive} compact={compact} />

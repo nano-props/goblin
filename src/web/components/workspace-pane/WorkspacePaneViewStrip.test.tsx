@@ -605,6 +605,15 @@ describe('WorkspacePaneViewStrip', () => {
     expect(compactTab?.className).toContain('flex-1')
     expect(compactTab?.className).not.toContain('w-32')
     expect(compactTab?.className).not.toContain('w-36')
+    // The compact tab treats itself as visually unselected, so the chrome
+    // matches an idle tab on the expanded strip: muted foreground and a
+    // right-edge separator between this tab and the popover button.
+    expect(compactTab?.className).not.toContain('bg-selected')
+    expect(compactTab?.querySelector('.border-r.border-separator')).not.toBeNull()
+    // Close button stays in the DOM but is hidden until hover/focus,
+    // matching the expanded strip's unselected-tab behaviour.
+    const compactCloseButton = compactTab?.querySelector('button[aria-label="close term-1"]')
+    expect(compactCloseButton?.className).toContain('opacity-0')
     expect(document.body.querySelector('button[aria-label="workspace-pane-views.tabs"]')).not.toBeNull()
 
     rerender(
@@ -622,6 +631,31 @@ describe('WorkspacePaneViewStrip', () => {
 
     expect(document.body.querySelectorAll('[role="tab"]').length).toBe(2)
     expect(document.body.querySelector('button[aria-label="workspace-pane-views.tabs"]')).toBeNull()
+  })
+
+  test('keeps the compact tab visually unselected even when its panel is active', () => {
+    render(
+      <TestWorkspacePaneViewStrip
+        worktreeTerminalKey="/repo\0/repo/worktree"
+        workspacePaneId="workspace"
+        responsiveCompact
+        panelActive
+        sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    const compactTab = document.body.querySelector('[data-workspace-pane-view-tooltip-id]')
+    // The active panel makes isActive=true, but the compact tab still mutes
+    // the active chrome — so the close button stays hidden-until-hover, just
+    // like an unselected tab on the expanded strip.
+    expect(compactTab?.className).not.toContain('bg-selected')
+    const compactCloseButton = compactTab?.querySelector('button[aria-label="close term-1"]')
+    expect(compactCloseButton?.className).toContain('opacity-0')
   })
 })
 
