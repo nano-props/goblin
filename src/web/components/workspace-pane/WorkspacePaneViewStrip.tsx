@@ -768,7 +768,7 @@ function WorkspacePaneViewChrome({
       closeVisible={isActive}
       onClose={(e) => onClose(e, item.identity)}
     >
-      <WorkspacePaneViewIcon item={item} active={isActive} />
+      <WorkspacePaneViewIcon item={item} active={isActive} compact={compact} />
       <span className="truncate">{item.label}</span>
       {isTerminalWorkspacePaneTabItem(item) && item.view.hasBell && (
         <>
@@ -890,8 +890,8 @@ function WorkspacePaneViewTooltipLayer({ items, children, ...props }: WorkspaceP
   )
 }
 
-function WorkspacePaneViewIcon({ item, active }: { item: WorkspacePaneTabItem; active: boolean }) {
-  const className = toolbarTabIconClassName(active)
+function WorkspacePaneViewIcon({ item, active, compact = false }: { item: WorkspacePaneTabItem; active: boolean; compact?: boolean }) {
+  const className = toolbarTabIconClassName(active, compact)
   if (item.icon === 'status') return <GitBranch size={13} className={className} />
   if (item.icon === 'changes') return <FileText size={13} className={className} />
   if (item.icon === 'history') return <History size={13} className={className} />

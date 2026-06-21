@@ -13,10 +13,10 @@ export function toolbarTabChromeClassName(options: {
   hoverable?: boolean
 }): string {
   const { variant, active, dragging = false, compact = false, hoverable = true } = options
-  // Compact repo strips render only the active tab, so the "active" chrome
-  // would be visually misleading — collapse it to the unselected chrome
-  // (matching the look of an idle tab on the expanded strip).
-  const treatAsUnselected = variant === 'repo' && compact
+  // Compact strips (repo *and* workspace) render only the visible tab, so the
+  // "active" chrome would be visually misleading — mute it to match the
+  // unselected chrome (the look of an idle tab on the expanded strip).
+  const muteActiveChrome = compact
   return cn(
     'group relative select-none items-center transition-colors duration-100',
     compositeFocusRing,
@@ -26,10 +26,10 @@ export function toolbarTabChromeClassName(options: {
         ? 'flex h-7 min-w-0 flex-1 gap-1 rounded-md border px-2.5 text-sm'
         : 'flex h-7 w-36 shrink-0 gap-1 rounded-md border px-2.5 text-sm',
     variant === 'repo'
-      ? active && !treatAsUnselected
+      ? active && !muteActiveChrome
         ? 'border-input bg-card text-foreground'
         : cn('border-transparent text-muted-foreground', hoverable && 'hover:bg-accent/70 hover:text-foreground')
-      : active
+      : active && !muteActiveChrome
         ? 'border-transparent bg-selected text-selected-foreground'
         : 'border-transparent text-muted-foreground hover:bg-accent/50 hover:text-foreground',
     dragging && 'z-10 cursor-grabbing',
@@ -45,8 +45,8 @@ export function toolbarTabButtonClassName(_variant: ToolbarTabVariant): string |
 }
 
 export function toolbarTabIconClassName(active: boolean, compact = false): string {
-  // Compact repo strips show only the active tab; the icon follows the
-  // tab chrome and stays muted to match the unselected look.
+  // Compact strips (repo *and* workspace) show only the visible tab; the
+  // icon follows the tab chrome and stays muted to match the unselected look.
   const emphasized = active && !compact
   return cn('shrink-0', emphasized ? 'text-foreground' : 'text-muted-foreground')
 }
