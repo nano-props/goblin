@@ -56,25 +56,31 @@ describe('Topbar', () => {
     expect(settingsButton()).not.toBeNull()
   })
 
-  test('renders a Focus Mode toggle on large screens', () => {
+  test('renders a Focus Mode toggle before repo tabs on large screens', () => {
     render(
       <Topbar repoId="/tmp/repo" onOpenSettings={() => {}}>
-        <div />
+        <div data-testid="repo-tabs" />
       </Topbar>,
     )
 
-    expect(focusModeToggle()).not.toBeNull()
+    const toggle = focusModeToggle()
+    const repoTabs = container?.querySelector('[data-testid="repo-tabs"]')
+    expect(toggle).not.toBeNull()
+    expect(toggle?.nextElementSibling?.className).toContain('bg-separator')
+    expect(toggle?.nextElementSibling?.nextElementSibling).toBe(repoTabs)
   })
 
-  test('toggles large-screen Focus Mode', () => {
+  test('toggles large-screen Focus Mode with stable tooltip and button styling', () => {
     render(
       <Topbar repoId="/tmp/repo" onOpenSettings={() => {}}>
         <div />
       </Topbar>,
     )
 
+    const initialClassName = focusModeToggle()?.className
     expect(useReposStore.getState().workspaceFocused).toBe(false)
     expect(focusModeToggle()?.getAttribute('aria-pressed')).toBe('false')
+    expect(focusModeToggle()?.getAttribute('title')).toBe('workspace.focus-toggle-tooltip.enable')
 
     act(() => {
       focusModeToggle()?.click()
@@ -82,6 +88,8 @@ describe('Topbar', () => {
 
     expect(useReposStore.getState().workspaceFocused).toBe(true)
     expect(focusModeToggle()?.getAttribute('aria-pressed')).toBe('true')
+    expect(focusModeToggle()?.getAttribute('title')).toBe('workspace.focus-toggle-tooltip.enable')
+    expect(focusModeToggle()?.className).toBe(initialClassName)
   })
 
   test('hides the Focus Mode toggle on compact screens', () => {
@@ -96,7 +104,7 @@ describe('Topbar', () => {
     expect(focusModeToggle()).toBeNull()
   })
 
-  test('renders branch workspace back before repo tabs on large screens while focused on a selected branch', () => {
+  test('hides branch workspace back on large screens while focused on a selected branch', () => {
     seedRepoState({
       id: '/tmp/repo',
       branches: [createRepoBranch('main'), createRepoBranch('feature/a')],
@@ -110,18 +118,14 @@ describe('Topbar', () => {
       </Topbar>,
     )
 
-    const back = branchWorkspaceBackButton()
     const repoTabs = container?.querySelector('[data-testid="repo-tabs"]')
-    expect(back).not.toBeNull()
-    expect(back?.nextElementSibling?.className).toContain('bg-separator')
-    expect(back?.nextElementSibling?.nextElementSibling).toBe(repoTabs)
-
-    act(() => {
-      back?.click()
-    })
-
+    const toggle = focusModeToggle()
+    expect(branchWorkspaceBackButton()).toBeNull()
+    expect(toggle).not.toBeNull()
+    expect(toggle?.nextElementSibling?.className).toContain('bg-separator')
+    expect(toggle?.nextElementSibling?.nextElementSibling).toBe(repoTabs)
     expect(useReposStore.getState().workspaceFocused).toBe(true)
-    expect(useReposStore.getState().repos['/tmp/repo']?.ui.selectedBranch).toBeNull()
+    expect(useReposStore.getState().repos['/tmp/repo']?.ui.selectedBranch).toBe('feature/a')
   })
 
   test('renders branch workspace back before repo tabs on compact screens without Focus Mode', () => {
