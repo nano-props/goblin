@@ -1,6 +1,5 @@
 import { useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
-import type { RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { Toolbar } from '#/web/components/Layout.tsx'
 import { cn } from '#/web/lib/cn.ts'
@@ -43,12 +42,10 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 interface Props {
   repo: Pick<BranchWorkspaceRepo, 'id' | 'ui' | 'data'>
   detail: SelectedBranchWorkspacePresentation
-  detailId: string
-  contentId: string
-  layout: RepoWorkspaceLayout
+  workspacePaneId: string
 }
 
-export function BranchWorkspaceToolbar({ repo, detail, detailId }: Props) {
+export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props) {
   const t = useT()
   const navigation = useMainWindowNavigation()
   const compact = useIsCompactUi()
@@ -170,7 +167,7 @@ export function BranchWorkspaceToolbar({ repo, detail, detailId }: Props) {
               label,
               tooltip: label,
               closeLabel: branchLevelWorkspacePaneViewCloseLabel(tab.type, t),
-              panelId: `${detailId}-${tab.type}-panel`,
+              panelId: `${workspacePaneId}-${tab.type}-panel`,
             })
           })
         : []),
@@ -180,18 +177,18 @@ export function BranchWorkspaceToolbar({ repo, detail, detailId }: Props) {
           label: labelForWorkspacePaneView(tab),
           tooltip: tooltipForWorkspacePaneView(tab),
           closeLabel: closeLabelForWorkspacePaneView(tab),
-          panelId: `${detailId}-${tab.type}-panel`,
+          panelId: `${workspacePaneId}-${tab.type}-panel`,
         }),
       ),
     ],
     [
       closeLabelForWorkspacePaneView,
-      detailId,
       labelForWorkspacePaneView,
       repo.ui.openBranchWorkspacePaneViews,
       showBranchLevelTabs,
       t,
       tooltipForWorkspacePaneView,
+      workspacePaneId,
       worktreeWorkspacePaneViews,
     ],
   )
@@ -251,13 +248,13 @@ export function BranchWorkspaceToolbar({ repo, detail, detailId }: Props) {
   if (!detail.branch) return null
 
   return (
-    <Toolbar variant="detail">
+    <Toolbar variant="workspace">
       <div className="flex h-full min-w-0 items-center gap-1 overflow-hidden">
         {showBranchLevelTabs && (
           <WorkspacePaneViewStrip
             worktreeTerminalKey={terminalWorktreeKey}
             items={workspacePaneTabItems}
-            detailId={detailId}
+            workspacePaneId={workspacePaneId}
             activeTabIdentity={activeTabIdentity}
             responsiveCompact={compact}
             panelActive

@@ -60,7 +60,7 @@ describe('WorkspacePaneViewStrip', () => {
     render(
       <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
-        detailId="detail"
+        workspacePaneId="workspace"
         panelActive
         sessions={[
           session({
@@ -107,7 +107,7 @@ describe('WorkspacePaneViewStrip', () => {
     render(
       <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
-        detailId="detail"
+        workspacePaneId="workspace"
         responsiveCompact
         sessions={[
           session({ key: 't1', selected: false, title: 'term-1' }),
@@ -148,7 +148,7 @@ describe('WorkspacePaneViewStrip', () => {
     render(
       <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
-        detailId="detail"
+        workspacePaneId="workspace"
         responsiveCompact
         sessions={[
           session({ key: 't1', selected: false, title: 'term-1' }),
@@ -163,7 +163,7 @@ describe('WorkspacePaneViewStrip', () => {
       />,
     )
 
-    const tab = document.body.querySelector('#detail-workspace-pane-view')
+    const tab = document.body.querySelector('#workspace-workspace-pane-view')
     if (!(tab instanceof HTMLButtonElement)) throw new Error('missing collapsed terminal view')
 
     act(() => {
@@ -184,7 +184,7 @@ describe('WorkspacePaneViewStrip', () => {
     render(
       <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
-        detailId="detail"
+        workspacePaneId="workspace"
         sessions={[
           session({ key: 't1', title: 'term-1' }),
           session({ key: 't2', title: 'term-2', selected: false }),
@@ -211,7 +211,7 @@ describe('WorkspacePaneViewStrip', () => {
       ),
     ).toBe(true)
     expect(document.body.querySelectorAll('[role="tab"]').length).toBe(3)
-    const firstTab = document.body.querySelector('#detail-workspace-pane-view')
+    const firstTab = document.body.querySelector('#workspace-workspace-pane-view')
     expect(firstTab?.getAttribute('aria-posinset')).toBe('1')
     expect(firstTab?.getAttribute('aria-setsize')).toBe('3')
   })
@@ -220,7 +220,7 @@ describe('WorkspacePaneViewStrip', () => {
     render(
       <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
-        detailId="detail"
+        workspacePaneId="workspace"
         panelActive
         sessions={[session({ key: 't1', selected: true }), session({ key: 't2', selected: false })]}
         onNew={() => {}}
@@ -249,7 +249,7 @@ describe('WorkspacePaneViewStrip', () => {
     render(
       <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
-        detailId="detail"
+        workspacePaneId="workspace"
         panelActive
         sessions={[
           session({
@@ -267,7 +267,7 @@ describe('WorkspacePaneViewStrip', () => {
       />,
     )
 
-    const tab = document.body.querySelector('#detail-workspace-pane-view')
+    const tab = document.body.querySelector('#workspace-workspace-pane-view')
     expect(tab?.getAttribute('aria-label')).toContain('~/repo/worktree — npm run dev')
     expect(tab?.getAttribute('aria-label')).toContain('terminal.bell-unread')
     expect(tab?.querySelector('.bg-notification')).not.toBeNull()
@@ -284,7 +284,7 @@ describe('WorkspacePaneViewStrip', () => {
     render(
       <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
-        detailId="detail"
+        workspacePaneId="workspace"
         sessions={[
           session({ key: 't1', title: 'term-1' }),
           session({ key: 't2', title: 'term-2', selected: false }),
@@ -299,9 +299,9 @@ describe('WorkspacePaneViewStrip', () => {
       />,
     )
 
-    const tab1 = document.body.querySelector('#detail-workspace-pane-view')
-    const tab2 = document.body.querySelector('#detail-workspace-pane-view-1')
-    const tab3 = document.body.querySelector('#detail-workspace-pane-view-2')
+    const tab1 = document.body.querySelector('#workspace-workspace-pane-view')
+    const tab2 = document.body.querySelector('#workspace-workspace-pane-view-1')
+    const tab3 = document.body.querySelector('#workspace-workspace-pane-view-2')
     if (
       !(tab1 instanceof HTMLButtonElement) ||
       !(tab2 instanceof HTMLButtonElement) ||
@@ -340,7 +340,7 @@ describe('WorkspacePaneViewStrip', () => {
     render(
       <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
-        detailId="detail"
+        workspacePaneId="workspace"
         sessions={[
           session({ key: 't1', title: 'term-1', selected: true }),
           session({ key: 't2', title: 'term-2', selected: false, terminalId: 'terminal-2', index: 2 }),
@@ -353,8 +353,8 @@ describe('WorkspacePaneViewStrip', () => {
       />,
     )
 
-    const tab1 = document.body.querySelector('#detail-workspace-pane-view')
-    const tab2 = document.body.querySelector('#detail-workspace-pane-view-1')
+    const tab1 = document.body.querySelector('#workspace-workspace-pane-view')
+    const tab2 = document.body.querySelector('#workspace-workspace-pane-view-1')
     if (!(tab1 instanceof HTMLButtonElement) || !(tab2 instanceof HTMLButtonElement)) {
       throw new Error('missing terminal views')
     }
@@ -369,7 +369,7 @@ describe('WorkspacePaneViewStrip', () => {
     render(
       <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
-        detailId="detail"
+        workspacePaneId="workspace"
         sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -388,7 +388,7 @@ describe('WorkspacePaneViewStrip', () => {
     rerender(
       <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
-        detailId="detail"
+        workspacePaneId="workspace"
         sessions={[
           session({ key: 't1', title: 'term-1' }),
           session({ key: 't2', title: 'term-2', selected: false }),
@@ -409,7 +409,7 @@ describe('WorkspacePaneViewStrip', () => {
     render(
       <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
-        detailId="detail"
+        workspacePaneId="workspace"
         sessions={[
           session({ key: 't1', title: 'term-1' }),
           session({ key: 't2', title: 'term-2', selected: false }),
@@ -433,7 +433,7 @@ describe('WorkspacePaneViewStrip', () => {
     rerender(
       <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
-        detailId="detail"
+        workspacePaneId="workspace"
         sessions={[
           session({ key: 't1', title: 'term-1' }),
           session({ key: 't2', title: 'term-2', selected: false }),
@@ -454,7 +454,7 @@ describe('WorkspacePaneViewStrip', () => {
     render(
       <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
-        detailId="detail"
+        workspacePaneId="workspace"
         sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -475,7 +475,7 @@ describe('WorkspacePaneViewStrip', () => {
     rerender(
       <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
-        detailId="detail"
+        workspacePaneId="workspace"
         sessions={[
           session({ key: 't1', title: 'term-1' }),
           session({ key: 't2', title: 'term-2', selected: false }),
@@ -501,7 +501,7 @@ describe('WorkspacePaneViewStrip', () => {
     render(
       <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
-        detailId="detail"
+        workspacePaneId="workspace"
         sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -521,7 +521,7 @@ describe('WorkspacePaneViewStrip', () => {
     rerender(
       <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
-        detailId="detail"
+        workspacePaneId="workspace"
         sessions={[
           session({ key: 't1', title: 'term-1' }),
           session({ key: 't2', title: 'term-2', selected: false }),
@@ -545,7 +545,7 @@ describe('WorkspacePaneViewStrip', () => {
     render(
       <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
-        detailId="detail"
+        workspacePaneId="workspace"
         sessions={[
           session({ key: 't1', title: 'term-1' }),
           session({ key: 't2', title: 'term-2', selected: false }),
@@ -568,7 +568,7 @@ describe('WorkspacePaneViewStrip', () => {
     rerender(
       <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
-        detailId="detail"
+        workspacePaneId="workspace"
         sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -585,7 +585,7 @@ describe('WorkspacePaneViewStrip', () => {
     rerender(
       <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
-        detailId="detail"
+        workspacePaneId="workspace"
         responsiveCompact
         sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
         onNew={() => {}}
@@ -605,7 +605,7 @@ describe('WorkspacePaneViewStrip', () => {
     rerender(
       <TestWorkspacePaneViewStrip
         worktreeTerminalKey="/repo\0/repo/worktree"
-        detailId="detail"
+        workspacePaneId="workspace"
         sessions={[session({ key: 't1', title: 'term-1' }), session({ key: 't2', title: 'term-2', selected: false })]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -623,7 +623,7 @@ describe('WorkspacePaneViewStrip', () => {
 function TestWorkspacePaneViewStrip(props: {
   worktreeTerminalKey: string
   sessions: TerminalSessionSummary[]
-  detailId: string
+  workspacePaneId: string
   responsiveCompact?: boolean
   panelActive?: boolean
   isLoading?: boolean

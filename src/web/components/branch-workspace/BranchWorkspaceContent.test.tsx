@@ -7,7 +7,6 @@ import { BranchWorkspaceContent } from '#/web/components/branch-workspace/Branch
 import { getSelectedBranchWorkspacePresentation } from '#/web/components/branch-workspace/model.ts'
 import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionReadContextValue, WorktreeTerminalSnapshot } from '#/web/components/terminal/types.ts'
-import { DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 
 const REPO_ID = '/tmp/gbl-branch-workspace-content-repo'
@@ -58,15 +57,13 @@ describe('BranchWorkspaceContent', () => {
           <BranchWorkspaceContent
             repo={repo}
             detail={detail}
-            detailId="detail"
-            contentId="content"
-            layout={DEFAULT_WORKSPACE_LAYOUT}
+            workspacePaneId="workspace"
           />
         </TerminalSessionReadContext.Provider>,
       )
     })
 
-    expect(container?.querySelector('#detail-status-panel')).not.toBeNull()
+    expect(container?.querySelector('#workspace-status-panel')).not.toBeNull()
     expect(container?.textContent).toContain('feature/no-worktree')
     expect(container?.textContent).toContain('branch-status.worktree.none')
     expect(container?.textContent).not.toContain('workspace-pane-views.empty')
@@ -96,15 +93,13 @@ describe('BranchWorkspaceContent', () => {
           <BranchWorkspaceContent
             repo={repo}
             detail={detail}
-            detailId="detail"
-            contentId="content"
-            layout={DEFAULT_WORKSPACE_LAYOUT}
+            workspacePaneId="workspace"
           />
         </TerminalSessionReadContext.Provider>,
       )
     })
 
-    expect(container?.querySelector('#detail-status-panel')).toBeNull()
+    expect(container?.querySelector('#workspace-status-panel')).toBeNull()
     expect(container?.textContent).toContain('workspace-pane-views.empty')
   })
 })
