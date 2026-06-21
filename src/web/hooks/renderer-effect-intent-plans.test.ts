@@ -74,6 +74,51 @@ describe('renderer effect intent plans', () => {
     expect(plan).toEqual({ kind: 'refresh-repo', repoId: '/tmp/repo', token: 7 })
   })
 
+  test('creates a focus mode toggle plan for the current workspace', () => {
+    const plan = createWorkspaceIntentPlan(
+      { type: 'workspace-focus-toggle-requested' },
+      {
+        overlayBlocked: false,
+        workspaceShortcutSuppressed: false,
+        terminalFocused: false,
+        currentRepoId: '/tmp/repo',
+        currentRepo: { id: '/tmp/repo', instanceToken: 7 },
+      },
+    )
+
+    expect(plan).toEqual({ kind: 'toggle-workspace-focus' })
+  })
+
+  test('suppresses focus mode toggle when workspace shortcuts are blocked', () => {
+    const plan = createWorkspaceIntentPlan(
+      { type: 'workspace-focus-toggle-requested' },
+      {
+        overlayBlocked: false,
+        workspaceShortcutSuppressed: true,
+        terminalFocused: false,
+        currentRepoId: '/tmp/repo',
+        currentRepo: { id: '/tmp/repo', instanceToken: 7 },
+      },
+    )
+
+    expect(plan).toEqual({ kind: 'noop' })
+  })
+
+  test('suppresses focus mode toggle while the terminal is focused', () => {
+    const plan = createWorkspaceIntentPlan(
+      { type: 'workspace-focus-toggle-requested' },
+      {
+        overlayBlocked: false,
+        workspaceShortcutSuppressed: false,
+        terminalFocused: true,
+        currentRepoId: '/tmp/repo',
+        currentRepo: { id: '/tmp/repo', instanceToken: 7 },
+      },
+    )
+
+    expect(plan).toEqual({ kind: 'noop' })
+  })
+
   test('external open drain kick plan schedules rerun when a drain is already active', () => {
     expect(createExternalOpenDrainKickPlan({ disposed: false, draining: true })).toEqual({
       kind: 'schedule-rerun',

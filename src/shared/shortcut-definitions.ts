@@ -2,7 +2,11 @@ import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
 import type { DictKey } from '#/shared/i18n/dictionaries.ts'
 
 export type BranchActionShortcutAction = 'pull' | 'push' | 'terminal' | 'editor' | 'remote'
-export type RendererNavigationShortcutAction = 'next-branch' | 'prev-branch' | 'next-workspace-pane-view' | 'prev-workspace-pane-view'
+export type RendererNavigationShortcutAction =
+  | 'next-branch'
+  | 'prev-branch'
+  | 'next-workspace-pane-view'
+  | 'prev-workspace-pane-view'
 export type RendererAppShortcutAction = 'show-help' | 'dismiss'
 export type RendererKeyboardShortcutAction =
   | BranchActionShortcutAction
@@ -19,6 +23,7 @@ export type RendererMenuCommandId =
   | 'view-status'
   | 'view-changes'
   | 'view-terminal'
+  | 'view-toggle-focus-mode'
   | 'view-refresh'
   | 'window-next-repo'
   | 'window-prev-repo'
@@ -183,6 +188,15 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
     },
   ),
   rendererMenuCommand(
+    'view-toggle-focus-mode',
+    'workspace.focus-toggle-label',
+    { type: 'workspace-focus-toggle-requested' },
+    {
+      helpLabelKey: 'workspace.focus-toggle-label',
+      accelerator: 'CmdOrCtrl+B',
+    },
+  ),
+  rendererMenuCommand(
     'view-refresh',
     'menu.view.refresh',
     { type: 'repo-refresh-requested' },
@@ -228,6 +242,7 @@ export const VIEW_SHORTCUTS: AcceleratorShortcutDefinition[] = rendererMenuAccel
   'view-status',
   'view-changes',
   'view-terminal',
+  'view-toggle-focus-mode',
 ])
 
 export const RENDERER_KEYBOARD_SHORTCUTS: RendererKeyboardShortcutDefinition[] = [

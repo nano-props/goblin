@@ -244,6 +244,26 @@ describe('useRendererEffectIntentRouter', () => {
     expect(useReposStore.getState().repos[repo.id]).toBeUndefined()
   })
 
+  test('focus mode menu action toggles the workspace focus state', async () => {
+    const repo = seedRepoState({
+      id: '/tmp/repo',
+      currentBranch: 'main',
+      selectedBranch: 'main',
+      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
+    })
+    currentRepoId = repo.id
+
+    await renderHookHost()
+
+    expect(useReposStore.getState().workspaceFocused).toBe(false)
+    await act(async () => {
+      for (const listener of intentListeners) listener({ type: 'workspace-focus-toggle-requested' })
+      await Promise.resolve()
+    })
+
+    expect(useReposStore.getState().workspaceFocused).toBe(true)
+  })
+
   test('current repo menu actions prefer the visible routed repo over store activeId', async () => {
     const activeRepo = seedRepoState({
       id: '/tmp/active-repo',
@@ -316,7 +336,6 @@ describe('useRendererEffectIntentRouter', () => {
     })
     currentRepoId = repo.id
     workspaceShortcutSuppressed = true
-    const before = useReposStore.getState()
 
     await renderHookHost()
 
@@ -324,6 +343,7 @@ describe('useRendererEffectIntentRouter', () => {
       for (const listener of intentListeners) {
         listener({ type: 'show-workspace-pane-view-requested', tab: 'terminal' })
         listener({ type: 'terminal-primary-action-requested' })
+        listener({ type: 'workspace-focus-toggle-requested' })
         listener({ type: 'close-repo-requested' })
       }
       await Promise.resolve()
@@ -331,6 +351,7 @@ describe('useRendererEffectIntentRouter', () => {
 
     const state = useReposStore.getState()
     expect(state.repos[repo.id]?.ui.preferredWorkspacePaneView).toBe('status')
+    expect(state.workspaceFocused).toBe(false)
     expect(closeRepoSpy).not.toHaveBeenCalled()
   })
 

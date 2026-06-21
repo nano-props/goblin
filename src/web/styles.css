@@ -135,6 +135,52 @@ button,
   justify-content: center;
 }
 
+/* Workspace split-pane collapse motion. Kept at the layout boundary so
+ * Focus Mode changes the pane geometry without remounting the workspace. */
+.goblin-split-pane {
+  container-type: inline-size;
+}
+
+.goblin-split-pane[data-collapse-transition='true'] > [data-slot='resizable-panel-group'] > [data-slot='resizable-panel'] {
+  transition:
+    flex-basis var(--goblin-split-pane-collapse-duration) cubic-bezier(0.2, 0, 0, 1),
+    flex-grow var(--goblin-split-pane-collapse-duration) cubic-bezier(0.2, 0, 0, 1),
+    width var(--goblin-split-pane-collapse-duration) cubic-bezier(0.2, 0, 0, 1);
+  will-change: flex-basis, flex-grow, width;
+}
+
+.goblin-split-pane__before-content {
+  --goblin-split-pane-before-content-size: max(
+    var(--goblin-split-pane-before-min-size, 0px),
+    var(
+      --goblin-split-pane-before-measured-size,
+      min(var(--goblin-split-pane-before-open-size, 0px), calc(100cqw - var(--goblin-split-pane-after-min-size, 0px)))
+    )
+  );
+
+  width: var(--goblin-split-pane-before-content-size);
+  flex-basis: var(--goblin-split-pane-before-content-size);
+  transform: translateX(0);
+  transition: transform var(--goblin-split-pane-collapse-duration) cubic-bezier(0.2, 0, 0, 1);
+  will-change: transform;
+}
+
+.goblin-split-pane__before-content--collapsed {
+  transform: translateX(-100%);
+  pointer-events: none;
+}
+
+.goblin-split-pane__handle {
+  transition:
+    opacity 140ms ease-out,
+    width var(--goblin-split-pane-collapse-duration) cubic-bezier(0.2, 0, 0, 1);
+}
+
+.goblin-split-pane__handle--collapsed {
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+}
 
 /* Honor the OS-level "reduce motion" preference. */
 @media (prefers-reduced-motion: reduce) {

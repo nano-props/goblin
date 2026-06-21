@@ -17,6 +17,7 @@ interface RepoWorkspaceProps {
   branchWorkspacePane: ReactNode
   layout?: RepoWorkspaceLayout
   mode?: RepoWorkspaceMode
+  branchNavigatorCollapsed?: boolean
   workspacePaneSize?: number
   onWorkspacePaneSizeChange?: (size: number) => void
 }
@@ -77,6 +78,7 @@ export function RepoWorkspace({
   branchWorkspacePane,
   layout = DEFAULT_WORKSPACE_LAYOUT,
   mode = 'split',
+  branchNavigatorCollapsed = false,
   workspacePaneSize = DEFAULT_WORKSPACE_PANE_SIZES[layout],
   onWorkspacePaneSizeChange,
 }: RepoWorkspaceProps) {
@@ -84,14 +86,16 @@ export function RepoWorkspace({
 
   return (
     <SplitPane
-      orientation="horizontal"
       before={branchNavigatorPane}
       after={branchWorkspacePane}
       afterSize={workspacePaneSize}
       onAfterSizeChange={onWorkspacePaneSizeChange}
+      beforeCollapsed={branchNavigatorCollapsed}
+      animateBeforeCollapse
       beforeMinSize={LEFT_RIGHT_BRANCH_MIN_SIZE}
+      beforeContentMinSize={LEFT_RIGHT_BRANCH_MIN_SIZE}
       afterMinSize={LEFT_RIGHT_WORKSPACE_MIN_SIZE}
-      afterMaxSize="90%"
+      afterMaxSize={branchNavigatorCollapsed ? undefined : '90%'}
       className="flex-1"
     />
   )

@@ -57,4 +57,11 @@ describe('shortcut definitions', () => {
     expect(command.intent).toEqual({ type: 'terminal-primary-action-requested' })
     expect(resolveRendererMenuCommandAccelerator(command, { swapCloseShortcuts: false })).toBe('CmdOrCtrl+Enter')
   })
+
+  test('defines the focus mode toggle shortcut', () => {
+    const command = rendererMenuCommandById('view-toggle-focus-mode')
+    expect(command.menuLabelKey).toBe('workspace.focus-toggle-label')
+    expect(command.intent).toEqual({ type: 'workspace-focus-toggle-requested' })
+    expect(resolveRendererMenuCommandAccelerator(command, { swapCloseShortcuts: false })).toBe('CmdOrCtrl+B')
+  })
 })

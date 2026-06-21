@@ -10,10 +10,7 @@ import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
 import { consumeExternalOpenPaths } from '#/web/app-shell-client.ts'
 import { openRepoPaths } from '#/web/lib/open-repo-paths.ts'
 import { externalOpenLog } from '#/web/logger.ts'
-import {
-  runShowWorkspacePaneViewCommand,
-  runTerminalPrimaryActionCommand,
-} from '#/web/commands/workspace-commands.ts'
+import { runShowWorkspacePaneViewCommand, runTerminalPrimaryActionCommand } from '#/web/commands/workspace-commands.ts'
 import {
   createAppLevelIntentPlan,
   createExternalOpenDrainKickPlan,
@@ -43,6 +40,7 @@ interface SharedRendererIntentDeps {
   ensureWorkspaceOpen: (input: string | RepoSessionEntry) => Promise<OpenRepoResult>
   setSelectedTerminal: (worktreeKey: string, key: string) => void
   resetLayout: () => void
+  toggleWorkspaceFocused: () => void
   t: (key: string) => string
 }
 
@@ -168,6 +166,9 @@ export async function handleWorkspaceRendererIntent(
         repoId: plan.repoId,
         navigation: deps.navigation,
       })
+      return true
+    case 'toggle-workspace-focus':
+      deps.toggleWorkspaceFocused()
       return true
   }
 }
