@@ -334,6 +334,7 @@ export const ja: Record<DictKey, string> = {
   'terminal.paste-file-partial': '一部のファイルを保存できませんでした。',
   'terminal.paste-file-too-large':
     'ファイルが大きすぎて貼り付けできません。scp、rsync、またはファイルマネージャをご利用ください。',
+  'terminal.paste-file-too-many': '一度に貼り付けるファイルパスが多すぎます。',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': 'Finder で表示',

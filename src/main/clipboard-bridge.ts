@@ -1,9 +1,9 @@
-import { mkdir, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, rm, stat, unlink, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { ipcMain } from 'electron'
 import { CLIPBOARD_SAVE_FILES_CHANNEL } from '#/shared/ipc-channels.ts'
-import { PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
+import { CLIPBOARD_TEMP_FILE_MAX_AGE_MS, PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 
 /**
@@ -38,7 +38,10 @@ function sanitizeBaseName(name: string): string {
   // that one substitutes for an empty `File.name` at the multipart
   // boundary, while this one substitutes for a name whose
   // post-sanitisation residue is empty.
-  const base = path.basename(name).replace(/[<>:"/\\|?*\x00-\x1f\x7f-\x9f]/g, '_').trim()
+  const base = path
+    .basename(name)
+    .replace(/[<>:"/\\|?*\x00-\x1f\x7f-\x9f]/g, '_')
+    .trim()
   return base.length > 0 ? base : 'clipboard.bin'
 }
 
@@ -125,6 +128,31 @@ export async function pruneStaleClipboardTempDirs(): Promise<void> {
   }
 }
 
+export async function pruneExpiredClipboardTempFiles(
+  now = Date.now(),
+  maxAgeMs = CLIPBOARD_TEMP_FILE_MAX_AGE_MS,
+): Promise<void> {
+  const dir = clipboardTempDir()
+  let entries: string[]
+  try {
+    entries = await readdir(dir)
+  } catch {
+    return
+  }
+  for (const entry of entries) {
+    const filePath = path.join(dir, entry)
+    try {
+      const info = await stat(filePath)
+      if (!info.isFile()) continue
+      if (now - info.mtimeMs <= maxAgeMs) continue
+      await unlink(filePath)
+    } catch {
+      // Best effort — the file may have been removed between readdir
+      // and stat/unlink, or permissions may deny deletion.
+    }
+  }
+}
+
 function asObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object'
 }
@@ -170,6 +198,7 @@ export function wireClipboardBridgeIpc(): void {
   // is bounded by per-file size, not file count, so this is a
   // housekeeping measure, not a security control.
   void pruneStaleClipboardTempDirs()
+  void pruneExpiredClipboardTempFiles()
   // Clear any previous interval — `wireClipboardBridgeIpc` may be
   // re-entered (test harness, future hot-reload), and `setInterval`
   // itself doesn't know about re-entry. Without this guard each call
@@ -178,11 +207,14 @@ export function wireClipboardBridgeIpc(): void {
     clearInterval(periodicPrune)
     periodicPrune = null
   }
-  periodicPrune = setInterval(() => {
-    void pruneStaleClipboardTempDirs().catch((err) =>
-      console.warn('[clipboard-bridge] periodic prune failed', err),
-    )
-  }, 60 * 60 * 1000)
+  periodicPrune = setInterval(
+    () => {
+      void Promise.all([pruneStaleClipboardTempDirs(), pruneExpiredClipboardTempFiles()]).catch((err) =>
+        console.warn('[clipboard-bridge] periodic prune failed', err),
+      )
+    },
+    60 * 60 * 1000,
+  )
   // Allow the process to exit naturally even with the timer
   // attached — without this, the interval keeps the event loop
   // alive indefinitely.

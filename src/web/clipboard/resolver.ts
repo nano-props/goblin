@@ -1,4 +1,5 @@
 import { pathForDroppedFile, saveClipboardFiles } from '#/web/app-shell-client.ts'
+import { isTerminalPastePathSafe } from '#/shared/clipboard-paste.ts'
 
 export interface PasteResolution {
   /** Absolute paths the PTY can read. May be non-empty even when `failed > 0`. */
@@ -32,15 +33,20 @@ export async function resolvePastedFiles(files: File[]): Promise<PasteResolution
   if (files.length === 0) return { paths: [], failed: 0 }
   const paths: string[] = []
   const blobOnly: File[] = []
+  let failed = 0
   for (const file of files) {
     const p = pathForDroppedFile(file)
-    if (p.length > 0) paths.push(p)
-    else blobOnly.push(file)
+    if (p.length > 0) {
+      if (isTerminalPastePathSafe(p)) paths.push(p)
+      else failed += 1
+    } else {
+      blobOnly.push(file)
+    }
   }
-  if (blobOnly.length === 0) return { paths, failed: 0 }
+  if (blobOnly.length === 0) return { paths, failed }
   const saved = await saveClipboardFiles(blobOnly)
   return {
     paths: paths.concat(saved),
-    failed: Math.max(0, blobOnly.length - saved.length),
+    failed: failed + Math.max(0, blobOnly.length - saved.length),
   }
 }

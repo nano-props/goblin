@@ -55,10 +55,17 @@ describe('collectClipboardFiles', () => {
     expect(collectClipboardFiles(dt)).toEqual([a])
   })
 
-  test('filters out zero-byte placeholder files', () => {
-    const empty = new File([], 'placeholder.bin')
+  test('keeps named zero-byte files so their filesystem path can be pasted', () => {
+    const empty = new File([], 'empty.txt')
     const real = new File([new Uint8Array([1])], 'real.png')
     const dt = mockDataTransfer({ files: [empty, real] })
+    expect(collectClipboardFiles(dt)).toEqual([empty, real])
+  })
+
+  test('filters out zero-byte placeholder files with no name', () => {
+    const placeholder = new File([], '')
+    const real = new File([new Uint8Array([1])], 'real.png')
+    const dt = mockDataTransfer({ files: [placeholder, real] })
     expect(collectClipboardFiles(dt)).toEqual([real])
   })
 

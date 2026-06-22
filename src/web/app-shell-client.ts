@@ -67,11 +67,11 @@ export function pathForDroppedFile(file: File): string {
  * than files in" to a `paste-file-partial` toast and "nothing back"
  * to `paste-file-failed`.
  */
-export function saveClipboardFiles(files: File[]): Promise<string[]> {
+export async function saveClipboardFiles(files: File[]): Promise<string[]> {
   try {
-    return getRendererBridge().saveClipboardFiles(files)
+    return await getRendererBridge().saveClipboardFiles(files)
   } catch {
-    return Promise.resolve([])
+    return []
   }
 }
 

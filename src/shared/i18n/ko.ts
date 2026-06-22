@@ -326,6 +326,7 @@ export const ko: Record<DictKey, string> = {
   'terminal.paste-file-failed': '파일을 터미널에 붙여넣지 못했습니다.',
   'terminal.paste-file-partial': '일부 파일을 저장하지 못했습니다.',
   'terminal.paste-file-too-large': '파일이 너무 커서 붙여넣을 수 없습니다. scp, rsync 또는 파일 관리자를 사용하세요.',
+  'terminal.paste-file-too-many': '한 번에 붙여넣을 파일 경로가 너무 많습니다.',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': 'Finder 에서 보기',

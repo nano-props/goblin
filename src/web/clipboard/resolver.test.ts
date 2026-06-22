@@ -35,6 +35,28 @@ describe('resolvePastedFiles', () => {
     expect(mocks.saveClipboardFiles).not.toHaveBeenCalled()
   })
 
+  test('rejects path-attempt results containing terminal control characters', async () => {
+    mocks.pathForDroppedFile.mockReturnValue('/abs/bad\nname.png')
+    const { resolvePastedFiles } = await import('#/web/clipboard/resolver.ts')
+    const file = new File([new Uint8Array([1])], 'bad.png')
+    await expect(resolvePastedFiles([file])).resolves.toEqual({
+      paths: [],
+      failed: 1,
+    })
+    expect(mocks.saveClipboardFiles).not.toHaveBeenCalled()
+  })
+
+  test('reports partial failure when only some path-attempt results are unsafe', async () => {
+    mocks.pathForDroppedFile.mockImplementation((f) => (f.name === 'ok' ? '/abs/ok' : '/abs/bad\u001bname'))
+    const { resolvePastedFiles } = await import('#/web/clipboard/resolver.ts')
+    const ok = new File([new Uint8Array([1])], 'ok')
+    const bad = new File([new Uint8Array([1])], 'bad')
+    await expect(resolvePastedFiles([ok, bad])).resolves.toEqual({
+      paths: ['/abs/ok'],
+      failed: 1,
+    })
+  })
+
   test('falls through to blob save for files with no resolvable path', async () => {
     mocks.pathForDroppedFile.mockReturnValue('')
     mocks.saveClipboardFiles.mockResolvedValue(['/tmp/x.bin'])

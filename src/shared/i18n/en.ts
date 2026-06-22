@@ -337,6 +337,7 @@ export const en = {
   'terminal.paste-file-failed': 'Could not paste the file into the terminal.',
   'terminal.paste-file-partial': 'Some pasted files could not be saved.',
   'terminal.paste-file-too-large': 'File is too large to paste. Use scp, rsync, or a file manager instead.',
+  'terminal.paste-file-too-many': 'Too many file paths to paste at once.',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) ---
   'worktrees.reveal-title': 'Reveal in Finder',

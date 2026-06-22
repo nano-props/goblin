@@ -377,7 +377,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       terminalHost: terminalHostStub,
     })
     const form = new FormData()
-    form.append('files', new File([new Uint8Array([1, 2, 3])], 'a.png'))
+    form.append('files', new File([new Uint8Array(8 * 1024 * 1024)], 'a.bin'))
     const response = await app.request(
       new Request('http://127.0.0.1:32100/api/clipboard/files', {
         method: 'POST',

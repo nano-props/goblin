@@ -13,8 +13,9 @@ import { toast } from 'sonner'
 import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { setTerminalFocused } from '#/web/terminal-focus.ts'
-import { collectClipboardFiles } from '#/web/clipboard/collect-clipboard-files.ts'
+import { collectClipboardFiles, isMeaningfulClipboardFile } from '#/web/clipboard/collect-clipboard-files.ts'
 import { processDrop, processPaste } from '#/web/clipboard/process.ts'
+import { planTerminalPathWrite } from '#/web/clipboard/terminal-path-write.ts'
 import { PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { terminalLog } from '#/web/logger.ts'
@@ -248,13 +249,17 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
   }, [])
   const writeResolutionToPty = useCallback(
     (paths: string[], failed: number, sessionKey: string, source: 'paste' | 'drop') => {
-      if (paths.length === 0) {
+      const plan = planTerminalPathWrite(paths, failed)
+      if (plan.kind === 'failed') {
         toast.error(t('terminal.paste-file-failed'))
         return
       }
-      const escaped = paths.map(shellEscapePath).join(' ')
-      writeInput(sessionKey, escaped, source)
-      if (failed > 0) toast.error(t('terminal.paste-file-partial'))
+      if (plan.kind === 'too-long') {
+        toast.error(t('terminal.paste-file-too-many'))
+        return
+      }
+      writeInput(sessionKey, plan.data, source)
+      if (plan.failed > 0) toast.error(t('terminal.paste-file-partial'))
     },
     [t, writeInput],
   )
@@ -268,7 +273,7 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
       // to the controller's PTY. The `!key` half preserves the
       // pre-existing guard against slots with no session.
       if (!key || !isController) return
-      const files = Array.from(event.dataTransfer.files).filter((f) => f.size > 0)
+      const files = Array.from(event.dataTransfer.files).filter(isMeaningfulClipboardFile)
       if (files.length === 0) return
       // Capture the session key the user actually dropped into. The
       // blob-save tier (web HTTP path) is a real roundtrip, so a
@@ -555,10 +560,4 @@ function ViewerOverlay({
 function isTerminalSearchShortcut(event: KeyboardEvent<HTMLDivElement>): boolean {
   if (event.altKey || event.key.toLowerCase() !== 'f') return false
   return event.metaKey || (event.ctrlKey && event.shiftKey)
-}
-
-function shellEscapePath(path: string): string {
-  if (path.length === 0) return "''"
-  if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(path)) return path
-  return "'" + path.replace(/'/g, "'\\''") + "'"
 }

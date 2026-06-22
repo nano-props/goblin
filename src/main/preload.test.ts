@@ -44,10 +44,12 @@ import {
   ROTATE_ACCESS_TOKEN_CHANNEL,
 } from '#/shared/ipc-channels.ts'
 
-function loadPreload(options: {
-  invoke?: (channel: string, ...args: unknown[]) => Promise<unknown>
-  argv?: string[]
-} = {}) {
+function loadPreload(
+  options: {
+    invoke?: (channel: string, ...args: unknown[]) => Promise<unknown>
+    argv?: string[]
+  } = {},
+) {
   const exposed: Record<string, any> = {}
   const invocations: Array<{ channel: string; args: unknown[] }> = []
   const sends: Array<{ channel: string; args: unknown[] }> = []
@@ -279,20 +281,22 @@ describe('preload goblinNative bridge', () => {
     // restart its own server).
     const { goblinNative, invocations } = loadPreload()
     const blob = new Uint8Array([1, 2, 3])
+    const unnamed = new Uint8Array([4])
     const files = [
       { name: 'a.png', bytes: blob.buffer },
+      { name: 'clipboard.bin', bytes: unnamed.buffer },
     ]
-    await goblinNative.saveClipboardFiles([{ name: 'a.png', arrayBuffer: async () => blob.buffer } as unknown as File])
+    await goblinNative.saveClipboardFiles([
+      { name: 'a.png', arrayBuffer: async () => blob.buffer } as unknown as File,
+      { name: '', arrayBuffer: async () => unnamed.buffer } as unknown as File,
+    ])
     await goblinNative.rotateAccessToken()
 
     expect(invocations.map((entry) => entry.channel)).toEqual([
       CLIPBOARD_SAVE_FILES_CHANNEL,
       ROTATE_ACCESS_TOKEN_CHANNEL,
     ])
-    // Keep the closure capture tight: `files` is constructed so the
-    // `arrayBuffer` shape above doesn't drift to `null` in a future
-    // refactor that touches the destructuring site.
-    expect(files).toHaveLength(1)
+    expect(invocations[0]?.args).toEqual([files])
   })
 
   test('locks the goblinNative IPC surface to browser-missing capabilities', () => {
@@ -312,28 +316,22 @@ describe('preload goblinNative bridge', () => {
         'native-only RPC dispatch — currently used for global-shortcut registration, native menu rebuilds, and workspace-layout menu gating',
       [IPC_ABORT_CHANNEL]: 'paired with IPC_CHANNEL for cancellation',
       [IPC_EVENT_CHANNEL]: 'main → renderer event broadcast (Electron-only transport)',
-      [RENDERER_EFFECT_INTENT_CHANNEL]:
-        'renderer effect intent dispatch (paired with the IPC dispatch channel)',
-      [SHELL_OPEN_SETTINGS_WINDOW_CHANNEL]:
-        'BrowserWindow management — open the settings window as its own OS window',
+      [RENDERER_EFFECT_INTENT_CHANNEL]: 'renderer effect intent dispatch (paired with the IPC dispatch channel)',
+      [SHELL_OPEN_SETTINGS_WINDOW_CHANNEL]: 'BrowserWindow management — open the settings window as its own OS window',
       [SHELL_OPEN_EXTERNAL_URL_CHANNEL]:
         'Electron shell.openExternal — protocol-handler restrictions the browser API cannot enforce',
-      [SHELL_OPEN_DIRECTORY_DIALOG_CHANNEL]:
-        'native OS directory picker dialog (no browser equivalent)',
+      [SHELL_OPEN_DIRECTORY_DIALOG_CHANNEL]: 'native OS directory picker dialog (no browser equivalent)',
       [SHELL_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL]:
         'OS file-association handoff (Finder/Explorer "open with Goblin") — Electron-only queue',
-      [SHELL_OPEN_IN_FINDER_CHANNEL]:
-        'Electron shell.showItemInFolder — no browser equivalent',
+      [SHELL_OPEN_IN_FINDER_CHANNEL]: 'Electron shell.showItemInFolder — no browser equivalent',
       [TERMINAL_NOTIFY_BELL_CHANNEL]:
         'Electron Notification API — desktop-attached notifications with per-app identity',
       [TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL]:
         'paired with TERMINAL_NOTIFY_BELL_CHANNEL for the settings-page "test" button',
-      [TERMINAL_SET_BADGE_CHANNEL]:
-        'app.dock.setBadge / taskbar badge count — Electron BrowserWindow only',
+      [TERMINAL_SET_BADGE_CHANNEL]: 'app.dock.setBadge / taskbar badge count — Electron BrowserWindow only',
       [CLIPBOARD_SAVE_FILES_CHANNEL]:
         'main process writes blob to <os.tmpdir>/goblin-clipboard-<pid>/ so the PTY can read it as a real file',
-      [ROTATE_ACCESS_TOKEN_CHANNEL]:
-        'embedded-server restart — only Electron main owns the server lifecycle',
+      [ROTATE_ACCESS_TOKEN_CHANNEL]: 'embedded-server restart — only Electron main owns the server lifecycle',
     }
 
     // Every channel the preload touches must appear in the manifest.
@@ -350,10 +348,7 @@ describe('preload goblinNative bridge', () => {
     // (the hardcoded list duplicated the manifest) and only
     // one-way (a brand-new channel could land in preload.cjs and
     // the test would still pass).
-    const preloadSource = readFileSync(
-      path.join(import.meta.dirname, '../preload/preload.cjs'),
-      'utf8',
-    )
+    const preloadSource = readFileSync(path.join(import.meta.dirname, '../preload/preload.cjs'), 'utf8')
     const channelsUsedByPreload = extractIpcChannelLiterals(preloadSource)
 
     // Forward: every manifest entry must be referenced by preload.

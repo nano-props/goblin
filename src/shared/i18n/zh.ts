@@ -316,6 +316,7 @@ export const zh: Record<DictKey, string> = {
   'terminal.paste-file-failed': '无法将文件粘贴到终端。',
   'terminal.paste-file-partial': '部分文件未能成功保存。',
   'terminal.paste-file-too-large': '文件过大,无法粘贴。请改用 scp、rsync 或文件管理器。',
+  'terminal.paste-file-too-many': '一次粘贴的文件路径过多。',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': '在访达中显示',
