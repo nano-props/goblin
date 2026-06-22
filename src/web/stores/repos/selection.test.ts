@@ -411,6 +411,35 @@ describe('setWorkspacePaneView', () => {
     expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
   })
 
+  test('adds a terminal tab at the end even when a stale entry already exists', () => {
+    seedRepo({
+      selectedBranch: 'main',
+      workspacePaneTabOrder: [terminalEntry('terminal-1'), workspacePaneStaticTabOrderEntry('status')],
+    })
+
+    useReposStore.getState().addWorkspacePaneTerminalTab(REPO_ID, 'terminal-1')
+
+    expect(tabOrderFor('main')).toEqual([workspacePaneStaticTabOrderEntry('status'), terminalEntry('terminal-1')])
+  })
+
+  test('removes a terminal tab order entry when its terminal closes', () => {
+    seedRepo({
+      selectedBranch: 'main',
+      workspacePaneTabOrder: [
+        workspacePaneStaticTabOrderEntry('status'),
+        terminalEntry('terminal-1'),
+        workspacePaneStaticTabOrderEntry('history'),
+      ],
+    })
+
+    useReposStore.getState().removeWorkspacePaneTerminalTab(REPO_ID, 'terminal-1')
+
+    expect(tabOrderFor('main')).toEqual([
+      workspacePaneStaticTabOrderEntry('status'),
+      workspacePaneStaticTabOrderEntry('history'),
+    ])
+  })
+
   test('reorders visible tabs while preserving hidden changes on branches without worktrees', () => {
     seedRepo({
       selectedBranch: 'feature/plain',

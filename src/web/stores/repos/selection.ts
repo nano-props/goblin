@@ -15,7 +15,9 @@ import {
   workspacePaneTabOrderForBranch,
   workspacePaneTabOrderRecordWith,
   workspacePaneTabOrderWithStaticView,
+  workspacePaneTabOrderWithTerminal,
   workspacePaneTabOrderWithoutStaticView,
+  workspacePaneTabOrderWithoutTerminal,
 } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import {
   preferredWorkspacePaneViewForBranch,
@@ -41,6 +43,8 @@ type RuntimeCoherentSelectionActions = Pick<
   | 'setWorkspacePaneView'
   | 'openWorkspacePaneStaticView'
   | 'closeWorkspacePaneStaticView'
+  | 'addWorkspacePaneTerminalTab'
+  | 'removeWorkspacePaneTerminalTab'
   | 'reorderWorkspacePaneTabs'
   | 'selectBranch'
   | 'clearSelectedBranch'
@@ -175,6 +179,34 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         if (!workspacePaneStaticViewsForBranch(repo.ui, branch).includes(tab)) return s
         const current = workspacePaneTabOrderForBranch(repo.ui, branch)
         const next = workspacePaneTabOrderWithoutStaticView(current, tab)
+        return replaceRepoState(s, repo, (r) => {
+          r.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(r.ui, branch, next)
+        })
+      })
+    },
+
+    addWorkspacePaneTerminalTab(id: string, terminalKey: string, branchName?: string) {
+      set((s) => {
+        const repo = s.repos[id]
+        const branch = branchName ?? repo?.ui.selectedBranch
+        if (!repo || !branch) return s
+        const current = workspacePaneTabOrderForBranch(repo.ui, branch)
+        const next = workspacePaneTabOrderWithTerminal(current, terminalKey)
+        if (workspacePaneTabOrdersEqual(current, next)) return s
+        return replaceRepoState(s, repo, (r) => {
+          r.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(r.ui, branch, next)
+        })
+      })
+    },
+
+    removeWorkspacePaneTerminalTab(id: string, terminalKey: string, branchName?: string) {
+      set((s) => {
+        const repo = s.repos[id]
+        const branch = branchName ?? repo?.ui.selectedBranch
+        if (!repo || !branch) return s
+        const current = workspacePaneTabOrderForBranch(repo.ui, branch)
+        const next = workspacePaneTabOrderWithoutTerminal(current, terminalKey)
+        if (workspacePaneTabOrdersEqual(current, next)) return s
         return replaceRepoState(s, repo, (r) => {
           r.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(r.ui, branch, next)
         })

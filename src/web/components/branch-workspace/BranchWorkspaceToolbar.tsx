@@ -44,6 +44,7 @@ import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pan
 import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { createBranchWorkspacePaneTabModel } from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
+import { createWorkspacePaneTerminalTab } from '#/web/stores/repos/workspace-pane-terminal-write-paths.ts'
 
 interface Props {
   repo: Pick<BranchWorkspaceRepo, 'id' | 'ui' | 'data'>
@@ -127,11 +128,12 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
   const handleNewTerminal = useCallback(() => {
     if (!terminalBase) return
     enterTerminalTab()
-    void createTerminal(terminalBase).catch((err) => {
-      terminalLog.warn('failed to create terminal', { err })
-      const message = err instanceof Error ? err.message : 'error.terminal-create-failed'
-      toast.error(t('action.result-error'), { description: t(message) })
-    })
+    void createWorkspacePaneTerminalTab({ base: terminalBase, createTerminal })
+      .catch((err) => {
+        terminalLog.warn('failed to create terminal', { err })
+        const message = err instanceof Error ? err.message : 'error.terminal-create-failed'
+        toast.error(t('action.result-error'), { description: t(message) })
+      })
   }, [createTerminal, terminalBase, enterTerminalTab, t])
 
   const showWorkspacePaneTabItem = useCallback(
