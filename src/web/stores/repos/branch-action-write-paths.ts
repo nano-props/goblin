@@ -61,6 +61,8 @@ export async function dispatchRepoUiAction(
     result = { ok: false, message: err instanceof Error ? err.message : String(err) }
   }
   if (!result.ok && result.message === 'cancelled') return null
+  // Caller handled it (e.g. opened a follow-up dialog); surface the result so
+  // they can inspect it instead of double-toasting from the dispatcher path.
   if (options?.handleResult?.(result)) return result
   const skipSuccessToast = result.ok && options?.silentSuccessOps?.has(op)
   if (!skipSuccessToast) setLastResult(repoId, result, instanceToken)

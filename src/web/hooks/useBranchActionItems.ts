@@ -13,7 +13,7 @@ import {
   type BranchCopyPatchAction,
 } from '#/web/hooks/branch-action-state.ts'
 import { branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
-import type { BrowserRemoteProvider, ExecResult } from '#/web/types.ts'
+import type { BrowserRemoteProvider } from '#/web/types.ts'
 import { useRuntimeExternalAppSettings } from '#/web/runtime-settings-external-apps.ts'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import type { WorkspacePaneBranchViewType, WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
@@ -29,13 +29,10 @@ export interface BranchActionItem {
   destructive?: boolean
   shortcut?: string
   icon: ReactNode
-  // Branch actions go through `useBranchActions` which routes UI effects
-  // (open editor / terminal / remote / copy-patch) through
-  // `dispatchRepoUiAction`. Those return `Promise<ExecResult | null>`, so
-  // we widen the surface to accept that shape and let the menu discard
-  // the value. `BranchCopyPatchAction` is the stricter variant used by
-  // the in-tab widget, which inspects the boolean outcome.
-  onSelect: () => void | Promise<void | ExecResult | null>
+  // Actions return either a dispatcher promise or nothing — the menu and
+  // shortcut registry both discard the value. The widget's wider variant
+  // lives on `BranchCopyPatchAction` so it can inspect the boolean outcome.
+  onSelect: () => void | Promise<void>
 }
 
 export interface BranchActionSurface {
@@ -190,7 +187,9 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
             visible: true,
             shortcut: 'G',
             icon: createElement(TerminalAppIcon, { pref: terminalIconPref }),
-            onSelect: actions.openTerminal,
+            onSelect: () => {
+              void actions.openTerminal()
+            },
           },
         ]
       : []),
@@ -204,7 +203,9 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
             visible: true,
             shortcut: 'V',
             icon: createElement(EditorAppIcon, { pref: editorIconPref }),
-            onSelect: actions.openEditor,
+            onSelect: () => {
+              void actions.openEditor()
+            },
           },
         ]
       : []),
@@ -216,7 +217,9 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
       visible: capabilities.canOpenRemote,
       shortcut: '⇧G',
       icon: createElement(remoteIcon),
-      onSelect: actions.openRemote,
+      onSelect: () => {
+        void actions.openRemote()
+      },
     },
   ]
 

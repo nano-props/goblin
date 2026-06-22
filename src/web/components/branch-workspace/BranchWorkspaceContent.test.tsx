@@ -140,6 +140,184 @@ describe('BranchWorkspaceContent', () => {
     expect(onCopyPatch).toHaveBeenCalledTimes(1)
   })
 
+  test('shows a check affordance after copy patch onSelect resolves to true, then reverts', async () => {
+    vi.useFakeTimers()
+    const worktreePath = '/tmp/copy-success-worktree'
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branchSnapshots: [
+        createBranchSnapshot('feature/copy-success', {
+          worktree: { path: worktreePath, summary: { dirty: true, changeCount: 1 } },
+        }),
+      ],
+      selectedBranch: 'feature/copy-success',
+      preferredWorkspacePaneView: 'changes',
+      openBranchWorkspacePaneViews: ['status'],
+      statusLoaded: true,
+      status: [
+        {
+          path: worktreePath,
+          branch: 'feature/copy-success',
+          isMain: false,
+          entries: [{ x: 'M', y: ' ', path: 'src/example.ts' }],
+        },
+      ],
+    })
+    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const readContext = changesReadContext(worktreePath)
+    const onCopyPatch = vi.fn().mockResolvedValue(true)
+
+    act(() => {
+      root!.render(
+        <TerminalSessionReadContext.Provider value={readContext}>
+          <BranchWorkspaceContent
+            repo={repo}
+            detail={detail}
+            workspacePaneId="workspace"
+            copyPatchAction={{
+              label: 'status.copy-patch',
+              title: 'status.copy-patch-title',
+              ariaLabel: 'status.copy-patch-title',
+              disabled: false,
+              visible: true,
+              onSelect: onCopyPatch,
+            }}
+          />
+        </TerminalSessionReadContext.Provider>,
+      )
+    })
+
+    const copyButton = container?.querySelector<HTMLButtonElement>('button[aria-label="status.copy-patch-title"]')!
+    expect(copyButton).not.toBeNull()
+
+    await act(async () => {
+      copyButton.click()
+      await vi.runOnlyPendingTimersAsync()
+    })
+
+    expect(container?.textContent).toContain('status.copy-patch-success')
+
+    act(() => {
+      vi.advanceTimersByTime(1500)
+    })
+
+    expect(container?.textContent).not.toContain('status.copy-patch-success')
+    vi.useRealTimers()
+  })
+
+  test('does not show the check affordance when copy patch onSelect resolves to false', async () => {
+    const worktreePath = '/tmp/copy-fail-worktree'
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branchSnapshots: [
+        createBranchSnapshot('feature/copy-fail', {
+          worktree: { path: worktreePath, summary: { dirty: true, changeCount: 1 } },
+        }),
+      ],
+      selectedBranch: 'feature/copy-fail',
+      preferredWorkspacePaneView: 'changes',
+      openBranchWorkspacePaneViews: ['status'],
+      statusLoaded: true,
+      status: [
+        {
+          path: worktreePath,
+          branch: 'feature/copy-fail',
+          isMain: false,
+          entries: [{ x: 'M', y: ' ', path: 'src/example.ts' }],
+        },
+      ],
+    })
+    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const readContext = changesReadContext(worktreePath)
+    const onCopyPatch = vi.fn().mockResolvedValue(false)
+
+    act(() => {
+      root!.render(
+        <TerminalSessionReadContext.Provider value={readContext}>
+          <BranchWorkspaceContent
+            repo={repo}
+            detail={detail}
+            workspacePaneId="workspace"
+            copyPatchAction={{
+              label: 'status.copy-patch',
+              title: 'status.copy-patch-title',
+              ariaLabel: 'status.copy-patch-title',
+              disabled: false,
+              visible: true,
+              onSelect: onCopyPatch,
+            }}
+          />
+        </TerminalSessionReadContext.Provider>,
+      )
+    })
+
+    const copyButton = container?.querySelector<HTMLButtonElement>('button[aria-label="status.copy-patch-title"]')!
+    await act(async () => {
+      copyButton.click()
+      await Promise.resolve()
+    })
+
+    expect(container?.textContent).not.toContain('status.copy-patch-success')
+  })
+
+  test('does not invoke onSelect while action.busy is true', () => {
+    const worktreePath = '/tmp/copy-busy-worktree'
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branchSnapshots: [
+        createBranchSnapshot('feature/copy-busy', {
+          worktree: { path: worktreePath, summary: { dirty: true, changeCount: 1 } },
+        }),
+      ],
+      selectedBranch: 'feature/copy-busy',
+      preferredWorkspacePaneView: 'changes',
+      openBranchWorkspacePaneViews: ['status'],
+      statusLoaded: true,
+      status: [
+        {
+          path: worktreePath,
+          branch: 'feature/copy-busy',
+          isMain: false,
+          entries: [{ x: 'M', y: ' ', path: 'src/example.ts' }],
+        },
+      ],
+    })
+    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const readContext = changesReadContext(worktreePath)
+    const onCopyPatch = vi.fn().mockResolvedValue(true)
+
+    act(() => {
+      root!.render(
+        <TerminalSessionReadContext.Provider value={readContext}>
+          <BranchWorkspaceContent
+            repo={repo}
+            detail={detail}
+            workspacePaneId="workspace"
+            copyPatchAction={{
+              label: 'status.copy-patch',
+              title: 'status.copy-patch-title',
+              ariaLabel: 'status.copy-patch-title',
+              disabled: false,
+              busy: true,
+              visible: true,
+              onSelect: onCopyPatch,
+            }}
+          />
+        </TerminalSessionReadContext.Provider>,
+      )
+    })
+
+    const copyButton = container?.querySelector<HTMLButtonElement>('button[aria-label="status.copy-patch-title"]')!
+    expect(copyButton.getAttribute('aria-busy')).toBe('true')
+    expect(copyButton.hasAttribute('disabled')).toBe(true)
+
+    act(() => {
+      copyButton.click()
+    })
+
+    expect(onCopyPatch).not.toHaveBeenCalled()
+  })
+
   test('hides the copy patch float widget when the worktree has no changes', () => {
     const worktreePath = '/tmp/clean-worktree'
     const repo = seedRepoState({
@@ -153,9 +331,7 @@ describe('BranchWorkspaceContent', () => {
       preferredWorkspacePaneView: 'changes',
       openBranchWorkspacePaneViews: ['status'],
       statusLoaded: true,
-      status: [
-        { path: worktreePath, branch: 'feature/clean', isMain: false, entries: [] },
-      ],
+      status: [{ path: worktreePath, branch: 'feature/clean', isMain: false, entries: [] }],
     })
     const detail = getSelectedBranchWorkspacePresentation(repo)
     const readContext = changesReadContext(worktreePath)

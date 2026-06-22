@@ -342,12 +342,10 @@ function BranchChangesTab({
 }) {
   const t = useT()
   const totalEntries = selectedStatus.reduce((n, wt) => n + wt.entries.length, 0)
-  // Hide the float widget while a stale status banner is on screen so it
-  // never overlaps the warning copy. The widget reappears once status
-  // refreshes successfully. `visible` is the capability gate; the entry
-  // count and the visibility flag can drift on transient state.
-  const showCopyPatchFloat =
-    totalEntries > 0 && !!copyPatchAction?.visible && !(statusStale && statusError)
+  // Hide the float widget while the stale status banner is on screen so they
+  // don't overlap. `visible` and `totalEntries` can drift on transient state,
+  // so both gates stay.
+  const showCopyPatchFloat = totalEntries > 0 && !!copyPatchAction?.visible && !(statusStale && statusError)
 
   return (
     <BranchTabPanel id={`${workspacePaneId}-changes-panel`} labelledById={labelledById} busy={statusLoading}>
@@ -386,9 +384,12 @@ function ChangesCopyPatchFloat({ action }: { action: BranchCopyPatchAction }) {
   // Guard against a slow onSelect() resolving after the widget unmounts
   // (e.g. user switches tabs mid-copy).
   const mountedRef = useRef(true)
-  useEffect(() => () => {
-    mountedRef.current = false
-  }, [])
+  useEffect(
+    () => () => {
+      mountedRef.current = false
+    },
+    [],
+  )
 
   useEffect(() => {
     if (!succeeded) return
