@@ -20,7 +20,15 @@ export function BranchListPopover({ repoId, children }: Props) {
 
   return (
     <HoverCard open={open} onOpenChange={setOpen} openDelay={200} closeDelay={150}>
-      <HoverCardTrigger asChild>{children}</HoverCardTrigger>
+      <HoverCardTrigger asChild>
+        {/* data-slot marker + inline-flex wrapper absorb Radix's
+            data-state="open" so it doesn't reach the child Button and
+            activate the global openRing. HoverCard is mouse-driven
+            peek UI — the trigger isn't semantically "open". */}
+        <span data-slot="hover-card-trigger" className="inline-flex">
+          {children}
+        </span>
+      </HoverCardTrigger>
       <HoverCardContent
         align="start"
         sideOffset={6}
