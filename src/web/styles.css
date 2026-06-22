@@ -145,9 +145,9 @@ button,
   > [data-slot='resizable-panel-group']
   > [data-slot='resizable-panel'] {
   transition:
-    flex-basis var(--goblin-split-pane-collapse-duration) cubic-bezier(0.2, 0, 0, 1),
-    flex-grow var(--goblin-split-pane-collapse-duration) cubic-bezier(0.2, 0, 0, 1),
-    width var(--goblin-split-pane-collapse-duration) cubic-bezier(0.2, 0, 0, 1);
+    flex-basis var(--goblin-workspace-pane-transition-duration) var(--goblin-workspace-pane-transition-easing),
+    flex-grow var(--goblin-workspace-pane-transition-duration) var(--goblin-workspace-pane-transition-easing),
+    width var(--goblin-workspace-pane-transition-duration) var(--goblin-workspace-pane-transition-easing);
   will-change: flex-basis, flex-grow, width;
 }
 
@@ -163,7 +163,7 @@ button,
   width: var(--goblin-split-pane-before-content-size);
   flex-basis: var(--goblin-split-pane-before-content-size);
   transform: translateX(0);
-  transition: transform var(--goblin-split-pane-collapse-duration) cubic-bezier(0.2, 0, 0, 1);
+  transition: transform var(--goblin-workspace-pane-transition-duration) var(--goblin-workspace-pane-transition-easing);
   will-change: transform;
 }
 
@@ -175,7 +175,7 @@ button,
 .goblin-split-pane__handle {
   transition:
     opacity 140ms ease-out,
-    width var(--goblin-split-pane-collapse-duration) cubic-bezier(0.2, 0, 0, 1);
+    width var(--goblin-workspace-pane-transition-duration) var(--goblin-workspace-pane-transition-easing);
 }
 
 .goblin-split-pane__handle--collapsed {
@@ -187,8 +187,6 @@ button,
 /* Compact workspace page transition. Mirrors the split-pane Focus Mode
  * timing while keeping both panes mounted for a mobile-style push/pop. */
 .goblin-compact-workspace {
-  --goblin-compact-workspace-transition-duration: 240ms;
-  --goblin-compact-workspace-transition-easing: cubic-bezier(0.2, 0, 0, 1);
   contain: layout paint;
 }
 
@@ -196,7 +194,7 @@ button,
   backface-visibility: hidden;
   transform: translate3d(0, 0, 0);
   transition:
-    transform var(--goblin-compact-workspace-transition-duration) var(--goblin-compact-workspace-transition-easing),
+    transform var(--goblin-workspace-pane-transition-duration) var(--goblin-workspace-pane-transition-easing),
     opacity 180ms ease-out;
   will-change: transform, opacity;
 }

@@ -5,6 +5,7 @@ import { cn } from '#/web/lib/cn.ts'
 import { DEFAULT_WORKSPACE_PANE_SIZES, DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 import type { RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
 import type { RepoWorkspaceMode } from '#/web/lib/workspace-layout.ts'
+import { WORKSPACE_PANE_MOTION_STYLE } from '#/web/components/workspace-motion.ts'
 const LEFT_RIGHT_BRANCH_MIN_SIZE = '14rem'
 const LEFT_RIGHT_WORKSPACE_MIN_SIZE = '22rem'
 
@@ -20,6 +21,12 @@ interface RepoWorkspaceProps {
   branchNavigatorCollapsed?: boolean
   workspacePaneSize?: number
   onWorkspacePaneSizeChange?: (size: number) => void
+}
+
+interface CompactRepoWorkspaceProps {
+  activePane: 'navigator' | 'workspace'
+  branchNavigatorPane: ReactNode
+  branchWorkspacePane: ReactNode
 }
 
 interface ToolbarProps extends HTMLAttributes<HTMLDivElement> {
@@ -103,6 +110,40 @@ export function RepoWorkspace({
 
 export function RepoWorkspacePane({ children }: PaneProps) {
   return <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
+}
+
+export function CompactRepoWorkspace({
+  activePane,
+  branchNavigatorPane,
+  branchWorkspacePane,
+}: CompactRepoWorkspaceProps) {
+  const workspaceActive = activePane === 'workspace'
+
+  return (
+    <div
+      data-compact-workspace=""
+      data-active-pane={activePane}
+      style={WORKSPACE_PANE_MOTION_STYLE}
+      className="goblin-compact-workspace relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background"
+    >
+      <div
+        data-compact-workspace-pane="navigator"
+        aria-hidden={workspaceActive || undefined}
+        inert={workspaceActive || undefined}
+        className="goblin-compact-workspace__pane goblin-compact-workspace__pane--navigator absolute inset-0 flex min-h-0 min-w-0 bg-background"
+      >
+        {branchNavigatorPane}
+      </div>
+      <div
+        data-compact-workspace-pane="workspace"
+        aria-hidden={!workspaceActive || undefined}
+        inert={!workspaceActive || undefined}
+        className="goblin-compact-workspace__pane goblin-compact-workspace__pane--workspace absolute inset-0 flex min-h-0 min-w-0 bg-background"
+      >
+        {branchWorkspacePane}
+      </div>
+    </div>
+  )
 }
 
 export function ScrollPane({ children }: ShellProps) {

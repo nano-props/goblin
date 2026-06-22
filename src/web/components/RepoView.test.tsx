@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoView } from '#/web/components/RepoView.tsx'
 import { resetReposStore, seedRepoState, createRepoBranch } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 
 const responsiveMocks = vi.hoisted(() => ({
   mode: 'default' as 'default' | 'compact',
@@ -38,15 +39,15 @@ vi.mock('#/web/components/BranchNavigator.tsx', () => ({
 
 vi.mock('#/web/components/BranchWorkspace.tsx', () => ({
   BranchWorkspace: ({
-    presentedBranchName,
+    selectedBranchOverrideForTransition,
     shortcutsEnabled = true,
   }: {
-    presentedBranchName?: string | null
+    selectedBranchOverrideForTransition?: string
     shortcutsEnabled?: boolean
   }) => (
     <div
       data-testid="branch-workspace"
-      data-presented-branch-name={presentedBranchName ?? ''}
+      data-selected-branch-override={selectedBranchOverrideForTransition ?? ''}
       data-shortcuts-enabled={shortcutsEnabled ? 'true' : 'false'}
     />
   ),
@@ -80,6 +81,24 @@ vi.mock('#/web/components/Layout.tsx', () => ({
     </div>
   ),
   RepoWorkspacePane: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  CompactRepoWorkspace: ({
+    activePane,
+    branchNavigatorPane,
+    branchWorkspacePane,
+  }: {
+    activePane: 'navigator' | 'workspace'
+    branchNavigatorPane: React.ReactNode
+    branchWorkspacePane: React.ReactNode
+  }) => (
+    <div data-compact-workspace="" data-active-pane={activePane}>
+      <div data-compact-workspace-pane="navigator" aria-hidden={activePane === 'workspace' ? 'true' : undefined}>
+        {branchNavigatorPane}
+      </div>
+      <div data-compact-workspace-pane="workspace" aria-hidden={activePane === 'navigator' ? 'true' : undefined}>
+        {branchWorkspacePane}
+      </div>
+    </div>
+  ),
   Toolbar: ({ children }: { children: React.ReactNode }) => <div data-testid="mock-toolbar">{children}</div>,
 }))
 
@@ -197,7 +216,7 @@ describe('RepoView workspace navigation', () => {
         useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
       })
 
-      expect(branchWorkspace()?.dataset.presentedBranchName).toBe('feature/a')
+      expect(branchWorkspace()?.dataset.selectedBranchOverride).toBe('')
       expect(branchWorkspace()?.dataset.shortcutsEnabled).toBe('true')
 
       act(() => {
@@ -206,14 +225,14 @@ describe('RepoView workspace navigation', () => {
 
       expect(compactWorkspace()?.dataset.activePane).toBe('navigator')
       expect(compactPane('workspace')?.getAttribute('aria-hidden')).toBe('true')
-      expect(branchWorkspace()?.dataset.presentedBranchName).toBe('feature/a')
+      expect(branchWorkspace()?.dataset.selectedBranchOverride).toBe('feature/a')
       expect(branchWorkspace()?.dataset.shortcutsEnabled).toBe('false')
 
       act(() => {
-        vi.advanceTimersByTime(240)
+        vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS)
       })
 
-      expect(branchWorkspace()?.dataset.presentedBranchName).toBe('')
+      expect(branchWorkspace()?.dataset.selectedBranchOverride).toBe('')
     } finally {
       vi.useRealTimers()
     }
