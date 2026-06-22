@@ -39,7 +39,6 @@ export function restorableWorkspaceStateFromStore(
     | 'workspaceFocused'
     | 'workspacePaneSizes'
     | 'selectedTerminalByWorktree'
-    | 'workspacePaneViewByRepo'
   >,
 ): RestorableWorkspaceState {
   return {
@@ -48,7 +47,6 @@ export function restorableWorkspaceStateFromStore(
     workspaceFocused: state.workspaceFocused,
     workspacePaneSizes: state.workspacePaneSizes,
     selectedTerminalByWorktree: state.selectedTerminalByWorktree,
-    workspacePaneViewByRepo: state.workspacePaneViewByRepo ?? {},
   }
 }
 

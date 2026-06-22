@@ -52,7 +52,7 @@ async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>): 
       hydrateSession,
       applySessionLayoutState,
       applySessionSelectedTerminalState,
-      applySessionWorkspacePaneViewByRepo,
+      applySessionWorkspacePaneViewByBranchByRepo,
     } = useReposStore.getState()
     // Apply layout prefs before repo probing finishes so the first
     // restored paint uses the saved geometry. useSessionPersistence
@@ -62,7 +62,7 @@ async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>): 
     applySessionLayoutState(normalizedLayout)
     applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalByWorktree)
     await hydrateSession(session.openRepos, session.activeRepo)
-    applySessionWorkspacePaneViewByRepo(restoredWorkspaceState.workspacePaneViewByRepo)
+    applySessionWorkspacePaneViewByBranchByRepo(restoredWorkspaceState.workspacePaneViewByBranchByRepo)
   } catch (err) {
     bootstrapLog.warn('session restore failed', { err })
     useReposStore.setState({ sessionReady: true })

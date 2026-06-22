@@ -5,6 +5,7 @@ import { runShowWorkspacePaneViewCommand, runTerminalPrimaryActionCommand } from
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { selectedWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 
 const REPO_ID = '/tmp/gbl-workspace-command-repo'
@@ -50,7 +51,7 @@ describe('workspace commands', () => {
     expect(runShowWorkspacePaneViewCommand({ repoId: REPO_ID, tab: 'status', navigation })).toBe(true)
 
     expect(openWorkspacePaneView).toHaveBeenCalledWith(WORKTREE_KEY, 'status')
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('status')
+    expect(selectedWorkspacePaneView()).toBe('status')
   })
 
   test('show workspace pane view command opens history without routing through status', () => {
@@ -83,7 +84,7 @@ describe('workspace commands', () => {
     expect(runShowWorkspacePaneViewCommand({ repoId: REPO_ID, tab: 'history', navigation })).toBe(true)
 
     expect(openWorkspacePaneView).toHaveBeenCalledWith(WORKTREE_KEY, 'history')
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('history')
+    expect(selectedWorkspacePaneView()).toBe('history')
   })
 
   test('show workspace pane view command opens changes as a worktree-level view', () => {
@@ -116,7 +117,7 @@ describe('workspace commands', () => {
     expect(runShowWorkspacePaneViewCommand({ repoId: REPO_ID, tab: 'changes', navigation })).toBe(true)
 
     expect(openWorkspacePaneView).toHaveBeenCalledWith(WORKTREE_KEY, 'changes')
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('changes')
+    expect(selectedWorkspacePaneView()).toBe('changes')
   })
 
   test('show workspace pane view command opens status for a selected branch without a worktree', () => {
@@ -149,7 +150,7 @@ describe('workspace commands', () => {
     expect(runShowWorkspacePaneViewCommand({ repoId: REPO_ID, tab: 'status', navigation })).toBe(true)
 
     expect(openWorkspacePaneView).not.toHaveBeenCalled()
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('status')
+    expect(selectedWorkspacePaneView()).toBe('status')
   })
 
   test('terminal primary action opens the terminal view and creates the first terminal when missing', async () => {
@@ -181,7 +182,7 @@ describe('workspace commands', () => {
 
     await runTerminalPrimaryActionCommand({ repoId: REPO_ID, navigation })
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('terminal')
+    expect(selectedWorkspacePaneView()).toBe('terminal')
     expect(createTerminal).toHaveBeenCalledWith({
       repoRoot: REPO_ID,
       branch: 'feature/worktree',
@@ -273,11 +274,16 @@ describe('workspace commands', () => {
 
     await runTerminalPrimaryActionCommand({ repoId: REPO_ID, navigation })
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('terminal')
+    expect(selectedWorkspacePaneView()).toBe('terminal')
     expect(createTerminal).not.toHaveBeenCalled()
     expect(selectTerminal).toHaveBeenCalledWith(WORKTREE_KEY, 'terminal-1')
   })
 })
+
+function selectedWorkspacePaneView() {
+  const repo = useReposStore.getState().repos[REPO_ID]
+  return repo ? selectedWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) : null
+}
 
 function navigationWith(): MainWindowNavigationActions {
   return {

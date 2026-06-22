@@ -24,6 +24,7 @@ import { keyboardRuntimeStateFromStore } from '#/web/stores/repos/selector-state
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { adjacentWorkspacePaneView } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
+import { selectedWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 
 type MoveDirection = 1 | -1
 const INTERACTIVE_SHORTCUT_TARGET_SELECTOR =
@@ -171,10 +172,11 @@ export function useKeyboard({
           const worktreeKey = worktreeTerminalKey(repo.id, worktreePath)
           const bridge = readTerminalSessionCommandBridge()
           const snapshot = bridge?.worktreeSnapshot(worktreeKey)
+          const selectedWorkspacePaneView = selectedWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch)
           const nextTab = snapshot
             ? adjacentWorkspacePaneView(
                 snapshot.workspacePaneViews,
-                repo.ui.preferredWorkspacePaneView,
+                selectedWorkspacePaneView,
                 action === 'next-workspace-pane-view' ? 1 : -1,
               )
             : null

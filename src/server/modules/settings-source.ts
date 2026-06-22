@@ -139,19 +139,29 @@ function normalizeSelectedTerminalByWorktree(value: unknown): Record<string, str
   return normalized
 }
 
-function normalizeWorkspacePaneViewByRepo(
+function normalizeWorkspacePaneViewByBranchByRepo(
   value: unknown,
   openRepos: RepoSessionEntry[],
-): Record<string, WorkspacePaneView> {
-  if (!value || typeof value !== 'object') return {}
+): Record<string, Record<string, WorkspacePaneView>> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const openRepoIds = new Set(openRepos.map(repoSessionEntryId))
-  const normalized: Record<string, WorkspacePaneView> = {}
-  for (const [repoId, paneView] of Object.entries(value)) {
+  const normalized: Record<string, Record<string, WorkspacePaneView>> = {}
+  for (const [repoId, rawByBranch] of Object.entries(value)) {
     const safeRepoId = toSafeRepoLocator(repoId)
-    if (!safeRepoId || !openRepoIds.has(safeRepoId)) continue
-    if (isWorkspacePaneViewType(paneView)) {
-      normalized[safeRepoId] = paneView
+    if (
+      !safeRepoId ||
+      !openRepoIds.has(safeRepoId) ||
+      !rawByBranch ||
+      typeof rawByBranch !== 'object' ||
+      Array.isArray(rawByBranch)
+    )
+      continue
+    const byBranch: Record<string, WorkspacePaneView> = {}
+    for (const [branchName, paneView] of Object.entries(rawByBranch)) {
+      if (!branchName || branchName.includes('\0')) continue
+      if (typeof paneView === 'string' && isWorkspacePaneViewType(paneView)) byBranch[branchName] = paneView
     }
+    if (Object.keys(byBranch).length > 0) normalized[safeRepoId] = byBranch
   }
   return normalized
 }
@@ -172,7 +182,10 @@ function normalizeSession(value: unknown): SessionState {
       typeof partial.workspaceFocused === 'boolean' ? partial.workspaceFocused : DEFAULT_WORKSPACE_FOCUSED,
     workspacePaneSizes: normalizeWorkspacePaneSizes(partial.workspacePaneSizes),
     selectedTerminalByWorktree: normalizeSelectedTerminalByWorktree(partial.selectedTerminalByWorktree),
-    workspacePaneViewByRepo: normalizeWorkspacePaneViewByRepo(partial.workspacePaneViewByRepo, openRepos),
+    workspacePaneViewByBranchByRepo: normalizeWorkspacePaneViewByBranchByRepo(
+      partial.workspacePaneViewByBranchByRepo,
+      openRepos,
+    ),
   }
 }
 

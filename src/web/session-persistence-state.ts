@@ -4,16 +4,31 @@ export function persistedActiveRepoIdForSession(activeId: string | null): string
   return activeId
 }
 
-export function persistedWorkspacePaneViewByRepoForSession(
-  repos: Record<string, { ui: { preferredWorkspacePaneView: WorkspacePaneView } } | undefined>,
+export function persistedWorkspacePaneViewByBranchByRepoForSession(
+  repos: Record<
+    string,
+    | {
+        data?: { branches?: Array<{ name?: string }> }
+        ui: { preferredWorkspacePaneViewByBranch: Record<string, WorkspacePaneView> }
+      }
+    | undefined
+  >,
   order: string[],
-): Record<string, WorkspacePaneView> {
-  const tabs: Record<string, WorkspacePaneView> = {}
+): Record<string, Record<string, WorkspacePaneView>> {
+  const byRepo: Record<string, Record<string, WorkspacePaneView>> = {}
   for (const id of order) {
     const repo = repos[id]
-    if (repo) tabs[id] = repo.ui.preferredWorkspacePaneView
+    if (!repo) continue
+    const knownBranches = new Set((repo.data?.branches ?? []).map((branch) => branch.name).filter(Boolean))
+    const byBranch: Record<string, WorkspacePaneView> = {}
+    for (const [branchName, tab] of Object.entries(repo.ui.preferredWorkspacePaneViewByBranch)) {
+      if (!branchName || branchName.includes('\0')) continue
+      if (knownBranches.size > 0 && !knownBranches.has(branchName)) continue
+      byBranch[branchName] = tab
+    }
+    if (Object.keys(byBranch).length > 0) byRepo[id] = byBranch
   }
-  return tabs
+  return byRepo
 }
 
 export function persistedSelectedTerminalByWorktreeForSession(

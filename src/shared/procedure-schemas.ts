@@ -186,7 +186,9 @@ const SessionStateSchema = v.object({
     'left-right': v.number(),
   }),
   selectedTerminalByWorktree: v.optional(v.record(v.string(), v.string())),
-  workspacePaneViewByRepo: v.optional(v.record(v.string(), v.picklist(['status', 'changes', 'history', 'terminal']))),
+  workspacePaneViewByBranchByRepo: v.optional(
+    v.record(v.string(), v.record(v.string(), v.picklist(['status', 'changes', 'history', 'terminal']))),
+  ),
 })
 
 export const SETTINGS_PROCEDURE_SCHEMAS = {

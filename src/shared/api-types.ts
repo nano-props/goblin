@@ -88,8 +88,8 @@ export interface SessionState {
   workspaceFocused: boolean
   workspacePaneSizes: WorkspacePaneSizes
   selectedTerminalByWorktree?: Record<string, string>
-  /** Per-repo workspace pane view preference, restored with the session. */
-  workspacePaneViewByRepo?: Record<string, WorkspacePaneView>
+  /** Per-repo, per-branch workspace pane view preference, restored with the session. */
+  workspacePaneViewByBranchByRepo?: Record<string, Record<string, WorkspacePaneView>>
 }
 
 export interface RuntimeSettingsSnapshot extends SettingsPrefs {

@@ -117,7 +117,6 @@ export function resetReposStore(): void {
     workspaceFocused: DEFAULT_WORKSPACE_FOCUSED,
     workspacePaneSizes: DEFAULT_WORKSPACE_PANE_SIZES,
     selectedTerminalByWorktree: {},
-    workspacePaneViewByRepo: {},
   })
 }
 
@@ -565,6 +564,7 @@ export function seedRepoState(options: {
   currentBranch?: string
   selectedBranch?: string | null
   workspacePaneView?: WorkspacePaneView
+  workspacePaneViewByBranch?: Record<string, WorkspacePaneView>
   openBranchWorkspacePaneViews?: WorkspacePaneBranchViewType[]
   openBranchWorkspacePaneViewsByBranch?: Record<string, WorkspacePaneBranchViewType[]>
   instanceToken?: number
@@ -583,6 +583,11 @@ export function seedRepoState(options: {
     (selectedBranch && options.openBranchWorkspacePaneViews !== undefined
       ? { [selectedBranch]: options.openBranchWorkspacePaneViews }
       : base.ui.openBranchWorkspacePaneViewsByBranch)
+  const preferredWorkspacePaneViewByBranch =
+    options.workspacePaneViewByBranch ??
+    (selectedBranch && options.workspacePaneView !== undefined
+      ? { [selectedBranch]: options.workspacePaneView }
+      : base.ui.preferredWorkspacePaneViewByBranch)
   const repo: RepoState = {
     ...base,
     instanceToken: options.instanceToken ?? base.instanceToken,
@@ -600,7 +605,7 @@ export function seedRepoState(options: {
       ...base.ui,
       selectedBranch,
       openBranchWorkspacePaneViewsByBranch,
-      preferredWorkspacePaneView: options.workspacePaneView ?? base.ui.preferredWorkspacePaneView,
+      preferredWorkspacePaneViewByBranch,
     },
     remote: {
       ...base.remote,
@@ -615,7 +620,6 @@ export function seedRepoState(options: {
     sessionReady: true,
     workspaceFocused: DEFAULT_WORKSPACE_FOCUSED,
     workspacePaneSizes: DEFAULT_WORKSPACE_PANE_SIZES,
-    workspacePaneViewByRepo: {},
   })
   return repo
 }

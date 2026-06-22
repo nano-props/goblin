@@ -6,6 +6,7 @@ import { emptyRepo, replaceRepo } from '#/web/stores/repos/helpers.ts'
 import { isRepoStatusRefreshable, useRepoStatusRefresh } from '#/web/hooks/useRepoStatusRefresh.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { resetReposStore } from '#/web/stores/repos/test-utils.ts'
+import { workspacePaneViewByBranchRecordWith } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 
 const originalRefreshStatus = useReposStore.getState().refreshStatus
@@ -35,7 +36,12 @@ function createRepo(
 ) {
   const repo = emptyRepo(id, 'repo')
   repo.instanceToken = id === '/repo-a' ? 1 : 2
-  repo.ui.preferredWorkspacePaneView = options.workspacePaneView ?? 'status'
+  repo.ui.selectedBranch = 'main'
+  repo.ui.preferredWorkspacePaneViewByBranch = workspacePaneViewByBranchRecordWith(
+    repo.ui,
+    'main',
+    options.workspacePaneView ?? 'status',
+  )
   if (options.unavailable) repo.availability = { phase: 'unavailable', reason: 'error.failed-read-repo', checkedAt: 0 }
   repo.resources.status.phase = options.statusPhase ?? 'idle'
   return repo

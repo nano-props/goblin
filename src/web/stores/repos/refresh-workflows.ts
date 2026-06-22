@@ -3,6 +3,7 @@ import { persistRestorableRepoSnapshot } from '#/web/stores/repos/persistence.ts
 import { refreshPullRequestsLog, terminalLog } from '#/web/logger.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
+import { selectedWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import {
   PULL_REQUEST_UNKNOWN_RETRY_DELAY_MS,
   PULL_REQUEST_UNKNOWN_RETRY_LIMIT,
@@ -26,7 +27,7 @@ function visibleDetailPullRequestPending(get: ReposGet, id: string, token: numbe
   const openBranchViews = branchWorkspacePaneViewsForBranch(repo.ui, repo.ui.selectedBranch)
   if (
     repo.instanceToken !== token ||
-    repo.ui.preferredWorkspacePaneView !== 'status' ||
+    selectedWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) !== 'status' ||
     !openBranchViews.includes('status') ||
     !repo.ui.selectedBranch
   )
@@ -41,7 +42,7 @@ async function refreshVisibleDetailPullRequest(get: ReposGet, id: string, token:
   const openBranchViews = branchWorkspacePaneViewsForBranch(repo.ui, repo.ui.selectedBranch)
   if (
     repo.instanceToken !== token ||
-    repo.ui.preferredWorkspacePaneView !== 'status' ||
+    selectedWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) !== 'status' ||
     !openBranchViews.includes('status') ||
     !repo.ui.selectedBranch
   )
