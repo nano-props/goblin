@@ -213,8 +213,9 @@ export function createExternalOpenIntentDrainer(deps: ExternalOpenIntentDrainerD
             ensureWorkspaceOpen: deps.ensureWorkspaceOpen,
             activateRepo: deps.activateRepo,
             onOpenFailed: (path, message) => {
+              const openErrorMessage = deps.t(message)
               toast.error(deps.t('drop.open-failed'), {
-                description: `${path}\n${deps.t(message)}`,
+                description: `${path}\n${openErrorMessage}`,
               })
             },
           })

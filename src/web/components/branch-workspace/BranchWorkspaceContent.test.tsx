@@ -623,8 +623,8 @@ describe('BranchWorkspaceContent', () => {
 
     const panel = container?.querySelector('#workspace-terminal-panel')
     expect(panel).not.toBeNull()
-    expect(panel?.getAttribute('aria-label')).toBe('terminal.opening')
-    expect(panel?.hasAttribute('aria-labelledby')).toBe(false)
+    expect(panel?.getAttribute('aria-labelledby')).toBe('workspace-terminal-pending-tab')
+    expect(panel?.hasAttribute('aria-label')).toBe(false)
     expect(container?.querySelector('.goblin-terminal-slot__host')).not.toBeNull()
     expect(container?.textContent).toContain('terminal.opening')
     expect(container?.textContent).not.toContain('workspace-pane-views.empty')

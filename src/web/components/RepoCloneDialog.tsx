@@ -20,8 +20,9 @@ export function RepoCloneDialog({ open, onOpenChange }: RepoCloneDialogProps) {
     if (!result.ok || !result.path) return result
     const openResult = await ensureWorkspaceOpen(result.path)
     if (!openResult.ok) {
+      const openErrorMessage = t(openResult.message)
       toast.error(t('drop.open-failed'), {
-        description: `${result.path}\n${t(openResult.message)}`,
+        description: `${result.path}\n${openErrorMessage}`,
       })
       return { ok: false, message: openResult.message, path: result.path }
     }

@@ -27,9 +27,10 @@ export function useRepoToasts(repoId: string) {
         const result = event.result
         const hasMessage = !!result.message
         const actionLabel = repoEventActionSuccessLabel(event.action)
+        const resultMessageKey = result.message || 'error.unknown'
         const description =
           (hasMessage && !actionLabel) || !result.ok ? (
-            <ToastDescription>{tRef.current(result.message || 'error.unknown')}</ToastDescription>
+            <ToastDescription>{tRef.current(resultMessageKey)}</ToastDescription>
           ) : undefined
         if (result.ok) {
           toast.success(

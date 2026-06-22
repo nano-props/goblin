@@ -6,8 +6,10 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   WorkspacePaneViewStrip,
+  createPendingWorkspacePaneTabItem,
   createTerminalWorkspacePaneTabItem,
   isTerminalWorkspacePaneTabItem,
+  type WorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx'
 import { terminalWorkspacePaneViewIdentity } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
 import type { WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
@@ -738,12 +740,71 @@ describe('WorkspacePaneViewStrip', () => {
 
     expect(document.activeElement).toBe(tabs[1])
   })
+
+  test('renders a compact pending item across the available tab row', () => {
+    render(
+      <TestWorkspacePaneViewStrip
+        worktreeTerminalKey="/repo\0/repo/worktree"
+        workspacePaneId="workspace"
+        responsiveCompact
+        panelActive
+        sessions={[session({ key: 't1', title: 'term-1', selected: false })]}
+        pendingTerminal
+        newTerminalBusy
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    const pendingView = document.body.querySelector('[data-workspace-pane-pending-view="terminal"]')
+    const tablist = document.body.querySelector('[role="tablist"][aria-label="workspace-pane-views.tabs"]')
+    const tab = document.body.querySelector('[role="tab"][aria-label="terminal.opening"]')
+
+    expect(pendingView).not.toBeNull()
+    expect(pendingView?.className).toContain('min-w-0')
+    expect(pendingView?.className).toContain('flex-1')
+    expect(tablist?.className).toContain('flex-1')
+    expect(tab?.getAttribute('aria-busy')).toBe('true')
+    expect(document.body.querySelectorAll('[role="tab"]')).toHaveLength(1)
+    expect(document.body.querySelector('button[aria-label="terminal.loading"]')).toBeNull()
+    expect(document.body.querySelector('button[aria-label="workspace-pane-views.tabs"]')).not.toBeNull()
+  })
+
+  test('renders the same pending item as a busy tab in expanded mode', () => {
+    render(
+      <TestWorkspacePaneViewStrip
+        worktreeTerminalKey="/repo\0/repo/worktree"
+        workspacePaneId="workspace"
+        panelActive
+        sessions={[session({ key: 't1', title: 'term-1', selected: false })]}
+        pendingTerminal
+        newTerminalBusy
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    const pendingView = document.body.querySelector('[data-workspace-pane-pending-view="terminal"]')
+    const tabs = Array.from(document.body.querySelectorAll('[role="tab"]'))
+
+    expect(pendingView).not.toBeNull()
+    expect(tabs).toHaveLength(2)
+    expect(tabs.map((tab) => tab.getAttribute('aria-label'))).toEqual(['term-1', 'terminal.opening'])
+    expect(document.body.querySelector('button[aria-label="terminal.loading"]')).not.toBeNull()
+  })
 })
 
 function TestWorkspacePaneViewStrip(props: {
   worktreeTerminalKey: string
   sessions: TerminalSessionSummary[]
   workspacePaneId: string
+  pendingTerminal?: boolean
   responsiveCompact?: boolean
   panelActive?: boolean
   newTerminalBusy?: boolean
@@ -756,7 +817,7 @@ function TestWorkspacePaneViewStrip(props: {
 }) {
   const selected = props.sessions.find((candidate) => candidate.selected) ?? null
   const { sessions, ...workspacePaneProps } = props
-  const items = sessions.map((tab) =>
+  const items: WorkspacePaneTabItem[] = sessions.map((tab) =>
     createTerminalWorkspacePaneTabItem({
       view: tab,
       label: tab.originalTitle ?? tab.fullTitle ?? tab.title,
@@ -764,6 +825,15 @@ function TestWorkspacePaneViewStrip(props: {
       closeLabel: `close ${tab.title}`,
     }),
   )
+  if (props.pendingTerminal) {
+    items.push(
+      createPendingWorkspacePaneTabItem({
+        type: 'terminal',
+        label: 'terminal.opening',
+        tooltip: 'terminal.opening',
+      }),
+    )
+  }
   return (
     <WorkspacePaneViewStrip
       {...workspacePaneProps}

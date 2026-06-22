@@ -35,6 +35,9 @@ import {
 import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { createWorkspacePaneTerminalTab } from '#/web/stores/repos/workspace-pane-terminal-write-paths.ts'
+
+const DEFAULT_BRANCH_HISTORY_ERROR_KEY = 'error.failed-read-repo'
+
 interface Props {
   repo: Pick<BranchWorkspaceRepo, 'id' | 'data' | 'ui'> & {
     data: BranchWorkspaceRepo['data'] & Pick<BranchWorkspaceRepo['data'], 'statusLoaded'>
@@ -87,9 +90,10 @@ export function BranchWorkspaceContent({ repo, detail, workspacePaneId, copyPatc
     compact,
     t,
     terminalSyncReady,
+    terminalCreatePending: worktreeSnapshot.pendingCreate,
   })
-  if (!branch)
-    return <EmptyState title={t(repo.data.branches.length === 0 ? 'branches.empty' : 'branches.filter-empty')} />
+  const noBranchTitleKey = repo.data.branches.length === 0 ? 'branches.empty' : 'branches.filter-empty'
+  if (!branch) return <EmptyState title={t(noBranchTitleKey)} />
 
   if (!selection) {
     return (
@@ -152,9 +156,10 @@ function workspacePanePanelLabel(input: {
   compact: boolean
   t: (key: string, params?: Record<string, string | number>) => string
   terminalSyncReady: boolean
+  terminalCreatePending: boolean
 }): WorkspacePanePanelLabel {
   const tab = input.selection?.kind === 'materialized-tab' ? input.selection.tab : null
-  if (tab?.kind === 'terminal' && tab.view) {
+  if (tab?.kind === 'terminal') {
     const terminalTabs = input.tabs.filter((candidate) => candidate.kind === 'terminal')
     const index = terminalTabs.findIndex((candidate) => candidate.identity === tab.identity)
     return { labelledById: workspacePaneViewButtonId(input.workspacePaneId, input.compact ? 0 : Math.max(0, index)) }
@@ -162,7 +167,13 @@ function workspacePanePanelLabel(input: {
   if (tab?.kind === 'static') {
     return { labelledById: workspacePaneStaticViewButtonId(input.workspacePaneId, tab.type as WorkspacePaneStaticViewType) }
   }
-  return { label: input.t(input.terminalSyncReady ? 'terminal.opening' : 'terminal.loading') }
+  const pendingTab = input.tabs.find((candidate) => candidate.kind === 'pending')
+  if (pendingTab) {
+    return { labelledById: `${input.workspacePaneId}-${pendingTab.type}-pending-tab` }
+  }
+  const terminalPanelLabelKey =
+    input.terminalCreatePending || input.terminalSyncReady ? 'terminal.opening' : 'terminal.loading'
+  return { label: input.t(terminalPanelLabelKey) }
 }
 
 function BranchHistoryTab({
@@ -205,6 +216,8 @@ function BranchHistoryTab({
     return () => ctrl.abort()
   }, [branchName, repoId])
 
+  const errorTitleKey = state.error ?? DEFAULT_BRANCH_HISTORY_ERROR_KEY
+
   return (
     <BranchTabPanel
       id={`${workspacePaneId}-history-panel`}
@@ -214,7 +227,7 @@ function BranchHistoryTab({
       {state.phase === 'loading' ? (
         <StatusListSkeleton rows={8} />
       ) : state.phase === 'error' ? (
-        <EmptyState title={t(state.error ?? 'error.failed-read-repo')} />
+        <EmptyState title={t(errorTitleKey)} />
       ) : state.entries.length === 0 ? (
         <EmptyState title={t('log.empty-for-branch', { branch: branchName })} />
       ) : (

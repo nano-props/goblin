@@ -122,6 +122,8 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
   const effectivePath = pathTrimmed || defaultPath
   const displayDefaultPath = remoteTarget ? formatWorktreePath(defaultPath, remoteTarget) : tildify(defaultPath)
   const displayEffectivePath = remoteTarget ? formatWorktreePath(effectivePath, remoteTarget) : tildify(effectivePath)
+  const pathDisabledHint = t('action.create-worktree-path-disabled-hint')
+  const pathHintText = !pathName ? pathDisabledHint : effectivePath ? displayEffectivePath : ''
 
   const pathSuggestions = useRemotePathSuggestions({
     enabled: open && !!remoteTarget && pathName.length > 0,
@@ -414,7 +416,7 @@ export function CreateWorktreeDialog({ open, repo, onClose, onCreate }: Props) {
             className="truncate"
             title={displayEffectivePath || undefined}
           >
-            {!pathName ? t('action.create-worktree-path-disabled-hint') : effectivePath ? displayEffectivePath : ''}
+            {pathHintText}
           </FieldDescription>
         </Field>
         <DialogFooter className="gap-2 pt-2">

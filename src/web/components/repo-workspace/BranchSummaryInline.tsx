@@ -76,10 +76,11 @@ export function buildBranchSummaryTitle(
   t: (key: string, params?: Record<string, string | number>) => string,
   terminalBellCount = 0,
 ): string {
+  const worktreeStateLabelKey = state.worktreeDirty ? 'branches.dirty' : 'branches.worktree'
   return [
     branch.name,
     branch.isDefault ? t('branches.default') : null,
-    state.hasWorktree ? t(state.worktreeDirty ? 'branches.dirty' : 'branches.worktree') : null,
+    state.hasWorktree ? t(worktreeStateLabelKey) : null,
     terminalBellCount > 0 ? t('terminal.bell-unread-count', { count: terminalBellCount }) : null,
     branch.trackingGone ? t('branches.gone') : null,
     branch.ahead > 0 ? t('branch-status.sync.ahead', { n: branch.ahead }) : null,

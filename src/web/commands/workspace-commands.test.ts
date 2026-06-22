@@ -540,6 +540,30 @@ describe('workspace commands', () => {
     expect(selectTerminal).toHaveBeenCalledWith(WORKTREE_KEY, 'terminal-1')
   })
 
+  test('select workspace pane tab by index ignores a pending terminal tab', () => {
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      preferredWorkspacePaneView: 'terminal',
+      workspacePaneTabOrderByBranch: { 'feature/worktree': [staticEntry('status')] },
+    })
+    useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
+    const showRepoWorkspacePaneView = vi.fn((repoId, tab) => {
+      useReposStore.getState().setWorkspacePaneView(repoId, tab)
+    })
+    setTerminalSessionCommandBridge({
+      worktreeSnapshot: () => ({ ...emptyWorktreeSnapshot(), pendingCreate: true }),
+      createTerminal: vi.fn(async () => 'terminal-1'),
+      selectTerminal: vi.fn(),
+    })
+    const navigation = navigationWith({ showRepoWorkspacePaneView })
+
+    expect(runSelectWorkspacePaneTabByIndexCommand({ repoId: REPO_ID, tabIndex: 2, navigation })).toBe(false)
+
+    expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
+  })
+
   test('move workspace pane tab command follows the mixed tab strip order', () => {
     seedRepoState({
       id: REPO_ID,

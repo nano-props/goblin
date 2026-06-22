@@ -139,8 +139,10 @@ function RepoRefreshButton({
     })
   }
 
+  const fetchTooltipKey = repo.remote.hasRemotes === false ? 'action.fetch-local-title' : 'action.fetch-title'
+
   return (
-    <Tip label={t(repo.remote.hasRemotes === false ? 'action.fetch-local-title' : 'action.fetch-title')}>
+    <Tip label={t(fetchTooltipKey)}>
       <AsyncButton
         variant="ghost"
         size="icon-lg"
