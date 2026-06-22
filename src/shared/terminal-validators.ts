@@ -20,7 +20,6 @@ const MIN_TERMINAL_ROWS = 1
 const MAX_TERMINAL_ROWS = 300
 export const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 export const TERMINAL_WS_MESSAGE_LIMIT_BYTES = MAX_TERMINAL_WRITE_CHARS
-const TERMINAL_TEXT_ENCODER = new TextEncoder()
 const TERMINAL_SESSION_ID_RE = /^[A-Za-z0-9_-]{16,64}$/
 const TERMINAL_ATTACHMENT_ID_RE = /^[A-Za-z0-9_-]{1,128}$/
 const TERMINAL_REQUEST_ID_RE = /^[A-Za-z0-9_-]{1,128}$/
@@ -283,7 +282,26 @@ const TerminalClientMessageSchema = v.variant('type', [
 ])
 
 export function terminalUtf8ByteLength(value: string): number {
-  return TERMINAL_TEXT_ENCODER.encode(value).byteLength
+  let bytes = 0
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i)
+    if (code <= 0x7f) {
+      bytes += 1
+    } else if (code <= 0x7ff) {
+      bytes += 2
+    } else if (code >= 0xd800 && code <= 0xdbff && i + 1 < value.length) {
+      const next = value.charCodeAt(i + 1)
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        bytes += 4
+        i += 1
+      } else {
+        bytes += 3
+      }
+    } else {
+      bytes += 3
+    }
+  }
+  return bytes
 }
 
 export function isTerminalWsMessageWithinLimit(value: string): boolean {
