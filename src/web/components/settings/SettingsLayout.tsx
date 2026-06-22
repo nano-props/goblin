@@ -10,7 +10,7 @@ import {
   Bell,
   Info,
   Keyboard,
-  Network,
+  Router,
   Settings2,
   Shield,
   SlidersHorizontal,
@@ -24,7 +24,7 @@ const SETTINGS_PAGE_ICONS = {
   sync: SlidersHorizontal,
   apps: AppWindow,
   github: GitHubMark,
-  web: Network,
+  web: Router,
   about: Info,
 } as const satisfies Record<SettingsPage, LucideIcon | typeof GitHubMark>
 
