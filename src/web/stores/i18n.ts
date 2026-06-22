@@ -1,20 +1,17 @@
-// Renderer-side i18n. Hydrate at boot pulls the dictionary from
-// the public `/api/i18n` endpoint via
-// `usePublicAppBootstrap`; setPref writes through and the
-// broadcast keeps every window in sync. React components read
-// translations through react-i18next, while this Zustand store
-// keeps the language preference/snapshot available to non-hook
-// call sites (Settings controls, ErrorBoundary fallback).
+// Renderer-side i18n. The app entrypoint hydrates this store from
+// the public `/api/i18n` endpoint before mounting the normal React
+// tree; setPref writes through and the broadcast keeps every window
+// in sync. React components read translations through react-i18next,
+// while this Zustand store keeps the language preference/snapshot
+// available to non-hook call sites (Settings controls, ErrorBoundary
+// fallback).
 //
 // No initial dictionary is read from the bootstrap: the server
 // stopped inlining it into HTML, so the renderer always starts
-// with an empty English resource and waits for the hydrate call
-// to replace it with the user's preferred language. The `hydrated`
-// flag flips to true on the first successful snapshot commit, so
-// UI that depends on translated strings (the auth gate, error
-// toasts) can block on it instead of flashing raw keys. The
-// trade-off is a brief loading state on first paint — much
-// better than a 200ms flash of `auth.gate.title` everywhere.
+// with an empty English resource and the app entrypoint shows a
+// static loading/error state until the first hydrate call replaces
+// it with the user's preferred language. The `hydrated` flag flips
+// to true on the first successful snapshot commit.
 
 import i18next from 'i18next'
 import { initReactI18next, useTranslation } from 'react-i18next'
@@ -54,8 +51,9 @@ interface I18nState {
    */
   hydrated: boolean
   hydrate: (options?: {
-    /** False for public bootstrap: fetch `/api/i18n` without opening the auth-gated invalidation socket. */
+    /** False for entrypoint bootstrap: fetch `/api/i18n` without opening the auth-gated invalidation socket. */
     subscribe?: boolean
+    signal?: AbortSignal
   }) => Promise<void>
   setPref: (pref: LangPref) => Promise<void>
 }
@@ -79,7 +77,7 @@ export const useI18nStore = create<I18nState>((set) => ({
 
   async hydrate(options) {
     const version = ++hydrateVersion
-    const snapshot = await getI18nSnapshot()
+    const snapshot = await getI18nSnapshot({ signal: options?.signal })
     if (version !== hydrateVersion) return
     await commitSnapshot(set, snapshot)
     if (version !== hydrateVersion) return

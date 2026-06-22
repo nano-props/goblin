@@ -147,6 +147,29 @@ describe('settings-client', () => {
     )
   })
 
+  test('passes abort signal through when fetching i18n payload', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ lang: 'en', pref: 'auto', dict: { hello: 'hello' } }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    const controller = new AbortController()
+
+    const { getI18nSnapshot } = await import('#/web/settings-client.ts')
+    await expect(getI18nSnapshot({ signal: controller.signal })).resolves.toEqual({
+      lang: 'en',
+      pref: 'auto',
+      dict: { hello: 'hello' },
+    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:32100/api/i18n',
+      expect.objectContaining({
+        signal: controller.signal,
+      }),
+    )
+  })
+
   test('sets the global shortcut through the native bridge even when the embedded server is available', async () => {
     const invokeIpc = vi.fn(async () => ({ accelerator: 'CommandOrControl+Shift+K', registered: true }))
     Object.defineProperty(globalThis, 'window', {

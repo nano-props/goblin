@@ -61,7 +61,7 @@ describe('app bootstrap hooks', () => {
 
     await render(<PublicHarness />)
 
-    expect(hydrateI18n).toHaveBeenCalledWith({ subscribe: false })
+    expect(hydrateI18n).not.toHaveBeenCalled()
     expect(hydrateHostInfo).toHaveBeenCalled()
     expect(hydrateTheme).not.toHaveBeenCalled()
     expect(hydrateSessionRestore).not.toHaveBeenCalled()

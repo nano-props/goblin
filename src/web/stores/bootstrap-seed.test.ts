@@ -37,15 +37,15 @@ describe('renderer bootstrap seeding', () => {
     expect(useSessionRestoreStore.getState()).toMatchObject({ bootSessionSnapshot: null })
   })
 
-  test('i18n store starts empty and waits for hydrate from /api/i18n', async () => {
+  test('i18n store starts empty and waits for the entrypoint hydrate from /api/i18n', async () => {
     installBridge()
     const { useI18nStore } = await import('#/web/stores/i18n.ts')
 
     // The store used to read `initialI18n` from the bootstrap and
     // seed itself synchronously. The server no longer inlines i18n
     // into HTML, so the store always starts with the default
-    // English / auto / empty-dict placeholder. `hydrate()` (called
-    // by the public bootstrap hook) populates it from `/api/i18n`.
+    // English / auto / empty-dict placeholder. The app entrypoint
+    // calls `hydrate()` before mounting the normal React tree.
     expect(useI18nStore.getState()).toMatchObject({
       lang: 'en',
       pref: 'auto',
