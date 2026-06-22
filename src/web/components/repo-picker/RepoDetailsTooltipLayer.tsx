@@ -27,6 +27,10 @@ export function RepoDetailsTooltipLayer({
   children,
   ...props
 }: RepoDetailsTooltipLayerProps) {
+  // The layer is a tablist whenever the consumer opts in via `role="tablist"`.
+  // The horizontal orientation mirrors the toolbar's left-to-right layout and
+  // matches the keyboard navigation (ArrowLeft/Right) on the current repo tab.
+  const ariaOrientation = props.role === 'tablist' ? 'horizontal' : undefined
   return (
     <DelegatedTooltipLayer
       items={repos}
@@ -40,7 +44,9 @@ export function RepoDetailsTooltipLayer({
       tooltipClassName="px-3 py-2"
       asChild
     >
-      <ToolbarTabList {...props}>{children}</ToolbarTabList>
+      <ToolbarTabList aria-orientation={ariaOrientation} {...props}>
+        {children}
+      </ToolbarTabList>
     </DelegatedTooltipLayer>
   )
 }

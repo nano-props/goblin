@@ -12,19 +12,6 @@ const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENV
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn((query: string) => ({
-      matches: query === '(max-width: 639px)',
-      media: query,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    })),
-  )
 })
 
 afterEach(() => {
@@ -39,7 +26,7 @@ afterEach(() => {
 })
 
 describe('RepoPicker', () => {
-  test('keeps the switcher trigger outside the current repo group on small screens', () => {
+  test('keeps the switcher trigger outside the current repo group', () => {
     render(
       <RepoPicker
         repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
@@ -58,6 +45,31 @@ describe('RepoPicker', () => {
     expect(currentRepoGroup?.querySelector('[data-current-repo-id="/tmp/repo-a"]')).not.toBeNull()
     expect(currentRepoGroup?.querySelector('[aria-label="More"]')).toBeNull()
     expect(document.body.querySelector('button[aria-label="More"]')).not.toBeNull()
+  })
+
+  test('exposes the current repo button as a selected tab in a horizontal tablist', () => {
+    render(
+      <RepoPicker
+        repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
+        activeId="/tmp/repo-a"
+        labels={labels}
+        onActivate={() => {}}
+        onClose={() => {}}
+        onOpenLocal={() => {}}
+        onOpenRemote={() => {}}
+        onClone={() => {}}
+      />,
+    )
+
+    const tablist = document.body.querySelector('[data-current-repo-group]')
+    expect(tablist?.getAttribute('role')).toBe('tablist')
+    expect(tablist?.getAttribute('aria-orientation')).toBe('horizontal')
+
+    const activeTab = document.body.querySelector('[data-current-repo-id="/tmp/repo-a"]')
+    if (!(activeTab instanceof HTMLButtonElement)) throw new Error('missing current repo tab')
+    expect(activeTab.getAttribute('role')).toBe('tab')
+    expect(activeTab.getAttribute('aria-selected')).toBe('true')
+    expect(activeTab.tabIndex).toBe(0)
   })
 
   test('shows the active repo in the repo switcher popover with selected styling', async () => {

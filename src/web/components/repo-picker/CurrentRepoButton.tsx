@@ -47,6 +47,9 @@ export function CurrentRepoButton({
       buttonProps={{
         'data-current-repo-id': repo.id,
         'data-current-repo-connecting': showConnecting ? 'true' : undefined,
+        role: 'tab',
+        tabIndex: isCurrent ? 0 : -1,
+        'aria-selected': isCurrent,
         'aria-label': repoLabel,
         onClick: () => onActivate(repo.id),
         onKeyDown: (e) => {

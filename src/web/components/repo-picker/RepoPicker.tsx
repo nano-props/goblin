@@ -317,7 +317,7 @@ export function RepoPicker({
       ) : (
         <div className="flex h-full min-w-0 flex-1 items-center">
           <ToolbarTabStripBody>
-            <RepoDetailsTooltipLayer repos={repos} data-current-repo-group>
+            <RepoDetailsTooltipLayer repos={repos} role="tablist" data-current-repo-group>
               <CurrentRepoButton
                 repo={currentRepo}
                 isCurrent={currentRepo.id === activeId}
