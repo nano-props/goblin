@@ -9,6 +9,10 @@ import {
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import type { TerminalDescriptor, TerminalRepoIndex } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
+import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
+import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
+import { workspacePaneStaticTabOrderEntry, workspacePaneTerminalTabOrderEntry } from '#/shared/workspace-pane.ts'
 
 const REPO_ROOT = '/repo'
 const WORKTREE_PATH = '/repo'
@@ -71,12 +75,22 @@ function makeServerSession(
 describe('TerminalSessionRegistry', () => {
   let registry: TerminalSessionRegistry
   let selectedChanges: Array<{ worktreeTerminalKey: string; key: string | null }>
+  let removedSessions: Array<{ key: string; repoRoot: string; branch: string; worktreePath: string }>
 
   beforeEach(() => {
+    resetReposStore()
     selectedChanges = []
+    removedSessions = []
     registry = new TerminalSessionRegistry(
       () => REPO_ROOT,
       (worktreeTerminalKey, key) => selectedChanges.push({ worktreeTerminalKey, key }),
+      (key, base) =>
+        removedSessions.push({
+          key,
+          repoRoot: base.repoRoot,
+          branch: base.branch,
+          worktreePath: base.worktreePath,
+        }),
     )
     // Install into the singleton slot so any code that reaches the
     // registry via `getTerminalSessionRegistry()` (e.g., a Provider
@@ -92,6 +106,7 @@ describe('TerminalSessionRegistry', () => {
     // contract documented at `setTerminalSessionRegistryForTests`.
     registry.destroy()
     setTerminalSessionRegistryForTests(null)
+    resetReposStore()
   })
 
   describe('event dispatch', () => {
@@ -316,6 +331,86 @@ describe('TerminalSessionRegistry', () => {
 
       expect(registry.isKnownSession(keyBefore)).toBe(false)
       expect(registry.worktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(removedSessions).toEqual([
+        { key: keyBefore, repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH },
+      ])
+    })
+
+    test('session removal callback removes the owned workspace pane tab', () => {
+      const descriptor = makeDescriptor('terminal-1', 1)
+      seedRepoState({
+        id: REPO_ROOT,
+        branches: [createRepoBranch(BRANCH, { worktree: { path: WORKTREE_PATH } })],
+        selectedBranch: BRANCH,
+        workspacePaneTabOrderByBranch: {
+          [BRANCH]: [
+            workspacePaneStaticTabOrderEntry('status'),
+            workspacePaneTerminalTabOrderEntry(descriptor.key),
+            workspacePaneStaticTabOrderEntry('history'),
+          ],
+        },
+      })
+      const registryWithStore = new TerminalSessionRegistry(
+        () => REPO_ROOT,
+        () => {},
+        (key, base) => {
+          useReposStore.getState().removeWorkspacePaneTerminalTab(base.repoRoot, key, base.branch)
+        },
+      )
+      try {
+        registryWithStore.setRepoIndex(makeRepoIndex())
+        registryWithStore.reconcileServerSessions(
+          REPO_ROOT,
+          [makeServerSession('session-1', 'terminal-1')],
+          'attachment_local',
+          new Map(),
+        )
+
+        registryWithStore.closeTerminalByDescriptor(descriptor.key, descriptor)
+
+        const repo = useReposStore.getState().repos[REPO_ROOT]
+        expect(repo ? workspacePaneTabOrderForBranch(repo.ui, BRANCH) : []).toEqual([
+          workspacePaneStaticTabOrderEntry('status'),
+          workspacePaneStaticTabOrderEntry('history'),
+        ])
+      } finally {
+        registryWithStore.destroy()
+      }
+    })
+
+    test('session removal callback failures do not block terminal disposal', () => {
+      const registryWithThrowingCallback = new TerminalSessionRegistry(
+        () => REPO_ROOT,
+        () => {},
+        () => {
+          throw new Error('store write failed')
+        },
+      )
+      try {
+        registryWithThrowingCallback.setRepoIndex(makeRepoIndex())
+        registryWithThrowingCallback.reconcileServerSessions(
+          REPO_ROOT,
+          [makeServerSession('session-1', 'terminal-1')],
+          'attachment_local',
+          new Map(),
+        )
+        const key = registryWithThrowingCallback.worktreeSnapshot(WORKTREE_KEY).sessions[0]!.key
+        const session = (registryWithThrowingCallback as any).sessions.get(key)
+        const dispose = vi.spyOn(session, 'dispose')
+
+        expect(() =>
+          registryWithThrowingCallback.closeTerminalByDescriptor(key, {
+            repoRoot: REPO_ROOT,
+            branch: BRANCH,
+            worktreePath: WORKTREE_PATH,
+          }),
+        ).not.toThrow()
+
+        expect(dispose).toHaveBeenCalledWith({ closeSession: true })
+        expect(registryWithThrowingCallback.isKnownSession(key)).toBe(false)
+      } finally {
+        registryWithThrowingCallback.destroy()
+      }
     })
 
     test('preserves current selection and falls back to controller when current is lost', () => {
@@ -467,6 +562,23 @@ describe('TerminalSessionRegistry', () => {
       expect(fresh).not.toBe(original)
       // Re-install for `afterEach` cleanup.
       setTerminalSessionRegistryForTests(registry)
+    })
+
+    test('destroy clears the singleton slot when destroying the installed instance', () => {
+      const original = getTerminalSessionRegistry({
+        getCurrentRepoId: () => REPO_ROOT,
+        onSelectedWorktreeChange: () => {},
+      })
+      expect(original).toBe(registry)
+
+      original.destroy()
+
+      const fresh = getTerminalSessionRegistry({
+        getCurrentRepoId: () => REPO_ROOT,
+        onSelectedWorktreeChange: () => {},
+      })
+      expect(fresh).not.toBe(original)
+      fresh.destroy()
     })
 
     test('state added before a synthetic remount survives in the singleton slot', () => {

@@ -1,5 +1,5 @@
 import { Check, ClipboardCopy, FolderTree, Loader2 } from 'lucide-react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import { StatusListSkeleton } from '#/web/components/Skeleton.tsx'
@@ -10,6 +10,7 @@ import { getRepositoryLog } from '#/web/repo-client.ts'
 import type { LogEntry } from '#/web/types.ts'
 import { BranchStatus } from '#/web/components/branch-workspace/BranchStatus.tsx'
 import { TerminalSlot } from '#/web/components/terminal/TerminalSlot.tsx'
+import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
 import type {
   BranchWorkspaceRepo,
   SelectedBranchWorkspacePresentation,
@@ -32,6 +33,8 @@ import {
   type BranchWorkspacePaneSelection,
 } from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
 import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
+import { createWorkspacePaneTerminalTab } from '#/web/stores/repos/workspace-pane-terminal-write-paths.ts'
 interface Props {
   repo: Pick<BranchWorkspaceRepo, 'id' | 'data' | 'ui'> & {
     data: BranchWorkspaceRepo['data'] & Pick<BranchWorkspaceRepo['data'], 'statusLoaded'>
@@ -341,6 +344,15 @@ function BranchTerminalTab({
   terminalSyncReady: boolean
   branch: BranchWorkspaceBranch
 }) {
+  const { createTerminal } = useTerminalSessionContext()
+  const createTerminalForSlot = useCallback(
+    (base: TerminalSessionBase) =>
+      createWorkspacePaneTerminalTab({
+        base,
+        createTerminal,
+      }),
+    [createTerminal],
+  )
   if (!branch.worktree?.path) return null
   return (
     <BranchTabPanel id={`${workspacePaneId}-terminal-panel`} {...panelLabel}>
@@ -349,6 +361,7 @@ function BranchTerminalTab({
         branch={branch.name}
         worktreePath={branch.worktree?.path}
         syncReady={terminalSyncReady}
+        createTerminalForSlot={createTerminalForSlot}
       />
     </BranchTabPanel>
   )

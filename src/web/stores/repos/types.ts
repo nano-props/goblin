@@ -213,6 +213,8 @@ export interface RuntimeCoherentRepoProjectionActions {
   setWorkspacePaneView: (id: string, tab: WorkspacePaneView) => void
   openWorkspacePaneStaticView: (id: string, tab: WorkspacePaneStaticViewType, branchName?: string) => void
   closeWorkspacePaneStaticView: (id: string, tab: WorkspacePaneStaticViewType, branchName?: string) => void
+  addWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
+  removeWorkspacePaneTerminalTab: (id: string, terminalKey: string, branchName?: string) => void
   reorderWorkspacePaneTabs: (
     id: string,
     orderedTabs: WorkspacePaneTabOrderEntry[],

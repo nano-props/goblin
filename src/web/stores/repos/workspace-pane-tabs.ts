@@ -3,6 +3,7 @@ import type { WorkspacePaneStaticViewType, WorkspacePaneTabOrderEntry } from '#/
 import {
   isWorkspacePaneTabOrderEntry,
   workspacePaneStaticTabOrderEntry,
+  workspacePaneTerminalTabOrderEntry,
   workspacePaneTabOrderEntryIdentity,
 } from '#/shared/workspace-pane.ts'
 
@@ -49,6 +50,22 @@ export function workspacePaneTabOrderWithoutStaticView(
   view: WorkspacePaneStaticViewType,
 ): WorkspacePaneTabOrderEntry[] {
   return normalizeWorkspacePaneTabOrder(current.filter((entry) => entry.type !== view))
+}
+
+export function workspacePaneTabOrderWithTerminal(
+  current: readonly WorkspacePaneTabOrderEntry[],
+  terminalKey: string,
+): WorkspacePaneTabOrderEntry[] {
+  if (terminalKey.length === 0) return normalizeWorkspacePaneTabOrder(current)
+  const withoutCurrentTerminal = current.filter((entry) => entry.type !== 'terminal' || entry.id !== terminalKey)
+  return normalizeWorkspacePaneTabOrder([...withoutCurrentTerminal, workspacePaneTerminalTabOrderEntry(terminalKey)])
+}
+
+export function workspacePaneTabOrderWithoutTerminal(
+  current: readonly WorkspacePaneTabOrderEntry[],
+  terminalKey: string,
+): WorkspacePaneTabOrderEntry[] {
+  return normalizeWorkspacePaneTabOrder(current.filter((entry) => entry.type !== 'terminal' || entry.id !== terminalKey))
 }
 
 export function normalizeWorkspacePaneTabOrderRecord(

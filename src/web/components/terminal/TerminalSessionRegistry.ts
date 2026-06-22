@@ -70,6 +70,7 @@ export const parseServerSessionKey = parseTerminalSessionKey
 export class TerminalSessionRegistry {
   private readonly getCurrentRepoId: () => string | null
   private readonly onSelectedWorktreeChange: (worktreeTerminalKey: string, key: string | null) => void
+  private readonly onTerminalSessionRemoved: (key: string, base: TerminalSessionBase) => void
   private repoIndex: TerminalRepoIndex = {}
   private parkingRoot: HTMLDivElement | null = null
   private readonly sessions = new Map<string, ManagedTerminalSession>()
@@ -149,9 +150,11 @@ export class TerminalSessionRegistry {
   constructor(
     getCurrentRepoId: () => string | null,
     onSelectedWorktreeChange: (worktreeTerminalKey: string, key: string | null) => void = () => {},
+    onTerminalSessionRemoved: (key: string, base: TerminalSessionBase) => void = () => {},
   ) {
     this.getCurrentRepoId = getCurrentRepoId
     this.onSelectedWorktreeChange = onSelectedWorktreeChange
+    this.onTerminalSessionRemoved = onTerminalSessionRemoved
   }
 
   setRepoIndex(repoIndex: TerminalRepoIndex): void {
@@ -204,6 +207,7 @@ export class TerminalSessionRegistry {
     this.worktreeListeners.clear()
     this.snapshotListeners.clear()
     this.bellController.reset()
+    if (registryInstance === this) registryInstance = null
   }
 
   handleOutput(event: { sessionId: string; data: string; seq: number; processName: string }): void {
@@ -811,6 +815,7 @@ export class TerminalSessionRegistry {
     this.snapshotCache.delete(key)
     this.reattachSnapshotCache.delete(key)
     this.displayOrderByKey.delete(key)
+    this.notifyTerminalSessionRemoved(key, session.descriptor)
     this.notifySnapshot(key)
     this.bellController.remove(key)
     if (options.dispose) session.dispose({ closeSession: options.closeSession !== false })
@@ -820,6 +825,14 @@ export class TerminalSessionRegistry {
     }
     this.notifyWorktree(worktreeTerminalKey)
     return true
+  }
+
+  private notifyTerminalSessionRemoved(key: string, base: TerminalSessionBase): void {
+    try {
+      this.onTerminalSessionRemoved(key, base)
+    } catch (err) {
+      terminalSessionProviderLog.warn('terminal session removal callback failed', { key, err })
+    }
   }
 
   private closeTerminal(key: string): void {
@@ -919,6 +932,7 @@ export class TerminalSessionRegistry {
 export interface TerminalSessionRegistryDeps {
   getCurrentRepoId: () => string | null
   onSelectedWorktreeChange: (worktreeTerminalKey: string, key: string | null) => void
+  onTerminalSessionRemoved?: (key: string, base: TerminalSessionBase) => void
 }
 
 let registryInstance: TerminalSessionRegistry | null = null
@@ -937,7 +951,11 @@ let registryInstance: TerminalSessionRegistry | null = null
  */
 export function getTerminalSessionRegistry(deps: TerminalSessionRegistryDeps): TerminalSessionRegistry {
   if (!registryInstance) {
-    registryInstance = new TerminalSessionRegistry(deps.getCurrentRepoId, deps.onSelectedWorktreeChange)
+    registryInstance = new TerminalSessionRegistry(
+      deps.getCurrentRepoId,
+      deps.onSelectedWorktreeChange,
+      deps.onTerminalSessionRemoved,
+    )
   }
   return registryInstance
 }

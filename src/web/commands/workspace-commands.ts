@@ -16,6 +16,7 @@ import {
   type BranchWorkspacePaneTab,
   type BranchWorkspacePaneTabModel,
 } from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
+import { createWorkspacePaneTerminalTab } from '#/web/stores/repos/workspace-pane-terminal-write-paths.ts'
 
 interface ShowWorkspacePaneViewCommandOptions {
   repoId: string | null
@@ -104,7 +105,7 @@ export async function runTerminalPrimaryActionCommand({
     if (firstSession) bridge.selectTerminal(worktreeKey, firstSession.key)
     return true
   }
-  await bridge.createTerminal(base)
+  await createWorkspacePaneTerminalTab({ base, createTerminal: bridge.createTerminal })
   return true
 }
 
@@ -115,7 +116,7 @@ export async function runNewTerminalTabCommand({ repoId, navigation }: NewTermin
   await runShowWorkspacePaneViewCommand({ repoId, tab: 'terminal', navigation })
   const bridge = readTerminalSessionCommandBridge()
   if (!bridge) return true
-  await bridge.createTerminal(base)
+  await createWorkspacePaneTerminalTab({ base, createTerminal: bridge.createTerminal })
   return true
 }
 

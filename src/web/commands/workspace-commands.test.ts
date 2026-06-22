@@ -13,11 +13,14 @@ import { setTerminalSessionCommandBridge } from '#/web/components/terminal/termi
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
-import { workspacePaneStaticViewsForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
+import {
+  workspacePaneStaticViewsForBranch,
+  workspacePaneTabOrderForBranch,
+} from '#/web/stores/repos/workspace-pane-tabs.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import type { WorktreeTerminalSnapshot } from '#/web/components/terminal/types.ts'
-import type { WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneStaticViewType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
 
 const REPO_ID = '/tmp/gbl-workspace-command-repo'
@@ -282,12 +285,37 @@ describe('workspace commands', () => {
     })
   })
 
+  test('new terminal tab command moves a reused stale terminal id to the end of the tab order', async () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      preferredWorkspacePaneView: 'status',
+      workspacePaneTabOrderByBranch: {
+        'feature/worktree': [terminalEntry('terminal-1'), staticEntry('status')],
+      },
+    })
+    const createTerminal = vi.fn(async () => 'terminal-1')
+    setTerminalSessionCommandBridge({
+      worktreeSnapshot: () => emptyWorktreeSnapshot(),
+      createTerminal,
+      selectTerminal: vi.fn(),
+    })
+
+    await runNewTerminalTabCommand({ repoId: REPO_ID, navigation: navigationWith() })
+
+    expect(tabOrderFor('feature/worktree')).toEqual([staticEntry('status'), terminalEntry('terminal-1')])
+  })
+
   test('close workspace tab command closes the selected terminal when terminal is active', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneView: 'terminal',
+      workspacePaneTabOrderByBranch: {
+        'feature/worktree': [staticEntry('status'), terminalEntry('terminal-1')],
+      },
     })
     const closeTerminalByDescriptor = vi.fn()
     const closeWindow = vi.fn()
@@ -307,6 +335,8 @@ describe('workspace commands', () => {
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
+    // Tab removal is owned by the registry's session-removed callback, not the command.
+    expect(tabOrderFor('feature/worktree')).toEqual([staticEntry('status'), terminalEntry('terminal-1')])
     expect(closeWindow).not.toHaveBeenCalled()
   })
 
@@ -567,6 +597,11 @@ function preferredWorkspacePaneView() {
 function openViewsFor(branch: string) {
   const repo = useReposStore.getState().repos[REPO_ID]
   return repo ? workspacePaneStaticViewsForBranch(repo.ui, branch) : []
+}
+
+function tabOrderFor(branch: string): WorkspacePaneTabOrderEntry[] {
+  const repo = useReposStore.getState().repos[REPO_ID]
+  return repo ? workspacePaneTabOrderForBranch(repo.ui, branch) : []
 }
 
 function staticEntry(type: WorkspacePaneStaticViewType) {

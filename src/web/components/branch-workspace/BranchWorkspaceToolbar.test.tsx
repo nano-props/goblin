@@ -29,7 +29,10 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
-import { workspacePaneStaticViewsForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
+import {
+  workspacePaneStaticViewsForBranch,
+  workspacePaneTabOrderForBranch,
+} from '#/web/stores/repos/workspace-pane-tabs.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 
 let compactUi = false
@@ -330,6 +333,21 @@ describe('BranchWorkspaceToolbar', () => {
 
     expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'terminal')
     expect(mocks.createTerminal).toHaveBeenCalledTimes(1)
+  })
+
+  test('clicking the new-terminal button moves a reused stale terminal id to the end', async () => {
+    const { terminalTab } = renderToolbar({
+      terminalCount: 0,
+      workspacePaneTabOrder: [terminalEntry('key'), staticEntry('status')],
+      navigation: navigationWith({}),
+    })
+
+    act(() => {
+      terminalTab.click()
+    })
+    await flush()
+
+    expect(tabOrderFor('feature/worktree')).toEqual([staticEntry('status'), terminalEntry('key')])
   })
 
   test('shows an error toast when new terminal creation fails', async () => {
@@ -793,6 +811,11 @@ function closeButtonFor(container: HTMLElement, identity: string): HTMLButtonEle
 function openViewsFor(branchName: string): WorkspacePaneStaticViewType[] {
   const repo = useReposStore.getState().repos[REPO_ID]
   return repo ? workspacePaneStaticViewsForBranch(repo.ui, branchName) : []
+}
+
+function tabOrderFor(branchName: string): WorkspacePaneTabOrderEntry[] {
+  const repo = useReposStore.getState().repos[REPO_ID]
+  return repo ? workspacePaneTabOrderForBranch(repo.ui, branchName) : []
 }
 
 function staticEntry(type: WorkspacePaneStaticViewType): WorkspacePaneTabOrderEntry {

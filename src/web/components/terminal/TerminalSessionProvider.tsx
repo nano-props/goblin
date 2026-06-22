@@ -74,6 +74,11 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     registryRef.current = getTerminalSessionRegistry({
       getCurrentRepoId: () => currentRepoIdRef.current,
       onSelectedWorktreeChange: setSelectedTerminal,
+      onTerminalSessionRemoved: (key, base) => {
+        // Terminal-session lifetime owns terminal tab lifetime. User closes,
+        // server exits, and reconcile removals all converge through this hook.
+        useReposStore.getState().removeWorkspacePaneTerminalTab(base.repoRoot, key, base.branch)
+      },
     })
   }
   const registry = registryRef.current

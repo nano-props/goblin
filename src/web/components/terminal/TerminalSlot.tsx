@@ -30,14 +30,22 @@ import {
 } from '#/web/components/terminal/terminal-session-store.ts'
 import { MobileTerminalToolbar } from '#/web/components/terminal/mobile-terminal-toolbar.tsx'
 import { isMobileDevice } from '#/web/components/terminal/mobile-detection.ts'
+import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
 interface TerminalSlotProps {
   repoRoot: string
   branch: string
   worktreePath: string
   syncReady?: boolean
+  createTerminalForSlot?: (base: TerminalSessionBase) => Promise<string>
 }
 
-export function TerminalSlot({ repoRoot, branch, worktreePath, syncReady = true }: TerminalSlotProps) {
+export function TerminalSlot({
+  repoRoot,
+  branch,
+  worktreePath,
+  syncReady = true,
+  createTerminalForSlot,
+}: TerminalSlotProps) {
   const t = useT()
   const hostRef = useRef<HTMLDivElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
@@ -454,7 +462,7 @@ export function TerminalSlot({ repoRoot, branch, worktreePath, syncReady = true 
         <EmptyTerminalCta
           onCreate={async () => {
             try {
-              await createTerminal({ repoRoot, branch, worktreePath })
+              await (createTerminalForSlot ?? createTerminal)({ repoRoot, branch, worktreePath })
             } catch (err) {
               terminalLog.warn('empty-state terminal create failed', { err })
               toast.error(t('error.terminal-create-failed'))
