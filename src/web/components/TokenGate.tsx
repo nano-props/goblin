@@ -23,13 +23,10 @@ import { postServerJson } from '#/web/lib/server-fetch.ts'
  * run only after the user has a valid session. This is what
  * keeps the server log quiet on first load.
  *
- * Note: we deliberately do NOT block on i18n hydration here.
- * The i18n store's `hydrate()` is async and races with the
- * preload's bootstrap-seed IPC; gating on it can leave the
- * user stuck on the "checking" placeholder if the bootstrap
- * is empty for any reason (e.g. the embedded server failed to
- * start). The 200ms flash of raw `auth.gate.title` is the
- * cheaper trade-off.
+ * i18n is intentionally not gated here. The renderer entrypoint
+ * hydrates `/api/i18n` before mounting the normal React tree, so
+ * this component can stay focused on auth state instead of owning
+ * another boot dependency.
  */
 export function TokenGate({ children }: { children: ReactNode }) {
   const auth = useAuth()

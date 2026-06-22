@@ -124,9 +124,11 @@ async function createMainWindow(): Promise<BrowserWindow> {
   const { url } = createRendererEntryUrl({ routePath: '/' })
   allowRendererWindowEntryUrl(win, url.toString())
   // Plant the auth cookie on the renderer's session BEFORE
-  // `loadURL` so the very first request the renderer fires
-  // (the `useAccessTokenStatus` whoami probe) already
-  // authenticates and clears the token gate. The window's
+  // `loadURL` so authenticated renderer requests are ready as
+  // soon as the app mounts. The first boot request is public
+  // i18n; the auth-gated `useAccessTokenStatus` whoami probe
+  // runs after the renderer entrypoint has hydrated i18n and
+  // mounted the app. The window's
   // `webContents.session` is a per-window cookie store in
   // Electron — sharing the default session across windows would
   // leak the cookie into popups. See `cookie-bootstrap.ts` for

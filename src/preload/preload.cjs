@@ -226,9 +226,10 @@ contextBridge.exposeInMainWorld('goblinNative', {
 //
 // The preload does NOT seed `window.__GOBLIN_BOOTSTRAP__` with
 // anything — the bootstrap is empty on first paint in every
-// runtime, and the renderer fetches host info, i18n, and settings
-// from the dedicated `/api/*` endpoints during
-// `useAppBootstrap.hydrate()`. The embedded path used to also seed
+// runtime, and the renderer fetches i18n before mounting the normal
+// app tree, then fetches host info and settings from the dedicated
+// `/api/*` endpoints during the app bootstrap hooks. The embedded
+// path used to also seed
 // homeDir + platform via `goblin:get-home-dir` /
 // `goblin:get-platform` IPC; those channels were removed when
 // host info moved to the public `/api/host` endpoint, so the

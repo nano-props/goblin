@@ -94,12 +94,12 @@ export async function setThemeColorTheme(colorTheme: ColorTheme): Promise<ThemeS
   return resolveThemeStateFromPrefs((await updateSettingsPrefsPatch({ colorTheme })).settings)
 }
 
-export async function getI18nSnapshot(): Promise<I18nSnapshot> {
+export async function getI18nSnapshot(options?: { signal?: AbortSignal }): Promise<I18nSnapshot> {
   // Public endpoint — i18n has to be fetchable before the user is
   // authenticated, otherwise the token gate would render with raw
   // i18n keys (the renderer never has a bootstrap on the web path
   // and the server is not inlining anything into HTML anymore).
-  return await fetchServerJson<I18nSnapshot>('/api/i18n')
+  return await fetchServerJson<I18nSnapshot>('/api/i18n', { signal: options?.signal })
 }
 
 export async function setI18nPref(pref: LangPref): Promise<I18nSnapshot> {

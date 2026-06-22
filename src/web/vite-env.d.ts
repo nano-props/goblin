@@ -9,9 +9,8 @@ import type { TerminalMutationResult, TerminalNotifyBellInput } from '#/shared/t
 /**
  * The renderer's view of the Electron preload's `contextBridge` surface.
  * The preload is now a strict IPC bridge — the bootstrap snapshot
- * (`window.__GOBLIN_BOOTSTRAP__`) carries renderer-side state
- * (i18n / settings / server URL / access token / platform / home
- * dir), and the preload only exposes the methods below.
+ * (`window.__GOBLIN_BOOTSTRAP__`) carries the initial server handoff,
+ * and the preload only exposes the methods below.
  */
 interface GoblinNativeBridge {
   invokeIpc: (request: IpcRequest) => Promise<unknown>
