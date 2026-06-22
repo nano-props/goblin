@@ -39,15 +39,15 @@ vi.mock('#/web/components/BranchNavigator.tsx', () => ({
 
 vi.mock('#/web/components/BranchWorkspace.tsx', () => ({
   BranchWorkspace: ({
-    selectedBranchOverrideForTransition,
+    selectedBranchName,
     shortcutsEnabled = true,
   }: {
-    selectedBranchOverrideForTransition?: string
+    selectedBranchName?: string | null
     shortcutsEnabled?: boolean
   }) => (
     <div
       data-testid="branch-workspace"
-      data-selected-branch-override={selectedBranchOverrideForTransition ?? ''}
+      data-selected-branch-name={selectedBranchName ?? ''}
       data-shortcuts-enabled={shortcutsEnabled ? 'true' : 'false'}
     />
   ),
@@ -216,7 +216,7 @@ describe('RepoView workspace navigation', () => {
         useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
       })
 
-      expect(branchWorkspace()?.dataset.selectedBranchOverride).toBe('')
+      expect(branchWorkspace()?.dataset.selectedBranchName).toBe('feature/a')
       expect(branchWorkspace()?.dataset.shortcutsEnabled).toBe('true')
 
       act(() => {
@@ -225,14 +225,14 @@ describe('RepoView workspace navigation', () => {
 
       expect(compactWorkspace()?.dataset.activePane).toBe('navigator')
       expect(compactPane('workspace')?.getAttribute('aria-hidden')).toBe('true')
-      expect(branchWorkspace()?.dataset.selectedBranchOverride).toBe('feature/a')
+      expect(branchWorkspace()?.dataset.selectedBranchName).toBe('feature/a')
       expect(branchWorkspace()?.dataset.shortcutsEnabled).toBe('false')
 
       act(() => {
         vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS)
       })
 
-      expect(branchWorkspace()?.dataset.selectedBranchOverride).toBe('')
+      expect(branchWorkspace()?.dataset.selectedBranchName).toBe('')
     } finally {
       vi.useRealTimers()
     }

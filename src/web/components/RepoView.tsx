@@ -3,7 +3,6 @@
 // and `App.tsx` — so the workspace below the topbar is just the
 // branch navigator and the branch workspace pane.
 
-import { useEffect, useRef, useState } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
@@ -18,6 +17,7 @@ import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
+import { useRetainedValueDuringExit } from '#/web/hooks/useRetainedValueDuringExit.ts'
 
 interface Props {
   repoId: string
@@ -59,7 +59,13 @@ export function RepoView({ repoId }: Props) {
 
   const workspacePaneSize = view.workspacePaneSizes[layout]
   const selectedBranch = repo?.ui.selectedBranch ?? null
-  const selectedBranchOverrideForTransition = useCompactWorkspaceBranchTransitionOverride(selectedBranch, compact)
+  const singlePane = selectedBranch ? 'workspace' : 'navigator'
+  const compactWorkspaceSelectedBranch = useRetainedValueDuringExit({
+    value: selectedBranch,
+    active: compact && singlePane === 'workspace',
+    retainMs: WORKSPACE_PANE_TRANSITION_MS,
+    resetKey: repoId,
+  })
 
   if (!view.exists || !repo) return <div />
   if (isRepoUnavailable(repo)) return <UnavailableRepoView repo={repo} />
@@ -74,12 +80,11 @@ export function RepoView({ repoId }: Props) {
     )
   }
 
-  const singlePane = repo.ui.selectedBranch ? 'workspace' : 'navigator'
   const branchWorkspacePane = (
     <RepoWorkspacePane>
       <BranchWorkspace
         repoId={repoId}
-        selectedBranchOverrideForTransition={selectedBranchOverrideForTransition}
+        selectedBranchName={compact ? compactWorkspaceSelectedBranch : undefined}
         shortcutsEnabled={!compact || singlePane === 'workspace'}
       />
     </RepoWorkspacePane>
@@ -112,41 +117,4 @@ export function RepoView({ repoId }: Props) {
   )
 
   return <section className="relative flex min-w-0 flex-1 flex-col">{workspaceBody}</section>
-}
-
-function useCompactWorkspaceBranchTransitionOverride(
-  selectedBranch: string | null,
-  compact: boolean,
-): string | undefined {
-  const previousBranchRef = useRef<string | null>(selectedBranch)
-  const [selectedBranchOverride, setSelectedBranchOverride] = useState<string | undefined>(undefined)
-
-  useEffect(() => {
-    if (!compact) {
-      previousBranchRef.current = selectedBranch
-      setSelectedBranchOverride(undefined)
-      return
-    }
-
-    if (selectedBranch) {
-      previousBranchRef.current = selectedBranch
-      setSelectedBranchOverride(undefined)
-      return
-    }
-
-    const outgoingBranch = previousBranchRef.current
-    if (!outgoingBranch) {
-      setSelectedBranchOverride(undefined)
-      return
-    }
-
-    setSelectedBranchOverride(outgoingBranch)
-    const timeout = window.setTimeout(() => {
-      previousBranchRef.current = null
-      setSelectedBranchOverride(undefined)
-    }, WORKSPACE_PANE_TRANSITION_MS)
-    return () => window.clearTimeout(timeout)
-  }, [compact, selectedBranch])
-
-  return compact ? selectedBranchOverride : undefined
 }

@@ -12,7 +12,7 @@ import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
 interface Props {
   repoId: string
-  selectedBranchOverrideForTransition?: string
+  selectedBranchName?: string | null
   shortcutsEnabled?: boolean
 }
 
@@ -44,16 +44,16 @@ function branchWorkspaceRepoEqual(a: BranchWorkspaceRepo | undefined, b: BranchW
   )
 }
 
-export function BranchWorkspace({ repoId, selectedBranchOverrideForTransition, shortcutsEnabled = true }: Props) {
+export function BranchWorkspace({ repoId, selectedBranchName, shortcutsEnabled = true }: Props) {
   const workspacePaneId = useId()
   const repo = useStoreWithEqualityFn(
     useReposStore,
     (s) => {
       const repo = s.repos[repoId]
       const selectedBranch = repo
-        ? selectedBranchOverrideForTransition === undefined
+        ? selectedBranchName === undefined
           ? repo.ui.selectedBranch
-          : selectedBranchOverrideForTransition
+          : selectedBranchName
         : null
       return repo
         ? {
