@@ -13,7 +13,7 @@ type WorkspaceRendererIntent = Extract<
   | { type: 'open-remote-repo-requested' }
   | { type: 'clone-repo-requested' }
   | { type: 'terminal-new-tab-requested' }
-  | { type: 'terminal-close-tab-or-window-requested' }
+  | { type: 'workspace-pane-close-tab-or-window-requested' }
   | { type: 'close-repo-requested' }
   | { type: 'cycle-repo-requested' }
   | { type: 'repo-refresh-requested' }
@@ -49,7 +49,7 @@ export type WorkspaceIntentPlan =
   | { kind: 'open-clone-repo' }
   | { kind: 'open-remote-repo' }
   | { kind: 'new-terminal-tab'; repoId: string }
-  | { kind: 'close-terminal-tab-or-window'; repoId: string | null }
+  | { kind: 'close-workspace-pane-tab-or-window'; repoId: string | null }
   | { kind: 'close-repo'; repoId: string }
   | { kind: 'close-window' }
   | { kind: 'cycle-repo'; direction: 1 | -1 }
@@ -119,9 +119,9 @@ export function createWorkspaceIntentPlan(
   context: WorkspaceIntentPlanContext,
 ): WorkspaceIntentPlan | null {
   if (!isWorkspaceRendererIntent(event)) return null
-  if (event.type === 'terminal-close-tab-or-window-requested') {
+  if (event.type === 'workspace-pane-close-tab-or-window-requested') {
     if (context.overlayBlocked || context.workspaceShortcutSuppressed) return { kind: 'close-window' }
-    return { kind: 'close-terminal-tab-or-window', repoId: context.currentRepoId }
+    return { kind: 'close-workspace-pane-tab-or-window', repoId: context.currentRepoId }
   }
   if (context.overlayBlocked) return { kind: 'noop' }
   switch (event.type) {
@@ -174,7 +174,7 @@ function isWorkspaceRendererIntent(event: RendererEffectIntent): event is Worksp
     event.type === 'open-remote-repo-requested' ||
     event.type === 'clone-repo-requested' ||
     event.type === 'terminal-new-tab-requested' ||
-    event.type === 'terminal-close-tab-or-window-requested' ||
+    event.type === 'workspace-pane-close-tab-or-window-requested' ||
     event.type === 'close-repo-requested' ||
     event.type === 'cycle-repo-requested' ||
     event.type === 'repo-refresh-requested' ||

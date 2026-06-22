@@ -6,8 +6,8 @@ import type {
 } from '#/shared/terminal-types.ts'
 import type {
   WorkspacePaneStaticViewSummary as ServerWorkspacePaneStaticViewSummary,
-  WorkspacePaneStaticViewType,
-  WorkspacePaneViewOrderEntry,
+  WorkspacePaneWorktreeStaticViewType,
+  WorkspacePaneWorktreeViewOrderEntry,
 } from '#/shared/workspace-pane.ts'
 import type { TerminalInput, TerminalUserInputSource } from '#/web/components/terminal/terminal-input.ts'
 export type TerminalPhase = 'opening' | 'restarting' | 'open' | 'error' | 'closed'
@@ -122,9 +122,9 @@ export interface TerminalSessionSummary {
 }
 
 export interface WorkspacePaneStaticViewSummary {
-  type: WorkspacePaneStaticViewType
-  id: WorkspacePaneStaticViewType
-  key: WorkspacePaneStaticViewType
+  type: WorkspacePaneWorktreeStaticViewType
+  id: WorkspacePaneWorktreeStaticViewType
+  key: WorkspacePaneWorktreeStaticViewType
   worktreeTerminalKey: string
   worktreePath: string
   displayOrder: number
@@ -161,12 +161,12 @@ export interface TerminalSessionContextValue {
   clearSearch: (key: string) => void
   writeInput: (key: string, data: string, source?: TerminalUserInputSource) => void
   takeover: (key: string) => Promise<boolean>
-  openWorkspacePaneView: (worktreeTerminalKey: string, type: WorkspacePaneStaticViewType) => Promise<boolean>
-  closeWorkspacePaneView: (worktreeTerminalKey: string, type: WorkspacePaneStaticViewType) => Promise<boolean>
+  openWorkspacePaneView: (worktreeTerminalKey: string, type: WorkspacePaneWorktreeStaticViewType) => Promise<boolean>
+  closeWorkspacePaneView: (worktreeTerminalKey: string, type: WorkspacePaneWorktreeStaticViewType) => Promise<boolean>
   /** Reorder all workspace pane views (static views + terminal views) within a worktree. */
   reorderWorkspacePaneViews: (
     worktreeTerminalKey: string,
-    orderedViews: WorkspacePaneViewOrderEntry[],
+    orderedViews: WorkspacePaneWorktreeViewOrderEntry[],
   ) => Promise<boolean>
   /** Serializes xterm framebuffer state as VT sequences; not plain-text output for copy UI. */
   serialize: (key: string) => string

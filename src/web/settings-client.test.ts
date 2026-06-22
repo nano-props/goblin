@@ -89,6 +89,7 @@ describe('settings-client', () => {
             activeRepo: null,
             workspaceFocused: true,
             workspacePaneSize: 50,
+            openBranchWorkspacePaneViewsByBranchByRepo: {},
           },
           recentRepos: [],
         }),

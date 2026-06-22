@@ -29,6 +29,7 @@ export function defaultSessionState(): SessionState {
     workspaceFocused: DEFAULT_WORKSPACE_FOCUSED,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     selectedTerminalByWorktree: {},
+    openBranchWorkspacePaneViewsByBranchByRepo: {},
   }
 }
 

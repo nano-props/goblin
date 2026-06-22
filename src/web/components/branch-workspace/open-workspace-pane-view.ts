@@ -4,31 +4,51 @@ import { readTerminalSessionCommandBridge } from '#/web/components/terminal/term
 import { requestVisibleRepoStatusRefresh } from '#/web/stores/repos/refresh-coordinator.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { WorkspacePaneBranchViewType, WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
+import { isWorkspacePaneWorktreeStaticViewType } from '#/shared/workspace-pane.ts'
 import { isBranchLevelWorkspacePaneView } from '#/web/lib/workspace-pane-view.ts'
+import { terminalLog } from '#/web/logger.ts'
 
-export function openWorkspacePaneView(input: {
+export async function openWorkspacePaneView(input: {
   repoId: string
   branchName?: string
   worktreePath: string | null | undefined
   type: WorkspacePaneBranchViewType | WorkspacePaneStaticViewType
   navigation: Pick<MainWindowNavigationActions, 'showRepoBranchWorkspacePaneView' | 'showRepoWorkspacePaneView'>
-}): void {
+}): Promise<boolean> {
   const branchLevelType = isBranchLevelWorkspacePaneView(input.type) ? input.type : null
   if (branchLevelType) {
     useReposStore.getState().openBranchWorkspacePaneView(input.repoId, branchLevelType, input.branchName)
+    showWorkspacePaneView(input)
+    if (input.type === 'status') requestVisibleRepoStatusRefresh(useReposStore.getState, input.repoId)
+    return true
   }
-  if (input.worktreePath) {
+
+  if (input.worktreePath && isWorkspacePaneWorktreeStaticViewType(input.type)) {
+    const bridge = readTerminalSessionCommandBridge()
+    if (!bridge) return false
     const worktreeKey = worktreeTerminalKey(input.repoId, input.worktreePath)
-    void readTerminalSessionCommandBridge()?.openWorkspacePaneView(worktreeKey, input.type)
-  } else if (!branchLevelType) {
-    return
+    const opened = await bridge.openWorkspacePaneView(worktreeKey, input.type).catch((err) => {
+      terminalLog.warn('failed to open workspace pane view', { err, type: input.type, worktreeKey })
+      return false
+    })
+    if (!opened) return false
+    showWorkspacePaneView(input)
+    requestVisibleRepoStatusRefresh(useReposStore.getState, input.repoId)
+    return true
   }
+
+  return false
+}
+
+function showWorkspacePaneView(input: {
+  repoId: string
+  branchName?: string
+  type: WorkspacePaneBranchViewType | WorkspacePaneStaticViewType
+  navigation: Pick<MainWindowNavigationActions, 'showRepoBranchWorkspacePaneView' | 'showRepoWorkspacePaneView'>
+}): void {
   if (input.branchName) {
     input.navigation.showRepoBranchWorkspacePaneView(input.repoId, input.branchName, input.type)
   } else {
     input.navigation.showRepoWorkspacePaneView(input.repoId, input.type)
-  }
-  if (input.type === 'status' || input.type === 'changes') {
-    requestVisibleRepoStatusRefresh(useReposStore.getState, input.repoId)
   }
 }

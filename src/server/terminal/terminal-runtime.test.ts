@@ -621,7 +621,7 @@ describe('server terminal runtime', () => {
     if (!first || !second) throw new Error('expected two sessions')
     socket.send.mockClear()
 
-    const result = host.reorderViews('client_1', OWNER_1, {
+    const invalidInput = {
       repoRoot: '/repo',
       worktreePath: '/repo-linked',
       orderedViews: [
@@ -629,7 +629,8 @@ describe('server terminal runtime', () => {
         { type: 'terminal', id: second.key },
         { type: 'terminal', id: first.key },
       ],
-    })
+    } as unknown as Parameters<typeof host.reorderViews>[2]
+    const result = host.reorderViews('client_1', OWNER_1, invalidInput)
 
     expect(result).toBe(false)
     expect(await host.listViews('client_1', OWNER_1, '/repo')).toEqual([])

@@ -59,9 +59,9 @@ describe('renderer effect intent plans', () => {
     expect(plan).toEqual({ kind: 'noop' })
   })
 
-  test('routes terminal close shortcut to close-window while workspace shortcuts are blocked', () => {
+  test('routes workspace tab close shortcut to close-window while workspace shortcuts are blocked', () => {
     const plan = createWorkspaceIntentPlan(
-      { type: 'terminal-close-tab-or-window-requested' },
+      { type: 'workspace-pane-close-tab-or-window-requested' },
       {
         overlayBlocked: false,
         workspaceShortcutSuppressed: true,
@@ -74,9 +74,9 @@ describe('renderer effect intent plans', () => {
     expect(plan).toEqual({ kind: 'close-window' })
   })
 
-  test('routes terminal close shortcut to close-window while overlays block workspace actions', () => {
+  test('routes workspace tab close shortcut to close-window while overlays block workspace actions', () => {
     const plan = createWorkspaceIntentPlan(
-      { type: 'terminal-close-tab-or-window-requested' },
+      { type: 'workspace-pane-close-tab-or-window-requested' },
       {
         overlayBlocked: true,
         workspaceShortcutSuppressed: true,

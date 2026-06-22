@@ -10,7 +10,7 @@ import {
   isWorktreeWorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx'
 import { terminalWorkspacePaneViewIdentity } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
-import type { WorkspacePaneViewOrderEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneWorktreeViewOrderEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneViewSummary, TerminalSessionSummary } from '#/web/components/terminal/types.ts'
 
 let container: HTMLDivElement | null = null
@@ -657,6 +657,40 @@ describe('WorkspacePaneViewStrip', () => {
     const compactCloseButton = compactTab?.querySelector('button[aria-label="close term-1"]')
     expect(compactCloseButton?.className).toContain('opacity-0')
   })
+
+  test('does not collapse to the first tab when compact mode has no active tab', () => {
+    render(
+      <TestWorkspacePaneViewStrip
+        worktreeTerminalKey="/repo\0/repo/worktree"
+        workspacePaneId="workspace"
+        responsiveCompact
+        panelActive
+        sessions={[
+          session({ key: 't1', title: 'term-1', selected: false }),
+          session({ key: 't2', title: 'term-2', selected: false }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    const tabs = Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
+    expect(tabs).toHaveLength(2)
+    expect(tabs.map((tab) => tab.getAttribute('aria-selected'))).toEqual(['false', 'false'])
+    expect(tabs.map((tab) => tab.tabIndex)).toEqual([0, -1])
+    expect(document.body.querySelector('button[aria-label="workspace-pane-views.tabs"]')).toBeNull()
+
+    act(() => {
+      tabs[0]?.focus()
+      tabs[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+      vi.runAllTimers()
+    })
+
+    expect(document.activeElement).toBe(tabs[1])
+  })
 })
 
 function TestWorkspacePaneViewStrip(props: {
@@ -665,15 +699,15 @@ function TestWorkspacePaneViewStrip(props: {
   workspacePaneId: string
   responsiveCompact?: boolean
   panelActive?: boolean
-  isLoading?: boolean
+  newTerminalBusy?: boolean
   onNew: () => void
   onSelect: (worktreeTerminalKey: string, tab: WorkspacePaneViewSummary) => void
   onScrollToBottom: (key: string) => void
   onClose: (tab: WorkspacePaneViewSummary) => void
-  onReorder: (worktreeTerminalKey: string, orderedViews: WorkspacePaneViewOrderEntry[]) => void
+  onReorder: (worktreeTerminalKey: string, orderedViews: WorkspacePaneWorktreeViewOrderEntry[]) => void
   onNavigateOut?: (direction: 'prev' | 'next' | 'first' | 'last') => void
 }) {
-  const selected = props.sessions.find((candidate) => candidate.selected) ?? props.sessions[0]
+  const selected = props.sessions.find((candidate) => candidate.selected) ?? null
   const { sessions, ...workspacePaneProps } = props
   const items = sessions.map((tab) =>
     createWorktreeWorkspacePaneTabItem({

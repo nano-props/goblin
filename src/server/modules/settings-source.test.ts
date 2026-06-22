@@ -76,6 +76,11 @@ test('persists updates and notifies subscribers from the server settings store',
     openRepos: [{ kind: 'local', id: '/repo-b' }],
     activeRepo: '/repo-b',
     selectedTerminalByWorktree: { '/repo-b\0/worktree': '/repo-b\0/worktree\0terminal-2' },
+    openBranchWorkspacePaneViewsByBranchByRepo: {
+      '/repo-b': {
+        main: [],
+      },
+    },
   })
   await mod.addServerRecentRepo({ kind: 'local', id: '/repo-b' })
   unsubscribe()
@@ -102,6 +107,11 @@ test('persists updates and notifies subscribers from the server settings store',
     openRepos: [{ kind: 'local', id: '/repo-b' }],
     activeRepo: '/repo-b',
     selectedTerminalByWorktree: { '/repo-b\0/worktree': '/repo-b\0/worktree\0terminal-2' },
+    openBranchWorkspacePaneViewsByBranchByRepo: {
+      '/repo-b': {
+        main: [],
+      },
+    },
   })
   expect(await reloaded.getServerRecentRepos()).toEqual([{ kind: 'local', id: '/repo-b' }])
 })
@@ -119,9 +129,10 @@ test('normalizes branch-scoped workspace pane view preferences in server session
       { kind: 'local', id: '/repo-array' },
     ],
     activeRepo: '/repo-b',
-    workspacePaneViewByBranchByRepo: {
+    preferredWorkspacePaneViewByBranchByRepo: {
       '/repo-b': {
         main: 'history',
+        changes: 'changes',
         'bad\0branch': 'changes',
         feature: 'not-a-pane-view',
       },
@@ -133,9 +144,47 @@ test('normalizes branch-scoped workspace pane view preferences in server session
   })
 
   expect(await mod.getServerSessionState()).toMatchObject({
-    workspacePaneViewByBranchByRepo: {
+    preferredWorkspacePaneViewByBranchByRepo: {
       '/repo-b': {
         main: 'history',
+      },
+    },
+  })
+})
+
+test('normalizes opened branch workspace pane tabs in server sessions', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+
+  const mod = await import('#/server/modules/settings-source.ts')
+  await mod.setServerSessionState({
+    ...defaultSessionState(),
+    openRepos: [
+      { kind: 'local', id: '/repo-b' },
+      { kind: 'local', id: '/repo-array' },
+    ],
+    activeRepo: '/repo-b',
+    openBranchWorkspacePaneViewsByBranchByRepo: {
+      '/repo-b': {
+        main: ['status', 'history', 'status'],
+        empty: [],
+        'bad\0branch': ['status'],
+        invalid: ['changes'],
+      },
+      '/repo-c': {
+        main: ['status'],
+      },
+      '/repo-array': ['status'],
+    } as never,
+  })
+
+  expect(await mod.getServerSessionState()).toMatchObject({
+    openBranchWorkspacePaneViewsByBranchByRepo: {
+      '/repo-b': {
+        main: ['status', 'history'],
+        empty: [],
+        invalid: [],
       },
     },
   })

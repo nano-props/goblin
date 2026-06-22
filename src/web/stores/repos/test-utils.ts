@@ -6,6 +6,7 @@ import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
 import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { vi } from 'vitest'
 import { stripBranchWorktreeMetadata, worktreeStatesFromBranches } from '#/web/stores/repos/worktree-state.ts'
+import { normalizeBranchWorkspacePaneViewsRecord } from '#/web/stores/repos/branch-workspace-pane-views.ts'
 import type {
   TerminalAttachResult,
   TerminalCatalogMutationResult,
@@ -563,8 +564,8 @@ export function seedRepoState(options: {
   branchSnapshots?: BranchSnapshotInfo[]
   currentBranch?: string
   selectedBranch?: string | null
-  workspacePaneView?: WorkspacePaneView
-  workspacePaneViewByBranch?: Record<string, WorkspacePaneView>
+  preferredWorkspacePaneView?: WorkspacePaneView
+  preferredWorkspacePaneViewByBranch?: Record<string, WorkspacePaneView>
   openBranchWorkspacePaneViews?: WorkspacePaneBranchViewType[]
   openBranchWorkspacePaneViewsByBranch?: Record<string, WorkspacePaneBranchViewType[]>
   instanceToken?: number
@@ -578,15 +579,19 @@ export function seedRepoState(options: {
   const branches = options.branches ?? stripBranchWorktreeMetadata(branchesWithSnapshotWorktreeMetadata)
   const status = options.status ?? base.data.status
   const selectedBranch = options.selectedBranch ?? base.ui.selectedBranch
-  const openBranchWorkspacePaneViewsByBranch =
+  const rawOpenBranchWorkspacePaneViewsByBranch =
     options.openBranchWorkspacePaneViewsByBranch ??
     (selectedBranch && options.openBranchWorkspacePaneViews !== undefined
       ? { [selectedBranch]: options.openBranchWorkspacePaneViews }
       : base.ui.openBranchWorkspacePaneViewsByBranch)
+  const openBranchWorkspacePaneViewsByBranch = normalizeBranchWorkspacePaneViewsRecord(
+    rawOpenBranchWorkspacePaneViewsByBranch,
+    branches.map((branch) => branch.name),
+  )
   const preferredWorkspacePaneViewByBranch =
-    options.workspacePaneViewByBranch ??
-    (selectedBranch && options.workspacePaneView !== undefined
-      ? { [selectedBranch]: options.workspacePaneView }
+    options.preferredWorkspacePaneViewByBranch ??
+    (selectedBranch && options.preferredWorkspacePaneView !== undefined
+      ? { [selectedBranch]: options.preferredWorkspacePaneView }
       : base.ui.preferredWorkspacePaneViewByBranch)
   const repo: RepoState = {
     ...base,

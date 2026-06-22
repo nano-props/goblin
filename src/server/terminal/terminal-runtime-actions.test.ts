@@ -2,7 +2,7 @@
 
 import { describe, expect, test, vi } from 'vitest'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
-import type { WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneWorktreeStaticViewType } from '#/shared/workspace-pane.ts'
 
 const CLIENT_ID = 'client_terminal_actions'
 // Identity is ownerId-keyed under method 2: the runtime derives
@@ -21,13 +21,13 @@ function makeActions(
       ownerId: string,
       scope: string,
       worktreePath: string,
-      type: WorkspacePaneStaticViewType,
+      type: WorkspacePaneWorktreeStaticViewType,
     ) => boolean
     closeStaticView?: (
       ownerId: string,
       scope: string,
       worktreePath: string,
-      type: WorkspacePaneStaticViewType,
+      type: WorkspacePaneWorktreeStaticViewType,
     ) => boolean
     getSessionScope?: (ownerId: string, sessionId: string) => string | undefined
     isValidTerminalClientId?: (value: unknown) => value is string
@@ -212,6 +212,20 @@ describe('terminal-runtime-actions static workspace pane views', () => {
       repoRoot: '/repo',
       worktreePath: '/repo-linked',
       type: 'terminal',
+    } as never)
+
+    expect(opened).toBe(false)
+    expect(workspacePane.openStaticView).not.toHaveBeenCalled()
+    expect(broadcasts).not.toHaveBeenCalled()
+  })
+
+  test('rejects branch-owned static workspace pane views before touching the runtime', () => {
+    const { actions, broadcasts, workspacePane } = makeActions({ closeSessionForOwner: () => false })
+
+    const opened = actions.openView(CLIENT_ID, OWNER_ID, {
+      repoRoot: '/repo',
+      worktreePath: '/repo-linked',
+      type: 'status',
     } as never)
 
     expect(opened).toBe(false)

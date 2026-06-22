@@ -162,6 +162,56 @@ describe('repo session hydration', () => {
     expect(useReposStore.getState().sessionReady).toBe(true)
   })
 
+  test('hydrateSession applies restored branch tab open-sets before cached placeholders become ready', async () => {
+    const savedAt = Date.now()
+    useReposStore.setState({
+      restorableRepoCache: {
+        [REPO_A]: {
+          savedAt,
+          name: 'cached-a',
+          data: {
+            branches: [branchSnapshot('main')],
+            currentBranch: 'main',
+          },
+          ui: {
+            selectedBranch: 'main',
+            branchViewMode: 'all',
+          },
+        },
+      },
+    })
+    const probes = new Map<string, (value: { ok: true; root: string; name: string }) => void>()
+    installGoblin({
+      probe: (path: string) =>
+        new Promise<{ ok: true; root: string; name: string }>((resolve) => {
+          probes.set(path, resolve)
+        }),
+      composite: () =>
+        new Promise<{
+          snapshot: { branches: BranchSnapshotInfo[]; current: string }
+          status: never[]
+          pullRequests: null
+        }>(() => {}),
+    })
+
+    const work = useReposStore.getState().hydrateSession([localRepoSessionEntry(REPO_A)], REPO_A, {
+      workspacePaneRestoreState: {
+        openBranchWorkspacePaneViewsByBranchByRepo: { [REPO_A]: { main: [] } },
+        preferredWorkspacePaneViewByBranchByRepo: { [REPO_A]: { main: 'status' } },
+      },
+    })
+
+    await vi.waitFor(() => {
+      const repo = useReposStore.getState().repos[REPO_A]
+      expect(useReposStore.getState().sessionReady).toBe(true)
+      expect(repo?.projection.source).toBe('cache')
+      expect(repo?.ui.openBranchWorkspacePaneViewsByBranch).toEqual({ main: [] })
+    })
+
+    probes.get(REPO_A)?.({ ok: true, root: REPO_A, name: 'repo-a' })
+    await work
+  })
+
   test('hydrateSession keeps a user-selected active repo when boot probing settles later', async () => {
     installGoblin()
     const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
@@ -338,7 +388,9 @@ describe('repo session hydration', () => {
 
     await useReposStore
       .getState()
-      .hydrateSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry(REPO_B)], REPO_A, controller.signal)
+      .hydrateSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry(REPO_B)], REPO_A, {
+        signal: controller.signal,
+      })
 
     // Phase 1 (placeholder insertion) is synchronous and runs before
     // any probe check, so the placeholders and sessionReady are intact.

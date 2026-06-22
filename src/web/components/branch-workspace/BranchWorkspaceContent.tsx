@@ -13,20 +13,20 @@ import type {
   BranchWorkspaceRepo,
   SelectedBranchWorkspacePresentation,
 } from '#/web/components/branch-workspace/model.ts'
-import { useEffectiveWorkspacePaneView } from '#/web/components/branch-workspace/useEffectiveWorkspacePaneView.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
-import { useWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-store.ts'
 import {
-  activeWorkspacePaneViewIdentity,
-  workspacePaneViewButtonId,
-  workspacePaneViewIdentity,
-} from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
+  useTerminalRepoSyncReady,
+  useWorktreeTerminalSnapshot,
+} from '#/web/components/terminal/terminal-session-store.ts'
+import { workspacePaneViewButtonId } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { branchLevelWorkspacePaneViewButtonId } from '#/web/components/branch-workspace/workspace-pane-views.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
 import { isBranchLevelWorkspacePaneView } from '#/web/lib/workspace-pane-view.ts'
 import type { BranchCopyPatchAction } from '#/web/hooks/branch-action-state.ts'
+import { createBranchWorkspacePaneTabModel } from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
+import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 interface Props {
   repo: Pick<BranchWorkspaceRepo, 'id' | 'data' | 'ui'> & {
     data: BranchWorkspaceRepo['data'] & Pick<BranchWorkspaceRepo['data'], 'statusLoaded'>
@@ -46,49 +46,42 @@ interface TabPanelProps {
 type BranchWorkspaceBranch = NonNullable<SelectedBranchWorkspacePresentation['branch']>
 
 // Pure view: the renderable tab is derived from the repos store's
-// branch-scoped selected tab and the live terminal session truth via
-// `useEffectiveWorkspacePaneView`. The store never re-projects on snapshot
-// refresh, branch switch, or session restore; this component is read-only.
+// branch-scoped selected tab and the live terminal session truth. The store
+// never re-projects on snapshot refresh, branch switch, or session restore;
+// this component is read-only.
 export function BranchWorkspaceContent({ repo, detail, workspacePaneId, copyPatchAction }: Props) {
   const t = useT()
   const compact = useIsCompactUi()
-  const effectiveTab = useEffectiveWorkspacePaneView(repo)
   const { branch } = detail
-  const openBranchWorkspacePaneViews = branchWorkspacePaneViewsForBranch(repo.ui, branch?.name)
-  const effectiveBranchTab = isBranchLevelWorkspacePaneView(effectiveTab) ? effectiveTab : null
   const terminalWorktreeKey = branch?.worktree?.path ? worktreeTerminalKey(repo.id, branch.worktree.path) : null
   const worktreeSnapshot = useWorktreeTerminalSnapshot(terminalWorktreeKey)
-  const worktreeWorkspacePaneViews = worktreeSnapshot.workspacePaneViews.filter((view) => {
-    return !isBranchLevelWorkspacePaneView(view.type) || openBranchWorkspacePaneViews.includes(view.type)
+  const terminalSyncReady = useTerminalRepoSyncReady(repo.id)
+  const openBranchWorkspacePaneViews = branchWorkspacePaneViewsForBranch(repo.ui, branch?.name)
+  const workspacePaneTabModel = createBranchWorkspacePaneTabModel({
+    repoId: repo.id,
+    branchName: branch?.name ?? null,
+    worktreePath: branch?.worktree?.path ?? null,
+    preferredView: preferredWorkspacePaneViewForBranch(repo.ui, branch?.name),
+    openBranchViews: openBranchWorkspacePaneViews,
+    runtimeWorktreeViews: worktreeSnapshot.workspacePaneViews,
+    terminalSessionCount: worktreeSnapshot.count,
+    terminalSyncReady,
   })
-  const activeTabIdentity = activeWorkspacePaneViewIdentity(worktreeWorkspacePaneViews, effectiveTab)
-  const activeTabIndex = activeTabIdentity
-    ? worktreeWorkspacePaneViews.findIndex((tab) => workspacePaneViewIdentity(tab) === activeTabIdentity)
-    : -1
-  const branchStaticWorktreeFallbackActive =
-    !!effectiveBranchTab &&
-    !!terminalWorktreeKey &&
-    activeTabIndex === -1 &&
-    openBranchWorkspacePaneViews.includes(effectiveBranchTab)
-  const branchStaticWorktreeFallbackIndex =
-    branchStaticWorktreeFallbackActive && effectiveBranchTab
-      ? Math.max(0, openBranchWorkspacePaneViews.indexOf(effectiveBranchTab))
-      : 0
+  const selectedView = workspacePaneTabModel.selectedView
+  const selectedBranchTab = selectedView && isBranchLevelWorkspacePaneView(selectedView) ? selectedView : null
+  const activeTab = workspacePaneTabModel.activeTab
+  const activeTabIndex =
+    activeTab?.scope === 'worktree' && activeTab.view ? workspacePaneTabModel.worktreeViews.indexOf(activeTab.view) : -1
   const activeTabLabelledById =
-    activeTabIndex >= 0
+    activeTab?.scope === 'worktree'
       ? workspacePaneViewButtonId(workspacePaneId, compact ? 0 : activeTabIndex)
-      : branchStaticWorktreeFallbackActive
-        ? workspacePaneViewButtonId(workspacePaneId, compact ? 0 : branchStaticWorktreeFallbackIndex)
-        : effectiveBranchTab
-          ? branchLevelWorkspacePaneViewButtonId(workspacePaneId, effectiveBranchTab)
-          : workspacePaneViewButtonId(workspacePaneId, 0)
-  const terminalPendingCreate = effectiveTab === 'terminal' && worktreeSnapshot.pendingCreate
-  const branchStaticTabActive =
-    !!effectiveBranchTab && (activeTabIndex >= 0 || openBranchWorkspacePaneViews.includes(effectiveBranchTab))
+      : activeTab && selectedBranchTab
+        ? branchLevelWorkspacePaneViewButtonId(workspacePaneId, selectedBranchTab)
+        : workspacePaneViewButtonId(workspacePaneId, 0)
   if (!branch)
     return <EmptyState title={t(repo.data.branches.length === 0 ? 'branches.empty' : 'branches.filter-empty')} />
 
-  if (!activeTabIdentity && !terminalPendingCreate && !branchStaticTabActive) {
+  if (!activeTab || !selectedView) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         <EmptyState title={t('workspace-pane-views.empty')} />
@@ -98,7 +91,7 @@ export function BranchWorkspaceContent({ repo, detail, workspacePaneId, copyPatc
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {effectiveTab === 'status' && (
+      {selectedView === 'status' && (
         <BranchStatusTab
           workspacePaneId={workspacePaneId}
           labelledById={activeTabLabelledById}
@@ -106,7 +99,7 @@ export function BranchWorkspaceContent({ repo, detail, workspacePaneId, copyPatc
           busy={detail.loading.pullRequests}
         />
       )}
-      {effectiveTab === 'history' && (
+      {selectedView === 'history' && (
         <BranchHistoryTab
           repoId={repo.id}
           branchName={branch.name}
@@ -114,7 +107,7 @@ export function BranchWorkspaceContent({ repo, detail, workspacePaneId, copyPatc
           labelledById={activeTabLabelledById}
         />
       )}
-      {effectiveTab === 'changes' && (
+      {selectedView === 'changes' && (
         <BranchChangesTab
           workspacePaneId={workspacePaneId}
           labelledById={activeTabLabelledById}
@@ -127,7 +120,7 @@ export function BranchWorkspaceContent({ repo, detail, workspacePaneId, copyPatc
           copyPatchAction={copyPatchAction}
         />
       )}
-      {effectiveTab === 'terminal' && branch.worktree?.path && (
+      {selectedView === 'terminal' && branch.worktree?.path && (
         <BranchTerminalTab
           workspacePaneId={workspacePaneId}
           labelledById={activeTabLabelledById}

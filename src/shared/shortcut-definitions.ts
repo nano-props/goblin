@@ -19,10 +19,11 @@ export type RendererMenuCommandId =
   | 'file-open-local-repo-path'
   | 'file-clone-repo'
   | 'file-open-remote-repo'
-  | 'file-close-terminal-tab-or-window'
+  | 'file-close-workspace-tab-or-window'
   | 'file-close-tab'
   | 'file-settings'
   | 'view-status'
+  | 'view-history'
   | 'view-changes'
   | 'view-terminal'
   | 'view-toggle-focus-mode'
@@ -99,7 +100,7 @@ export const RENDERER_APP_SHORTCUTS: RendererKeyboardShortcutDefinition<Renderer
 export const SETTINGS_SHORTCUT_MAC = 'Cmd+,'
 export const SETTINGS_SHORTCUT_NON_MAC = 'Ctrl+,'
 export const NEW_TERMINAL_TAB_SHORTCUT = 'CmdOrCtrl+N'
-export const CLOSE_TERMINAL_TAB_OR_WINDOW_SHORTCUT = 'CmdOrCtrl+W'
+export const CLOSE_WORKSPACE_TAB_OR_WINDOW_SHORTCUT = 'CmdOrCtrl+W'
 export const CLOSE_REPO_SHORTCUT = 'CmdOrCtrl+Shift+W'
 
 export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
@@ -151,12 +152,12 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
     },
   ),
   rendererMenuCommand(
-    'file-close-terminal-tab-or-window',
-    'menu.file.close-terminal-tab-or-window',
-    { type: 'terminal-close-tab-or-window-requested' },
+    'file-close-workspace-tab-or-window',
+    'menu.file.close-workspace-tab-or-window',
+    { type: 'workspace-pane-close-tab-or-window-requested' },
     {
-      helpLabelKey: 'help.row.close-terminal-tab-or-window',
-      accelerator: CLOSE_TERMINAL_TAB_OR_WINDOW_SHORTCUT,
+      helpLabelKey: 'help.row.close-workspace-tab-or-window',
+      accelerator: CLOSE_WORKSPACE_TAB_OR_WINDOW_SHORTCUT,
     },
   ),
   rendererMenuCommand(
@@ -183,6 +184,14 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
     { type: 'show-workspace-pane-view-requested', tab: 'status' },
     {
       helpLabelKey: 'help.row.view-status',
+    },
+  ),
+  rendererMenuCommand(
+    'view-history',
+    'menu.view.history',
+    { type: 'show-workspace-pane-view-requested', tab: 'history' },
+    {
+      helpLabelKey: 'help.row.view-log',
     },
   ),
   rendererMenuCommand(

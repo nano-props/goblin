@@ -4,9 +4,13 @@ import { setTerminalSessionCommandBridge } from '#/web/components/terminal/termi
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
-import type { WorkspacePaneBranchViewType, WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
+import type {
+  WorkspacePaneBranchViewType,
+  WorkspacePaneStaticViewType,
+  WorkspacePaneWorktreeStaticViewType,
+} from '#/shared/workspace-pane.ts'
 import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
-import { selectedWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 
 const REPO_ID = '/tmp/workspace-pane-view-repo'
 const WORKTREE_PATH = '/tmp/workspace-pane-view-worktree'
@@ -24,7 +28,7 @@ afterEach(() => {
 })
 
 describe('openWorkspacePaneView', () => {
-  test('opens status as a static workspace pane view when the branch has a worktree', () => {
+  test('opens status as a branch-owned tab when the branch has a worktree', async () => {
     seedWorktreeRepo('status')
     useReposStore.getState().closeBranchWorkspacePaneView(REPO_ID, 'status')
     const refreshStatus = vi.fn(async () => {})
@@ -33,21 +37,23 @@ describe('openWorkspacePaneView', () => {
     const openStaticView = vi.fn(async () => true)
     setWorkspacePaneBridge(openStaticView)
 
-    openWorkspacePaneView({
-      repoId: REPO_ID,
-      branchName: 'feature/worktree',
-      worktreePath: WORKTREE_PATH,
-      type: 'status',
-      navigation: navigationWithStoreActions(),
-    })
+    await expect(
+      openWorkspacePaneView({
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        worktreePath: WORKTREE_PATH,
+        type: 'status',
+        navigation: navigationWithStoreActions(),
+      }),
+    ).resolves.toBe(true)
 
-    expect(openStaticView).toHaveBeenCalledWith(WORKTREE_KEY, 'status')
+    expect(openStaticView).not.toHaveBeenCalled()
     expect(openViewsFor('feature/worktree')).toEqual(['status'])
-    expect(selectedWorkspacePaneView()).toBe('status')
+    expect(preferredWorkspacePaneView()).toBe('status')
     expect(refreshStatus).toHaveBeenCalledWith(REPO_ID, { token })
   })
 
-  test('registers changes as a worktree-level view and refreshes status', () => {
+  test('registers changes as a worktree-level view and refreshes status', async () => {
     seedWorktreeRepo('changes')
     const refreshStatus = vi.fn(async () => {})
     useReposStore.setState({ refreshStatus: refreshStatus as typeof originalRefreshStatus })
@@ -55,68 +61,97 @@ describe('openWorkspacePaneView', () => {
     const openStaticView = vi.fn(async () => true)
     setWorkspacePaneBridge(openStaticView)
 
-    openWorkspacePaneView({
-      repoId: REPO_ID,
-      branchName: 'feature/worktree',
-      worktreePath: WORKTREE_PATH,
-      type: 'changes',
-      navigation: navigationWithStoreActions(),
-    })
+    await expect(
+      openWorkspacePaneView({
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        worktreePath: WORKTREE_PATH,
+        type: 'changes',
+        navigation: navigationWithStoreActions(),
+      }),
+    ).resolves.toBe(true)
 
     expect(openStaticView).toHaveBeenCalledWith(WORKTREE_KEY, 'changes')
+    expect(preferredWorkspacePaneView()).toBe('changes')
     expect(refreshStatus).toHaveBeenCalledWith(REPO_ID, { token })
   })
 
-  test('opens status for a branch without a worktree', () => {
+  test('does not select changes when the runtime open fails', async () => {
+    seedWorktreeRepo('status')
+    const refreshStatus = vi.fn(async () => {})
+    useReposStore.setState({ refreshStatus: refreshStatus as typeof originalRefreshStatus })
+    const openStaticView = vi.fn(async () => false)
+    setWorkspacePaneBridge(openStaticView)
+
+    await expect(
+      openWorkspacePaneView({
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        worktreePath: WORKTREE_PATH,
+        type: 'changes',
+        navigation: navigationWithStoreActions(),
+      }),
+    ).resolves.toBe(false)
+
+    expect(openStaticView).toHaveBeenCalledWith(WORKTREE_KEY, 'changes')
+    expect(preferredWorkspacePaneView()).toBe('status')
+    expect(refreshStatus).not.toHaveBeenCalled()
+  })
+
+  test('opens status for a branch without a worktree', async () => {
     seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
       selectedBranch: 'feature/no-worktree',
-      workspacePaneView: 'changes',
+      preferredWorkspacePaneView: 'changes',
     })
     const openStaticView = vi.fn(async () => true)
     setWorkspacePaneBridge(openStaticView)
 
-    openWorkspacePaneView({
-      repoId: REPO_ID,
-      branchName: 'feature/no-worktree',
-      worktreePath: null,
-      type: 'status',
-      navigation: navigationWithStoreActions(),
-    })
+    await expect(
+      openWorkspacePaneView({
+        repoId: REPO_ID,
+        branchName: 'feature/no-worktree',
+        worktreePath: null,
+        type: 'status',
+        navigation: navigationWithStoreActions(),
+      }),
+    ).resolves.toBe(true)
 
     expect(openStaticView).not.toHaveBeenCalled()
-    expect(selectedWorkspacePaneView()).toBe('status')
+    expect(preferredWorkspacePaneView()).toBe('status')
   })
 
-  test('opens history as a branch-static workspace pane view', () => {
+  test('opens history as a branch-static workspace pane view', async () => {
     seedWorktreeRepo('history')
     const refreshStatus = vi.fn(async () => {})
     useReposStore.setState({ refreshStatus: refreshStatus as typeof originalRefreshStatus })
     const openStaticView = vi.fn(async () => true)
     setWorkspacePaneBridge(openStaticView)
 
-    openWorkspacePaneView({
-      repoId: REPO_ID,
-      branchName: 'feature/worktree',
-      worktreePath: WORKTREE_PATH,
-      type: 'history',
-      navigation: navigationWithStoreActions(),
-    })
+    await expect(
+      openWorkspacePaneView({
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        worktreePath: WORKTREE_PATH,
+        type: 'history',
+        navigation: navigationWithStoreActions(),
+      }),
+    ).resolves.toBe(true)
 
-    expect(openStaticView).toHaveBeenCalledWith(WORKTREE_KEY, 'history')
+    expect(openStaticView).not.toHaveBeenCalled()
     expect(openViewsFor('feature/worktree')).toContain('history')
-    expect(selectedWorkspacePaneView()).toBe('history')
+    expect(preferredWorkspacePaneView()).toBe('history')
     expect(refreshStatus).not.toHaveBeenCalled()
   })
 })
 
-function seedWorktreeRepo(workspacePaneView: WorkspacePaneBranchViewType | WorkspacePaneStaticViewType) {
+function seedWorktreeRepo(preferredWorkspacePaneView: WorkspacePaneBranchViewType | WorkspacePaneStaticViewType) {
   seedRepoState({
     id: REPO_ID,
     branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
     selectedBranch: 'feature/worktree',
-    workspacePaneView,
+    preferredWorkspacePaneView,
   })
 }
 
@@ -125,9 +160,9 @@ function openViewsFor(branchName: string): WorkspacePaneBranchViewType[] {
   return repo ? branchWorkspacePaneViewsForBranch(repo.ui, branchName) : []
 }
 
-function selectedWorkspacePaneView() {
+function preferredWorkspacePaneView() {
   const repo = useReposStore.getState().repos[REPO_ID]
-  return repo ? selectedWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) : null
+  return repo ? preferredWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) : null
 }
 
 function navigationWithStoreActions(): Pick<
@@ -150,7 +185,7 @@ function navigationWithStoreActions(): Pick<
 }
 
 function setWorkspacePaneBridge(
-  openWorkspacePaneView: (worktreeKey: string, type: WorkspacePaneStaticViewType) => Promise<boolean>,
+  openWorkspacePaneView: (worktreeKey: string, type: WorkspacePaneWorktreeStaticViewType) => Promise<boolean>,
 ) {
   setTerminalSessionCommandBridge({
     worktreeSnapshot: () => ({

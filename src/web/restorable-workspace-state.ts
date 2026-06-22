@@ -3,8 +3,9 @@ import type { RestorableWorkspaceState, ReposStore } from '#/web/stores/repos/ty
 import { persistedOpenWorkspaceEntries } from '#/web/open-workspace-state.ts'
 import {
   persistedActiveRepoIdForSession,
+  persistedOpenBranchWorkspacePaneViewsByBranchByRepoForSession,
   persistedSelectedTerminalByWorktreeForSession,
-  persistedWorkspacePaneViewByBranchByRepoForSession,
+  persistedPreferredWorkspacePaneViewByBranchByRepoForSession,
 } from '#/web/session-persistence-state.ts'
 
 export function sessionStateFromRestorableWorkspaceState(input: {
@@ -21,7 +22,11 @@ export function sessionStateFromRestorableWorkspaceState(input: {
       restorableWorkspaceState.selectedTerminalByWorktree,
       repos,
     ),
-    workspacePaneViewByBranchByRepo: persistedWorkspacePaneViewByBranchByRepoForSession(
+    preferredWorkspacePaneViewByBranchByRepo: persistedPreferredWorkspacePaneViewByBranchByRepoForSession(
+      repos,
+      restorableWorkspaceState.order,
+    ),
+    openBranchWorkspacePaneViewsByBranchByRepo: persistedOpenBranchWorkspacePaneViewsByBranchByRepoForSession(
       repos,
       restorableWorkspaceState.order,
     ),
@@ -36,7 +41,8 @@ interface RestoredWorkspaceStateFromSession
     RestorableWorkspaceState,
     'activeId' | 'workspaceFocused' | 'workspacePaneSize' | 'selectedTerminalByWorktree'
   > {
-  workspacePaneViewByBranchByRepo: NonNullable<SessionState['workspacePaneViewByBranchByRepo']>
+  preferredWorkspacePaneViewByBranchByRepo: NonNullable<SessionState['preferredWorkspacePaneViewByBranchByRepo']>
+  openBranchWorkspacePaneViewsByBranchByRepo: SessionState['openBranchWorkspacePaneViewsByBranchByRepo']
 }
 
 export function restoreRestorableWorkspaceStateFromSession(
@@ -48,6 +54,7 @@ export function restoreRestorableWorkspaceStateFromSession(
     workspaceFocused: session.workspaceFocused,
     workspacePaneSize: session.workspacePaneSize,
     selectedTerminalByWorktree: session.selectedTerminalByWorktree ?? {},
-    workspacePaneViewByBranchByRepo: session.workspacePaneViewByBranchByRepo ?? {},
+    preferredWorkspacePaneViewByBranchByRepo: session.preferredWorkspacePaneViewByBranchByRepo ?? {},
+    openBranchWorkspacePaneViewsByBranchByRepo: session.openBranchWorkspacePaneViewsByBranchByRepo ?? {},
   }
 }

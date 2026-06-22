@@ -21,12 +21,9 @@ import type { MainWindowNavigationActions } from '#/web/main-window-navigation.t
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import { getRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { keyboardRuntimeStateFromStore } from '#/web/stores/repos/selector-state.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
-import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
-import { adjacentWorkspacePaneView } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
-import { selectedWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import {
-  runCloseTerminalTabOrWindowCommand,
+  runCloseWorkspacePaneTabOrWindowCommand,
+  runMoveWorkspacePaneTabCommand,
   runNewTerminalTabCommand,
   runSelectWorkspacePaneTabByIndexCommand,
 } from '#/web/commands/workspace-commands.ts'
@@ -149,7 +146,7 @@ export function useKeyboard({
         }
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyW') {
           e.preventDefault()
-          runCloseTerminalTabOrWindowCommand({ repoId })
+          void runCloseWorkspacePaneTabOrWindowCommand({ repoId, navigation })
           return
         }
         const tabIndex = !e.shiftKey ? digitShortcutIndex(e) : null
@@ -210,24 +207,15 @@ export function useKeyboard({
         case 'next-workspace-pane-view':
         case 'prev-workspace-pane-view': {
           if (overlayOpen || !repo || !repo.ui.selectedBranch) break
-          const selected = repo.data.branches.find((branch) => branch.name === repo.ui.selectedBranch)
-          const worktreePath = selected?.worktree?.path
-          if (!worktreePath) break
-          const worktreeKey = worktreeTerminalKey(repo.id, worktreePath)
-          const bridge = readTerminalSessionCommandBridge()
-          const snapshot = bridge?.worktreeSnapshot(worktreeKey)
-          const selectedWorkspacePaneView = selectedWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch)
-          const nextTab = snapshot
-            ? adjacentWorkspacePaneView(
-                snapshot.workspacePaneViews,
-                selectedWorkspacePaneView,
-                action === 'next-workspace-pane-view' ? 1 : -1,
-              )
-            : null
-          if (!nextTab) break
-          e.preventDefault()
-          navigation.showRepoWorkspacePaneView(repo.id, nextTab.type)
-          if (nextTab.type === 'terminal') bridge?.selectTerminal(worktreeKey, nextTab.key)
+          if (
+            runMoveWorkspacePaneTabCommand({
+              repoId: repo.id,
+              direction: action === 'next-workspace-pane-view' ? 1 : -1,
+              navigation,
+            })
+          ) {
+            e.preventDefault()
+          }
           break
         }
       }

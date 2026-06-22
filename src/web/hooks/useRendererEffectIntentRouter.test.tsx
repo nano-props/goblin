@@ -11,7 +11,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { createBranchSnapshot, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
-import { selectedWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 
 const appDataClientMocks = vi.hoisted(() => ({
   clearRecentRepoHistory: vi.fn(async () => {}),
@@ -143,7 +143,7 @@ describe('useRendererEffectIntentRouter', () => {
       id: '/tmp/repo',
       currentBranch: 'main',
       selectedBranch: 'main',
-      workspacePaneView: 'status',
+      preferredWorkspacePaneView: 'status',
       branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
     })
     currentRepoId = repo.id
@@ -159,7 +159,7 @@ describe('useRendererEffectIntentRouter', () => {
     expect(closeAllOverlays).toHaveBeenCalledTimes(1)
     const state = useReposStore.getState()
     expect(state.activeId).toBe(repo.id)
-    expect(selectedWorkspacePaneView(repo.id)).toBe('terminal')
+    expect(preferredWorkspacePaneView(repo.id)).toBe('terminal')
   })
 
   test('terminal bell clicks switch to the emitting worktree branch and selected terminal', async () => {
@@ -167,7 +167,7 @@ describe('useRendererEffectIntentRouter', () => {
       id: '/tmp/repo',
       currentBranch: 'main',
       selectedBranch: 'main',
-      workspacePaneView: 'status',
+      preferredWorkspacePaneView: 'status',
       branchSnapshots: [
         createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-main' } }),
         createBranchSnapshot('feature/test', { worktree: { path: '/tmp/repo-feature' } }),
@@ -186,7 +186,7 @@ describe('useRendererEffectIntentRouter', () => {
     const state = useReposStore.getState()
     expect(showRepoBranchWorkspacePaneViewSpy).toHaveBeenCalledWith(repo.id, 'feature/test', 'terminal')
     expect(state.repos[repo.id]?.ui.selectedBranch).toBe('feature/test')
-    expect(selectedWorkspacePaneView(repo.id)).toBe('terminal')
+    expect(preferredWorkspacePaneView(repo.id)).toBe('terminal')
     expect(state.selectedTerminalByWorktree).toMatchObject({
       [worktreeTerminalKey(repo.id, '/tmp/repo-feature')]: key,
     })
@@ -197,7 +197,7 @@ describe('useRendererEffectIntentRouter', () => {
       id: '/tmp/repo',
       currentBranch: 'main',
       selectedBranch: 'main',
-      workspacePaneView: 'status',
+      preferredWorkspacePaneView: 'status',
       branchSnapshots: [
         createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-main' } }),
         createBranchSnapshot('feature/test', { worktree: { path: '/tmp/repo-feature' } }),
@@ -332,7 +332,7 @@ describe('useRendererEffectIntentRouter', () => {
       id: '/tmp/repo',
       currentBranch: 'main',
       selectedBranch: 'main',
-      workspacePaneView: 'status',
+      preferredWorkspacePaneView: 'status',
       branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
     })
     currentRepoId = repo.id
@@ -351,7 +351,7 @@ describe('useRendererEffectIntentRouter', () => {
     })
 
     const state = useReposStore.getState()
-    expect(selectedWorkspacePaneView(repo.id)).toBe('status')
+    expect(preferredWorkspacePaneView(repo.id)).toBe('status')
     expect(state.workspaceFocused).toBe(false)
     expect(closeRepoSpy).not.toHaveBeenCalled()
   })
@@ -419,9 +419,9 @@ describe('useRendererEffectIntentRouter', () => {
   })
 })
 
-function selectedWorkspacePaneView(repoId: string) {
+function preferredWorkspacePaneView(repoId: string) {
   const repo = useReposStore.getState().repos[repoId]
-  return repo ? selectedWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) : null
+  return repo ? preferredWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) : null
 }
 
 async function renderHookHost() {

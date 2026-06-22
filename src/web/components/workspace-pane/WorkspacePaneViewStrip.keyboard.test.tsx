@@ -4,7 +4,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { terminalWorkspacePaneViewIdentity } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
-import type { WorkspacePaneViewOrderEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneWorktreeViewOrderEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneViewSummary, TerminalSessionSummary } from '#/web/components/terminal/types.ts'
 
 let container: HTMLDivElement | null = null
@@ -154,9 +154,9 @@ function makeWorkspacePaneViewStrip(
     onSelect: (worktreeTerminalKey: string, tab: WorkspacePaneViewSummary) => void
     onScrollToBottom: (key: string) => void
     onClose: (tab: WorkspacePaneViewSummary) => void
-    onReorder: (worktreeTerminalKey: string, orderedViews: WorkspacePaneViewOrderEntry[]) => void
+    onReorder: (worktreeTerminalKey: string, orderedViews: WorkspacePaneWorktreeViewOrderEntry[]) => void
   }) {
-    const selected = props.sessions.find((candidate) => candidate.selected) ?? props.sessions[0]
+    const selected = props.sessions.find((candidate) => candidate.selected) ?? null
     const { sessions, ...workspacePaneProps } = props
     const items = sessions.map((tab) =>
       createWorktreeWorkspacePaneTabItem({

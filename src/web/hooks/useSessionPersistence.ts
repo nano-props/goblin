@@ -39,6 +39,8 @@ export function useSessionPersistence() {
       workspaceFocused: session.workspaceFocused,
       workspacePaneSize: session.workspacePaneSize,
       selectedTerminalByWorktree: session.selectedTerminalByWorktree,
+      preferredWorkspacePaneViewByBranchByRepo: session.preferredWorkspacePaneViewByBranchByRepo,
+      openBranchWorkspacePaneViewsByBranchByRepo: session.openBranchWorkspacePaneViewsByBranchByRepo,
     })
     const immediate = lastImmediateKeyRef.current !== immediateKey
     lastImmediateKeyRef.current = immediateKey

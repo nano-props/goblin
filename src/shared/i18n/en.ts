@@ -42,7 +42,7 @@ export const en = {
   'menu.file.open-data-folder.mac': 'Open Data Folder in Finder',
   'menu.file.open-data-folder.win': 'Open Data Folder in Explorer',
   'menu.file.close-window': 'Close Window',
-  'menu.file.close-terminal-tab-or-window': 'Close Terminal Tab or Window',
+  'menu.file.close-workspace-tab-or-window': 'Close Workspace Tab or Window',
   'menu.file.close-tab': 'Close Repository',
   'menu.file.settings': 'Settings…',
   'menu.file.quit': 'Quit',
@@ -59,6 +59,7 @@ export const en = {
 
   // ---- Menu — View --------------------------------------------------------
   'menu.view.status': 'Branch Status',
+  'menu.view.history': 'History',
   'menu.view.changes': 'Changes',
   'menu.view.terminal': 'Terminal',
   'menu.view.refresh': 'Sync Repository',
@@ -669,7 +670,7 @@ export const en = {
   'help.row.clone-repo': 'Clone repository',
   'help.row.activate-window': 'Show Goblin window',
   'help.row.close-repo': 'Close current repository',
-  'help.row.close-terminal-tab-or-window': 'Close terminal tab or window',
+  'help.row.close-workspace-tab-or-window': 'Close workspace tab or window',
   'help.row.close-window': 'Close window',
   'help.row.refresh': 'Sync Repository',
   'help.row.reload-page': 'Reload Page',

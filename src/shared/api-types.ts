@@ -13,7 +13,7 @@ import type {
   RepoRemoteInfo,
   WorktreeStatus,
 } from '#/shared/git-types.ts'
-import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneBranchViewType, WorkspacePaneSessionView } from '#/shared/workspace-pane.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type {
@@ -87,8 +87,10 @@ export interface SessionState {
   workspaceFocused: boolean
   workspacePaneSize: number
   selectedTerminalByWorktree?: Record<string, string>
-  /** Per-repo, per-branch workspace pane view preference, restored with the session. */
-  workspacePaneViewByBranchByRepo?: Record<string, Record<string, WorkspacePaneView>>
+  /** Per-repo, per-branch workspace pane view preference that session restore can make renderable. */
+  preferredWorkspacePaneViewByBranchByRepo?: Record<string, Record<string, WorkspacePaneSessionView>>
+  /** Per-repo, per-branch opened branch-level workspace pane tabs. Empty arrays are meaningful. */
+  openBranchWorkspacePaneViewsByBranchByRepo: Record<string, Record<string, WorkspacePaneBranchViewType[]>>
 }
 
 export interface RuntimeSettingsSnapshot extends SettingsPrefs {

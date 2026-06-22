@@ -65,7 +65,7 @@ describe('useKeyboard', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'status',
+      preferredWorkspacePaneView: 'status',
     })
     const selectTerminal = vi.fn()
     const showRepoWorkspacePaneView = vi.fn()
@@ -91,6 +91,30 @@ describe('useKeyboard', () => {
     expect(selectTerminal).toHaveBeenCalledWith(WORKTREE_KEY, 'terminal-1')
   })
 
+  test('workspace pane view shortcuts move through branch tabs without a worktree', async () => {
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/no-worktree')],
+      selectedBranch: 'feature/no-worktree',
+      preferredWorkspacePaneView: 'status',
+      openBranchWorkspacePaneViews: ['status', 'history'],
+    })
+    const showRepoWorkspacePaneView = vi.fn((repoId, tab) => {
+      useReposStore.getState().setWorkspacePaneView(repoId, tab)
+    })
+    await renderHookHost({
+      currentRepoId: REPO_ID,
+      navigation: navigationWith({ showRepoWorkspacePaneView }),
+    })
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'history')
+  })
+
   test('primary modifier plus number selects workspace pane tabs even while terminal is focused', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
     installNativeBridgeStub()
@@ -98,7 +122,7 @@ describe('useKeyboard', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'status',
+      preferredWorkspacePaneView: 'status',
     })
     const selectTerminal = vi.fn()
     const showRepoWorkspacePaneView = vi.fn()
@@ -137,7 +161,7 @@ describe('useKeyboard', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'terminal',
+      preferredWorkspacePaneView: 'terminal',
     })
     const createTerminal = vi.fn(async () => 'terminal-2')
     const closeTerminalByDescriptor = vi.fn()
@@ -168,7 +192,7 @@ describe('useKeyboard', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'terminal',
+      preferredWorkspacePaneView: 'terminal',
     })
     const closeTerminalByDescriptor = vi.fn()
     setTerminalSessionCommandBridge({

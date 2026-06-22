@@ -8,17 +8,15 @@ const WORKTREE_PATH = '/repo-linked'
 const WORKTREE_KEY = `${REPO_ROOT}\0${WORKTREE_PATH}`
 
 describe('RendererWorkspacePaneRegistry', () => {
-  test('reconciles server static views by worktree and reports changed keys', () => {
+  test('reconciles worktree-owned server static views by worktree and reports changed keys', () => {
     const registry = new RendererWorkspacePaneRegistry()
 
     const changed = registry.reconcileServerStaticViews(REPO_ROOT, [
       { type: 'changes', id: 'changes', worktreePath: WORKTREE_PATH, displayOrder: 2 },
-      { type: 'status', id: 'status', worktreePath: WORKTREE_PATH, displayOrder: 1 },
-      { type: 'history', id: 'history', worktreePath: WORKTREE_PATH, displayOrder: 3 },
     ])
 
     expect(changed).toEqual([WORKTREE_KEY])
-    expect(registry.staticViews(WORKTREE_KEY).map((tab) => tab.type)).toEqual(['status', 'changes', 'history'])
+    expect(registry.staticViews(WORKTREE_KEY).map((tab) => tab.type)).toEqual(['changes'])
   })
 
   test('validates and applies optimistic mixed reorder state', () => {

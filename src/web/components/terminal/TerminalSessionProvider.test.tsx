@@ -20,8 +20,8 @@ import { settingsSnapshotQueryKey } from '#/web/settings-queries.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
-  selectedWorkspacePaneViewForBranch,
-  workspacePaneViewByBranchRecordWith,
+  preferredWorkspacePaneViewForBranch,
+  preferredWorkspacePaneViewByBranchRecordWith,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import type {
@@ -70,7 +70,7 @@ vi.mock('#/web/components/terminal/terminal-geometry.ts', () => ({
 
 function selectedWorkspacePaneView(repoId: string) {
   const repo = useReposStore.getState().repos[repoId]
-  return repo ? selectedWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) : null
+  return repo ? preferredWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) : null
 }
 
 vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
@@ -612,7 +612,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'terminal',
+      preferredWorkspacePaneView: 'terminal',
     })
     const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
@@ -676,7 +676,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'terminal',
+      preferredWorkspacePaneView: 'terminal',
     })
     mainWindowQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
@@ -741,7 +741,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'terminal',
+      preferredWorkspacePaneView: 'terminal',
     })
     const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
@@ -799,7 +799,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'terminal',
+      preferredWorkspacePaneView: 'terminal',
     })
     mainWindowQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
@@ -862,7 +862,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'terminal',
+      preferredWorkspacePaneView: 'terminal',
     })
     listSessionsMock.mockResolvedValue([
       {
@@ -921,7 +921,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'terminal',
+      preferredWorkspacePaneView: 'terminal',
     })
     const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
     const { unmount } = await renderProviderWithProbe(terminalWorktreeKey)
@@ -947,7 +947,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'terminal',
+      preferredWorkspacePaneView: 'terminal',
     })
     managedServerSessions = [
       {
@@ -999,7 +999,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'terminal',
+      preferredWorkspacePaneView: 'terminal',
     })
     const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
     useReposStore.setState({
@@ -1058,7 +1058,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'terminal',
+      preferredWorkspacePaneView: 'terminal',
     })
     const secondRepo = {
       ...firstRepo,
@@ -1079,7 +1079,7 @@ describe('TerminalSessionProvider', () => {
       ui: {
         ...firstRepo.ui,
         selectedBranch: 'feature/other',
-        preferredWorkspacePaneViewByBranch: workspacePaneViewByBranchRecordWith(
+        preferredWorkspacePaneViewByBranch: preferredWorkspacePaneViewByBranchRecordWith(
           firstRepo.ui,
           'feature/other',
           'terminal',
@@ -1109,7 +1109,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'terminal',
+      preferredWorkspacePaneView: 'terminal',
     })
     const secondRepo = {
       ...firstRepo,
@@ -1130,7 +1130,7 @@ describe('TerminalSessionProvider', () => {
       ui: {
         ...firstRepo.ui,
         selectedBranch: 'feature/other',
-        preferredWorkspacePaneViewByBranch: workspacePaneViewByBranchRecordWith(
+        preferredWorkspacePaneViewByBranch: preferredWorkspacePaneViewByBranchRecordWith(
           firstRepo.ui,
           'feature/other',
           'terminal',
@@ -1166,7 +1166,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'terminal',
+      preferredWorkspacePaneView: 'terminal',
     })
     const { unmount } = await renderProviderWithProbe(worktreeTerminalKey(REPO_ID, WORKTREE_PATH))
 
@@ -1200,7 +1200,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'terminal',
+      preferredWorkspacePaneView: 'terminal',
     })
     listSessionsMock.mockResolvedValue([
       {
@@ -1244,7 +1244,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'terminal',
+      preferredWorkspacePaneView: 'terminal',
     })
     listSessionsMock.mockResolvedValue([
       {
@@ -1311,7 +1311,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'terminal',
+      preferredWorkspacePaneView: 'terminal',
     })
     listSessionsMock.mockResolvedValue([
       {
@@ -1372,7 +1372,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'terminal',
+      preferredWorkspacePaneView: 'terminal',
     })
     listSessionsMock.mockResolvedValue([
       {
@@ -1441,7 +1441,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'terminal',
+      preferredWorkspacePaneView: 'terminal',
     })
     listSessionsMock.mockResolvedValue([
       {
@@ -1514,7 +1514,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'terminal',
+      preferredWorkspacePaneView: 'terminal',
     })
     listSessionsMock.mockResolvedValue([
       {
@@ -1572,7 +1572,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'terminal',
+      preferredWorkspacePaneView: 'terminal',
     })
     listSessionsMock.mockResolvedValue([
       {
@@ -1642,7 +1642,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'terminal',
+      preferredWorkspacePaneView: 'terminal',
     })
     const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
     const { getContext, getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
@@ -1675,7 +1675,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'terminal',
+      preferredWorkspacePaneView: 'terminal',
     })
     createTerminalMock.mockResolvedValueOnce({
       ok: true as const,
@@ -1820,7 +1820,7 @@ describe('TerminalSessionProvider', () => {
         id: REPO_ID,
         branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
         selectedBranch: 'feature/worktree',
-        workspacePaneView: 'terminal',
+        preferredWorkspacePaneView: 'terminal',
       })
       await act(async () => {
         await Promise.resolve()
@@ -1959,7 +1959,7 @@ describe('TerminalSessionProvider', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'terminal',
+      preferredWorkspacePaneView: 'terminal',
     })
     const terminalWorktreeKey = worktreeTerminalKey(REPO_ID, WORKTREE_PATH)
 

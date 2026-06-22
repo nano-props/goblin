@@ -144,7 +144,7 @@ function createFileMenu(state: AppMenuState): MenuItemConstructorOptions {
       createRendererCommandMenuItem(state, 'file-open-remote-repo'),
       { label: t('menu.file.open-recent'), submenu: createRecentReposMenu(state.recentRepos) },
       separator(),
-      createRendererCommandMenuItem(state, 'file-close-terminal-tab-or-window'),
+      createRendererCommandMenuItem(state, 'file-close-workspace-tab-or-window'),
       createRendererCommandMenuItem(state, 'file-close-tab'),
       { label: t('menu.file.close-window'), click: () => focusedRegisteredSurface()?.window.close() },
       separator(),
@@ -204,6 +204,7 @@ function createViewMenu(state: AppMenuState): MenuItemConstructorOptions {
     label: t('menu.view'),
     submenu: [
       createRendererCommandMenuItem(state, 'view-status'),
+      createRendererCommandMenuItem(state, 'view-history'),
       createRendererCommandMenuItem(state, 'view-changes'),
       // Single Terminal entry. Clicking it mirrors what happens when the
       // user clicks the first terminal view on the page: open the terminal

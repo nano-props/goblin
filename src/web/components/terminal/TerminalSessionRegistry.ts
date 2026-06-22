@@ -13,8 +13,8 @@ import type {
 } from '#/shared/terminal-types.ts'
 import type {
   WorkspacePaneStaticViewSummary as ServerWorkspacePaneStaticViewSummary,
-  WorkspacePaneStaticViewType,
-  WorkspacePaneViewOrderEntry,
+  WorkspacePaneWorktreeStaticViewType,
+  WorkspacePaneWorktreeViewOrderEntry,
 } from '#/shared/workspace-pane.ts'
 import { branchForTerminalWorktree } from '#/web/components/terminal/terminal-repo-index.ts'
 import {
@@ -744,7 +744,7 @@ export class TerminalSessionRegistry {
 
   reorderWorkspacePaneViews = async (
     worktreeKey: string,
-    orderedViews: WorkspacePaneViewOrderEntry[],
+    orderedViews: WorkspacePaneWorktreeViewOrderEntry[],
   ): Promise<boolean> => {
     const parsedWorktree = parseWorktreeTerminalKey(worktreeKey)
     if (!parsedWorktree) return false
@@ -776,7 +776,7 @@ export class TerminalSessionRegistry {
     return result
   }
 
-  openWorkspacePaneView = async (worktreeKey: string, type: WorkspacePaneStaticViewType): Promise<boolean> => {
+  openWorkspacePaneView = async (worktreeKey: string, type: WorkspacePaneWorktreeStaticViewType): Promise<boolean> => {
     const parsedWorktree = parseWorktreeTerminalKey(worktreeKey)
     if (!parsedWorktree) return false
 
@@ -805,7 +805,7 @@ export class TerminalSessionRegistry {
     return result
   }
 
-  closeWorkspacePaneView = async (worktreeKey: string, type: WorkspacePaneStaticViewType): Promise<boolean> => {
+  closeWorkspacePaneView = async (worktreeKey: string, type: WorkspacePaneWorktreeStaticViewType): Promise<boolean> => {
     const parsedWorktree = parseWorktreeTerminalKey(worktreeKey)
     if (!parsedWorktree) return false
 

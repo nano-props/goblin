@@ -26,12 +26,12 @@ describe('shortcut definitions', () => {
     expect(matchRendererKeyboardShortcut({ key: 'Escape', code: 'Escape', shiftKey: false })).toBe('dismiss')
   })
 
-  test('resolves fixed close and terminal tab accelerators from shared definitions', () => {
+  test('resolves fixed close and workspace tab accelerators from shared definitions', () => {
     expect(resolveRendererMenuCommandAccelerator(rendererMenuCommandById('file-new-terminal-tab'), {})).toBe(
       'CmdOrCtrl+N',
     )
     expect(
-      resolveRendererMenuCommandAccelerator(rendererMenuCommandById('file-close-terminal-tab-or-window'), {}),
+      resolveRendererMenuCommandAccelerator(rendererMenuCommandById('file-close-workspace-tab-or-window'), {}),
     ).toBe('CmdOrCtrl+W')
     expect(resolveRendererMenuCommandAccelerator(rendererMenuCommandById('file-close-tab'), {})).toBe(
       'CmdOrCtrl+Shift+W',
@@ -42,6 +42,13 @@ describe('shortcut definitions', () => {
     const command = rendererMenuCommandById('view-terminal')
     expect(command.menuLabelKey).toBe('menu.view.terminal')
     expect(command.intent).toEqual({ type: 'terminal-primary-action-requested' })
+    expect(resolveRendererMenuCommandAccelerator(command, {})).toBeUndefined()
+  })
+
+  test('defines history as a workspace pane view menu command', () => {
+    const command = rendererMenuCommandById('view-history')
+    expect(command.menuLabelKey).toBe('menu.view.history')
+    expect(command.intent).toEqual({ type: 'show-workspace-pane-view-requested', tab: 'history' })
     expect(resolveRendererMenuCommandAccelerator(command, {})).toBeUndefined()
   })
 

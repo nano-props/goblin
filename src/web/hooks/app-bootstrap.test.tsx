@@ -55,6 +55,7 @@ describe('app bootstrap hooks', () => {
       workspaceFocused: true,
       workspacePaneSize: 50,
       selectedTerminalByWorktree: {},
+      openBranchWorkspacePaneViewsByBranchByRepo: {},
     })
     const hydrateI18n = vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
     const hydrateHostInfo = vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
@@ -75,6 +76,11 @@ describe('app bootstrap hooks', () => {
       workspaceFocused: false,
       workspacePaneSize: 45,
       selectedTerminalByWorktree: { '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2' },
+      openBranchWorkspacePaneViewsByBranchByRepo: {
+        '/tmp/repo': {
+          main: [],
+        },
+      },
     }
     const settings = defaultSettingsSnapshot({ session })
     mockedGetSettingsSnapshot.mockResolvedValue(settings)
@@ -91,7 +97,16 @@ describe('app bootstrap hooks', () => {
     expect(state.selectedTerminalByWorktree).toEqual({
       '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2',
     })
-    expect(hydrateSession).toHaveBeenCalledWith([{ kind: 'local', id: '/tmp/repo' }], '/tmp/repo')
+    expect(hydrateSession).toHaveBeenCalledWith([{ kind: 'local', id: '/tmp/repo' }], '/tmp/repo', {
+      workspacePaneRestoreState: {
+        openBranchWorkspacePaneViewsByBranchByRepo: {
+          '/tmp/repo': {
+            main: [],
+          },
+        },
+        preferredWorkspacePaneViewByBranchByRepo: {},
+      },
+    })
     expect(hydrateTheme).toHaveBeenCalledWith(settings)
     expect(mockedGetSettingsSnapshot).toHaveBeenCalledTimes(1)
   })
@@ -103,6 +118,7 @@ describe('app bootstrap hooks', () => {
       workspaceFocused: true,
       workspacePaneSize: 55,
       selectedTerminalByWorktree: {},
+      openBranchWorkspacePaneViewsByBranchByRepo: {},
     }
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot({ session }))
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockRejectedValue(new Error('theme unavailable'))
@@ -112,7 +128,12 @@ describe('app bootstrap hooks', () => {
 
     await render(<Harness />)
 
-    expect(hydrateSession).toHaveBeenCalledWith([{ kind: 'local', id: '/tmp/repo' }], '/tmp/repo')
+    expect(hydrateSession).toHaveBeenCalledWith([{ kind: 'local', id: '/tmp/repo' }], '/tmp/repo', {
+      workspacePaneRestoreState: {
+        openBranchWorkspacePaneViewsByBranchByRepo: {},
+        preferredWorkspacePaneViewByBranchByRepo: {},
+      },
+    })
     expect(useReposStore.getState().workspacePaneSize).toBe(55)
     expect(mockedGetSettingsSnapshot).toHaveBeenCalledTimes(1)
   })

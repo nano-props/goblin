@@ -1,11 +1,11 @@
 import path from 'node:path'
 import type {
   WorkspacePaneStaticViewSummary,
-  WorkspacePaneStaticViewType,
-  WorkspacePaneViewOrderEntry,
+  WorkspacePaneWorktreeStaticViewType,
+  WorkspacePaneWorktreeViewOrderEntry,
   WorkspacePaneViewType,
 } from '#/shared/workspace-pane.ts'
-import { isWorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
+import { isWorkspacePaneWorktreeStaticViewType } from '#/shared/workspace-pane.ts'
 
 interface WorkspacePaneViewRecord<TOwner extends string | number> {
   ownerId: TOwner
@@ -49,7 +49,8 @@ export class WorkspacePaneRuntime<TOwner extends string | number> {
     const summaries: WorkspacePaneStaticViewSummary[] = []
     for (const views of this.viewsByWorktree.values()) {
       for (const view of views.values()) {
-        if (view.ownerId !== ownerId || view.scope !== scope || !isWorkspacePaneStaticViewType(view.type)) continue
+        if (view.ownerId !== ownerId || view.scope !== scope || !isWorkspacePaneWorktreeStaticViewType(view.type))
+          continue
         summaries.push({
           type: view.type,
           id: view.type,
@@ -65,12 +66,22 @@ export class WorkspacePaneRuntime<TOwner extends string | number> {
     return summaries
   }
 
-  openStaticView(ownerId: TOwner, scope: string, worktreePath: string, type: WorkspacePaneStaticViewType): boolean {
+  openStaticView(
+    ownerId: TOwner,
+    scope: string,
+    worktreePath: string,
+    type: WorkspacePaneWorktreeStaticViewType,
+  ): boolean {
     this.registerView({ ownerId, scope, worktreePath, type, id: type })
     return true
   }
 
-  closeStaticView(ownerId: TOwner, scope: string, worktreePath: string, type: WorkspacePaneStaticViewType): boolean {
+  closeStaticView(
+    ownerId: TOwner,
+    scope: string,
+    worktreePath: string,
+    type: WorkspacePaneWorktreeStaticViewType,
+  ): boolean {
     this.unregisterView({ ownerId, scope, worktreePath, type, id: type })
     return true
   }
@@ -86,7 +97,8 @@ export class WorkspacePaneRuntime<TOwner extends string | number> {
     let pruned = 0
     for (const [key, views] of Array.from(this.viewsByWorktree.entries())) {
       for (const [identity, view] of Array.from(views.entries())) {
-        if (view.ownerId !== ownerId || view.scope !== scope || !isWorkspacePaneStaticViewType(view.type)) continue
+        if (view.ownerId !== ownerId || view.scope !== scope || !isWorkspacePaneWorktreeStaticViewType(view.type))
+          continue
         if (liveWorktreePaths.has(path.resolve(view.worktreePath))) continue
         views.delete(identity)
         pruned += 1
@@ -100,7 +112,7 @@ export class WorkspacePaneRuntime<TOwner extends string | number> {
     ownerId: TOwner,
     scope: string,
     worktreePath: string,
-    orderedViews: WorkspacePaneViewOrderEntry[],
+    orderedViews: WorkspacePaneWorktreeViewOrderEntry[],
   ): boolean {
     const key = this.worktreeKey({ ownerId, scope, worktreePath })
     const currentViews = this.viewsByWorktree.get(key) ?? new Map()

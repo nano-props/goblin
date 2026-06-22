@@ -184,8 +184,12 @@ const SessionStateSchema = v.object({
   workspaceFocused: v.boolean(),
   workspacePaneSize: v.number(),
   selectedTerminalByWorktree: v.optional(v.record(v.string(), v.string())),
-  workspacePaneViewByBranchByRepo: v.optional(
-    v.record(v.string(), v.record(v.string(), v.picklist(['status', 'changes', 'history', 'terminal']))),
+  preferredWorkspacePaneViewByBranchByRepo: v.optional(
+    v.record(v.string(), v.record(v.string(), v.picklist(['status', 'history', 'terminal']))),
+  ),
+  openBranchWorkspacePaneViewsByBranchByRepo: v.record(
+    v.string(),
+    v.record(v.string(), v.array(v.picklist(['status', 'history']))),
   ),
 })
 

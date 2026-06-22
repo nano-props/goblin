@@ -123,7 +123,7 @@ export function BranchNavigator({ repoId, showActions = true }: Props) {
   const handleOpenBranchStatus = (branchName: string) => {
     const branch = repo.data.branches.find((candidate) => candidate.name === branchName)
     if (branch?.worktree?.path) {
-      openWorkspacePaneView({
+      void openWorkspacePaneView({
         repoId: repo.id,
         branchName,
         worktreePath: branch.worktree.path,
@@ -132,8 +132,13 @@ export function BranchNavigator({ repoId, showActions = true }: Props) {
       })
       return
     }
-    handleSelectBranch(branchName)
-    navigation.showRepoWorkspacePaneView(repoId, 'status')
+    void openWorkspacePaneView({
+      repoId: repo.id,
+      branchName,
+      worktreePath: null,
+      type: 'status',
+      navigation,
+    })
   }
   useEffect(() => {
     if (!openActionMenu) return

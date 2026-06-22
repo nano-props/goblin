@@ -20,7 +20,7 @@ function activeRepoStatusSnapshotEqual(
       !!b &&
       a.id === b.id &&
       a.token === b.token &&
-      a.workspacePaneView === b.workspacePaneView &&
+      a.preferredWorkspacePaneView === b.preferredWorkspacePaneView &&
       a.statusViewOpen === b.statusViewOpen &&
       a.unavailable === b.unavailable &&
       a.statusPhase === b.statusPhase)
@@ -38,25 +38,25 @@ export function useRepoStatusRefresh() {
     activeRepoStatusSnapshotEqual,
   )
   const previousActiveRepoId = useRef<string | null>(null)
-  const previousWorkspacePaneView = useRef<WorkspacePaneView | null>(null)
+  const previousPreferredWorkspacePaneView = useRef<WorkspacePaneView | null>(null)
   const previousStatusViewOpen = useRef<boolean>(false)
 
   useEffect(() => {
     const lastActiveRepoId = previousActiveRepoId.current
-    const lastWorkspacePaneView = previousWorkspacePaneView.current
+    const lastPreferredWorkspacePaneView = previousPreferredWorkspacePaneView.current
     const lastStatusViewOpen = previousStatusViewOpen.current
     const nextActiveRepoId = activeRepo?.id ?? null
-    const nextWorkspacePaneView = activeRepo?.workspacePaneView ?? null
+    const nextPreferredWorkspacePaneView = activeRepo?.preferredWorkspacePaneView ?? null
     const nextStatusViewOpen = activeRepo?.statusViewOpen ?? false
     const activeRepoChanged = nextActiveRepoId !== lastActiveRepoId
     const openedStatusLikeTab =
       !activeRepoChanged &&
       nextActiveRepoId !== null &&
-      ((nextWorkspacePaneView === 'status' && nextStatusViewOpen && !lastStatusViewOpen) ||
-        ((nextWorkspacePaneView === 'status' || nextWorkspacePaneView === 'changes') &&
-          nextWorkspacePaneView !== lastWorkspacePaneView))
+      ((nextPreferredWorkspacePaneView === 'status' && nextStatusViewOpen && !lastStatusViewOpen) ||
+        ((nextPreferredWorkspacePaneView === 'status' || nextPreferredWorkspacePaneView === 'changes') &&
+          nextPreferredWorkspacePaneView !== lastPreferredWorkspacePaneView))
     previousActiveRepoId.current = nextActiveRepoId
-    previousWorkspacePaneView.current = nextWorkspacePaneView
+    previousPreferredWorkspacePaneView.current = nextPreferredWorkspacePaneView
     previousStatusViewOpen.current = nextStatusViewOpen
     if (!activeRepo || (!activeRepoChanged && !openedStatusLikeTab)) return
     void runRepoRefreshIntent(useReposStore.getState, {

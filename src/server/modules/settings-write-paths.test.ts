@@ -132,6 +132,7 @@ describe('settings write paths', () => {
       workspaceFocused: true,
       workspacePaneSize: 50,
       selectedTerminalByWorktree: {},
+      openBranchWorkspacePaneViewsByBranchByRepo: {},
     }
     mocks.setServerSessionState.mockResolvedValue(session)
     mocks.setServerSessionState.mockResolvedValue(session as SessionState)
@@ -173,9 +174,32 @@ describe('settings write paths', () => {
         activeRepo: null,
         workspaceFocused: true,
         workspacePaneSize: 61.8,
+        openBranchWorkspacePaneViewsByBranchByRepo: {},
       },
     })
     expect(parsed.session.workspaceFocused).toBe(true)
     expect(parsed.session.workspacePaneSize).toBe(61.8)
+  })
+
+  test('schema rejects runtime-owned changes as a session-restorable preferred view', async () => {
+    const { SETTINGS_PATCH_SCHEMAS } = await import('#/shared/procedure-schemas.ts')
+    const { parseHttpInput } = await import('#/server/common/http-validate.ts')
+
+    expect(() =>
+      parseHttpInput(SETTINGS_PATCH_SCHEMAS.session, {
+        session: {
+          openRepos: [{ kind: 'local', id: '/tmp/repo' }],
+          activeRepo: '/tmp/repo',
+          workspaceFocused: true,
+          workspacePaneSize: 61.8,
+          preferredWorkspacePaneViewByBranchByRepo: {
+            '/tmp/repo': {
+              main: 'changes',
+            },
+          },
+          openBranchWorkspacePaneViewsByBranchByRepo: {},
+        },
+      }),
+    ).toThrow()
   })
 })

@@ -6,7 +6,8 @@ import { emptyRepo, replaceRepo } from '#/web/stores/repos/helpers.ts'
 import { isRepoStatusRefreshable, useRepoStatusRefresh } from '#/web/hooks/useRepoStatusRefresh.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { resetReposStore } from '#/web/stores/repos/test-utils.ts'
-import { workspacePaneViewByBranchRecordWith } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { preferredWorkspacePaneViewByBranchRecordWith } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { branchWorkspacePaneViewsRecordWith } from '#/web/stores/repos/branch-workspace-pane-views.ts'
 import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 
 const originalRefreshStatus = useReposStore.getState().refreshStatus
@@ -19,7 +20,7 @@ function Harness() {
 function createRepo(
   id: string,
   options: {
-    workspacePaneView?: WorkspacePaneView
+    preferredWorkspacePaneView?: WorkspacePaneView
     /**
      * Phase 4: the legacy `availability.phase` field is gone for
      * remote repos. The snapshot's `unavailable` boolean is
@@ -37,10 +38,11 @@ function createRepo(
   const repo = emptyRepo(id, 'repo')
   repo.instanceToken = id === '/repo-a' ? 1 : 2
   repo.ui.selectedBranch = 'main'
-  repo.ui.preferredWorkspacePaneViewByBranch = workspacePaneViewByBranchRecordWith(
+  repo.ui.openBranchWorkspacePaneViewsByBranch = branchWorkspacePaneViewsRecordWith(repo.ui, 'main', ['status'])
+  repo.ui.preferredWorkspacePaneViewByBranch = preferredWorkspacePaneViewByBranchRecordWith(
     repo.ui,
     'main',
-    options.workspacePaneView ?? 'status',
+    options.preferredWorkspacePaneView ?? 'status',
   )
   if (options.unavailable) repo.availability = { phase: 'unavailable', reason: 'error.failed-read-repo', checkedAt: 0 }
   repo.resources.status.phase = options.statusPhase ?? 'idle'
@@ -53,7 +55,7 @@ describe('isRepoStatusRefreshable', () => {
       isRepoStatusRefreshable({
         id: '/r',
         token: 1,
-        workspacePaneView: 'status',
+        preferredWorkspacePaneView: 'status',
         statusViewOpen: true,
         unavailable: false,
         statusPhase: 'idle',
@@ -66,7 +68,7 @@ describe('isRepoStatusRefreshable', () => {
       isRepoStatusRefreshable({
         id: '/r',
         token: 1,
-        workspacePaneView: 'status',
+        preferredWorkspacePaneView: 'status',
         statusViewOpen: true,
         unavailable: true,
         statusPhase: 'idle',
@@ -79,7 +81,7 @@ describe('isRepoStatusRefreshable', () => {
       isRepoStatusRefreshable({
         id: '/r',
         token: 1,
-        workspacePaneView: 'status',
+        preferredWorkspacePaneView: 'status',
         statusViewOpen: true,
         unavailable: false,
         statusPhase: 'loading',
@@ -89,7 +91,7 @@ describe('isRepoStatusRefreshable', () => {
       isRepoStatusRefreshable({
         id: '/r',
         token: 1,
-        workspacePaneView: 'status',
+        preferredWorkspacePaneView: 'status',
         statusViewOpen: true,
         unavailable: false,
         statusPhase: 'refreshing',
@@ -142,7 +144,7 @@ describe('useRepoStatusRefresh', () => {
   })
 
   test('refreshes status when opening the status tab', async () => {
-    const repo = createRepo('/repo-a', { workspacePaneView: 'terminal' })
+    const repo = createRepo('/repo-a', { preferredWorkspacePaneView: 'terminal' })
     await act(async () => {
       useReposStore.setState({
         repos: { '/repo-a': repo },
@@ -161,7 +163,7 @@ describe('useRepoStatusRefresh', () => {
   })
 
   test('refreshes status when opening the changes tab', async () => {
-    const repo = createRepo('/repo-a', { workspacePaneView: 'terminal' })
+    const repo = createRepo('/repo-a', { preferredWorkspacePaneView: 'terminal' })
     await act(async () => {
       useReposStore.setState({
         repos: { '/repo-a': repo },
@@ -180,7 +182,7 @@ describe('useRepoStatusRefresh', () => {
   })
 
   test('refreshes status when reopening the status tab after bouncing through terminal', async () => {
-    const repo = createRepo('/repo-a', { workspacePaneView: 'status' })
+    const repo = createRepo('/repo-a', { preferredWorkspacePaneView: 'status' })
     repo.data.branches = [
       {
         name: 'main',
@@ -259,7 +261,7 @@ describe('useRepoStatusRefresh', () => {
   })
 
   test('does not treat branch selection changes as refresh triggers', async () => {
-    const repo = createRepo('/repo-a', { workspacePaneView: 'status' })
+    const repo = createRepo('/repo-a', { preferredWorkspacePaneView: 'status' })
     repo.ui.selectedBranch = 'feature/a'
     await act(async () => {
       useReposStore.setState({

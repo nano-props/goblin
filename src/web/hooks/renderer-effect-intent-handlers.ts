@@ -11,7 +11,7 @@ import { consumeExternalOpenPaths } from '#/web/app-shell-client.ts'
 import { openRepoPaths } from '#/web/lib/open-repo-paths.ts'
 import { externalOpenLog } from '#/web/logger.ts'
 import {
-  runCloseTerminalTabOrWindowCommand,
+  runCloseWorkspacePaneTabOrWindowCommand,
   runNewTerminalTabCommand,
   runShowWorkspacePaneViewCommand,
   runTerminalPrimaryActionCommand,
@@ -144,14 +144,12 @@ export async function handleWorkspaceRendererIntent(
       deps.openRemoteRepo()
       return true
     case 'new-terminal-tab':
-      await runNewTerminalTabCommand({
+      return await runNewTerminalTabCommand({
         repoId: plan.repoId,
         navigation: deps.navigation,
       })
-      return true
-    case 'close-terminal-tab-or-window':
-      runCloseTerminalTabOrWindowCommand({ repoId: plan.repoId })
-      return true
+    case 'close-workspace-pane-tab-or-window':
+      return await runCloseWorkspacePaneTabOrWindowCommand({ repoId: plan.repoId, navigation: deps.navigation })
     case 'close-repo':
       deps.navigation.closeRepo(plan.repoId)
       return true
@@ -169,18 +167,16 @@ export async function handleWorkspaceRendererIntent(
       })
       return true
     case 'show-workspace-pane-view':
-      runShowWorkspacePaneViewCommand({
+      return await runShowWorkspacePaneViewCommand({
         repoId: plan.repoId,
         tab: plan.tab,
         navigation: deps.navigation,
       })
-      return true
     case 'terminal-primary-action':
-      await runTerminalPrimaryActionCommand({
+      return await runTerminalPrimaryActionCommand({
         repoId: plan.repoId,
         navigation: deps.navigation,
       })
-      return true
     case 'toggle-workspace-focus':
       deps.toggleWorkspaceFocused()
       return true

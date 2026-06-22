@@ -29,12 +29,10 @@ describe('workspace pane runtime', () => {
     const runtime = createWorkspacePaneRuntime<string>()
     runtime.registerTerminalView({ ownerId: 'owner-a', scope: '/repo', worktreePath: '/repo-linked', id: 'terminal-1' })
     runtime.registerTerminalView({ ownerId: 'owner-a', scope: '/repo', worktreePath: '/repo-linked', id: 'terminal-2' })
-    runtime.openStaticView('owner-a', '/repo', '/repo-linked', 'status')
     runtime.openStaticView('owner-a', '/repo', '/repo-linked', 'changes')
 
     expect(
       runtime.reorderViews('owner-a', '/repo', '/repo-linked', [
-        { type: 'status', id: 'status' },
         { type: 'changes', id: 'changes' },
         { type: 'terminal', id: 'terminal-2' },
         { type: 'terminal', id: 'terminal-1' },
@@ -43,20 +41,14 @@ describe('workspace pane runtime', () => {
 
     expect(runtime.listStaticViews('owner-a', '/repo')).toEqual([
       {
-        type: 'status',
-        id: 'status',
-        worktreePath: '/repo-linked',
-        displayOrder: 0,
-      },
-      {
         type: 'changes',
         id: 'changes',
         worktreePath: '/repo-linked',
-        displayOrder: 1,
+        displayOrder: 0,
       },
     ])
-    expect(runtime.viewDisplayOrder(view('terminal', 'terminal-2'))).toBe(2)
-    expect(runtime.viewDisplayOrder(view('terminal', 'terminal-1'))).toBe(3)
+    expect(runtime.viewDisplayOrder(view('terminal', 'terminal-2'))).toBe(1)
+    expect(runtime.viewDisplayOrder(view('terminal', 'terminal-1'))).toBe(2)
   })
 
   test('rejects duplicate, missing, and unopened views without changing order', () => {
@@ -70,12 +62,11 @@ describe('workspace pane runtime', () => {
         { type: 'terminal', id: 'terminal-1' },
       ]),
     ).toBe(false)
-    expect(
-      runtime.reorderViews('owner-a', '/repo', '/repo-linked', [
-        { type: 'terminal', id: 'terminal-2' },
-        { type: 'status', id: 'status' },
-      ]),
-    ).toBe(false)
+    const invalidStatusOrder = [
+      { type: 'terminal', id: 'terminal-2' },
+      { type: 'status', id: 'status' },
+    ] as unknown as Parameters<typeof runtime.reorderViews>[3]
+    expect(runtime.reorderViews('owner-a', '/repo', '/repo-linked', invalidStatusOrder)).toBe(false)
 
     expect(runtime.viewDisplayOrder(view('terminal', 'terminal-1'))).toBe(0)
     expect(runtime.viewDisplayOrder(view('terminal', 'terminal-2'))).toBe(1)

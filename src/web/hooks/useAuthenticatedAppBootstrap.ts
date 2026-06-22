@@ -48,12 +48,7 @@ async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>): 
     useSessionRestoreStore.getState().hydrateFromSettingsSnapshot(await settingsSnapshot)
     const session = useSessionRestoreStore.getState().consumeBootSessionSnapshot()
     const normalizedLayout = normalizeWorkspaceSessionLayoutState(session)
-    const {
-      hydrateSession,
-      applySessionLayoutState,
-      applySessionSelectedTerminalState,
-      applySessionWorkspacePaneViewByBranchByRepo,
-    } = useReposStore.getState()
+    const { hydrateSession, applySessionLayoutState, applySessionSelectedTerminalState } = useReposStore.getState()
     // Apply layout prefs before repo probing finishes so the first
     // restored paint uses the saved geometry. useSessionPersistence
     // still waits for sessionReady, so this cannot overwrite the
@@ -61,8 +56,12 @@ async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>): 
     const restoredWorkspaceState = restoreRestorableWorkspaceStateFromSession(session)
     applySessionLayoutState(normalizedLayout)
     applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalByWorktree)
-    await hydrateSession(session.openRepos, session.activeRepo)
-    applySessionWorkspacePaneViewByBranchByRepo(restoredWorkspaceState.workspacePaneViewByBranchByRepo)
+    await hydrateSession(session.openRepos, session.activeRepo, {
+      workspacePaneRestoreState: {
+        openBranchWorkspacePaneViewsByBranchByRepo: restoredWorkspaceState.openBranchWorkspacePaneViewsByBranchByRepo,
+        preferredWorkspacePaneViewByBranchByRepo: restoredWorkspaceState.preferredWorkspacePaneViewByBranchByRepo,
+      },
+    })
   } catch (err) {
     bootstrapLog.warn('session restore failed', { err })
     useReposStore.setState({ sessionReady: true })
@@ -91,10 +90,7 @@ async function primeSettingsQueryCache(settingsSnapshot: Promise<SettingsSnapsho
   // reaches `fetch`). Wrap each one individually so the other can
   // still succeed and so a synchronous throw doesn't propagate up
   // and abort the rest of the boot.
-  const fetchAndPrime = async (
-    fetcher: () => Promise<unknown>,
-    queryKey: readonly unknown[],
-  ): Promise<void> => {
+  const fetchAndPrime = async (fetcher: () => Promise<unknown>, queryKey: readonly unknown[]): Promise<void> => {
     try {
       const snapshot = await fetcher()
       mainWindowQueryClient.setQueryData(queryKey, snapshot)

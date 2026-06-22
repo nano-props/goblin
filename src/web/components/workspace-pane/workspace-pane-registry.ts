@@ -1,9 +1,9 @@
 import type {
   WorkspacePaneStaticViewSummary as ServerWorkspacePaneStaticViewSummary,
-  WorkspacePaneStaticViewType,
-  WorkspacePaneViewOrderEntry,
+  WorkspacePaneWorktreeStaticViewType,
+  WorkspacePaneWorktreeViewOrderEntry,
 } from '#/shared/workspace-pane.ts'
-import { isWorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
+import { isWorkspacePaneWorktreeStaticViewType } from '#/shared/workspace-pane.ts'
 import { worktreeTerminalKey, parseWorktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import type { WorkspacePaneStaticViewSummary, WorkspacePaneViewSummary } from '#/web/components/terminal/types.ts'
 
@@ -34,6 +34,7 @@ export class RendererWorkspacePaneRegistry {
     const nextByWorktree = new Map<string, WorkspacePaneStaticViewSummary[]>()
 
     for (const tab of tabs) {
+      if (!isWorkspacePaneWorktreeStaticViewType(tab.type)) continue
       const terminalWorktreeKey = worktreeTerminalKey(repoRoot, tab.worktreePath)
       const summary: WorkspacePaneStaticViewSummary = {
         type: tab.type,
@@ -62,7 +63,7 @@ export class RendererWorkspacePaneRegistry {
 
   validateReorder(input: {
     worktreeKey: string
-    orderedViews: WorkspacePaneViewOrderEntry[]
+    orderedViews: WorkspacePaneWorktreeViewOrderEntry[]
     existingTerminalKeys: string[]
   }): boolean {
     if (new Set(input.orderedViews.map((tab) => `${tab.type}\0${tab.id}`)).size !== input.orderedViews.length) {
@@ -75,10 +76,10 @@ export class RendererWorkspacePaneRegistry {
     if (!orderedTerminalKeys.every((key) => existingTerminalKeySet.has(key))) return false
 
     const existingStaticTypes = new Set(this.staticViews(input.worktreeKey).map((tab) => tab.type))
-    const orderedStaticTypes: WorkspacePaneStaticViewType[] = []
+    const orderedStaticTypes: WorkspacePaneWorktreeStaticViewType[] = []
     for (const tab of input.orderedViews) {
       if (tab.type === 'terminal') continue
-      if (!isWorkspacePaneStaticViewType(tab.type)) return false
+      if (!isWorkspacePaneWorktreeStaticViewType(tab.type)) return false
       orderedStaticTypes.push(tab.type)
     }
     if (orderedStaticTypes.length !== existingStaticTypes.size) return false
@@ -93,7 +94,7 @@ export class RendererWorkspacePaneRegistry {
 
   applyOptimisticWorkspacePaneViewOrder(
     worktreeKey: string,
-    orderedViews: WorkspacePaneViewOrderEntry[],
+    orderedViews: WorkspacePaneWorktreeViewOrderEntry[],
     displayOrderByKey: Map<string, number>,
   ): void {
     const parsedWorktree = parseWorktreeTerminalKey(worktreeKey)
@@ -105,7 +106,7 @@ export class RendererWorkspacePaneRegistry {
         displayOrderByKey.set(tab.id, i)
         continue
       }
-      if (!isWorkspacePaneStaticViewType(tab.type)) return
+      if (!isWorkspacePaneWorktreeStaticViewType(tab.type)) return
       staticWorkspacePaneViews.push({
         type: tab.type,
         id: tab.type,
@@ -120,7 +121,7 @@ export class RendererWorkspacePaneRegistry {
 
   applyOptimisticStaticWorkspacePaneViewOpen(input: {
     worktreeKey: string
-    type: WorkspacePaneStaticViewType
+    type: WorkspacePaneWorktreeStaticViewType
     currentWorkspacePaneViews: WorkspacePaneViewSummary[]
   }): void {
     const parsedWorktree = parseWorktreeTerminalKey(input.worktreeKey)
@@ -141,7 +142,7 @@ export class RendererWorkspacePaneRegistry {
     ])
   }
 
-  applyOptimisticStaticWorkspacePaneViewClose(worktreeKey: string, type: WorkspacePaneStaticViewType): void {
+  applyOptimisticStaticWorkspacePaneViewClose(worktreeKey: string, type: WorkspacePaneWorktreeStaticViewType): void {
     const nextStaticViews = this.staticViews(worktreeKey).filter((tab) => tab.type !== type)
     this.restoreStaticViews(worktreeKey, nextStaticViews)
   }

@@ -39,7 +39,7 @@ export const ja: Record<DictKey, string> = {
   'menu.file.open-data-folder.mac': 'Finderでデータフォルダを開く',
   'menu.file.open-data-folder.win': 'エクスプローラーでデータフォルダを開く',
   'menu.file.close-window': 'ウィンドウを閉じる',
-  'menu.file.close-terminal-tab-or-window': 'ターミナルタブまたはウィンドウを閉じる',
+  'menu.file.close-workspace-tab-or-window': 'ワークスペースタブまたはウィンドウを閉じる',
   'menu.file.close-tab': 'リポジトリを閉じる',
   'menu.file.settings': '設定…',
   'menu.file.quit': '終了',
@@ -56,6 +56,7 @@ export const ja: Record<DictKey, string> = {
 
   // ---- Menu — View -------------------------------------------------------
   'menu.view.status': 'ブランチステータス',
+  'menu.view.history': '履歴',
   'menu.view.changes': '変更',
   'menu.view.terminal': 'ターミナル',
   'menu.view.refresh': 'リポジトリを同期',
@@ -663,7 +664,7 @@ export const ja: Record<DictKey, string> = {
   'help.row.clone-repo': 'リポジトリをクローン',
   'help.row.activate-window': 'Goblin ウィンドウを表示',
   'help.row.close-repo': '現在のリポジトリを閉じる',
-  'help.row.close-terminal-tab-or-window': 'ターミナルタブまたはウィンドウを閉じる',
+  'help.row.close-workspace-tab-or-window': 'ワークスペースタブまたはウィンドウを閉じる',
   'help.row.close-window': 'ウィンドウを閉じる',
   'help.row.refresh': 'リポジトリを同期',
   'help.row.reload-page': 'ページを再読み込み',

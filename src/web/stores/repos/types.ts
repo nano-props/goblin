@@ -9,7 +9,7 @@ import type {
 } from '#/web/types.ts'
 import type { RemoteRepoLifecycle, RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { SessionState } from '#/shared/api-types.ts'
-import type { WorkspacePaneBranchViewType, WorkspacePaneView } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneBranchViewType, WorkspacePaneSessionView, WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/repos/branch-action-types.ts'
 import type { RepoOperationsState } from '#/web/stores/repos/operations.ts'
 import type { RepoResourcesState } from '#/web/stores/repos/resources.ts'
@@ -62,11 +62,10 @@ export interface RepoUiState {
   selectedBranch: string | null
   branchViewMode: BranchViewMode
   /**
-   * Branch-scoped workspace pane views opened per branch. When a selected
-   * branch has a worktree, its views are also materialized in the workspace-pane
-   * runtime so they sort with changes/terminal. The per-branch array keeps the
-   * branch-level open intent and the fallback order for branches without a
-   * worktree path.
+   * Branch-owned workspace pane tabs opened per branch. These are projected
+   * directly into the tab strip and are never materialized into the terminal
+   * runtime; worktree-owned tabs (`changes` and terminals) come from the
+   * terminal runtime separately.
    */
   openBranchWorkspacePaneViewsByBranch: Record<string, WorkspacePaneBranchViewType[]>
   /** Branch-scoped selected workspace pane view. Branch switches read this
@@ -159,6 +158,16 @@ export interface RestorableWorkspaceState {
   selectedTerminalByWorktree: Record<string, string>
 }
 
+export interface SessionWorkspacePaneRestoreState {
+  openBranchWorkspacePaneViewsByBranchByRepo: Record<string, Record<string, WorkspacePaneBranchViewType[]>>
+  preferredWorkspacePaneViewByBranchByRepo: Record<string, Record<string, WorkspacePaneSessionView>>
+}
+
+export interface RepoSessionHydrationOptions {
+  signal?: AbortSignal
+  workspacePaneRestoreState?: SessionWorkspacePaneRestoreState
+}
+
 export interface LocalWorkspaceState {
   /** Renderer-only workspace UI state that should never be serialized into
    *  SessionState or treated as restorable workspace state. */
@@ -171,9 +180,6 @@ export interface RestorableWorkspaceActions {
   setActive: (id: string) => void
   applySessionLayoutState: (layout: Pick<SessionState, 'workspaceFocused' | 'workspacePaneSize'>) => void
   applySessionSelectedTerminalState: (selectedTerminalByWorktree: Record<string, string>) => void
-  applySessionWorkspacePaneViewByBranchByRepo: (
-    workspacePaneViewByBranchByRepo: Record<string, Record<string, WorkspacePaneView>>,
-  ) => void
   setWorkspaceFocused: (enabled: boolean) => void
   toggleWorkspaceFocused: () => void
   setWorkspacePaneSize: (size: number) => void
@@ -232,7 +238,11 @@ export interface RuntimeCoherentRepoProjectionActions {
     options?: RepoResultEventOptions,
   ) => void
   clearEvents: (id: string, eventIds: number[]) => void
-  hydrateSession: (openRepos: RepoSessionEntry[], activeRepo: string | null, signal?: AbortSignal) => Promise<void>
+  hydrateSession: (
+    openRepos: RepoSessionEntry[],
+    activeRepo: string | null,
+    options?: RepoSessionHydrationOptions,
+  ) => Promise<void>
   /** Clear the fetchFailed flag — called by manual fetch success and
    *  by an explicit refresh, so a stale badge doesn't follow the user
    *  around forever. */

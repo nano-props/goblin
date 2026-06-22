@@ -13,6 +13,10 @@ import type {
   TerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneStaticViewSummary } from '#/shared/workspace-pane.ts'
+import {
+  WORKSPACE_PANE_WORKTREE_STATIC_VIEW_TYPES,
+  WORKSPACE_PANE_WORKTREE_VIEW_TYPES,
+} from '#/shared/workspace-pane.ts'
 
 const MIN_TERMINAL_COLS = 1
 const MAX_TERMINAL_COLS = 500
@@ -50,8 +54,6 @@ const TERMINAL_SESSION_PHASE_VALUES = [
   'error',
   'closed',
 ] satisfies TerminalSessionPhase[]
-const WORKSPACE_PANE_STATIC_VIEW_TYPES = ['status', 'changes', 'history'] as const
-const WORKSPACE_PANE_VIEW_TYPES = [...WORKSPACE_PANE_STATIC_VIEW_TYPES, 'terminal'] as const
 const TerminalSessionIdSchema = v.pipe(v.string(), v.regex(TERMINAL_SESSION_ID_RE))
 const TerminalAttachmentIdSchema = v.pipe(v.string(), v.regex(TERMINAL_ATTACHMENT_ID_RE))
 const TerminalRequestIdSchema = v.pipe(v.string(), v.regex(TERMINAL_REQUEST_ID_RE))
@@ -85,7 +87,7 @@ const WorkspacePaneListViewsInputSchema = TerminalListSessionsInputSchema
 const WorkspacePaneStaticViewInputSchema = v.object({
   repoRoot: v.string(),
   worktreePath: v.string(),
-  type: v.picklist(WORKSPACE_PANE_STATIC_VIEW_TYPES),
+  type: v.picklist(WORKSPACE_PANE_WORKTREE_STATIC_VIEW_TYPES),
 })
 const TerminalCreateInputSchema = v.object({
   repoRoot: v.string(),
@@ -104,7 +106,7 @@ const WorkspacePaneReorderInputSchema = v.object({
   worktreePath: v.string(),
   orderedViews: v.array(
     v.object({
-      type: v.picklist(WORKSPACE_PANE_VIEW_TYPES),
+      type: v.picklist(WORKSPACE_PANE_WORKTREE_VIEW_TYPES),
       id: v.string(),
     }),
   ),
@@ -128,7 +130,7 @@ const TerminalSessionSummarySchema = v.object({
   displayOrder: v.number(),
 })
 const WorkspacePaneStaticViewSummarySchema = v.object({
-  type: v.picklist(WORKSPACE_PANE_STATIC_VIEW_TYPES),
+  type: v.picklist(WORKSPACE_PANE_WORKTREE_STATIC_VIEW_TYPES),
   id: v.string(),
   worktreePath: v.string(),
   displayOrder: v.number(),

@@ -41,36 +41,20 @@ export interface WorkspacePaneViewContext {
   terminalSessionCount: number
   /** Whether the terminal session registry has finished its first sync. */
   terminalSyncReady: boolean
-  /** True while a `create terminal` IPC is in flight. */
-  terminalPendingCreate?: boolean
 }
 
 /**
- * Resolve the workspace pane view the UI should actually render.
- *
- * The repos store holds the user's preferred view (the persisted intent).
- * Whether that preference is renderable depends on the live context:
- *  - `hasWorktree` describes whether the branch can host worktree-scoped views
- *  - `terminalSessionCount` + `terminalSyncReady` come from the
- *    TerminalSessionRegistry (live terminal context)
- *
- * `syncReady` lets us avoid briefly flashing `status → terminal → status`
- * during boot: until the registry confirms the worktree truth, a
- * `terminal` preference is preserved. Once the first sync settles, an
- * empty worktree dismisses the `terminal` preference.
- *
- * A branch without a worktree still has branch-level status, but no
- * worktree-scoped changes or terminal view; those preferences resolve to
- * `status` at render time.
- *
- * Pure function so it can be unit-tested without React.
+ * Resolve whether the stored preferred view can still be considered as the
+ * current selection. This never substitutes another tab: unavailable views
+ * resolve to null, and the tab projection decides whether a matching tab
+ * actually exists.
  */
-export function computeEffectiveWorkspacePaneView(
+export function resolveWorkspacePaneSelectionView(
   preferred: WorkspacePaneView,
   context: WorkspacePaneViewContext,
-): WorkspacePaneView {
-  if (!context.hasWorktree && workspacePaneViewRequiresWorktree(preferred)) return 'status'
+): WorkspacePaneView | null {
+  if (!context.hasWorktree && workspacePaneViewRequiresWorktree(preferred)) return null
   if (preferred !== 'terminal') return preferred
   if (!context.terminalSyncReady) return 'terminal'
-  return context.terminalSessionCount > 0 || context.terminalPendingCreate ? 'terminal' : 'status'
+  return context.terminalSessionCount > 0 ? 'terminal' : null
 }

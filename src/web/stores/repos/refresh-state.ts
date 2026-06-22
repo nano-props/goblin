@@ -14,6 +14,7 @@ import {
 } from '#/web/stores/repos/resources.ts'
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
 import { stripBranchWorktreeMetadata, worktreeStatesFromBranches } from '#/web/stores/repos/worktree-state.ts'
+import { normalizeBranchWorkspacePaneViewsRecord } from '#/web/stores/repos/branch-workspace-pane-views.ts'
 import { branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 import type { RepoState, ReposGet } from '#/web/stores/repos/types.ts'
@@ -81,6 +82,7 @@ export function applySnapshotToRepoProjection(r: RepoState, snap: RepoSnapshot, 
     return pullRequest && branchPullRequestBelongsToBranch(branch, pullRequest) ? { ...branch, pullRequest } : branch
   })
   const branches = stripBranchWorktreeMetadata(branchesWithSnapshotWorktreeMetadata)
+  const branchNames = branches.map((branch) => branch.name)
   r.data.branches = branches
   r.data.currentBranch = snap.current
   r.data.currentHEAD = snap.currentHEAD
@@ -94,6 +96,10 @@ export function applySnapshotToRepoProjection(r: RepoState, snap: RepoSnapshot, 
   )
   pruneRepoOperationViewsForBranches(r.operations, validBranches)
   r.ui.selectedBranch = selected
+  r.ui.openBranchWorkspacePaneViewsByBranch = normalizeBranchWorkspacePaneViewsRecord(
+    r.ui.openBranchWorkspacePaneViewsByBranch,
+    branchNames,
+  )
   if (snap.remote) {
     r.remote.remotes = snap.remote.remotes.map((remote) => remote.name)
     r.remote.remoteDetails = snap.remote.remotes

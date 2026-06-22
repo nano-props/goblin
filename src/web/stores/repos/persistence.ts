@@ -5,6 +5,7 @@ import { selectedBranchForBranchSet } from '#/web/stores/repos/branch-view-mode.
 import type { RestorableRepoSnapshot, RepoState } from '#/web/stores/repos/types.ts'
 import { finishResourceSuccess } from '#/web/stores/repos/resources.ts'
 import { stripBranchWorktreeMetadata } from '#/web/stores/repos/worktree-state.ts'
+import { normalizeBranchWorkspacePaneViewsRecord } from '#/web/stores/repos/branch-workspace-pane-views.ts'
 const MAX_CACHE_AGE_MS = 14 * 24 * 60 * 60 * 1000
 const MAX_REPOS = 50
 const FiniteNumber = v.pipe(v.number(), v.finite())
@@ -59,6 +60,7 @@ function restoreProjectionFromSnapshot(repo: RepoState, snapshot: RestorableRepo
   }
   if (snapshot.data.branches.length > 0) finishResourceSuccess(resources.snapshot, snapshot.savedAt)
   const branches = cachedBranches(snapshot.data.branches)
+  const branchNames = branches.map((branch) => branch.name)
   return {
     ...repo,
     name: snapshot.name || repo.name,
@@ -72,6 +74,10 @@ function restoreProjectionFromSnapshot(repo: RepoState, snapshot: RestorableRepo
       ...repo.ui,
       selectedBranch,
       branchViewMode: snapshot.ui.branchViewMode,
+      openBranchWorkspacePaneViewsByBranch: normalizeBranchWorkspacePaneViewsRecord(
+        repo.ui.openBranchWorkspacePaneViewsByBranch,
+        branchNames,
+      ),
     },
     projection: {
       source: 'cache',

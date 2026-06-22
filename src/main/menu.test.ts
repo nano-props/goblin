@@ -234,20 +234,20 @@ describe('app menu actions', () => {
     expect(remoteItem?.accelerator).toBe('CmdOrCtrl+Shift+R')
   })
 
-  test('wires fixed terminal tab, repository, and window close actions', async () => {
+  test('wires fixed workspace tab, repository, and window close actions', async () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
 
     buildAppMenu()
 
     const fileMenu = mocks.template.find((entry) => entry.label === 'menu.file')
     const newTerminalItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'terminal.new')
-    const closeTerminalItem = fileMenu?.submenu?.find(
-      (entry: any) => entry.label === 'menu.file.close-terminal-tab-or-window',
+    const closeWorkspaceTabItem = fileMenu?.submenu?.find(
+      (entry: any) => entry.label === 'menu.file.close-workspace-tab-or-window',
     )
     const closeViewItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.close-tab')
     const closeWindowItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.close-window')
     expect(newTerminalItem?.accelerator).toBe('CmdOrCtrl+N')
-    expect(closeTerminalItem?.accelerator).toBe('CmdOrCtrl+W')
+    expect(closeWorkspaceTabItem?.accelerator).toBe('CmdOrCtrl+W')
     expect(closeViewItem?.accelerator).toBe('CmdOrCtrl+Shift+W')
     expect(closeWindowItem?.accelerator).toBeUndefined()
   })
@@ -259,6 +259,7 @@ describe('app menu actions', () => {
 
     const viewMenu = mocks.template.find((entry) => entry.label === 'menu.view')
     const statusItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.status')
+    const historyItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.history')
     const changesItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.changes')
     const terminalItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.terminal')
     const focusModeItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'workspace.focus-toggle-label')
@@ -267,6 +268,7 @@ describe('app menu actions', () => {
     const oldPrimaryItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.terminal-primary-action')
 
     expect(statusItem?.accelerator).toBeUndefined()
+    expect(historyItem?.accelerator).toBeUndefined()
     expect(changesItem?.accelerator).toBeUndefined()
     expect(terminalItem?.accelerator).toBeUndefined()
     expect(focusModeItem?.accelerator).toBe('CmdOrCtrl+B')

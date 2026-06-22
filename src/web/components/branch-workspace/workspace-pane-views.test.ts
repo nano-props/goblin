@@ -16,24 +16,6 @@ const changesTab: WorkspacePaneViewSummary = {
   displayOrder: 2,
 }
 
-const statusTab: WorkspacePaneViewSummary = {
-  type: 'status',
-  id: 'status',
-  key: 'status',
-  worktreeTerminalKey: '/repo\0/worktree',
-  worktreePath: '/worktree',
-  displayOrder: 1,
-}
-
-const historyTab: WorkspacePaneViewSummary = {
-  type: 'history',
-  id: 'history',
-  key: 'history',
-  worktreeTerminalKey: '/repo\0/worktree',
-  worktreePath: '/worktree',
-  displayOrder: 3,
-}
-
 const t = (key: string, params?: Record<string, string | number>) => {
   if (key === 'tab.status') return '状态'
   if (key === 'tab.log') return '历史'
@@ -61,22 +43,6 @@ describe('branchWorkspacePaneViewLabel', () => {
 })
 
 describe('branchWorkspacePaneViewTooltip', () => {
-  test('appends the branch name to the status tooltip when a branch is selected', () => {
-    expect(
-      branchWorkspacePaneViewTooltip({ tab: statusTab, branchName: 'feature/foo', statusCount: 0, t }),
-    ).toBe('状态 · feature/foo')
-  })
-
-  test('falls back to the plain status label when no branch is selected', () => {
-    expect(branchWorkspacePaneViewTooltip({ tab: statusTab, branchName: '', statusCount: 0, t })).toBe('状态')
-  })
-
-  test('appends the branch name to the history tooltip when a branch is selected', () => {
-    expect(
-      branchWorkspacePaneViewTooltip({ tab: historyTab, branchName: 'main', statusCount: 0, t }),
-    ).toBe('历史 · main')
-  })
-
   test('passes the changes count through to the changes tooltip', () => {
     expect(
       branchWorkspacePaneViewTooltip({ tab: changesTab, branchName: 'main', statusCount: 7, t }),

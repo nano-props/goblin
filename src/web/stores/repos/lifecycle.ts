@@ -1,5 +1,5 @@
 import pLimit from 'p-limit'
-import type { ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
+import type { RepoSessionHydrationOptions, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
 import {
   insertPlaceholderRepo,
   addResolvedRepo,
@@ -11,6 +11,7 @@ import {
 import { runRemoteRepoLifecycle } from '#/web/stores/repos/remote-lifecycle-orchestrator.ts'
 import { activeRepoIdAfterWorkspaceHydration } from '#/web/open-workspace-state.ts'
 import { isRemoteRepoId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
+import { restoreSessionWorkspacePaneStateInRepos } from '#/web/stores/repos/workspace-pane-session-restore.ts'
 
 interface InitialRepoRefresh {
   id: string
@@ -23,7 +24,12 @@ const SESSION_PROBE_CONCURRENCY = 4
 
 function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet): RestorableWorkspaceLifecycleActions {
   return {
-    async hydrateSession(openRepos: RepoSessionEntry[], activeRepo: string | null, signal?: AbortSignal) {
+    async hydrateSession(
+      openRepos: RepoSessionEntry[],
+      activeRepo: string | null,
+      options?: RepoSessionHydrationOptions,
+    ) {
+      const { signal, workspacePaneRestoreState } = options ?? {}
       // Boot/session restore of workspace membership and active repository. This
       // reopens what SessionState described, but does not subscribe the repos
       // store to future session writes from persistence.
@@ -77,6 +83,11 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
             managedActiveId,
           )
           if (s.activeId === null || s.activeId === managedActiveId) managedActiveId = nextActiveId
+        }
+        const restoredRepos = restoreSessionWorkspacePaneStateInRepos(nextRepos, workspacePaneRestoreState)
+        if (restoredRepos !== nextRepos) {
+          changed = true
+          nextRepos = restoredRepos
         }
         if (!changed) return s
         return { repos: nextRepos, order: nextOrder, activeId: nextActiveId }

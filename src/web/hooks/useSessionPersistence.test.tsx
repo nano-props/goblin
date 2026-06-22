@@ -38,7 +38,7 @@ describe('useSessionPersistence', () => {
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
-      workspacePaneView: 'terminal',
+      preferredWorkspacePaneView: 'terminal',
     })
     useReposStore.setState({
       repos: { [repo.id]: repo },
@@ -58,6 +58,33 @@ describe('useSessionPersistence', () => {
         activeRepo: '/tmp/repo',
         selectedTerminalByWorktree: {
           '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2',
+        },
+        openBranchWorkspacePaneViewsByBranchByRepo: {
+          '/tmp/repo': {
+            'feature/worktree': ['status'],
+          },
+        },
+      }),
+    )
+  })
+
+  test('persists explicitly closed branch workspace tabs as empty arrays', async () => {
+    const repo = seedRepoState({
+      id: '/tmp/repo',
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
+      selectedBranch: 'feature/worktree',
+      preferredWorkspacePaneView: 'status',
+    })
+    useReposStore.getState().closeBranchWorkspacePaneView(repo.id, 'status', 'feature/worktree')
+
+    await render(<Harness />)
+
+    expect(persistSessionStateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        openBranchWorkspacePaneViewsByBranchByRepo: {
+          '/tmp/repo': {
+            'feature/worktree': [],
+          },
         },
       }),
     )

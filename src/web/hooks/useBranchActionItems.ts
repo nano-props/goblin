@@ -110,7 +110,7 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
   })()
 
   const openStaticWorkspacePaneView = (type: WorkspacePaneBranchViewType | WorkspacePaneStaticViewType) => {
-    openWorkspacePaneView({
+    void openWorkspacePaneView({
       repoId: repo.id,
       branchName: branch.name,
       worktreePath: branch.worktree?.path,

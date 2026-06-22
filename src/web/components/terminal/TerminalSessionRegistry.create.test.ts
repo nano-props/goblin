@@ -387,19 +387,6 @@ describe('TerminalSessionRegistry create flow', () => {
     ])
   })
 
-  test('opens status through the same static workspace pane bridge action', async () => {
-    await expect(registry.openWorkspacePaneView(WORKTREE_KEY, 'status')).resolves.toBe(true)
-
-    expect(mocks.openViewMock).toHaveBeenCalledWith({
-      repoRoot: REPO_ROOT,
-      worktreePath: WORKTREE_PATH,
-      type: 'status',
-    })
-    expect(
-      registry.worktreeSnapshot(WORKTREE_KEY).staticWorkspacePaneViews.map((tab) => `${tab.type}:${tab.id}`),
-    ).toEqual(['status:status'])
-  })
-
   test('rolls back optimistic static workspace pane view open when the bridge rejects it', async () => {
     mocks.openViewMock.mockResolvedValueOnce(false)
 
@@ -425,13 +412,12 @@ describe('TerminalSessionRegistry create flow', () => {
   test('rejects reorder payloads that would create an unopened static workspace pane view', async () => {
     const terminalKey = `${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-1`
     registry.reconcileServerSessions(REPO_ROOT, makeCreateResult().sessions as any, 'attachment_local', new Map())
+    const invalidStatusOrder = [
+      { type: 'status', id: 'status' },
+      { type: 'terminal', id: terminalKey },
+    ] as unknown as Parameters<typeof registry.reorderWorkspacePaneViews>[1]
 
-    await expect(
-      registry.reorderWorkspacePaneViews(WORKTREE_KEY, [
-        { type: 'status', id: 'status' },
-        { type: 'terminal', id: terminalKey },
-      ]),
-    ).resolves.toBe(false)
+    await expect(registry.reorderWorkspacePaneViews(WORKTREE_KEY, invalidStatusOrder)).resolves.toBe(false)
 
     expect(mocks.reorderMock).not.toHaveBeenCalled()
     expect(registry.worktreeSnapshot(WORKTREE_KEY).staticWorkspacePaneViews).toEqual([])

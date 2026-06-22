@@ -22,7 +22,7 @@ describe('helpShortcutSections', () => {
     expect(nav?.find((row) => row.labelKey === 'help.row.prev-repo')?.combos).toEqual([['⌃', '[']])
     expect(view?.find((row) => row.labelKey === 'help.row.select-workspace-tab')?.combos[8]).toEqual(['⌃', '9'])
     expect(view?.find((row) => row.labelKey === 'workspace.focus-toggle-label')?.combos).toEqual([['⌃', 'B']])
-    expect(app?.find((row) => row.labelKey === 'help.row.close-terminal-tab-or-window')?.combos).toEqual([['⌃', 'W']])
+    expect(app?.find((row) => row.labelKey === 'help.row.close-workspace-tab-or-window')?.combos).toEqual([['⌃', 'W']])
     expect(app?.find((row) => row.labelKey === 'help.row.close-repo')?.combos).toEqual([['⌃', '⇧', 'W']])
     expect(app?.find((row) => row.labelKey === 'help.row.settings')?.combos).toEqual([['⌃', ',']])
   })

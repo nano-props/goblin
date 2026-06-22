@@ -7,8 +7,8 @@ import { branch, REPO_ID, resetRefreshTest, ipcHandlers, seedRepo } from '#/web/
 import { seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
 import {
-  selectedWorkspacePaneViewForBranch,
-  workspacePaneViewByBranchRecordWith,
+  preferredWorkspacePaneViewForBranch,
+  preferredWorkspacePaneViewByBranchRecordWith,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import type { LogEntry, WorktreeStatus } from '#/web/types.ts'
 beforeEach(resetRefreshTest)
@@ -806,12 +806,16 @@ describe('core refresh request ordering', () => {
 
   test('snapshot refresh preserves the terminal preference when the selected branch has no worktree', async () => {
     // The store never re-projects the preferred tab. Whether the terminal
-    // tab is renderable is decided at read time by `useEffectiveWorkspacePaneView`,
-    // which inspects the active branch's worktree + terminal session count.
+    // tab is renderable is decided at read time by the workspace pane tab
+    // model, which inspects the active branch's worktree + terminal session count.
     const token = seedRepo([branch('main', undefined, { worktree: { path: '/repo' } }), branch('feature/a')])
     updateRepoForTest((repo) => {
       repo.ui.selectedBranch = 'feature/a'
-      repo.ui.preferredWorkspacePaneViewByBranch = workspacePaneViewByBranchRecordWith(repo.ui, 'feature/a', 'terminal')
+      repo.ui.preferredWorkspacePaneViewByBranch = preferredWorkspacePaneViewByBranchRecordWith(
+        repo.ui,
+        'feature/a',
+        'terminal',
+      )
     })
     ipcHandlers['repo.snapshot'] = async () => ({ branches: [branch('feature/a')], current: 'feature/a' })
 
@@ -819,7 +823,7 @@ describe('core refresh request ordering', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.selectedBranch).toBe('feature/a')
-    expect(repo ? selectedWorkspacePaneViewForBranch(repo.ui, 'feature/a') : null).toBe('terminal')
+    expect(repo ? preferredWorkspacePaneViewForBranch(repo.ui, 'feature/a') : null).toBe('terminal')
   })
 
   test('snapshot refresh prunes terminal sessions to current worktree paths', async () => {

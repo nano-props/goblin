@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '#/web/stores/i18n.ts'
@@ -7,20 +7,21 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
 import { terminalLog } from '#/web/logger.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
-import { useWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-store.ts'
+import {
+  useTerminalRepoSyncReady,
+  useWorktreeTerminalSnapshot,
+} from '#/web/components/terminal/terminal-session-store.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import {
   WorkspacePaneViewStrip,
   EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY,
   createBranchWorkspacePaneTabItem,
   createWorktreeWorkspacePaneTabItem,
-  isBranchWorkspacePaneTabItem,
-  isTerminalWorkspacePaneTabItem,
   isWorktreeWorkspacePaneTabItem,
   type WorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
-import type { WorkspacePaneBranchViewType, WorkspacePaneViewOrderEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneBranchViewType, WorkspacePaneWorktreeViewOrderEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneViewSummary, TerminalSessionBase } from '#/web/components/terminal/types.ts'
 import type {
   BranchWorkspaceRepo,
@@ -37,12 +38,12 @@ import {
 } from '#/web/components/branch-workspace/workspace-pane-views.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
-import { useEffectiveWorkspacePaneView } from '#/web/components/branch-workspace/useEffectiveWorkspacePaneView.ts'
 import { useIsInitialSyncInFlight } from '#/web/stores/repo-sync.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
-import { isBranchLevelWorkspacePaneView } from '#/web/lib/workspace-pane-view.ts'
-import { selectedWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
+import { createBranchWorkspacePaneTabModel } from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
 
 interface Props {
   repo: Pick<BranchWorkspaceRepo, 'id' | 'ui' | 'data'>
@@ -55,72 +56,56 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
   const navigation = useMainWindowNavigation()
   const compact = useIsCompactUi()
   const clearSelectedBranch = useReposStore((s) => s.clearSelectedBranch)
-  const effectiveTab = useEffectiveWorkspacePaneView(repo)
-  // T6.1: while the first server-side session list for this repo is
-  // in flight, render skeleton placeholder chips in the tab strip.
-  // Hooks into the existing repo-sync store which the Provider
-  // updates via markReady() at the end of every syncServerSessions.
+  // While the first server-side session list for this repo is in flight,
+  // keep the New Terminal affordance visible but busy. Hooks into the
+  // repo-sync store which the Provider updates via markReady() at the end
+  // of every syncServerSessions.
   const isInitialSyncInFlight = useIsInitialSyncInFlight(repo.id)
   const terminalWorktreeKey = detail.branch?.worktree?.path
     ? worktreeTerminalKey(repo.id, detail.branch.worktree.path)
     : null
   const branchName = detail.branch?.name ?? null
-  const selectedWorkspacePaneView = selectedWorkspacePaneViewForBranch(repo.ui, branchName)
+  const worktreePath = detail.branch?.worktree?.path ?? null
+  const preferredWorkspacePaneView = preferredWorkspacePaneViewForBranch(repo.ui, branchName)
   const showBranchLevelTabs = !!detail.branch
 
-  const {
-    createTerminal,
-    selectTerminal,
-    scrollToBottom,
-    closeTerminalByDescriptor,
-    openWorkspacePaneView,
-    closeWorkspacePaneView,
-    reorderWorkspacePaneViews,
-  } = useTerminalSessionContext()
+  const { createTerminal, selectTerminal, scrollToBottom, reorderWorkspacePaneViews } = useTerminalSessionContext()
 
   const worktreeSnapshot = useWorktreeTerminalSnapshot(terminalWorktreeKey)
+  const terminalSyncReady = useTerminalRepoSyncReady(repo.id)
   const runtimeWorkspacePaneViews = worktreeSnapshot.workspacePaneViews
   const openBranchWorkspacePaneViews = useMemo(
     () => branchWorkspacePaneViewsForBranch(repo.ui, branchName),
     [branchName, repo.ui.openBranchWorkspacePaneViewsByBranch],
   )
-  const openBranchLevelTabs = useMemo(
-    () => branchLevelWorkspacePaneViewDefinitions(openBranchWorkspacePaneViews),
-    [openBranchWorkspacePaneViews],
-  )
-  const worktreeWorkspacePaneViews = useMemo<WorkspacePaneViewSummary[]>(() => {
-    if (!terminalWorktreeKey || !detail.branch?.worktree?.path) return runtimeWorkspacePaneViews
-    const openBranchTypes = new Set(openBranchLevelTabs.map((tab) => tab.type))
-    const runtimeBranchTypes = runtimeWorkspacePaneViews.flatMap((view) => {
-      return isBranchLevelWorkspacePaneView(view.type) ? [view.type] : []
-    })
-    const hasSameBranchRuntimeSet =
-      runtimeBranchTypes.length === openBranchTypes.size &&
-      runtimeBranchTypes.every((type) => openBranchTypes.has(type))
-    if (hasSameBranchRuntimeSet) return runtimeWorkspacePaneViews
-
-    const runtimeBranchViewsByType = new Map(
-      runtimeWorkspacePaneViews.flatMap((view) => {
-        return isBranchLevelWorkspacePaneView(view.type) ? [[view.type, view] as const] : []
+  const workspacePaneTabModel = useMemo(
+    () =>
+      createBranchWorkspacePaneTabModel({
+        repoId: repo.id,
+        branchName,
+        worktreePath,
+        preferredView: preferredWorkspacePaneView,
+        openBranchViews: openBranchWorkspacePaneViews,
+        runtimeWorktreeViews: runtimeWorkspacePaneViews,
+        terminalSessionCount: worktreeSnapshot.count,
+        terminalSyncReady,
       }),
-    )
-    const branchStaticViews = openBranchLevelTabs.map((tab, index) => {
-      const runtimeView = runtimeBranchViewsByType.get(tab.type)
-      if (runtimeView) return runtimeView
-      return {
-        type: tab.type,
-        id: tab.type,
-        key: tab.type,
-        worktreeTerminalKey: terminalWorktreeKey,
-        worktreePath: detail.branch!.worktree!.path,
-        displayOrder: index,
-      }
-    })
-    return [
-      ...branchStaticViews,
-      ...runtimeWorkspacePaneViews.filter((view) => !isBranchLevelWorkspacePaneView(view.type)),
-    ]
-  }, [detail.branch, openBranchLevelTabs, runtimeWorkspacePaneViews, terminalWorktreeKey])
+    [
+      branchName,
+      openBranchWorkspacePaneViews,
+      repo.id,
+      runtimeWorkspacePaneViews,
+      preferredWorkspacePaneView,
+      terminalSyncReady,
+      worktreePath,
+      worktreeSnapshot.count,
+    ],
+  )
+  const openBranchLevelTabs = useMemo(
+    () => branchLevelWorkspacePaneViewDefinitions(workspacePaneTabModel.openBranchViews),
+    [workspacePaneTabModel.openBranchViews],
+  )
+  const worktreeWorkspacePaneViews = workspacePaneTabModel.worktreeViews
   const workspacePaneTabFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()
 
   const terminalBase = useMemo<TerminalSessionBase | null>(
@@ -136,12 +121,12 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
   // uncollapse the pane. Callers add their own follow-up command
   // (create/select/scroll). Whether the terminal view is *renderable*
   // (worktree + sessions) is decided at read time by
-  // `useEffectiveWorkspacePaneView` — we only assert user intent here.
+  // the shared workspace pane tab model — we only assert user intent here.
   const enterTerminalTab = useCallback(() => {
-    if (selectedWorkspacePaneView !== 'terminal') {
+    if (preferredWorkspacePaneView !== 'terminal') {
       navigation.showRepoWorkspacePaneView(repo.id, 'terminal')
     }
-  }, [navigation, repo.id, selectedWorkspacePaneView])
+  }, [navigation, repo.id, preferredWorkspacePaneView])
 
   const handleNewTerminal = useCallback(() => {
     if (!terminalBase) return
@@ -178,15 +163,10 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
   )
 
   const handleReorderWorkspacePaneViewStrip = useCallback(
-    (worktreeKey: string, orderedViews: WorkspacePaneViewOrderEntry[]) => {
-      const branchViews = orderedViews.map((entry) => entry.type).filter(isBranchLevelWorkspacePaneView)
-      void reorderWorkspacePaneViews(worktreeKey, orderedViews).then((reordered) => {
-        if (reordered && branchName && branchViews.length > 0) {
-          useReposStore.getState().reorderBranchWorkspacePaneViews(repo.id, branchViews, branchName)
-        }
-      })
+    (worktreeKey: string, orderedViews: WorkspacePaneWorktreeViewOrderEntry[]) => {
+      void reorderWorkspacePaneViews(worktreeKey, orderedViews)
     },
-    [branchName, reorderWorkspacePaneViews, repo.id],
+    [reorderWorkspacePaneViews],
   )
   const handleReorderBranchWorkspacePaneViewStrip = useCallback(
     (orderedViews: WorkspacePaneBranchViewType[]) => {
@@ -194,14 +174,6 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
     },
     [branchName, repo.id],
   )
-
-  useEffect(() => {
-    if (!terminalWorktreeKey) return
-    for (const tab of openBranchLevelTabs) {
-      if (runtimeWorkspacePaneViews.some((view) => view.type === tab.type)) continue
-      void openWorkspacePaneView(terminalWorktreeKey, tab.type)
-    }
-  }, [openBranchLevelTabs, openWorkspacePaneView, runtimeWorkspacePaneViews, terminalWorktreeKey])
 
   const labelForWorkspacePaneView = useCallback(
     (tab: WorkspacePaneViewSummary) => branchWorkspacePaneViewLabel(tab, t, detail.statusCount),
@@ -233,7 +205,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
 
   const workspacePaneTabItems = useMemo<WorkspacePaneTabItem[]>(
     () => [
-      ...(showBranchLevelTabs && !terminalWorktreeKey
+      ...(showBranchLevelTabs
         ? openBranchLevelTabs.map((tab) => {
             const label = branchLevelWorkspacePaneViewLabel(tab.type, t)
             return createBranchWorkspacePaneTabItem({
@@ -260,7 +232,6 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
       labelForWorkspacePaneView,
       openBranchLevelTabs,
       showBranchLevelTabs,
-      terminalWorktreeKey,
       t,
       tooltipForBranchLevelPaneView,
       tooltipForWorkspacePaneView,
@@ -268,13 +239,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
       worktreeWorkspacePaneViews,
     ],
   )
-  const activeTabIdentity = useMemo(() => {
-    const activeItem = workspacePaneTabItems.find((item) => {
-      if (effectiveTab === 'terminal') return isTerminalWorkspacePaneTabItem(item) && item.view.selected
-      return item.type === effectiveTab
-    })
-    return activeItem?.identity ?? null
-  }, [effectiveTab, workspacePaneTabItems])
+  const activeTabIdentity = workspacePaneTabModel.activeTab?.identity ?? null
   const handleSelectWorkspacePaneTabItem = useCallback(
     (item: WorkspacePaneTabItem) => {
       if (
@@ -291,54 +256,13 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
   )
   const handleCloseWorkspacePaneView = useCallback(
     (item: WorkspacePaneTabItem) => {
-      const nextItem = nextWorkspacePaneTabItemAfterClose(workspacePaneTabItems, item.identity)
-      const isActive = activeTabIdentity === item.identity
-
-      if (isBranchWorkspacePaneTabItem(item)) {
-        if (!branchName) return
-        useReposStore.getState().closeBranchWorkspacePaneView(repo.id, item.branchViewType, branchName)
-      } else if (item.view.type === 'terminal') {
-        if (!terminalBase) return
-        closeTerminalByDescriptor(item.view.key, terminalBase)
-      } else {
-        const branchViewType = isBranchLevelWorkspacePaneView(item.view.type) ? item.view.type : null
-        const currentRepo = useReposStore.getState().repos[repo.id]
-        const previousBranchViews =
-          branchViewType && currentRepo && branchName
-            ? branchWorkspacePaneViewsForBranch(currentRepo.ui, branchName)
-            : []
-        if (branchViewType) {
-          if (!branchName) return
-          useReposStore.getState().closeBranchWorkspacePaneView(repo.id, branchViewType, branchName)
-        }
-        if (!terminalWorktreeKey) return
-        void closeWorkspacePaneView(terminalWorktreeKey, item.view.type)
-          .then((closed) => {
-            if (!closed && branchViewType && branchName) {
-              restoreBranchWorkspacePaneViews(repo.id, branchName, previousBranchViews)
-            }
-          })
-          .catch((err) => {
-            terminalLog.warn('failed to close workspace pane view', { err, type: item.view.type })
-            if (branchViewType && branchName) restoreBranchWorkspacePaneViews(repo.id, branchName, previousBranchViews)
-          })
-      }
-
-      if (isActive && nextItem) {
-        showWorkspacePaneTabItem(nextItem)
-      }
+      void runCloseWorkspacePaneTabCommand({
+        repoId: repo.id,
+        targetIdentity: item.identity,
+        navigation,
+      })
     },
-    [
-      activeTabIdentity,
-      closeTerminalByDescriptor,
-      closeWorkspacePaneView,
-      branchName,
-      repo.id,
-      showWorkspacePaneTabItem,
-      terminalBase,
-      terminalWorktreeKey,
-      workspacePaneTabItems,
-    ],
+    [navigation, repo.id],
   )
 
   // No selected branch means there is no tab/action target; BranchWorkspaceContent renders the empty state.
@@ -375,11 +299,10 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
             leadingAction={branchWorkspaceBackAction}
             focusRegistry={workspacePaneTabFocusRegistry}
             emptyFocusKey={EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY}
-            // T6.1: while the first server-side session list is in
-            // flight (mount or repo switch), show a single placeholder
-            // chip instead of the lone "+ New" button — the user gets
-            // a visible signal that the strip is loading, not broken.
-            isLoading={isInitialSyncInFlight}
+            // While terminal sync/create is in flight, the New Terminal
+            // button itself shows the busy state. The tab strip never
+            // receives a pseudo loading tab.
+            newTerminalBusy={isInitialSyncInFlight || worktreeSnapshot.pendingCreate}
             onNew={handleNewTerminal}
             onSelect={handleSelectWorkspacePaneTabItem}
             onScrollToBottom={handleScrollToBottom}
@@ -394,32 +317,9 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
   )
 }
 
-function nextWorkspacePaneTabItemAfterClose(
-  items: WorkspacePaneTabItem[],
-  closingIdentity: string,
-): WorkspacePaneTabItem | null {
-  const index = items.findIndex((item) => item.identity === closingIdentity)
-  if (index === -1) return items[0] ?? null
-  return items[index + 1] ?? items[index - 1] ?? null
-}
-
 function branchLevelWorkspacePaneViewDefinitions(openViews: readonly WorkspacePaneBranchViewType[]) {
   return openViews.flatMap((type) => {
     const tab = branchLevelWorkspacePaneViewDefinition(type)
     return tab ? [tab] : []
   })
-}
-
-function restoreBranchWorkspacePaneViews(
-  repoId: string,
-  branchName: string,
-  previousViews: WorkspacePaneBranchViewType[],
-): void {
-  if (previousViews.length === 0) return
-  const store = useReposStore.getState()
-  if (store.repos[repoId]?.ui.selectedBranch !== branchName) return
-  for (const view of previousViews) {
-    store.openBranchWorkspacePaneView(repoId, view, branchName)
-  }
-  store.reorderBranchWorkspacePaneViews(repoId, previousViews, branchName)
 }

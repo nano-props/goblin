@@ -13,6 +13,7 @@ import {
   resetReposStore,
   seedRepoState,
 } from '#/web/stores/repos/test-utils.ts'
+import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 
 const repoClientMocks = vi.hoisted(() => ({
   getRepositoryLog: vi.fn(),
@@ -31,6 +32,7 @@ const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENV
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
+  useRepoSyncStore.setState({ ready: new Map(), timestamps: new Map() })
   repoClientMocks.getRepositoryLog.mockResolvedValue([])
   container = document.createElement('div')
   document.body.append(container)
@@ -60,7 +62,7 @@ describe('BranchWorkspaceContent', () => {
         }),
       ],
       selectedBranch: 'feature/changes',
-      workspacePaneView: 'changes',
+      preferredWorkspacePaneView: 'changes',
       openBranchWorkspacePaneViews: ['status'],
       statusLoaded: true,
       status: [
@@ -137,7 +139,7 @@ describe('BranchWorkspaceContent', () => {
         }),
       ],
       selectedBranch: 'feature/no-worktree',
-      workspacePaneView: 'status',
+      preferredWorkspacePaneView: 'status',
     })
     const detail = getSelectedBranchWorkspacePresentation(repo)
 
@@ -168,7 +170,7 @@ describe('BranchWorkspaceContent', () => {
         }),
       ],
       selectedBranch: 'feature/no-worktree',
-      workspacePaneView: 'status',
+      preferredWorkspacePaneView: 'status',
       openBranchWorkspacePaneViews: [],
     })
     const detail = getSelectedBranchWorkspacePresentation(repo)
@@ -185,12 +187,60 @@ describe('BranchWorkspaceContent', () => {
     expect(container?.textContent).toContain('workspace-pane-views.empty')
   })
 
-  test('does not render history on a branch that did not open it', async () => {
+  test('does not render status for a worktree-scoped preference on a branch without a worktree', () => {
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/no-worktree')],
+      selectedBranch: 'feature/no-worktree',
+      preferredWorkspacePaneView: 'terminal',
+      openBranchWorkspacePaneViews: ['status'],
+    })
+    const detail = getSelectedBranchWorkspacePresentation(repo)
+
+    act(() => {
+      root!.render(
+        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+          <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+        </TerminalSessionReadContext.Provider>,
+      )
+    })
+
+    expect(container?.querySelector('#workspace-status-panel')).toBeNull()
+    expect(container?.querySelector('#workspace-terminal-panel')).toBeNull()
+    expect(container?.textContent).toContain('workspace-pane-views.empty')
+  })
+
+  test('does not render status when terminal is preferred but sync confirms no terminal tabs', () => {
+    const worktreePath = '/tmp/terminal-empty-worktree'
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/terminal-empty', { worktree: { path: worktreePath } })],
+      selectedBranch: 'feature/terminal-empty',
+      preferredWorkspacePaneView: 'terminal',
+      openBranchWorkspacePaneViews: ['status'],
+    })
+    useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
+    const detail = getSelectedBranchWorkspacePresentation(repo)
+
+    act(() => {
+      root!.render(
+        <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
+          <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+        </TerminalSessionReadContext.Provider>,
+      )
+    })
+
+    expect(container?.querySelector('#workspace-status-panel')).toBeNull()
+    expect(container?.querySelector('#workspace-terminal-panel')).toBeNull()
+    expect(container?.textContent).toContain('workspace-pane-views.empty')
+  })
+
+  test('does not select another tab when the preferred branch tab is closed', async () => {
     const repo = seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/a'), createRepoBranch('feature/b')],
       selectedBranch: 'feature/b',
-      workspacePaneView: 'history',
+      preferredWorkspacePaneView: 'history',
       openBranchWorkspacePaneViewsByBranch: {
         'feature/a': ['status', 'history'],
       },
@@ -206,8 +256,9 @@ describe('BranchWorkspaceContent', () => {
     })
     await flushAsyncWork()
 
-    expect(container?.querySelector('#workspace-status-panel')).not.toBeNull()
+    expect(container?.querySelector('#workspace-status-panel')).toBeNull()
     expect(container?.querySelector('#workspace-history-panel')).toBeNull()
+    expect(container?.textContent).toContain('workspace-pane-views.empty')
     expect(repoClientMocks.getRepositoryLog).not.toHaveBeenCalled()
   })
 
@@ -226,7 +277,7 @@ describe('BranchWorkspaceContent', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/history')],
       selectedBranch: 'feature/history',
-      workspacePaneView: 'history',
+      preferredWorkspacePaneView: 'history',
       openBranchWorkspacePaneViews: ['status', 'history'],
     })
     const detail = getSelectedBranchWorkspacePresentation(repo)
@@ -275,12 +326,12 @@ describe('BranchWorkspaceContent', () => {
     )
   })
 
-  test('labels worktree history fallback panels with the matching fallback tab id', async () => {
+  test('labels worktree history panels with the branch-owned tab id', async () => {
     const repo = seedRepoState({
       id: REPO_ID,
       branches: [createRepoBranch('feature/history', { worktree: { path: '/tmp/history-worktree' } })],
       selectedBranch: 'feature/history',
-      workspacePaneView: 'history',
+      preferredWorkspacePaneView: 'history',
       openBranchWorkspacePaneViews: ['status', 'history'],
     })
     const detail = getSelectedBranchWorkspacePresentation(repo)
@@ -295,7 +346,7 @@ describe('BranchWorkspaceContent', () => {
     await flushAsyncWork()
 
     expect(container?.querySelector('#workspace-history-panel')?.getAttribute('aria-labelledby')).toBe(
-      'workspace-workspace-pane-view-1',
+      'workspace-history-tab',
     )
   })
 
@@ -305,7 +356,7 @@ describe('BranchWorkspaceContent', () => {
       id: REPO_ID,
       branches: [createRepoBranch('feature/history')],
       selectedBranch: 'feature/history',
-      workspacePaneView: 'history',
+      preferredWorkspacePaneView: 'history',
       openBranchWorkspacePaneViews: ['history'],
     })
     const detail = getSelectedBranchWorkspacePresentation(repo)
