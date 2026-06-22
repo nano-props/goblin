@@ -16,9 +16,16 @@ import { CLIPBOARD_TEMP_FILE_MAX_AGE_MS, PASTE_FILE_MAX_BYTES } from '#/shared/c
  */
 
 const TEMP_DIR_NAME = `clipboard-tmp-${process.pid}`
+const WINDOWS_RESERVED_FILE_STEM_RE = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/i
 
 export function clipboardTempDir(): string {
   return path.join(serverDataDir(), TEMP_DIR_NAME)
+}
+
+function avoidWindowsReservedBaseName(base: string): string {
+  const dot = base.lastIndexOf('.')
+  const stem = (dot > 0 ? base.slice(0, dot) : base).replace(/\.+$/g, '')
+  return WINDOWS_RESERVED_FILE_STEM_RE.test(stem) ? `_${base}` : base
 }
 
 function sanitizeBaseName(name: string): string {
@@ -29,7 +36,7 @@ function sanitizeBaseName(name: string): string {
     .basename(name)
     .replace(/[<>:"/\\|?*\x00-\x1f\x7f-\x9f]/g, '_')
     .trim()
-  return base.length > 0 ? base : 'clipboard.bin'
+  return base.length > 0 ? avoidWindowsReservedBaseName(base) : 'clipboard.bin'
 }
 
 // Process-level monotonically increasing counter. The previous
@@ -112,6 +119,9 @@ export async function pruneExpiredClipboardTempFiles(
   now = Date.now(),
   maxAgeMs = CLIPBOARD_TEMP_FILE_MAX_AGE_MS,
 ): Promise<void> {
+  // Server-written blobs live under `serverDataDir()`, which can persist
+  // across restarts and reboots; this age cap bounds durable growth in
+  // addition to startup cleanup of previous-process dirs.
   const dir = clipboardTempDir()
   let entries: string[]
   try {

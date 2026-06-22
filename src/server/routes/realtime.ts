@@ -8,7 +8,7 @@ import {
 import { createAccessTokenMiddleware } from '#/server/common/auth.ts'
 import { ownerIdFromContext } from '#/server/common/identity.ts'
 import { errorJson } from '#/server/common/responses.ts'
-import { TERMINAL_WS_MESSAGE_LIMIT_BYTES } from '#/shared/terminal-validators.ts'
+import { isTerminalWsMessageWithinLimit } from '#/shared/terminal-validators.ts'
 import type { ServerTerminalHost, ServerTerminalSocket } from '#/server/terminal/terminal-host.ts'
 
 interface RealtimeRouteOptions {
@@ -37,26 +37,22 @@ export function createRealtimeRoutes({ accessToken, terminalHost }: RealtimeRout
 
   const app = new Hono()
   app.use('/invalidation', auth)
-  app.use(
-    '/terminal',
-    auth,
-    async (c, next) => {
-      if (!terminalHost.isValidClientId(c.req.query('clientId'))) {
-        return errorJson(c, 'BAD_REQUEST', 'Invalid client id')
-      }
-      if (!c.req.query('attachmentId')) {
-        return errorJson(c, 'BAD_REQUEST', 'Missing attachment id')
-      }
-      // Defense in depth: the auth middleware above always sets
-      // `ownerId` on success, but refuse the upgrade if the value
-      // ever goes missing — a single empty ownerId would silently
-      // merge unrelated sessions in the manager.
-      if (!ownerIdFromContext(c)) {
-        return errorJson(c, 'INTERNAL', 'Owner id missing from auth context', 500)
-      }
-      await next()
-    },
-  )
+  app.use('/terminal', auth, async (c, next) => {
+    if (!terminalHost.isValidClientId(c.req.query('clientId'))) {
+      return errorJson(c, 'BAD_REQUEST', 'Invalid client id')
+    }
+    if (!c.req.query('attachmentId')) {
+      return errorJson(c, 'BAD_REQUEST', 'Missing attachment id')
+    }
+    // Defense in depth: the auth middleware above always sets
+    // `ownerId` on success, but refuse the upgrade if the value
+    // ever goes missing — a single empty ownerId would silently
+    // merge unrelated sessions in the manager.
+    if (!ownerIdFromContext(c)) {
+      return errorJson(c, 'INTERNAL', 'Owner id missing from auth context', 500)
+    }
+    await next()
+  })
 
   app.get(
     '/invalidation',
@@ -106,19 +102,13 @@ export function createRealtimeRoutes({ accessToken, terminalHost }: RealtimeRout
         },
         onMessage(event, ws) {
           if (typeof event.data === 'string') {
-            if (event.data.length > TERMINAL_WS_MESSAGE_LIMIT_BYTES) {
+            if (!isTerminalWsMessageWithinLimit(event.data)) {
               try {
                 ws.close(1009, 'message too large')
               } catch {}
               return
             }
-            terminalHost.handleRealtimeMessage(
-              clientId,
-              attachmentId,
-              ownerId,
-              ws as ServerTerminalSocket,
-              event.data,
-            )
+            terminalHost.handleRealtimeMessage(clientId, attachmentId, ownerId, ws as ServerTerminalSocket, event.data)
           }
         },
         onClose(_event, ws) {

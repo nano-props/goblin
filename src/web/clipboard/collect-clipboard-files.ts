@@ -21,7 +21,7 @@ export function collectClipboardFiles(data: DataTransfer | null): File[] {
   if (filesProp && filesProp.length > 0) {
     for (let i = 0; i < filesProp.length; i += 1) {
       const file = filesProp.item(i)
-      if (isMeaningfulClipboardFile(file)) files.push(file)
+      if (isNonPlaceholderClipboardFile(file)) files.push(file)
     }
     if (files.length > 0) return files
   }
@@ -31,12 +31,12 @@ export function collectClipboardFiles(data: DataTransfer | null): File[] {
       const item = items[i]
       if (item.kind !== 'file') continue
       const file = item.getAsFile()
-      if (isMeaningfulClipboardFile(file)) files.push(file)
+      if (isNonPlaceholderClipboardFile(file)) files.push(file)
     }
   }
   return files
 }
 
-export function isMeaningfulClipboardFile(file: File | null): file is File {
-  return !!file && (file.size > 0 || file.name.length > 0)
+export function isNonPlaceholderClipboardFile(file: File | null): file is File {
+  return file !== null && (file.size > 0 || file.name.length > 0)
 }

@@ -332,9 +332,10 @@ export const ja: Record<DictKey, string> = {
   'terminal.bell-unread-count': '未読ベル {count} 件',
   'terminal.paste-file-failed': 'ファイルをターミナルに貼り付けできませんでした。',
   'terminal.paste-file-partial': '一部のファイルを保存できませんでした。',
+  'terminal.paste-file-unsafe': '一部の貼り付けたパスにはターミナル制御文字が含まれるためスキップしました。',
   'terminal.paste-file-too-large':
     'ファイルが大きすぎて貼り付けできません。scp、rsync、またはファイルマネージャをご利用ください。',
-  'terminal.paste-file-too-many': '一度に貼り付けるファイルパスが多すぎます。',
+  'terminal.paste-file-overflow': '貼り付けたパスが長すぎてターミナルに送信できません。',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': 'Finder で表示',

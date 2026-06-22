@@ -67,6 +67,122 @@ function completeWorktreeSnapshot(snapshot: TestWorktreeSnapshot): WorktreeTermi
   }
 }
 
+async function renderControllerSlot() {
+  ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root: Root = createRoot(container)
+  const writeInput = vi.fn()
+  const descriptor = {
+    key: 'terminal-1',
+    worktreeTerminalKey: '/repo\0/worktree',
+    terminalId: 'terminal-1',
+    index: 1,
+    repoRoot: '/repo',
+    branch: 'feature',
+    worktreePath: '/worktree',
+  }
+  const worktreeSnapshot = {
+    worktreeTerminalKey: '/repo\0/worktree',
+    selectedDescriptor: descriptor,
+    sessions: [
+      {
+        key: 'terminal-1',
+        worktreeTerminalKey: '/repo\0/worktree',
+        terminalId: 'terminal-1',
+        index: 1,
+        title: 'zsh',
+        phase: 'open' as const,
+        selected: true,
+        hasBell: false,
+      },
+    ],
+    count: 1,
+    pendingCreate: false,
+  }
+  const snapshot = {
+    phase: 'open' as const,
+    message: null,
+    processName: 'zsh',
+    attachment: {
+      role: 'controller' as const,
+      controllerStatus: 'connected' as const,
+      active: true,
+      canTakeover: false,
+      canonicalCols: 120,
+      canonicalRows: 40,
+      phase: 'open' as const,
+    },
+  }
+  const context: TerminalSessionContextValue = {
+    createTerminal: async () => 'terminal-1',
+    registerHost: vi.fn(),
+    unregisterHost: vi.fn(),
+    selectTerminal: vi.fn(),
+    scrollToBottom: vi.fn(),
+    scrollLines: vi.fn(),
+    clearBell: vi.fn(() => false),
+    closeTerminalByDescriptor: vi.fn(() => []),
+    attach: vi.fn(),
+    detach: vi.fn(),
+    restart: vi.fn(),
+    isTerminalFocusTarget: vi.fn(() => false),
+    findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+    findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+    clearSearch: vi.fn(),
+    writeInput,
+    takeover: vi.fn(),
+    openWorkspacePaneView: vi.fn(async () => true),
+    closeWorkspacePaneView: vi.fn(async () => true),
+    reorderWorkspacePaneViews: vi.fn(async () => true),
+    serialize: vi.fn(() => ''),
+  }
+  const readContext: TerminalSessionReadContextValue = {
+    worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
+    subscribeWorktree: () => () => {},
+    snapshot: () => snapshot,
+    subscribeSnapshot: () => () => {},
+  }
+
+  await act(async () => {
+    root.render(
+      <TerminalSessionContext.Provider value={context}>
+        <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
+        </TerminalSessionReadContext.Provider>
+      </TerminalSessionContext.Provider>,
+    )
+  })
+
+  return {
+    slotRoot: container.querySelector('.goblin-terminal-slot') as HTMLElement,
+    writeInput,
+    async cleanup() {
+      await act(async () => root.unmount())
+      container.remove()
+    },
+  }
+}
+
+function clipboardDataWithFiles(files: File[]): DataTransfer {
+  return {
+    files: {
+      length: files.length,
+      item: (i: number) => files[i] ?? null,
+    } as unknown as FileList,
+    items: [] as unknown as DataTransferItemList,
+  } as unknown as DataTransfer
+}
+
+async function dispatchPaste(slotRoot: HTMLElement, files: File[]): Promise<void> {
+  const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
+  Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardDataWithFiles(files) })
+  await act(async () => {
+    slotRoot.dispatchEvent(pasteEvent)
+    await new Promise((r) => setTimeout(r, 0))
+  })
+}
+
 describe('TerminalSlot', () => {
   test('renders mirror attach banner and triggers takeover', async () => {
     ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -998,6 +1114,87 @@ describe('TerminalSlot', () => {
     }
   })
 
+  test('paste with backend failure surfaces paste-file-failed without writing', async () => {
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
+    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
+    const { toast } = await import('sonner')
+    vi.mocked(toast.error).mockClear()
+    const rendered = await renderControllerSlot()
+
+    try {
+      await dispatchPaste(rendered.slotRoot, [new File([new Uint8Array([1])], 'a.png')])
+
+      expect(rendered.writeInput).not.toHaveBeenCalled()
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-failed')
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-unsafe')
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('paste with an unsafe resolved path surfaces paste-file-unsafe without writing', async () => {
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('/abs/bad\nname.png')
+    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
+    const { toast } = await import('sonner')
+    vi.mocked(toast.error).mockClear()
+    const rendered = await renderControllerSlot()
+
+    try {
+      await dispatchPaste(rendered.slotRoot, [new File([new Uint8Array([1])], 'bad.png')])
+
+      expect(rendered.writeInput).not.toHaveBeenCalled()
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-unsafe')
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('paste with paths over the terminal envelope surfaces paste-file-overflow', async () => {
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue(`/abs/${'a'.repeat(1024 * 1024)}`)
+    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
+    const { toast } = await import('sonner')
+    vi.mocked(toast.error).mockClear()
+    const rendered = await renderControllerSlot()
+
+    try {
+      await dispatchPaste(rendered.slotRoot, [new File([new Uint8Array([1])], 'huge-path.png')])
+
+      expect(rendered.writeInput).not.toHaveBeenCalled()
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-overflow')
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('paste with partial backend failure writes resolved paths and surfaces paste-file-partial', async () => {
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockImplementation((file: File) =>
+      file.name === 'a.png' ? '/abs/a.png' : '',
+    )
+    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue(['/tmp/b.png'])
+    const { toast } = await import('sonner')
+    vi.mocked(toast.error).mockClear()
+    const rendered = await renderControllerSlot()
+
+    try {
+      await dispatchPaste(rendered.slotRoot, [
+        new File([new Uint8Array([1])], 'a.png'),
+        new File([new Uint8Array([1])], 'b.png'),
+        new File([new Uint8Array([1])], 'c.png'),
+      ])
+
+      expect(rendered.writeInput).toHaveBeenCalledWith('terminal-1', "'/abs/a.png' '/tmp/b.png'", 'paste')
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-partial')
+      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
   test('controller drop with partial backend failure writes the resolved paths AND surfaces paste-file-partial', async () => {
     // Locks the toast-mapping contract from §9 of the design doc:
     // a multi-file paste where path-attempt succeeded for some and
@@ -1127,7 +1324,7 @@ describe('TerminalSlot', () => {
       // the order the resolver returns them (path-attempt tier first,
       // then blob-save). paste-file-partial toasts once.
       expect(writeInput).toHaveBeenCalledTimes(1)
-      expect(writeInput).toHaveBeenCalledWith('terminal-1', '/abs/a.png /tmp/b.png', 'drop')
+      expect(writeInput).toHaveBeenCalledWith('terminal-1', "'/abs/a.png' '/tmp/b.png'", 'drop')
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-partial')
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
     } finally {

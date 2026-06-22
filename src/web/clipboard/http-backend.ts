@@ -5,7 +5,7 @@
  * paths the PTY can read.
  *
  * Returns `[]` on any failure (network, non-2xx, malformed JSON). The
- * resolver maps that to a `paste-file-failed` toast.
+ * resolver counts those as backend transfer failures for the terminal toast.
  */
 import { CLIPBOARD_FALLBACK_FILE_NAME } from '#/shared/clipboard-paste.ts'
 import { ACCESS_TOKEN_HEADER } from '#/shared/access-token.ts'

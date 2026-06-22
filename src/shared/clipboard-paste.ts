@@ -29,10 +29,11 @@ export const MAX_PASTE_BATCH_BYTES = PASTE_FILE_MAX_BYTES + 2 * 1024 * 1024 // 1
 
 /**
  * How long pasted blob files stay in the current process's temp dir.
- * Startup cleanup still removes previous-process dirs immediately; this
- * age cap keeps a long-running desktop app or LAN server from growing its
- * current temp dir forever while leaving pasted paths usable for a normal
- * working session.
+ * Electron stores these under `os.tmpdir()`, which is transient and may
+ * be cleared by the OS or on reboot. The web server stores them under
+ * `serverDataDir()`, which persists across restarts, so the same 24 h cap
+ * is more important there: it bounds durable server-side growth while
+ * leaving pasted paths usable for a normal working session.
  */
 export const CLIPBOARD_TEMP_FILE_MAX_AGE_MS = 24 * 60 * 60 * 1000
 

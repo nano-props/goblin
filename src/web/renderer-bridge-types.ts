@@ -108,7 +108,8 @@ export interface RendererBridge {
    * `<os.tmpdir>/goblin-clipboard-<pid>/`; web POSTs multipart to
    * `/api/clipboard/files` and the server writes under
    * `<serverDataDir()>/clipboard-tmp-<pid>/`. Returns `[]` on any failure
-   * (the resolver maps that to a single `paste-file-failed` toast).
+   * so the resolver can count backend transfer failures separately from
+   * unsafe path filtering.
    */
   saveClipboardFiles(files: File[]): Promise<string[]>
   /**

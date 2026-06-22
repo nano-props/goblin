@@ -39,8 +39,8 @@ interface GoblinNativeBridge {
   /**
    * Persist clipboard / drop file blobs through the main process.
    * Always returns `[]` on failure (preload swallows errors); callers
-   * should treat an empty result as "no blob made it across" and
-   * surface a single `paste-file-failed` toast.
+   * should treat an empty result as "no blob made it across" and count
+   * backend transfer failures separately from unsafe path filtering.
    */
   saveClipboardFiles: (files: File[]) => Promise<string[]>
   /**

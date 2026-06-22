@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rm, utimes, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rm, symlink, utimes, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -91,6 +91,16 @@ describe('saveClipboardFiles', () => {
     // process-level so the exact value isn't pinned here.
     expect(path.basename(paths[0])).toMatch(/\d+-\d+-clipboard\.bin$/)
   })
+
+  test('prefixes Windows reserved file stems after sanitising', async () => {
+    const { saveClipboardFiles } = await import('#/server/modules/clipboard-write-paths.ts')
+    const { paths } = await saveClipboardFiles([
+      new File([new Uint8Array([0])], 'AUX.png'),
+      new File([new Uint8Array([0])], 'com1.txt'),
+    ])
+    expect(path.basename(paths[0]).endsWith('_AUX.png')).toBe(true)
+    expect(path.basename(paths[1]).endsWith('_com1.txt')).toBe(true)
+  })
 })
 
 describe('pruneStaleClipboardTempDirs', () => {
@@ -149,5 +159,21 @@ describe('pruneExpiredClipboardTempFiles', () => {
   test('does not throw if the current server temp dir does not exist', async () => {
     const { pruneExpiredClipboardTempFiles } = await import('#/server/modules/clipboard-write-paths.ts')
     await expect(pruneExpiredClipboardTempFiles()).resolves.toBeUndefined()
+  })
+
+  test('handles empty dirs, subdirs, and stat failures without throwing', async () => {
+    const { clipboardTempDir, pruneExpiredClipboardTempFiles } =
+      await import('#/server/modules/clipboard-write-paths.ts')
+    const currentDir = clipboardTempDir()
+    await mkdir(currentDir, { recursive: true })
+    await expect(pruneExpiredClipboardTempFiles(Date.now(), 0)).resolves.toBeUndefined()
+    await mkdir(path.join(currentDir, 'nested'), { recursive: true })
+    await symlink(path.join(currentDir, 'missing.bin'), path.join(currentDir, 'broken-link'))
+
+    await expect(pruneExpiredClipboardTempFiles(Date.now(), 0)).resolves.toBeUndefined()
+
+    const entries = await readdir(currentDir)
+    expect(entries).toContain('nested')
+    expect(entries).toContain('broken-link')
   })
 })

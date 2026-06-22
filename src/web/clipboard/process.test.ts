@@ -29,23 +29,23 @@ describe('processPaste', () => {
   })
 
   test('returns the resolver result on the happy path', async () => {
-    mocks.resolvePastedFiles.mockResolvedValue({ paths: ['/abs/foo.png'], failed: 0 })
+    mocks.resolvePastedFiles.mockResolvedValue({ paths: ['/abs/foo.png'], failedUnsafe: 0, failedBackend: 0 })
     const { processPaste } = await import('#/web/clipboard/process.ts')
     const f = new File([new Uint8Array([1])], 'foo.png')
     await expect(processPaste({ files: [f] })).resolves.toEqual({
       kind: 'files',
-      resolution: { paths: ['/abs/foo.png'], failed: 0 },
+      resolution: { paths: ['/abs/foo.png'], failedUnsafe: 0, failedBackend: 0 },
     })
   })
 
   test('passes partial failure through from the resolver', async () => {
-    mocks.resolvePastedFiles.mockResolvedValue({ paths: ['/tmp/a'], failed: 1 })
+    mocks.resolvePastedFiles.mockResolvedValue({ paths: ['/tmp/a'], failedUnsafe: 0, failedBackend: 1 })
     const { processPaste } = await import('#/web/clipboard/process.ts')
     const a = new File([new Uint8Array([1])], 'a')
     const b = new File([new Uint8Array([1])], 'b')
     await expect(processPaste({ files: [a, b] })).resolves.toEqual({
       kind: 'files',
-      resolution: { paths: ['/tmp/a'], failed: 1 },
+      resolution: { paths: ['/tmp/a'], failedUnsafe: 0, failedBackend: 1 },
     })
   })
 })
@@ -68,12 +68,12 @@ describe('processDrop', () => {
   })
 
   test('delegates to the resolver for OK-sized files', async () => {
-    mocks.resolvePastedFiles.mockResolvedValue({ paths: ['/abs/a'], failed: 0 })
+    mocks.resolvePastedFiles.mockResolvedValue({ paths: ['/abs/a'], failedUnsafe: 0, failedBackend: 0 })
     const { processDrop } = await import('#/web/clipboard/process.ts')
     const a = new File([new Uint8Array([1])], 'a')
     await expect(processDrop({ files: [a] })).resolves.toEqual({
       kind: 'files',
-      resolution: { paths: ['/abs/a'], failed: 0 },
+      resolution: { paths: ['/abs/a'], failedUnsafe: 0, failedBackend: 0 },
     })
   })
 })

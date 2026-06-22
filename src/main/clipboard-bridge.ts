@@ -23,9 +23,16 @@ export interface BinaryClipboardFile {
 }
 
 const TEMP_DIR_NAME = `goblin-clipboard-${process.pid}`
+const WINDOWS_RESERVED_FILE_STEM_RE = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/i
 
 function clipboardTempDir(): string {
   return path.join(os.tmpdir(), TEMP_DIR_NAME)
+}
+
+function avoidWindowsReservedBaseName(base: string): string {
+  const dot = base.lastIndexOf('.')
+  const stem = (dot > 0 ? base.slice(0, dot) : base).replace(/\.+$/g, '')
+  return WINDOWS_RESERVED_FILE_STEM_RE.test(stem) ? `_${base}` : base
 }
 
 function sanitizeBaseName(name: string): string {
@@ -42,7 +49,7 @@ function sanitizeBaseName(name: string): string {
     .basename(name)
     .replace(/[<>:"/\\|?*\x00-\x1f\x7f-\x9f]/g, '_')
     .trim()
-  return base.length > 0 ? base : 'clipboard.bin'
+  return base.length > 0 ? avoidWindowsReservedBaseName(base) : 'clipboard.bin'
 }
 
 // Process-level monotonically increasing counter. The previous
@@ -132,6 +139,9 @@ export async function pruneExpiredClipboardTempFiles(
   now = Date.now(),
   maxAgeMs = CLIPBOARD_TEMP_FILE_MAX_AGE_MS,
 ): Promise<void> {
+  // Electron stores pasted blobs under `os.tmpdir()`, so this is a
+  // housekeeping cap for the current long-running process; stale
+  // previous-process dirs are handled separately at startup.
   const dir = clipboardTempDir()
   let entries: string[]
   try {
@@ -177,9 +187,9 @@ export function wireClipboardBridgeIpc(): void {
     try {
       return await saveClipboardBinaryFiles(files)
     } catch (err) {
-      // We collapse to `[]` so the resolver can surface a single
-      // `paste-file-failed` toast, but the renderer can't tell *why*
-      // it failed. Log here so ops can diagnose (an oversized
+      // We collapse to `[]` so the resolver can count a backend-transfer
+      // failure, but the renderer can't tell *why*
+      // this bridge call failed. Log here so ops can diagnose (an oversized
       // payload routed through a misbehaving preload, a temp-dir
       // permission failure, etc.). Uses raw console.warn because
       // pino/consola isn't available in this module's import graph;
