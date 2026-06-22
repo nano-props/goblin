@@ -108,3 +108,38 @@ test('persists updates and notifies subscribers from the server settings store',
   })
   expect(await reloaded.getServerRecentRepos()).toEqual([{ kind: 'local', id: '/repo-b' }])
 })
+
+test('normalizes branch-scoped workspace pane view preferences in server sessions', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+
+  const mod = await import('#/server/modules/settings-source.ts')
+  await mod.setServerSessionState({
+    ...defaultSessionState(),
+    openRepos: [
+      { kind: 'local', id: '/repo-b' },
+      { kind: 'local', id: '/repo-array' },
+    ],
+    activeRepo: '/repo-b',
+    workspacePaneViewByBranchByRepo: {
+      '/repo-b': {
+        main: 'history',
+        'bad\0branch': 'changes',
+        feature: 'not-a-pane-view',
+      },
+      '/repo-c': {
+        main: 'terminal',
+      },
+      '/repo-array': ['history'],
+    } as never,
+  })
+
+  expect(await mod.getServerSessionState()).toMatchObject({
+    workspacePaneViewByBranchByRepo: {
+      '/repo-b': {
+        main: 'history',
+      },
+    },
+  })
+})

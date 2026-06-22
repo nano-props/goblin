@@ -143,12 +143,19 @@ function normalizeWorkspacePaneViewByBranchByRepo(
   value: unknown,
   openRepos: RepoSessionEntry[],
 ): Record<string, Record<string, WorkspacePaneView>> {
-  if (!value || typeof value !== 'object') return {}
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const openRepoIds = new Set(openRepos.map(repoSessionEntryId))
   const normalized: Record<string, Record<string, WorkspacePaneView>> = {}
   for (const [repoId, rawByBranch] of Object.entries(value)) {
     const safeRepoId = toSafeRepoLocator(repoId)
-    if (!safeRepoId || !openRepoIds.has(safeRepoId) || !rawByBranch || typeof rawByBranch !== 'object') continue
+    if (
+      !safeRepoId ||
+      !openRepoIds.has(safeRepoId) ||
+      !rawByBranch ||
+      typeof rawByBranch !== 'object' ||
+      Array.isArray(rawByBranch)
+    )
+      continue
     const byBranch: Record<string, WorkspacePaneView> = {}
     for (const [branchName, paneView] of Object.entries(rawByBranch)) {
       if (!branchName || branchName.includes('\0')) continue
