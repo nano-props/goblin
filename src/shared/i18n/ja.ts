@@ -237,7 +237,7 @@ export const ja: Record<DictKey, string> = {
   'branches.filter.worktrees': 'ワークツリー',
   'branches.filter-tooltip.all': 'すべてのブランチ',
   'branches.filter-tooltip.worktrees': 'ワークツリーブランチ',
-  'workspace.focus-toggle-label': 'Focus Mode を切り替え',
+  'workspace.focus-toggle-label': '集中モードを切り替え',
   'workspace.focus-toggle-tooltip.enable': '集中モード',
   'workspace.back-to-branch-navigator': 'Branch Navigator に戻る',
   'branches.gone': '消失',
