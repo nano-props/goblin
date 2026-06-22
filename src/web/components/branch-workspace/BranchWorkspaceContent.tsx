@@ -1,10 +1,11 @@
-import { ClipboardCopy, FolderTree, Loader2 } from 'lucide-react'
-import { useEffect, useState, type ReactNode } from 'react'
+import { Check, ClipboardCopy, FolderTree, Loader2 } from 'lucide-react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import { StatusListSkeleton } from '#/web/components/Skeleton.tsx'
 import { StatusList } from '#/web/components/StatusList.tsx'
-import { AsyncButton } from '#/web/components/AsyncButton.tsx'
+import { Button } from '#/web/components/ui/button.tsx'
+import '#/web/components/branch-workspace/changes-tab.css'
 import { getRepositoryLog } from '#/web/repo-client.ts'
 import type { LogEntry } from '#/web/types.ts'
 import { BranchStatus } from '#/web/components/branch-workspace/BranchStatus.tsx'
@@ -341,6 +342,10 @@ function BranchChangesTab({
 }) {
   const t = useT()
   const totalEntries = selectedStatus.reduce((n, wt) => n + wt.entries.length, 0)
+  // Hide the float widget while the stale status banner is on screen so they
+  // don't overlap. `visible` and `totalEntries` can drift on transient state,
+  // so both gates stay.
+  const showCopyPatchFloat = totalEntries > 0 && !!copyPatchAction?.visible && !(statusStale && statusError)
 
   return (
     <BranchTabPanel id={`${workspacePaneId}-changes-panel`} labelledById={labelledById} busy={statusLoading}>
@@ -349,19 +354,13 @@ function BranchChangesTab({
       ) : branch.worktree?.path && !repo.data.statusLoaded && statusError ? (
         <EmptyState title={t(statusError)} />
       ) : branch.worktree?.path ? (
-        <div className="flex min-h-0 flex-1 flex-col">
+        <div className="relative flex min-h-0 flex-1 flex-col">
           {statusStale && statusError && <StaleStatusNotice message={statusError} />}
+          {showCopyPatchFloat && <ChangesCopyPatchFloat action={copyPatchAction} />}
           {totalEntries > 0 ? (
-            <>
-              <ChangesTabToolbar
-                totalEntries={totalEntries}
-                copyPatchAction={copyPatchAction}
-                copyDisabled={statusLoading}
-              />
-              <ScrollPane>
-                <StatusList status={selectedStatus} />
-              </ScrollPane>
-            </>
+            <ScrollPane>
+              <StatusList status={selectedStatus} />
+            </ScrollPane>
           ) : (
             <StatusList status={selectedStatus} />
           )}
@@ -377,42 +376,60 @@ function BranchChangesTab({
   )
 }
 
-function ChangesTabToolbar({
-  totalEntries,
-  copyPatchAction,
-  copyDisabled,
-}: {
-  totalEntries: number
-  copyPatchAction?: BranchCopyPatchAction
-  copyDisabled: boolean
-}) {
+const COPY_PATCH_FEEDBACK_MS = 1500
+
+function ChangesCopyPatchFloat({ action }: { action: BranchCopyPatchAction }) {
   const t = useT()
-  const showCopyPatch = !!copyPatchAction?.visible
+  const [succeeded, setSucceeded] = useState(false)
+  // Guard against a slow onSelect() resolving after the widget unmounts
+  // (e.g. user switches tabs mid-copy).
+  const mountedRef = useRef(true)
+  useEffect(
+    () => () => {
+      mountedRef.current = false
+    },
+    [],
+  )
+
+  useEffect(() => {
+    if (!succeeded) return
+    const timer = window.setTimeout(() => setSucceeded(false), COPY_PATCH_FEEDBACK_MS)
+    return () => window.clearTimeout(timer)
+  }, [succeeded])
+
+  const handleClick = () => {
+    if (action.busy || action.disabled) return
+    void Promise.resolve(action.onSelect()).then((ok) => {
+      if (mountedRef.current && ok) setSucceeded(true)
+    })
+  }
+
+  const busy = !!action.busy
+  const showCheck = succeeded && !busy
 
   return (
-    <div className="flex h-8 shrink-0 items-center gap-2 border-b border-separator/70 bg-background px-2">
-      <div className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground">
-        {t('tab.changes-with-count', { count: totalEntries })}
-      </div>
-      {showCopyPatch && (
-        <AsyncButton
-          variant="ghost"
-          size="sm"
-          loading={copyPatchAction.busy}
-          disabled={copyDisabled || copyPatchAction.disabled}
-          title={copyPatchAction.title}
-          aria-label={copyPatchAction.ariaLabel ?? copyPatchAction.title ?? copyPatchAction.label}
-          onClick={copyPatchAction.onSelect}
-          className="ml-auto"
-        >
-          {({ busy }) => (
-            <>
-              {busy ? <Loader2 className="size-3 animate-spin" /> : <ClipboardCopy className="size-3" />}
-              <span>{copyPatchAction.label}</span>
-            </>
-          )}
-        </AsyncButton>
-      )}
+    <div className="goblin-changes-tab__copy-patch">
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        disabled={action.disabled || busy}
+        aria-busy={busy || undefined}
+        title={action.title}
+        aria-label={action.ariaLabel ?? action.title}
+        onClick={handleClick}
+      >
+        {busy ? (
+          <Loader2 className="size-3 animate-spin" />
+        ) : showCheck ? (
+          <Check className="size-3" />
+        ) : (
+          <ClipboardCopy className="size-3" />
+        )}
+        <span aria-live="polite" role="status">
+          {showCheck ? t('status.copy-patch-success') : action.label}
+        </span>
+      </Button>
     </div>
   )
 }

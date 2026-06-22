@@ -21,7 +21,10 @@ export interface BranchCopyPatchAction {
   disabled: boolean
   busy?: boolean
   visible: boolean
-  onSelect: () => void | Promise<void>
+  // The boolean lets the caller gate the in-context "Copied" affordance
+  // on whether the patch actually landed on the clipboard. The failure
+  // toast is surfaced by the action dispatcher itself.
+  onSelect: () => boolean | Promise<boolean> | void | Promise<void>
 }
 
 export interface BranchActionRepo {

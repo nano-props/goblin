@@ -298,6 +298,7 @@ export const ko: Record<DictKey, string> = {
   'status.copy-patch-title': '이 워크트리의 git apply --binary 패치를 클립보드에 복사',
   'status.copy-patch-ok': '패치를 클립보드에 복사했습니다',
   'status.copy-patch-empty': '복사할 내용 없음 — 워크트리가 깨끗합니다',
+  'status.copy-patch-success': '복사됨',
 
   // ---- Terminal ----------------------------------------------------------
   'terminal.opening': '터미널 여는 중…',

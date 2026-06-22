@@ -93,15 +93,18 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
     op: LocalBranchActionItemId,
     fn: () => Promise<ExecResult>,
     options?: { handleResult?: (result: ExecResult) => boolean },
-  ) {
-    if (guardBusy()) return
+  ): Promise<ExecResult | null> {
+    if (guardBusy()) return Promise.resolve(null)
     const pending = runPendingLocalAction(op, async () => {
-      await dispatchRepoUiAction(repo.id, repo.instanceToken, op, fn, setLastResult, {
+      const result = await dispatchRepoUiAction(repo.id, repo.instanceToken, op, fn, setLastResult, {
         silentSuccessOps: SILENT_SUCCESS_OPS,
         handleResult: options?.handleResult,
       })
+      return result
     })
-    if (pending) return Promise.resolve(pending).then(() => undefined)
+    // useAsyncPending.run returns Promise<unknown>; the inner async fn above
+    // is statically known to resolve to ExecResult | null, so narrow once.
+    return (pending ?? Promise.resolve(null)) as Promise<ExecResult | null>
   }
 
   async function runRepoAction(
@@ -115,9 +118,9 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
     })
   }
 
-  function copyPatch() {
-    if (!branch.worktree?.path) return
-    const worktreePath = branch.worktree.path
+  function copyPatch(): Promise<boolean> {
+    const worktreePath = branch.worktree?.path
+    if (!worktreePath) return Promise.resolve(false)
     return runUiAction('copyPatch', async () => {
       const result = await getRepositoryPatch(repo.id, worktreePath)
       if (!result.ok) return { ok: false, message: result.message }
@@ -128,7 +131,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
         return { ok: false, message: err instanceof Error ? err.message : String(err) }
       }
       return { ok: true, message: 'status.copy-patch-ok' }
-    })
+    }).then((result) => result?.ok ?? false)
   }
 
   function pull() {
