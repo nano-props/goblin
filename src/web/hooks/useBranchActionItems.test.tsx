@@ -76,7 +76,7 @@ describe('useBranchActionItems', () => {
     reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
   })
 
-  test('orders visible branch actions by primary workflow before destructive actions', async () => {
+  test('orders visible branch actions by high-frequency workflow before destructive actions', async () => {
     let actionIds: string[] = []
 
     await renderHookHost((actions) => {
@@ -84,18 +84,29 @@ describe('useBranchActionItems', () => {
     })
 
     expect(actionIds).toEqual([
+      'pull',
+      'push',
       'status',
       'history',
       'changes',
-      'pull',
-      'push',
-      'copyPatch',
       'terminal',
       'editor',
       'remote',
       'removeWorktree',
       'deleteBranch',
     ])
+  })
+
+  test('exposes copy patch as a changes-tab action instead of a menu item', async () => {
+    let actions: ReturnType<typeof useBranchActionItems> | null = null
+
+    await renderHookHost((nextActions) => {
+      actions = nextActions
+    })
+
+    expect(actions!.copyPatchAction.visible).toBe(true)
+    expect(actions!.copyPatchAction.label).toBe('status.copy-patch')
+    expect(visibleBranchActionItems(actions!).map((item) => item.id)).not.toContain('copyPatch')
   })
 
   test('keeps branch-static views visible for a branch without a worktree but hides changes', async () => {

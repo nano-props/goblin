@@ -14,6 +14,16 @@ export type BranchActionItemId =
   | 'deleteBranch'
   | 'removeWorktree'
 
+export interface BranchCopyPatchAction {
+  label: string
+  title?: string
+  ariaLabel?: string
+  disabled: boolean
+  busy?: boolean
+  visible: boolean
+  onSelect: () => void | Promise<void>
+}
+
 export interface BranchActionRepo {
   id: RepoState['id']
   instanceToken: RepoState['instanceToken']

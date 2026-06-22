@@ -3,7 +3,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import type { BranchActionItemGroups } from '#/web/hooks/useBranchActionItems.ts'
+import type { BranchActionSurface } from '#/web/hooks/useBranchActionItems.ts'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
 import { runBranchActionShortcut } from '#/web/keyboard/branch-action-shortcuts.ts'
 
@@ -41,7 +41,6 @@ describe('useBranchActionShortcutRegistry', () => {
         },
       ],
       destructiveItems: [],
-      dialogs: null,
     })
 
     act(() => {
@@ -75,7 +74,6 @@ describe('useBranchActionShortcutRegistry', () => {
         },
       ],
       destructiveItems: [],
-      dialogs: null,
     })
 
     act(() => {
@@ -142,7 +140,9 @@ describe('useBranchActionShortcutRegistry', () => {
   })
 })
 
-async function renderHookHost(actions: BranchActionItemGroups) {
+type ShortcutActionItems = Pick<BranchActionSurface, 'mainItems' | 'destructiveItems'>
+
+async function renderHookHost(actions: ShortcutActionItems) {
   container = document.createElement('div')
   document.body.append(container)
   root = createRoot(container)
@@ -152,12 +152,12 @@ async function renderHookHost(actions: BranchActionItemGroups) {
   })
 }
 
-function HookHost({ actions, enabled = true }: { actions: BranchActionItemGroups; enabled?: boolean }) {
+function HookHost({ actions, enabled = true }: { actions: ShortcutActionItems; enabled?: boolean }) {
   useBranchActionShortcutRegistry(actions, enabled)
   return null
 }
 
-function actionsWith(onPull: () => void): BranchActionItemGroups {
+function actionsWith(onPull: () => void): ShortcutActionItems {
   return {
     mainItems: [
       {
@@ -170,6 +170,5 @@ function actionsWith(onPull: () => void): BranchActionItemGroups {
       },
     ],
     destructiveItems: [],
-    dialogs: null,
   }
 }

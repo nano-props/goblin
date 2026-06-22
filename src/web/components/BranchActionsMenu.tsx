@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/pop
 import {
   useBranchActionItems,
   type BranchActionItem,
-  type BranchActionItemGroups,
+  type BranchActionSurface,
 } from '#/web/hooks/useBranchActionItems.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
@@ -41,7 +41,7 @@ export function BranchActionsPopover({
   destructiveItems,
   open,
   onOpenChange,
-}: Pick<BranchActionItemGroups, 'mainItems' | 'destructiveItems'> & {
+}: Pick<BranchActionSurface, 'mainItems' | 'destructiveItems'> & {
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }) {

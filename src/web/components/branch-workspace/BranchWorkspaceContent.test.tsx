@@ -7,7 +7,12 @@ import { BranchWorkspaceContent } from '#/web/components/branch-workspace/Branch
 import { getSelectedBranchWorkspacePresentation } from '#/web/components/branch-workspace/model.ts'
 import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionReadContextValue, WorktreeTerminalSnapshot } from '#/web/components/terminal/types.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
+import {
+  createBranchSnapshot,
+  createRepoBranch,
+  resetReposStore,
+  seedRepoState,
+} from '#/web/stores/repos/test-utils.ts'
 
 const repoClientMocks = vi.hoisted(() => ({
   getRepositoryLog: vi.fn(),
@@ -44,6 +49,81 @@ afterEach(() => {
 })
 
 describe('BranchWorkspaceContent', () => {
+  test('renders copy patch as a changes-tab toolbar action', () => {
+    const onCopyPatch = vi.fn()
+    const worktreePath = '/tmp/changes-worktree'
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branchSnapshots: [
+        createBranchSnapshot('feature/changes', {
+          worktree: { path: worktreePath, summary: { dirty: true, changeCount: 1 } },
+        }),
+      ],
+      selectedBranch: 'feature/changes',
+      workspacePaneView: 'changes',
+      openBranchWorkspacePaneViews: ['status'],
+      statusLoaded: true,
+      status: [
+        {
+          path: worktreePath,
+          branch: 'feature/changes',
+          isMain: false,
+          entries: [{ x: 'M', y: ' ', path: 'src/example.ts' }],
+        },
+      ],
+    })
+    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const changesWorkspaceView = {
+      type: 'changes' as const,
+      id: 'changes' as const,
+      key: 'changes' as const,
+      worktreeTerminalKey: `${REPO_ID}\0${worktreePath}`,
+      worktreePath,
+      displayOrder: 0,
+    }
+    const changesWorktreeSnapshot: WorktreeTerminalSnapshot = {
+      ...emptyWorktreeSnapshot,
+      worktreeTerminalKey: `${REPO_ID}\0${worktreePath}`,
+      staticWorkspacePaneViews: [changesWorkspaceView],
+      workspacePaneViews: [changesWorkspaceView],
+    }
+    const readContext: TerminalSessionReadContextValue = {
+      ...emptyTerminalReadContext,
+      worktreeSnapshot: () => changesWorktreeSnapshot,
+    }
+
+    act(() => {
+      root!.render(
+        <TerminalSessionReadContext.Provider value={readContext}>
+          <BranchWorkspaceContent
+            repo={repo}
+            detail={detail}
+            workspacePaneId="workspace"
+            copyPatchAction={{
+              label: 'status.copy-patch',
+              title: 'status.copy-patch-title',
+              ariaLabel: 'status.copy-patch-title',
+              disabled: false,
+              visible: true,
+              onSelect: onCopyPatch,
+            }}
+          />
+        </TerminalSessionReadContext.Provider>,
+      )
+    })
+
+    expect(container?.querySelector('#workspace-changes-panel')).not.toBeNull()
+    expect(container?.textContent).toContain('tab.changes-with-count')
+    expect(container?.textContent).toContain('status.copy-patch')
+
+    const copyButton = container?.querySelector<HTMLButtonElement>('button[aria-label="status.copy-patch-title"]')
+    expect(copyButton).not.toBeNull()
+    act(() => {
+      copyButton!.click()
+    })
+    expect(onCopyPatch).toHaveBeenCalledTimes(1)
+  })
+
   test('renders branch status for a selected branch without a worktree', () => {
     const repo = seedRepoState({
       id: REPO_ID,
@@ -64,11 +144,7 @@ describe('BranchWorkspaceContent', () => {
     act(() => {
       root!.render(
         <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-          <BranchWorkspaceContent
-            repo={repo}
-            detail={detail}
-            workspacePaneId="workspace"
-          />
+          <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
         </TerminalSessionReadContext.Provider>,
       )
     })
@@ -100,11 +176,7 @@ describe('BranchWorkspaceContent', () => {
     act(() => {
       root!.render(
         <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-          <BranchWorkspaceContent
-            repo={repo}
-            detail={detail}
-            workspacePaneId="workspace"
-          />
+          <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
         </TerminalSessionReadContext.Provider>,
       )
     })
@@ -128,11 +200,7 @@ describe('BranchWorkspaceContent', () => {
     act(() => {
       root!.render(
         <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-          <BranchWorkspaceContent
-            repo={repo}
-            detail={detail}
-            workspacePaneId="workspace"
-          />
+          <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
         </TerminalSessionReadContext.Provider>,
       )
     })
@@ -166,11 +234,7 @@ describe('BranchWorkspaceContent', () => {
     act(() => {
       root!.render(
         <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-          <BranchWorkspaceContent
-            repo={repo}
-            detail={detail}
-            workspacePaneId="workspace"
-          />
+          <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
         </TerminalSessionReadContext.Provider>,
       )
     })
@@ -224,11 +288,7 @@ describe('BranchWorkspaceContent', () => {
     act(() => {
       root!.render(
         <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-          <BranchWorkspaceContent
-            repo={repo}
-            detail={detail}
-            workspacePaneId="workspace"
-          />
+          <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
         </TerminalSessionReadContext.Provider>,
       )
     })
@@ -253,11 +313,7 @@ describe('BranchWorkspaceContent', () => {
     act(() => {
       root!.render(
         <TerminalSessionReadContext.Provider value={emptyTerminalReadContext}>
-          <BranchWorkspaceContent
-            repo={repo}
-            detail={detail}
-            workspacePaneId="workspace"
-          />
+          <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
         </TerminalSessionReadContext.Provider>,
       )
     })

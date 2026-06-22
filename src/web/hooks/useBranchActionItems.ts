@@ -1,14 +1,4 @@
-import {
-  ArrowDown,
-  ArrowUp,
-  ClipboardCopy,
-  ExternalLink,
-  FileText,
-  GitBranch,
-  GitPullRequest,
-  History,
-  Trash2,
-} from 'lucide-react'
+import { ArrowDown, ArrowUp, ExternalLink, FileText, GitBranch, GitPullRequest, History, Trash2 } from 'lucide-react'
 import { createElement, type ReactNode } from 'react'
 import { GitHubOutlineIcon } from '#/web/components/GitHubOutlineIcon.tsx'
 import { GitLabLogoIcon } from '#/web/components/GitLabLogoIcon.tsx'
@@ -17,7 +7,11 @@ import { remoteRepoTarget } from '#/web/stores/repos/helpers.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { EditorAppIcon, TerminalAppIcon } from '#/web/components/ExternalAppIcon/index.tsx'
 import { useBranchActions, type BranchActionItemId } from '#/web/hooks/useBranchActions.tsx'
-import { branchActionDisplayPhase, type BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
+import {
+  branchActionDisplayPhase,
+  type BranchActionRepo,
+  type BranchCopyPatchAction,
+} from '#/web/hooks/branch-action-state.ts'
 import { branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import type { BrowserRemoteProvider } from '#/web/types.ts'
 import { useRuntimeExternalAppSettings } from '#/web/runtime-settings-external-apps.ts'
@@ -38,16 +32,17 @@ export interface BranchActionItem {
   onSelect: () => void | Promise<void>
 }
 
-export interface BranchActionItemGroups {
+export interface BranchActionSurface {
   mainItems: BranchActionItem[]
   destructiveItems: BranchActionItem[]
+  copyPatchAction: BranchCopyPatchAction
   dialogs: ReactNode
 }
 
 export function visibleBranchActionItems({
   mainItems,
   destructiveItems,
-}: Pick<BranchActionItemGroups, 'mainItems' | 'destructiveItems'>): BranchActionItem[] {
+}: Pick<BranchActionSurface, 'mainItems' | 'destructiveItems'>): BranchActionItem[] {
   return [...mainItems, ...destructiveItems].filter((item) => item.visible)
 }
 
@@ -71,7 +66,7 @@ function browserRemoteIcon(provider: BrowserRemoteProvider | undefined) {
   return ExternalLink
 }
 
-export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchState): BranchActionItemGroups {
+export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchState): BranchActionSurface {
   const t = useT()
   const navigation = useMainWindowNavigation()
   const { terminalApp, resolvedTerminalApp, terminalAvailable, editorApp, resolvedEditorApp, editorAvailable } =
@@ -124,7 +119,37 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
     })
   }
 
+  const copyPatchAction: BranchCopyPatchAction = {
+    label: t('status.copy-patch'),
+    title: t('status.copy-patch-title'),
+    ariaLabel: t('status.copy-patch-title'),
+    disabled,
+    busy: busy('copyPatch'),
+    visible: capabilities.canCopyPatch,
+    onSelect: actions.copyPatch,
+  }
+
   const mainItems: BranchActionItem[] = [
+    {
+      id: 'pull',
+      label: branchActionLabel('pull', 'action.pull', 'action.pull-loading', 'action.pull-queued'),
+      disabled,
+      busy: busy('pull'),
+      visible: capabilities.canPull,
+      shortcut: 'P',
+      icon: createElement(ArrowDown),
+      onSelect: actions.pull,
+    },
+    {
+      id: 'push',
+      label: branchActionLabel('push', 'action.push', 'action.push-loading', 'action.push-queued'),
+      disabled,
+      busy: busy('push'),
+      visible: capabilities.canPush,
+      shortcut: '⇧P',
+      icon: createElement(ArrowUp),
+      onSelect: actions.push,
+    },
     {
       id: 'status',
       label: t('tab.status'),
@@ -149,41 +174,6 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
       icon: createElement(FileText),
       onSelect: () => openStaticWorkspacePaneView('changes'),
     },
-    {
-      id: 'pull',
-      label: branchActionLabel('pull', 'action.pull', 'action.pull-loading', 'action.pull-queued'),
-      disabled,
-      busy: busy('pull'),
-      visible: capabilities.canPull,
-      shortcut: 'P',
-      icon: createElement(ArrowDown),
-      onSelect: actions.pull,
-    },
-    {
-      id: 'push',
-      label: branchActionLabel('push', 'action.push', 'action.push-loading', 'action.push-queued'),
-      disabled,
-      busy: busy('push'),
-      visible: capabilities.canPush,
-      shortcut: '⇧P',
-      icon: createElement(ArrowUp),
-      onSelect: actions.push,
-    },
-    ...(capabilities.canCopyPatch
-      ? [
-          {
-            id: 'copyPatch' as const,
-            label: t('status.copy-patch'),
-            title: t('status.copy-patch-title'),
-            ariaLabel: t('status.copy-patch-title'),
-            disabled,
-            busy: busy('copyPatch'),
-            visible: true,
-            icon: createElement(ClipboardCopy),
-            onSelect: actions.copyPatch,
-          },
-        ]
-      : []),
     ...(showTerminalAction
       ? [
           {
@@ -265,5 +255,5 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
       : []),
   ]
 
-  return { mainItems, destructiveItems, dialogs }
+  return { mainItems, destructiveItems, copyPatchAction, dialogs }
 }

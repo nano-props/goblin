@@ -138,7 +138,12 @@ function BranchShortcutHandler({
     <>
       <BranchWorkspaceToolbar repo={repo} detail={detail} workspacePaneId={workspacePaneId} />
       {actions.dialogs}
-      <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId={workspacePaneId} />
+      <BranchWorkspaceContent
+        repo={repo}
+        detail={detail}
+        workspacePaneId={workspacePaneId}
+        copyPatchAction={actions.copyPatchAction}
+      />
     </>
   )
 }

@@ -1,9 +1,10 @@
-import { FolderTree } from 'lucide-react'
+import { ClipboardCopy, FolderTree, Loader2 } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import { StatusListSkeleton } from '#/web/components/Skeleton.tsx'
 import { StatusList } from '#/web/components/StatusList.tsx'
+import { AsyncButton } from '#/web/components/AsyncButton.tsx'
 import { getRepositoryLog } from '#/web/repo-client.ts'
 import type { LogEntry } from '#/web/types.ts'
 import { BranchStatus } from '#/web/components/branch-workspace/BranchStatus.tsx'
@@ -25,12 +26,14 @@ import { branchLevelWorkspacePaneViewButtonId } from '#/web/components/branch-wo
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
 import { isBranchLevelWorkspacePaneView } from '#/web/lib/workspace-pane-view.ts'
+import type { BranchCopyPatchAction } from '#/web/hooks/branch-action-state.ts'
 interface Props {
   repo: Pick<BranchWorkspaceRepo, 'id' | 'data' | 'ui'> & {
     data: BranchWorkspaceRepo['data'] & Pick<BranchWorkspaceRepo['data'], 'statusLoaded'>
   }
   detail: SelectedBranchWorkspacePresentation
   workspacePaneId: string
+  copyPatchAction?: BranchCopyPatchAction
 }
 
 interface TabPanelProps {
@@ -46,7 +49,7 @@ type BranchWorkspaceBranch = NonNullable<SelectedBranchWorkspacePresentation['br
 // branch-scoped selected tab and the live terminal session truth via
 // `useEffectiveWorkspacePaneView`. The store never re-projects on snapshot
 // refresh, branch switch, or session restore; this component is read-only.
-export function BranchWorkspaceContent({ repo, detail, workspacePaneId }: Props) {
+export function BranchWorkspaceContent({ repo, detail, workspacePaneId, copyPatchAction }: Props) {
   const t = useT()
   const compact = useIsCompactUi()
   const effectiveTab = useEffectiveWorkspacePaneView(repo)
@@ -67,9 +70,10 @@ export function BranchWorkspaceContent({ repo, detail, workspacePaneId }: Props)
     !!terminalWorktreeKey &&
     activeTabIndex === -1 &&
     openBranchWorkspacePaneViews.includes(effectiveBranchTab)
-  const branchStaticWorktreeFallbackIndex = branchStaticWorktreeFallbackActive && effectiveBranchTab
-    ? Math.max(0, openBranchWorkspacePaneViews.indexOf(effectiveBranchTab))
-    : 0
+  const branchStaticWorktreeFallbackIndex =
+    branchStaticWorktreeFallbackActive && effectiveBranchTab
+      ? Math.max(0, openBranchWorkspacePaneViews.indexOf(effectiveBranchTab))
+      : 0
   const activeTabLabelledById =
     activeTabIndex >= 0
       ? workspacePaneViewButtonId(workspacePaneId, compact ? 0 : activeTabIndex)
@@ -120,6 +124,7 @@ export function BranchWorkspaceContent({ repo, detail, workspacePaneId }: Props)
           statusLoading={detail.loading.status}
           statusError={detail.errors.status}
           statusStale={detail.stale.status}
+          copyPatchAction={copyPatchAction}
         />
       )}
       {effectiveTab === 'terminal' && branch.worktree?.path && (
@@ -175,7 +180,11 @@ function BranchHistoryTab({
   }, [branchName, repoId])
 
   return (
-    <BranchTabPanel id={`${workspacePaneId}-history-panel`} labelledById={labelledById} busy={state.phase === 'loading'}>
+    <BranchTabPanel
+      id={`${workspacePaneId}-history-panel`}
+      labelledById={labelledById}
+      busy={state.phase === 'loading'}
+    >
       {state.phase === 'loading' ? (
         <StatusListSkeleton rows={8} />
       ) : state.phase === 'error' ? (
@@ -323,6 +332,7 @@ function BranchChangesTab({
   statusLoading,
   statusError,
   statusStale,
+  copyPatchAction,
 }: {
   workspacePaneId: string
   labelledById: string
@@ -332,6 +342,7 @@ function BranchChangesTab({
   statusLoading: boolean
   statusError: string | null
   statusStale: boolean
+  copyPatchAction?: BranchCopyPatchAction
 }) {
   const t = useT()
   const totalEntries = selectedStatus.reduce((n, wt) => n + wt.entries.length, 0)
@@ -346,9 +357,16 @@ function BranchChangesTab({
         <div className="flex min-h-0 flex-1 flex-col">
           {statusStale && statusError && <StaleStatusNotice message={statusError} />}
           {totalEntries > 0 ? (
-            <ScrollPane>
-              <StatusList status={selectedStatus} />
-            </ScrollPane>
+            <>
+              <ChangesTabToolbar
+                totalEntries={totalEntries}
+                copyPatchAction={copyPatchAction}
+                copyDisabled={statusLoading}
+              />
+              <ScrollPane>
+                <StatusList status={selectedStatus} />
+              </ScrollPane>
+            </>
           ) : (
             <StatusList status={selectedStatus} />
           )}
@@ -361,6 +379,46 @@ function BranchChangesTab({
         />
       )}
     </BranchTabPanel>
+  )
+}
+
+function ChangesTabToolbar({
+  totalEntries,
+  copyPatchAction,
+  copyDisabled,
+}: {
+  totalEntries: number
+  copyPatchAction?: BranchCopyPatchAction
+  copyDisabled: boolean
+}) {
+  const t = useT()
+  const showCopyPatch = !!copyPatchAction?.visible
+
+  return (
+    <div className="flex h-8 shrink-0 items-center gap-2 border-b border-separator/70 bg-background px-2">
+      <div className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground">
+        {t('tab.changes-with-count', { count: totalEntries })}
+      </div>
+      {showCopyPatch && (
+        <AsyncButton
+          variant="ghost"
+          size="sm"
+          loading={copyPatchAction.busy}
+          disabled={copyDisabled || copyPatchAction.disabled}
+          title={copyPatchAction.title}
+          aria-label={copyPatchAction.ariaLabel ?? copyPatchAction.title ?? copyPatchAction.label}
+          onClick={copyPatchAction.onSelect}
+          className="ml-auto"
+        >
+          {({ busy }) => (
+            <>
+              {busy ? <Loader2 className="size-3 animate-spin" /> : <ClipboardCopy className="size-3" />}
+              <span>{copyPatchAction.label}</span>
+            </>
+          )}
+        </AsyncButton>
+      )}
+    </div>
   )
 }
 
