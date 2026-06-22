@@ -13,9 +13,9 @@ export function toolbarTabChromeClassName(options: {
   hoverable?: boolean
 }): string {
   const { variant, active, dragging = false, compact = false, hoverable = true } = options
-  // Compact strips (repo *and* workspace) render only the visible tab, so the
-  // "active" chrome would be visually misleading — mute it to match the
-  // unselected chrome (the look of an idle tab on the expanded strip).
+  // The repo picker and compact workspace strips render only one visible item,
+  // so the "active" chrome would be visually misleading. Mute it to match the
+  // idle tab chrome from expanded strips.
   const muteActiveChrome = compact
   return cn(
     'group relative select-none items-center transition-colors duration-100',
@@ -45,8 +45,8 @@ export function toolbarTabButtonClassName(_variant: ToolbarTabVariant): string |
 }
 
 export function toolbarTabIconClassName(active: boolean, compact = false): string {
-  // Compact strips (repo *and* workspace) show only the visible tab; the
-  // icon follows the tab chrome and stays muted to match the unselected look.
+  // The repo picker and compact workspace strips show only one visible item;
+  // the icon follows the muted chrome.
   const emphasized = active && !compact
   return cn('shrink-0', emphasized ? 'text-foreground' : 'text-muted-foreground')
 }

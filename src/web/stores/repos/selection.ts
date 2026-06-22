@@ -1,4 +1,3 @@
-import { arrayMove } from '@dnd-kit/sortable'
 import { selectedBranchForViewMode } from '#/web/stores/repos/branch-view-mode.ts'
 import { replaceRepo, replaceRepoState } from '#/web/stores/repos/helpers.ts'
 import { persistRestorableRepoSnapshot } from '#/web/stores/repos/persistence.ts'
@@ -22,7 +21,6 @@ import { isBranchLevelWorkspacePaneView } from '#/web/lib/workspace-pane-view.ts
 type RestorableWorkspaceSelectionActions = Pick<
   ReposStore,
   | 'setActive'
-  | 'reorderRepos'
   | 'cycleActive'
   | 'applySessionLayoutState'
   | 'applySessionSelectedTerminalState'
@@ -50,16 +48,6 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
   return {
     setActive(id: string) {
       set((s) => (s.repos[id] && s.activeId !== id ? { activeId: id } : s))
-    },
-
-    reorderRepos(fromId: string, toId: string) {
-      if (fromId === toId) return
-      set((s) => {
-        const from = s.order.indexOf(fromId)
-        const to = s.order.indexOf(toId)
-        if (from === -1 || to === -1) return s
-        return { order: arrayMove(s.order, from, to) }
-      })
     },
 
     cycleActive(direction: 1 | -1) {

@@ -185,7 +185,7 @@ describe('CloneRepositoryDialog', () => {
 
     render(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
 
-    expect(queryButtonByText('repo-tabs.clone-parent-choose')).toBeNull()
+    expect(queryButtonByText('repo-picker.clone-parent-choose')).toBeNull()
   })
 })
 

@@ -3,8 +3,8 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { RepoTabStrip } from '#/web/components/repo-tabs/RepoTabStrip.tsx'
-import type { RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
+import { RepoPicker } from '#/web/components/repo-picker/RepoPicker.tsx'
+import type { RepoPickerRepo } from '#/web/components/repo-picker/types.ts'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
@@ -31,8 +31,8 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('RepoTabStrip keyboard navigation', () => {
-  test('moves between repos from the compact visible tab', () => {
+describe('RepoPicker keyboard navigation', () => {
+  test('moves between repos from the current repo button', () => {
     const onActivate = vi.fn()
 
     container = document.createElement('div')
@@ -40,7 +40,7 @@ describe('RepoTabStrip keyboard navigation', () => {
     root = createRoot(container)
     act(() => {
       root!.render(
-        <RepoTabStrip
+        <RepoPicker
           repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
           activeId="/tmp/repo-a"
           labels={labels}
@@ -53,18 +53,20 @@ describe('RepoTabStrip keyboard navigation', () => {
       )
     })
 
-    const tab = document.body.querySelector('[data-repo-tab-id="/tmp/repo-a"]')
-    if (!(tab instanceof HTMLButtonElement)) throw new Error('missing repo tab')
+    const currentRepoButton = document.body.querySelector('[data-current-repo-id="/tmp/repo-a"]')
+    if (!(currentRepoButton instanceof HTMLButtonElement)) throw new Error('missing current repo button')
 
     act(() => {
-      tab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', bubbles: true }))
+      currentRepoButton.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', bubbles: true }),
+      )
     })
 
     expect(onActivate).toHaveBeenCalledWith('/tmp/repo-b')
   })
 })
 
-function repo(name: string, id: string): RepoTabSummary {
+function repo(name: string, id: string): RepoPickerRepo {
   return { id, name, remoteDetails: [], lastSyncedAt: null, lifecycle: null }
 }
 

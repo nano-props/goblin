@@ -5,8 +5,8 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { RepoTabTooltipLayer } from '#/web/components/repo-tabs/RepoTabTooltipLayer.tsx'
-import type { RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
+import { RepoDetailsTooltipLayer } from '#/web/components/repo-picker/RepoDetailsTooltipLayer.tsx'
+import type { RepoPickerRepo } from '#/web/components/repo-picker/types.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 
@@ -59,10 +59,10 @@ afterEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
-describe('RepoTabTooltipLayer', () => {
-  test('shows all remotes in the repo tab tooltip', async () => {
+describe('RepoDetailsTooltipLayer', () => {
+  test('shows all remotes in the repo details tooltip', async () => {
     render(
-      <RepoTabTooltipLayer
+      <RepoDetailsTooltipLayer
         repos={[
           repo('goblin', '/Users/tester/Developer/goblin', [
             {
@@ -79,18 +79,18 @@ describe('RepoTabTooltipLayer', () => {
         ]}
         delayMs={0}
       >
-        <div data-repo-tab-tooltip-id="/Users/tester/Developer/goblin">goblin</div>
-      </RepoTabTooltipLayer>,
+        <div data-repo-tooltip-id="/Users/tester/Developer/goblin">goblin</div>
+      </RepoDetailsTooltipLayer>,
     )
 
-    hoverTab('/Users/tester/Developer/goblin')
+    hoverRepo('/Users/tester/Developer/goblin')
     await flushTimers()
 
     const text = document.body.textContent ?? ''
     expect(text).toContain('goblin')
     expect(text).toContain('~/Developer/goblin')
-    expect(text).toContain('repo-tabs.tooltip.last-sync-label')
-    expect(text).toContain('repo-tabs.tooltip.not-synced')
+    expect(text).toContain('repo-picker.tooltip.last-sync-label')
+    expect(text).toContain('repo-picker.tooltip.not-synced')
     expect(text).toContain('origin')
     expect(text).toContain('https://github.com/nano-props/goblin.git')
     expect(text).toContain('upstream')
@@ -100,21 +100,21 @@ describe('RepoTabTooltipLayer', () => {
 
   test('shows a no-remotes hint when the repo has no remotes', async () => {
     render(
-      <RepoTabTooltipLayer repos={[repo('local-only', '/Users/tester/Developer/local-only', [])]} delayMs={0}>
-        <div data-repo-tab-tooltip-id="/Users/tester/Developer/local-only">local-only</div>
-      </RepoTabTooltipLayer>,
+      <RepoDetailsTooltipLayer repos={[repo('local-only', '/Users/tester/Developer/local-only', [])]} delayMs={0}>
+        <div data-repo-tooltip-id="/Users/tester/Developer/local-only">local-only</div>
+      </RepoDetailsTooltipLayer>,
     )
 
-    hoverTab('/Users/tester/Developer/local-only')
+    hoverRepo('/Users/tester/Developer/local-only')
     await flushTimers()
 
-    expect(document.body.textContent).toContain('repo-tabs.tooltip.no-remotes')
+    expect(document.body.textContent).toContain('repo-picker.tooltip.no-remotes')
   })
 
   test('shows the relative last sync time when repo data has refreshed', async () => {
     vi.setSystemTime(new Date('2026-06-20T12:00:00.000Z'))
     render(
-      <RepoTabTooltipLayer
+      <RepoDetailsTooltipLayer
         repos={[
           {
             ...repo('repo', '/Users/tester/Developer/repo', []),
@@ -123,46 +123,46 @@ describe('RepoTabTooltipLayer', () => {
         ]}
         delayMs={0}
       >
-        <div data-repo-tab-tooltip-id="/Users/tester/Developer/repo">repo</div>
-      </RepoTabTooltipLayer>,
+        <div data-repo-tooltip-id="/Users/tester/Developer/repo">repo</div>
+      </RepoDetailsTooltipLayer>,
     )
 
-    hoverTab('/Users/tester/Developer/repo')
+    hoverRepo('/Users/tester/Developer/repo')
     await flushTimers()
 
     const text = document.body.textContent ?? ''
-    expect(text).toContain('repo-tabs.tooltip.last-sync-label')
+    expect(text).toContain('repo-picker.tooltip.last-sync-label')
     expect(text).toContain('2 minutes ago')
-    expect(text).not.toContain('repo-tabs.tooltip.not-synced')
+    expect(text).not.toContain('repo-picker.tooltip.not-synced')
   })
 
-  test('uses the provided tablist element as the tooltip root without an extra wrapper', () => {
+  test('uses the provided element as the tooltip root without an extra wrapper', () => {
     render(
-      <RepoTabTooltipLayer
+      <RepoDetailsTooltipLayer
         repos={[repo('goblin', '/Users/tester/Developer/goblin', [])]}
         className="flex h-full"
-        role="tablist"
+        role="group"
       >
-        <div data-repo-tab-tooltip-id="/Users/tester/Developer/goblin">goblin</div>
-      </RepoTabTooltipLayer>,
+        <div data-repo-tooltip-id="/Users/tester/Developer/goblin">goblin</div>
+      </RepoDetailsTooltipLayer>,
     )
 
-    expect(container?.firstElementChild?.getAttribute('role')).toBe('tablist')
+    expect(container?.firstElementChild?.getAttribute('role')).toBe('group')
     expect(container?.firstElementChild?.className).toContain('h-full')
     expect(
-      container?.firstElementChild?.querySelector('[data-repo-tab-tooltip-id="/Users/tester/Developer/goblin"]'),
+      container?.firstElementChild?.querySelector('[data-repo-tooltip-id="/Users/tester/Developer/goblin"]'),
     ).not.toBeNull()
   })
 
   test('keeps the tooltip open when the same hovered item is updated in place', async () => {
     const repos = [repo('goblin', '/Users/tester/Developer/goblin', [])]
     render(
-      <RepoTabTooltipLayer repos={repos} delayMs={0}>
-        <div data-repo-tab-tooltip-id="/Users/tester/Developer/goblin">goblin</div>
-      </RepoTabTooltipLayer>,
+      <RepoDetailsTooltipLayer repos={repos} delayMs={0}>
+        <div data-repo-tooltip-id="/Users/tester/Developer/goblin">goblin</div>
+      </RepoDetailsTooltipLayer>,
     )
 
-    hoverTab('/Users/tester/Developer/goblin')
+    hoverRepo('/Users/tester/Developer/goblin')
     await flushTimers()
 
     const firstTooltip = document.body.querySelector('[role="tooltip"]')
@@ -170,9 +170,9 @@ describe('RepoTabTooltipLayer', () => {
 
     act(() => {
       root!.render(
-        <RepoTabTooltipLayer repos={[repo('goblin-renamed', '/Users/tester/Developer/goblin', [])]} delayMs={0}>
-          <div data-repo-tab-tooltip-id="/Users/tester/Developer/goblin">goblin-renamed</div>
-        </RepoTabTooltipLayer>,
+        <RepoDetailsTooltipLayer repos={[repo('goblin-renamed', '/Users/tester/Developer/goblin', [])]} delayMs={0}>
+          <div data-repo-tooltip-id="/Users/tester/Developer/goblin">goblin-renamed</div>
+        </RepoDetailsTooltipLayer>,
       )
     })
 
@@ -185,21 +185,21 @@ describe('RepoTabTooltipLayer', () => {
     function Harness() {
       const [hovered, setHovered] = useState(false)
       return (
-        <RepoTabTooltipLayer repos={[repo('goblin', '/Users/tester/Developer/goblin', [])]}>
+        <RepoDetailsTooltipLayer repos={[repo('goblin', '/Users/tester/Developer/goblin', [])]}>
           <div
             data-hovered={hovered ? 'true' : 'false'}
-            data-repo-tab-tooltip-id="/Users/tester/Developer/goblin"
+            data-repo-tooltip-id="/Users/tester/Developer/goblin"
             onPointerEnter={() => setHovered(true)}
           >
             goblin
           </div>
-        </RepoTabTooltipLayer>
+        </RepoDetailsTooltipLayer>
       )
     }
 
     render(<Harness />)
 
-    hoverTab('/Users/tester/Developer/goblin')
+    hoverRepo('/Users/tester/Developer/goblin')
     await flushTimers()
 
     const tooltip = document.body.querySelector('[role="tooltip"]')
@@ -209,9 +209,9 @@ describe('RepoTabTooltipLayer', () => {
 
   test('keeps the tooltip open when a container leave event fires while the pointer is still inside the strip gap', async () => {
     render(
-      <RepoTabTooltipLayer repos={[repo('goblin', '/Users/tester/Developer/goblin', [])]} delayMs={0}>
-        <div data-repo-tab-tooltip-id="/Users/tester/Developer/goblin">goblin</div>
-      </RepoTabTooltipLayer>,
+      <RepoDetailsTooltipLayer repos={[repo('goblin', '/Users/tester/Developer/goblin', [])]} delayMs={0}>
+        <div data-repo-tooltip-id="/Users/tester/Developer/goblin">goblin</div>
+      </RepoDetailsTooltipLayer>,
     )
 
     const layer = container?.firstElementChild
@@ -229,7 +229,7 @@ describe('RepoTabTooltipLayer', () => {
         toJSON: () => ({}),
       }) as DOMRect
 
-    hoverTab('/Users/tester/Developer/goblin')
+    hoverRepo('/Users/tester/Developer/goblin')
     await flushTimers()
 
     expect(document.body.querySelector('[role="tooltip"]')).not.toBeNull()
@@ -244,21 +244,21 @@ describe('RepoTabTooltipLayer', () => {
 
   test('hides the tooltip when pointerout leaves the window without a container pointerleave', async () => {
     render(
-      <RepoTabTooltipLayer repos={[repo('goblin', '/Users/tester/Developer/goblin', [])]} delayMs={0}>
-        <div data-repo-tab-tooltip-id="/Users/tester/Developer/goblin">goblin</div>
-      </RepoTabTooltipLayer>,
+      <RepoDetailsTooltipLayer repos={[repo('goblin', '/Users/tester/Developer/goblin', [])]} delayMs={0}>
+        <div data-repo-tooltip-id="/Users/tester/Developer/goblin">goblin</div>
+      </RepoDetailsTooltipLayer>,
     )
 
-    const tab = document.body.querySelector('[data-repo-tab-tooltip-id="/Users/tester/Developer/goblin"]')
-    if (!(tab instanceof HTMLElement)) throw new Error('Missing tooltip tab')
+    const target = document.body.querySelector('[data-repo-tooltip-id="/Users/tester/Developer/goblin"]')
+    if (!(target instanceof HTMLElement)) throw new Error('Missing tooltip target')
 
-    hoverTab('/Users/tester/Developer/goblin')
+    hoverRepo('/Users/tester/Developer/goblin')
     await flushTimers()
 
     expect(document.body.querySelector('[role="tooltip"]')).not.toBeNull()
 
     act(() => {
-      tab.dispatchEvent(new MouseEvent('pointerout', { bubbles: true }))
+      target.dispatchEvent(new MouseEvent('pointerout', { bubbles: true }))
     })
     await flushTimers()
 
@@ -266,7 +266,7 @@ describe('RepoTabTooltipLayer', () => {
   })
 })
 
-function repo(name: string, id: string, remoteDetails: RepoTabSummary['remoteDetails']): RepoTabSummary {
+function repo(name: string, id: string, remoteDetails: RepoPickerRepo['remoteDetails']): RepoPickerRepo {
   return { id, name, remoteDetails, lastSyncedAt: null, lifecycle: null }
 }
 
@@ -279,11 +279,11 @@ function render(element: ReactNode) {
   })
 }
 
-function hoverTab(id: string) {
-  const element = [...document.body.querySelectorAll('[data-repo-tab-tooltip-id]')].find(
-    (candidate) => candidate.getAttribute('data-repo-tab-tooltip-id') === id,
+function hoverRepo(id: string) {
+  const element = [...document.body.querySelectorAll('[data-repo-tooltip-id]')].find(
+    (candidate) => candidate.getAttribute('data-repo-tooltip-id') === id,
   )
-  if (!(element instanceof HTMLElement)) throw new Error(`Missing tab: ${id}`)
+  if (!(element instanceof HTMLElement)) throw new Error(`Missing repo target: ${id}`)
   element.getBoundingClientRect = () =>
     ({
       left: 12,

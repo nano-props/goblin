@@ -164,8 +164,8 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
       }}
       showCloseButton={!pending}
       className="sm:max-w-xl"
-      title={t('repo-tabs.open-remote-title')}
-      description={t('repo-tabs.open-remote-description')}
+      title={t('repo-picker.open-remote-title')}
+      description={t('repo-picker.open-remote-description')}
     >
       <form
         className="space-y-3"
@@ -175,7 +175,7 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
         }}
       >
         <Field className="gap-2">
-          <FieldLabel htmlFor="remote-ssh-host">{t('repo-tabs.open-remote-host-alias-label')}</FieldLabel>
+          <FieldLabel htmlFor="remote-ssh-host">{t('repo-picker.open-remote-host-alias-label')}</FieldLabel>
           {hasInclude ? (
             <>
               <Input
@@ -202,7 +202,7 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
                   ))}
                 </datalist>
               )}
-              <FieldDescription>{t('repo-tabs.open-remote-include-manual-hint')}</FieldDescription>
+              <FieldDescription>{t('repo-picker.open-remote-include-manual-hint')}</FieldDescription>
             </>
           ) : hosts.length > 0 ? (
             <Select
@@ -236,7 +236,7 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
         </Field>
 
         <Field className="gap-2" data-invalid={pathFieldError ? true : undefined}>
-          <FieldLabel htmlFor="remote-path">{t('repo-tabs.open-remote-path-label')}</FieldLabel>
+          <FieldLabel htmlFor="remote-path">{t('repo-picker.open-remote-path-label')}</FieldLabel>
           <Input
             id="remote-path"
             ref={pathInputRef}
@@ -247,7 +247,7 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
               setRemotePath(event.target.value)
               clearResolvedRemoteState()
             }}
-            placeholder={t('repo-tabs.open-remote-path-placeholder')}
+            placeholder={t('repo-picker.open-remote-path-placeholder')}
             className="h-10 font-mono text-sm"
             list={pathSuggestions.length > 0 ? 'open-remote-path-suggestions' : undefined}
           />
@@ -271,8 +271,8 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
           loading={loading}
           idleText={
             !hasInclude && hosts.length === 0
-              ? t('repo-tabs.open-remote-config-required')
-              : t('repo-tabs.open-remote-diagnostics-idle-detail')
+              ? t('repo-picker.open-remote-config-required')
+              : t('repo-picker.open-remote-diagnostics-idle-detail')
           }
         />
 
@@ -293,14 +293,14 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
             disabled={!canSubmit || pending}
             onClick={() => void handleTest()}
           >
-            {t('repo-tabs.open-remote-test-connection')}
+            {t('repo-picker.open-remote-test-connection')}
           </Button>
           <Button
             type="submit"
             className={cn('min-w-28', compact && 'w-full min-w-0')}
             disabled={!canSubmit || pending}
           >
-            {t('repo-tabs.open-remote-confirm')}
+            {t('repo-picker.open-remote-confirm')}
           </Button>
         </DialogFooter>
       </form>
@@ -310,8 +310,8 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
 
 export function remotePathError(value: string): { errorKey: string | null } {
   const trimmed = value.trim()
-  if (!trimmed) return { errorKey: 'repo-tabs.open-remote-path-required' }
-  if (!isValidRemotePathInput(trimmed)) return { errorKey: 'repo-tabs.open-remote-path-absolute' }
+  if (!trimmed) return { errorKey: 'repo-picker.open-remote-path-required' }
+  if (!isValidRemotePathInput(trimmed)) return { errorKey: 'repo-picker.open-remote-path-absolute' }
   return { errorKey: null }
 }
 
@@ -332,7 +332,7 @@ export function formatRemoteDialogError(
   err: unknown,
 ): string {
   const message = err instanceof Error ? err.message : String(err)
-  if (message.startsWith('error.') || message.startsWith('repo-tabs.')) return t(message)
+  if (message.startsWith('error.') || message.startsWith('repo-picker.')) return t(message)
   return message
 }
 

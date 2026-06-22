@@ -24,13 +24,13 @@ const SESSION_PROBE_CONCURRENCY = 4
 function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet): RestorableWorkspaceLifecycleActions {
   return {
     async hydrateSession(openRepos: RepoSessionEntry[], activeRepo: string | null, signal?: AbortSignal) {
-      // Boot/session restore of workspace membership and active tab. This
+      // Boot/session restore of workspace membership and active repository. This
       // reopens what SessionState described, but does not subscribe the repos
       // store to future session writes from persistence.
       //
-      // The flow is split into two phases so the tab strip never sits
+      // The flow is split into two phases so the repo picker never sits
       // empty on a slow SSH network:
-      //   Phase 1 (synchronous): paint a placeholder tab for every entry
+      //   Phase 1 (synchronous): paint a placeholder repo for every entry
       //     using the cached projection (if any) and the entry's own
       //     metadata. For remote entries the host/port are not yet known
       //     (resolveRemoteRepositoryTarget hasn't run), so the placeholder
@@ -83,10 +83,10 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
       })
 
       // Flip sessionReady unconditionally once Phase 1 has finished.
-      // With tabs, the boot skeleton (shown only when no activeId) gives
+      // With open repositories, the boot skeleton (shown only when no activeId) gives
       // way to a real workspace immediately — the per-repo body keeps
-      // showing its own skeleton until each snapshot resolves. With no
-      // tabs (openRepos was empty), there's nothing else to compute but
+      // showing its own skeleton until each snapshot resolves. With no open
+      // repositories (openRepos was empty), there's nothing else to compute but
       // we still need to clear the boot skeleton, so just flip the flag.
       set((s) => {
         if (s.sessionReady) return s

@@ -6,14 +6,14 @@ import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
 import { ToolbarTabStripBody } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
-import { RepoTab } from '#/web/components/repo-tabs/RepoTab.tsx'
-import { RepoTabTooltipLayer } from '#/web/components/repo-tabs/RepoTabTooltipLayer.tsx'
-import { useFocusRegistry, type FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
-import type { RepoTabStripLabels, RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
+import { CurrentRepoButton } from '#/web/components/repo-picker/CurrentRepoButton.tsx'
+import { RepoDetailsTooltipLayer } from '#/web/components/repo-picker/RepoDetailsTooltipLayer.tsx'
+import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
+import type { RepoPickerLabels, RepoPickerRepo } from '#/web/components/repo-picker/types.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 
-function navigatedRepoTabId(
-  repos: RepoTabSummary[],
+function navigatedRepoId(
+  repos: RepoPickerRepo[],
   currentId: string,
   direction: 'prev' | 'next' | 'first' | 'last',
 ): string | null {
@@ -32,10 +32,10 @@ function navigatedRepoTabId(
   return repos[index]?.id ?? null
 }
 
-interface RepoTabStripProps {
-  repos: RepoTabSummary[]
+interface RepoPickerProps {
+  repos: RepoPickerRepo[]
   activeId: string | null
-  labels: RepoTabStripLabels
+  labels: RepoPickerLabels
   onActivate: (id: string) => void
   onClose: (id: string) => void
   onOpenLocal: () => void
@@ -43,7 +43,7 @@ interface RepoTabStripProps {
   onClone: () => void
 }
 
-function RepoTabEdgeAction({ children, showSeparator = false }: { children: ReactNode; showSeparator?: boolean }) {
+function RepoPickerEdgeAction({ children, showSeparator = false }: { children: ReactNode; showSeparator?: boolean }) {
   return (
     <div className="relative flex h-8 shrink-0 items-center pl-1">
       {showSeparator && (
@@ -90,7 +90,7 @@ function OpenRepoPopover({
   onOpenLocal,
   onOpenRemote,
   onClone,
-}: Pick<RepoTabStripProps, 'labels' | 'onOpenLocal' | 'onOpenRemote' | 'onClone'>) {
+}: Pick<RepoPickerProps, 'labels' | 'onOpenLocal' | 'onOpenRemote' | 'onClone'>) {
   const [open, setOpen] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
   const selectAction = (action: () => void) => {
@@ -156,9 +156,9 @@ function RepoSwitcherPopover({
   onOpenRemote,
   onClone,
 }: {
-  repos: RepoTabSummary[]
+  repos: RepoPickerRepo[]
   activeId: string | null
-  labels: RepoTabStripLabels
+  labels: RepoPickerLabels
   onActivate: (id: string) => void
   onClose: (id: string) => void
   onOpenLocal: () => void
@@ -270,51 +270,7 @@ function RepoSwitcherPopover({
   )
 }
 
-function CompactRepoTabs({
-  visibleRepos,
-  allRepos,
-  activeId,
-  labels,
-  onActivate,
-  onKeyboardNavigate,
-  focusRegistry,
-  moreMenu,
-}: {
-  visibleRepos: RepoTabSummary[]
-  allRepos: RepoTabSummary[]
-  activeId: string | null
-  labels: RepoTabStripLabels
-  onActivate: (id: string) => void
-  onKeyboardNavigate: (id: string, direction: 'prev' | 'next' | 'first' | 'last') => void
-  focusRegistry: FocusRegistry<string, HTMLButtonElement>
-  moreMenu: ReactNode
-}) {
-  const showMoreSeparator = visibleRepos.length > 0
-
-  return (
-    <ToolbarTabStripBody>
-      <RepoTabTooltipLayer repos={allRepos} role="tablist">
-        {visibleRepos.map((repo, index) => (
-          <RepoTab
-            key={repo.id}
-            repo={repo}
-            isActive={repo.id === activeId}
-            index={index}
-            total={allRepos.length}
-            focusRegistry={focusRegistry}
-            onActivate={onActivate}
-            onKeyboardNavigate={onKeyboardNavigate}
-            unavailableLabel={labels.unavailable}
-            compact
-          />
-        ))}
-      </RepoTabTooltipLayer>
-      <RepoTabEdgeAction showSeparator={showMoreSeparator}>{moreMenu}</RepoTabEdgeAction>
-    </ToolbarTabStripBody>
-  )
-}
-
-export function RepoTabStrip({
+export function RepoPicker({
   repos,
   activeId,
   labels,
@@ -323,7 +279,7 @@ export function RepoTabStrip({
   onOpenLocal,
   onOpenRemote,
   onClone,
-}: RepoTabStripProps) {
+}: RepoPickerProps) {
   const focusRegistry = useFocusRegistry<string, HTMLButtonElement>()
 
   const handleClose = useCallback(
@@ -340,38 +296,38 @@ export function RepoTabStrip({
   )
 
   const handleKeyboardNavigate = (id: string, direction: 'prev' | 'next' | 'first' | 'last') => {
-    const nextId = navigatedRepoTabId(repos, id, direction)
+    const nextId = navigatedRepoId(repos, id, direction)
     if (!nextId) return
     onActivate(nextId)
     focusRegistry.focus(nextId)
   }
 
-  const activeRepo = repos.find((r) => r.id === activeId)
-  // The repo strip now always renders the compact shape: one visible repo tab
-  // plus a switcher popover that contains every open repo and open/clone actions.
-  const visibleRepos = activeRepo ? [activeRepo] : repos.slice(0, 1)
+  const currentRepo = repos.find((r) => r.id === activeId) ?? repos[0] ?? null
 
   const openMenu = (
-    <RepoTabEdgeAction>
+    <RepoPickerEdgeAction>
       <OpenRepoPopover labels={labels} onOpenLocal={onOpenLocal} onOpenRemote={onOpenRemote} onClone={onClone} />
-    </RepoTabEdgeAction>
+    </RepoPickerEdgeAction>
   )
 
   return (
     <nav className="flex h-full min-w-0 flex-1 items-center" aria-label={labels.repositories}>
-      {repos.length === 0 ? (
+      {!currentRepo ? (
         openMenu
       ) : (
         <div className="flex h-full min-w-0 flex-1 items-center">
-          <CompactRepoTabs
-            visibleRepos={visibleRepos}
-            allRepos={repos}
-            activeId={activeId}
-            labels={labels}
-            focusRegistry={focusRegistry}
-            onActivate={onActivate}
-            onKeyboardNavigate={handleKeyboardNavigate}
-            moreMenu={
+          <ToolbarTabStripBody>
+            <RepoDetailsTooltipLayer repos={repos} role="tablist" data-current-repo-group>
+              <CurrentRepoButton
+                repo={currentRepo}
+                isCurrent={currentRepo.id === activeId}
+                focusRegistry={focusRegistry}
+                onActivate={onActivate}
+                onKeyboardNavigate={handleKeyboardNavigate}
+                unavailableLabel={labels.unavailable}
+              />
+            </RepoDetailsTooltipLayer>
+            <RepoPickerEdgeAction showSeparator>
               <RepoSwitcherPopover
                 repos={repos}
                 activeId={activeId}
@@ -382,8 +338,8 @@ export function RepoTabStrip({
                 onOpenRemote={onOpenRemote}
                 onClone={onClone}
               />
-            }
-          />
+            </RepoPickerEdgeAction>
+          </ToolbarTabStripBody>
         </div>
       )}
     </nav>

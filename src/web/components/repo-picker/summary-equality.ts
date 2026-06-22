@@ -1,41 +1,44 @@
-import type { RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
-import { isRemoteRepoLifecycleTerminal, type RemoteRepoLifecycle } from '#/shared/remote-repo.ts'
+import type { RepoPickerRepo } from '#/web/components/repo-picker/types.ts'
+import { isRemoteRepoLifecycleTerminal, type RemoteRepoLifecycle, type RemoteRepoTarget } from '#/shared/remote-repo.ts'
 
 /**
  * Structural equality for the lifecycle union as it appears on a
- * `RepoTabSummary`. The `connecting` variant is the only
- * discriminating case here, since the only thing the tab UI cares
- * about is whether the lifecycle has converged.
+ * `RepoPickerRepo`. The `connecting` variant has no fields, while
+ * terminal variants include the rendered remote locator.
  */
+function remoteTargetEqual(a: RemoteRepoTarget, b: RemoteRepoTarget): boolean {
+  return (
+    a.id === b.id &&
+    a.alias === b.alias &&
+    a.host === b.host &&
+    a.user === b.user &&
+    a.port === b.port &&
+    a.remotePath === b.remotePath &&
+    a.displayName === b.displayName
+  )
+}
+
 function lifecycleEqual(a: RemoteRepoLifecycle | null, b: RemoteRepoLifecycle | null): boolean {
   if (a === b) return true
   if (!a || !b) return false
   if (a.kind !== b.kind) return false
   if (a.kind === 'connecting' && b.kind === 'connecting') return true
   if (a.kind === 'ready' && b.kind === 'ready') {
-    return (
-      a.target.id === b.target.id &&
-      a.target.alias === b.target.alias &&
-      a.target.host === b.target.host &&
-      a.target.user === b.target.user &&
-      a.target.port === b.target.port &&
-      a.target.remotePath === b.target.remotePath &&
-      a.target.displayName === b.target.displayName
-    )
+    return remoteTargetEqual(a.target, b.target)
   }
   if (a.kind === 'failed' && b.kind === 'failed') {
     if (a.reason !== b.reason) return false
     if (a.target && !b.target) return false
     if (!a.target && b.target) return false
     if (a.target && b.target) {
-      return a.target.id === b.target.id && a.target.host === b.target.host
+      return remoteTargetEqual(a.target, b.target)
     }
     return true
   }
   return !isRemoteRepoLifecycleTerminal(a) && !isRemoteRepoLifecycleTerminal(b)
 }
 
-export function repoTabSummariesEqual(a: RepoTabSummary[], b: RepoTabSummary[]): boolean {
+export function repoPickerReposEqual(a: RepoPickerRepo[], b: RepoPickerRepo[]): boolean {
   if (a === b) return true
   if (a.length !== b.length) return false
   for (let i = 0; i < a.length; i++) {

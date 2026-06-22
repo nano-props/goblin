@@ -113,8 +113,8 @@ describe('OpenRemoteRepositoryDialog', () => {
 
     expect(document.body.querySelector('[data-slot="remote-diagnostics-status"]')).not.toBeNull()
     expect(document.body.querySelector('[data-slot="dialog-status-row"]')).not.toBeNull()
-    expect(document.body.textContent).toContain('repo-tabs.open-remote-diagnostics-idle-detail')
-    expect(document.body.textContent).not.toContain('repo-tabs.open-remote-path-required')
+    expect(document.body.textContent).toContain('repo-picker.open-remote-diagnostics-idle-detail')
+    expect(document.body.textContent).not.toContain('repo-picker.open-remote-path-required')
   })
 
   test('updates typed values in the host and path inputs', async () => {
@@ -170,10 +170,10 @@ describe('OpenRemoteRepositoryDialog', () => {
 
     setInputValue('#remote-ssh-host', 'prod')
     setInputValue('#remote-path', '~/repo')
-    clickButtonByText('repo-tabs.open-remote-test-connection')
+    clickButtonByText('repo-picker.open-remote-test-connection')
     await flush()
 
-    expect(document.body.textContent).toContain('repo-tabs.open-remote-diagnostics-ok')
+    expect(document.body.textContent).toContain('repo-picker.open-remote-diagnostics-ok')
   })
 
   test('shows a testing tip while connection test is running', async () => {
@@ -218,10 +218,10 @@ describe('OpenRemoteRepositoryDialog', () => {
 
     setInputValue('#remote-ssh-host', 'prod')
     setInputValue('#remote-path', '/srv/repo')
-    clickButtonByText('repo-tabs.open-remote-test-connection')
+    clickButtonByText('repo-picker.open-remote-test-connection')
     await flush()
 
-    expect(document.body.textContent).toContain('repo-tabs.open-remote-diagnostics-testing')
+    expect(document.body.textContent).toContain('repo-picker.open-remote-diagnostics-testing')
 
     if (resolveTest) resolveTest({ ok: true, target, stages: [] })
     await flush()
@@ -272,13 +272,13 @@ describe('OpenRemoteRepositoryDialog', () => {
 
     setInputValue('#remote-ssh-host', 'prod')
     setInputValue('#remote-path', '/srv/repo')
-    clickButtonByText('repo-tabs.open-remote-test-connection')
+    clickButtonByText('repo-picker.open-remote-test-connection')
     await flush()
 
-    const copyButton = findButtonByText('repo-tabs.open-remote-diagnostics-copy-details')
+    const copyButton = findButtonByText('repo-picker.open-remote-diagnostics-copy-details')
     const row = copyButton.parentElement
     expect(row?.textContent).toContain('handshake-failed')
-    expect(row?.textContent).toContain('repo-tabs.open-remote-diagnostics-copy-details')
+    expect(row?.textContent).toContain('repo-picker.open-remote-diagnostics-copy-details')
   })
 
   test('does not reserve an empty helper row below the SSH alias select', async () => {
@@ -329,11 +329,11 @@ describe('OpenRemoteRepositoryDialog', () => {
     )
     await flush()
 
-    expect(document.body.textContent).not.toContain('repo-tabs.open-remote-path-required')
+    expect(document.body.textContent).not.toContain('repo-picker.open-remote-path-required')
 
     setInputValue('#remote-path', 'repo')
 
-    expect(document.body.textContent).toContain('repo-tabs.open-remote-path-absolute')
+    expect(document.body.textContent).toContain('repo-picker.open-remote-path-absolute')
   })
 
   test('focuses the host alias input when include mode requires manual host entry', async () => {

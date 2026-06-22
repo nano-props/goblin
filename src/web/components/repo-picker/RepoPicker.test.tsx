@@ -3,8 +3,8 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { RepoTabStrip } from '#/web/components/repo-tabs/RepoTabStrip.tsx'
-import type { RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
+import { RepoPicker } from '#/web/components/repo-picker/RepoPicker.tsx'
+import type { RepoPickerRepo } from '#/web/components/repo-picker/types.ts'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
@@ -12,19 +12,6 @@ const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENV
 
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn((query: string) => ({
-      matches: query === '(max-width: 639px)',
-      media: query,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    })),
-  )
 })
 
 afterEach(() => {
@@ -38,10 +25,10 @@ afterEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
-describe('RepoTabStrip', () => {
-  test('keeps the overflow popover trigger outside the tablist on small screens', () => {
+describe('RepoPicker', () => {
+  test('keeps the switcher trigger outside the current repo group', () => {
     render(
-      <RepoTabStrip
+      <RepoPicker
         repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
         activeId="/tmp/repo-a"
         labels={labels}
@@ -53,17 +40,41 @@ describe('RepoTabStrip', () => {
       />,
     )
 
-    const tablist = document.body.querySelector('[role="tablist"]')
-    expect(tablist).not.toBeNull()
-    expect(tablist?.getAttribute('aria-orientation')).toBe('horizontal')
-    expect(tablist?.querySelector('[role="tab"]')).not.toBeNull()
-    expect(tablist?.querySelector('[aria-label="More"]')).toBeNull()
+    const currentRepoGroup = document.body.querySelector('[data-current-repo-group]')
+    expect(currentRepoGroup).not.toBeNull()
+    expect(currentRepoGroup?.querySelector('[data-current-repo-id="/tmp/repo-a"]')).not.toBeNull()
+    expect(currentRepoGroup?.querySelector('[aria-label="More"]')).toBeNull()
     expect(document.body.querySelector('button[aria-label="More"]')).not.toBeNull()
+  })
+
+  test('exposes the current repo button as a selected tab in a horizontal tablist', () => {
+    render(
+      <RepoPicker
+        repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
+        activeId="/tmp/repo-a"
+        labels={labels}
+        onActivate={() => {}}
+        onClose={() => {}}
+        onOpenLocal={() => {}}
+        onOpenRemote={() => {}}
+        onClone={() => {}}
+      />,
+    )
+
+    const tablist = document.body.querySelector('[data-current-repo-group]')
+    expect(tablist?.getAttribute('role')).toBe('tablist')
+    expect(tablist?.getAttribute('aria-orientation')).toBe('horizontal')
+
+    const activeTab = document.body.querySelector('[data-current-repo-id="/tmp/repo-a"]')
+    if (!(activeTab instanceof HTMLButtonElement)) throw new Error('missing current repo tab')
+    expect(activeTab.getAttribute('role')).toBe('tab')
+    expect(activeTab.getAttribute('aria-selected')).toBe('true')
+    expect(activeTab.tabIndex).toBe(0)
   })
 
   test('shows the active repo in the repo switcher popover with selected styling', async () => {
     render(
-      <RepoTabStrip
+      <RepoPicker
         repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
         activeId="/tmp/repo-a"
         labels={labels}
@@ -91,11 +102,11 @@ describe('RepoTabStrip', () => {
     expect(selectedItem?.className).toContain('bg-selected')
   })
 
-  test('renders only the active repo tab when multiple repos are open, with the rest in the overflow popover', () => {
+  test('renders only the active repo button when multiple repos are open, with the rest in the switcher popover', () => {
     vi.stubGlobal('matchMedia', createMatchMedia(false))
 
     render(
-      <RepoTabStrip
+      <RepoPicker
         repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b'), repo('repo-c', '/tmp/repo-c')]}
         activeId="/tmp/repo-b"
         labels={labels}
@@ -107,17 +118,15 @@ describe('RepoTabStrip', () => {
       />,
     )
 
-    // Only the active repo is rendered as a tab; every other repo lives
-    // behind the overflow popover trigger.
-    expect(document.body.querySelector('[data-repo-tab-id="/tmp/repo-b"]')).not.toBeNull()
-    expect(document.body.querySelector('[data-repo-tab-id="/tmp/repo-a"]')).toBeNull()
-    expect(document.body.querySelector('[data-repo-tab-id="/tmp/repo-c"]')).toBeNull()
+    expect(document.body.querySelector('[data-current-repo-id="/tmp/repo-b"]')).not.toBeNull()
+    expect(document.body.querySelector('[data-current-repo-id="/tmp/repo-a"]')).toBeNull()
+    expect(document.body.querySelector('[data-current-repo-id="/tmp/repo-c"]')).toBeNull()
     expect(document.body.querySelector('button[aria-label="More"]')).not.toBeNull()
   })
 
-  test('keeps repo tab chrome borderless with hover while leaving close action in the repo switcher popover', async () => {
+  test('keeps current repo chrome borderless with hover while leaving close action in the repo switcher popover', async () => {
     render(
-      <RepoTabStrip
+      <RepoPicker
         repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
         activeId="/tmp/repo-a"
         labels={labels}
@@ -129,15 +138,15 @@ describe('RepoTabStrip', () => {
       />,
     )
 
-    const tab = document.body.querySelector('[data-repo-tab-id="/tmp/repo-a"]')
-    if (!(tab instanceof HTMLButtonElement)) throw new Error('missing repo tab')
+    const currentRepoButton = document.body.querySelector('[data-current-repo-id="/tmp/repo-a"]')
+    if (!(currentRepoButton instanceof HTMLButtonElement)) throw new Error('missing current repo button')
 
-    const tabChrome = tab.closest('[role="presentation"]')
-    expect(tabChrome?.className).toContain('border-transparent')
-    expect(tabChrome?.className).not.toContain('border-separator')
-    expect(tabChrome?.className).toContain('hover:bg-accent/70')
-    expect(tabChrome?.className).toContain('hover:text-foreground')
-    expect(tabChrome?.querySelector('button[aria-label="Close repo-a"]')).toBeNull()
+    const currentRepoChrome = currentRepoButton.closest('[data-current-repo-chrome]')
+    expect(currentRepoChrome?.className).toContain('border-transparent')
+    expect(currentRepoChrome?.className).not.toContain('border-separator')
+    expect(currentRepoChrome?.className).toContain('hover:bg-accent/70')
+    expect(currentRepoChrome?.className).toContain('hover:text-foreground')
+    expect(currentRepoChrome?.querySelector('button[aria-label="Close repo-a"]')).toBeNull()
 
     const trigger = document.body.querySelector('button[aria-label="More"]')
     if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing more trigger')
@@ -167,7 +176,7 @@ function render(element: React.ReactNode) {
   })
 }
 
-function repo(name: string, id: string): RepoTabSummary {
+function repo(name: string, id: string): RepoPickerRepo {
   return { id, name, remoteDetails: [], lastSyncedAt: null, lifecycle: null }
 }
 

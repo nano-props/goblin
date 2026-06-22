@@ -111,7 +111,7 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
       // same mapping. The server-side composeTarget-then-probe
       // order means a failed probe STILL has the resolved
       // target — we forward it in `lifecycle.target` so the
-      // UI keeps showing the remote locator on the failed tab.
+      // UI keeps showing the remote locator on the failed repo.
       const failureTarget = resolveResult?.target
       return {
         kind: 'failed',

@@ -284,7 +284,7 @@ describe('setWorkspacePaneView', () => {
     expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('terminal')
   })
 
-  test('does not refresh when reselecting the current tab', () => {
+  test('does not refresh when reselecting the current workspace pane view', () => {
     seedRepo({ selectedBranch: 'main', workspacePaneView: 'status' })
     const before = useReposStore.getState().repos[REPO_ID]
     useReposStore.getState().setWorkspacePaneView(REPO_ID, 'status')

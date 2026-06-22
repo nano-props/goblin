@@ -31,7 +31,7 @@ describe('OpenRemoteRepositoryDialog helpers', () => {
   })
 
   test('rejects non-absolute remote paths', () => {
-    expect(remotePathError('repo').errorKey).toBe('repo-tabs.open-remote-path-absolute')
+    expect(remotePathError('repo').errorKey).toBe('repo-picker.open-remote-path-absolute')
     expect(remotePathError('~/repo').errorKey).toBeNull()
   })
 

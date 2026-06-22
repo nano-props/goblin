@@ -15,13 +15,10 @@ import {
   mainWindowNavigationStoreActionsFromStore,
   rendererEffectIntentStoreActionsEqual,
   rendererEffectIntentStoreActionsFromStore,
-  repoTabStoreActionsEqual,
-  repoTabStoreActionsFromStore,
+  repoPickerStoreActionsEqual,
+  repoPickerStoreActionsFromStore,
   restorableWorkspaceLayoutPreferenceStoreActionsFromStore,
   restorableWorkspaceLayoutStoreActionsFromStore,
-  restorableWorkspaceNavigationStoreActionsFromStore,
-  restorableWorkspaceOrderStoreActionsFromStore,
-  restorableWorkspaceStoreActionsFromStore,
   restorableWorkspaceViewportStoreActionsFromStore,
   runtimeCoherentRepoNavigationStoreActionsFromStore,
   runtimeCoherentRepoOpenStoreActionsFromStore,
@@ -151,34 +148,6 @@ describe('repo selectors', () => {
     const fnA = () => {}
     const fnB = () => {}
     expect(
-      restorableWorkspaceStoreActionsFromStore({
-        setActive: fnA as never,
-        reorderRepos: fnA as never,
-        cycleActive: fnA as never,
-        toggleWorkspaceFocused: fnA as never,
-        resetLayout: fnA as never,
-        setSelectedTerminal: fnA as never,
-      }),
-    ).toMatchObject({
-      setActive: fnA,
-      reorderRepos: fnA,
-      cycleActive: fnA,
-      toggleWorkspaceFocused: fnA,
-      resetLayout: fnA,
-      setSelectedTerminal: fnA,
-    })
-    expect(
-      restorableWorkspaceNavigationStoreActionsFromStore({
-        setActive: fnA as never,
-        reorderRepos: fnA as never,
-        cycleActive: fnA as never,
-      }),
-    ).toEqual({
-      setActive: fnA,
-      reorderRepos: fnA,
-      cycleActive: fnA,
-    })
-    expect(
       restorableWorkspaceViewportStoreActionsFromStore({
         setActive: fnA as never,
         cycleActive: fnA as never,
@@ -186,13 +155,6 @@ describe('repo selectors', () => {
     ).toEqual({
       setActive: fnA,
       cycleActive: fnA,
-    })
-    expect(
-      restorableWorkspaceOrderStoreActionsFromStore({
-        reorderRepos: fnA as never,
-      }),
-    ).toEqual({
-      reorderRepos: fnA,
     })
     expect(
       restorableWorkspaceLayoutStoreActionsFromStore({
@@ -266,11 +228,11 @@ describe('repo selectors', () => {
       ),
     ).toBe(true)
     expect(
-      repoTabStoreActionsEqual(
-        repoTabStoreActionsFromStore({
+      repoPickerStoreActionsEqual(
+        repoPickerStoreActionsFromStore({
           ensureWorkspaceOpen: fnA as never,
         }),
-        repoTabStoreActionsFromStore({
+        repoPickerStoreActionsFromStore({
           ensureWorkspaceOpen: fnB as never,
         }),
       ),

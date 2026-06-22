@@ -243,7 +243,7 @@ export function addUnavailableRepo(
       // Existing repo: refresh the failed lifecycle with the new
       // reason. Preserve the last-known target if the new failure
       // didn't pin down a fresh one — the user can still see the
-      // remote locator on the failed tab. The remote slice MUST
+      // remote locator on the failed repo. The remote slice MUST
       // be a fresh object — zustand's middleware freezes the
       // state tree, and markRemoteLifecycleFailed mutates the
       // passed repo's remote.
@@ -259,7 +259,7 @@ export function addUnavailableRepo(
 }
 
 /**
- * Insert a placeholder tab for a session entry whose probe is still in
+ * Insert a placeholder repo for a session entry whose probe is still in
  * flight. The placeholder paints the cached branch projection (if any)
  * immediately; the derived connectivity naturally reads as 'connecting'
  * because no remote target has been resolved yet. The probe resolution
@@ -284,7 +284,7 @@ export function insertPlaceholderRepo(
     create: () => {
       const fallbackName = entry.kind === 'remote' ? entry.ref.displayName : null
       const repo = buildNewRepo(s, entry.id, [fallbackName])
-      // Placeholders exist only to occupy the tab slot during a
+      // Placeholders exist only to occupy the repo switcher slot during a
       // remote-repo lifecycle run. For a local placeholder the
       // lifecycle stays null (local repos don't have one); for a
       // remote placeholder we mark `connecting` so deriveConnectivity
@@ -381,8 +381,8 @@ export function createRuntimeRepoLifecycleActions(
       disposeRepoRuntime(id)
       // Tell main to abort any cancellable network op for this repo —
       // otherwise a `git push` started right before the user closed the
-      // tab keeps running for up to the network timeout, charged to a
-      // tab that no longer exists. Fire-and-forget; failure is fine.
+      // repo keeps running for up to the network timeout, charged to a
+      // repo that no longer exists. Fire-and-forget; failure is fine.
       void abortRepositoryOperation(id).catch(() => {
         /* main may have nothing to abort — ignore */
       })

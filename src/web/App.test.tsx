@@ -20,8 +20,8 @@ vi.mock('#/web/components/Topbar.tsx', () => ({
   Topbar: ({ children }: { children: React.ReactNode }) => <div data-testid="topbar">{children}</div>,
 }))
 
-vi.mock('#/web/components/RepoTabs.tsx', () => ({
-  RepoTabs: () => <div data-testid="repo-tabs" />,
+vi.mock('#/web/components/RepoPickerHost.tsx', () => ({
+  RepoPickerHost: () => <div data-testid="repo-picker" />,
 }))
 
 vi.mock('#/web/components/RepoView.tsx', () => ({
