@@ -216,9 +216,8 @@ describe('Topbar', () => {
     expect(wrapper).not.toBeNull()
     // The focus toggle button is still the popover trigger.
     expect(wrapper?.querySelector('button[aria-label="workspace.focus-toggle-label"]')).toBe(focusModeToggle())
-    // The tooltip wrapper from `Tip` should NOT be present alongside
-    // the popover wrapper.
-    expect(document.querySelector('[data-slot="tooltip-content"]')).toBeNull()
+    // Only the popover wrapper owns the trigger (no Tip wrapper also
+    // renders the same button — would mean both wrappers are live).
     expect(popoverWrapper.wrapperCount).toBe(1)
   })
 

@@ -105,10 +105,13 @@ describe('BranchList', () => {
   })
 
   test('renders the emptyState slot when repo is null (popover pre-load)', () => {
+    // `branches` is non-empty so the `!repo` branch is the one that
+    // short-circuits — passing `branches={[]}` would exercise the
+    // empty-list early-return instead.
     render(
       <BranchList
         repo={null}
-        branches={[]}
+        branches={[createRepoBranch('main')]}
         highlightedBranch={null}
         onSelectBranch={() => {}}
         onOpenBranchStatus={() => {}}
