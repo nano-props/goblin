@@ -22,6 +22,12 @@ export function GitHubSettings() {
   const githubCliVersion = data.version
   const githubCliHosts = data.hosts
   const hostStates = Object.values(githubCliHosts).sort((a, b) => a.host.localeCompare(b.host))
+  const githubCliStatusKey = githubCliAvailable
+    ? 'settings.github.status-available'
+    : 'settings.github.status-unavailable'
+  const githubCliHint = githubCliAvailable
+    ? (githubCliVersion ?? t('settings.github.hint-installed'))
+    : t('settings.github.hint-missing')
 
   async function refreshGitHubCli() {
     await run('refresh', async () => {
@@ -45,15 +51,11 @@ export function GitHubSettings() {
                 variant={githubCliAvailable ? 'success' : 'outline'}
                 className={cn(githubCliAvailable ? '' : 'text-muted-foreground')}
               >
-                {t(githubCliAvailable ? 'settings.github.status-available' : 'settings.github.status-unavailable')}
+                {t(githubCliStatusKey)}
               </Badge>
             </span>
           }
-          hint={
-            githubCliAvailable
-              ? (githubCliVersion ?? t('settings.github.hint-installed'))
-              : t('settings.github.hint-missing')
-          }
+          hint={githubCliHint}
           control={
             <div className="flex items-center justify-end gap-2">
               <Button
@@ -74,41 +76,47 @@ export function GitHubSettings() {
           }
         />
         {hostStates.length > 0 ? (
-          hostStates.map((hostState) => (
-            <SettingsRow
-              key={hostState.host}
-              controlId={`settings-github-host-${hostState.host}`}
-              label={
-                <span className="inline-flex items-center gap-2">
-                  <span className="font-mono text-xs">{hostState.host}</span>
-                  <Badge
-                    variant={hostState.authenticated ? 'success' : 'outline'}
-                    className={cn(hostState.authenticated ? '' : 'text-muted-foreground')}
-                  >
-                    {t(hostState.authenticated ? 'settings.github.auth-signed-in' : 'settings.github.auth-signed-out')}
-                  </Badge>
-                </span>
-              }
-              hint={
-                hostState.authenticated
-                  ? hostState.activeLogin
-                    ? `${t('settings.github.auth-account')} ${hostState.activeLogin}`
-                    : t('settings.github.auth-signed-in-hint')
-                  : `${t('settings.github.auth-login-required')} ${hostLoginCommand(hostState.host)}`
-              }
-              control={
-                <div className="flex min-w-0 items-center justify-end gap-2 text-xs text-muted-foreground">
-                  {hostState.tokenSource ? (
-                    <span className="truncate">
-                      {t('settings.github.auth-token-source')} {hostState.tokenSource}
-                    </span>
-                  ) : hostState.logins.length > 1 ? (
-                    <span className="truncate">{hostState.logins.join(', ')}</span>
-                  ) : null}
-                </div>
-              }
-            />
-          ))
+          hostStates.map((hostState) => {
+            const authStatusKey = hostState.authenticated
+              ? 'settings.github.auth-signed-in'
+              : 'settings.github.auth-signed-out'
+            const authAccountLabel = t('settings.github.auth-account')
+            const authLoginRequiredLabel = t('settings.github.auth-login-required')
+            const authHint = hostState.authenticated
+              ? hostState.activeLogin
+                ? `${authAccountLabel} ${hostState.activeLogin}`
+                : t('settings.github.auth-signed-in-hint')
+              : `${authLoginRequiredLabel} ${hostLoginCommand(hostState.host)}`
+            return (
+              <SettingsRow
+                key={hostState.host}
+                controlId={`settings-github-host-${hostState.host}`}
+                label={
+                  <span className="inline-flex items-center gap-2">
+                    <span className="font-mono text-xs">{hostState.host}</span>
+                    <Badge
+                      variant={hostState.authenticated ? 'success' : 'outline'}
+                      className={cn(hostState.authenticated ? '' : 'text-muted-foreground')}
+                    >
+                      {t(authStatusKey)}
+                    </Badge>
+                  </span>
+                }
+                hint={authHint}
+                control={
+                  <div className="flex min-w-0 items-center justify-end gap-2 text-xs text-muted-foreground">
+                    {hostState.tokenSource ? (
+                      <span className="truncate">
+                        {t('settings.github.auth-token-source')} {hostState.tokenSource}
+                      </span>
+                    ) : hostState.logins.length > 1 ? (
+                      <span className="truncate">{hostState.logins.join(', ')}</span>
+                    ) : null}
+                  </div>
+                }
+              />
+            )
+          })
         ) : (
           <div className="px-4 py-3 text-[13px] leading-relaxed text-muted-foreground">
             {t('settings.github.no-hosts')}

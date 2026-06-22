@@ -73,7 +73,10 @@ export function GeneralSettings() {
               <SettingsSelect
                 id="settings-language"
                 value={langPref}
-                options={langOptions.map((o) => ({ value: o.value, label: `${o.emoji} ${t(o.labelKey)}` }))}
+                options={langOptions.map((o) => {
+                  const languageLabel = t(o.labelKey)
+                  return { value: o.value, label: `${o.emoji} ${languageLabel}` }
+                })}
                 onChange={(v) => void setLangPref(v)}
               />
             }

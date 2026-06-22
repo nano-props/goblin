@@ -2,6 +2,10 @@ import type { WorkspacePaneViewSummary } from '#/web/components/terminal/types.t
 import type { WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
 
 type T = (key: string, params?: Record<string, string | number>) => string
+const BRANCH_SCOPED_VIEW_TOOLTIP_KEYS: Record<'status' | 'history', string> = {
+  status: 'workspace-pane-views.status-tooltip',
+  history: 'workspace-pane-views.history-tooltip',
+}
 
 export function workspacePaneStaticViewButtonId(workspacePaneId: string, type: WorkspacePaneStaticViewType): string {
   return `${workspacePaneId}-${type}-tab`
@@ -33,7 +37,7 @@ function branchScopedViewTooltip(input: {
 }): string {
   const fallbackKey = input.kind === 'status' ? 'tab.status' : 'tab.log'
   if (!input.branchName) return input.t(fallbackKey)
-  return input.t(`workspace-pane-views.${input.kind}-tooltip`, { branch: input.branchName })
+  return input.t(BRANCH_SCOPED_VIEW_TOOLTIP_KEYS[input.kind], { branch: input.branchName })
 }
 
 export function branchWorkspacePaneViewTooltip(input: {

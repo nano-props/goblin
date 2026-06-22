@@ -20,6 +20,11 @@ import type { PullRequestInfo } from '#/shared/git-types.ts'
 import type { Lang } from '#/shared/api-types.ts'
 type TFn = (key: string, params?: Record<string, string | number>) => string
 type TooltipSide = 'top' | 'right' | 'bottom' | 'left'
+const PR_STATE_LABEL_KEYS: Record<PullRequestInfo['state'], string> = {
+  open: 'branch-status.pr.open',
+  merged: 'branch-status.pr.merged',
+  closed: 'branch-status.pr.closed',
+}
 
 function prChecksSignal(pr: PullRequestInfo, t: TFn): PrHealthSignal | null {
   if (!pr.checks) return null
@@ -58,9 +63,11 @@ function prHealthSignals(pr: PullRequestInfo | undefined, t: TFn): PrHealthSigna
 }
 
 function prSummary(pr: PullRequestInfo, t: TFn): string {
+  const stateLabelKey = PR_STATE_LABEL_KEYS[pr.state]
+  const stateLabel = pr.isDraft && pr.state === 'open' ? t('branch-status.pr.draft') : t(stateLabelKey)
   return t('branch-status.pr.summary', {
     n: pr.number,
-    state: pr.isDraft && pr.state === 'open' ? t('branch-status.pr.draft') : t(`branch-status.pr.${pr.state}`),
+    state: stateLabel,
   })
 }
 

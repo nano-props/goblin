@@ -56,7 +56,7 @@ describe('branch workspace pane tab model', () => {
     expect(model.renderedView).toBe('terminal')
     expect(model.selection).toMatchObject({ kind: 'materialized-tab', view: 'terminal' })
     expect(model.activeTab?.identity).toBe('terminal:terminal-2')
-    expect(model.activeTab?.key).toBe('terminal-2')
+    expect(model.activeTab?.kind === 'terminal' ? model.activeTab.key : null).toBe('terminal-2')
   })
 
   test('keeps terminal selected without a runtime tab while creation is pending', () => {
@@ -75,7 +75,29 @@ describe('branch workspace pane tab model', () => {
     expect(model.renderedView).toBe('terminal')
     expect(model.selection).toEqual({ kind: 'terminal-host', view: 'terminal', tab: null })
     expect(model.activeTab).toBeNull()
-    expect(model.tabs.map((tab) => tab.identity)).toEqual(['status:status'])
+    expect(model.tabs.map((tab) => [tab.identity, tab.kind])).toEqual([
+      ['status:status', 'static'],
+      ['terminal:pending', 'pending'],
+    ])
+  })
+
+  test('does not add a pending terminal tab during initial terminal sync', () => {
+    const model = createBranchWorkspacePaneTabModel({
+      repoId: REPO_ID,
+      branchName: 'feature/model',
+      worktreePath: WORKTREE_PATH,
+      preferredView: 'terminal',
+      tabOrder: [staticEntry('status')],
+      runtimeTerminalViews: [],
+      terminalSessionCount: 0,
+      terminalCreatePending: false,
+      terminalSyncReady: false,
+    })
+
+    expect(model.renderedView).toBe('terminal')
+    expect(model.selection).toEqual({ kind: 'terminal-host', view: 'terminal', tab: null })
+    expect(model.activeTab).toBeNull()
+    expect(model.tabs.map((tab) => [tab.identity, tab.kind])).toEqual([['status:status', 'static']])
   })
 
   test('does not select another tab when the preferred worktree static view is not open', () => {
@@ -144,6 +166,22 @@ describe('branch workspace pane tab model', () => {
     expect(nextBranchWorkspacePaneTabAfterClose(model.tabs, 'status:status')?.identity).toBe('terminal:terminal-1')
     expect(nextBranchWorkspacePaneTabAfterClose(model.tabs, 'changes:changes')?.identity).toBe('terminal:terminal-1')
     expect(nextBranchWorkspacePaneTabAfterClose(model.tabs, 'missing:missing')).toBeNull()
+  })
+
+  test('skips pending terminal tabs when resolving the next tab after close', () => {
+    const model = createBranchWorkspacePaneTabModel({
+      repoId: REPO_ID,
+      branchName: 'feature/model',
+      worktreePath: WORKTREE_PATH,
+      preferredView: 'terminal',
+      tabOrder: [staticEntry('status')],
+      runtimeTerminalViews: [],
+      terminalSessionCount: 0,
+      terminalCreatePending: true,
+      terminalSyncReady: true,
+    })
+
+    expect(nextBranchWorkspacePaneTabAfterClose(model.tabs, 'status:status')).toBeNull()
   })
 
   test('moves through the shared tab list from the active tab identity', () => {

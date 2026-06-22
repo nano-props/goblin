@@ -9,6 +9,8 @@ export function terminalWorkspacePaneViewIdentity(sessionKey: string): string {
   return `terminal:${sessionKey}`
 }
 
+export const PENDING_TERMINAL_WORKSPACE_PANE_VIEW_IDENTITY = 'terminal:pending'
+
 export function staticWorkspacePaneViewIdentity(
   type: WorkspacePaneBranchViewType | WorkspacePaneStaticViewType,
 ): string {

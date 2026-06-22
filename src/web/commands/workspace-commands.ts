@@ -169,6 +169,7 @@ export function runSelectWorkspacePaneTabByIndexCommand({
   const target = workspacePaneCommandTarget(repoId)
   const tab = target?.tabs[tabIndex - 1]
   if (!target || !tab) return false
+  if (tab.kind === 'pending') return false
   showWorkspacePaneCommandTab(target, tab, navigation)
   return true
 }
@@ -208,7 +209,8 @@ function closeWorkspacePaneCommandTab(
   target: BranchWorkspacePaneTabModel,
   tab: BranchWorkspacePaneTab,
 ): CloseWorkspacePaneCommandTabResult {
-  if (tab.type === 'terminal') return closeTerminalWorkspacePaneCommandTab(target, tab)
+  if (tab.kind === 'pending') return { handled: false }
+  if (tab.kind === 'terminal') return closeTerminalWorkspacePaneCommandTab(target, tab)
   const branchName = target.branchName
   if (!branchName) return { handled: false }
   if (isWorkspacePaneStaticViewType(tab.type)) {
@@ -220,9 +222,9 @@ function closeWorkspacePaneCommandTab(
 
 function closeTerminalWorkspacePaneCommandTab(
   target: BranchWorkspacePaneTabModel,
-  tab: BranchWorkspacePaneTab,
+  tab: Extract<BranchWorkspacePaneTab, { kind: 'terminal' }>,
 ): CloseWorkspacePaneCommandTabResult {
-  if (!target.terminalBase || !tab.key) return { handled: false }
+  if (!target.terminalBase) return { handled: false }
   const bridge = readTerminalSessionCommandBridge()
   if (!bridge?.closeTerminalByDescriptor) return { handled: false }
   bridge.closeTerminalByDescriptor(tab.key, target.terminalBase)
@@ -239,7 +241,7 @@ function showWorkspacePaneCommandTab(
   navigation: MainWindowNavigationActions,
 ): void {
   navigation.showRepoWorkspacePaneView(target.repoId, tab.type)
-  if (tab.type === 'terminal' && tab.key && target.worktreeTerminalKey) {
+  if (tab.kind === 'terminal' && target.worktreeTerminalKey) {
     readTerminalSessionCommandBridge()?.selectTerminal(target.worktreeTerminalKey, tab.key)
   }
 }

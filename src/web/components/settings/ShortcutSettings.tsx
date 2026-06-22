@@ -67,6 +67,9 @@ export function ShortcutSettings() {
           : globalShortcutDisabled
             ? { text: t('settings.global-shortcut-disabled-hint'), tone: 'muted' as const }
             : null
+  const recordShortcutLabelKey = recordingShortcut
+    ? 'settings.global-shortcut-recording'
+    : 'settings.global-shortcut-record'
 
   return (
     <SettingsCard>
@@ -129,7 +132,7 @@ export function ShortcutSettings() {
                   ? 'border-primary/70 bg-primary/10 text-primary hover:bg-primary/15'
                   : 'border-border bg-muted/50 text-foreground hover:bg-accent',
             )}
-            aria-label={t(recordingShortcut ? 'settings.global-shortcut-recording' : 'settings.global-shortcut-record')}
+            aria-label={t(recordShortcutLabelKey)}
             aria-pressed={recordingShortcut}
             aria-describedby={shortcutStatusId}
             disabled={!globalShortcutSupported}

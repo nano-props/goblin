@@ -103,7 +103,8 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
       return
     }
     setPending(false)
-    setError(t(result.message || 'error.unknown'))
+    const errorMessageKey = result.message || 'error.unknown'
+    setError(t(errorMessageKey))
   }
 
   async function handleCancel() {

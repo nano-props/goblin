@@ -31,6 +31,9 @@ import {
 import { MobileTerminalToolbar } from '#/web/components/terminal/mobile-terminal-toolbar.tsx'
 import { isMobileDevice } from '#/web/components/terminal/mobile-detection.ts'
 import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
+
+const DEFAULT_TERMINAL_ERROR_MESSAGE_KEY = 'error.unknown'
+
 interface TerminalSlotProps {
   repoRoot: string
   branch: string
@@ -241,6 +244,7 @@ export function TerminalSlot({
   const isReadonly = slotMode === 'open-viewer' || slotMode === 'error-viewer'
   const showViewerOverlay = isReadonly
   const showErrorChip = slotMode === 'error-controller'
+  const terminalErrorMessageKey = snapshot.message ?? DEFAULT_TERMINAL_ERROR_MESSAGE_KEY
   const readonlyBadge = attachment?.role === 'viewer' ? t('terminal.mirror-controlled') : t('terminal.unowned')
   const progressVariant =
     progress?.state === 2 ? 'error' : progress?.state === 4 ? 'warning' : progress?.state === 3 ? 'indeterminate' : ''
@@ -484,7 +488,7 @@ export function TerminalSlot({
           "no sessions yet" placeholder and never renders the chip. */}
       {showErrorChip && snapshot.message !== 'terminal.empty' && (
         <div className="goblin-terminal-slot__status-overlay goblin-terminal-slot__status-overlay--error">
-          <span>{t(snapshot.message ?? 'error.unknown')}</span>
+          <span>{t(terminalErrorMessageKey)}</span>
           {key && (
             <Button type="button" size="sm" variant="ghost" onClick={() => restart(key)}>
               {t('terminal.restart')}

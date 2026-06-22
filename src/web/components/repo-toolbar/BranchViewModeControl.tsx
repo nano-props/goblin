@@ -39,7 +39,8 @@ export function BranchViewModeControl({ value, disabled = false, onChange }: Pro
   // list is shown, FolderTree when only worktree-bearing
   // branches are. Mirrors the i18n labels under those keys.
   const Icon: LucideIcon = worktreesOnly ? FolderTree : ListTree
-  const label = t(worktreesOnly ? 'branches.filter.worktrees' : 'branches.filter.all')
+  const labelKey = worktreesOnly ? 'branches.filter.worktrees' : 'branches.filter.all'
+  const label = t(labelKey)
 
   return (
     <Tip label={label}>

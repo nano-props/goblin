@@ -15,8 +15,10 @@ import { useTerminalSessionContext } from '#/web/components/terminal/terminal-se
 import {
   WorkspacePaneViewStrip,
   EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY,
+  createPendingWorkspacePaneTabItem,
   createStaticWorkspacePaneTabItem,
   createTerminalWorkspacePaneTabItem,
+  isPendingWorkspacePaneTabItem,
   isStaticWorkspacePaneTabItem,
   isTerminalWorkspacePaneTabItem,
   type WorkspacePaneTabItem,
@@ -212,8 +214,16 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
             panelId: `${workspacePaneId}-${type}-panel`,
           })
         }
-        if (!tab.view || tab.view.type !== 'terminal') {
-          throw new Error('terminal workspace pane tab missing terminal view')
+        if (tab.kind === 'pending') {
+          const pendingTerminalLabelKey =
+            worktreeSnapshot.pendingCreate || terminalSyncReady ? 'terminal.opening' : 'terminal.loading'
+          const label = t(pendingTerminalLabelKey)
+          return createPendingWorkspacePaneTabItem({
+            type: tab.type,
+            label,
+            tooltip: label,
+            panelId: `${workspacePaneId}-${tab.type}-panel`,
+          })
         }
         return createTerminalWorkspacePaneTabItem({
           view: tab.view,
@@ -230,6 +240,8 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
       t,
       tooltipForStaticWorkspacePaneView,
       tooltipForWorkspacePaneView,
+      terminalSyncReady,
+      worktreeSnapshot.pendingCreate,
       workspacePaneTabModel.tabs,
       workspacePaneId,
     ],
@@ -237,6 +249,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
   const activeTabIdentity = workspacePaneTabModel.activeTab?.identity ?? null
   const handleSelectWorkspacePaneTabItem = useCallback(
     (item: WorkspacePaneTabItem) => {
+      if (isPendingWorkspacePaneTabItem(item)) return
       if (
         isTerminalWorkspacePaneTabItem(item) &&
         item.identity === activeTabIdentity
@@ -250,6 +263,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
   )
   const handleCloseWorkspacePaneView = useCallback(
     (item: WorkspacePaneTabItem) => {
+      if (isPendingWorkspacePaneTabItem(item)) return
       void runCloseWorkspacePaneTabCommand({
         repoId: repo.id,
         targetIdentity: item.identity,
@@ -293,9 +307,9 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
             leadingAction={branchWorkspaceBackAction}
             focusRegistry={workspacePaneTabFocusRegistry}
             emptyFocusKey={EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY}
-            // While terminal sync/create is in flight, the New Terminal
-            // button itself shows the busy state. The tab strip never
-            // receives a pseudo loading tab.
+            // While a real terminal create is in flight, the tab model
+            // contributes a pending terminal tab. Additional creates stay
+            // disabled through the New Terminal affordance.
             newTerminalBusy={isInitialSyncInFlight || worktreeSnapshot.pendingCreate}
             onNew={handleNewTerminal}
             onSelect={handleSelectWorkspacePaneTabItem}

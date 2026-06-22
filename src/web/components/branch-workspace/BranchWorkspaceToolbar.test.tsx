@@ -319,6 +319,42 @@ describe('BranchWorkspaceToolbar', () => {
     expect(c.querySelector('button[aria-label="workspace-pane-views.tabs"]')).not.toBeNull()
   })
 
+  test('compact workspace view shows terminal creation as a full-width pending tab', () => {
+    compactUi = true
+    const { container: c } = renderToolbar({
+      terminalCount: 0,
+      preferredWorkspacePaneView: 'terminal',
+      navigation: navigationWith({}),
+      pendingCreate: true,
+    })
+
+    const pendingView = c.querySelector('[data-workspace-pane-pending-view="terminal"]')
+    const tab = c.querySelector('[role="tab"][aria-label="terminal.opening"]')
+
+    expect(pendingView).not.toBeNull()
+    expect(pendingView?.className).toContain('flex-1')
+    expect(tab?.getAttribute('aria-busy')).toBe('true')
+    expect(c.querySelector('button[aria-label="terminal.loading"]')).toBeNull()
+    expect(c.querySelector('button[aria-label="workspace-pane-views.tabs"]')).not.toBeNull()
+  })
+
+  test('expanded workspace view uses the same pending terminal tab during creation', () => {
+    const { container: c } = renderToolbar({
+      terminalCount: 0,
+      preferredWorkspacePaneView: 'terminal',
+      navigation: navigationWith({}),
+      pendingCreate: true,
+    })
+
+    const pendingView = c.querySelector('[data-workspace-pane-pending-view="terminal"]')
+    const tabs = Array.from(c.querySelectorAll('[role="tab"]'))
+
+    expect(pendingView).not.toBeNull()
+    expect(tabs.map((tab) => tab.getAttribute('aria-label'))).toEqual(['tab.status', 'terminal.opening'])
+    expect(c.querySelector('[role="tab"][aria-label="terminal.opening"]')?.getAttribute('aria-busy')).toBe('true')
+    expect(c.querySelector('button[aria-label="terminal.loading"]')).not.toBeNull()
+  })
+
   test('clicking the new-terminal button navigates and creates a terminal', async () => {
     const showRepoWorkspacePaneView = vi.fn()
     const { terminalTab, mocks } = renderToolbar({
