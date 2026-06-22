@@ -12,19 +12,13 @@ import type { RepoPickerRepo } from '#/web/components/repo-picker/types.ts'
 import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
 import { useRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { repoPickerStoreActionsEqual, repoPickerStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
-import type { RepoState } from '#/web/stores/repos/types.ts'
+import { latestRepoSyncTime } from '#/web/stores/repos/sync-time.ts'
 
 interface RepoPickerHostProps {
   currentRepoId: string | null
   onOpenRepoPathDialog: () => void
   onOpenRemote: () => void
   onClone: () => void
-}
-
-export function latestRepoSyncTime(repo: Pick<RepoState, 'projection' | 'resources'>): number | null {
-  const snapshotLoadedAt = repo.projection.source === 'fresh' ? repo.resources.snapshot.loadedAt : null
-  const times = [repo.resources.fetch.loadedAt, snapshotLoadedAt].filter((time): time is number => time !== null)
-  return times.length === 0 ? null : Math.max(...times)
 }
 
 export function RepoPickerHost({ currentRepoId, onOpenRepoPathDialog, onOpenRemote, onClone }: RepoPickerHostProps) {
@@ -78,7 +72,6 @@ export function RepoPickerHost({ currentRepoId, onOpenRepoPathDialog, onOpenRemo
       labels={{
         repositories: t('repo-picker.repos'),
         closeWithName: (name) => t('repo-picker.close-named', { name }),
-        more: t('repo-picker.more'),
         open: t('topbar.open'),
         openLocal: t('repo-picker.open-local'),
         openLocalShortcut: shortcutsDisabled ? null : '⌘O',

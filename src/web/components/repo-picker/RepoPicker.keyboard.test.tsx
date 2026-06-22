@@ -73,7 +73,6 @@ function repo(name: string, id: string): RepoPickerRepo {
 const labels = {
   repositories: 'Repositories',
   closeWithName: (name: string) => `Close ${name}`,
-  more: 'More',
   open: 'Open',
   openLocal: 'Open local repository…',
   openLocalShortcut: '⌘O',

@@ -86,7 +86,6 @@ export const en = {
   // ---- Repository picker ----------------------------------------------------
   'repo-picker.repos': 'Repositories',
   'repo-picker.close-named': 'Close {name}',
-  'repo-picker.more': 'All repositories',
   'repo-picker.open-local': 'Open local repository…',
   'repo-picker.open-remote': 'Open remote repository…',
   'repo-picker.open-title': 'Open local repository',
@@ -169,9 +168,7 @@ export const en = {
   'repo-picker.open-remote-path-required': 'Path required',
   'repo-picker.open-remote-path-absolute': 'Path must start with / or ~/',
   'repo-picker.open-remote-home-unavailable': 'Could not resolve the remote home directory',
-  'repo-picker.tooltip.no-remotes': 'No remotes',
   'repo-picker.tooltip.last-sync-label': 'Last synced',
-  'repo-picker.tooltip.not-synced': 'Not synced yet',
   'repo-picker.connecting-title': 'Connecting to SSH…',
   'repo-unavailable.title': 'Repository path unavailable',
   'repo-unavailable.body':
@@ -239,8 +236,6 @@ export const en = {
   'branches.filter-label': 'Filter branches',
   'branches.selected': 'Selected branch',
   'branches.switch': 'Switch branch',
-  'branches.filter.all': 'All',
-  'branches.filter.worktrees': 'Worktrees',
   'branches.filter-tooltip.all': 'All branches',
   'branches.filter-tooltip.worktrees': 'Worktree branches',
   'workspace.focus-toggle-label': 'Toggle Focus Mode',

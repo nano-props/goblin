@@ -39,7 +39,10 @@ export function BranchViewModeControl({ value, disabled = false, onChange }: Pro
   // list is shown, FolderTree when only worktree-bearing
   // branches are. Mirrors the i18n labels under those keys.
   const Icon: LucideIcon = worktreesOnly ? FolderTree : ListTree
-  const labelKey = worktreesOnly ? 'branches.filter.worktrees' : 'branches.filter.all'
+  // The tooltip uses the verbose form ("All branches" / "Worktree
+  // branches") so the icon-only button is self-explanatory; the
+  // short keys (`branches.filter.*`) are intentionally not used.
+  const labelKey = worktreesOnly ? 'branches.filter-tooltip.worktrees' : 'branches.filter-tooltip.all'
   const label = t(labelKey)
 
   return (

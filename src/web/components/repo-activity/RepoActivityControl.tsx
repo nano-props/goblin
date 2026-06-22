@@ -3,7 +3,7 @@ import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { Check, Loader2, RefreshCw } from 'lucide-react'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoEvent, RepoState } from '#/web/stores/repos/types.ts'
-import { useT } from '#/web/stores/i18n.ts'
+import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { Tip } from '#/web/components/Tip.tsx'
 import { AsyncButton } from '#/web/components/AsyncButton.tsx'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
@@ -17,6 +17,8 @@ import { useVisibleLoadingValue } from '#/web/hooks/useLoadingVisibility.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { repoEventActionSuccessLabel } from '#/web/stores/repos/action-labels.ts'
+import { formatRelativeTime } from '#/web/lib/dates.ts'
+import { latestRepoSyncTime } from '#/web/stores/repos/sync-time.ts'
 interface Props {
   repoId: string
 }
@@ -125,6 +127,7 @@ function RepoRefreshButton({
   manualSyncBusy: boolean
 }) {
   const t = useT()
+  const lang = useI18nStore((s) => s.lang)
   const label = t('action.refresh')
 
   function handleSync() {
@@ -140,9 +143,22 @@ function RepoRefreshButton({
   }
 
   const fetchTooltipKey = repo.remote.hasRemotes === false ? 'action.fetch-local-title' : 'action.fetch-title'
+  const lastSyncedAt = latestRepoSyncTime(repo)
+  const lastSyncedAtIso = lastSyncedAt === null ? null : new Date(lastSyncedAt).toISOString()
+  const lastSyncedLabel = lastSyncedAtIso ? formatRelativeTime(lastSyncedAtIso, lang) : null
+
+  // The picker no longer surfaces last-sync info on the tab itself,
+  // so the refresh button tooltip is the primary place users check
+  // how stale the view is. We show "Last synced X ago" when we have
+  // a timestamp, and fall back to the action title before the first
+  // sync has happened. Single-line label so the font matches the
+  // rest of the topbar tooltips.
+  const tooltipLabel = lastSyncedLabel
+    ? `${t('repo-picker.tooltip.last-sync-label')} ${lastSyncedLabel}`
+    : t(fetchTooltipKey)
 
   return (
-    <Tip label={t(fetchTooltipKey)}>
+    <Tip label={tooltipLabel}>
       <AsyncButton
         variant="ghost"
         size="icon-lg"

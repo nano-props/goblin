@@ -32,3 +32,14 @@ Use this doc for UI language and presentation rules.
   box, not a separate child element. All separators read their color
   from `--color-separator` (= `--goblin-border-subtle`, one notch
   weaker than `--color-border`).
+- The topbar's `flex-1` spacer between the per-repo actions cluster
+  (repo picker + Refresh / Filter / CreateWorktree) and the app-level
+  cluster (Focus Mode toggle + Settings) is the only intentional
+  exception to the inline-divider rule: the two clusters are
+  separated by layout distance alone, not by `<Separator>`. The icon
+  styles already differ enough on their own (the per-repo actions sit
+  in the repo picker's tab family; the app-level buttons sit in the
+  global ghost-button family), and a 1px line would just split a
+  visual gap that already reads as a group break. If a future layout
+  pulls the two clusters closer together, re-evaluate before reaching
+  for `<Separator>`.

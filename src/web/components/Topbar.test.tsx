@@ -70,7 +70,7 @@ describe('Topbar', () => {
     expect(settingsButton()).not.toBeNull()
   })
 
-  test('renders a Focus Mode toggle separated from the per-repo actions and flush with the settings button', () => {
+  test('renders a Focus Mode toggle flush with the settings button, separated from per-repo actions by the flex spacer alone', () => {
     render(
       <Topbar repoId="/tmp/repo" onOpenSettings={() => {}}>
         <div data-testid="repo-picker" />
@@ -83,14 +83,15 @@ describe('Topbar', () => {
     expect(toggle).not.toBeNull()
     expect(settings).not.toBeNull()
     expect(repoPicker).not.toBeNull()
-    // Layout: [repo-picker] [RepoToolbarActions] [Separator] [focus-toggle] [settings]
+    // Layout: [repo-picker] [RepoToolbarActions] [flex-1 spacer] [focus-toggle] [settings]
     // The toggle sits immediately left of the settings button.
     expect(toggle?.nextElementSibling).toBe(settings)
-    // A vertical Separator separates the per-repo actions cluster from
-    // the focus-mode toggle (matches the convention enforced by
-    // `ui-conventions.md`).
-    expect(toggle?.previousElementSibling?.getAttribute('data-slot')).toBe('separator')
-    expect(toggle?.previousElementSibling?.getAttribute('data-orientation')).toBe('vertical')
+    // The "repo context" cluster (picker + actions) and the "app-level"
+    // cluster (focus toggle + settings) are separated by the flex-1
+    // spacer alone — no vertical Separator. The toggle's previous
+    // sibling is the spacer, not a separator.
+    expect(toggle?.previousElementSibling).toBe(spacerDiv())
+    expect(toggle?.previousElementSibling?.getAttribute('data-slot')).not.toBe('separator')
     // The repo picker is to the left of the toolbar cluster.
     expect(repoPicker?.nextElementSibling).not.toBe(toggle)
   })
@@ -151,13 +152,14 @@ describe('Topbar', () => {
     expect(branchWorkspaceBackButton()).toBeNull()
     expect(toggle).not.toBeNull()
     // The focus toggle (wrapped in BranchListPopover mock) sits
-    // immediately left of the settings button, with a vertical
-    // Separator between it and the per-repo actions.
+    // immediately left of the settings button. The "repo context"
+    // cluster (picker + actions) and the "app-level" cluster are
+    // separated by the flex-1 spacer alone — no Separator.
     const popoverWrapper = toggle?.closest('[data-testid="branch-list-popover-wrapper"]')
     expect(popoverWrapper).not.toBeNull()
     expect(popoverWrapper?.nextElementSibling).toBe(settings)
-    expect(popoverWrapper?.previousElementSibling?.getAttribute('data-slot')).toBe('separator')
-    expect(popoverWrapper?.previousElementSibling?.getAttribute('data-orientation')).toBe('vertical')
+    expect(popoverWrapper?.previousElementSibling).toBe(spacerDiv())
+    expect(popoverWrapper?.previousElementSibling?.getAttribute('data-slot')).not.toBe('separator')
     expect(repoPicker).not.toBeNull()
     expect(useReposStore.getState().workspaceFocused).toBe(true)
     expect(useReposStore.getState().repos['/tmp/repo']?.ui.selectedBranch).toBe('feature/a')
@@ -259,4 +261,12 @@ function settingsButton(): HTMLButtonElement | null {
 
 function branchWorkspaceBackButton(): HTMLButtonElement | null {
   return container?.querySelector('button[aria-label="workspace.back-to-branch-navigator"]') ?? null
+}
+
+// The flex-1 spacer between the per-repo actions cluster and the
+// focus toggle. Identified by its class so the assertion stays
+// meaningful if the class is renamed (selector returns null and the
+// `not.toBe(...)` checks fall back to a no-op).
+function spacerDiv(): HTMLDivElement | null {
+  return container?.querySelector<HTMLDivElement>('.topbar > .flex-1') ?? null
 }
