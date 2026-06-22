@@ -167,8 +167,8 @@ contextBridge.exposeInMainWorld('goblinNative', {
   // (Electron's IPC has no `transfer` list — `ArrayBuffer` and
   // `Uint8Array` both copy — so the choice is a typing/contract one.)
   // Errors are swallowed to `[]` because the renderer-side resolver
-  // treats `[]` as "blob save failed for everything" and surfaces a
-  // single `paste-file-failed` toast.
+  // treats `[]` as "blob save failed for everything" and counts it
+  // separately from unsafe path filtering.
   saveClipboardFiles: async (files) => {
     if (!Array.isArray(files) || files.length === 0) return []
     try {
@@ -180,10 +180,7 @@ contextBridge.exposeInMainWorld('goblinNative', {
           // preserves it. Keeping the names identical across runtimes
           // avoids a class of debugging where Electron and web leave
           // different temp filenames for the same paste payload.
-          name:
-            typeof file?.name === 'string' && file.name.length > 0
-              ? file.name
-              : CLIPBOARD_FALLBACK_FILE_NAME,
+          name: typeof file?.name === 'string' && file.name.length > 0 ? file.name : CLIPBOARD_FALLBACK_FILE_NAME,
           bytes: await file.arrayBuffer(),
         })),
       )

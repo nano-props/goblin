@@ -315,7 +315,9 @@ export const zh: Record<DictKey, string> = {
   'terminal.bell-unread-count': '{count} 个未读终端提醒',
   'terminal.paste-file-failed': '无法将文件粘贴到终端。',
   'terminal.paste-file-partial': '部分文件未能成功保存。',
+  'terminal.paste-file-unsafe': '部分粘贴路径包含终端控制字符,已跳过。',
   'terminal.paste-file-too-large': '文件过大,无法粘贴。请改用 scp、rsync 或文件管理器。',
+  'terminal.paste-file-overflow': '粘贴的路径过长，无法发送到终端。',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': '在访达中显示',

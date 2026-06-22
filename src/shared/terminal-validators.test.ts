@@ -2,11 +2,14 @@ import { describe, expect, test } from 'vitest'
 import {
   isValidTerminalAttachmentId,
   isValidTerminalNotifyBellInput,
+  isTerminalWsMessageWithinLimit,
   isValidTerminalSize,
   isValidTerminalSessionId,
   normalizeTerminalClientMessage,
   normalizeTerminalSize,
   normalizeTerminalSocketServerMessage,
+  terminalUtf8ByteLength,
+  TERMINAL_WS_MESSAGE_LIMIT_BYTES,
 } from '#/shared/terminal-validators.ts'
 
 describe('shared terminal validators', () => {
@@ -42,6 +45,15 @@ describe('shared terminal validators', () => {
         repoRoot: '/repo',
       }),
     ).toBe(false)
+  })
+
+  test('measures terminal websocket messages in UTF-8 bytes', () => {
+    expect('你'.length).toBe(1)
+    expect(terminalUtf8ByteLength('你')).toBe(3)
+    expect('😀'.length).toBe(2)
+    expect(terminalUtf8ByteLength('😀')).toBe(4)
+    expect(isTerminalWsMessageWithinLimit('a'.repeat(TERMINAL_WS_MESSAGE_LIMIT_BYTES))).toBe(true)
+    expect(isTerminalWsMessageWithinLimit('你'.repeat(Math.floor(TERMINAL_WS_MESSAGE_LIMIT_BYTES / 2)))).toBe(false)
   })
 
   test('normalizes valid terminal client messages', () => {

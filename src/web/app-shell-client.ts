@@ -63,15 +63,15 @@ export function pathForDroppedFile(file: File): string {
  * Returns absolute paths the PTY can read. On any failure (bridge
  * unavailable, IPC error, HTTP transport problem, server 4xx/5xx),
  * the underlying bridge collapses the error to `[]`; this wrapper
- * preserves that contract so the resolver can map "fewer paths back
- * than files in" to a `paste-file-partial` toast and "nothing back"
- * to `paste-file-failed`.
+ * preserves that contract so the resolver can count backend transfer
+ * failures separately from unsafe path filtering and map them to
+ * `paste-file-partial` / `paste-file-failed` toasts.
  */
-export function saveClipboardFiles(files: File[]): Promise<string[]> {
+export async function saveClipboardFiles(files: File[]): Promise<string[]> {
   try {
-    return getRendererBridge().saveClipboardFiles(files)
+    return await getRendererBridge().saveClipboardFiles(files)
   } catch {
-    return Promise.resolve([])
+    return []
   }
 }
 

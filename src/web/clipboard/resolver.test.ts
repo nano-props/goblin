@@ -17,9 +17,9 @@ describe('resolvePastedFiles', () => {
     mocks.saveClipboardFiles.mockResolvedValue([])
   })
 
-  test('returns {paths: [], failed: 0} for empty input', async () => {
+  test('returns an empty resolution for empty input', async () => {
     const { resolvePastedFiles } = await import('#/web/clipboard/resolver.ts')
-    await expect(resolvePastedFiles([])).resolves.toEqual({ paths: [], failed: 0 })
+    await expect(resolvePastedFiles([])).resolves.toEqual({ paths: [], failedUnsafe: 0, failedBackend: 0 })
     expect(mocks.saveClipboardFiles).not.toHaveBeenCalled()
   })
 
@@ -30,9 +30,34 @@ describe('resolvePastedFiles', () => {
     const b = new File([new Uint8Array([2])], 'b.png')
     await expect(resolvePastedFiles([a, b])).resolves.toEqual({
       paths: ['/abs/a.png', '/abs/b.png'],
-      failed: 0,
+      failedUnsafe: 0,
+      failedBackend: 0,
     })
     expect(mocks.saveClipboardFiles).not.toHaveBeenCalled()
+  })
+
+  test('rejects path-attempt results containing terminal control characters', async () => {
+    mocks.pathForDroppedFile.mockReturnValue('/abs/bad\nname.png')
+    const { resolvePastedFiles } = await import('#/web/clipboard/resolver.ts')
+    const file = new File([new Uint8Array([1])], 'bad.png')
+    await expect(resolvePastedFiles([file])).resolves.toEqual({
+      paths: [],
+      failedUnsafe: 1,
+      failedBackend: 0,
+    })
+    expect(mocks.saveClipboardFiles).not.toHaveBeenCalled()
+  })
+
+  test('reports partial failure when only some path-attempt results are unsafe', async () => {
+    mocks.pathForDroppedFile.mockImplementation((f) => (f.name === 'ok' ? '/abs/ok' : '/abs/bad\u001bname'))
+    const { resolvePastedFiles } = await import('#/web/clipboard/resolver.ts')
+    const ok = new File([new Uint8Array([1])], 'ok')
+    const bad = new File([new Uint8Array([1])], 'bad')
+    await expect(resolvePastedFiles([ok, bad])).resolves.toEqual({
+      paths: ['/abs/ok'],
+      failedUnsafe: 1,
+      failedBackend: 0,
+    })
   })
 
   test('falls through to blob save for files with no resolvable path', async () => {
@@ -40,7 +65,11 @@ describe('resolvePastedFiles', () => {
     mocks.saveClipboardFiles.mockResolvedValue(['/tmp/x.bin'])
     const { resolvePastedFiles } = await import('#/web/clipboard/resolver.ts')
     const f = new File([new Uint8Array([1])], 'x.bin')
-    await expect(resolvePastedFiles([f])).resolves.toEqual({ paths: ['/tmp/x.bin'], failed: 0 })
+    await expect(resolvePastedFiles([f])).resolves.toEqual({
+      paths: ['/tmp/x.bin'],
+      failedUnsafe: 0,
+      failedBackend: 0,
+    })
     expect(mocks.saveClipboardFiles).toHaveBeenCalledWith([f])
   })
 
@@ -52,7 +81,8 @@ describe('resolvePastedFiles', () => {
     const b = new File([new Uint8Array([1])], 'b')
     await expect(resolvePastedFiles([a, b])).resolves.toEqual({
       paths: ['/abs/a', '/tmp/b'],
-      failed: 0,
+      failedUnsafe: 0,
+      failedBackend: 0,
     })
     expect(mocks.saveClipboardFiles).toHaveBeenCalledWith([b])
   })
@@ -65,7 +95,8 @@ describe('resolvePastedFiles', () => {
     const b = new File([new Uint8Array([2])], 'b.bin')
     await expect(resolvePastedFiles([a, b])).resolves.toEqual({
       paths: ['/tmp/only.bin'],
-      failed: 1,
+      failedUnsafe: 0,
+      failedBackend: 1,
     })
   })
 
@@ -75,10 +106,10 @@ describe('resolvePastedFiles', () => {
     const { resolvePastedFiles } = await import('#/web/clipboard/resolver.ts')
     const a = new File([new Uint8Array([1])], 'a.bin')
     const b = new File([new Uint8Array([2])], 'b.bin')
-    await expect(resolvePastedFiles([a, b])).resolves.toEqual({ paths: [], failed: 2 })
+    await expect(resolvePastedFiles([a, b])).resolves.toEqual({ paths: [], failedUnsafe: 0, failedBackend: 2 })
   })
 
-  test('does NOT count path-attempt failures as failed (they were the resolver, not the backend)', async () => {
+  test('counts path-attempt misses as backend failures only after blob save fails', async () => {
     // If path-attempt failed and backend also failed, only the blob-save
     // miscount should be in `failed`. (Here: 0 path successes + 2 blob
     // inputs - 0 backend returns = 2 failed; not 4.)
@@ -88,6 +119,7 @@ describe('resolvePastedFiles', () => {
     const a = new File([new Uint8Array([1])], 'a')
     const b = new File([new Uint8Array([1])], 'b')
     const result = await resolvePastedFiles([a, b])
-    expect(result.failed).toBe(2)
+    expect(result.failedUnsafe).toBe(0)
+    expect(result.failedBackend).toBe(2)
   })
 })

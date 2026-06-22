@@ -1,7 +1,7 @@
-import { mkdir, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, rm, stat, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { serverDataDir } from '#/shared/data-dir.ts'
-import { PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
+import { CLIPBOARD_TEMP_FILE_MAX_AGE_MS, PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
 
 /**
  * Web counterpart to `src/main/clipboard-bridge.ts`. Web renderers reach
@@ -16,17 +16,27 @@ import { PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
  */
 
 const TEMP_DIR_NAME = `clipboard-tmp-${process.pid}`
+const WINDOWS_RESERVED_FILE_STEM_RE = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/i
 
 export function clipboardTempDir(): string {
   return path.join(serverDataDir(), TEMP_DIR_NAME)
+}
+
+function avoidWindowsReservedBaseName(base: string): string {
+  const dot = base.lastIndexOf('.')
+  const stem = (dot > 0 ? base.slice(0, dot) : base).replace(/\.+$/g, '')
+  return WINDOWS_RESERVED_FILE_STEM_RE.test(stem) ? `_${base}` : base
 }
 
 function sanitizeBaseName(name: string): string {
   // Strip path separators (defence in depth — `path.basename` should already
   // have removed them) and a small set of Windows-reserved characters. The
   // dash inside the class is escaped so it stays a literal, not a range.
-  const base = path.basename(name).replace(/[<>:"/\\|?*\x00-\x1f\x7f-\x9f]/g, '_').trim()
-  return base.length > 0 ? base : 'clipboard.bin'
+  const base = path
+    .basename(name)
+    .replace(/[<>:"/\\|?*\x00-\x1f\x7f-\x9f]/g, '_')
+    .trim()
+  return base.length > 0 ? avoidWindowsReservedBaseName(base) : 'clipboard.bin'
 }
 
 // Process-level monotonically increasing counter. The previous
@@ -99,6 +109,33 @@ export async function pruneStaleClipboardTempDirs(): Promise<void> {
     if (!entry.startsWith('clipboard-tmp-') || entry === selfDirName) continue
     try {
       await rm(path.join(root, entry), { recursive: true, force: true })
+    } catch {
+      // best effort
+    }
+  }
+}
+
+export async function pruneExpiredClipboardTempFiles(
+  now = Date.now(),
+  maxAgeMs = CLIPBOARD_TEMP_FILE_MAX_AGE_MS,
+): Promise<void> {
+  // Server-written blobs live under `serverDataDir()`, which can persist
+  // across restarts and reboots; this age cap bounds durable growth in
+  // addition to startup cleanup of previous-process dirs.
+  const dir = clipboardTempDir()
+  let entries: string[]
+  try {
+    entries = await readdir(dir)
+  } catch {
+    return
+  }
+  for (const entry of entries) {
+    const filePath = path.join(dir, entry)
+    try {
+      const info = await stat(filePath)
+      if (!info.isFile()) continue
+      if (now - info.mtimeMs <= maxAgeMs) continue
+      await unlink(filePath)
     } catch {
       // best effort
     }

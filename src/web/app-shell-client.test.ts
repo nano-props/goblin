@@ -146,14 +146,9 @@ describe('app shell client', () => {
     // it across. Without this test, that contract relied on
     // coincidence.
     const bridgeModule = await import('#/web/renderer-bridge.ts')
-    bridgeModule.setRendererBridgeForTests(
-      testBridge({ saveClipboardFiles: vi.fn(async () => ['/tmp/a', '/tmp/b']) }),
-    )
+    bridgeModule.setRendererBridgeForTests(testBridge({ saveClipboardFiles: vi.fn(async () => ['/tmp/a', '/tmp/b']) }))
     const { saveClipboardFiles } = await import('#/web/app-shell-client.ts')
-    await expect(saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).resolves.toEqual([
-      '/tmp/a',
-      '/tmp/b',
-    ])
+    await expect(saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).resolves.toEqual(['/tmp/a', '/tmp/b'])
   })
 
   test('saveClipboardFiles collapses bridge throw to [] (resolver treats this as paste-file-failed)', async () => {
@@ -166,6 +161,19 @@ describe('app shell client', () => {
       testBridge({
         saveClipboardFiles: vi.fn(() => {
           throw new Error('bridge unavailable')
+        }),
+      }),
+    )
+    const { saveClipboardFiles } = await import('#/web/app-shell-client.ts')
+    await expect(saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).resolves.toEqual([])
+  })
+
+  test('saveClipboardFiles collapses bridge rejection to []', async () => {
+    const bridgeModule = await import('#/web/renderer-bridge.ts')
+    bridgeModule.setRendererBridgeForTests(
+      testBridge({
+        saveClipboardFiles: vi.fn(async () => {
+          throw new Error('async bridge failure')
         }),
       }),
     )

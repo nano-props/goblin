@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rm, symlink, utimes, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -95,9 +95,7 @@ describe('saveClipboardBinaryFiles', () => {
 
   test('sanitises path-separator characters in the supplied name', async () => {
     const { saveClipboardBinaryFiles } = await import('#/main/clipboard-bridge.ts')
-    const paths = await saveClipboardBinaryFiles([
-      { name: '../escape/attempt.png', bytes: new ArrayBuffer(4) },
-    ])
+    const paths = await saveClipboardBinaryFiles([{ name: '../escape/attempt.png', bytes: new ArrayBuffer(4) }])
     expect(paths[0]).not.toContain('../')
     // Anchor the literal `.png` extension — see comment above on why
     // a bare `.png$` regex is not enough to catch the sanitiser
@@ -126,6 +124,16 @@ describe('saveClipboardBinaryFiles', () => {
     expect(basename).not.toContain(c1Char)
     expect(basename.endsWith('name_tail.bin')).toBe(true)
   })
+
+  test('prefixes Windows reserved file stems after sanitising', async () => {
+    const { saveClipboardBinaryFiles } = await import('#/main/clipboard-bridge.ts')
+    const paths = await saveClipboardBinaryFiles([
+      { name: 'CON.png', bytes: new ArrayBuffer(1) },
+      { name: 'lpt9.txt', bytes: new ArrayBuffer(1) },
+    ])
+    expect(path.basename(paths[0]).endsWith('_CON.png')).toBe(true)
+    expect(path.basename(paths[1]).endsWith('_lpt9.txt')).toBe(true)
+  })
 })
 
 describe('pruneStaleClipboardTempDirs', () => {
@@ -153,6 +161,49 @@ describe('pruneStaleClipboardTempDirs', () => {
   })
 })
 
+describe('pruneExpiredClipboardTempFiles', () => {
+  test('removes expired files from the current process temp dir but preserves fresh files', async () => {
+    const { pruneExpiredClipboardTempFiles } = await import('#/main/clipboard-bridge.ts')
+    const currentDir = path.join(testTmpdir, `goblin-clipboard-${process.pid}`)
+    await mkdir(currentDir, { recursive: true })
+    const oldFile = path.join(currentDir, 'old.bin')
+    const freshFile = path.join(currentDir, 'fresh.bin')
+    await writeFile(oldFile, 'old')
+    await writeFile(freshFile, 'fresh')
+    const now = Date.now()
+    const oldDate = new Date(now - 10_000)
+    const freshDate = new Date(now - 1_000)
+    await utimes(oldFile, oldDate, oldDate)
+    await utimes(freshFile, freshDate, freshDate)
+
+    await pruneExpiredClipboardTempFiles(now, 5_000)
+
+    const entries = await readdir(currentDir)
+    expect(entries).not.toContain('old.bin')
+    expect(entries).toContain('fresh.bin')
+  })
+
+  test('does not throw when the current temp dir is missing', async () => {
+    const { pruneExpiredClipboardTempFiles } = await import('#/main/clipboard-bridge.ts')
+    await expect(pruneExpiredClipboardTempFiles()).resolves.toBeUndefined()
+  })
+
+  test('handles empty dirs, subdirs, and stat failures without throwing', async () => {
+    const { pruneExpiredClipboardTempFiles } = await import('#/main/clipboard-bridge.ts')
+    const currentDir = path.join(testTmpdir, `goblin-clipboard-${process.pid}`)
+    await mkdir(currentDir, { recursive: true })
+    await expect(pruneExpiredClipboardTempFiles(Date.now(), 0)).resolves.toBeUndefined()
+    await mkdir(path.join(currentDir, 'nested'), { recursive: true })
+    await symlink(path.join(currentDir, 'missing.bin'), path.join(currentDir, 'broken-link'))
+
+    await expect(pruneExpiredClipboardTempFiles(Date.now(), 0)).resolves.toBeUndefined()
+
+    const entries = await readdir(currentDir)
+    expect(entries).toContain('nested')
+    expect(entries).toContain('broken-link')
+  })
+})
+
 describe('wireClipboardBridgeIpc', () => {
   test('registers the handler and triggers a startup prune', async () => {
     const stale = path.join(testTmpdir, 'goblin-clipboard-99999')
@@ -171,10 +222,7 @@ describe('wireClipboardBridgeIpc', () => {
     const { wireClipboardBridgeIpc } = await import('#/main/clipboard-bridge.ts')
     wireClipboardBridgeIpc()
     const handler = ipcHandlers.get('goblin:clipboard-save-files')!
-    const result = await handler(
-      {},
-      [{ name: 'a.txt', bytes: new ArrayBuffer(1) }],
-    )
+    const result = await handler({}, [{ name: 'a.txt', bytes: new ArrayBuffer(1) }])
     expect(result).toEqual([])
   })
 
@@ -191,10 +239,7 @@ describe('wireClipboardBridgeIpc', () => {
     const { wireClipboardBridgeIpc } = await import('#/main/clipboard-bridge.ts')
     wireClipboardBridgeIpc()
     const handler = ipcHandlers.get('goblin:clipboard-save-files')!
-    const result = await handler(
-      {},
-      [{ name: 'a.txt', bytes: new TextEncoder().encode('hi').buffer as ArrayBuffer }],
-    )
+    const result = await handler({}, [{ name: 'a.txt', bytes: new TextEncoder().encode('hi').buffer as ArrayBuffer }])
     expect(Array.isArray(result)).toBe(true)
     expect((result as string[])[0]).toContain(path.join(testTmpdir, `goblin-clipboard-${process.pid}`))
   })

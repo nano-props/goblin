@@ -28,6 +28,16 @@ export const PASTE_FILE_MAX_BYTES = 10 * 1024 * 1024 // 10 MiB
 export const MAX_PASTE_BATCH_BYTES = PASTE_FILE_MAX_BYTES + 2 * 1024 * 1024 // 12 MiB
 
 /**
+ * How long pasted blob files stay in the current process's temp dir.
+ * Electron stores these under `os.tmpdir()`, which is transient and may
+ * be cleared by the OS or on reboot. The web server stores them under
+ * `serverDataDir()`, which persists across restarts, so the same 24 h cap
+ * is more important there: it bounds durable server-side growth while
+ * leaving pasted paths usable for a normal working session.
+ */
+export const CLIPBOARD_TEMP_FILE_MAX_AGE_MS = 24 * 60 * 60 * 1000
+
+/**
  * Filename used when a `File` synthesised from `clipboardData.items` (or
  * otherwise constructed without a `name`) hits the multipart upload path.
  * Multipart requires a filename for `File` parts; the server-side
@@ -37,3 +47,13 @@ export const MAX_PASTE_BATCH_BYTES = PASTE_FILE_MAX_BYTES + 2 * 1024 * 1024 // 1
  * symmetric across runtimes.
  */
 export const CLIPBOARD_FALLBACK_FILE_NAME = 'clipboard.bin'
+
+/**
+ * Paths typed into a PTY must not contain terminal/input control bytes.
+ * Shell quoting protects against shell metacharacters, but bytes such as
+ * ESC, CR, LF, Ctrl-C, or DEL are processed by the terminal/line editor
+ * before the shell parser can treat them as part of a quoted string.
+ */
+export function isTerminalPastePathSafe(path: string): boolean {
+  return !/[\x00-\x1f\x7f-\x9f]/.test(path)
+}

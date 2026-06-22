@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { collectClipboardFiles } from '#/web/clipboard/collect-clipboard-files.ts'
+import { collectClipboardFiles, isNonPlaceholderClipboardFile } from '#/web/clipboard/collect-clipboard-files.ts'
 
 function mockDataTransfer(opts: { files?: File[]; items?: DataTransferItem[] }): DataTransfer {
   const files = opts.files ?? []
@@ -55,10 +55,17 @@ describe('collectClipboardFiles', () => {
     expect(collectClipboardFiles(dt)).toEqual([a])
   })
 
-  test('filters out zero-byte placeholder files', () => {
-    const empty = new File([], 'placeholder.bin')
+  test('keeps named zero-byte files so their filesystem path can be pasted', () => {
+    const empty = new File([], 'empty.txt')
     const real = new File([new Uint8Array([1])], 'real.png')
     const dt = mockDataTransfer({ files: [empty, real] })
+    expect(collectClipboardFiles(dt)).toEqual([empty, real])
+  })
+
+  test('filters out zero-byte placeholder files with no name', () => {
+    const placeholder = new File([], '')
+    const real = new File([new Uint8Array([1])], 'real.png')
+    const dt = mockDataTransfer({ files: [placeholder, real] })
     expect(collectClipboardFiles(dt)).toEqual([real])
   })
 
@@ -69,5 +76,14 @@ describe('collectClipboardFiles', () => {
 
   test('returns [] when neither files nor items have anything', () => {
     expect(collectClipboardFiles(mockDataTransfer({}))).toEqual([])
+  })
+})
+
+describe('isNonPlaceholderClipboardFile', () => {
+  test('keeps named and non-empty files but rejects null and unnamed empty placeholders', () => {
+    expect(isNonPlaceholderClipboardFile(null)).toBe(false)
+    expect(isNonPlaceholderClipboardFile(new File([], ''))).toBe(false)
+    expect(isNonPlaceholderClipboardFile(new File([], 'empty.txt'))).toBe(true)
+    expect(isNonPlaceholderClipboardFile(new File([new Uint8Array([1])], ''))).toBe(true)
   })
 })

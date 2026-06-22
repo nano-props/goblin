@@ -27,11 +27,11 @@ Make "paste file" work the same way "drop file" already does, on both Electron a
 
 After this PR, the terminal slot accepts file content through two gestures on both Electron and web:
 
-|  | Electron app | Web (`serve.sh`) |
-|---|---|---|
-| **Drag-and-drop** | ✅ via `pathForDroppedFile` + IPC save | ✅ via HTTP upload (new) |
-| **Paste (`Cmd/Ctrl+V`)** | ✅ via `pathForDroppedFile` + IPC save | ✅ via HTTP upload (new) |
-| **Mobile toolbar paste button** | ❌ no toolbar entry exists today; deferred | ❌ same; deferred |
+|                                 | Electron app                               | Web (`serve.sh`)         |
+| ------------------------------- | ------------------------------------------ | ------------------------ |
+| **Drag-and-drop**               | ✅ via `pathForDroppedFile` + IPC save     | ✅ via HTTP upload (new) |
+| **Paste (`Cmd/Ctrl+V`)**        | ✅ via `pathForDroppedFile` + IPC save     | ✅ via HTTP upload (new) |
+| **Mobile toolbar paste button** | ❌ no toolbar entry exists today; deferred | ❌ same; deferred        |
 
 ### Desktop (Electron)
 
@@ -59,7 +59,7 @@ Both **drop** and **paste** route through this same resolver on web, so the two 
 
 Behavior contract on web:
 
-- A `paste` event with at least one file uploads to the server, regardless of any `text/plain` presence (files-first ordering — see §9 "Linux text/uri-list mixed with text"). On success, paths are echoed into the PTY. On failure (server unreachable, batch exceeds `MAX_PASTE_BATCH_BYTES` at `bodyLimit`, server error), the user sees `terminal.paste-file-failed`. (Single-file oversize is intercepted earlier in the renderer with `paste-file-too-large`, not here.)
+- A `paste` event with at least one file uploads to the server, regardless of any `text/plain` presence (files-first ordering — see §9 "Linux text/uri-list mixed with text"). On success, paths are echoed into the PTY. On backend failure (server unreachable, batch exceeds `MAX_PASTE_BATCH_BYTES` at `bodyLimit`, server error), the user sees `terminal.paste-file-failed` or `terminal.paste-file-partial` depending on whether any paths survived. Unsafe path filtering uses `terminal.paste-file-unsafe`. (Single-file oversize is intercepted earlier in the renderer with `paste-file-too-large`, not here.)
 - A `drop` event with files uploads to the server. Same success / failure surface as paste. The existing `dragOver` indicator (the dashed border on the slot) is preserved unchanged.
 - A `paste` event with text continues to flow through xterm as today; the resolver is not consulted.
 - The paste and drop handlers' `isController` gate applies on web exactly as on desktop (viewers and mirrors silently no-op for files; text still flows through xterm for paste). Remote-host detection is deferred (see §"Follow-ups").
@@ -74,7 +74,7 @@ Add one small module to keep the size cap in one place:
 
 ```ts
 // src/shared/clipboard-paste.ts (new)
-export const PASTE_FILE_MAX_BYTES = 10 * 1024 * 1024  // 10 MiB
+export const PASTE_FILE_MAX_BYTES = 10 * 1024 * 1024 // 10 MiB
 ```
 
 Four call sites read it. **The cap is per-file**, not per-batch:
@@ -86,56 +86,69 @@ Four call sites read it. **The cap is per-file**, not per-batch:
 
 Why the per-file check and the batch limit serve different audiences:
 
-- **Renderer per-file check** = the user-friendly path. It produces `terminal.paste-file-too-large` *before* the request leaves the browser, so the user sees a specific, actionable toast (suggesting `scp`/`rsync` in the message body would be a natural follow-up).
+- **Renderer per-file check** = the user-friendly path. It produces `terminal.paste-file-too-large` _before_ the request leaves the browser, so the user sees a specific, actionable toast (suggesting `scp`/`rsync` in the message body would be a natural follow-up).
 - **Server `bodyLimit`** = worker protection. It defends against a hostile client that bypasses the renderer (custom curl, malicious extension, replayed request) from streaming arbitrary bytes into multipart parsing. The 413 it produces is intentionally generic because by that point we're past the UX layer.
 
-There's one observable consequence of this split: a *single* 12+ MiB file from a bypassed-renderer request is caught only by `bodyLimit` (→ 413 → `paste-file-failed`), not by `paste-file-too-large`. The legitimate renderer code path can never reach that branch; it's just defense-in-depth.
+There's one observable consequence of this split: a _single_ 12+ MiB file from a bypassed-renderer request is caught only by `bodyLimit` (→ 413 → `paste-file-failed`), not by `paste-file-too-large`. The legitimate renderer code path can never reach that branch; it's just defense-in-depth.
 
 ### 2. Web: capture-phase paste on the slot
 
-Add a capture-phase `paste` listener on the slot root in `TerminalSlot.tsx`, parallel to the existing `onDrop` handler. xterm renders *inside* the slot root (`TerminalSlot.tsx:265` → `terminal-session-view.ts:69-73` → xterm host), so a capture-phase handler on the root fires first by the standard DOM dispatch order — there's no need to call `stopPropagation()` to "beat" xterm, and `preventDefault()` alone is enough to suppress xterm's built-in paste. (Don't `stopPropagation`: it would silently break any future bubble-phase paste listener above the slot — toast region, focus tracker, error boundary.)
+Add a capture-phase `paste` listener on the slot root in `TerminalSlot.tsx`, parallel to the existing `onDrop` handler. xterm renders _inside_ the slot root (`TerminalSlot.tsx:265` → `terminal-session-view.ts:69-73` → xterm host), so a capture-phase handler on the root fires first by the standard DOM dispatch order — there's no need to call `stopPropagation()` to "beat" xterm, and `preventDefault()` alone is enough to suppress xterm's built-in paste. (Don't `stopPropagation`: it would silently break any future bubble-phase paste listener above the slot — toast region, focus tracker, error boundary.)
 
 The slot already uses `onFocusCapture`/`onBlurCapture`/`onKeyDownCapture` (lines 242-244), so the same `on<Event>Capture` JSX prop works for paste — no `useEffect + addEventListener('paste', ..., true)` needed.
 
 ```ts
-const handlePasteCapture = useCallback((event: ClipboardEvent<HTMLDivElement>) => {
-  if (!key || !isController) return                       // viewer / mirror: do nothing
+const handlePasteCapture = useCallback(
+  (event: ClipboardEvent<HTMLDivElement>) => {
+    if (!key || !isController) return // viewer / mirror: do nothing
 
-  // Files FIRST. On Linux a file copy carries `text/uri-list` *and* a
-  // `text/plain` rendering of the same URI list; if we let text win the
-  // user sees a literal `file:///home/user/foo.png` string in the PTY.
-  // See §9 ("Linux text/uri-list mixed with text") for the full reasoning.
-  const files = collectClipboardFiles(event.clipboardData)
-  if (files.length > 0) {
-    const oversized = files.find((f) => f.size > PASTE_FILE_MAX_BYTES)
-    if (oversized) {
+    // Files FIRST. On Linux a file copy carries `text/uri-list` *and* a
+    // `text/plain` rendering of the same URI list; if we let text win the
+    // user sees a literal `file:///home/user/foo.png` string in the PTY.
+    // See §9 ("Linux text/uri-list mixed with text") for the full reasoning.
+    const files = collectClipboardFiles(event.clipboardData)
+    if (files.length > 0) {
+      const oversized = files.find((f) => f.size > PASTE_FILE_MAX_BYTES)
+      if (oversized) {
+        event.preventDefault()
+        toast.error(t('terminal.paste-file-too-large'))
+        return
+      }
+
       event.preventDefault()
-      toast.error(t('terminal.paste-file-too-large'))
+      void resolvePastedFiles(files).then((resolution) => {
+        const plan = planTerminalPathWrite(resolution.paths, {
+          failedUnsafe: resolution.failedUnsafe,
+          failedBackend: resolution.failedBackend,
+        })
+        if (plan.kind === 'none') {
+          if (plan.failures.failedUnsafe > 0) toast.error(t('terminal.paste-file-unsafe'))
+          if (plan.failures.failedBackend > 0) toast.error(t('terminal.paste-file-failed'))
+          return
+        }
+        if (plan.kind === 'too-long') {
+          toast.error(t('terminal.paste-file-overflow'))
+          return
+        }
+        writeInput(key, plan.data)
+        if (plan.failures.failedUnsafe > 0) toast.error(t('terminal.paste-file-unsafe'))
+        if (plan.failures.failedBackend > 0) toast.error(t('terminal.paste-file-partial'))
+      })
       return
     }
 
-    event.preventDefault()
-    void resolvePastedFiles(files).then(({ paths, failed }) => {
-      if (paths.length === 0) {
-        toast.error(t('terminal.paste-file-failed'))
-        return
-      }
-      writeInput(key, paths.map(shellEscapePath).join(' '))
-      if (failed > 0) toast.error(t('terminal.paste-file-partial'))
-    })
-    return
-  }
+    // No files: if there's text, let xterm handle it (do NOT preventDefault).
+    if (event.clipboardData.getData('text/plain').length > 0) return
 
-  // No files: if there's text, let xterm handle it (do NOT preventDefault).
-  if (event.clipboardData.getData('text/plain').length > 0) return
-
-  // Nothing useful — no files, no text. No-op, no toast.
-}, [key, isController, writeInput, t, toast])
+    // Nothing useful — no files, no text. No-op, no toast.
+  },
+  [key, isController, writeInput, t, toast],
+)
 ```
 
 One helper, new and small:
 
-- `collectClipboardFiles(data)` — mirrors the existing drop semantics: prefer `data.files`, fall back to `data.items` (`kind === 'file'` → `getAsFile()`), filter out zero-byte entries that some platforms emit as placeholders. ~10 lines. Lives in `TerminalSlot.tsx`.
+- `collectClipboardFiles(data)` — mirrors the existing drop semantics: prefer `data.files`, fall back to `data.items` (`kind === 'file'` → `getAsFile()`), filter out unnamed zero-byte entries that some platforms emit as placeholders. ~10 lines. Lives in `TerminalSlot.tsx`.
 
 ### 3. Web: two-tier path resolver
 
@@ -144,17 +157,19 @@ The resolver is runtime-agnostic. It tries each tier in order; the first non-emp
 ```ts
 // web/clipboard/resolver.ts (new)
 export interface PasteResolution {
-  /** Absolute paths the PTY can read. May be non-empty even when `failed > 0`. */
+  /** Absolute paths the PTY can read. May be non-empty even when failures are present. */
   paths: string[]
+  /**
+   * Number of path-attempt results rejected because they contain terminal
+   * control bytes that would be interpreted before shell quoting applies.
+   */
+  failedUnsafe: number
   /**
    * Number of blobs the resolver handed to the backend that did not come back
    * with a path. Computed as `blobOnly.length - saved.length` — path-attempt
-   * successes do not count, they're already in `paths`. Surfacing this prevents
-   * silent partial loss: if `failed > 0 && paths.length > 0`, the handler shows
-   * a `paste-file-partial` toast in addition to writing the paths that did
-   * succeed.
+   * successes do not count, they're already in `paths`.
    */
-  failed: number
+  failedBackend: number
 }
 
 export async function resolvePastedFiles(files: File[]): Promise<PasteResolution> {
@@ -162,21 +177,27 @@ export async function resolvePastedFiles(files: File[]): Promise<PasteResolution
   // from the OS filesystem; the web bridge returns ''.
   const paths: string[] = []
   const blobOnly: File[] = []
+  let failedUnsafe = 0
   for (const file of files) {
     const p = pathForDroppedFile(file)
-    if (p.length > 0) paths.push(p)
-    else blobOnly.push(file)
+    if (p.length > 0) {
+      if (isTerminalPastePathSafe(p)) paths.push(p)
+      else failedUnsafe += 1
+    } else {
+      blobOnly.push(file)
+    }
   }
-  if (blobOnly.length === 0) return { paths, failed: 0 }
+  if (blobOnly.length === 0) return { paths, failedUnsafe, failedBackend: 0 }
 
   // Blob save: persist remaining blobs via the runtime backend.
   // The backend is all-or-nothing in the happy path (every input written,
   // every path returned) but can return fewer paths than blobOnly.length on
-  // partial transport failure. We count the gap as `failed`.
+  // partial transport failure. We count the gap as `failedBackend`.
   const saved = await saveClipboardFiles(blobOnly)
   return {
     paths: paths.concat(saved),
-    failed: Math.max(0, blobOnly.length - saved.length),
+    failedUnsafe,
+    failedBackend: Math.max(0, blobOnly.length - saved.length),
   }
 }
 ```
@@ -236,7 +257,7 @@ Concretely:
 
 - New factory `createClipboardRoutes()` under `src/server/routes/clipboard.ts`, mounted in `app-factory.ts`. The mount point is `/api/clipboard`, which means the existing `cors` and `applyApiSecurityHeaders` middlewares (registered for `/api/*` in `app-factory.ts`) cover the new route automatically. **Auth is not** auto-applied: `createAccessTokenMiddleware` is only registered on `/api/settings/*`, `/api/repo/*`, `/api/remote/*`. Add an explicit `app.use('/api/clipboard/*', createAccessTokenMiddleware(options.accessToken))` in `app-factory.ts` next to the existing auth registrations, before mounting the new routes.
 - Per `docs/layering.md`, the route file is thin — it parses the multipart body, calls into the write layer, and returns the JSON envelope. Orchestration lives in a new `src/server/modules/clipboard-write-paths.ts` module, parallel to `settings-write-paths.ts` and `repo-write-paths.ts`.
-- **Body limit refactor**. The existing `bodyLimit({ maxSize: 1 MiB })` middleware on `/api/*` (`app-factory.ts:131-137`) is too tight for 10 MiB blobs (multipart overhead included), and a per-route override registered *after* the global one does not take effect — Hono's `bodyLimit` reads `Content-Length` and returns `onError(c)` directly when it exceeds `maxSize` *before* calling `next()` (see `node_modules/hono/dist/middleware/body-limit/index.js:18-21`), so any later middleware in the chain never runs. The fix is to delete the global `/api/*` `bodyLimit` and register one per sub-path that needs it.
+- **Body limit refactor**. The existing `bodyLimit({ maxSize: 1 MiB })` middleware on `/api/*` (`app-factory.ts:131-137`) is too tight for 10 MiB blobs (multipart overhead included), and a per-route override registered _after_ the global one does not take effect — Hono's `bodyLimit` reads `Content-Length` and returns `onError(c)` directly when it exceeds `maxSize` _before_ calling `next()` (see `node_modules/hono/dist/middleware/body-limit/index.js:18-21`), so any later middleware in the chain never runs. The fix is to delete the global `/api/*` `bodyLimit` and register one per sub-path that needs it.
 
   The new ordering on each protected sub-path (`/api/settings/*`, `/api/repo/*`, `/api/remote/*`, `/api/clipboard/*`) is:
 
@@ -250,6 +271,7 @@ Concretely:
   2. **`/api/health` loses its bodyLimit.** Today the global `/api/*` rule covers health endpoints by accident. Health handlers don't accept bodies but they do accept POSTs in principle, and they're frequently hit by external probes. Add an explicit `app.use('/api/health/*', bodyLimit({ maxSize: 1 KiB, onError: ... }))` so the new layout doesn't accidentally widen the attack surface — a kilobyte is generous for any health request that legitimately exists.
 
   The four protected routes keep the existing 1 MiB cap; only `/api/clipboard/*` gets `MAX_PASTE_BATCH_BYTES`. Behavior for every existing endpoint is preserved (same 413 on overflow, same status codes), and the refactor must land in the same PR as the new route.
+
 - The server writes to `<serverDataDir()>/clipboard-tmp-<pid>/` (re-using `serverDataDir()` from `src/server/common/data-dir.ts`), with timestamped names. Same startup-prune policy as the Electron tier: clean files from previous runs once per server process, not per request.
 - The multipart body shape is fixed (repeated `files` field), so no valibot schema is needed. The route uses `await c.req.parseBody()` and normalises the result: Hono's `parseBody()` returns `Record<string, string | File | (string | File)[]>`, so the `files` key may surface as a single `File` (one uploaded file), a `File[]` (multiple), or absent (empty upload). The handler treats each value uniformly — coerce strings to a 400, collect files into a `File[]` — before passing to the write layer. If a future variant adds fields (e.g. worktree selection), introduce a `clipboard-save-files` schema in `procedure-schemas.ts` at that point.
 - Returned `paths` are absolute paths on the **server machine**. On web mode this works because the server hosts the terminal PTY (`serverTerminalHost` in `app-factory.ts`), so a path the server can resolve is also a path the PTY can read.
@@ -259,8 +281,8 @@ Renderer side: the new web `PasteFileBackend` (effectively just `saveClipboardFi
 ```ts
 // web/clipboard/http-backend.ts (new)
 export function createHttpClipboardBackend(config: {
-  url: string          // initialServer.url from bootstrap
-  secret: string       // initialServer.secret
+  url: string // initialServer.url from bootstrap
+  secret: string // initialServer.secret
 }): {
   saveClipboardFiles(files: File[]): Promise<string[]>
 } {
@@ -280,7 +302,7 @@ export function createHttpClipboardBackend(config: {
         body: form,
       })
       if (!res.ok) return []
-      const json = await res.json() as { paths?: string[] }
+      const json = (await res.json()) as { paths?: string[] }
       return Array.isArray(json.paths) ? json.paths : []
     },
   }
@@ -305,7 +327,7 @@ const handleDrop = useCallback(
     if (!event.dataTransfer.types.includes('Files')) return
     event.preventDefault()
     setDragOver(false)
-    if (!key || !isController) return       // controller-only, same as paste
+    if (!key || !isController) return // controller-only, same as paste
     const files = Array.from(event.dataTransfer.files)
     if (files.length === 0) return
 
@@ -315,13 +337,23 @@ const handleDrop = useCallback(
       return
     }
 
-    void resolvePastedFiles(files).then(({ paths, failed }) => {
-      if (paths.length === 0) {
-        toast.error(t('terminal.paste-file-failed'))
+    void resolvePastedFiles(files).then((resolution) => {
+      const plan = planTerminalPathWrite(resolution.paths, {
+        failedUnsafe: resolution.failedUnsafe,
+        failedBackend: resolution.failedBackend,
+      })
+      if (plan.kind === 'none') {
+        if (plan.failures.failedUnsafe > 0) toast.error(t('terminal.paste-file-unsafe'))
+        if (plan.failures.failedBackend > 0) toast.error(t('terminal.paste-file-failed'))
         return
       }
-      writeInput(key, paths.map(shellEscapePath).join(' '))
-      if (failed > 0) toast.error(t('terminal.paste-file-partial'))
+      if (plan.kind === 'too-long') {
+        toast.error(t('terminal.paste-file-overflow'))
+        return
+      }
+      writeInput(key, plan.data)
+      if (plan.failures.failedUnsafe > 0) toast.error(t('terminal.paste-file-unsafe'))
+      if (plan.failures.failedBackend > 0) toast.error(t('terminal.paste-file-partial'))
     })
   },
   [key, isController, writeInput, t, toast],
@@ -338,38 +370,40 @@ Notes:
 
 New keys (en/zh/ja/ko), following the existing flat `terminal.<kebab>` convention. The keys are named after the **gesture** (paste), but the drop handler reuses them on purpose: a "file too large" toast is the same UX regardless of whether the user pasted or dropped. If the team wants gesture-specific copy, split later.
 
-- `terminal.paste-file-failed` — resolver returned no paths
-- `terminal.paste-file-partial` — some files resolved, some didn't (only shown when `failed > 0 && paths.length > 0`)
+- `terminal.paste-file-failed` — backend transfer failed and no paths were available to write
+- `terminal.paste-file-partial` — some paths resolved, but at least one backend transfer failed
+- `terminal.paste-file-unsafe` — one or more resolved paths contained terminal control characters and were skipped
 - `terminal.paste-file-too-large` — file exceeded the configured size cap
+- `terminal.paste-file-overflow` — escaped paths exceeded the terminal WebSocket payload guard
 
 ### 9. Error handling and edge cases
 
 - **Viewer / mirror mode**: both `handlePasteCapture` and `handleDrop` short-circuit when `!isController`, silently no-opping for files. Text paste still flows through xterm for viewers (xterm's own paste isn't gated). The handlers are symmetric on this point — see §7 for the rationale on tightening drop's gate.
 - **Remote host**: deferred to follow-up (see §"Follow-ups"). The first iteration has no SSH, so there is no remote-controller case to handle. The existing `!isController` gate in the paste handler covers non-controllers (viewers, mirrors, unowned) by silently no-opping for files — this is the current behavior, preserved unchanged.
-- **Size cap**: enforced at three layers, all reading `PASTE_FILE_MAX_BYTES` — renderer handlers (paste + drop, early bail with toast), the main-process IPC handler (defense-in-depth; rejects oversized payloads before reading bytes), and the server `bodyLimit` middleware (transport ceiling; per-batch, sized at `PASTE_FILE_MAX_BYTES + 2 MiB`). The server route handler itself does **not** re-check per-file size — the bodyLimit already bounds the request, and the renderer is the only legitimate source of paste/drop events, so adding a redundant check would be code without a purpose. Per-file intent is enforced at the renderer; per-batch transport safety is enforced at the bodyLimit.
-- **Zero-byte files**: `collectClipboardFiles` filters them out. If filtering drops everything, the function returns and we do not `preventDefault`, so the user keeps their usual paste experience.
+- **Size cap**: enforced at three layers, all reading `PASTE_FILE_MAX_BYTES` — renderer handlers (paste + drop, early bail with toast), the main-process IPC handler (defense-in-depth; rejects oversized payloads before writing bytes), and the server write-path module (defense-in-depth for bypassed renderers). The server `bodyLimit` middleware is a separate per-batch transport ceiling, sized at `PASTE_FILE_MAX_BYTES + 2 MiB`.
+- **Zero-byte placeholders**: `collectClipboardFiles` filters unnamed zero-byte placeholders, but keeps named zero-byte files because they are legitimate filesystem entries whose path can still be pasted. If filtering drops everything, the function returns and we do not `preventDefault`, so the user keeps their usual paste experience.
 - **No file selected, only image**: still a file-like blob; we serialize it like any other binary and write the path. xterm will not preview it, but the user can open it.
 - **Server unreachable (web only)**: the HTTP backend returns `[]` on network error, which maps to `terminal.paste-file-failed`. No silent failure.
 - **Startup cleanup of stale temp files**: a single pruning pass on main / server startup. If the process crashes mid-write, leftover files from the previous run are removed on next boot. Per-request pruning is unnecessary.
-- **Linux `text/uri-list` mixed with text**: when a file manager copies a file on Linux, the clipboard carries `text/uri-list` *and* `text/plain` (a textual rendering of the same URI list). The capture handler must check for files (`data.files` / `data.items` with `kind === 'file'`) **before** the text/plain bail-out — otherwise a Linux file copy is pasted as a literal `file:///home/user/foo.png` string. The handler ordering in §2 already does this (file check precedes text check); the helper `collectClipboardFiles` returns the file blobs, and the text fallback only fires when no files are present.
+- **Linux `text/uri-list` mixed with text**: when a file manager copies a file on Linux, the clipboard carries `text/uri-list` _and_ `text/plain` (a textual rendering of the same URI list). The capture handler must check for files (`data.files` / `data.items` with `kind === 'file'`) **before** the text/plain bail-out — otherwise a Linux file copy is pasted as a literal `file:///home/user/foo.png` string. The handler ordering in §2 already does this (file check precedes text check); the helper `collectClipboardFiles` returns the file blobs, and the text fallback only fires when no files are present.
 
 ## Follow-ups (not in this PR)
 
 - **Mobile toolbar paste button.** Add a dedicated entry to `mobile-terminal-toolbar.tsx` (icon, accessible name, placement next to Ctrl+C) that reads `navigator.clipboard.read()` and dispatches on `clipboardItem.types`: files → `resolvePastedFiles`, text-only → `readText`, neither → no-op. Wrap in `try/catch` and fall back to `readText` on `NotAllowedError` / API unavailable.
-- **OS-clipboard path formats on Electron.** `clipboard.readBuffer('FileNameW')` (Windows), NSFilenamesPboard (macOS), `text/uri-list` (Linux). When implemented, this would slot into the resolver as a *prepended* step before the current path-attempt: try `clipboard.readBuffer` first, fall through to `webUtils.getPathForFile` + blob save. Cross-platform cost is high; defer.
+- **OS-clipboard path formats on Electron.** `clipboard.readBuffer('FileNameW')` (Windows), NSFilenamesPboard (macOS), `text/uri-list` (Linux). When implemented, this would slot into the resolver as a _prepended_ step before the current path-attempt: try `clipboard.readBuffer` first, fall through to `webUtils.getPathForFile` + blob save. Cross-platform cost is high; defer.
 - **Remote-host detection.** When SSH terminal support lands, the controller-attached-to-remote case needs detection (via `attachment.role` / `processName` / SSH plumbing — see `docs/terminal-target-model.md`) and a new `terminal.paste-file-remote` toast surfaced from the paste handler before the resolver runs. Until then the handler's existing `!isController` gate silently no-ops for non-controllers, matching today's behavior.
 - **Image preview / inline thumbnails via the iTerm2 image protocol.**
 - **"Copy to my machine" download route for LAN deployments.**
 
 ## Testing
 
-- `TerminalSlot.test.tsx` (extend): simulate both `paste` and `drop` events with synthetic payloads (text-only, file-only, zero-byte, oversized). Assert `preventDefault` is called only when we handle it, `writeInput` receives the escaped paths, and the toast key matches the failure mode. For drop, additionally assert `setDragOver(false)` fires regardless of resolution outcome (UI state must not get stuck). **The Linux mixed `text/uri-list`+`text/plain` case is *not* covered here** — jsdom can't faithfully deliver a dual-format `ClipboardEvent`; it lives in the Rollout manual matrix and the Electron e2e instead.
+- `TerminalSlot.test.tsx` (extend): simulate both `paste` and `drop` events with synthetic payloads (text-only, file-only, zero-byte, oversized). Assert `preventDefault` is called only when we handle it, `writeInput` receives the escaped paths, and the toast key matches the failure mode. For drop, additionally assert `setDragOver(false)` fires regardless of resolution outcome (UI state must not get stuck). **The Linux mixed `text/uri-list`+`text/plain` case is _not_ covered here** — jsdom can't faithfully deliver a dual-format `ClipboardEvent`; it lives in the Rollout manual matrix and the Electron e2e instead.
 
   **Testability note.** jsdom does not implement `ClipboardEvent` (the constructor exists but `clipboardData` is unset) and `DataTransfer` is only a partial stub. Do not rely on constructing real events in jsdom — instead, factor the per-event logic into pure helpers and unit-test those, then keep the DOM wiring thin and verify it via a single Electron integration test (Playwright + Electron driver, or `@playwright/test` with `electron`/`_electron`). Concretely:
   - Extract `processPaste({ text, files }, backend) → Promise<PasteResolution>` and `processDrop({ files }, backend) → Promise<PasteResolution>` as pure functions in `web/clipboard/process.ts`. The slot handlers become one-liners that build the event-data argument and call the function. Unit-test the pure functions with synthetic `File` / string inputs (no DOM).
   - Cover the DOM wiring (capture-phase firing, `preventDefault` timing, `setDragOver(false)` placement, async-result toast mapping, **and the Linux mixed payload case**) in one Electron end-to-end test that exercises the real slot.
 
-- `app-shell-client.test.ts` (extend): mock `getRendererBridge().saveClipboardFiles` for both runtimes; assert the resolver splits files into path-known vs. blob-only, concatenates results, and reports `failed` correctly when blob-save returns fewer paths than input. For web, mock the HTTP backend and assert the multipart payload (including the filename fallback for empty `file.name`).
+- `app-shell-client.test.ts` (extend): mock `getRendererBridge().saveClipboardFiles` for both runtimes; assert the resolver splits files into path-known vs. blob-only, concatenates results, and reports `failedBackend` correctly when blob-save returns fewer paths than input. For web, mock the HTTP backend and assert the multipart payload (including the filename fallback for empty `file.name`).
 - `src/main/clipboard-bridge.test.ts` (new): follow the existing main-process test pattern (`vi.mock('electron', () => ({...}))`, `vi.hoisted` for handles, no real Electron binary) — see `src/main/ipc.test.ts` for the template. Mock `os.tmpdir()`, assert files are written with timestamped names, oversized payloads are rejected, startup prune removes stale files.
 - `src/server/modules/clipboard-write-paths.test.ts` (new): same shape as `settings-write-paths.test.ts` — Hono test app with a temp data dir. Assert: writes are timestamped, prune of stale files works, body-limit returns 413, auth returns 401, happy path returns absolute paths under the data dir.
 

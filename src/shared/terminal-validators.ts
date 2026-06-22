@@ -281,6 +281,33 @@ const TerminalClientMessageSchema = v.variant('type', [
   }),
 ])
 
+export function terminalUtf8ByteLength(value: string): number {
+  let bytes = 0
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i)
+    if (code <= 0x7f) {
+      bytes += 1
+    } else if (code <= 0x7ff) {
+      bytes += 2
+    } else if (code >= 0xd800 && code <= 0xdbff && i + 1 < value.length) {
+      const next = value.charCodeAt(i + 1)
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        bytes += 4
+        i += 1
+      } else {
+        bytes += 3
+      }
+    } else {
+      bytes += 3
+    }
+  }
+  return bytes
+}
+
+export function isTerminalWsMessageWithinLimit(value: string): boolean {
+  return terminalUtf8ByteLength(value) <= TERMINAL_WS_MESSAGE_LIMIT_BYTES
+}
+
 export function normalizeTerminalSize(cols: unknown, rows: unknown): { cols: number; rows: number } | null {
   if (typeof cols !== 'number' || typeof rows !== 'number' || !Number.isFinite(cols) || !Number.isFinite(rows)) {
     return null

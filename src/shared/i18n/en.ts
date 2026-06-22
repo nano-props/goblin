@@ -336,7 +336,9 @@ export const en = {
   'terminal.bell-unread-count': '{count} unread bell',
   'terminal.paste-file-failed': 'Could not paste the file into the terminal.',
   'terminal.paste-file-partial': 'Some pasted files could not be saved.',
+  'terminal.paste-file-unsafe': 'Some pasted paths contain terminal control characters and were skipped.',
   'terminal.paste-file-too-large': 'File is too large to paste. Use scp, rsync, or a file manager instead.',
+  'terminal.paste-file-overflow': 'Pasted paths are too long for the terminal.',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) ---
   'worktrees.reveal-title': 'Reveal in Finder',

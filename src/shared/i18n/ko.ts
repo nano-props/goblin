@@ -325,7 +325,9 @@ export const ko: Record<DictKey, string> = {
   'terminal.bell-unread-count': '읽지 않은 벨 {count}개',
   'terminal.paste-file-failed': '파일을 터미널에 붙여넣지 못했습니다.',
   'terminal.paste-file-partial': '일부 파일을 저장하지 못했습니다.',
+  'terminal.paste-file-unsafe': '일부 붙여넣은 경로에 터미널 제어 문자가 있어 건너뛰었습니다.',
   'terminal.paste-file-too-large': '파일이 너무 커서 붙여넣을 수 없습니다. scp, rsync 또는 파일 관리자를 사용하세요.',
+  'terminal.paste-file-overflow': '붙여넣은 경로가 너무 길어 터미널로 보낼 수 없습니다.',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': 'Finder 에서 보기',

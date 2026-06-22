@@ -1,6 +1,7 @@
 import { createRouteApp } from '#/server/common/http-validate.ts'
 import { errorJson } from '#/server/common/responses.ts'
 import {
+  pruneExpiredClipboardTempFiles,
   pruneStaleClipboardTempDirs,
   saveClipboardFiles,
 } from '#/server/modules/clipboard-write-paths.ts'
@@ -12,6 +13,7 @@ export function createClipboardRoutes() {
   // process via `app-factory.ts`. Fire-and-forget — readdir/rm errors
   // are swallowed inside the module.
   void pruneStaleClipboardTempDirs()
+  void pruneExpiredClipboardTempFiles()
 
   // Persist binary blobs from a `ClipboardEvent` / `DragEvent` on the
   // web renderer. The multipart body shape is fixed (repeated `files`),
@@ -42,11 +44,7 @@ export function createClipboardRoutes() {
       return c.json({ paths })
     } catch (err) {
       if (err instanceof Error && /exceeds/.test(err.message)) {
-        return errorJson(
-          c,
-          'PAYLOAD_TOO_LARGE',
-          `One or more files exceed the ${PASTE_FILE_MAX_BYTES}-byte cap`,
-        )
+        return errorJson(c, 'PAYLOAD_TOO_LARGE', `One or more files exceed the ${PASTE_FILE_MAX_BYTES}-byte cap`)
       }
       return errorJson(c, 'INTERNAL_SERVER_ERROR', 'Failed to persist clipboard files')
     }

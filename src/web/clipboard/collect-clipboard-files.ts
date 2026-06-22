@@ -8,10 +8,11 @@
  * is a partial stub in jsdom, real browsers populate one or the other,
  * so trying both shapes is the right contract.
  *
- * Zero-byte entries (some platforms emit them as placeholders for
- * "there's clipboard data but no real file") are filtered out — they
- * would otherwise materialise as empty files on disk and confuse the
- * user.
+ * Zero-byte entries with no filename (some platforms emit them as
+ * placeholders for "there's clipboard data but no real file") are
+ * filtered out. Named zero-byte files are legitimate filesystem entries
+ * and must still be allowed through so the path-attempt tier can resolve
+ * them.
  */
 export function collectClipboardFiles(data: DataTransfer | null): File[] {
   if (!data) return []
@@ -20,7 +21,7 @@ export function collectClipboardFiles(data: DataTransfer | null): File[] {
   if (filesProp && filesProp.length > 0) {
     for (let i = 0; i < filesProp.length; i += 1) {
       const file = filesProp.item(i)
-      if (file && file.size > 0) files.push(file)
+      if (isNonPlaceholderClipboardFile(file)) files.push(file)
     }
     if (files.length > 0) return files
   }
@@ -30,8 +31,12 @@ export function collectClipboardFiles(data: DataTransfer | null): File[] {
       const item = items[i]
       if (item.kind !== 'file') continue
       const file = item.getAsFile()
-      if (file && file.size > 0) files.push(file)
+      if (isNonPlaceholderClipboardFile(file)) files.push(file)
     }
   }
   return files
+}
+
+export function isNonPlaceholderClipboardFile(file: File | null): file is File {
+  return file !== null && (file.size > 0 || file.name.length > 0)
 }

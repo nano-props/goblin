@@ -3,17 +3,20 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   saveClipboardFiles: vi.fn(),
   pruneStaleClipboardTempDirs: vi.fn(),
+  pruneExpiredClipboardTempFiles: vi.fn(),
 }))
 
 vi.mock('#/server/modules/clipboard-write-paths.ts', () => ({
   saveClipboardFiles: mocks.saveClipboardFiles,
   pruneStaleClipboardTempDirs: mocks.pruneStaleClipboardTempDirs,
+  pruneExpiredClipboardTempFiles: mocks.pruneExpiredClipboardTempFiles,
 }))
 
 describe('clipboard routes', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.pruneStaleClipboardTempDirs.mockResolvedValue(undefined)
+    mocks.pruneExpiredClipboardTempFiles.mockResolvedValue(undefined)
   })
 
   test('200 with absolute paths when the write module succeeds', async () => {
@@ -90,5 +93,6 @@ describe('clipboard routes', () => {
     // void pruneStaleClipboardTempDirs() returns synchronously; the mock
     // should have been called once.
     expect(mocks.pruneStaleClipboardTempDirs).toHaveBeenCalledTimes(1)
+    expect(mocks.pruneExpiredClipboardTempFiles).toHaveBeenCalledTimes(1)
   })
 })

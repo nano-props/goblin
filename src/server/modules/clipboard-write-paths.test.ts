@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rm, symlink, utimes, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -91,11 +91,22 @@ describe('saveClipboardFiles', () => {
     // process-level so the exact value isn't pinned here.
     expect(path.basename(paths[0])).toMatch(/\d+-\d+-clipboard\.bin$/)
   })
+
+  test('prefixes Windows reserved file stems after sanitising', async () => {
+    const { saveClipboardFiles } = await import('#/server/modules/clipboard-write-paths.ts')
+    const { paths } = await saveClipboardFiles([
+      new File([new Uint8Array([0])], 'AUX.png'),
+      new File([new Uint8Array([0])], 'com1.txt'),
+    ])
+    expect(path.basename(paths[0]).endsWith('_AUX.png')).toBe(true)
+    expect(path.basename(paths[1]).endsWith('_com1.txt')).toBe(true)
+  })
 })
 
 describe('pruneStaleClipboardTempDirs', () => {
   test('removes clipboard-tmp-* dirs from previous runs but preserves the current one', async () => {
-    const { pruneStaleClipboardTempDirs, saveClipboardFiles } = await import('#/server/modules/clipboard-write-paths.ts')
+    const { pruneStaleClipboardTempDirs, saveClipboardFiles } =
+      await import('#/server/modules/clipboard-write-paths.ts')
     const stale = path.join(dataDir, 'clipboard-tmp-99999')
     await mkdir(stale, { recursive: true })
     await writeFile(path.join(stale, 'leftover.bin'), 'x')
@@ -119,5 +130,50 @@ describe('pruneStaleClipboardTempDirs', () => {
     vi.stubEnv('GOBLIN_SERVER_DATA_DIR', path.join(dataDir, 'never-existed'))
     const { pruneStaleClipboardTempDirs } = await import('#/server/modules/clipboard-write-paths.ts')
     await expect(pruneStaleClipboardTempDirs()).resolves.toBeUndefined()
+  })
+})
+
+describe('pruneExpiredClipboardTempFiles', () => {
+  test('removes expired files from the current server temp dir but preserves fresh files', async () => {
+    const { clipboardTempDir, pruneExpiredClipboardTempFiles } =
+      await import('#/server/modules/clipboard-write-paths.ts')
+    const currentDir = clipboardTempDir()
+    await mkdir(currentDir, { recursive: true })
+    const oldFile = path.join(currentDir, 'old.bin')
+    const freshFile = path.join(currentDir, 'fresh.bin')
+    await writeFile(oldFile, 'old')
+    await writeFile(freshFile, 'fresh')
+    const now = Date.now()
+    const oldDate = new Date(now - 10_000)
+    const freshDate = new Date(now - 1_000)
+    await utimes(oldFile, oldDate, oldDate)
+    await utimes(freshFile, freshDate, freshDate)
+
+    await pruneExpiredClipboardTempFiles(now, 5_000)
+
+    const entries = await readdir(currentDir)
+    expect(entries).not.toContain('old.bin')
+    expect(entries).toContain('fresh.bin')
+  })
+
+  test('does not throw if the current server temp dir does not exist', async () => {
+    const { pruneExpiredClipboardTempFiles } = await import('#/server/modules/clipboard-write-paths.ts')
+    await expect(pruneExpiredClipboardTempFiles()).resolves.toBeUndefined()
+  })
+
+  test('handles empty dirs, subdirs, and stat failures without throwing', async () => {
+    const { clipboardTempDir, pruneExpiredClipboardTempFiles } =
+      await import('#/server/modules/clipboard-write-paths.ts')
+    const currentDir = clipboardTempDir()
+    await mkdir(currentDir, { recursive: true })
+    await expect(pruneExpiredClipboardTempFiles(Date.now(), 0)).resolves.toBeUndefined()
+    await mkdir(path.join(currentDir, 'nested'), { recursive: true })
+    await symlink(path.join(currentDir, 'missing.bin'), path.join(currentDir, 'broken-link'))
+
+    await expect(pruneExpiredClipboardTempFiles(Date.now(), 0)).resolves.toBeUndefined()
+
+    const entries = await readdir(currentDir)
+    expect(entries).toContain('nested')
+    expect(entries).toContain('broken-link')
   })
 })
