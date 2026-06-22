@@ -85,6 +85,30 @@ describe('useRetainedValueDuringExit', () => {
       vi.useRealTimers()
     }
   })
+
+  test('keeps a re-entered value after an earlier exit timer settles', () => {
+    vi.useFakeTimers()
+    try {
+      render(<Harness value="feature/a" active onRender={() => {}} />)
+
+      render(<Harness value={null} active={false} onRender={() => {}} />)
+      expect(retainedValue()).toBe('feature/a')
+
+      render(<Harness value="feature/b" active onRender={() => {}} />)
+      expect(retainedValue()).toBe('feature/b')
+
+      act(() => {
+        vi.advanceTimersByTime(RETAIN_MS)
+      })
+
+      expect(retainedValue()).toBe('feature/b')
+
+      render(<Harness value={null} active={false} onRender={() => {}} />)
+      expect(retainedValue()).toBe('feature/b')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 function Harness({ value, active, resetKey, onRender }: HarnessProps) {
