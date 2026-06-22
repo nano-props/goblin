@@ -197,9 +197,42 @@ describe('TerminalSessionRegistry create flow', () => {
     })
   })
 
+  test('keeps the worktree pending while create is in flight with registered host geometry', async () => {
+    const { promise, resolve } = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
+    mocks.createMock.mockReturnValueOnce(promise)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    registry.registerHost(WORKTREE_KEY, host)
+
+    const pending = registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
+
+    await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
+    expect(registry.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(true)
+    expect(registry.worktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+
+    resolve(makeCreateResult())
+    await expect(pending).resolves.toBe(`${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-1`)
+    expect(registry.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
+    expect(registry.worktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+  })
+
+  test('clears pendingCreate when create rejects', async () => {
+    mocks.createMock.mockRejectedValueOnce(new Error('boom'))
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    registry.registerHost(WORKTREE_KEY, host)
+
+    await expect(
+      registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH }),
+    ).rejects.toThrow('boom')
+    expect(registry.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
+    expect(registry.worktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+  })
+
   test('waits for host registration before creating when no geometry is available yet', async () => {
     const pending = registry.createTerminal({ repoRoot: REPO_ROOT, branch: BRANCH, worktreePath: WORKTREE_PATH })
 
+    expect(registry.worktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(true)
     expect(mocks.createMock).not.toHaveBeenCalled()
 
     const host = document.createElement('div')

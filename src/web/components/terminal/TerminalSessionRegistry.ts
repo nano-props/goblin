@@ -87,6 +87,7 @@ export class TerminalSessionRegistry {
       promise: Promise<string>
       resolve: (key: string) => void
       reject: (error: unknown) => void
+      flushing: boolean
     }
   >()
   // Durable close queue. `ManagedTerminalSession.dispose` used to fire
@@ -394,20 +395,8 @@ export class TerminalSessionRegistry {
     }
   }
 
-  createTerminal = async (base: TerminalSessionBase): Promise<string> => {
-    const terminalWorktreeKey = worktreeTerminalKey(base.repoRoot, base.worktreePath)
-    // Drain any in-flight close for this worktree before we issue a
-    // new create. The close is what kills the orphan PTY; if the
-    // request was lost on the previous dispose, awaiting it here
-    // guarantees the catalog sees a clean slate and returns
-    // `action: 'created'` instead of `'restored'` reattaching to
-    // the still-alive orphan. See `pendingCloseBySessionId` for the
-    // full failure mode this guards against.
-    await this.flushPendingClosesForWorktree(terminalWorktreeKey)
-    const geometry = await this.resolveCreateGeometry(terminalWorktreeKey)
-    if (!geometry) return await this.enqueuePendingCreate(base, terminalWorktreeKey)
-    return await this.performCreateTerminal(base, geometry)
-  }
+  createTerminal = (base: TerminalSessionBase): Promise<string> =>
+    this.enqueuePendingCreate(base, worktreeTerminalKey(base.repoRoot, base.worktreePath))
 
   registerHost = (worktreeTerminalKey: string, host: HTMLElement): void => {
     this.hostByWorktree.set(worktreeTerminalKey, host)
@@ -488,35 +477,46 @@ export class TerminalSessionRegistry {
       resolve = innerResolve
       reject = innerReject
     })
-    this.pendingCreateByWorktree.set(worktreeTerminalKey, { base, promise, resolve, reject })
+    this.pendingCreateByWorktree.set(worktreeTerminalKey, { base, promise, resolve, reject, flushing: false })
     this.notifyWorktree(worktreeTerminalKey)
     void this.flushPendingCreate(worktreeTerminalKey)
     return promise
   }
 
   private async flushPendingCreate(worktreeTerminalKey: string): Promise<void> {
-    // Atomically claim the pending entry. Concurrent flushes (one from
-    // `enqueuePendingCreate`, one from `registerHost`, and possibly a
-    // StrictMode double-invoked effect) all await `resolveCreateGeometry`
-    // in parallel; without this claim, every concurrent caller observes
-    // the same pending entry and races into `performCreateTerminal`,
-    // spawning duplicate sessions. The first `delete` wins; the rest see
-    // `false` and bail.
     const pending = this.pendingCreateByWorktree.get(worktreeTerminalKey)
-    if (!pending) return
-    if (!this.pendingCreateByWorktree.delete(worktreeTerminalKey)) return
-    const geometry = await this.resolveCreateGeometry(worktreeTerminalKey)
-    if (!geometry) {
-      // No geometry yet (host not mounted). Put the entry back so the
-      // next mount-driven flush can claim it.
-      this.pendingCreateByWorktree.set(worktreeTerminalKey, pending)
-      return
-    }
-    this.notifyWorktree(worktreeTerminalKey)
+    if (!pending || pending.flushing) return
+    // Synchronous claim: enqueuePendingCreate, registerHost, and a
+    // StrictMode double-invoke can all arrive here while a prior flush
+    // is still awaiting. The first one through sets the flag; the rest
+    // bail and observe the same pending promise.
+    pending.flushing = true
     try {
+      // Close-drain lives here (not at the top of `createTerminal`) so
+      // `enqueuePendingCreate` puts the entry into the map first and
+      // emits the synchronous `pendingCreate: true` snapshot.
+      await this.flushPendingClosesForWorktree(worktreeTerminalKey)
+      if (this.pendingCreateByWorktree.get(worktreeTerminalKey) !== pending) return
+      const geometry = await this.resolveCreateGeometry(worktreeTerminalKey)
+      if (this.pendingCreateByWorktree.get(worktreeTerminalKey) !== pending) return
+      if (!geometry) {
+        // Host not mounted yet: hand the entry back. Clearing `flushing`
+        // is what keeps the cleanup below from removing it.
+        pending.flushing = false
+        this.notifyWorktree(worktreeTerminalKey)
+        return
+      }
       pending.resolve(await this.performCreateTerminal(pending.base, geometry))
     } catch (error) {
       pending.reject(error)
+    }
+    // Cleanup runs iff we owned the create to completion. Geometry-missing
+    // has cleared `flushing` to keep the entry. `destroy()` is the only
+    // other writer to this map, and it rejects every entry before clearing,
+    // so the early-return identity checks above never strand a caller.
+    if (pending.flushing) {
+      this.pendingCreateByWorktree.delete(worktreeTerminalKey)
+      this.notifyWorktree(worktreeTerminalKey)
     }
   }
 
@@ -731,13 +731,25 @@ export class TerminalSessionRegistry {
     this.worktreeSnapshotCache.delete(worktreeTerminalKey)
     const listeners = this.worktreeListeners.get(worktreeTerminalKey)
     if (!listeners) return
-    for (const listener of Array.from(listeners)) listener()
+    for (const listener of Array.from(listeners)) {
+      try {
+        listener()
+      } catch (err) {
+        terminalSessionProviderLog.warn('worktree listener threw', { worktreeTerminalKey, err })
+      }
+    }
   }
 
   private notifySnapshot(key: string): void {
     const listeners = this.snapshotListeners.get(key)
     if (!listeners) return
-    for (const listener of Array.from(listeners)) listener()
+    for (const listener of Array.from(listeners)) {
+      try {
+        listener()
+      } catch (err) {
+        terminalSessionProviderLog.warn('snapshot listener threw', { key, err })
+      }
+    }
   }
 
   private notifyAllWorktrees(): void {
