@@ -53,15 +53,16 @@ export async function dispatchRepoUiAction(
     silentSuccessOps?: Set<string>
     handleResult?: (result: ExecResult) => boolean
   },
-): Promise<void> {
+): Promise<ExecResult | null> {
   let result: ExecResult
   try {
     result = await fn()
   } catch (err) {
     result = { ok: false, message: err instanceof Error ? err.message : String(err) }
   }
-  if (!result.ok && result.message === 'cancelled') return
-  if (options?.handleResult?.(result)) return
+  if (!result.ok && result.message === 'cancelled') return null
+  if (options?.handleResult?.(result)) return result
   const skipSuccessToast = result.ok && options?.silentSuccessOps?.has(op)
   if (!skipSuccessToast) setLastResult(repoId, result, instanceToken)
+  return result
 }

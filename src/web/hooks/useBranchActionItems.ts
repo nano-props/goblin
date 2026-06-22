@@ -13,7 +13,7 @@ import {
   type BranchCopyPatchAction,
 } from '#/web/hooks/branch-action-state.ts'
 import { branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
-import type { BrowserRemoteProvider } from '#/web/types.ts'
+import type { BrowserRemoteProvider, ExecResult } from '#/web/types.ts'
 import { useRuntimeExternalAppSettings } from '#/web/runtime-settings-external-apps.ts'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
 import type { WorkspacePaneBranchViewType, WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
@@ -29,7 +29,13 @@ export interface BranchActionItem {
   destructive?: boolean
   shortcut?: string
   icon: ReactNode
-  onSelect: () => void | Promise<void>
+  // Branch actions go through `useBranchActions` which routes UI effects
+  // (open editor / terminal / remote / copy-patch) through
+  // `dispatchRepoUiAction`. Those return `Promise<ExecResult | null>`, so
+  // we widen the surface to accept that shape and let the menu discard
+  // the value. `BranchCopyPatchAction` is the stricter variant used by
+  // the in-tab widget, which inspects the boolean outcome.
+  onSelect: () => void | Promise<void | ExecResult | null>
 }
 
 export interface BranchActionSurface {

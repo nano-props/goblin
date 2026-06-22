@@ -309,6 +309,7 @@ export const en = {
   'status.copy-patch-title': 'Copy a git apply --binary patch of this worktree to the clipboard',
   'status.copy-patch-ok': 'Patch copied to clipboard',
   'status.copy-patch-empty': 'Nothing to copy — worktree is clean',
+  'status.copy-patch-success': 'Copied',
 
   // ---- Terminal -----------------------------------------------------------
   'terminal.opening': 'Opening terminal…',

@@ -305,6 +305,7 @@ export const ja: Record<DictKey, string> = {
   'status.copy-patch-title': 'このワークツリーの git apply --binary 用パッチをクリップボードにコピー',
   'status.copy-patch-ok': 'パッチをクリップボードにコピーしました',
   'status.copy-patch-empty': 'コピー対象なし — ワークツリーはクリーンです',
+  'status.copy-patch-success': 'コピーしました',
 
   // ---- Terminal ----------------------------------------------------------
   'terminal.opening': 'ターミナルを開いています…',
