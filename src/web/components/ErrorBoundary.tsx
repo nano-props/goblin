@@ -1,5 +1,5 @@
 // React error boundary for the active-repo body. Without this, a render
-// crash inside any tab (BranchNavigator / StatusList / commit
+// crash inside any repo workspace view (BranchNavigator / StatusList / commit
 // detail) would unmount the whole shell and show a blank window.
 //
 // We re-mount on `resetKey` change — App.tsx passes the active repoId

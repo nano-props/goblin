@@ -81,9 +81,9 @@ export interface ThemeState {
 }
 
 export interface SessionState {
-  /** Repo entries that were open, in tab order. */
+  /** Repo entries that were open, in switcher order. */
   openRepos: RepoSessionEntry[]
-  /** The active tab id — null when no repos were open. */
+  /** The active repository id — null when no repos were open. */
   activeRepo: string | null
   workspaceFocused: boolean
   workspacePaneSizes: WorkspacePaneSizes

@@ -224,7 +224,7 @@ export function isRemoteRepoLifecycleTerminal(
  * renderer will land on `RepoRemoteState.lifecycle.target` after
  * the orchestrator's settle. The `target?` in the failed
  * variant retains the last-known target so the UI keeps
- * showing the remote locator on a failed tab.
+ * showing the remote locator on a failed repository.
  */
 export type RemoteRepoLifecycleResult =
   | {

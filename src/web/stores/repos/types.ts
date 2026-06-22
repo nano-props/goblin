@@ -153,9 +153,9 @@ export interface RestorableWorkspaceState {
   /** Renderer workspace UI state that is serialized into SessionState for
    *  next-launch restore. This is restorable state, not runtime-coherent
    *  shared state. */
-  /** Workspace tab order restored from SessionState.openRepos. */
+  /** Open repository order restored from SessionState.openRepos. */
   order: string[]
-  /** Active workspace tab restored from SessionState.activeRepo. */
+  /** Active repository restored from SessionState.activeRepo. */
   activeId: string | null
   /** Large-screen Focus Mode restored from SessionState. Compact UI is stronger and always shows one pane at a time. */
   workspaceFocused: boolean
@@ -176,11 +176,6 @@ export interface LocalWorkspaceState {
 
 export interface RestorableWorkspaceActions {
   setActive: (id: string) => void
-  /** Reorder the tab strip so `fromId` lands at `toId`'s position, using
-   *  the same shift semantics as dnd-kit's `arrayMove` (the rest of the
-   *  list closes the gap; later items shift up if `from < to`, down if
-   *  `from > to`). No-op if either id is unknown or they're identical. */
-  reorderRepos: (fromId: string, toId: string) => void
   applySessionLayoutState: (layout: Pick<SessionState, 'workspaceFocused' | 'workspacePaneSizes'>) => void
   applySessionSelectedTerminalState: (selectedTerminalByWorktree: Record<string, string>) => void
   applySessionWorkspacePaneViewByRepo: (workspacePaneViewByRepo: Record<string, WorkspacePaneView>) => void

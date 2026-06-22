@@ -56,18 +56,18 @@ describe('Topbar', () => {
     expect(settingsButton()).not.toBeNull()
   })
 
-  test('renders a Focus Mode toggle before repo tabs on large screens', () => {
+  test('renders a Focus Mode toggle before repo picker on large screens', () => {
     render(
       <Topbar repoId="/tmp/repo" onOpenSettings={() => {}}>
-        <div data-testid="repo-tabs" />
+        <div data-testid="repo-picker" />
       </Topbar>,
     )
 
     const toggle = focusModeToggle()
-    const repoTabs = container?.querySelector('[data-testid="repo-tabs"]')
+    const repoPicker = container?.querySelector('[data-testid="repo-picker"]')
     expect(toggle).not.toBeNull()
     expect(toggle?.nextElementSibling?.className).toContain('bg-separator')
-    expect(toggle?.nextElementSibling?.nextElementSibling).toBe(repoTabs)
+    expect(toggle?.nextElementSibling?.nextElementSibling).toBe(repoPicker)
   })
 
   test('toggles large-screen Focus Mode with stable tooltip and button styling', () => {
@@ -114,16 +114,16 @@ describe('Topbar', () => {
 
     render(
       <Topbar repoId="/tmp/repo" onOpenSettings={() => {}}>
-        <div data-testid="repo-tabs" />
+        <div data-testid="repo-picker" />
       </Topbar>,
     )
 
-    const repoTabs = container?.querySelector('[data-testid="repo-tabs"]')
+    const repoPicker = container?.querySelector('[data-testid="repo-picker"]')
     const toggle = focusModeToggle()
     expect(branchWorkspaceBackButton()).toBeNull()
     expect(toggle).not.toBeNull()
     expect(toggle?.nextElementSibling?.className).toContain('bg-separator')
-    expect(toggle?.nextElementSibling?.nextElementSibling).toBe(repoTabs)
+    expect(toggle?.nextElementSibling?.nextElementSibling).toBe(repoPicker)
     expect(useReposStore.getState().workspaceFocused).toBe(true)
     expect(useReposStore.getState().repos['/tmp/repo']?.ui.selectedBranch).toBe('feature/a')
   })
@@ -138,13 +138,13 @@ describe('Topbar', () => {
 
     render(
       <Topbar repoId="/tmp/repo" onOpenSettings={() => {}}>
-        <div data-testid="repo-tabs" />
+        <div data-testid="repo-picker" />
       </Topbar>,
     )
 
-    const repoTabs = container?.querySelector('[data-testid="repo-tabs"]')
+    const repoPicker = container?.querySelector('[data-testid="repo-picker"]')
     expect(branchWorkspaceBackButton()).toBeNull()
-    expect(repoTabs).not.toBeNull()
+    expect(repoPicker).not.toBeNull()
     expect(useReposStore.getState().repos['/tmp/repo']?.ui.selectedBranch).toBe('feature/a')
   })
 
@@ -157,7 +157,7 @@ describe('Topbar', () => {
 
     render(
       <Topbar repoId="/tmp/repo" onOpenSettings={() => {}}>
-        <div data-testid="repo-tabs" />
+        <div data-testid="repo-picker" />
       </Topbar>,
     )
 

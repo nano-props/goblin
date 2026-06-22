@@ -1,9 +1,8 @@
-// Top app bar with embedded tab strip, a per-repo actions group,
+// Top app bar with embedded repo picker, a per-repo actions group,
 // a large-screen Focus Mode toggle, and a global settings button.
 //   • left-side navigation control — large screens use this slot for
 //     Focus Mode; compact branch workspace back lives with workspace tabs.
-//   • tab strip (children) — repo tabs + the "open new repo"
-//     popover + the "more" overflow.
+//   • repo picker (children) — current repo + open/switch controls.
 //   • repo actions (when `repoId` is set) — Refresh, the worktree
 //     filter toggle, and the new-worktree action. These used to
 //     live in a dedicated RepoToolbar above the branch navigator; they

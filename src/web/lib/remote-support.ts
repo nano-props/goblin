@@ -5,7 +5,7 @@ import {
 } from '#/shared/remote-repo.ts'
 const SSH_SETTINGS_REASONS = new Set([
   'error.ssh-config-changed',
-  'repo-tabs.open-remote-home-unavailable',
+  'repo-picker.open-remote-home-unavailable',
   'auth-failed',
   'host-key',
   'config-changed',
@@ -14,7 +14,7 @@ const SSH_SETTINGS_REASONS = new Set([
 const REMOTE_DIAGNOSTIC_REASONS = new Set<string>(REMOTE_DIAGNOSTIC_CATEGORIES)
 
 function reasonTranslationKey(reason: string): string {
-  return REMOTE_DIAGNOSTIC_REASONS.has(reason) ? `repo-tabs.open-remote-diagnostics-category-${reason}` : reason
+  return REMOTE_DIAGNOSTIC_REASONS.has(reason) ? `repo-picker.open-remote-diagnostics-category-${reason}` : reason
 }
 
 export function formatTranslatableReason(t: (key: string) => string, reason: string): string {
@@ -26,7 +26,7 @@ export function formatTranslatableReason(t: (key: string) => string, reason: str
 export function unavailableBodyKey(isRemote: boolean, reason: string): string {
   if (!isRemote) return 'repo-unavailable.body'
   if (reason === 'error.ssh-config-changed') return 'repo-unavailable.remote-config-changed'
-  if (reason === 'repo-tabs.open-remote-home-unavailable') return 'repo-unavailable.remote-home-unavailable'
+  if (reason === 'repo-picker.open-remote-home-unavailable') return 'repo-unavailable.remote-home-unavailable'
   if (reason === 'path-missing') return 'repo-unavailable.remote-path-missing'
   if (reason === 'not-a-repo') return 'repo-unavailable.remote-not-a-repo'
   if (REMOTE_DIAGNOSTIC_REASONS.has(reason)) return 'repo-unavailable.remote-connect-failed'

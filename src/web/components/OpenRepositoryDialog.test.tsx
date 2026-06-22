@@ -131,7 +131,7 @@ describe('OpenRepositoryDialog', () => {
 
     render(<OpenRepositoryDialog open onClose={onClose} onOpen={onOpen} />)
 
-    clickButtonByText('repo-tabs.open-path-choose')
+    clickButtonByText('repo-picker.open-path-choose')
     await flush()
     expect(testWindow.goblinNative).toEqual(
       expect.objectContaining({
@@ -224,7 +224,7 @@ describe('OpenRepositoryDialog', () => {
 
     render(<OpenRepositoryDialog open onClose={onClose} onOpen={onOpen} />)
 
-    expect(queryButtonByText('repo-tabs.open-path-choose')).toBeNull()
+    expect(queryButtonByText('repo-picker.open-path-choose')).toBeNull()
   })
 })
 

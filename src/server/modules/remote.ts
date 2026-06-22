@@ -32,7 +32,7 @@ import type { ExecResult } from '#/shared/git-types.ts'
 async function resolveRemoteHomeDirectory(target: RemoteRepoTarget, signal?: AbortSignal): Promise<string> {
   const homeResult = await runRemoteCommand(target, { type: 'printHome' }, { signal })
   const homePath = homeResult.ok ? (homeResult.stdout.trim().split(/\r?\n/, 1)[0]?.trim() ?? '') : ''
-  if (!homePath.startsWith('/')) throw new Error('repo-tabs.open-remote-home-unavailable')
+  if (!homePath.startsWith('/')) throw new Error('repo-picker.open-remote-home-unavailable')
   return homePath
 }
 
@@ -76,7 +76,7 @@ export async function resolveServerRemoteTarget(
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'error.failed-read-repo' }
   }
-  if (!normalized) return { error: 'repo-tabs.open-remote-home-unavailable' }
+  if (!normalized) return { error: 'repo-picker.open-remote-home-unavailable' }
   return { target: normalized }
 }
 

@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'vitest'
-import { latestRepoSyncTime } from '#/web/components/RepoTabs.tsx'
-import { repoTabSummariesEqual } from '#/web/components/repo-tabs/summary-equality.ts'
-import type { RepoTabSummary } from '#/web/components/repo-tabs/types.ts'
+import { latestRepoSyncTime } from '#/web/components/RepoPickerHost.tsx'
+import { repoPickerReposEqual } from '#/web/components/repo-picker/summary-equality.ts'
+import type { RepoPickerRepo } from '#/web/components/repo-picker/types.ts'
 import { emptyRepo } from '#/web/stores/repos/helpers.ts'
 
-describe('repoTabSummariesEqual', () => {
+describe('repoPickerReposEqual', () => {
   test('treats remote lifecycle target changes as unequal even when repo id stays the same', () => {
-    const left: RepoTabSummary[] = [
+    const left: RepoPickerRepo[] = [
       {
         id: 'ssh-config://example/srv%2Frepo',
         name: 'repo',
@@ -26,7 +26,7 @@ describe('repoTabSummariesEqual', () => {
         },
       },
     ]
-    const right: RepoTabSummary[] = [
+    const right: RepoPickerRepo[] = [
       {
         id: 'ssh-config://example/srv%2Frepo',
         name: 'repo',
@@ -47,11 +47,56 @@ describe('repoTabSummariesEqual', () => {
       },
     ]
 
-    expect(repoTabSummariesEqual(left, right)).toBe(false)
+    expect(repoPickerReposEqual(left, right)).toBe(false)
+  })
+
+  test('treats failed lifecycle target locator changes as unequal', () => {
+    const target = {
+      id: 'ssh-config://example/srv%2Frepo',
+      alias: 'example',
+      host: 'same-host.internal',
+      user: 'old-user',
+      port: 22,
+      remotePath: '/srv/repo',
+      displayName: 'example:repo',
+    }
+    const left: RepoPickerRepo[] = [
+      {
+        id: target.id,
+        name: 'repo',
+        remoteDetails: [],
+        lastSyncedAt: null,
+        lifecycle: {
+          kind: 'failed',
+          reason: 'timeout',
+          target,
+        },
+      },
+    ]
+    const right: RepoPickerRepo[] = [
+      {
+        id: target.id,
+        name: 'repo',
+        remoteDetails: [],
+        lastSyncedAt: null,
+        lifecycle: {
+          kind: 'failed',
+          reason: 'timeout',
+          target: {
+            ...target,
+            user: 'new-user',
+            port: 2222,
+            displayName: 'example-renamed:repo',
+          },
+        },
+      },
+    ]
+
+    expect(repoPickerReposEqual(left, right)).toBe(false)
   })
 
   test('treats last sync time changes as unequal', () => {
-    const left: RepoTabSummary[] = [
+    const left: RepoPickerRepo[] = [
       {
         id: '/tmp/repo',
         name: 'repo',
@@ -60,7 +105,7 @@ describe('repoTabSummariesEqual', () => {
         lifecycle: null,
       },
     ]
-    const right: RepoTabSummary[] = [
+    const right: RepoPickerRepo[] = [
       {
         id: '/tmp/repo',
         name: 'repo',
@@ -70,7 +115,7 @@ describe('repoTabSummariesEqual', () => {
       },
     ]
 
-    expect(repoTabSummariesEqual(left, right)).toBe(false)
+    expect(repoPickerReposEqual(left, right)).toBe(false)
   })
 
   test('does not treat warm cache snapshot time as a sync time', () => {

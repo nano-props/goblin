@@ -15,7 +15,7 @@ import {
 beforeEach(resetLifecycleTest)
 
 describe('repo session hydration', () => {
-  test('hydrateSession restores tabs through the same initial local refresh path without recent-repo side effects', async () => {
+  test('hydrateSession restores repositories through the same initial local refresh path without recent-repo side effects', async () => {
     const calls = installGoblin()
 
     await useReposStore
@@ -128,7 +128,7 @@ describe('repo session hydration', () => {
     const work = useReposStore
       .getState()
       .hydrateSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry(REPO_B)], REPO_A)
-    // Placeholder tabs are inserted synchronously before any probe runs,
+    // Placeholder repos are inserted synchronously before any probe runs,
     // so REPO_A's cached projection is visible immediately.
     await vi.waitFor(() => {
       const cachedRepo = useReposStore.getState().repos[REPO_A]
@@ -174,7 +174,7 @@ describe('repo session hydration', () => {
   })
 
   test('hydrateSession flips sessionReady even when openRepos is empty', async () => {
-    // Regression: a session with zero open tabs used to leave the boot
+    // Regression: a session with zero open repos used to leave the boot
     // skeleton up forever because sessionReady only flipped on the first
     // placeholder landing, and Phase 1 with no entries is a no-op.
     installGoblin()
@@ -210,7 +210,7 @@ describe('repo session hydration', () => {
     expect(deriveConnectivity(repo!)).toBe('connected')
   })
 
-  test('hydrateSession restores unavailable repos as tabs', async () => {
+  test('hydrateSession restores unavailable repos as workspace entries', async () => {
     installGoblin()
 
     await useReposStore

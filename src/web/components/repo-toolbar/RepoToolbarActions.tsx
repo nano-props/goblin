@@ -1,5 +1,5 @@
 // Per-repo chrome buttons. These actions sit to the right of the
-// repo tabs in the Topbar (see `Topbar.tsx`) — they are unrelated
+// repo picker in the Topbar (see `Topbar.tsx`) — they are unrelated
 // to any single branch:
 //
 //   Refresh — syncs configured remotes when present, then rebuilds the

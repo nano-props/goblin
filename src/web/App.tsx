@@ -2,7 +2,7 @@ import { useContext } from 'react'
 import { Trans } from 'react-i18next'
 import { Topbar } from '#/web/components/Topbar.tsx'
 import { ErrorBoundary } from '#/web/components/ErrorBoundary.tsx'
-import { RepoTabs } from '#/web/components/RepoTabs.tsx'
+import { RepoPickerHost } from '#/web/components/RepoPickerHost.tsx'
 import { SettingsPageScreen } from '#/web/components/SettingsPageScreen.tsx'
 import { RepoView } from '#/web/components/RepoView.tsx'
 import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
@@ -49,7 +49,7 @@ export function App({ routeSettingsPage = null, onRouteSettingsPageChange }: App
   return (
     <>
       <Topbar onOpenSettings={() => onRouteSettingsPageChange?.('general')} repoId={activeId}>
-        <RepoTabs
+        <RepoPickerHost
           currentRepoId={activeId}
           onOpenRepoPathDialog={overlayActions.openRepoPathDialog}
           onOpenRemote={overlayActions.openRemoteRepo}

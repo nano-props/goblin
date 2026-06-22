@@ -1,13 +1,6 @@
 import type { ReposStore } from '#/web/stores/repos/types.ts'
 
-export interface RestorableWorkspaceNavigationStoreActions extends Pick<
-  ReposStore,
-  'setActive' | 'reorderRepos' | 'cycleActive'
-> {}
-
 export interface RestorableWorkspaceViewportStoreActions extends Pick<ReposStore, 'setActive' | 'cycleActive'> {}
-
-export interface RestorableWorkspaceOrderStoreActions extends Pick<ReposStore, 'reorderRepos'> {}
 
 export interface RestorableWorkspaceLayoutStoreActions extends Pick<
   ReposStore,
@@ -26,11 +19,6 @@ export interface RuntimeCoherentRepoNavigationStoreActions extends Pick<
   'closeRepo' | 'selectBranch' | 'setWorkspacePaneView'
 > {}
 
-export interface RestorableWorkspaceStoreActions extends Pick<
-  ReposStore,
-  'setActive' | 'reorderRepos' | 'cycleActive' | 'resetLayout' | 'setSelectedTerminal' | 'toggleWorkspaceFocused'
-> {}
-
 export interface RuntimeCoherentRepoProjectionStoreActions extends Pick<
   ReposStore,
   'ensureWorkspaceOpen' | 'closeRepo' | 'selectBranch' | 'setWorkspacePaneView'
@@ -41,7 +29,7 @@ export interface MainWindowNavigationStoreActions extends Pick<
   'setActive' | 'closeRepo' | 'cycleActive' | 'selectBranch' | 'setWorkspacePaneView'
 > {}
 
-export interface RepoTabStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen'> {}
+export interface RepoPickerStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen'> {}
 
 export interface RendererEffectIntentStoreActions extends Pick<
   ReposStore,
@@ -53,24 +41,6 @@ export function restorableWorkspaceViewportStoreActionsFromStore(
 ): RestorableWorkspaceViewportStoreActions {
   return {
     setActive: state.setActive,
-    cycleActive: state.cycleActive,
-  }
-}
-
-export function restorableWorkspaceOrderStoreActionsFromStore(
-  state: Pick<ReposStore, 'reorderRepos'>,
-): RestorableWorkspaceOrderStoreActions {
-  return {
-    reorderRepos: state.reorderRepos,
-  }
-}
-
-export function restorableWorkspaceNavigationStoreActionsFromStore(
-  state: Pick<ReposStore, 'setActive' | 'reorderRepos' | 'cycleActive'>,
-): RestorableWorkspaceNavigationStoreActions {
-  return {
-    setActive: state.setActive,
-    reorderRepos: state.reorderRepos,
     cycleActive: state.cycleActive,
   }
 }
@@ -107,22 +77,6 @@ export function restorableWorkspaceLayoutPreferenceStoreActionsFromStore(
   state: Pick<ReposStore, 'resetLayout' | 'setSelectedTerminal' | 'toggleWorkspaceFocused'>,
 ): RestorableWorkspaceLayoutPreferenceStoreActions {
   return {
-    resetLayout: state.resetLayout,
-    setSelectedTerminal: state.setSelectedTerminal,
-    toggleWorkspaceFocused: state.toggleWorkspaceFocused,
-  }
-}
-
-export function restorableWorkspaceStoreActionsFromStore(
-  state: Pick<
-    ReposStore,
-    'setActive' | 'reorderRepos' | 'cycleActive' | 'resetLayout' | 'setSelectedTerminal' | 'toggleWorkspaceFocused'
-  >,
-): RestorableWorkspaceStoreActions {
-  return {
-    setActive: state.setActive,
-    reorderRepos: state.reorderRepos,
-    cycleActive: state.cycleActive,
     resetLayout: state.resetLayout,
     setSelectedTerminal: state.setSelectedTerminal,
     toggleWorkspaceFocused: state.toggleWorkspaceFocused,
@@ -167,7 +121,9 @@ export function mainWindowNavigationStoreActionsFromStore(
   }
 }
 
-export function repoTabStoreActionsFromStore(state: Pick<ReposStore, 'ensureWorkspaceOpen'>): RepoTabStoreActions {
+export function repoPickerStoreActionsFromStore(
+  state: Pick<ReposStore, 'ensureWorkspaceOpen'>,
+): RepoPickerStoreActions {
   const runtimeCoherent = runtimeCoherentRepoOpenStoreActionsFromStore({
     ensureWorkspaceOpen: state.ensureWorkspaceOpen,
   })
@@ -203,7 +159,7 @@ export function mainWindowNavigationStoreActionsEqual(
   )
 }
 
-export function repoTabStoreActionsEqual(a: RepoTabStoreActions, b: RepoTabStoreActions): boolean {
+export function repoPickerStoreActionsEqual(a: RepoPickerStoreActions, b: RepoPickerStoreActions): boolean {
   return a.ensureWorkspaceOpen === b.ensureWorkspaceOpen
 }
 

@@ -1,6 +1,6 @@
 import type { GitRemoteInfo } from '#/web/types.ts'
 import type { RemoteRepoLifecycle } from '#/shared/remote-repo.ts'
-export interface RepoTabSummary {
+export interface RepoPickerRepo {
   id: string
   name: string
   remoteDetails: GitRemoteInfo[]
@@ -10,14 +10,14 @@ export interface RepoTabSummary {
    */
   lastSyncedAt: number | null
   /**
-   * Single source-of-truth lifecycle for a remote repo tab. `null`
-   * for local repos. The tab UI reads `lifecycle.kind` directly
-   * to decide which badge to show.
+   * Single source-of-truth lifecycle for a remote repo. `null`
+   * for local repos. The picker reads `lifecycle.kind` directly
+   * to decide which badge to show on the current repo button.
    */
   lifecycle: RemoteRepoLifecycle | null
 }
 
-export interface RepoTabStripLabels {
+export interface RepoPickerLabels {
   repositories: string
   closeWithName: (name: string) => string
   more: string

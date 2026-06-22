@@ -27,10 +27,10 @@ export function RemoteDiagnosticsPanel({ diagnostics, error, loading, idleText }
   }
 
   const statusText = loading
-    ? t('repo-tabs.open-remote-diagnostics-testing')
+    ? t('repo-picker.open-remote-diagnostics-testing')
     : diagnostics
       ? diagnostics.ok
-        ? t('repo-tabs.open-remote-diagnostics-ok')
+        ? t('repo-picker.open-remote-diagnostics-ok')
         : diagnosticCategoryLabel(t, failedCategory ?? diagnostics.category ?? diagnostics.message ?? 'unknown')
       : error
         ? error
@@ -42,7 +42,7 @@ export function RemoteDiagnosticsPanel({ diagnostics, error, loading, idleText }
       <DialogStatusRow
         message={statusText}
         tone={error || (diagnostics && !diagnostics.ok) ? 'danger' : diagnostics?.ok ? 'success' : 'default'}
-        actionLabel={copyDetailsValue ? t('repo-tabs.open-remote-diagnostics-copy-details') : undefined}
+        actionLabel={copyDetailsValue ? t('repo-picker.open-remote-diagnostics-copy-details') : undefined}
         onAction={copyDetailsValue ? () => void copyText(copyDetailsValue) : undefined}
       />
     </div>
@@ -51,7 +51,7 @@ export function RemoteDiagnosticsPanel({ diagnostics, error, loading, idleText }
 
 function diagnosticCategoryLabel(t: (key: string) => string, category: string): string {
   const known = category as RemoteDiagnosticCategory
-  const key = `repo-tabs.open-remote-diagnostics-category-${known}`
+  const key = `repo-picker.open-remote-diagnostics-category-${known}`
   const translated = t(key)
   return translated === key ? category : translated
 }

@@ -26,7 +26,7 @@ export function RepoCloneDialog({ open, onOpenChange }: RepoCloneDialogProps) {
       return { ok: false, message: openResult.message, path: result.path }
     }
     navigation.activateRepo(openResult.id)
-    toast.success(t('repo-tabs.clone-opened'), { description: result.path })
+    toast.success(t('repo-picker.clone-opened'), { description: result.path })
     return result
   }
 

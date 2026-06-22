@@ -2,9 +2,9 @@
 // absolute path (the toplevel returned by `git rev-parse --show-toplevel`,
 // so opening a subdirectory dedupes against an already-open root).
 //
-// `order` controls top tab strip order; `activeId` is the visible
+// `order` controls repository switcher order; `activeId` is the visible
 // repo on the right. Per-repo data (branches, log, status, worktrees,
-// commit detail) lives inside `repos[id]` so each tab keeps its own
+// commit detail) lives inside `repos[id]` so each repo keeps its own
 // scroll/selection state when the user flips between them.
 //
 // Race-condition defenses
@@ -22,10 +22,7 @@ import { createRefreshActions } from '#/web/stores/repos/refresh.ts'
 import { createSelectionActions } from '#/web/stores/repos/selection.ts'
 import { reposLog } from '#/web/logger.ts'
 import { normalizeRestorableRepoCache } from '#/web/stores/repos/persistence.ts'
-import {
-  DEFAULT_WORKSPACE_FOCUSED,
-  DEFAULT_WORKSPACE_PANE_SIZES,
-} from '#/shared/workspace-layout.ts'
+import { DEFAULT_WORKSPACE_FOCUSED, DEFAULT_WORKSPACE_PANE_SIZES } from '#/shared/workspace-layout.ts'
 import type { RestorableRepoSnapshot, ReposStore } from '#/web/stores/repos/types.ts'
 
 interface PersistedReposStore {
