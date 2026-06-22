@@ -151,7 +151,7 @@ describe('RepoPicker', () => {
     const trigger = document.body.querySelector('button[aria-label="More"]')
     if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing more trigger')
     expect(
-      trigger.parentElement?.querySelector(':scope > .pointer-events-none.border-l.border-separator'),
+      trigger.parentElement?.querySelector(':scope > [data-slot="separator"][data-orientation="vertical"]'),
     ).not.toBeNull()
 
     await act(async () => {

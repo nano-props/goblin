@@ -236,13 +236,17 @@ describe('WorkspacePaneViewStrip', () => {
     if (!(terminalTwo instanceof HTMLElement)) throw new Error('missing terminal view')
     if (!(newButton instanceof HTMLButtonElement)) throw new Error('missing new terminal button')
 
-    expect(terminalTwo.querySelector(':scope > .pointer-events-none.border-r.border-separator')).not.toBeNull()
+    expect(
+      terminalTwo.querySelector(':scope > [data-slot="separator"][data-orientation="vertical"]'),
+    ).not.toBeNull()
 
     act(() => {
       newButton.dispatchEvent(new MouseEvent('pointerover', { bubbles: true }))
     })
 
-    expect(terminalTwo.querySelector(':scope > .pointer-events-none.border-r.border-separator')).not.toBeNull()
+    expect(
+      terminalTwo.querySelector(':scope > [data-slot="separator"][data-orientation="vertical"]'),
+    ).not.toBeNull()
   })
 
   test('uses the full terminal title and unread state in the tab aria-label', () => {
@@ -609,7 +613,7 @@ describe('WorkspacePaneViewStrip', () => {
     // matches an idle tab on the expanded strip: muted foreground and a
     // right-edge separator between this tab and the popover button.
     expect(compactTab?.className).not.toContain('bg-selected')
-    expect(compactTab?.querySelector('.border-r.border-separator')).not.toBeNull()
+    expect(compactTab?.querySelector(':scope > [data-slot="separator"][data-orientation="vertical"]')).not.toBeNull()
     // Close button stays in the DOM but is hidden until hover/focus,
     // matching the expanded strip's unselected-tab behaviour.
     const compactCloseButton = compactTab?.querySelector('button[aria-label="close term-1"]')

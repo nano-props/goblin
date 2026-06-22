@@ -25,6 +25,7 @@ import type { ReactNode } from 'react'
 import { PanelLeft, Settings } from 'lucide-react'
 import { useT } from '#/web/stores/i18n.ts'
 import { Button } from '#/web/components/ui/button.tsx'
+import { Separator } from '#/web/components/ui/separator.tsx'
 import { RepoToolbarActions } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
 import { WINDOW_TOPBAR_HEIGHT_PX } from '#/shared/window-chrome.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -50,7 +51,7 @@ export function Topbar({ onOpenSettings, repoId, children }: Props) {
       {showFocusToggle && (
         <>
           <WorkspaceFocusToggle />
-          <div aria-hidden="true" className="h-5 w-px shrink-0 bg-separator" />
+          <Separator orientation="vertical" />
         </>
       )}
       {children}

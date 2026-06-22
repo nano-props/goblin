@@ -270,7 +270,8 @@ describe('BranchWorkspaceToolbar', () => {
     const tablist = c.querySelector('[role="tablist"][aria-label="workspace-pane-views.tabs"]')
     const leadingAction = back?.parentElement
     const compactTab = tablist?.querySelector('[data-workspace-pane-view-tooltip-id]')
-    const separator = () => leadingAction?.querySelector(':scope > .pointer-events-none.border-r.border-separator')
+    const separator = () =>
+      leadingAction?.querySelector(':scope > [data-slot="separator"][data-orientation="vertical"]')
     expect(back).not.toBeNull()
     expect(tablist).not.toBeNull()
     expect(leadingAction?.parentElement?.firstElementChild).toBe(leadingAction)
