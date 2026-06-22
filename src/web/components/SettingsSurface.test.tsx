@@ -46,7 +46,7 @@ function defaultIpcResult(path: string, input?: unknown) {
         openRepos: [],
         activeRepo: null,
         workspaceFocused: true,
-        workspacePaneSizes: { 'left-right': 50 },
+        workspacePaneSize: 50,
       },
       recentRepos: [],
     }

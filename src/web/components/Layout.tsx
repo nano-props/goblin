@@ -2,8 +2,7 @@ import type { HTMLAttributes, ReactNode } from 'react'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { SplitPane } from '#/web/components/SplitPane.tsx'
 import { cn } from '#/web/lib/cn.ts'
-import { DEFAULT_WORKSPACE_PANE_SIZES, DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
-import type { RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
+import { DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 import type { RepoWorkspaceMode } from '#/web/lib/workspace-layout.ts'
 import { WORKSPACE_PANE_MOTION_STYLE } from '#/web/components/workspace-motion.ts'
 const LEFT_RIGHT_BRANCH_MIN_SIZE = '14rem'
@@ -16,7 +15,6 @@ interface ShellProps {
 interface RepoWorkspaceProps {
   branchNavigatorPane: ReactNode
   branchWorkspacePane: ReactNode
-  layout?: RepoWorkspaceLayout
   mode?: RepoWorkspaceMode
   branchNavigatorCollapsed?: boolean
   workspacePaneSize?: number
@@ -83,10 +81,9 @@ export function ToolbarTitle({ title, description, after }: ToolbarTitleProps) {
 export function RepoWorkspace({
   branchNavigatorPane,
   branchWorkspacePane,
-  layout = DEFAULT_WORKSPACE_LAYOUT,
   mode = 'split',
   branchNavigatorCollapsed = false,
-  workspacePaneSize = DEFAULT_WORKSPACE_PANE_SIZES[layout],
+  workspacePaneSize = DEFAULT_WORKSPACE_PANE_SIZE,
   onWorkspacePaneSizeChange,
 }: RepoWorkspaceProps) {
   if (mode === 'single-pane') return <div className="flex min-h-0 flex-1">{branchWorkspacePane}</div>

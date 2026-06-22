@@ -3,7 +3,7 @@ import path from 'node:path'
 import { toSafeRepoLocator, toSafeSessionRepoEntry } from '#/shared/input-validation.ts'
 import { serverDataFile } from '#/shared/data-dir.ts'
 import type { EditorPref, LangPref, SessionState, SettingsPrefs, TerminalPref, ThemePref } from '#/shared/api-types.ts'
-import { DEFAULT_WORKSPACE_FOCUSED, normalizeWorkspacePaneSizes } from '#/shared/workspace-layout.ts'
+import { DEFAULT_WORKSPACE_FOCUSED, normalizeWorkspacePaneSize } from '#/shared/workspace-layout.ts'
 import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 import { isWorkspacePaneViewType, type WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import { normalizeGlobalShortcut } from '#/shared/accelerator.ts'
@@ -165,7 +165,7 @@ function normalizeWorkspacePaneViewByBranchByRepo(
 
 function normalizeSession(value: unknown): SessionState {
   if (!value || typeof value !== 'object') return defaultSession()
-  const partial = value as Partial<SessionState>
+  const partial = value as Partial<SessionState> & { workspacePaneSizes?: unknown }
   const openRepos = Array.isArray(partial.openRepos)
     ? dedupeRepoEntries(
         partial.openRepos.map(toSafeSessionRepoEntry).filter((entry): entry is RepoSessionEntry => entry !== null),
@@ -177,13 +177,26 @@ function normalizeSession(value: unknown): SessionState {
     activeRepo: activeRepo && openRepos.some((entry) => repoSessionEntryId(entry) === activeRepo) ? activeRepo : null,
     workspaceFocused:
       typeof partial.workspaceFocused === 'boolean' ? partial.workspaceFocused : DEFAULT_WORKSPACE_FOCUSED,
-    workspacePaneSizes: normalizeWorkspacePaneSizes(partial.workspacePaneSizes),
+    // One-release migration: when reading a pre-rename `server-settings.json`,
+    // fall back to the legacy `workspacePaneSizes: { 'left-right': N }` record
+    // so existing users keep their saved pane split on first launch after
+    // upgrade. The next save writes only the new field and the legacy shape
+    // is gone from disk.
+    workspacePaneSize: normalizeWorkspacePaneSize(
+      partial.workspacePaneSize ?? legacyWorkspacePaneSize(partial.workspacePaneSizes),
+    ),
     selectedTerminalByWorktree: normalizeSelectedTerminalByWorktree(partial.selectedTerminalByWorktree),
     workspacePaneViewByBranchByRepo: normalizeWorkspacePaneViewByBranchByRepo(
       partial.workspacePaneViewByBranchByRepo,
       openRepos,
     ),
   }
+}
+
+function legacyWorkspacePaneSize(value: unknown): number | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const inner = (value as Record<string, unknown>)['left-right']
+  return typeof inner === 'number' ? inner : undefined
 }
 
 function normalizeRecentRepos(value: unknown): RepoSessionEntry[] {

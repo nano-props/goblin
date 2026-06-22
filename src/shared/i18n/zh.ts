@@ -59,7 +59,7 @@ export const zh: Record<DictKey, string> = {
 
   'menu.window.next-repo': '下一个仓库',
   'menu.window.prev-repo': '上一个仓库',
-  'menu.window.reset-layout': '重置布局',
+  'menu.window.reset-window': '重置窗口',
 
   'menu.help.shortcuts': '键盘快捷键',
 

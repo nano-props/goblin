@@ -14,7 +14,6 @@ import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
 import { getRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
 import { UnavailableRepoView } from '#/web/components/UnavailableRepoView.tsx'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
-import { DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import { useRetainedValueDuringExit } from '#/web/hooks/useRetainedValueDuringExit.ts'
@@ -35,20 +34,19 @@ export function RepoView({ repoId }: Props) {
         exists: presentation.exists,
         initialLoading: presentation.initialLoading,
         workspaceFocused: s.workspaceFocused,
-        workspacePaneSizes: s.workspacePaneSizes,
+        workspacePaneSize: s.workspacePaneSize,
       }
     },
     (a, b) =>
       a.exists === b.exists &&
       a.initialLoading === b.initialLoading &&
       a.workspaceFocused === b.workspaceFocused &&
-      a.workspacePaneSizes['left-right'] === b.workspacePaneSizes['left-right'],
+      a.workspacePaneSize === b.workspacePaneSize,
   )
   const setWorkspacePaneSize = useReposStore((s) => s.setWorkspacePaneSize)
   const repo = useReposStore((s) => s.repos[repoId])
   useRepoToasts(repoId)
 
-  const layout = DEFAULT_WORKSPACE_LAYOUT
   const branchWorkspaceActive = !!repo?.ui.selectedBranch
   const behavior = repoWorkspaceBehavior({
     compact,
@@ -56,7 +54,7 @@ export function RepoView({ repoId }: Props) {
     branchWorkspaceActive,
   })
 
-  const workspacePaneSize = view.workspacePaneSizes[layout]
+  const workspacePaneSize = view.workspacePaneSize
   const selectedBranch = repo?.ui.selectedBranch ?? null
   const singlePane = selectedBranch ? 'workspace' : 'navigator'
   const compactWorkspaceSelectedBranch = useRetainedValueDuringExit({
@@ -71,7 +69,6 @@ export function RepoView({ repoId }: Props) {
   if (view.initialLoading) {
     return (
       <RepoWorkspaceSkeleton
-        layout={layout}
         singlePane={behavior.singlePane}
         singlePaneView={selectedBranch ? 'workspace' : 'navigator'}
         branchWorkspaceState={selectedBranch ? 'content' : 'empty'}
@@ -105,10 +102,9 @@ export function RepoView({ repoId }: Props) {
     singlePaneBody
   ) : (
     <RepoWorkspace
-      layout={layout}
       mode="split"
       workspacePaneSize={workspacePaneSize}
-      onWorkspacePaneSizeChange={(size) => setWorkspacePaneSize(layout, size)}
+      onWorkspacePaneSizeChange={setWorkspacePaneSize}
       branchNavigatorCollapsed={behavior.branchNavigatorCollapsed}
       branchNavigatorPane={branchNavigatorPane}
       branchWorkspacePane={branchWorkspacePane}

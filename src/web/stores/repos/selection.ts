@@ -2,15 +2,12 @@ import { selectedBranchForViewMode } from '#/web/stores/repos/branch-view-mode.t
 import { replaceRepo, replaceRepoState } from '#/web/stores/repos/helpers.ts'
 import { persistRestorableRepoSnapshot } from '#/web/stores/repos/persistence.ts'
 import {
-  DEFAULT_WORKSPACE_FOCUSED,
-  DEFAULT_WORKSPACE_PANE_SIZES,
+  DEFAULT_WORKSPACE_PANE_SIZE,
   normalizeWorkspacePaneSize,
-  normalizeWorkspacePaneSizes,
   normalizeWorkspaceSessionLayoutState,
 } from '#/shared/workspace-layout.ts'
-import type { BranchViewMode, RepoWorkspaceLayout, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
+import type { BranchViewMode, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
 import type { WorkspacePaneBranchViewType, WorkspacePaneView } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneSizes } from '#/shared/workspace-layout.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import {
   branchWorkspacePaneViewsForBranch,
@@ -32,7 +29,6 @@ type RestorableWorkspaceSelectionActions = Pick<
   | 'setWorkspaceFocused'
   | 'toggleWorkspaceFocused'
   | 'setWorkspacePaneSize'
-  | 'setWorkspacePaneSizes'
   | 'resetLayout'
   | 'setSelectedTerminal'
 >
@@ -68,15 +64,12 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
       // edits are persisted later through useSessionPersistence.
       set((s) => {
         const next = normalizeWorkspaceSessionLayoutState(layoutState)
-        if (
-          s.workspaceFocused === next.workspaceFocused &&
-          s.workspacePaneSizes['left-right'] === next.workspacePaneSizes['left-right']
-        ) {
+        if (s.workspaceFocused === next.workspaceFocused && s.workspacePaneSize === next.workspacePaneSize) {
           return s
         }
         return {
           workspaceFocused: next.workspaceFocused,
-          workspacePaneSizes: next.workspacePaneSizes,
+          workspacePaneSize: next.workspacePaneSize,
         }
       })
     },
@@ -144,35 +137,21 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
       set((s) => ({ workspaceFocused: !s.workspaceFocused }))
     },
 
-    setWorkspacePaneSize(layout: RepoWorkspaceLayout, size: number) {
+    setWorkspacePaneSize(size: number) {
       set((s) => {
-        const next = normalizeWorkspacePaneSize(layout, size)
-        if (s.workspacePaneSizes[layout] === next) return s
-        return { workspacePaneSizes: { ...s.workspacePaneSizes, [layout]: next } }
-      })
-    },
-
-    setWorkspacePaneSizes(sizes: WorkspacePaneSizes) {
-      set((s) => {
-        const next = normalizeWorkspacePaneSizes(sizes)
-        if (s.workspacePaneSizes['left-right'] === next['left-right']) {
-          return s
-        }
-        return { workspacePaneSizes: next }
+        const next = normalizeWorkspacePaneSize(size)
+        if (s.workspacePaneSize === next) return s
+        return { workspacePaneSize: next }
       })
     },
 
     resetLayout() {
       set((s) => {
-        if (
-          s.workspaceFocused === DEFAULT_WORKSPACE_FOCUSED &&
-          s.workspacePaneSizes['left-right'] === DEFAULT_WORKSPACE_PANE_SIZES['left-right']
-        ) {
+        if (s.workspacePaneSize === DEFAULT_WORKSPACE_PANE_SIZE) {
           return s
         }
         return {
-          workspaceFocused: DEFAULT_WORKSPACE_FOCUSED,
-          workspacePaneSizes: DEFAULT_WORKSPACE_PANE_SIZES,
+          workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
         }
       })
     },

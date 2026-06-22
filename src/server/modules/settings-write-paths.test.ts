@@ -130,9 +130,7 @@ describe('settings write paths', () => {
       openRepos: [],
       activeRepo: null,
       workspaceFocused: true,
-      workspacePaneSizes: {
-        'left-right': 50,
-      },
+      workspacePaneSize: 50,
       selectedTerminalByWorktree: {},
     }
     mocks.setServerSessionState.mockResolvedValue(session)
@@ -174,10 +172,10 @@ describe('settings write paths', () => {
         openRepos: [],
         activeRepo: null,
         workspaceFocused: true,
-        workspacePaneSizes: { 'left-right': 61.8 },
+        workspacePaneSize: 61.8,
       },
     })
     expect(parsed.session.workspaceFocused).toBe(true)
-    expect(parsed.session.workspacePaneSizes).toEqual({ 'left-right': 61.8 })
+    expect(parsed.session.workspacePaneSize).toBe(61.8)
   })
 })

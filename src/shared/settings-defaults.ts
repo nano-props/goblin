@@ -9,7 +9,7 @@ import type {
   TerminalPref,
   ThemePref,
 } from '#/shared/api-types.ts'
-import { DEFAULT_WORKSPACE_FOCUSED, DEFAULT_WORKSPACE_PANE_SIZES } from '#/shared/workspace-layout.ts'
+import { DEFAULT_WORKSPACE_FOCUSED, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 
 export const DEFAULT_FETCH_INTERVAL_SEC = 120
 export const MAX_RECENT_REPOS = 10
@@ -27,7 +27,7 @@ export function defaultSessionState(): SessionState {
     openRepos: [],
     activeRepo: null,
     workspaceFocused: DEFAULT_WORKSPACE_FOCUSED,
-    workspacePaneSizes: { ...DEFAULT_WORKSPACE_PANE_SIZES },
+    workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     selectedTerminalByWorktree: {},
   }
 }

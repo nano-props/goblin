@@ -10,7 +10,7 @@ export function useSessionPersistence() {
   const activeId = useReposStore((s) => s.activeId)
   const order = useReposStore((s) => s.order)
   const workspaceFocused = useReposStore((s) => s.workspaceFocused)
-  const workspacePaneSizes = useReposStore((s) => s.workspacePaneSizes)
+  const workspacePaneSize = useReposStore((s) => s.workspacePaneSize)
   const selectedTerminalByWorktree = useReposStore((s) => s.selectedTerminalByWorktree)
   const sessionReady = useReposStore((s) => s.sessionReady)
   const repos = useReposStore((s) => s.repos)
@@ -28,7 +28,7 @@ export function useSessionPersistence() {
         order,
         activeId,
         workspaceFocused,
-        workspacePaneSizes,
+        workspacePaneSize,
         selectedTerminalByWorktree,
       }),
     })
@@ -37,6 +37,7 @@ export function useSessionPersistence() {
       openRepos: session.openRepos,
       activeRepo: session.activeRepo,
       workspaceFocused: session.workspaceFocused,
+      workspacePaneSize: session.workspacePaneSize,
       selectedTerminalByWorktree: session.selectedTerminalByWorktree,
     })
     const immediate = lastImmediateKeyRef.current !== immediateKey
@@ -59,7 +60,7 @@ export function useSessionPersistence() {
     sessionReady,
     order,
     activeId,
-    workspacePaneSizes,
+    workspacePaneSize,
     workspaceFocused,
     selectedTerminalByWorktree,
     repos,

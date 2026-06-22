@@ -252,7 +252,7 @@ function createWindowMenu(state: AppMenuState): MenuItemConstructorOptions {
       createRendererCommandMenuItem(state, 'window-prev-repo'),
       separator(),
       createRendererCommandMenuItem(state, 'window-reset-layout', {
-        // Reset Layout also restores the window itself to its default
+        // Reset Window also restores the main window itself to its default
         // size, so users have a one-click escape from an awkward
         // drag-resize — not just from an awkward pane split.
         beforeIntent: () => resetMainWindowToDefault(),
@@ -301,7 +301,7 @@ function createRendererCommandMenuItem(
   state: AppMenuState,
   id: Parameters<typeof rendererMenuCommandById>[0],
   // `beforeIntent` runs a main-side side effect before the renderer
-  // intent is dispatched — for actions like Reset Layout that need to
+  // intent is dispatched — for actions like Reset Window that need to
   // touch the Electron window itself, not just the renderer state.
   options?: { beforeIntent?: () => void },
 ): MenuItemConstructorOptions {

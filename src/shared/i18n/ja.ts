@@ -66,7 +66,7 @@ export const ja: Record<DictKey, string> = {
   // ---- Menu — Window (gbl-specific) --------------------------------------
   'menu.window.next-repo': '次のリポジトリ',
   'menu.window.prev-repo': '前のリポジトリ',
-  'menu.window.reset-layout': 'レイアウトをリセット',
+  'menu.window.reset-window': 'ウィンドウをリセット',
 
   // ---- Menu — Help -------------------------------------------------------
   'menu.help.shortcuts': 'キーボードショートカット',

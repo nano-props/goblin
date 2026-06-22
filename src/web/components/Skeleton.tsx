@@ -8,8 +8,6 @@ import type { CSSProperties, ReactNode } from 'react'
 import { cn } from '#/web/lib/cn.ts'
 import { Skeleton } from '#/web/components/ui/skeleton.tsx'
 import { RepoWorkspace, RepoWorkspacePane, Toolbar } from '#/web/components/Layout.tsx'
-import { DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
-import type { RepoWorkspaceLayout } from '#/web/stores/repos/types.ts'
 
 interface BranchNavigatorSkeletonProps {
   rows?: number
@@ -21,7 +19,6 @@ interface RowCountProps {
 }
 
 interface WorkspaceSkeletonProps {
-  layout?: RepoWorkspaceLayout
   singlePane?: boolean
   singlePaneView?: 'navigator' | 'workspace'
   branchWorkspaceState?: 'empty' | 'content'
@@ -52,7 +49,6 @@ export function StatusListSkeleton({ rows = 6 }: RowCountProps) {
 // a repo is being hydrated. The per-repo toolbar lives in the Topbar,
 // so the workspace skeleton just shows the panes.
 export function RepoWorkspaceSkeleton({
-  layout = DEFAULT_WORKSPACE_LAYOUT,
   singlePane = false,
   singlePaneView = 'navigator',
   branchWorkspaceState = 'empty',
@@ -79,7 +75,6 @@ export function RepoWorkspaceSkeleton({
   return (
     <section className="flex min-w-0 flex-1 flex-col">
       <RepoWorkspace
-        layout={layout}
         mode="split"
         branchNavigatorPane={branchNavigatorPane}
         branchWorkspacePane={branchWorkspacePane}

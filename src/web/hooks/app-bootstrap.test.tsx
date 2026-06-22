@@ -53,7 +53,7 @@ describe('app bootstrap hooks', () => {
       openRepos: [{ kind: 'local', id: '/tmp/repo' }],
       activeRepo: '/tmp/repo',
       workspaceFocused: true,
-      workspacePaneSizes: { 'left-right': 50 },
+      workspacePaneSize: 50,
       selectedTerminalByWorktree: {},
     })
     const hydrateI18n = vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
@@ -73,7 +73,7 @@ describe('app bootstrap hooks', () => {
       openRepos: [{ kind: 'local' as const, id: '/tmp/repo' }],
       activeRepo: '/tmp/repo',
       workspaceFocused: false,
-      workspacePaneSizes: { 'left-right': 45 },
+      workspacePaneSize: 45,
       selectedTerminalByWorktree: { '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2' },
     }
     const settings = defaultSettingsSnapshot({ session })
@@ -87,7 +87,7 @@ describe('app bootstrap hooks', () => {
 
     const state = useReposStore.getState()
     expect(state.workspaceFocused).toBe(false)
-    expect(state.workspacePaneSizes).toEqual({ 'left-right': 45 })
+    expect(state.workspacePaneSize).toBe(45)
     expect(state.selectedTerminalByWorktree).toEqual({
       '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2',
     })
@@ -101,7 +101,7 @@ describe('app bootstrap hooks', () => {
       openRepos: [{ kind: 'local' as const, id: '/tmp/repo' }],
       activeRepo: '/tmp/repo',
       workspaceFocused: true,
-      workspacePaneSizes: { 'left-right': 55 },
+      workspacePaneSize: 55,
       selectedTerminalByWorktree: {},
     }
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot({ session }))
@@ -113,7 +113,7 @@ describe('app bootstrap hooks', () => {
     await render(<Harness />)
 
     expect(hydrateSession).toHaveBeenCalledWith([{ kind: 'local', id: '/tmp/repo' }], '/tmp/repo')
-    expect(useReposStore.getState().workspacePaneSizes).toEqual({ 'left-right': 55 })
+    expect(useReposStore.getState().workspacePaneSize).toBe(55)
     expect(mockedGetSettingsSnapshot).toHaveBeenCalledTimes(1)
   })
 })

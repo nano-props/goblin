@@ -13,7 +13,6 @@ import type {
   RepoRemoteInfo,
   WorktreeStatus,
 } from '#/shared/git-types.ts'
-import type { WorkspacePaneSizes } from '#/shared/workspace-layout.ts'
 import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
@@ -86,7 +85,7 @@ export interface SessionState {
   /** The active repository id — null when no repos were open. */
   activeRepo: string | null
   workspaceFocused: boolean
-  workspacePaneSizes: WorkspacePaneSizes
+  workspacePaneSize: number
   selectedTerminalByWorktree?: Record<string, string>
   /** Per-repo, per-branch workspace pane view preference, restored with the session. */
   workspacePaneViewByBranchByRepo?: Record<string, Record<string, WorkspacePaneView>>

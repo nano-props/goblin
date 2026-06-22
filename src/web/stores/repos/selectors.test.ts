@@ -60,9 +60,7 @@ describe('repo selectors', () => {
         order: ['/tmp/repo'],
         activeId: '/tmp/repo',
         workspaceFocused: false,
-        workspacePaneSizes: {
-          'left-right': 50,
-        },
+        workspacePaneSize: 50,
         selectedTerminalByWorktree: {
           '/tmp/repo\0/tmp/repo': 'terminal-1',
         },
@@ -71,9 +69,7 @@ describe('repo selectors', () => {
       order: ['/tmp/repo'],
       activeId: '/tmp/repo',
       workspaceFocused: false,
-      workspacePaneSizes: {
-        'left-right': 50,
-      },
+      workspacePaneSize: 50,
       selectedTerminalByWorktree: {
         '/tmp/repo\0/tmp/repo': 'terminal-1',
       },

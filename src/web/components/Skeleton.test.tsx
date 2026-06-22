@@ -62,7 +62,7 @@ describe('RepoWorkspaceSkeleton', () => {
   })
 
   test('renders split workspace content when a branch workspace is selected', () => {
-    render(<RepoWorkspaceSkeleton layout="left-right" branchWorkspaceState="content" />)
+    render(<RepoWorkspaceSkeleton branchWorkspaceState="content" />)
 
     expect(container?.querySelectorAll('li')).toHaveLength(14)
     expect(container?.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(6)

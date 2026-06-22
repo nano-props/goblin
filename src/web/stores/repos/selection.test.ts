@@ -12,7 +12,7 @@ import {
 import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
 import { selectedWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
-import { DEFAULT_WORKSPACE_FOCUSED, DEFAULT_WORKSPACE_PANE_SIZES } from '#/shared/workspace-layout.ts'
+import { DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 const REPO_ID = '/tmp/gbl-selection-test-repo'
 const ipcHandlers: Record<string, (input: any) => unknown> = {}
 
@@ -458,12 +458,12 @@ describe('workspace pane layout state', () => {
   test('applies session pane state atomically with shared normalization rules', () => {
     useReposStore.getState().applySessionLayoutState({
       workspaceFocused: true,
-      workspacePaneSizes: { 'left-right': 45 },
+      workspacePaneSize: 45,
     })
 
     expect(useReposStore.getState()).toMatchObject({
       workspaceFocused: true,
-      workspacePaneSizes: { 'left-right': 45 },
+      workspacePaneSize: 45,
     })
   })
 })
@@ -500,35 +500,33 @@ describe('setWorkspaceFocused', () => {
 })
 
 describe('setWorkspacePaneSize', () => {
-  test('stores the workspace pane size for the left-right layout', () => {
-    useReposStore.getState().setWorkspacePaneSize('left-right', 72.28)
+  test('stores the workspace pane size', () => {
+    useReposStore.getState().setWorkspacePaneSize(72.28)
 
-    expect(useReposStore.getState().workspacePaneSizes).toEqual({ 'left-right': 72.3 })
+    expect(useReposStore.getState().workspacePaneSize).toBe(72.3)
   })
 
   test('normalizes invalid and out-of-range sizes', () => {
-    useReposStore.getState().setWorkspacePaneSize('left-right', 200)
+    useReposStore.getState().setWorkspacePaneSize(200)
 
-    expect(useReposStore.getState().workspacePaneSizes).toEqual({
-      'left-right': 90,
-    })
+    expect(useReposStore.getState().workspacePaneSize).toBe(90)
   })
 })
 
 describe('resetLayout', () => {
-  test('restores the initial workspace layout defaults', () => {
+  test('restores the default pane size but leaves workspaceFocused untouched', () => {
     useReposStore.setState({
       workspaceFocused: true,
-      workspacePaneSizes: { 'left-right': 70 },
+      workspacePaneSize: 70,
     })
 
     useReposStore.getState().resetLayout()
 
-    expect(useReposStore.getState().workspaceFocused).toBe(DEFAULT_WORKSPACE_FOCUSED)
-    expect(useReposStore.getState().workspacePaneSizes).toBe(DEFAULT_WORKSPACE_PANE_SIZES)
+    expect(useReposStore.getState().workspaceFocused).toBe(true)
+    expect(useReposStore.getState().workspacePaneSize).toBe(DEFAULT_WORKSPACE_PANE_SIZE)
   })
 
-  test('is idempotent when layout is already at defaults', () => {
+  test('is idempotent when pane sizes are already at defaults', () => {
     const before = useReposStore.getState()
 
     useReposStore.getState().resetLayout()

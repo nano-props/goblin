@@ -74,7 +74,7 @@ describe('settings snapshot partitions', () => {
         openRepos: [{ kind: 'local', id: '/tmp/repo-b' }],
         activeRepo: '/tmp/repo-b',
         workspaceFocused: false,
-        workspacePaneSizes: { 'left-right': 50 },
+        workspacePaneSize: 50,
         selectedTerminalByWorktree: { '/tmp/repo-b\0/tmp/repo-b': 'terminal-1' },
       },
     })
@@ -89,7 +89,7 @@ describe('settings snapshot partitions', () => {
       openRepos: [{ kind: 'local', id: '/tmp/repo-b' }],
       activeRepo: '/tmp/repo-b',
       workspaceFocused: false,
-      workspacePaneSizes: { 'left-right': 50 },
+      workspacePaneSize: 50,
       selectedTerminalByWorktree: { '/tmp/repo-b\0/tmp/repo-b': 'terminal-1' },
     })
   })

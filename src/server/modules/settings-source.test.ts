@@ -1,8 +1,9 @@
 import { afterEach, expect, test, vi } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { defaultSessionState } from '#/shared/settings-defaults.ts'
+import { serverDataFile } from '#/shared/data-dir.ts'
 
 let tmp: string | null = null
 let previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
@@ -139,4 +140,52 @@ test('normalizes branch-scoped workspace pane view preferences in server session
       },
     },
   })
+})
+
+test('migrates legacy workspacePaneSizes record to the new flat workspacePaneSize number', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+
+  // Hand-author an old-format server-settings.json: pane size lives under the
+  // pre-cleanup `workspacePaneSizes: { 'left-right': N }` record. After
+  // upgrade, the loader should read the inner value into the new
+  // `workspacePaneSize` field so the user's saved split survives.
+  mkdirSync(path.dirname(serverDataFile('server-settings.json')), { recursive: true })
+  writeFileSync(
+    serverDataFile('server-settings.json'),
+    JSON.stringify({
+      lang: 'auto',
+      theme: 'auto',
+      colorTheme: 'macos',
+      fetchIntervalSec: 120,
+      terminalNotificationsEnabled: false,
+      shortcutsDisabled: false,
+      globalShortcutDisabled: false,
+      globalShortcut: 'Alt+G',
+      terminalApp: 'auto',
+      editorApp: 'auto',
+      lanEnabled: false,
+      session: {
+        openRepos: [],
+        activeRepo: null,
+        workspaceFocused: false,
+        workspacePaneSizes: { 'left-right': 75 },
+        selectedTerminalByWorktree: {},
+      },
+      recentRepos: [],
+    }),
+    'utf-8',
+  )
+
+  const mod = await import('#/server/modules/settings-source.ts')
+  expect(await mod.getServerSessionState()).toMatchObject({
+    workspaceFocused: false,
+    workspacePaneSize: 75,
+  })
+
+  // After a save, the on-disk shape should be the new flat field and the
+  // legacy record should be gone.
+  await mod.setServerSessionState(await mod.getServerSessionState())
+  expect((await mod.getServerSessionState()).workspacePaneSize).toBe(75)
 })
