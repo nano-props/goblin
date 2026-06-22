@@ -116,6 +116,30 @@ describe('useBranchActionShortcutRegistry', () => {
     expect(firstPull).toHaveBeenCalledTimes(1)
     expect(secondPull).toHaveBeenCalledTimes(1)
   })
+
+  test('clears the shortcut handler while disabled', async () => {
+    const onPull = vi.fn()
+
+    container = document.createElement('div')
+    document.body.append(container)
+    root = createRoot(container)
+
+    await act(async () => {
+      root!.render(<HookHost actions={actionsWith(onPull)} />)
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      root!.render(<HookHost actions={actionsWith(onPull)} enabled={false} />)
+      await Promise.resolve()
+    })
+
+    act(() => {
+      runBranchActionShortcut('pull')
+    })
+
+    expect(onPull).not.toHaveBeenCalled()
+  })
 })
 
 async function renderHookHost(actions: BranchActionItemGroups) {
@@ -128,8 +152,8 @@ async function renderHookHost(actions: BranchActionItemGroups) {
   })
 }
 
-function HookHost({ actions }: { actions: BranchActionItemGroups }) {
-  useBranchActionShortcutRegistry(actions)
+function HookHost({ actions, enabled = true }: { actions: BranchActionItemGroups; enabled?: boolean }) {
+  useBranchActionShortcutRegistry(actions, enabled)
   return null
 }
 

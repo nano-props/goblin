@@ -141,7 +141,9 @@ button,
   container-type: inline-size;
 }
 
-.goblin-split-pane[data-collapse-transition='true'] > [data-slot='resizable-panel-group'] > [data-slot='resizable-panel'] {
+.goblin-split-pane[data-collapse-transition='true']
+  > [data-slot='resizable-panel-group']
+  > [data-slot='resizable-panel'] {
   transition:
     flex-basis var(--goblin-split-pane-collapse-duration) cubic-bezier(0.2, 0, 0, 1),
     flex-grow var(--goblin-split-pane-collapse-duration) cubic-bezier(0.2, 0, 0, 1),
@@ -180,6 +182,54 @@ button,
   opacity: 0;
   pointer-events: none;
   width: 0;
+}
+
+/* Compact workspace page transition. Mirrors the split-pane Focus Mode
+ * timing while keeping both panes mounted for a mobile-style push/pop. */
+.goblin-compact-workspace {
+  --goblin-compact-workspace-transition-duration: 240ms;
+  --goblin-compact-workspace-transition-easing: cubic-bezier(0.2, 0, 0, 1);
+  contain: layout paint;
+}
+
+.goblin-compact-workspace__pane {
+  backface-visibility: hidden;
+  transform: translate3d(0, 0, 0);
+  transition:
+    transform var(--goblin-compact-workspace-transition-duration) var(--goblin-compact-workspace-transition-easing),
+    opacity 180ms ease-out;
+  will-change: transform, opacity;
+}
+
+.goblin-compact-workspace__pane--navigator {
+  z-index: 1;
+}
+
+.goblin-compact-workspace__pane--workspace {
+  z-index: 2;
+  box-shadow: -1px 0 0 var(--color-separator);
+}
+
+.goblin-compact-workspace[data-active-pane='navigator'] .goblin-compact-workspace__pane--navigator {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+.goblin-compact-workspace[data-active-pane='navigator'] .goblin-compact-workspace__pane--workspace {
+  opacity: 1;
+  pointer-events: none;
+  transform: translate3d(100%, 0, 0);
+}
+
+.goblin-compact-workspace[data-active-pane='workspace'] .goblin-compact-workspace__pane--navigator {
+  opacity: 0.82;
+  pointer-events: none;
+  transform: translate3d(-18%, 0, 0);
+}
+
+.goblin-compact-workspace[data-active-pane='workspace'] .goblin-compact-workspace__pane--workspace {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
 }
 
 /* Honor the OS-level "reduce motion" preference. */

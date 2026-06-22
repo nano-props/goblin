@@ -3,6 +3,7 @@
 // and `App.tsx` — so the workspace below the topbar is just the
 // branch navigator and the branch workspace pane.
 
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
@@ -20,6 +21,8 @@ import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 interface Props {
   repoId: string
 }
+
+const COMPACT_WORKSPACE_TRANSITION_MS = 240
 
 export function RepoView({ repoId }: Props) {
   const uiMode = useResponsiveUiMode()
@@ -57,6 +60,7 @@ export function RepoView({ repoId }: Props) {
 
   const workspacePaneSize = view.workspacePaneSizes[layout]
   const selectedBranch = repo?.ui.selectedBranch ?? null
+  const presentedWorkspaceBranch = usePresentedCompactWorkspaceBranch(selectedBranch, compact)
 
   if (!view.exists || !repo) return <div />
   if (isRepoUnavailable(repo)) return <UnavailableRepoView repo={repo} />
@@ -71,9 +75,14 @@ export function RepoView({ repoId }: Props) {
     )
   }
 
+  const singlePane = repo.ui.selectedBranch ? 'workspace' : 'navigator'
   const branchWorkspacePane = (
     <RepoWorkspacePane>
-      <BranchWorkspace repoId={repoId} />
+      <BranchWorkspace
+        repoId={repoId}
+        presentedBranchName={compact ? presentedWorkspaceBranch : undefined}
+        shortcutsEnabled={!compact || singlePane === 'workspace'}
+      />
     </RepoWorkspacePane>
   )
   const branchNavigatorPane = (
@@ -81,11 +90,15 @@ export function RepoView({ repoId }: Props) {
       <BranchNavigator repoId={repoId} showActions={behavior.branchNavigatorActionsVisible} />
     </RepoWorkspacePane>
   )
-
-  const singlePane = repo.ui.selectedBranch ? 'workspace' : 'navigator'
   const singlePaneBody = singlePane === 'workspace' ? branchWorkspacePane : branchNavigatorPane
 
-  const workspaceBody = behavior.singlePane ? (
+  const workspaceBody = compact ? (
+    <CompactRepoWorkspace
+      activePane={singlePane}
+      branchNavigatorPane={branchNavigatorPane}
+      branchWorkspacePane={branchWorkspacePane}
+    />
+  ) : behavior.singlePane ? (
     singlePaneBody
   ) : (
     <RepoWorkspace
@@ -100,4 +113,75 @@ export function RepoView({ repoId }: Props) {
   )
 
   return <section className="relative flex min-w-0 flex-1 flex-col">{workspaceBody}</section>
+}
+
+function CompactRepoWorkspace({
+  activePane,
+  branchNavigatorPane,
+  branchWorkspacePane,
+}: {
+  activePane: 'navigator' | 'workspace'
+  branchNavigatorPane: ReactNode
+  branchWorkspacePane: ReactNode
+}) {
+  const workspaceActive = activePane === 'workspace'
+
+  return (
+    <div
+      data-compact-workspace=""
+      data-active-pane={activePane}
+      className="goblin-compact-workspace relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background"
+    >
+      <div
+        data-compact-workspace-pane="navigator"
+        aria-hidden={workspaceActive || undefined}
+        inert={workspaceActive || undefined}
+        className="goblin-compact-workspace__pane goblin-compact-workspace__pane--navigator absolute inset-0 flex min-h-0 min-w-0 bg-background"
+      >
+        {branchNavigatorPane}
+      </div>
+      <div
+        data-compact-workspace-pane="workspace"
+        aria-hidden={!workspaceActive || undefined}
+        inert={!workspaceActive || undefined}
+        className="goblin-compact-workspace__pane goblin-compact-workspace__pane--workspace absolute inset-0 flex min-h-0 min-w-0 bg-background"
+      >
+        {branchWorkspacePane}
+      </div>
+    </div>
+  )
+}
+
+function usePresentedCompactWorkspaceBranch(selectedBranch: string | null, compact: boolean): string | null {
+  const previousBranchRef = useRef<string | null>(selectedBranch)
+  const [presentedBranch, setPresentedBranch] = useState<string | null>(selectedBranch)
+
+  useEffect(() => {
+    if (!compact) {
+      previousBranchRef.current = selectedBranch
+      setPresentedBranch(selectedBranch)
+      return
+    }
+
+    if (selectedBranch) {
+      previousBranchRef.current = selectedBranch
+      setPresentedBranch(selectedBranch)
+      return
+    }
+
+    const outgoingBranch = previousBranchRef.current
+    if (!outgoingBranch) {
+      setPresentedBranch(null)
+      return
+    }
+
+    setPresentedBranch(outgoingBranch)
+    const timeout = window.setTimeout(() => {
+      previousBranchRef.current = null
+      setPresentedBranch(null)
+    }, COMPACT_WORKSPACE_TRANSITION_MS)
+    return () => window.clearTimeout(timeout)
+  }, [compact, selectedBranch])
+
+  return selectedBranch ?? (compact ? presentedBranch : null)
 }
