@@ -19,6 +19,10 @@ import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-queries.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import {
+  selectedWorkspacePaneViewForBranch,
+  workspacePaneViewByBranchRecordWith,
+} from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import type {
   TerminalBellEvent,
@@ -63,6 +67,11 @@ vi.mock('#/web/components/terminal/terminal-geometry.ts', () => ({
   preloadTerminalFont: geometryMocks.preloadTerminalFont,
   proposeTerminalGeometry: geometryMocks.proposeTerminalGeometry,
 }))
+
+function selectedWorkspacePaneView(repoId: string) {
+  const repo = useReposStore.getState().repos[repoId]
+  return repo ? selectedWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) : null
+}
 
 vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
   class ManagedTerminalSession {
@@ -641,7 +650,7 @@ describe('TerminalSessionProvider', () => {
       })
 
       expect(closeMock).not.toHaveBeenCalled()
-      expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('terminal')
+      expect(selectedWorkspacePaneView(REPO_ID)).toBe('terminal')
       expect(getProbe().summaries.map((session) => [session.terminalId, session.selected, session.hasBell])).toEqual([
         ['terminal-1', true, false],
       ])
@@ -656,7 +665,7 @@ describe('TerminalSessionProvider', () => {
       })
 
       expect(closeMock).not.toHaveBeenCalled()
-      expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('terminal')
+      expect(selectedWorkspacePaneView(REPO_ID)).toBe('terminal')
     } finally {
       await unmount()
     }
@@ -1070,7 +1079,11 @@ describe('TerminalSessionProvider', () => {
       ui: {
         ...firstRepo.ui,
         selectedBranch: 'feature/other',
-        preferredWorkspacePaneView: 'terminal',
+        preferredWorkspacePaneViewByBranch: workspacePaneViewByBranchRecordWith(
+          firstRepo.ui,
+          'feature/other',
+          'terminal',
+        ),
       },
     } satisfies typeof firstRepo
     useReposStore.setState((state) => ({
@@ -1117,7 +1130,11 @@ describe('TerminalSessionProvider', () => {
       ui: {
         ...firstRepo.ui,
         selectedBranch: 'feature/other',
-        preferredWorkspacePaneView: 'terminal',
+        preferredWorkspacePaneViewByBranch: workspacePaneViewByBranchRecordWith(
+          firstRepo.ui,
+          'feature/other',
+          'terminal',
+        ),
       },
     } satisfies typeof firstRepo
     useReposStore.setState((state) => ({

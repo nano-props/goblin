@@ -4,7 +4,7 @@ import { persistedOpenWorkspaceEntries } from '#/web/open-workspace-state.ts'
 import {
   persistedActiveRepoIdForSession,
   persistedSelectedTerminalByWorktreeForSession,
-  persistedWorkspacePaneViewByRepoForSession,
+  persistedWorkspacePaneViewByBranchByRepoForSession,
 } from '#/web/session-persistence-state.ts'
 
 export function sessionStateFromRestorableWorkspaceState(input: {
@@ -21,29 +21,33 @@ export function sessionStateFromRestorableWorkspaceState(input: {
       restorableWorkspaceState.selectedTerminalByWorktree,
       repos,
     ),
-    workspacePaneViewByRepo: persistedWorkspacePaneViewByRepoForSession(repos, restorableWorkspaceState.order),
+    workspacePaneViewByBranchByRepo: persistedWorkspacePaneViewByBranchByRepoForSession(
+      repos,
+      restorableWorkspaceState.order,
+    ),
   }
 }
 
 /** Restores only the restorable workspace UI projection from SessionState.
  *  It intentionally does not establish a live binding back to SessionState;
  *  subsequent updates flow through useSessionPersistence. */
+interface RestoredWorkspaceStateFromSession
+  extends Pick<
+    RestorableWorkspaceState,
+    'activeId' | 'workspaceFocused' | 'workspacePaneSizes' | 'selectedTerminalByWorktree'
+  > {
+  workspacePaneViewByBranchByRepo: NonNullable<SessionState['workspacePaneViewByBranchByRepo']>
+}
+
 export function restoreRestorableWorkspaceStateFromSession(
   session: SessionState,
   activeId: string | null = session.activeRepo,
-): Pick<
-  RestorableWorkspaceState,
-  | 'activeId'
-  | 'workspaceFocused'
-  | 'workspacePaneSizes'
-  | 'selectedTerminalByWorktree'
-  | 'workspacePaneViewByRepo'
-> {
+): RestoredWorkspaceStateFromSession {
   return {
     activeId,
     workspaceFocused: session.workspaceFocused,
     workspacePaneSizes: session.workspacePaneSizes,
     selectedTerminalByWorktree: session.selectedTerminalByWorktree ?? {},
-    workspacePaneViewByRepo: session.workspacePaneViewByRepo ?? {},
+    workspacePaneViewByBranchByRepo: session.workspacePaneViewByBranchByRepo ?? {},
   }
 }

@@ -10,6 +10,7 @@ import {
   seedRepoState,
 } from '#/web/stores/repos/test-utils.ts'
 import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
+import { selectedWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
 import { DEFAULT_WORKSPACE_FOCUSED, DEFAULT_WORKSPACE_PANE_SIZES } from '#/shared/workspace-layout.ts'
 const REPO_ID = '/tmp/gbl-selection-test-repo'
@@ -55,6 +56,11 @@ function updateRepoForTest(mutator: (repo: RepoState) => void) {
 function openViewsFor(branchName: string): WorkspacePaneBranchViewType[] {
   const repo = useReposStore.getState().repos[REPO_ID]
   return repo ? branchWorkspacePaneViewsForBranch(repo.ui, branchName) : []
+}
+
+function selectedViewFor(branchName?: string | null): WorkspacePaneView | null {
+  const repo = useReposStore.getState().repos[REPO_ID]
+  return repo ? selectedWorkspacePaneViewForBranch(repo.ui, branchName ?? repo.ui.selectedBranch) : null
 }
 
 async function flushAsyncWork() {
@@ -149,9 +155,7 @@ describe('setBranchViewMode', () => {
     expect(calls).toEqual([{ branches: ['main'], mode: 'full' }])
   })
 
-  test('preserves the terminal preference when the view mode hides the active branch', () => {
-    // The store only re-picks the visible branch — the preferred tab is
-    // never re-projected. The UI hook decides what's actually renderable.
+  test('keeps the hidden branch workspace pane selection on that branch', () => {
     seedRepo({
       selectedBranch: 'feature/plain',
       workspacePaneView: 'terminal',
@@ -162,7 +166,8 @@ describe('setBranchViewMode', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.selectedBranch).toBe('main')
-    expect(repo?.ui.preferredWorkspacePaneView).toBe('terminal')
+    expect(selectedViewFor('feature/plain')).toBe('terminal')
+    expect(selectedViewFor('main')).toBe('status')
   })
 })
 
@@ -234,17 +239,15 @@ describe('selectBranch', () => {
     expect(calls).toBe(0)
   })
 
-  test('preserves the terminal preference when selecting a branch without a worktree', () => {
-    // selectBranch updates `selectedBranch` only; the preferred tab is
-    // preserved verbatim. The UI hook resolves the effective tab from
-    // the active branch's worktree and the terminal session count.
+  test('keeps workspace pane selection isolated when selecting another branch', () => {
     seedRepo({ selectedBranch: 'feature/worktree', workspacePaneView: 'terminal' })
 
     useReposStore.getState().selectBranch(REPO_ID, 'feature/plain')
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.selectedBranch).toBe('feature/plain')
-    expect(repo?.ui.preferredWorkspacePaneView).toBe('terminal')
+    expect(selectedViewFor('feature/worktree')).toBe('terminal')
+    expect(selectedViewFor('feature/plain')).toBe('status')
   })
 })
 
@@ -281,7 +284,7 @@ describe('setWorkspacePaneView', () => {
 
     useReposStore.getState().setWorkspacePaneView(REPO_ID, 'terminal')
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('terminal')
+    expect(selectedViewFor('feature/worktree')).toBe('terminal')
   })
 
   test('does not refresh when reselecting the current tab', () => {
@@ -303,16 +306,16 @@ describe('setWorkspacePaneView', () => {
   test('opens restored branch-level history during session restore', () => {
     seedRepo({ selectedBranch: 'main', workspacePaneView: 'status', openBranchWorkspacePaneViews: ['status'] })
 
-    useReposStore.getState().applySessionWorkspacePaneViewByRepo({ [REPO_ID]: 'history' })
+    useReposStore.getState().applySessionWorkspacePaneViewByBranchByRepo({ [REPO_ID]: { main: 'history' } })
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('history')
+    expect(selectedViewFor('main')).toBe('history')
     expect(openViewsFor('main')).toEqual(['status', 'history'])
   })
 
   test('reopens restored branch-level history even when it was already preferred', () => {
     seedRepo({ selectedBranch: 'main', workspacePaneView: 'history', openBranchWorkspacePaneViews: ['status'] })
 
-    useReposStore.getState().applySessionWorkspacePaneViewByRepo({ [REPO_ID]: 'history' })
+    useReposStore.getState().applySessionWorkspacePaneViewByBranchByRepo({ [REPO_ID]: { main: 'history' } })
 
     expect(openViewsFor('main')).toEqual(['status', 'history'])
   })
@@ -360,6 +363,22 @@ describe('setWorkspacePaneView', () => {
     expect(openViewsFor('feature/plain')).toEqual(['status', 'history'])
   })
 
+  test('keeps selected workspace pane views isolated by branch', () => {
+    seedRepo({ selectedBranch: 'feature/plain' })
+
+    useReposStore.getState().setWorkspacePaneView(REPO_ID, 'history')
+    useReposStore.getState().selectBranch(REPO_ID, 'main')
+
+    expect(selectedViewFor('feature/plain')).toBe('history')
+    expect(selectedViewFor('main')).toBe('status')
+
+    useReposStore.getState().setWorkspacePaneView(REPO_ID, 'changes')
+    useReposStore.getState().selectBranch(REPO_ID, 'feature/plain')
+
+    expect(selectedViewFor('main')).toBe('changes')
+    expect(selectedViewFor('feature/plain')).toBe('history')
+  })
+
   test('keeps an explicitly closed status tab closed on its branch', () => {
     seedRepo({ selectedBranch: 'main' })
 
@@ -377,7 +396,7 @@ describe('setWorkspacePaneView', () => {
     useReposStore.getState().setWorkspacePaneView(REPO_ID, 'changes')
     await flushAsyncWork()
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('changes')
+    expect(selectedViewFor('main')).toBe('changes')
   })
 
   test('passes the current repo token to workspace pane view refreshes', () => {
@@ -421,7 +440,7 @@ describe('setWorkspacePaneView', () => {
 
     useReposStore.getState().setWorkspacePaneView(REPO_ID, 'terminal')
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('terminal')
+    expect(selectedViewFor('feature/plain')).toBe('terminal')
   })
 
   test('preserves the terminal preference even when no worktree exists for the active branch', () => {
@@ -431,7 +450,7 @@ describe('setWorkspacePaneView', () => {
     seedRepo({ selectedBranch: 'feature/plain', workspacePaneView: 'terminal' })
     useReposStore.getState().setWorkspacePaneView(REPO_ID, 'terminal')
 
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('terminal')
+    expect(selectedViewFor('feature/plain')).toBe('terminal')
   })
 })
 

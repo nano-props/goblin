@@ -42,6 +42,7 @@ import { useIsInitialSyncInFlight } from '#/web/stores/repo-sync.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
 import { isBranchLevelWorkspacePaneView } from '#/web/lib/workspace-pane-view.ts'
+import { selectedWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 
 interface Props {
   repo: Pick<BranchWorkspaceRepo, 'id' | 'ui' | 'data'>
@@ -64,6 +65,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
     ? worktreeTerminalKey(repo.id, detail.branch.worktree.path)
     : null
   const branchName = detail.branch?.name ?? null
+  const selectedWorkspacePaneView = selectedWorkspacePaneViewForBranch(repo.ui, branchName)
   const showBranchLevelTabs = !!detail.branch
 
   const {
@@ -136,10 +138,10 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
   // (worktree + sessions) is decided at read time by
   // `useEffectiveWorkspacePaneView` — we only assert user intent here.
   const enterTerminalTab = useCallback(() => {
-    if (repo.ui.preferredWorkspacePaneView !== 'terminal') {
+    if (selectedWorkspacePaneView !== 'terminal') {
       navigation.showRepoWorkspacePaneView(repo.id, 'terminal')
     }
-  }, [navigation, repo.id, repo.ui.preferredWorkspacePaneView])
+  }, [navigation, repo.id, selectedWorkspacePaneView])
 
   const handleNewTerminal = useCallback(() => {
     if (!terminalBase) return

@@ -6,6 +6,7 @@ import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/r
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import type { WorkspacePaneBranchViewType, WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
 import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
+import { selectedWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 
 const REPO_ID = '/tmp/workspace-pane-view-repo'
 const WORKTREE_PATH = '/tmp/workspace-pane-view-worktree'
@@ -42,7 +43,7 @@ describe('openWorkspacePaneView', () => {
 
     expect(openStaticView).toHaveBeenCalledWith(WORKTREE_KEY, 'status')
     expect(openViewsFor('feature/worktree')).toEqual(['status'])
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('status')
+    expect(selectedWorkspacePaneView()).toBe('status')
     expect(refreshStatus).toHaveBeenCalledWith(REPO_ID, { token })
   })
 
@@ -85,7 +86,7 @@ describe('openWorkspacePaneView', () => {
     })
 
     expect(openStaticView).not.toHaveBeenCalled()
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('status')
+    expect(selectedWorkspacePaneView()).toBe('status')
   })
 
   test('opens history as a branch-static workspace pane view', () => {
@@ -105,7 +106,7 @@ describe('openWorkspacePaneView', () => {
 
     expect(openStaticView).toHaveBeenCalledWith(WORKTREE_KEY, 'history')
     expect(openViewsFor('feature/worktree')).toContain('history')
-    expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneView).toBe('history')
+    expect(selectedWorkspacePaneView()).toBe('history')
     expect(refreshStatus).not.toHaveBeenCalled()
   })
 })
@@ -122,6 +123,11 @@ function seedWorktreeRepo(workspacePaneView: WorkspacePaneBranchViewType | Works
 function openViewsFor(branchName: string): WorkspacePaneBranchViewType[] {
   const repo = useReposStore.getState().repos[REPO_ID]
   return repo ? branchWorkspacePaneViewsForBranch(repo.ui, branchName) : []
+}
+
+function selectedWorkspacePaneView() {
+  const repo = useReposStore.getState().repos[REPO_ID]
+  return repo ? selectedWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) : null
 }
 
 function navigationWithStoreActions(): Pick<

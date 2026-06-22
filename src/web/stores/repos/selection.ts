@@ -18,6 +18,10 @@ import {
   branchWorkspacePaneViewsRecordWith,
 } from '#/web/stores/repos/branch-workspace-pane-views.ts'
 import { isBranchLevelWorkspacePaneView } from '#/web/lib/workspace-pane-view.ts'
+import {
+  selectedWorkspacePaneViewForBranch,
+  workspacePaneViewByBranchRecordWith,
+} from '#/web/stores/repos/workspace-pane-preferences.ts'
 
 type RestorableWorkspaceSelectionActions = Pick<
   ReposStore,
@@ -26,7 +30,7 @@ type RestorableWorkspaceSelectionActions = Pick<
   | 'cycleActive'
   | 'applySessionLayoutState'
   | 'applySessionSelectedTerminalState'
-  | 'applySessionWorkspacePaneViewByRepo'
+  | 'applySessionWorkspacePaneViewByBranchByRepo'
   | 'setWorkspaceFocused'
   | 'toggleWorkspaceFocused'
   | 'setWorkspacePaneSize'
@@ -106,36 +110,39 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
       })
     },
 
-    applySessionWorkspacePaneViewByRepo(workspacePaneViewByRepo: Record<string, WorkspacePaneView>) {
-      // One-shot boot/session restore of per-repo user-preferred workspace pane view.
-      // The store does not project against terminal session count or
-      // worktree presence — `useEffectiveWorkspacePaneView` handles that at read
-      // time, which keeps the restored preference intact even if a
-      // worktree later confirms zero sessions.
+    applySessionWorkspacePaneViewByBranchByRepo(
+      workspacePaneViewByBranchByRepo: Record<string, Record<string, WorkspacePaneView>>,
+    ) {
+      // One-shot boot/session restore of branch-scoped user-preferred
+      // workspace pane views. The UI still resolves renderability at read time.
       set((s) => {
         let changed = false
         const repos = { ...s.repos }
-        for (const [id, tab] of Object.entries(workspacePaneViewByRepo)) {
+        for (const [id, byBranch] of Object.entries(workspacePaneViewByBranchByRepo)) {
           const repo = repos[id]
           if (!repo) continue
-          const openBranchViews = branchWorkspacePaneViewsForBranch(repo.ui, repo.ui.selectedBranch)
-          const branchViewNeedsOpen =
-            isBranchLevelWorkspacePaneView(tab) && !!repo.ui.selectedBranch && !openBranchViews.includes(tab)
-          if (repo.ui.preferredWorkspacePaneView === tab && !branchViewNeedsOpen) continue
-          changed = true
+          let repoChanged = false
           repos[id] = replaceRepo(repo, (r) => {
-            const branch = r.ui.selectedBranch
-            if (branch && isBranchLevelWorkspacePaneView(tab)) {
-              const current = branchWorkspacePaneViewsForBranch(r.ui, branch)
-              if (!current.includes(tab)) {
-                r.ui.openBranchWorkspacePaneViewsByBranch = branchWorkspacePaneViewsRecordWith(r.ui, branch, [
-                  ...current,
-                  tab,
-                ])
+            for (const [branch, tab] of Object.entries(byBranch)) {
+              const current = selectedWorkspacePaneViewForBranch(r.ui, branch)
+              const openBranchViews = branchWorkspacePaneViewsForBranch(r.ui, branch)
+              const branchViewNeedsOpen = isBranchLevelWorkspacePaneView(tab) && !openBranchViews.includes(tab)
+              if (current === tab && !branchViewNeedsOpen) continue
+              repoChanged = true
+              r.ui.preferredWorkspacePaneViewByBranch = workspacePaneViewByBranchRecordWith(r.ui, branch, tab)
+              if (isBranchLevelWorkspacePaneView(tab)) {
+                const currentOpenViews = branchWorkspacePaneViewsForBranch(r.ui, branch)
+                if (!currentOpenViews.includes(tab)) {
+                  r.ui.openBranchWorkspacePaneViewsByBranch = branchWorkspacePaneViewsRecordWith(r.ui, branch, [
+                    ...currentOpenViews,
+                    tab,
+                  ])
+                }
               }
             }
-            r.ui.preferredWorkspacePaneView = tab
           })
+          if (!repoChanged) repos[id] = repo
+          changed = changed || repoChanged
         }
         return changed ? { repos } : s
       })
@@ -284,11 +291,11 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
     },
 
     setWorkspacePaneView(id: string, tab: WorkspacePaneView) {
-      // Persists the user's preferred view type verbatim. Branch-scoped views
+      // Persists the user's branch-scoped preferred view type verbatim. Branch-scoped views
       // are reopened here so selecting "Status" restores the tab; worktree
       // presence, terminal session count, and worktree-scoped open views are
       // still resolved by the UI from live terminal runtime state. This
-      // preserves user intent across session restore, branch switches, and the
+      // preserves user intent across session restore and the
       // transient zero-session window between handleNewTerminal and
       // createTerminal.
       let changed = false
@@ -298,26 +305,35 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         const branch = repo?.ui.selectedBranch
         const openBranchViews = repo ? branchWorkspacePaneViewsForBranch(repo.ui, branch) : []
         const branchViewNeedsOpen = isBranchLevelWorkspacePaneView(tab) && !!branch && !openBranchViews.includes(tab)
-        if (!repo || (repo.ui.preferredWorkspacePaneView === tab && !branchViewNeedsOpen)) return s
+        const current = repo ? selectedWorkspacePaneViewForBranch(repo.ui, branch) : null
+        if (!repo || !branch || (current === tab && !branchViewNeedsOpen)) return s
         changed = true
         token = repo.instanceToken
         return replaceRepoState(s, repo, (r) => {
           const selectedBranch = r.ui.selectedBranch
-          if (selectedBranch && isBranchLevelWorkspacePaneView(tab)) {
-            const current = branchWorkspacePaneViewsForBranch(r.ui, selectedBranch)
-            if (!current.includes(tab)) {
-              r.ui.openBranchWorkspacePaneViewsByBranch = branchWorkspacePaneViewsRecordWith(r.ui, selectedBranch, [
-                ...current,
-                tab,
-              ])
+          if (selectedBranch) {
+            r.ui.preferredWorkspacePaneViewByBranch = workspacePaneViewByBranchRecordWith(r.ui, selectedBranch, tab)
+            if (isBranchLevelWorkspacePaneView(tab)) {
+              const currentOpenViews = branchWorkspacePaneViewsForBranch(r.ui, selectedBranch)
+              if (!currentOpenViews.includes(tab)) {
+                r.ui.openBranchWorkspacePaneViewsByBranch = branchWorkspacePaneViewsRecordWith(r.ui, selectedBranch, [
+                  ...currentOpenViews,
+                  tab,
+                ])
+              }
             }
           }
-          r.ui.preferredWorkspacePaneView = tab
         })
       })
       if (!changed || token === undefined) return
       const repo = get().repos[id]
-      afterSelectionChange(id, token, repo?.ui.preferredWorkspacePaneView === 'status' ? repo.ui.selectedBranch : null)
+      afterSelectionChange(
+        id,
+        token,
+        repo && selectedWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) === 'status'
+          ? repo.ui.selectedBranch
+          : null,
+      )
     },
 
     selectBranch(id: string, branch: string) {

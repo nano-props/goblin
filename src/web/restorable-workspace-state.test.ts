@@ -26,7 +26,6 @@ describe('restorable-workspace-state', () => {
           selectedTerminalByWorktree: {
             '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2',
           },
-          workspacePaneViewByRepo: {},
         },
       }),
     ).toEqual({
@@ -37,7 +36,7 @@ describe('restorable-workspace-state', () => {
       selectedTerminalByWorktree: {
         '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2',
       },
-      workspacePaneViewByRepo: { '/tmp/repo': 'terminal' },
+      workspacePaneViewByBranchByRepo: { '/tmp/repo': { 'feature/worktree': 'terminal' } },
     })
   })
 
@@ -59,7 +58,7 @@ describe('restorable-workspace-state', () => {
       selectedTerminalByWorktree: {
         '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-1',
       },
-      workspacePaneViewByRepo: {},
+      workspacePaneViewByBranchByRepo: {},
     })
   })
 })

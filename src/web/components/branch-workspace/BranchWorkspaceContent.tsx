@@ -43,7 +43,7 @@ interface TabPanelProps {
 type BranchWorkspaceBranch = NonNullable<SelectedBranchWorkspacePresentation['branch']>
 
 // Pure view: the renderable tab is derived from the repos store's
-// user-preferred tab and the live terminal session truth via
+// branch-scoped selected tab and the live terminal session truth via
 // `useEffectiveWorkspacePaneView`. The store never re-projects on snapshot
 // refresh, branch switch, or session restore; this component is read-only.
 export function BranchWorkspaceContent({ repo, detail, workspacePaneId }: Props) {

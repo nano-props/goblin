@@ -71,12 +71,9 @@ export interface RepoUiState {
    * worktree path.
    */
   openBranchWorkspacePaneViewsByBranch: Record<string, WorkspacePaneBranchViewType[]>
-  /** The user-preferred workspace pane view type. This is persisted intent; the
-   *  rendered workspace pane is resolved at read time from this preference plus
-   *  live worktree, terminal, and opened workspace pane view state. The store never
-   *  adjusts this on snapshot/branch changes, preserving the user's
-   *  preference across them. */
-  preferredWorkspacePaneView: WorkspacePaneView
+  /** Branch-scoped selected workspace pane view. Branch switches read this
+   *  first so selecting a tab on one branch does not select it on another. */
+  preferredWorkspacePaneViewByBranch: Record<string, WorkspacePaneView>
 }
 
 export interface RepoProjectionMeta {
@@ -162,8 +159,6 @@ export interface RestorableWorkspaceState {
   workspacePaneSizes: WorkspacePaneSizes
   /** Per worktree terminal selection restored from SessionState.selectedTerminalByWorktree. */
   selectedTerminalByWorktree: Record<string, string>
-  /** Per-repo workspace pane view selection, restored with the session. */
-  workspacePaneViewByRepo: Record<string, WorkspacePaneView>
 }
 
 export interface LocalWorkspaceState {
@@ -183,7 +178,9 @@ export interface RestorableWorkspaceActions {
   reorderRepos: (fromId: string, toId: string) => void
   applySessionLayoutState: (layout: Pick<SessionState, 'workspaceFocused' | 'workspacePaneSizes'>) => void
   applySessionSelectedTerminalState: (selectedTerminalByWorktree: Record<string, string>) => void
-  applySessionWorkspacePaneViewByRepo: (workspacePaneViewByRepo: Record<string, WorkspacePaneView>) => void
+  applySessionWorkspacePaneViewByBranchByRepo: (
+    workspacePaneViewByBranchByRepo: Record<string, Record<string, WorkspacePaneView>>,
+  ) => void
   setWorkspaceFocused: (enabled: boolean) => void
   toggleWorkspaceFocused: () => void
   setWorkspacePaneSize: (layout: RepoWorkspaceLayout, size: number) => void
@@ -207,10 +204,10 @@ export interface RuntimeCoherentRepoProjectionActions {
    * Returns the new outcome, or `null` for non-remote ids.
    */
   retryRemoteRepoLifecycle: (id: string) => Promise<{ ok: boolean; reason?: string } | null>
-  /** Updates the user-preferred workspace pane view type. The store does not project
+  /** Updates the selected branch's workspace pane view type. The store does not project
    *  against terminal session count, worktree presence, or opened workspace pane views;
-   *  the UI resolves the active pane at read time so session restore and branch
-   *  switches preserve user intent. */
+   *  the UI resolves the active pane at read time so session restore preserves
+   *  branch-scoped user intent. */
   setWorkspacePaneView: (id: string, tab: WorkspacePaneView) => void
   openBranchWorkspacePaneView: (id: string, tab: WorkspacePaneBranchViewType, branchName?: string) => void
   closeBranchWorkspacePaneView: (id: string, tab: WorkspacePaneBranchViewType, branchName?: string) => void

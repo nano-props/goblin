@@ -201,7 +201,7 @@ function seedRepo(id: string, lifecycle: RemoteRepoLifecycle | null) {
           selectedBranch: null,
           branchViewMode: 'all',
           openBranchWorkspacePaneViewsByBranch: {},
-          preferredWorkspacePaneView: 'status',
+          preferredWorkspacePaneViewByBranch: {},
         },
         projection: { source: 'fresh', savedAt: null },
         remote: {

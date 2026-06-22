@@ -11,21 +11,25 @@ import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-
 import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { RepoDataState, RepoState, RepoUiState } from '#/web/stores/repos/types.ts'
 import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
+import { selectedWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 
 type EffectiveWorkspacePaneViewRepo = {
   id: RepoState['id']
-  ui: Pick<RepoUiState, 'selectedBranch' | 'preferredWorkspacePaneView' | 'openBranchWorkspacePaneViewsByBranch'>
+  ui: Pick<
+    RepoUiState,
+    'selectedBranch' | 'preferredWorkspacePaneViewByBranch' | 'openBranchWorkspacePaneViewsByBranch'
+  >
   data: Pick<RepoDataState, 'branches'>
 }
 
 /**
- * Resolve the preferred workspace pane view type after applying worktree and
- * terminal-session fallbacks. Whether a view of that type is actually open is
- * still checked by callers against the branch-scope open view state and the
+ * Resolve the selected branch's workspace pane view after applying worktree
+ * and terminal-session fallbacks. Whether a view of that type is actually open
+ * is still checked by callers against the branch-scope open view state and the
  * live workspace-pane runtime view list.
  *
  * Use this before resolving an active view identity. The repos store only
- * carries the user's preferred view type; branch-scope open view state owns
+ * carries branch-scoped selected view intent; branch-scope open view state owns
  * branch-level open intent, and the live runtime view list owns sortable views
  * for branches with a worktree.
  */
@@ -47,7 +51,8 @@ export function useEffectiveWorkspacePaneView(
     terminalSyncReady: syncReady,
     terminalPendingCreate: terminalSnapshot.pendingCreate,
   }
-  const effective = computeEffectiveWorkspacePaneView(repo.ui.preferredWorkspacePaneView, context)
+  const preferred = selectedWorkspacePaneViewForBranch(repo.ui, selectedBranch)
+  const effective = computeEffectiveWorkspacePaneView(preferred, context)
   const openBranchViews = branchWorkspacePaneViewsForBranch(repo.ui, selectedBranch)
   if (isBranchLevelWorkspacePaneView(effective) && !openBranchViews.includes(effective)) {
     return openBranchViews[0] ?? 'status'
