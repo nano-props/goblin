@@ -1,5 +1,5 @@
-import type { WorkspacePaneBranchViewType, WorkspacePaneView } from '#/shared/workspace-pane.ts'
-import { isBranchLevelWorkspacePaneView, resolveWorkspacePaneSelectionView } from '#/web/lib/workspace-pane-view.ts'
+import type { WorkspacePaneStaticViewType, WorkspacePaneTabOrderEntry, WorkspacePaneView } from '#/shared/workspace-pane.ts'
+import { resolveRenderableWorkspacePaneView } from '#/web/lib/workspace-pane-view.ts'
 import type { TerminalSessionBase, WorkspacePaneViewSummary } from '#/web/components/terminal/types.ts'
 import {
   isTerminalWorkspacePaneView,
@@ -7,17 +7,31 @@ import {
   workspacePaneViewIdentity,
 } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
+import { normalizeWorkspacePaneTabOrder } from '#/web/stores/repos/workspace-pane-tabs.ts'
 
-export type BranchWorkspacePaneTabScope = 'branch' | 'worktree'
+export type BranchWorkspacePaneTabKind = 'static' | 'terminal'
 
 export interface BranchWorkspacePaneTab {
   identity: string
   type: WorkspacePaneView
-  scope: BranchWorkspacePaneTabScope
+  kind: BranchWorkspacePaneTabKind
   view: WorkspacePaneViewSummary | null
   key?: string
   selected?: boolean
 }
+
+export type BranchWorkspacePaneSelection =
+  | {
+      kind: 'materialized-tab'
+      view: WorkspacePaneView
+      tab: BranchWorkspacePaneTab
+    }
+  | {
+      /** Render the terminal host even though no terminal tab exists yet. */
+      kind: 'terminal-host'
+      view: 'terminal'
+      tab: null
+    }
 
 export interface BranchWorkspacePaneTabModel {
   repoId: string
@@ -25,12 +39,18 @@ export interface BranchWorkspacePaneTabModel {
   worktreePath: string | null
   worktreeTerminalKey: string | null
   terminalBase: TerminalSessionBase | null
-  /** Branch-scoped open-set persisted in the repo store. */
-  openBranchViews: WorkspacePaneBranchViewType[]
-  /** Worktree-scoped runtime views owned by the terminal runtime. */
-  worktreeViews: WorkspacePaneViewSummary[]
+  /** Single branch-scoped workspace pane tab strip order. */
+  tabOrder: WorkspacePaneTabOrderEntry[]
+  /** Open static workspace pane views derived from tabOrder. */
+  staticViews: WorkspacePaneStaticViewType[]
+  /** Live terminal views owned by the terminal runtime. */
+  terminalViews: WorkspacePaneViewSummary[]
   tabs: BranchWorkspacePaneTab[]
-  selectedView: WorkspacePaneView | null
+  /** The render target for the workspace pane body. */
+  selection: BranchWorkspacePaneSelection | null
+  /** The selected view, when a body can be rendered. */
+  renderedView: WorkspacePaneView | null
+  /** The selected materialized tab, when one exists in the tab strip. */
   activeTab: BranchWorkspacePaneTab | null
 }
 
@@ -39,32 +59,30 @@ export interface BranchWorkspacePaneTabModelInput {
   branchName: string | null
   worktreePath: string | null
   preferredView: WorkspacePaneView
-  openBranchViews: readonly WorkspacePaneBranchViewType[]
-  runtimeWorktreeViews: readonly WorkspacePaneViewSummary[]
+  tabOrder: readonly WorkspacePaneTabOrderEntry[]
+  runtimeTerminalViews: readonly WorkspacePaneViewSummary[]
   terminalSessionCount: number
-  pendingCreate?: boolean
+  terminalCreatePending?: boolean
   terminalSyncReady: boolean
 }
 
 export function createBranchWorkspacePaneTabModel(
   input: BranchWorkspacePaneTabModelInput,
 ): BranchWorkspacePaneTabModel {
-  const openBranchViews = input.branchName ? [...input.openBranchViews] : []
+  const tabOrder = input.branchName ? normalizeWorkspacePaneTabOrder(input.tabOrder) : []
   const worktreePath = input.branchName ? input.worktreePath : null
   const worktreeKey = worktreePath ? worktreeTerminalKey(input.repoId, worktreePath) : null
-  const branchTabs = openBranchViews.map((type) => branchWorkspacePaneTab(type))
-  const worktreeViews = worktreeKey
-    ? input.runtimeWorktreeViews.filter((view) => !isBranchLevelWorkspacePaneView(view.type))
-    : []
-  const tabs = [...branchTabs, ...worktreeViews.map(worktreeWorkspacePaneTab)]
-  const candidateView = resolveWorkspacePaneSelectionView(input.preferredView, {
+  const terminalViews = worktreeKey ? input.runtimeTerminalViews.filter(isTerminalWorkspacePaneView) : []
+  const tabs = materializedWorkspacePaneTabs({ tabOrder, terminalViews, hasWorktree: !!worktreeKey })
+  const staticViews = tabs.flatMap((tab) => (tab.kind === 'static' ? [tab.type as WorkspacePaneStaticViewType] : []))
+  const candidateView = resolveRenderableWorkspacePaneView(input.preferredView, {
     hasWorktree: !!worktreeKey,
     terminalSessionCount: input.terminalSessionCount,
-    pendingCreate: input.pendingCreate,
+    terminalCreatePending: input.terminalCreatePending,
     terminalSyncReady: input.terminalSyncReady,
   })
   const activeTab = candidateView ? activeBranchWorkspacePaneTab(tabs, candidateView) : null
-  const selectedView = activeTab?.type ?? (candidateView === 'terminal' ? 'terminal' : null)
+  const selection = workspacePaneSelection(candidateView, activeTab)
 
   return {
     repoId: input.repoId,
@@ -73,10 +91,12 @@ export function createBranchWorkspacePaneTabModel(
     worktreeTerminalKey: worktreeKey,
     terminalBase:
       input.branchName && worktreePath ? { repoRoot: input.repoId, branch: input.branchName, worktreePath } : null,
-    openBranchViews,
-    worktreeViews,
+    tabOrder,
+    staticViews,
+    terminalViews,
     tabs,
-    selectedView,
+    selection,
+    renderedView: selection?.view ?? null,
     activeTab,
   }
 }
@@ -103,35 +123,74 @@ export function adjacentBranchWorkspacePaneTab(
   return tabs[nextIndex] ?? null
 }
 
-function branchWorkspacePaneTab(type: WorkspacePaneBranchViewType): BranchWorkspacePaneTab {
+function staticWorkspacePaneTab(type: WorkspacePaneStaticViewType): BranchWorkspacePaneTab {
   return {
     identity: staticWorkspacePaneViewIdentity(type),
     type,
-    scope: 'branch',
+    kind: 'static',
     view: null,
   }
 }
 
-function worktreeWorkspacePaneTab(view: WorkspacePaneViewSummary): BranchWorkspacePaneTab {
+function terminalWorkspacePaneTab(view: WorkspacePaneViewSummary): BranchWorkspacePaneTab {
   return {
     identity: workspacePaneViewIdentity(view),
     type: view.type,
-    scope: 'worktree',
+    kind: 'terminal',
     view,
     ...(isTerminalWorkspacePaneView(view) ? { key: view.key, selected: view.selected } : {}),
   }
 }
 
+function materializedWorkspacePaneTabs(input: {
+  tabOrder: readonly WorkspacePaneTabOrderEntry[]
+  terminalViews: readonly WorkspacePaneViewSummary[]
+  hasWorktree: boolean
+}): BranchWorkspacePaneTab[] {
+  const terminalById = new Map(input.terminalViews.map((view) => [view.id, view]))
+  const seenTerminals = new Set<string>()
+  const tabs: BranchWorkspacePaneTab[] = []
+
+  for (const entry of input.tabOrder) {
+    if (entry.type !== 'terminal') {
+      if (entry.type === 'changes' && !input.hasWorktree) continue
+      tabs.push(staticWorkspacePaneTab(entry.type))
+      continue
+    }
+    const terminal = terminalById.get(entry.id)
+    if (!terminal || seenTerminals.has(entry.id)) continue
+    seenTerminals.add(entry.id)
+    tabs.push(terminalWorkspacePaneTab(terminal))
+  }
+
+  for (const terminal of input.terminalViews) {
+    if (seenTerminals.has(terminal.id)) continue
+    tabs.push(terminalWorkspacePaneTab(terminal))
+  }
+
+  return tabs
+}
+
+function workspacePaneSelection(
+  renderableView: WorkspacePaneView | null,
+  activeTab: BranchWorkspacePaneTab | null,
+): BranchWorkspacePaneSelection | null {
+  if (!renderableView) return null
+  if (activeTab) return { kind: 'materialized-tab', view: activeTab.type, tab: activeTab }
+  if (renderableView === 'terminal') return { kind: 'terminal-host', view: 'terminal', tab: null }
+  return null
+}
+
 function activeBranchWorkspacePaneTab(
   tabs: readonly BranchWorkspacePaneTab[],
-  selectedView: WorkspacePaneView,
+  renderableView: WorkspacePaneView,
 ): BranchWorkspacePaneTab | null {
-  if (selectedView === 'terminal') {
+  if (renderableView === 'terminal') {
     return (
       tabs.find((tab) => tab.type === 'terminal' && tab.selected && tab.key !== undefined) ??
       tabs.find((tab) => tab.type === 'terminal' && tab.key !== undefined) ??
       null
     )
   }
-  return tabs.find((tab) => tab.type === selectedView) ?? null
+  return tabs.find((tab) => tab.type === renderableView) ?? null
 }

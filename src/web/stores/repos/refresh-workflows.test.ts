@@ -25,7 +25,7 @@ describe('repo refresh workflows', () => {
             ui: {
               selectedBranch: 'feature/a',
               branchViewMode: 'all',
-              openBranchWorkspacePaneViewsByBranch: { 'feature/a': ['status'] },
+              workspacePaneTabOrderByBranch: { 'feature/a': [{ type: 'status', id: 'status' }] },
               preferredWorkspacePaneViewByBranch: {},
             },
             resources: { pullRequests: { error: null } },
@@ -84,7 +84,7 @@ describe('repo refresh workflows', () => {
             ui: {
               selectedBranch: 'feature/a',
               branchViewMode: 'all',
-              openBranchWorkspacePaneViewsByBranch: { 'feature/a': ['status'] },
+              workspacePaneTabOrderByBranch: { 'feature/a': [{ type: 'status', id: 'status' }] },
               preferredWorkspacePaneViewByBranch: {},
             },
             resources: { pullRequests: { error: null } },

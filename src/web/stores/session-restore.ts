@@ -15,7 +15,7 @@ export const DEFAULT_RESTORABLE_SESSION_STATE: SessionState = {
   workspaceFocused: DEFAULT_WORKSPACE_FOCUSED,
   workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
   selectedTerminalByWorktree: {},
-  openBranchWorkspacePaneViewsByBranchByRepo: {},
+  workspacePaneTabOrderByBranchByRepo: {},
 }
 
 interface SessionRestoreStore {

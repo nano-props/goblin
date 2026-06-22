@@ -6,14 +6,17 @@ import {
   normalizeWorkspacePaneSize,
   normalizeWorkspaceSessionLayoutState,
 } from '#/shared/workspace-layout.ts'
-import type { BranchViewMode, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
-import type { WorkspacePaneBranchViewType, WorkspacePaneView } from '#/shared/workspace-pane.ts'
+import type { BranchViewMode, RepoState, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
+import type { WorkspacePaneStaticViewType, WorkspacePaneTabOrderEntry, WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import {
-  branchWorkspacePaneViewsForBranch,
-  branchWorkspacePaneViewsRecordWith,
-} from '#/web/stores/repos/branch-workspace-pane-views.ts'
-import { isBranchLevelWorkspacePaneView } from '#/web/lib/workspace-pane-view.ts'
+  normalizeWorkspacePaneTabOrder,
+  workspacePaneStaticViewsForBranch,
+  workspacePaneTabOrderForBranch,
+  workspacePaneTabOrderRecordWith,
+  workspacePaneTabOrderWithStaticView,
+  workspacePaneTabOrderWithoutStaticView,
+} from '#/web/stores/repos/workspace-pane-tabs.ts'
 import {
   preferredWorkspacePaneViewForBranch,
   preferredWorkspacePaneViewByBranchRecordWith,
@@ -36,9 +39,9 @@ type RuntimeCoherentSelectionActions = Pick<
   ReposStore,
   | 'setBranchViewMode'
   | 'setWorkspacePaneView'
-  | 'openBranchWorkspacePaneView'
-  | 'closeBranchWorkspacePaneView'
-  | 'reorderBranchWorkspacePaneViews'
+  | 'openWorkspacePaneStaticView'
+  | 'closeWorkspacePaneStaticView'
+  | 'reorderWorkspacePaneTabs'
   | 'selectBranch'
   | 'clearSelectedBranch'
 >
@@ -150,50 +153,53 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
   }
 
   return {
-    openBranchWorkspacePaneView(id: string, tab: WorkspacePaneBranchViewType, branchName?: string) {
+    openWorkspacePaneStaticView(id: string, tab: WorkspacePaneStaticViewType, branchName?: string) {
       set((s) => {
         const repo = s.repos[id]
         const branch = branchName ?? repo?.ui.selectedBranch
         if (!repo || !branch) return s
-        const current = branchWorkspacePaneViewsForBranch(repo.ui, branch)
-        if (current.includes(tab)) return s
+        const current = workspacePaneTabOrderForBranch(repo.ui, branch)
+        const next = workspacePaneTabOrderWithStaticView(current, tab)
+        if (workspacePaneTabOrdersEqual(current, next)) return s
         return replaceRepoState(s, repo, (r) => {
-          r.ui.openBranchWorkspacePaneViewsByBranch = branchWorkspacePaneViewsRecordWith(r.ui, branch, [
-            ...current,
-            tab,
-          ])
+          r.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(r.ui, branch, next)
         })
       })
     },
 
-    closeBranchWorkspacePaneView(id: string, tab: WorkspacePaneBranchViewType, branchName?: string) {
+    closeWorkspacePaneStaticView(id: string, tab: WorkspacePaneStaticViewType, branchName?: string) {
       set((s) => {
         const repo = s.repos[id]
         const branch = branchName ?? repo?.ui.selectedBranch
         if (!repo || !branch) return s
-        const current = branchWorkspacePaneViewsForBranch(repo.ui, branch)
-        if (!current.includes(tab)) return s
-        const next = current.filter((view) => view !== tab)
+        if (!workspacePaneStaticViewsForBranch(repo.ui, branch).includes(tab)) return s
+        const current = workspacePaneTabOrderForBranch(repo.ui, branch)
+        const next = workspacePaneTabOrderWithoutStaticView(current, tab)
         return replaceRepoState(s, repo, (r) => {
-          r.ui.openBranchWorkspacePaneViewsByBranch = branchWorkspacePaneViewsRecordWith(r.ui, branch, next)
+          r.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(r.ui, branch, next)
         })
       })
     },
 
-    reorderBranchWorkspacePaneViews(id: string, orderedViews: WorkspacePaneBranchViewType[], branchName?: string) {
+    reorderWorkspacePaneTabs(id: string, orderedTabs: WorkspacePaneTabOrderEntry[], branchName?: string) {
       set((s) => {
         const repo = s.repos[id]
         const branch = branchName ?? repo?.ui.selectedBranch
         if (!repo || !branch) return s
-        const current = branchWorkspacePaneViewsForBranch(repo.ui, branch)
-        if (orderedViews.length !== current.length) return s
-        const next = orderedViews.filter(isBranchLevelWorkspacePaneView)
-        if (next.length !== orderedViews.length || new Set(next).size !== next.length) return s
-        const currentSet = new Set(current)
-        if (!next.every((view) => currentSet.has(view))) return s
-        if (next.every((view, index) => view === current[index])) return s
+        const current = workspacePaneTabOrderForBranch(repo.ui, branch)
+        const hiddenStaticViews = hiddenWorkspacePaneStaticViews(repo, branch)
+        const currentStaticViews = workspacePaneStaticViewsForBranch(repo.ui, branch).filter(
+          (view) => !hiddenStaticViews.has(view),
+        )
+        const next = normalizeWorkspacePaneTabOrder(orderedTabs)
+        const nextStaticViews = next.flatMap((entry) => (entry.type === 'terminal' ? [] : [entry.type]))
+        if (nextStaticViews.length !== currentStaticViews.length) return s
+        const currentStaticSet = new Set(currentStaticViews)
+        if (!nextStaticViews.every((view) => currentStaticSet.has(view))) return s
+        const nextOrder = mergeHiddenWorkspacePaneStaticTabs(current, next, hiddenStaticViews)
+        if (workspacePaneTabOrdersEqual(current, nextOrder)) return s
         return replaceRepoState(s, repo, (r) => {
-          r.ui.openBranchWorkspacePaneViewsByBranch = branchWorkspacePaneViewsRecordWith(r.ui, branch, next)
+          r.ui.workspacePaneTabOrderByBranch = workspacePaneTabOrderRecordWith(r.ui, branch, nextOrder)
         })
       })
     },
@@ -292,4 +298,36 @@ export function createSelectionActions(set: ReposSet, get: ReposGet) {
     ...createRestorableWorkspaceSelectionActions(set, get),
     ...createRuntimeCoherentSelectionActions(set, get),
   }
+}
+
+function workspacePaneTabOrdersEqual(
+  a: readonly WorkspacePaneTabOrderEntry[],
+  b: readonly WorkspacePaneTabOrderEntry[],
+): boolean {
+  return a.length === b.length && b.every((entry, index) => entry.type === a[index]?.type && entry.id === a[index]?.id)
+}
+
+function hiddenWorkspacePaneStaticViews(repo: RepoState, branchName: string): ReadonlySet<WorkspacePaneStaticViewType> {
+  const branch = repo.data.branches.find((candidate) => candidate.name === branchName)
+  return branch?.worktree?.path ? new Set() : new Set<WorkspacePaneStaticViewType>(['changes'])
+}
+
+function mergeHiddenWorkspacePaneStaticTabs(
+  current: readonly WorkspacePaneTabOrderEntry[],
+  visibleOrder: readonly WorkspacePaneTabOrderEntry[],
+  hiddenStaticViews: ReadonlySet<WorkspacePaneStaticViewType>,
+): WorkspacePaneTabOrderEntry[] {
+  if (hiddenStaticViews.size === 0) return [...visibleOrder]
+  const visible = [...visibleOrder]
+  const next: WorkspacePaneTabOrderEntry[] = []
+  for (const entry of current) {
+    if (entry.type !== 'terminal' && hiddenStaticViews.has(entry.type)) {
+      next.push(entry)
+      continue
+    }
+    const replacement = visible.shift()
+    if (replacement) next.push(replacement)
+  }
+  next.push(...visible)
+  return next
 }

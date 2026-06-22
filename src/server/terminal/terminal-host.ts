@@ -14,11 +14,6 @@ import type {
   TerminalTakeoverResult,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
-import type {
-  WorkspacePaneReorderInput,
-  WorkspacePaneStaticViewInput,
-  WorkspacePaneStaticViewSummary,
-} from '#/shared/workspace-pane.ts'
 
 type MaybePromise<T> = T | Promise<T>
 
@@ -98,9 +93,6 @@ export interface ServerTerminalHost {
   takeover(clientId: string, ownerId: string, input: TerminalTakeoverInput): MaybePromise<TerminalTakeoverResult>
   close(clientId: string, ownerId: string, input: TerminalSessionInput): MaybePromise<TerminalMutationResult>
   listSessions(clientId: string, ownerId: string, repoRoot: string): MaybePromise<TerminalSessionSummary[]>
-  listViews(clientId: string, ownerId: string, repoRoot: string): MaybePromise<WorkspacePaneStaticViewSummary[]>
-  openView(clientId: string, ownerId: string, input: WorkspacePaneStaticViewInput): MaybePromise<TerminalMutationResult>
-  closeView(clientId: string, ownerId: string, input: WorkspacePaneStaticViewInput): MaybePromise<TerminalMutationResult>
   create(clientId: string, ownerId: string, input: TerminalCreateInput): MaybePromise<TerminalCatalogMutationResult>
   prune(clientId: string, ownerId: string, repoRoot: string): MaybePromise<{ pruned: number; remaining: number }>
   getSessionSnapshot(
@@ -108,7 +100,6 @@ export interface ServerTerminalHost {
     ownerId: string,
     input: TerminalSessionSnapshotInput,
   ): MaybePromise<TerminalSessionSnapshot | null>
-  reorderViews(clientId: string, ownerId: string, input: WorkspacePaneReorderInput): MaybePromise<TerminalMutationResult>
   /** Handle an incoming realtime message from a client socket. */
   handleRealtimeMessage(
     clientId: string,

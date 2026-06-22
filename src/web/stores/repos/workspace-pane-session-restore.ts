@@ -1,7 +1,7 @@
-import { isWorkspacePaneBranchViewType, isWorkspacePaneSessionViewType } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneBranchViewType } from '#/shared/workspace-pane.ts'
+import { isWorkspacePaneSessionViewType, isWorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneStaticViewType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
 import { replaceRepo } from '#/web/stores/repos/helpers.ts'
-import { normalizeBranchWorkspacePaneViewsRecord } from '#/web/stores/repos/branch-workspace-pane-views.ts'
+import { normalizeWorkspacePaneTabOrderRecord } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import {
   preferredWorkspacePaneViewForBranch,
   preferredWorkspacePaneViewByBranchRecordWith,
@@ -16,7 +16,7 @@ export function restoreSessionWorkspacePaneStateInRepos(
 
   let nextRepos = repos
   const repoIds = new Set([
-    ...Object.keys(restoreState.openBranchWorkspacePaneViewsByBranchByRepo),
+    ...Object.keys(restoreState.workspacePaneTabOrderByBranchByRepo),
     ...Object.keys(restoreState.preferredWorkspacePaneViewByBranchByRepo),
   ])
 
@@ -24,30 +24,30 @@ export function restoreSessionWorkspacePaneStateInRepos(
     const repo = nextRepos[id]
     if (!repo) continue
 
-    const openViewsByBranch = restoreState.openBranchWorkspacePaneViewsByBranchByRepo[id]
+    const tabOrderByBranch = restoreState.workspacePaneTabOrderByBranchByRepo[id]
     const preferredViewByBranch = restoreState.preferredWorkspacePaneViewByBranchByRepo[id]
     let repoChanged = false
 
-    const nextOpenViewsByBranch =
-      openViewsByBranch === undefined
-        ? repo.ui.openBranchWorkspacePaneViewsByBranch
-        : normalizeBranchWorkspacePaneViewsRecord(
-            openViewsByBranch,
+    const nextTabOrderByBranch =
+      tabOrderByBranch === undefined
+        ? repo.ui.workspacePaneTabOrderByBranch
+        : normalizeWorkspacePaneTabOrderRecord(
+            tabOrderByBranch,
             sessionWorkspacePaneRestoreBranchNames(
               repo.data.branches.map((branch) => branch.name),
-              openViewsByBranch,
+              tabOrderByBranch,
             ),
           )
 
     if (
-      nextOpenViewsByBranch !== repo.ui.openBranchWorkspacePaneViewsByBranch &&
-      !branchWorkspacePaneViewRecordsEqual(repo.ui.openBranchWorkspacePaneViewsByBranch, nextOpenViewsByBranch)
+      nextTabOrderByBranch !== repo.ui.workspacePaneTabOrderByBranch &&
+      !workspacePaneTabOrderRecordsEqual(repo.ui.workspacePaneTabOrderByBranch, nextTabOrderByBranch)
     ) {
       repoChanged = true
     }
 
     const nextPreferredViewByBranch = preferredViewByBranch
-      ? restoredPreferredWorkspacePaneViews(repo, preferredViewByBranch, nextOpenViewsByBranch)
+      ? restoredPreferredWorkspacePaneViews(repo, preferredViewByBranch, nextTabOrderByBranch)
       : repo.ui.preferredWorkspacePaneViewByBranch
 
     if (nextPreferredViewByBranch !== repo.ui.preferredWorkspacePaneViewByBranch) {
@@ -57,7 +57,7 @@ export function restoreSessionWorkspacePaneStateInRepos(
     if (!repoChanged) continue
     if (nextRepos === repos) nextRepos = { ...repos }
     nextRepos[id] = replaceRepo(repo, (r) => {
-      r.ui.openBranchWorkspacePaneViewsByBranch = nextOpenViewsByBranch
+      r.ui.workspacePaneTabOrderByBranch = nextTabOrderByBranch
       r.ui.preferredWorkspacePaneViewByBranch = nextPreferredViewByBranch
     })
   }
@@ -68,13 +68,14 @@ export function restoreSessionWorkspacePaneStateInRepos(
 function restoredPreferredWorkspacePaneViews(
   repo: RepoState,
   preferredViewByBranch: SessionWorkspacePaneRestoreState['preferredWorkspacePaneViewByBranchByRepo'][string],
-  openViewsByBranch: Record<string, readonly WorkspacePaneBranchViewType[]>,
+  tabOrderByBranch: Record<string, readonly WorkspacePaneTabOrderEntry[]>,
 ): RepoState['ui']['preferredWorkspacePaneViewByBranch'] {
   let next = repo.ui.preferredWorkspacePaneViewByBranch
   for (const [branch, view] of Object.entries(preferredViewByBranch)) {
     if (!isRestorableBranchName(branch)) continue
     if (!isWorkspacePaneSessionViewType(view)) continue
-    if (isWorkspacePaneBranchViewType(view) && !(openViewsByBranch[branch] ?? []).includes(view)) continue
+    if (isWorkspacePaneStaticViewType(view) && !workspacePaneStaticViews(tabOrderByBranch[branch] ?? []).includes(view))
+      continue
     const current =
       next === repo.ui.preferredWorkspacePaneViewByBranch
         ? preferredWorkspacePaneViewForBranch(repo.ui, branch)
@@ -89,7 +90,7 @@ function restoredPreferredWorkspacePaneViews(
 
 function sessionWorkspacePaneRestoreBranchNames(
   knownBranchNames: readonly string[],
-  restoredByBranch: Record<string, readonly WorkspacePaneBranchViewType[]>,
+  restoredByBranch: Record<string, readonly WorkspacePaneTabOrderEntry[]>,
 ): string[] {
   const branchNames = new Set<string>()
   for (const branch of knownBranchNames) {
@@ -105,15 +106,23 @@ function isRestorableBranchName(branch: string): boolean {
   return branch.length > 0 && !branch.includes('\0')
 }
 
-function branchWorkspacePaneViewRecordsEqual(
-  a: Record<string, WorkspacePaneBranchViewType[]>,
-  b: Record<string, WorkspacePaneBranchViewType[]>,
+function workspacePaneTabOrderRecordsEqual(
+  a: Record<string, WorkspacePaneTabOrderEntry[]>,
+  b: Record<string, WorkspacePaneTabOrderEntry[]>,
 ): boolean {
   const aEntries = Object.entries(a)
   const bEntries = Object.entries(b)
   if (aEntries.length !== bEntries.length) return false
   return bEntries.every(([branch, views]) => {
     const current = a[branch]
-    return !!current && current.length === views.length && views.every((view, index) => view === current[index])
+    return (
+      !!current &&
+      current.length === views.length &&
+      views.every((view, index) => view.type === current[index]?.type && view.id === current[index]?.id)
+    )
   })
+}
+
+function workspacePaneStaticViews(order: readonly WorkspacePaneTabOrderEntry[]): WorkspacePaneStaticViewType[] {
+  return order.flatMap((entry) => (entry.type === 'terminal' ? [] : [entry.type]))
 }

@@ -4,10 +4,9 @@ import { openWorkspacePaneView } from '#/web/components/branch-workspace/open-wo
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
-import { isWorkspacePaneWorktreeStaticViewType } from '#/shared/workspace-pane.ts'
+import { isWorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
-import { isBranchLevelWorkspacePaneView } from '#/web/lib/workspace-pane-view.ts'
-import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
+import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import {
@@ -17,7 +16,6 @@ import {
   type BranchWorkspacePaneTab,
   type BranchWorkspacePaneTabModel,
 } from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
-import { terminalLog } from '#/web/logger.ts'
 
 interface ShowWorkspacePaneViewCommandOptions {
   repoId: string | null
@@ -70,25 +68,13 @@ export async function runShowWorkspacePaneViewCommand({
   navigation,
 }: ShowWorkspacePaneViewCommandOptions): Promise<boolean> {
   if (!repoId) return false
-  if (isBranchLevelWorkspacePaneView(tab)) {
+  if (isWorkspacePaneStaticViewType(tab)) {
     const target = selectedBranchWorkspaceTarget(repoId)
     if (target) {
       return openWorkspacePaneView({
         repoId,
         branchName: target.branchName,
         worktreePath: target.worktreePath,
-        type: tab,
-        navigation,
-      })
-    }
-  }
-  if (tab === 'changes') {
-    const base = selectedTerminalBase(repoId)
-    if (base) {
-      return openWorkspacePaneView({
-        repoId,
-        branchName: base.branch,
-        worktreePath: base.worktreePath,
         type: tab,
         navigation,
       })
@@ -139,10 +125,12 @@ export async function runCloseWorkspacePaneTabCommand({
   targetIdentity,
 }: CloseWorkspacePaneTabCommandOptions): Promise<boolean> {
   const target = repoId ? workspacePaneCommandTarget(repoId) : null
+  if (!target) return false
+  if (!targetIdentity && target.selection?.kind === 'terminal-host') return true
   const tab = targetIdentity
     ? (target?.tabs.find((candidate) => candidate.identity === targetIdentity) ?? null)
     : (target?.activeTab ?? null)
-  if (!target || !tab) return false
+  if (!tab) return false
 
   const isActive = target.activeTab?.identity === tab.identity
   const nextTab = isActive ? nextBranchWorkspacePaneTabAfterClose(target.tabs, tab.identity) : null
@@ -222,22 +210,11 @@ function closeWorkspacePaneCommandTab(
   if (tab.type === 'terminal') return closeTerminalWorkspacePaneCommandTab(target, tab)
   const branchName = target.branchName
   if (!branchName) return { handled: false }
-
-  const branchViewType = isBranchLevelWorkspacePaneView(tab.type) ? tab.type : null
-  if (branchViewType) {
-    useReposStore.getState().closeBranchWorkspacePaneView(target.repoId, branchViewType, branchName)
+  if (isWorkspacePaneStaticViewType(tab.type)) {
+    useReposStore.getState().closeWorkspacePaneStaticView(target.repoId, tab.type, branchName)
     return committedCloseResult(true)
   }
-
-  if (tab.scope !== 'worktree' || !target.worktreeTerminalKey) return committedCloseResult(true)
-  if (!isWorkspacePaneWorktreeStaticViewType(tab.type)) return committedCloseResult(true)
-  const bridge = readTerminalSessionCommandBridge()
-  if (!bridge) return committedCloseResult(true)
-  const committed = bridge.closeWorkspacePaneView(target.worktreeTerminalKey, tab.type).catch((err) => {
-    terminalLog.warn('failed to close workspace pane view', { err, type: tab.type })
-    return false
-  })
-  return { handled: true, committed }
+  return committedCloseResult(true)
 }
 
 function closeTerminalWorkspacePaneCommandTab(
@@ -292,10 +269,10 @@ function workspacePaneCommandTarget(repoId: string): BranchWorkspacePaneTabModel
     branchName,
     worktreePath: worktreePath ?? null,
     preferredView: preferredWorkspacePaneViewForBranch(repo.ui, branchName),
-    openBranchViews: branchWorkspacePaneViewsForBranch(repo.ui, branchName),
-    runtimeWorktreeViews: snapshot?.workspacePaneViews ?? [],
+    tabOrder: workspacePaneTabOrderForBranch(repo.ui, branchName),
+    runtimeTerminalViews: snapshot?.sessions ?? [],
     terminalSessionCount: snapshot?.count ?? 0,
-    pendingCreate: snapshot?.pendingCreate ?? false,
+    terminalCreatePending: snapshot?.pendingCreate ?? false,
     terminalSyncReady,
   })
 }

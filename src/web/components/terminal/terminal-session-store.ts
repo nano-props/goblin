@@ -13,8 +13,6 @@ const EMPTY_WORKTREE_TERMINAL_SNAPSHOT: WorktreeTerminalSnapshot = {
   worktreeTerminalKey: '',
   selectedDescriptor: null,
   sessions: [],
-  staticWorkspacePaneViews: [],
-  workspacePaneViews: [],
   count: 0,
   bellCount: 0,
   pendingCreate: false,

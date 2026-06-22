@@ -12,7 +12,12 @@
 //      environment ordering or cross-environment pollution between jsdom
 //      and node-env tests.
 //
-//   3. Stub `HTMLCanvasElement.prototype.getContext` to return null in jsdom.
+//   3. Stub `window.focus` as a no-op in jsdom. Browser notification click
+//      handlers call it legitimately in production, but jsdom emits a
+//      not-implemented error through its virtual console instead of behaving
+//      like a browser window.
+//
+//   4. Stub `HTMLCanvasElement.prototype.getContext` to return null in jsdom.
 //      xterm's ImageAddon pulls a 2d context for image rendering, and jsdom
 //      logs "Not implemented: HTMLCanvasElement's getContext() method"
 //      otherwise. Returning null is what real browsers do when canvas is
@@ -57,6 +62,15 @@ function makeMemoryStorage(): Storage {
 
 globalThis.localStorage = makeMemoryStorage()
 globalThis.sessionStorage = makeMemoryStorage()
+
+// Only relevant in the jsdom environment; no-op when undefined.
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'focus', {
+    configurable: true,
+    writable: true,
+    value() {},
+  })
+}
 
 // Only relevant in the jsdom environment; no-op when undefined.
 if (typeof HTMLCanvasElement !== 'undefined') {

@@ -5,31 +5,38 @@ import {
   nextBranchWorkspacePaneTabAfterClose,
 } from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
 import type { WorkspacePaneViewSummary } from '#/web/components/terminal/types.ts'
+import type { WorkspacePaneStaticViewType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
 
 const REPO_ID = '/tmp/gbl-workspace-pane-tab-model-repo'
 const WORKTREE_PATH = '/tmp/gbl-workspace-pane-tab-model-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 
 describe('branch workspace pane tab model', () => {
-  test('projects branch-owned tabs ahead of runtime worktree tabs', () => {
+  test('projects a single tab order across static and terminal tabs', () => {
     const model = createBranchWorkspacePaneTabModel({
       repoId: REPO_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredView: 'status',
-      openBranchViews: ['status', 'history'],
-      runtimeWorktreeViews: [terminalView('terminal-1', 1, true), changesView(2)],
+      tabOrder: [
+        terminalEntry('terminal-1'),
+        staticEntry('status'),
+        staticEntry('changes'),
+        staticEntry('history'),
+      ],
+      runtimeTerminalViews: [terminalView('terminal-1', 1, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
     })
 
     expect(model.worktreeTerminalKey).toBe(WORKTREE_KEY)
-    expect(model.worktreeViews.map((view) => view.type)).toEqual(['terminal', 'changes'])
-    expect(model.tabs.map((tab) => [tab.identity, tab.scope])).toEqual([
-      ['status:status', 'branch'],
-      ['history:history', 'branch'],
-      ['terminal:terminal-1', 'worktree'],
-      ['changes:changes', 'worktree'],
+    expect(model.terminalViews.map((view) => view.type)).toEqual(['terminal'])
+    expect(model.staticViews).toEqual(['status', 'changes', 'history'])
+    expect(model.tabs.map((tab) => [tab.identity, tab.kind])).toEqual([
+      ['terminal:terminal-1', 'terminal'],
+      ['status:status', 'static'],
+      ['changes:changes', 'static'],
+      ['history:history', 'static'],
     ])
     expect(model.activeTab?.identity).toBe('status:status')
   })
@@ -40,13 +47,14 @@ describe('branch workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredView: 'terminal',
-      openBranchViews: ['status'],
-      runtimeWorktreeViews: [terminalView('terminal-1', 1, false), terminalView('terminal-2', 2, true)],
+      tabOrder: [staticEntry('status')],
+      runtimeTerminalViews: [terminalView('terminal-1', 1, false), terminalView('terminal-2', 2, true)],
       terminalSessionCount: 2,
       terminalSyncReady: true,
     })
 
-    expect(model.selectedView).toBe('terminal')
+    expect(model.renderedView).toBe('terminal')
+    expect(model.selection).toMatchObject({ kind: 'materialized-tab', view: 'terminal' })
     expect(model.activeTab?.identity).toBe('terminal:terminal-2')
     expect(model.activeTab?.key).toBe('terminal-2')
   })
@@ -57,14 +65,15 @@ describe('branch workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredView: 'terminal',
-      openBranchViews: ['status'],
-      runtimeWorktreeViews: [],
+      tabOrder: [staticEntry('status')],
+      runtimeTerminalViews: [],
       terminalSessionCount: 0,
-      pendingCreate: true,
+      terminalCreatePending: true,
       terminalSyncReady: true,
     })
 
-    expect(model.selectedView).toBe('terminal')
+    expect(model.renderedView).toBe('terminal')
+    expect(model.selection).toEqual({ kind: 'terminal-host', view: 'terminal', tab: null })
     expect(model.activeTab).toBeNull()
     expect(model.tabs.map((tab) => tab.identity)).toEqual(['status:status'])
   })
@@ -75,13 +84,14 @@ describe('branch workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredView: 'changes',
-      openBranchViews: ['status'],
-      runtimeWorktreeViews: [],
+      tabOrder: [staticEntry('status')],
+      runtimeTerminalViews: [],
       terminalSessionCount: 0,
       terminalSyncReady: true,
     })
 
-    expect(model.selectedView).toBeNull()
+    expect(model.selection).toBeNull()
+    expect(model.renderedView).toBeNull()
     expect(model.activeTab).toBeNull()
   })
 
@@ -91,13 +101,14 @@ describe('branch workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredView: 'history',
-      openBranchViews: ['status'],
-      runtimeWorktreeViews: [terminalView('terminal-1', 1, true)],
+      tabOrder: [staticEntry('status'), terminalEntry('terminal-1')],
+      runtimeTerminalViews: [terminalView('terminal-1', 1, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
     })
 
-    expect(model.selectedView).toBeNull()
+    expect(model.selection).toBeNull()
+    expect(model.renderedView).toBeNull()
     expect(model.activeTab).toBeNull()
   })
 
@@ -107,14 +118,14 @@ describe('branch workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: null,
       preferredView: 'status',
-      openBranchViews: ['status'],
-      runtimeWorktreeViews: [terminalView('ignored', 1, true)],
+      tabOrder: [staticEntry('status'), staticEntry('changes'), terminalEntry('ignored')],
+      runtimeTerminalViews: [terminalView('ignored', 1, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
     })
 
-    expect(model.worktreeViews).toEqual([])
-    expect(model.tabs).toMatchObject([{ identity: 'status:status', scope: 'branch', type: 'status' }])
+    expect(model.terminalViews).toEqual([])
+    expect(model.tabs).toMatchObject([{ identity: 'status:status', kind: 'static', type: 'status' }])
     expect(model.activeTab?.identity).toBe('status:status')
   })
 
@@ -124,8 +135,8 @@ describe('branch workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredView: 'status',
-      openBranchViews: ['status'],
-      runtimeWorktreeViews: [terminalView('terminal-1', 1, true), changesView(2)],
+      tabOrder: [staticEntry('status'), terminalEntry('terminal-1'), staticEntry('changes')],
+      runtimeTerminalViews: [terminalView('terminal-1', 1, true)],
       terminalSessionCount: 1,
       terminalSyncReady: true,
     })
@@ -141,8 +152,13 @@ describe('branch workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredView: 'terminal',
-      openBranchViews: ['status'],
-      runtimeWorktreeViews: [terminalView('terminal-1', 1, false), terminalView('terminal-2', 2, true), changesView(3)],
+      tabOrder: [
+        staticEntry('status'),
+        terminalEntry('terminal-1'),
+        terminalEntry('terminal-2'),
+        staticEntry('changes'),
+      ],
+      runtimeTerminalViews: [terminalView('terminal-1', 1, false), terminalView('terminal-2', 2, true)],
       terminalSessionCount: 2,
       terminalSyncReady: true,
     })
@@ -155,6 +171,14 @@ describe('branch workspace pane tab model', () => {
     expect(adjacentBranchWorkspacePaneTab(model.tabs, 'missing:missing', 1)).toBeNull()
   })
 })
+
+function staticEntry(type: WorkspacePaneStaticViewType): WorkspacePaneTabOrderEntry {
+  return { type, id: type }
+}
+
+function terminalEntry(id: string): WorkspacePaneTabOrderEntry {
+  return { type: 'terminal', id }
+}
 
 function terminalView(key: string, displayOrder: number, selected: boolean): WorkspacePaneViewSummary {
   return {
@@ -169,16 +193,5 @@ function terminalView(key: string, displayOrder: number, selected: boolean): Wor
     phase: 'open',
     selected,
     hasBell: false,
-  }
-}
-
-function changesView(displayOrder: number): WorkspacePaneViewSummary {
-  return {
-    type: 'changes',
-    id: 'changes',
-    key: 'changes',
-    worktreeTerminalKey: WORKTREE_KEY,
-    worktreePath: WORKTREE_PATH,
-    displayOrder,
   }
 }

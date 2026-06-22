@@ -2,7 +2,7 @@ import { appendRepoEvent, errorEvent, isRepoUnavailable, updateIfFresh } from '#
 import { persistRestorableRepoSnapshot } from '#/web/stores/repos/persistence.ts'
 import { refreshPullRequestsLog, terminalLog } from '#/web/logger.ts'
 import { terminalBridge } from '#/web/terminal.ts'
-import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
+import { workspacePaneStaticViewsForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import {
   PULL_REQUEST_UNKNOWN_RETRY_DELAY_MS,
@@ -24,11 +24,11 @@ function pullRequestRefreshFailed(get: ReposGet, id: string, token: number): boo
 function visibleDetailPullRequestPending(get: ReposGet, id: string, token: number): boolean {
   const repo = get().repos[id]
   if (!repo) return false
-  const openBranchViews = branchWorkspacePaneViewsForBranch(repo.ui, repo.ui.selectedBranch)
+  const openStaticViews = workspacePaneStaticViewsForBranch(repo.ui, repo.ui.selectedBranch)
   if (
     repo.instanceToken !== token ||
     preferredWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) !== 'status' ||
-    !openBranchViews.includes('status') ||
+    !openStaticViews.includes('status') ||
     !repo.ui.selectedBranch
   )
     return false
@@ -39,11 +39,11 @@ function visibleDetailPullRequestPending(get: ReposGet, id: string, token: numbe
 async function refreshVisibleDetailPullRequest(get: ReposGet, id: string, token: number): Promise<void> {
   const repo = get().repos[id]
   if (!repo) return
-  const openBranchViews = branchWorkspacePaneViewsForBranch(repo.ui, repo.ui.selectedBranch)
+  const openStaticViews = workspacePaneStaticViewsForBranch(repo.ui, repo.ui.selectedBranch)
   if (
     repo.instanceToken !== token ||
     preferredWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) !== 'status' ||
-    !openBranchViews.includes('status') ||
+    !openStaticViews.includes('status') ||
     !repo.ui.selectedBranch
   )
     return

@@ -19,12 +19,6 @@ import type {
   TerminalExitEvent,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
-import type {
-  WorkspacePaneListViewsInput,
-  WorkspacePaneReorderInput,
-  WorkspacePaneStaticViewInput,
-  WorkspacePaneStaticViewSummary,
-} from '#/shared/workspace-pane.ts'
 
 export type TerminalRealtimeMessage =
   | { type: 'output'; event: TerminalOutputEvent }
@@ -32,7 +26,6 @@ export type TerminalRealtimeMessage =
   | { type: 'exit'; event: TerminalExitEvent }
   | { type: 'ownership'; event: TerminalOwnershipEvent }
   | { type: 'sessions-changed'; repoRoot: string }
-  | { type: 'workspace-pane-changed'; repoRoot: string }
   // Targeted per-session close. Emitted by the server after a
   // successful `close` request, alongside the existing
   // `sessions-changed` global broadcast. Multi-window clients use
@@ -50,13 +43,9 @@ export interface TerminalSocketRequestInputs {
   takeover: TerminalTakeoverInput
   close: TerminalSessionInput
   'list-sessions': TerminalListSessionsInput
-  'workspace-pane:list-views': WorkspacePaneListViewsInput
-  'workspace-pane:open-view': WorkspacePaneStaticViewInput
-  'workspace-pane:close-view': WorkspacePaneStaticViewInput
   create: TerminalCreateInput
   prune: { repoRoot: string }
   'session-snapshot': TerminalSessionSnapshotInput
-  'workspace-pane:reorder-views': WorkspacePaneReorderInput
 }
 
 export interface TerminalSocketResponseOutputs {
@@ -67,13 +56,9 @@ export interface TerminalSocketResponseOutputs {
   takeover: TerminalTakeoverResult
   close: TerminalMutationResult
   'list-sessions': TerminalSessionSummary[]
-  'workspace-pane:list-views': WorkspacePaneStaticViewSummary[]
-  'workspace-pane:open-view': TerminalMutationResult
-  'workspace-pane:close-view': TerminalMutationResult
   create: TerminalCatalogMutationResult
   prune: { pruned: number; remaining: number }
   'session-snapshot': TerminalSessionSnapshot | null
-  'workspace-pane:reorder-views': TerminalMutationResult
 }
 
 export type TerminalSocketRequestAction = keyof TerminalSocketRequestInputs

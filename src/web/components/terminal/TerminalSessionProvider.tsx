@@ -114,13 +114,9 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       if (!repoRoot || !repoIndexRef.current[repoRoot]) return
       try {
         const attachmentId = readOrCreateWebTerminalAttachmentId()
-        const [serverSessions, staticWorkspacePaneViews] = await Promise.all([
-          loadTerminalSessions(repoRoot),
-          terminalBridge.listViews({ repoRoot }),
-        ])
+        const serverSessions = await loadTerminalSessions(repoRoot)
         const snapshotsBySessionId = await loadMissingSnapshots(serverSessions)
         if (!repoIndexRef.current[repoRoot]) return
-        registry.reconcileServerStaticViews(repoRoot, staticWorkspacePaneViews)
         registry.reconcileServerSessions(repoRoot, serverSessions, attachmentId, snapshotsBySessionId)
       } catch (err) {
         terminalSessionProviderLog.debug('failed to sync server sessions', { err })
@@ -208,9 +204,6 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       createTerminal: registry.createTerminal,
       selectTerminal: registry.selectTerminal,
       closeTerminalByDescriptor: registry.closeTerminalByDescriptor,
-      openWorkspacePaneView: registry.openWorkspacePaneView,
-      closeWorkspacePaneView: registry.closeWorkspacePaneView,
-      reorderWorkspacePaneViews: registry.reorderWorkspacePaneViews,
     })
 
     return () => {
@@ -250,14 +243,12 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       }, 0)
     }
     const offSessionsChanged = terminalBridge.onSessionsChanged(scheduleServerSync)
-    const offWorkspacePaneChanged = terminalBridge.onWorkspacePaneChanged(scheduleServerSync)
 
     return () => {
       disposed = true
       if (syncTimer !== null) window.clearTimeout(syncTimer)
       window.removeEventListener('focus', handleFocus)
       offSessionsChanged()
-      offWorkspacePaneChanged()
     }
   }, [currentRepoId, currentRepoInstanceToken, syncServerSessions])
 
@@ -280,9 +271,6 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       clearSearch: registry.clearSearch,
       writeInput: registry.writeInput,
       takeover: registry.takeover,
-      openWorkspacePaneView: registry.openWorkspacePaneView,
-      closeWorkspacePaneView: registry.closeWorkspacePaneView,
-      reorderWorkspacePaneViews: registry.reorderWorkspacePaneViews,
       serialize: registry.serialize,
     }),
     [registry],

@@ -343,43 +343,6 @@ describe('terminal web host bridge', () => {
     dispose()
   })
 
-  test('loads workspace pane views through workspace-pane websocket action', async () => {
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
-    const { terminalBridge } = await import('#/web/terminal.ts')
-    const dispose = terminalBridge.onOutput(() => {})
-    const socket = MockWebSocket.instances[0]
-
-    const listPromise = terminalBridge.listViews({ repoRoot: '/tmp/repo' })
-    socket?.emitOpen()
-    await Promise.resolve()
-    const request = socket?.sent
-      .map((payload) => JSON.parse(payload))
-      .find((message) => message.action === 'workspace-pane:list-views')
-    expect(request).toMatchObject({
-      type: 'request',
-      action: 'workspace-pane:list-views',
-      input: {
-        repoRoot: '/tmp/repo',
-      },
-    })
-    socket?.emitMessage(
-      JSON.stringify({
-        type: 'response',
-        requestId: request?.requestId,
-        ok: true,
-        action: 'workspace-pane:list-views',
-        payload: [{ type: 'changes', id: 'changes', worktreePath: '/tmp/repo', displayOrder: 0 }],
-      }),
-    )
-
-    await expect(listPromise).resolves.toEqual([
-      { type: 'changes', id: 'changes', worktreePath: '/tmp/repo', displayOrder: 0 },
-    ])
-    expect(fetchMock).not.toHaveBeenCalled()
-    dispose()
-  })
-
   test('loads terminal snapshots through websocket request-response and validates payloads', async () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
@@ -571,14 +534,12 @@ describe('terminal web host bridge', () => {
     const onExit = vi.fn()
     const onOwnership = vi.fn()
     const onSessionsChanged = vi.fn()
-    const onWorkspacePaneChanged = vi.fn()
 
     const disposeOutput = terminalBridge.onOutput(onOutput)
     const disposeTitle = terminalBridge.onTitle(onTitle)
     const disposeExit = terminalBridge.onExit(onExit)
     const disposeOwnership = terminalBridge.onOwnership(onOwnership)
     const disposeSessionsChanged = terminalBridge.onSessionsChanged(onSessionsChanged)
-    const disposeWorkspacePaneChanged = terminalBridge.onWorkspacePaneChanged(onWorkspacePaneChanged)
     const socket = MockWebSocket.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
 
@@ -612,12 +573,6 @@ describe('terminal web host bridge', () => {
         repoRoot: '/tmp/repo',
       }),
     )
-    socket.emitMessage(
-      JSON.stringify({
-        type: 'workspace-pane-changed',
-        repoRoot: '/tmp/repo',
-      }),
-    )
 
     expect(onOutput).toHaveBeenCalledWith({ sessionId: 'term_1', data: 'hello', seq: 1, processName: 'zsh' })
     expect(onTitle).toHaveBeenCalledWith({ sessionId: 'term_1', canonicalTitle: '~/Developer/goblin — npm run dev' })
@@ -631,14 +586,12 @@ describe('terminal web host bridge', () => {
       phase: 'open',
     })
     expect(onSessionsChanged).toHaveBeenCalledWith('/tmp/repo')
-    expect(onWorkspacePaneChanged).toHaveBeenCalledWith('/tmp/repo')
 
     disposeOutput()
     disposeTitle()
     disposeExit()
     disposeOwnership()
     disposeSessionsChanged()
-    disposeWorkspacePaneChanged()
   })
 
   test('reuses a connecting terminal socket when subscribers briefly drop to zero', async () => {

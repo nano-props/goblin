@@ -21,12 +21,16 @@ import {
 } from '#/web/components/terminal/terminal-session-store.ts'
 import { workspacePaneViewButtonId } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
-import { branchLevelWorkspacePaneViewButtonId } from '#/web/components/branch-workspace/workspace-pane-views.ts'
+import { workspacePaneStaticViewButtonId } from '#/web/components/branch-workspace/workspace-pane-views.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
-import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
-import { isBranchLevelWorkspacePaneView } from '#/web/lib/workspace-pane-view.ts'
+import type { WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
+import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import type { BranchCopyPatchAction } from '#/web/hooks/branch-action-state.ts'
-import { createBranchWorkspacePaneTabModel } from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
+import {
+  createBranchWorkspacePaneTabModel,
+  type BranchWorkspacePaneTab,
+  type BranchWorkspacePaneSelection,
+} from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
 import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 interface Props {
   repo: Pick<BranchWorkspaceRepo, 'id' | 'data' | 'ui'> & {
@@ -39,17 +43,19 @@ interface Props {
 
 interface TabPanelProps {
   id: string
-  labelledById: string
+  labelledById?: string
+  label?: string
   busy?: boolean
   children: ReactNode
 }
 
 type BranchWorkspaceBranch = NonNullable<SelectedBranchWorkspacePresentation['branch']>
 
-// Pure view: the renderable tab is derived from the repos store's
-// branch-scoped selected tab and the live terminal session truth. The store
-// never re-projects on snapshot refresh, branch switch, or session restore;
-// this component is read-only.
+// Pure view: the workspace pane body is derived from the repos store's
+// branch-scoped preferred view and the live terminal session truth. The store
+// never re-projects on snapshot refresh, branch switch, or session restore.
+// The tab model keeps the body render target separate from the active
+// materialized tab.
 export function BranchWorkspaceContent({ repo, detail, workspacePaneId, copyPatchAction }: Props) {
   const t = useT()
   const compact = useIsCompactUi()
@@ -57,34 +63,32 @@ export function BranchWorkspaceContent({ repo, detail, workspacePaneId, copyPatc
   const terminalWorktreeKey = branch?.worktree?.path ? worktreeTerminalKey(repo.id, branch.worktree.path) : null
   const worktreeSnapshot = useWorktreeTerminalSnapshot(terminalWorktreeKey)
   const terminalSyncReady = useTerminalRepoSyncReady(repo.id)
-  const openBranchWorkspacePaneViews = branchWorkspacePaneViewsForBranch(repo.ui, branch?.name)
+  const workspacePaneTabOrder = workspacePaneTabOrderForBranch(repo.ui, branch?.name)
   const workspacePaneTabModel = createBranchWorkspacePaneTabModel({
     repoId: repo.id,
     branchName: branch?.name ?? null,
     worktreePath: branch?.worktree?.path ?? null,
     preferredView: preferredWorkspacePaneViewForBranch(repo.ui, branch?.name),
-    openBranchViews: openBranchWorkspacePaneViews,
-    runtimeWorktreeViews: worktreeSnapshot.workspacePaneViews,
+    tabOrder: workspacePaneTabOrder,
+    runtimeTerminalViews: worktreeSnapshot.sessions,
     terminalSessionCount: worktreeSnapshot.count,
-    pendingCreate: worktreeSnapshot.pendingCreate,
+    terminalCreatePending: worktreeSnapshot.pendingCreate,
     terminalSyncReady,
   })
-  const selectedView = workspacePaneTabModel.selectedView
-  const selectedBranchTab = selectedView && isBranchLevelWorkspacePaneView(selectedView) ? selectedView : null
-  const activeTab = workspacePaneTabModel.activeTab
-  const canRenderSelectedTerminal = selectedView === 'terminal' && !!branch?.worktree?.path
-  const activeTabIndex =
-    activeTab?.scope === 'worktree' && activeTab.view ? workspacePaneTabModel.worktreeViews.indexOf(activeTab.view) : -1
-  const activeTabLabelledById =
-    activeTab?.scope === 'worktree'
-      ? workspacePaneViewButtonId(workspacePaneId, compact ? 0 : activeTabIndex)
-      : activeTab && selectedBranchTab
-        ? branchLevelWorkspacePaneViewButtonId(workspacePaneId, selectedBranchTab)
-        : workspacePaneViewButtonId(workspacePaneId, 0)
+  const selection = workspacePaneTabModel.selection
+  const renderedView = selection?.view ?? null
+  const panelLabel = workspacePanePanelLabel({
+    selection,
+    tabs: workspacePaneTabModel.tabs,
+    workspacePaneId,
+    compact,
+    t,
+    terminalSyncReady,
+  })
   if (!branch)
     return <EmptyState title={t(repo.data.branches.length === 0 ? 'branches.empty' : 'branches.filter-empty')} />
 
-  if (!selectedView || (!activeTab && !canRenderSelectedTerminal)) {
+  if (!selection) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         <EmptyState title={t('workspace-pane-views.empty')} />
@@ -94,26 +98,26 @@ export function BranchWorkspaceContent({ repo, detail, workspacePaneId, copyPatc
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {selectedView === 'status' && (
+      {renderedView === 'status' && (
         <BranchStatusTab
           workspacePaneId={workspacePaneId}
-          labelledById={activeTabLabelledById}
+          panelLabel={panelLabel}
           detail={detail}
           busy={detail.loading.pullRequests}
         />
       )}
-      {selectedView === 'history' && (
+      {renderedView === 'history' && (
         <BranchHistoryTab
           repoId={repo.id}
           branchName={branch.name}
           workspacePaneId={workspacePaneId}
-          labelledById={activeTabLabelledById}
+          panelLabel={panelLabel}
         />
       )}
-      {selectedView === 'changes' && (
+      {renderedView === 'changes' && (
         <BranchChangesTab
           workspacePaneId={workspacePaneId}
-          labelledById={activeTabLabelledById}
+          panelLabel={panelLabel}
           repo={repo}
           branch={branch}
           selectedStatus={detail.selectedStatus}
@@ -123,11 +127,12 @@ export function BranchWorkspaceContent({ repo, detail, workspacePaneId, copyPatc
           copyPatchAction={copyPatchAction}
         />
       )}
-      {selectedView === 'terminal' && branch.worktree?.path && (
+      {renderedView === 'terminal' && branch.worktree?.path && (
         <BranchTerminalTab
           workspacePaneId={workspacePaneId}
-          labelledById={activeTabLabelledById}
+          panelLabel={panelLabel}
           repoId={repo.id}
+          terminalSyncReady={terminalSyncReady}
           branch={branch}
         />
       )}
@@ -135,16 +140,38 @@ export function BranchWorkspaceContent({ repo, detail, workspacePaneId, copyPatc
   )
 }
 
+type WorkspacePanePanelLabel = Pick<TabPanelProps, 'labelledById' | 'label'>
+
+function workspacePanePanelLabel(input: {
+  selection: BranchWorkspacePaneSelection | null
+  tabs: readonly BranchWorkspacePaneTab[]
+  workspacePaneId: string
+  compact: boolean
+  t: (key: string, params?: Record<string, string | number>) => string
+  terminalSyncReady: boolean
+}): WorkspacePanePanelLabel {
+  const tab = input.selection?.kind === 'materialized-tab' ? input.selection.tab : null
+  if (tab?.kind === 'terminal' && tab.view) {
+    const terminalTabs = input.tabs.filter((candidate) => candidate.kind === 'terminal')
+    const index = terminalTabs.findIndex((candidate) => candidate.identity === tab.identity)
+    return { labelledById: workspacePaneViewButtonId(input.workspacePaneId, input.compact ? 0 : Math.max(0, index)) }
+  }
+  if (tab?.kind === 'static') {
+    return { labelledById: workspacePaneStaticViewButtonId(input.workspacePaneId, tab.type as WorkspacePaneStaticViewType) }
+  }
+  return { label: input.t(input.terminalSyncReady ? 'terminal.opening' : 'terminal.loading') }
+}
+
 function BranchHistoryTab({
   repoId,
   branchName,
   workspacePaneId,
-  labelledById,
+  panelLabel,
 }: {
   repoId: string
   branchName: string
   workspacePaneId: string
-  labelledById: string
+  panelLabel: WorkspacePanePanelLabel
 }) {
   const t = useT()
   const [state, setState] = useState<{
@@ -178,7 +205,7 @@ function BranchHistoryTab({
   return (
     <BranchTabPanel
       id={`${workspacePaneId}-history-panel`}
-      labelledById={labelledById}
+      {...panelLabel}
       busy={state.phase === 'loading'}
     >
       {state.phase === 'loading' ? (
@@ -266,13 +293,14 @@ function historyLogLine(entry: LogEntry): string {
   return [hash, refs ? `(${refs})` : '', entry.message].filter(Boolean).join(' ')
 }
 
-function BranchTabPanel({ id, labelledById, busy = false, children }: TabPanelProps) {
+function BranchTabPanel({ id, labelledById, label, busy = false, children }: TabPanelProps) {
   return (
     <div
       id={id}
       role="tabpanel"
       aria-busy={busy || undefined}
       aria-labelledby={labelledById}
+      aria-label={labelledById ? undefined : label}
       className="flex min-h-0 flex-1 flex-col"
     >
       {children}
@@ -282,17 +310,17 @@ function BranchTabPanel({ id, labelledById, busy = false, children }: TabPanelPr
 
 function BranchStatusTab({
   workspacePaneId,
-  labelledById,
+  panelLabel,
   detail,
   busy,
 }: {
   workspacePaneId: string
-  labelledById: string
+  panelLabel: WorkspacePanePanelLabel
   detail: SelectedBranchWorkspacePresentation
   busy?: boolean
 }) {
   return (
-    <BranchTabPanel id={`${workspacePaneId}-status-panel`} labelledById={labelledById} busy={busy}>
+    <BranchTabPanel id={`${workspacePaneId}-status-panel`} {...panelLabel} busy={busy}>
       <ScrollPane>
         <BranchStatus detail={detail} />
       </ScrollPane>
@@ -302,26 +330,33 @@ function BranchStatusTab({
 
 function BranchTerminalTab({
   workspacePaneId,
-  labelledById,
+  panelLabel,
   repoId,
+  terminalSyncReady,
   branch,
 }: {
   workspacePaneId: string
-  labelledById: string
+  panelLabel: WorkspacePanePanelLabel
   repoId: string
+  terminalSyncReady: boolean
   branch: BranchWorkspaceBranch
 }) {
   if (!branch.worktree?.path) return null
   return (
-    <BranchTabPanel id={`${workspacePaneId}-terminal-panel`} labelledById={labelledById}>
-      <TerminalSlot repoRoot={repoId} branch={branch.name} worktreePath={branch.worktree?.path} />
+    <BranchTabPanel id={`${workspacePaneId}-terminal-panel`} {...panelLabel}>
+      <TerminalSlot
+        repoRoot={repoId}
+        branch={branch.name}
+        worktreePath={branch.worktree?.path}
+        syncReady={terminalSyncReady}
+      />
     </BranchTabPanel>
   )
 }
 
 function BranchChangesTab({
   workspacePaneId,
-  labelledById,
+  panelLabel,
   repo,
   branch,
   selectedStatus,
@@ -331,7 +366,7 @@ function BranchChangesTab({
   copyPatchAction,
 }: {
   workspacePaneId: string
-  labelledById: string
+  panelLabel: WorkspacePanePanelLabel
   repo: Props['repo']
   branch: BranchWorkspaceBranch
   selectedStatus: SelectedBranchWorkspacePresentation['selectedStatus']
@@ -348,7 +383,7 @@ function BranchChangesTab({
   const showCopyPatchFloat = totalEntries > 0 && !!copyPatchAction?.visible && !(statusStale && statusError)
 
   return (
-    <BranchTabPanel id={`${workspacePaneId}-changes-panel`} labelledById={labelledById} busy={statusLoading}>
+    <BranchTabPanel id={`${workspacePaneId}-changes-panel`} {...panelLabel} busy={statusLoading}>
       {branch.worktree?.path && statusLoading && !repo.data.statusLoaded ? (
         <StatusListSkeleton rows={8} />
       ) : branch.worktree?.path && !repo.data.statusLoaded && statusError ? (

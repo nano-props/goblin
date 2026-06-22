@@ -9,7 +9,6 @@ import {
   TerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import type {
-  WorkspacePaneStaticViewSummary,
   TerminalSessionContextValue,
   TerminalSessionReadContextValue,
   TerminalSessionSummary,
@@ -42,16 +41,13 @@ type TestTerminalSummary = Omit<TerminalSessionSummary, 'type' | 'id' | 'display
 
 type TestWorktreeSnapshot = Omit<
   WorktreeTerminalSnapshot,
-  'sessions' | 'staticWorkspacePaneViews' | 'workspacePaneViews' | 'bellCount'
+  'sessions' | 'bellCount'
 > & {
   sessions: TestTerminalSummary[]
-  staticWorkspacePaneViews?: WorkspacePaneStaticViewSummary[]
-  workspacePaneViews?: WorktreeTerminalSnapshot['workspacePaneViews']
   bellCount?: number
 }
 
 function completeWorktreeSnapshot(snapshot: TestWorktreeSnapshot): WorktreeTerminalSnapshot {
-  const staticWorkspacePaneViews = snapshot.staticWorkspacePaneViews ?? []
   const sessions = snapshot.sessions.map((session, index) => ({
     ...session,
     type: 'terminal' as const,
@@ -61,8 +57,6 @@ function completeWorktreeSnapshot(snapshot: TestWorktreeSnapshot): WorktreeTermi
   return {
     ...snapshot,
     sessions,
-    staticWorkspacePaneViews,
-    workspacePaneViews: snapshot.workspacePaneViews ?? [...staticWorkspacePaneViews, ...sessions],
     bellCount: snapshot.bellCount ?? sessions.filter((session) => session.hasBell).length,
   }
 }
@@ -132,9 +126,6 @@ async function renderControllerSlot() {
     clearSearch: vi.fn(),
     writeInput,
     takeover: vi.fn(),
-    openWorkspacePaneView: vi.fn(async () => true),
-    closeWorkspacePaneView: vi.fn(async () => true),
-    reorderWorkspacePaneViews: vi.fn(async () => true),
     serialize: vi.fn(() => ''),
   }
   const readContext: TerminalSessionReadContextValue = {
@@ -250,9 +241,6 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput: vi.fn(),
       takeover,
-      openWorkspacePaneView: vi.fn(async () => true),
-      closeWorkspacePaneView: vi.fn(async () => true),
-      reorderWorkspacePaneViews: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
@@ -324,9 +312,6 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput: vi.fn(),
       takeover: vi.fn(),
-      openWorkspacePaneView: vi.fn(async () => true),
-      closeWorkspacePaneView: vi.fn(async () => true),
-      reorderWorkspacePaneViews: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
@@ -433,9 +418,6 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput: vi.fn(),
       takeover,
-      openWorkspacePaneView: vi.fn(async () => true),
-      closeWorkspacePaneView: vi.fn(async () => true),
-      reorderWorkspacePaneViews: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
@@ -554,9 +536,6 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput,
       takeover: vi.fn(),
-      openWorkspacePaneView: vi.fn(async () => true),
-      closeWorkspacePaneView: vi.fn(async () => true),
-      reorderWorkspacePaneViews: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
@@ -678,9 +657,6 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput,
       takeover: vi.fn(),
-      openWorkspacePaneView: vi.fn(async () => true),
-      closeWorkspacePaneView: vi.fn(async () => true),
-      reorderWorkspacePaneViews: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
@@ -819,9 +795,6 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput,
       takeover: vi.fn(),
-      openWorkspacePaneView: vi.fn(async () => true),
-      closeWorkspacePaneView: vi.fn(async () => true),
-      reorderWorkspacePaneViews: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
@@ -932,9 +905,6 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput,
       takeover: vi.fn(),
-      openWorkspacePaneView: vi.fn(async () => true),
-      closeWorkspacePaneView: vi.fn(async () => true),
-      reorderWorkspacePaneViews: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
@@ -1058,9 +1028,6 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput,
       takeover: vi.fn(),
-      openWorkspacePaneView: vi.fn(async () => true),
-      closeWorkspacePaneView: vi.fn(async () => true),
-      reorderWorkspacePaneViews: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
@@ -1268,9 +1235,6 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput,
       takeover: vi.fn(),
-      openWorkspacePaneView: vi.fn(async () => true),
-      closeWorkspacePaneView: vi.fn(async () => true),
-      reorderWorkspacePaneViews: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
@@ -1435,9 +1399,6 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput,
       takeover: vi.fn(),
-      openWorkspacePaneView: vi.fn(async () => true),
-      closeWorkspacePaneView: vi.fn(async () => true),
-      reorderWorkspacePaneViews: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     let activeWorktreeSnapshot = worktreeSnapshotA
@@ -1559,9 +1520,6 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput: vi.fn(),
       takeover: vi.fn(),
-      openWorkspacePaneView: vi.fn(async () => true),
-      closeWorkspacePaneView: vi.fn(async () => true),
-      reorderWorkspacePaneViews: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {
@@ -1649,9 +1607,6 @@ describe('TerminalSlot', () => {
       clearSearch: vi.fn(),
       writeInput: vi.fn(),
       takeover: vi.fn(),
-      openWorkspacePaneView: vi.fn(async () => true),
-      closeWorkspacePaneView: vi.fn(async () => true),
-      reorderWorkspacePaneViews: vi.fn(async () => true),
       serialize: vi.fn(() => ''),
     }
     const readContext: TerminalSessionReadContextValue = {

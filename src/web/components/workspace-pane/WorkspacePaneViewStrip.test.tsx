@@ -1,17 +1,17 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
+import { act, useState } from 'react'
 import type { ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   WorkspacePaneViewStrip,
-  createWorktreeWorkspacePaneTabItem,
-  isWorktreeWorkspacePaneTabItem,
+  createTerminalWorkspacePaneTabItem,
+  isTerminalWorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx'
 import { terminalWorkspacePaneViewIdentity } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
-import type { WorkspacePaneWorktreeViewOrderEntry } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneViewSummary, TerminalSessionSummary } from '#/web/components/terminal/types.ts'
+import type { WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
+import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
@@ -662,6 +662,49 @@ describe('WorkspacePaneViewStrip', () => {
     expect(compactCloseButton?.className).toContain('opacity-0')
   })
 
+  test('focuses the next compact tab after closing the active tab', async () => {
+    function CompactCloseFocusHarness() {
+      const [sessions, setSessions] = useState([
+        session({ key: 't1', title: 'term-1', selected: true }),
+        session({ key: 't2', title: 'term-2', selected: false }),
+      ])
+
+      return (
+        <TestWorkspacePaneViewStrip
+          worktreeTerminalKey="/repo\0/repo/worktree"
+          workspacePaneId="workspace"
+          responsiveCompact
+          panelActive
+          sessions={sessions}
+          onNew={() => {}}
+          onSelect={() => {}}
+          onScrollToBottom={() => {}}
+          onClose={(closed) => {
+            setSessions((current) =>
+              current.filter((candidate) => candidate.key !== closed.key).map((candidate, index) => ({
+                ...candidate,
+                selected: index === 0,
+              })),
+            )
+          }}
+          onReorder={() => {}}
+        />
+      )
+    }
+
+    render(<CompactCloseFocusHarness />)
+    const closeButton = document.body.querySelector<HTMLButtonElement>('button[aria-label="close term-1"]')
+    expect(closeButton).not.toBeNull()
+
+    act(() => {
+      closeButton?.click()
+    })
+    await flushTimers()
+
+    expect(document.activeElement?.id).toBe('workspace-workspace-pane-view')
+    expect(document.activeElement?.textContent).toContain('term-2')
+  })
+
   test('does not collapse to the first tab when compact mode has no active tab', () => {
     render(
       <TestWorkspacePaneViewStrip
@@ -705,16 +748,16 @@ function TestWorkspacePaneViewStrip(props: {
   panelActive?: boolean
   newTerminalBusy?: boolean
   onNew: () => void
-  onSelect: (worktreeTerminalKey: string, tab: WorkspacePaneViewSummary) => void
+  onSelect: (worktreeTerminalKey: string, tab: TerminalSessionSummary) => void
   onScrollToBottom: (key: string) => void
-  onClose: (tab: WorkspacePaneViewSummary) => void
-  onReorder: (worktreeTerminalKey: string, orderedViews: WorkspacePaneWorktreeViewOrderEntry[]) => void
+  onClose: (tab: TerminalSessionSummary) => void
+  onReorder: (orderedTabs: WorkspacePaneTabOrderEntry[]) => void
   onNavigateOut?: (direction: 'prev' | 'next' | 'first' | 'last') => void
 }) {
   const selected = props.sessions.find((candidate) => candidate.selected) ?? null
   const { sessions, ...workspacePaneProps } = props
   const items = sessions.map((tab) =>
-    createWorktreeWorkspacePaneTabItem({
+    createTerminalWorkspacePaneTabItem({
       view: tab,
       label: tab.originalTitle ?? tab.fullTitle ?? tab.title,
       tooltip: tab.originalTitle ?? tab.fullTitle ?? tab.title,
@@ -727,10 +770,10 @@ function TestWorkspacePaneViewStrip(props: {
       items={items}
       activeTabIdentity={selected ? terminalWorkspacePaneViewIdentity(selected.key) : null}
       onSelect={(item) => {
-        if (isWorktreeWorkspacePaneTabItem(item)) props.onSelect(props.worktreeTerminalKey, item.view)
+        if (isTerminalWorkspacePaneTabItem(item)) props.onSelect(props.worktreeTerminalKey, item.view)
       }}
       onClose={(item) => {
-        if (isWorktreeWorkspacePaneTabItem(item)) props.onClose(item.view)
+        if (isTerminalWorkspacePaneTabItem(item)) props.onClose(item.view)
       }}
     />
   )

@@ -1,11 +1,11 @@
 import { TerminalConnectionState } from '#/server/terminal/terminal-connection-state.ts'
 import { TerminalRealtimeBroker } from '#/server/terminal/terminal-realtime-broker.ts'
 import type { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
-import type { WorkspacePaneRuntime } from '#/server/workspace-pane/workspace-pane-runtime.ts'
+import type { TerminalViewOrderRuntime } from '#/server/terminal/terminal-view-order-runtime.ts'
 
 export interface TerminalRuntimeCoordinatorOptions {
   manager: TerminalSessionManager<string>
-  workspacePane: WorkspacePaneRuntime<string>
+  terminalViewOrder: TerminalViewOrderRuntime<string>
   ownershipGraceMs: number
   detachedTtlMs: number
 }
@@ -18,7 +18,7 @@ export interface TerminalRuntimeCoordinator {
 export function createTerminalRuntimeCoordinator(
   options: TerminalRuntimeCoordinatorOptions,
 ): TerminalRuntimeCoordinator {
-  const { manager, workspacePane, ownershipGraceMs, detachedTtlMs } = options
+  const { manager, terminalViewOrder, ownershipGraceMs, detachedTtlMs } = options
 
   // The connection-state timers key by owner, not clientId. clientId
   // is only the per-tab routing id; terminal lifetime is owned by
@@ -31,7 +31,7 @@ export function createTerminalRuntimeCoordinator(
     },
     onOwnerExpired(ownerId) {
       manager.closeSessionsForOwner(ownerId)
-      workspacePane.closeViewsForOwner(ownerId)
+      terminalViewOrder.closeViewsForOwner(ownerId)
     },
   })
 

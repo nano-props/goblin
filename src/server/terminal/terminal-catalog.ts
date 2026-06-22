@@ -22,7 +22,6 @@ import {
   buildGoblinTerminalCommandEnvironment,
   type GoblinTerminalCommandRuntime,
 } from '#/server/terminal/g-command.ts'
-import type { WorkspacePaneRuntime } from '#/server/workspace-pane/workspace-pane-runtime.ts'
 
 interface EnsureTerminalCatalogInput {
   repoRoot: string
@@ -81,7 +80,6 @@ interface TerminalCatalogOptions {
   isValidClientId(value: unknown): value is string
   isValidTerminalId(value: unknown): value is string
   manager: TerminalCatalogManager
-  workspacePane: Pick<WorkspacePaneRuntime<string>, 'pruneStaticViewsForOwner'>
   isAttachmentConnected(ownerId: string, attachmentId?: string): boolean | undefined
   broadcastSessionsChanged(ownerId: string, repoRoot: string): void
   gCommand?: GoblinTerminalCommandRuntime
@@ -180,11 +178,6 @@ class TerminalCatalog {
 
     const worktrees = await getWorktrees(repoRoot, { includeStatus: false })
     const liveWorktreePaths = new Set(worktrees.map((worktree) => path.resolve(worktree.path)))
-    const staticViewsPruned = this.options.workspacePane.pruneStaticViewsForOwner(
-      ownerId,
-      sessionScope,
-      liveWorktreePaths,
-    )
     let pruned = 0
     for (const session of allSessions) {
       const parsed = parseTerminalSessionKey(session.key)
@@ -194,7 +187,7 @@ class TerminalCatalog {
       this.options.manager.closeSession(session.sessionId)
       pruned += 1
     }
-    if (pruned > 0 || staticViewsPruned > 0) this.options.broadcastSessionsChanged(ownerId, repoRoot)
+    if (pruned > 0) this.options.broadcastSessionsChanged(ownerId, repoRoot)
     const remaining = await this.options.manager
       .listSessionsForOwner(ownerId, sessionScope)
       .then((sessions) => sessions.length)

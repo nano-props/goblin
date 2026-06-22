@@ -55,7 +55,7 @@ describe('app bootstrap hooks', () => {
       workspaceFocused: true,
       workspacePaneSize: 50,
       selectedTerminalByWorktree: {},
-      openBranchWorkspacePaneViewsByBranchByRepo: {},
+      workspacePaneTabOrderByBranchByRepo: {},
     })
     const hydrateI18n = vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
     const hydrateHostInfo = vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
@@ -76,7 +76,7 @@ describe('app bootstrap hooks', () => {
       workspaceFocused: false,
       workspacePaneSize: 45,
       selectedTerminalByWorktree: { '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2' },
-      openBranchWorkspacePaneViewsByBranchByRepo: {
+      workspacePaneTabOrderByBranchByRepo: {
         '/tmp/repo': {
           main: [],
         },
@@ -99,7 +99,7 @@ describe('app bootstrap hooks', () => {
     })
     expect(hydrateSession).toHaveBeenCalledWith([{ kind: 'local', id: '/tmp/repo' }], '/tmp/repo', {
       workspacePaneRestoreState: {
-        openBranchWorkspacePaneViewsByBranchByRepo: {
+        workspacePaneTabOrderByBranchByRepo: {
           '/tmp/repo': {
             main: [],
           },
@@ -118,7 +118,7 @@ describe('app bootstrap hooks', () => {
       workspaceFocused: true,
       workspacePaneSize: 55,
       selectedTerminalByWorktree: {},
-      openBranchWorkspacePaneViewsByBranchByRepo: {},
+      workspacePaneTabOrderByBranchByRepo: {},
     }
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot({ session }))
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockRejectedValue(new Error('theme unavailable'))
@@ -130,7 +130,7 @@ describe('app bootstrap hooks', () => {
 
     expect(hydrateSession).toHaveBeenCalledWith([{ kind: 'local', id: '/tmp/repo' }], '/tmp/repo', {
       workspacePaneRestoreState: {
-        openBranchWorkspacePaneViewsByBranchByRepo: {},
+        workspacePaneTabOrderByBranchByRepo: {},
         preferredWorkspacePaneViewByBranchByRepo: {},
       },
     })

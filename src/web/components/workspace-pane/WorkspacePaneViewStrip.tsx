@@ -28,11 +28,10 @@ import { DelegatedTooltipLayer } from '#/web/components/DelegatedTooltipLayer.ts
 import { createRestrictToTabStripBounds } from '#/web/components/tab-strip/drag-bounds.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import type {
-  WorkspacePaneBranchViewType,
+  WorkspacePaneStaticViewType,
+  WorkspacePaneTabOrderEntry,
   WorkspacePaneView,
-  WorkspacePaneWorktreeViewOrderEntry,
 } from '#/shared/workspace-pane.ts'
-import { isWorkspacePaneBranchViewType } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneViewSummary } from '#/web/components/terminal/types.ts'
 import { ToolbarTabList, ToolbarTabStrip, ToolbarTabStripBody } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
 import { ToolbarClosableTab } from '#/web/components/tab-strip/ToolbarClosableTab.tsx'
@@ -47,8 +46,9 @@ import {
   staticWorkspacePaneViewIdentity,
   workspacePaneViewIdentity,
   workspacePaneViewButtonId,
-  workspacePaneViewOrderEntry,
 } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
+
+type TerminalWorkspacePaneViewSummary = Extract<WorkspacePaneViewSummary, { type: 'terminal' }>
 
 interface WorkspacePaneViewStripProps {
   worktreeTerminalKey: string | null
@@ -69,24 +69,18 @@ interface WorkspacePaneViewStripProps {
   onSelect: (item: WorkspacePaneTabItem) => void
   onScrollToBottom: (key: string) => void
   onClose: (item: WorkspacePaneTabItem) => void
-  onReorder: (worktreeTerminalKey: string, orderedViews: WorkspacePaneWorktreeViewOrderEntry[]) => void
-  onReorderBranchViews?: (orderedViews: WorkspacePaneBranchViewType[]) => void
+  onReorder: (orderedTabs: WorkspacePaneTabOrderEntry[]) => void
   onNavigateOut?: (direction: 'prev' | 'next' | 'first' | 'last') => void
-  activateCrossScopeKeyboardNavigation?: boolean
+  activateKeyboardNavigationSelection?: boolean
 }
 
-export type WorkspacePaneTabScope = 'branch' | 'worktree'
+export type WorkspacePaneTabKind = 'static' | 'terminal'
 type WorkspacePaneTabIcon = 'status' | 'changes' | 'history' | 'terminal'
-type WorkspacePaneBranchViewOrderEntry = {
-  type: WorkspacePaneBranchViewType
-  id: WorkspacePaneBranchViewType
-}
-type WorkspacePaneTabOrderEntry = WorkspacePaneBranchViewOrderEntry | WorkspacePaneWorktreeViewOrderEntry
 
 interface WorkspacePaneTabItemBase {
   identity: string
   type: WorkspacePaneView
-  scope: WorkspacePaneTabScope
+  kind: WorkspacePaneTabKind
   label: string
   tooltip: string
   closeLabel: string
@@ -96,33 +90,33 @@ interface WorkspacePaneTabItemBase {
   orderEntry: WorkspacePaneTabOrderEntry
 }
 
-export interface WorkspacePaneBranchTabItem extends WorkspacePaneTabItemBase {
-  scope: 'branch'
-  branchViewType: WorkspacePaneBranchViewType
-  orderEntry: WorkspacePaneBranchViewOrderEntry
+export interface WorkspacePaneStaticTabItem extends WorkspacePaneTabItemBase {
+  kind: 'static'
+  staticViewType: WorkspacePaneStaticViewType
+  orderEntry: Extract<WorkspacePaneTabOrderEntry, { type: WorkspacePaneStaticViewType }>
 }
 
-export interface WorkspacePaneWorktreeTabItem extends WorkspacePaneTabItemBase {
-  scope: 'worktree'
-  view: WorkspacePaneViewSummary
+export interface WorkspacePaneTerminalTabItem extends WorkspacePaneTabItemBase {
+  kind: 'terminal'
+  view: TerminalWorkspacePaneViewSummary
   closeLabel: string
-  orderEntry: WorkspacePaneWorktreeViewOrderEntry
+  orderEntry: Extract<WorkspacePaneTabOrderEntry, { type: 'terminal' }>
 }
 
-export type WorkspacePaneTabItem = WorkspacePaneBranchTabItem | WorkspacePaneWorktreeTabItem
+export type WorkspacePaneTabItem = WorkspacePaneStaticTabItem | WorkspacePaneTerminalTabItem
 
-export function createBranchWorkspacePaneTabItem(input: {
-  type: WorkspacePaneBranchViewType
+export function createStaticWorkspacePaneTabItem(input: {
+  type: WorkspacePaneStaticViewType
   label: string
   tooltip: string
   closeLabel: string
   panelId?: string
-}): WorkspacePaneBranchTabItem {
+}): WorkspacePaneStaticTabItem {
   return {
     identity: staticWorkspacePaneViewIdentity(input.type),
     type: input.type,
-    scope: 'branch',
-    branchViewType: input.type,
+    kind: 'static',
+    staticViewType: input.type,
     label: input.label,
     tooltip: input.tooltip,
     closeLabel: input.closeLabel,
@@ -133,17 +127,17 @@ export function createBranchWorkspacePaneTabItem(input: {
   }
 }
 
-export function createWorktreeWorkspacePaneTabItem(input: {
-  view: WorkspacePaneViewSummary
+export function createTerminalWorkspacePaneTabItem(input: {
+  view: TerminalWorkspacePaneViewSummary
   label: string
   tooltip: string
   closeLabel: string
   panelId?: string
-}): WorkspacePaneWorktreeTabItem {
+}): WorkspacePaneTerminalTabItem {
   return {
     identity: workspacePaneViewIdentity(input.view),
     type: input.view.type,
-    scope: 'worktree',
+    kind: 'terminal',
     view: input.view,
     label: input.label,
     tooltip: input.tooltip,
@@ -151,7 +145,7 @@ export function createWorktreeWorkspacePaneTabItem(input: {
     icon: input.view.type,
     panelId: input.panelId,
     sortableId: workspacePaneViewIdentity(input.view),
-    orderEntry: workspacePaneViewOrderEntry(input.view),
+    orderEntry: { type: 'terminal', id: input.view.id },
   }
 }
 
@@ -316,17 +310,12 @@ export function WorkspacePaneViewStrip({
   onScrollToBottom,
   onClose,
   onReorder,
-  onReorderBranchViews,
   onNavigateOut,
-  activateCrossScopeKeyboardNavigation = false,
+  activateKeyboardNavigationSelection = false,
 }: WorkspacePaneViewStripProps) {
   const t = useT()
-  const worktreeItems = useMemo(() => items.filter(isWorktreeWorkspacePaneTabItem), [items])
-  const branchItems = useMemo(() => items.filter(isBranchWorkspacePaneTabItem), [items])
-  const sortableItems = useMemo(
-    () => [...(onReorderBranchViews ? branchItems : []), ...(worktreeTerminalKey ? worktreeItems : [])],
-    [branchItems, onReorderBranchViews, worktreeItems, worktreeTerminalKey],
-  )
+  const terminalItems = useMemo(() => items.filter(isTerminalWorkspacePaneTabItem), [items])
+  const sortableItems = useMemo(() => items, [items])
   const canCreateNew = worktreeTerminalKey !== null
   const showCollapsedTabs = !!responsiveCompact
   const selectedItem = activeTabIdentity ? (items.find((item) => item.identity === activeTabIdentity) ?? null) : null
@@ -337,7 +326,9 @@ export function WorkspacePaneViewStrip({
   const viewportRef = useRef<HTMLDivElement>(null)
   const prevTabCountRef = useRef(items.length)
   const newButtonRef = useRef<HTMLButtonElement>(null)
+  const pendingFocusIdentityRef = useRef<string | null>(null)
   const [hoveredTabIdentity, setHoveredTabIdentity] = useState<string | null>(null)
+  const [focusRequestVersion, setFocusRequestVersion] = useState(0)
 
   useLayoutEffect(() => {
     if (items.length <= prevTabCountRef.current) {
@@ -358,6 +349,17 @@ export function WorkspacePaneViewStrip({
     })
     return () => cancelAnimationFrame(frame)
   }, [items.length])
+
+  useLayoutEffect(() => {
+    const pendingFocusIdentity = pendingFocusIdentityRef.current
+    if (!pendingFocusIdentity) return
+    if (!items.some((item) => item.identity === pendingFocusIdentity)) {
+      pendingFocusIdentityRef.current = null
+      return
+    }
+    focusRegistry.focus(pendingFocusIdentity)
+    pendingFocusIdentityRef.current = null
+  }, [focusRegistry, focusRequestVersion, items])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -399,34 +401,32 @@ export function WorkspacePaneViewStrip({
         (items[idx + 1] ? items[idx + 1].identity : null) ?? (items[idx - 1] ? items[idx - 1].identity : null)
 
       setHoveredTabIdentity(null)
+      if (isActive && nextKey) pendingFocusIdentityRef.current = nextKey
       onClose(item)
 
       if (isActive && nextKey) {
-        focusRegistry.focus(nextKey)
+        setFocusRequestVersion((version) => version + 1)
       }
     },
-    [activeTabIdentity, focusRegistry, items, onClose],
+    [activeTabIdentity, items, onClose],
   )
 
   const tabIdForItem = useCallback(
     (item: WorkspacePaneTabItem) => {
-      if (isBranchWorkspacePaneTabItem(item)) return `${workspacePaneId}-${item.branchViewType}-tab`
-      const index = worktreeItems.findIndex((candidate) => candidate.identity === item.identity)
+      if (isStaticWorkspacePaneTabItem(item)) return `${workspacePaneId}-${item.staticViewType}-tab`
+      const index = terminalItems.findIndex((candidate) => candidate.identity === item.identity)
       return workspacePaneViewButtonId(workspacePaneId, Math.max(0, index))
     },
-    [workspacePaneId, worktreeItems],
+    [workspacePaneId, terminalItems],
   )
 
   const activateKeyboardNavigationTarget = useCallback(
     (fromIdentity: string, toIdentity: string) => {
-      if (!activateCrossScopeKeyboardNavigation || fromIdentity === toIdentity) return
-      const from = items.find((item) => item.identity === fromIdentity)
       const to = items.find((item) => item.identity === toIdentity)
-      if (!from || !to) return
-      if (from.scope === to.scope) return
-      handleSelect(toIdentity)
+      if (!activateKeyboardNavigationSelection || fromIdentity === toIdentity || !to) return
+      onSelect(to)
     },
-    [activateCrossScopeKeyboardNavigation, handleSelect, items],
+    [activateKeyboardNavigationSelection, items, onSelect],
   )
 
   const handleTabKeyDown = useCallback(
@@ -487,26 +487,10 @@ export function WorkspacePaneViewStrip({
       if (oldIndex === -1 || newIndex === -1) return
       const activeItem = sortableItems[oldIndex]
       const overItem = sortableItems[newIndex]
-      if (!activeItem || !overItem || activeItem.scope !== overItem.scope) return
-      if (activeItem.scope === 'worktree' && worktreeTerminalKey) {
-        const next = arrayMove(
-          worktreeItems.map((item) => item.orderEntry),
-          worktreeItems.findIndex((item) => item.sortableId === activeId),
-          worktreeItems.findIndex((item) => item.sortableId === overId),
-        )
-        onReorder(worktreeTerminalKey, next)
-        return
-      }
-      const nextBranchViews = arrayMove(
-        branchItems.map((item) => item.orderEntry),
-        branchItems.findIndex((item) => item.sortableId === activeId),
-        branchItems.findIndex((item) => item.sortableId === overId),
-      )
-        .map((entry) => entry.type)
-        .filter(isWorkspacePaneBranchViewType)
-      if (nextBranchViews.length === branchItems.length) onReorderBranchViews?.(nextBranchViews)
+      if (!activeItem || !overItem) return
+      onReorder(arrayMove(sortableItems.map((item) => item.orderEntry), oldIndex, newIndex))
     },
-    [branchItems, onReorder, onReorderBranchViews, sortableItems, worktreeItems, worktreeTerminalKey],
+    [onReorder, sortableItems],
   )
 
   if (items.length === 0) {
@@ -556,7 +540,7 @@ export function WorkspacePaneViewStrip({
             isSelected={compactItem.identity === activeTabIdentity}
             isFocusable={compactItem.identity === focusableTabIdentity}
             tabId={
-              isBranchWorkspacePaneTabItem(compactItem)
+              isStaticWorkspacePaneTabItem(compactItem)
                 ? tabIdForItem(compactItem)
                 : workspacePaneViewButtonId(workspacePaneId, 0)
             }
@@ -619,7 +603,6 @@ export function WorkspacePaneViewStrip({
               {items.map((item, index) => {
                 const nextItem = items[index + 1]
                 const rightId = nextItem ? nextItem.identity : WORKSPACE_PANE_NEW_ACTION_ID
-                const forceGroupSeparator = !!nextItem && item.scope !== nextItem.scope
                 const commonProps = {
                   item,
                   isActive: !!panelActive && item.identity === activeTabIdentity,
@@ -630,7 +613,6 @@ export function WorkspacePaneViewStrip({
                   tabId: tabIdForItem(item),
                   focusRegistry,
                   showSeparator:
-                    forceGroupSeparator ||
                     shouldShowWorkspacePaneViewSeparator({
                       leftId: item.identity,
                       rightId,
@@ -656,7 +638,7 @@ export function WorkspacePaneViewStrip({
           {canCreateNew ? (
             <WorkspacePaneNewButton
               ref={newButtonRef}
-              id={worktreeItems.length === 0 ? `${workspacePaneId}-workspace-pane-view-empty` : undefined}
+              id={items.length === 0 ? `${workspacePaneId}-workspace-pane-view-empty` : undefined}
               onClick={onNew}
               busy={newTerminalBusy}
               t={t}
@@ -977,18 +959,12 @@ function WorkspacePaneViewIcon({
   return <Terminal size={13} className={className} />
 }
 
-export function isBranchWorkspacePaneTabItem(item: WorkspacePaneTabItem): item is WorkspacePaneBranchTabItem {
-  return item.scope === 'branch'
+export function isStaticWorkspacePaneTabItem(item: WorkspacePaneTabItem): item is WorkspacePaneStaticTabItem {
+  return item.kind === 'static'
 }
 
-export function isWorktreeWorkspacePaneTabItem(item: WorkspacePaneTabItem): item is WorkspacePaneWorktreeTabItem {
-  return item.scope === 'worktree'
-}
-
-export function isTerminalWorkspacePaneTabItem(item: WorkspacePaneTabItem): item is WorkspacePaneWorktreeTabItem & {
-  view: Extract<WorkspacePaneViewSummary, { type: 'terminal' }>
-} {
-  return isWorktreeWorkspacePaneTabItem(item) && item.view.type === 'terminal'
+export function isTerminalWorkspacePaneTabItem(item: WorkspacePaneTabItem): item is WorkspacePaneTerminalTabItem {
+  return item.kind === 'terminal' && item.view.type === 'terminal'
 }
 
 function arrayMove<T>(array: T[], from: number, to: number): T[] {

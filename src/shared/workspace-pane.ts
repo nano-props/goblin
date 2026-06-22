@@ -13,11 +13,20 @@ export const WORKSPACE_PANE_WORKTREE_VIEW_TYPES = [
   'terminal',
 ] as const satisfies readonly WorkspacePaneViewType[]
 export type WorkspacePaneWorktreeViewType = (typeof WORKSPACE_PANE_WORKTREE_VIEW_TYPES)[number]
-export const WORKSPACE_PANE_SESSION_VIEW_TYPES = [
-  ...WORKSPACE_PANE_BRANCH_VIEW_TYPES,
-  'terminal',
-] as const satisfies readonly WorkspacePaneViewType[]
+export const WORKSPACE_PANE_SESSION_VIEW_TYPES = WORKSPACE_PANE_VIEW_TYPES
 export type WorkspacePaneSessionView = (typeof WORKSPACE_PANE_SESSION_VIEW_TYPES)[number]
+
+export interface WorkspacePaneStaticTabOrderEntry {
+  type: WorkspacePaneStaticViewType
+  id: WorkspacePaneStaticViewType
+}
+
+export interface WorkspacePaneTerminalTabOrderEntry {
+  type: 'terminal'
+  id: string
+}
+
+export type WorkspacePaneTabOrderEntry = WorkspacePaneStaticTabOrderEntry | WorkspacePaneTerminalTabOrderEntry
 
 export function isWorkspacePaneViewType(value: string | null | undefined): value is WorkspacePaneViewType {
   return typeof value === 'string' && (WORKSPACE_PANE_VIEW_TYPES as readonly string[]).includes(value)
@@ -47,30 +56,21 @@ export function isWorkspacePaneSessionViewType(
   return typeof value === 'string' && (WORKSPACE_PANE_SESSION_VIEW_TYPES as readonly string[]).includes(value)
 }
 
-export interface WorkspacePaneWorktreeViewOrderEntry {
-  type: WorkspacePaneWorktreeViewType
-  id: string
+export function isWorkspacePaneTabOrderEntry(value: unknown): value is WorkspacePaneTabOrderEntry {
+  if (!value || typeof value !== 'object') return false
+  const entry = value as Partial<WorkspacePaneTabOrderEntry>
+  if (entry.type === 'terminal') return typeof entry.id === 'string' && entry.id.length > 0
+  return isWorkspacePaneStaticViewType(entry.type) && entry.id === entry.type
 }
 
-export interface WorkspacePaneStaticViewSummary {
-  type: WorkspacePaneWorktreeStaticViewType
-  id: string
-  worktreePath: string
-  displayOrder: number
+export function workspacePaneStaticTabOrderEntry(type: WorkspacePaneStaticViewType): WorkspacePaneStaticTabOrderEntry {
+  return { type, id: type }
 }
 
-export interface WorkspacePaneListViewsInput {
-  repoRoot: string
+export function workspacePaneTerminalTabOrderEntry(id: string): WorkspacePaneTerminalTabOrderEntry {
+  return { type: 'terminal', id }
 }
 
-export interface WorkspacePaneStaticViewInput {
-  repoRoot: string
-  worktreePath: string
-  type: WorkspacePaneWorktreeStaticViewType
-}
-
-export interface WorkspacePaneReorderInput {
-  repoRoot: string
-  worktreePath: string
-  orderedViews: WorkspacePaneWorktreeViewOrderEntry[]
+export function workspacePaneTabOrderEntryIdentity(entry: WorkspacePaneTabOrderEntry): string {
+  return `${entry.type}:${entry.id}`
 }

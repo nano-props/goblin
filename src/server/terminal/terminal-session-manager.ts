@@ -15,7 +15,7 @@ import { cloneTerminalController } from '#/shared/terminal-ownership.ts'
 import { isValidTerminalSessionId, normalizeTerminalSize } from '#/shared/terminal-validators.ts'
 import { parseTerminalSessionKey } from '#/shared/terminal-session-key.ts'
 import { serverLogger } from '#/server/logger.ts'
-import type { WorkspacePaneRuntime } from '#/server/workspace-pane/workspace-pane-runtime.ts'
+import type { TerminalViewOrderRuntime } from '#/server/terminal/terminal-view-order-runtime.ts'
 import {
   attachTerminalAttachment,
   claimTerminalAttachmentControl,
@@ -50,8 +50,8 @@ import type { PtyHandle, PtySupervisor } from '#/server/terminal/pty-supervisor.
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 const sessionManagerLogger = serverLogger.child({ module: 'terminal-session-manager' })
 
-type TerminalWorkspacePaneRuntime<TOwner extends string | number> = Pick<
-  WorkspacePaneRuntime<TOwner>,
+type TerminalViewOrderRuntimeLike<TOwner extends string | number> = Pick<
+  TerminalViewOrderRuntime<TOwner>,
   'registerTerminalView' | 'unregisterTerminalView' | 'viewDisplayOrder'
 >
 
@@ -108,16 +108,16 @@ export class TerminalSessionManager<TOwner extends string | number> {
   private readonly sessionIdByOwnerKey = new Map<string, string>()
   private readonly sink: TerminalEventSink<TOwner>
   private readonly ptySupervisor: PtySupervisor
-  private readonly workspacePane: TerminalWorkspacePaneRuntime<TOwner>
+  private readonly terminalViewOrder: TerminalViewOrderRuntimeLike<TOwner>
 
   constructor(
     ptySupervisor: PtySupervisor,
     sink: TerminalEventSink<TOwner>,
-    workspacePane: TerminalWorkspacePaneRuntime<TOwner>,
+    terminalViewOrder: TerminalViewOrderRuntimeLike<TOwner>,
   ) {
     this.ptySupervisor = ptySupervisor
     this.sink = sink
-    this.workspacePane = workspacePane
+    this.terminalViewOrder = terminalViewOrder
   }
 
   async ensureSession(input: TerminalEnsureSessionInput<TOwner>): Promise<TerminalAttachResult> {
@@ -132,7 +132,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     const existingId = this.sessionIdByOwnerKey.get(ownerKey)
     const existing = existingId ? this.sessionsById.get(existingId) : undefined
     if (existing) {
-      this.workspacePane.registerTerminalView({
+      this.terminalViewOrder.registerTerminalView({
         ownerId,
         scope: existing.scope,
         worktreePath: existing.worktreePath,
@@ -171,7 +171,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     }
     this.sessionsById.set(id, session)
     this.sessionIdByOwnerKey.set(ownerKey, id)
-    this.workspacePane.registerTerminalView({
+    this.terminalViewOrder.registerTerminalView({
       ownerId,
       scope: input.scope,
       worktreePath,
@@ -341,7 +341,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     this.sessionsById.delete(sessionId)
     const ownerKey = this.sessionOwnerKey(session.ownerId, session.key)
     if (this.sessionIdByOwnerKey.get(ownerKey) === sessionId) this.sessionIdByOwnerKey.delete(ownerKey)
-    this.workspacePane.unregisterTerminalView({
+    this.terminalViewOrder.unregisterTerminalView({
       ownerId: session.ownerId,
       scope: session.scope,
       worktreePath: session.worktreePath,
@@ -445,11 +445,10 @@ export class TerminalSessionManager<TOwner extends string | number> {
 
   private terminalViewDisplayOrder(session: TerminalSession<TOwner>): number {
     return (
-      this.workspacePane.viewDisplayOrder({
+      this.terminalViewOrder.viewDisplayOrder({
         ownerId: session.ownerId,
         scope: session.scope,
         worktreePath: session.worktreePath,
-        type: 'terminal',
         id: session.key,
       }) ?? Number.MAX_SAFE_INTEGER
     )

@@ -6,7 +6,7 @@ import {
 import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
 import type { RepoState, ReposGet } from '#/web/stores/repos/types.ts'
 import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
-import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
+import { workspacePaneStaticViewsForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 
 interface RepoRefreshIntentBase {
@@ -38,7 +38,7 @@ export function repoStatusRefreshSnapshot(repo: RepoState): RepoStatusRefreshSna
     id: repo.id,
     token: repo.instanceToken,
     preferredWorkspacePaneView: preferredWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch),
-    statusViewOpen: branchWorkspacePaneViewsForBranch(repo.ui, repo.ui.selectedBranch).includes('status'),
+    statusViewOpen: workspacePaneStaticViewsForBranch(repo.ui, repo.ui.selectedBranch).includes('status'),
     unavailable: isRepoUnavailable(repo),
     statusPhase: repo.resources.status.phase,
   }

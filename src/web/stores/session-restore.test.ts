@@ -31,7 +31,7 @@ function installBridge(sessionOverrides: Record<string, unknown> = {}) {
               workspaceFocused: true,
               workspacePaneSize: 0.5,
               selectedTerminalByWorktree: {},
-              openBranchWorkspacePaneViewsByBranchByRepo: {},
+              workspacePaneTabOrderByBranchByRepo: {},
               ...sessionOverrides,
             },
             recentRepos: [],

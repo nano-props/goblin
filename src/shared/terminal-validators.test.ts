@@ -81,22 +81,6 @@ describe('shared terminal validators', () => {
     ).toBeNull()
   })
 
-  test('normalizes workspace pane client message actions', () => {
-    expect(
-      normalizeTerminalClientMessage({
-        type: 'request',
-        requestId: 'req_1',
-        action: 'workspace-pane:open-view',
-        input: { repoRoot: '/repo', worktreePath: '/repo', type: 'changes' },
-      }),
-    ).toEqual({
-      type: 'request',
-      requestId: 'req_1',
-      action: 'workspace-pane:open-view',
-      input: { repoRoot: '/repo', worktreePath: '/repo', type: 'changes' },
-    })
-  })
-
   test('normalizes valid terminal socket server messages', () => {
     expect(
       normalizeTerminalSocketServerMessage({
@@ -132,15 +116,4 @@ describe('shared terminal validators', () => {
     })
   })
 
-  test('normalizes workspace pane change realtime messages', () => {
-    expect(
-      normalizeTerminalSocketServerMessage({
-        type: 'workspace-pane-changed',
-        repoRoot: '/repo',
-      }),
-    ).toEqual({
-      type: 'workspace-pane-changed',
-      repoRoot: '/repo',
-    })
-  })
 })

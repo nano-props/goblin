@@ -3,12 +3,12 @@ import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import {
   isBranchLevelWorkspacePaneView,
   isWorktreeLevelWorkspacePaneView,
-  resolveWorkspacePaneSelectionView,
+  resolveRenderableWorkspacePaneView,
   workspacePaneViewScope,
-  type WorkspacePaneViewContext,
+  type WorkspacePaneRenderabilityContext,
 } from '#/web/lib/workspace-pane-view.ts'
 
-function ctx(overrides: Partial<WorkspacePaneViewContext> = {}): WorkspacePaneViewContext {
+function ctx(overrides: Partial<WorkspacePaneRenderabilityContext> = {}): WorkspacePaneRenderabilityContext {
   return {
     hasWorktree: true,
     terminalSessionCount: 0,
@@ -17,50 +17,50 @@ function ctx(overrides: Partial<WorkspacePaneViewContext> = {}): WorkspacePaneVi
   }
 }
 
-describe('resolveWorkspacePaneSelectionView', () => {
+describe('resolveRenderableWorkspacePaneView', () => {
   test('preserves a non-terminal preference verbatim', () => {
-    expect(resolveWorkspacePaneSelectionView('status', ctx())).toBe('status')
-    expect(resolveWorkspacePaneSelectionView('history', ctx())).toBe('history')
-    expect(resolveWorkspacePaneSelectionView('changes', ctx())).toBe('changes')
+    expect(resolveRenderableWorkspacePaneView('status', ctx())).toBe('status')
+    expect(resolveRenderableWorkspacePaneView('history', ctx())).toBe('history')
+    expect(resolveRenderableWorkspacePaneView('changes', ctx())).toBe('changes')
   })
 
   test('keeps a changes preference even when the worktree is clean', () => {
-    expect(resolveWorkspacePaneSelectionView('changes', ctx())).toBe('changes')
-    expect(resolveWorkspacePaneSelectionView('changes', ctx({ terminalSessionCount: 7 }))).toBe('changes')
+    expect(resolveRenderableWorkspacePaneView('changes', ctx())).toBe('changes')
+    expect(resolveRenderableWorkspacePaneView('changes', ctx({ terminalSessionCount: 7 }))).toBe('changes')
   })
 
   test('returns null for worktree-scoped preferences when no worktree exists', () => {
-    expect(resolveWorkspacePaneSelectionView('changes', ctx({ hasWorktree: false }))).toBeNull()
-    expect(resolveWorkspacePaneSelectionView('terminal', ctx({ hasWorktree: false }))).toBeNull()
+    expect(resolveRenderableWorkspacePaneView('changes', ctx({ hasWorktree: false }))).toBeNull()
+    expect(resolveRenderableWorkspacePaneView('terminal', ctx({ hasWorktree: false }))).toBeNull()
     expect(
-      resolveWorkspacePaneSelectionView('terminal', ctx({ hasWorktree: false, terminalSessionCount: 5 })),
+      resolveRenderableWorkspacePaneView('terminal', ctx({ hasWorktree: false, terminalSessionCount: 5 })),
     ).toBeNull()
-    expect(resolveWorkspacePaneSelectionView('history', ctx({ hasWorktree: false }))).toBe('history')
+    expect(resolveRenderableWorkspacePaneView('history', ctx({ hasWorktree: false }))).toBe('history')
   })
 
   test('preserves the terminal preference while sync is unresolved', () => {
-    expect(resolveWorkspacePaneSelectionView('terminal', ctx({ terminalSyncReady: false }))).toBe('terminal')
+    expect(resolveRenderableWorkspacePaneView('terminal', ctx({ terminalSyncReady: false }))).toBe('terminal')
   })
 
   test('preserves the terminal preference while terminal creation is pending', () => {
-    expect(resolveWorkspacePaneSelectionView('terminal', ctx({ pendingCreate: true }))).toBe('terminal')
+    expect(resolveRenderableWorkspacePaneView('terminal', ctx({ terminalCreatePending: true }))).toBe('terminal')
   })
 
   test('keeps the terminal preference when the active worktree has at least one session', () => {
-    expect(resolveWorkspacePaneSelectionView('terminal', ctx({ terminalSessionCount: 1 }))).toBe('terminal')
-    expect(resolveWorkspacePaneSelectionView('terminal', ctx({ terminalSessionCount: 7 }))).toBe('terminal')
+    expect(resolveRenderableWorkspacePaneView('terminal', ctx({ terminalSessionCount: 1 }))).toBe('terminal')
+    expect(resolveRenderableWorkspacePaneView('terminal', ctx({ terminalSessionCount: 7 }))).toBe('terminal')
   })
 
   test('returns null for terminal after sync confirms the worktree has no terminal sessions', () => {
-    expect(resolveWorkspacePaneSelectionView('terminal', ctx({ terminalSessionCount: 0 }))).toBeNull()
+    expect(resolveRenderableWorkspacePaneView('terminal', ctx({ terminalSessionCount: 0 }))).toBeNull()
   })
 
   test('does not dismiss terminal when sync settled with non-zero sessions', () => {
-    expect(resolveWorkspacePaneSelectionView('terminal', ctx({ terminalSessionCount: 1 }))).toBe('terminal')
+    expect(resolveRenderableWorkspacePaneView('terminal', ctx({ terminalSessionCount: 1 }))).toBe('terminal')
   })
 
   test('is total over the inputs', () => {
-    const cases: Array<[WorkspacePaneView, WorkspacePaneViewContext, WorkspacePaneView | null]> = [
+    const cases: Array<[WorkspacePaneView, WorkspacePaneRenderabilityContext, WorkspacePaneView | null]> = [
       ['status', ctx(), 'status'],
       ['status', ctx({ hasWorktree: false, terminalSyncReady: false }), 'status'],
       ['history', ctx(), 'history'],
@@ -69,12 +69,12 @@ describe('resolveWorkspacePaneSelectionView', () => {
       ['changes', ctx({ hasWorktree: false }), null],
       ['terminal', ctx({ hasWorktree: false }), null],
       ['terminal', ctx({ terminalSyncReady: false }), 'terminal'],
-      ['terminal', ctx({ pendingCreate: true }), 'terminal'],
+      ['terminal', ctx({ terminalCreatePending: true }), 'terminal'],
       ['terminal', ctx({ terminalSessionCount: 0 }), null],
       ['terminal', ctx({ terminalSessionCount: 3 }), 'terminal'],
     ]
     for (const [preferred, context, expected] of cases) {
-      expect(resolveWorkspacePaneSelectionView(preferred, context)).toBe(expected)
+      expect(resolveRenderableWorkspacePaneView(preferred, context)).toBe(expected)
     }
   })
 })

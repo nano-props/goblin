@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { useSessionPersistence } from '#/web/hooks/useSessionPersistence.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
 
 const persistSessionStateMock = vi.fn(async (_session: unknown) => {})
 
@@ -59,29 +60,29 @@ describe('useSessionPersistence', () => {
         selectedTerminalByWorktree: {
           '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2',
         },
-        openBranchWorkspacePaneViewsByBranchByRepo: {
+        workspacePaneTabOrderByBranchByRepo: {
           '/tmp/repo': {
-            'feature/worktree': ['status'],
+            'feature/worktree': [workspacePaneStaticTabOrderEntry('status')],
           },
         },
       }),
     )
   })
 
-  test('persists explicitly closed branch workspace tabs as empty arrays', async () => {
+  test('persists explicitly closed workspace pane tabs as empty arrays', async () => {
     const repo = seedRepoState({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneView: 'status',
     })
-    useReposStore.getState().closeBranchWorkspacePaneView(repo.id, 'status', 'feature/worktree')
+    useReposStore.getState().closeWorkspacePaneStaticView(repo.id, 'status', 'feature/worktree')
 
     await render(<Harness />)
 
     expect(persistSessionStateMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        openBranchWorkspacePaneViewsByBranchByRepo: {
+        workspacePaneTabOrderByBranchByRepo: {
           '/tmp/repo': {
             'feature/worktree': [],
           },

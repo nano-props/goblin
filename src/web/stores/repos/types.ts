@@ -9,7 +9,12 @@ import type {
 } from '#/web/types.ts'
 import type { RemoteRepoLifecycle, RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { SessionState } from '#/shared/api-types.ts'
-import type { WorkspacePaneBranchViewType, WorkspacePaneSessionView, WorkspacePaneView } from '#/shared/workspace-pane.ts'
+import type {
+  WorkspacePaneSessionView,
+  WorkspacePaneStaticViewType,
+  WorkspacePaneTabOrderEntry,
+  WorkspacePaneView,
+} from '#/shared/workspace-pane.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/repos/branch-action-types.ts'
 import type { RepoOperationsState } from '#/web/stores/repos/operations.ts'
 import type { RepoResourcesState } from '#/web/stores/repos/resources.ts'
@@ -62,12 +67,11 @@ export interface RepoUiState {
   selectedBranch: string | null
   branchViewMode: BranchViewMode
   /**
-   * Branch-owned workspace pane tabs opened per branch. These are projected
-   * directly into the tab strip and are never materialized into the terminal
-   * runtime; worktree-owned tabs (`changes` and terminals) come from the
-   * terminal runtime separately.
+   * Single branch-scoped workspace pane tab strip order. Static view entries
+   * are the opened static tabs; terminal entries are ordering hints for live
+   * terminal sessions, whose lifecycle remains terminal-runtime owned.
    */
-  openBranchWorkspacePaneViewsByBranch: Record<string, WorkspacePaneBranchViewType[]>
+  workspacePaneTabOrderByBranch: Record<string, WorkspacePaneTabOrderEntry[]>
   /** Branch-scoped selected workspace pane view. Branch switches read this
    *  first so selecting a tab on one branch does not select it on another. */
   preferredWorkspacePaneViewByBranch: Record<string, WorkspacePaneView>
@@ -159,7 +163,7 @@ export interface RestorableWorkspaceState {
 }
 
 export interface SessionWorkspacePaneRestoreState {
-  openBranchWorkspacePaneViewsByBranchByRepo: Record<string, Record<string, WorkspacePaneBranchViewType[]>>
+  workspacePaneTabOrderByBranchByRepo: Record<string, Record<string, WorkspacePaneTabOrderEntry[]>>
   preferredWorkspacePaneViewByBranchByRepo: Record<string, Record<string, WorkspacePaneSessionView>>
 }
 
@@ -207,11 +211,11 @@ export interface RuntimeCoherentRepoProjectionActions {
    *  the UI resolves the active pane at read time so session restore preserves
    *  branch-scoped user intent. */
   setWorkspacePaneView: (id: string, tab: WorkspacePaneView) => void
-  openBranchWorkspacePaneView: (id: string, tab: WorkspacePaneBranchViewType, branchName?: string) => void
-  closeBranchWorkspacePaneView: (id: string, tab: WorkspacePaneBranchViewType, branchName?: string) => void
-  reorderBranchWorkspacePaneViews: (
+  openWorkspacePaneStaticView: (id: string, tab: WorkspacePaneStaticViewType, branchName?: string) => void
+  closeWorkspacePaneStaticView: (id: string, tab: WorkspacePaneStaticViewType, branchName?: string) => void
+  reorderWorkspacePaneTabs: (
     id: string,
-    orderedViews: WorkspacePaneBranchViewType[],
+    orderedTabs: WorkspacePaneTabOrderEntry[],
     branchName?: string,
   ) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void

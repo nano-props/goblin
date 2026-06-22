@@ -15,32 +15,32 @@ import { useTerminalSessionContext } from '#/web/components/terminal/terminal-se
 import {
   WorkspacePaneViewStrip,
   EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY,
-  createBranchWorkspacePaneTabItem,
-  createWorktreeWorkspacePaneTabItem,
-  isWorktreeWorkspacePaneTabItem,
+  createStaticWorkspacePaneTabItem,
+  createTerminalWorkspacePaneTabItem,
+  isStaticWorkspacePaneTabItem,
+  isTerminalWorkspacePaneTabItem,
   type WorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx'
 import { useMainWindowNavigation } from '#/web/main-window-navigation.tsx'
-import type { WorkspacePaneBranchViewType, WorkspacePaneWorktreeViewOrderEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneStaticViewType, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneViewSummary, TerminalSessionBase } from '#/web/components/terminal/types.ts'
 import type {
   BranchWorkspaceRepo,
   SelectedBranchWorkspacePresentation,
 } from '#/web/components/branch-workspace/model.ts'
 import {
-  branchLevelWorkspacePaneViewDefinition,
-  branchLevelWorkspacePaneViewCloseLabel,
-  branchLevelWorkspacePaneViewLabel,
-  branchLevelWorkspacePaneViewTooltip,
   branchWorkspacePaneViewCloseLabel,
   branchWorkspacePaneViewLabel,
   branchWorkspacePaneViewTooltip,
+  workspacePaneStaticViewCloseLabel,
+  workspacePaneStaticViewLabel,
+  workspacePaneStaticViewTooltip,
 } from '#/web/components/branch-workspace/workspace-pane-views.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useIsInitialSyncInFlight } from '#/web/stores/repo-sync.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
+import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { createBranchWorkspacePaneTabModel } from '#/web/components/branch-workspace/workspace-pane-tab-model.ts'
@@ -69,14 +69,13 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
   const preferredWorkspacePaneView = preferredWorkspacePaneViewForBranch(repo.ui, branchName)
   const showBranchLevelTabs = !!detail.branch
 
-  const { createTerminal, selectTerminal, scrollToBottom, reorderWorkspacePaneViews } = useTerminalSessionContext()
+  const { createTerminal, selectTerminal, scrollToBottom } = useTerminalSessionContext()
 
   const worktreeSnapshot = useWorktreeTerminalSnapshot(terminalWorktreeKey)
   const terminalSyncReady = useTerminalRepoSyncReady(repo.id)
-  const runtimeWorkspacePaneViews = worktreeSnapshot.workspacePaneViews
-  const openBranchWorkspacePaneViews = useMemo(
-    () => branchWorkspacePaneViewsForBranch(repo.ui, branchName),
-    [branchName, repo.ui.openBranchWorkspacePaneViewsByBranch],
+  const workspacePaneTabOrder = useMemo(
+    () => workspacePaneTabOrderForBranch(repo.ui, branchName),
+    [branchName, repo.ui.workspacePaneTabOrderByBranch],
   )
   const workspacePaneTabModel = useMemo(
     () =>
@@ -85,29 +84,24 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
         branchName,
         worktreePath,
         preferredView: preferredWorkspacePaneView,
-        openBranchViews: openBranchWorkspacePaneViews,
-        runtimeWorktreeViews: runtimeWorkspacePaneViews,
+        tabOrder: workspacePaneTabOrder,
+        runtimeTerminalViews: worktreeSnapshot.sessions,
         terminalSessionCount: worktreeSnapshot.count,
-        pendingCreate: worktreeSnapshot.pendingCreate,
+        terminalCreatePending: worktreeSnapshot.pendingCreate,
         terminalSyncReady,
       }),
     [
       branchName,
-      openBranchWorkspacePaneViews,
+      workspacePaneTabOrder,
       repo.id,
-      runtimeWorkspacePaneViews,
       preferredWorkspacePaneView,
       terminalSyncReady,
       worktreePath,
       worktreeSnapshot.count,
       worktreeSnapshot.pendingCreate,
+      worktreeSnapshot.sessions,
     ],
   )
-  const openBranchLevelTabs = useMemo(
-    () => branchLevelWorkspacePaneViewDefinitions(workspacePaneTabModel.openBranchViews),
-    [workspacePaneTabModel.openBranchViews],
-  )
-  const worktreeWorkspacePaneViews = workspacePaneTabModel.worktreeViews
   const workspacePaneTabFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()
 
   const terminalBase = useMemo<TerminalSessionBase | null>(
@@ -142,16 +136,15 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
 
   const showWorkspacePaneTabItem = useCallback(
     (item: WorkspacePaneTabItem) => {
-      if (!isWorktreeWorkspacePaneTabItem(item)) {
-        navigation.showRepoWorkspacePaneView(repo.id, item.branchViewType)
+      if (isStaticWorkspacePaneTabItem(item)) {
+        navigation.showRepoWorkspacePaneView(repo.id, item.staticViewType)
         return
       }
-      if (item.view.type === 'terminal') {
+      if (isTerminalWorkspacePaneTabItem(item)) {
         enterTerminalTab()
         selectTerminal(item.view.worktreeTerminalKey, item.view.key)
         return
       }
-      navigation.showRepoWorkspacePaneView(repo.id, item.view.type)
     },
     [enterTerminalTab, navigation, repo.id, selectTerminal],
   )
@@ -165,14 +158,8 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
   )
 
   const handleReorderWorkspacePaneViewStrip = useCallback(
-    (worktreeKey: string, orderedViews: WorkspacePaneWorktreeViewOrderEntry[]) => {
-      void reorderWorkspacePaneViews(worktreeKey, orderedViews)
-    },
-    [reorderWorkspacePaneViews],
-  )
-  const handleReorderBranchWorkspacePaneViewStrip = useCallback(
-    (orderedViews: WorkspacePaneBranchViewType[]) => {
-      useReposStore.getState().reorderBranchWorkspacePaneViews(repo.id, orderedViews, branchName ?? undefined)
+    (orderedTabs: WorkspacePaneTabOrderEntry[]) => {
+      useReposStore.getState().reorderWorkspacePaneTabs(repo.id, orderedTabs, branchName ?? undefined)
     },
     [branchName, repo.id],
   )
@@ -195,58 +182,61 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
     (tab: WorkspacePaneViewSummary) => branchWorkspacePaneViewCloseLabel(tab, t),
     [t],
   )
-  const tooltipForBranchLevelPaneView = useCallback(
-    (tab: WorkspacePaneBranchViewType) =>
-      branchLevelWorkspacePaneViewTooltip({
+  const labelForStaticWorkspacePaneView = useCallback(
+    (tab: WorkspacePaneStaticViewType) => workspacePaneStaticViewLabel(tab, t, detail.statusCount),
+    [detail.statusCount, t],
+  )
+  const tooltipForStaticWorkspacePaneView = useCallback(
+    (tab: WorkspacePaneStaticViewType) =>
+      workspacePaneStaticViewTooltip({
         tab,
         branchName: branchName ?? '',
+        statusCount: detail.statusCount,
         t,
       }),
-    [branchName, t],
+    [branchName, detail.statusCount, t],
   )
 
   const workspacePaneTabItems = useMemo<WorkspacePaneTabItem[]>(
-    () => [
-      ...(showBranchLevelTabs
-        ? openBranchLevelTabs.map((tab) => {
-            const label = branchLevelWorkspacePaneViewLabel(tab.type, t)
-            return createBranchWorkspacePaneTabItem({
-              type: tab.type,
-              label,
-              tooltip: tooltipForBranchLevelPaneView(tab.type),
-              closeLabel: branchLevelWorkspacePaneViewCloseLabel(tab.type, t),
-              panelId: `${workspacePaneId}-${tab.type}-panel`,
-            })
+    () =>
+      workspacePaneTabModel.tabs.map((tab) => {
+        if (tab.kind === 'static') {
+          const type = tab.type as WorkspacePaneStaticViewType
+          return createStaticWorkspacePaneTabItem({
+            type,
+            label: labelForStaticWorkspacePaneView(type),
+            tooltip: tooltipForStaticWorkspacePaneView(type),
+            closeLabel: workspacePaneStaticViewCloseLabel(type, t),
+            panelId: `${workspacePaneId}-${type}-panel`,
           })
-        : []),
-      ...worktreeWorkspacePaneViews.map((tab) =>
-        createWorktreeWorkspacePaneTabItem({
-          view: tab,
-          label: labelForWorkspacePaneView(tab),
-          tooltip: tooltipForWorkspacePaneView(tab),
-          closeLabel: closeLabelForWorkspacePaneView(tab),
+        }
+        if (!tab.view || tab.view.type !== 'terminal') {
+          throw new Error('terminal workspace pane tab missing terminal view')
+        }
+        return createTerminalWorkspacePaneTabItem({
+          view: tab.view,
+          label: labelForWorkspacePaneView(tab.view),
+          tooltip: tooltipForWorkspacePaneView(tab.view),
+          closeLabel: closeLabelForWorkspacePaneView(tab.view),
           panelId: `${workspacePaneId}-${tab.type}-panel`,
-        }),
-      ),
-    ],
+        })
+      }),
     [
       closeLabelForWorkspacePaneView,
+      labelForStaticWorkspacePaneView,
       labelForWorkspacePaneView,
-      openBranchLevelTabs,
-      showBranchLevelTabs,
       t,
-      tooltipForBranchLevelPaneView,
+      tooltipForStaticWorkspacePaneView,
       tooltipForWorkspacePaneView,
+      workspacePaneTabModel.tabs,
       workspacePaneId,
-      worktreeWorkspacePaneViews,
     ],
   )
   const activeTabIdentity = workspacePaneTabModel.activeTab?.identity ?? null
   const handleSelectWorkspacePaneTabItem = useCallback(
     (item: WorkspacePaneTabItem) => {
       if (
-        isWorktreeWorkspacePaneTabItem(item) &&
-        item.view.type === 'terminal' &&
+        isTerminalWorkspacePaneTabItem(item) &&
         item.identity === activeTabIdentity
       ) {
         handleScrollToBottom(item.view.key)
@@ -310,18 +300,10 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
             onScrollToBottom={handleScrollToBottom}
             onClose={handleCloseWorkspacePaneView}
             onReorder={handleReorderWorkspacePaneViewStrip}
-            onReorderBranchViews={handleReorderBranchWorkspacePaneViewStrip}
-            activateCrossScopeKeyboardNavigation
+            activateKeyboardNavigationSelection
           />
         )}
       </div>
     </Toolbar>
   )
-}
-
-function branchLevelWorkspacePaneViewDefinitions(openViews: readonly WorkspacePaneBranchViewType[]) {
-  return openViews.flatMap((type) => {
-    const tab = branchLevelWorkspacePaneViewDefinition(type)
-    return tab ? [tab] : []
-  })
 }
