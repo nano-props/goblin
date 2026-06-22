@@ -2,12 +2,14 @@
 // repo picker in the Topbar (see `Topbar.tsx`) — they are unrelated
 // to any single branch:
 //
-//   Refresh — syncs configured remotes when present, then rebuilds the
-//             local snapshot (branches, status, log) from disk. Local-only
-//             repositories skip remote sync and refresh from local reads only.
+//   Refresh — see `RepoActivityControl`; syncs configured remotes when
+//             present, then rebuilds the local snapshot (branches,
+//             status, log) from disk. Local-only repositories skip
+//             remote sync and refresh from local reads only.
 //   Filter  — single-button toggle for `branchViewMode` (worktrees-only /
-//             all), using the same topbar icon-button treatment as the
-//             surrounding controls.
+//             all). Hidden when the branch navigator is off screen —
+//             there is no branch list to filter, so the toggle would
+//             just add noise to the topbar.
 //   Create  — open the new-worktree dialog for the active repo.
 //
 // Branch-scoped operations (Pull / Push / Open in Terminal
@@ -25,6 +27,7 @@ import { CreateWorktreeDialog, type CreateWorktreeRequest } from '#/web/componen
 import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivityControl.tsx'
 import { BranchViewModeControl } from '#/web/components/repo-toolbar/BranchViewModeControl.tsx'
 import type { BranchViewMode } from '#/web/stores/repos/types.ts'
+import { useBranchNavigatorVisible } from '#/web/hooks/useBranchNavigatorVisible.ts'
 
 interface Props {
   repoId: string
@@ -50,7 +53,18 @@ export function RepoToolbarActions({ repoId }: Props) {
 // into the BranchViewModeControl toggle. Sits between Refresh and
 // CreateWorktree in the topbar, the visual grouping is implied by
 // the row order rather than a separate flex container.
+//
+// The visibility check is split into its own component so the
+// store-reading hooks in `WorktreeFilterToggle` are never called
+// while the button is hidden — keeps the rules of hooks happy
+// (consistent hook order across renders) and avoids a needless
+// subscription on the rest of the store.
 function WorktreeFilterAction({ repoId }: Props) {
+  if (!useBranchNavigatorVisible(repoId)) return null
+  return <WorktreeFilterToggle repoId={repoId} />
+}
+
+function WorktreeFilterToggle({ repoId }: Props) {
   const setBranchViewMode = useReposStore((s) => s.setBranchViewMode)
   const { branchCount, branchViewMode } = useStoreWithEqualityFn(
     useReposStore,

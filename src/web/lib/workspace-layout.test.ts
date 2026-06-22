@@ -3,29 +3,30 @@ import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 
 describe('repoWorkspaceBehavior', () => {
   test('renders split behavior when neither compact nor Focus Mode is active', () => {
-    expect(repoWorkspaceBehavior({ layout: 'left-right', compact: false, workspaceFocused: false })).toMatchObject({
+    expect(repoWorkspaceBehavior({ compact: false, workspaceFocused: false })).toMatchObject({
       mode: 'split',
       singlePane: false,
       workspaceFocused: false,
       branchNavigatorCollapsed: false,
       branchNavigatorActionsVisible: true,
+      branchNavigatorVisible: true,
     })
   })
 
   test('uses Branch Navigator as the single pane when large-screen Focus Mode has no active branch workspace', () => {
-    expect(repoWorkspaceBehavior({ layout: 'left-right', compact: false, workspaceFocused: true })).toMatchObject({
+    expect(repoWorkspaceBehavior({ compact: false, workspaceFocused: true })).toMatchObject({
       mode: 'single-pane',
       singlePane: true,
       workspaceFocused: true,
       branchNavigatorCollapsed: false,
       branchNavigatorActionsVisible: true,
+      branchNavigatorVisible: false,
     })
   })
 
   test('collapses Branch Navigator inside split layout when large-screen Focus Mode has an active branch workspace', () => {
     expect(
       repoWorkspaceBehavior({
-        layout: 'left-right',
         compact: false,
         workspaceFocused: true,
         branchWorkspaceActive: true,
@@ -36,17 +37,36 @@ describe('repoWorkspaceBehavior', () => {
       workspaceFocused: true,
       branchNavigatorCollapsed: true,
       branchNavigatorActionsVisible: true,
+      branchNavigatorVisible: false,
     })
   })
 
   test('uses single-pane behavior in compact mode even when Focus Mode is off', () => {
-    expect(repoWorkspaceBehavior({ layout: 'left-right', compact: true, workspaceFocused: false })).toMatchObject({
+    expect(repoWorkspaceBehavior({ compact: true, workspaceFocused: false })).toMatchObject({
       mode: 'single-pane',
       singlePane: true,
       compact: true,
       workspaceFocused: false,
       branchNavigatorCollapsed: false,
       branchNavigatorActionsVisible: true,
+      branchNavigatorVisible: true,
+    })
+  })
+
+  test('hides Branch Navigator in compact mode once a branch workspace is active', () => {
+    expect(
+      repoWorkspaceBehavior({
+        compact: true,
+        workspaceFocused: false,
+        branchWorkspaceActive: true,
+      }),
+    ).toMatchObject({
+      mode: 'single-pane',
+      singlePane: true,
+      compact: true,
+      branchNavigatorCollapsed: false,
+      branchNavigatorActionsVisible: true,
+      branchNavigatorVisible: false,
     })
   })
 })

@@ -31,7 +31,6 @@ export function App({ routeSettingsPage = null, onRouteSettingsPageChange }: App
   const workspaceFocused = useReposStore((s) => s.workspaceFocused)
   const uiMode = useResponsiveUiMode()
   const bootWorkspaceBehavior = repoWorkspaceBehavior({
-    layout: DEFAULT_WORKSPACE_LAYOUT,
     compact: uiMode === 'compact',
     workspaceFocused,
   })

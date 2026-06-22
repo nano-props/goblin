@@ -51,7 +51,6 @@ export function RepoView({ repoId }: Props) {
   const layout = DEFAULT_WORKSPACE_LAYOUT
   const branchWorkspaceActive = !!repo?.ui.selectedBranch
   const behavior = repoWorkspaceBehavior({
-    layout,
     compact,
     workspaceFocused: view.workspaceFocused,
     branchWorkspaceActive,
