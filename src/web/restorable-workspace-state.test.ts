@@ -22,7 +22,7 @@ describe('restorable-workspace-state', () => {
           order: [repo.id],
           activeId: repo.id,
           workspaceFocused: false,
-          workspacePaneSizes: { 'left-right': 55 },
+          workspacePaneSize: 55,
           selectedTerminalByWorktree: {
             '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2',
           },
@@ -32,7 +32,7 @@ describe('restorable-workspace-state', () => {
       openRepos: [localRepoSessionEntry('/tmp/repo')],
       activeRepo: '/tmp/repo',
       workspaceFocused: false,
-      workspacePaneSizes: { 'left-right': 55 },
+      workspacePaneSize: 55,
       selectedTerminalByWorktree: {
         '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-2',
       },
@@ -46,7 +46,7 @@ describe('restorable-workspace-state', () => {
         openRepos: [localRepoSessionEntry('/tmp/repo')],
         activeRepo: '/tmp/repo',
         workspaceFocused: false,
-        workspacePaneSizes: { 'left-right': 40 },
+        workspacePaneSize: 40,
         selectedTerminalByWorktree: {
           '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-1',
         },
@@ -54,7 +54,7 @@ describe('restorable-workspace-state', () => {
     ).toEqual({
       activeId: '/tmp/repo',
       workspaceFocused: false,
-      workspacePaneSizes: { 'left-right': 40 },
+      workspacePaneSize: 40,
       selectedTerminalByWorktree: {
         '/tmp/repo\0/tmp/worktree': '/tmp/repo\0/tmp/worktree\0terminal-1',
       },

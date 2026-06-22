@@ -188,7 +188,7 @@ export function applyMainWindowChromeTheme(theme: 'light' | 'dark'): void {
  *  rather than firing it inline. Maximize/minimize unwinding is
  *  synchronous everywhere we care about, so those run inline. The
  *  existing resize/move listeners persist the new bounds. Wired to the
- *  Window > Reset Layout menu item so users have a one-click escape from
+ *  Window > Reset Window menu item so users have a one-click escape from
  *  an awkward drag-resize. */
 export function resetMainWindowToDefault(): void {
   const win = getMainWindow()

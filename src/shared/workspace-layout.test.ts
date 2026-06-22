@@ -1,20 +1,20 @@
 import { describe, expect, test } from 'vitest'
 import {
   DEFAULT_WORKSPACE_FOCUSED,
-  DEFAULT_WORKSPACE_PANE_SIZES,
+  DEFAULT_WORKSPACE_PANE_SIZE,
   normalizeWorkspaceSessionLayoutState,
 } from '#/shared/workspace-layout.ts'
 
 describe('normalizeWorkspaceSessionLayoutState', () => {
-  test('preserves Focus Mode and workspace pane sizes', () => {
+  test('preserves Focus Mode and workspace pane size', () => {
     expect(
       normalizeWorkspaceSessionLayoutState({
         workspaceFocused: false,
-        workspacePaneSizes: { 'left-right': 45 },
+        workspacePaneSize: 45,
       }),
     ).toEqual({
       workspaceFocused: false,
-      workspacePaneSizes: { 'left-right': 45 },
+      workspacePaneSize: 45,
     })
   })
 
@@ -22,11 +22,11 @@ describe('normalizeWorkspaceSessionLayoutState', () => {
     expect(
       normalizeWorkspaceSessionLayoutState({
         workspaceFocused: 'bad',
-        workspacePaneSizes: { 'left-right': 'bad' },
+        workspacePaneSize: 'bad',
       }),
     ).toEqual({
       workspaceFocused: DEFAULT_WORKSPACE_FOCUSED,
-      workspacePaneSizes: DEFAULT_WORKSPACE_PANE_SIZES,
+      workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     })
   })
 })

@@ -29,7 +29,7 @@ function installBridge(sessionOverrides: Record<string, unknown> = {}) {
               openRepos: [],
               activeRepo: null,
               workspaceFocused: true,
-              workspacePaneSizes: { 'left-right': 0.5 },
+              workspacePaneSize: 0.5,
               selectedTerminalByWorktree: {},
               ...sessionOverrides,
             },
@@ -74,7 +74,7 @@ describe('session restore store', () => {
     expect(useSessionRestoreStore.getState().bootSessionSnapshot).toMatchObject({
       openRepos: [],
       activeRepo: null,
-      workspacePaneSizes: { 'left-right': 0.5 },
+      workspacePaneSize: 0.5,
     })
   })
 
@@ -83,7 +83,7 @@ describe('session restore store', () => {
       openRepos: [{ kind: 'local', id: '/tmp/repo' }],
       activeRepo: '/tmp/repo',
       workspaceFocused: false,
-      workspacePaneSizes: { 'left-right': 0.4 },
+      workspacePaneSize: 0.4,
     })
 
     await useSessionRestoreStore.getState().hydrate()
@@ -92,14 +92,14 @@ describe('session restore store', () => {
       openRepos: [{ kind: 'local', id: '/tmp/repo' }],
       activeRepo: '/tmp/repo',
       workspaceFocused: false,
-      workspacePaneSizes: { 'left-right': 0.4 },
+      workspacePaneSize: 0.4,
     })
     expect(useSessionRestoreStore.getState().bootSessionSnapshot).toBeNull()
     expect(useSessionRestoreStore.getState().consumeBootSessionSnapshot()).toMatchObject({
       openRepos: [],
       activeRepo: null,
       workspaceFocused: false,
-      workspacePaneSizes: { 'left-right': 61.8 },
+      workspacePaneSize: 61.8,
     })
   })
 })

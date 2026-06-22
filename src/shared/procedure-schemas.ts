@@ -182,9 +182,7 @@ const SessionStateSchema = v.object({
   openRepos: v.array(RepoSessionEntrySchema),
   activeRepo: v.nullable(v.string()),
   workspaceFocused: v.boolean(),
-  workspacePaneSizes: v.object({
-    'left-right': v.number(),
-  }),
+  workspacePaneSize: v.number(),
   selectedTerminalByWorktree: v.optional(v.record(v.string(), v.string())),
   workspacePaneViewByBranchByRepo: v.optional(
     v.record(v.string(), v.record(v.string(), v.picklist(['status', 'changes', 'history', 'terminal']))),

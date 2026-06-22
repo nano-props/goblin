@@ -3,7 +3,7 @@ import path from 'node:path'
 import { toSafeRepoLocator, toSafeSessionRepoEntry } from '#/shared/input-validation.ts'
 import { serverDataFile } from '#/shared/data-dir.ts'
 import type { EditorPref, LangPref, SessionState, SettingsPrefs, TerminalPref, ThemePref } from '#/shared/api-types.ts'
-import { DEFAULT_WORKSPACE_FOCUSED, normalizeWorkspacePaneSizes } from '#/shared/workspace-layout.ts'
+import { DEFAULT_WORKSPACE_FOCUSED, normalizeWorkspacePaneSize } from '#/shared/workspace-layout.ts'
 import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 import { isWorkspacePaneViewType, type WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import { normalizeGlobalShortcut } from '#/shared/accelerator.ts'
@@ -177,7 +177,7 @@ function normalizeSession(value: unknown): SessionState {
     activeRepo: activeRepo && openRepos.some((entry) => repoSessionEntryId(entry) === activeRepo) ? activeRepo : null,
     workspaceFocused:
       typeof partial.workspaceFocused === 'boolean' ? partial.workspaceFocused : DEFAULT_WORKSPACE_FOCUSED,
-    workspacePaneSizes: normalizeWorkspacePaneSizes(partial.workspacePaneSizes),
+    workspacePaneSize: normalizeWorkspacePaneSize(partial.workspacePaneSize),
     selectedTerminalByWorktree: normalizeSelectedTerminalByWorktree(partial.selectedTerminalByWorktree),
     workspacePaneViewByBranchByRepo: normalizeWorkspacePaneViewByBranchByRepo(
       partial.workspacePaneViewByBranchByRepo,

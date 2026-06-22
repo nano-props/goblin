@@ -237,7 +237,7 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
       accelerator: 'CmdOrCtrl+[',
     },
   ),
-  rendererMenuCommand('window-reset-layout', 'menu.window.reset-layout', { type: 'layout-reset-requested' }),
+  rendererMenuCommand('window-reset-layout', 'menu.window.reset-window', { type: 'layout-reset-requested' }),
   rendererMenuCommand('help-shortcuts', 'menu.help.shortcuts', { type: 'open-settings-requested', page: 'shortcuts' }),
 ]
 

@@ -37,7 +37,7 @@ export function restorableWorkspaceStateFromStore(
     | 'order'
     | 'activeId'
     | 'workspaceFocused'
-    | 'workspacePaneSizes'
+    | 'workspacePaneSize'
     | 'selectedTerminalByWorktree'
   >,
 ): RestorableWorkspaceState {
@@ -45,7 +45,7 @@ export function restorableWorkspaceStateFromStore(
     order: state.order,
     activeId: state.activeId,
     workspaceFocused: state.workspaceFocused,
-    workspacePaneSizes: state.workspacePaneSizes,
+    workspacePaneSize: state.workspacePaneSize,
     selectedTerminalByWorktree: state.selectedTerminalByWorktree,
   }
 }

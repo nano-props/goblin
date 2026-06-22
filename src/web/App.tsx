@@ -10,7 +10,6 @@ import { useT } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
-import { DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 
@@ -61,7 +60,6 @@ export function App({ routeSettingsPage = null, onRouteSettingsPageChange }: App
             <RepoView repoId={activeId} />
           ) : !sessionReady ? (
             <RepoWorkspaceSkeleton
-              layout={DEFAULT_WORKSPACE_LAYOUT}
               singlePane={bootWorkspaceBehavior.singlePane}
               singlePaneView="navigator"
               branchWorkspaceState="empty"

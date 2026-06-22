@@ -69,7 +69,7 @@ export const en = {
   // ---- Menu — Window (gbl-specific) ---------------------------------------
   'menu.window.next-repo': 'Next Repository',
   'menu.window.prev-repo': 'Previous Repository',
-  'menu.window.reset-layout': 'Reset Layout',
+  'menu.window.reset-window': 'Reset Window',
 
   // ---- Menu — Help --------------------------------------------------------
   'menu.help.shortcuts': 'Keyboard Shortcuts',

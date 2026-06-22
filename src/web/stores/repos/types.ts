@@ -8,14 +8,12 @@ import type {
   WorktreeStatus,
 } from '#/web/types.ts'
 import type { RemoteRepoLifecycle, RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { WorkspacePaneSizes } from '#/shared/workspace-layout.ts'
 import type { SessionState } from '#/shared/api-types.ts'
 import type { WorkspacePaneBranchViewType, WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/repos/branch-action-types.ts'
 import type { RepoOperationsState } from '#/web/stores/repos/operations.ts'
 import type { RepoResourcesState } from '#/web/stores/repos/resources.ts'
 export type BranchViewMode = 'all' | 'worktrees'
-export type RepoWorkspaceLayout = 'left-right'
 export type RepoDataSource = 'cache' | 'fresh'
 // Renderer branches keep only the worktree reference; metadata lives in worktreesByPath.
 export type RepoBranchState = Omit<BranchSnapshotInfo, 'worktree'> & {
@@ -156,7 +154,7 @@ export interface RestorableWorkspaceState {
   activeId: string | null
   /** Large-screen Focus Mode restored from SessionState. Compact UI is stronger and always shows one pane at a time. */
   workspaceFocused: boolean
-  workspacePaneSizes: WorkspacePaneSizes
+  workspacePaneSize: number
   /** Per worktree terminal selection restored from SessionState.selectedTerminalByWorktree. */
   selectedTerminalByWorktree: Record<string, string>
 }
@@ -171,15 +169,14 @@ export interface LocalWorkspaceState {
 
 export interface RestorableWorkspaceActions {
   setActive: (id: string) => void
-  applySessionLayoutState: (layout: Pick<SessionState, 'workspaceFocused' | 'workspacePaneSizes'>) => void
+  applySessionLayoutState: (layout: Pick<SessionState, 'workspaceFocused' | 'workspacePaneSize'>) => void
   applySessionSelectedTerminalState: (selectedTerminalByWorktree: Record<string, string>) => void
   applySessionWorkspacePaneViewByBranchByRepo: (
     workspacePaneViewByBranchByRepo: Record<string, Record<string, WorkspacePaneView>>,
   ) => void
   setWorkspaceFocused: (enabled: boolean) => void
   toggleWorkspaceFocused: () => void
-  setWorkspacePaneSize: (layout: RepoWorkspaceLayout, size: number) => void
-  setWorkspacePaneSizes: (sizes: WorkspacePaneSizes) => void
+  setWorkspacePaneSize: (size: number) => void
   resetLayout: () => void
   setSelectedTerminal: (worktreeTerminalKey: string, key: string | null) => void
   cycleActive: (direction: 1 | -1) => void

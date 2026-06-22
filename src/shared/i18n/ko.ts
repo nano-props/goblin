@@ -60,7 +60,7 @@ export const ko: Record<DictKey, string> = {
 
   'menu.window.next-repo': '다음 리포지토리',
   'menu.window.prev-repo': '이전 리포지토리',
-  'menu.window.reset-layout': '레이아웃 재설정',
+  'menu.window.reset-window': '창 재설정',
 
   'menu.help.shortcuts': '키보드 단축키',
 

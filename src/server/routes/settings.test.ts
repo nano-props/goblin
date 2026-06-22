@@ -80,9 +80,7 @@ describe('settings routes', () => {
       openRepos: [],
       activeRepo: null,
       workspaceFocused: true,
-      workspacePaneSizes: {
-        'left-right': 50,
-      },
+      workspacePaneSize: 50,
       selectedTerminalByWorktree: {},
     } as const
     mocks.applyServerSessionWrite.mockResolvedValue({ ok: true, session })

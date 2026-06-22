@@ -365,7 +365,7 @@ describe('app menu actions', () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
     buildAppMenu()
 
-    clickMenuItem('menu.window', 'menu.window.reset-layout')
+    clickMenuItem('menu.window', 'menu.window.reset-window')
     await Promise.resolve()
 
     expect(mocks.resetMainWindowToDefault).toHaveBeenCalledTimes(1)
