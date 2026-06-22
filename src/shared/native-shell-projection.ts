@@ -13,7 +13,6 @@ export interface NativeSettingsProjectionPatch {
   colorTheme?: SettingsPrefs['colorTheme']
   shortcutsDisabled?: SettingsPrefs['shortcutsDisabled']
   globalShortcutDisabled?: SettingsPrefs['globalShortcutDisabled']
-  swapCloseShortcuts?: SettingsPrefs['swapCloseShortcuts']
 }
 
 export interface NativeSettingsProjectionState {
@@ -22,7 +21,6 @@ export interface NativeSettingsProjectionState {
   colorTheme: SettingsPrefs['colorTheme']
   shortcutsDisabled: SettingsPrefs['shortcutsDisabled']
   globalShortcutDisabled: SettingsPrefs['globalShortcutDisabled']
-  swapCloseShortcuts: SettingsPrefs['swapCloseShortcuts']
   globalShortcut: SettingsPrefs['globalShortcut']
 }
 
@@ -44,7 +42,6 @@ export const NATIVE_SETTINGS_PROJECTION_KEYS = [
   'colorTheme',
   'shortcutsDisabled',
   'globalShortcutDisabled',
-  'swapCloseShortcuts',
 ] as const
 
 export const NativeSettingsProjectionPatchSchema = v.object({
@@ -53,7 +50,6 @@ export const NativeSettingsProjectionPatchSchema = v.object({
   colorTheme: v.optional(v.picklist(COLOR_THEMES)),
   shortcutsDisabled: v.optional(v.boolean()),
   globalShortcutDisabled: v.optional(v.boolean()),
-  swapCloseShortcuts: v.optional(v.boolean()),
 })
 
 export const NativeSettingsProjectionStateSchema = v.object({
@@ -62,7 +58,6 @@ export const NativeSettingsProjectionStateSchema = v.object({
   colorTheme: v.picklist(COLOR_THEMES),
   shortcutsDisabled: v.boolean(),
   globalShortcutDisabled: v.boolean(),
-  swapCloseShortcuts: v.boolean(),
   globalShortcut: v.string(),
 })
 
@@ -95,7 +90,6 @@ export function pickNativeSettingsProjectionPatch(
   if (settings.colorTheme !== undefined) patch.colorTheme = settings.colorTheme
   if (settings.shortcutsDisabled !== undefined) patch.shortcutsDisabled = settings.shortcutsDisabled
   if (settings.globalShortcutDisabled !== undefined) patch.globalShortcutDisabled = settings.globalShortcutDisabled
-  if (settings.swapCloseShortcuts !== undefined) patch.swapCloseShortcuts = settings.swapCloseShortcuts
   return NATIVE_SETTINGS_PROJECTION_KEYS.some((key) => patch[key] !== undefined) ? patch : null
 }
 
@@ -106,7 +100,6 @@ export function nativeSettingsProjectionStateFromSettings(settings: SettingsPref
     colorTheme: settings.colorTheme,
     shortcutsDisabled: settings.shortcutsDisabled,
     globalShortcutDisabled: settings.globalShortcutDisabled,
-    swapCloseShortcuts: settings.swapCloseShortcuts,
     globalShortcut: settings.globalShortcut,
   }
 }

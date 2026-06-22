@@ -30,22 +30,18 @@ function menuStatePatchFromSettingsProjection(input: {
 }): {
   langPref?: NativeSettingsProjectionState['lang']
   shortcutsDisabled?: boolean
-  swapCloseShortcuts?: boolean
 } {
   const menuStatePatch: {
     langPref?: NativeSettingsProjectionState['lang']
     shortcutsDisabled?: boolean
-    swapCloseShortcuts?: boolean
   } = {}
   if (input.patch.lang !== undefined) menuStatePatch.langPref = input.settings.lang
   if (input.patch.shortcutsDisabled !== undefined) menuStatePatch.shortcutsDisabled = input.settings.shortcutsDisabled
-  if (input.patch.swapCloseShortcuts !== undefined)
-    menuStatePatch.swapCloseShortcuts = input.settings.swapCloseShortcuts
   return menuStatePatch
 }
 
 function shouldRebuildMenuFromSettingsProjection(patch: NativeSettingsProjectionPatch): boolean {
-  return patch.lang !== undefined || patch.shortcutsDisabled !== undefined || patch.swapCloseShortcuts !== undefined
+  return patch.lang !== undefined || patch.shortcutsDisabled !== undefined
 }
 
 function applyI18nSettingsProjection(input: {

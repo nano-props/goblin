@@ -79,9 +79,12 @@ async function updateSettingsPrefsPatch(settings: Record<string, unknown>): Prom
       },
     })
   } catch (err) {
-    sessionLog.warn('settings.applyShellProjection failed; server write committed, menu will catch up on next rebuild', {
-      err,
-    })
+    sessionLog.warn(
+      'settings.applyShellProjection failed; server write committed, menu will catch up on next rebuild',
+      {
+        err,
+      },
+    )
   }
   return result
 }
@@ -171,9 +174,12 @@ export async function clearRecentRepos(): Promise<void> {
       recentRepos: { recentRepos: [] },
     })
   } catch (err) {
-    sessionLog.warn('clear-recent-repos projection IPC failed; server list cleared, menu will catch up on next rebuild', {
-      err,
-    })
+    sessionLog.warn(
+      'clear-recent-repos projection IPC failed; server list cleared, menu will catch up on next rebuild',
+      {
+        err,
+      },
+    )
   }
 }
 
@@ -203,10 +209,6 @@ export async function setShortcutsDisabled(disabled: boolean): Promise<void> {
 
 export async function setGlobalShortcutDisabled(disabled: boolean): Promise<void> {
   await updateSettingsPrefsPatch({ globalShortcutDisabled: disabled })
-}
-
-export async function setSwapCloseShortcuts(swapped: boolean): Promise<void> {
-  await updateSettingsPrefsPatch({ swapCloseShortcuts: swapped })
 }
 
 export async function setGlobalShortcut(accelerator: string): Promise<GlobalShortcutState> {

@@ -12,6 +12,8 @@ type WorkspaceRendererIntent = Extract<
   | { type: 'open-repo-path-requested' }
   | { type: 'open-remote-repo-requested' }
   | { type: 'clone-repo-requested' }
+  | { type: 'terminal-new-tab-requested' }
+  | { type: 'terminal-close-tab-or-window-requested' }
   | { type: 'close-repo-requested' }
   | { type: 'cycle-repo-requested' }
   | { type: 'repo-refresh-requested' }
@@ -46,6 +48,8 @@ export type WorkspaceIntentPlan =
   | { kind: 'open-repo-path' }
   | { kind: 'open-clone-repo' }
   | { kind: 'open-remote-repo' }
+  | { kind: 'new-terminal-tab'; repoId: string }
+  | { kind: 'close-terminal-tab-or-window'; repoId: string | null }
   | { kind: 'close-repo'; repoId: string }
   | { kind: 'close-window' }
   | { kind: 'cycle-repo'; direction: 1 | -1 }
@@ -115,6 +119,10 @@ export function createWorkspaceIntentPlan(
   context: WorkspaceIntentPlanContext,
 ): WorkspaceIntentPlan | null {
   if (!isWorkspaceRendererIntent(event)) return null
+  if (event.type === 'terminal-close-tab-or-window-requested') {
+    if (context.overlayBlocked || context.workspaceShortcutSuppressed) return { kind: 'close-window' }
+    return { kind: 'close-terminal-tab-or-window', repoId: context.currentRepoId }
+  }
   if (context.overlayBlocked) return { kind: 'noop' }
   switch (event.type) {
     case 'open-repo-requested':
@@ -125,6 +133,9 @@ export function createWorkspaceIntentPlan(
       return { kind: 'open-clone-repo' }
     case 'open-remote-repo-requested':
       return { kind: 'open-remote-repo' }
+    case 'terminal-new-tab-requested':
+      if (context.workspaceShortcutSuppressed || !context.currentRepoId) return { kind: 'noop' }
+      return { kind: 'new-terminal-tab', repoId: context.currentRepoId }
     case 'close-repo-requested':
       if (context.workspaceShortcutSuppressed) return { kind: 'noop' }
       return context.currentRepoId ? { kind: 'close-repo', repoId: context.currentRepoId } : { kind: 'close-window' }
@@ -162,6 +173,8 @@ function isWorkspaceRendererIntent(event: RendererEffectIntent): event is Worksp
     event.type === 'open-repo-path-requested' ||
     event.type === 'open-remote-repo-requested' ||
     event.type === 'clone-repo-requested' ||
+    event.type === 'terminal-new-tab-requested' ||
+    event.type === 'terminal-close-tab-or-window-requested' ||
     event.type === 'close-repo-requested' ||
     event.type === 'cycle-repo-requested' ||
     event.type === 'repo-refresh-requested' ||

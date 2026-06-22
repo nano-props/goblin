@@ -53,7 +53,6 @@ export function currentExternalAppsSnapshot(): ExternalAppsSnapshot | undefined 
 export function readRuntimeShortcutSettings(data: RuntimeSettingsSnapshot | undefined) {
   return {
     shortcutsDisabled: data?.shortcutsDisabled ?? false,
-    swapCloseShortcuts: data?.swapCloseShortcuts ?? false,
     globalShortcutDisabled: data?.globalShortcutDisabled ?? false,
     globalShortcut: data?.globalShortcut ?? 'CommandOrControl+Shift+G',
     globalShortcutRegistered: data?.globalShortcutRegistered ?? false,

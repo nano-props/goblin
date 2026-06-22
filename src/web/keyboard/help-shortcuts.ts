@@ -9,7 +9,8 @@ import {
   SETTINGS_SHORTCUT_NON_MAC,
   VIEW_SHORTCUTS,
   WINDOW_REPO_SHORTCUTS,
-  closeShortcutAccelerators,
+  CLOSE_REPO_SHORTCUT,
+  CLOSE_TERMINAL_TAB_OR_WINDOW_SHORTCUT,
 } from '#/shared/shortcut-definitions.ts'
 export interface HelpShortcutRow {
   combos: string[][]
@@ -22,12 +23,7 @@ export interface HelpShortcutSection {
   rows: HelpShortcutRow[]
 }
 
-export function helpShortcutSections(
-  globalShortcut: string,
-  swapCloseShortcuts = false,
-  isMac = inferIsMacPlatform(),
-): HelpShortcutSection[] {
-  const { closeView, closeWindow } = closeShortcutAccelerators(swapCloseShortcuts)
+export function helpShortcutSections(globalShortcut: string, isMac = inferIsMacPlatform()): HelpShortcutSection[] {
   return [
     {
       titleKey: 'help.section.nav',
@@ -42,15 +38,21 @@ export function helpShortcutSections(
     },
     {
       titleKey: 'help.section.views',
-      rows: VIEW_SHORTCUTS.map((shortcut) => helpRowFromAccelerator(shortcut, isMac)),
+      rows: [
+        workspaceTabShortcutRow(isMac),
+        ...VIEW_SHORTCUTS.map((shortcut) => helpRowFromAccelerator(shortcut, isMac)),
+      ],
     },
     {
       titleKey: 'help.section.app',
       rows: [
         ...APP_SHORTCUTS.map((shortcut) => helpRowFromAccelerator(shortcut, isMac)),
         { combos: [acceleratorToKeyLabels(globalShortcut)], labelKey: 'help.row.activate-window' },
-        { combos: [acceleratorToKeyLabelsForHelp(closeView, isMac)], labelKey: 'help.row.close-repo' },
-        { combos: [acceleratorToKeyLabelsForHelp(closeWindow, isMac)], labelKey: 'help.row.close-window' },
+        {
+          combos: [acceleratorToKeyLabelsForHelp(CLOSE_TERMINAL_TAB_OR_WINDOW_SHORTCUT, isMac)],
+          labelKey: 'help.row.close-terminal-tab-or-window',
+        },
+        { combos: [acceleratorToKeyLabelsForHelp(CLOSE_REPO_SHORTCUT, isMac)], labelKey: 'help.row.close-repo' },
         {
           combos: [acceleratorToKeyLabelsForHelp(isMac ? SETTINGS_SHORTCUT_MAC : SETTINGS_SHORTCUT_NON_MAC, isMac)],
           labelKey: 'help.row.settings',
@@ -59,6 +61,14 @@ export function helpShortcutSections(
       ],
     },
   ]
+}
+
+function workspaceTabShortcutRow(isMac: boolean): HelpShortcutRow {
+  const modifier = isMac ? '⌘' : '⌃'
+  return {
+    combos: Array.from({ length: 9 }, (_, index) => [modifier, String(index + 1)]),
+    labelKey: 'help.row.select-workspace-tab',
+  }
 }
 
 function helpRowFromKeyboardDefinition(shortcut: { combos: string[][]; labelKey: DictKey }): HelpShortcutRow {

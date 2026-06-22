@@ -1,10 +1,10 @@
 // Global keyboard shortcuts. Mounted once in App.tsx — all bindings
 // live here so adding/removing one is a single-file change.
 //
-// Shortcuts that are also wired through the application menu (⌘O,
-// ⌘W, ⌘1/⌘2/⌘3, ⌘[ , ⌘]) are handled by Electron's accelerator system
-// and forwarded as typed IPC events. We only handle the "no
-// modifier" keys here (j/k/arrows/p/P/g/v/G/?/Enter/Esc) so we don't fight the menu.
+// Shortcuts wired through the Electron application menu are forwarded
+// as typed IPC events. Numbered workspace tab shortcuts are handled
+// here in the capture phase so terminal focus cannot swallow them;
+// Cmd/Ctrl+N and Cmd/Ctrl+W use this DOM path only in the web runtime.
 //
 // Modal awareness: when an overlay/dialog/menu is open every shortcut
 // is suppressed — including `?`, otherwise pressing it with Settings
@@ -25,6 +25,12 @@ import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { adjacentWorkspacePaneView } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
 import { selectedWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import {
+  runCloseTerminalTabOrWindowCommand,
+  runNewTerminalTabCommand,
+  runSelectWorkspacePaneTabByIndexCommand,
+} from '#/web/commands/workspace-commands.ts'
+import { getRendererBridge } from '#/web/renderer-bridge.ts'
 
 type MoveDirection = 1 | -1
 const INTERACTIVE_SHORTCUT_TARGET_SELECTOR =
@@ -52,6 +58,24 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
 
 function activeElement(): HTMLElement | null {
   return document.activeElement instanceof HTMLElement ? document.activeElement : null
+}
+
+function primaryModifierPressed(event: KeyboardEvent): boolean {
+  const isMac = /\bMac|iPhone|iPad|iPod/.test(globalThis.navigator?.platform ?? '')
+  return isMac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey
+}
+
+function digitShortcutIndex(event: KeyboardEvent): number | null {
+  if (!/^Digit[1-9]$/.test(event.code)) return null
+  return Number(event.code.slice('Digit'.length))
+}
+
+function hasNativeMenuAccelerators(): boolean {
+  try {
+    return getRendererBridge().kind() === 'electron'
+  } catch {
+    return false
+  }
 }
 
 function nextIndex(current: number, length: number, direction: MoveDirection): number {
@@ -113,6 +137,26 @@ export function useKeyboard({
         e.preventDefault()
         onExitSettingsRef.current()
         return
+      }
+
+      if (primaryModifierPressed(e) && !e.altKey && !workspaceShortcutsSuppressed) {
+        const repoId = currentRepoIdRef.current
+        const menuBackedShortcut = hasNativeMenuAccelerators()
+        if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyN') {
+          e.preventDefault()
+          void runNewTerminalTabCommand({ repoId, navigation })
+          return
+        }
+        if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyW') {
+          e.preventDefault()
+          runCloseTerminalTabOrWindowCommand({ repoId })
+          return
+        }
+        const tabIndex = !e.shiftKey ? digitShortcutIndex(e) : null
+        if (tabIndex !== null) {
+          if (runSelectWorkspacePaneTabByIndexCommand({ repoId, tabIndex, navigation })) e.preventDefault()
+          return
+        }
       }
 
       if (isTerminalFocused()) return
@@ -188,7 +232,7 @@ export function useKeyboard({
         }
       }
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, { capture: true })
+    return () => window.removeEventListener('keydown', onKey, { capture: true })
   }, [navigation])
 }

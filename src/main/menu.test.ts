@@ -4,7 +4,6 @@ import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 interface MockMenuRuntimeState {
   recentRepos: RepoSessionEntry[]
   shortcutsDisabled: boolean
-  swapCloseShortcuts: boolean
   langPref: 'auto' | 'en' | 'zh' | 'ko' | 'ja'
 }
 
@@ -12,7 +11,6 @@ function defaultMenuRuntimeState(): MockMenuRuntimeState {
   return {
     recentRepos: [],
     shortcutsDisabled: false,
-    swapCloseShortcuts: false,
     langPref: 'auto',
   }
 }
@@ -236,19 +234,25 @@ describe('app menu actions', () => {
     expect(remoteItem?.accelerator).toBe('CmdOrCtrl+Shift+R')
   })
 
-  test('keeps the intentional default close shortcut mapping', async () => {
+  test('wires fixed terminal tab, repository, and window close actions', async () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
 
     buildAppMenu()
 
     const fileMenu = mocks.template.find((entry) => entry.label === 'menu.file')
+    const newTerminalItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'terminal.new')
+    const closeTerminalItem = fileMenu?.submenu?.find(
+      (entry: any) => entry.label === 'menu.file.close-terminal-tab-or-window',
+    )
     const closeViewItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.close-tab')
     const closeWindowItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.close-window')
+    expect(newTerminalItem?.accelerator).toBe('CmdOrCtrl+N')
+    expect(closeTerminalItem?.accelerator).toBe('CmdOrCtrl+W')
     expect(closeViewItem?.accelerator).toBe('CmdOrCtrl+Shift+W')
-    expect(closeWindowItem?.accelerator).toBe('CmdOrCtrl+W')
+    expect(closeWindowItem?.accelerator).toBeUndefined()
   })
 
-  test('wires workspace accelerators from the view menu and removes the numbered terminal entries', async () => {
+  test('keeps workspace view menu clicks and removes fixed view accelerators', async () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
 
     buildAppMenu()
@@ -262,9 +266,9 @@ describe('app menu actions', () => {
     const lastNumberedItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.terminal 7')
     const oldPrimaryItem = viewMenu?.submenu?.find((entry: any) => entry.label === 'menu.view.terminal-primary-action')
 
-    expect(statusItem?.accelerator).toBe('CmdOrCtrl+1')
-    expect(changesItem?.accelerator).toBe('CmdOrCtrl+2')
-    expect(terminalItem?.accelerator).toBe('CmdOrCtrl+Enter')
+    expect(statusItem?.accelerator).toBeUndefined()
+    expect(changesItem?.accelerator).toBeUndefined()
+    expect(terminalItem?.accelerator).toBeUndefined()
     expect(focusModeItem?.accelerator).toBe('CmdOrCtrl+B')
     expect(firstNumberedItem).toBeUndefined()
     expect(lastNumberedItem).toBeUndefined()

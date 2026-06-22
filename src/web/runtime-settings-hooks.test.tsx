@@ -60,7 +60,6 @@ describe('runtime settings hooks', () => {
         terminalNotificationsEnabled: true,
         shortcutsDisabled: true,
         globalShortcutDisabled: true,
-        swapCloseShortcuts: true,
         globalShortcut: 'CommandOrControl+Shift+K',
         globalShortcutRegistered: true,
         lanEnabled: true,
@@ -93,7 +92,6 @@ describe('runtime settings hooks', () => {
       shortcuts: {
         shortcutsDisabled: true,
         globalShortcutDisabled: true,
-        swapCloseShortcuts: true,
         globalShortcut: 'CommandOrControl+Shift+K',
         globalShortcutRegistered: true,
       },

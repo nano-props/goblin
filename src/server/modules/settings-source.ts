@@ -16,7 +16,6 @@ import {
   DEFAULT_GLOBAL_SHORTCUT_DISABLED,
   DEFAULT_LANG_PREF,
   DEFAULT_SHORTCUTS_DISABLED,
-  DEFAULT_SWAP_CLOSE_SHORTCUTS,
   DEFAULT_TERMINAL_APP,
   DEFAULT_TERMINAL_NOTIFICATIONS_ENABLED,
   DEFAULT_THEME_PREF,
@@ -34,7 +33,6 @@ interface ServerSettingsData {
   terminalNotificationsEnabled: boolean
   shortcutsDisabled: boolean
   globalShortcutDisabled: boolean
-  swapCloseShortcuts: boolean
   globalShortcut: string
   terminalApp: TerminalPref
   editorApp: EditorPref
@@ -102,7 +100,6 @@ function settingsPrefsFromData(data: ServerSettingsData): SettingsPrefs {
     terminalNotificationsEnabled: data.terminalNotificationsEnabled,
     shortcutsDisabled: data.shortcutsDisabled,
     globalShortcutDisabled: data.globalShortcutDisabled,
-    swapCloseShortcuts: data.swapCloseShortcuts,
     globalShortcut: data.globalShortcut,
     terminalApp: data.terminalApp,
     editorApp: data.editorApp,
@@ -208,7 +205,6 @@ async function readServerSettingsFile(): Promise<ServerSettingsData | null> {
       terminalNotificationsEnabled: normalizeTerminalNotificationsEnabled(parsed.terminalNotificationsEnabled),
       shortcutsDisabled: parsed.shortcutsDisabled === true,
       globalShortcutDisabled: parsed.globalShortcutDisabled === true,
-      swapCloseShortcuts: parsed.swapCloseShortcuts === true,
       globalShortcut: normalizeGlobalShortcut(parsed.globalShortcut),
       terminalApp: normalizeTerminalPref(parsed.terminalApp),
       editorApp: normalizeEditorPref(parsed.editorApp),
@@ -281,8 +277,6 @@ export async function updateServerSettingsPrefs(patch: ServerSettingsPrefsPatch)
     patch.shortcutsDisabled === undefined ? data.shortcutsDisabled : patch.shortcutsDisabled === true
   const nextGlobalShortcutDisabled =
     patch.globalShortcutDisabled === undefined ? data.globalShortcutDisabled : patch.globalShortcutDisabled === true
-  const nextSwapCloseShortcuts =
-    patch.swapCloseShortcuts === undefined ? data.swapCloseShortcuts : patch.swapCloseShortcuts === true
   const nextGlobalShortcut =
     patch.globalShortcut === undefined ? data.globalShortcut : normalizeGlobalShortcut(patch.globalShortcut)
   const nextTerminalApp = patch.terminalApp === undefined ? data.terminalApp : normalizeTerminalPref(patch.terminalApp)
@@ -296,7 +290,6 @@ export async function updateServerSettingsPrefs(patch: ServerSettingsPrefsPatch)
     data.terminalNotificationsEnabled !== nextTerminalNotificationsEnabled ||
     data.shortcutsDisabled !== nextShortcutsDisabled ||
     data.globalShortcutDisabled !== nextGlobalShortcutDisabled ||
-    data.swapCloseShortcuts !== nextSwapCloseShortcuts ||
     data.globalShortcut !== nextGlobalShortcut ||
     data.terminalApp !== nextTerminalApp ||
     data.editorApp !== nextEditorApp ||
@@ -308,7 +301,6 @@ export async function updateServerSettingsPrefs(patch: ServerSettingsPrefsPatch)
   data.terminalNotificationsEnabled = nextTerminalNotificationsEnabled
   data.shortcutsDisabled = nextShortcutsDisabled
   data.globalShortcutDisabled = nextGlobalShortcutDisabled
-  data.swapCloseShortcuts = nextSwapCloseShortcuts
   data.globalShortcut = nextGlobalShortcut
   data.terminalApp = nextTerminalApp
   data.editorApp = nextEditorApp

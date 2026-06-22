@@ -10,7 +10,12 @@ import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
 import { consumeExternalOpenPaths } from '#/web/app-shell-client.ts'
 import { openRepoPaths } from '#/web/lib/open-repo-paths.ts'
 import { externalOpenLog } from '#/web/logger.ts'
-import { runShowWorkspacePaneViewCommand, runTerminalPrimaryActionCommand } from '#/web/commands/workspace-commands.ts'
+import {
+  runCloseTerminalTabOrWindowCommand,
+  runNewTerminalTabCommand,
+  runShowWorkspacePaneViewCommand,
+  runTerminalPrimaryActionCommand,
+} from '#/web/commands/workspace-commands.ts'
 import {
   createAppLevelIntentPlan,
   createExternalOpenDrainKickPlan,
@@ -137,6 +142,15 @@ export async function handleWorkspaceRendererIntent(
       return true
     case 'open-remote-repo':
       deps.openRemoteRepo()
+      return true
+    case 'new-terminal-tab':
+      await runNewTerminalTabCommand({
+        repoId: plan.repoId,
+        navigation: deps.navigation,
+      })
+      return true
+    case 'close-terminal-tab-or-window':
+      runCloseTerminalTabOrWindowCommand({ repoId: plan.repoId })
       return true
     case 'close-repo':
       deps.navigation.closeRepo(plan.repoId)

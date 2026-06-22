@@ -14,10 +14,12 @@ export type RendererKeyboardShortcutAction =
   | RendererAppShortcutAction
 export type RendererMenuCommandId =
   | 'app-settings'
+  | 'file-new-terminal-tab'
   | 'file-open-local-repo'
   | 'file-open-local-repo-path'
   | 'file-clone-repo'
   | 'file-open-remote-repo'
+  | 'file-close-terminal-tab-or-window'
   | 'file-close-tab'
   | 'file-settings'
   | 'view-status'
@@ -47,9 +49,7 @@ export interface AcceleratorShortcutDefinition {
   labelParams?: Record<string, string | number>
 }
 
-export interface RendererMenuCommandContext {
-  swapCloseShortcuts: boolean
-}
+export interface RendererMenuCommandContext {}
 
 export interface RendererMenuCommandDefinition {
   id: RendererMenuCommandId
@@ -98,10 +98,9 @@ export const RENDERER_APP_SHORTCUTS: RendererKeyboardShortcutDefinition<Renderer
 
 export const SETTINGS_SHORTCUT_MAC = 'Cmd+,'
 export const SETTINGS_SHORTCUT_NON_MAC = 'Ctrl+,'
-export const CLOSE_TAB_SHORTCUT_DEFAULT = 'CmdOrCtrl+Shift+W'
-export const CLOSE_TAB_SHORTCUT_SWAPPED = 'CmdOrCtrl+W'
-export const CLOSE_WINDOW_SHORTCUT_DEFAULT = 'CmdOrCtrl+W'
-export const CLOSE_WINDOW_SHORTCUT_SWAPPED = 'CmdOrCtrl+Shift+W'
+export const NEW_TERMINAL_TAB_SHORTCUT = 'CmdOrCtrl+N'
+export const CLOSE_TERMINAL_TAB_OR_WINDOW_SHORTCUT = 'CmdOrCtrl+W'
+export const CLOSE_REPO_SHORTCUT = 'CmdOrCtrl+Shift+W'
 
 export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
   rendererMenuCommand(
@@ -111,6 +110,15 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
     {
       helpLabelKey: 'help.row.settings',
       accelerator: () => SETTINGS_SHORTCUT_MAC,
+    },
+  ),
+  rendererMenuCommand(
+    'file-new-terminal-tab',
+    'terminal.new',
+    { type: 'terminal-new-tab-requested' },
+    {
+      helpLabelKey: 'help.row.new-terminal',
+      accelerator: NEW_TERMINAL_TAB_SHORTCUT,
     },
   ),
   rendererMenuCommand(
@@ -143,12 +151,21 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
     },
   ),
   rendererMenuCommand(
+    'file-close-terminal-tab-or-window',
+    'menu.file.close-terminal-tab-or-window',
+    { type: 'terminal-close-tab-or-window-requested' },
+    {
+      helpLabelKey: 'help.row.close-terminal-tab-or-window',
+      accelerator: CLOSE_TERMINAL_TAB_OR_WINDOW_SHORTCUT,
+    },
+  ),
+  rendererMenuCommand(
     'file-close-tab',
     'menu.file.close-tab',
     { type: 'close-repo-requested' },
     {
       helpLabelKey: 'help.row.close-repo',
-      accelerator: (context) => closeShortcutAccelerators(context.swapCloseShortcuts).closeView,
+      accelerator: CLOSE_REPO_SHORTCUT,
     },
   ),
   rendererMenuCommand(
@@ -166,7 +183,6 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
     { type: 'show-workspace-pane-view-requested', tab: 'status' },
     {
       helpLabelKey: 'help.row.view-status',
-      accelerator: 'CmdOrCtrl+1',
     },
   ),
   rendererMenuCommand(
@@ -175,7 +191,6 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
     { type: 'show-workspace-pane-view-requested', tab: 'changes' },
     {
       helpLabelKey: 'help.row.view-changes',
-      accelerator: 'CmdOrCtrl+2',
     },
   ),
   rendererMenuCommand(
@@ -184,7 +199,6 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
     { type: 'terminal-primary-action-requested' },
     {
       helpLabelKey: 'help.row.view-terminal',
-      accelerator: 'CmdOrCtrl+Enter',
     },
   ),
   rendererMenuCommand(
@@ -228,6 +242,7 @@ export const RENDERER_MENU_COMMANDS: RendererMenuCommandDefinition[] = [
 ]
 
 export const APP_SHORTCUTS: AcceleratorShortcutDefinition[] = rendererMenuAcceleratorShortcuts([
+  'file-new-terminal-tab',
   'file-open-local-repo',
   'file-clone-repo',
   'view-refresh',
@@ -239,9 +254,6 @@ export const WINDOW_REPO_SHORTCUTS: AcceleratorShortcutDefinition[] = rendererMe
 ])
 
 export const VIEW_SHORTCUTS: AcceleratorShortcutDefinition[] = rendererMenuAcceleratorShortcuts([
-  'view-status',
-  'view-changes',
-  'view-terminal',
   'view-toggle-focus-mode',
 ])
 
@@ -264,15 +276,6 @@ export function matchRendererKeyboardShortcut(input: {
   shiftKey: boolean
 }): RendererKeyboardShortcutAction | null {
   return matchKeyboardShortcut(RENDERER_KEYBOARD_SHORTCUTS, input)
-}
-
-export function closeShortcutAccelerators(swapCloseShortcuts = false): {
-  closeView: string
-  closeWindow: string
-} {
-  return swapCloseShortcuts
-    ? { closeView: CLOSE_TAB_SHORTCUT_SWAPPED, closeWindow: CLOSE_WINDOW_SHORTCUT_SWAPPED }
-    : { closeView: CLOSE_TAB_SHORTCUT_DEFAULT, closeWindow: CLOSE_WINDOW_SHORTCUT_DEFAULT }
 }
 
 export function rendererMenuCommandById(id: RendererMenuCommandId): RendererMenuCommandDefinition {
@@ -352,9 +355,7 @@ function keyboardShortcutMatch(
 function rendererMenuAcceleratorShortcuts(ids: RendererMenuCommandId[]): AcceleratorShortcutDefinition[] {
   return ids.map((id) => {
     const command = rendererMenuCommandById(id)
-    const accelerator = resolveRendererMenuCommandAccelerator(command, {
-      swapCloseShortcuts: false,
-    })
+    const accelerator = resolveRendererMenuCommandAccelerator(command, {})
     if (!accelerator || !command.helpLabelKey)
       throw new Error(`Renderer menu command ${id} is missing help shortcut metadata`)
     return { accelerator, labelKey: command.helpLabelKey }

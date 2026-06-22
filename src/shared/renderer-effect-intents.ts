@@ -9,6 +9,8 @@ export type RendererEffectIntent =
   | { type: 'open-remote-repo-requested' }
   | { type: 'clone-repo-requested' }
   | { type: 'app-quitting' }
+  | { type: 'terminal-new-tab-requested' }
+  | { type: 'terminal-close-tab-or-window-requested' }
   | { type: 'close-repo-requested' }
   | { type: 'cycle-repo-requested'; direction: 1 | -1 }
   | { type: 'repo-refresh-requested' }
@@ -35,6 +37,8 @@ export function isRendererEffectIntent(event: unknown): event is RendererEffectI
     type === 'open-remote-repo-requested' ||
     type === 'clone-repo-requested' ||
     type === 'app-quitting' ||
+    type === 'terminal-new-tab-requested' ||
+    type === 'terminal-close-tab-or-window-requested' ||
     type === 'close-repo-requested' ||
     type === 'cycle-repo-requested' ||
     type === 'repo-refresh-requested' ||

@@ -64,14 +64,14 @@ function ShortcutList({ sections }: { sections: HelpShortcutSection[] }) {
 
 export function KeyboardShortcutSettings() {
   const t = useT()
-  const { globalShortcut, swapCloseShortcuts } = useRuntimeShortcutSettings()
+  const { globalShortcut } = useRuntimeShortcutSettings()
   return (
     <>
       <SettingsGroup label={t('settings.shortcuts')}>
         <ShortcutSettings />
       </SettingsGroup>
       <SettingsGroup label={t('help.title')} hint={t('help.hint')}>
-        <ShortcutList sections={helpShortcutSections(globalShortcut, swapCloseShortcuts)} />
+        <ShortcutList sections={helpShortcutSections(globalShortcut)} />
       </SettingsGroup>
     </>
   )

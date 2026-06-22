@@ -29,7 +29,6 @@ describe('server settings snapshot runtime state', () => {
       terminalNotificationsEnabled: false,
       shortcutsDisabled: false,
       globalShortcutDisabled: false,
-      swapCloseShortcuts: false,
       globalShortcut: 'Alt+G',
       terminalApp: 'auto',
       editorApp: 'auto',

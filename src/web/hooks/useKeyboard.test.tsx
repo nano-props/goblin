@@ -13,6 +13,7 @@ import type { WorktreeTerminalSnapshot } from '#/web/components/terminal/types.t
 let container: HTMLDivElement | null = null
 let root: Root | null = null
 const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+const testWindow = window as unknown as { goblinNative?: Window['goblinNative'] }
 const REPO_ID = '/tmp/keyboard-repo'
 const WORKTREE_PATH = '/tmp/keyboard-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
@@ -35,6 +36,7 @@ afterEach(() => {
     root?.unmount()
   })
   setTerminalSessionCommandBridge(null)
+  delete testWindow.goblinNative
   container?.remove()
   root = null
   container = null
@@ -88,6 +90,109 @@ describe('useKeyboard', () => {
     expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'terminal')
     expect(selectTerminal).toHaveBeenCalledWith(WORKTREE_KEY, 'terminal-1')
   })
+
+  test('primary modifier plus number selects workspace pane tabs even while terminal is focused', async () => {
+    Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
+    installNativeBridgeStub()
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      workspacePaneView: 'status',
+    })
+    const selectTerminal = vi.fn()
+    const showRepoWorkspacePaneView = vi.fn()
+    setTerminalSessionCommandBridge({
+      worktreeSnapshot: () => worktreeSnapshot(),
+      createTerminal: vi.fn(async () => 'terminal-1'),
+      selectTerminal,
+      openWorkspacePaneView: vi.fn(async () => true),
+      closeWorkspacePaneView: vi.fn(async () => true),
+      reorderWorkspacePaneViews: vi.fn(async () => true),
+    })
+    await renderHookHost({
+      currentRepoId: REPO_ID,
+      navigation: navigationWith({ showRepoWorkspacePaneView }),
+    })
+    const terminalHost = document.createElement('div')
+    terminalHost.className = 'goblin-managed-terminal-host'
+    terminalHost.tabIndex = -1
+    document.body.append(terminalHost)
+    terminalHost.focus()
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: '2', code: 'Digit2', ctrlKey: true, bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'terminal')
+    expect(selectTerminal).toHaveBeenCalledWith(WORKTREE_KEY, 'terminal-1')
+    terminalHost.remove()
+  })
+
+  test('does not run menu-backed primary shortcuts from the renderer in electron', async () => {
+    Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
+    installNativeBridgeStub()
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      workspacePaneView: 'terminal',
+    })
+    const createTerminal = vi.fn(async () => 'terminal-2')
+    const closeTerminalByDescriptor = vi.fn()
+    setTerminalSessionCommandBridge({
+      worktreeSnapshot: () => worktreeSnapshot(),
+      createTerminal,
+      selectTerminal: vi.fn(),
+      closeTerminalByDescriptor,
+      openWorkspacePaneView: vi.fn(async () => true),
+      closeWorkspacePaneView: vi.fn(async () => true),
+      reorderWorkspacePaneViews: vi.fn(async () => true),
+    })
+    await renderHookHost({ currentRepoId: REPO_ID })
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', code: 'KeyN', ctrlKey: true, bubbles: true }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', code: 'KeyW', ctrlKey: true, bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(createTerminal).not.toHaveBeenCalled()
+    expect(closeTerminalByDescriptor).not.toHaveBeenCalled()
+  })
+
+  test('primary modifier plus w closes the selected terminal tab', async () => {
+    Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
+    seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      selectedBranch: 'feature/worktree',
+      workspacePaneView: 'terminal',
+    })
+    const closeTerminalByDescriptor = vi.fn()
+    setTerminalSessionCommandBridge({
+      worktreeSnapshot: () => worktreeSnapshot(),
+      createTerminal: vi.fn(async () => 'terminal-1'),
+      selectTerminal: vi.fn(),
+      closeTerminalByDescriptor,
+      openWorkspacePaneView: vi.fn(async () => true),
+      closeWorkspacePaneView: vi.fn(async () => true),
+      reorderWorkspacePaneViews: vi.fn(async () => true),
+    })
+    await renderHookHost({ currentRepoId: REPO_ID })
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', code: 'KeyW', ctrlKey: true, bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('terminal-1', {
+      repoRoot: REPO_ID,
+      branch: 'feature/worktree',
+      worktreePath: WORKTREE_PATH,
+    })
+  })
 })
 
 async function renderHookHost(overrides: Partial<HookHostOptions> = {}) {
@@ -122,6 +227,18 @@ function navigationWith(overrides: Partial<MainWindowNavigationActions> = {}): M
     showRepoBranchWorkspacePaneView: () => {},
     openSettings: () => {},
     ...overrides,
+  }
+}
+
+function installNativeBridgeStub() {
+  testWindow.goblinNative = {
+    invokeIpc: vi.fn(async () => null),
+    abortIpc: vi.fn(async () => false),
+    onEvent: vi.fn(() => () => {}),
+    onIntent: vi.fn(() => () => {}),
+    pathForFile: vi.fn(() => ''),
+    terminal: {},
+    saveClipboardFiles: vi.fn(async () => []),
   }
 }
 

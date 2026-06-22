@@ -39,7 +39,6 @@ describe('native shell projection helpers', () => {
         terminalNotificationsEnabled: false,
         shortcutsDisabled: true,
         globalShortcutDisabled: true,
-        swapCloseShortcuts: true,
         globalShortcut: 'Alt+K',
         terminalApp: 'auto',
         editorApp: 'auto',
@@ -51,7 +50,6 @@ describe('native shell projection helpers', () => {
       colorTheme: 'github',
       shortcutsDisabled: true,
       globalShortcutDisabled: true,
-      swapCloseShortcuts: true,
       globalShortcut: 'Alt+K',
     })
   })

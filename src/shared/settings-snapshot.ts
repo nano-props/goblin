@@ -19,7 +19,6 @@ export function buildRuntimeSettingsSnapshot(input: {
     terminalNotificationsEnabled: input.prefs.terminalNotificationsEnabled,
     shortcutsDisabled: input.prefs.shortcutsDisabled,
     globalShortcutDisabled: input.prefs.globalShortcutDisabled,
-    swapCloseShortcuts: input.prefs.swapCloseShortcuts,
     globalShortcut: input.prefs.globalShortcut,
     globalShortcutRegistered: input.globalShortcutRegistered,
     terminalApp: input.prefs.terminalApp,
@@ -60,7 +59,6 @@ export function runtimeSettingsSnapshotFromSettingsSnapshot(
     | 'terminalNotificationsEnabled'
     | 'shortcutsDisabled'
     | 'globalShortcutDisabled'
-    | 'swapCloseShortcuts'
     | 'globalShortcut'
     | 'globalShortcutRegistered'
     | 'terminalApp'
@@ -76,7 +74,6 @@ export function runtimeSettingsSnapshotFromSettingsSnapshot(
     terminalNotificationsEnabled: snapshot.terminalNotificationsEnabled,
     shortcutsDisabled: snapshot.shortcutsDisabled,
     globalShortcutDisabled: snapshot.globalShortcutDisabled,
-    swapCloseShortcuts: snapshot.swapCloseShortcuts,
     globalShortcut: snapshot.globalShortcut,
     globalShortcutRegistered: snapshot.globalShortcutRegistered,
     terminalApp: snapshot.terminalApp,

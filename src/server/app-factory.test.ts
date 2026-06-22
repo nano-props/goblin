@@ -23,7 +23,6 @@ const mocks = vi.hoisted(() => ({
     terminalNotificationsEnabled: false,
     shortcutsDisabled: false,
     globalShortcutDisabled: false,
-    swapCloseShortcuts: false,
     globalShortcut: 'CommandOrControl+Shift+G',
     terminalApp: 'auto',
     editorApp: 'auto',

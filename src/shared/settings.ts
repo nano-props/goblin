@@ -19,7 +19,6 @@ export interface SettingsPrefs {
   terminalNotificationsEnabled: boolean
   shortcutsDisabled: boolean
   globalShortcutDisabled: boolean
-  swapCloseShortcuts: boolean
   globalShortcut: string
   terminalApp: TerminalPref
   editorApp: EditorPref

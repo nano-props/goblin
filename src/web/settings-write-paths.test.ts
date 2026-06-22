@@ -62,7 +62,6 @@ const appDataClientMocks = vi.hoisted(() => ({
   })),
   setSettingsFetchInterval: vi.fn(async (sec) => sec),
   setShortcutsDisabled: vi.fn(async () => {}),
-  setSwapCloseShortcuts: vi.fn(async () => {}),
   setTerminalNotificationsEnabled: vi.fn(async () => {}),
 }))
 
@@ -79,7 +78,6 @@ vi.mock('#/web/settings-client.ts', () => ({
   setPreferredTerminalApp: appDataClientMocks.setPreferredTerminalApp,
   setSettingsFetchInterval: appDataClientMocks.setSettingsFetchInterval,
   setShortcutsDisabled: appDataClientMocks.setShortcutsDisabled,
-  setSwapCloseShortcuts: appDataClientMocks.setSwapCloseShortcuts,
   setTerminalNotificationsEnabled: appDataClientMocks.setTerminalNotificationsEnabled,
 }))
 
@@ -142,8 +140,6 @@ describe('settings write paths', () => {
     appDataClientMocks.setSettingsFetchInterval.mockImplementation(async (sec) => sec)
     appDataClientMocks.setShortcutsDisabled.mockReset()
     appDataClientMocks.setShortcutsDisabled.mockResolvedValue(undefined)
-    appDataClientMocks.setSwapCloseShortcuts.mockReset()
-    appDataClientMocks.setSwapCloseShortcuts.mockResolvedValue(undefined)
     appDataClientMocks.setTerminalNotificationsEnabled.mockReset()
     appDataClientMocks.setTerminalNotificationsEnabled.mockResolvedValue(undefined)
   })

@@ -28,7 +28,6 @@ import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
 import { focusedRegisteredSurface } from '#/main/window-registry.ts'
 import { applyMenuRuntimeState, readMenuRuntimeState } from '#/main/menu-state.ts'
 import {
-  closeShortcutAccelerators,
   rendererMenuCommandById,
   resolveRendererMenuCommandAccelerator,
   resolveRendererMenuCommandEnabled,
@@ -45,12 +44,11 @@ interface AppMenuState {
   name: string
   recentRepos: RepoSessionEntry[]
   shortcutsDisabled: boolean
-  swapCloseShortcuts: boolean
   themePref: ThemePref
   langPref: LangPref
 }
 
-type AppMenuCommandContext = Pick<AppMenuState, 'swapCloseShortcuts'>
+type AppMenuCommandContext = Record<string, never>
 
 const APPEARANCE_MENU_OPTIONS = [
   { pref: 'auto', labelKey: 'settings.appearance.auto' },
@@ -94,7 +92,6 @@ function readMenuState(): AppMenuState {
     name: app.name,
     recentRepos: runtimeState.recentRepos,
     shortcutsDisabled: runtimeState.shortcutsDisabled,
-    swapCloseShortcuts: runtimeState.swapCloseShortcuts,
     themePref: getTheme().pref,
     langPref: runtimeState.langPref,
   }
@@ -139,22 +136,17 @@ function createFileMenu(state: AppMenuState): MenuItemConstructorOptions {
   return {
     label: t('menu.file'),
     submenu: [
+      createRendererCommandMenuItem(state, 'file-new-terminal-tab'),
+      separator(),
       createRendererCommandMenuItem(state, 'file-open-local-repo'),
       createRendererCommandMenuItem(state, 'file-open-local-repo-path'),
       createRendererCommandMenuItem(state, 'file-clone-repo'),
       createRendererCommandMenuItem(state, 'file-open-remote-repo'),
       { label: t('menu.file.open-recent'), submenu: createRecentReposMenu(state.recentRepos) },
       separator(),
+      createRendererCommandMenuItem(state, 'file-close-terminal-tab-or-window'),
       createRendererCommandMenuItem(state, 'file-close-tab'),
-      // Close-window uses Electron's `role: 'close'` so it still works
-      // even if the renderer is hung.
-      state.shortcutsDisabled
-        ? { label: t('menu.file.close-window'), click: () => focusedRegisteredSurface()?.window.close() }
-        : {
-            role: 'close',
-            label: t('menu.file.close-window'),
-            accelerator: closeWindowAccelerator(state),
-          },
+      { label: t('menu.file.close-window'), click: () => focusedRegisteredSurface()?.window.close() },
       separator(),
       { label: t('menu.file.open-in-browser'), click: () => void openWebVersionFromMenu() },
       // Pick the OS-specific copy so Windows users see "in Explorer"
@@ -328,14 +320,9 @@ function createRendererCommandMenuItem(
   }
 }
 
-function closeWindowAccelerator(state: AppMenuState): string {
-  return closeShortcutAccelerators(state.swapCloseShortcuts).closeWindow
-}
-
 function menuCommandContext(state: AppMenuState): AppMenuCommandContext {
-  return {
-    swapCloseShortcuts: state.swapCloseShortcuts,
-  }
+  void state
+  return {}
 }
 
 async function openWebVersionFromMenu(): Promise<void> {
