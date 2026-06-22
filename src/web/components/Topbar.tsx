@@ -1,15 +1,21 @@
 // Top app bar with embedded repo picker, a per-repo actions group,
 // a global settings button, and a large-screen Focus Mode toggle.
 //   • repo picker (children) — current repo + open/switch controls.
+//     Content-sized so the per-repo actions read as "actions on this
+//     repo" rather than floating in the middle of an expanded bar.
 //   • repo actions (when `repoId` is set) — Refresh, the worktree
 //     filter toggle, and the new-worktree action. These used to
 //     live in a dedicated RepoToolbar above the branch navigator; they
 //     moved up here so the workspace's vertical chrome collapses
-//     to the branch navigator and workspace pane.
+//     to the branch navigator and workspace pane. They sit flush
+//     against the right edge of the repo picker so the picker +
+//     actions read as one "repo context" group on the left.
 //   • Focus Mode toggle — sits immediately left of the settings button
-//     on large screens, separated from the per-repo actions by a
-//     vertical Separator so the layout-mode control reads as its own
-//     group; hidden in compact mode.
+//     on large screens. The "repo context" group (picker + actions)
+//     and this "app-level" group are separated visually by the
+//     flex-1 spacer alone — no vertical Separator, since the spacer
+//     already provides clear horizontal distance and the icon
+//     styles differ enough on their own; hidden in compact mode.
 //   • Settings button (always shown) — navigates to the app
 //     settings page.
 //
@@ -26,7 +32,6 @@ import type { ReactNode } from 'react'
 import { PanelLeft, Settings } from 'lucide-react'
 import { useT } from '#/web/stores/i18n.ts'
 import { Button } from '#/web/components/ui/button.tsx'
-import { Separator } from '#/web/components/ui/separator.tsx'
 import { RepoToolbarActions } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
 import { WINDOW_TOPBAR_HEIGHT_PX } from '#/shared/window-chrome.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -52,12 +57,8 @@ export function Topbar({ onOpenSettings, repoId, children }: Props) {
     >
       {children}
       {repoId && <RepoToolbarActions repoId={repoId} />}
-      {showFocusToggle && (
-        <>
-          <Separator orientation="vertical" />
-          <WorkspaceFocusToggle repoId={repoId!} />
-        </>
-      )}
+      <div className="flex-1" />
+      {showFocusToggle && <WorkspaceFocusToggle repoId={repoId!} />}
       <SettingsButton onClick={onOpenSettings} />
     </div>
   )

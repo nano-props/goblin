@@ -76,7 +76,6 @@ export const ko: Record<DictKey, string> = {
   // ---- Repository picker ---------------------------------------------------
   'repo-picker.repos': '리포지토리',
   'repo-picker.close-named': '{name} 닫기',
-  'repo-picker.more': '모든 리포지토리',
   'repo-picker.open-local': '로컬 리포지토리 열기…',
   'repo-picker.open-remote': '원격 리포지토리 열기…',
   'repo-picker.open-title': '로컬 리포지토리 열기',
@@ -160,9 +159,7 @@ export const ko: Record<DictKey, string> = {
   'repo-picker.open-remote-path-required': '경로가 필요합니다',
   'repo-picker.open-remote-path-absolute': '경로는 / 또는 ~/로 시작해야 합니다',
   'repo-picker.open-remote-home-unavailable': '원격 홈 디렉터리를 확인할 수 없습니다',
-  'repo-picker.tooltip.no-remotes': '원격 없음',
   'repo-picker.tooltip.last-sync-label': '마지막 동기화',
-  'repo-picker.tooltip.not-synced': '아직 동기화되지 않음',
   'repo-picker.connecting-title': 'SSH에 연결 중…',
   'repo-unavailable.title': '리포지토리 경로를 사용할 수 없음',
   'repo-unavailable.body':
@@ -228,8 +225,6 @@ export const ko: Record<DictKey, string> = {
   'branches.filter-label': '브랜치 필터',
   'branches.selected': '선택한 브랜치',
   'branches.switch': '브랜치 전환',
-  'branches.filter.all': '전체',
-  'branches.filter.worktrees': '워크트리',
   'branches.filter-tooltip.all': '모든 브랜치',
   'branches.filter-tooltip.worktrees': '워크트리 브랜치',
   'workspace.focus-toggle-label': '집중 모드 전환',

@@ -83,7 +83,6 @@ export const ja: Record<DictKey, string> = {
   // ---- Repository picker ---------------------------------------------------
   'repo-picker.repos': 'リポジトリ',
   'repo-picker.close-named': '{name} を閉じる',
-  'repo-picker.more': 'すべてのリポジトリ',
   'repo-picker.open-local': 'ローカルリポジトリを開く…',
   'repo-picker.open-remote': 'リモートリポジトリを開く…',
   'repo-picker.open-title': 'ローカルリポジトリを開く',
@@ -167,9 +166,7 @@ export const ja: Record<DictKey, string> = {
   'repo-picker.open-remote-path-required': 'パスを入力してください',
   'repo-picker.open-remote-path-absolute': 'パスは / または ~/ で始まる必要があります',
   'repo-picker.open-remote-home-unavailable': 'リモートのホームディレクトリを解決できませんでした',
-  'repo-picker.tooltip.no-remotes': 'リモートなし',
   'repo-picker.tooltip.last-sync-label': '最終同期',
-  'repo-picker.tooltip.not-synced': '未同期',
   'repo-picker.connecting-title': 'SSH に接続中…',
   'repo-unavailable.title': 'リポジトリパスを利用できません',
   'repo-unavailable.body':
@@ -235,8 +232,6 @@ export const ja: Record<DictKey, string> = {
   'branches.filter-label': 'ブランチをフィルター',
   'branches.selected': '選択中のブランチ',
   'branches.switch': 'ブランチを切り替え',
-  'branches.filter.all': 'すべて',
-  'branches.filter.worktrees': 'ワークツリー',
   'branches.filter-tooltip.all': 'すべてのブランチ',
   'branches.filter-tooltip.worktrees': 'ワークツリーブランチ',
   'workspace.focus-toggle-label': '集中モードを切り替え',

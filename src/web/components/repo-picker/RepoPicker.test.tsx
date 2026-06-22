@@ -26,7 +26,7 @@ afterEach(() => {
 })
 
 describe('RepoPicker', () => {
-  test('keeps the switcher trigger outside the current repo group', () => {
+  test('keeps the current repo button as the only repo chrome inside the current repo group', () => {
     render(
       <RepoPicker
         repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
@@ -43,8 +43,10 @@ describe('RepoPicker', () => {
     const currentRepoGroup = document.body.querySelector('[data-current-repo-group]')
     expect(currentRepoGroup).not.toBeNull()
     expect(currentRepoGroup?.querySelector('[data-current-repo-id="/tmp/repo-a"]')).not.toBeNull()
-    expect(currentRepoGroup?.querySelector('[aria-label="More"]')).toBeNull()
-    expect(document.body.querySelector('button[aria-label="More"]')).not.toBeNull()
+    // The "All repositories" chevron button is gone — the tab is the
+    // single popover trigger now.
+    expect(currentRepoGroup?.querySelector('button[aria-label="More"]')).toBeNull()
+    expect(document.body.querySelector('button[aria-label="More"]')).toBeNull()
   })
 
   test('exposes the current repo button as a selected tab in a horizontal tablist', () => {
@@ -72,7 +74,7 @@ describe('RepoPicker', () => {
     expect(activeTab.tabIndex).toBe(0)
   })
 
-  test('shows the active repo in the repo switcher popover with selected styling', async () => {
+  test('opens the repo menu popover when the current repo tab is clicked', async () => {
     render(
       <RepoPicker
         repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
@@ -86,12 +88,12 @@ describe('RepoPicker', () => {
       />,
     )
 
-    const trigger = document.body.querySelector('button[aria-label="More"]')
-    if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing more trigger')
+    const tab = document.body.querySelector('[data-current-repo-id="/tmp/repo-a"]')
+    if (!(tab instanceof HTMLButtonElement)) throw new Error('missing current repo tab')
 
     await act(async () => {
-      trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
-      trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
+      tab.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+      tab.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
       await Promise.resolve()
     })
 
@@ -102,7 +104,7 @@ describe('RepoPicker', () => {
     expect(selectedItem?.className).toContain('bg-selected')
   })
 
-  test('renders only the active repo button when multiple repos are open, with the rest in the switcher popover', () => {
+  test('renders only the active repo button when multiple repos are open, with the rest in the popover', () => {
     vi.stubGlobal('matchMedia', createMatchMedia(false))
 
     render(
@@ -121,10 +123,11 @@ describe('RepoPicker', () => {
     expect(document.body.querySelector('[data-current-repo-id="/tmp/repo-b"]')).not.toBeNull()
     expect(document.body.querySelector('[data-current-repo-id="/tmp/repo-a"]')).toBeNull()
     expect(document.body.querySelector('[data-current-repo-id="/tmp/repo-c"]')).toBeNull()
-    expect(document.body.querySelector('button[aria-label="More"]')).not.toBeNull()
+    // No standalone "All repositories" button — the tab is the trigger.
+    expect(document.body.querySelector('button[aria-label="More"]')).toBeNull()
   })
 
-  test('keeps current repo chrome borderless with hover while leaving close action in the repo switcher popover', async () => {
+  test('keeps current repo chrome borderless with hover and shows two-line rows with path in the popover', async () => {
     render(
       <RepoPicker
         repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
@@ -145,18 +148,25 @@ describe('RepoPicker', () => {
     expect(currentRepoChrome?.className).toContain('border-transparent')
     expect(currentRepoChrome?.className).not.toContain('border-separator')
     expect(currentRepoChrome?.className).toContain('hover:bg-accent/70')
-    expect(currentRepoChrome?.className).toContain('hover:text-foreground')
+    // The chrome now reads in text-foreground by default to match the
+    // action buttons, so there's no hover:text-foreground shift anymore.
+    expect(currentRepoChrome?.className).toContain('text-foreground')
+    // The close button used to live in the chrome; it now lives in
+    // each popover row instead.
     expect(currentRepoChrome?.querySelector('button[aria-label="Close repo-a"]')).toBeNull()
 
-    const trigger = document.body.querySelector('button[aria-label="More"]')
-    if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing more trigger')
+    // No internal vertical separator between tab and chevron — the
+    // chevron is part of the tab now.
     expect(
-      trigger.parentElement?.querySelector(':scope > [data-slot="separator"][data-orientation="vertical"]'),
-    ).not.toBeNull()
+      currentRepoChrome?.parentElement?.querySelector(':scope > [data-slot="separator"][data-orientation="vertical"]'),
+    ).toBeNull()
+
+    const tab = document.body.querySelector('[data-current-repo-id="/tmp/repo-a"]')
+    if (!(tab instanceof HTMLButtonElement)) throw new Error('missing current repo tab')
 
     await act(async () => {
-      trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
-      trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
+      tab.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+      tab.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
       await Promise.resolve()
     })
 
@@ -164,6 +174,18 @@ describe('RepoPicker', () => {
     expect(closeButton).not.toBeNull()
     expect(closeButton?.className).not.toContain('opacity-0')
     expect(closeButton?.className).not.toContain('group-hover:opacity-100')
+
+    // Each popover row is now two lines: name on top, locator (path
+    // or remote target) below in mono muted text. The locator for a
+    // local repo is the tilde-expanded path.
+    const repoARow = [...document.body.querySelectorAll('button[aria-current]')].find((btn) =>
+      btn.textContent?.includes('repo-a'),
+    )
+    expect(repoARow).not.toBeNull()
+    expect(repoARow?.className).toContain('min-h-11')
+    const locator = repoARow?.querySelector('.font-mono')
+    expect(locator).not.toBeNull()
+    expect(locator?.textContent?.trim()).toBe('/tmp/repo-a')
   })
 })
 
@@ -183,7 +205,6 @@ function repo(name: string, id: string): RepoPickerRepo {
 const labels = {
   repositories: 'Repositories',
   closeWithName: (name: string) => `Close ${name}`,
-  more: 'More',
   open: 'Open',
   openLocal: 'Open local repository…',
   openLocalShortcut: '⌘O',
