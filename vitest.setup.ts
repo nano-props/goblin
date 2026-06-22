@@ -23,6 +23,12 @@
 //      otherwise. Returning null is what real browsers do when canvas is
 //      disabled, and the addon falls back gracefully. Per-test `vi.spyOn`
 //      calls still take precedence (they run after this stub is installed).
+//
+//   5. Install a no-op `ResizeObserver` on `window` in jsdom. jsdom does not
+//      implement it, but Radix UI's Tooltip and HoverCard mount a `use-size`
+//      observer on every TooltipContent. A no-op shim is enough — those
+//      components only use the observation to anchor the portal, which is
+//      irrelevant in tests.
 
 const originalEmit = process.emit.bind(process)
 process.emit = function patchedEmit(event, payload, ...rest) {
@@ -77,4 +83,14 @@ if (typeof HTMLCanvasElement !== 'undefined') {
   HTMLCanvasElement.prototype.getContext = function getContext() {
     return null
   }
+}
+
+// Only relevant in the jsdom environment; no-op when undefined.
+if (typeof window !== 'undefined' && !window.ResizeObserver) {
+  class NoopResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  ;(window as { ResizeObserver?: typeof ResizeObserver }).ResizeObserver = NoopResizeObserver
 }

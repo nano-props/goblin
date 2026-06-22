@@ -17,7 +17,6 @@ export type BranchActionItemId =
 export interface BranchCopyPatchAction {
   label: string
   title?: string
-  ariaLabel?: string
   disabled: boolean
   busy?: boolean
   visible: boolean

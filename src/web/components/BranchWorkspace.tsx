@@ -10,6 +10,7 @@ import { BranchWorkspaceToolbar } from '#/web/components/branch-workspace/Branch
 import { BranchWorkspaceContent } from '#/web/components/branch-workspace/BranchWorkspaceContent.tsx'
 import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
+import { BranchActionSurfaceContext } from '#/web/components/branch-workspace/branch-action-surface-context.ts'
 interface Props {
   repoId: string
   selectedBranchName?: string | null
@@ -135,15 +136,10 @@ function BranchShortcutHandler({
   useBranchActionShortcutRegistry(actions, shortcutsEnabled)
 
   return (
-    <>
+    <BranchActionSurfaceContext.Provider value={actions}>
       <BranchWorkspaceToolbar repo={repo} detail={detail} workspacePaneId={workspacePaneId} />
       {actions.dialogs}
-      <BranchWorkspaceContent
-        repo={repo}
-        detail={detail}
-        workspacePaneId={workspacePaneId}
-        copyPatchAction={actions.copyPatchAction}
-      />
-    </>
+      <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId={workspacePaneId} />
+    </BranchActionSurfaceContext.Provider>
   )
 }

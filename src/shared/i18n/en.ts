@@ -253,7 +253,7 @@ export const en = {
   'branches.no-upstream': 'no upstream',
 
   // ---- Branch status ------------------------------------------------------
-  'branch-status.worktree-dirty': '{n} change(s)',
+  'branch-status.changes-count': '{n} change(s)',
   'branch-status.merged': 'included',
   'branch-status.not-merged': 'unique commits',
   'branch-status.merge-unknown': 'unknown',
@@ -268,6 +268,7 @@ export const en = {
   'branch-status.signal.merge': 'Baseline',
   'branch-status.signal.pr': 'PR',
   'branch-status.signal.worktree': 'Worktree',
+  'branch-status.signal.changes': 'Changes',
   'branch-status.sync.up-to-date': 'up to date',
   'branch-status.upstream.pr-only': 'PR only',
   'branch-status.worktree.none': 'no worktree',
@@ -306,6 +307,7 @@ export const en = {
   'status.worktree-clean': 'clean',
   'status.stale-title': 'Showing stale changes',
   'status.copy-patch': 'Patch',
+  'status.copy-patch-label': 'Copy patch',
   'status.copy-patch-title': 'Copy a git apply --binary patch of this worktree to the clipboard',
   'status.copy-patch-ok': 'Patch copied to clipboard',
   'status.copy-patch-empty': 'Nothing to copy — worktree is clean',

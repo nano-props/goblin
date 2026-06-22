@@ -21,7 +21,7 @@ vi.mock('#/web/stores/i18n.ts', () => ({
         return '已失联'
       case 'terminal.bell-unread-count':
         return `${params?.count ?? 0} 个未读终端提醒`
-      case 'branch-status.worktree-dirty':
+      case 'branch-status.changes-count':
         return `${params?.n ?? 0} 个改动`
       case 'branch-status.sync.ahead':
         return `领先 ${params?.n ?? 0}`

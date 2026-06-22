@@ -233,7 +233,7 @@ export const zh: Record<DictKey, string> = {
   'branches.no-upstream': '未设置上游',
 
   // ---- Branch status -----------------------------------------------------
-  'branch-status.worktree-dirty': '{n} 个改动',
+  'branch-status.changes-count': '{n} 个改动',
   'branch-status.merged': '已包含',
   'branch-status.not-merged': '有独有提交',
   'branch-status.merge-unknown': '未知',
@@ -248,6 +248,7 @@ export const zh: Record<DictKey, string> = {
   'branch-status.signal.merge': '基线',
   'branch-status.signal.pr': 'PR',
   'branch-status.signal.worktree': '工作树',
+  'branch-status.signal.changes': '变更',
   'branch-status.sync.up-to-date': '已同步',
   'branch-status.upstream.pr-only': '仅 PR',
   'branch-status.worktree.none': '没有工作树',
@@ -286,6 +287,7 @@ export const zh: Record<DictKey, string> = {
   'status.worktree-clean': '干净',
   'status.stale-title': '正在显示旧的改动数据',
   'status.copy-patch': '补丁',
+  'status.copy-patch-label': '复制补丁',
   'status.copy-patch-title': '将该工作树的 git apply --binary 补丁复制到剪贴板',
   'status.copy-patch-ok': '补丁已复制到剪贴板',
   'status.copy-patch-empty': '无需复制 — 工作树是干净的',

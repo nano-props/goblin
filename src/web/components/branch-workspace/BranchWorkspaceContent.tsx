@@ -1,11 +1,9 @@
-import { Check, ClipboardCopy, FolderTree, Loader2 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { FolderTree } from 'lucide-react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import { StatusListSkeleton } from '#/web/components/Skeleton.tsx'
 import { StatusList } from '#/web/components/StatusList.tsx'
-import { Button } from '#/web/components/ui/button.tsx'
-import '#/web/components/branch-workspace/changes-tab.css'
 import { getRepositoryLog } from '#/web/repo-client.ts'
 import type { LogEntry } from '#/web/types.ts'
 import { BranchStatus } from '#/web/components/branch-workspace/BranchStatus.tsx'
@@ -26,7 +24,6 @@ import { workspacePaneStaticViewButtonId } from '#/web/components/branch-workspa
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
-import type { BranchCopyPatchAction } from '#/web/hooks/branch-action-state.ts'
 import {
   createBranchWorkspacePaneTabModel,
   type BranchWorkspacePaneTab,
@@ -41,7 +38,6 @@ interface Props {
   }
   detail: SelectedBranchWorkspacePresentation
   workspacePaneId: string
-  copyPatchAction?: BranchCopyPatchAction
 }
 
 interface TabPanelProps {
@@ -59,7 +55,7 @@ type BranchWorkspaceBranch = NonNullable<SelectedBranchWorkspacePresentation['br
 // never re-projects on snapshot refresh, branch switch, or session restore.
 // The tab model keeps the body render target separate from the active
 // materialized tab.
-export function BranchWorkspaceContent({ repo, detail, workspacePaneId, copyPatchAction }: Props) {
+export function BranchWorkspaceContent({ repo, detail, workspacePaneId }: Props) {
   const t = useT()
   const compact = useIsCompactUi()
   const { branch } = detail
@@ -127,7 +123,6 @@ export function BranchWorkspaceContent({ repo, detail, workspacePaneId, copyPatc
           statusLoading={detail.loading.status}
           statusError={detail.errors.status}
           statusStale={detail.stale.status}
-          copyPatchAction={copyPatchAction}
         />
       )}
       {renderedView === 'terminal' && branch.worktree?.path && (
@@ -376,7 +371,6 @@ function BranchChangesTab({
   statusLoading,
   statusError,
   statusStale,
-  copyPatchAction,
 }: {
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
@@ -386,14 +380,9 @@ function BranchChangesTab({
   statusLoading: boolean
   statusError: string | null
   statusStale: boolean
-  copyPatchAction?: BranchCopyPatchAction
 }) {
   const t = useT()
   const totalEntries = selectedStatus.reduce((n, wt) => n + wt.entries.length, 0)
-  // Hide the float widget while the stale status banner is on screen so they
-  // don't overlap. `visible` and `totalEntries` can drift on transient state,
-  // so both gates stay.
-  const showCopyPatchFloat = totalEntries > 0 && !!copyPatchAction?.visible && !(statusStale && statusError)
 
   return (
     <BranchTabPanel id={`${workspacePaneId}-changes-panel`} {...panelLabel} busy={statusLoading}>
@@ -404,7 +393,6 @@ function BranchChangesTab({
       ) : branch.worktree?.path ? (
         <div className="relative flex min-h-0 flex-1 flex-col">
           {statusStale && statusError && <StaleStatusNotice message={statusError} />}
-          {showCopyPatchFloat && <ChangesCopyPatchFloat action={copyPatchAction} />}
           {totalEntries > 0 ? (
             <ScrollPane>
               <StatusList status={selectedStatus} />
@@ -421,64 +409,6 @@ function BranchChangesTab({
         />
       )}
     </BranchTabPanel>
-  )
-}
-
-const COPY_PATCH_FEEDBACK_MS = 1500
-
-function ChangesCopyPatchFloat({ action }: { action: BranchCopyPatchAction }) {
-  const t = useT()
-  const [succeeded, setSucceeded] = useState(false)
-  // Guard against a slow onSelect() resolving after the widget unmounts
-  // (e.g. user switches tabs mid-copy).
-  const mountedRef = useRef(true)
-  useEffect(
-    () => () => {
-      mountedRef.current = false
-    },
-    [],
-  )
-
-  useEffect(() => {
-    if (!succeeded) return
-    const timer = window.setTimeout(() => setSucceeded(false), COPY_PATCH_FEEDBACK_MS)
-    return () => window.clearTimeout(timer)
-  }, [succeeded])
-
-  const handleClick = () => {
-    if (action.busy || action.disabled) return
-    void Promise.resolve(action.onSelect()).then((ok) => {
-      if (mountedRef.current && ok) setSucceeded(true)
-    })
-  }
-
-  const busy = !!action.busy
-  const showCheck = succeeded && !busy
-
-  return (
-    <div className="goblin-changes-tab__copy-patch">
-      <Button
-        type="button"
-        size="sm"
-        variant="ghost"
-        disabled={action.disabled || busy}
-        aria-busy={busy || undefined}
-        title={action.title}
-        aria-label={action.ariaLabel ?? action.title}
-        onClick={handleClick}
-      >
-        {busy ? (
-          <Loader2 className="size-3 animate-spin" />
-        ) : showCheck ? (
-          <Check className="size-3" />
-        ) : (
-          <ClipboardCopy className="size-3" />
-        )}
-        <span aria-live="polite" role="status">
-          {showCheck ? t('status.copy-patch-success') : action.label}
-        </span>
-      </Button>
-    </div>
   )
 }
 

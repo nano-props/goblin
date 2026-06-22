@@ -125,7 +125,6 @@ export function useBranchActionItems(repo: BranchActionRepo, branch: RepoBranchS
   const copyPatchAction: BranchCopyPatchAction = {
     label: t('status.copy-patch'),
     title: t('status.copy-patch-title'),
-    ariaLabel: t('status.copy-patch-title'),
     disabled,
     busy: busy('copyPatch'),
     visible: capabilities.canCopyPatch,

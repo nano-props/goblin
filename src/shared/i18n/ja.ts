@@ -249,7 +249,7 @@ export const ja: Record<DictKey, string> = {
   'branches.no-upstream': '上流なし',
 
   // ---- Branch status -----------------------------------------------------
-  'branch-status.worktree-dirty': '{n} 件の変更',
+  'branch-status.changes-count': '{n} 件の変更',
   'branch-status.merged': '含まれています',
   'branch-status.not-merged': '固有コミットあり',
   'branch-status.merge-unknown': '不明',
@@ -264,6 +264,7 @@ export const ja: Record<DictKey, string> = {
   'branch-status.signal.merge': 'ベースライン',
   'branch-status.signal.pr': 'PR',
   'branch-status.signal.worktree': 'ワークツリー',
+  'branch-status.signal.changes': '変更',
   'branch-status.sync.up-to-date': '最新',
   'branch-status.upstream.pr-only': 'PR のみ',
   'branch-status.worktree.none': 'ワークツリーなし',
@@ -302,6 +303,7 @@ export const ja: Record<DictKey, string> = {
   'status.worktree-clean': 'クリーン',
   'status.stale-title': '古い変更データを表示しています',
   'status.copy-patch': 'パッチ',
+  'status.copy-patch-label': 'パッチをコピー',
   'status.copy-patch-title': 'このワークツリーの git apply --binary 用パッチをクリップボードにコピー',
   'status.copy-patch-ok': 'パッチをクリップボードにコピーしました',
   'status.copy-patch-empty': 'コピー対象なし — ワークツリーはクリーンです',

@@ -2,6 +2,7 @@ import {
   ArrowDown,
   ArrowUp,
   Check,
+  FileEdit,
   FolderTree,
   GitBranch,
   GitCommitHorizontal,
@@ -12,6 +13,10 @@ import {
 import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { PullRequestStatusRow } from '#/web/components/branch-workspace/PullRequestStatusRow.tsx'
+import { IconCopyButton } from '#/web/components/IconCopyButton.tsx'
+import type { BranchCopyPatchAction } from '#/web/hooks/branch-action-state.ts'
+import { useActionFeedback } from '#/web/hooks/useActionFeedback.ts'
+import { useBranchActionSurface } from '#/web/components/branch-workspace/branch-action-surface-context.ts'
 import {
   CopyableValue,
   MonoValue,
@@ -74,7 +79,35 @@ function SyncValue({
   )
 }
 
+function StatusCopyPatchButton({ action }: { action: BranchCopyPatchAction }) {
+  const t = useT()
+  const { succeeded, trigger } = useActionFeedback()
+  const busy = !!action.busy
+  // Icon-only button — the label drives both the visible Tooltip and the
+  // aria-label. Use the descriptive `action.title` (vs the short
+  // `status.copy-patch-label`) so screen-reader users and sighted users
+  // hovering the button learn it copies a git-apply patch specifically.
+  const showCheck = succeeded && !busy
+  const label = showCheck ? t('status.copy-patch-success') : action.title ?? t('status.copy-patch-label')
+
+  const handleClick = () => {
+    if (action.busy || action.disabled) return
+    trigger(action.onSelect)
+  }
+
+  return (
+    <IconCopyButton
+      label={label}
+      succeeded={showCheck}
+      busy={busy}
+      disabled={action.disabled || busy}
+      onClick={handleClick}
+    />
+  )
+}
+
 export function BranchStatus({ detail }: Props) {
+  const { copyPatchAction } = useBranchActionSurface()
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
   const compact = useIsCompactUi()
@@ -94,7 +127,10 @@ export function BranchStatus({ detail }: Props) {
   const pullRequest =
     branch.pullRequest && branchPullRequestBelongsToBranch(branch, branch.pullRequest) ? branch.pullRequest : undefined
   const hasRole = branch.isDefault || protectedBranch
-  const hasWorktreeChanges = !!branch.worktree?.path && (detail.worktreeState?.dirty || worktreeChangeCount > 0)
+  // Gate on the same value the chip displays. If `worktreeChangeCount` is 0,
+  // the row shows "0 changes" and there's nothing to copy — keep the
+  // button hidden so we don't surface an action next to a contradictory chip.
+  const hasWorktreeChanges = !!branch.worktree?.path && worktreeChangeCount > 0
   const mergeKnown = branch.isDefault || branch.mergedToDefault !== undefined
   const showMerged = !branch.isDefault
   const commitTime = formatRelativeTimeOrNull(branch.lastCommitDate, lang)
@@ -112,8 +148,13 @@ export function BranchStatus({ detail }: Props) {
   const upstreamTone: Tone = branch.trackingGone || !branch.tracking ? 'attention' : 'brand'
   const syncTone: Tone = !branch.tracking ? 'attention' : branch.behind > 0 ? 'attention' : 'success'
   const worktreeLocked = detail.worktreeState?.isLocked ?? false
-  const worktreeTone: Tone =
-    worktreeLocked || hasWorktreeChanges ? 'attention' : branch.worktree?.path ? 'brand' : 'neutral'
+  // The "dirty worktree" signal moved to its own row below; the worktree
+  // row only needs to surface lock state on its own.
+  const worktreeTone: Tone = worktreeLocked
+    ? 'attention'
+    : branch.worktree?.path
+      ? 'brand'
+      : 'neutral'
   const worktreeValue = branch.worktree?.path ? (
     <CopyableValue
       value={worktreePath}
@@ -124,15 +165,9 @@ export function BranchStatus({ detail }: Props) {
   ) : (
     <StatusChip>{t('branch-status.worktree.none')}</StatusChip>
   )
-  const worktreeAfter =
-    worktreeLocked || hasWorktreeChanges ? (
-      <>
-        {worktreeLocked && <StatusChip tone="attention">{t('branch-status.worktree.locked')}</StatusChip>}
-        {hasWorktreeChanges && (
-          <StatusChip tone="attention">{t('branch-status.worktree-dirty', { n: worktreeChangeCount })}</StatusChip>
-        )}
-      </>
-    ) : undefined
+  const worktreeAfter = worktreeLocked ? (
+    <StatusChip tone="attention">{t('branch-status.worktree.locked')}</StatusChip>
+  ) : undefined
   const upstreamValue = branch.tracking ? (
     <MonoValue title={branch.tracking} tone={branch.trackingGone ? 'attention' : undefined} truncate>
       {branch.tracking}
@@ -176,6 +211,20 @@ export function BranchStatus({ detail }: Props) {
         valueLayout="inline"
         tone={worktreeTone}
       />
+      {hasWorktreeChanges && (
+        <StatusRow
+          icon={<FileEdit size={14} />}
+          label={t('branch-status.signal.changes')}
+          value={
+            <StatusChip tone="attention">
+              {t('branch-status.changes-count', { n: worktreeChangeCount })}
+            </StatusChip>
+          }
+          after={copyPatchAction.visible ? <StatusCopyPatchButton action={copyPatchAction} /> : undefined}
+          valueLayout="inline"
+          tone="attention"
+        />
+      )}
       <StatusRow
         icon={<RadioTower size={14} />}
         label={t('branch-status.signal.upstream')}

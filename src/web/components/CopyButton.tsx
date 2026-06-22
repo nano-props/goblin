@@ -1,84 +1,68 @@
-import { Check, Copy } from 'lucide-react'
 import { useEffect, useRef, useState, type ComponentPropsWithoutRef } from 'react'
 import { toast } from 'sonner'
 import { useT } from '#/web/stores/i18n.ts'
-import { Tip } from '#/web/components/Tip.tsx'
-import { Button } from '#/web/components/ui/button.tsx'
-import { cn } from '#/web/lib/cn.ts'
-const COPY_FEEDBACK_MS = 3000
+import { IconCopyButton } from '#/web/components/IconCopyButton.tsx'
+import { useActionFeedback } from '#/web/hooks/useActionFeedback.ts'
 
-type CopyButtonProps = Omit<
-  ComponentPropsWithoutRef<typeof Button>,
-  'aria-label' | 'asChild' | 'children' | 'onClick' | 'size' | 'title' | 'type' | 'variant'
-> & {
+type CopyButtonProps = Omit<ComponentPropsWithoutRef<typeof IconCopyButton>, 'busy' | 'label' | 'onClick' | 'succeeded'> & {
   value: string
   copyLabel: string
   copiedLabel: string
 }
 
 export function CopyButton({ value, copyLabel, copiedLabel, className, disabled, ...props }: CopyButtonProps) {
-  const [copied, setCopied] = useState(false)
+  // `copying` guards against double-clicks while the clipboard write is
+  // in flight; `succeeded` is the post-success flash managed by the
+  // shared hook. When `value` changes mid-flight, drop the flash so an
+  // old "Copied!" tooltip can't bleed across rows.
+  const { succeeded, trigger, reset } = useActionFeedback()
   const [copying, setCopying] = useState(false)
+  const requestIdRef = useRef(0)
+  const valueRef = useRef(value)
   const t = useT()
-  const copiedTimerRef = useRef<number | null>(null)
 
-  function clearCopiedTimer() {
-    if (copiedTimerRef.current) {
-      window.clearTimeout(copiedTimerRef.current)
-      copiedTimerRef.current = null
-    }
+  if (valueRef.current !== value) {
+    valueRef.current = value
+    requestIdRef.current += 1
   }
 
   useEffect(() => {
-    setCopied(false)
+    reset()
     setCopying(false)
-    clearCopiedTimer()
-  }, [value])
-
-  useEffect(() => {
-    return clearCopiedTimer
-  }, [])
+  }, [value, reset])
 
   function copy() {
     if (copying) return
+    const requestId = requestIdRef.current + 1
+    requestIdRef.current = requestId
+    const copiedValue = value
     setCopying(true)
     void navigator.clipboard
-      .writeText(value)
+      .writeText(copiedValue)
       .then(() => {
-        setCopied(true)
-        clearCopiedTimer()
-        copiedTimerRef.current = window.setTimeout(() => {
-          setCopied(false)
-          copiedTimerRef.current = null
-        }, COPY_FEEDBACK_MS)
+        if (requestIdRef.current !== requestId || valueRef.current !== copiedValue) return
+        trigger(() => true)
       })
       .catch((err: unknown) => {
-        setCopied(false)
-        clearCopiedTimer()
+        if (requestIdRef.current !== requestId || valueRef.current !== copiedValue) return
         toast.error(t('action.result-error'), {
           description: err instanceof Error ? err.message : String(err),
         })
       })
       .finally(() => {
-        setCopying(false)
+        if (requestIdRef.current === requestId) setCopying(false)
       })
   }
 
   return (
-    <Tip label={copied ? copiedLabel : copyLabel} side="right" forceOpen={copied}>
-      <Button
-        {...props}
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        className={cn('text-muted-foreground hover:text-foreground', className)}
-        aria-label={copied ? copiedLabel : copyLabel}
-        aria-busy={copying ? true : undefined}
-        disabled={disabled || copying}
-        onClick={copy}
-      >
-        {copied ? <Check size={12} /> : <Copy size={12} />}
-      </Button>
-    </Tip>
+    <IconCopyButton
+      {...props}
+      className={className}
+      label={succeeded ? copiedLabel : copyLabel}
+      succeeded={succeeded}
+      busy={copying}
+      disabled={disabled || copying}
+      onClick={copy}
+    />
   )
 }
