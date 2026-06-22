@@ -12,6 +12,7 @@ import {
 import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
+import { Separator } from '#/web/components/ui/separator.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
 import {
   DndContext,
@@ -711,7 +712,7 @@ function WorkspacePaneLeadingAction({
     >
       {children}
       {showSeparator && (
-        <span className="pointer-events-none absolute right-0 top-1/2 h-4 -translate-y-1/2 border-r border-separator" />
+        <Separator orientation="vertical" className="absolute right-0 top-1/2 -translate-y-1/2" />
       )}
     </div>
   )
@@ -813,7 +814,7 @@ function WorkspacePaneViewChrome({
       })}
       overlay={
         showSeparator ? (
-          <span className="pointer-events-none absolute right-0 top-1/2 h-4 -translate-y-1/2 border-r border-separator" />
+          <Separator orientation="vertical" className="absolute right-0 top-1/2 -translate-y-1/2" />
         ) : null
       }
       buttonRef={buttonRef}

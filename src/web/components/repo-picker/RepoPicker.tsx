@@ -3,6 +3,7 @@ import { Check, ChevronDown, Download, FolderGit2, FolderOpen, Plus, Server, X }
 import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
+import { Separator } from '#/web/components/ui/separator.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
 import { ToolbarTabStripBody } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
@@ -47,10 +48,7 @@ function RepoPickerEdgeAction({ children, showSeparator = false }: { children: R
   return (
     <div className="relative flex h-8 shrink-0 items-center pl-1">
       {showSeparator && (
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute left-0 top-1/2 h-4 -translate-y-1/2 border-l border-separator"
-        />
+        <Separator orientation="vertical" className="absolute left-0 top-1/2 -translate-y-1/2" />
       )}
       {children}
     </div>

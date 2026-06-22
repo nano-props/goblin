@@ -16,3 +16,19 @@ Use this doc for UI language and presentation rules.
   `clip-path` / scroll containers can't slice the halo. Concentric outer
   rings are clip-fragile — the `AnimateHeight` height transition was
   previously clipping Input's left/right focus halo mid-animation.
+- 1px inline dividers go through `<Separator>` from `src/web/components/ui/separator.tsx`.
+  Don't hand-roll `bg-separator w-px` or `border-l border-separator` —
+  these used to drift in height across files (h-4 vs h-5) and in
+  implementation (background fill vs left/right border). `Separator`
+  defaults to `orientation="horizontal"` / `size="sm"`. For an inline
+  vertical seam between toolbar siblings, use `<Separator orientation="vertical" />`
+  (renders `h-4 w-px bg-separator`) and let the caller's `relative`
+  parent add `absolute left-0|right-0 top-1/2 -translate-y-1/2` via
+  `className` when the seam must overlay without consuming layout width.
+  The chunkier `size="md"` (`h-5`) is reserved for any future 40px+
+  toolbar — no current caller. Larger surface dividers (the topbar's
+  own `border-b`, the sidebar's `border-r`, list `divide-y`) stay on
+  Tailwind border utilities; they belong to the surrounding container's
+  box, not a separate child element. All separators read their color
+  from `--color-separator` (= `--goblin-border-subtle`, one notch
+  weaker than `--color-border`).
