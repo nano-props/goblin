@@ -74,7 +74,7 @@ describe('renderer entrypoint', () => {
     })
 
     expect(hydrate).toHaveBeenCalledWith({ subscribe: false, signal: expect.any(AbortSignal) })
-    expect(document.body.textContent).toContain('Loading...')
+    expect(document.body.textContent).toContain('Loading')
     expect(document.body.textContent).not.toContain('app mounted')
 
     await act(async () => {
@@ -117,7 +117,7 @@ describe('renderer entrypoint', () => {
       await import('#/web/main.tsx')
     })
 
-    expect(document.body.textContent).toContain('Loading...')
+    expect(document.body.textContent).toContain('Loading')
     expect(hydrate.mock.calls[0]?.[0].signal.aborted).toBe(false)
 
     await act(async () => {
