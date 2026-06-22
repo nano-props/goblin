@@ -141,11 +141,13 @@ button,
   container-type: inline-size;
 }
 
-.goblin-split-pane[data-collapse-transition='true'] > [data-slot='resizable-panel-group'] > [data-slot='resizable-panel'] {
+.goblin-split-pane[data-collapse-transition='true']
+  > [data-slot='resizable-panel-group']
+  > [data-slot='resizable-panel'] {
   transition:
-    flex-basis var(--goblin-split-pane-collapse-duration) cubic-bezier(0.2, 0, 0, 1),
-    flex-grow var(--goblin-split-pane-collapse-duration) cubic-bezier(0.2, 0, 0, 1),
-    width var(--goblin-split-pane-collapse-duration) cubic-bezier(0.2, 0, 0, 1);
+    flex-basis var(--goblin-workspace-pane-transition-duration) var(--goblin-workspace-pane-transition-easing),
+    flex-grow var(--goblin-workspace-pane-transition-duration) var(--goblin-workspace-pane-transition-easing),
+    width var(--goblin-workspace-pane-transition-duration) var(--goblin-workspace-pane-transition-easing);
   will-change: flex-basis, flex-grow, width;
 }
 
@@ -161,7 +163,7 @@ button,
   width: var(--goblin-split-pane-before-content-size);
   flex-basis: var(--goblin-split-pane-before-content-size);
   transform: translateX(0);
-  transition: transform var(--goblin-split-pane-collapse-duration) cubic-bezier(0.2, 0, 0, 1);
+  transition: transform var(--goblin-workspace-pane-transition-duration) var(--goblin-workspace-pane-transition-easing);
   will-change: transform;
 }
 
@@ -173,13 +175,59 @@ button,
 .goblin-split-pane__handle {
   transition:
     opacity 140ms ease-out,
-    width var(--goblin-split-pane-collapse-duration) cubic-bezier(0.2, 0, 0, 1);
+    width var(--goblin-workspace-pane-transition-duration) var(--goblin-workspace-pane-transition-easing);
 }
 
 .goblin-split-pane__handle--collapsed {
   opacity: 0;
   pointer-events: none;
   width: 0;
+}
+
+/* Compact workspace page transition. Mirrors the split-pane Focus Mode
+ * timing while keeping both panes mounted for a mobile-style push/pop. */
+.goblin-compact-workspace {
+  contain: layout paint;
+}
+
+.goblin-compact-workspace__pane {
+  backface-visibility: hidden;
+  transform: translate3d(0, 0, 0);
+  transition:
+    transform var(--goblin-workspace-pane-transition-duration) var(--goblin-workspace-pane-transition-easing),
+    opacity 180ms ease-out;
+  will-change: transform, opacity;
+}
+
+.goblin-compact-workspace__pane--navigator {
+  z-index: 1;
+}
+
+.goblin-compact-workspace__pane--workspace {
+  z-index: 2;
+  box-shadow: -1px 0 0 var(--color-separator);
+}
+
+.goblin-compact-workspace[data-active-pane='navigator'] .goblin-compact-workspace__pane--navigator {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+.goblin-compact-workspace[data-active-pane='navigator'] .goblin-compact-workspace__pane--workspace {
+  opacity: 1;
+  pointer-events: none;
+  transform: translate3d(100%, 0, 0);
+}
+
+.goblin-compact-workspace[data-active-pane='workspace'] .goblin-compact-workspace__pane--navigator {
+  opacity: 0.82;
+  pointer-events: none;
+  transform: translate3d(-18%, 0, 0);
+}
+
+.goblin-compact-workspace[data-active-pane='workspace'] .goblin-compact-workspace__pane--workspace {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
 }
 
 /* Honor the OS-level "reduce motion" preference. */

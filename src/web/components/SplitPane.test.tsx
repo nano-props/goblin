@@ -4,6 +4,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { SplitPane } from '#/web/components/SplitPane.tsx'
+import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 
 const resizableMocks = vi.hoisted(() => ({
   setLayout: vi.fn<(layout: Record<string, number>) => void>(),
@@ -156,7 +157,9 @@ describe('SplitPane', () => {
     expect(beforeContent()?.style.getPropertyValue('--goblin-split-pane-before-open-size')).toBe('38cqw')
     expect(beforeContent()?.style.getPropertyValue('--goblin-split-pane-before-min-size')).toBe('14rem')
     expect(beforeContent()?.style.getPropertyValue('--goblin-split-pane-after-min-size')).toBe('22rem')
-    expect(splitPane()?.style.getPropertyValue('--goblin-split-pane-collapse-duration')).toBe('240ms')
+    expect(splitPane()?.style.getPropertyValue('--goblin-workspace-pane-transition-duration')).toBe(
+      `${WORKSPACE_PANE_TRANSITION_MS}ms`,
+    )
     expect(beforeContent()?.className).toContain('shrink-0')
     expect(beforeContent()?.className).not.toContain('flex-1')
     expect(resizeHandle()?.disabled).toBe(true)

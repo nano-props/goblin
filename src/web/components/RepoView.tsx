@@ -9,13 +9,15 @@ import { isRepoUnavailable } from '#/web/stores/repos/helpers.ts'
 import { BranchNavigator } from '#/web/components/BranchNavigator.tsx'
 import { BranchWorkspace } from '#/web/components/BranchWorkspace.tsx'
 import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
-import { RepoWorkspace, RepoWorkspacePane } from '#/web/components/Layout.tsx'
+import { CompactRepoWorkspace, RepoWorkspace, RepoWorkspacePane } from '#/web/components/Layout.tsx'
 import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
 import { getRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
 import { UnavailableRepoView } from '#/web/components/UnavailableRepoView.tsx'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { DEFAULT_WORKSPACE_LAYOUT } from '#/shared/workspace-layout.ts'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
+import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
+import { useRetainedValueDuringExit } from '#/web/hooks/useRetainedValueDuringExit.ts'
 
 interface Props {
   repoId: string
@@ -57,6 +59,13 @@ export function RepoView({ repoId }: Props) {
 
   const workspacePaneSize = view.workspacePaneSizes[layout]
   const selectedBranch = repo?.ui.selectedBranch ?? null
+  const singlePane = selectedBranch ? 'workspace' : 'navigator'
+  const compactWorkspaceSelectedBranch = useRetainedValueDuringExit({
+    value: selectedBranch,
+    active: compact && singlePane === 'workspace',
+    retainMs: WORKSPACE_PANE_TRANSITION_MS,
+    resetKey: repoId,
+  })
 
   if (!view.exists || !repo) return <div />
   if (isRepoUnavailable(repo)) return <UnavailableRepoView repo={repo} />
@@ -73,7 +82,11 @@ export function RepoView({ repoId }: Props) {
 
   const branchWorkspacePane = (
     <RepoWorkspacePane>
-      <BranchWorkspace repoId={repoId} />
+      <BranchWorkspace
+        repoId={repoId}
+        selectedBranchName={compact ? compactWorkspaceSelectedBranch : undefined}
+        shortcutsEnabled={!compact || singlePane === 'workspace'}
+      />
     </RepoWorkspacePane>
   )
   const branchNavigatorPane = (
@@ -81,11 +94,15 @@ export function RepoView({ repoId }: Props) {
       <BranchNavigator repoId={repoId} showActions={behavior.branchNavigatorActionsVisible} />
     </RepoWorkspacePane>
   )
-
-  const singlePane = repo.ui.selectedBranch ? 'workspace' : 'navigator'
   const singlePaneBody = singlePane === 'workspace' ? branchWorkspacePane : branchNavigatorPane
 
-  const workspaceBody = behavior.singlePane ? (
+  const workspaceBody = compact ? (
+    <CompactRepoWorkspace
+      activePane={singlePane}
+      branchNavigatorPane={branchNavigatorPane}
+      branchWorkspacePane={branchWorkspacePane}
+    />
+  ) : behavior.singlePane ? (
     singlePaneBody
   ) : (
     <RepoWorkspace

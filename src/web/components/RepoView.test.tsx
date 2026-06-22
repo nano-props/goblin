@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoView } from '#/web/components/RepoView.tsx'
 import { resetReposStore, seedRepoState, createRepoBranch } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 
 const responsiveMocks = vi.hoisted(() => ({
   mode: 'default' as 'default' | 'compact',
@@ -37,7 +38,19 @@ vi.mock('#/web/components/BranchNavigator.tsx', () => ({
 }))
 
 vi.mock('#/web/components/BranchWorkspace.tsx', () => ({
-  BranchWorkspace: () => <div data-testid="branch-workspace" />,
+  BranchWorkspace: ({
+    selectedBranchName,
+    shortcutsEnabled = true,
+  }: {
+    selectedBranchName?: string | null
+    shortcutsEnabled?: boolean
+  }) => (
+    <div
+      data-testid="branch-workspace"
+      data-selected-branch-name={selectedBranchName ?? ''}
+      data-shortcuts-enabled={shortcutsEnabled ? 'true' : 'false'}
+    />
+  ),
 }))
 
 vi.mock('#/web/components/Layout.tsx', () => ({
@@ -68,6 +81,24 @@ vi.mock('#/web/components/Layout.tsx', () => ({
     </div>
   ),
   RepoWorkspacePane: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  CompactRepoWorkspace: ({
+    activePane,
+    branchNavigatorPane,
+    branchWorkspacePane,
+  }: {
+    activePane: 'navigator' | 'workspace'
+    branchNavigatorPane: React.ReactNode
+    branchWorkspacePane: React.ReactNode
+  }) => (
+    <div data-compact-workspace="" data-active-pane={activePane}>
+      <div data-compact-workspace-pane="navigator" aria-hidden={activePane === 'workspace' ? 'true' : undefined}>
+        {branchNavigatorPane}
+      </div>
+      <div data-compact-workspace-pane="workspace" aria-hidden={activePane === 'navigator' ? 'true' : undefined}>
+        {branchWorkspacePane}
+      </div>
+    </div>
+  ),
   Toolbar: ({ children }: { children: React.ReactNode }) => <div data-testid="mock-toolbar">{children}</div>,
 }))
 
@@ -141,19 +172,23 @@ describe('RepoView workspace navigation', () => {
     expect(branchWorkspace()).not.toBeNull()
   })
 
-  test('compact branch activation opens Branch Workspace as the single pane', () => {
+  test('compact branch activation slides Branch Workspace into the active pane', () => {
     responsiveMocks.mode = 'compact'
     render(<RepoView repoId={REPO_ID} />)
 
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBeNull()
-    expect(branchWorkspace()).toBeNull()
+    expect(compactWorkspace()?.dataset.activePane).toBe('navigator')
+    expect(compactPane('navigator')?.getAttribute('aria-hidden')).toBeNull()
+    expect(compactPane('workspace')?.getAttribute('aria-hidden')).toBe('true')
 
     act(() => {
       branchNavigator()?.click()
     })
 
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBe('feature/a')
-    expect(branchNavigator()).toBeNull()
+    expect(compactWorkspace()?.dataset.activePane).toBe('workspace')
+    expect(compactPane('navigator')?.getAttribute('aria-hidden')).toBe('true')
+    expect(compactPane('workspace')?.getAttribute('aria-hidden')).toBeNull()
     expect(branchWorkspace()).not.toBeNull()
   })
 
@@ -165,8 +200,42 @@ describe('RepoView workspace navigation', () => {
       useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
     })
 
-    expect(branchNavigator()).toBeNull()
+    expect(compactWorkspace()?.dataset.activePane).toBe('workspace')
+    expect(compactPane('navigator')?.getAttribute('aria-hidden')).toBe('true')
+    expect(compactPane('workspace')?.getAttribute('aria-hidden')).toBeNull()
     expect(branchWorkspace()).not.toBeNull()
+  })
+
+  test('compact back transition keeps the outgoing Branch Workspace content during slide-out', () => {
+    vi.useFakeTimers()
+    try {
+      responsiveMocks.mode = 'compact'
+      render(<RepoView repoId={REPO_ID} />)
+
+      act(() => {
+        useReposStore.getState().selectBranch(REPO_ID, 'feature/a')
+      })
+
+      expect(branchWorkspace()?.dataset.selectedBranchName).toBe('feature/a')
+      expect(branchWorkspace()?.dataset.shortcutsEnabled).toBe('true')
+
+      act(() => {
+        useReposStore.getState().clearSelectedBranch(REPO_ID)
+      })
+
+      expect(compactWorkspace()?.dataset.activePane).toBe('navigator')
+      expect(compactPane('workspace')?.getAttribute('aria-hidden')).toBe('true')
+      expect(branchWorkspace()?.dataset.selectedBranchName).toBe('feature/a')
+      expect(branchWorkspace()?.dataset.shortcutsEnabled).toBe('false')
+
+      act(() => {
+        vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS)
+      })
+
+      expect(branchWorkspace()?.dataset.selectedBranchName).toBe('')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   test('large-screen initial loading keeps the workspace pane empty when no branch is selected', () => {
@@ -208,7 +277,9 @@ describe('RepoView workspace navigation', () => {
       root!.render(<RepoView repoId={REPO_ID} />)
     })
 
-    expect(branchNavigator()).toBeNull()
+    expect(compactWorkspace()?.dataset.activePane).toBe('workspace')
+    expect(compactPane('navigator')?.getAttribute('aria-hidden')).toBe('true')
+    expect(compactPane('workspace')?.getAttribute('aria-hidden')).toBeNull()
     expect(branchWorkspace()).not.toBeNull()
   })
 })
@@ -229,6 +300,14 @@ function branchWorkspace(): HTMLElement | null {
 
 function workspace(): HTMLElement | null {
   return container?.querySelector<HTMLElement>('[data-testid="repo-workspace"]') ?? null
+}
+
+function compactWorkspace(): HTMLElement | null {
+  return container?.querySelector<HTMLElement>('[data-compact-workspace]') ?? null
+}
+
+function compactPane(pane: 'navigator' | 'workspace'): HTMLElement | null {
+  return container?.querySelector<HTMLElement>(`[data-compact-workspace-pane="${pane}"]`) ?? null
 }
 
 function setSnapshotLoading(repoId: string) {

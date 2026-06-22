@@ -4,6 +4,7 @@ import { useGroupRef } from 'react-resizable-panels'
 import type { Layout } from 'react-resizable-panels'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '#/web/components/ui/resizable.tsx'
 import { cn } from '#/web/lib/cn.ts'
+import { WORKSPACE_PANE_MOTION_STYLE, WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 
 interface SplitPaneProps {
   before: ReactNode
@@ -25,7 +26,6 @@ interface SplitPaneProps {
 const BEFORE_PANEL_ID = 'before'
 const AFTER_PANEL_ID = 'after'
 const RESIZE_TARGET_MINIMUM_SIZE = { fine: 7, coarse: 20 }
-const COLLAPSE_TRANSITION_MS = 240
 
 export function SplitPane({
   before,
@@ -52,13 +52,7 @@ export function SplitPane({
     splitPaneRef,
     frozen: beforeCollapsed || collapseTransitioning,
   })
-  const splitPaneStyle = useMemo<CSSProperties>(
-    () =>
-      ({
-        '--goblin-split-pane-collapse-duration': `${COLLAPSE_TRANSITION_MS}ms`,
-      }) as CSSProperties,
-    [],
-  )
+  const splitPaneStyle = useMemo<CSSProperties>(() => WORKSPACE_PANE_MOTION_STYLE, [])
   const beforeContentStyle = useMemo<CSSProperties | undefined>(
     () =>
       ({
@@ -163,7 +157,7 @@ function useCollapseTransition(collapsed: boolean, enabled: boolean): boolean {
 
     previousCollapsedRef.current = collapsed
     setTransitioning(true)
-    const timeout = window.setTimeout(() => setTransitioning(false), COLLAPSE_TRANSITION_MS)
+    const timeout = window.setTimeout(() => setTransitioning(false), WORKSPACE_PANE_TRANSITION_MS)
     return () => window.clearTimeout(timeout)
   }, [collapsed, enabled])
 
