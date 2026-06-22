@@ -33,7 +33,6 @@ function settingsPrefs(overrides: Partial<SettingsPrefs> = {}): SettingsPrefs {
     terminalNotificationsEnabled: false,
     shortcutsDisabled: false,
     globalShortcutDisabled: false,
-    swapCloseShortcuts: false,
     globalShortcut: '',
     terminalApp: 'auto',
     editorApp: 'auto',
@@ -468,7 +467,6 @@ describe('main repo ipc cancellation', () => {
           colorTheme: 'github',
           shortcutsDisabled: true,
           globalShortcutDisabled: true,
-          swapCloseShortcuts: true,
         },
         settings: {
           lang: 'ja',
@@ -476,7 +474,6 @@ describe('main repo ipc cancellation', () => {
           colorTheme: 'github',
           shortcutsDisabled: true,
           globalShortcutDisabled: true,
-          swapCloseShortcuts: true,
           globalShortcut: 'Alt+K',
         },
       },
@@ -492,7 +489,6 @@ describe('main repo ipc cancellation', () => {
     expect((await import('#/main/menu-state.ts')).applyMenuRuntimeState).toHaveBeenCalledWith({
       langPref: 'ja',
       shortcutsDisabled: true,
-      swapCloseShortcuts: true,
     })
     expect((await import('#/main/shortcuts.ts')).syncGlobalShortcuts).toHaveBeenCalledWith(true, 'Alt+K')
     expect((await import('#/main/menu.ts')).buildAppMenu).toHaveBeenCalled()

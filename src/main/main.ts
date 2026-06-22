@@ -118,7 +118,6 @@ async function initializeRuntimeState(settingsSnapshot: SettingsSnapshot): Promi
   assertDictionaryParity(!app.isPackaged)
   initializeMenuRuntimeState({
     shortcutsDisabled: settingsSnapshot.shortcutsDisabled,
-    swapCloseShortcuts: settingsSnapshot.swapCloseShortcuts,
     langPref: settingsSnapshot.lang,
   })
   setCurrentLang(resolveLang(settingsSnapshot.lang))

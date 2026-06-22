@@ -212,7 +212,6 @@ export type IpcEvent =
   | { type: 'terminal-notifications-changed'; enabled: boolean }
   | { type: 'shortcuts-disabled-changed'; disabled: boolean }
   | { type: 'global-shortcut-disabled-changed'; disabled: boolean }
-  | { type: 'swap-close-shortcuts-changed'; swapped: boolean }
   | ({ type: 'terminal-app-changed' } & TerminalAppState)
   | ({ type: 'editor-app-changed' } & EditorAppState)
   | { type: 'github-cli-changed'; state: GitHubCliState }
@@ -277,7 +276,6 @@ export interface AppIpcHandlers {
     setTerminalNotificationsEnabled: (input: { enabled: boolean }) => Promise<void>
     setShortcutsDisabled: (input: { disabled: boolean }) => Promise<void>
     setGlobalShortcutDisabled: (input: { disabled: boolean }) => Promise<void>
-    setSwapCloseShortcuts: (input: { swapped: boolean }) => Promise<void>
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
     setTerminalApp: (input: { pref: TerminalPref }) => Promise<TerminalAppState>
     setEditorApp: (input: { pref: EditorPref }) => Promise<EditorAppState>

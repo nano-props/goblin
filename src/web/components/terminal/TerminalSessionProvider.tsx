@@ -207,6 +207,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       worktreeSnapshot: registry.worktreeSnapshot,
       createTerminal: registry.createTerminal,
       selectTerminal: registry.selectTerminal,
+      closeTerminalByDescriptor: registry.closeTerminalByDescriptor,
       openWorkspacePaneView: registry.openWorkspacePaneView,
       closeWorkspacePaneView: registry.closeWorkspacePaneView,
       reorderWorkspacePaneViews: registry.reorderWorkspacePaneViews,

@@ -8,7 +8,6 @@ import {
   setGlobalShortcutDisabledPreference,
   setGlobalShortcutPreference,
   setShortcutsDisabledPreference,
-  setSwapCloseShortcutsPreference,
 } from '#/web/settings-write-paths.ts'
 import type { GlobalShortcutState } from '#/shared/api-types.ts'
 
@@ -30,11 +29,6 @@ export function useShortcutSettingsController() {
     async setGlobalShortcutDisabled(disabled: boolean): Promise<void> {
       await runSettingsControllerAction('global shortcut disabled update', async () => {
         await setGlobalShortcutDisabledPreference(disabled)
-      })
-    },
-    async setSwapCloseShortcuts(swapped: boolean): Promise<void> {
-      await runSettingsControllerAction('swap close shortcuts update', async () => {
-        await setSwapCloseShortcutsPreference(swapped)
       })
     },
     async setGlobalShortcut(accelerator: string): Promise<GlobalShortcutState | null> {

@@ -11,10 +11,9 @@ import { DEFAULT_GLOBAL_SHORTCUT, formatAccelerator, globalShortcutFromKeyboardE
 export function ShortcutSettings() {
   const t = useT()
   const shortcutStatusId = 'global-shortcut-status'
-  const { shortcutsDisabled, globalShortcutDisabled, swapCloseShortcuts, globalShortcut, globalShortcutRegistered } =
+  const { shortcutsDisabled, globalShortcutDisabled, globalShortcut, globalShortcutRegistered } =
     useRuntimeShortcutSettings()
-  const { setShortcutsDisabled, setGlobalShortcutDisabled, setSwapCloseShortcuts, setGlobalShortcut } =
-    useShortcutSettingsController()
+  const { setShortcutsDisabled, setGlobalShortcutDisabled, setGlobalShortcut } = useShortcutSettingsController()
   const [recordingShortcut, setRecordingShortcut] = useState(false)
   const [shortcutError, setShortcutError] = useState<string | null>(null)
   const recordingShortcutRef = useRef(recordingShortcut)
@@ -99,21 +98,6 @@ export function ShortcutSettings() {
           onCheckedChange={(disabled) => void setGlobalShortcutDisabled(disabled)}
           aria-label={t('settings.shortcuts-disable-global')}
           disabled={!globalShortcutSupported}
-        />
-      </SettingsListItem>
-
-      <SettingsListItem size="md">
-        <label
-          htmlFor="swap-close-shortcuts-switch"
-          className="min-w-0 cursor-pointer select-none text-sm text-foreground"
-        >
-          {t('settings.swap-close-shortcuts')}
-        </label>
-        <Switch
-          id="swap-close-shortcuts-switch"
-          checked={swapCloseShortcuts}
-          onCheckedChange={(swapped) => void setSwapCloseShortcuts(swapped)}
-          aria-label={t('settings.swap-close-shortcuts')}
         />
       </SettingsListItem>
 

@@ -4,14 +4,12 @@ import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 export interface MenuRuntimeState {
   recentRepos: RepoSessionEntry[]
   shortcutsDisabled: boolean
-  swapCloseShortcuts: boolean
   langPref: LangPref
 }
 
 const DEFAULT_MENU_RUNTIME_STATE: MenuRuntimeState = {
   recentRepos: [],
   shortcutsDisabled: false,
-  swapCloseShortcuts: false,
   langPref: 'auto',
 }
 
@@ -21,7 +19,6 @@ function nextMenuRuntimeState(base: MenuRuntimeState, next: Partial<MenuRuntimeS
   return {
     recentRepos: next.recentRepos ? [...next.recentRepos] : [...base.recentRepos],
     shortcutsDisabled: next.shortcutsDisabled ?? base.shortcutsDisabled,
-    swapCloseShortcuts: next.swapCloseShortcuts ?? base.swapCloseShortcuts,
     langPref: next.langPref ?? base.langPref,
   }
 }
@@ -34,7 +31,6 @@ export function readMenuRuntimeState(): MenuRuntimeState {
   return {
     recentRepos: [...state.recentRepos],
     shortcutsDisabled: state.shortcutsDisabled,
-    swapCloseShortcuts: state.swapCloseShortcuts,
     langPref: state.langPref,
   }
 }

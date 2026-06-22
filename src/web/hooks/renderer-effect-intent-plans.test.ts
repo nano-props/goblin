@@ -59,6 +59,36 @@ describe('renderer effect intent plans', () => {
     expect(plan).toEqual({ kind: 'noop' })
   })
 
+  test('routes terminal close shortcut to close-window while workspace shortcuts are blocked', () => {
+    const plan = createWorkspaceIntentPlan(
+      { type: 'terminal-close-tab-or-window-requested' },
+      {
+        overlayBlocked: false,
+        workspaceShortcutSuppressed: true,
+        terminalFocused: false,
+        currentRepoId: '/tmp/repo',
+        currentRepo: { id: '/tmp/repo', instanceToken: 7 },
+      },
+    )
+
+    expect(plan).toEqual({ kind: 'close-window' })
+  })
+
+  test('routes terminal close shortcut to close-window while overlays block workspace actions', () => {
+    const plan = createWorkspaceIntentPlan(
+      { type: 'terminal-close-tab-or-window-requested' },
+      {
+        overlayBlocked: true,
+        workspaceShortcutSuppressed: true,
+        terminalFocused: false,
+        currentRepoId: '/tmp/repo',
+        currentRepo: { id: '/tmp/repo', instanceToken: 7 },
+      },
+    )
+
+    expect(plan).toEqual({ kind: 'close-window' })
+  })
+
   test('creates a refresh plan from the current visible repo token', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'repo-refresh-requested' },

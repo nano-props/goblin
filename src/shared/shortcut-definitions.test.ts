@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest'
 import {
-  closeShortcutAccelerators,
   matchBranchActionShortcut,
   matchRendererKeyboardShortcut,
   rendererMenuCommandById,
@@ -17,17 +16,6 @@ describe('shortcut definitions', () => {
     expect(matchBranchActionShortcut({ code: 'KeyV', shiftKey: true })).toBeNull()
   })
 
-  test('derives close accelerators from the swap preference', () => {
-    expect(closeShortcutAccelerators(false)).toEqual({
-      closeView: 'CmdOrCtrl+Shift+W',
-      closeWindow: 'CmdOrCtrl+W',
-    })
-    expect(closeShortcutAccelerators(true)).toEqual({
-      closeView: 'CmdOrCtrl+W',
-      closeWindow: 'CmdOrCtrl+Shift+W',
-    })
-  })
-
   test('matches renderer navigation and app shortcuts from keyboard input', () => {
     expect(matchRendererKeyboardShortcut({ key: 'j', code: 'KeyJ', shiftKey: false })).toBe('next-branch')
     expect(matchRendererKeyboardShortcut({ key: 'ArrowLeft', code: 'ArrowLeft', shiftKey: false })).toBe(
@@ -38,30 +26,29 @@ describe('shortcut definitions', () => {
     expect(matchRendererKeyboardShortcut({ key: 'Escape', code: 'Escape', shiftKey: false })).toBe('dismiss')
   })
 
-  test('resolves renderer menu command accelerators and enabled state from shared definitions', () => {
+  test('resolves fixed close and terminal tab accelerators from shared definitions', () => {
+    expect(resolveRendererMenuCommandAccelerator(rendererMenuCommandById('file-new-terminal-tab'), {})).toBe(
+      'CmdOrCtrl+N',
+    )
     expect(
-      resolveRendererMenuCommandAccelerator(rendererMenuCommandById('file-close-tab'), {
-        swapCloseShortcuts: false,
-      }),
-    ).toBe('CmdOrCtrl+Shift+W')
-    expect(
-      resolveRendererMenuCommandAccelerator(rendererMenuCommandById('file-close-tab'), {
-        swapCloseShortcuts: true,
-      }),
+      resolveRendererMenuCommandAccelerator(rendererMenuCommandById('file-close-terminal-tab-or-window'), {}),
     ).toBe('CmdOrCtrl+W')
+    expect(resolveRendererMenuCommandAccelerator(rendererMenuCommandById('file-close-tab'), {})).toBe(
+      'CmdOrCtrl+Shift+W',
+    )
   })
 
   test('defines the terminal primary action as the single terminal shortcut', () => {
     const command = rendererMenuCommandById('view-terminal')
     expect(command.menuLabelKey).toBe('menu.view.terminal')
     expect(command.intent).toEqual({ type: 'terminal-primary-action-requested' })
-    expect(resolveRendererMenuCommandAccelerator(command, { swapCloseShortcuts: false })).toBe('CmdOrCtrl+Enter')
+    expect(resolveRendererMenuCommandAccelerator(command, {})).toBeUndefined()
   })
 
   test('defines the focus mode toggle shortcut', () => {
     const command = rendererMenuCommandById('view-toggle-focus-mode')
     expect(command.menuLabelKey).toBe('workspace.focus-toggle-label')
     expect(command.intent).toEqual({ type: 'workspace-focus-toggle-requested' })
-    expect(resolveRendererMenuCommandAccelerator(command, { swapCloseShortcuts: false })).toBe('CmdOrCtrl+B')
+    expect(resolveRendererMenuCommandAccelerator(command, {})).toBe('CmdOrCtrl+B')
   })
 })

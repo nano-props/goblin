@@ -37,7 +37,6 @@ function defaultIpcResult(path: string, input?: unknown) {
       terminalNotificationsEnabled: false,
       shortcutsDisabled: false,
       globalShortcutDisabled: false,
-      swapCloseShortcuts: false,
       globalShortcut: 'CommandOrControl+Shift+G',
       globalShortcutRegistered: true,
       terminalApp: 'auto',

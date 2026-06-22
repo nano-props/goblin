@@ -21,7 +21,6 @@ import {
   setPreferredTerminalApp,
   setSettingsFetchInterval,
   setShortcutsDisabled,
-  setSwapCloseShortcuts,
   setTerminalNotificationsEnabled,
 } from '#/web/settings-client.ts'
 import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
@@ -75,11 +74,6 @@ export async function setGlobalShortcutDisabledPreference(disabled: boolean): Pr
     ...current,
     globalShortcutDisabled: disabled,
   }))
-}
-
-export async function setSwapCloseShortcutsPreference(swapped: boolean): Promise<void> {
-  await setSwapCloseShortcuts(swapped)
-  updateRuntimeSettingsSnapshotCache(mainWindowQueryClient, (current) => ({ ...current, swapCloseShortcuts: swapped }))
 }
 
 export async function setGlobalShortcutPreference(accelerator: string): Promise<GlobalShortcutState> {
