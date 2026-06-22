@@ -49,7 +49,7 @@ export const zh: Record<DictKey, string> = {
   'menu.edit.delete': '删除',
   'menu.edit.select-all': '全选',
 
-  'menu.view.status': '分支状态',
+  'menu.view.status': '状态',
   'menu.view.history': '历史',
   'menu.view.changes': '变更',
   'menu.view.terminal': '终端',
@@ -625,7 +625,7 @@ export const zh: Record<DictKey, string> = {
   'help.row.prev-branch': '上一个分支 / 提交',
   'help.row.next-repo': '下一个仓库',
   'help.row.prev-repo': '上一个仓库',
-  'help.row.view-status': '分支状态',
+  'help.row.view-status': '状态',
   'help.row.view-changes': '变更',
   'help.row.view-log': '提交历史',
   'help.row.view-terminal': '终端',

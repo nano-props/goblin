@@ -50,7 +50,7 @@ export const ko: Record<DictKey, string> = {
   'menu.edit.delete': '삭제',
   'menu.edit.select-all': '전체 선택',
 
-  'menu.view.status': '브랜치 상태',
+  'menu.view.status': '상태',
   'menu.view.history': '기록',
   'menu.view.changes': '변경 사항',
   'menu.view.terminal': '터미널',
@@ -646,7 +646,7 @@ export const ko: Record<DictKey, string> = {
   'help.row.prev-branch': '이전 브랜치 / 커밋',
   'help.row.next-repo': '다음 리포지토리',
   'help.row.prev-repo': '이전 리포지토리',
-  'help.row.view-status': '브랜치 상태',
+  'help.row.view-status': '상태',
   'help.row.view-changes': '변경 사항',
   'help.row.view-log': '커밋 로그',
   'help.row.view-terminal': '터미널',

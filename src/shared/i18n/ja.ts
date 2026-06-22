@@ -55,7 +55,7 @@ export const ja: Record<DictKey, string> = {
   'menu.edit.select-all': 'すべてを選択',
 
   // ---- Menu — View -------------------------------------------------------
-  'menu.view.status': 'ブランチステータス',
+  'menu.view.status': 'ステータス',
   'menu.view.history': '履歴',
   'menu.view.changes': '変更',
   'menu.view.terminal': 'ターミナル',
@@ -654,7 +654,7 @@ export const ja: Record<DictKey, string> = {
   'help.row.prev-branch': '前のブランチ / コミット',
   'help.row.next-repo': '次のリポジトリ',
   'help.row.prev-repo': '前のリポジトリ',
-  'help.row.view-status': 'ブランチステータス',
+  'help.row.view-status': 'ステータス',
   'help.row.view-changes': '変更',
   'help.row.view-log': 'ログ',
   'help.row.view-terminal': 'ターミナル',
