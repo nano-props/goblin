@@ -42,6 +42,10 @@ describe('resolveWorkspacePaneSelectionView', () => {
     expect(resolveWorkspacePaneSelectionView('terminal', ctx({ terminalSyncReady: false }))).toBe('terminal')
   })
 
+  test('preserves the terminal preference while terminal creation is pending', () => {
+    expect(resolveWorkspacePaneSelectionView('terminal', ctx({ pendingCreate: true }))).toBe('terminal')
+  })
+
   test('keeps the terminal preference when the active worktree has at least one session', () => {
     expect(resolveWorkspacePaneSelectionView('terminal', ctx({ terminalSessionCount: 1 }))).toBe('terminal')
     expect(resolveWorkspacePaneSelectionView('terminal', ctx({ terminalSessionCount: 7 }))).toBe('terminal')
@@ -65,6 +69,7 @@ describe('resolveWorkspacePaneSelectionView', () => {
       ['changes', ctx({ hasWorktree: false }), null],
       ['terminal', ctx({ hasWorktree: false }), null],
       ['terminal', ctx({ terminalSyncReady: false }), 'terminal'],
+      ['terminal', ctx({ pendingCreate: true }), 'terminal'],
       ['terminal', ctx({ terminalSessionCount: 0 }), null],
       ['terminal', ctx({ terminalSessionCount: 3 }), 'terminal'],
     ]

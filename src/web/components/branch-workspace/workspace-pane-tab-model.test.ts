@@ -51,6 +51,24 @@ describe('branch workspace pane tab model', () => {
     expect(model.activeTab?.key).toBe('terminal-2')
   })
 
+  test('keeps terminal selected without a runtime tab while creation is pending', () => {
+    const model = createBranchWorkspacePaneTabModel({
+      repoId: REPO_ID,
+      branchName: 'feature/model',
+      worktreePath: WORKTREE_PATH,
+      preferredView: 'terminal',
+      openBranchViews: ['status'],
+      runtimeWorktreeViews: [],
+      terminalSessionCount: 0,
+      pendingCreate: true,
+      terminalSyncReady: true,
+    })
+
+    expect(model.selectedView).toBe('terminal')
+    expect(model.activeTab).toBeNull()
+    expect(model.tabs.map((tab) => tab.identity)).toEqual(['status:status'])
+  })
+
   test('does not select another tab when the preferred worktree static view is not open', () => {
     const model = createBranchWorkspacePaneTabModel({
       repoId: REPO_ID,

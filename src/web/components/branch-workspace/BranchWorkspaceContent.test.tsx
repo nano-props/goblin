@@ -5,8 +5,15 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchWorkspaceContent } from '#/web/components/branch-workspace/BranchWorkspaceContent.tsx'
 import { getSelectedBranchWorkspacePresentation } from '#/web/components/branch-workspace/model.ts'
-import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
-import type { TerminalSessionReadContextValue, WorktreeTerminalSnapshot } from '#/web/components/terminal/types.ts'
+import {
+  TerminalSessionContext,
+  TerminalSessionReadContext,
+} from '#/web/components/terminal/terminal-session-context.ts'
+import type {
+  TerminalSessionContextValue,
+  TerminalSessionReadContextValue,
+  WorktreeTerminalSnapshot,
+} from '#/web/components/terminal/types.ts'
 import {
   createBranchSnapshot,
   createRepoBranch,
@@ -235,6 +242,46 @@ describe('BranchWorkspaceContent', () => {
     expect(container?.textContent).toContain('workspace-pane-views.empty')
   })
 
+  test('mounts the terminal slot while terminal creation is pending with no sessions', () => {
+    const worktreePath = '/tmp/terminal-pending-worktree'
+    const worktreeKey = `${REPO_ID}\0${worktreePath}`
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/terminal-pending', { worktree: { path: worktreePath } })],
+      selectedBranch: 'feature/terminal-pending',
+      preferredWorkspacePaneView: 'terminal',
+      openBranchWorkspacePaneViews: ['status'],
+    })
+    useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
+    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const registerHost = vi.fn()
+    const worktreeSnapshot: WorktreeTerminalSnapshot = {
+      ...emptyWorktreeSnapshot,
+      worktreeTerminalKey: worktreeKey,
+      pendingCreate: true,
+    }
+    const readContext: TerminalSessionReadContextValue = {
+      ...emptyTerminalReadContext,
+      worktreeSnapshot: () => worktreeSnapshot,
+    }
+
+    act(() => {
+      root!.render(
+        <TerminalSessionContext.Provider value={terminalCommandContextWith({ registerHost })}>
+          <TerminalSessionReadContext.Provider value={readContext}>
+            <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+          </TerminalSessionReadContext.Provider>
+        </TerminalSessionContext.Provider>,
+      )
+    })
+
+    expect(container?.querySelector('#workspace-terminal-panel')).not.toBeNull()
+    expect(container?.querySelector('.goblin-terminal-slot__host')).not.toBeNull()
+    expect(container?.textContent).toContain('terminal.opening')
+    expect(container?.textContent).not.toContain('workspace-pane-views.empty')
+    expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
+  })
+
   test('does not select another tab when the preferred branch tab is closed', async () => {
     const repo = seedRepoState({
       id: REPO_ID,
@@ -391,6 +438,33 @@ const emptyTerminalReadContext: TerminalSessionReadContextValue = {
   subscribeWorktree: () => () => {},
   snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),
   subscribeSnapshot: () => () => {},
+}
+
+function terminalCommandContextWith(overrides: Partial<TerminalSessionContextValue> = {}): TerminalSessionContextValue {
+  return {
+    createTerminal: vi.fn(async () => 'terminal-1'),
+    registerHost: vi.fn(),
+    unregisterHost: vi.fn(),
+    selectTerminal: vi.fn(),
+    scrollToBottom: vi.fn(),
+    scrollLines: vi.fn(),
+    clearBell: vi.fn(() => false),
+    closeTerminalByDescriptor: vi.fn(),
+    attach: vi.fn(),
+    detach: vi.fn(),
+    restart: vi.fn(),
+    isTerminalFocusTarget: vi.fn(() => false),
+    findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+    findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+    clearSearch: vi.fn(),
+    writeInput: vi.fn(),
+    takeover: vi.fn(async () => true),
+    openWorkspacePaneView: vi.fn(async () => true),
+    closeWorkspacePaneView: vi.fn(async () => true),
+    reorderWorkspacePaneViews: vi.fn(async () => true),
+    serialize: vi.fn(() => ''),
+    ...overrides,
+  }
 }
 
 async function flushAsyncWork() {

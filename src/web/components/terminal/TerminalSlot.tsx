@@ -25,6 +25,7 @@ import { useTerminalSessionContext } from '#/web/components/terminal/terminal-se
 import {
   useWorktreeTerminalSelectedDescriptor,
   useWorktreeTerminalCount,
+  useWorktreeTerminalPendingCreate,
   useTerminalSnapshot,
 } from '#/web/components/terminal/terminal-session-store.ts'
 import { MobileTerminalToolbar } from '#/web/components/terminal/mobile-terminal-toolbar.tsx'
@@ -88,6 +89,7 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
   }, [key])
   const snapshot = useTerminalSnapshot(key)
   const hasSessions = useWorktreeTerminalCount(terminalWorktreeKey) > 0
+  const pendingCreate = useWorktreeTerminalPendingCreate(terminalWorktreeKey)
 
   useLayoutEffect(() => {
     const host = hostRef.current
@@ -430,7 +432,11 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
           takeoverPending={snapshot.takeoverPending}
         />
       )}
-      {slotMode === 'opening' && !hasSessions ? (
+      {slotMode === 'opening' && !hasSessions && pendingCreate ? (
+        <div className="goblin-terminal-slot__status-overlay">
+          <span>{t('terminal.opening')}</span>
+        </div>
+      ) : slotMode === 'opening' && !hasSessions ? (
         // Empty state: the worktree has no terminals yet. The bare
         // host <div> renders a featureless black box otherwise, which
         // is what the user reported as "blank screen" on the first

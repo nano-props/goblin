@@ -295,6 +295,7 @@ function workspacePaneCommandTarget(repoId: string): BranchWorkspacePaneTabModel
     openBranchViews: branchWorkspacePaneViewsForBranch(repo.ui, branchName),
     runtimeWorktreeViews: snapshot?.workspacePaneViews ?? [],
     terminalSessionCount: snapshot?.count ?? 0,
+    pendingCreate: snapshot?.pendingCreate ?? false,
     terminalSyncReady,
   })
 }

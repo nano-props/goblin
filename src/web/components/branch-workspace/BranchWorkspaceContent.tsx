@@ -65,11 +65,13 @@ export function BranchWorkspaceContent({ repo, detail, workspacePaneId, copyPatc
     openBranchViews: openBranchWorkspacePaneViews,
     runtimeWorktreeViews: worktreeSnapshot.workspacePaneViews,
     terminalSessionCount: worktreeSnapshot.count,
+    pendingCreate: worktreeSnapshot.pendingCreate,
     terminalSyncReady,
   })
   const selectedView = workspacePaneTabModel.selectedView
   const selectedBranchTab = selectedView && isBranchLevelWorkspacePaneView(selectedView) ? selectedView : null
   const activeTab = workspacePaneTabModel.activeTab
+  const canRenderSelectedTerminal = selectedView === 'terminal' && !!branch?.worktree?.path
   const activeTabIndex =
     activeTab?.scope === 'worktree' && activeTab.view ? workspacePaneTabModel.worktreeViews.indexOf(activeTab.view) : -1
   const activeTabLabelledById =
@@ -81,7 +83,7 @@ export function BranchWorkspaceContent({ repo, detail, workspacePaneId, copyPatc
   if (!branch)
     return <EmptyState title={t(repo.data.branches.length === 0 ? 'branches.empty' : 'branches.filter-empty')} />
 
-  if (!activeTab || !selectedView) {
+  if (!selectedView || (!activeTab && !canRenderSelectedTerminal)) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         <EmptyState title={t('workspace-pane-views.empty')} />

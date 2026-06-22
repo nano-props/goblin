@@ -42,6 +42,7 @@ export interface BranchWorkspacePaneTabModelInput {
   openBranchViews: readonly WorkspacePaneBranchViewType[]
   runtimeWorktreeViews: readonly WorkspacePaneViewSummary[]
   terminalSessionCount: number
+  pendingCreate?: boolean
   terminalSyncReady: boolean
 }
 
@@ -59,10 +60,11 @@ export function createBranchWorkspacePaneTabModel(
   const candidateView = resolveWorkspacePaneSelectionView(input.preferredView, {
     hasWorktree: !!worktreeKey,
     terminalSessionCount: input.terminalSessionCount,
+    pendingCreate: input.pendingCreate,
     terminalSyncReady: input.terminalSyncReady,
   })
   const activeTab = candidateView ? activeBranchWorkspacePaneTab(tabs, candidateView) : null
-  const selectedView = activeTab?.type ?? null
+  const selectedView = activeTab?.type ?? (candidateView === 'terminal' ? 'terminal' : null)
 
   return {
     repoId: input.repoId,

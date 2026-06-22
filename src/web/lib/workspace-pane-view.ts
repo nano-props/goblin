@@ -39,6 +39,8 @@ export interface WorkspacePaneViewContext {
   hasWorktree: boolean
   /** Number of open terminal sessions for the worktree. */
   terminalSessionCount: number
+  /** Whether a new terminal is queued and waiting for mount geometry. */
+  pendingCreate?: boolean
   /** Whether the terminal session registry has finished its first sync. */
   terminalSyncReady: boolean
 }
@@ -55,6 +57,6 @@ export function resolveWorkspacePaneSelectionView(
 ): WorkspacePaneView | null {
   if (!context.hasWorktree && workspacePaneViewRequiresWorktree(preferred)) return null
   if (preferred !== 'terminal') return preferred
-  if (!context.terminalSyncReady) return 'terminal'
+  if (!context.terminalSyncReady || context.pendingCreate) return 'terminal'
   return context.terminalSessionCount > 0 ? 'terminal' : null
 }

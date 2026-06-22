@@ -88,6 +88,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
         openBranchViews: openBranchWorkspacePaneViews,
         runtimeWorktreeViews: runtimeWorkspacePaneViews,
         terminalSessionCount: worktreeSnapshot.count,
+        pendingCreate: worktreeSnapshot.pendingCreate,
         terminalSyncReady,
       }),
     [
@@ -99,6 +100,7 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
       terminalSyncReady,
       worktreePath,
       worktreeSnapshot.count,
+      worktreeSnapshot.pendingCreate,
     ],
   )
   const openBranchLevelTabs = useMemo(
