@@ -165,7 +165,7 @@ function normalizeWorkspacePaneViewByBranchByRepo(
 
 function normalizeSession(value: unknown): SessionState {
   if (!value || typeof value !== 'object') return defaultSession()
-  const partial = value as Partial<SessionState> & { workspacePaneSizes?: unknown }
+  const partial = value as Partial<SessionState>
   const openRepos = Array.isArray(partial.openRepos)
     ? dedupeRepoEntries(
         partial.openRepos.map(toSafeSessionRepoEntry).filter((entry): entry is RepoSessionEntry => entry !== null),
@@ -177,26 +177,13 @@ function normalizeSession(value: unknown): SessionState {
     activeRepo: activeRepo && openRepos.some((entry) => repoSessionEntryId(entry) === activeRepo) ? activeRepo : null,
     workspaceFocused:
       typeof partial.workspaceFocused === 'boolean' ? partial.workspaceFocused : DEFAULT_WORKSPACE_FOCUSED,
-    // One-release migration: when reading a pre-rename `server-settings.json`,
-    // fall back to the legacy `workspacePaneSizes: { 'left-right': N }` record
-    // so existing users keep their saved pane split on first launch after
-    // upgrade. The next save writes only the new field and the legacy shape
-    // is gone from disk.
-    workspacePaneSize: normalizeWorkspacePaneSize(
-      partial.workspacePaneSize ?? legacyWorkspacePaneSize(partial.workspacePaneSizes),
-    ),
+    workspacePaneSize: normalizeWorkspacePaneSize(partial.workspacePaneSize),
     selectedTerminalByWorktree: normalizeSelectedTerminalByWorktree(partial.selectedTerminalByWorktree),
     workspacePaneViewByBranchByRepo: normalizeWorkspacePaneViewByBranchByRepo(
       partial.workspacePaneViewByBranchByRepo,
       openRepos,
     ),
   }
-}
-
-function legacyWorkspacePaneSize(value: unknown): number | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
-  const inner = (value as Record<string, unknown>)['left-right']
-  return typeof inner === 'number' ? inner : undefined
 }
 
 function normalizeRecentRepos(value: unknown): RepoSessionEntry[] {
