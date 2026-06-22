@@ -37,4 +37,12 @@ describe('planTerminalPathWrite', () => {
     const hugePath = `/tmp/${'a'.repeat(MAX_TERMINAL_WRITE_CHARS)}`
     expect(planTerminalPathWrite([hugePath], 0)).toEqual({ kind: 'too-long' })
   })
+
+  test('uses JSON-escaped length so quoted paths cannot overflow the websocket envelope', () => {
+    const path = `/tmp/${'"'.repeat(Math.floor(MAX_TERMINAL_WRITE_CHARS / 2))}`
+    const escaped = shellEscapePath(path)
+    expect(escaped.length).toBeLessThan(MAX_TERMINAL_WRITE_CHARS)
+    expect(JSON.stringify(escaped).length).toBeGreaterThan(MAX_TERMINAL_WRITE_CHARS)
+    expect(planTerminalPathWrite([path], 0)).toEqual({ kind: 'too-long' })
+  })
 })

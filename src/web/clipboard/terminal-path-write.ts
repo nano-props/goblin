@@ -14,7 +14,10 @@ export function planTerminalPathWrite(paths: string[], failed: number): Terminal
   const failedCount = failed + paths.length - safePaths.length
   if (safePaths.length === 0) return { kind: 'failed' }
   const data = safePaths.map(shellEscapePath).join(' ')
-  if (data.length > PASTE_PATH_MAX_WRITE_CHARS) return { kind: 'too-long' }
+  // The server caps the whole WebSocket message, not just input.data.
+  // Measure the JSON-escaped payload so paths full of backslashes or
+  // double quotes cannot pass this check and then close the socket.
+  if (JSON.stringify(data).length > PASTE_PATH_MAX_WRITE_CHARS) return { kind: 'too-long' }
   return { kind: 'write', data, failed: failedCount }
 }
 
