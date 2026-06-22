@@ -21,7 +21,7 @@ export function toolbarTabChromeClassName(options: {
     'group relative select-none items-center transition-colors duration-100',
     compositeFocusRing,
     variant === 'repo'
-      ? 'flex h-8 min-w-36 max-w-64 shrink-0 touch-none gap-1.5 rounded-md border px-2 text-xs'
+      ? 'flex h-8 max-w-64 shrink-0 touch-none gap-1.5 rounded-md border px-2 text-xs'
       : compact
         ? 'flex h-7 min-w-0 flex-1 gap-1 rounded-md border px-2.5 text-sm'
         : 'flex h-7 w-36 shrink-0 gap-1 rounded-md border px-2.5 text-sm',
