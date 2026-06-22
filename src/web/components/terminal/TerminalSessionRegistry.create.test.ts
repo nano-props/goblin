@@ -5,9 +5,6 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   createMock: vi.fn(),
   closeMock: vi.fn(),
-  openViewMock: vi.fn(),
-  closeViewMock: vi.fn(),
-  reorderMock: vi.fn(),
   proposeTerminalGeometryMock: vi.fn(() => ({ cols: 101, rows: 31 })),
   preloadTerminalFontMock: vi.fn(async () => {}),
   attachmentIdMock: vi.fn(() => 'attachment_local'),
@@ -17,9 +14,6 @@ vi.mock('#/web/terminal.ts', () => ({
   terminalBridge: {
     create: mocks.createMock,
     close: mocks.closeMock,
-    openView: mocks.openViewMock,
-    closeView: mocks.closeViewMock,
-    reorderViews: mocks.reorderMock,
     setBadge: vi.fn(),
   },
 }))
@@ -169,12 +163,6 @@ describe('TerminalSessionRegistry create flow', () => {
     mocks.createMock.mockResolvedValue(makeCreateResult())
     mocks.closeMock.mockReset()
     mocks.closeMock.mockResolvedValue(true)
-    mocks.openViewMock.mockReset()
-    mocks.openViewMock.mockResolvedValue(true)
-    mocks.closeViewMock.mockReset()
-    mocks.closeViewMock.mockResolvedValue(true)
-    mocks.reorderMock.mockReset()
-    mocks.reorderMock.mockResolvedValue(true)
     mocks.proposeTerminalGeometryMock.mockClear()
     mocks.preloadTerminalFontMock.mockClear()
     mocks.attachmentIdMock.mockClear()
@@ -370,75 +358,4 @@ describe('TerminalSessionRegistry create flow', () => {
     expect(registry.worktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
   })
 
-  test('opens a static workspace pane view through the workspace pane bridge action', async () => {
-    registry.reconcileServerSessions(REPO_ROOT, makeCreateResult().sessions as any, 'attachment_local', new Map())
-
-    await expect(registry.openWorkspacePaneView(WORKTREE_KEY, 'changes')).resolves.toBe(true)
-
-    expect(mocks.openViewMock).toHaveBeenCalledWith({
-      repoRoot: REPO_ROOT,
-      worktreePath: WORKTREE_PATH,
-      type: 'changes',
-    })
-    expect(mocks.reorderMock).not.toHaveBeenCalled()
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).workspacePaneViews.map((tab) => `${tab.type}:${tab.id}`)).toEqual([
-      'terminal:/repo\0/repo\0terminal-1',
-      'changes:changes',
-    ])
-  })
-
-  test('rolls back optimistic static workspace pane view open when the bridge rejects it', async () => {
-    mocks.openViewMock.mockResolvedValueOnce(false)
-
-    await expect(registry.openWorkspacePaneView(WORKTREE_KEY, 'changes')).resolves.toBe(false)
-
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).staticWorkspacePaneViews).toEqual([])
-  })
-
-  test('closes a static workspace pane view through the workspace pane bridge action', async () => {
-    await registry.openWorkspacePaneView(WORKTREE_KEY, 'changes')
-
-    await expect(registry.closeWorkspacePaneView(WORKTREE_KEY, 'changes')).resolves.toBe(true)
-
-    expect(mocks.closeViewMock).toHaveBeenCalledWith({
-      repoRoot: REPO_ROOT,
-      worktreePath: WORKTREE_PATH,
-      type: 'changes',
-    })
-    expect(mocks.reorderMock).not.toHaveBeenCalled()
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).staticWorkspacePaneViews).toEqual([])
-  })
-
-  test('rejects reorder payloads that would create an unopened static workspace pane view', async () => {
-    const terminalKey = `${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-1`
-    registry.reconcileServerSessions(REPO_ROOT, makeCreateResult().sessions as any, 'attachment_local', new Map())
-    const invalidStatusOrder = [
-      { type: 'status', id: 'status' },
-      { type: 'terminal', id: terminalKey },
-    ] as unknown as Parameters<typeof registry.reorderWorkspacePaneViews>[1]
-
-    await expect(registry.reorderWorkspacePaneViews(WORKTREE_KEY, invalidStatusOrder)).resolves.toBe(false)
-
-    expect(mocks.reorderMock).not.toHaveBeenCalled()
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).staticWorkspacePaneViews).toEqual([])
-  })
-
-  test('rolls back optimistic workspace pane view reorder when the bridge throws', async () => {
-    const terminalKey = `${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-1`
-    registry.reconcileServerSessions(REPO_ROOT, makeCreateResult().sessions as any, 'attachment_local', new Map())
-    await registry.openWorkspacePaneView(WORKTREE_KEY, 'changes')
-    mocks.reorderMock.mockRejectedValueOnce(new Error('Terminal socket closed'))
-
-    await expect(
-      registry.reorderWorkspacePaneViews(WORKTREE_KEY, [
-        { type: 'changes', id: 'changes' },
-        { type: 'terminal', id: terminalKey },
-      ]),
-    ).resolves.toBe(false)
-
-    expect(registry.worktreeSnapshot(WORKTREE_KEY).workspacePaneViews.map((tab) => `${tab.type}:${tab.id}`)).toEqual([
-      `terminal:${terminalKey}`,
-      'changes:changes',
-    ])
-  })
 })

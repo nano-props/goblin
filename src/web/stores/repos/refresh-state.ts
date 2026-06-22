@@ -14,7 +14,7 @@ import {
 } from '#/web/stores/repos/resources.ts'
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
 import { stripBranchWorktreeMetadata, worktreeStatesFromBranches } from '#/web/stores/repos/worktree-state.ts'
-import { normalizeBranchWorkspacePaneViewsRecord } from '#/web/stores/repos/branch-workspace-pane-views.ts'
+import { normalizeWorkspacePaneTabOrderRecord } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import { branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 import type { RepoState, ReposGet } from '#/web/stores/repos/types.ts'
@@ -96,8 +96,8 @@ export function applySnapshotToRepoProjection(r: RepoState, snap: RepoSnapshot, 
   )
   pruneRepoOperationViewsForBranches(r.operations, validBranches)
   r.ui.selectedBranch = selected
-  r.ui.openBranchWorkspacePaneViewsByBranch = normalizeBranchWorkspacePaneViewsRecord(
-    r.ui.openBranchWorkspacePaneViewsByBranch,
+  r.ui.workspacePaneTabOrderByBranch = normalizeWorkspacePaneTabOrderRecord(
+    r.ui.workspacePaneTabOrderByBranch,
     branchNames,
   )
   if (snap.remote) {

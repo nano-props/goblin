@@ -82,7 +82,7 @@ describe('settings routes', () => {
       workspaceFocused: true,
       workspacePaneSize: 50,
       selectedTerminalByWorktree: {},
-      openBranchWorkspacePaneViewsByBranchByRepo: {},
+      workspacePaneTabOrderByBranchByRepo: {},
     } as const
     mocks.applyServerSessionWrite.mockResolvedValue({ ok: true, session })
 

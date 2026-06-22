@@ -178,6 +178,15 @@ export const REPO_QUERY_SCHEMAS = {
 // `#/server/modules/settings-write-paths.ts` — the route layer
 // validates with these, then passes the parsed object directly to the
 // module layer.
+const WorkspacePaneStaticTabOrderEntrySchema = v.variant('type', [
+  v.object({ type: v.literal('status'), id: v.literal('status') }),
+  v.object({ type: v.literal('changes'), id: v.literal('changes') }),
+  v.object({ type: v.literal('history'), id: v.literal('history') }),
+])
+const WorkspacePaneTerminalTabOrderEntrySchema = v.object({
+  type: v.literal('terminal'),
+  id: v.pipe(v.string(), v.minLength(1)),
+})
 const SessionStateSchema = v.object({
   openRepos: v.array(RepoSessionEntrySchema),
   activeRepo: v.nullable(v.string()),
@@ -185,11 +194,16 @@ const SessionStateSchema = v.object({
   workspacePaneSize: v.number(),
   selectedTerminalByWorktree: v.optional(v.record(v.string(), v.string())),
   preferredWorkspacePaneViewByBranchByRepo: v.optional(
-    v.record(v.string(), v.record(v.string(), v.picklist(['status', 'history', 'terminal']))),
+    v.record(v.string(), v.record(v.string(), v.picklist(['status', 'changes', 'history', 'terminal']))),
   ),
-  openBranchWorkspacePaneViewsByBranchByRepo: v.record(
+  workspacePaneTabOrderByBranchByRepo: v.record(
     v.string(),
-    v.record(v.string(), v.array(v.picklist(['status', 'history']))),
+    v.record(
+      v.string(),
+      v.array(
+        v.union([WorkspacePaneStaticTabOrderEntrySchema, WorkspacePaneTerminalTabOrderEntrySchema]),
+      ),
+    ),
   ),
 })
 

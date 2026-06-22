@@ -9,6 +9,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { WorktreeTerminalSnapshot } from '#/web/components/terminal/types.ts'
+import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
@@ -73,9 +74,6 @@ describe('useKeyboard', () => {
       worktreeSnapshot: () => worktreeSnapshot(),
       createTerminal: vi.fn(async () => 'terminal-1'),
       selectTerminal,
-      openWorkspacePaneView: vi.fn(async () => true),
-      closeWorkspacePaneView: vi.fn(async () => true),
-      reorderWorkspacePaneViews: vi.fn(async () => true),
     })
     await renderHookHost({
       currentRepoId: REPO_ID,
@@ -97,7 +95,12 @@ describe('useKeyboard', () => {
       branches: [createRepoBranch('feature/no-worktree')],
       selectedBranch: 'feature/no-worktree',
       preferredWorkspacePaneView: 'status',
-      openBranchWorkspacePaneViews: ['status', 'history'],
+      workspacePaneTabOrderByBranch: {
+        'feature/no-worktree': [
+          workspacePaneStaticTabOrderEntry('status'),
+          workspacePaneStaticTabOrderEntry('history'),
+        ],
+      },
     })
     const showRepoWorkspacePaneView = vi.fn((repoId, tab) => {
       useReposStore.getState().setWorkspacePaneView(repoId, tab)
@@ -130,9 +133,6 @@ describe('useKeyboard', () => {
       worktreeSnapshot: () => worktreeSnapshot(),
       createTerminal: vi.fn(async () => 'terminal-1'),
       selectTerminal,
-      openWorkspacePaneView: vi.fn(async () => true),
-      closeWorkspacePaneView: vi.fn(async () => true),
-      reorderWorkspacePaneViews: vi.fn(async () => true),
     })
     await renderHookHost({
       currentRepoId: REPO_ID,
@@ -170,9 +170,6 @@ describe('useKeyboard', () => {
       createTerminal,
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
-      openWorkspacePaneView: vi.fn(async () => true),
-      closeWorkspacePaneView: vi.fn(async () => true),
-      reorderWorkspacePaneViews: vi.fn(async () => true),
     })
     await renderHookHost({ currentRepoId: REPO_ID })
 
@@ -200,9 +197,6 @@ describe('useKeyboard', () => {
       createTerminal: vi.fn(async () => 'terminal-1'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
-      openWorkspacePaneView: vi.fn(async () => true),
-      closeWorkspacePaneView: vi.fn(async () => true),
-      reorderWorkspacePaneViews: vi.fn(async () => true),
     })
     await renderHookHost({ currentRepoId: REPO_ID })
 
@@ -278,16 +272,6 @@ function worktreeSnapshot(): WorktreeTerminalSnapshot {
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     },
-    staticWorkspacePaneViews: [
-      {
-        type: 'changes',
-        id: 'changes',
-        key: 'changes',
-        worktreeTerminalKey: WORKTREE_KEY,
-        worktreePath: WORKTREE_PATH,
-        displayOrder: 2,
-      },
-    ],
     sessions: [
       {
         type: 'terminal',
@@ -301,29 +285,6 @@ function worktreeSnapshot(): WorktreeTerminalSnapshot {
         phase: 'open',
         selected: true,
         hasBell: false,
-      },
-    ],
-    workspacePaneViews: [
-      {
-        type: 'terminal',
-        id: 'terminal-1',
-        key: 'terminal-1',
-        worktreeTerminalKey: WORKTREE_KEY,
-        terminalId: 'terminal-1',
-        index: 1,
-        displayOrder: 1,
-        title: 'terminal 1',
-        phase: 'open',
-        selected: true,
-        hasBell: false,
-      },
-      {
-        type: 'changes',
-        id: 'changes',
-        key: 'changes',
-        worktreeTerminalKey: WORKTREE_KEY,
-        worktreePath: WORKTREE_PATH,
-        displayOrder: 2,
       },
     ],
     count: 1,

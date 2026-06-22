@@ -76,7 +76,7 @@ test('persists updates and notifies subscribers from the server settings store',
     openRepos: [{ kind: 'local', id: '/repo-b' }],
     activeRepo: '/repo-b',
     selectedTerminalByWorktree: { '/repo-b\0/worktree': '/repo-b\0/worktree\0terminal-2' },
-    openBranchWorkspacePaneViewsByBranchByRepo: {
+    workspacePaneTabOrderByBranchByRepo: {
       '/repo-b': {
         main: [],
       },
@@ -107,7 +107,7 @@ test('persists updates and notifies subscribers from the server settings store',
     openRepos: [{ kind: 'local', id: '/repo-b' }],
     activeRepo: '/repo-b',
     selectedTerminalByWorktree: { '/repo-b\0/worktree': '/repo-b\0/worktree\0terminal-2' },
-    openBranchWorkspacePaneViewsByBranchByRepo: {
+    workspacePaneTabOrderByBranchByRepo: {
       '/repo-b': {
         main: [],
       },
@@ -133,6 +133,7 @@ test('normalizes branch-scoped workspace pane view preferences in server session
       '/repo-b': {
         main: 'history',
         changes: 'changes',
+        terminal: 'terminal',
         'bad\0branch': 'changes',
         feature: 'not-a-pane-view',
       },
@@ -141,18 +142,26 @@ test('normalizes branch-scoped workspace pane view preferences in server session
       },
       '/repo-array': ['history'],
     } as never,
+    workspacePaneTabOrderByBranchByRepo: {
+      '/repo-b': {
+        main: [{ type: 'history', id: 'history' }],
+        changes: [],
+        terminal: [],
+      },
+    },
   })
 
   expect(await mod.getServerSessionState()).toMatchObject({
     preferredWorkspacePaneViewByBranchByRepo: {
       '/repo-b': {
         main: 'history',
+        terminal: 'terminal',
       },
     },
   })
 })
 
-test('normalizes opened branch workspace pane tabs in server sessions', async () => {
+test('normalizes workspace pane tab order in server sessions', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
@@ -165,24 +174,35 @@ test('normalizes opened branch workspace pane tabs in server sessions', async ()
       { kind: 'local', id: '/repo-array' },
     ],
     activeRepo: '/repo-b',
-    openBranchWorkspacePaneViewsByBranchByRepo: {
+    workspacePaneTabOrderByBranchByRepo: {
       '/repo-b': {
-        main: ['status', 'history', 'status'],
+        main: [
+          { type: 'status', id: 'status' },
+          { type: 'terminal', id: 'terminal-1' },
+          { type: 'history', id: 'history' },
+          { type: 'status', id: 'status' },
+          { type: 'changes', id: 'changes' },
+        ],
         empty: [],
-        'bad\0branch': ['status'],
-        invalid: ['changes'],
+        'bad\0branch': [{ type: 'status', id: 'status' }],
+        invalid: [{ type: 'changes', id: 'status' }],
       },
       '/repo-c': {
-        main: ['status'],
+        main: [{ type: 'status', id: 'status' }],
       },
-      '/repo-array': ['status'],
+      '/repo-array': [{ type: 'status', id: 'status' }],
     } as never,
   })
 
   expect(await mod.getServerSessionState()).toMatchObject({
-    openBranchWorkspacePaneViewsByBranchByRepo: {
+    workspacePaneTabOrderByBranchByRepo: {
       '/repo-b': {
-        main: ['status', 'history'],
+        main: [
+          { type: 'status', id: 'status' },
+          { type: 'terminal', id: 'terminal-1' },
+          { type: 'history', id: 'history' },
+          { type: 'changes', id: 'changes' },
+        ],
         empty: [],
         invalid: [],
       },

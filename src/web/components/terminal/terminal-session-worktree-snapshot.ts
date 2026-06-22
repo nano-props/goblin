@@ -1,7 +1,5 @@
 import { compactTerminalProcessName, compactTerminalTitle } from '#/web/components/terminal/terminal-title.ts'
 import type {
-  WorkspacePaneStaticViewSummary,
-  WorkspacePaneViewSummary,
   ManagedTerminalSessionLike,
   TerminalSessionSummary,
   TerminalSnapshot,
@@ -12,7 +10,6 @@ export function buildWorktreeTerminalSnapshot(input: {
   worktreeTerminalKey: string
   selectedDescriptor: WorktreeTerminalSnapshot['selectedDescriptor']
   pendingCreate: boolean
-  staticWorkspacePaneViews: WorkspacePaneStaticViewSummary[]
   sessions: ManagedTerminalSessionLike[]
   selectedKey: string | null
   getCachedSnapshot: (key: string) => TerminalSnapshot | null
@@ -21,27 +18,15 @@ export function buildWorktreeTerminalSnapshot(input: {
   getDisplayOrder: (session: ManagedTerminalSessionLike) => number
 }): WorktreeTerminalSnapshot {
   const sessions = buildTerminalSessionSummaries(input)
-  const workspacePaneViews = [...input.staticWorkspacePaneViews, ...sessions].sort(compareWorkspacePaneViewStrip)
   const bellCount = sessions.reduce((count, session) => count + (session.hasBell ? 1 : 0), 0)
   return {
     worktreeTerminalKey: input.worktreeTerminalKey,
     selectedDescriptor: input.selectedDescriptor,
     sessions,
-    staticWorkspacePaneViews: input.staticWorkspacePaneViews,
-    workspacePaneViews,
     count: sessions.length,
     bellCount,
     pendingCreate: input.pendingCreate,
   }
-}
-
-function compareWorkspacePaneViewStrip(a: WorkspacePaneViewSummary, b: WorkspacePaneViewSummary): number {
-  return a.displayOrder - b.displayOrder || typeRank(a.type) - typeRank(b.type) || a.id.localeCompare(b.id)
-}
-
-function typeRank(type: WorkspacePaneViewSummary['type']): number {
-  if (type === 'changes') return 0
-  return 1
 }
 
 function buildTerminalSessionSummaries(input: {

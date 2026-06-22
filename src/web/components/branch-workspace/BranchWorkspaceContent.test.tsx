@@ -11,6 +11,7 @@ import {
 } from '#/web/components/terminal/terminal-session-context.ts'
 import type {
   TerminalSessionContextValue,
+  TerminalSessionSummary,
   TerminalSessionReadContextValue,
   WorktreeTerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
@@ -21,6 +22,8 @@ import {
   seedRepoState,
 } from '#/web/stores/repos/test-utils.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
+import type { WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabOrderEntry, workspacePaneTerminalTabOrderEntry } from '#/shared/workspace-pane.ts'
 
 const repoClientMocks = vi.hoisted(() => ({
   getRepositoryLog: vi.fn(),
@@ -59,22 +62,12 @@ afterEach(() => {
 
 describe('BranchWorkspaceContent', () => {
   function changesReadContext(worktreePath: string): TerminalSessionReadContextValue {
-    const changesWorkspaceView = {
-      type: 'changes' as const,
-      id: 'changes' as const,
-      key: 'changes' as const,
-      worktreeTerminalKey: `${REPO_ID}\0${worktreePath}`,
-      worktreePath,
-      displayOrder: 0,
-    }
     // Build the snapshot once and reuse the same reference — returning a
     // fresh object on every call makes zustand / useSyncExternalStore
     // believe the store changed and triggers an infinite render loop.
     const changesWorktreeSnapshot: WorktreeTerminalSnapshot = {
       ...emptyWorktreeSnapshot,
       worktreeTerminalKey: `${REPO_ID}\0${worktreePath}`,
-      staticWorkspacePaneViews: [changesWorkspaceView],
-      workspacePaneViews: [changesWorkspaceView],
     }
     return {
       ...emptyTerminalReadContext,
@@ -94,7 +87,9 @@ describe('BranchWorkspaceContent', () => {
       ],
       selectedBranch: 'feature/changes',
       preferredWorkspacePaneView: 'changes',
-      openBranchWorkspacePaneViews: ['status'],
+      workspacePaneTabOrderByBranch: {
+        'feature/changes': [staticEntry('status'), staticEntry('changes')],
+      },
       statusLoaded: true,
       status: [
         {
@@ -152,7 +147,9 @@ describe('BranchWorkspaceContent', () => {
       ],
       selectedBranch: 'feature/copy-success',
       preferredWorkspacePaneView: 'changes',
-      openBranchWorkspacePaneViews: ['status'],
+      workspacePaneTabOrderByBranch: {
+        'feature/copy-success': [staticEntry('status'), staticEntry('changes')],
+      },
       statusLoaded: true,
       status: [
         {
@@ -216,7 +213,9 @@ describe('BranchWorkspaceContent', () => {
       ],
       selectedBranch: 'feature/copy-fail',
       preferredWorkspacePaneView: 'changes',
-      openBranchWorkspacePaneViews: ['status'],
+      workspacePaneTabOrderByBranch: {
+        'feature/copy-fail': [staticEntry('status'), staticEntry('changes')],
+      },
       statusLoaded: true,
       status: [
         {
@@ -271,7 +270,9 @@ describe('BranchWorkspaceContent', () => {
       ],
       selectedBranch: 'feature/copy-busy',
       preferredWorkspacePaneView: 'changes',
-      openBranchWorkspacePaneViews: ['status'],
+      workspacePaneTabOrderByBranch: {
+        'feature/copy-busy': [staticEntry('status'), staticEntry('changes')],
+      },
       statusLoaded: true,
       status: [
         {
@@ -329,7 +330,9 @@ describe('BranchWorkspaceContent', () => {
       ],
       selectedBranch: 'feature/clean',
       preferredWorkspacePaneView: 'changes',
-      openBranchWorkspacePaneViews: ['status'],
+      workspacePaneTabOrderByBranch: {
+        'feature/clean': [staticEntry('status'), staticEntry('changes')],
+      },
       statusLoaded: true,
       status: [{ path: worktreePath, branch: 'feature/clean', isMain: false, entries: [] }],
     })
@@ -370,7 +373,9 @@ describe('BranchWorkspaceContent', () => {
       ],
       selectedBranch: 'feature/hidden',
       preferredWorkspacePaneView: 'changes',
-      openBranchWorkspacePaneViews: ['status'],
+      workspacePaneTabOrderByBranch: {
+        'feature/hidden': [staticEntry('status'), staticEntry('changes')],
+      },
       statusLoaded: true,
       status: [
         {
@@ -418,7 +423,9 @@ describe('BranchWorkspaceContent', () => {
       ],
       selectedBranch: 'feature/stale',
       preferredWorkspacePaneView: 'changes',
-      openBranchWorkspacePaneViews: ['status'],
+      workspacePaneTabOrderByBranch: {
+        'feature/stale': [staticEntry('status'), staticEntry('changes')],
+      },
       statusLoaded: true,
       status: [
         {
@@ -517,7 +524,7 @@ describe('BranchWorkspaceContent', () => {
       ],
       selectedBranch: 'feature/no-worktree',
       preferredWorkspacePaneView: 'status',
-      openBranchWorkspacePaneViews: [],
+      workspacePaneTabOrderByBranch: { 'feature/no-worktree': [] },
     })
     const detail = getSelectedBranchWorkspacePresentation(repo)
 
@@ -539,7 +546,7 @@ describe('BranchWorkspaceContent', () => {
       branches: [createRepoBranch('feature/no-worktree')],
       selectedBranch: 'feature/no-worktree',
       preferredWorkspacePaneView: 'terminal',
-      openBranchWorkspacePaneViews: ['status'],
+      workspacePaneTabOrderByBranch: { 'feature/no-worktree': [staticEntry('status')] },
     })
     const detail = getSelectedBranchWorkspacePresentation(repo)
 
@@ -563,7 +570,7 @@ describe('BranchWorkspaceContent', () => {
       branches: [createRepoBranch('feature/terminal-empty', { worktree: { path: worktreePath } })],
       selectedBranch: 'feature/terminal-empty',
       preferredWorkspacePaneView: 'terminal',
-      openBranchWorkspacePaneViews: ['status'],
+      workspacePaneTabOrderByBranch: { 'feature/terminal-empty': [staticEntry('status')] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
     const detail = getSelectedBranchWorkspacePresentation(repo)
@@ -589,7 +596,7 @@ describe('BranchWorkspaceContent', () => {
       branches: [createRepoBranch('feature/terminal-pending', { worktree: { path: worktreePath } })],
       selectedBranch: 'feature/terminal-pending',
       preferredWorkspacePaneView: 'terminal',
-      openBranchWorkspacePaneViews: ['status'],
+      workspacePaneTabOrderByBranch: { 'feature/terminal-pending': [staticEntry('status')] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
     const detail = getSelectedBranchWorkspacePresentation(repo)
@@ -614,10 +621,99 @@ describe('BranchWorkspaceContent', () => {
       )
     })
 
-    expect(container?.querySelector('#workspace-terminal-panel')).not.toBeNull()
+    const panel = container?.querySelector('#workspace-terminal-panel')
+    expect(panel).not.toBeNull()
+    expect(panel?.getAttribute('aria-label')).toBe('terminal.opening')
+    expect(panel?.hasAttribute('aria-labelledby')).toBe(false)
     expect(container?.querySelector('.goblin-terminal-slot__host')).not.toBeNull()
     expect(container?.textContent).toContain('terminal.opening')
     expect(container?.textContent).not.toContain('workspace-pane-views.empty')
+    expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
+  })
+
+  test('renders terminal loading without a create CTA while initial terminal sync is unresolved', () => {
+    const worktreePath = '/tmp/terminal-loading-worktree'
+    const worktreeKey = `${REPO_ID}\0${worktreePath}`
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/terminal-loading', { worktree: { path: worktreePath } })],
+      selectedBranch: 'feature/terminal-loading',
+      preferredWorkspacePaneView: 'terminal',
+      workspacePaneTabOrderByBranch: { 'feature/terminal-loading': [staticEntry('status')] },
+    })
+    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const createTerminal = vi.fn(async () => 'terminal-1')
+    const registerHost = vi.fn()
+    const worktreeSnapshot: WorktreeTerminalSnapshot = {
+      ...emptyWorktreeSnapshot,
+      worktreeTerminalKey: worktreeKey,
+      pendingCreate: false,
+    }
+    const readContext: TerminalSessionReadContextValue = {
+      ...emptyTerminalReadContext,
+      worktreeSnapshot: () => worktreeSnapshot,
+    }
+
+    act(() => {
+      root!.render(
+        <TerminalSessionContext.Provider value={terminalCommandContextWith({ createTerminal, registerHost })}>
+          <TerminalSessionReadContext.Provider value={readContext}>
+            <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+          </TerminalSessionReadContext.Provider>
+        </TerminalSessionContext.Provider>,
+      )
+    })
+
+    const panel = container?.querySelector('#workspace-terminal-panel')
+    expect(panel).not.toBeNull()
+    expect(panel?.getAttribute('aria-label')).toBe('terminal.loading')
+    expect(panel?.hasAttribute('aria-labelledby')).toBe(false)
+    expect(container?.textContent).toContain('terminal.loading')
+    expect(container?.textContent).not.toContain('terminal.new')
+    expect(container?.querySelector('.goblin-terminal-slot__empty-cta')).toBeNull()
+    expect(createTerminal).not.toHaveBeenCalled()
+    expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
+  })
+
+  test('labels terminal panels from the unified tab order, not runtime session order', () => {
+    const worktreePath = '/tmp/terminal-reordered-worktree'
+    const worktreeKey = `${REPO_ID}\0${worktreePath}`
+    const repo = seedRepoState({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/terminal-reordered', { worktree: { path: worktreePath } })],
+      selectedBranch: 'feature/terminal-reordered',
+      preferredWorkspacePaneView: 'terminal',
+      workspacePaneTabOrderByBranch: {
+        'feature/terminal-reordered': [terminalEntry('t2'), staticEntry('status'), terminalEntry('t1')],
+      },
+    })
+    useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceToken)
+    const detail = getSelectedBranchWorkspacePresentation(repo)
+    const registerHost = vi.fn()
+    const worktreeSnapshot: WorktreeTerminalSnapshot = {
+      ...emptyWorktreeSnapshot,
+      worktreeTerminalKey: worktreeKey,
+      sessions: [terminalSession('t1', 1, false, worktreeKey), terminalSession('t2', 2, true, worktreeKey)],
+      count: 2,
+    }
+    const readContext: TerminalSessionReadContextValue = {
+      ...emptyTerminalReadContext,
+      worktreeSnapshot: () => worktreeSnapshot,
+    }
+
+    act(() => {
+      root!.render(
+        <TerminalSessionContext.Provider value={terminalCommandContextWith({ registerHost })}>
+          <TerminalSessionReadContext.Provider value={readContext}>
+            <BranchWorkspaceContent repo={repo} detail={detail} workspacePaneId="workspace" />
+          </TerminalSessionReadContext.Provider>
+        </TerminalSessionContext.Provider>,
+      )
+    })
+
+    expect(container?.querySelector('#workspace-terminal-panel')?.getAttribute('aria-labelledby')).toBe(
+      'workspace-workspace-pane-view',
+    )
     expect(registerHost).toHaveBeenCalledWith(worktreeKey, expect.any(HTMLDivElement))
   })
 
@@ -627,8 +723,8 @@ describe('BranchWorkspaceContent', () => {
       branches: [createRepoBranch('feature/a'), createRepoBranch('feature/b')],
       selectedBranch: 'feature/b',
       preferredWorkspacePaneView: 'history',
-      openBranchWorkspacePaneViewsByBranch: {
-        'feature/a': ['status', 'history'],
+      workspacePaneTabOrderByBranch: {
+        'feature/a': [staticEntry('status'), staticEntry('history')],
       },
     })
     const detail = getSelectedBranchWorkspacePresentation(repo)
@@ -664,7 +760,7 @@ describe('BranchWorkspaceContent', () => {
       branches: [createRepoBranch('feature/history')],
       selectedBranch: 'feature/history',
       preferredWorkspacePaneView: 'history',
-      openBranchWorkspacePaneViews: ['status', 'history'],
+      workspacePaneTabOrderByBranch: { 'feature/history': [staticEntry('status'), staticEntry('history')] },
     })
     const detail = getSelectedBranchWorkspacePresentation(repo)
 
@@ -718,7 +814,7 @@ describe('BranchWorkspaceContent', () => {
       branches: [createRepoBranch('feature/history', { worktree: { path: '/tmp/history-worktree' } })],
       selectedBranch: 'feature/history',
       preferredWorkspacePaneView: 'history',
-      openBranchWorkspacePaneViews: ['status', 'history'],
+      workspacePaneTabOrderByBranch: { 'feature/history': [staticEntry('status'), staticEntry('history')] },
     })
     const detail = getSelectedBranchWorkspacePresentation(repo)
 
@@ -743,7 +839,7 @@ describe('BranchWorkspaceContent', () => {
       branches: [createRepoBranch('feature/history')],
       selectedBranch: 'feature/history',
       preferredWorkspacePaneView: 'history',
-      openBranchWorkspacePaneViews: ['history'],
+      workspacePaneTabOrderByBranch: { 'feature/history': [staticEntry('history')] },
     })
     const detail = getSelectedBranchWorkspacePresentation(repo)
 
@@ -765,8 +861,6 @@ const emptyWorktreeSnapshot: WorktreeTerminalSnapshot = {
   worktreeTerminalKey: '',
   selectedDescriptor: null,
   sessions: [],
-  staticWorkspacePaneViews: [],
-  workspacePaneViews: [],
   count: 0,
   bellCount: 0,
   pendingCreate: false,
@@ -798,9 +892,6 @@ function terminalCommandContextWith(overrides: Partial<TerminalSessionContextVal
     clearSearch: vi.fn(),
     writeInput: vi.fn(),
     takeover: vi.fn(async () => true),
-    openWorkspacePaneView: vi.fn(async () => true),
-    closeWorkspacePaneView: vi.fn(async () => true),
-    reorderWorkspacePaneViews: vi.fn(async () => true),
     serialize: vi.fn(() => ''),
     ...overrides,
   }
@@ -810,4 +901,33 @@ async function flushAsyncWork() {
   await act(async () => {
     await Promise.resolve()
   })
+}
+
+function staticEntry(type: WorkspacePaneStaticViewType) {
+  return workspacePaneStaticTabOrderEntry(type)
+}
+
+function terminalEntry(id: string) {
+  return workspacePaneTerminalTabOrderEntry(id)
+}
+
+function terminalSession(
+  key: string,
+  index: number,
+  selected: boolean,
+  worktreeTerminalKey: string,
+): TerminalSessionSummary {
+  return {
+    type: 'terminal',
+    id: key,
+    key,
+    worktreeTerminalKey,
+    terminalId: key,
+    index,
+    displayOrder: index,
+    title: key,
+    phase: 'open',
+    selected,
+    hasBell: false,
+  }
 }

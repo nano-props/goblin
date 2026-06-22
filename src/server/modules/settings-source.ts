@@ -6,10 +6,13 @@ import type { EditorPref, LangPref, SessionState, SettingsPrefs, TerminalPref, T
 import { DEFAULT_WORKSPACE_FOCUSED, normalizeWorkspacePaneSize } from '#/shared/workspace-layout.ts'
 import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 import {
-  isWorkspacePaneBranchViewType,
   isWorkspacePaneSessionViewType,
-  type WorkspacePaneBranchViewType,
+  isWorkspacePaneStaticViewType,
+  isWorkspacePaneTabOrderEntry,
   type WorkspacePaneSessionView,
+  type WorkspacePaneStaticViewType,
+  type WorkspacePaneTabOrderEntry,
+  workspacePaneStaticTabOrderEntry,
 } from '#/shared/workspace-pane.ts'
 import { normalizeGlobalShortcut } from '#/shared/accelerator.ts'
 import { isColorTheme, type ColorTheme } from '#/shared/color-theme.ts'
@@ -144,6 +147,7 @@ function normalizeSelectedTerminalByWorktree(value: unknown): Record<string, str
 function normalizePreferredWorkspacePaneViewByBranchByRepo(
   value: unknown,
   openRepos: RepoSessionEntry[],
+  tabOrderByRepo: Record<string, Record<string, WorkspacePaneTabOrderEntry[]>>,
 ): Record<string, Record<string, WorkspacePaneSessionView>> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const openRepoIds = new Set(openRepos.map(repoSessionEntryId))
@@ -161,20 +165,26 @@ function normalizePreferredWorkspacePaneViewByBranchByRepo(
     const byBranch: Record<string, WorkspacePaneSessionView> = {}
     for (const [branchName, paneView] of Object.entries(rawByBranch)) {
       if (!branchName || branchName.includes('\0')) continue
-      if (typeof paneView === 'string' && isWorkspacePaneSessionViewType(paneView)) byBranch[branchName] = paneView
+      if (typeof paneView !== 'string' || !isWorkspacePaneSessionViewType(paneView)) continue
+      if (
+        isWorkspacePaneStaticViewType(paneView) &&
+        !workspacePaneStaticViews(tabOrderByRepo[safeRepoId]?.[branchName] ?? []).includes(paneView)
+      )
+        continue
+      byBranch[branchName] = paneView
     }
     if (Object.keys(byBranch).length > 0) normalized[safeRepoId] = byBranch
   }
   return normalized
 }
 
-function normalizeOpenBranchWorkspacePaneViewsByBranchByRepo(
+function normalizeWorkspacePaneTabOrderByBranchByRepo(
   value: unknown,
   openRepos: RepoSessionEntry[],
-): Record<string, Record<string, WorkspacePaneBranchViewType[]>> {
+): Record<string, Record<string, WorkspacePaneTabOrderEntry[]>> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const openRepoIds = new Set(openRepos.map(repoSessionEntryId))
-  const normalized: Record<string, Record<string, WorkspacePaneBranchViewType[]>> = {}
+  const normalized: Record<string, Record<string, WorkspacePaneTabOrderEntry[]>> = {}
   for (const [repoId, rawByBranch] of Object.entries(value)) {
     const safeRepoId = toSafeRepoLocator(repoId)
     if (
@@ -185,15 +195,21 @@ function normalizeOpenBranchWorkspacePaneViewsByBranchByRepo(
       Array.isArray(rawByBranch)
     )
       continue
-    const byBranch: Record<string, WorkspacePaneBranchViewType[]> = {}
-    for (const [branchName, rawViews] of Object.entries(rawByBranch)) {
-      if (!branchName || branchName.includes('\0') || !Array.isArray(rawViews)) continue
-      const views: WorkspacePaneBranchViewType[] = []
-      for (const view of rawViews) {
-        if (typeof view !== 'string' || !isWorkspacePaneBranchViewType(view)) continue
-        if (!views.includes(view)) views.push(view)
+    const byBranch: Record<string, WorkspacePaneTabOrderEntry[]> = {}
+    for (const [branchName, rawOrder] of Object.entries(rawByBranch)) {
+      if (!branchName || branchName.includes('\0') || !Array.isArray(rawOrder)) continue
+      const order: WorkspacePaneTabOrderEntry[] = []
+      const seen = new Set<string>()
+      for (const raw of rawOrder) {
+        if (!isWorkspacePaneTabOrderEntry(raw)) continue
+        const entry =
+          raw.type === 'terminal' ? { type: 'terminal' as const, id: raw.id } : workspacePaneStaticTabOrderEntry(raw.type)
+        const identity = `${entry.type}:${entry.id}`
+        if (seen.has(identity)) continue
+        seen.add(identity)
+        order.push(entry)
       }
-      byBranch[branchName] = views
+      byBranch[branchName] = order
     }
     if (Object.keys(byBranch).length > 0) normalized[safeRepoId] = byBranch
   }
@@ -209,6 +225,10 @@ function normalizeSession(value: unknown): SessionState {
       )
     : []
   const activeRepo = toSafeRepoLocator(partial.activeRepo)
+  const workspacePaneTabOrderByBranchByRepo = normalizeWorkspacePaneTabOrderByBranchByRepo(
+    partial.workspacePaneTabOrderByBranchByRepo,
+    openRepos,
+  )
   return {
     openRepos,
     activeRepo: activeRepo && openRepos.some((entry) => repoSessionEntryId(entry) === activeRepo) ? activeRepo : null,
@@ -219,12 +239,14 @@ function normalizeSession(value: unknown): SessionState {
     preferredWorkspacePaneViewByBranchByRepo: normalizePreferredWorkspacePaneViewByBranchByRepo(
       partial.preferredWorkspacePaneViewByBranchByRepo,
       openRepos,
+      workspacePaneTabOrderByBranchByRepo,
     ),
-    openBranchWorkspacePaneViewsByBranchByRepo: normalizeOpenBranchWorkspacePaneViewsByBranchByRepo(
-      partial.openBranchWorkspacePaneViewsByBranchByRepo,
-      openRepos,
-    ),
+    workspacePaneTabOrderByBranchByRepo,
   }
+}
+
+function workspacePaneStaticViews(order: readonly WorkspacePaneTabOrderEntry[]): WorkspacePaneStaticViewType[] {
+  return order.flatMap((entry) => (entry.type === 'terminal' ? [] : [entry.type]))
 }
 
 function normalizeRecentRepos(value: unknown): RepoSessionEntry[] {

@@ -1,20 +1,9 @@
 import { describe, expect, test } from 'vitest'
 import {
-  branchLevelWorkspacePaneViewTooltip,
-  branchWorkspacePaneViewCloseLabel,
-  branchWorkspacePaneViewLabel,
-  branchWorkspacePaneViewTooltip,
+  workspacePaneStaticViewCloseLabel,
+  workspacePaneStaticViewLabel,
+  workspacePaneStaticViewTooltip,
 } from '#/web/components/branch-workspace/workspace-pane-views.ts'
-import type { WorkspacePaneViewSummary } from '#/web/components/terminal/types.ts'
-
-const changesTab: WorkspacePaneViewSummary = {
-  type: 'changes',
-  id: 'changes',
-  key: 'changes',
-  worktreeTerminalKey: '/repo\0/worktree',
-  worktreePath: '/worktree',
-  displayOrder: 2,
-}
 
 const t = (key: string, params?: Record<string, string | number>) => {
   if (key === 'tab.status') return '状态'
@@ -28,38 +17,40 @@ const t = (key: string, params?: Record<string, string | number>) => {
   return key
 }
 
-describe('branchWorkspacePaneViewLabel', () => {
+describe('workspacePaneStaticViewLabel', () => {
   test('shows the changes count inline when present', () => {
-    expect(branchWorkspacePaneViewLabel(changesTab, t, 3)).toBe('变更 · 3个')
+    expect(workspacePaneStaticViewLabel('changes', t, 3)).toBe('变更 · 3个')
   })
 
   test('keeps the plain changes label when there are no changes', () => {
-    expect(branchWorkspacePaneViewLabel(changesTab, t, 0)).toBe('变更')
+    expect(workspacePaneStaticViewLabel('changes', t, 0)).toBe('变更')
   })
 
   test('does not include the count in close labels', () => {
-    expect(branchWorkspacePaneViewCloseLabel(changesTab, t)).toBe('关闭变更')
+    expect(workspacePaneStaticViewCloseLabel('changes', t)).toBe('关闭变更')
   })
 })
 
-describe('branchWorkspacePaneViewTooltip', () => {
+describe('workspacePaneStaticViewTooltip', () => {
   test('passes the changes count through to the changes tooltip', () => {
     expect(
-      branchWorkspacePaneViewTooltip({ tab: changesTab, branchName: 'main', statusCount: 7, t }),
+      workspacePaneStaticViewTooltip({ tab: 'changes', branchName: 'main', statusCount: 7, t }),
     ).toBe('7 个文件变更')
   })
-})
 
-describe('branchLevelWorkspacePaneViewTooltip', () => {
   test('appends the branch name to the status tooltip', () => {
-    expect(branchLevelWorkspacePaneViewTooltip({ tab: 'status', branchName: 'main', t })).toBe('状态 · main')
+    expect(workspacePaneStaticViewTooltip({ tab: 'status', branchName: 'main', statusCount: 0, t })).toBe(
+      '状态 · main',
+    )
   })
 
   test('falls back to the plain label when no branch is selected', () => {
-    expect(branchLevelWorkspacePaneViewTooltip({ tab: 'status', branchName: '', t })).toBe('状态')
+    expect(workspacePaneStaticViewTooltip({ tab: 'status', branchName: '', statusCount: 0, t })).toBe('状态')
   })
 
   test('appends the branch name to the history tooltip', () => {
-    expect(branchLevelWorkspacePaneViewTooltip({ tab: 'history', branchName: 'main', t })).toBe('历史 · main')
+    expect(workspacePaneStaticViewTooltip({ tab: 'history', branchName: 'main', statusCount: 0, t })).toBe(
+      '历史 · main',
+    )
   })
 })

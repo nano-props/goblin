@@ -25,31 +25,6 @@ export function createTerminalRealtimeHandlers(host: ServerTerminalHost): {
     input: TerminalSocketRequestInputs[TAction],
   ) => MaybePromise<TerminalSocketResponseOutputs[TAction]>
 } {
-  const listWorkspacePaneViews = (
-    clientId: string,
-    _attachmentId: string,
-    ownerId: string,
-    input: TerminalSocketRequestInputs['workspace-pane:list-views'],
-  ) => host.listViews(clientId, ownerId, input.repoRoot)
-  const openWorkspacePaneView = (
-    clientId: string,
-    _attachmentId: string,
-    ownerId: string,
-    input: TerminalSocketRequestInputs['workspace-pane:open-view'],
-  ) => host.openView(clientId, ownerId, input)
-  const closeWorkspacePaneView = (
-    clientId: string,
-    _attachmentId: string,
-    ownerId: string,
-    input: TerminalSocketRequestInputs['workspace-pane:close-view'],
-  ) => host.closeView(clientId, ownerId, input)
-  const reorderWorkspacePaneViews = (
-    clientId: string,
-    _attachmentId: string,
-    ownerId: string,
-    input: TerminalSocketRequestInputs['workspace-pane:reorder-views'],
-  ) => host.reorderViews(clientId, ownerId, input)
-
   return {
     attach(clientId, attachmentId, ownerId, input) {
       return host.attach(clientId, ownerId, { ...input, attachmentId })
@@ -72,9 +47,6 @@ export function createTerminalRealtimeHandlers(host: ServerTerminalHost): {
     'list-sessions'(clientId, _attachmentId, ownerId, input) {
       return host.listSessions(clientId, ownerId, input.repoRoot)
     },
-    'workspace-pane:list-views': listWorkspacePaneViews,
-    'workspace-pane:open-view': openWorkspacePaneView,
-    'workspace-pane:close-view': closeWorkspacePaneView,
     create(clientId, attachmentId, ownerId, input) {
       return host.create(clientId, ownerId, { ...input, attachmentId })
     },
@@ -84,7 +56,6 @@ export function createTerminalRealtimeHandlers(host: ServerTerminalHost): {
     'session-snapshot'(clientId, _attachmentId, ownerId, input) {
       return host.getSessionSnapshot(clientId, ownerId, input)
     },
-    'workspace-pane:reorder-views': reorderWorkspacePaneViews,
   }
 }
 

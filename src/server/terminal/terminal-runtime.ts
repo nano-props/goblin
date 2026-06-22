@@ -14,7 +14,7 @@ import type { TerminalClientMessage } from '#/shared/terminal-socket.ts'
 import { normalizeTerminalClientMessage } from '#/shared/terminal-validators.ts'
 import { serverLogger } from '#/server/logger.ts'
 import { createTerminalCatalog } from '#/server/terminal/terminal-catalog.ts'
-import { createWorkspacePaneRuntime } from '#/server/workspace-pane/workspace-pane-runtime.ts'
+import { createTerminalViewOrderRuntime } from '#/server/terminal/terminal-view-order-runtime.ts'
 import type { TerminalRealtimeSocket } from '#/server/terminal/terminal-realtime-broker.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
 import { createTerminalRuntimeCoordinator } from '#/server/terminal/terminal-runtime-coordinator.ts'
@@ -53,7 +53,7 @@ export interface ServerTerminalRuntime {
 
 export function createServerTerminalRuntime(options: ServerTerminalRuntimeOptions): ServerTerminalRuntime {
   const { ptySupervisor } = options
-  const workspacePane = createWorkspacePaneRuntime<string>()
+  const terminalViewOrder = createTerminalViewOrderRuntime<string>()
 
   // Sink callbacks fan out to every clientId that shares the
   // session's ownerId. The manager passes `ownerId` (a string
@@ -73,17 +73,17 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       onExit(ownerId, event) {
         const repoRoot = manager.getSession(ownerId, event.sessionId)?.scope
         broker.broadcastToOwner(ownerId, { type: 'exit', event })
-        if (repoRoot) broadcastRepoWorkspacePaneChanged(ownerId, repoRoot)
+        if (repoRoot) broadcastRepoSessionsChanged(ownerId, repoRoot)
       },
       onOwnership(ownerId, event) {
         broker.broadcastToOwner(ownerId, { type: 'ownership', event })
       },
     },
-    workspacePane,
+    terminalViewOrder,
   )
   const { broker, connectionState } = createTerminalRuntimeCoordinator({
     manager,
-    workspacePane,
+    terminalViewOrder,
     ownershipGraceMs: TERMINAL_OWNERSHIP_GRACE_MS,
     detachedTtlMs: TERMINAL_DETACHED_TTL_MS,
   })
@@ -91,12 +91,11 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     isValidClientId: isValidTerminalClientId,
     isValidTerminalId,
     manager,
-    workspacePane,
     isAttachmentConnected(ownerId, attachmentId) {
       return broker.isAttachmentConnected(ownerId, attachmentId)
     },
     broadcastSessionsChanged(ownerId, repoRoot) {
-      broadcastRepoWorkspacePaneChanged(ownerId, repoRoot)
+      broadcastRepoSessionsChanged(ownerId, repoRoot)
     },
     gCommand: options.gCommand,
   })
@@ -105,7 +104,6 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   let shuttingDown = false
   const actions = createTerminalRuntimeActions({
     manager,
-    workspacePane,
     broker,
     catalog,
     isValidTerminalClientId,
@@ -176,15 +174,6 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     async listSessions(clientId, ownerId, repoRoot) {
       return await actions.listSessions(clientId, ownerId, repoRoot)
     },
-    listViews(clientId, ownerId, repoRoot) {
-      return actions.listViews(clientId, ownerId, repoRoot)
-    },
-    openView(clientId, ownerId, input) {
-      return actions.openView(clientId, ownerId, input)
-    },
-    closeView(clientId, ownerId, input) {
-      return actions.closeView(clientId, ownerId, input)
-    },
     async create(clientId, ownerId, input) {
       return await actions.create(clientId, ownerId, input)
     },
@@ -193,9 +182,6 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     },
     async getSessionSnapshot(clientId, ownerId, input) {
       return await actions.getSessionSnapshot(clientId, ownerId, input)
-    },
-    reorderViews(clientId, ownerId, input) {
-      return actions.reorderViews(clientId, ownerId, input)
     },
     handleRealtimeMessage(clientId, attachmentId, ownerId, socket, payload) {
       // Log invalid identifier/parse drops so a stuck takeover
@@ -258,8 +244,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     },
   }
 
-  function broadcastRepoWorkspacePaneChanged(ownerId: string, repoRoot: string): void {
+  function broadcastRepoSessionsChanged(ownerId: string, repoRoot: string): void {
     broker.broadcastToOwner(ownerId, { type: 'sessions-changed', repoRoot })
-    broker.broadcastToOwner(ownerId, { type: 'workspace-pane-changed', repoRoot })
   }
 }

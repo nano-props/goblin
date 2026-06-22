@@ -11,10 +11,11 @@ import {
   TerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import type {
-  WorkspacePaneBranchViewType,
-  WorkspacePaneWorktreeStaticViewType,
+  WorkspacePaneStaticViewType,
+  WorkspacePaneTabOrderEntry,
   WorkspacePaneView,
 } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
 import type {
   TerminalSessionContextValue,
   TerminalSessionReadContextValue,
@@ -28,7 +29,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import type { RendererBridge } from '#/web/renderer-bridge-types.ts'
-import { branchWorkspacePaneViewsForBranch } from '#/web/stores/repos/branch-workspace-pane-views.ts'
+import { workspacePaneStaticViewsForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 
 let compactUi = false
@@ -143,6 +144,19 @@ describe('BranchWorkspaceToolbar', () => {
     expect(tablist?.querySelector('#workspace-workspace-pane-view')).not.toBeNull()
   })
 
+  test('renders saved unified tab order across terminal and static tabs', () => {
+    const { container: c } = renderToolbar({
+      terminalCount: 1,
+      workspacePaneTabOrder: [terminalEntry('t1'), staticEntry('status')],
+      navigation: navigationWith({}),
+    })
+
+    const tabs = Array.from(c.querySelectorAll('[data-workspace-pane-view-tooltip-id]')).map((node) =>
+      node.getAttribute('data-workspace-pane-view-tooltip-id'),
+    )
+    expect(tabs.slice(0, 2)).toEqual(['terminal:t1', 'status:status'])
+  })
+
   test('lets the workspace tab strip reach the toolbar right edge', () => {
     const { container: c } = renderToolbar({
       terminalCount: 3,
@@ -158,23 +172,22 @@ describe('BranchWorkspaceToolbar', () => {
     expect(stripHost.className).toContain('flex-1')
   })
 
-  test('renders branch-level tabs in saved branch order without runtime materialization', async () => {
-    const { container: c, mocks } = renderToolbar({
+  test('renders static tabs in saved workspace pane order without runtime materialization', async () => {
+    const { container: c } = renderToolbar({
       terminalCount: 0,
       preferredWorkspacePaneView: 'history',
-      openBranchWorkspacePaneViews: ['history', 'status'],
+      workspacePaneStaticViews: ['history', 'status'],
       navigation: navigationWith({}),
     })
     await flush()
 
-    expect(mocks.openWorkspacePaneView).not.toHaveBeenCalled()
     const tabs = Array.from(c.querySelectorAll('[data-workspace-pane-view-tooltip-id]')).map((node) =>
       node.getAttribute('data-workspace-pane-view-tooltip-id'),
     )
     expect(tabs.slice(0, 2)).toEqual(['history:history', 'status:status'])
   })
 
-  test('closes the branch-level status tab through the shared tab close control', async () => {
+  test('closes the status static tab through the shared tab close control', async () => {
     const { container: c } = renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({}),
@@ -211,12 +224,11 @@ describe('BranchWorkspaceToolbar', () => {
     expect(mocks.selectTerminal).toHaveBeenCalledWith(`${REPO_ID}\0${WORKTREE_PATH}`, 't1')
   })
 
-  test('closes a branch-level tab without routing through runtime close', async () => {
+  test('closes a static tab without routing through runtime close', async () => {
     const { container: c, mocks } = renderToolbar({
       terminalCount: 0,
       preferredWorkspacePaneView: 'history',
-      openBranchWorkspacePaneViews: ['history', 'status'],
-      closeWorkspacePaneViewResult: false,
+      workspacePaneStaticViews: ['history', 'status'],
       navigation: navigationWith({}),
     })
 
@@ -228,7 +240,6 @@ describe('BranchWorkspaceToolbar', () => {
     })
     await flush()
 
-    expect(mocks.closeWorkspacePaneView).not.toHaveBeenCalled()
     expect(openViewsFor('feature/worktree')).toEqual(['status'])
   })
 
@@ -433,13 +444,13 @@ describe('BranchWorkspaceToolbar', () => {
     const { container: c } = renderToolbar({
       terminalCount: 2,
       changeCount: 1,
-      staticWorkspaceViewTypes: ['changes'],
+      workspacePaneStaticViews: ['status', 'changes'],
       navigation: navigationWith({ showRepoWorkspacePaneView }),
     })
 
     const statusTab = c.querySelector<HTMLButtonElement>('#workspace-status-tab')
-    const changesTab = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-view')
-    const terminalTab = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-view-1')
+    const changesTab = c.querySelector<HTMLButtonElement>('#workspace-changes-tab')
+    const terminalTab = c.querySelector<HTMLButtonElement>('#workspace-workspace-pane-view')
     if (!statusTab || !changesTab || !terminalTab) throw new Error('missing branch workspace pane views')
 
     act(() => {
@@ -455,14 +466,15 @@ describe('BranchWorkspaceToolbar', () => {
       changesTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
     })
     await flush()
-    expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
+    expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'terminal')
     expect(document.activeElement).toBe(terminalTab)
+    showRepoWorkspacePaneView.mockClear()
 
     act(() => {
       terminalTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
     })
     await flush()
-    expect(showRepoWorkspacePaneView).not.toHaveBeenCalled()
+    expect(showRepoWorkspacePaneView).toHaveBeenCalledWith(REPO_ID, 'changes')
     expect(document.activeElement).toBe(changesTab)
   })
 
@@ -501,7 +513,7 @@ describe('BranchWorkspaceToolbar', () => {
     const showRepoWorkspacePaneView = vi.fn()
     const { container: c, mocks } = renderToolbar({
       terminalCount: 1,
-      staticWorkspaceViewTypes: ['changes'],
+      workspacePaneTabOrder: [staticEntry('status'), terminalEntry('t1'), staticEntry('changes')],
       preferredWorkspacePaneView: 'terminal',
       navigation: navigationWith({ showRepoWorkspacePaneView }),
     })
@@ -581,9 +593,8 @@ function renderToolbar(options: {
   changeCount?: number
   navigation: MainWindowNavigationActions
   preferredWorkspacePaneView?: WorkspacePaneView
-  openBranchWorkspacePaneViews?: WorkspacePaneBranchViewType[]
-  staticWorkspaceViewTypes?: WorkspacePaneWorktreeStaticViewType[]
-  closeWorkspacePaneViewResult?: boolean
+  workspacePaneStaticViews?: WorkspacePaneStaticViewType[]
+  workspacePaneTabOrder?: WorkspacePaneTabOrderEntry[]
   worktree?: boolean
   collapsed?: boolean
   pendingCreate?: boolean
@@ -601,9 +612,6 @@ function renderToolbar(options: {
     selectTerminal: ReturnType<typeof vi.fn>
     scrollToBottom: ReturnType<typeof vi.fn>
     closeTerminalByDescriptor: ReturnType<typeof vi.fn>
-    openWorkspacePaneView: ReturnType<typeof vi.fn>
-    closeWorkspacePaneView: ReturnType<typeof vi.fn>
-    reorderWorkspacePaneViews: ReturnType<typeof vi.fn>
     showRepoWorkspacePaneView: ReturnType<typeof vi.fn>
   }
 } {
@@ -619,7 +627,13 @@ function renderToolbar(options: {
     branches: [branch],
     selectedBranch: branchName,
     preferredWorkspacePaneView: options.preferredWorkspacePaneView ?? 'status',
-    openBranchWorkspacePaneViews: options.openBranchWorkspacePaneViews,
+    workspacePaneTabOrderByBranch:
+      options.workspacePaneTabOrder || options.workspacePaneStaticViews
+        ? {
+            [branchName]:
+              options.workspacePaneTabOrder ?? options.workspacePaneStaticViews?.map((type) => staticEntry(type)) ?? [],
+          }
+        : undefined,
     status:
       options.changeCount && options.changeCount > 0
         ? [
@@ -638,14 +652,6 @@ function renderToolbar(options: {
     statusLoaded: true,
   })
   const detail = getSelectedBranchWorkspacePresentation(repo)
-  const staticWorkspacePaneViews = (options.staticWorkspaceViewTypes ?? []).map((type, index) => ({
-    type,
-    id: type,
-    key: type,
-    worktreeTerminalKey: `${REPO_ID}\0${WORKTREE_PATH}`,
-    worktreePath: WORKTREE_PATH,
-    displayOrder: index + 1,
-  }))
   const sessions: TerminalSessionSummary[] = Array.from({ length: options.terminalCount }, (_, index) => ({
     type: 'terminal',
     id: `t${index + 1}`,
@@ -653,7 +659,7 @@ function renderToolbar(options: {
     worktreeTerminalKey: `${REPO_ID}\0${WORKTREE_PATH}`,
     terminalId: `t${index + 1}`,
     index: index + 1,
-    displayOrder: staticWorkspacePaneViews.length + index + 1,
+    displayOrder: index + 1,
     title: `term-${index + 1}`,
     fullTitle: `full-term-${index + 1}`,
     phase: 'open' as const,
@@ -675,8 +681,6 @@ function renderToolbar(options: {
     worktreeTerminalKey: `${REPO_ID}\0${WORKTREE_PATH}`,
     selectedDescriptor,
     sessions,
-    staticWorkspacePaneViews,
-    workspacePaneViews: [...staticWorkspacePaneViews, ...sessions],
     count: options.terminalCount,
     bellCount: sessions.filter((session) => session.hasBell).length,
     pendingCreate: options.pendingCreate ?? false,
@@ -692,9 +696,6 @@ function renderToolbar(options: {
   const selectTerminal = vi.fn()
   const scrollToBottom = vi.fn()
   const closeTerminalByDescriptor = vi.fn()
-  const openWorkspacePaneView = vi.fn(async () => true)
-  const closeWorkspacePaneView = vi.fn(async () => options.closeWorkspacePaneViewResult ?? true)
-  const reorderWorkspacePaneViews = vi.fn(async () => true)
   const showRepoWorkspacePaneView = vi.fn(options.navigation.showRepoWorkspacePaneView)
   const commandContext: TerminalSessionContextValue = {
     createTerminal,
@@ -714,9 +715,6 @@ function renderToolbar(options: {
     clearSearch: vi.fn(),
     writeInput: vi.fn(),
     takeover: vi.fn(),
-    openWorkspacePaneView,
-    closeWorkspacePaneView,
-    reorderWorkspacePaneViews,
     serialize: vi.fn(() => ''),
   }
   setTerminalSessionCommandBridge({
@@ -724,9 +722,6 @@ function renderToolbar(options: {
     createTerminal,
     selectTerminal,
     closeTerminalByDescriptor,
-    openWorkspacePaneView,
-    closeWorkspacePaneView,
-    reorderWorkspacePaneViews,
   })
 
   container = document.createElement('div')
@@ -763,9 +758,6 @@ function renderToolbar(options: {
       selectTerminal,
       scrollToBottom,
       closeTerminalByDescriptor,
-      openWorkspacePaneView,
-      closeWorkspacePaneView,
-      reorderWorkspacePaneViews,
       showRepoWorkspacePaneView,
     },
   }
@@ -798,7 +790,15 @@ function closeButtonFor(container: HTMLElement, identity: string): HTMLButtonEle
   )
 }
 
-function openViewsFor(branchName: string): WorkspacePaneBranchViewType[] {
+function openViewsFor(branchName: string): WorkspacePaneStaticViewType[] {
   const repo = useReposStore.getState().repos[REPO_ID]
-  return repo ? branchWorkspacePaneViewsForBranch(repo.ui, branchName) : []
+  return repo ? workspacePaneStaticViewsForBranch(repo.ui, branchName) : []
+}
+
+function staticEntry(type: WorkspacePaneStaticViewType): WorkspacePaneTabOrderEntry {
+  return workspacePaneStaticTabOrderEntry(type)
+}
+
+function terminalEntry(id: string): WorkspacePaneTabOrderEntry {
+  return { type: 'terminal', id }
 }

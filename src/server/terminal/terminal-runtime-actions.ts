@@ -1,6 +1,4 @@
-import path from 'node:path'
 import { isValidRepoLocator } from '#/shared/input-validation.ts'
-import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import type {
   TerminalAttachInput,
   TerminalAttachResult,
@@ -17,21 +15,13 @@ import type {
   TerminalTakeoverResult,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
-import type {
-  WorkspacePaneReorderInput,
-  WorkspacePaneStaticViewInput,
-  WorkspacePaneStaticViewSummary,
-} from '#/shared/workspace-pane.ts'
-import { isWorkspacePaneWorktreeStaticViewType } from '#/shared/workspace-pane.ts'
 import {
   isValidTerminalAttachmentId,
   isValidTerminalSessionId,
   isValidTerminalSize,
 } from '#/shared/terminal-validators.ts'
-import { terminalSessionScope } from '#/server/terminal/terminal-session-scope.ts'
 import type { TerminalRealtimeBroker } from '#/server/terminal/terminal-realtime-broker.ts'
 import { isValidTerminalWriteData, type TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
-import type { WorkspacePaneRuntime } from '#/server/workspace-pane/workspace-pane-runtime.ts'
 
 interface TerminalCatalogLike {
   create(clientId: string, ownerId: string, input: TerminalCreateInput): Promise<TerminalCatalogMutationResult>
@@ -41,10 +31,6 @@ interface TerminalCatalogLike {
 
 interface TerminalRuntimeActionDependencies {
   manager: TerminalSessionManager<string>
-  workspacePane: Pick<
-    WorkspacePaneRuntime<string>,
-    'listStaticViews' | 'openStaticView' | 'closeStaticView' | 'reorderViews'
-  >
   broker: Pick<TerminalRealtimeBroker, 'broadcastToOwner'>
   catalog: TerminalCatalogLike
   isValidTerminalClientId(value: unknown): value is string
@@ -56,7 +42,7 @@ interface TerminalRuntimeActionDependencies {
 // identifier, but it must not decide session visibility or lifecycle
 // fanout.
 export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependencies) {
-  const { manager, workspacePane, broker, catalog, isValidTerminalClientId, resolveAttachmentConnected } = deps
+  const { manager, broker, catalog, isValidTerminalClientId, resolveAttachmentConnected } = deps
 
   return {
     async attach(clientId: string, ownerId: string, input: TerminalAttachInput): Promise<TerminalAttachResult> {
@@ -97,7 +83,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         input.attachmentId,
         resolveAttachmentConnected(ownerId, input.attachmentId),
       )
-      if (repoRoot) broadcastRepoWorkspacePaneChanged(ownerId, repoRoot)
+      if (repoRoot) broadcastRepoSessionsChanged(ownerId, repoRoot)
       return result
     },
 
@@ -163,7 +149,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         // is the immediate invalidation for any sibling window under
         // the same owner. Other owners must not hear about this
         // session id.
-        broadcastRepoWorkspacePaneChanged(ownerId, repoRoot)
+        broadcastRepoSessionsChanged(ownerId, repoRoot)
         broker.broadcastToOwner(ownerId, {
           type: 'session-closed',
           sessionId: input.sessionId,
@@ -198,28 +184,6 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       return await catalog.listSessions(ownerId, repoRoot)
     },
 
-    listViews(clientId: string, ownerId: string, repoRoot: string): WorkspacePaneStaticViewSummary[] {
-      if (!isValidTerminalClientId(clientId)) return []
-      if (!isValidRepoLocator(repoRoot)) return []
-      return workspacePane.listStaticViews(ownerId, terminalSessionScope(repoRoot))
-    },
-
-    openView(clientId: string, ownerId: string, input: WorkspacePaneStaticViewInput): TerminalMutationResult {
-      const normalized = normalizeStaticWorkspacePaneViewInput(clientId, input)
-      if (!normalized) return false
-      const opened = workspacePane.openStaticView(ownerId, normalized.scope, normalized.worktreePath, input.type)
-      if (opened) broadcastRepoWorkspacePaneChanged(ownerId, input.repoRoot)
-      return opened
-    },
-
-    closeView(clientId: string, ownerId: string, input: WorkspacePaneStaticViewInput): TerminalMutationResult {
-      const normalized = normalizeStaticWorkspacePaneViewInput(clientId, input)
-      if (!normalized) return false
-      const closed = workspacePane.closeStaticView(ownerId, normalized.scope, normalized.worktreePath, input.type)
-      if (closed) broadcastRepoWorkspacePaneChanged(ownerId, input.repoRoot)
-      return closed
-    },
-
     async getSessionSnapshot(
       clientId: string,
       ownerId: string,
@@ -230,50 +194,9 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       return await manager.getSessionSnapshot(ownerId, input.sessionId)
     },
 
-    reorderViews(clientId: string, ownerId: string, input: WorkspacePaneReorderInput): TerminalMutationResult {
-      if (!isValidTerminalClientId(clientId)) return false
-      if (!isValidRepoLocator(input?.repoRoot)) return false
-      if (typeof input?.worktreePath !== 'string' || input.worktreePath.length === 0) return false
-      if (!Array.isArray(input?.orderedViews)) return false
-      if (
-        !input.orderedViews.every(
-          (view) =>
-            view &&
-            (view.type === 'changes' || view.type === 'terminal') &&
-            typeof view.id === 'string' &&
-            view.id.length > 0,
-        )
-      ) {
-        return false
-      }
-      // Normalize the scope/worktreePath the same way the catalog does, so
-      // manager.reorderViews sees the canonical forms it stored on each
-      // session. Without this, Windows forward-slash paths never match the
-      // resolved back-slash form and the reorder silently no-ops.
-      const scope = terminalSessionScope(input.repoRoot)
-      const worktreePath = isRemoteRepoId(input.repoRoot) ? input.worktreePath : path.resolve(input.worktreePath)
-      const reordered = workspacePane.reorderViews(ownerId, scope, worktreePath, input.orderedViews)
-      if (reordered) broadcastRepoWorkspacePaneChanged(ownerId, input.repoRoot)
-      return reordered
-    },
   }
 
-  function broadcastRepoWorkspacePaneChanged(ownerId: string, repoRoot: string): void {
+  function broadcastRepoSessionsChanged(ownerId: string, repoRoot: string): void {
     broker.broadcastToOwner(ownerId, { type: 'sessions-changed', repoRoot })
-    broker.broadcastToOwner(ownerId, { type: 'workspace-pane-changed', repoRoot })
-  }
-
-  function normalizeStaticWorkspacePaneViewInput(
-    clientId: string,
-    input: WorkspacePaneStaticViewInput,
-  ): { scope: string; worktreePath: string } | null {
-    if (!isValidTerminalClientId(clientId)) return null
-    if (!isValidRepoLocator(input?.repoRoot)) return null
-    if (typeof input?.worktreePath !== 'string' || input.worktreePath.length === 0) return null
-    if (!isWorkspacePaneWorktreeStaticViewType(input.type)) return null
-    return {
-      scope: terminalSessionScope(input.repoRoot),
-      worktreePath: isRemoteRepoId(input.repoRoot) ? input.worktreePath : path.resolve(input.worktreePath),
-    }
   }
 }

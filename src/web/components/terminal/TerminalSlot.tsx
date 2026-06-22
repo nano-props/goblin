@@ -34,9 +34,10 @@ interface TerminalSlotProps {
   repoRoot: string
   branch: string
   worktreePath: string
+  syncReady?: boolean
 }
 
-export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotProps) {
+export function TerminalSlot({ repoRoot, branch, worktreePath, syncReady = true }: TerminalSlotProps) {
   const t = useT()
   const hostRef = useRef<HTMLDivElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
@@ -432,7 +433,11 @@ export function TerminalSlot({ repoRoot, branch, worktreePath }: TerminalSlotPro
           takeoverPending={snapshot.takeoverPending}
         />
       )}
-      {slotMode === 'opening' && !hasSessions && pendingCreate ? (
+      {slotMode === 'opening' && !hasSessions && !syncReady ? (
+        <div className="goblin-terminal-slot__status-overlay">
+          <span>{t('terminal.loading')}</span>
+        </div>
+      ) : slotMode === 'opening' && !hasSessions && pendingCreate ? (
         <div className="goblin-terminal-slot__status-overlay">
           <span>{t('terminal.opening')}</span>
         </div>

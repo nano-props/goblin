@@ -1,16 +1,8 @@
 import type { WorkspacePaneViewSummary, TerminalSessionSummary } from '#/web/components/terminal/types.ts'
-import type {
-  WorkspacePaneBranchViewType,
-  WorkspacePaneStaticViewType,
-  WorkspacePaneWorktreeViewOrderEntry,
-} from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneBranchViewType, WorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
 
 export function workspacePaneViewIdentity(tab: WorkspacePaneViewSummary): string {
   return `${tab.type}:${tab.id}`
-}
-
-export function workspacePaneViewOrderEntry(tab: WorkspacePaneViewSummary): WorkspacePaneWorktreeViewOrderEntry {
-  return { type: tab.type, id: tab.id }
 }
 
 export function terminalWorkspacePaneViewIdentity(sessionKey: string): string {

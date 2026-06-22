@@ -58,7 +58,7 @@ async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>): 
     applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalByWorktree)
     await hydrateSession(session.openRepos, session.activeRepo, {
       workspacePaneRestoreState: {
-        openBranchWorkspacePaneViewsByBranchByRepo: restoredWorkspaceState.openBranchWorkspacePaneViewsByBranchByRepo,
+        workspacePaneTabOrderByBranchByRepo: restoredWorkspaceState.workspacePaneTabOrderByBranchByRepo,
         preferredWorkspacePaneViewByBranchByRepo: restoredWorkspaceState.preferredWorkspacePaneViewByBranchByRepo,
       },
     })

@@ -12,11 +12,6 @@ import type {
   TerminalSessionSnapshot,
   TerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
-import type { WorkspacePaneStaticViewSummary } from '#/shared/workspace-pane.ts'
-import {
-  WORKSPACE_PANE_WORKTREE_STATIC_VIEW_TYPES,
-  WORKSPACE_PANE_WORKTREE_VIEW_TYPES,
-} from '#/shared/workspace-pane.ts'
 
 const MIN_TERMINAL_COLS = 1
 const MAX_TERMINAL_COLS = 500
@@ -35,13 +30,9 @@ const TERMINAL_SOCKET_ACTIONS = [
   'takeover',
   'close',
   'list-sessions',
-  'workspace-pane:list-views',
-  'workspace-pane:open-view',
-  'workspace-pane:close-view',
   'create',
   'prune',
   'session-snapshot',
-  'workspace-pane:reorder-views',
 ] as const satisfies TerminalSocketRequestAction[]
 const TERMINAL_CONNECTED_CONTROLLER_STATUS_VALUES = ['connected', 'grace'] satisfies Exclude<
   TerminalControllerStatus,
@@ -83,12 +74,6 @@ const TerminalSessionInputSchema = v.object({
 const TerminalListSessionsInputSchema = v.object({
   repoRoot: v.string(),
 })
-const WorkspacePaneListViewsInputSchema = TerminalListSessionsInputSchema
-const WorkspacePaneStaticViewInputSchema = v.object({
-  repoRoot: v.string(),
-  worktreePath: v.string(),
-  type: v.picklist(WORKSPACE_PANE_WORKTREE_STATIC_VIEW_TYPES),
-})
 const TerminalCreateInputSchema = v.object({
   repoRoot: v.string(),
   branch: v.string(),
@@ -100,16 +85,6 @@ const TerminalCreateInputSchema = v.object({
 })
 const TerminalPruneInputSchema = v.object({
   repoRoot: v.string(),
-})
-const WorkspacePaneReorderInputSchema = v.object({
-  repoRoot: v.string(),
-  worktreePath: v.string(),
-  orderedViews: v.array(
-    v.object({
-      type: v.picklist(WORKSPACE_PANE_WORKTREE_VIEW_TYPES),
-      id: v.string(),
-    }),
-  ),
 })
 const TerminalSessionSnapshotInputSchema = v.object({
   sessionId: TerminalSessionIdSchema,
@@ -127,12 +102,6 @@ const TerminalSessionSummarySchema = v.object({
   message: v.nullable(v.string()),
   cols: v.number(),
   rows: v.number(),
-  displayOrder: v.number(),
-})
-const WorkspacePaneStaticViewSummarySchema = v.object({
-  type: v.picklist(WORKSPACE_PANE_WORKTREE_STATIC_VIEW_TYPES),
-  id: v.string(),
-  worktreePath: v.string(),
   displayOrder: v.number(),
 })
 const TerminalSessionSnapshotSchema = v.object({
@@ -175,7 +144,6 @@ const TerminalRealtimeMessageVariants = [
   v.object({ type: v.literal('exit'), event: TerminalExitEventSchema }),
   v.object({ type: v.literal('ownership'), event: TerminalOwnershipEventSchema }),
   v.object({ type: v.literal('sessions-changed'), repoRoot: v.string() }),
-  v.object({ type: v.literal('workspace-pane-changed'), repoRoot: v.string() }),
   TerminalSessionClosedEventSchema,
 ] as const
 const TerminalRealtimeMessageSchema = v.variant('type', TerminalRealtimeMessageVariants)
@@ -242,24 +210,6 @@ const TerminalClientMessageSchema = v.variant('type', [
   v.object({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
-    action: v.literal('workspace-pane:list-views'),
-    input: WorkspacePaneListViewsInputSchema,
-  }),
-  v.object({
-    type: v.literal('request'),
-    requestId: TerminalRequestIdSchema,
-    action: v.literal('workspace-pane:open-view'),
-    input: WorkspacePaneStaticViewInputSchema,
-  }),
-  v.object({
-    type: v.literal('request'),
-    requestId: TerminalRequestIdSchema,
-    action: v.literal('workspace-pane:close-view'),
-    input: WorkspacePaneStaticViewInputSchema,
-  }),
-  v.object({
-    type: v.literal('request'),
-    requestId: TerminalRequestIdSchema,
     action: v.literal('create'),
     input: TerminalCreateInputSchema,
   }),
@@ -274,12 +224,6 @@ const TerminalClientMessageSchema = v.variant('type', [
     requestId: TerminalRequestIdSchema,
     action: v.literal('session-snapshot'),
     input: TerminalSessionSnapshotInputSchema,
-  }),
-  v.object({
-    type: v.literal('request'),
-    requestId: TerminalRequestIdSchema,
-    action: v.literal('workspace-pane:reorder-views'),
-    input: WorkspacePaneReorderInputSchema,
   }),
 ])
 
@@ -349,11 +293,6 @@ export function isValidTerminalNotifyBellInput(value: unknown): value is Termina
 export function normalizeTerminalSessionSummaryList(value: unknown): TerminalSessionSummary[] | null {
   const parsed = v.safeParse(v.array(TerminalSessionSummarySchema), value)
   return parsed.success ? parsed.output : null
-}
-
-export function normalizeWorkspacePaneStaticViewSummaryList(value: unknown): WorkspacePaneStaticViewSummary[] | null {
-  const parsed = v.safeParse(v.array(WorkspacePaneStaticViewSummarySchema), value)
-  return parsed.success ? (parsed.output as WorkspacePaneStaticViewSummary[]) : null
 }
 
 export function normalizeTerminalSessionSnapshot(value: unknown): TerminalSessionSnapshot | null {

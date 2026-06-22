@@ -30,17 +30,18 @@ export function workspacePaneViewRequiresWorktree(view: WorkspacePaneView): bool
 }
 
 /**
- * The runtime truth that determines which workspace pane view is renderable.
+ * The runtime truth that determines whether a preferred workspace pane view
+ * has a backing surface that can be rendered now.
  * Grouped into an object so callers can't accidentally swap two
  * booleans at the call site.
  */
-export interface WorkspacePaneViewContext {
+export interface WorkspacePaneRenderabilityContext {
   /** Whether the selected branch has a worktree on disk. */
   hasWorktree: boolean
   /** Number of open terminal sessions for the worktree. */
   terminalSessionCount: number
   /** Whether a new terminal is queued and waiting for mount geometry. */
-  pendingCreate?: boolean
+  terminalCreatePending?: boolean
   /** Whether the terminal session registry has finished its first sync. */
   terminalSyncReady: boolean
 }
@@ -51,12 +52,12 @@ export interface WorkspacePaneViewContext {
  * resolve to null, and the tab projection decides whether a matching tab
  * actually exists.
  */
-export function resolveWorkspacePaneSelectionView(
+export function resolveRenderableWorkspacePaneView(
   preferred: WorkspacePaneView,
-  context: WorkspacePaneViewContext,
+  context: WorkspacePaneRenderabilityContext,
 ): WorkspacePaneView | null {
   if (!context.hasWorktree && workspacePaneViewRequiresWorktree(preferred)) return null
   if (preferred !== 'terminal') return preferred
-  if (!context.terminalSyncReady || context.pendingCreate) return 'terminal'
+  if (!context.terminalSyncReady || context.terminalCreatePending) return 'terminal'
   return context.terminalSessionCount > 0 ? 'terminal' : null
 }

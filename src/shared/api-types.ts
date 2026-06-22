@@ -13,7 +13,7 @@ import type {
   RepoRemoteInfo,
   WorktreeStatus,
 } from '#/shared/git-types.ts'
-import type { WorkspacePaneBranchViewType, WorkspacePaneSessionView } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneSessionView, WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type {
@@ -89,8 +89,8 @@ export interface SessionState {
   selectedTerminalByWorktree?: Record<string, string>
   /** Per-repo, per-branch workspace pane view preference that session restore can make renderable. */
   preferredWorkspacePaneViewByBranchByRepo?: Record<string, Record<string, WorkspacePaneSessionView>>
-  /** Per-repo, per-branch opened branch-level workspace pane tabs. Empty arrays are meaningful. */
-  openBranchWorkspacePaneViewsByBranchByRepo: Record<string, Record<string, WorkspacePaneBranchViewType[]>>
+  /** Per-repo, per-branch workspace pane tab strip order. Empty arrays are meaningful. */
+  workspacePaneTabOrderByBranchByRepo: Record<string, Record<string, WorkspacePaneTabOrderEntry[]>>
 }
 
 export interface RuntimeSettingsSnapshot extends SettingsPrefs {

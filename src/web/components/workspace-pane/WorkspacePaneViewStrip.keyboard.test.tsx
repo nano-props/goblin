@@ -4,8 +4,8 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { terminalWorkspacePaneViewIdentity } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
-import type { WorkspacePaneWorktreeViewOrderEntry } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneViewSummary, TerminalSessionSummary } from '#/web/components/terminal/types.ts'
+import type { WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
+import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
@@ -143,7 +143,7 @@ describe('WorkspacePaneViewStrip keyboard dnd wiring', () => {
 function makeWorkspacePaneViewStrip(
   workspacePaneViewStripModule: typeof import('#/web/components/workspace-pane/WorkspacePaneViewStrip.tsx'),
 ) {
-  const { WorkspacePaneViewStrip, createWorktreeWorkspacePaneTabItem, isWorktreeWorkspacePaneTabItem } =
+  const { WorkspacePaneViewStrip, createTerminalWorkspacePaneTabItem, isTerminalWorkspacePaneTabItem } =
     workspacePaneViewStripModule
   return function TestWorkspacePaneViewStrip(props: {
     worktreeTerminalKey: string
@@ -151,15 +151,15 @@ function makeWorkspacePaneViewStrip(
     workspacePaneId: string
     panelActive?: boolean
     onNew: () => void
-    onSelect: (worktreeTerminalKey: string, tab: WorkspacePaneViewSummary) => void
+    onSelect: (worktreeTerminalKey: string, tab: TerminalSessionSummary) => void
     onScrollToBottom: (key: string) => void
-    onClose: (tab: WorkspacePaneViewSummary) => void
-    onReorder: (worktreeTerminalKey: string, orderedViews: WorkspacePaneWorktreeViewOrderEntry[]) => void
+    onClose: (tab: TerminalSessionSummary) => void
+    onReorder: (orderedTabs: WorkspacePaneTabOrderEntry[]) => void
   }) {
     const selected = props.sessions.find((candidate) => candidate.selected) ?? null
     const { sessions, ...workspacePaneProps } = props
     const items = sessions.map((tab) =>
-      createWorktreeWorkspacePaneTabItem({
+      createTerminalWorkspacePaneTabItem({
         view: tab,
         label: tab.originalTitle ?? tab.fullTitle ?? tab.title,
         tooltip: tab.originalTitle ?? tab.fullTitle ?? tab.title,
@@ -172,10 +172,10 @@ function makeWorkspacePaneViewStrip(
         items={items}
         activeTabIdentity={selected ? terminalWorkspacePaneViewIdentity(selected.key) : null}
         onSelect={(item) => {
-          if (isWorktreeWorkspacePaneTabItem(item)) props.onSelect(props.worktreeTerminalKey, item.view)
+          if (isTerminalWorkspacePaneTabItem(item)) props.onSelect(props.worktreeTerminalKey, item.view)
         }}
         onClose={(item) => {
-          if (isWorktreeWorkspacePaneTabItem(item)) props.onClose(item.view)
+          if (isTerminalWorkspacePaneTabItem(item)) props.onClose(item.view)
         }}
       />
     )

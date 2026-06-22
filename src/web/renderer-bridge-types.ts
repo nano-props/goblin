@@ -22,12 +22,6 @@ import type {
   TerminalTitleEvent,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
-import type {
-  WorkspacePaneListViewsInput,
-  WorkspacePaneReorderInput,
-  WorkspacePaneStaticViewInput,
-  WorkspacePaneStaticViewSummary,
-} from '#/shared/workspace-pane.ts'
 import type { TerminalOwnershipViewModel } from '#/web/components/terminal/types.ts'
 
 export interface RendererTerminalBridge {
@@ -40,9 +34,6 @@ export interface RendererTerminalBridge {
   create: (input: TerminalCreateInput) => Promise<TerminalCatalogMutationResult>
   pruneTerminals: (repoRoot: string) => Promise<{ pruned: number; remaining: number }>
   listSessions: (input: { repoRoot: string }) => Promise<TerminalSessionSummary[]>
-  listViews: (input: WorkspacePaneListViewsInput) => Promise<WorkspacePaneStaticViewSummary[]>
-  openView: (input: WorkspacePaneStaticViewInput) => Promise<TerminalMutationResult>
-  closeView: (input: WorkspacePaneStaticViewInput) => Promise<TerminalMutationResult>
   /**
    * Open the underlying WebSocket (if not already open) and resolve
    * once it reaches the OPEN state. Used as a T1.2 prewarm when the
@@ -63,7 +54,6 @@ export interface RendererTerminalBridge {
    */
   kickReconnect: () => void
   getSessionSnapshot: (input: TerminalSessionSnapshotInput) => Promise<TerminalSessionSnapshot | null>
-  reorderViews: (input: WorkspacePaneReorderInput) => Promise<TerminalMutationResult>
   notifyBell: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>
   sendTestNotification: () => Promise<boolean>
   setBadge: (count: number) => void
@@ -72,7 +62,6 @@ export interface RendererTerminalBridge {
   onExit: (cb: (event: TerminalExitEvent) => void) => () => void
   onOwnership: (cb: (event: TerminalOwnershipViewModel) => void) => () => void
   onSessionsChanged: (cb: (repoRoot: string) => void) => () => void
-  onWorkspacePaneChanged: (cb: (repoRoot: string) => void) => () => void
   /**
    * Subscribe to per-session close broadcasts from the server. Emitted
    * after a successful `close` IPC alongside the broader
