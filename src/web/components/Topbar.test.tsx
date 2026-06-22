@@ -20,6 +20,19 @@ vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
   useIsCompactUi: () => responsiveMocks.compact,
 }))
 
+// BranchListPopover pulls the store + navigation + portaled HoverCard
+// (Radix HoverCard requires ResizeObserver and animation timing in
+// jsdom that we don't want to fight here). The topbar test cares about
+// which wrapper owns the trigger — Tip vs popover — so we expose a
+// recognisable data attribute to assert on.
+const popoverWrapper = vi.hoisted(() => ({ wrapperCount: 0 }))
+vi.mock('#/web/components/branch-navigator/BranchListPopover.tsx', () => ({
+  BranchListPopover: ({ children, repoId: _repoId }: { children: ReactNode; repoId: string }) => {
+    popoverWrapper.wrapperCount += 1
+    return <div data-testid="branch-list-popover-wrapper">{children}</div>
+  },
+}))
+
 let container: HTMLDivElement | null = null
 let root: Root | null = null
 
@@ -28,6 +41,7 @@ const reactActEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENV
 beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   responsiveMocks.compact = false
+  popoverWrapper.wrapperCount = 0
   resetReposStore()
   container = document.createElement('div')
   document.body.appendChild(container)
@@ -56,7 +70,7 @@ describe('Topbar', () => {
     expect(settingsButton()).not.toBeNull()
   })
 
-  test('renders a Focus Mode toggle before repo picker on large screens', () => {
+  test('renders a Focus Mode toggle separated from the per-repo actions and flush with the settings button', () => {
     render(
       <Topbar repoId="/tmp/repo" onOpenSettings={() => {}}>
         <div data-testid="repo-picker" />
@@ -64,11 +78,21 @@ describe('Topbar', () => {
     )
 
     const toggle = focusModeToggle()
+    const settings = settingsButton()
     const repoPicker = container?.querySelector('[data-testid="repo-picker"]')
     expect(toggle).not.toBeNull()
-    expect(toggle?.nextElementSibling?.getAttribute('data-slot')).toBe('separator')
-    expect(toggle?.nextElementSibling?.getAttribute('data-orientation')).toBe('vertical')
-    expect(toggle?.nextElementSibling?.nextElementSibling).toBe(repoPicker)
+    expect(settings).not.toBeNull()
+    expect(repoPicker).not.toBeNull()
+    // Layout: [repo-picker] [RepoToolbarActions] [Separator] [focus-toggle] [settings]
+    // The toggle sits immediately left of the settings button.
+    expect(toggle?.nextElementSibling).toBe(settings)
+    // A vertical Separator separates the per-repo actions cluster from
+    // the focus-mode toggle (matches the convention enforced by
+    // `ui-conventions.md`).
+    expect(toggle?.previousElementSibling?.getAttribute('data-slot')).toBe('separator')
+    expect(toggle?.previousElementSibling?.getAttribute('data-orientation')).toBe('vertical')
+    // The repo picker is to the left of the toolbar cluster.
+    expect(repoPicker?.nextElementSibling).not.toBe(toggle)
   })
 
   test('toggles large-screen Focus Mode with stable tooltip and button styling', () => {
@@ -89,7 +113,9 @@ describe('Topbar', () => {
 
     expect(useReposStore.getState().workspaceFocused).toBe(true)
     expect(focusModeToggle()?.getAttribute('aria-pressed')).toBe('true')
-    expect(focusModeToggle()?.getAttribute('title')).toBe('workspace.focus-toggle-tooltip.enable')
+    // In focus mode the native title is dropped so the OS tooltip
+    // doesn't race the hover card on touch / OS-default hover delays.
+    expect(focusModeToggle()?.getAttribute('title')).toBeNull()
     expect(focusModeToggle()?.className).toBe(initialClassName)
   })
 
@@ -121,11 +147,18 @@ describe('Topbar', () => {
 
     const repoPicker = container?.querySelector('[data-testid="repo-picker"]')
     const toggle = focusModeToggle()
+    const settings = settingsButton()
     expect(branchWorkspaceBackButton()).toBeNull()
     expect(toggle).not.toBeNull()
-    expect(toggle?.nextElementSibling?.getAttribute('data-slot')).toBe('separator')
-    expect(toggle?.nextElementSibling?.getAttribute('data-orientation')).toBe('vertical')
-    expect(toggle?.nextElementSibling?.nextElementSibling).toBe(repoPicker)
+    // The focus toggle (wrapped in BranchListPopover mock) sits
+    // immediately left of the settings button, with a vertical
+    // Separator between it and the per-repo actions.
+    const popoverWrapper = toggle?.closest('[data-testid="branch-list-popover-wrapper"]')
+    expect(popoverWrapper).not.toBeNull()
+    expect(popoverWrapper?.nextElementSibling).toBe(settings)
+    expect(popoverWrapper?.previousElementSibling?.getAttribute('data-slot')).toBe('separator')
+    expect(popoverWrapper?.previousElementSibling?.getAttribute('data-orientation')).toBe('vertical')
+    expect(repoPicker).not.toBeNull()
     expect(useReposStore.getState().workspaceFocused).toBe(true)
     expect(useReposStore.getState().repos['/tmp/repo']?.ui.selectedBranch).toBe('feature/a')
   })
@@ -164,6 +197,49 @@ describe('Topbar', () => {
     )
 
     expect(branchWorkspaceBackButton()).toBeNull()
+  })
+
+  test('wraps the focus toggle in BranchListPopover while Focus Mode is on', () => {
+    seedRepoState({
+      id: '/tmp/repo',
+      branches: [createRepoBranch('main'), createRepoBranch('feature/a')],
+    })
+    useReposStore.getState().setWorkspaceFocused(true)
+
+    render(
+      <Topbar repoId="/tmp/repo" onOpenSettings={() => {}}>
+        <div />
+      </Topbar>,
+    )
+
+    const wrapper = container?.querySelector('[data-testid="branch-list-popover-wrapper"]')
+    expect(wrapper).not.toBeNull()
+    // The focus toggle button is still the popover trigger.
+    expect(wrapper?.querySelector('button[aria-label="workspace.focus-toggle-label"]')).toBe(focusModeToggle())
+    // Only the popover wrapper owns the trigger (no Tip wrapper also
+    // renders the same button — would mean both wrappers are live).
+    expect(popoverWrapper.wrapperCount).toBe(1)
+  })
+
+  test('keeps the text Tip on the focus toggle while Focus Mode is off', () => {
+    seedRepoState({
+      id: '/tmp/repo',
+      branches: [createRepoBranch('main')],
+    })
+
+    render(
+      <Topbar repoId="/tmp/repo" onOpenSettings={() => {}}>
+        <div />
+      </Topbar>,
+    )
+
+    expect(useReposStore.getState().workspaceFocused).toBe(false)
+    expect(container?.querySelector('[data-testid="branch-list-popover-wrapper"]')).toBeNull()
+    expect(popoverWrapper.wrapperCount).toBe(0)
+    // The tooltip wrapper is only built on hover via Radix; the
+    // invariant we can assert is that the underlying button keeps the
+    // existing title used by the text tooltip path.
+    expect(focusModeToggle()?.getAttribute('title')).toBe('workspace.focus-toggle-tooltip.enable')
   })
 })
 
