@@ -203,20 +203,15 @@ export class TerminalSessionManager<TOwner extends string | number> {
     return result
   }
 
-  writeSession(ownerId: TOwner, sessionId: string, data: string, attachmentId?: string): boolean {
+  writeSession(ownerId: TOwner, sessionId: string, data: string, attachmentId: string): boolean {
     if (!isValidTerminalSessionId(sessionId) || !isValidTerminalWriteData(data)) return false
     const session = this.getSession(ownerId, sessionId)
     if (!session?.pty) return false
-    if (attachmentId) {
-      // Register the attachment first so a brand-new socket can satisfy
-      // the unknown-attachment gate, then defer to the shared
-      // authority helper so write/resize/restart stay in lockstep.
-      registerTerminalAttachment(session, attachmentId, session.cols, session.rows, undefined)
-      if (!isAuthoritative(session, attachmentId, 'write')) return false
-    } else if (session.controller !== null) {
-      // A controller exists but the caller did not identify itself.
-      return false
-    }
+    // Register the attachment first so a brand-new socket can satisfy
+    // the unknown-attachment gate, then defer to the shared
+    // authority helper so write/resize/restart stay in lockstep.
+    registerTerminalAttachment(session, attachmentId, session.cols, session.rows, undefined)
+    if (!isAuthoritative(session, attachmentId, 'write')) return false
     session.inputQueue.push(data)
     this.scheduleInputFlush(session)
     return true
@@ -227,7 +222,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     sessionId: string,
     cols: number,
     rows: number,
-    attachmentId?: string,
+    attachmentId: string,
     attachmentConnected?: boolean,
   ): Promise<TerminalAttachResult> {
     if (!isValidTerminalSessionId(sessionId)) return { ok: false, message: 'error.invalid-arguments' }
@@ -235,10 +230,8 @@ export class TerminalSessionManager<TOwner extends string | number> {
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
     const session = this.getSession(ownerId, sessionId)
     if (!session) return { ok: false, message: 'error.invalid-arguments' }
-    if (attachmentId) {
-      registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
-      this.applyOwnershipEffect(session, attachTerminalAttachment(session, attachmentId))
-    }
+    registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
+    this.applyOwnershipEffect(session, attachTerminalAttachment(session, attachmentId))
     return await this.attachResult(session)
   }
 
@@ -247,7 +240,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     sessionId: string,
     cols: number,
     rows: number,
-    attachmentId?: string,
+    attachmentId: string,
     attachmentConnected?: boolean,
   ): boolean {
     if (!isValidTerminalSessionId(sessionId)) return false
@@ -255,7 +248,6 @@ export class TerminalSessionManager<TOwner extends string | number> {
     if (!size) return false
     const session = this.getSession(ownerId, sessionId)
     if (!session) return false
-    if (!attachmentId) return false
     registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
     if (!isAuthoritative(session, attachmentId, 'resize')) return false
     return this.resizeSessionPty(session, size.cols, size.rows)
@@ -266,7 +258,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     sessionId: string,
     cols: number,
     rows: number,
-    attachmentId?: string,
+    attachmentId: string,
     attachmentConnected?: boolean,
   ): TerminalTakeoverResult {
     if (!isValidTerminalSessionId(sessionId)) return { ok: false, message: 'error.invalid-arguments' }
@@ -274,32 +266,29 @@ export class TerminalSessionManager<TOwner extends string | number> {
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
     const session = this.getSession(ownerId, sessionId)
     if (!session) return { ok: false, message: 'error.invalid-arguments' }
-    if (attachmentId) {
-      // Takeover is the only path that may preempt, but it still
-      // requires the caller to be a known attachment. Use the same
-      // authority gate as the other actions for consistency.
-      registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
-      if (!isAuthoritative(session, attachmentId, 'takeover')) {
-        return { ok: false, message: 'error.invalid-arguments' }
-      }
-      const effect = claimTerminalAttachmentControl(session, attachmentId)
-      this.applyOwnershipEffect(session, effect)
-      // Bug D: when the attachment isn't `connected`, the effect
-      // is empty (no resize, no ownership event) — the caller is
-      // known but not authoritative yet (the WS hasn't been
-      // observed as alive for this attachment). Surfacing `ok:
-      // true` here would tell the renderer it became controller
-      // when nothing actually changed; the existing
-      // `takeoverResult()` would still hardcode
-      // `role: 'controller'` and `controllerStatus: 'connected'`,
-      // masking the no-op. Reject with the same key the renderer
-      // maps to "session lost" so the user can retry.
-      if (!effect.emitOwnership && !effect.resizeTo) {
-        return { ok: false, message: 'error.unavailable' }
-      }
-      return this.takeoverResult(session)
+    // Takeover is the only path that may preempt, but it still
+    // requires the caller to be a known attachment. Use the same
+    // authority gate as the other actions for consistency.
+    registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
+    if (!isAuthoritative(session, attachmentId, 'takeover')) {
+      return { ok: false, message: 'error.invalid-arguments' }
     }
-    return { ok: false, message: 'error.invalid-arguments' }
+    const effect = claimTerminalAttachmentControl(session, attachmentId)
+    this.applyOwnershipEffect(session, effect)
+    // Bug D: when the attachment isn't `connected`, the effect
+    // is empty (no resize, no ownership event) — the caller is
+    // known but not authoritative yet (the WS hasn't been
+    // observed as alive for this attachment). Surfacing `ok:
+    // true` here would tell the renderer it became controller
+    // when nothing actually changed; the existing
+    // `takeoverResult()` would still hardcode
+    // `role: 'controller'` and `controllerStatus: 'connected'`,
+    // masking the no-op. Reject with the same key the renderer
+    // maps to "session lost" so the user can retry.
+    if (!effect.emitOwnership && !effect.resizeTo) {
+      return { ok: false, message: 'error.unavailable' }
+    }
+    return this.takeoverResult(session)
   }
 
   async restartSession(
@@ -307,7 +296,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     sessionId: string,
     cols: number,
     rows: number,
-    attachmentId?: string,
+    attachmentId: string,
     attachmentConnected?: boolean,
   ): Promise<TerminalAttachResult> {
     if (!isValidTerminalSessionId(sessionId)) return { ok: false, message: 'error.invalid-arguments' }
@@ -315,17 +304,12 @@ export class TerminalSessionManager<TOwner extends string | number> {
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
     const session = this.getSession(ownerId, sessionId)
     if (!session) return { ok: false, message: 'error.invalid-arguments' }
-    if (attachmentId) {
-      registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
-      const denyReason = explainAuthority(session, attachmentId, 'restart')
-      if (denyReason !== null) {
-        return { ok: false, message: authorityReasonToMessage(denyReason) }
-      }
-      restartTerminalAttachmentControl(session, attachmentId)
-    } else if (session.controller !== null) {
-      // A controller exists but the caller did not identify itself.
-      return { ok: false, message: 'error.invalid-arguments' }
+    registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
+    const denyReason = explainAuthority(session, attachmentId, 'restart')
+    if (denyReason !== null) {
+      return { ok: false, message: authorityReasonToMessage(denyReason) }
     }
+    restartTerminalAttachmentControl(session, attachmentId)
     this.resetSessionState(session, size.cols, size.rows, 'restarting')
     const result = await this.spawnSessionPty(session)
     if (!result.ok) {

@@ -59,7 +59,7 @@ The controller is the attachment that currently owns write and resize authority.
 Controller state should be derived from:
 
 - which attachment currently controls the session
-- whether that attachment is connected or in grace
+- whether that attachment is connected (a disconnected controller clears the slot immediately; the model carries no "grace" sub-state)
 
 ### View
 
@@ -120,7 +120,6 @@ Each attachment should track:
 - connected or disconnected state
 - most recent geometry
 - whether it is eligible for implicit or explicit control transitions
-- any timestamps needed for grace and expiry policy
 
 This allows the server to reason about:
 
@@ -128,7 +127,7 @@ This allows the server to reason about:
 - viewer attachments
 - reconnect of the same attachment
 - takeover by a different attachment
-- release after disconnect grace
+- release on disconnect (the controller slot clears immediately; ownership survives via the per-session `claimedByOwner` flag, not via a per-attachment grace timer)
 
 ## Ownership roles as renderer projection
 
@@ -159,8 +158,8 @@ That keeps the UI simple while keeping the business model accurate.
 
 ### Disconnect behavior
 
-- disconnect should move control into grace, not immediately destroy it
-- grace expiry may release the controller
+- disconnect should clear the controller slot immediately, not preserve it
+- a subsequent attach from the same owner (any attachment) auto-claims when no controller is present, because `claimedByOwner` is sticky per session
 - releasing control should not require the renderer to guess what happened
 
 ### Takeover behavior
@@ -220,13 +219,10 @@ The renderer should not have to infer hidden lifecycle meaning from missing PTY 
 
 ## Migration direction
 
-The recommended migration path is:
-
-1. introduce explicit session phases in server-owned session state
-2. replace single attachment fields with multi-attachment state
-3. derive controller and renderer ownership projection from that state
-4. update reconnect, release, and takeover rules to use the richer model
-5. simplify renderer-side inference after the server model becomes explicit
+All five steps are landed as of this revision. The renderer-side
+projection (steps 3 + 5) is centralized in
+`src/web/components/terminal/authority-gate.ts`; see
+`terminal-takeover.md` for the resulting ownership model.
 
 ## Success criteria
 

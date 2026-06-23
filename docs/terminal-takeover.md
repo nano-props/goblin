@@ -164,11 +164,36 @@ extra round-trip on the first keystroke after A returns.
 
 In practice the window between A's disconnect and B's attach is
 much smaller than the time it takes a human to switch windows
-and reattach, so this case is rare. It is most likely to bite
-a user who has automation that opens terminals in the
-background — those should pin their `attachmentId` and accept
-that the first window still focused is the one in control
-until they type.
+and reattach, so this case is rare. When it does bite, the
+recovery path is the same as the friendly case: type, get
+control.
+
+## Known behavior: self-reconnect mid-flight
+
+The friendly reconnect case has one observable wrinkle. When A's
+socket drops, the server clears the slot and emits a
+`controller: null` event. When A's socket comes back, the
+server re-emits `controller: A` after the auto-claim. Between
+those two events — typically a few milliseconds — A's renderer
+sees its cached role transition from `controller` to `viewer`
+(per `handleOwnership` collapsing unowned to viewer) and back
+to `controller`.
+
+If the user types in that window, the gate's `authorize('write')`
+takes the viewer branch and fires a takeover round-trip, which
+succeeds against the just-reclaimed slot. The first keystroke
+after A returns therefore costs one extra round-trip — same
+shape as the "lost the race to B" case above, but for a
+session that was always A's.
+
+This is not a bug; it is the cost of a model that has no grace
+timer. A renderer-side coalescing window (e.g. "wait 100ms
+after a self-reconnect before firing takeover on write") would
+hide the round-trip but would re-introduce a small grace period
+on the client, which is exactly what the server-side no-grace
+design exists to avoid. The right answer is to accept the
+rare extra round-trip and document the behavior so it doesn't
+surprise future contributors.
 
 ## Boundaries this model respects
 

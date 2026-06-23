@@ -148,3 +148,51 @@ describe('terminal-runtime-actions close broadcast', () => {
     expect(broadcasts).not.toHaveBeenCalled()
   })
 })
+
+describe('terminal-runtime-actions attachmentId gate', () => {
+  // The action layer is the single point that validates caller
+  // identity before reaching the manager. Every authority-gated
+  // action (write / resize / takeover / restart / attach) must
+  // refuse a missing or empty `attachmentId` so the manager's
+  // tightened `attachmentId: string` (no longer optional) contract
+  // holds. A missing attachmentId would otherwise let a caller
+  // reach the manager with an undefined value, where the old
+  // optional-param dead branch would silently let the write
+  // through to the PTY.
+  test('write / resize / takeover / restart / attach all reject a missing attachmentId', async () => {
+    const { actions, manager } = makeActions({ closeSessionForOwner: () => false })
+
+    // undefined attachmentId on every authority-gated action.
+    expect(actions.write(CLIENT_ID, OWNER_ID, { sessionId: SESSION_ID, data: 'x' } as never)).toBe(false)
+    expect(
+      actions.resize(CLIENT_ID, OWNER_ID, { sessionId: SESSION_ID, cols: 80, rows: 24 } as never),
+    ).toBe(false)
+    const takeover = actions.takeover(CLIENT_ID, OWNER_ID, {
+      sessionId: SESSION_ID,
+      cols: 80,
+      rows: 24,
+    } as never)
+    expect(takeover.ok).toBe(false)
+    const restart = await actions.restart(CLIENT_ID, OWNER_ID, {
+      sessionId: SESSION_ID,
+      cols: 80,
+      rows: 24,
+    } as never)
+    expect(restart.ok).toBe(false)
+    const attach = await actions.attach(CLIENT_ID, OWNER_ID, {
+      sessionId: SESSION_ID,
+      cols: 80,
+      rows: 24,
+    } as never)
+    expect(attach.ok).toBe(false)
+
+    // None of these should have reached the manager — the gate is
+    // responsible for turning a missing attachmentId into a clean
+    // refusal without crossing the trust boundary.
+    expect(manager.writeSession).not.toHaveBeenCalled()
+    expect(manager.resizeSession).not.toHaveBeenCalled()
+    expect(manager.takeoverSession).not.toHaveBeenCalled()
+    expect(manager.restartSession).not.toHaveBeenCalled()
+    expect(manager.attachSession).not.toHaveBeenCalled()
+  })
+})

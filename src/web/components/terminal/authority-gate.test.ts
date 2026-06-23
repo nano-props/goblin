@@ -3,6 +3,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalTakeoverInput, TerminalTakeoverResult } from '#/shared/terminal-types.ts'
 import { createXtermAuthorityGate } from '#/web/components/terminal/authority-gate.ts'
+import { terminalLog } from '#/web/logger.ts'
 import type { RendererTerminalBridge } from '#/web/renderer-bridge-types.ts'
 
 // Focused unit tests for the AuthorityGate. The gate is the single
@@ -130,7 +131,11 @@ describe('AuthorityGate.authorize', () => {
     })
     gate.setRole('viewer')
     const result = await gate.authorize('write')
-    expect(result).toEqual({ kind: 'denied', reason: 'takeover-rejected' })
+    // The server message is now propagated through the gate so the
+    // caller (or its logs) can correlate the failure with the
+    // server's i18n key. 'rejected' is not a known server key, so
+    // the classifier falls through to the catch-all reason.
+    expect(result).toEqual({ kind: 'denied', reason: 'takeover-rejected', message: 'rejected' })
     expect(bridge.takeover).toHaveBeenCalledTimes(1)
     expect(promoted).not.toHaveBeenCalled()
     expect(gate.currentRole()).toBe('viewer')
@@ -138,42 +143,38 @@ describe('AuthorityGate.authorize', () => {
 })
 
 describe('AuthorityGate.takeover (explicit button path)', () => {
-  test('returns true and flips role to controller on success', async () => {
+  test('returns allowed and flips role to controller on success', async () => {
     const { gate, promoted } = buildGate({
       takeoverImpl: async () => successResult('session-1'),
     })
     gate.setRole('viewer')
-    const ok = await gate.takeover()
-    expect(ok).toBe(true)
+    const result = await gate.takeover()
+    expect(result).toEqual({ kind: 'allowed' })
     expect(gate.currentRole()).toBe('controller')
     expect(promoted).toHaveBeenCalledTimes(1)
   })
 
-  test('returns false when the session id is null', async () => {
+  test('returns session-closed when the session id is null', async () => {
     const { gate, bridge } = buildGate({ getSessionId: () => null })
     gate.setRole('viewer')
-    const ok = await gate.takeover()
-    expect(ok).toBe(false)
+    const result = await gate.takeover()
+    expect(result).toEqual({ kind: 'denied', reason: 'session-closed' })
     expect(bridge.takeover).not.toHaveBeenCalled()
   })
 
-  test('returns false when the session was disposed mid-call', async () => {
+  test('returns session-closed when the session was disposed mid-call', async () => {
     const { gate, bridge, isSessionAlive, promoted } = buildGate({
       isSessionAlive: () => false,
     })
     gate.setRole('viewer')
-    const ok = await gate.takeover()
-    expect(ok).toBe(false)
+    const result = await gate.takeover()
+    expect(result).toEqual({ kind: 'denied', reason: 'session-closed' })
     expect(bridge.takeover).not.toHaveBeenCalled()
     expect(isSessionAlive).toHaveBeenCalledWith('session-1')
     expect(promoted).not.toHaveBeenCalled()
   })
 
-  test('returns false when resolveSize throws and does not call the bridge', async () => {
-    const { gate, bridge } = buildGate()
-    gate.setRole('viewer')
-    // Replace resolveSize via a fresh gate; the factory above gives
-    // us a working resolveSize, so build a new harness.
+  test('returns takeover-rejected when resolveSize throws and does not call the bridge', async () => {
     const bridge2 = makeBridge()
     const gate2 = createXtermAuthorityGate({
       bridge: bridge2,
@@ -185,12 +186,12 @@ describe('AuthorityGate.takeover (explicit button path)', () => {
       onPromoted: vi.fn(),
     })
     gate2.setRole('viewer')
-    const ok = await gate2.takeover()
-    expect(ok).toBe(false)
+    const result = await gate2.takeover()
+    expect(result).toEqual({ kind: 'denied', reason: 'takeover-rejected' })
     expect(bridge2.takeover).not.toHaveBeenCalled()
   })
 
-  test('returns false when the bridge call throws synchronously', async () => {
+  test('returns no-bridge when the bridge call throws synchronously', async () => {
     const bridge = makeBridge()
     ;(bridge.takeover as ReturnType<typeof vi.fn>).mockImplementation(() => {
       throw new Error('ipc blew up')
@@ -203,19 +204,96 @@ describe('AuthorityGate.takeover (explicit button path)', () => {
       onPromoted: vi.fn(),
     })
     gate.setRole('viewer')
-    const ok = await gate.takeover()
-    expect(ok).toBe(false)
+    const result = await gate.takeover()
+    expect(result).toEqual({ kind: 'denied', reason: 'no-bridge' })
     expect(gate.currentRole()).toBe('viewer')
   })
 
-  test('returns false when the bridge rejects with ok:false', async () => {
+  test('classifies error.unavailable as attachment-offline', async () => {
     const { gate } = buildGate({
-      takeoverImpl: async () => ({ ok: false, message: 'no controller seat for you' }),
+      takeoverImpl: async () => ({ ok: false, message: 'error.unavailable' }),
     })
     gate.setRole('viewer')
-    const ok = await gate.takeover()
-    expect(ok).toBe(false)
+    const result = await gate.takeover()
+    expect(result).toEqual({
+      kind: 'denied',
+      reason: 'attachment-offline',
+      message: 'error.unavailable',
+    })
     expect(gate.currentRole()).toBe('viewer')
+  })
+
+  test('classifies error.invalid-arguments as session-unknown', async () => {
+    const { gate } = buildGate({
+      takeoverImpl: async () => ({ ok: false, message: 'error.invalid-arguments' }),
+    })
+    gate.setRole('viewer')
+    const result = await gate.takeover()
+    expect(result).toEqual({
+      kind: 'denied',
+      reason: 'session-unknown',
+      message: 'error.invalid-arguments',
+    })
+    expect(gate.currentRole()).toBe('viewer')
+  })
+
+  test('classifies an unknown server message as takeover-rejected', async () => {
+    const { gate } = buildGate({
+      takeoverImpl: async () => ({ ok: false, message: 'error.something-new' }),
+    })
+    gate.setRole('viewer')
+    const result = await gate.takeover()
+    expect(result).toEqual({
+      kind: 'denied',
+      reason: 'takeover-rejected',
+      message: 'error.something-new',
+    })
+  })
+})
+
+describe('AuthorityGate synchronous getSessionId + isSessionAlive contract', () => {
+  // The gate's `doTakeover` captures `getSessionId()` then immediately
+  // calls `isSessionAlive(sessionId)` before any await. This is a
+  // load-bearing ordering: the two synchronous calls must see the
+  // same closure state, otherwise a rehydrate that lands between
+  // them would let a takeover round-trip fire against a stale
+  // sessionId. The two tests below exercise that ordering.
+  test('short-circuits when sessionId is captured but no longer alive by isSessionAlive (rehydrate race)', async () => {
+    // Simulate a rehydrate that swaps the live sessionId the instant
+    // getSessionId returns. The next closure call (`isSessionAlive`)
+    // sees the post-rehydrate value and returns false.
+    let liveId: string = 'session-1'
+    const bridge = makeBridge(async () => successResult('session-1'))
+    const gate = createXtermAuthorityGate({
+      bridge,
+      resolveSize: async () => ({ cols: 80, rows: 24 }),
+      isSessionAlive: (id) => liveId === id,
+      getSessionId: () => {
+        const captured = liveId
+        liveId = 'session-2'
+        return captured
+      },
+      onPromoted: vi.fn(),
+    })
+    gate.setRole('viewer')
+    const result = await gate.takeover()
+    expect(result).toEqual({ kind: 'denied', reason: 'session-closed' })
+    expect(bridge.takeover).not.toHaveBeenCalled()
+  })
+
+  test('does not short-circuit when both getSessionId and isSessionAlive observe the same sessionId', async () => {
+    const bridge = makeBridge(async () => successResult('session-1'))
+    const gate = createXtermAuthorityGate({
+      bridge,
+      resolveSize: async () => ({ cols: 80, rows: 24 }),
+      isSessionAlive: () => true,
+      getSessionId: () => 'session-1',
+      onPromoted: vi.fn(),
+    })
+    gate.setRole('viewer')
+    const result = await gate.takeover()
+    expect(result).toEqual({ kind: 'allowed' })
+    expect(bridge.takeover).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -242,8 +320,8 @@ describe('AuthorityGate ordering contract', () => {
     gate.setRole('viewer')
     // Pre-call: gate is a viewer.
     expect(gate.isController()).toBe(false)
-    const ok = await gate.takeover()
-    expect(ok).toBe(true)
+    const result = await gate.takeover()
+    expect(result).toEqual({ kind: 'allowed' })
     // The takeover contract for callers (e.g. ManagedTerminalSession
     // uses wasController then runtime.canResize()) requires
     // onPromoted → role='controller' to be observable as soon as
@@ -271,5 +349,98 @@ describe('AuthorityGate ordering contract', () => {
       rows: 50,
       attachmentId: 'attachment_local',
     })
+  })
+})
+
+describe('AuthorityGate single-emit deny log', () => {
+  // Every deny path (gate-internal and server-side) goes through
+  // the same `deny()` helper so a future denial can't silently skip
+  // the diagnostic. The session layer no longer double-logs — the
+  // gate is the single source of truth for takeover-failure logs.
+  // These tests pin that contract: one warn per deny, tagged with
+  // the pipeline stage that produced it.
+  test('preflight deny (null sessionId) logs with stage=preflight', async () => {
+    const warnSpy = vi.spyOn(terminalLog, 'warn').mockImplementation(() => {})
+    const { gate } = buildGate({ getSessionId: () => null })
+    gate.setRole('viewer')
+    await gate.takeover()
+    expect(warnSpy).toHaveBeenCalledWith(
+      'authority gate: takeover denied',
+      expect.objectContaining({ reason: 'session-closed', stage: 'preflight' }),
+    )
+    warnSpy.mockRestore()
+  })
+
+  test('isSessionAlive deny logs with stage=isSessionAlive', async () => {
+    const warnSpy = vi.spyOn(terminalLog, 'warn').mockImplementation(() => {})
+    const { gate } = buildGate({ isSessionAlive: () => false })
+    gate.setRole('viewer')
+    await gate.takeover()
+    expect(warnSpy).toHaveBeenCalledWith(
+      'authority gate: takeover denied',
+      expect.objectContaining({ reason: 'session-closed', stage: 'isSessionAlive', sessionId: 'session-1' }),
+    )
+    warnSpy.mockRestore()
+  })
+
+  test('resolveSize throw logs with stage=resolveSize', async () => {
+    const warnSpy = vi.spyOn(terminalLog, 'warn').mockImplementation(() => {})
+    const gate = createXtermAuthorityGate({
+      bridge: makeBridge(),
+      resolveSize: async () => {
+        throw new Error('measurement failed')
+      },
+      isSessionAlive: () => true,
+      getSessionId: () => 'session-1',
+      onPromoted: vi.fn(),
+    })
+    gate.setRole('viewer')
+    await gate.takeover()
+    expect(warnSpy).toHaveBeenCalledWith(
+      'authority gate: takeover denied',
+      expect.objectContaining({ reason: 'takeover-rejected', stage: 'resolveSize' }),
+    )
+    warnSpy.mockRestore()
+  })
+
+  test('bridge throw logs with stage=bridge and reason=no-bridge', async () => {
+    const warnSpy = vi.spyOn(terminalLog, 'warn').mockImplementation(() => {})
+    const bridge = makeBridge()
+    ;(bridge.takeover as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      throw new Error('ipc blew up')
+    })
+    const gate = createXtermAuthorityGate({
+      bridge,
+      resolveSize: async () => ({ cols: 80, rows: 24 }),
+      isSessionAlive: () => true,
+      getSessionId: () => 'session-1',
+      onPromoted: vi.fn(),
+    })
+    gate.setRole('viewer')
+    await gate.takeover()
+    expect(warnSpy).toHaveBeenCalledWith(
+      'authority gate: takeover denied',
+      expect.objectContaining({ reason: 'no-bridge', stage: 'bridge' }),
+    )
+    warnSpy.mockRestore()
+  })
+
+  test('server rejection logs with stage=server and propagates the i18n message', async () => {
+    const warnSpy = vi.spyOn(terminalLog, 'warn').mockImplementation(() => {})
+    const { gate } = buildGate({
+      takeoverImpl: async () => ({ ok: false, message: 'error.unavailable' }),
+    })
+    gate.setRole('viewer')
+    await gate.takeover()
+    expect(warnSpy).toHaveBeenCalledWith(
+      'authority gate: takeover denied',
+      expect.objectContaining({
+        reason: 'attachment-offline',
+        stage: 'server',
+        message: 'error.unavailable',
+        sessionId: 'session-1',
+      }),
+    )
+    warnSpy.mockRestore()
   })
 })

@@ -26,10 +26,38 @@ import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
  * value. The only async path is `authorize` / `takeover`, both of
  * which hit the bridge.
  */
+/**
+ * Reasons a write or takeover was denied. Surfaced to the UI so the
+ * right toast can be shown (and to logs so the failure mode is
+ * diagnosable from production).
+ *
+ * - `session-closed` — gate-internal: the runtime no longer has a
+ *   sessionId, or the session was disposed mid-call. The takeover
+ *   round-trip never started.
+ * - `no-bridge` — gate-internal: the renderer bridge is unavailable
+ *   (typically only in tests / startup). The takeover round-trip
+ *   never started.
+ * - `session-unknown` — the server reported the sessionId is not
+ *   known to this owner. The renderer's catalog is stale; the user
+ *   needs to re-list before retrying.
+ * - `attachment-offline` — the server's broker has no live socket
+ *   for `(ownerId, attachmentId)`. The renderer is reconnecting.
+ *   Retrying after a moment usually works.
+ * - `takeover-rejected` — catch-all for any other server-side
+ *   refusal (size out of range, validator rejection, etc.). The
+ *   `message` field carries the server's i18n key.
+ */
+export type AuthorizationDenialReason =
+  | 'session-closed'
+  | 'no-bridge'
+  | 'session-unknown'
+  | 'attachment-offline'
+  | 'takeover-rejected'
+
 export type AuthorizationResult =
   | { kind: 'allowed' }
   | { kind: 'promoted' }
-  | { kind: 'denied'; reason: 'session-closed' | 'no-bridge' | 'takeover-rejected' }
+  | { kind: 'denied'; reason: AuthorizationDenialReason; message?: string }
 
 export interface TerminalAuthorityGate {
   /** True when the cached role says we're the controller. */
@@ -55,8 +83,13 @@ export interface TerminalAuthorityGate {
    * shortcuts, and by any other "I want control right now" path.
    * Internal callers go through `authorize` for write/resize so the
    * promote + retry pattern stays centralized.
+   *
+   * Returns the structured outcome (an `AuthorizationResult` with
+   * only `allowed` or `denied` in practice — `promoted` is
+   * write-specific) so the caller can surface a specific toast for
+   * the failure mode and log the server's i18n key.
    */
-  takeover(): Promise<boolean>
+  takeover(): Promise<AuthorizationResult>
   /**
    * Push the latest role the server believes this attachmentId has.
    * Called by the realtime ownership event handler in
@@ -114,8 +147,9 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
       if (role === 'controller') return { kind: 'allowed' }
       if (role === 'unowned') return { kind: 'denied', reason: 'session-closed' }
       // role === 'viewer': auto-promote
-      const promoted = await doTakeover()
-      return promoted ? { kind: 'promoted' } : { kind: 'denied', reason: 'takeover-rejected' }
+      const takeover = await doTakeover()
+      if (takeover.kind === 'allowed') return { kind: 'promoted' }
+      return takeover
     },
 
     async takeover() {
@@ -123,16 +157,41 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
     },
   }
 
-  async function doTakeover(): Promise<boolean> {
+  /**
+   * Single deny-path helper: emits a structured `warn` (so ops can
+   * correlate with the i18n key in the `message` field) and returns
+   * the matching `AuthorizationResult`. The `stage` tag is the only
+   * diagnostic the helper adds — it tells the operator which step
+   * in the takeover pipeline produced the denial (preflight /
+   * resolveSize / bridge / server) without forcing the call site
+   * to invent a new log message per branch.
+   */
+  function deny(
+    reason: AuthorizationDenialReason,
+    stage: string,
+    extra: { sessionId?: string; message?: string; err?: unknown } = {},
+  ): { kind: 'denied'; reason: AuthorizationDenialReason; message?: string } {
+    terminalLog.warn('authority gate: takeover denied', {
+      reason,
+      stage,
+      ...(extra.sessionId !== undefined ? { sessionId: extra.sessionId } : {}),
+      ...(extra.message !== undefined ? { message: extra.message } : {}),
+      ...(extra.err !== undefined ? { err: extra.err } : {}),
+    })
+    return extra.message !== undefined
+      ? { kind: 'denied', reason, message: extra.message }
+      : { kind: 'denied', reason }
+  }
+
+  async function doTakeover(): Promise<AuthorizationResult> {
     const sessionId = opts.getSessionId()
-    if (!sessionId) return false
-    if (!opts.isSessionAlive(sessionId)) return false
+    if (!sessionId) return deny('session-closed', 'preflight')
+    if (!opts.isSessionAlive(sessionId)) return deny('session-closed', 'isSessionAlive', { sessionId })
     let size: { cols: number; rows: number }
     try {
       size = await opts.resolveSize()
     } catch (err) {
-      terminalLog.warn('authority gate: failed to resolve size for takeover', { sessionId, err })
-      return false
+      return deny('takeover-rejected', 'resolveSize', { sessionId, err })
     }
     let result: TerminalTakeoverResult
     try {
@@ -143,12 +202,13 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
         attachmentId: readAttachmentId(),
       })
     } catch (err) {
-      terminalLog.warn('authority gate: takeover bridge call threw', { sessionId, err })
-      return false
+      return deny('no-bridge', 'bridge', { sessionId, err })
     }
     if (!result.ok) {
-      terminalLog.warn('authority gate: takeover rejected by server', { sessionId, message: result.message })
-      return false
+      return deny(classifyTakeoverRejection(result.message), 'server', {
+        sessionId,
+        message: result.message,
+      })
     }
     // ORDERING CONTRACT: `onPromoted` MUST run before `role` is
     // flipped to 'controller'. Callers of `takeover()` /
@@ -163,6 +223,21 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
     // and have it land without seeing a transient "denied".
     opts.onPromoted?.(result)
     role = 'controller'
-    return true
+    return { kind: 'allowed' }
   }
+}
+
+/**
+ * Classify a server-side takeover rejection message into a UI-friendly
+ * reason. The server returns i18n keys; only two are used in the
+ * takeover failure paths today (`error.unavailable` for the
+ * "attachment not connected" path, and `error.invalid-arguments`
+ * for everything else, including unknown session/attachment). The
+ * catch-all `takeover-rejected` is preserved so a future server
+ * message key can land without a renderer change.
+ */
+function classifyTakeoverRejection(message: string): AuthorizationDenialReason {
+  if (message === 'error.unavailable') return 'attachment-offline'
+  if (message === 'error.invalid-arguments') return 'session-unknown'
+  return 'takeover-rejected'
 }

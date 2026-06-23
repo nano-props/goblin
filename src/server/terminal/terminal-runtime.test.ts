@@ -205,18 +205,26 @@ describe('server terminal runtime', () => {
 
   test('replay snapshots omit a leading zsh prompt end marker prelude', async () => {
     const { host, shutdown } = buildRuntime()
-    const sessionId = await createTerminalSession(host, 'client_1')
+    const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_1', 'attachment_a', OWNER_1, socket)
+    const sessionId = await createTerminalSession(host, 'client_1', 'attachment_a')
     const prompt =
       '\x1b[1m\x1b[7m%\x1b[27m\x1b[1m\x1b[0m                                                                            \r \r\r\x1b[0m\x1b[27m\x1b[24m\x1b[J👾:~/repo\r\n$ '
     mockPtys[0]?.emitData(prompt)
 
-    const attach = await host.attach('client_1', OWNER_1, { sessionId, cols: 80, rows: 24 })
+    const attach = await host.attach('client_1', OWNER_1, {
+      sessionId,
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_a',
+    })
     const snapshot = await host.getSessionSnapshot('client_1', OWNER_1, { sessionId })
 
     expect(attach.ok).toBe(true)
     if (!attach.ok) return
     expect(attach.snapshot).toBe('👾:~/repo\r\n$ ')
     expect(snapshot?.snapshot).toBe('👾:~/repo\r\n$ ')
+    host.unregisterSocket('client_1', 'attachment_a', OWNER_1, socket)
     shutdown()
   })
 
@@ -343,9 +351,14 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_1', 'attachment_a', OWNER_1, socket)
-    const sessionId = await createTerminalSession(host, 'client_1')
+    const sessionId = await createTerminalSession(host, 'client_1', 'attachment_a')
 
-    const result = await host.attach('client_1', OWNER_1, { sessionId, cols: 80, rows: 24 })
+    const result = await host.attach('client_1', OWNER_1, {
+      sessionId,
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_a',
+    })
     expect(result.ok).toBe(true)
 
     mockPtys[0]?.emitData('hello')
@@ -757,9 +770,14 @@ describe('server terminal runtime', () => {
     const socketB = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_1', 'attachment_a', OWNER_1, socketA)
     host.registerSocket('client_2', 'attachment_b', OWNER_1, socketB)
-    const sessionId = await createTerminalSession(host, 'client_1')
+    const sessionId = await createTerminalSession(host, 'client_1', 'attachment_a')
 
-    const result = await host.attach('client_1', OWNER_1, { sessionId, cols: 80, rows: 24 })
+    const result = await host.attach('client_1', OWNER_1, {
+      sessionId,
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_a',
+    })
     expect(result.ok).toBe(true)
 
     const sessions = await host.listSessions('client_2', OWNER_1, '/repo')
@@ -844,9 +862,14 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_1', 'attachment_a', OWNER_1, socket)
-    const sessionId = await createTerminalSession(host, 'client_1')
+    const sessionId = await createTerminalSession(host, 'client_1', 'attachment_a')
 
-    const first = await host.attach('client_1', OWNER_1, { sessionId, cols: 80, rows: 24 })
+    const first = await host.attach('client_1', OWNER_1, {
+      sessionId,
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_a',
+    })
     expect(first.ok).toBe(true)
     expect(mockPtys).toHaveLength(1)
 
@@ -857,11 +880,12 @@ describe('server terminal runtime', () => {
 
     const socket2 = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_1', 'attachment_b', OWNER_1, socket2)
-    const recreatedSessionId = await createTerminalSession(host, 'client_1')
+    const recreatedSessionId = await createTerminalSession(host, 'client_1', 'attachment_b')
     const replacementAttach = await host.attach('client_1', OWNER_1, {
       sessionId: recreatedSessionId,
       cols: 80,
       rows: 24,
+      attachmentId: 'attachment_b',
     })
     expect(replacementAttach.ok).toBe(true)
     if (!first.ok || !replacementAttach.ok) return

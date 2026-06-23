@@ -324,6 +324,23 @@ export class ManagedTerminalSession {
       // Sync the gate's cached role with the runtime's view of the
       // world. The gate uses this cache to decide whether a write
       // needs a takeover round-trip or can pass through.
+      //
+      // We deliberately collapse the runtime's three-state role
+      // (`controller | viewer | unowned`) to the gate's two-state
+      // cache (`controller | viewer`) here:
+      //   - `unowned` in the gate is reserved for "session vanished"
+      //     (hydrate before any controller existed, or post-exit).
+      //   - A server event that flips the controller to `null` while
+      //     we are still attached is the "slot is empty, you can
+      //     claim" case — the user-typing-into-it path should
+      //     auto-promote, not drop the keystroke as session-closed.
+      // Collapsing to `viewer` here is what makes the "viewer
+      // types → auto-promote → take control" round-trip work
+      // uniformly for "another tab has it" and "nobody has it
+      // yet". The runtime retains the full three-state view for
+      // UI consumers; the gate is a write-path cache and only
+      // needs to know "can I pass through or do I need a
+      // takeover".
       this.authority().setRole(isController ? 'controller' : 'viewer')
       if (!isController) {
         if (this.view.currentTerminal()) {
@@ -375,8 +392,12 @@ export class ManagedTerminalSession {
     // src/shared/terminal-types.ts). We delegate the round-trip to
     // the AuthorityGate — the same path the auto-promote-on-write
     // uses — so there is one implementation of "promote me to
-    // controller" for both the button and the keyboard.
-    const ok = await this.authority().takeover()
+    // controller" for both the button and the keyboard. The gate
+    // owns the diagnostic log for the denied case (single
+    // emission point for all deny paths); this layer only flips
+    // the pending flag.
+    const result = await this.authority().takeover()
+    const ok = result.kind === 'allowed'
     if (ok) {
       this.runtime.clearTakeoverPending()
       this.notify('metadata')
