@@ -1,8 +1,15 @@
-// Body content for the five branch-action confirmation dialogs
-// (push / delete branch / force-delete / remove worktree / force-
-// remove worktree). The orchestration lives in
-// `BranchActionDialogHost`; this file owns the visual presentation
-// of the dialog body below the title.
+// Body content for the branch-action confirmation dialogs. Three
+// body components serve four of the five dialogs:
+//
+//   - `DeleteBranchConfirmBody` — used by both `deleteConfirm` and
+//     `forceDeleteConfirm` (they share the same structural body;
+//     only the i18n strings differ).
+//   - `RemoveWorktreeConfirmBody` — used by `removeConfirm`.
+//   - `ForceRemoveWorktreeConfirmBody` — used by `forceRemoveConfirm`.
+//
+// The push-protected dialog (`pushConfirm`) has no body component
+// here — its body is a `<Trans>` rendered inline in
+// `BranchActionDialogHost`.
 //
 // Each body takes already-resolved display data as plain props — the
 // host narrows the store view (slot entry + `(repo, branch)` + checkbox
@@ -40,7 +47,7 @@ function ConfirmNote({ children }: { children: ReactNode }) {
   return <span className="block text-muted-foreground">{children}</span>
 }
 
-export interface DeleteBranchConfirmBodyProps {
+interface DeleteBranchConfirmBodyProps {
   body: string
   branchName: string
   note: string
@@ -80,10 +87,10 @@ export function DeleteBranchConfirmBody({
   )
 }
 
-export interface RemoveWorktreeConfirmBodyProps {
+interface RemoveWorktreeConfirmBodyProps {
   body: string
   path: string
-  branch: string
+  branchName: string
   protectedHint: string
   removeAlsoDeletes: boolean
   removeConfirmProtected: boolean
@@ -99,7 +106,7 @@ export interface RemoveWorktreeConfirmBodyProps {
 export function RemoveWorktreeConfirmBody({
   body,
   path,
-  branch,
+  branchName,
   protectedHint,
   removeAlsoDeletes,
   removeConfirmProtected,
@@ -129,7 +136,7 @@ export function RemoveWorktreeConfirmBody({
           >
             {alsoDeleteBranchLabel}
           </ConfirmCheckbox>
-          <IndentedValue value={branch} />
+          <IndentedValue value={branchName} />
         </ConfirmSection>
         {removeConfirmProtected && (
           <div id="remove-worktree-protected-hint" className="pl-6 text-xs text-muted-foreground">
@@ -149,11 +156,11 @@ export function RemoveWorktreeConfirmBody({
   )
 }
 
-export interface ForceRemoveWorktreeConfirmBodyProps {
+interface ForceRemoveWorktreeConfirmBodyProps {
   removeBody: string
   path: string
   forceDeleteBody: string
-  branch: string
+  branchName: string
   note: string
   hasUpstream: boolean
   tracking?: string
@@ -166,7 +173,7 @@ export function ForceRemoveWorktreeConfirmBody({
   removeBody,
   path,
   forceDeleteBody,
-  branch,
+  branchName,
   note,
   hasUpstream,
   tracking,
@@ -182,7 +189,7 @@ export function ForceRemoveWorktreeConfirmBody({
       </ConfirmSection>
       <ConfirmSection>
         <span>{forceDeleteBody}</span>
-        <ConfirmValue value={branch} />
+        <ConfirmValue value={branchName} />
         <ConfirmNote>{note}</ConfirmNote>
       </ConfirmSection>
       {hasUpstream && tracking && (

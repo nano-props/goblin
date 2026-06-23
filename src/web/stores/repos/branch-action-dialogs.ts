@@ -46,7 +46,7 @@ export interface BranchCheckboxState {
   deleteAlsoUpstream: boolean
 }
 
-export const EMPTY_CHECKBOXES: BranchCheckboxState = Object.freeze({
+export const EMPTY_CHECKBOXES: Readonly<BranchCheckboxState> = Object.freeze({
   removeAlsoDeletes: false,
   removeAlsoUpstream: false,
   deleteAlsoUpstream: false,

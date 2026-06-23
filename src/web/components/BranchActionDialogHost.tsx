@@ -153,8 +153,12 @@ export function BranchActionDialogHost({ activeRepoId, activeBranchName }: Props
           const { entry, liveContext } = pushConfirmView
           closeDialog('pushConfirm')
           if (entry && liveContext) {
-            dispatchPush({ repo: liveContext.repo, branchName: entry.payload })
+            // Return the IPC promise so `useAsyncPending.run` keeps the
+            // Confirm button `aria-busy` and rejects duplicate clicks
+            // for the duration of the round-trip.
+            return dispatchPush({ repo: liveContext.repo, branchName: entry.payload })
           }
+          return undefined
         }}
       />
 
@@ -198,13 +202,14 @@ export function BranchActionDialogHost({ activeRepoId, activeBranchName }: Props
               const liveContext = deleteConfirmView.liveContext
               closeDialog('deleteConfirm')
               if (liveContext) {
-                dispatchDeleteBranch({
+                return dispatchDeleteBranch({
                   repo: liveContext.repo,
                   branchName: entry.payload,
                   force: false,
                   alsoDeleteUpstream: displayCheckboxes.deleteAlsoUpstream,
                 })
               }
+              return undefined
             }}
           />
         )
@@ -250,13 +255,14 @@ export function BranchActionDialogHost({ activeRepoId, activeBranchName }: Props
               const liveContext = forceDeleteConfirmView.liveContext
               closeDialog('forceDeleteConfirm')
               if (liveContext) {
-                dispatchDeleteBranch({
+                return dispatchDeleteBranch({
                   repo: liveContext.repo,
                   branchName: entry.payload,
                   force: true,
                   alsoDeleteUpstream: displayCheckboxes.deleteAlsoUpstream,
                 })
               }
+              return undefined
             }}
           />
         )
@@ -288,7 +294,7 @@ export function BranchActionDialogHost({ activeRepoId, activeBranchName }: Props
                   entry.payload.path,
                   remoteRepoTarget(displayContext.repo.id, displayContext.repo.remote.lifecycle),
                 )}
-                branch={entry.payload.branch}
+                branchName={entry.payload.branch}
                 protectedHint={t('action.confirm-remove-worktree-protected-hint')}
                 removeAlsoDeletes={displayCheckboxes.removeAlsoDeletes}
                 removeConfirmProtected={removeConfirmProtected}
@@ -312,10 +318,10 @@ export function BranchActionDialogHost({ activeRepoId, activeBranchName }: Props
               const liveContext = removeConfirmView.liveContext
               if (!liveContext) {
                 closeDialog('removeConfirm')
-                return
+                return undefined
               }
               closeDialog('removeConfirm')
-              dispatchRemoveWorktree({
+              return dispatchRemoveWorktree({
                 repo: liveContext.repo,
                 target: entry.payload,
                 alsoDeleteBranch: displayCheckboxes.removeAlsoDeletes,
@@ -354,7 +360,7 @@ export function BranchActionDialogHost({ activeRepoId, activeBranchName }: Props
                   remoteRepoTarget(displayContext.repo.id, displayContext.repo.remote.lifecycle),
                 )}
                 forceDeleteBody={t('action.confirm-force-delete-branch-body')}
-                branch={entry.payload.branch}
+                branchName={entry.payload.branch}
                 note={t('action.confirm-force-delete-branch-note')}
                 hasUpstream={hasUpstream(displayContext.branch)}
                 tracking={displayContext.branch.tracking}
@@ -372,10 +378,10 @@ export function BranchActionDialogHost({ activeRepoId, activeBranchName }: Props
               const liveContext = forceRemoveConfirmView.liveContext
               if (!liveContext) {
                 closeDialog('forceRemoveConfirm')
-                return
+                return undefined
               }
               closeDialog('forceRemoveConfirm')
-              dispatchRemoveWorktree({
+              return dispatchRemoveWorktree({
                 repo: liveContext.repo,
                 target: entry.payload,
                 alsoDeleteBranch: true,

@@ -47,14 +47,18 @@
 // Radix close-animation window (~200 ms) and that completion removes
 // the branch from `useReposStore` (e.g. `git worktree remove` on the
 // last ref), `displayContext` becomes null while `entry` is still
-// retained. The body, guarded on `entry && displayContext`, falls
-// back to empty — the title stays (it reads `entry.payload`) but the
-// body collapses for the rest of the fade. We accept this: the
-// alternative — caching the last non-null `(repo, branch)` snapshot
-// inside the hook — would extend stale `hasUpstream` / `tracking`
-// past a real repo mutation. The current behaviour is "show the
-// title, drop the body" and is preferable to "show a body that lies
-// about upstream state".
+// retained. For the push dialog (`pushConfirmView`), the host reads
+// the title directly from `entry.payload`, so the title stays
+// visible — only the body collapses. For the other four dialogs, the
+// host's IIFE body guard (`if (!entry || !displayContext) return
+// empty fallback`) short-circuits to a `<ConfirmDialog title=""
+// message="" />` shell, so both title AND body collapse in lockstep
+// for the rest of the fade. We accept this: the alternative — caching
+// the last non-null `(repo, branch)` snapshot inside the hook —
+// would extend stale `hasUpstream` / `tracking` past a real repo
+// mutation. The current behaviour is "show the title where the host
+// reads it from entry, drop the body" and is preferable to "show a
+// body that lies about upstream state".
 
 import {
   EMPTY_CHECKBOXES,
@@ -66,7 +70,7 @@ import {
 import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
 import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
 
-export interface BranchActionDialogContext {
+interface BranchActionDialogContext {
   repo: RepoState
   branch: RepoBranchState
 }
@@ -97,7 +101,7 @@ export interface BranchActionDialogDisplay<P> {
    * Retained across close so the user's last choice stays rendered
    * during the close animation.
    */
-  displayCheckboxes: BranchCheckboxState
+  displayCheckboxes: Readonly<BranchCheckboxState>
 }
 
 export function useBranchActionDialogDisplay<P>(

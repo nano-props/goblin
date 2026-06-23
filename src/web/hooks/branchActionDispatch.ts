@@ -9,10 +9,14 @@
 // open a dialog for a non-selected branch (e.g. a row in the focus-mode
 // HoverCard popover).
 //
-// Each function is pure: it takes the resolved `repo` and `branch`
-// explicitly, plus the dialog payload. The force-promote callbacks
-// dispatch back into `useBranchActionDialogsStore` to open the follow-up
-// confirm dialog with the same payload.
+// Each function takes the resolved `repo` and `branch` explicitly,
+// plus the dialog payload, and **returns the IPC promise** rather than
+// dropping it. The host's `onConfirm` returns this promise to
+// `useAsyncPending.run`, which then marks the Confirm button as
+// `aria-busy` and rejects duplicate clicks for the duration of the IPC
+// round-trip. The force-promote callbacks dispatch back into
+// `useBranchActionDialogsStore` to open the follow-up confirm dialog
+// with the same payload.
 
 import {
   deleteBranchNeedsForceConfirm,
@@ -24,9 +28,10 @@ import {
   type RemoveWorktreeDialogPayload,
 } from '#/web/stores/repos/branch-action-dialogs.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
+import type { ExecResult } from '#/web/types.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 
-export interface BranchActionDispatchContext {
+interface BranchActionDispatchContext {
   repo: BranchActionRepo
 }
 
@@ -47,8 +52,8 @@ export function dispatchDeleteBranch({
   branchName: string
   force: boolean
   alsoDeleteUpstream: boolean
-}): void {
-  void dispatchRepoBranchAction(
+}): Promise<ExecResult | null> {
+  return dispatchRepoBranchAction(
     repo.id,
     repo.instanceToken,
     { kind: 'deleteBranch', branch: branchName, force, alsoDeleteUpstream },
@@ -85,8 +90,8 @@ export function dispatchRemoveWorktree({
   alsoDeleteBranch: boolean
   forceDeleteBranch: boolean
   alsoDeleteUpstream: boolean
-}): void {
-  void dispatchRepoBranchAction(
+}): Promise<ExecResult | null> {
+  return dispatchRepoBranchAction(
     repo.id,
     repo.instanceToken,
     {
@@ -120,8 +125,11 @@ export function dispatchRemoveWorktree({
  * Dispatch a `push` action, bypassing the protected-branch confirm
  * gate (the user has already cleared it by confirming the dialog).
  */
-export function dispatchPush({ repo, branchName }: BranchActionDispatchContext & { branchName: string }): void {
-  void dispatchRepoBranchAction(
+export function dispatchPush({
+  repo,
+  branchName,
+}: BranchActionDispatchContext & { branchName: string }): Promise<ExecResult | null> {
+  return dispatchRepoBranchAction(
     repo.id,
     repo.instanceToken,
     { kind: 'push', branch: branchName },

@@ -61,7 +61,12 @@ function mountHarness<P>(initial: BranchActionDialogEntry<P> | null): HarnessHan
     setSlot: () => {},
   }
   function Harness({ slot }: { slot: BranchActionDialogEntry<P> | null }) {
-    handle.current = useBranchActionDialogDisplay(slot, useReposStore((s) => s.repos))
+    // Hoist the subscription outside the hook call, mirroring the
+    // production `BranchActionDialogHost` pattern. The helper takes
+    // `repos` as a parameter precisely so multiple display hooks in
+    // one host share a single subscription.
+    const repos = useReposStore((s) => s.repos)
+    handle.current = useBranchActionDialogDisplay(slot, repos)
     return null
   }
   act(() => {
@@ -223,11 +228,21 @@ describe('useBranchActionDialogDisplay', () => {
     expect(handle.current?.entry).toEqual(entryA)
     expect(handle.current?.displayCheckboxes.deleteAlsoUpstream).toBe(true)
 
-    // Close the slot (entry A is retained) and immediately reopen
-    // with a new entry (B). The ref must replace, and the checkbox
-    // for B's key must be the fresh default, not entry A's.
+    // Close the slot. The harness re-renders with a null slot so the
+    // retention actually passes through null between A and B — the
+    // `useLastNonNull` ref holds entry A during this null, and the
+    // checkbox for entry A's key is still preserved in the store.
     act(() => {
       useBranchActionDialogsStore.getState().closeDialog('deleteConfirm')
+    })
+    handle.setSlot(null)
+    expect(handle.current?.entry).toEqual(entryA)
+    expect(handle.current?.liveContext).toBeNull()
+    expect(handle.current?.displayCheckboxes.deleteAlsoUpstream).toBe(true)
+
+    // Reopen with a new entry B. The ref must replace, and the
+    // checkbox for B's key must be the fresh default, not entry A's.
+    act(() => {
       useBranchActionDialogsStore.getState().openDeleteConfirm(entryB)
     })
     handle.setSlot(entryB)
