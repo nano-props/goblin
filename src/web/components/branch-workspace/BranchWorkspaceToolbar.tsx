@@ -296,6 +296,11 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
   return (
     <Toolbar variant="workspace">
       <div className="flex h-full min-w-0 flex-1 items-center gap-1 overflow-hidden">
+        {/* Compact UI only: back-to-branch-navigator is the user's escape hatch
+            from the branch workspace. It must stay visible even when the tab
+            strip below is empty, so it lives at the toolbar level rather than
+            inside WorkspacePaneViewStrip's tab chrome. */}
+        {compact && branchWorkspaceBackAction}
         {showBranchLevelTabs && (
           <WorkspacePaneViewStrip
             worktreeTerminalKey={terminalWorktreeKey}
@@ -304,7 +309,6 @@ export function BranchWorkspaceToolbar({ repo, detail, workspacePaneId }: Props)
             activeTabIdentity={activeTabIdentity}
             responsiveCompact={compact}
             panelActive
-            leadingAction={branchWorkspaceBackAction}
             focusRegistry={workspacePaneTabFocusRegistry}
             emptyFocusKey={EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY}
             // While a real terminal create is in flight, the tab model

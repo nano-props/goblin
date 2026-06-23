@@ -7,7 +7,6 @@ import {
   useState,
   forwardRef,
   type ComponentPropsWithoutRef,
-  type ReactNode,
 } from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
@@ -58,7 +57,6 @@ interface WorkspacePaneViewStripProps {
   responsiveCompact?: boolean
   activeTabIdentity: string | null
   panelActive?: boolean
-  leadingAction?: ReactNode
   focusRegistry?: FocusRegistry<string, HTMLButtonElement>
   emptyFocusKey?: string
   /** Render the New Terminal affordance in a busy state. */
@@ -178,7 +176,9 @@ export function createPendingWorkspacePaneTabItem(input: {
 export const EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY = '__workspace-pane-empty__'
 
 const WORKSPACE_PANE_VIEW_TOOLTIP_SELECTOR = '[data-workspace-pane-view-tooltip-id]'
-const WORKSPACE_PANE_LEADING_ACTION_ID = '__workspace-pane-leading-action__'
+// Virtual right-edge for the compact tab's separator computation. The popover
+// trigger that follows the tab is the only real DOM node on that side, but it
+// doesn't report hover state, so we use this sentinel identity instead.
 const WORKSPACE_PANE_COMPACT_TRAILING_ACTION_ID = '__workspace-pane-compact-trailing-action__'
 const WORKSPACE_PANE_NEW_ACTION_ID = '__workspace-pane-new-action__'
 
@@ -332,7 +332,6 @@ export function WorkspacePaneViewStrip({
   activeTabIdentity,
   responsiveCompact,
   panelActive,
-  leadingAction,
   focusRegistry: externalFocusRegistry,
   emptyFocusKey = EMPTY_WORKSPACE_PANE_VIEW_FOCUS_KEY,
   newTerminalBusy = false,
@@ -563,19 +562,6 @@ export function WorkspacePaneViewStrip({
 
     return (
       <ToolbarTabStripBody className="flex-1">
-        {leadingAction && (
-          <WorkspacePaneLeadingAction
-            showSeparator={shouldShowWorkspacePaneViewSeparator({
-              leftId: WORKSPACE_PANE_LEADING_ACTION_ID,
-              rightId: compactItem.identity,
-              activeId: compactActiveVisualIdentity,
-              hoveredId: hoveredTabIdentity,
-            })}
-            onHoverChange={setHoveredTabIdentity}
-          >
-            {leadingAction}
-          </WorkspacePaneLeadingAction>
-        )}
         <WorkspacePaneViewTooltipLayer
           items={items}
           role="tablist"
@@ -633,19 +619,6 @@ export function WorkspacePaneViewStrip({
         onDragEnd={handleDragEnd}
       >
         <ToolbarTabStripBody scroll>
-          {leadingAction && (
-            <WorkspacePaneLeadingAction
-              showSeparator={shouldShowWorkspacePaneViewSeparator({
-                leftId: WORKSPACE_PANE_LEADING_ACTION_ID,
-                rightId: items[0]?.identity,
-                activeId: activeVisualIdentity,
-                hoveredId: hoveredTabIdentity,
-              })}
-              onHoverChange={setHoveredTabIdentity}
-            >
-              {leadingAction}
-            </WorkspacePaneLeadingAction>
-          )}
           <SortableContext items={sortableIds} strategy={horizontalListSortingStrategy}>
             <WorkspacePaneViewTooltipLayer items={items} role="tablist" aria-label={t('workspace-pane-views.tabs')}>
               {items.map((item, index) => {
@@ -723,29 +696,6 @@ interface WorkspacePaneViewProps {
   compact?: boolean
   showSeparator?: boolean
   onHoverChange?: (identity: string | null) => void
-}
-
-function WorkspacePaneLeadingAction({
-  children,
-  showSeparator,
-  onHoverChange,
-}: {
-  children: ReactNode
-  showSeparator: boolean
-  onHoverChange: (identity: string | null) => void
-}) {
-  return (
-    <div
-      className="relative flex h-7 shrink-0 items-center pr-1"
-      onPointerEnter={() => onHoverChange(WORKSPACE_PANE_LEADING_ACTION_ID)}
-      onPointerLeave={() => onHoverChange(null)}
-    >
-      {children}
-      {showSeparator && (
-        <Separator orientation="vertical" className="absolute right-0 top-1/2 -translate-y-1/2" />
-      )}
-    </div>
-  )
 }
 
 const WorkspacePaneNewButton = forwardRef<
