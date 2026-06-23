@@ -272,7 +272,7 @@ describe('BranchWorkspaceToolbar', () => {
     expect(document.body.textContent).toContain('terminal.new')
   })
 
-  test('puts compact back at the start of the workspace tab row with a separator', () => {
+  test('puts compact back at the start of the workspace tab row', () => {
     compactUi = true
     const { container: c } = renderToolbar({
       terminalCount: 1,
@@ -282,27 +282,58 @@ describe('BranchWorkspaceToolbar', () => {
 
     const back = c.querySelector<HTMLButtonElement>('button[aria-label="workspace.back-to-branch-navigator"]')
     const tablist = c.querySelector('[role="tablist"][aria-label="workspace-pane-views.tabs"]')
-    const leadingAction = back?.parentElement
-    const compactTab = tablist?.querySelector('[data-workspace-pane-view-tooltip-id]')
-    const separator = () =>
-      leadingAction?.querySelector(':scope > [data-slot="separator"][data-orientation="vertical"]')
+    // After the refactor the back button lives at the toolbar level, so the
+    // tablist is no longer a sibling of an internal "leading action" wrapper.
+    // The back button is the first flex child; the strip that hosts the
+    // tablist is its next sibling.
     expect(back).not.toBeNull()
     expect(tablist).not.toBeNull()
-    expect(leadingAction?.parentElement?.firstElementChild).toBe(leadingAction)
-    expect(leadingAction?.nextElementSibling).toBe(tablist)
-    expect(separator()).not.toBeNull()
-
-    act(() => {
-      compactTab?.dispatchEvent(new MouseEvent('pointerover', { bubbles: true }))
-    })
-
-    expect(separator()).toBeNull()
+    const toolbarRow = back?.parentElement
+    expect(toolbarRow).not.toBeNull()
+    expect(toolbarRow?.firstElementChild).toBe(back)
+    // The next sibling of the back button hosts the tablist — this nails down
+    // the architectural contract that the strip lives beside (not inside) the
+    // back button, so a future refactor can't silently re-couple them.
+    const viewStripHost = back?.nextElementSibling
+    expect(viewStripHost?.querySelector('[role="tablist"]')).toBe(tablist)
 
     act(() => {
       back?.click()
     })
 
     expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBeNull()
+  })
+
+  test('compact UI keeps the back button visible when the tab strip is empty', () => {
+    compactUi = true
+    const { container: c } = renderToolbar({
+      terminalCount: 0,
+      workspacePaneStaticViews: [],
+      workspacePaneTabOrder: [],
+      navigation: navigationWith({}),
+    })
+
+    // Empty strip: no tabs, just the + new terminal affordance.
+    expect(c.querySelectorAll('[role="tab"]')).toHaveLength(0)
+    expect(c.querySelector('button[aria-label="terminal.new"]')).not.toBeNull()
+    // The back button must remain visible so the user can navigate back to
+    // the branch navigator — otherwise closing the status tab strands them.
+    const back = c.querySelector<HTMLButtonElement>('button[aria-label="workspace.back-to-branch-navigator"]')
+    expect(back).not.toBeNull()
+  })
+
+  test('non-compact UI does not render the back button in the toolbar', () => {
+    compactUi = false
+    const { container: c } = renderToolbar({
+      terminalCount: 1,
+      navigation: navigationWith({}),
+    })
+
+    // In expanded mode the toolbar delegates navigation to the branch row,
+    // so the back button must stay out of the workspace pane toolbar.
+    expect(c.querySelector('button[aria-label="workspace.back-to-branch-navigator"]')).toBeNull()
+    // Sanity check: tabs are still rendered in expanded mode.
+    expect(c.querySelectorAll('[role="tab"]').length).toBeGreaterThan(0)
   })
 
   test('compact workspace view keeps the tab switcher available during terminal sync loading', () => {
