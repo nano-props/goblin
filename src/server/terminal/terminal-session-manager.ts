@@ -20,7 +20,6 @@ import {
   attachTerminalAttachment,
   claimTerminalAttachmentControl,
   explainAuthority,
-  expireTerminalAttachment,
   isAuthoritative,
   registerTerminalAttachment,
   restartTerminalAttachmentControl,
@@ -87,7 +86,14 @@ interface TerminalSession<TOwner extends string | number> {
   render: TerminalRenderState
   attachments: Map<string, TerminalAttachmentState>
   controller: TerminalController | null
-  allowImplicitAttachControl: boolean
+  /**
+   * Sticky owner-level claim. Once any attachment from this session's
+   * owner has successfully attached or taken over, this stays set
+   * for the lifetime of the session so a subsequent attach from a
+   * different attachmentId (e.g. switching devices) can still
+   * auto-claim when no controller is alive.
+   */
+  claimedByOwner: boolean
   phase: TerminalSessionPhase
   message: string | null
   /** Input queue ensures ordered PTY writes even with multiple concurrent callers. */
@@ -163,7 +169,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
       render: createEmptyTerminalRenderState(size.cols, size.rows),
       attachments: new Map(),
       controller: null,
-      allowImplicitAttachControl: true,
+      claimedByOwner: false,
       phase: 'opening',
       message: null,
       inputQueue: [],
@@ -360,15 +366,6 @@ export class TerminalSessionManager<TOwner extends string | number> {
     for (const session of Array.from(this.sessionsById.values())) {
       if (session.ownerId !== ownerId) continue
       this.applyOwnershipEffect(session, updateTerminalAttachmentConnection(session, attachmentId, connected))
-    }
-  }
-
-  expireAttachment(ownerId: TOwner, attachmentId: string): void {
-    for (const session of Array.from(this.sessionsById.values())) {
-      if (session.ownerId !== ownerId) continue
-      const effect = expireTerminalAttachment(session, attachmentId)
-      if (!effect.removed) continue
-      if (effect.emitOwnership) this.emitOwnership(session)
     }
   }
 

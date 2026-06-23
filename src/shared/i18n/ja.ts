@@ -320,8 +320,8 @@ export const ja: Record<DictKey, string> = {
   'terminal.progress': 'ターミナル進行状況',
   'terminal.empty': '開いているターミナルはありません',
   'terminal.drop-hint': 'ドロップしてパスを貼り付け',
-  'terminal.mirror-controlled': '現在このターミナルは別のウィンドウまたはタブが操作しています。',
-  'terminal.unowned': '現在このターミナルを操作しているウィンドウはありません。',
+  'terminal.mirror-controlled': '別のセッションが現在このターミナルを制御しています。',
+  'terminal.unowned': '現在このターミナルを制御しているセッションはありません。',
   'terminal.takeover': 'ターミナルを引き継ぐ',
   'terminal.takeover-failed':
     'ターミナルを引き継げませんでした。閉じられたか、接続の準備ができていない可能性があります。もう一度お試しください。',

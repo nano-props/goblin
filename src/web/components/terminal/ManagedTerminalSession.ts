@@ -7,7 +7,6 @@ import type {
   TerminalAttachInput,
   TerminalOutputEvent,
   TerminalRestartInput,
-  TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 import { setTerminalFocused } from '#/web/terminal-focus.ts'
@@ -25,6 +24,7 @@ import { TerminalSessionRuntime } from '#/web/components/terminal/terminal-sessi
 import { TerminalSessionView } from '#/web/components/terminal/terminal-session-view.ts'
 import { isTerminalEmulatorInput, type TerminalInput } from '#/web/components/terminal/terminal-input.ts'
 import { readOrCreateWebTerminalAttachmentId } from '#/web/renderer-terminal-bridge.ts'
+import { createXtermAuthorityGate, type TerminalAuthorityGate } from '#/web/components/terminal/authority-gate.ts'
 import { terminalLog } from '#/web/logger.ts'
 import type {
   TerminalBellEvent,
@@ -44,6 +44,12 @@ export class ManagedTerminalSession {
   private readonly requestDurableClose: (sessionId: string) => Promise<void>
   private readonly runtime = new TerminalSessionRuntime()
   private readonly view: TerminalSessionView
+  // Authority gate owns the "am I the controller?" cache and the
+  // auto-promote-on-write path. The gate is constructed lazily so
+  // the runtime/bridge dependency wiring stays inside the methods
+  // that need it; this also keeps the gate from outliving the
+  // session when the registry disposes us.
+  private authorityGate: TerminalAuthorityGate | null = null
   private startToken = 0
   private geometryAbortController: AbortController | null = null
   private resizeFlushScheduled = false
@@ -178,12 +184,26 @@ export class ManagedTerminalSession {
     const data = this.pendingWriteBuffer
     this.pendingWriteBuffer = ''
     if (!data) return
-    void terminalBridge.write({ sessionId, data }).catch((err) => {
-      // Keystrokes that fail to reach the shell leave the user thinking
-      // their input was accepted — surface the failure so a debugger can
-      // correlate with terminalBridge.write validation/transport errors.
-      terminalLog.warn('write failed for session', { sessionId, err })
-    })
+    // Funnel every write through the AuthorityGate. If we're a
+    // viewer (sibling device / sibling tab is currently the
+    // controller), the gate fires a takeover round-trip first so the
+    // PTY sees our input as the new controller — the user just
+    // types and the gate handles the rest. If the takeover fails
+    // (session gone, server rejected), we drop the keystroke rather
+    // than firing a write the server would reject with
+    // `not-controller`.
+    void this.authority()
+      .authorize('write')
+      .then((result) => {
+        if (result.kind === 'denied') {
+          terminalLog.warn('write denied by authority gate', { sessionId, reason: result.reason })
+          return
+        }
+        return terminalBridge.write({ sessionId, data })
+      })
+      .catch((err) => {
+        terminalLog.warn('write failed for session', { sessionId, err })
+      })
   }
 
   findNext(term: string, incremental = false): TerminalSearchResult {
@@ -215,6 +235,50 @@ export class ManagedTerminalSession {
     return this.runtime.currentSessionId()
   }
 
+  /**
+   * Lazy accessor for the per-session AuthorityGate. The gate is
+   * the single source of truth for write-side promotion: xterm
+   * onData, paste, drop file, and the 接管 button all funnel
+   * through it. Constructed on first access so the bridge/runtime
+   * dependencies stay inside the gate's closure.
+   */
+  authority(): TerminalAuthorityGate {
+    if (!this.authorityGate) {
+      this.authorityGate = createXtermAuthorityGate({
+        bridge: terminalBridge,
+        getSessionId: () => this.runtime.currentSessionId(),
+        resolveSize: async () => {
+          // Prefer the live xterm size — the takeover round-trip
+          // resizes the PTY to match the new controller's geometry.
+          const term = this.view.currentTerminal()
+          if (term) return { cols: term.cols, rows: term.rows }
+          // Pre-view fallback: measure the host. The same probe the
+          // `start()` path uses for the initial attach, so a takeover
+          // fired before the view is mounted lands on a sane size
+          // instead of the canonical 80x24.
+          const fallback = this.runtime.currentCanonicalSize()
+          if (!this.view.isConnected()) return fallback
+          try {
+            await preloadTerminalFont()
+            return proposeTerminalGeometry(this.view.measurableHost()) ?? fallback
+          } catch {
+            return fallback
+          }
+        },
+        isSessionAlive: (sessionId) =>
+          !this.disposed && this.runtime.currentSessionId() === sessionId,
+        onPromoted: (result) => {
+          // Mirror the runtime's `applyTakeover` so the new
+          // controller's view (cols/rows/phase) is applied
+          // synchronously. The realtime ownership event that
+          // follows is idempotent.
+          if (result.ok) this.runtime.applyTakeover(result)
+        },
+      })
+    }
+    return this.authorityGate
+  }
+
   hydrate(input: TerminalSessionHydrationInput): void {
     const previousSessionId = this.runtime.currentSessionId()
     this.hydratedSnapshot = { snapshot: input.snapshot, snapshotSeq: input.snapshotSeq }
@@ -229,6 +293,11 @@ export class ManagedTerminalSession {
       canonicalCols: input.canonicalCols,
       canonicalRows: input.canonicalRows,
     })
+    // Sync the gate's cached role from the hydration input so the
+    // first write after attach doesn't have to wait for a realtime
+    // ownership event to know whether a takeover round-trip is
+    // needed.
+    if (changed) this.authority().setRole(input.role)
     if (previousSessionId && previousSessionId !== input.sessionId) this.applyHydratedSnapshotToActiveView()
     if (changed) this.notify('metadata')
   }
@@ -252,6 +321,10 @@ export class ManagedTerminalSession {
     const pendingCleared = applies ? this.runtime.clearTakeoverPending() : false
     if (changed) {
       const isController = this.runtime.canResize()
+      // Sync the gate's cached role with the runtime's view of the
+      // world. The gate uses this cache to decide whether a write
+      // needs a takeover round-trip or can pass through.
+      this.authority().setRole(isController ? 'controller' : 'viewer')
       if (!isController) {
         if (this.view.currentTerminal()) {
           this.destroyActiveView({ preserveTransientState: true })
@@ -290,106 +363,35 @@ export class ManagedTerminalSession {
   async takeover(): Promise<boolean> {
     const sessionId = this.runtime.currentSessionId()
     if (!sessionId) return false
+    // Capture the role BEFORE the gate calls applyTakeover — the
+    // post-takeover check below needs to fire `ensureControllerViewStarted`
+    // when the caller was a viewer and is now a controller. Reading
+    // `wasController` after the gate returns would always be `true`
+    // and the view-start branch would be skipped.
+    const wasController = this.runtime.canResize()
+    if (this.runtime.setTakeoverPending(true)) this.notify('metadata')
     // The takeover response is the authoritative handshake for the
     // new controller's view (see TerminalTakeoverResult in
-    // src/shared/terminal-types.ts). The response carries role,
-    // controllerStatus, canonicalCols/Rows, and phase — we apply
-    // them synchronously so the renderer doesn't have to wait for
-    // the realtime `ownership` event before painting the
-    // post-takeover frame. A later realtime ownership event for the
-    // same session is idempotent.
-    //
-    // `attachmentId` must be passed: the server-side `takeoverSession`
-    // rejects with `error.invalid-arguments` when the caller isn't a
-    // known attachment (see `isAuthoritative` in
-    // `src/server/terminal/terminal-ownership.ts`). Without it the
-    // browser-side takeover silently no-ops — the button click lands
-    // and the pending state clears, but the renderer never becomes the
-    // controller. The renderer already self-issues an attachment id on
-    // attach (`readOrCreateWebTerminalAttachmentId`); reuse it here so
-    // the same id the server saw on attach is the one it sees on
-    // takeover.
-    //
-    // The promise resolves with `true` on success and `false` on
-    // failure so callers (e.g. `TerminalSlot`) can surface a toast
-    // explaining *why* the takeover didn't take — a user who clicks
-    // 「接管」 and sees nothing happen doesn't know whether the
-    // session vanished, the server rejected them, or the attachment
-    // websocket was not connected yet.
-    const attachmentId = readOrCreateWebTerminalAttachmentId()
-    if (this.runtime.setTakeoverPending(true)) this.notify('metadata')
-    const size = await this.resolveTakeoverSize(sessionId)
-    if (this.disposed || this.runtime.currentSessionId() !== sessionId) {
-      this.clearTakeoverPendingWithNotify()
-      return false
-    }
-    // Bug F: `setTakeoverPending` runs *before* the `.then` chain
-    // attaches its `.finally`. If `terminalBridge.takeover` throws
-    // synchronously (e.g. the bridge is unset, a bad request id
-    // pattern slips through, a future test mock throws from the
-    // implementation), the rejection path's `.finally` will still
-    // run, but only if a microtask boundary exists between the
-    // throw and the catch. Wrap the bridge call in a defensive
-    // `try/finally` so a sync throw still clears the pending flag.
-    let bridgeCall: Promise<TerminalTakeoverResult>
-    try {
-      bridgeCall = terminalBridge.takeover({
-        sessionId,
-        cols: size.cols,
-        rows: size.rows,
-        attachmentId,
-      })
-    } catch (err) {
-      terminalLog.warn('takeover bridge call threw synchronously', { sessionId, err })
-      this.clearTakeoverPendingWithNotify()
-      return false
-    }
-    try {
-      const result = await bridgeCall
-      if (!result.ok) {
-        terminalLog.warn('takeover rejected by server', { sessionId, message: result.message })
-        return false
-      }
-      const wasController = this.runtime.canResize()
-      const changed = this.runtime.applyTakeover(result)
+    // src/shared/terminal-types.ts). We delegate the round-trip to
+    // the AuthorityGate — the same path the auto-promote-on-write
+    // uses — so there is one implementation of "promote me to
+    // controller" for both the button and the keyboard.
+    const ok = await this.authority().takeover()
+    if (ok) {
+      this.runtime.clearTakeoverPending()
+      this.notify('metadata')
+      // `applyTakeover` was called inside the gate's onPromoted
+      // hook, so the runtime already reflects the new role.
       if (!wasController && this.runtime.canResize()) this.ensureControllerViewStarted()
-      if (changed) this.notify('metadata')
-      return true
-    } catch (err) {
-      // Mirror the resize rejection pattern: surface the failure
-      // so ops can correlate. The takeover UI stays in
-      // "pending takeover" state until the user retries; the
-      // `finally` below clears the flag on any settlement.
-      terminalLog.warn('takeover failed for session', { sessionId, err })
-      return false
-    } finally {
-      // If the server response settles but we never received an
-      // ownership event, clear the pending state so the user can
-      // retry. After this plan, the realtime event is no longer
-      // the only path to clear the flag — the success branch
-      // above already applied the new state, so this is purely
-      // the failure / timeout fallback.
+    } else {
       this.clearTakeoverPendingWithNotify()
     }
+    return ok
   }
 
   private clearTakeoverPendingWithNotify(): void {
     if (this.runtime.isTakeoverPending()) {
       if (this.runtime.setTakeoverPending(false)) this.notify('metadata')
-    }
-  }
-
-  private async resolveTakeoverSize(sessionId: string): Promise<{ cols: number; rows: number }> {
-    const term = this.view.currentTerminal()
-    if (term) return { cols: term.cols, rows: term.rows }
-    const fallback = this.runtime.currentCanonicalSize()
-    if (!this.view.isConnected()) return fallback
-    try {
-      await preloadTerminalFont()
-      return proposeTerminalGeometry(this.view.measurableHost()) ?? fallback
-    } catch (err) {
-      terminalLog.warn('failed to measure terminal host for takeover; using canonical size', { sessionId, err })
-      return fallback
     }
   }
 
