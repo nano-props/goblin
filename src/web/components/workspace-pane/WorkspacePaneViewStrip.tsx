@@ -7,7 +7,6 @@ import {
   useState,
   forwardRef,
   type ComponentPropsWithoutRef,
-  type ReactNode,
 } from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
