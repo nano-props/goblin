@@ -120,7 +120,7 @@ export function dispatchRemoveWorktree({
  * Dispatch a `push` action, bypassing the protected-branch confirm
  * gate (the user has already cleared it by confirming the dialog).
  */
-export function dispatchConfirmPush({ repo, branchName }: BranchActionDispatchContext & { branchName: string }): void {
+export function dispatchPush({ repo, branchName }: BranchActionDispatchContext & { branchName: string }): void {
   void dispatchRepoBranchAction(
     repo.id,
     repo.instanceToken,

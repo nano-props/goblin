@@ -137,7 +137,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
       // store. State outlives any temporary surface (e.g. focus-mode
       // HoverCard popover), so the dialog stays open even after the
       // trigger surface unmounts. The dialog's Confirm button calls
-      // `dispatchConfirmPush` from `branchActionDispatch` to commit.
+      // `dispatchPush` from `branchActionDispatch` to commit.
       useBranchActionDialogsStore.getState().openPushConfirm({
         repoId: repo.id,
         branchName: branch.name,

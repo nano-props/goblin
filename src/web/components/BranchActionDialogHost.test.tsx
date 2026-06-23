@@ -24,12 +24,8 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { idleOperation } from '#/web/stores/repos/operations.ts'
 
-const dispatchMocks = vi.hoisted(() => ({
-  runBranchAction: vi.fn((_id: string, _action: { kind: string }) => Promise.resolve({ ok: true, message: 'ok' })),
-}))
-
 vi.mock('#/web/hooks/branchActionDispatch.ts', () => ({
-  dispatchConfirmPush: vi.fn(),
+  dispatchPush: vi.fn(),
   dispatchDeleteBranch: vi.fn(),
   dispatchRemoveWorktree: vi.fn(),
 }))
@@ -75,10 +71,6 @@ beforeEach(() => {
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
   resetReposStore()
   resetBranchActionDialogsStore()
-  dispatchMocks.runBranchAction.mockReset()
-  dispatchMocks.runBranchAction.mockImplementation(
-    (_id: string, _action: { kind: string }) => Promise.resolve({ ok: true, message: 'ok' }),
-  )
   container = document.createElement('div')
   document.body.append(container)
   root = createRoot(container)
@@ -276,10 +268,153 @@ describe('BranchActionDialogHost', () => {
   })
 
   // NOTE: Regression coverage for the "dialog content stays rendered
-  // during the close animation" fix lives in `useDialogDisplay.test.tsx`
-  // (the display retention hook that the host calls). A
-  // Radix-portal-driven DOM check is not feasible in jsdom — Radix's
-  // `Presence` checks `getComputedStyle` for an active animation and
-  // sends `UNMOUNT` immediately when none is found, so the dialog
-  // unmounts before we can inspect content.
+  // during the close animation" fix lives in
+  // `useBranchActionDialogDisplay.test.tsx` (the display retention
+  // hook that the host calls). A Radix-portal-driven DOM check is
+  // not feasible in jsdom — Radix's `Presence` checks
+  // `getComputedStyle` for an active animation and sends `UNMOUNT`
+  // immediately when none is found, so the dialog unmounts before
+  // we can inspect content.
+
+  test('integration: clicking Confirm dispatches against the dialog payload, not the host\'s active workspace', async () => {
+    // The headline contract of this refactor: the user can open a
+    // dialog for a non-selected branch row (e.g. a row in the
+    // focus-mode HoverCard popover) and the Confirm click dispatches
+    // against that branch's data, not the workspace's
+    // `(activeRepoId, activeBranchName)`.
+    const dispatch = await import('#/web/hooks/branchActionDispatch.ts')
+    const repoA = setupRepo().repo
+    const repoBId = '/tmp/gbl-other-repo'
+    seedRepoState({ id: repoBId, branches: [createRepoBranch('main')] })
+    act(() => {
+      useReposStore.setState((state) => ({
+        repos: { ...state.repos, [REPO_ID]: repoA },
+        activeId: REPO_ID,
+      }))
+    })
+
+    // Mount the host FIRST with workspace = repoA / feature/host. The
+    // closeStaleDialogs effect runs on mount and finds no stale
+    // dialogs to close (nothing is open yet).
+    render(<BranchActionDialogHost activeRepoId={REPO_ID} activeBranchName="feature/host" />)
+
+    // NOW open a delete dialog for repo B's main branch while the
+    // workspace is still on repo A — the popover use case. The
+    // effect does not re-fire (its deps didn't change), so the
+    // dialog stays open.
+    act(() => {
+      useBranchActionDialogsStore.getState().openDeleteConfirm({
+        repoId: repoBId,
+        branchName: 'main',
+        payload: 'main',
+      })
+    })
+
+    const confirmButton = findButtonByText('action.confirm-delete-branch-confirm')
+    expect(confirmButton).not.toBeNull()
+    act(() => {
+      confirmButton!.click()
+    })
+
+    expect(dispatch.dispatchDeleteBranch).toHaveBeenCalledTimes(1)
+    const call = vi.mocked(dispatch.dispatchDeleteBranch).mock.calls[0]![0] as {
+      repo: { id: string }
+      branchName: string
+      force: boolean
+      alsoDeleteUpstream: boolean
+    }
+    // The dispatch must target repo B and the dialog's branch — NOT
+    // the host's active (repoA, feature/host).
+    expect(call.repo.id).toBe(repoBId)
+    expect(call.branchName).toBe('main')
+    expect(call.force).toBe(false)
+  })
+
+  test('integration: clicking Confirm forwards the persisted checkbox state to dispatchDeleteBranch', async () => {
+    const dispatch = await import('#/web/hooks/branchActionDispatch.ts')
+    const { repo, branch } = setupRepo()
+    act(() => {
+      useBranchActionDialogsStore.getState().openDeleteConfirm({
+        repoId: repo.id,
+        branchName: branch.name,
+        payload: branch.name,
+      })
+      useBranchActionDialogsStore.getState().setDeleteAlsoUpstream(repo.id, branch.name, true)
+    })
+    render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+
+    const confirmButton = findButtonByText('action.confirm-delete-branch-confirm')
+    act(() => {
+      confirmButton!.click()
+    })
+
+    expect(dispatch.dispatchDeleteBranch).toHaveBeenCalledWith(
+      expect.objectContaining({ alsoDeleteUpstream: true }),
+    )
+  })
+
+  test('integration: clicking Confirm on a force-promoted dialog dispatches with force: true', async () => {
+    const dispatch = await import('#/web/hooks/branchActionDispatch.ts')
+    const { repo, branch } = setupRepo()
+    act(() => {
+      useBranchActionDialogsStore.getState().openForceDeleteConfirm({
+        repoId: repo.id,
+        branchName: branch.name,
+        payload: branch.name,
+      })
+    })
+    render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+
+    const confirmButton = findButtonByText('action.confirm-force-delete-unmerged-confirm')
+    act(() => {
+      confirmButton!.click()
+    })
+
+    expect(dispatch.dispatchDeleteBranch).toHaveBeenCalledWith(expect.objectContaining({ force: true }))
+  })
+
+  test('integration: clicking Confirm on the push-protected dialog calls dispatchPush', async () => {
+    const dispatch = await import('#/web/hooks/branchActionDispatch.ts')
+    const { repo, branch } = setupRepo()
+    act(() => {
+      useBranchActionDialogsStore.getState().openPushConfirm({
+        repoId: repo.id,
+        branchName: branch.name,
+        payload: branch.name,
+      })
+    })
+    render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+
+    const confirmButton = findButtonByText('action.confirm-push-confirm')
+    act(() => {
+      confirmButton!.click()
+    })
+
+    expect(dispatch.dispatchPush).toHaveBeenCalledTimes(1)
+    const call = vi.mocked(dispatch.dispatchPush).mock.calls[0]![0] as {
+      repo: { id: string }
+      branchName: string
+    }
+    expect(call.repo.id).toBe(repo.id)
+    expect(call.branchName).toBe(branch.name)
+  })
+
+  test('integration: clicking Confirm on the remove-worktree dialog dispatches dispatchRemoveWorktree', async () => {
+    const dispatch = await import('#/web/hooks/branchActionDispatch.ts')
+    const { repo, branch } = setupRepo()
+    act(() => {
+      useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
+        { repoId: repo.id, branchName: branch.name, payload: { branch: branch.name, path: branch.worktree!.path } },
+        { isProtectedBranch: false },
+      )
+    })
+    render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+
+    const confirmButton = findButtonByText('action.confirm-remove-worktree-confirm')
+    act(() => {
+      confirmButton!.click()
+    })
+
+    expect(dispatch.dispatchRemoveWorktree).toHaveBeenCalledTimes(1)
+  })
 })

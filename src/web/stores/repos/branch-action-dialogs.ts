@@ -46,11 +46,11 @@ export interface BranchCheckboxState {
   deleteAlsoUpstream: boolean
 }
 
-const EMPTY_CHECKBOXES: BranchCheckboxState = {
+export const EMPTY_CHECKBOXES: BranchCheckboxState = Object.freeze({
   removeAlsoDeletes: false,
   removeAlsoUpstream: false,
   deleteAlsoUpstream: false,
-}
+})
 
 export function branchCheckboxKey(repoId: string, branchName: string): string {
   return `${repoId}\0${branchName}`
@@ -70,7 +70,7 @@ const DIALOG_KEYS: readonly BranchActionDialogKey[] = [
   'forceDeleteConfirm',
   'removeConfirm',
   'forceRemoveConfirm',
-] as const
+]
 
 interface BranchActionDialogsState {
   pushConfirm: BranchActionDialogEntry<string> | null
@@ -254,16 +254,15 @@ export const useBranchActionDialogsStore = create<BranchActionDialogsStore>()((s
 
   closeStaleDialogs: (activeRepoId, activeBranchName) =>
     set((state) => {
-      const next: Partial<Record<BranchActionDialogKey, null>> = {}
-      let changed = false
+      let next: Partial<BranchActionDialogsState> | null = null
       for (const key of DIALOG_KEYS) {
         const slot = state[key]
         if (slot && (slot.repoId !== activeRepoId || slot.branchName !== activeBranchName)) {
+          next ??= {}
           next[key] = null
-          changed = true
         }
       }
-      return changed ? (next as Partial<BranchActionDialogsState>) : state
+      return next ?? state
     }),
 
   setRemoveAlsoDeletes: (repoId, branchName, value) =>

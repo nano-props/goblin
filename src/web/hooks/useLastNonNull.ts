@@ -10,6 +10,11 @@ import { useRef } from 'react'
  * while Radix AlertDialog plays its close animation, after the
  * underlying store slot has already been cleared by `closeDialog`.
  *
+ * For the timer-based variant (the value stays retained for `retainMs`
+ * after `active` flips to false, useful for transitions with a fixed
+ * duration like the compact-workspace pane), see
+ * `useRetainedValueDuringExit`.
+ *
  * Pre-PR this behaviour was provided by `useRetainedDialogState`,
  * which kept the payload in a `useState` slot across close. The new
  * store clears the slot on close (cleaner data model, no stale
