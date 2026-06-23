@@ -23,7 +23,7 @@ import {
 import { TerminalSessionRuntime } from '#/web/components/terminal/terminal-session-runtime.ts'
 import { TerminalSessionView } from '#/web/components/terminal/terminal-session-view.ts'
 import { isTerminalEmulatorInput, type TerminalInput } from '#/web/components/terminal/terminal-input.ts'
-import { readOrCreateWebTerminalAttachmentId } from '#/web/renderer-terminal-bridge.ts'
+import { readOrCreateWebTerminalClientId } from '#/web/renderer-terminal-bridge.ts'
 import { createXtermAuthorityGate, type TerminalAuthorityGate } from '#/web/components/terminal/authority-gate.ts'
 import { terminalLog } from '#/web/logger.ts'
 import type {
@@ -41,7 +41,7 @@ export class ManagedTerminalSession {
   descriptor: TerminalDescriptor
   private readonly notify: (reason: TerminalNotifyReason) => void
   private readonly onBell: ((descriptor: TerminalDescriptor, event: TerminalBellEvent) => void) | null
-  private readonly requestDurableClose: (sessionId: string) => Promise<void>
+  private readonly requestDurableClose: (ptySessionId: string) => Promise<void>
   private readonly runtime = new TerminalSessionRuntime()
   private readonly view: TerminalSessionView
   // Authority gate owns the "am I the controller?" cache and the
@@ -76,7 +76,7 @@ export class ManagedTerminalSession {
     // drop the request if the WebSocket was already closing, leaving
     // the server PTY alive and the next create reattaching to the
     // orphan. See `TerminalSessionRegistry.pendingCloseBySessionId`.
-    requestDurableClose: (sessionId: string) => Promise<void> = () => Promise.resolve(),
+    requestDurableClose: (ptySessionId: string) => Promise<void> = () => Promise.resolve(),
   ) {
     this.descriptor = descriptor
     this.notify = notify
@@ -127,7 +127,7 @@ export class ManagedTerminalSession {
     this.start()
   }
 
-  dispose(options: { closeSession?: boolean } = {}): void {
+  dispose(options: { closeSlot?: boolean } = {}): void {
     if (this.disposed) return
     this.disposed = true
     this.geometryAbortController?.abort()
@@ -135,7 +135,7 @@ export class ManagedTerminalSession {
     this.clearTerminalFocusIfOwned()
     this.view.blurIfFocused()
     const sessionIds = this.runtime.disposeSessionIds()
-    if (options.closeSession !== false) {
+    if (options.closeSlot !== false) {
       // Hand the close to the registry's durable queue instead of
       // firing `terminalBridge.close` directly. The queue fires the
       // close in the background and the next `createTerminal` for
@@ -143,8 +143,8 @@ export class ManagedTerminalSession {
       // the still-alive orphan. Failures are logged inside the queue
       // — the old `void … .catch(() => {})` path silently swallowed
       // the rejection and let the bug hide.
-      for (const sessionId of sessionIds) {
-        void this.requestDurableClose(sessionId).catch(() => {
+      for (const ptySessionId of sessionIds) {
+        void this.requestDurableClose(ptySessionId).catch(() => {
           // Already logged at the queue site. Swallow here so a
           // misbehaving registry hook can never bubble out of
           // dispose() — the user has already navigated away and a
@@ -166,8 +166,8 @@ export class ManagedTerminalSession {
   }
 
   writeInput(input: TerminalInput): void {
-    const sessionId = this.runtime.currentSessionId()
-    if (!sessionId || !this.runtime.canResize()) return
+    const ptySessionId = this.runtime.currentSessionId()
+    if (!ptySessionId || !this.runtime.canResize()) return
     if (this.runtime.isReplaying() && isTerminalEmulatorInput(input)) return
     this.pendingWriteBuffer += input.data
     this.scheduleInputFlush()
@@ -184,8 +184,8 @@ export class ManagedTerminalSession {
 
   private flushInput(): void {
     if (this.disposed) return
-    const sessionId = this.runtime.currentSessionId()
-    if (!sessionId || !this.runtime.canResize()) return
+    const ptySessionId = this.runtime.currentSessionId()
+    if (!ptySessionId || !this.runtime.canResize()) return
     const data = this.pendingWriteBuffer
     this.pendingWriteBuffer = ''
     if (!data) return
@@ -201,13 +201,13 @@ export class ManagedTerminalSession {
       .authorize('write')
       .then((result) => {
         if (result.kind === 'denied') {
-          terminalLog.warn('write denied by authority gate', { sessionId, reason: result.reason })
+          terminalLog.warn('write denied by authority gate', { ptySessionId, reason: result.reason })
           return
         }
-        return terminalBridge.write({ sessionId, data })
+        return terminalBridge.write({ ptySessionId, data })
       })
       .catch((err) => {
-        terminalLog.warn('write failed for session', { sessionId, err })
+        terminalLog.warn('write failed for session', { ptySessionId, err })
       })
   }
 
@@ -270,8 +270,8 @@ export class ManagedTerminalSession {
             return fallback
           }
         },
-        isSessionAlive: (sessionId) =>
-          !this.disposed && this.runtime.currentSessionId() === sessionId,
+        isSessionAlive: (ptySessionId) =>
+          !this.disposed && this.runtime.currentSessionId() === ptySessionId,
         onPromoted: (result) => {
           // Mirror the runtime's `applyTakeover` so the new
           // controller's view (cols/rows/phase) is applied
@@ -288,7 +288,7 @@ export class ManagedTerminalSession {
     const previousSessionId = this.runtime.currentSessionId()
     this.hydratedSnapshot = { snapshot: input.snapshot, snapshotSeq: input.snapshotSeq }
     const changed = this.runtime.hydrateSession({
-      sessionId: input.sessionId,
+      ptySessionId: input.ptySessionId,
       phase: input.phase,
       message: input.message,
       processName: input.processName,
@@ -303,7 +303,7 @@ export class ManagedTerminalSession {
     if (changed && input.phase === 'open' && input.role === 'unowned' && this.view.isConnected()) {
       this.start()
     }
-    if (previousSessionId && previousSessionId !== input.sessionId) this.applyHydratedSnapshotToActiveView()
+    if (previousSessionId && previousSessionId !== input.ptySessionId) this.applyHydratedSnapshotToActiveView()
     if (changed) this.notify('metadata')
   }
 
@@ -314,7 +314,7 @@ export class ManagedTerminalSession {
   }
 
   handleOwnership(event: TerminalOwnershipViewModel): void {
-    const applies = this.runtime.currentSessionId() === event.sessionId
+    const applies = this.runtime.currentSessionId() === event.ptySessionId
     const wasController = this.runtime.canResize()
     const changed = this.runtime.handleOwnership(event)
     const pendingCleared = applies ? this.runtime.clearTakeoverPending() : false
@@ -362,8 +362,8 @@ export class ManagedTerminalSession {
   }
 
   async takeover(): Promise<boolean> {
-    const sessionId = this.runtime.currentSessionId()
-    if (!sessionId) return false
+    const ptySessionId = this.runtime.currentSessionId()
+    if (!ptySessionId) return false
     // Capture the role BEFORE the gate calls applyTakeover — the
     // post-takeover check below needs to fire `ensureControllerViewStarted`
     // when the caller was a viewer and is now a controller. Reading
@@ -512,17 +512,17 @@ export class ManagedTerminalSession {
 
   private async ipcPhase(token: number, term: XTermTerminal): Promise<TerminalAttachResultWithOwnership> {
     const restart = this.runtime.consumeRestartFlag()
-    const sessionId = restart ? this.runtime.restartingSessionId() : this.runtime.currentSessionId()
-    if (!sessionId) {
+    const ptySessionId = restart ? this.runtime.restartingSessionId() : this.runtime.currentSessionId()
+    if (!ptySessionId) {
       this.destroyActiveView()
       if (this.runtime.failAttachAttempt('error.invalid-arguments')) this.notify('metadata')
       throw new StartCancelledError()
     }
     const result = restart
-      ? await terminalBridge.restart(this.terminalRestartInput(sessionId, term))
-      : await terminalBridge.attach(this.terminalAttachInput(sessionId, term))
+      ? await terminalBridge.restart(this.terminalRestartInput(ptySessionId, term))
+      : await terminalBridge.attach(this.terminalAttachInput(ptySessionId, term))
     if (this.disposed || this.startToken !== token || this.view.currentTerminal() !== term) {
-      if (result.ok) void terminalBridge.close({ sessionId: result.sessionId }).catch(() => {})
+      if (result.ok) void terminalBridge.close({ ptySessionId: result.ptySessionId }).catch(() => {})
       else this.closeReplacingPtySession()
       throw new StartCancelledError()
     }
@@ -568,25 +568,25 @@ export class ManagedTerminalSession {
     }
   }
 
-  private terminalAttachInput(sessionId: string, term: XTermTerminal): TerminalAttachInput {
+  private terminalAttachInput(ptySessionId: string, term: XTermTerminal): TerminalAttachInput {
     return {
-      sessionId,
+      ptySessionId,
       cols: term.cols,
       rows: term.rows,
     }
   }
 
-  private terminalRestartInput(sessionId: string, term: XTermTerminal): TerminalRestartInput {
+  private terminalRestartInput(ptySessionId: string, term: XTermTerminal): TerminalRestartInput {
     return {
-      sessionId,
+      ptySessionId,
       cols: term.cols,
       rows: term.rows,
     }
   }
 
   private withLocalOwnership(result: Extract<TerminalAttachResult, { ok: true }>): TerminalAttachResultWithOwnership {
-    const attachmentId = readOrCreateWebTerminalAttachmentId()
-    return projectTerminalAttachResultForAttachment(result, attachmentId)
+    const clientId = readOrCreateWebTerminalClientId()
+    return projectTerminalAttachResultForAttachment(result, clientId)
   }
 
   private async replayActiveView(token: number, term: XTermTerminal, replay: string, replaySeq: number): Promise<void> {
@@ -689,24 +689,24 @@ export class ManagedTerminalSession {
   }
 
   private flushResize(): void {
-    const sessionId = this.runtime.currentSessionId()
+    const ptySessionId = this.runtime.currentSessionId()
     const resize = this.pendingResize
-    if (!sessionId || !resize) return
+    if (!ptySessionId || !resize) return
     if (!this.runtime.canResize()) return
     this.pendingResize = null
     const { cols, rows } = resize
     const canonicalSize = this.runtime.currentCanonicalSize()
     if (canonicalSize.cols === cols && canonicalSize.rows === rows) return
     void terminalBridge
-      .resize({ sessionId, cols, rows })
+      .resize({ ptySessionId, cols, rows })
       .then((ok) => {
-        if (ok && this.runtime.currentSessionId() === sessionId) this.runtime.acknowledgeResize(cols, rows)
+        if (ok && this.runtime.currentSessionId() === ptySessionId) this.runtime.acknowledgeResize(cols, rows)
       })
       .catch((err) => {
         // Resize rejection leaves the view stuck at the old geometry —
         // surface the failure so ops can correlate with server-side
         // validation rejections (size out of range, lost controller, etc.).
-        terminalLog.warn('resize failed for session', { sessionId, cols, rows, err })
+        terminalLog.warn('resize failed for session', { ptySessionId, cols, rows, err })
       })
   }
 
@@ -809,8 +809,8 @@ export class ManagedTerminalSession {
   }
 
   private closeReplacingPtySession(): void {
-    const sessionId = this.runtime.closeReplacingSessionId()
-    if (sessionId) void terminalBridge.close({ sessionId }).catch(() => {})
+    const ptySessionId = this.runtime.closeReplacingSessionId()
+    if (ptySessionId) void terminalBridge.close({ ptySessionId }).catch(() => {})
   }
 }
 

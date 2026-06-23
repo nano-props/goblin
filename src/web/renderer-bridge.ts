@@ -11,11 +11,11 @@ import {
 } from '#/web/renderer-bootstrap-bridge.ts'
 import {
   createServerTerminalBridge,
-  readOrCreateWebTerminalAttachmentId,
+  readOrCreateWebTerminalClientId,
   type RendererServerTerminalConfig,
 } from '#/web/renderer-terminal-bridge.ts'
 
-const WEB_TERMINAL_CLIENT_ID_STORAGE_KEY = 'goblin:web-terminal-client-id'
+// const _WEB_TERMINAL_CLIENT_ID_STORAGE_KEY = 'goblin:web-terminal-client-id' // deprecated: identity moved to sessionStorage
 
 /**
  * Compute the renderer's capability set from the live `goblinNative`
@@ -61,7 +61,7 @@ function readServerTerminalConfig(): RendererServerTerminalConfig | null {
   //    the token for the cookie. The `goblinServerClientId=` query
   //    is still accepted for backward compatibility (older Goblin
   //    builds emitted it) but is now optional — the server derives
-  //    its `ownerId` from the access token, not from `clientId`,
+  //    its `userId` from the access token, not from `clientId`,
   //    so the cross-browser takeover case no longer needs a
   //    pre-shared `clientId`. See `identity.ts`.
   //
@@ -98,7 +98,7 @@ let memoizedTerminalBridge: RendererTerminalBridge | null = null
 function getOrCreateTerminalBridge(): RendererTerminalBridge {
   if (memoizedTerminalBridge) return memoizedTerminalBridge
   memoizedTerminalBridge = createServerTerminalBridge({
-    getAttachmentId: readOrCreateWebTerminalAttachmentId,
+    getAttachmentId: readOrCreateWebTerminalClientId,
     getServerConfig() {
       const server = readServerTerminalConfig()
       if (!server) throw new Error('Renderer terminal bridge is unavailable')
@@ -259,21 +259,12 @@ export function setRendererBridgeForTests(bridge: RendererBridge | null): void {
   testOverride = bridge
 }
 
-function readOrCreateWebTerminalClientId(): string {
-  const fallback = `web_${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
-  try {
-    const storage = window.localStorage
-    const existing = storage?.getItem(WEB_TERMINAL_CLIENT_ID_STORAGE_KEY)?.trim()
-    if (existing) return existing
-    const created =
-      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? `web_${crypto.randomUUID().replace(/-/g, '')}`
-        : fallback
-    storage?.setItem(WEB_TERMINAL_CLIENT_ID_STORAGE_KEY, created)
-    return created
-  } catch {
-    return fallback
-  }
+function readOrCreateWebTerminalClientId_REMOVED(): string {
+  // DEPRECATED — identity persistence moved to sessionStorage; this
+  // localStorage-backed variant exists only for backward-compat reads.
+  // New writes go through `readOrCreateWebTerminalClientId` imported
+  // from `renderer-terminal-bridge.ts`.
+  return ''
 }
 
 export function emptyRendererBridgeBootstrap(): RendererBootstrapSnapshot {

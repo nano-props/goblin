@@ -1,14 +1,14 @@
 import type {
   TerminalAttachResult,
-  TerminalAttachmentRole,
+  TerminalClientRole,
   TerminalOutputEvent,
-  TerminalSessionPhase,
+  TerminalSlotPhase,
   TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
-import { TerminalSessionState } from '#/web/components/terminal/terminal-session-state.ts'
+import { TerminalSlotState } from '#/web/components/terminal/terminal-session-state.ts'
 import type { TerminalOwnershipViewModel, TerminalSearchResult } from '#/web/components/terminal/types.ts'
 export class TerminalSessionRuntime {
-  private readonly state = new TerminalSessionState()
+  private readonly state = new TerminalSlotState()
   private ptySessionId: string | null = null
   private replacingPtySessionId: string | null = null
   private restartOnStart = false
@@ -45,7 +45,7 @@ export class TerminalSessionRuntime {
     return this.state.getCanResize()
   }
 
-  attachmentRole(): TerminalAttachmentRole {
+  attachmentRole(): TerminalClientRole {
     return this.state.getAttachmentOwnership().role
   }
 
@@ -77,7 +77,7 @@ export class TerminalSessionRuntime {
     fallbackSize: { cols: number; rows: number },
   ): boolean {
     this.replacingPtySessionId = null
-    this.ptySessionId = result.sessionId
+    this.ptySessionId = result.ptySessionId
     return this.state.applyOpenResult({
       phase: result.phase,
       message: result.message,
@@ -91,8 +91,8 @@ export class TerminalSessionRuntime {
   }
 
   hydrateSession(input: {
-    sessionId: string
-    phase: TerminalSessionPhase
+    ptySessionId: string
+    phase: TerminalSlotPhase
     message: string | null
     processName: string
     canonicalTitle?: string | null
@@ -101,10 +101,10 @@ export class TerminalSessionRuntime {
     canonicalCols: number
     canonicalRows: number
   }): boolean {
-    const sessionChanged = this.ptySessionId !== input.sessionId
+    const sessionChanged = this.ptySessionId !== input.ptySessionId
     this.replacingPtySessionId = null
     this.restartOnStart = false
-    this.ptySessionId = input.sessionId
+    this.ptySessionId = input.ptySessionId
     const metadataChanged = this.state.applyOpenResult({
       phase: input.phase,
       message: input.message,
@@ -160,14 +160,14 @@ export class TerminalSessionRuntime {
   }
 
   handleOutput(event: TerminalOutputEvent): { changed: boolean; output: string | null } {
-    if (event.sessionId !== this.ptySessionId) return { changed: false, output: null }
+    if (event.ptySessionId !== this.ptySessionId) return { changed: false, output: null }
     const changed = this.state.setProcessName(event.processName)
     if (this.state.captureReplayOutput(event)) return { changed, output: null }
     return { changed, output: event.data }
   }
 
   handleOwnership(event: TerminalOwnershipViewModel): boolean {
-    if (event.sessionId !== this.ptySessionId) return false
+    if (event.ptySessionId !== this.ptySessionId) return false
     return this.state.applyOwnership(event)
   }
 
@@ -182,13 +182,13 @@ export class TerminalSessionRuntime {
    * idempotent — re-applying the same values is a no-op.
    *
    * Returns `false` if the result is for a different session (the
-   * caller must already have a current sessionId for the takeover
+   * caller must already have a current ptySessionId for the takeover
    * to be valid; this is a defensive guard).
    */
   applyTakeover(result: Extract<TerminalTakeoverResult, { ok: true }>): boolean {
-    if (result.sessionId !== this.ptySessionId) return false
+    if (result.ptySessionId !== this.ptySessionId) return false
     return this.state.applyOwnership({
-      sessionId: result.sessionId,
+      ptySessionId: result.ptySessionId,
       role: result.role,
       controllerStatus: result.controllerStatus,
       canonicalCols: result.canonicalCols,
@@ -201,8 +201,8 @@ export class TerminalSessionRuntime {
     return this.state.setCanonicalTitle(canonicalTitle)
   }
 
-  handleExit(event: { sessionId: string }): boolean {
-    if (event.sessionId !== this.ptySessionId) return false
+  handleExit(event: { ptySessionId: string }): boolean {
+    if (event.ptySessionId !== this.ptySessionId) return false
     this.ptySessionId = null
     return true
   }
@@ -239,8 +239,8 @@ export class TerminalSessionRuntime {
   }
 
   closeReplacingSessionId(): string | null {
-    const sessionId = this.replacingPtySessionId
+    const ptySessionId = this.replacingPtySessionId
     this.replacingPtySessionId = null
-    return sessionId
+    return ptySessionId
   }
 }

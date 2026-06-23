@@ -358,7 +358,7 @@ In `terminal-runtime-actions.ts`, after `manager.closeSessionForOwner(...)`
 returns `true`:
 
 ```ts
-broker.broadcastToOwner(ownerId, {
+broker.broadcastToOwner(userId, {
   type: 'session-closed',
   sessionId: input.sessionId,
   repoRoot,
@@ -366,7 +366,7 @@ broker.broadcastToOwner(ownerId, {
 ```
 
 The `repoRoot` is derived from the session's scope. The message is
-sent only to sockets for the same `ownerId`; other owners never see
+sent only to sockets for the same `userId`; other owners never see
 the closed session id. The manager
 returns it on the close result, or we look it up via
 `manager.findSessionById(sessionId)` before closing.

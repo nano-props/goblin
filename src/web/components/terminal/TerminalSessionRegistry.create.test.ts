@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
     rows: 31,
   })),
   preloadTerminalFontMock: vi.fn(async () => {}),
-  attachmentIdMock: vi.fn(() => 'attachment_local'),
+  attachmentIdMock: vi.fn(() => 'client_local'),
 }))
 
 vi.mock('#/web/terminal.ts', () => ({
@@ -22,7 +22,7 @@ vi.mock('#/web/terminal.ts', () => ({
 }))
 
 vi.mock('#/web/renderer-terminal-bridge.ts', () => ({
-  readOrCreateWebTerminalAttachmentId: mocks.attachmentIdMock,
+  readOrCreateWebTerminalClientId: mocks.attachmentIdMock,
 }))
 
 vi.mock('#/web/components/terminal/terminal-geometry.ts', () => ({
@@ -35,7 +35,7 @@ vi.mock('#/web/components/terminal/terminal-geometry.ts', () => ({
 vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
   class MockManagedTerminalSession {
     descriptor: any
-    private sessionId: string | null = null
+    private ptySessionId: string | null = null
     private snapshotState: any = { phase: 'opening', message: null, processName: 'terminal', canonicalTitle: null }
     private serializeValue = ''
 
@@ -77,13 +77,13 @@ vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
     }
     handleOwnership(): void {}
     currentSessionId(): string | null {
-      return this.sessionId
+      return this.ptySessionId
     }
     snapshot() {
       return this.snapshotState
     }
     hydrate(input: any): void {
-      this.sessionId = input.sessionId
+      this.ptySessionId = input.ptySessionId
       this.serializeValue = input.snapshot ?? this.serializeValue
       this.snapshotState = {
         phase: 'open',
@@ -146,22 +146,22 @@ function makeCreateResult(overrides: Partial<Record<string, unknown>> = {}) {
     ok: true as const,
     action: 'created' as const,
     key: `${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-1`,
-    sessionId: 'session-1',
+    ptySessionId: 'session-1',
     processName: 'zsh',
     canonicalTitle: null,
     phase: 'open' as const,
     message: null,
     snapshot: '',
     snapshotSeq: 0,
-    controller: { attachmentId: 'attachment_local', status: 'connected' as const },
+    controller: { clientId: 'client_local', status: 'connected' as const },
     canonicalCols: 101,
     canonicalRows: 31,
     sessions: [
       {
-        sessionId: 'session-1',
+        ptySessionId: 'session-1',
         key: `${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-1`,
         cwd: WORKTREE_PATH,
-        controller: { attachmentId: 'attachment_local', status: 'connected' as const },
+        controller: { clientId: 'client_local', status: 'connected' as const },
         processName: 'zsh',
         canonicalTitle: null,
         phase: 'open' as const,
@@ -228,7 +228,7 @@ describe('TerminalSessionRegistry create flow', () => {
       kind: 'primary',
       cols: 101,
       rows: 31,
-      attachmentId: 'attachment_local',
+      clientId: 'client_local',
     })
   })
 
@@ -283,7 +283,7 @@ describe('TerminalSessionRegistry create flow', () => {
       kind: 'primary',
       cols: 101,
       rows: 31,
-      attachmentId: 'attachment_local',
+      clientId: 'client_local',
     })
   })
 
@@ -371,7 +371,7 @@ describe('TerminalSessionRegistry create flow', () => {
     // createTerminal must wait for the close to settle before
     // issuing its own create call.
     const closePromise = registry.enqueueDurableClose({
-      sessionId: 'session-stale',
+      ptySessionId: 'session-stale',
       worktreeTerminalKey: WORKTREE_KEY,
     })
 
@@ -407,7 +407,7 @@ describe('TerminalSessionRegistry create flow', () => {
     mocks.closeMock.mockRejectedValueOnce(new Error('Terminal socket closed'))
 
     const closePromise = registry.enqueueDurableClose({
-      sessionId: 'session-stale',
+      ptySessionId: 'session-stale',
       worktreeTerminalKey: WORKTREE_KEY,
     })
 
@@ -423,7 +423,7 @@ describe('TerminalSessionRegistry create flow', () => {
 
   test('durable close: deduplicates concurrent enqueues for the same session', async () => {
     // The catalog may surface a session-closed event AND a parallel
-    // dispose() call for the same sessionId. The first call owns the
+    // dispose() call for the same ptySessionId. The first call owns the
     // request; the second observes the same outcome.
     let resolveClose!: (value: boolean) => void
     mocks.closeMock.mockReturnValueOnce(
@@ -433,17 +433,17 @@ describe('TerminalSessionRegistry create flow', () => {
     )
 
     const first = registry.enqueueDurableClose({
-      sessionId: 'session-stale',
+      ptySessionId: 'session-stale',
       worktreeTerminalKey: WORKTREE_KEY,
     })
     const second = registry.enqueueDurableClose({
-      sessionId: 'session-stale',
+      ptySessionId: 'session-stale',
       worktreeTerminalKey: WORKTREE_KEY,
     })
 
     // Only one close call was dispatched.
     expect(mocks.closeMock).toHaveBeenCalledTimes(1)
-    expect(mocks.closeMock).toHaveBeenCalledWith({ sessionId: 'session-stale' })
+    expect(mocks.closeMock).toHaveBeenCalledWith({ ptySessionId: 'session-stale' })
 
     resolveClose(true)
     await expect(first).resolves.toBeUndefined()
@@ -458,7 +458,7 @@ describe('TerminalSessionRegistry create flow', () => {
     mocks.closeMock.mockReturnValueOnce(new Promise<boolean>(() => {}))
 
     const closePromise = registry.enqueueDurableClose({
-      sessionId: 'session-stale',
+      ptySessionId: 'session-stale',
       worktreeTerminalKey: WORKTREE_KEY,
     })
 

@@ -6,11 +6,11 @@ import type {
   TerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
 
-function makeDescriptor(terminalId: string, index: number): TerminalDescriptor {
+function makeDescriptor(slotId: string, index: number): TerminalDescriptor {
   return {
-    key: `/repo\0/repo\0${terminalId}`,
+    key: `/repo\0/repo\0${slotId}`,
     worktreeTerminalKey: '/repo\0/repo',
-    terminalId,
+    slotId,
     index,
     repoRoot: '/repo',
     branch: 'main',
@@ -79,7 +79,7 @@ describe('terminal session worktree snapshot helper', () => {
           type: 'terminal',
           id: descriptor.key,
           key: descriptor.key,
-          terminalId: 'terminal-1',
+          slotId: 'terminal-1',
           selected: true,
           hasBell: true,
           phase: 'open',

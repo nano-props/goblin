@@ -8,7 +8,7 @@ import type {
   TerminalAttachmentOwnershipViewModel,
   TerminalOwnershipViewModel,
 } from '#/web/components/terminal/types.ts'
-export class TerminalSessionState {
+export class TerminalSlotState {
   /** Terminal runtime metadata mirrored from attach/session/ownership events.
    *  This is authoritative runtime shape for the renderer, but it is not
    *  the same thing as workspace/session persistence. */

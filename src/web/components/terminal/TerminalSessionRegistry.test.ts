@@ -8,7 +8,7 @@ import {
 } from '#/web/components/terminal/TerminalSessionRegistry.ts'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import type { TerminalDescriptor, TerminalRepoIndex } from '#/web/components/terminal/types.ts'
-import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
+import type { TerminalSlotSummary } from '#/shared/terminal-types.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
@@ -19,11 +19,11 @@ const WORKTREE_PATH = '/repo'
 const BRANCH = 'main'
 const WORKTREE_KEY = worktreeTerminalKey(REPO_ROOT, WORKTREE_PATH)
 
-function makeDescriptor(terminalId: string, index: number): TerminalDescriptor {
+function makeDescriptor(slotId: string, index: number): TerminalDescriptor {
   return {
-    key: `${REPO_ROOT}\0${WORKTREE_PATH}\0${terminalId}`,
+    key: `${REPO_ROOT}\0${WORKTREE_PATH}\0${slotId}`,
     worktreeTerminalKey: WORKTREE_KEY,
-    terminalId,
+    slotId,
     index,
     repoRoot: REPO_ROOT,
     branch: BRANCH,
@@ -41,10 +41,10 @@ function makeRepoIndex(): TerminalRepoIndex {
 }
 
 function makeServerSession(
-  sessionId: string,
-  terminalId: string,
+  ptySessionId: string,
+  slotId: string,
   overrides: Partial<{
-    controller: { attachmentId: string; status: 'connected' }
+    controller: { clientId: string; status: 'connected' }
     processName: string
     canonicalTitle: string | null
     phase: 'opening' | 'restarting' | 'open' | 'error' | 'closed'
@@ -53,10 +53,10 @@ function makeServerSession(
     rows: number
     displayOrder: number
   }> = {},
-): TerminalSessionSummary {
-  const key = `${REPO_ROOT}\0${WORKTREE_PATH}\0${terminalId}`
+): TerminalSlotSummary {
+  const key = `${REPO_ROOT}\0${WORKTREE_PATH}\0${slotId}`
   return {
-    sessionId,
+    ptySessionId,
     key,
     viewType: 'terminal',
     viewId: key,
@@ -110,12 +110,12 @@ describe('TerminalSessionRegistry', () => {
   })
 
   describe('event dispatch', () => {
-    test('dispatches output to the correct session by sessionId index', () => {
+    test('dispatches output to the correct session by ptySessionId index', () => {
       registry.setRepoIndex(makeRepoIndex())
       registry.reconcileServerSessions(
         REPO_ROOT,
         [makeServerSession('session-a', 'terminal-1')],
-        'attachment_local',
+        'client_local',
         new Map(),
       )
 
@@ -124,19 +124,19 @@ describe('TerminalSessionRegistry', () => {
       const session = (registry as any).sessions.get(key)
       const handleOutputSpy = vi.spyOn(session, 'handleOutput')
 
-      registry.handleOutput({ sessionId: 'session-a', data: 'hello', seq: 1, processName: 'bash' })
+      registry.handleOutput({ ptySessionId: 'session-a', data: 'hello', seq: 1, processName: 'bash' })
       expect(handleOutputSpy).toHaveBeenCalledTimes(1)
 
-      registry.handleOutput({ sessionId: 'session-b', data: 'hello', seq: 1, processName: 'bash' })
+      registry.handleOutput({ ptySessionId: 'session-b', data: 'hello', seq: 1, processName: 'bash' })
       expect(handleOutputSpy).toHaveBeenCalledTimes(1)
     })
 
-    test('dispatches title changes by sessionId index', () => {
+    test('dispatches title changes by ptySessionId index', () => {
       registry.setRepoIndex(makeRepoIndex())
       registry.reconcileServerSessions(
         REPO_ROOT,
         [makeServerSession('session-a', 'terminal-1')],
-        'attachment_local',
+        'client_local',
         new Map(),
       )
 
@@ -144,20 +144,20 @@ describe('TerminalSessionRegistry', () => {
       const session = (registry as any).sessions.get(key)
       const handleServerTitleSpy = vi.spyOn(session, 'handleServerTitle')
 
-      registry.handleServerTitle({ sessionId: 'session-a', canonicalTitle: 'new title' })
+      registry.handleServerTitle({ ptySessionId: 'session-a', canonicalTitle: 'new title' })
       expect(handleServerTitleSpy).toHaveBeenCalledWith('new title')
 
       handleServerTitleSpy.mockClear()
-      registry.handleServerTitle({ sessionId: 'session-b', canonicalTitle: 'ignored' })
+      registry.handleServerTitle({ ptySessionId: 'session-b', canonicalTitle: 'ignored' })
       expect(handleServerTitleSpy).not.toHaveBeenCalled()
     })
 
-    test('dispatches exit by sessionId index', () => {
+    test('dispatches exit by ptySessionId index', () => {
       registry.setRepoIndex(makeRepoIndex())
       registry.reconcileServerSessions(
         REPO_ROOT,
         [makeServerSession('session-a', 'terminal-1')],
-        'attachment_local',
+        'client_local',
         new Map(),
       )
 
@@ -165,11 +165,11 @@ describe('TerminalSessionRegistry', () => {
       const session = (registry as any).sessions.get(key)
       const handleExitSpy = vi.spyOn(session, 'handleExit').mockReturnValue(true)
 
-      registry.handleExit({ sessionId: 'session-a' })
+      registry.handleExit({ ptySessionId: 'session-a' })
       expect(handleExitSpy).toHaveBeenCalledTimes(1)
 
       handleExitSpy.mockClear()
-      registry.handleExit({ sessionId: 'session-b' })
+      registry.handleExit({ ptySessionId: 'session-b' })
       expect(handleExitSpy).not.toHaveBeenCalled()
     })
 
@@ -178,7 +178,7 @@ describe('TerminalSessionRegistry', () => {
       registry.reconcileServerSessions(
         REPO_ROOT,
         [makeServerSession('session-a', 'terminal-1')],
-        'attachment_local',
+        'client_local',
         new Map(),
       )
 
@@ -187,7 +187,7 @@ describe('TerminalSessionRegistry', () => {
       // event is what removes the entry, not the local-session
       // cleanup.
       ;(registry as any).reattachSnapshotCache.set(key, {
-        sessionId: 'session-a',
+        ptySessionId: 'session-a',
         snapshot: 'cached',
         snapshotSeq: 7,
       })
@@ -199,7 +199,7 @@ describe('TerminalSessionRegistry', () => {
       const session = (registry as any).sessions.get(key)
       vi.spyOn(session, 'handleExit').mockReturnValue(true)
 
-      registry.handleExit({ sessionId: 'session-a' })
+      registry.handleExit({ ptySessionId: 'session-a' })
       expect((registry as any).reattachSnapshotCache.has(key)).toBe(false)
     })
 
@@ -213,7 +213,7 @@ describe('TerminalSessionRegistry', () => {
 
       for (let i = 0; i < limit + 1; i++) {
         ;(registry as any).setReattachSnapshot(`key-${i}`, {
-          sessionId: `session-${i}`,
+          ptySessionId: `session-${i}`,
           snapshot: `snap-${i}`,
           snapshotSeq: i,
         })
@@ -239,34 +239,34 @@ describe('TerminalSessionRegistry', () => {
 
     test('handleExit preserves the reattach cache when the local session rejects the exit', () => {
       // Race scenario: the server emitted an exit for an old
-      // sessionId, but the local session has already been updated to
-      // a new sessionId (e.g., after a server-side restart). The
-      // sessionKeyBySessionId index may still map the old sessionId
+      // ptySessionId, but the local session has already been updated to
+      // a new ptySessionId (e.g., after a server-side restart). The
+      // slotKeyByPtySessionId index may still map the old ptySessionId
       // to the local key. Evicting the reattach cache here would
       // discard a snapshot the user can still use on next reattach.
       registry.setRepoIndex(makeRepoIndex())
       registry.reconcileServerSessions(
         REPO_ROOT,
         [makeServerSession('session-a', 'terminal-1')],
-        'attachment_local',
+        'client_local',
         new Map(),
       )
 
       const key = registry.worktreeSnapshot(WORKTREE_KEY).sessions[0]!.key
       const session = (registry as any).sessions.get(key)
-      // Local session is alive under a *different* sessionId.
+      // Local session is alive under a *different* ptySessionId.
       session.currentSessionId = () => 'session-b'
       session.handleExit = vi.fn().mockReturnValue(false)
 
-      // Seed the reattach cache for the old sessionId.
+      // Seed the reattach cache for the old ptySessionId.
       ;(registry as any).reattachSnapshotCache.set(key, {
-        sessionId: 'session-a',
+        ptySessionId: 'session-a',
         snapshot: 'cached',
         snapshotSeq: 7,
       })
       expect((registry as any).reattachSnapshotCache.has(key)).toBe(true)
 
-      registry.handleExit({ sessionId: 'session-a' })
+      registry.handleExit({ ptySessionId: 'session-a' })
       // Cache survives — the local session didn't confirm the exit.
       expect((registry as any).reattachSnapshotCache.has(key)).toBe(true)
     })
@@ -278,7 +278,7 @@ describe('TerminalSessionRegistry', () => {
       registry.reconcileServerSessions(
         REPO_ROOT,
         [makeServerSession('session-a', 'terminal-1')],
-        'attachment_local',
+        'client_local',
         new Map(),
       )
 
@@ -305,13 +305,13 @@ describe('TerminalSessionRegistry', () => {
       registry.reconcileServerSessions(
         REPO_ROOT,
         [makeServerSession('session-1', 'terminal-1')],
-        'attachment_local',
+        'client_local',
         new Map(),
       )
 
       const snapshot = registry.worktreeSnapshot(WORKTREE_KEY)
       expect(snapshot.count).toBe(1)
-      expect(snapshot.sessions[0]!.terminalId).toBe('terminal-1')
+      expect(snapshot.sessions[0]!.slotId).toBe('terminal-1')
       expect(selectedChanges).toContainEqual({ worktreeTerminalKey: WORKTREE_KEY, key: snapshot.sessions[0]!.key })
     })
 
@@ -320,14 +320,14 @@ describe('TerminalSessionRegistry', () => {
       registry.reconcileServerSessions(
         REPO_ROOT,
         [makeServerSession('session-1', 'terminal-1')],
-        'attachment_local',
+        'client_local',
         new Map(),
       )
 
       const keyBefore = registry.worktreeSnapshot(WORKTREE_KEY).sessions[0]!.key
       expect(registry.isKnownSession(keyBefore)).toBe(true)
 
-      registry.reconcileServerSessions(REPO_ROOT, [], 'attachment_local', new Map())
+      registry.reconcileServerSessions(REPO_ROOT, [], 'client_local', new Map())
 
       expect(registry.isKnownSession(keyBefore)).toBe(false)
       expect(registry.worktreeSnapshot(WORKTREE_KEY).count).toBe(0)
@@ -362,7 +362,7 @@ describe('TerminalSessionRegistry', () => {
         registryWithStore.reconcileServerSessions(
           REPO_ROOT,
           [makeServerSession('session-1', 'terminal-1')],
-          'attachment_local',
+          'client_local',
           new Map(),
         )
 
@@ -391,7 +391,7 @@ describe('TerminalSessionRegistry', () => {
         registryWithThrowingCallback.reconcileServerSessions(
           REPO_ROOT,
           [makeServerSession('session-1', 'terminal-1')],
-          'attachment_local',
+          'client_local',
           new Map(),
         )
         const key = registryWithThrowingCallback.worktreeSnapshot(WORKTREE_KEY).sessions[0]!.key
@@ -406,7 +406,7 @@ describe('TerminalSessionRegistry', () => {
           }),
         ).not.toThrow()
 
-        expect(dispose).toHaveBeenCalledWith({ closeSession: true })
+        expect(dispose).toHaveBeenCalledWith({ closeSlot: true })
         expect(registryWithThrowingCallback.isKnownSession(key)).toBe(false)
       } finally {
         registryWithThrowingCallback.destroy()
@@ -420,23 +420,23 @@ describe('TerminalSessionRegistry', () => {
       registry.reconcileServerSessions(
         REPO_ROOT,
         [makeServerSession('session-1', 'terminal-1')],
-        'attachment_local',
+        'client_local',
         new Map(),
       )
-      expect(registry.worktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalId).toBe('terminal-1')
+      expect(registry.worktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.slotId).toBe('terminal-1')
 
       // Second reconcile: terminal-1 removed, terminal-2 is controller
       registry.reconcileServerSessions(
         REPO_ROOT,
         [
           makeServerSession('session-2', 'terminal-2', {
-            controller: { attachmentId: 'attachment_local', status: 'connected' },
+            controller: { clientId: 'client_local', status: 'connected' },
           }),
         ],
-        'attachment_local',
+        'client_local',
         new Map(),
       )
-      expect(registry.worktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalId).toBe('terminal-2')
+      expect(registry.worktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.slotId).toBe('terminal-2')
     })
 
     test('closing the active terminal selects the adjacent tab in display order', () => {
@@ -449,18 +449,18 @@ describe('TerminalSessionRegistry', () => {
           makeServerSession('session-2', 'terminal-2', { displayOrder: 0 }),
           makeServerSession('session-3', 'terminal-3', { displayOrder: 2 }),
         ],
-        'attachment_local',
+        'client_local',
         new Map(),
       )
 
       const snapshot = registry.worktreeSnapshot(WORKTREE_KEY)
-      const activeKey = snapshot.sessions.find((session) => session.terminalId === 'terminal-2')?.key
+      const activeKey = snapshot.sessions.find((session) => session.slotId === 'terminal-2')?.key
       if (!activeKey) throw new Error('missing terminal-2')
 
       registry.selectTerminal(WORKTREE_KEY, activeKey)
-      ;(registry as any).removeSession(activeKey, { dispose: false, closeSession: false })
+      ;(registry as any).removeSession(activeKey, { dispose: false, closeSlot: false })
 
-      expect(registry.worktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalId).toBe('terminal-1')
+      expect(registry.worktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.slotId).toBe('terminal-1')
     })
 
     test('invalidates cached worktree snapshot when server display order changes', () => {
@@ -471,12 +471,12 @@ describe('TerminalSessionRegistry', () => {
           makeServerSession('session-1', 'terminal-1', { displayOrder: 0 }),
           makeServerSession('session-2', 'terminal-2', { displayOrder: 1 }),
         ],
-        'attachment_local',
+        'client_local',
         new Map(),
       )
 
       const firstSnapshot = registry.worktreeSnapshot(WORKTREE_KEY)
-      expect(firstSnapshot.sessions.map((session) => session.terminalId)).toEqual(['terminal-1', 'terminal-2'])
+      expect(firstSnapshot.sessions.map((session) => session.slotId)).toEqual(['terminal-1', 'terminal-2'])
 
       registry.reconcileServerSessions(
         REPO_ROOT,
@@ -484,12 +484,12 @@ describe('TerminalSessionRegistry', () => {
           makeServerSession('session-1', 'terminal-1', { displayOrder: 1 }),
           makeServerSession('session-2', 'terminal-2', { displayOrder: 0 }),
         ],
-        'attachment_local',
+        'client_local',
         new Map(),
       )
 
       const secondSnapshot = registry.worktreeSnapshot(WORKTREE_KEY)
-      expect(secondSnapshot.sessions.map((session) => session.terminalId)).toEqual(['terminal-2', 'terminal-1'])
+      expect(secondSnapshot.sessions.map((session) => session.slotId)).toEqual(['terminal-2', 'terminal-1'])
     })
   })
 
@@ -499,7 +499,7 @@ describe('TerminalSessionRegistry', () => {
       registry.reconcileServerSessions(
         REPO_ROOT,
         [makeServerSession('session-1', 'terminal-1')],
-        'attachment_local',
+        'client_local',
         new Map(),
       )
 
@@ -521,7 +521,7 @@ describe('TerminalSessionRegistry', () => {
       registry.reconcileServerSessions(
         REPO_ROOT,
         [makeServerSession('session-1', 'terminal-1')],
-        'attachment_local',
+        'client_local',
         new Map(),
       )
 
@@ -605,7 +605,7 @@ describe('TerminalSessionRegistry', () => {
       // The session we injected is still in the registry's map —
       // i.e. the state survived the synthetic remount.
       const stored = (after as any).sessions.get(descriptor.key) as { descriptor: TerminalDescriptor } | undefined
-      expect(stored?.descriptor.terminalId).toBe('terminal-1')
+      expect(stored?.descriptor.slotId).toBe('terminal-1')
     })
   })
 })

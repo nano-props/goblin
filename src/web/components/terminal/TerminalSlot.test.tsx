@@ -11,7 +11,7 @@ import {
 import type {
   TerminalSessionContextValue,
   TerminalSessionReadContextValue,
-  TerminalSessionSummary,
+  TerminalSlotSummary,
   WorktreeTerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
 
@@ -36,8 +36,8 @@ afterEach(() => {
   document.body.innerHTML = ''
 })
 
-type TestTerminalSummary = Omit<TerminalSessionSummary, 'type' | 'id' | 'displayOrder'> &
-  Partial<Pick<TerminalSessionSummary, 'type' | 'id' | 'displayOrder'>>
+type TestTerminalSummary = Omit<TerminalSlotSummary, 'type' | 'id' | 'displayOrder'> &
+  Partial<Pick<TerminalSlotSummary, 'type' | 'id' | 'displayOrder'>>
 
 type TestWorktreeSnapshot = Omit<
   WorktreeTerminalSnapshot,
@@ -70,7 +70,7 @@ async function renderControllerSlot() {
   const descriptor = {
     key: 'terminal-1',
     worktreeTerminalKey: '/repo\0/worktree',
-    terminalId: 'terminal-1',
+    slotId: 'terminal-1',
     index: 1,
     repoRoot: '/repo',
     branch: 'feature',
@@ -83,7 +83,7 @@ async function renderControllerSlot() {
       {
         key: 'terminal-1',
         worktreeTerminalKey: '/repo\0/worktree',
-        terminalId: 'terminal-1',
+        slotId: 'terminal-1',
         index: 1,
         title: 'zsh',
         phase: 'open' as const,
@@ -185,7 +185,7 @@ describe('TerminalSlot', () => {
       {
         key: 'terminal-1',
         worktreeTerminalKey: '/repo\0/worktree',
-        terminalId: 'terminal-1',
+        slotId: 'terminal-1',
         index: 1,
         title: 'zsh',
         phase: 'open' as const,
@@ -196,7 +196,7 @@ describe('TerminalSlot', () => {
     const descriptor = {
       key: 'terminal-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      terminalId: 'terminal-1',
+      slotId: 'terminal-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -362,7 +362,7 @@ describe('TerminalSlot', () => {
     const descriptor = {
       key: 'terminal-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      terminalId: 'terminal-1',
+      slotId: 'terminal-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -375,7 +375,7 @@ describe('TerminalSlot', () => {
         {
           key: 'terminal-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          terminalId: 'terminal-1',
+          slotId: 'terminal-1',
           index: 1,
           title: 'zsh',
           phase: 'error' as const,
@@ -478,7 +478,7 @@ describe('TerminalSlot', () => {
     const descriptor = {
       key: 'terminal-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      terminalId: 'terminal-1',
+      slotId: 'terminal-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -491,7 +491,7 @@ describe('TerminalSlot', () => {
         {
           key: 'terminal-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          terminalId: 'terminal-1',
+          slotId: 'terminal-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -599,7 +599,7 @@ describe('TerminalSlot', () => {
     const descriptor = {
       key: 'terminal-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      terminalId: 'terminal-1',
+      slotId: 'terminal-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -612,7 +612,7 @@ describe('TerminalSlot', () => {
         {
           key: 'terminal-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          terminalId: 'terminal-1',
+          slotId: 'terminal-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -739,7 +739,7 @@ describe('TerminalSlot', () => {
     const descriptor = {
       key: 'terminal-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      terminalId: 'terminal-1',
+      slotId: 'terminal-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -752,7 +752,7 @@ describe('TerminalSlot', () => {
         {
           key: 'terminal-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          terminalId: 'terminal-1',
+          slotId: 'terminal-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -849,7 +849,7 @@ describe('TerminalSlot', () => {
     const descriptor = {
       key: 'terminal-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      terminalId: 'terminal-1',
+      slotId: 'terminal-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -862,7 +862,7 @@ describe('TerminalSlot', () => {
         {
           key: 'terminal-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          terminalId: 'terminal-1',
+          slotId: 'terminal-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -972,7 +972,7 @@ describe('TerminalSlot', () => {
     const descriptor = {
       key: 'terminal-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      terminalId: 'terminal-1',
+      slotId: 'terminal-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -985,7 +985,7 @@ describe('TerminalSlot', () => {
         {
           key: 'terminal-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          terminalId: 'terminal-1',
+          slotId: 'terminal-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -1179,7 +1179,7 @@ describe('TerminalSlot', () => {
     const descriptor = {
       key: 'terminal-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      terminalId: 'terminal-1',
+      slotId: 'terminal-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -1192,7 +1192,7 @@ describe('TerminalSlot', () => {
         {
           key: 'terminal-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          terminalId: 'terminal-1',
+          slotId: 'terminal-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -1302,7 +1302,7 @@ describe('TerminalSlot', () => {
     // controller-drop path. The blob-save tier is a real roundtrip
     // (HTTP POST in web, IPC in Electron), so the user has a real
     // window to switch worktrees before the resolver returns. The
-    // captured `sessionKey` would otherwise be typed into a session
+    // captured `slotKey` would otherwise be typed into a session
     // the user is no longer looking at — invisible to them, or worse,
     // into a now-detached session that the registry silently drops.
     // The fix: capture `key` at handler invocation time, compare to
@@ -1316,7 +1316,7 @@ describe('TerminalSlot', () => {
     const descriptorA = {
       key: 'terminal-1',
       worktreeTerminalKey: '/repo\0/worktree',
-      terminalId: 'terminal-1',
+      slotId: 'terminal-1',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -1325,7 +1325,7 @@ describe('TerminalSlot', () => {
     const descriptorB = {
       key: 'terminal-2',
       worktreeTerminalKey: '/repo\0/worktree-other',
-      terminalId: 'terminal-2',
+      slotId: 'terminal-2',
       index: 1,
       repoRoot: '/repo',
       branch: 'feature',
@@ -1338,7 +1338,7 @@ describe('TerminalSlot', () => {
         {
           key: 'terminal-1',
           worktreeTerminalKey: '/repo\0/worktree',
-          terminalId: 'terminal-1',
+          slotId: 'terminal-1',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,
@@ -1356,7 +1356,7 @@ describe('TerminalSlot', () => {
         {
           key: 'terminal-2',
           worktreeTerminalKey: '/repo\0/worktree-other',
-          terminalId: 'terminal-2',
+          slotId: 'terminal-2',
           index: 1,
           title: 'zsh',
           phase: 'open' as const,

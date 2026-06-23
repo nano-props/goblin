@@ -6,7 +6,7 @@ import type {
   WorktreeTerminalSnapshot,
   TerminalSnapshot,
   TerminalDescriptor,
-  TerminalSessionSummary,
+  TerminalSlotSummary,
 } from '#/web/components/terminal/types.ts'
 
 const EMPTY_WORKTREE_TERMINAL_SNAPSHOT: WorktreeTerminalSnapshot = {
@@ -85,7 +85,7 @@ export function useWorktreeTerminalSelectedDescriptor(worktreeTerminalKey: strin
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
 
-export function useTerminalSessionSummaries(worktreeTerminalKey: string | null): TerminalSessionSummary[] {
+export function useTerminalSessionSummaries(worktreeTerminalKey: string | null): TerminalSlotSummary[] {
   const { worktreeSnapshot, subscribeWorktree } = useTerminalSessionReadContext()
   const subscribe = useCallback(
     (listener: () => void) => (worktreeTerminalKey ? subscribeWorktree(worktreeTerminalKey, listener) : () => {}),

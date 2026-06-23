@@ -1,7 +1,7 @@
 import { compactTerminalProcessName, compactTerminalTitle } from '#/web/components/terminal/terminal-title.ts'
 import type {
   ManagedTerminalSessionLike,
-  TerminalSessionSummary,
+  TerminalSlotSummary,
   TerminalSnapshot,
   WorktreeTerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
@@ -37,7 +37,7 @@ function buildTerminalSessionSummaries(input: {
   cacheSnapshot: (key: string, snapshot: TerminalSnapshot) => void
   hasBell: (key: string) => boolean
   getDisplayOrder: (session: ManagedTerminalSessionLike) => number
-}): TerminalSessionSummary[] {
+}): TerminalSlotSummary[] {
   return input.sessions.map((session) => {
     const cached = input.getCachedSnapshot(session.descriptor.key)
     const snapshot = cached ?? session.snapshot()
@@ -47,7 +47,7 @@ function buildTerminalSessionSummaries(input: {
       id: session.descriptor.key,
       key: session.descriptor.key,
       worktreeTerminalKey: input.worktreeTerminalKey,
-      terminalId: session.descriptor.terminalId,
+      slotId: session.descriptor.slotId,
       index: session.descriptor.index,
       displayOrder: input.getDisplayOrder(session),
       title: summarizeTerminalTitle(snapshot, session.descriptor.index),

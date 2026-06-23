@@ -38,8 +38,8 @@ import type {
   TerminalExitEvent,
   TerminalAttachResult,
   TerminalOutputEvent,
-  TerminalSessionSnapshot,
-  TerminalSessionSummary,
+  TerminalSlotSnapshot,
+  TerminalSlotSummary,
   TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
 
@@ -84,7 +84,7 @@ vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
     private readonly hydrateSpy = vi.fn()
     private readonly detachSpy = vi.fn()
     private serializeValue = ''
-    private sessionId: string | null = null
+    private ptySessionId: string | null = null
     private snapshotValue: TerminalSnapshot
 
     constructor(
@@ -95,7 +95,7 @@ vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
       this.descriptor = descriptor
       this.notify = _notify
       this.onBell = onBell
-      this.sessionId = null
+      this.ptySessionId = null
       this.snapshotValue = {
         phase: 'opening',
         message: null,
@@ -158,11 +158,11 @@ vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
     }
 
     currentSessionId(): string | null {
-      return this.sessionId
+      return this.ptySessionId
     }
 
     hydrate(input: {
-      sessionId: string
+      ptySessionId: string
       phase: 'opening' | 'open' | 'error'
       message: string | null
       processName: string
@@ -175,7 +175,7 @@ vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
       snapshotSeq?: number
     }) {
       this.hydrateSpy(input)
-      this.sessionId = input.sessionId
+      this.ptySessionId = input.ptySessionId
       this.snapshotValue = {
         phase: input.phase,
         message: input.message,
@@ -214,7 +214,7 @@ vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
     }
 
     handleOwnership(event: {
-      sessionId: string
+      ptySessionId: string
       role: 'controller' | 'viewer' | 'unowned'
       controllerStatus: 'connected' | 'none'
       canonicalCols: number
@@ -242,20 +242,20 @@ let titleHandler: ((event: TerminalTitleEvent) => void) | null = null
 let ownershipHandler: ((event: TerminalOwnershipViewModel) => void) | null = null
 let sessionsChangedHandler: ((repoRoot: string) => void) | null = null
 let workspacePaneChangedHandler: ((repoRoot: string) => void) | null = null
-let sessionClosedHandler: ((event: { sessionId: string; repoRoot: string }) => void) | null = null
-type TestTerminalSessionSummary = Omit<TerminalSessionSummary, 'viewType' | 'viewId'> &
-  Partial<Pick<TerminalSessionSummary, 'viewType' | 'viewId'>>
+let sessionClosedHandler: ((event: { ptySessionId: string; repoRoot: string }) => void) | null = null
+type TestTerminalSessionSummary = Omit<TerminalSlotSummary, 'viewType' | 'viewId'> &
+  Partial<Pick<TerminalSlotSummary, 'viewType' | 'viewId'>>
 const listSessionsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<TestTerminalSessionSummary[]>>(
   async () => [],
 )
-const getSessionSnapshotMock = vi.fn<
-  (...args: Array<{ sessionId: string }>) => Promise<TerminalSessionSnapshot | null>
+const getSlotSnapshotMock = vi.fn<
+  (...args: Array<{ ptySessionId: string }>) => Promise<TerminalSlotSnapshot | null>
 >(async () => null)
 const closeMock = vi.fn(async () => true)
 const createTerminalMock = vi.fn<(input: TerminalCreateInput) => Promise<TerminalCatalogMutationResult>>()
 let managedServerSessions: TestTerminalSessionSummary[] = []
 
-function completeServerSession(session: TestTerminalSessionSummary): TerminalSessionSummary {
+function completeServerSession(session: TestTerminalSessionSummary): TerminalSlotSummary {
   return {
     ...session,
     viewType: session.viewType ?? 'terminal',
@@ -263,7 +263,7 @@ function completeServerSession(session: TestTerminalSessionSummary): TerminalSes
   }
 }
 
-function completeServerSessions(sessions: TestTerminalSessionSummary[]): TerminalSessionSummary[] {
+function completeServerSessions(sessions: TestTerminalSessionSummary[]): TerminalSlotSummary[] {
   return sessions.map(completeServerSession)
 }
 
@@ -288,14 +288,14 @@ async function waitForScheduledServerSync(): Promise<void> {
 function attachResult(): TerminalAttachResult {
   return {
     ok: true,
-    sessionId: 'unused',
+    ptySessionId: 'unused',
     snapshot: '',
     snapshotSeq: 0,
     processName: 'zsh',
     canonicalTitle: null,
     phase: 'open',
     message: null,
-    controller: { attachmentId: 'attachment_local', status: 'connected' },
+    controller: { clientId: 'client_local', status: 'connected' },
     canonicalCols: 80,
     canonicalRows: 24,
   }
@@ -314,14 +314,14 @@ beforeEach(() => {
   managedServerSessions = []
   listSessionsMock.mockReset()
   listSessionsMock.mockImplementation(async () => managedServerSessions)
-  getSessionSnapshotMock.mockReset()
-  getSessionSnapshotMock.mockResolvedValue(null)
+  getSlotSnapshotMock.mockReset()
+  getSlotSnapshotMock.mockResolvedValue(null)
   closeMock.mockReset()
   closeMock.mockResolvedValue(true)
   createTerminalMock.mockReset()
   createTerminalMock.mockImplementation(async (input) => {
     const currentSessions = await listSessionsMock({ repoRoot: input.repoRoot })
-    const terminalId =
+    const slotId =
       input.kind === 'primary'
         ? 'terminal-1'
         : `terminal-${
@@ -331,7 +331,7 @@ beforeEach(() => {
               return Number.isFinite(index) ? Math.max(max, index) : max
             }, 0) + 1
           }`
-    const key = `${input.repoRoot}\u0000${input.worktreePath}\u0000${terminalId}`
+    const key = `${input.repoRoot}\u0000${input.worktreePath}\u0000${slotId}`
     if (input.kind === 'primary' && currentSessions.some((session) => session.key === key)) {
       managedServerSessions = currentSessions
       const reused = currentSessions.find((session) => session.key === key)
@@ -343,7 +343,7 @@ beforeEach(() => {
         action: 'reused',
         key,
         sessions: completeServerSessions(managedServerSessions),
-        sessionId: reused?.sessionId ?? 'terminal-1',
+        ptySessionId: reused?.ptySessionId ?? 'terminal-1',
         snapshot: '',
         snapshotSeq: 0,
         processName: reused?.processName ?? 'zsh',
@@ -355,20 +355,20 @@ beforeEach(() => {
         canonicalRows: reused?.rows ?? 24,
       }
     }
-    const controller = input.attachmentId ? { attachmentId: input.attachmentId, status: 'connected' as const } : null
+    const controller = input.clientId ? { clientId: input.clientId, status: 'connected' as const } : null
     managedServerSessions = [
       ...currentSessions
         .filter((session) => session.key !== key)
         .map((session) => ({
           ...session,
-          controller: session.controller?.attachmentId === input.attachmentId ? null : session.controller,
+          controller: session.controller?.clientId === input.clientId ? null : session.controller,
         })),
       {
-        sessionId: terminalId,
+        ptySessionId: slotId,
         key,
         cwd: input.worktreePath,
         controller,
-        processName: terminalId,
+        processName: slotId,
         canonicalTitle: null,
         phase: 'open',
         message: null,
@@ -378,7 +378,7 @@ beforeEach(() => {
       },
     ]
     // New first-frame hydration contract: `create` returns
-    // `sessionId` + `snapshot` + `snapshotSeq` directly so the
+    // `ptySessionId` + `snapshot` + `snapshotSeq` directly so the
     // renderer can paint without a follow-up snapshot fetch.
     // The fields are still optional on the shared type (transitional
     // shape — see docs/terminal-first-frame-fix.md) but the
@@ -389,7 +389,7 @@ beforeEach(() => {
       action: 'created',
       key,
       sessions: completeServerSessions(managedServerSessions),
-      sessionId: terminalId,
+      ptySessionId: slotId,
       snapshot: '',
       snapshotSeq: 0,
       processName: 'zsh',
@@ -403,7 +403,7 @@ beforeEach(() => {
   })
   resetReposStore()
   useRepoSyncStore.setState(useRepoSyncStore.getInitialState())
-  window.sessionStorage.setItem('goblin:web-terminal-attachment-id', 'attachment_local')
+  window.sessionStorage.setItem('goblin:web-terminal-attachment-id', 'client_local')
   mainWindowQueryClient.clear()
   mainWindowQueryClient.setQueryData(
     settingsSnapshotQueryKey(),
@@ -426,7 +426,7 @@ beforeEach(() => {
       terminal: {
         attach: vi.fn(async () => ({
           ok: true,
-          sessionId: 'unused',
+          ptySessionId: 'unused',
           replay: '',
           replaySeq: 0,
           processName: 'zsh',
@@ -436,7 +436,7 @@ beforeEach(() => {
         })),
         restart: vi.fn(async () => ({
           ok: true,
-          sessionId: 'unused',
+          ptySessionId: 'unused',
           replay: '',
           replaySeq: 0,
           processName: 'zsh',
@@ -448,10 +448,10 @@ beforeEach(() => {
         resize: vi.fn(async () => true),
         takeover: vi.fn(async () => ({
           ok: true as const,
-          sessionId: 'session-1',
+          ptySessionId: 'session-1',
           role: 'controller' as const,
           controllerStatus: 'connected' as const,
-          controller: { attachmentId: 'attachment_local', status: 'connected' as const },
+          controller: { clientId: 'client_local', status: 'connected' as const },
           canonicalCols: 80,
           canonicalRows: 24,
           phase: 'open' as const,
@@ -463,7 +463,7 @@ beforeEach(() => {
         pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
         listSessions: async (input: { repoRoot: string }) => completeServerSessions(await listSessionsMock(input)),
         listViews: vi.fn(async () => []),
-        getSessionSnapshot: getSessionSnapshotMock,
+        getSlotSnapshot: getSlotSnapshotMock,
         onOutput: vi.fn((cb: (event: TerminalOutputEvent) => void) => {
           outputHandler = cb
           return () => {}
@@ -539,10 +539,10 @@ beforeEach(() => {
       resize: vi.fn(async () => true),
       takeover: vi.fn(async () => ({
         ok: true as const,
-        sessionId: 'session-1',
+        ptySessionId: 'session-1',
         role: 'controller' as const,
         controllerStatus: 'connected' as const,
-        controller: { attachmentId: 'attachment_local', status: 'connected' as const },
+        controller: { clientId: 'client_local', status: 'connected' as const },
         canonicalCols: 80,
         canonicalRows: 24,
         phase: 'open' as const,
@@ -556,7 +556,7 @@ beforeEach(() => {
       closeView: vi.fn(async () => true),
       prewarm: vi.fn(async () => {}),
       kickReconnect: vi.fn(() => {}),
-      getSessionSnapshot: getSessionSnapshotMock,
+      getSlotSnapshot: getSlotSnapshotMock,
       reorderViews: vi.fn(async () => true),
       notifyBell: window.goblinNative.terminal.notifyBell ?? vi.fn(async () => true),
       sendTestNotification: vi.fn(async () => true),
@@ -589,7 +589,7 @@ beforeEach(() => {
           if (workspacePaneChangedHandler === cb) workspacePaneChangedHandler = null
         }
       }),
-      onSessionClosed: vi.fn((cb: (event: { sessionId: string; repoRoot: string }) => void) => {
+      onSessionClosed: vi.fn((cb: (event: { ptySessionId: string; repoRoot: string }) => void) => {
         sessionClosedHandler = cb
         return () => {
           if (sessionClosedHandler === cb) sessionClosedHandler = null
@@ -629,29 +629,29 @@ describe('TerminalSessionProvider', () => {
       expect(createTerminalMock).toHaveBeenNthCalledWith(1, {
         ...base,
         kind: 'primary',
-        attachmentId: 'attachment_local',
+        clientId: 'client_local',
         cols: 100,
         rows: 30,
       })
       expect(createTerminalMock).toHaveBeenNthCalledWith(2, {
         ...base,
         kind: 'additional',
-        attachmentId: 'attachment_local',
+        clientId: 'client_local',
         cols: 100,
         rows: 30,
       })
-      expect(getProbe().summaries.map((session) => [session.terminalId, session.selected, session.hasBell])).toEqual([
+      expect(getProbe().summaries.map((session) => [session.slotId, session.selected, session.hasBell])).toEqual([
         ['terminal-1', false, false],
         ['terminal-2', true, false],
       ])
 
       await act(async () => {
-        exitHandler?.({ sessionId: 'terminal-2' })
+        exitHandler?.({ ptySessionId: 'terminal-2' })
       })
 
       expect(closeMock).not.toHaveBeenCalled()
       expect(selectedWorkspacePaneView(REPO_ID)).toBe('terminal')
-      expect(getProbe().summaries.map((session) => [session.terminalId, session.selected, session.hasBell])).toEqual([
+      expect(getProbe().summaries.map((session) => [session.slotId, session.selected, session.hasBell])).toEqual([
         ['terminal-1', true, false],
       ])
 
@@ -661,7 +661,7 @@ describe('TerminalSessionProvider', () => {
       // at read time (covered by `workspace-pane-views.test.ts` and
       // `useEffectiveWorkspacePaneView.test.tsx`).
       await act(async () => {
-        exitHandler?.({ sessionId: 'terminal-1' })
+        exitHandler?.({ ptySessionId: 'terminal-1' })
       })
 
       expect(closeMock).not.toHaveBeenCalled()
@@ -695,7 +695,7 @@ describe('TerminalSessionProvider', () => {
         await getContext().createTerminal(base)
       })
 
-      const firstSession = mockSessions.find((session) => session.descriptor.terminalId === 'terminal-1')
+      const firstSession = mockSessions.find((session) => session.descriptor.slotId === 'terminal-1')
       if (!firstSession) throw new Error('missing terminal-1 mock session')
 
       await act(async () => {
@@ -706,7 +706,7 @@ describe('TerminalSessionProvider', () => {
         })
       })
 
-      expect(getProbe().summaries.map((session) => [session.terminalId, session.selected, session.hasBell])).toEqual([
+      expect(getProbe().summaries.map((session) => [session.slotId, session.selected, session.hasBell])).toEqual([
         ['terminal-1', false, true],
         ['terminal-2', true, false],
       ])
@@ -723,7 +723,7 @@ describe('TerminalSessionProvider', () => {
         getContext().selectTerminal(terminalWorktreeKey, firstKey)
       })
 
-      expect(getProbe().summaries.map((session) => [session.terminalId, session.selected, session.hasBell])).toEqual([
+      expect(getProbe().summaries.map((session) => [session.slotId, session.selected, session.hasBell])).toEqual([
         ['terminal-1', true, false],
         ['terminal-2', false, false],
       ])
@@ -753,15 +753,15 @@ describe('TerminalSessionProvider', () => {
         await getContext().createTerminal(base)
       })
 
-      const first = mockSessions.find((session) => session.descriptor.terminalId === 'terminal-1')
-      const second = mockSessions.find((session) => session.descriptor.terminalId === 'terminal-2')
+      const first = mockSessions.find((session) => session.descriptor.slotId === 'terminal-1')
+      const second = mockSessions.find((session) => session.descriptor.slotId === 'terminal-2')
       if (!first || !second) throw new Error('missing terminal mock sessions')
 
       await act(async () => {
-        outputHandler?.({ sessionId: 'terminal-1', data: 'hello', seq: 1, processName: 'zsh' })
-        titleHandler?.({ sessionId: 'terminal-1', canonicalTitle: '~/Developer/goblin — npm run dev' })
+        outputHandler?.({ ptySessionId: 'terminal-1', data: 'hello', seq: 1, processName: 'zsh' })
+        titleHandler?.({ ptySessionId: 'terminal-1', canonicalTitle: '~/Developer/goblin — npm run dev' })
         ownershipHandler?.({
-          sessionId: 'terminal-2',
+          ptySessionId: 'terminal-2',
           role: 'controller',
           controllerStatus: 'connected',
           canonicalCols: 100,
@@ -772,7 +772,7 @@ describe('TerminalSessionProvider', () => {
 
       expect(first.handleOutput).toHaveBeenCalledTimes(1)
       expect(first.handleOutput).toHaveBeenCalledWith({
-        sessionId: 'terminal-1',
+        ptySessionId: 'terminal-1',
         data: 'hello',
         seq: 1,
         processName: 'zsh',
@@ -781,7 +781,7 @@ describe('TerminalSessionProvider', () => {
       expect(first.handleServerTitle).toHaveBeenCalledWith('~/Developer/goblin — npm run dev')
       expect(second.handleOwnership).toHaveBeenCalledTimes(1)
       expect(second.handleOwnership).toHaveBeenCalledWith({
-        sessionId: 'terminal-2',
+        ptySessionId: 'terminal-2',
         role: 'controller',
         controllerStatus: 'connected',
         canonicalCols: 100,
@@ -838,7 +838,7 @@ describe('TerminalSessionProvider', () => {
         await Promise.resolve()
       })
 
-      const session = mockSessions.find((item) => item.descriptor.terminalId === 'terminal-1')
+      const session = mockSessions.find((item) => item.descriptor.slotId === 'terminal-1')
       if (!session) throw new Error('missing terminal-1 mock session')
 
       await act(async () => {
@@ -866,10 +866,10 @@ describe('TerminalSessionProvider', () => {
     })
     listSessionsMock.mockResolvedValue([
       {
-        sessionId: 'server_session_1',
+        ptySessionId: 'server_session_1',
         key: `${REPO_ID}\u0000${WORKTREE_PATH}\u0000terminal-1`,
         cwd: WORKTREE_PATH,
-        controller: { attachmentId: 'attachment_remote', status: 'connected' },
+        controller: { clientId: 'client_remote', status: 'connected' },
         processName: 'zsh',
         canonicalTitle: null,
         phase: 'open',
@@ -879,8 +879,8 @@ describe('TerminalSessionProvider', () => {
         displayOrder: 1,
       },
     ])
-    getSessionSnapshotMock.mockResolvedValue({
-      sessionId: 'server_session_1',
+    getSlotSnapshotMock.mockResolvedValue({
+      ptySessionId: 'server_session_1',
       snapshot: 'hydrated-screen',
       snapshotSeq: 5,
     })
@@ -891,12 +891,12 @@ describe('TerminalSessionProvider', () => {
       await emitSessionsChanged()
 
       expect(getProbe().summaries).toEqual([
-        expect.objectContaining({ terminalId: 'terminal-1', title: 'zsh', phase: 'open' }),
+        expect.objectContaining({ slotId: 'terminal-1', title: 'zsh', phase: 'open' }),
       ])
-      const hydrated = mockSessions.find((session) => session.descriptor.terminalId === 'terminal-1')
+      const hydrated = mockSessions.find((session) => session.descriptor.slotId === 'terminal-1')
       expect(hydrated?.hydrate).toHaveBeenCalledWith(
         expect.objectContaining({
-          sessionId: 'server_session_1',
+          ptySessionId: 'server_session_1',
           processName: 'zsh',
           role: 'viewer',
           controllerStatus: 'connected',
@@ -951,10 +951,10 @@ describe('TerminalSessionProvider', () => {
     })
     managedServerSessions = [
       {
-        sessionId: 'server_session_1',
+        ptySessionId: 'server_session_1',
         key: `${REPO_ID}\u0000${WORKTREE_PATH}\u0000terminal-1`,
         cwd: WORKTREE_PATH,
-        controller: { attachmentId: 'attachment_local', status: 'connected' },
+        controller: { clientId: 'client_local', status: 'connected' },
         processName: 'zsh',
         canonicalTitle: null,
         phase: 'open',
@@ -970,7 +970,7 @@ describe('TerminalSessionProvider', () => {
 
     try {
       await emitSessionsChanged()
-      expect(getProbe().summaries.map((session) => [session.terminalId, session.selected])).toEqual([
+      expect(getProbe().summaries.map((session) => [session.slotId, session.selected])).toEqual([
         ['terminal-1', true],
       ])
 
@@ -978,14 +978,14 @@ describe('TerminalSessionProvider', () => {
       await act(async () => {
         await getContext().createTerminal(base)
       })
-      expect(getProbe().summaries.map((session) => [session.terminalId, session.selected])).toEqual([
+      expect(getProbe().summaries.map((session) => [session.slotId, session.selected])).toEqual([
         ['terminal-1', false],
         ['terminal-2', true],
       ])
 
       await emitSessionsChanged()
 
-      expect(getProbe().summaries.map((session) => [session.terminalId, session.selected])).toEqual([
+      expect(getProbe().summaries.map((session) => [session.slotId, session.selected])).toEqual([
         ['terminal-1', false],
         ['terminal-2', true],
       ])
@@ -1009,7 +1009,7 @@ describe('TerminalSessionProvider', () => {
     })
     managedServerSessions = [
       {
-        sessionId: 'server_session_1',
+        ptySessionId: 'server_session_1',
         key: `${REPO_ID}\u0000${WORKTREE_PATH}\u0000terminal-1`,
         cwd: WORKTREE_PATH,
         controller: null,
@@ -1022,10 +1022,10 @@ describe('TerminalSessionProvider', () => {
         displayOrder: 1,
       },
       {
-        sessionId: 'server_session_2',
+        ptySessionId: 'server_session_2',
         key: `${REPO_ID}\u0000${WORKTREE_PATH}\u0000terminal-2`,
         cwd: WORKTREE_PATH,
-        controller: { attachmentId: 'attachment_local', status: 'connected' },
+        controller: { clientId: 'client_local', status: 'connected' },
         processName: 'zsh',
         canonicalTitle: null,
         phase: 'open',
@@ -1041,7 +1041,7 @@ describe('TerminalSessionProvider', () => {
     try {
       await emitSessionsChanged()
 
-      expect(getProbe().summaries.map((session) => [session.terminalId, session.selected])).toEqual([
+      expect(getProbe().summaries.map((session) => [session.slotId, session.selected])).toEqual([
         ['terminal-1', true],
         ['terminal-2', false],
       ])
@@ -1204,10 +1204,10 @@ describe('TerminalSessionProvider', () => {
     })
     listSessionsMock.mockResolvedValue([
       {
-        sessionId: 'server_session_2',
+        ptySessionId: 'server_session_2',
         key: `${REPO_ID}\u0000${WORKTREE_PATH}\u0000terminal-2`,
         cwd: WORKTREE_PATH,
-        controller: { attachmentId: 'attachment_remote', status: 'connected' },
+        controller: { clientId: 'client_remote', status: 'connected' },
         processName: 'node',
         canonicalTitle: null,
         phase: 'open',
@@ -1233,7 +1233,7 @@ describe('TerminalSessionProvider', () => {
       })
 
       expect(createdKey.endsWith('\u0000terminal-3')).toBe(true)
-      expect(getProbe().summaries.map((session) => session.terminalId)).toEqual(['terminal-2', 'terminal-3'])
+      expect(getProbe().summaries.map((session) => session.slotId)).toEqual(['terminal-2', 'terminal-3'])
     } finally {
       await unmount()
     }
@@ -1248,10 +1248,10 @@ describe('TerminalSessionProvider', () => {
     })
     listSessionsMock.mockResolvedValue([
       {
-        sessionId: 'server_session_3',
+        ptySessionId: 'server_session_3',
         key: `${REPO_ID}\u0000${WORKTREE_PATH}\u0000terminal-1`,
         cwd: WORKTREE_PATH,
-        controller: { attachmentId: 'attachment_remote', status: 'connected' },
+        controller: { clientId: 'client_remote', status: 'connected' },
         processName: 'bash',
         canonicalTitle: null,
         phase: 'open',
@@ -1269,7 +1269,7 @@ describe('TerminalSessionProvider', () => {
 
       const key = getProbe().summaries[0]?.key
       if (!key) throw new Error('missing terminal key')
-      const session = mockSessions.find((item) => item.descriptor.terminalId === 'terminal-1')
+      const session = mockSessions.find((item) => item.descriptor.slotId === 'terminal-1')
       if (!session) throw new Error('missing terminal mock session')
 
       session.setSerializeValue('local-render-cache')
@@ -1277,10 +1277,10 @@ describe('TerminalSessionProvider', () => {
 
       listSessionsMock.mockResolvedValue([
         {
-          sessionId: 'server_session_3',
+          ptySessionId: 'server_session_3',
           key: `${REPO_ID}\u0000${WORKTREE_PATH}\u0000terminal-1`,
           cwd: WORKTREE_PATH,
-          controller: { attachmentId: 'attachment_remote', status: 'connected' },
+          controller: { clientId: 'client_remote', status: 'connected' },
           processName: 'bash',
           canonicalTitle: null,
           phase: 'open',
@@ -1290,8 +1290,8 @@ describe('TerminalSessionProvider', () => {
           displayOrder: 1,
         },
       ])
-      getSessionSnapshotMock.mockClear()
-      getSessionSnapshotMock.mockResolvedValueOnce(null)
+      getSlotSnapshotMock.mockClear()
+      getSlotSnapshotMock.mockResolvedValueOnce(null)
 
       await emitSessionsChanged()
 
@@ -1315,10 +1315,10 @@ describe('TerminalSessionProvider', () => {
     })
     listSessionsMock.mockResolvedValue([
       {
-        sessionId: 'server_session_live',
+        ptySessionId: 'server_session_live',
         key: `${REPO_ID}\u0000${WORKTREE_PATH}\u0000terminal-1`,
         cwd: WORKTREE_PATH,
-        controller: { attachmentId: 'attachment_remote', status: 'connected' },
+        controller: { clientId: 'client_remote', status: 'connected' },
         processName: 'bash',
         canonicalTitle: null,
         phase: 'open',
@@ -1336,22 +1336,22 @@ describe('TerminalSessionProvider', () => {
 
       const key = getProbe().summaries[0]?.key
       if (!key) throw new Error('missing terminal key')
-      const session = mockSessions.find((item) => item.descriptor.terminalId === 'terminal-1')
+      const session = mockSessions.find((item) => item.descriptor.slotId === 'terminal-1')
       if (!session) throw new Error('missing terminal mock session')
 
       session.setSerializeValue('stale-local-cache-%')
       getContext().detach(key, document.createElement('div'))
 
-      getSessionSnapshotMock.mockClear()
-      getSessionSnapshotMock.mockResolvedValueOnce({
-        sessionId: 'server_session_live',
+      getSlotSnapshotMock.mockClear()
+      getSlotSnapshotMock.mockResolvedValueOnce({
+        ptySessionId: 'server_session_live',
         snapshot: 'server-snapshot-clean-2',
         snapshotSeq: 8,
       })
 
       await emitSessionsChanged()
 
-      expect(getSessionSnapshotMock).toHaveBeenCalledWith({ sessionId: 'server_session_live' })
+      expect(getSlotSnapshotMock).toHaveBeenCalledWith({ ptySessionId: 'server_session_live' })
       expect(session.hydrate).toHaveBeenLastCalledWith(
         expect.objectContaining({
           snapshot: 'server-snapshot-clean-2',
@@ -1376,10 +1376,10 @@ describe('TerminalSessionProvider', () => {
     })
     listSessionsMock.mockResolvedValue([
       {
-        sessionId: 'server_session_old',
+        ptySessionId: 'server_session_old',
         key: `${REPO_ID}\u0000${WORKTREE_PATH}\u0000terminal-1`,
         cwd: WORKTREE_PATH,
-        controller: { attachmentId: 'attachment_remote', status: 'connected' },
+        controller: { clientId: 'client_remote', status: 'connected' },
         processName: 'bash',
         canonicalTitle: null,
         phase: 'open',
@@ -1389,8 +1389,8 @@ describe('TerminalSessionProvider', () => {
         displayOrder: 1,
       },
     ])
-    getSessionSnapshotMock.mockResolvedValueOnce({
-      sessionId: 'server_session_old',
+    getSlotSnapshotMock.mockResolvedValueOnce({
+      ptySessionId: 'server_session_old',
       snapshot: 'old-snapshot',
       snapshotSeq: 7,
     })
@@ -1402,7 +1402,7 @@ describe('TerminalSessionProvider', () => {
 
       const key = getProbe().summaries[0]?.key
       if (!key) throw new Error('missing terminal key')
-      const session = mockSessions.find((item) => item.descriptor.terminalId === 'terminal-1')
+      const session = mockSessions.find((item) => item.descriptor.slotId === 'terminal-1')
       if (!session) throw new Error('missing terminal mock session')
 
       session.setSerializeValue('local-render-cache')
@@ -1410,10 +1410,10 @@ describe('TerminalSessionProvider', () => {
 
       listSessionsMock.mockResolvedValue([
         {
-          sessionId: 'server_session_new',
+          ptySessionId: 'server_session_new',
           key: `${REPO_ID}\u0000${WORKTREE_PATH}\u0000terminal-1`,
           cwd: WORKTREE_PATH,
-          controller: { attachmentId: 'attachment_remote', status: 'connected' },
+          controller: { clientId: 'client_remote', status: 'connected' },
           processName: 'bash',
           canonicalTitle: null,
           phase: 'open',
@@ -1445,10 +1445,10 @@ describe('TerminalSessionProvider', () => {
     })
     listSessionsMock.mockResolvedValue([
       {
-        sessionId: 'server_session_live',
+        ptySessionId: 'server_session_live',
         key: `${REPO_ID}\u0000${WORKTREE_PATH}\u0000terminal-1`,
         cwd: WORKTREE_PATH,
-        controller: { attachmentId: 'attachment_remote', status: 'connected' },
+        controller: { clientId: 'client_remote', status: 'connected' },
         processName: 'bash',
         canonicalTitle: null,
         phase: 'open',
@@ -1458,8 +1458,8 @@ describe('TerminalSessionProvider', () => {
         displayOrder: 1,
       },
     ])
-    getSessionSnapshotMock.mockResolvedValueOnce({
-      sessionId: 'server_session_live',
+    getSlotSnapshotMock.mockResolvedValueOnce({
+      ptySessionId: 'server_session_live',
       snapshot: 'server-snapshot',
       snapshotSeq: 7,
     })
@@ -1469,22 +1469,22 @@ describe('TerminalSessionProvider', () => {
     try {
       await emitSessionsChanged()
 
-      const session = mockSessions.find((item) => item.descriptor.terminalId === 'terminal-1')
+      const session = mockSessions.find((item) => item.descriptor.slotId === 'terminal-1')
       if (!session) throw new Error('missing terminal mock session')
 
-      getSessionSnapshotMock.mockClear()
-      getSessionSnapshotMock.mockResolvedValueOnce({
-        sessionId: 'server_session_live',
+      getSlotSnapshotMock.mockClear()
+      getSlotSnapshotMock.mockResolvedValueOnce({
+        ptySessionId: 'server_session_live',
         snapshot: 'server-snapshot-2',
         snapshotSeq: 8,
       })
 
       listSessionsMock.mockResolvedValue([
         {
-          sessionId: 'server_session_live',
+          ptySessionId: 'server_session_live',
           key: `${REPO_ID}\u0000${WORKTREE_PATH}\u0000terminal-1`,
           cwd: WORKTREE_PATH,
-          controller: { attachmentId: 'attachment_remote', status: 'connected' },
+          controller: { clientId: 'client_remote', status: 'connected' },
           processName: 'bash',
           canonicalTitle: null,
           phase: 'open',
@@ -1497,8 +1497,8 @@ describe('TerminalSessionProvider', () => {
 
       await emitSessionsChanged()
 
-      expect(getProbe().summaries).toEqual([expect.objectContaining({ terminalId: 'terminal-1' })])
-      expect(getSessionSnapshotMock).toHaveBeenCalledTimes(1)
+      expect(getProbe().summaries).toEqual([expect.objectContaining({ slotId: 'terminal-1' })])
+      expect(getSlotSnapshotMock).toHaveBeenCalledTimes(1)
       expect(session.hydrate).toHaveBeenLastCalledWith(
         expect.objectContaining({
           snapshot: 'server-snapshot-2',
@@ -1518,10 +1518,10 @@ describe('TerminalSessionProvider', () => {
     })
     listSessionsMock.mockResolvedValue([
       {
-        sessionId: 'server_session_live',
+        ptySessionId: 'server_session_live',
         key: `${REPO_ID}\u0000${WORKTREE_PATH}\u0000terminal-1`,
         cwd: WORKTREE_PATH,
-        controller: { attachmentId: 'attachment_remote', status: 'connected' },
+        controller: { clientId: 'client_remote', status: 'connected' },
         processName: 'bash',
         canonicalTitle: null,
         phase: 'open',
@@ -1531,37 +1531,37 @@ describe('TerminalSessionProvider', () => {
         displayOrder: 1,
       },
     ])
-    getSessionSnapshotMock.mockResolvedValueOnce({
-      sessionId: 'server_session_live',
+    getSlotSnapshotMock.mockResolvedValueOnce({
+      ptySessionId: 'server_session_live',
       snapshot: 'server-snapshot',
       snapshotSeq: 7,
     })
     const { unmount } = await renderProvider()
-    getSessionSnapshotMock.mockClear()
+    getSlotSnapshotMock.mockClear()
 
     try {
       await emitSessionsChanged()
 
-      expect(getSessionSnapshotMock).toHaveBeenCalledTimes(1)
-      getSessionSnapshotMock.mockClear()
-      getSessionSnapshotMock.mockResolvedValueOnce({
-        sessionId: 'server_session_live',
+      expect(getSlotSnapshotMock).toHaveBeenCalledTimes(1)
+      getSlotSnapshotMock.mockClear()
+      getSlotSnapshotMock.mockResolvedValueOnce({
+        ptySessionId: 'server_session_live',
         snapshot: 'server-snapshot-2',
         snapshotSeq: 8,
       })
 
       await emitSessionsChanged()
-      expect(getSessionSnapshotMock).toHaveBeenCalledTimes(1)
+      expect(getSlotSnapshotMock).toHaveBeenCalledTimes(1)
 
-      getSessionSnapshotMock.mockClear()
-      getSessionSnapshotMock.mockResolvedValueOnce({
-        sessionId: 'server_session_live',
+      getSlotSnapshotMock.mockClear()
+      getSlotSnapshotMock.mockResolvedValueOnce({
+        ptySessionId: 'server_session_live',
         snapshot: 'server-snapshot-3',
         snapshotSeq: 9,
       })
 
       await emitSessionsChanged()
-      expect(getSessionSnapshotMock).toHaveBeenCalledTimes(1)
+      expect(getSlotSnapshotMock).toHaveBeenCalledTimes(1)
     } finally {
       await unmount()
     }
@@ -1576,10 +1576,10 @@ describe('TerminalSessionProvider', () => {
     })
     listSessionsMock.mockResolvedValue([
       {
-        sessionId: 'session_fail',
+        ptySessionId: 'session_fail',
         key: `${REPO_ID} ${WORKTREE_PATH} terminal-1`,
         cwd: WORKTREE_PATH,
-        controller: { attachmentId: 'attachment_remote', status: 'connected' },
+        controller: { clientId: 'client_remote', status: 'connected' },
         processName: 'bash',
         canonicalTitle: null,
         phase: 'open',
@@ -1589,10 +1589,10 @@ describe('TerminalSessionProvider', () => {
         displayOrder: 1,
       },
       {
-        sessionId: 'session_ok',
+        ptySessionId: 'session_ok',
         key: `${REPO_ID} ${WORKTREE_PATH} terminal-2`,
         cwd: WORKTREE_PATH,
-        controller: { attachmentId: 'attachment_remote', status: 'connected' },
+        controller: { clientId: 'client_remote', status: 'connected' },
         processName: 'bash',
         canonicalTitle: null,
         phase: 'open',
@@ -1611,24 +1611,24 @@ describe('TerminalSessionProvider', () => {
     // entirely or surface the rejection to the caller as an
     // unhandled promise.
     const debugSpy = vi.spyOn(terminalSessionProviderLog, 'debug').mockImplementation(() => {})
-    getSessionSnapshotMock.mockImplementation(async ({ sessionId }) => {
-      if (sessionId === 'session_fail') throw new Error('snapshot unavailable')
-      return { sessionId: 'session_ok', snapshot: 'ok-snapshot', snapshotSeq: 1 }
+    getSlotSnapshotMock.mockImplementation(async ({ ptySessionId }) => {
+      if (ptySessionId === 'session_fail') throw new Error('snapshot unavailable')
+      return { ptySessionId: 'session_ok', snapshot: 'ok-snapshot', snapshotSeq: 1 }
     })
 
     const { unmount } = await renderProvider()
     try {
       await emitSessionsChanged()
 
-      const okSession = mockSessions.find((item) => item.descriptor.terminalId === 'terminal-2')
+      const okSession = mockSessions.find((item) => item.descriptor.slotId === 'terminal-2')
       if (!okSession) throw new Error('missing terminal-2 mock session')
       expect(okSession.hydrate).toHaveBeenLastCalledWith(
-        expect.objectContaining({ sessionId: 'session_ok', snapshot: 'ok-snapshot', snapshotSeq: 1 }),
+        expect.objectContaining({ ptySessionId: 'session_ok', snapshot: 'ok-snapshot', snapshotSeq: 1 }),
       )
       // The failed session's rejection is logged but does not poison
       // the other session's hydrate path.
       expect(debugSpy).toHaveBeenCalledWith('failed to load terminal session snapshot', {
-        sessionId: 'session_fail',
+        ptySessionId: 'session_fail',
         err: expect.any(Error),
       })
     } finally {
@@ -1662,7 +1662,7 @@ describe('TerminalSessionProvider', () => {
       expect(getProbe()).toMatchObject({ count: 2, terminalIds: ['terminal-1', 'terminal-2'] })
 
       await act(async () => {
-        exitHandler?.({ sessionId: 'terminal-2' })
+        exitHandler?.({ ptySessionId: 'terminal-2' })
       })
       expect(getProbe()).toMatchObject({ count: 1, terminalIds: ['terminal-1'] })
     } finally {
@@ -1682,14 +1682,14 @@ describe('TerminalSessionProvider', () => {
       action: 'created' as const,
       key: `${REPO_ID} ${WORKTREE_PATH} terminal-1`,
       sessions: [],
-      sessionId: 'terminal-1',
+      ptySessionId: 'terminal-1',
       snapshot: '',
       snapshotSeq: 0,
       processName: 'zsh',
       canonicalTitle: null,
       phase: 'open' as const,
       message: null,
-      controller: { attachmentId: 'attachment_local', status: 'connected' as const },
+      controller: { clientId: 'client_local', status: 'connected' as const },
       canonicalCols: 80,
       canonicalRows: 24,
     })
@@ -1766,7 +1766,7 @@ describe('TerminalSessionProvider', () => {
           action: 'created' as const,
           key: 'k',
           sessions: [],
-          sessionId: 'session-1',
+          ptySessionId: 'session-1',
           snapshot: '',
           snapshotSeq: 0,
           processName: 'zsh',
@@ -1784,7 +1784,7 @@ describe('TerminalSessionProvider', () => {
         closeView: vi.fn(async () => false),
         prewarm,
         kickReconnect: vi.fn(() => {}),
-        getSessionSnapshot: vi.fn(async () => null),
+        getSlotSnapshot: vi.fn(async () => null),
         reorderViews: vi.fn(async () => false),
         notifyBell: vi.fn(async () => false),
         sendTestNotification: vi.fn(async () => false),
@@ -1865,7 +1865,7 @@ describe('TerminalSessionProvider', () => {
           action: 'created' as const,
           key: 'k',
           sessions: [],
-          sessionId: 'session-1',
+          ptySessionId: 'session-1',
           snapshot: '',
           snapshotSeq: 0,
           processName: 'zsh',
@@ -1883,7 +1883,7 @@ describe('TerminalSessionProvider', () => {
         closeView: vi.fn(async () => false),
         prewarm: vi.fn(async () => {}),
         kickReconnect,
-        getSessionSnapshot: vi.fn(async () => null),
+        getSlotSnapshot: vi.fn(async () => null),
         reorderViews: vi.fn(async () => false),
         notifyBell: vi.fn(async () => false),
         sendTestNotification: vi.fn(async () => false),
@@ -2012,7 +2012,7 @@ function CaptureGroupProbe({
     terminalIds: string[]
     summaries: Array<{
       key: string
-      terminalId: string
+      slotId: string
       selected: boolean
       hasBell: boolean
       title: string
@@ -2023,10 +2023,10 @@ function CaptureGroupProbe({
   const summaries = useTerminalSessionSummaries(worktreeTerminalKey)
   onProbe({
     count: useWorktreeTerminalCount(worktreeTerminalKey),
-    terminalIds: summaries.map((session) => session.terminalId),
+    terminalIds: summaries.map((session) => session.slotId),
     summaries: summaries.map((session) => ({
       key: session.key,
-      terminalId: session.terminalId,
+      slotId: session.slotId,
       selected: session.selected,
       hasBell: session.hasBell,
       title: session.title,
@@ -2080,7 +2080,7 @@ async function renderProviderWithProbe(worktreeTerminalKey: string): Promise<{
     terminalIds: string[]
     summaries: Array<{
       key: string
-      terminalId: string
+      slotId: string
       selected: boolean
       hasBell: boolean
       title: string
@@ -2098,7 +2098,7 @@ async function renderProviderWithProbe(worktreeTerminalKey: string): Promise<{
     terminalIds: string[]
     summaries: Array<{
       key: string
-      terminalId: string
+      slotId: string
       selected: boolean
       hasBell: boolean
       title: string

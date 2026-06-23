@@ -22,14 +22,14 @@ describe('terminal session projection helpers', () => {
     const projected = projectServerTerminalSession({
       repoIndex: makeRepoIndex(),
       repoRoot: REPO_ROOT,
-      attachmentId: 'attachment_a',
+      clientId: 'client_a',
       serverSession: {
-        sessionId: 'session_123',
-        key: `${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-2`,
+        ptySessionId: 'session_123',
+        key: `${REPO_ROOT}\0${WORKTREE_PATH}\0slot-2`,
         viewType: 'terminal',
-        viewId: `${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-2`,
+        viewId: `${REPO_ROOT}\0${WORKTREE_PATH}\0slot-2`,
         cwd: WORKTREE_PATH,
-        controller: { attachmentId: 'attachment_a', status: 'connected' },
+        controller: { clientId: 'client_a', status: 'connected' },
         processName: 'zsh',
         canonicalTitle: 'shell',
         phase: 'open',
@@ -38,14 +38,14 @@ describe('terminal session projection helpers', () => {
         rows: 40,
         displayOrder: 2,
       },
-      serverSnapshot: { sessionId: 'session_123', snapshot: 'server-snap', snapshotSeq: 9 },
+      serverSnapshot: { ptySessionId: 'session_123', snapshot: 'server-snap', snapshotSeq: 9 },
     })
 
     expect(projected).toEqual({
       descriptor: {
-        key: `${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-2`,
+        key: `${REPO_ROOT}\0${WORKTREE_PATH}\0slot-2`,
         worktreeTerminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}`,
-        terminalId: 'terminal-2',
+        slotId: 'slot-2',
         index: 2,
         repoRoot: REPO_ROOT,
         branch: 'main',
@@ -53,7 +53,7 @@ describe('terminal session projection helpers', () => {
       },
       worktreeTerminalKey: `${REPO_ROOT}\0${WORKTREE_PATH}`,
       hydrateInput: {
-        sessionId: 'session_123',
+        ptySessionId: 'session_123',
         processName: 'zsh',
         canonicalTitle: 'shell',
         phase: 'open',
@@ -74,14 +74,14 @@ describe('terminal session projection helpers', () => {
     const projected = projectServerTerminalSession({
       repoIndex: makeRepoIndex(),
       repoRoot: REPO_ROOT,
-      attachmentId: 'attachment_b',
+      clientId: 'client_b',
       serverSession: {
-        sessionId: 'session_123',
-        key: `${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-1`,
+        ptySessionId: 'session_123',
+        key: `${REPO_ROOT}\0${WORKTREE_PATH}\0slot-1`,
         viewType: 'terminal',
-        viewId: `${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-1`,
+        viewId: `${REPO_ROOT}\0${WORKTREE_PATH}\0slot-1`,
         cwd: WORKTREE_PATH,
-        controller: { attachmentId: 'attachment_a', status: 'connected' },
+        controller: { clientId: 'client_a', status: 'connected' },
         processName: 'bash',
         canonicalTitle: null,
         phase: 'error',
@@ -90,7 +90,7 @@ describe('terminal session projection helpers', () => {
         rows: 24,
         displayOrder: 1,
       },
-      reattachSnapshot: { sessionId: 'session_123', snapshot: 'cached-snap', snapshotSeq: 3 },
+      reattachSnapshot: { ptySessionId: 'session_123', snapshot: 'cached-snap', snapshotSeq: 3 },
     })
 
     expect(projected?.hydrateInput.snapshot).toBe('cached-snap')
@@ -104,18 +104,18 @@ describe('terminal session projection helpers', () => {
     const projected = projectTerminalAttachResultForAttachment(
       {
         ok: true,
-        sessionId: 'session_123',
+        ptySessionId: 'session_123',
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',
         canonicalTitle: null,
         phase: 'open',
         message: null,
-        controller: { attachmentId: 'attachment_a', status: 'connected' },
+        controller: { clientId: 'client_a', status: 'connected' },
         canonicalCols: 80,
         canonicalRows: 24,
       },
-      'attachment_b',
+      'client_b',
     )
 
     expect(projected.role).toBe('viewer')

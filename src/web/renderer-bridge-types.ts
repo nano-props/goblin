@@ -13,10 +13,10 @@ import type {
   TerminalOutputEvent,
   TerminalResizeInput,
   TerminalRestartInput,
-  TerminalSessionSnapshot,
-  TerminalSessionSnapshotInput,
-  TerminalSessionSummary,
-  TerminalSessionInput,
+  TerminalSlotSnapshot,
+  TerminalSlotSnapshotInput,
+  TerminalSlotSummary,
+  TerminalSlotInput,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalTitleEvent,
@@ -30,10 +30,10 @@ export interface RendererTerminalBridge {
   write: (input: TerminalWriteInput) => Promise<TerminalMutationResult>
   resize: (input: TerminalResizeInput) => Promise<TerminalMutationResult>
   takeover: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>
-  close: (input: TerminalSessionInput) => Promise<TerminalMutationResult>
+  close: (input: TerminalSlotInput) => Promise<TerminalMutationResult>
   create: (input: TerminalCreateInput) => Promise<TerminalCatalogMutationResult>
   pruneTerminals: (repoRoot: string) => Promise<{ pruned: number; remaining: number }>
-  listSessions: (input: { repoRoot: string }) => Promise<TerminalSessionSummary[]>
+  listSessions: (input: { repoRoot: string }) => Promise<TerminalSlotSummary[]>
   /**
    * Open the underlying WebSocket (if not already open) and resolve
    * once it reaches the OPEN state. Used as a T1.2 prewarm when the
@@ -53,7 +53,7 @@ export interface RendererTerminalBridge {
    * already healthy. Never force-closes a working socket.
    */
   kickReconnect: () => void
-  getSessionSnapshot: (input: TerminalSessionSnapshotInput) => Promise<TerminalSessionSnapshot | null>
+  getSlotSnapshot: (input: TerminalSlotSnapshotInput) => Promise<TerminalSlotSnapshot | null>
   notifyBell: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>
   sendTestNotification: () => Promise<boolean>
   setBadge: (count: number) => void
@@ -71,7 +71,7 @@ export interface RendererTerminalBridge {
    * see the previous shell's `Restored session: …` line print twice"
    * bug, where a lost close request left the server PTY alive.
    */
-  onSessionClosed: (cb: (event: { sessionId: string; repoRoot: string }) => void) => () => void
+  onSessionClosed: (cb: (event: { ptySessionId: string; repoRoot: string }) => void) => () => void
 }
 
 export interface RendererShellBridge {

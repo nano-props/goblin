@@ -119,7 +119,7 @@ Closing a session should be an explicit business action or the result of server-
 
 The terminal system relies on four identity scopes:
 
-- **ownerId**: the server-side terminal owner derived from the authenticated access token. Session visibility, lifecycle cleanup, and realtime fanout are partitioned by this id.
+- **userId**: the server-side terminal owner derived from the authenticated access token. Session visibility, lifecycle cleanup, and realtime fanout are partitioned by this id.
 - **clientId**: the logical renderer client for one browser tab or Electron renderer. It validates and routes requests, but it does not own terminal sessions.
 - **attachmentId**: one terminal view/socket attachment under an owner.
 - **sessionId**: the server-owned identifier for one live terminal session.

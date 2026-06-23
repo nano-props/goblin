@@ -264,7 +264,7 @@ export function TerminalSlot({
     if (!(relatedTarget instanceof Node) || !event.currentTarget.contains(relatedTarget)) setDragOver(false)
   }, [])
   const writeResolutionToPty = useCallback(
-    (resolution: PasteResolution, sessionKey: string, source: 'paste' | 'drop') => {
+    (resolution: PasteResolution, slotKey: string, source: 'paste' | 'drop') => {
       const plan = planTerminalPathWrite(resolution.paths, {
         failedUnsafe: resolution.failedUnsafe,
         failedBackend: resolution.failedBackend,
@@ -278,7 +278,7 @@ export function TerminalSlot({
         toast.error(t('terminal.paste-file-overflow'))
         return
       }
-      writeInput(sessionKey, plan.data, source)
+      writeInput(slotKey, plan.data, source)
       if (plan.failures.failedUnsafe > 0) toast.error(t('terminal.paste-file-unsafe'))
       if (plan.failures.failedBackend > 0) toast.error(t('terminal.paste-file-partial'))
     },
@@ -300,15 +300,15 @@ export function TerminalSlot({
       // blob-save tier (web HTTP path) is a real roundtrip, so a
       // worktree switch during resolve would otherwise route the
       // write to a session the user is no longer looking at.
-      const sessionKey = key
+      const slotKey = key
       void processDrop({ files }).then((outcome) => {
-        if (keyRef.current !== sessionKey) return
+        if (keyRef.current !== slotKey) return
         // `no-op` is unreachable at this call site: `handleDrop`
         // filters zero-byte files before calling `processDrop`, so
         // `processDrop` can only return `files` or `too-large`.
         // `handlePasteCapture` uses the same if-narrowing shape.
         if (outcome.kind === 'files') {
-          writeResolutionToPty(outcome.resolution, sessionKey, 'drop')
+          writeResolutionToPty(outcome.resolution, slotKey, 'drop')
           return
         }
         if (outcome.kind === 'too-large') {
@@ -339,11 +339,11 @@ export function TerminalSlot({
         event.preventDefault()
         // Capture the session key the user pasted into. See
         // `handleDrop` for the worktree-switch rationale.
-        const sessionKey = key
+        const slotKey = key
         void processPaste({ files }).then((outcome) => {
-          if (keyRef.current !== sessionKey) return
+          if (keyRef.current !== slotKey) return
           if (outcome.kind === 'files') {
-            writeResolutionToPty(outcome.resolution, sessionKey, 'paste')
+            writeResolutionToPty(outcome.resolution, slotKey, 'paste')
             return
           }
           if (outcome.kind === 'too-large') {

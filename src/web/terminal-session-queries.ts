@@ -1,4 +1,4 @@
-import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
+import type { TerminalSlotSummary } from '#/shared/terminal-types.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 
 // Plain async loader for a repo's terminal session list. The
@@ -11,6 +11,6 @@ import { terminalBridge } from '#/web/terminal.ts'
 // already drives the refetch lifecycle on its own. Keeping the
 // loader as a plain async function means there is no second
 // client-side state surface to keep in sync with the registry.
-export async function loadTerminalSessions(repoRoot: string): Promise<TerminalSessionSummary[]> {
+export async function loadTerminalSessions(repoRoot: string): Promise<TerminalSlotSummary[]> {
   return await terminalBridge.listSessions({ repoRoot })
 }

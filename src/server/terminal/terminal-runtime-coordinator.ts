@@ -1,10 +1,10 @@
 import { TerminalConnectionState } from '#/server/terminal/terminal-connection-state.ts'
 import { TerminalRealtimeBroker } from '#/server/terminal/terminal-realtime-broker.ts'
-import type { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
+import type { TerminalSlotManager } from '#/server/terminal/terminal-session-manager.ts'
 import type { TerminalViewOrderRuntime } from '#/server/terminal/terminal-view-order-runtime.ts'
 
 export interface TerminalRuntimeCoordinatorOptions {
-  manager: TerminalSessionManager<string>
+  manager: TerminalSlotManager<string>
   terminalViewOrder: TerminalViewOrderRuntime<string>
   detachedTtlMs: number
 }
@@ -21,31 +21,31 @@ export function createTerminalRuntimeCoordinator(
 
   // The connection-state timers key by owner, not clientId. clientId
   // is only the per-tab routing id; terminal lifetime is owned by
-  // the access-token-derived ownerId.
+  // the access-token-derived userId.
   const connectionState = new TerminalConnectionState({
     detachedTtlMs,
-    onOwnerExpired(ownerId) {
-      manager.closeSessionsForOwner(ownerId)
-      terminalViewOrder.closeViewsForOwner(ownerId)
+    onOwnerExpired(userId) {
+      manager.closeSessionsForOwner(userId)
+      terminalViewOrder.closeViewsForOwner(userId)
     },
   })
 
   const broker = new TerminalRealtimeBroker({
-    onAttachmentConnected(_clientId, attachmentId, ownerId) {
-      connectionState.clearOwnerDisconnect(ownerId)
-      manager.setAttachmentConnected(ownerId, attachmentId, true)
+    onClientConnected(clientId, userId) {
+      connectionState.clearOwnerDisconnect(userId)
+      manager.setAttachmentConnected(userId, clientId, true)
     },
-    onAttachmentDisconnected(_clientId, attachmentId, ownerId) {
+    onClientDisconnected(clientId, userId) {
       // Disconnect is immediate: the controller slot clears on
       // disconnect and the next attach from any sibling attachment
       // auto-claims (see `terminal-ownership.ts`). The detached TTL
       // is the only timer we still schedule on disconnect — it
       // covers the "all sockets gone, drop the catalog" path.
-      manager.setAttachmentConnected(ownerId, attachmentId, false)
-      connectionState.scheduleOwnerDisconnect(ownerId, () => broker.hasOwnerSockets(ownerId))
+      manager.setAttachmentConnected(userId, clientId, false)
+      connectionState.scheduleOwnerDisconnect(userId, () => broker.hasOwnerSockets(userId))
     },
-    onOwnerDisconnected(ownerId) {
-      connectionState.scheduleOwnerDisconnect(ownerId, () => broker.hasOwnerSockets(ownerId))
+    onOwnerDisconnected(userId) {
+      connectionState.scheduleOwnerDisconnect(userId, () => broker.hasOwnerSockets(userId))
     },
   })
 

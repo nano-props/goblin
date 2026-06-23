@@ -3,13 +3,13 @@ import { terminalSessionProviderLog } from '#/web/logger.ts'
 import { ManagedTerminalSession } from '#/web/components/terminal/ManagedTerminalSession.ts'
 import { createTerminalBellController } from '#/web/components/terminal/terminal-bell-controller.ts'
 import { terminalDescriptor } from '#/web/components/terminal/terminal-descriptor.ts'
-import { parseWorktreeTerminalKey, worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
+import { parseWorktreeKey, worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
 import { terminalBridge } from '#/web/terminal.ts'
-import { readOrCreateWebTerminalAttachmentId } from '#/web/renderer-terminal-bridge.ts'
-import { parseTerminalSessionKey } from '#/shared/terminal-session-key.ts'
+import { readOrCreateWebTerminalClientId } from '#/web/renderer-terminal-bridge.ts'
+import { parseTerminalSlotKey } from '#/shared/terminal-slot-key.ts'
 import type {
-  TerminalSessionSnapshot,
-  TerminalSessionSummary as ServerTerminalSessionSummary,
+  TerminalSlotSnapshot,
+  TerminalSlotSummary as ServerTerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
 import { branchForTerminalWorktree } from '#/web/components/terminal/terminal-repo-index.ts'
 import {
@@ -47,7 +47,7 @@ const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
 }
 // Re-exported for any callers that still want the parser under its
 // renderer-side name.
-export const parseServerSessionKey = parseTerminalSessionKey
+export const parseServerSessionKey = parseTerminalSlotKey
 
 /**
  * Renderer-level authority for terminal session state.
@@ -75,7 +75,7 @@ export class TerminalSessionRegistry {
   private repoIndex: TerminalRepoIndex = {}
   private parkingRoot: HTMLDivElement | null = null
   private readonly sessions = new Map<string, ManagedTerminalSession>()
-  private readonly sessionKeyBySessionId = new Map<string, string>()
+  private readonly slotKeyByPtySessionId = new Map<string, string>()
   private readonly sessionIdByKey = new Map<string, string>()
   private readonly selectedKeyByWorktree = new Map<string, string>()
   private readonly preferredSelectedKeyByWorktree = new Map<string, string>()
@@ -94,7 +94,7 @@ export class TerminalSessionRegistry {
     }
   >()
   // Durable close queue. `ManagedTerminalSession.dispose` used to fire
-  // `terminalBridge.close({ sessionId })` as a `void ... .catch(() => {})`
+  // `terminalBridge.close({ ptySessionId })` as a `void ... .catch(() => {})`
   // — if the WebSocket was already closing (or `closeSocketIfIdle` raced
   // the request), the request was rejected before the server saw it and
   // the PTY stayed alive. The next `createTerminal` then reattached to
@@ -198,9 +198,9 @@ export class TerminalSessionRegistry {
     }
     for (const pending of this.pendingCloseBySessionId.values())
       pending.reject(new Error('terminal registry destroyed'))
-    for (const session of this.sessions.values()) session.dispose({ closeSession: false })
+    for (const session of this.sessions.values()) session.dispose({ closeSlot: false })
     this.sessions.clear()
-    this.sessionKeyBySessionId.clear()
+    this.slotKeyByPtySessionId.clear()
     this.sessionIdByKey.clear()
     this.selectedKeyByWorktree.clear()
     this.preferredSelectedKeyByWorktree.clear()
@@ -218,32 +218,32 @@ export class TerminalSessionRegistry {
     if (registryInstance === this) registryInstance = null
   }
 
-  handleOutput(event: { sessionId: string; data: string; seq: number; processName: string }): void {
-    const directKey = this.sessionKeyBySessionId.get(event.sessionId)
+  handleOutput(event: { ptySessionId: string; data: string; seq: number; processName: string }): void {
+    const directKey = this.slotKeyByPtySessionId.get(event.ptySessionId)
     const directSession = directKey ? this.sessions.get(directKey) : null
     if (directSession) {
       directSession.handleOutput(event)
     }
   }
 
-  handleServerTitle(event: { sessionId: string; canonicalTitle: string | null }): void {
-    const directKey = this.sessionKeyBySessionId.get(event.sessionId)
+  handleServerTitle(event: { ptySessionId: string; canonicalTitle: string | null }): void {
+    const directKey = this.slotKeyByPtySessionId.get(event.ptySessionId)
     const directSession = directKey ? this.sessions.get(directKey) : null
     if (directSession) {
       directSession.handleServerTitle(event.canonicalTitle)
     }
   }
 
-  handleExit(event: { sessionId: string }): void {
-    const directKey = this.sessionKeyBySessionId.get(event.sessionId)
+  handleExit(event: { ptySessionId: string }): void {
+    const directKey = this.slotKeyByPtySessionId.get(event.ptySessionId)
     const directSession = directKey ? this.sessions.get(directKey) : null
     if (directKey && directSession?.handleExit(event)) {
       // Local runtime accepted the exit. Gating the discard on the
       // runtime's accept (rather than evicting eagerly on the
-      // sessionId match) avoids discarding a still-valid cache entry
+      // ptySessionId match) avoids discarding a still-valid cache entry
       // during a race where the local session has moved to a new
-      // sessionId (e.g. after a server-side restart) but the index
-      // still maps the old sessionId to the same key.
+      // ptySessionId (e.g. after a server-side restart) but the index
+      // still maps the old ptySessionId to the same key.
       // `discardLocalSessionAndDismissDetailIfLast → removeSession`
       // is what actually evicts the reattach cache entry for `directKey`.
       this.discardLocalSessionAndDismissDetailIfLast(directKey, directSession.descriptor)
@@ -251,9 +251,9 @@ export class TerminalSessionRegistry {
     }
     if (directKey && directSession && !directSession.currentSessionId()) {
       // The runtime is empty (exit was observed earlier, or the
-      // session was never attached) but the sessionId index still
+      // session was never attached) but the ptySessionId index still
       // points at it. The cache entry is keyed by the local key, not
-      // the old sessionId, so leaving it in place is the right call —
+      // the old ptySessionId, so leaving it in place is the right call —
       // the next reattach may still hydrate from it.
       this.discardLocalSessionAndDismissDetailIfLast(directKey, directSession.descriptor)
     }
@@ -267,10 +267,10 @@ export class TerminalSessionRegistry {
   // for the broader `sessions-changed` list-rescan. We route through
   // `discardLocalSessionAndDismissDetailIfLast` (rather than
   // `closeTerminal`) because the server has already killed the PTY
-  // — calling `close` again would no-op the `closeSessionForOwner` check
+  // — calling `close` again would no-op the `closeSlotForUser` check
   // on the server and add a useless WS roundtrip.
-  handleSessionClosed(sessionId: string): void {
-    const directKey = this.sessionKeyBySessionId.get(sessionId)
+  handleSessionClosed(ptySessionId: string): void {
+    const directKey = this.slotKeyByPtySessionId.get(ptySessionId)
     if (!directKey) return
     const session = this.sessions.get(directKey)
     if (!session) return
@@ -278,7 +278,7 @@ export class TerminalSessionRegistry {
   }
 
   handleOwnership(event: TerminalOwnershipViewModel): void {
-    const directKey = this.sessionKeyBySessionId.get(event.sessionId)
+    const directKey = this.slotKeyByPtySessionId.get(event.ptySessionId)
     const directSession = directKey ? this.sessions.get(directKey) : null
     if (directSession) {
       directSession.handleOwnership(event)
@@ -288,8 +288,8 @@ export class TerminalSessionRegistry {
   reconcileServerSessions(
     repoRoot: string,
     serverSessions: ServerTerminalSessionSummary[],
-    attachmentId: string,
-    snapshotsBySessionId: ReadonlyMap<string, TerminalSessionSnapshot>,
+    clientId: string,
+    snapshotsBySessionId: ReadonlyMap<string, TerminalSlotSnapshot>,
   ): void {
     if (!this.repoIndex[repoRoot]) return
 
@@ -298,7 +298,7 @@ export class TerminalSessionRegistry {
       .map(([key]) => key)
 
     const { controllerKeyByWorktree, touchedWorktrees, displayOrderChangedWorktrees, missingLocalCount } =
-      this.materializeServerSessions(repoRoot, serverSessions, attachmentId, snapshotsBySessionId)
+      this.materializeServerSessions(repoRoot, serverSessions, clientId, snapshotsBySessionId)
 
     const serverKeys = new Set(serverSessions.map((s) => s.key))
     const orphanedLocalCount = this.evictOrphanedLocalSessions(repoRoot, serverKeys)
@@ -311,13 +311,13 @@ export class TerminalSessionRegistry {
 
   // Phase 1: for each server session, ensure a local ManagedTerminalSession
   // exists, hydrate it with the latest server-side metadata, and track
-  // which worktrees saw any change. Side effects: ensureSession,
+  // which worktrees saw any change. Side effects: ensureSlot,
   // session.hydrate, displayOrderByKey, syncSessionIdIndex.
   private materializeServerSessions(
     repoRoot: string,
     serverSessions: ServerTerminalSessionSummary[],
-    attachmentId: string,
-    snapshotsBySessionId: ReadonlyMap<string, TerminalSessionSnapshot>,
+    clientId: string,
+    snapshotsBySessionId: ReadonlyMap<string, TerminalSlotSnapshot>,
   ): {
     controllerKeyByWorktree: Map<string, string>
     touchedWorktrees: Set<string>
@@ -334,8 +334,8 @@ export class TerminalSessionRegistry {
         repoIndex: this.repoIndex,
         repoRoot,
         serverSession,
-        attachmentId,
-        serverSnapshot: snapshotsBySessionId.get(serverSession.sessionId) ?? null,
+        clientId,
+        serverSnapshot: snapshotsBySessionId.get(serverSession.ptySessionId) ?? null,
         reattachSnapshot: this.reattachSnapshotCache.get(serverSession.key) ?? null,
       })
       if (!projected) continue
@@ -343,10 +343,10 @@ export class TerminalSessionRegistry {
       const { descriptor } = projected
       if (!this.sessions.has(descriptor.key)) {
         missingLocalCount += 1
-        this.ensureSession(descriptor)
+        this.ensureSlot(descriptor)
       }
       this.sessions.get(descriptor.key)?.hydrate(projected.hydrateInput)
-      this.syncSessionIdIndex(descriptor.key, projected.hydrateInput.sessionId)
+      this.syncSessionIdIndex(descriptor.key, projected.hydrateInput.ptySessionId)
       if (projected.controlsAttachment) controllerKeyByWorktree.set(projected.worktreeTerminalKey, descriptor.key)
       const previousDisplayOrder = this.displayOrderByKey.get(descriptor.key)
       this.displayOrderByKey.set(descriptor.key, projected.displayOrder)
@@ -360,7 +360,7 @@ export class TerminalSessionRegistry {
 
   // Phase 2: drop local sessions that have a serverId but no longer
   // appear on the server. Only sessions that have ever been attached
-  // (i.e. have a sessionId in our index) are eligible for eviction;
+  // (i.e. have a ptySessionId in our index) are eligible for eviction;
   // never-attached local shells (purely UI placeholders) are left
   // alone. Returns the count for the debug log.
   private evictOrphanedLocalSessions(repoRoot: string, serverKeys: Set<string>): number {
@@ -426,7 +426,7 @@ export class TerminalSessionRegistry {
     base: TerminalSessionBase,
     geometry: { cols: number; rows: number },
   ): Promise<string> {
-    const attachmentId = readOrCreateWebTerminalAttachmentId()
+    const clientId = readOrCreateWebTerminalClientId()
     const terminalWorktreeKey = worktreeTerminalKey(base.repoRoot, base.worktreePath)
     const result = await terminalBridge.create({
       repoRoot: base.repoRoot,
@@ -435,12 +435,12 @@ export class TerminalSessionRegistry {
       kind: this.sortedSessionsForWorktree(terminalWorktreeKey).length === 0 ? 'primary' : 'additional',
       cols: geometry.cols,
       rows: geometry.rows,
-      attachmentId,
+      clientId,
     })
     if (!result.ok) {
       throw new Error(result.message)
     }
-    const snapshotSessionId = result.sessionId
+    const snapshotSessionId = result.ptySessionId
     if (!snapshotSessionId || typeof result.snapshot !== 'string' || typeof result.snapshotSeq !== 'number') {
       throw new Error('error.terminal-create-failed')
     }
@@ -451,7 +451,7 @@ export class TerminalSessionRegistry {
     // committed the session row but skipped the catalog append). Reject
     // and let the operator restart the create.
     const createdSession = result.sessions.find(
-      (session) => session.key === result.key && session.sessionId === snapshotSessionId,
+      (session) => session.key === result.key && session.ptySessionId === snapshotSessionId,
     )
     if (!createdSession) {
       throw new Error('error.terminal-create-failed')
@@ -461,8 +461,8 @@ export class TerminalSessionRegistry {
     this.reconcileServerSessions(
       base.repoRoot,
       serverSessions,
-      attachmentId,
-      new Map<string, TerminalSessionSnapshot>([[snapshotSessionId, result as TerminalSessionSnapshot]]),
+      clientId,
+      new Map<string, TerminalSlotSnapshot>([[snapshotSessionId, result as TerminalSlotSnapshot]]),
     )
     return result.key
   }
@@ -606,12 +606,12 @@ export class TerminalSessionRegistry {
   // promise the caller can ignore; the close fires in the background
   // and the entry is removed when it settles (resolve or reject).
   //
-  // Returning a stable promise (deduped per sessionId) is intentional:
+  // Returning a stable promise (deduped per ptySessionId) is intentional:
   // a `restart` and a `dispose` can both call this for the same
-  // sessionId in quick succession. The first call owns the request;
+  // ptySessionId in quick succession. The first call owns the request;
   // the second is a no-op and just observes the same outcome.
-  enqueueDurableClose(input: { sessionId: string; worktreeTerminalKey: string }): Promise<void> {
-    const existing = this.pendingCloseBySessionId.get(input.sessionId)
+  enqueueDurableClose(input: { ptySessionId: string; worktreeTerminalKey: string }): Promise<void> {
+    const existing = this.pendingCloseBySessionId.get(input.ptySessionId)
     if (existing) return existing.promise
 
     let resolve!: () => void
@@ -620,14 +620,14 @@ export class TerminalSessionRegistry {
       resolve = innerResolve
       reject = innerReject
     })
-    this.pendingCloseBySessionId.set(input.sessionId, {
+    this.pendingCloseBySessionId.set(input.ptySessionId, {
       worktreeTerminalKey: input.worktreeTerminalKey,
       promise,
       resolve,
       reject,
     })
 
-    void this.performDurableClose(input.sessionId)
+    void this.performDurableClose(input.ptySessionId)
     return promise
   }
 
@@ -647,21 +647,21 @@ export class TerminalSessionRegistry {
     await Promise.allSettled(pendingForWorktree.map(([, entry]) => entry.promise))
   }
 
-  private async performDurableClose(sessionId: string): Promise<void> {
+  private async performDurableClose(ptySessionId: string): Promise<void> {
     try {
-      await terminalBridge.close({ sessionId })
-      const entry = this.pendingCloseBySessionId.get(sessionId)
-      this.pendingCloseBySessionId.delete(sessionId)
+      await terminalBridge.close({ ptySessionId })
+      const entry = this.pendingCloseBySessionId.get(ptySessionId)
+      this.pendingCloseBySessionId.delete(ptySessionId)
       entry?.resolve()
     } catch (err) {
-      const entry = this.pendingCloseBySessionId.get(sessionId)
-      this.pendingCloseBySessionId.delete(sessionId)
+      const entry = this.pendingCloseBySessionId.get(ptySessionId)
+      this.pendingCloseBySessionId.delete(ptySessionId)
       // The old fire-and-forget path swallowed this rejection. Loud
       // logging is intentional: the failure mode (orphan PTY surviving
       // a tab close) is otherwise invisible to operators and surfaces
       // only as a confused user re-opening a tab and seeing the prior
       // shell's `Restored session: …` line print twice.
-      terminalSessionProviderLog.warn('durable close failed for terminal session', { sessionId, err })
+      terminalSessionProviderLog.warn('durable close failed for terminal session', { ptySessionId, err })
       entry?.reject(err)
     }
   }
@@ -740,16 +740,16 @@ export class TerminalSessionRegistry {
   }
 
   attach = (descriptor: TerminalDescriptor, host: HTMLElement): void => {
-    this.ensureSession(descriptor).attach(host)
+    this.ensureSlot(descriptor).attach(host)
   }
 
   detach = (key: string, host: HTMLElement): void => {
     const session = this.sessions.get(key)
     if (session && this.parkingRoot) {
       const serialized = session.serialize()
-      const sessionId = session.currentSessionId()
-      if (serialized && sessionId) {
-        this.setReattachSnapshot(key, { sessionId, snapshot: serialized, snapshotSeq: 0 })
+      const ptySessionId = session.currentSessionId()
+      if (serialized && ptySessionId) {
+        this.setReattachSnapshot(key, { ptySessionId, snapshot: serialized, snapshotSeq: 0 })
       }
       session.detach(host, this.parkingRoot)
     }
@@ -856,12 +856,12 @@ export class TerminalSessionRegistry {
     }
   }
 
-  private syncSessionIdIndex(key: string, sessionId: string | null): void {
+  private syncSessionIdIndex(key: string, ptySessionId: string | null): void {
     syncTerminalSessionIdIndex({
       key,
-      sessionId,
+      ptySessionId,
       sessionIdByKey: this.sessionIdByKey,
-      sessionKeyBySessionId: this.sessionKeyBySessionId,
+      slotKeyByPtySessionId: this.slotKeyByPtySessionId,
     })
   }
 
@@ -894,7 +894,7 @@ export class TerminalSessionRegistry {
     }
   }
 
-  private removeSession(key: string, options: { dispose: boolean; closeSession?: boolean }): boolean {
+  private removeSession(key: string, options: { dispose: boolean; closeSlot?: boolean }): boolean {
     const session = this.sessions.get(key)
     if (!session) return false
     const worktreeTerminalKey = session.descriptor.worktreeTerminalKey
@@ -910,7 +910,7 @@ export class TerminalSessionRegistry {
     this.notifyTerminalSessionRemoved(key, session.descriptor)
     this.notifySnapshot(key)
     this.bellController.remove(key)
-    if (options.dispose) session.dispose({ closeSession: options.closeSession !== false })
+    if (options.dispose) session.dispose({ closeSlot: options.closeSlot !== false })
     if (wasSelected) {
       const nextKey = resolveAdjacentTerminalSelectionAfterRemoval(orderedKeysBeforeRemoval, key)
       this.selectTerminalKey(worktreeTerminalKey, nextKey, { notify: false })
@@ -928,14 +928,14 @@ export class TerminalSessionRegistry {
   }
 
   private closeTerminal(key: string): void {
-    this.removeSession(key, { dispose: true, closeSession: true })
+    this.removeSession(key, { dispose: true, closeSlot: true })
   }
 
   private discardLocalSessionAndDismissDetailIfLast(key: string, base: TerminalSessionBase): void {
     const session = this.sessions.get(key)
     const terminalWorktreeKey = worktreeTerminalKey(base.repoRoot, base.worktreePath)
     if (!session || session.descriptor.worktreeTerminalKey !== terminalWorktreeKey) return
-    this.removeSession(key, { dispose: true, closeSession: false })
+    this.removeSession(key, { dispose: true, closeSlot: false })
   }
 
   private syncDescriptorsFromRepoIndex(): void {
@@ -953,7 +953,7 @@ export class TerminalSessionRegistry {
     for (const worktreeTerminalKey of changedWorktrees) this.notifyWorktree(worktreeTerminalKey)
   }
 
-  private ensureSession(descriptor: TerminalDescriptor): ManagedTerminalSession {
+  private ensureSlot(descriptor: TerminalDescriptor): ManagedTerminalSession {
     const current = this.sessions.get(descriptor.key)
     if (current) {
       current.updateDescriptor(descriptor)
@@ -968,7 +968,7 @@ export class TerminalSessionRegistry {
       descriptor,
       () => this.notifySession(descriptor.key),
       this.bellController.handleBell,
-      (sessionId) => this.enqueueDurableClose({ sessionId, worktreeTerminalKey: descriptor.worktreeTerminalKey }),
+      (ptySessionId) => this.enqueueDurableClose({ ptySessionId, worktreeTerminalKey: descriptor.worktreeTerminalKey }),
     )
     this.sessions.set(descriptor.key, session)
     this.syncSessionIdIndex(descriptor.key, session.currentSessionId())

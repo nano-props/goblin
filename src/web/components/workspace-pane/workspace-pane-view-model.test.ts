@@ -13,7 +13,7 @@ const terminalView: WorkspacePaneViewSummary = {
   id: 'terminal-1',
   key: 'terminal-1',
   worktreeTerminalKey: 'repo\0worktree',
-  terminalId: 'terminal-1',
+  slotId: 'terminal-1',
   index: 1,
   displayOrder: 1,
   title: 'terminal 1',

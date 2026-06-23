@@ -1,10 +1,10 @@
 import { resolveTerminalOwnership } from '#/shared/terminal-ownership.ts'
-import { parseTerminalIdIndex } from '#/shared/terminal-ids.ts'
-import { parseTerminalSessionKey } from '#/shared/terminal-session-key.ts'
+import { parseSlotIdIndex } from '#/shared/slot-ids.ts'
+import { parseTerminalSlotKey } from '#/shared/terminal-slot-key.ts'
 import type {
   TerminalAttachResult,
-  TerminalSessionSnapshot,
-  TerminalSessionSummary as ServerTerminalSessionSummary,
+  TerminalSlotSnapshot,
+  TerminalSlotSummary as ServerTerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
 import { terminalDescriptor } from '#/web/components/terminal/terminal-descriptor.ts'
 import { branchForTerminalWorktree } from '#/web/components/terminal/terminal-repo-index.ts'
@@ -17,7 +17,7 @@ import type {
 } from '#/web/components/terminal/types.ts'
 
 export interface ReattachSnapshotCacheEntry {
-  sessionId: string
+  ptySessionId: string
   snapshot: string
   snapshotSeq: number
 }
@@ -37,11 +37,11 @@ export interface ProjectedServerTerminalSession {
 
 export function projectTerminalAttachResultForAttachment(
   result: Extract<TerminalAttachResult, { ok: true }>,
-  attachmentId: string,
+  clientId: string,
 ): TerminalAttachResultWithOwnership {
   return {
     ...result,
-    ...resolveTerminalOwnership(result.controller, attachmentId),
+    ...resolveTerminalOwnership(result.controller, clientId),
   }
 }
 
@@ -49,27 +49,27 @@ export function projectServerTerminalSession(input: {
   repoIndex: TerminalRepoIndex
   repoRoot: string
   serverSession: ServerTerminalSessionSummary
-  attachmentId: string
-  serverSnapshot?: TerminalSessionSnapshot | null
+  clientId: string
+  serverSnapshot?: TerminalSlotSnapshot | null
   reattachSnapshot?: ReattachSnapshotCacheEntry | null
 }): ProjectedServerTerminalSession | null {
-  const parsed = parseTerminalSessionKey(input.serverSession.key)
+  const parsed = parseTerminalSlotKey(input.serverSession.key)
   if (!parsed || parsed.repoRoot !== input.repoRoot) return null
   const branch = branchForTerminalWorktree(input.repoIndex, parsed.repoRoot, parsed.worktreePath)
   if (!branch) return null
   const descriptor = terminalDescriptor(
     { repoRoot: parsed.repoRoot, branch, worktreePath: parsed.worktreePath },
-    parsed.terminalId,
-    parseTerminalIdIndex(parsed.terminalId) ?? 1,
+    parsed.slotId,
+    parseSlotIdIndex(parsed.slotId) ?? 1,
   )
   const terminalWorktree = worktreeTerminalKey(parsed.repoRoot, parsed.worktreePath)
-  const ownership = resolveTerminalOwnership(input.serverSession.controller, input.attachmentId)
-  const isReattachMatch = input.reattachSnapshot?.sessionId === input.serverSession.sessionId
+  const ownership = resolveTerminalOwnership(input.serverSession.controller, input.clientId)
+  const isReattachMatch = input.reattachSnapshot?.ptySessionId === input.serverSession.ptySessionId
   return {
     descriptor,
     worktreeTerminalKey: terminalWorktree,
     hydrateInput: {
-      sessionId: input.serverSession.sessionId,
+      ptySessionId: input.serverSession.ptySessionId,
       processName: input.serverSession.processName,
       canonicalTitle: input.serverSession.canonicalTitle,
       phase: input.serverSession.phase,
@@ -82,7 +82,7 @@ export function projectServerTerminalSession(input: {
       snapshotSeq:
         input.serverSnapshot?.snapshotSeq ?? (isReattachMatch ? (input.reattachSnapshot?.snapshotSeq ?? 0) : 0),
     },
-    controlsAttachment: input.serverSession.controller?.attachmentId === input.attachmentId,
+    controlsAttachment: input.serverSession.controller?.clientId === input.clientId,
     displayOrder: input.serverSession.displayOrder,
   }
 }

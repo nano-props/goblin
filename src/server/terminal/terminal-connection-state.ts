@@ -8,14 +8,14 @@ interface TerminalConnectionStateOptions {
    * resume doesn't lose the session catalog.
    */
   detachedTtlMs: number
-  onOwnerExpired(ownerId: string): void
+  onOwnerExpired(userId: string): void
 }
 
 type TimerHandle = ReturnType<typeof setTimeout>
 
 interface OwnerTimerEntry {
   timer: TimerHandle
-  ownerId: string
+  userId: string
 }
 
 /**
@@ -33,24 +33,24 @@ export class TerminalConnectionState {
     this.options = options
   }
 
-  clearOwnerDisconnect(ownerId: string): void {
-    const entry = this.disconnectTimerByOwnerId.get(ownerId)
+  clearOwnerDisconnect(userId: string): void {
+    const entry = this.disconnectTimerByOwnerId.get(userId)
     if (!entry) return
     clearTimeout(entry.timer)
-    this.disconnectTimerByOwnerId.delete(ownerId)
+    this.disconnectTimerByOwnerId.delete(userId)
   }
 
-  scheduleOwnerDisconnect(ownerId: string, hasSockets: () => boolean): void {
-    this.clearOwnerDisconnect(ownerId)
+  scheduleOwnerDisconnect(userId: string, hasSockets: () => boolean): void {
+    this.clearOwnerDisconnect(userId)
     const entry: OwnerTimerEntry = {
-      ownerId,
+      userId,
       timer: setTimeout(() => {
-        this.disconnectTimerByOwnerId.delete(ownerId)
+        this.disconnectTimerByOwnerId.delete(userId)
         if (hasSockets()) return
-        this.options.onOwnerExpired(ownerId)
+        this.options.onOwnerExpired(userId)
       }, this.options.detachedTtlMs),
     }
-    this.disconnectTimerByOwnerId.set(ownerId, entry)
+    this.disconnectTimerByOwnerId.set(userId, entry)
   }
 
   shutdown(): void {

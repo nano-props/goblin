@@ -19,7 +19,7 @@ import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
 import type {
   TerminalSessionContextValue,
   TerminalSessionReadContextValue,
-  TerminalSessionSummary,
+  TerminalSlotSummary,
   TerminalDescriptor,
   WorktreeTerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
@@ -752,12 +752,12 @@ function renderToolbar(options: {
     statusLoaded: true,
   })
   const detail = getSelectedBranchWorkspacePresentation(repo)
-  const sessions: TerminalSessionSummary[] = Array.from({ length: options.terminalCount }, (_, index) => ({
+  const sessions: TerminalSlotSummary[] = Array.from({ length: options.terminalCount }, (_, index) => ({
     type: 'terminal',
     id: `t${index + 1}`,
     key: `t${index + 1}`,
     worktreeTerminalKey: `${REPO_ID}\0${WORKTREE_PATH}`,
-    terminalId: `t${index + 1}`,
+    slotId: `t${index + 1}`,
     index: index + 1,
     displayOrder: index + 1,
     title: `term-${index + 1}`,
@@ -770,7 +770,7 @@ function renderToolbar(options: {
     ? {
         key: sessions[0].key,
         worktreeTerminalKey: sessions[0].worktreeTerminalKey,
-        terminalId: sessions[0].terminalId,
+        slotId: sessions[0].slotId,
         index: sessions[0].index,
         repoRoot: REPO_ID,
         branch: branchName,

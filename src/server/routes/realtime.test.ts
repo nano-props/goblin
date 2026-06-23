@@ -20,7 +20,7 @@ function makeTerminalHost(overrides: Partial<ServerTerminalHost> = {}): ServerTe
     listSessions: vi.fn(async () => []),
     create: vi.fn(async () => ({ ok: true }) as never),
     prune: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
-    getSessionSnapshot: vi.fn(async () => null),
+    getSlotSnapshot: vi.fn(async () => null),
     handleRealtimeMessage: vi.fn(),
     shutdown: vi.fn(),
     ...overrides,
@@ -63,26 +63,26 @@ describe('createRealtimeRoutes — auth middleware', () => {
   test('rejects /terminal with a wrong token', async () => {
     const host = makeTerminalHost({ isValidClientId: acceptOnly('c1') })
     const app = createRealtimeRoutes({ accessToken: 'secret', terminalHost: host })
-    const res = await app.request('http://localhost/terminal?t=wrong&clientId=c1&attachmentId=a1')
+    const res = await app.request('http://localhost/terminal?t=wrong&clientId=c1')
     expect(res.status).toBe(401)
   })
 
   test('rejects /terminal with an invalid clientId', async () => {
     const host = makeTerminalHost({ isValidClientId: acceptOnly('c1') })
     const app = createRealtimeRoutes({ accessToken: 'secret', terminalHost: host })
-    const res = await app.request('http://localhost/terminal?t=secret&clientId=bad&attachmentId=a1')
+    const res = await app.request('http://localhost/terminal?t=secret&clientId=bad')
     expect(res.status).toBe(400)
     const json = (await res.json()) as { ok: false; message: string }
     expect(json.message).toBe('Invalid client id')
   })
 
-  test('rejects /terminal with a missing attachmentId', async () => {
+  test('rejects /terminal with a missing clientId', async () => {
     const host = makeTerminalHost({ isValidClientId: acceptAll() })
     const app = createRealtimeRoutes({ accessToken: 'secret', terminalHost: host })
-    const res = await app.request('http://localhost/terminal?t=secret&clientId=c1')
+    const res = await app.request('http://localhost/terminal?t=secret')
     expect(res.status).toBe(400)
     const json = (await res.json()) as { ok: false; message: string }
-    expect(json.message).toBe('Missing attachment id')
+    expect(json.message).toBe('Missing client id')
   })
 
   test('rejects /renderer-intent without a token', async () => {
@@ -113,10 +113,10 @@ describe('createRealtimeRoutes — terminal message forwarding', () => {
     const handle = vi.fn()
     const host = makeTerminalHost({ handleRealtimeMessage: handle })
     const socket = {} as ServerTerminalSocket
-    // Method 2 adds `ownerId` between `attachmentId` and `socket`.
+    // Method 2 adds `userId` between `clientId` and `socket`.
     // Tests verify the host receives the value the auth middleware
     // derived from the access token.
-    host.handleRealtimeMessage('c1', 'a1', 'owner_test', socket, 'ls -la\n')
-    expect(handle).toHaveBeenCalledWith('c1', 'a1', 'owner_test', socket, 'ls -la\n')
+    host.handleRealtimeMessage('c1', 'owner_test', socket, 'ls -la\n')
+    expect(handle).toHaveBeenCalledWith('c1', 'owner_test', socket, 'ls -la\n')
   })
 })

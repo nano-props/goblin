@@ -26,9 +26,8 @@ import {
 import {
   isValidTerminalClientId,
   isValidTerminalId,
-  isValidTerminalSocketAttachmentId,
 } from '#/server/terminal/terminal-runtime-support.ts'
-import { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
+import { TerminalSlotManager } from '#/server/terminal/terminal-session-manager.ts'
 import { type PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { type ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.ts'
@@ -57,27 +56,27 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   const terminalViewOrder = createTerminalViewOrderRuntime<string>()
 
   // Sink callbacks fan out to every clientId that shares the
-  // session's ownerId. The manager passes `ownerId` (a string
+  // session's userId. The manager passes `userId` (a string
   // derived from the access token) rather than `clientId`, so a
   // live output event reaches a sibling tab (different `clientId`,
-  // same `ownerId`) without an extra attach roundtrip. See
+  // same `userId`) without an extra attach roundtrip. See
   // `identity.ts` for the model.
-  const manager = new TerminalSessionManager<string>(
+  const manager = new TerminalSlotManager<string>(
     ptySupervisor,
     {
-      onOutput(ownerId, event) {
-        broker.broadcastToOwner(ownerId, { type: 'output', event })
+      onOutput(userId, event) {
+        broker.broadcastToOwner(userId, { type: 'output', event })
       },
-      onTitle(ownerId, event) {
-        broker.broadcastToOwner(ownerId, { type: 'title', event })
+      onTitle(userId, event) {
+        broker.broadcastToOwner(userId, { type: 'title', event })
       },
-      onExit(ownerId, event) {
-        const repoRoot = manager.getSession(ownerId, event.sessionId)?.scope
-        broker.broadcastToOwner(ownerId, { type: 'exit', event })
-        if (repoRoot) broadcastRepoSessionsChanged(ownerId, repoRoot)
+      onExit(userId, event) {
+        const repoRoot = manager.getSlot(userId, event.ptySessionId)?.scope
+        broker.broadcastToOwner(userId, { type: 'exit', event })
+        if (repoRoot) broadcastRepoSessionsChanged(userId, repoRoot)
       },
-      onOwnership(ownerId, event) {
-        broker.broadcastToOwner(ownerId, { type: 'ownership', event })
+      onOwnership(userId, event) {
+        broker.broadcastToOwner(userId, { type: 'ownership', event })
       },
     },
     terminalViewOrder,
@@ -91,11 +90,11 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     isValidClientId: isValidTerminalClientId,
     isValidTerminalId,
     manager,
-    isAttachmentConnected(ownerId, attachmentId) {
-      return broker.isAttachmentConnected(ownerId, attachmentId)
+    isClientConnected(userId, clientId) {
+      return broker.isClientConnected(userId, clientId)
     },
-    broadcastSessionsChanged(ownerId, repoRoot) {
-      broadcastRepoSessionsChanged(ownerId, repoRoot)
+    broadcastSessionsChanged(userId, repoRoot) {
+      broadcastRepoSessionsChanged(userId, repoRoot)
     },
     gCommand: options.gCommand,
   })
@@ -107,16 +106,16 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     broker,
     catalog,
     isValidTerminalClientId,
-    // The previous stub returned `true` whenever an attachmentId
+    // The previous stub returned `true` whenever an clientId
     // was present (see `resolveAttachmentConnected` before this
     // plan), which made the takeover path "work" for the first
     // browser tab but masked the fact that we never asked the
     // broker. Replacing with the broker check ensures a takeover
     // request from a brand-new tab (the cross-browser scenario)
     // only counts the attachment as connected if the WS is
-    // actually alive for the (ownerId, attachmentId) pair.
-    resolveAttachmentConnected(ownerId, attachmentId) {
-      return broker.isAttachmentConnected(ownerId, attachmentId) ?? false
+    // actually alive for the (userId, clientId) pair.
+    resolveAttachmentConnected(userId, clientId) {
+      return broker.isClientConnected(userId, clientId) ?? false
     },
   })
 
@@ -137,66 +136,66 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         maxRingBufferChars: bufferStats.maxBufferChars,
       }
     },
-    registerSocket(clientId, attachmentId, ownerId, socket) {
-      if (!isValidTerminalClientId(clientId) || !isValidTerminalSocketAttachmentId(attachmentId) || !ownerId) {
+    registerSocket(clientId, userId, socket) {
+      if (!isValidTerminalClientId(clientId) || !userId) {
         socket.close(1008, 'invalid client id')
         return
       }
       const buffered = new BufferedTerminalSocket(socket as TerminalRealtimeSocket)
       bufferedSocketByRawSocket.set(socket as TerminalRealtimeSocket, buffered)
-      broker.registerSocket(clientId, attachmentId, ownerId, buffered)
+      broker.registerSocket(clientId, userId, buffered)
     },
-    unregisterSocket(_clientId, _attachmentId, _ownerId, socket) {
+    unregisterSocket(clientId, userId, socket) {
       const buffered =
         bufferedSocketByRawSocket.get(socket as TerminalRealtimeSocket) ?? (socket as TerminalRealtimeSocket)
       if (buffered instanceof BufferedTerminalSocket) buffered.deactivate()
       broker.unregisterSocket(buffered)
       bufferedSocketByRawSocket.delete(socket as TerminalRealtimeSocket)
     },
-    async attach(clientId, ownerId, input) {
-      return await actions.attach(clientId, ownerId, input)
+    async attach(clientId, userId, input) {
+      return await actions.attach(clientId, userId, input)
     },
-    async restart(clientId, ownerId, input) {
-      return await actions.restart(clientId, ownerId, input)
+    async restart(clientId, userId, input) {
+      return await actions.restart(clientId, userId, input)
     },
-    write(clientId, ownerId, input) {
-      return actions.write(clientId, ownerId, input)
+    write(clientId, userId, input) {
+      return actions.write(clientId, userId, input)
     },
-    resize(clientId, ownerId, input) {
-      return actions.resize(clientId, ownerId, input)
+    resize(clientId, userId, input) {
+      return actions.resize(clientId, userId, input)
     },
-    takeover(clientId, ownerId, input) {
-      return actions.takeover(clientId, ownerId, input)
+    takeover(clientId, userId, input) {
+      return actions.takeover(clientId, userId, input)
     },
-    close(clientId, ownerId, input) {
-      return actions.close(clientId, ownerId, input)
+    close(clientId, userId, input) {
+      return actions.close(clientId, userId, input)
     },
-    async listSessions(clientId, ownerId, repoRoot) {
-      return await actions.listSessions(clientId, ownerId, repoRoot)
+    async listSessions(clientId, userId, repoRoot) {
+      return await actions.listSessions(clientId, userId, repoRoot)
     },
-    async create(clientId, ownerId, input) {
-      return await actions.create(clientId, ownerId, input)
+    async create(clientId, userId, input) {
+      return await actions.create(clientId, userId, input)
     },
-    async prune(clientId, ownerId, repoRoot) {
-      return await actions.prune(clientId, ownerId, repoRoot)
+    async prune(clientId, userId, repoRoot) {
+      return await actions.prune(clientId, userId, repoRoot)
     },
-    async getSessionSnapshot(clientId, ownerId, input) {
-      return await actions.getSessionSnapshot(clientId, ownerId, input)
+    async getSlotSnapshot(clientId, userId, input) {
+      return await actions.getSlotSnapshot(clientId, userId, input)
     },
-    handleRealtimeMessage(clientId, attachmentId, ownerId, socket, payload) {
+    handleRealtimeMessage(clientId, userId, socket, payload) {
       // Log invalid identifier/parse drops so a stuck takeover
       // (e.g. an old clientId pattern that the WS validator
       // missed) is observable in production logs. We still
       // return early without rejecting the WS — the message is
       // just unprocessable for this socket.
-      if (!isValidTerminalClientId(clientId) || !isValidTerminalSocketAttachmentId(attachmentId)) {
-        terminalRuntimeLogger.warn({ clientId, attachmentId }, 'invalid realtime message: missing/invalid identifiers')
+      if (!isValidTerminalClientId(clientId)) {
+        terminalRuntimeLogger.warn({ clientId }, 'invalid realtime message: missing/invalid identifiers')
         return
       }
-      if (!ownerId) {
+      if (!userId) {
         terminalRuntimeLogger.warn(
-          { clientId, attachmentId },
-          'invalid realtime message: missing ownerId from auth context',
+          { clientId },
+          'invalid realtime message: missing userId from auth context',
         )
         return
       }
@@ -204,11 +203,11 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       try {
         message = normalizeTerminalClientMessage(JSON.parse(payload))
       } catch (err) {
-        terminalRuntimeLogger.warn({ clientId, attachmentId, err }, 'invalid realtime message: parse/normalize failed')
+        terminalRuntimeLogger.warn({ clientId, err }, 'invalid realtime message: parse/normalize failed')
         return
       }
       if (!message) {
-        terminalRuntimeLogger.warn({ clientId, attachmentId }, 'invalid realtime message: null after normalize')
+        terminalRuntimeLogger.warn({ clientId }, 'invalid realtime message: null after normalize')
         return
       }
       const bufferedSocket = bufferedSocketByRawSocket.get(socket as TerminalRealtimeSocket)
@@ -216,8 +215,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       void handleTerminalRealtimeRequestMessage(
         realtimeHandlers,
         clientId,
-        attachmentId,
-        ownerId,
+        userId,
         socket as TerminalRealtimeSocket,
         bufferedSocket,
         message,
@@ -244,7 +242,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     },
   }
 
-  function broadcastRepoSessionsChanged(ownerId: string, repoRoot: string): void {
-    broker.broadcastToOwner(ownerId, { type: 'sessions-changed', repoRoot })
+  function broadcastRepoSessionsChanged(userId: string, repoRoot: string): void {
+    broker.broadcastToOwner(userId, { type: 'sessions-changed', repoRoot })
   }
 }

@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { terminalWorkspacePaneViewIdentity } from '#/web/components/workspace-pane/workspace-pane-view-model.ts'
 import type { WorkspacePaneTabOrderEntry } from '#/shared/workspace-pane.ts'
-import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
+import type { TerminalSlotSummary } from '#/web/components/terminal/types.ts'
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
@@ -112,7 +112,7 @@ describe('WorkspacePaneViewStrip keyboard dnd wiring', () => {
           workspacePaneId="workspace"
           sessions={[
             session({ key: 't1', selected: true }),
-            session({ key: 't2', selected: false, terminalId: 'terminal-2', index: 2 }),
+            session({ key: 't2', selected: false, slotId: 'terminal-2', index: 2 }),
           ]}
           onNew={() => {}}
           onSelect={() => {}}
@@ -147,13 +147,13 @@ function makeWorkspacePaneViewStrip(
     workspacePaneViewStripModule
   return function TestWorkspacePaneViewStrip(props: {
     worktreeTerminalKey: string
-    sessions: TerminalSessionSummary[]
+    sessions: TerminalSlotSummary[]
     workspacePaneId: string
     panelActive?: boolean
     onNew: () => void
-    onSelect: (worktreeTerminalKey: string, tab: TerminalSessionSummary) => void
+    onSelect: (worktreeTerminalKey: string, tab: TerminalSlotSummary) => void
     onScrollToBottom: (key: string) => void
-    onClose: (tab: TerminalSessionSummary) => void
+    onClose: (tab: TerminalSlotSummary) => void
     onReorder: (orderedTabs: WorkspacePaneTabOrderEntry[]) => void
   }) {
     const selected = props.sessions.find((candidate) => candidate.selected) ?? null
@@ -182,7 +182,7 @@ function makeWorkspacePaneViewStrip(
   }
 }
 
-function session(overrides: Partial<TerminalSessionSummary> = {}): TerminalSessionSummary {
+function session(overrides: Partial<TerminalSlotSummary> = {}): TerminalSlotSummary {
   const key = overrides.key ?? 't1'
   const title = overrides.title ?? 'term-1'
   return {
@@ -190,7 +190,7 @@ function session(overrides: Partial<TerminalSessionSummary> = {}): TerminalSessi
     id: overrides.id ?? key,
     key,
     worktreeTerminalKey: overrides.worktreeTerminalKey ?? '/repo\0/repo/worktree',
-    terminalId: overrides.terminalId ?? 'terminal-1',
+    slotId: overrides.slotId ?? 'terminal-1',
     index: overrides.index ?? 1,
     displayOrder: overrides.displayOrder ?? 1,
     title,

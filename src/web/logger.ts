@@ -15,8 +15,8 @@
 //   - Dev: Info. Full visibility while iterating.
 //
 // Tagged children are pre-bound so call sites stay one symbol:
-//   `terminalLog.warn('write failed', { sessionId, err })`
-//   renders as `[terminal] write failed { sessionId: ..., err: ... }`.
+//   `terminalLog.warn('write failed', { ptySessionId, err })`
+//   renders as `[terminal] write failed { ptySessionId: ..., err: ... }`.
 
 import { createConsola, LogLevels, type ConsolaInstance } from 'consola'
 

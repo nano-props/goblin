@@ -1,30 +1,30 @@
 import type { WorkspacePaneViewType } from '#/shared/workspace-pane.ts'
 
 /**
- * `controllerStatus === 'connected'` while the controller's attachment has
+ * `controllerStatus === 'connected'` while the controller's client has
  * a live socket. The server clears the controller slot on disconnect
  * (no grace), so the only transient state the renderer needs to render is
  * `connected` vs `none`.
  */
 export type TerminalControllerStatus = 'connected' | 'none'
-export type TerminalAttachmentRole = 'controller' | 'viewer' | 'unowned'
-export type TerminalSessionPhase = 'opening' | 'restarting' | 'open' | 'error' | 'closed'
+export type TerminalClientRole = 'controller' | 'viewer' | 'unowned'
+export type TerminalSlotPhase = 'opening' | 'restarting' | 'open' | 'error' | 'closed'
 
 export interface TerminalResolvedOwnership {
-  role: TerminalAttachmentRole
+  role: TerminalClientRole
   controllerStatus: TerminalControllerStatus
 }
 
 export interface TerminalController {
-  attachmentId: string
+  clientId: string
   status: Exclude<TerminalControllerStatus, 'none'>
 }
 
 export interface TerminalAttachInput {
-  sessionId: string
+  ptySessionId: string
   cols: number
   rows: number
-  attachmentId?: string
+  clientId?: string
 }
 
 export interface TerminalCreateInput {
@@ -34,14 +34,14 @@ export interface TerminalCreateInput {
   kind: 'primary' | 'additional'
   cols?: number
   rows?: number
-  attachmentId?: string
+  clientId?: string
 }
 
 export interface TerminalRestartInput {
-  sessionId: string
+  ptySessionId: string
   cols: number
   rows: number
-  attachmentId?: string
+  clientId?: string
 }
 
 /**
@@ -66,26 +66,26 @@ export interface TerminalRestartInput {
 export type TerminalTakeoverResult =
   | {
       ok: true
-      sessionId: string
+      ptySessionId: string
       role: 'controller' | 'viewer' | 'unowned'
       controllerStatus: 'connected' | 'none'
       controller: TerminalController | null
       canonicalCols: number
       canonicalRows: number
-      phase: TerminalSessionPhase
+      phase: TerminalSlotPhase
     }
   | { ok: false; message: string }
 
 /**
  * Successful attach/restart result.
  *
- * `snapshot`/`snapshotSeq` are the session's server-side serialized
+ * `snapshot`/`snapshotSeq` are the slot's server-side serialized
  * xterm screen and the last PTY output sequence included in that screen.
  * The renderer hydrates from these and re-replays any post-snapshot
  * events the runtime captures.
  *
  * First-frame contract: a successful `attach`/`restart` response is
- * the authoritative handshake for that session's frame state. All
+ * the authoritative handshake for that slot's frame state. All
  * fields are required at the type level — the server must populate
  * them on every success path, and the renderer can hydrate the UI
  * without waiting for any follow-up event. This mirrors the R0
@@ -95,10 +95,10 @@ export type TerminalTakeoverResult =
 export type TerminalAttachResult =
   | {
       ok: true
-      sessionId: string
+      ptySessionId: string
       processName: string
       canonicalTitle: string | null
-      phase: TerminalSessionPhase
+      phase: TerminalSlotPhase
       message: string | null
       snapshot: string
       snapshotSeq: number
@@ -117,10 +117,10 @@ export type TerminalCatalogAction = 'created' | 'restored' | 'reused'
  * source of truth for the first-frame contract.
  */
 export interface TerminalFirstFrame {
-  sessionId: string
+  ptySessionId: string
   processName: string
   canonicalTitle: string | null
-  phase: TerminalSessionPhase
+  phase: TerminalSlotPhase
   message: string | null
   snapshot: string
   snapshotSeq: number
@@ -134,27 +134,27 @@ export type TerminalCatalogMutationResult =
       ok: true
       action: TerminalCatalogAction
       key: string
-      sessions: TerminalSessionSummary[]
+      sessions: TerminalSlotSummary[]
     } & TerminalFirstFrame)
   | { ok: false; message: string }
 
 export interface TerminalWriteInput {
-  sessionId: string
+  ptySessionId: string
   data: string
-  attachmentId?: string
+  clientId?: string
 }
 
 export interface TerminalResizeInput {
-  sessionId: string
+  ptySessionId: string
   cols: number
   rows: number
-  attachmentId?: string
+  clientId?: string
 }
 
 export type TerminalTakeoverInput = TerminalResizeInput
 
-export interface TerminalSessionInput {
-  sessionId: string
+export interface TerminalSlotInput {
+  ptySessionId: string
 }
 
 export interface TerminalNotifyBellInput {
@@ -168,8 +168,8 @@ export interface TerminalListSessionsInput {
   repoRoot: string
 }
 
-export interface TerminalSessionSummary {
-  sessionId: string
+export interface TerminalSlotSummary {
+  ptySessionId: string
   key: string
   viewType: Extract<WorkspacePaneViewType, 'terminal'>
   viewId: string
@@ -177,19 +177,19 @@ export interface TerminalSessionSummary {
   controller: TerminalController | null
   processName: string
   canonicalTitle: string | null
-  phase: TerminalSessionPhase
+  phase: TerminalSlotPhase
   message: string | null
   cols: number
   rows: number
   displayOrder: number
 }
 
-export interface TerminalSessionSnapshotInput {
-  sessionId: string
+export interface TerminalSlotSnapshotInput {
+  ptySessionId: string
 }
 
-export interface TerminalSessionSnapshot {
-  sessionId: string
+export interface TerminalSlotSnapshot {
+  ptySessionId: string
   snapshot: string
   snapshotSeq: number
 }
@@ -197,19 +197,19 @@ export interface TerminalSessionSnapshot {
 export type TerminalMutationResult = boolean
 
 export interface TerminalOutputEvent {
-  sessionId: string
+  ptySessionId: string
   data: string
   seq: number
   processName: string
 }
 
 export interface TerminalTitleEvent {
-  sessionId: string
+  ptySessionId: string
   canonicalTitle: string | null
 }
 
 export interface TerminalExitEvent {
-  sessionId: string
+  ptySessionId: string
 }
 
 /**
@@ -220,9 +220,9 @@ export interface TerminalExitEvent {
  * re-checking the shape.
  */
 export interface TerminalOwnershipEvent {
-  sessionId: string
+  ptySessionId: string
   controller: TerminalController | null
   cols: number
   rows: number
-  phase: TerminalSessionPhase
+  phase: TerminalSlotPhase
 }

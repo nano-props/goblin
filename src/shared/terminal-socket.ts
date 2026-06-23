@@ -9,10 +9,10 @@ import type {
   TerminalOwnershipEvent,
   TerminalResizeInput,
   TerminalRestartInput,
-  TerminalSessionInput,
-  TerminalSessionSnapshot,
-  TerminalSessionSnapshotInput,
-  TerminalSessionSummary,
+  TerminalSlotInput,
+  TerminalSlotSnapshot,
+  TerminalSlotSnapshotInput,
+  TerminalSlotSummary,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalTitleEvent,
@@ -26,14 +26,14 @@ export type TerminalRealtimeMessage =
   | { type: 'exit'; event: TerminalExitEvent }
   | { type: 'ownership'; event: TerminalOwnershipEvent }
   | { type: 'sessions-changed'; repoRoot: string }
-  // Targeted per-session close. Emitted by the server after a
+  // Targeted per-slot close. Emitted by the server after a
   // successful `close` request, alongside the existing
   // `sessions-changed` global broadcast. Multi-window clients use
-  // this to drop the local session immediately, without waiting for
+  // this to drop the local slot immediately, without waiting for
   // a full list-rescan. The `repoRoot` is included so the renderer
   // can route the event to the right worktree without a manager
   // lookup.
-  | { type: 'session-closed'; sessionId: string; repoRoot: string }
+  | { type: 'slot-closed'; ptySessionId: string; repoRoot: string }
 
 export interface TerminalSocketRequestInputs {
   attach: TerminalAttachInput
@@ -41,11 +41,11 @@ export interface TerminalSocketRequestInputs {
   write: TerminalWriteInput
   resize: TerminalResizeInput
   takeover: TerminalTakeoverInput
-  close: TerminalSessionInput
+  close: TerminalSlotInput
   'list-sessions': TerminalListSessionsInput
   create: TerminalCreateInput
   prune: { repoRoot: string }
-  'session-snapshot': TerminalSessionSnapshotInput
+  'session-snapshot': TerminalSlotSnapshotInput
 }
 
 export interface TerminalSocketResponseOutputs {
@@ -55,10 +55,10 @@ export interface TerminalSocketResponseOutputs {
   resize: TerminalMutationResult
   takeover: TerminalTakeoverResult
   close: TerminalMutationResult
-  'list-sessions': TerminalSessionSummary[]
+  'list-sessions': TerminalSlotSummary[]
   create: TerminalCatalogMutationResult
   prune: { pruned: number; remaining: number }
-  'session-snapshot': TerminalSessionSnapshot | null
+  'session-snapshot': TerminalSlotSnapshot | null
 }
 
 export type TerminalSocketRequestAction = keyof TerminalSocketRequestInputs

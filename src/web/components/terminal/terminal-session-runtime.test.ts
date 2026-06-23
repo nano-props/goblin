@@ -8,14 +8,14 @@ describe('TerminalSessionRuntime', () => {
     runtime.applyAttachResult(
       {
         ok: true,
-        sessionId: 'session-1',
+        ptySessionId: 'session-1',
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',
         canonicalTitle: null,
         phase: 'open',
         message: null,
-        controller: { attachmentId: 'attachment_local', status: 'connected' },
+        controller: { clientId: 'client_local', status: 'connected' },
         canonicalCols: 100,
         canonicalRows: 30,
         role: 'controller',
@@ -42,14 +42,14 @@ describe('TerminalSessionRuntime', () => {
     runtime.applyAttachResult(
       {
         ok: true,
-        sessionId: 'session-1',
+        ptySessionId: 'session-1',
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',
         canonicalTitle: null,
         phase: 'open',
         message: null,
-        controller: { attachmentId: 'attachment_remote', status: 'connected' },
+        controller: { clientId: 'client_remote', status: 'connected' },
         role: 'viewer',
         controllerStatus: 'connected',
         canonicalCols: 120,
@@ -62,16 +62,16 @@ describe('TerminalSessionRuntime', () => {
     expect(runtime.snapshot().attachment).toMatchObject({ active: false, canTakeover: true })
 
     runtime.beginReplay(2)
-    expect(runtime.handleOutput({ sessionId: 'session-1', data: 'old', seq: 1, processName: 'zsh' })).toEqual({
+    expect(runtime.handleOutput({ ptySessionId: 'session-1', data: 'old', seq: 1, processName: 'zsh' })).toEqual({
       changed: false,
       output: null,
     })
-    expect(runtime.handleOutput({ sessionId: 'session-1', data: 'new', seq: 3, processName: 'bash' })).toEqual({
+    expect(runtime.handleOutput({ ptySessionId: 'session-1', data: 'new', seq: 3, processName: 'bash' })).toEqual({
       changed: true,
       output: null,
     })
     expect(runtime.processName()).toBe('bash')
-    expect(runtime.finishReplay()).toEqual([{ sessionId: 'session-1', data: 'new', seq: 3, processName: 'bash' }])
+    expect(runtime.finishReplay()).toEqual([{ ptySessionId: 'session-1', data: 'new', seq: 3, processName: 'bash' }])
   })
 
   test('drainReplay discards the replay buffer without surfacing captured events', () => {
@@ -83,14 +83,14 @@ describe('TerminalSessionRuntime', () => {
     runtime.applyAttachResult(
       {
         ok: true,
-        sessionId: 'session-1',
+        ptySessionId: 'session-1',
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',
         canonicalTitle: null,
         phase: 'open',
         message: null,
-        controller: { attachmentId: 'attachment_remote', status: 'connected' },
+        controller: { clientId: 'client_remote', status: 'connected' },
         role: 'viewer',
         controllerStatus: 'connected',
         canonicalCols: 120,
@@ -101,7 +101,7 @@ describe('TerminalSessionRuntime', () => {
     runtime.markAttached()
 
     runtime.beginReplay(2)
-    runtime.handleOutput({ sessionId: 'session-1', data: 'new', seq: 3, processName: 'bash' })
+    runtime.handleOutput({ ptySessionId: 'session-1', data: 'new', seq: 3, processName: 'bash' })
     runtime.drainReplay()
     // Subsequent finishReplay returns nothing — the buffer was cleared.
     expect(runtime.finishReplay()).toEqual([])
@@ -120,14 +120,14 @@ describe('TerminalSessionRuntime', () => {
     runtime.applyAttachResult(
       {
         ok: true,
-        sessionId: 'session-1',
+        ptySessionId: 'session-1',
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',
         canonicalTitle: null,
         phase: 'open',
         message: null,
-        controller: { attachmentId: 'attachment_remote', status: 'connected' },
+        controller: { clientId: 'client_remote', status: 'connected' },
         role: 'viewer',
         controllerStatus: 'connected',
         canonicalCols: 120,
@@ -140,13 +140,13 @@ describe('TerminalSessionRuntime', () => {
     // Preload window: events arrive during the cached-snapshot write.
     // The boundary is the cached snapshot's seq.
     runtime.beginReplay(2)
-    runtime.handleOutput({ sessionId: 'session-1', data: 'preload-old', seq: 3, processName: 'bash' })
-    runtime.handleOutput({ sessionId: 'session-1', data: 'preload-new', seq: 6, processName: 'bash' })
+    runtime.handleOutput({ ptySessionId: 'session-1', data: 'preload-old', seq: 3, processName: 'bash' })
+    runtime.handleOutput({ ptySessionId: 'session-1', data: 'preload-new', seq: 6, processName: 'bash' })
 
     // Post-attach window: the new snapshot is at seq=5. Update the
     // boundary; the buffer is preserved across the call.
     runtime.beginReplay(5)
-    runtime.handleOutput({ sessionId: 'session-1', data: 'post-attach', seq: 7, processName: 'bash' })
+    runtime.handleOutput({ ptySessionId: 'session-1', data: 'post-attach', seq: 7, processName: 'bash' })
 
     const events = runtime.finishReplay()
     // preload-old (seq 3) is older than the new snapshot (seq=5) → dropped
@@ -161,14 +161,14 @@ describe('TerminalSessionRuntime', () => {
     runtime.applyAttachResult(
       {
         ok: true,
-        sessionId: 'session-1',
+        ptySessionId: 'session-1',
         snapshot: '',
         snapshotSeq: 0,
         processName: 'zsh',
         canonicalTitle: '~/Developer/goblin — npm run dev',
         phase: 'open',
         message: null,
-        controller: { attachmentId: 'attachment_remote', status: 'connected' },
+        controller: { clientId: 'client_remote', status: 'connected' },
         canonicalCols: 100,
         canonicalRows: 30,
         role: 'viewer',
@@ -190,7 +190,7 @@ describe('TerminalSessionRuntime', () => {
 
     expect(
       runtime.hydrateSession({
-        sessionId: 'session-remote',
+        ptySessionId: 'session-remote',
         phase: 'open',
         message: null,
         processName: 'node',
@@ -211,7 +211,7 @@ describe('TerminalSessionRuntime', () => {
       canonicalCols: 132,
       canonicalRows: 43,
     })
-    expect(runtime.handleOutput({ sessionId: 'session-remote', data: 'tick', seq: 1, processName: 'node' })).toEqual({
+    expect(runtime.handleOutput({ ptySessionId: 'session-remote', data: 'tick', seq: 1, processName: 'node' })).toEqual({
       changed: false,
       output: 'tick',
     })
@@ -220,7 +220,7 @@ describe('TerminalSessionRuntime', () => {
   test('resetTransientState clears transient terminal state without dropping runtime metadata', () => {
     const runtime = new TerminalSessionRuntime()
     runtime.hydrateSession({
-      sessionId: 'session-1',
+      ptySessionId: 'session-1',
       phase: 'open',
       message: null,
       processName: 'zsh',

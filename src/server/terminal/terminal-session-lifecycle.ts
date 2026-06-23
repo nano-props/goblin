@@ -1,7 +1,7 @@
-import type { TerminalSessionPhase } from '#/shared/terminal-types.ts'
+import type { TerminalSlotPhase } from '#/shared/terminal-types.ts'
 
 export interface TerminalLifecycleState {
-  phase: TerminalSessionPhase
+  phase: TerminalSlotPhase
   message: string | null
 }
 
@@ -27,7 +27,7 @@ export function markTerminalSessionClosed(state: TerminalLifecycleState): void {
 
 function setTerminalSessionPhase(
   state: TerminalLifecycleState,
-  phase: TerminalSessionPhase,
+  phase: TerminalSlotPhase,
   message: string | null = null,
 ): void {
   state.phase = phase

@@ -476,7 +476,7 @@ function terminalView(key: string, displayOrder: number, selected: boolean): Wor
     id: key,
     key,
     worktreeTerminalKey: WORKTREE_KEY,
-    terminalId: key,
+    slotId: key,
     index: displayOrder,
     displayOrder,
     title: key,

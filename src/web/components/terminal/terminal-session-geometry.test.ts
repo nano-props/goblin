@@ -40,7 +40,7 @@ function descriptor(): TerminalDescriptor {
   return {
     key: '/repo\0/repo\0terminal-1',
     worktreeTerminalKey: '/repo\0/repo',
-    terminalId: 'terminal-1',
+    slotId: 'terminal-1',
     index: 1,
     repoRoot: '/repo',
     branch: 'main',

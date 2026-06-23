@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'vitest'
-import { TerminalSessionState } from '#/web/components/terminal/terminal-session-state.ts'
+import { TerminalSlotState } from '#/web/components/terminal/terminal-session-state.ts'
 
-describe('TerminalSessionState', () => {
+describe('TerminalSlotState', () => {
   test('tracks snapshot and attachment state transitions', () => {
-    const state = new TerminalSessionState()
+    const state = new TerminalSlotState()
 
     expect(state.snapshot(null)).toEqual({
       phase: 'opening',
@@ -40,7 +40,7 @@ describe('TerminalSessionState', () => {
   })
 
   test('restarting state is non-interactive until open resumes', () => {
-    const state = new TerminalSessionState()
+    const state = new TerminalSlotState()
     state.applyOpenResult({
       processName: 'zsh',
       canonicalTitle: null,
@@ -60,21 +60,21 @@ describe('TerminalSessionState', () => {
   })
 
   test('buffers replay output until replay completes', () => {
-    const state = new TerminalSessionState()
+    const state = new TerminalSlotState()
 
     state.beginReplay(3)
-    expect(state.captureReplayOutput({ sessionId: 'session-1', data: 'old', seq: 2, processName: 'zsh' })).toBe(true)
-    expect(state.captureReplayOutput({ sessionId: 'session-1', data: 'new', seq: 4, processName: 'zsh' })).toBe(true)
+    expect(state.captureReplayOutput({ ptySessionId: 'session-1', data: 'old', seq: 2, processName: 'zsh' })).toBe(true)
+    expect(state.captureReplayOutput({ ptySessionId: 'session-1', data: 'new', seq: 4, processName: 'zsh' })).toBe(true)
 
-    expect(state.finishReplay()).toEqual([{ sessionId: 'session-1', data: 'new', seq: 4, processName: 'zsh' }])
-    expect(state.captureReplayOutput({ sessionId: 'session-1', data: 'live', seq: 5, processName: 'zsh' })).toBe(false)
+    expect(state.finishReplay()).toEqual([{ ptySessionId: 'session-1', data: 'new', seq: 4, processName: 'zsh' }])
+    expect(state.captureReplayOutput({ ptySessionId: 'session-1', data: 'live', seq: 5, processName: 'zsh' })).toBe(false)
   })
 
   test('ignores stale replay generation cleanup', () => {
-    const state = new TerminalSessionState()
+    const state = new TerminalSlotState()
 
     const staleGeneration = state.beginReplay(1)
-    expect(state.captureReplayOutput({ sessionId: 'session-1', data: 'old-window', seq: 2, processName: 'zsh' })).toBe(
+    expect(state.captureReplayOutput({ ptySessionId: 'session-1', data: 'old-window', seq: 2, processName: 'zsh' })).toBe(
       true,
     )
     const currentGeneration = state.beginReplay(2)
@@ -82,7 +82,7 @@ describe('TerminalSessionState', () => {
     state.discardReplay(staleGeneration)
     expect(state.isReplaying()).toBe(true)
     expect(
-      state.captureReplayOutput({ sessionId: 'session-1', data: 'current-window', seq: 3, processName: 'zsh' }),
+      state.captureReplayOutput({ ptySessionId: 'session-1', data: 'current-window', seq: 3, processName: 'zsh' }),
     ).toBe(true)
 
     expect(state.finishReplay(staleGeneration)).toEqual([])
@@ -91,7 +91,7 @@ describe('TerminalSessionState', () => {
   })
 
   test('resetTransientState clears transient state without overwriting ownership', () => {
-    const state = new TerminalSessionState()
+    const state = new TerminalSlotState()
 
     state.applyOpenResult({
       processName: 'zsh',
@@ -103,7 +103,7 @@ describe('TerminalSessionState', () => {
     })
     state.setOpen()
     state.beginReplay(1)
-    state.captureReplayOutput({ sessionId: 'session-1', data: 'live', seq: 2, processName: 'zsh' })
+    state.captureReplayOutput({ ptySessionId: 'session-1', data: 'live', seq: 2, processName: 'zsh' })
     state.setSearchResult({ resultIndex: 0, resultCount: 1, found: true })
     state.setProgress(1, 10)
 
@@ -126,7 +126,7 @@ describe('TerminalSessionState', () => {
   })
 
   test('normalizes empty titles back to null', () => {
-    const state = new TerminalSessionState()
+    const state = new TerminalSlotState()
 
     expect(state.setCanonicalTitle('  hello   world  ')).toBe(true)
     expect(state.snapshot(null).canonicalTitle).toBe('hello world')

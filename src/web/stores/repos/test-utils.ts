@@ -11,8 +11,8 @@ import type {
   TerminalAttachResult,
   TerminalCatalogMutationResult,
   TerminalMutationResult,
-  TerminalSessionSnapshot,
-  TerminalSessionSummary,
+  TerminalSlotSnapshot,
+  TerminalSlotSummary,
   TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
 import type {
@@ -33,8 +33,8 @@ interface TerminalBridgeTestOutputs {
   'terminal.close': TerminalMutationResult
   'terminal.create': TerminalCatalogMutationResult
   'terminal.prune': { pruned: number; remaining: number }
-  'terminal.listSessions': TerminalSessionSummary[]
-  'terminal.getSessionSnapshot': TerminalSessionSnapshot | null
+  'terminal.listSessions': TerminalSlotSummary[]
+  'terminal.getSlotSnapshot': TerminalSlotSnapshot | null
   'terminal.notifyBell': TerminalMutationResult
 }
 
@@ -59,7 +59,7 @@ function terminalHandlerNameForSocketAction(action: string): keyof TerminalBridg
     case 'list-sessions':
       return 'terminal.listSessions'
     case 'session-snapshot':
-      return 'terminal.getSessionSnapshot'
+      return 'terminal.getSlotSnapshot'
     default:
       return null
   }
@@ -165,8 +165,8 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           takeover: () =>
             Promise.resolve({
               ok: true as const,
-              sessionId: 'session-1',
-              controller: { attachmentId: 'attachment_local', status: 'connected' as const },
+              ptySessionId: 'session-1',
+              controller: { clientId: 'attachment_local', status: 'connected' as const },
             }),
           close: () => Promise.resolve(true),
           create: () => Promise.resolve({ ok: false, message: 'unhandled terminal create' }),
@@ -201,9 +201,9 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     payload: unknown,
   ): TerminalBridgeTestOutputs['terminal.listSessions']
   function callTerminalHandler(
-    name: 'terminal.getSessionSnapshot',
+    name: 'terminal.getSlotSnapshot',
     payload: unknown,
-  ): TerminalBridgeTestOutputs['terminal.getSessionSnapshot']
+  ): TerminalBridgeTestOutputs['terminal.getSlotSnapshot']
   function callTerminalHandler(
     name: 'terminal.notifyBell',
     payload: unknown,
@@ -230,10 +230,10 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         case 'terminal.takeover':
           return {
             ok: true as const,
-            sessionId: 'session-1',
+            ptySessionId: 'session-1',
             role: 'controller' as const,
             controllerStatus: 'connected' as const,
-            controller: { attachmentId: 'attachment_local', status: 'connected' as const },
+            controller: { clientId: 'attachment_local', status: 'connected' as const },
             canonicalCols: 80,
             canonicalRows: 24,
             phase: 'open' as const,
@@ -242,24 +242,24 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           return { pruned: 0, remaining: 0 }
         case 'terminal.listSessions':
           return []
-        case 'terminal.getSessionSnapshot':
+        case 'terminal.getSlotSnapshot':
           return null
         case 'terminal.create': {
           const terminalKind = (payload as { kind?: string } | undefined)?.kind
-          const sessionId = terminalKind === 'primary' ? 'terminal-1' : 'terminal-2'
+          const ptySessionId = terminalKind === 'primary' ? 'terminal-1' : 'terminal-2'
           return {
             ok: true,
             action: terminalKind === 'primary' ? 'reused' : 'created',
             key: terminalKind === 'primary' ? 'repo\0worktree\0terminal-1' : 'repo\0worktree\0terminal-2',
             sessions: [],
-            sessionId,
+            ptySessionId,
             snapshot: '',
             snapshotSeq: 0,
             processName: 'zsh',
             canonicalTitle: null,
             phase: 'open',
             message: null,
-            controller: { attachmentId: 'attachment_local', status: 'connected' },
+            controller: { clientId: 'attachment_local', status: 'connected' },
             canonicalCols: 80,
             canonicalRows: 24,
           }
@@ -381,7 +381,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       listSessions: async (input) => callTerminalHandler('terminal.listSessions', input),
       prewarm: async () => {},
       kickReconnect: () => {},
-      getSessionSnapshot: async (input) => callTerminalHandler('terminal.getSessionSnapshot', input),
+      getSlotSnapshot: async (input) => callTerminalHandler('terminal.getSlotSnapshot', input),
       notifyBell: async (input) => callTerminalHandler('terminal.notifyBell', input),
       sendTestNotification: async () => true,
       setBadge: () => {},

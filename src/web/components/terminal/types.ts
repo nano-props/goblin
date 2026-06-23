@@ -1,5 +1,5 @@
 import type {
-  TerminalAttachmentRole,
+  TerminalClientRole,
   TerminalControllerStatus,
   TerminalExitEvent,
   TerminalOutputEvent,
@@ -10,7 +10,7 @@ export type TerminalPhase = 'opening' | 'restarting' | 'open' | 'error' | 'close
 export interface TerminalDescriptor {
   key: string
   worktreeTerminalKey: string
-  terminalId: string
+  slotId: string
   index: number
   repoRoot: string
   branch: string
@@ -32,7 +32,7 @@ export interface TerminalBellEvent {
 }
 
 export interface TerminalAttachmentOwnershipViewModel {
-  role: TerminalAttachmentRole
+  role: TerminalClientRole
   controllerStatus: TerminalControllerStatus
 }
 
@@ -53,7 +53,7 @@ export interface TerminalAttachmentSnapshot extends TerminalAttachmentOwnershipV
  * without re-checking the shape.
  */
 export interface TerminalOwnershipViewModel extends TerminalAttachmentOwnershipViewModel {
-  sessionId: string
+  ptySessionId: string
   canonicalCols: number
   canonicalRows: number
   phase: TerminalPhase
@@ -100,12 +100,12 @@ export interface TerminalRepoSnapshot {
 
 export type TerminalRepoIndex = Record<string, TerminalRepoSnapshot>
 
-export interface TerminalSessionSummary {
+export interface TerminalSlotSummary {
   type: 'terminal'
   id: string
   key: string
   worktreeTerminalKey: string
-  terminalId: string
+  slotId: string
   index: number
   displayOrder: number
   title: string
@@ -116,12 +116,12 @@ export interface TerminalSessionSummary {
   hasBell: boolean
 }
 
-export type WorkspacePaneViewSummary = TerminalSessionSummary
+export type WorkspacePaneViewSummary = TerminalSlotSummary
 
 export interface WorktreeTerminalSnapshot {
   worktreeTerminalKey: string
   selectedDescriptor: TerminalDescriptor | null
-  sessions: TerminalSessionSummary[]
+  sessions: TerminalSlotSummary[]
   count: number
   bellCount: number
   pendingCreate: boolean
@@ -162,7 +162,7 @@ export interface ManagedTerminalSessionLike {
   attach: (host: HTMLElement) => void
   detach: (host: HTMLElement, parkingRoot: HTMLElement) => void
   restart: () => void
-  dispose: (options?: { closeSession?: boolean }) => void
+  dispose: (options?: { closeSlot?: boolean }) => void
   snapshot: () => TerminalSnapshot
   isTerminalFocusTarget: (target: EventTarget | null) => boolean
   findNext: (term: string, incremental?: boolean) => TerminalSearchResult
@@ -181,7 +181,7 @@ export interface ManagedTerminalSessionLike {
 }
 
 export function createTerminalAttachmentSnapshot(input: {
-  role: TerminalAttachmentRole
+  role: TerminalClientRole
   controllerStatus: TerminalControllerStatus
   canonicalCols: number
   canonicalRows: number

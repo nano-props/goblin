@@ -3,8 +3,8 @@ import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
 import { ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
 import {
   normalizeTerminalSocketServerMessage,
-  normalizeTerminalSessionSnapshot,
-  normalizeTerminalSessionSummaryList,
+  normalizeTerminalSlotSnapshot,
+  normalizeTerminalSlotSummaryList,
 } from '#/shared/terminal-validators.ts'
 import { resolveTerminalOwnership } from '#/shared/terminal-ownership.ts'
 import type {
@@ -23,9 +23,9 @@ import type {
   TerminalMutationResult,
   TerminalNotifyBellInput,
   TerminalOutputEvent,
-  TerminalSessionSnapshot,
-  TerminalSessionSnapshotInput,
-  TerminalSessionSummary,
+  TerminalSlotSnapshot,
+  TerminalSlotSnapshotInput,
+  TerminalSlotSummary,
   TerminalTakeoverResult,
   TerminalTitleEvent,
   TerminalRestartInput,
@@ -40,7 +40,7 @@ export interface RendererServerTerminalConfig {
   clientId: string
 }
 
-const WEB_TERMINAL_ATTACHMENT_ID_STORAGE_KEY = 'goblin:web-terminal-attachment-id'
+const WEB_TERMINAL_CLIENT_ID_STORAGE_KEY = 'goblin:web-terminal-attachment-id'
 const TERMINAL_REQUEST_TIMEOUT_MS = 30_000
 
 export function createServerTerminalBridge(options: {
@@ -68,8 +68,8 @@ export function createServerTerminalBridge(options: {
   const exitSubscribers = new Set<(event: TerminalExitEvent) => void>()
   const ownershipSubscribers = new Set<(event: TerminalOwnershipViewModel) => void>()
   const sessionsChangedSubscribers = new Set<(repoRoot: string) => void>()
-  const sessionClosedSubscribers = new Set<(event: { sessionId: string; repoRoot: string }) => void>()
-  const attachmentId = options.getAttachmentId()
+  const sessionClosedSubscribers = new Set<(event: { ptySessionId: string; repoRoot: string }) => void>()
+  const clientId = options.getAttachmentId()
   let socket: WebSocket | null = null
   let reconnectTimer: number | null = null
   let manualSocketClose = false
@@ -150,7 +150,7 @@ export function createServerTerminalBridge(options: {
     let socketUrl: string
     try {
       const server = options.getServerConfig()
-      socketUrl = createTerminalWebSocketUrl(server.url, server.accessToken, server.clientId, attachmentId)
+      socketUrl = createTerminalWebSocketUrl(server.url, server.accessToken, server.clientId)
     } catch {
       return
     }
@@ -182,13 +182,13 @@ export function createServerTerminalBridge(options: {
         for (const subscriber of exitSubscribers) subscriber(message.event)
       } else if (message.type === 'sessions-changed') {
         for (const subscriber of sessionsChangedSubscribers) subscriber(message.repoRoot)
-      } else if (message.type === 'session-closed') {
+      } else if (message.type === 'slot-closed') {
         for (const subscriber of sessionClosedSubscribers)
-          subscriber({ sessionId: message.sessionId, repoRoot: message.repoRoot })
+          subscriber({ ptySessionId: message.ptySessionId, repoRoot: message.repoRoot })
       } else {
         const ownershipEvent = {
-          sessionId: message.event.sessionId,
-          ...resolveTerminalOwnership(message.event.controller, attachmentId),
+          ptySessionId: message.event.ptySessionId,
+          ...resolveTerminalOwnership(message.event.controller, clientId),
           canonicalCols: message.event.cols,
           canonicalRows: message.event.rows,
           // Phase arrives from the server's realtime ownership event
@@ -275,7 +275,7 @@ export function createServerTerminalBridge(options: {
     },
     listSessions(input) {
       return requestOverSocket('list-sessions', input).then((value) => {
-        const sessions = normalizeTerminalSessionSummaryList(value)
+        const sessions = normalizeTerminalSlotSummaryList(value)
         if (!sessions) throw new Error('Terminal socket response failed: invalid terminal sessions response')
         return sessions
       })
@@ -292,10 +292,10 @@ export function createServerTerminalBridge(options: {
         .then(() => undefined)
         .catch(() => {})
     },
-    getSessionSnapshot(input) {
-      return requestOverSocket('session-snapshot', input satisfies TerminalSessionSnapshotInput).then((value) => {
+    getSlotSnapshot(input) {
+      return requestOverSocket('session-snapshot', input satisfies TerminalSlotSnapshotInput).then((value) => {
         if (value === null) return null
-        const snapshot = normalizeTerminalSessionSnapshot(value)
+        const snapshot = normalizeTerminalSlotSnapshot(value)
         if (!snapshot) throw new Error('Terminal socket response failed: invalid terminal session snapshot response')
         return snapshot
       })
@@ -401,11 +401,11 @@ export function createServerTerminalBridge(options: {
   async function requestOverSocket(
     action: 'list-sessions',
     input: { repoRoot: string },
-  ): Promise<TerminalSessionSummary[]>
+  ): Promise<TerminalSlotSummary[]>
   async function requestOverSocket(
     action: 'session-snapshot',
-    input: TerminalSessionSnapshotInput,
-  ): Promise<TerminalSessionSnapshot | null>
+    input: TerminalSlotSnapshotInput,
+  ): Promise<TerminalSlotSnapshot | null>
   async function requestOverSocket(
     action: 'write',
     input: TerminalSocketRequestInputs['write'],
@@ -488,7 +488,6 @@ export function createTerminalWebSocketUrl(
   baseUrl: string,
   accessToken: string,
   clientId: string,
-  attachmentId: string,
 ): string {
   const httpUrl = new URL('/ws/terminal', baseUrl)
   httpUrl.protocol = resolveWebSocketProtocol()
@@ -500,7 +499,6 @@ export function createTerminalWebSocketUrl(
   // (cookie / header / `?t=`).
   httpUrl.searchParams.set(ACCESS_TOKEN_QUERY, accessToken)
   httpUrl.searchParams.set('clientId', clientId)
-  httpUrl.searchParams.set('attachmentId', attachmentId)
   return httpUrl.toString()
 }
 
@@ -522,17 +520,17 @@ function createSocketRequestId(): string {
     : `request_${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
 }
 
-export function readOrCreateWebTerminalAttachmentId(): string {
-  const fallback = `attachment_${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
+export function readOrCreateWebTerminalClientId(): string {
+  const fallback = `client_${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
   try {
     const storage = window.sessionStorage
-    const existing = storage?.getItem(WEB_TERMINAL_ATTACHMENT_ID_STORAGE_KEY)?.trim()
+    const existing = storage?.getItem(WEB_TERMINAL_CLIENT_ID_STORAGE_KEY)?.trim()
     if (existing) return existing
     const created =
       typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? `attachment_${crypto.randomUUID().replace(/-/g, '')}`
+        ? `client_${crypto.randomUUID().replace(/-/g, '')}`
         : fallback
-    storage?.setItem(WEB_TERMINAL_ATTACHMENT_ID_STORAGE_KEY, created)
+    storage?.setItem(WEB_TERMINAL_CLIENT_ID_STORAGE_KEY, created)
     return created
   } catch {
     return fallback

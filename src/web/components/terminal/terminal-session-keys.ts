@@ -3,8 +3,8 @@
 // share the same key format.
 
 export {
-  formatTerminalSessionKey as terminalSessionKey,
-  formatWorktreeTerminalKey as worktreeTerminalKey,
-  parseTerminalSessionKey,
-  parseWorktreeTerminalKey,
-} from '#/shared/terminal-session-key.ts'
+  formatTerminalSlotKey as terminalSessionKey,
+  formatWorktreeKey as worktreeTerminalKey,
+  parseTerminalSlotKey,
+  parseWorktreeKey,
+} from '#/shared/terminal-slot-key.ts'

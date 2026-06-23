@@ -6,25 +6,25 @@ import {
   type TerminalExitEvent,
   type TerminalOwnershipEvent,
   type TerminalOutputEvent,
-  type TerminalSessionPhase,
-  type TerminalSessionSnapshot,
-  type TerminalSessionSummary,
+  type TerminalSlotPhase,
+  type TerminalSlotSnapshot,
+  type TerminalSlotSummary,
   type TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
 import { cloneTerminalController } from '#/shared/terminal-ownership.ts'
-import { isValidTerminalSessionId, normalizeTerminalSize } from '#/shared/terminal-validators.ts'
-import { parseTerminalSessionKey } from '#/shared/terminal-session-key.ts'
+import { isValidTerminalPtySessionId, normalizeTerminalSize } from '#/shared/terminal-validators.ts'
+import { parseTerminalSlotKey } from '#/shared/terminal-slot-key.ts'
 import { serverLogger } from '#/server/logger.ts'
 import type { TerminalViewOrderRuntime } from '#/server/terminal/terminal-view-order-runtime.ts'
 import {
-  attachTerminalAttachment,
-  claimTerminalAttachmentControl,
+  attachTerminalClient,
+  claimTerminalClientControl,
   explainAuthority,
   isAuthoritative,
-  registerTerminalAttachment,
-  restartTerminalAttachmentControl,
-  type TerminalAttachmentState,
-  updateTerminalAttachmentConnection,
+  registerTerminalClient,
+  restartTerminalClientControl,
+  type TerminalClientState,
+  updateTerminalClientConnection,
 } from '#/server/terminal/terminal-ownership.ts'
 import {
   appendOutput,
@@ -49,29 +49,29 @@ import type { PtyHandle, PtySupervisor } from '#/server/terminal/pty-supervisor.
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 const sessionManagerLogger = serverLogger.child({ module: 'terminal-session-manager' })
 
-type TerminalViewOrderRuntimeLike<TOwner extends string | number> = Pick<
-  TerminalViewOrderRuntime<TOwner>,
+type TerminalViewOrderRuntimeLike<TUser extends string | number> = Pick<
+  TerminalViewOrderRuntime<TUser>,
   'registerTerminalView' | 'unregisterTerminalView' | 'viewDisplayOrder'
 >
 
-export interface TerminalEnsureSessionInput<TOwner extends string | number> {
-  ownerId: TOwner
+export interface TerminalEnsureSessionInput<TUser extends string | number> {
+  userId: TUser
   scope: string
   key: string
   cwd: string
   cols: number
   rows: number
-  attachmentId?: string
-  attachmentConnected?: boolean
+  clientId?: string
+  clientConnected?: boolean
   forceNew?: boolean
   command?: string
   args?: string[]
   env?: Record<string, string>
 }
 
-interface TerminalSession<TOwner extends string | number> {
+interface TerminalSlot<TUser extends string | number> {
   id: string
-  ownerId: TOwner
+  userId: TUser
   scope: string
   key: string
   worktreePath: string
@@ -84,17 +84,17 @@ interface TerminalSession<TOwner extends string | number> {
   pty: PtyHandle | null
   disposables: Array<{ dispose(): void }>
   render: TerminalRenderState
-  attachments: Map<string, TerminalAttachmentState>
+  attachments: Map<string, TerminalClientState>
   controller: TerminalController | null
   /**
    * Sticky owner-level claim. Once any attachment from this session's
    * owner has successfully attached or taken over, this stays set
    * for the lifetime of the session so a subsequent attach from a
-   * different attachmentId (e.g. switching devices) can still
+   * different clientId (e.g. switching devices) can still
    * auto-claim when no controller is alive.
    */
-  claimedByOwner: boolean
-  phase: TerminalSessionPhase
+  ownerSticky: boolean
+  phase: TerminalSlotPhase
   message: string | null
   /** Input queue ensures ordered PTY writes even with multiple concurrent callers. */
   inputQueue: string[]
@@ -102,60 +102,60 @@ interface TerminalSession<TOwner extends string | number> {
   inputFlushScheduled: boolean
 }
 
-export interface TerminalEventSink<TOwner extends string | number> {
-  onOutput(ownerId: TOwner, event: TerminalOutputEvent): void
-  onTitle?(ownerId: TOwner, event: { sessionId: string; canonicalTitle: string | null }): void
-  onExit(ownerId: TOwner, event: TerminalExitEvent): void
-  onOwnership?(ownerId: TOwner, event: TerminalOwnershipEvent): void
+export interface TerminalEventSink<TUser extends string | number> {
+  onOutput(userId: TUser, event: TerminalOutputEvent): void
+  onTitle?(userId: TUser, event: { ptySessionId: string; canonicalTitle: string | null }): void
+  onExit(userId: TUser, event: TerminalExitEvent): void
+  onOwnership?(userId: TUser, event: TerminalOwnershipEvent): void
 }
 
-export class TerminalSessionManager<TOwner extends string | number> {
-  private readonly sessionsById = new Map<string, TerminalSession<TOwner>>()
-  private readonly sessionIdByOwnerKey = new Map<string, string>()
-  private readonly sink: TerminalEventSink<TOwner>
+export class TerminalSlotManager<TUser extends string | number> {
+  private readonly slotsByPtySessionId = new Map<string, TerminalSlot<TUser>>()
+  private readonly ptySessionIdByUserSlotKey = new Map<string, string>()
+  private readonly sink: TerminalEventSink<TUser>
   private readonly ptySupervisor: PtySupervisor
-  private readonly terminalViewOrder: TerminalViewOrderRuntimeLike<TOwner>
+  private readonly terminalViewOrder: TerminalViewOrderRuntimeLike<TUser>
 
   constructor(
     ptySupervisor: PtySupervisor,
-    sink: TerminalEventSink<TOwner>,
-    terminalViewOrder: TerminalViewOrderRuntimeLike<TOwner>,
+    sink: TerminalEventSink<TUser>,
+    terminalViewOrder: TerminalViewOrderRuntimeLike<TUser>,
   ) {
     this.ptySupervisor = ptySupervisor
     this.sink = sink
     this.terminalViewOrder = terminalViewOrder
   }
 
-  async ensureSession(input: TerminalEnsureSessionInput<TOwner>): Promise<TerminalAttachResult> {
+  async ensureSlot(input: TerminalEnsureSessionInput<TUser>): Promise<TerminalAttachResult> {
     const size = normalizeTerminalSize(input.cols, input.rows)
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
 
     const cwd = path.resolve(input.cwd)
-    const ownerId = input.ownerId
-    if (!this.isValidOwnerId(ownerId)) return { ok: false, message: 'error.invalid-arguments' }
-    const ownerKey = this.sessionOwnerKey(ownerId, input.key)
-    if (input.forceNew) this.closeOwnerKey(ownerId, input.key)
-    const existingId = this.sessionIdByOwnerKey.get(ownerKey)
-    const existing = existingId ? this.sessionsById.get(existingId) : undefined
+    const userId = input.userId
+    if (!this.isValidUserId(userId)) return { ok: false, message: 'error.invalid-arguments' }
+    const ownerKey = this.userSlotKey(userId, input.key)
+    if (input.forceNew) this.closeOwnerKey(userId, input.key)
+    const existingId = this.ptySessionIdByUserSlotKey.get(ownerKey)
+    const existing = existingId ? this.slotsByPtySessionId.get(existingId) : undefined
     if (existing) {
       this.terminalViewOrder.registerTerminalView({
-        ownerId,
+        userId,
         scope: existing.scope,
         worktreePath: existing.worktreePath,
         id: existing.key,
       })
-      if (input.attachmentId) {
-        registerTerminalAttachment(existing, input.attachmentId, size.cols, size.rows, input.attachmentConnected)
-        this.applyOwnershipEffect(existing, attachTerminalAttachment(existing, input.attachmentId))
+      if (input.clientId) {
+        registerTerminalClient(existing, input.clientId, size.cols, size.rows, input.clientConnected)
+        this.applyOwnershipEffect(existing, attachTerminalClient(existing, input.clientId))
       }
       return await this.attachResult(existing)
     }
 
     const worktreePath = parseWorktreePathFromKey(input.key) ?? input.key
-    const id = createSessionId()
-    const session: TerminalSession<TOwner> = {
+    const id = createPtySessionId()
+    const session: TerminalSlot<TUser> = {
       id,
-      ownerId,
+      userId,
       scope: input.scope,
       key: input.key,
       worktreePath,
@@ -170,109 +170,109 @@ export class TerminalSessionManager<TOwner extends string | number> {
       render: createEmptyTerminalRenderState(size.cols, size.rows),
       attachments: new Map(),
       controller: null,
-      claimedByOwner: false,
+      ownerSticky: false,
       phase: 'opening',
       message: null,
       inputQueue: [],
       inputFlushScheduled: false,
     }
-    this.sessionsById.set(id, session)
-    this.sessionIdByOwnerKey.set(ownerKey, id)
+    this.slotsByPtySessionId.set(id, session)
+    this.ptySessionIdByUserSlotKey.set(ownerKey, id)
     this.terminalViewOrder.registerTerminalView({
-      ownerId,
+      userId,
       scope: input.scope,
       worktreePath,
       id: input.key,
     })
-    if (input.attachmentId) {
-      registerTerminalAttachment(session, input.attachmentId, size.cols, size.rows, input.attachmentConnected ?? true)
-      attachTerminalAttachment(session, input.attachmentId)
+    if (input.clientId) {
+      registerTerminalClient(session, input.clientId, size.cols, size.rows, input.clientConnected ?? true)
+      attachTerminalClient(session, input.clientId)
     }
     const result = await this.spawnSessionPty(session)
     if (!result.ok) {
       // Spawn failed: do not leave a zombie session in the maps. The
       // catalog would otherwise find it on retry and surface it as a
       // successful attach with an empty buffer and a null pty — i.e.
-      // a blank, non-responsive terminal. `closeSession` removes the
+      // a blank, non-responsive terminal. `closeSlot` removes the
       // map entry and frees pty/listener resources via the standard
       // disposal path.
-      this.closeSession(id)
+      this.closeSlot(id)
       return result
     }
     return result
   }
 
-  writeSession(ownerId: TOwner, sessionId: string, data: string, attachmentId: string): boolean {
-    if (!isValidTerminalSessionId(sessionId) || !isValidTerminalWriteData(data)) return false
-    const session = this.getSession(ownerId, sessionId)
+  writeSlot(userId: TUser, ptySessionId: string, data: string, clientId: string): boolean {
+    if (!isValidTerminalPtySessionId(ptySessionId) || !isValidTerminalWriteData(data)) return false
+    const session = this.getSlot(userId, ptySessionId)
     if (!session?.pty) return false
     // Register the attachment first so a brand-new socket can satisfy
     // the unknown-attachment gate, then defer to the shared
     // authority helper so write/resize/restart stay in lockstep.
-    registerTerminalAttachment(session, attachmentId, session.cols, session.rows, undefined)
-    if (!isAuthoritative(session, attachmentId, 'write')) return false
+    registerTerminalClient(session, clientId, session.cols, session.rows, undefined)
+    if (!isAuthoritative(session, clientId, 'write')) return false
     session.inputQueue.push(data)
     this.scheduleInputFlush(session)
     return true
   }
 
   async attachSession(
-    ownerId: TOwner,
-    sessionId: string,
+    userId: TUser,
+    ptySessionId: string,
     cols: number,
     rows: number,
-    attachmentId: string,
-    attachmentConnected?: boolean,
+    clientId: string,
+    clientConnected?: boolean,
   ): Promise<TerminalAttachResult> {
-    if (!isValidTerminalSessionId(sessionId)) return { ok: false, message: 'error.invalid-arguments' }
+    if (!isValidTerminalPtySessionId(ptySessionId)) return { ok: false, message: 'error.invalid-arguments' }
     const size = normalizeTerminalSize(cols, rows)
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
-    const session = this.getSession(ownerId, sessionId)
+    const session = this.getSlot(userId, ptySessionId)
     if (!session) return { ok: false, message: 'error.invalid-arguments' }
-    registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
-    this.applyOwnershipEffect(session, attachTerminalAttachment(session, attachmentId))
+    registerTerminalClient(session, clientId, size.cols, size.rows, clientConnected)
+    this.applyOwnershipEffect(session, attachTerminalClient(session, clientId))
     return await this.attachResult(session)
   }
 
-  resizeSession(
-    ownerId: TOwner,
-    sessionId: string,
+  resizeSlot(
+    userId: TUser,
+    ptySessionId: string,
     cols: number,
     rows: number,
-    attachmentId: string,
-    attachmentConnected?: boolean,
+    clientId: string,
+    clientConnected?: boolean,
   ): boolean {
-    if (!isValidTerminalSessionId(sessionId)) return false
+    if (!isValidTerminalPtySessionId(ptySessionId)) return false
     const size = normalizeTerminalSize(cols, rows)
     if (!size) return false
-    const session = this.getSession(ownerId, sessionId)
+    const session = this.getSlot(userId, ptySessionId)
     if (!session) return false
-    registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
-    if (!isAuthoritative(session, attachmentId, 'resize')) return false
+    registerTerminalClient(session, clientId, size.cols, size.rows, clientConnected)
+    if (!isAuthoritative(session, clientId, 'resize')) return false
     return this.resizeSessionPty(session, size.cols, size.rows)
   }
 
-  takeoverSession(
-    ownerId: TOwner,
-    sessionId: string,
+  takeoverSlot(
+    userId: TUser,
+    ptySessionId: string,
     cols: number,
     rows: number,
-    attachmentId: string,
-    attachmentConnected?: boolean,
+    clientId: string,
+    clientConnected?: boolean,
   ): TerminalTakeoverResult {
-    if (!isValidTerminalSessionId(sessionId)) return { ok: false, message: 'error.invalid-arguments' }
+    if (!isValidTerminalPtySessionId(ptySessionId)) return { ok: false, message: 'error.invalid-arguments' }
     const size = normalizeTerminalSize(cols, rows)
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
-    const session = this.getSession(ownerId, sessionId)
+    const session = this.getSlot(userId, ptySessionId)
     if (!session) return { ok: false, message: 'error.invalid-arguments' }
     // Takeover is the only path that may preempt, but it still
     // requires the caller to be a known attachment. Use the same
     // authority gate as the other actions for consistency.
-    registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
-    if (!isAuthoritative(session, attachmentId, 'takeover')) {
+    registerTerminalClient(session, clientId, size.cols, size.rows, clientConnected)
+    if (!isAuthoritative(session, clientId, 'takeover')) {
       return { ok: false, message: 'error.invalid-arguments' }
     }
-    const effect = claimTerminalAttachmentControl(session, attachmentId)
+    const effect = claimTerminalClientControl(session, clientId)
     this.applyOwnershipEffect(session, effect)
     // Bug D: when the attachment isn't `connected`, the effect
     // is empty (no resize, no ownership event) — the caller is
@@ -291,24 +291,24 @@ export class TerminalSessionManager<TOwner extends string | number> {
   }
 
   async restartSession(
-    ownerId: TOwner,
-    sessionId: string,
+    userId: TUser,
+    ptySessionId: string,
     cols: number,
     rows: number,
-    attachmentId: string,
-    attachmentConnected?: boolean,
+    clientId: string,
+    clientConnected?: boolean,
   ): Promise<TerminalAttachResult> {
-    if (!isValidTerminalSessionId(sessionId)) return { ok: false, message: 'error.invalid-arguments' }
+    if (!isValidTerminalPtySessionId(ptySessionId)) return { ok: false, message: 'error.invalid-arguments' }
     const size = normalizeTerminalSize(cols, rows)
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
-    const session = this.getSession(ownerId, sessionId)
+    const session = this.getSlot(userId, ptySessionId)
     if (!session) return { ok: false, message: 'error.invalid-arguments' }
-    registerTerminalAttachment(session, attachmentId, size.cols, size.rows, attachmentConnected)
-    const denyReason = explainAuthority(session, attachmentId, 'restart')
+    registerTerminalClient(session, clientId, size.cols, size.rows, clientConnected)
+    const denyReason = explainAuthority(session, clientId, 'restart')
     if (denyReason !== null) {
       return { ok: false, message: authorityReasonToMessage(denyReason) }
     }
-    restartTerminalAttachmentControl(session, attachmentId)
+    restartTerminalClientControl(session, clientId)
     this.resetSessionState(session, size.cols, size.rows, 'restarting')
     const result = await this.spawnSessionPty(session)
     if (!result.ok) {
@@ -317,21 +317,21 @@ export class TerminalSessionManager<TOwner extends string | number> {
     return result
   }
 
-  closeSessionForOwner(ownerId: TOwner, sessionId: string): boolean {
-    if (!this.getSession(ownerId, sessionId)) return false
-    this.closeSession(sessionId)
+  closeSlotForUser(userId: TUser, ptySessionId: string): boolean {
+    if (!this.getSlot(userId, ptySessionId)) return false
+    this.closeSlot(ptySessionId)
     return true
   }
 
-  closeSession(sessionId: string): void {
-    const session = this.sessionsById.get(sessionId)
+  closeSlot(ptySessionId: string): void {
+    const session = this.slotsByPtySessionId.get(ptySessionId)
     if (!session) return
     markTerminalSessionClosed(session)
-    this.sessionsById.delete(sessionId)
-    const ownerKey = this.sessionOwnerKey(session.ownerId, session.key)
-    if (this.sessionIdByOwnerKey.get(ownerKey) === sessionId) this.sessionIdByOwnerKey.delete(ownerKey)
+    this.slotsByPtySessionId.delete(ptySessionId)
+    const ownerKey = this.userSlotKey(session.userId, session.key)
+    if (this.ptySessionIdByUserSlotKey.get(ownerKey) === ptySessionId) this.ptySessionIdByUserSlotKey.delete(ownerKey)
     this.terminalViewOrder.unregisterTerminalView({
-      ownerId: session.ownerId,
+      userId: session.userId,
       scope: session.scope,
       worktreePath: session.worktreePath,
       id: session.key,
@@ -339,37 +339,37 @@ export class TerminalSessionManager<TOwner extends string | number> {
     this.disposeSessionResources(session)
   }
 
-  closeSessionsForOwner(ownerId: TOwner): void {
-    for (const session of Array.from(this.sessionsById.values())) {
-      if (session.ownerId === ownerId) this.closeSession(session.id)
+  closeSessionsForOwner(userId: TUser): void {
+    for (const session of Array.from(this.slotsByPtySessionId.values())) {
+      if (session.userId === userId) this.closeSlot(session.id)
     }
   }
 
-  setAttachmentConnected(ownerId: TOwner, attachmentId: string, connected: boolean): void {
-    for (const session of Array.from(this.sessionsById.values())) {
-      if (session.ownerId !== ownerId) continue
-      this.applyOwnershipEffect(session, updateTerminalAttachmentConnection(session, attachmentId, connected))
+  setAttachmentConnected(userId: TUser, clientId: string, connected: boolean): void {
+    for (const session of Array.from(this.slotsByPtySessionId.values())) {
+      if (session.userId !== userId) continue
+      this.applyOwnershipEffect(session, updateTerminalClientConnection(session, clientId, connected))
     }
   }
 
   closeAll(): void {
-    for (const sessionId of Array.from(this.sessionsById.keys())) this.closeSession(sessionId)
+    for (const ptySessionId of Array.from(this.slotsByPtySessionId.keys())) this.closeSlot(ptySessionId)
   }
 
-  async getSessionSnapshot(ownerId: TOwner, sessionId: string): Promise<TerminalSessionSnapshot | null> {
-    const session = this.getSession(ownerId, sessionId)
+  async getSlotSnapshot(userId: TUser, ptySessionId: string): Promise<TerminalSlotSnapshot | null> {
+    const session = this.getSlot(userId, ptySessionId)
     if (!session) return null
     const snap = await takeSnapshot(session.render)
     if (!snap) return null
-    return { sessionId, snapshot: snap.snapshot, snapshotSeq: snap.snapshotSeq }
+    return { ptySessionId, snapshot: snap.snapshot, snapshotSeq: snap.snapshotSeq }
   }
 
-  async listSessionsForOwner(ownerId: TOwner, scope: string): Promise<TerminalSessionSummary[]> {
-    const sessions: TerminalSessionSummary[] = []
-    for (const session of Array.from(this.sessionsById.values())) {
-      if (session.ownerId === ownerId && session.scope === scope) {
+  async listSlotsForUser(userId: TUser, scope: string): Promise<TerminalSlotSummary[]> {
+    const sessions: TerminalSlotSummary[] = []
+    for (const session of Array.from(this.slotsByPtySessionId.values())) {
+      if (session.userId === userId && session.scope === scope) {
         sessions.push({
-          sessionId: session.id,
+          ptySessionId: session.id,
           key: session.key,
           viewType: 'terminal',
           viewId: session.key,
@@ -393,10 +393,10 @@ export class TerminalSessionManager<TOwner extends string | number> {
   // owner. Public so the runtime can resolve the scope for
   // `sessions-changed` broadcasts without exposing the rest of the
   // session internals.
-  getSession(ownerId: TOwner, sessionId: string): TerminalSession<TOwner> | undefined {
-    if (!this.isValidOwnerId(ownerId) || !isValidTerminalSessionId(sessionId)) return undefined
-    const session = this.sessionsById.get(sessionId)
-    return session?.ownerId === ownerId ? session : undefined
+  getSlot(userId: TUser, ptySessionId: string): TerminalSlot<TUser> | undefined {
+    if (!this.isValidUserId(userId) || !isValidTerminalPtySessionId(ptySessionId)) return undefined
+    const session = this.slotsByPtySessionId.get(ptySessionId)
+    return session?.userId === userId ? session : undefined
   }
 
   // T4.1: aggregate replay-buffer stats across all live sessions, for
@@ -409,7 +409,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     let count = 0
     let totalBufferChars = 0
     let maxBufferChars = 0
-    for (const session of this.sessionsById.values()) {
+    for (const session of this.slotsByPtySessionId.values()) {
       count += 1
       const chars = session.render.buffer.length
       totalBufferChars += chars
@@ -418,15 +418,15 @@ export class TerminalSessionManager<TOwner extends string | number> {
     return { count, totalBufferChars, maxBufferChars }
   }
 
-  private closeOwnerKey(ownerId: TOwner, key: string): void {
-    const id = this.sessionIdByOwnerKey.get(this.sessionOwnerKey(ownerId, key))
-    if (id) this.closeSession(id)
+  private closeOwnerKey(userId: TUser, key: string): void {
+    const id = this.ptySessionIdByUserSlotKey.get(this.userSlotKey(userId, key))
+    if (id) this.closeSlot(id)
   }
 
-  private terminalViewDisplayOrder(session: TerminalSession<TOwner>): number {
+  private terminalViewDisplayOrder(session: TerminalSlot<TUser>): number {
     return (
       this.terminalViewOrder.viewDisplayOrder({
-        ownerId: session.ownerId,
+        userId: session.userId,
         scope: session.scope,
         worktreePath: session.worktreePath,
         id: session.key,
@@ -439,7 +439,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
   // arrives through the regular `onData` path, but snapshots taken during
   // the transition are serialized from a screen model with the canonical
   // dimensions instead of replaying raw historical bytes into the client.
-  private resizeSessionPty(session: TerminalSession<TOwner>, cols: number, rows: number): boolean {
+  private resizeSessionPty(session: TerminalSlot<TUser>, cols: number, rows: number): boolean {
     if (!session.pty) return false
     if (session.cols === cols && session.rows === rows) return true
     try {
@@ -450,14 +450,14 @@ export class TerminalSessionManager<TOwner extends string | number> {
       this.emitOwnership(session)
       return true
     } catch (err) {
-      sessionManagerLogger.warn({ sessionId: session.id, err }, 'failed to resize PTY')
+      sessionManagerLogger.warn({ ptySessionId: session.id, err }, 'failed to resize PTY')
       return false
     }
   }
 
-  private takeoverResult(session: TerminalSession<TOwner>): TerminalTakeoverResult {
+  private takeoverResult(session: TerminalSlot<TUser>): TerminalTakeoverResult {
     // By the time we get here, `applyOwnershipEffect` has already
-    // executed in `takeoverSession()` — the requesting attachment
+    // executed in `takeoverSlot()` — the requesting attachment
     // is the controller and `session.cols`/`session.rows` reflect
     // any resize effect that ran during the ownership claim. We
     // surface all four frame fields synchronously so the renderer
@@ -466,7 +466,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     // `docs/terminal-session-lifecycle.md` §Takeover atomicity.
     return {
       ok: true,
-      sessionId: session.id,
+      ptySessionId: session.id,
       role: 'controller',
       controllerStatus: 'connected',
       controller: cloneTerminalController(session.controller),
@@ -476,12 +476,12 @@ export class TerminalSessionManager<TOwner extends string | number> {
     }
   }
 
-  private async attachResult(session: TerminalSession<TOwner>): Promise<TerminalAttachResult> {
+  private async attachResult(session: TerminalSlot<TUser>): Promise<TerminalAttachResult> {
     const snap = await replaySnapshot(session.render)
     if (!snap) return { ok: false, message: 'error.unavailable' }
     return {
       ok: true,
-      sessionId: session.id,
+      ptySessionId: session.id,
       snapshot: snap.snapshot,
       snapshotSeq: snap.snapshotSeq,
       processName: session.pty ? this.ptySupervisor.processName(session.pty) : 'terminal',
@@ -494,13 +494,13 @@ export class TerminalSessionManager<TOwner extends string | number> {
     }
   }
 
-  private sessionOwnerKey(ownerId: TOwner, key: string): string {
-    return `${String(ownerId)}\0${key}`
+  private userSlotKey(userId: TUser, key: string): string {
+    return `${String(userId)}\0${key}`
   }
 
-  private emitOwnership(session: TerminalSession<TOwner>): void {
-    this.sink.onOwnership?.(session.ownerId, {
-      sessionId: session.id,
+  private emitOwnership(session: TerminalSlot<TUser>): void {
+    this.sink.onOwnership?.(session.userId, {
+      ptySessionId: session.id,
       controller: cloneTerminalController(session.controller),
       cols: session.cols,
       rows: session.rows,
@@ -509,7 +509,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
   }
 
   private applyOwnershipEffect(
-    session: TerminalSession<TOwner>,
+    session: TerminalSlot<TUser>,
     effect: { resizeTo?: { cols: number; rows: number }; emitOwnership: boolean },
   ): void {
     if (effect.resizeTo) this.resizeSessionPty(session, effect.resizeTo.cols, effect.resizeTo.rows)
@@ -517,10 +517,10 @@ export class TerminalSessionManager<TOwner extends string | number> {
   }
 
   private resetSessionState(
-    session: TerminalSession<TOwner>,
+    session: TerminalSlot<TUser>,
     cols: number,
     rows: number,
-    phase: TerminalSessionPhase = 'opening',
+    phase: TerminalSlotPhase = 'opening',
   ): void {
     this.disposeSessionResources(session)
     session.cols = cols
@@ -532,10 +532,10 @@ export class TerminalSessionManager<TOwner extends string | number> {
     session.inputFlushScheduled = false
   }
 
-  private async spawnSessionPty(session: TerminalSession<TOwner>): Promise<TerminalAttachResult> {
+  private async spawnSessionPty(session: TerminalSlot<TUser>): Promise<TerminalAttachResult> {
     // We do NOT call `disposeSessionResources` on the failure path
     // here. The caller decides what to do with a failed spawn:
-    //   - `ensureSession` removes the just-created session from the
+    //   - `ensureSlot` removes the just-created session from the
     //     maps so the catalog doesn't surface a zombie on retry.
     //   - `restartSession` keeps the session in the maps (the new
     //     pty simply wasn't created) so a later retry can succeed.
@@ -587,8 +587,8 @@ export class TerminalSessionManager<TOwner extends string | number> {
           session.render.title = null
           if (lastBroadcastTitle !== null) {
             lastBroadcastTitle = null
-            this.sink.onTitle?.(session.ownerId, {
-              sessionId: session.id,
+            this.sink.onTitle?.(session.userId, {
+              ptySessionId: session.id,
               canonicalTitle: null,
             })
           }
@@ -596,13 +596,13 @@ export class TerminalSessionManager<TOwner extends string | number> {
 
         if (session.render.title !== lastBroadcastTitle) {
           lastBroadcastTitle = session.render.title
-          this.sink.onTitle?.(session.ownerId, {
-            sessionId: session.id,
+          this.sink.onTitle?.(session.userId, {
+            ptySessionId: session.id,
             canonicalTitle: session.render.title,
           })
         }
-        this.sink.onOutput(session.ownerId, {
-          sessionId: session.id,
+        this.sink.onOutput(session.userId, {
+          ptySessionId: session.id,
           data,
           seq,
           processName: processNameAfterData,
@@ -612,21 +612,21 @@ export class TerminalSessionManager<TOwner extends string | number> {
     session.disposables.push(
       this.ptySupervisor.onExit(handle, () => {
         session.pty = null
-        this.sink.onExit(session.ownerId, { sessionId: session.id })
-        this.closeSession(session.id)
+        this.sink.onExit(session.userId, { ptySessionId: session.id })
+        this.closeSlot(session.id)
       }),
     )
     return await this.attachResult(session)
   }
 
-  private disposeSessionResources(session: TerminalSession<TOwner>): void {
+  private disposeSessionResources(session: TerminalSlot<TUser>): void {
     disposeSessionListeners(session)
     disposeRender(session.render)
     if (session.pty) {
       try {
         this.ptySupervisor.kill(session.pty)
       } catch (err) {
-        sessionManagerLogger.warn({ sessionId: session.id, err }, 'failed to kill PTY')
+        sessionManagerLogger.warn({ ptySessionId: session.id, err }, 'failed to kill PTY')
       }
     }
     session.pty = null
@@ -634,7 +634,7 @@ export class TerminalSessionManager<TOwner extends string | number> {
     session.inputFlushScheduled = false
   }
 
-  private scheduleInputFlush(session: TerminalSession<TOwner>): void {
+  private scheduleInputFlush(session: TerminalSlot<TUser>): void {
     if (session.inputFlushScheduled || session.inputQueue.length === 0 || !session.pty) return
     session.inputFlushScheduled = true
     queueMicrotask(() => {
@@ -643,20 +643,20 @@ export class TerminalSessionManager<TOwner extends string | number> {
     })
   }
 
-  private drainInputQueue(session: TerminalSession<TOwner>): void {
+  private drainInputQueue(session: TerminalSlot<TUser>): void {
     if (session.inputQueue.length === 0 || !session.pty) return
     const batch = session.inputQueue.splice(0).join('')
     try {
       this.ptySupervisor.write(session.pty, batch)
     } catch (err) {
-      sessionManagerLogger.warn({ sessionId: session.id, err, bytes: batch.length }, 'failed to write PTY')
+      sessionManagerLogger.warn({ ptySessionId: session.id, err, bytes: batch.length }, 'failed to write PTY')
     }
   }
 
-  private isValidOwnerId(ownerId: TOwner): boolean {
+  private isValidUserId(userId: TUser): boolean {
     return (
-      (typeof ownerId === 'number' && Number.isSafeInteger(ownerId) && ownerId > 0) ||
-      (typeof ownerId === 'string' && ownerId.length > 0)
+      (typeof userId === 'number' && Number.isSafeInteger(userId) && userId > 0) ||
+      (typeof userId === 'string' && userId.length > 0)
     )
   }
 }
@@ -684,20 +684,20 @@ function authorityReasonToMessage(reason: 'not-controller' | 'session-unowned' |
   }
 }
 
-function disposeSessionListeners<TOwner extends string | number>(session: TerminalSession<TOwner>): void {
+function disposeSessionListeners<TUser extends string | number>(session: TerminalSlot<TUser>): void {
   for (const disposable of session.disposables.splice(0)) {
     try {
       disposable.dispose()
     } catch (err) {
-      sessionManagerLogger.warn({ sessionId: session.id, err }, 'failed to dispose PTY listener')
+      sessionManagerLogger.warn({ ptySessionId: session.id, err }, 'failed to dispose PTY listener')
     }
   }
 }
 
-function createSessionId(): string {
+function createPtySessionId(): string {
   return `term_${crypto.randomUUID()}`
 }
 
 function parseWorktreePathFromKey(key: string): string | null {
-  return parseTerminalSessionKey(key)?.worktreePath ?? null
+  return parseTerminalSlotKey(key)?.worktreePath ?? null
 }

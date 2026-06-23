@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 
-import type { TerminalSessionSnapshot, TerminalSessionSummary } from '#/shared/terminal-types.ts'
+import type { TerminalSlotSnapshot, TerminalSlotSummary } from '#/shared/terminal-types.ts'
 import '#/web/components/terminal/terminal-session.css'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
@@ -11,7 +11,7 @@ import {
   TerminalSessionContext,
   TerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
-import { readOrCreateWebTerminalAttachmentId } from '#/web/renderer-terminal-bridge.ts'
+import { readOrCreateWebTerminalClientId } from '#/web/renderer-terminal-bridge.ts'
 import { preloadTerminalFont } from '#/web/components/terminal/terminal-geometry.ts'
 import { loadTerminalSessions } from '#/web/terminal-session-queries.ts'
 import {
@@ -88,7 +88,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   const registry = registryRef.current
 
   const loadMissingSnapshots = useCallback(
-    async (serverSessions: TerminalSessionSummary[]): Promise<Map<string, TerminalSessionSnapshot>> => {
+    async (serverSessions: TerminalSlotSummary[]): Promise<Map<string, TerminalSlotSnapshot>> => {
       // allSettled (not all) so a single rejected snapshot fetch does not
       // cancel the rest of the reconciliation. Each request is bounded by
       // the bridge's per-request timeout, so the worst case here is that
@@ -97,19 +97,19 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       // Rejections are surfaced via `result.reason` so they remain visible
       // in logs without poisoning the reconciliation.
       const settled = await Promise.allSettled(
-        serverSessions.map((session) => terminalBridge.getSessionSnapshot({ sessionId: session.sessionId })),
+        serverSessions.map((session) => terminalBridge.getSlotSnapshot({ ptySessionId: session.ptySessionId })),
       )
-      const entries: Array<readonly [string, TerminalSessionSnapshot]> = []
+      const entries: Array<readonly [string, TerminalSlotSnapshot]> = []
       settled.forEach((result, index) => {
         const session = serverSessions[index]
         if (!session) return
         if (result.status === 'fulfilled') {
           const snapshot = result.value
-          if (snapshot) entries.push([session.sessionId, snapshot])
+          if (snapshot) entries.push([session.ptySessionId, snapshot])
           return
         }
         terminalSessionProviderLog.debug('failed to load terminal session snapshot', {
-          sessionId: session.sessionId,
+          ptySessionId: session.ptySessionId,
           err: result.reason,
         })
       })
@@ -122,11 +122,11 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     async (repoRoot: string) => {
       if (!repoRoot || !repoIndexRef.current[repoRoot]) return
       try {
-        const attachmentId = readOrCreateWebTerminalAttachmentId()
+        const clientId = readOrCreateWebTerminalClientId()
         const serverSessions = await loadTerminalSessions(repoRoot)
         const snapshotsBySessionId = await loadMissingSnapshots(serverSessions)
         if (!repoIndexRef.current[repoRoot]) return
-        registry.reconcileServerSessions(repoRoot, serverSessions, attachmentId, snapshotsBySessionId)
+        registry.reconcileServerSessions(repoRoot, serverSessions, clientId, snapshotsBySessionId)
       } catch (err) {
         terminalSessionProviderLog.debug('failed to sync server sessions', { err })
       } finally {
@@ -205,7 +205,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     // already disposed the local entry, so the handler is a no-op
     // there — the broadcast is multi-window safe by construction.
     const offSessionClosed = terminalBridge.onSessionClosed((event) => {
-      registry.handleSessionClosed(event.sessionId)
+      registry.handleSessionClosed(event.ptySessionId)
     })
 
     setTerminalSessionCommandBridge({

@@ -4,31 +4,31 @@ import { syncTerminalSessionIdIndex } from '#/web/components/terminal/terminal-s
 describe('terminal session index helper', () => {
   test('updates both key->session and session->key maps coherently', () => {
     const sessionIdByKey = new Map<string, string>()
-    const sessionKeyBySessionId = new Map<string, string>()
+    const slotKeyByPtySessionId = new Map<string, string>()
 
     syncTerminalSessionIdIndex({
       key: 'terminal-1',
-      sessionId: 'session-a',
+      ptySessionId: 'session-a',
       sessionIdByKey,
-      sessionKeyBySessionId,
+      slotKeyByPtySessionId,
     })
     expect(sessionIdByKey.get('terminal-1')).toBe('session-a')
-    expect(sessionKeyBySessionId.get('session-a')).toBe('terminal-1')
+    expect(slotKeyByPtySessionId.get('session-a')).toBe('terminal-1')
 
     syncTerminalSessionIdIndex({
       key: 'terminal-1',
-      sessionId: 'session-b',
+      ptySessionId: 'session-b',
       sessionIdByKey,
-      sessionKeyBySessionId,
+      slotKeyByPtySessionId,
     })
-    expect(sessionKeyBySessionId.has('session-a')).toBe(false)
-    expect(sessionKeyBySessionId.get('session-b')).toBe('terminal-1')
+    expect(slotKeyByPtySessionId.has('session-a')).toBe(false)
+    expect(slotKeyByPtySessionId.get('session-b')).toBe('terminal-1')
 
     syncTerminalSessionIdIndex({
       key: 'terminal-1',
-      sessionId: null,
+      ptySessionId: null,
       sessionIdByKey,
-      sessionKeyBySessionId,
+      slotKeyByPtySessionId,
     })
     expect(sessionIdByKey.has('terminal-1')).toBe(false)
   })

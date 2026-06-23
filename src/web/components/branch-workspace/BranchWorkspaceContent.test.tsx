@@ -13,7 +13,7 @@ import {
 } from '#/web/components/terminal/terminal-session-context.ts'
 import type {
   TerminalSessionContextValue,
-  TerminalSessionSummary,
+  TerminalSlotSummary,
   TerminalSessionReadContextValue,
   WorktreeTerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
@@ -769,13 +769,13 @@ function terminalSession(
   index: number,
   selected: boolean,
   worktreeTerminalKey: string,
-): TerminalSessionSummary {
+): TerminalSlotSummary {
   return {
     type: 'terminal',
     id: key,
     key,
     worktreeTerminalKey,
-    terminalId: key,
+    slotId: key,
     index,
     displayOrder: index,
     title: key,

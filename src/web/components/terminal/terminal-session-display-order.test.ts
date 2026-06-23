@@ -13,7 +13,7 @@ describe('terminal session display order helpers', () => {
         {
           key: 'terminal-2',
           worktreeTerminalKey: 'repo\0wt',
-          terminalId: 'terminal-2',
+          slotId: 'terminal-2',
           index: 2,
           repoRoot: '/repo',
           branch: 'main',
@@ -27,7 +27,7 @@ describe('terminal session display order helpers', () => {
         {
           key: 'terminal-3',
           worktreeTerminalKey: 'repo\0wt',
-          terminalId: 'terminal-3',
+          slotId: 'terminal-3',
           index: 3,
           repoRoot: '/repo',
           branch: 'main',

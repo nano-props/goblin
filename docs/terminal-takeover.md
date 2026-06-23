@@ -128,7 +128,7 @@ When a window's network briefly drops and comes back to the same
 attachment, the user perceives no interruption: the new attach is
 recognized as a continuation of the same window, the slot is
 cleared on disconnect, and the reattach re-claims through the
-owner-sticky path. Because the reconnect and the reclaim happen
+user-sticky path. Because the reconnect and the reclaim happen
 back-to-back, the user sees their next keystroke flow as expected.
 
 This works because **window identity is per-sessionStorage, which

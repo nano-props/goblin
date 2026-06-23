@@ -266,7 +266,7 @@ function worktreeSnapshot(): WorktreeTerminalSnapshot {
     selectedDescriptor: {
       key: 'terminal-1',
       worktreeTerminalKey: WORKTREE_KEY,
-      terminalId: 'terminal-1',
+      slotId: 'terminal-1',
       index: 1,
       repoRoot: REPO_ID,
       branch: 'feature/worktree',
@@ -278,7 +278,7 @@ function worktreeSnapshot(): WorktreeTerminalSnapshot {
         id: 'terminal-1',
         key: 'terminal-1',
         worktreeTerminalKey: WORKTREE_KEY,
-        terminalId: 'terminal-1',
+        slotId: 'terminal-1',
         index: 1,
         displayOrder: 1,
         title: 'terminal 1',
