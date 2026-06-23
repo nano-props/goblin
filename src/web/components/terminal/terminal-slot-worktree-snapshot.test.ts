@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import { buildWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-slot-worktree-snapshot.ts'
 import type {
-  ManagedTerminalSessionLike,
+  ManagedTerminalSlotLike,
   TerminalDescriptor,
   TerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
@@ -21,7 +21,7 @@ function makeDescriptor(slotId: string, index: number): TerminalDescriptor {
 function makeSession(
   descriptor: TerminalDescriptor,
   snapshot: TerminalSnapshot,
-): ManagedTerminalSessionLike & { snapshotSpy: ReturnType<typeof vi.fn> } {
+): ManagedTerminalSlotLike & { snapshotSpy: ReturnType<typeof vi.fn> } {
   const snapshotSpy = vi.fn(() => snapshot)
   return {
     descriptor,

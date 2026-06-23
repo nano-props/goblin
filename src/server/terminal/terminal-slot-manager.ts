@@ -463,7 +463,7 @@ export class TerminalSlotManager<TUser extends string | number> {
     // surface all four frame fields synchronously so the renderer
     // doesn't have to wait for a follow-up realtime `ownership`
     // event before painting the post-takeover frame. See
-    // `docs/terminal-session-lifecycle.md` §Takeover atomicity.
+    // `docs/terminal-slot-lifecycle.md` §Takeover atomicity.
     return {
       ok: true,
       ptySessionId: session.id,

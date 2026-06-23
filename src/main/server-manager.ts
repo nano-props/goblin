@@ -150,7 +150,7 @@ export async function startEmbeddedServer(): Promise<EmbeddedServerRuntime | nul
         // The server child process reads this and uses it as the
         // shared auth secret for cookie / header / `?t=` middleware.
         // The renderer does NOT see this env var — it gets the
-        // token via the `goblin:get-access-token` IPC channel
+        // token via the http-only `goblin_access_token` cookie planted by `plantEmbedAuthCookie` (see `#/main/cookie-bootstrap.ts`)
         // backed by the `runtime.accessToken` field above.
         GOBLIN_SERVER_ACCESS_TOKEN: accessToken,
         GOBLIN_SERVER_DATA_DIR: app.getPath('userData'),

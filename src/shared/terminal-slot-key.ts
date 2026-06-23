@@ -6,8 +6,8 @@
 // `\0` (validated upstream) and a NUL split makes the key
 // human-readable in logs.
 //
-// Scope normalization (`terminalSessionScope`) lives in
-// `server/terminal/terminal-session-scope.ts` because it depends on
+// Scope normalization (`terminalSlotScope`) lives in
+// `server/terminal/terminal-slot-scope.ts` because it depends on
 // `node:path`. This file stays pure so the renderer can import the
 // format/parse helpers via `web/components/terminal/terminal-session-keys.ts`
 // without dragging Node built-ins into the bundle.

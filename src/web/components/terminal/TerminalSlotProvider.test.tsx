@@ -74,7 +74,7 @@ function selectedWorkspacePaneView(repoId: string) {
 }
 
 vi.mock('#/web/components/terminal/ManagedTerminalSlot.ts', () => {
-  class ManagedTerminalSession {
+  class ManagedTerminalSlot {
     descriptor: TerminalDescriptor
     private readonly onBell: (descriptor: TerminalDescriptor, event: TerminalBellEvent) => void
     private readonly notify: () => void
@@ -228,7 +228,7 @@ vi.mock('#/web/components/terminal/ManagedTerminalSlot.ts', () => {
     }
   }
 
-  return { ManagedTerminalSession }
+  return { ManagedTerminalSlot }
 })
 
 const REPO_ID = '/tmp/gbl-terminal-provider-repo'

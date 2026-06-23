@@ -132,7 +132,7 @@ export class TerminalSlotView {
   /**
    * Exposes the xterm DOM host so the orchestrator can drive geometry
    * measurement (see `waitForMeasurableHost` in
-   * `terminal-session-geometry.ts`). The view itself never falls back to
+   * `terminal-slot-geometry.ts`). The view itself never falls back to
    * a default geometry — it is given one by the orchestrator and trusts it.
    */
   measurableHost(): HTMLElement {

@@ -1,9 +1,7 @@
-// Branch list row wrapper. Resolves per-row derived state from each
-// feature's respective store — `terminalBellCount` from the terminal-
-// session store, `branchActionBusy` from the repo's operations state
-// — and delegates rendering to BranchRow. Shared between the persistent
-// BranchNavigator pane and the focus-mode BranchListPopover so the row
-// behavior stays in lockstep.
+// Branch list row wrapper. Resolves `terminalBellCount` from the
+// terminal-slot store and delegates rendering to BranchRow. Shared
+// between the persistent BranchNavigator pane and the focus-mode
+// BranchListPopover so the row behavior stays in lockstep.
 
 import { BranchRow, type BranchRowProps } from '#/web/components/branch-navigator/BranchRow.tsx'
 import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'

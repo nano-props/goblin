@@ -1,4 +1,4 @@
-// Per-repo terminal-session sync bookkeeping.
+// Per-repo terminal-slot sync bookkeeping.
 //
 // The provider records when a repo's terminal session list has been refreshed
 // and gates the focus-driven re-sync behind a cooldown to keep window

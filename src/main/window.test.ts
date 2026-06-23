@@ -25,10 +25,9 @@ const mocks = vi.hoisted(() => {
     isMaximized: vi.fn(() => false),
     isMinimized: vi.fn(() => false),
     cookieSetMock: vi.fn(),
-    getEmbeddedServerRuntime: vi.fn<() => { url: string; accessToken: string; clientId: string } | null>(() => ({
+    getEmbeddedServerRuntime: vi.fn<() => { url: string; accessToken: string } | null>(() => ({
       url: 'http://127.0.0.1:32100/',
       accessToken: 'secret',
-      clientId: 'client_sharedterminal',
     })),
     readFileSync: vi.fn((filePath: string) =>
       filePath.endsWith('/dist/web/index.html')

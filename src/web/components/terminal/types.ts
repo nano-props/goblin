@@ -156,7 +156,7 @@ export interface TerminalSlotReadContextValue {
   subscribeSnapshot: (key: string, listener: () => void) => () => void
 }
 
-export interface ManagedTerminalSessionLike {
+export interface ManagedTerminalSlotLike {
   descriptor: TerminalDescriptor
   updateDescriptor: (descriptor: TerminalDescriptor) => void
   attach: (host: HTMLElement) => void

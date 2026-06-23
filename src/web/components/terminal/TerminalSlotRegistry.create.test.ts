@@ -33,7 +33,7 @@ vi.mock('#/web/components/terminal/terminal-geometry.ts', () => ({
 }))
 
 vi.mock('#/web/components/terminal/ManagedTerminalSlot.ts', () => {
-  class MockManagedTerminalSession {
+  class MockManagedTerminalSlot {
     descriptor: any
     private ptySessionId: string | null = null
     private snapshotState: any = { phase: 'opening', message: null, processName: 'terminal', canonicalTitle: null }
@@ -102,7 +102,7 @@ vi.mock('#/web/components/terminal/ManagedTerminalSlot.ts', () => {
     }
   }
 
-  return { ManagedTerminalSession: MockManagedTerminalSession }
+  return { ManagedTerminalSlot: MockManagedTerminalSlot }
 })
 
 import {

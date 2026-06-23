@@ -1,6 +1,6 @@
 import { setTerminalFocused } from '#/web/terminal-focus.ts'
 import { terminalSlotProviderLog } from '#/web/logger.ts'
-import { ManagedTerminalSession } from '#/web/components/terminal/ManagedTerminalSlot.ts'
+import { ManagedTerminalSlot } from '#/web/components/terminal/ManagedTerminalSlot.ts'
 import { createTerminalBellController } from '#/web/components/terminal/terminal-bell-controller.ts'
 import { terminalDescriptor } from '#/web/components/terminal/terminal-descriptor.ts'
 import { parseWorktreeKey, worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
@@ -70,7 +70,7 @@ export class TerminalSlotRegistry {
   private readonly onTerminalSessionRemoved: (key: string, base: TerminalSlotBase) => void
   private repoIndex: TerminalRepoIndex = {}
   private parkingRoot: HTMLDivElement | null = null
-  private readonly sessions = new Map<string, ManagedTerminalSession>()
+  private readonly sessions = new Map<string, ManagedTerminalSlot>()
   private readonly slotKeyByPtySessionId = new Map<string, string>()
   private readonly sessionIdByKey = new Map<string, string>()
   private readonly selectedKeyByWorktree = new Map<string, string>()
@@ -89,7 +89,7 @@ export class TerminalSlotRegistry {
       geometryAbortController: AbortController | null
     }
   >()
-  // Durable close queue. `ManagedTerminalSession.dispose` used to fire
+  // Durable close queue. `ManagedTerminalSlot.dispose` used to fire
   // `terminalBridge.close({ ptySessionId })` as a `void ... .catch(() => {})`
   // — if the WebSocket was already closing (or `closeSocketIfIdle` raced
   // the request), the request was rejected before the server saw it and
@@ -305,7 +305,7 @@ export class TerminalSlotRegistry {
     }
   }
 
-  // Phase 1: for each server session, ensure a local ManagedTerminalSession
+  // Phase 1: for each server session, ensure a local ManagedTerminalSlot
   // exists, hydrate it with the latest server-side metadata, and track
   // which worktrees saw any change. Side effects: ensureSlot,
   // session.hydrate, displayOrderByKey, syncSessionIdIndex.
@@ -949,7 +949,7 @@ export class TerminalSlotRegistry {
     for (const worktreeTerminalKey of changedWorktrees) this.notifyWorktree(worktreeTerminalKey)
   }
 
-  private ensureSlot(descriptor: TerminalDescriptor): ManagedTerminalSession {
+  private ensureSlot(descriptor: TerminalDescriptor): ManagedTerminalSlot {
     const current = this.sessions.get(descriptor.key)
     if (current) {
       current.updateDescriptor(descriptor)
@@ -960,7 +960,7 @@ export class TerminalSlotRegistry {
       this.notifyWorktree(descriptor.worktreeTerminalKey)
       return current
     }
-    const session = new ManagedTerminalSession(
+    const session = new ManagedTerminalSlot(
       descriptor,
       () => this.notifySession(descriptor.key),
       this.bellController.handleBell,
@@ -1006,7 +1006,7 @@ export class TerminalSlotRegistry {
     return this.sessions.get(key)?.descriptor.worktreeTerminalKey === worktreeTerminalKey
   }
 
-  private sortedSessionsForWorktree(worktreeTerminalKey: string): ManagedTerminalSession[] {
+  private sortedSessionsForWorktree(worktreeTerminalKey: string): ManagedTerminalSlot[] {
     return Array.from(this.sessions.values())
       .filter((session) => session.descriptor.worktreeTerminalKey === worktreeTerminalKey)
       .sort((a, b) => {

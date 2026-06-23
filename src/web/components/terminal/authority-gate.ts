@@ -93,7 +93,7 @@ export interface TerminalAuthorityGate {
   /**
    * Push the latest role the server believes this clientId has.
    * Called by the realtime ownership event handler in
-   * `ManagedTerminalSession.handleOwnership`.
+   * `ManagedTerminalSlot.handleOwnership`.
    */
   setRole(role: 'controller' | 'viewer' | 'unowned'): void
   /**
@@ -124,7 +124,7 @@ interface XtermAuthorityGateOptions {
 }
 
 /**
- * Default implementation. One instance per `ManagedTerminalSession`
+ * Default implementation. One instance per `ManagedTerminalSlot`
  * — the registry constructs them when a session becomes active.
  */
 export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): TerminalAuthorityGate {

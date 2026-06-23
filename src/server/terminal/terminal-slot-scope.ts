@@ -19,6 +19,6 @@ import { isRemoteRepoId } from '#/shared/remote-repo.ts'
  * list, reorder, prune) must normalize through here first, otherwise
  * string-equality lookups will silently miss.
  */
-export function terminalSessionScope(repoRoot: string): string {
+export function terminalSlotScope(repoRoot: string): string {
   return isRemoteRepoId(repoRoot) ? repoRoot : path.resolve(repoRoot)
 }

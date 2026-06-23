@@ -37,7 +37,7 @@ const EMPTY_SEARCH_RESULT: TerminalSearchResult = { resultIndex: -1, resultCount
 
 export type TerminalNotifyReason = 'metadata'
 
-export class ManagedTerminalSession {
+export class ManagedTerminalSlot {
   descriptor: TerminalDescriptor
   private readonly notify: (reason: TerminalNotifyReason) => void
   private readonly onBell: ((descriptor: TerminalDescriptor, event: TerminalBellEvent) => void) | null

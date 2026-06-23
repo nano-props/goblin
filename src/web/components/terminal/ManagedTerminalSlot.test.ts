@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ILinkHandler } from '@xterm/xterm'
 import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import { ManagedTerminalSession } from '#/web/components/terminal/ManagedTerminalSlot.ts'
+import { ManagedTerminalSlot } from '#/web/components/terminal/ManagedTerminalSlot.ts'
 import { terminalLog } from '#/web/logger.ts'
 import { installTerminalThemeStyles } from '#/web/components/terminal/terminal-theme-test-utils.ts'
 import { isTerminalFocused } from '#/web/terminal-focus.ts'
@@ -654,11 +654,11 @@ beforeEach(() => {
   })
 })
 
-describe('ManagedTerminalSession', () => {
+describe('ManagedTerminalSlot', () => {
   test('opens xterm and attaches the primary terminal session with fitted dimensions', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
 
     session.attach(host)
@@ -694,7 +694,7 @@ describe('ManagedTerminalSession', () => {
         }),
     )
 
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
 
     session.attach(host)
@@ -720,7 +720,7 @@ describe('ManagedTerminalSession', () => {
   test('remeasures and refits after fonts finish loading', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
 
     session.attach(host)
@@ -751,7 +751,7 @@ describe('ManagedTerminalSession', () => {
   test('loads terminal addons and exposes search and serialization', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
 
     session.attach(host)
@@ -782,7 +782,7 @@ describe('ManagedTerminalSession', () => {
     try {
       const host = document.createElement('div')
       document.body.appendChild(host)
-      const session = new ManagedTerminalSession(descriptor, vi.fn())
+      const session = new ManagedTerminalSlot(descriptor, vi.fn())
       hydrateManagedSession(session)
 
       session.attach(host)
@@ -821,7 +821,7 @@ describe('ManagedTerminalSession', () => {
     try {
       const host = document.createElement('div')
       document.body.appendChild(host)
-      const session = new ManagedTerminalSession(descriptor, vi.fn())
+      const session = new ManagedTerminalSlot(descriptor, vi.fn())
       hydrateManagedSession(session)
       session.attach(host)
       await flushTerminalStart()
@@ -858,7 +858,7 @@ describe('ManagedTerminalSession', () => {
     try {
       const host = document.createElement('div')
       document.body.appendChild(host)
-      const session = new ManagedTerminalSession(descriptor, vi.fn())
+      const session = new ManagedTerminalSlot(descriptor, vi.fn())
       hydrateManagedSession(session)
       session.attach(host)
       await flushTerminalStart()
@@ -902,7 +902,7 @@ describe('ManagedTerminalSession', () => {
     try {
       const host = document.createElement('div')
       document.body.appendChild(host)
-      const session = new ManagedTerminalSession(descriptor, vi.fn())
+      const session = new ManagedTerminalSlot(descriptor, vi.fn())
       hydrateManagedSession(session)
       session.attach(host)
       await flushTerminalStart()
@@ -921,7 +921,7 @@ describe('ManagedTerminalSession', () => {
   test('opens web links through the safe shell bridge', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
 
     session.attach(host)
@@ -936,7 +936,7 @@ describe('ManagedTerminalSession', () => {
   test('opens OSC 8 hyperlinks through the safe shell bridge', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
 
     session.attach(host)
@@ -957,7 +957,7 @@ describe('ManagedTerminalSession', () => {
   test('does not send unsafe web links to the app ipc', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
 
     session.attach(host)
@@ -983,7 +983,7 @@ describe('ManagedTerminalSession', () => {
     const warnSpy = vi.spyOn(terminalLog, 'warn').mockImplementation(() => {})
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
 
     session.attach(host)
@@ -1007,7 +1007,7 @@ describe('ManagedTerminalSession', () => {
   test('uses first-class restart IPC instead of recreating through ensureSlot forceNew', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -1027,7 +1027,7 @@ describe('ManagedTerminalSession', () => {
     terminalCalls.attach.mockResolvedValueOnce({ ok: false, message: 'error.spawn-failed' })
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
 
     session.attach(host)
@@ -1045,7 +1045,7 @@ describe('ManagedTerminalSession', () => {
     terminalCalls.write.mockRejectedValueOnce(new Error('write failed'))
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -1061,7 +1061,7 @@ describe('ManagedTerminalSession', () => {
   test('batches rapid user input into a single ordered write', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -1082,7 +1082,7 @@ describe('ManagedTerminalSession', () => {
   test('drops buffered input after dispose', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -1101,7 +1101,7 @@ describe('ManagedTerminalSession', () => {
     terminalCalls.resize.mockRejectedValueOnce(new Error('resize failed'))
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -1128,7 +1128,7 @@ describe('ManagedTerminalSession', () => {
     )
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -1154,7 +1154,7 @@ describe('ManagedTerminalSession', () => {
     terminalCalls.attach.mockResolvedValueOnce(attachResult('pty_session_1_aaaaaaaaa'))
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
 
     session.hydrate({
@@ -1182,7 +1182,7 @@ describe('ManagedTerminalSession', () => {
   test('clears hydratedSnapshot after preloadHydratedSnapshot writes the snapshot to the term', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
 
     session.hydrate({
@@ -1215,7 +1215,7 @@ describe('ManagedTerminalSession', () => {
   test('clears hydratedSnapshot after applyHydratedSnapshotToActiveView writes the snapshot to the term', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -1252,7 +1252,7 @@ describe('ManagedTerminalSession', () => {
   test('resets an existing terminal view when hydrate switches to a different session id', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -1286,7 +1286,7 @@ describe('ManagedTerminalSession', () => {
   test('does not rewrite an existing terminal view when hydrate refreshes the same session snapshot', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -1318,7 +1318,7 @@ describe('ManagedTerminalSession', () => {
   test('stale active hydrate replay callback does not close a newer replay boundary', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -1370,7 +1370,7 @@ describe('ManagedTerminalSession', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const notify = vi.fn()
-    const session = new ManagedTerminalSession(descriptor, notify)
+    const session = new ManagedTerminalSlot(descriptor, notify)
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -1388,7 +1388,7 @@ describe('ManagedTerminalSession', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const notify = vi.fn()
-    const session = new ManagedTerminalSession(descriptor, notify)
+    const session = new ManagedTerminalSlot(descriptor, notify)
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -1416,7 +1416,7 @@ describe('ManagedTerminalSession', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const notify = vi.fn()
-    const session = new ManagedTerminalSession(descriptor, notify)
+    const session = new ManagedTerminalSlot(descriptor, notify)
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -1458,7 +1458,7 @@ describe('ManagedTerminalSession', () => {
     )
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -1530,7 +1530,7 @@ describe('ManagedTerminalSession', () => {
     )
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session, {
       role: 'viewer',
       controllerStatus: 'connected',
@@ -1575,7 +1575,7 @@ describe('ManagedTerminalSession', () => {
     )
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session, {
       role: 'unowned',
       controllerStatus: 'none',
@@ -1611,7 +1611,7 @@ describe('ManagedTerminalSession', () => {
     )
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session, {
       role: 'viewer',
       controllerStatus: 'connected',
@@ -1662,7 +1662,7 @@ describe('ManagedTerminalSession', () => {
     geometryMocks.proposeTerminalGeometry.mockReturnValueOnce(null)
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session, {
       role: 'viewer',
       controllerStatus: 'connected',
@@ -1703,7 +1703,7 @@ describe('ManagedTerminalSession', () => {
     )
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -1735,7 +1735,7 @@ describe('ManagedTerminalSession', () => {
     )
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -1762,7 +1762,7 @@ describe('ManagedTerminalSession', () => {
     )
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -1809,7 +1809,7 @@ describe('ManagedTerminalSession', () => {
       )
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -1854,7 +1854,7 @@ describe('ManagedTerminalSession', () => {
     )
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -1883,7 +1883,7 @@ describe('ManagedTerminalSession', () => {
     xtermMocks.deferWriteCallbacks(true)
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushUntil(() => xtermMocks.terminals[0]?.write.mock.calls.some((call: unknown[]) => call[0] === 'history'))
@@ -1902,7 +1902,7 @@ describe('ManagedTerminalSession', () => {
     xtermMocks.deferWriteCallbacks(true)
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushUntil(() => xtermMocks.terminals[0]?.write.mock.calls.some((call: unknown[]) => call[0] === 'history'))
@@ -1921,7 +1921,7 @@ describe('ManagedTerminalSession', () => {
     xtermMocks.deferWriteCallbacks(true)
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushUntil(() => xtermMocks.terminals[0]?.write.mock.calls.some((call: unknown[]) => call[0] === 'history'))
@@ -1939,7 +1939,7 @@ describe('ManagedTerminalSession', () => {
     terminalCalls.attach.mockResolvedValueOnce(attachResult('pty_session_1_aaaaaaaaa', { snapshot: 'tail', snapshotSeq: 1 }))
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushUntil(() => xtermMocks.terminals[0]?.write.mock.calls.some((call: unknown[]) => call[0] === 'tail'))
@@ -1952,7 +1952,7 @@ describe('ManagedTerminalSession', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const notify = vi.fn()
-    const session = new ManagedTerminalSession(descriptor, notify)
+    const session = new ManagedTerminalSlot(descriptor, notify)
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -1975,7 +1975,7 @@ describe('ManagedTerminalSession', () => {
   test('flushes matching terminal exits before the provider dismisses the session', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -1999,7 +1999,7 @@ describe('ManagedTerminalSession', () => {
     )
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session, {
       ptySessionId: 'pty_session_1_aaaaaaaaa',
       processName: 'zsh',
@@ -2021,13 +2021,13 @@ describe('ManagedTerminalSession', () => {
   test('closes pending replacement session when disposed before restart reaches main', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    // The new `requestDurableClose` callback is the seam ManagedTerminalSession
+    // The new `requestDurableClose` callback is the seam ManagedTerminalSlot
     // uses to hand a close off to the registry's durable queue. In production
     // the queue dedupes and the registry awaits it on the next create; in
     // this test we wire it straight to `terminalCalls.close` so the same
     // assertions the old test made still hold.
     const pendingCloses: Array<Promise<unknown>> = []
-    const session = new ManagedTerminalSession(descriptor, vi.fn(), null, async (ptySessionId) => {
+    const session = new ManagedTerminalSlot(descriptor, vi.fn(), null, async (ptySessionId) => {
       const promise = terminalCalls.close({ ptySessionId })
       pendingCloses.push(promise)
       await promise
@@ -2056,7 +2056,7 @@ describe('ManagedTerminalSession', () => {
     // See the comment in the previous test for why we wire
     // `requestDurableClose` to `terminalCalls.close` here.
     const pendingCloses: Array<Promise<unknown>> = []
-    const session = new ManagedTerminalSession(descriptor, vi.fn(), null, async (ptySessionId) => {
+    const session = new ManagedTerminalSlot(descriptor, vi.fn(), null, async (ptySessionId) => {
       const promise = terminalCalls.close({ ptySessionId })
       pendingCloses.push(promise)
       await promise
@@ -2080,7 +2080,7 @@ describe('ManagedTerminalSession', () => {
     const host = document.createElement('div')
     const parking = document.createElement('div')
     document.body.append(host, parking)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -2098,7 +2098,7 @@ describe('ManagedTerminalSession', () => {
   test('focus checks are derived from the xterm DOM host', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -2110,7 +2110,7 @@ describe('ManagedTerminalSession', () => {
   test('applies terminal theme and updates when the app theme changes', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -2140,7 +2140,7 @@ describe('ManagedTerminalSession', () => {
   test('loads image and progress addons', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
 
     session.attach(host)
@@ -2156,7 +2156,7 @@ describe('ManagedTerminalSession', () => {
     document.body.appendChild(host)
     const notify = vi.fn()
     const onBell = vi.fn()
-    const session = new ManagedTerminalSession(descriptor, notify, onBell)
+    const session = new ManagedTerminalSlot(descriptor, notify, onBell)
     hydrateManagedSession(session)
 
     session.attach(host)
@@ -2171,7 +2171,7 @@ describe('ManagedTerminalSession', () => {
     const notify = vi.fn()
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, notify)
+    const session = new ManagedTerminalSlot(descriptor, notify)
     hydrateManagedSession(session)
 
     session.attach(host)
@@ -2193,7 +2193,7 @@ describe('ManagedTerminalSession', () => {
   test('progress error and indeterminate states', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
 
     session.attach(host)
@@ -2210,7 +2210,7 @@ describe('ManagedTerminalSession', () => {
   test('progress state is cleared on restart', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
 
     session.attach(host)
@@ -2230,7 +2230,7 @@ describe('ManagedTerminalSession', () => {
   test('progress value is clamped to 0-100', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new ManagedTerminalSession(descriptor, vi.fn())
+    const session = new ManagedTerminalSlot(descriptor, vi.fn())
     hydrateManagedSession(session)
 
     session.attach(host)
@@ -2268,7 +2268,7 @@ describe('ManagedTerminalSession', () => {
       )
       const host = document.createElement('div')
       document.body.appendChild(host)
-      const session = new ManagedTerminalSession(descriptor, vi.fn())
+      const session = new ManagedTerminalSlot(descriptor, vi.fn())
       hydrateManagedSession(session)
       session.attach(host)
       await flushTerminalStart()
@@ -2354,7 +2354,7 @@ function takeoverResult(
 }
 
 function hydrateManagedSession(
-  session: ManagedTerminalSession,
+  session: ManagedTerminalSlot,
   overrides: Partial<{
     ptySessionId: string
     phase: 'opening' | 'restarting' | 'open' | 'error' | 'closed'
@@ -2385,7 +2385,7 @@ function hydrateManagedSession(
   })
 }
 
-function hydratedSnapshot(session: ManagedTerminalSession): { snapshot: string; snapshotSeq: number } {
+function hydratedSnapshot(session: ManagedTerminalSlot): { snapshot: string; snapshotSeq: number } {
   return (session as unknown as { hydratedSnapshot: { snapshot: string; snapshotSeq: number } }).hydratedSnapshot
 }
 

@@ -100,7 +100,7 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-async function createTerminalSession(
+async function createTerminalSlot(
   host: ServerTerminalHost,
   clientId: string,
   userId = USER_1,
@@ -206,7 +206,7 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
-    const ptySessionId = await createTerminalSession(host, 'client_1')
+    const ptySessionId = await createTerminalSlot(host, 'client_1')
     const prompt =
       '\x1b[1m\x1b[7m%\x1b[27m\x1b[1m\x1b[0m                                                                            \r \r\r\x1b[0m\x1b[27m\x1b[24m\x1b[J👾:~/repo\r\n$ '
     mockPtys[0]?.emitData(prompt)
@@ -346,7 +346,7 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
-    const ptySessionId = await createTerminalSession(host, 'client_1')
+    const ptySessionId = await createTerminalSlot(host, 'client_1')
 
     const result = await host.attach('client_a', USER_1, {
       ptySessionId,
@@ -537,7 +537,7 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
-    const ptySessionId = await createTerminalSession(host, 'client_a')
+    const ptySessionId = await createTerminalSlot(host, 'client_a')
 
     const { spawn } = await import('node-pty')
     vi.mocked(spawn).mockImplementationOnce(() => {
@@ -575,7 +575,7 @@ describe('server terminal runtime', () => {
     const socketB = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socketA)
     host.registerSocket('client_b', USER_1, socketB)
-    const ptySessionId = await createTerminalSession(host, 'client_1')
+    const ptySessionId = await createTerminalSlot(host, 'client_1')
 
     const restarted = await host.restart('client_a', USER_1, {
       ptySessionId,
@@ -613,7 +613,7 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
-    const ptySessionId = await createTerminalSession(host, 'client_1')
+    const ptySessionId = await createTerminalSlot(host, 'client_1')
     socket.send.mockClear()
 
     host.handleRealtimeMessage('client_1', USER_1, socket,
@@ -724,7 +724,7 @@ describe('server terminal runtime', () => {
     const socketA = { send: vi.fn(), close: vi.fn() }
     const socketB = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socketA)
-    const ptySessionId = await createTerminalSession(host, 'client_1')
+    const ptySessionId = await createTerminalSlot(host, 'client_1')
     host.registerSocket('client_b', USER_1, socketB)
 
     const result = host.takeover('client_a', USER_1, {
@@ -756,7 +756,7 @@ describe('server terminal runtime', () => {
     const socketA = { send: vi.fn(), close: vi.fn() }
     const socketB = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socketA)
-    const ptySessionId = await createTerminalSession(host, 'client_a')
+    const ptySessionId = await createTerminalSlot(host, 'client_a')
     host.registerSocket('client_b', USER_1, socketB)
     socketB.send.mockClear()
 
@@ -808,7 +808,7 @@ describe('server terminal runtime', () => {
     const socketB = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socketA)
     host.registerSocket('client2_b', USER_1, socketB)
-    const ptySessionId = await createTerminalSession(host, 'client_1')
+    const ptySessionId = await createTerminalSlot(host, 'client_1')
 
     const result = await host.attach('client_a', USER_1, {
       ptySessionId,
@@ -900,7 +900,7 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
-    const ptySessionId = await createTerminalSession(host, 'client_1')
+    const ptySessionId = await createTerminalSlot(host, 'client_1')
 
     const first = await host.attach('client_a', USER_1, {
       ptySessionId,
@@ -918,7 +918,7 @@ describe('server terminal runtime', () => {
 
     const socket2 = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_b', USER_1, socket2)
-    const recreatedSessionId = await createTerminalSession(host, 'client_1')
+    const recreatedSessionId = await createTerminalSlot(host, 'client_1')
     const replacementAttach = await host.attach('client_a', USER_1, {
       ptySessionId: recreatedSessionId,
       cols: 80,
@@ -1142,7 +1142,7 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
-    const ptySessionId = await createTerminalSession(host, 'client_1')
+    const ptySessionId = await createTerminalSlot(host, 'client_1')
 
     const attach = await host.attach('client_a', USER_1, {
       ptySessionId,
@@ -1180,7 +1180,7 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
-    const ptySessionId = await createTerminalSession(host, 'client_1')
+    const ptySessionId = await createTerminalSlot(host, 'client_1')
     socket.send.mockClear()
 
     const result = await host.takeover('client_a', USER_1, {
@@ -1219,8 +1219,8 @@ describe('server terminal runtime', () => {
       expect(stats.maxRingBufferChars).toBe(0)
 
       // Create two sessions; their buffers start empty.
-      const sessionA = await createTerminalSession(host, 'client_1')
-      const sessionB = await createTerminalSession(host, 'client_1')
+      const sessionA = await createTerminalSlot(host, 'client_1')
+      const sessionB = await createTerminalSlot(host, 'client_1')
       stats = host.getDiagnostics()
       expect(stats.liveSessionCount).toBe(2)
       expect(stats.totalRingBufferChars).toBe(0)

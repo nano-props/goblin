@@ -588,7 +588,7 @@ describe('TerminalSlotRegistry', () => {
       registry.setRepoIndex(makeRepoIndex())
       const descriptor = makeDescriptor('slot-1', 1)
       // Add a session via the internal API (no real WS, no
-      // ManagedTerminalSession — just the registry bookkeeping).
+      // ManagedTerminalSlot — just the registry bookkeeping).
       ;(registry as any).sessions.set(descriptor.key, {
         descriptor,
         snapshot: () => ({ phase: 'open', message: null, processName: 'zsh', canonicalTitle: null }),

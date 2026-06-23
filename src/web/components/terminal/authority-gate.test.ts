@@ -9,7 +9,7 @@ import type { RendererTerminalBridge } from '#/web/renderer-bridge-types.ts'
 // Focused unit tests for the AuthorityGate. The gate is the single
 // source of truth for write-side authorization, so its decision
 // branches and ordering contracts are pinned here without booting a
-// full ManagedTerminalSession.
+// full ManagedTerminalSlot.
 
 function makeBridge(
   takeoverImpl?: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>,
@@ -322,7 +322,7 @@ describe('AuthorityGate ordering contract', () => {
     expect(gate.isController()).toBe(false)
     const result = await gate.takeover()
     expect(result).toEqual({ kind: 'allowed' })
-    // The takeover contract for callers (e.g. ManagedTerminalSession
+    // The takeover contract for callers (e.g. ManagedTerminalSlot
     // uses wasController then runtime.canResize()) requires
     // onPromoted → role='controller' to be observable as soon as
     // the returned promise resolves. Both layers must agree by the

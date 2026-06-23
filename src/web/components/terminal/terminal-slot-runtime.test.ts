@@ -75,7 +75,7 @@ describe('TerminalSessionRuntime', () => {
   })
 
   test('drainReplay discards the replay buffer without surfacing captured events', () => {
-    // The error / cancellation path in `ManagedTerminalSession` calls
+    // The error / cancellation path in `ManagedTerminalSlot` calls
     // `drainReplay` to clear the preload's replay window when the
     // attach fails partway through. drainReplay must not surface
     // captured events to the term.
@@ -108,7 +108,7 @@ describe('TerminalSessionRuntime', () => {
   })
 
   test('a preload window followed by a post-attach window keeps events newer than the new snapshot seq', () => {
-    // This is the contract that `ManagedTerminalSession.preloadHydratedSnapshot`
+    // This is the contract that `ManagedTerminalSlot.preloadHydratedSnapshot`
     // and `replayActiveView` rely on: the preload's beginReplay starts
     // a window that the post-attach's beginReplay extends with a
     // higher boundary, and the post-attach's finishReplay returns

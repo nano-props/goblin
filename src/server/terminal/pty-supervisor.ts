@@ -11,7 +11,7 @@
 import type { PtySupervisorDiagnostics, PtySupervisorMode } from '#/server/terminal/terminal-host.ts'
 
 export interface PtyHandle {
-  readonly sessionId: string
+  readonly ptySessionId: string
 }
 
 export interface PtySpawnInput {
@@ -42,6 +42,6 @@ export interface PtySupervisor {
   shutdown(): void
 }
 
-export function createPtyHandle(sessionId: string): PtyHandle {
-  return { sessionId }
+export function createPtyHandle(ptySessionId: string): PtyHandle {
+  return { ptySessionId }
 }

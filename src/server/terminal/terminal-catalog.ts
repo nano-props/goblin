@@ -17,7 +17,7 @@ import {
 import { formatSlotId, parseSlotIdIndex } from '#/shared/slot-ids.ts'
 import { isValidTerminalClientId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import { formatTerminalSlotKey, parseTerminalSlotKey } from '#/shared/terminal-slot-key.ts'
-import { terminalSessionScope } from '#/server/terminal/terminal-slot-scope.ts'
+import { terminalSlotScope } from '#/server/terminal/terminal-slot-scope.ts'
 import {
   buildGoblinTerminalCommandEnvironment,
   type GoblinTerminalCommandRuntime,
@@ -108,11 +108,11 @@ class TerminalCatalog {
     if (!this.options.isValidTerminalId(slotId)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidTerminalSize(cols, rows)) return { ok: false, message: 'error.invalid-arguments' }
 
-    const slotScope = terminalSessionScope(input.repoRoot)
+    const slotScope = terminalSlotScope(input.repoRoot)
     const existingSessions = await this.options.manager.listSlotsForUser(userId, slotScope)
     // Build the target session key from the same form the manager uses
     // to scope owner-scoped session lists — see the comment on
-    // `terminalSessionScope` in server/terminal/terminal-session-scope.ts
+    // `terminalSlotScope` in server/terminal/terminal-slot-scope.ts
     // for the normalization rationale.
     const targetSessionKey = formatTerminalSlotKey(
       slotScope,
@@ -167,14 +167,14 @@ class TerminalCatalog {
 
   async listSessions(userId: string, repoRoot: string): Promise<TerminalSlotSummary[]> {
     if (!isValidRepoLocator(repoRoot)) return []
-    return await this.options.manager.listSlotsForUser(userId, terminalSessionScope(repoRoot))
+    return await this.options.manager.listSlotsForUser(userId, terminalSlotScope(repoRoot))
   }
 
   async prune(clientId: string, userId: string, repoRoot: string): Promise<{ pruned: number; remaining: number }> {
     if (!this.options.isValidClientId(clientId)) return { pruned: 0, remaining: 0 }
     if (!isValidRepoLocator(repoRoot)) return { pruned: 0, remaining: 0 }
 
-    const slotScope = terminalSessionScope(repoRoot)
+    const slotScope = terminalSlotScope(repoRoot)
     const allSessions = await this.options.manager.listSlotsForUser(userId, slotScope)
     if (isRemoteRepoId(repoRoot)) return { pruned: 0, remaining: allSessions.length }
 
@@ -199,7 +199,7 @@ class TerminalCatalog {
   async nextSlotId(userId: string, repoRoot: string, worktreePath: string): Promise<string> {
     // Compare against the canonical form so a forward-slash Windows path
     // matches the resolved back-slash form used as the session key prefix.
-    const scopedRepoRoot = terminalSessionScope(repoRoot)
+    const scopedRepoRoot = terminalSlotScope(repoRoot)
     const scopedWorktreePath = isRemoteRepoId(repoRoot) ? worktreePath : path.resolve(worktreePath)
     const sessions = await this.options.manager.listSlotsForUser(userId, scopedRepoRoot)
     let maxIndex = 0

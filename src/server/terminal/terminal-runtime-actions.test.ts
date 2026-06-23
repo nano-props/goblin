@@ -16,7 +16,7 @@ const SESSION_ID = 'session_aaaaaaaaaaaaaa'
 function makeActions(
   options: {
     closeSlotForUser: (userId: string, ptySessionId: string) => boolean
-    getSessionScope?: (userId: string, ptySessionId: string) => string | undefined
+    getSlotScope?: (userId: string, ptySessionId: string) => string | undefined
     isValidTerminalClientId?: (value: unknown) => value is string
     broadcasts?: ReturnType<typeof vi.fn>
   } = { closeSlotForUser: () => false },
@@ -24,8 +24,8 @@ function makeActions(
   const broadcasts = options.broadcasts ?? vi.fn()
   const manager = {
     // The close path only reads `scope` off the session record.
-    getSlot: vi.fn((_ownerId: string, ptySessionId: string) =>
-      options.getSessionScope ? { scope: options.getSessionScope(_ownerId, ptySessionId) } : undefined,
+    getSlot: vi.fn((_userId: string, ptySessionId: string) =>
+      options.getSlotScope ? { scope: options.getSlotScope(_userId, ptySessionId) } : undefined,
     ),
     closeSlotForUser: vi.fn(options.closeSlotForUser),
     // The other manager methods are unused by `close`, but the
@@ -68,7 +68,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     const close = vi.fn(() => true)
     const { actions, broadcasts } = makeActions({
       closeSlotForUser: close,
-      getSessionScope: () => '/repo',
+      getSlotScope: () => '/repo',
     })
 
     const closed = actions.close(CLIENT_ID, USER_ID, { ptySessionId: SESSION_ID })
@@ -92,7 +92,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     // sibling windows. The guard is `if (closed && repoRoot)`.
     const { actions, broadcasts } = makeActions({
       closeSlotForUser: () => false,
-      getSessionScope: () => '/repo',
+      getSlotScope: () => '/repo',
     })
 
     const closed = actions.close(CLIENT_ID, USER_ID, { ptySessionId: SESSION_ID })
@@ -107,7 +107,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     // path must not synthesize a session-closed with a fake repoRoot.
     const { actions, broadcasts } = makeActions({
       closeSlotForUser: () => true,
-      getSessionScope: () => undefined,
+      getSlotScope: () => undefined,
     })
 
     const closed = actions.close(CLIENT_ID, USER_ID, { ptySessionId: SESSION_ID })
@@ -138,7 +138,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     const close = vi.fn(() => true)
     const { actions, broadcasts } = makeActions({
       closeSlotForUser: close,
-      getSessionScope: () => '/repo',
+      getSlotScope: () => '/repo',
     })
 
     const closed = actions.close('not_a_client', USER_ID, { ptySessionId: SESSION_ID })
@@ -152,7 +152,7 @@ describe('terminal-runtime-actions close broadcast', () => {
 describe('terminal-runtime-actions clientId gate', () => {
   // The action layer is the single point that validates caller
   // identity before reaching the manager. Every authority-gated
-  // After the `attachmentId` -> `clientId` merge, every
+  // After the `attachmentId` + `clientId` -> `clientId` merge, every
   // authority-gated action (write / resize / takeover / restart /
   // attach) accepts a missing `input.clientId` and falls back to
   // the outer (request-level) `clientId`. The manager sees a single
