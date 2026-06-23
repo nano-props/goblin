@@ -1,34 +1,36 @@
 interface TerminalConnectionStateOptions {
-  ownershipGraceMs: number
+  /**
+   * Time after the owner's last socket disconnects before the
+   * server-side sessions owned by that owner are torn down entirely
+   * (PTY exit, view-order purge). This is unrelated to terminal
+   * ownership grace — by the time it fires the owner is presumed to
+   * have moved on. Keep it long enough that an end-of-day quit-then-
+   * resume doesn't lose the session catalog.
+   */
   detachedTtlMs: number
-  onAttachmentExpired(ownerId: string, attachmentId: string): void
   onOwnerExpired(ownerId: string): void
 }
 
 type TimerHandle = ReturnType<typeof setTimeout>
-
-interface OwnershipTimerEntry {
-  timer: TimerHandle
-  ownerId: string
-  attachmentId: string
-}
 
 interface OwnerTimerEntry {
   timer: TimerHandle
   ownerId: string
 }
 
+/**
+ * Tracks the per-owner detached TTL. The previous revision also
+ * managed a per-attachment ownership grace timer (30 s after a
+ * controller's socket dropped) — that timer has been removed: the
+ * server now clears the controller slot on disconnect and the next
+ * attach auto-claims (see `terminal-ownership.ts`).
+ */
 export class TerminalConnectionState {
   private readonly options: TerminalConnectionStateOptions
-  private readonly ownershipTimerByAttachmentKey = new Map<string, OwnershipTimerEntry>()
   private readonly disconnectTimerByOwnerId = new Map<string, OwnerTimerEntry>()
 
   constructor(options: TerminalConnectionStateOptions) {
     this.options = options
-  }
-
-  clearAttachmentDisconnect(ownerId: string, attachmentId: string): void {
-    this.clearOwnershipTimerByKey(ownerAttachmentKey(ownerId, attachmentId))
   }
 
   clearOwnerDisconnect(ownerId: string): void {
@@ -36,21 +38,6 @@ export class TerminalConnectionState {
     if (!entry) return
     clearTimeout(entry.timer)
     this.disconnectTimerByOwnerId.delete(ownerId)
-  }
-
-  scheduleOwnershipRelease(ownerId: string, attachmentId: string, stillConnected: () => boolean): void {
-    const attachmentKey = ownerAttachmentKey(ownerId, attachmentId)
-    this.clearOwnershipTimerByKey(attachmentKey)
-    const entry: OwnershipTimerEntry = {
-      ownerId,
-      attachmentId,
-      timer: setTimeout(() => {
-        this.ownershipTimerByAttachmentKey.delete(attachmentKey)
-        if (stillConnected()) return
-        this.options.onAttachmentExpired(ownerId, attachmentId)
-      }, this.options.ownershipGraceMs),
-    }
-    this.ownershipTimerByAttachmentKey.set(attachmentKey, entry)
   }
 
   scheduleOwnerDisconnect(ownerId: string, hasSockets: () => boolean): void {
@@ -67,20 +54,7 @@ export class TerminalConnectionState {
   }
 
   shutdown(): void {
-    for (const entry of this.ownershipTimerByAttachmentKey.values()) clearTimeout(entry.timer)
     for (const entry of this.disconnectTimerByOwnerId.values()) clearTimeout(entry.timer)
-    this.ownershipTimerByAttachmentKey.clear()
     this.disconnectTimerByOwnerId.clear()
   }
-
-  private clearOwnershipTimerByKey(attachmentKey: string): void {
-    const entry = this.ownershipTimerByAttachmentKey.get(attachmentKey)
-    if (!entry) return
-    clearTimeout(entry.timer)
-    this.ownershipTimerByAttachmentKey.delete(attachmentKey)
-  }
-}
-
-function ownerAttachmentKey(ownerId: string, attachmentId: string): string {
-  return `${ownerId}\0${attachmentId}`
 }

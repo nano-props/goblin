@@ -469,9 +469,9 @@ Implemented on `main`. The `terminal.takeover` response is now
 the authoritative handshake for the new controller's view; the
 realtime `ownership` event keeps the same shape (and the same
 authority role) for the _other_ ownership-change paths
-(controller crash, grace expiry, fresh attach). The renderer no
-longer waits for a follow-up `ownership` event before painting
-the post-takeover frame.
+(controller crash, sibling auto-claim after disconnect, fresh
+attach). The renderer no longer waits for a follow-up
+`ownership` event before painting the post-takeover frame.
 
 ### The two-step handshake that was
 
@@ -538,12 +538,12 @@ response.
 ### What is _not_ changed
 
 The realtime `ownership` event keeps its authority role on the
-non-takeover paths (controller crash, grace expiry, controller
-reconnect). For those, ownership-event-as-authority is the only
-choice — there is no response to be authoritative. A subsequent
-realtime event for the _same_ sessionId after a successful
-takeover is treated as a benign re-apply with identical values
-(no-op).
+non-takeover paths (controller crash, controller reconnect,
+sibling auto-claim). For those, ownership-event-as-authority
+is the only choice — there is no response to be authoritative.
+A subsequent realtime event for the _same_ sessionId after a
+successful takeover is treated as a benign re-apply with
+identical values (no-op).
 
 `TerminalSlot` and `BranchWorkspaceToolbar` UI are unchanged — they
 read `role` / `controllerStatus` from the runtime and simply see

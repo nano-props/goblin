@@ -324,8 +324,8 @@ export const en = {
   'terminal.progress': 'Terminal progress',
   'terminal.empty': 'No terminal open',
   'terminal.drop-hint': 'Drop to paste path',
-  'terminal.mirror-controlled': 'Another window or tab is currently controlling this terminal.',
-  'terminal.unowned': 'This terminal currently has no controller.',
+  'terminal.mirror-controlled': 'Another session is currently controlling this terminal.',
+  'terminal.unowned': 'No session is currently controlling this terminal.',
   'terminal.takeover': 'Take over terminal',
   'terminal.takeover-failed':
     'Could not take over the terminal. It may have closed or the connection may not be ready; try again.',

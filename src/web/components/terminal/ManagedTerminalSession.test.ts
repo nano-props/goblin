@@ -2239,7 +2239,7 @@ function hydrateManagedSession(
     processName: string
     canonicalTitle?: string | null
     role: 'controller' | 'viewer' | 'unowned'
-    controllerStatus: 'connected' | 'grace' | 'none'
+    controllerStatus: 'connected' | 'none'
     canonicalCols: number
     canonicalRows: number
     snapshot: string

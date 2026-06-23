@@ -36,9 +36,10 @@ import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.t
 // Intentionally long TTL: we want terminals to survive as long as possible in
 // the background so users can leave builds or long-running tasks unattended.
 // 24 hours gives a full day for the user to reconnect before sessions are
-// forcibly cleaned up.
+// forcibly cleaned up. (The previous revision also kept a 30s ownership
+// grace timer here; it has been removed — see `terminal-ownership.ts` for
+// the new disconnect-clears-controller semantics.)
 const TERMINAL_DETACHED_TTL_MS = 24 * 60 * 60 * 1000
-const TERMINAL_OWNERSHIP_GRACE_MS = 30_000
 const terminalRuntimeLogger = serverLogger.child({ module: 'terminal-runtime' })
 
 export interface ServerTerminalRuntimeOptions {
@@ -84,7 +85,6 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   const { broker, connectionState } = createTerminalRuntimeCoordinator({
     manager,
     terminalViewOrder,
-    ownershipGraceMs: TERMINAL_OWNERSHIP_GRACE_MS,
     detachedTtlMs: TERMINAL_DETACHED_TTL_MS,
   })
   const catalog = createTerminalCatalog({

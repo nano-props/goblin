@@ -168,7 +168,7 @@ vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
       processName: string
       canonicalTitle?: string | null
       role: 'controller' | 'viewer' | 'unowned'
-      controllerStatus: 'connected' | 'grace' | 'none'
+      controllerStatus: 'connected' | 'none'
       canonicalCols: number
       canonicalRows: number
       snapshot?: string
@@ -216,7 +216,7 @@ vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
     handleOwnership(event: {
       sessionId: string
       role: 'controller' | 'viewer' | 'unowned'
-      controllerStatus: 'connected' | 'grace' | 'none'
+      controllerStatus: 'connected' | 'none'
       canonicalCols: number
       canonicalRows: number
     }) {

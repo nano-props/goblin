@@ -44,7 +44,7 @@ function makeServerSession(
   sessionId: string,
   terminalId: string,
   overrides: Partial<{
-    controller: { attachmentId: string; status: 'connected' | 'grace' }
+    controller: { attachmentId: string; status: 'connected' }
     processName: string
     canonicalTitle: string | null
     phase: 'opening' | 'restarting' | 'open' | 'error' | 'closed'

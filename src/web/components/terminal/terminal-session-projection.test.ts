@@ -81,7 +81,7 @@ describe('terminal session projection helpers', () => {
         viewType: 'terminal',
         viewId: `${REPO_ROOT}\0${WORKTREE_PATH}\0terminal-1`,
         cwd: WORKTREE_PATH,
-        controller: { attachmentId: 'attachment_a', status: 'grace' },
+        controller: { attachmentId: 'attachment_a', status: 'connected' },
         processName: 'bash',
         canonicalTitle: null,
         phase: 'error',
@@ -96,7 +96,7 @@ describe('terminal session projection helpers', () => {
     expect(projected?.hydrateInput.snapshot).toBe('cached-snap')
     expect(projected?.hydrateInput.snapshotSeq).toBe(3)
     expect(projected?.hydrateInput.role).toBe('viewer')
-    expect(projected?.hydrateInput.controllerStatus).toBe('grace')
+    expect(projected?.hydrateInput.controllerStatus).toBe('connected')
     expect(projected?.controlsAttachment).toBe(false)
   })
 

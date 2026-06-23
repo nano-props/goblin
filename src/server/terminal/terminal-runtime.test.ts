@@ -205,22 +205,36 @@ describe('server terminal runtime', () => {
 
   test('replay snapshots omit a leading zsh prompt end marker prelude', async () => {
     const { host, shutdown } = buildRuntime()
-    const sessionId = await createTerminalSession(host, 'client_1')
+    const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_1', 'attachment_a', OWNER_1, socket)
+    const sessionId = await createTerminalSession(host, 'client_1', 'attachment_a')
     const prompt =
       '\x1b[1m\x1b[7m%\x1b[27m\x1b[1m\x1b[0m                                                                            \r \r\r\x1b[0m\x1b[27m\x1b[24m\x1b[J👾:~/repo\r\n$ '
     mockPtys[0]?.emitData(prompt)
 
-    const attach = await host.attach('client_1', OWNER_1, { sessionId, cols: 80, rows: 24 })
+    const attach = await host.attach('client_1', OWNER_1, {
+      sessionId,
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_a',
+    })
     const snapshot = await host.getSessionSnapshot('client_1', OWNER_1, { sessionId })
 
     expect(attach.ok).toBe(true)
     if (!attach.ok) return
     expect(attach.snapshot).toBe('👾:~/repo\r\n$ ')
     expect(snapshot?.snapshot).toBe('👾:~/repo\r\n$ ')
+    host.unregisterSocket('client_1', 'attachment_a', OWNER_1, socket)
     shutdown()
   })
 
-  test('reattaching the grace controller restores connected ownership and canonical geometry', async () => {
+  test('reattaching after a disconnect auto-reclaims ownership and canonical geometry', async () => {
+    // The previous revision had a 30s grace sub-state that kept the
+    // controller slot occupied between disconnect and reconnect. The
+    // current model clears the slot on disconnect (no grace) and
+    // treats a reconnect as a fresh attach — for a session that has
+    // already been claimed by the owner (claimedByOwner=true), the
+    // reattach auto-claims.
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_1', 'attachment_a', OWNER_1, socketA)
@@ -240,11 +254,6 @@ describe('server terminal runtime', () => {
     if (!sessionId) throw new Error('expected session id')
 
     host.unregisterSocket('client_1', 'attachment_a', OWNER_1, socketA)
-    // The grace period is 30s; re-register a fresh socket before
-    // the reattach so the broker check (Bug B fix) sees the
-    // attachment as connected. The old stub always returned `true`
-    // for any attachmentId; method 2 makes the broker the source
-    // of truth, so a live socket is required.
     const socketA2 = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_1', 'attachment_a', OWNER_1, socketA2)
 
@@ -342,9 +351,14 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_1', 'attachment_a', OWNER_1, socket)
-    const sessionId = await createTerminalSession(host, 'client_1')
+    const sessionId = await createTerminalSession(host, 'client_1', 'attachment_a')
 
-    const result = await host.attach('client_1', OWNER_1, { sessionId, cols: 80, rows: 24 })
+    const result = await host.attach('client_1', OWNER_1, {
+      sessionId,
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_a',
+    })
     expect(result.ok).toBe(true)
 
     mockPtys[0]?.emitData('hello')
@@ -756,9 +770,14 @@ describe('server terminal runtime', () => {
     const socketB = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_1', 'attachment_a', OWNER_1, socketA)
     host.registerSocket('client_2', 'attachment_b', OWNER_1, socketB)
-    const sessionId = await createTerminalSession(host, 'client_1')
+    const sessionId = await createTerminalSession(host, 'client_1', 'attachment_a')
 
-    const result = await host.attach('client_1', OWNER_1, { sessionId, cols: 80, rows: 24 })
+    const result = await host.attach('client_1', OWNER_1, {
+      sessionId,
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_a',
+    })
     expect(result.ok).toBe(true)
 
     const sessions = await host.listSessions('client_2', OWNER_1, '/repo')
@@ -843,9 +862,14 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_1', 'attachment_a', OWNER_1, socket)
-    const sessionId = await createTerminalSession(host, 'client_1')
+    const sessionId = await createTerminalSession(host, 'client_1', 'attachment_a')
 
-    const first = await host.attach('client_1', OWNER_1, { sessionId, cols: 80, rows: 24 })
+    const first = await host.attach('client_1', OWNER_1, {
+      sessionId,
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_a',
+    })
     expect(first.ok).toBe(true)
     expect(mockPtys).toHaveLength(1)
 
@@ -856,11 +880,12 @@ describe('server terminal runtime', () => {
 
     const socket2 = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_1', 'attachment_b', OWNER_1, socket2)
-    const recreatedSessionId = await createTerminalSession(host, 'client_1')
+    const recreatedSessionId = await createTerminalSession(host, 'client_1', 'attachment_b')
     const replacementAttach = await host.attach('client_1', OWNER_1, {
       sessionId: recreatedSessionId,
       cols: 80,
       rows: 24,
+      attachmentId: 'attachment_b',
     })
     expect(replacementAttach.ok).toBe(true)
     if (!first.ok || !replacementAttach.ok) return
@@ -870,7 +895,12 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('a released controller does not implicitly regain control on reattach, but can takeover explicitly', async () => {
+  test('after the controller disconnects, a sibling attachment auto-claims on attach (single-owner)', async () => {
+    // Device-switch scenario in the new model: A was the controller
+    // (from create); A's socket closes; B (a different attachmentId)
+    // attaches. The previous revision refused the auto-claim because
+    // the slot was still in the 30s grace sub-state. The current
+    // model clears the slot on disconnect, so B's attach auto-claims.
     vi.useFakeTimers()
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
@@ -889,76 +919,139 @@ describe('server terminal runtime', () => {
     if (!created.ok) return
     const sessionId = created.sessions[0]?.sessionId
     if (!sessionId) throw new Error('expected session id')
-    host.registerSocket('client_1', 'attachment_b', OWNER_1, socketB)
 
+    host.unregisterSocket('client_1', 'attachment_a', OWNER_1, socketA)
+
+    // B comes online and attaches — no explicit takeover needed
+    // because the slot was cleared on A's disconnect.
+    host.registerSocket('client_1', 'attachment_b', OWNER_1, socketB)
     const viewerAttach = await host.attach('client_1', OWNER_1, {
       sessionId,
       cols: 120,
       rows: 40,
       attachmentId: 'attachment_b',
     })
-    expect(viewerAttach.ok).toBe(true)
+    expect(viewerAttach).toMatchObject({
+      ok: true,
+      sessionId,
+      controller: { attachmentId: 'attachment_b', status: 'connected' },
+      canonicalCols: 120,
+      canonicalRows: 40,
+    })
 
+    host.unregisterSocket('client_1', 'attachment_b', OWNER_1, socketB)
+    shutdown()
+  })
+
+  test('a late-returning original controller stays a viewer once a sibling has claimed the slot (no grace restore)', async () => {
+    // The new owner-sticky model clears the controller slot on
+    // disconnect with no grace period. If a sibling attachment
+    // attaches in the window before the original controller
+    // reconnects, the sibling claims the slot. When the original
+    // controller eventually reconnects, it is a viewer — the
+    // previous design's grace restore ("same attachmentId keeps
+    // control after a brief disconnect") does not apply. The
+    // design-doc rule that wins here is "most recent write intent
+    // wins" — the sibling's attach is the more recent intent.
+    //
+    // The renderer's AuthorityGate handles the recovery path: a
+    // write from the late-returning attachment triggers a takeover
+    // round-trip (asserted in the authority-gate tests). This
+    // runtime test pins down the server-side state after the
+    // reconnect so the contract is explicit.
+    vi.useFakeTimers()
+    const { host, shutdown } = buildRuntime()
+    const socketA = { send: vi.fn(), close: vi.fn() }
+    const socketB = { send: vi.fn(), close: vi.fn() }
+    const socketAReconnect = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_1', 'attachment_a', OWNER_1, socketA)
+    const created = await host.create('client_1', OWNER_1, {
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'additional',
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_a',
+    })
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+    const sessionId = created.sessions[0]?.sessionId
+    if (!sessionId) throw new Error('expected session id')
+
+    // A disconnects; B attaches and claims the now-empty slot.
     host.unregisterSocket('client_1', 'attachment_a', OWNER_1, socketA)
-    await vi.advanceTimersByTimeAsync(30_000 + 1)
-    await vi.runOnlyPendingTimersAsync()
-    await Promise.resolve()
+    host.registerSocket('client_1', 'attachment_b', OWNER_1, socketB)
+    const bAttach = await host.attach('client_1', OWNER_1, {
+      sessionId,
+      cols: 120,
+      rows: 40,
+      attachmentId: 'attachment_b',
+    })
+    expect(bAttach).toMatchObject({
+      ok: true,
+      controller: { attachmentId: 'attachment_b', status: 'connected' },
+    })
 
-    const afterRelease = await host.listSessions('client_1', OWNER_1, '/repo')
-    expect(afterRelease).toEqual([
+    // A reconnects later. The slot is held by B; A's attach must
+    // NOT preempt B — A becomes a viewer.
+    host.registerSocket('client_1', 'attachment_a', OWNER_1, socketAReconnect)
+    const aReattach = await host.attach('client_1', OWNER_1, {
+      sessionId,
+      cols: 80,
+      rows: 24,
+      attachmentId: 'attachment_a',
+    })
+    expect(aReattach).toMatchObject({
+      ok: true,
+      sessionId,
+      // A's view sees B still in control.
+      controller: { attachmentId: 'attachment_b', status: 'connected' },
+    })
+
+    // And A's write is rejected — server-side authority check fails
+    // with not-controller. The renderer-side AuthorityGate catches
+    // this and fires a takeover before retrying; this test pins the
+    // server invariant.
+    const aWrite = host.write('client_1', OWNER_1, {
+      sessionId,
+      data: 'ls\n',
+      attachmentId: 'attachment_a',
+    })
+    expect(aWrite).toBe(false)
+
+    // B's write still works.
+    const bWrite = host.write('client_1', OWNER_1, {
+      sessionId,
+      data: 'pwd\n',
+      attachmentId: 'attachment_b',
+    })
+    expect(bWrite).toBe(true)
+
+    // listSessions confirms the global view: B is the controller,
+    // canonical geometry follows B (the most recent writer).
+    const sessions = await host.listSessions('client_1', OWNER_1, '/repo')
+    expect(sessions).toEqual([
       expect.objectContaining({
         sessionId,
-        controller: null,
-        cols: 80,
-        rows: 24,
+        controller: { attachmentId: 'attachment_b', status: 'connected' },
+        cols: 120,
+        rows: 40,
       }),
     ])
-
-    const reattach = await host.attach('client_1', OWNER_1, {
-      sessionId,
-      cols: 101,
-      rows: 31,
-      attachmentId: 'attachment_a',
-    })
-    expect(reattach).toMatchObject({
-      ok: true,
-      sessionId,
-      controller: null,
-      canonicalCols: 80,
-      canonicalRows: 24,
-    })
-
-    // Re-register the socket for `attachment_a` before the
-    // explicit takeover. Under method 2 the broker check is the
-    // source of truth for the attachment's `connected` state;
-    // without a live socket the takeover would now (correctly)
-    // reject as a no-op — see Bug D fix.
-    const socketAReconnect = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_1', 'attachment_a', OWNER_1, socketAReconnect)
-
-    const takeover = host.takeover('client_1', OWNER_1, {
-      sessionId,
-      cols: 101,
-      rows: 31,
-      attachmentId: 'attachment_a',
-    })
-    expect(takeover).toEqual({
-      ok: true,
-      sessionId,
-      role: 'controller',
-      controllerStatus: 'connected',
-      controller: { attachmentId: 'attachment_a', status: 'connected' },
-      canonicalCols: 101,
-      canonicalRows: 31,
-      phase: 'open',
-    })
 
     host.unregisterSocket('client_1', 'attachment_a', OWNER_1, socketAReconnect)
     host.unregisterSocket('client_1', 'attachment_b', OWNER_1, socketB)
     shutdown()
   })
 
-  test('expiring a disconnected viewer attachment leaves the current controller unchanged', async () => {
+  test('disconnecting a viewer leaves the current controller unchanged', async () => {
+    // The previous revision had a grace sub-state that, on expiry,
+    // would remove the disconnected viewer via `expireAttachment`.
+    // The current model has no per-attachment grace — only the
+    // detached TTL fires (after 24h), which is far longer than the
+    // test. The relevant invariant is that disconnecting a viewer
+    // doesn't disturb the controller.
     vi.useFakeTimers()
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
@@ -988,8 +1081,9 @@ describe('server terminal runtime', () => {
     expect(viewerAttach.ok).toBe(true)
 
     host.unregisterSocket('client_1', 'attachment_b', OWNER_1, socketB)
-    await vi.advanceTimersByTimeAsync(30_000 + 1)
-    await vi.runOnlyPendingTimersAsync()
+    // The detached TTL is 24h — far longer than any grace we used
+    // to have. Run a small tick to flush the socket-disconnect
+    // microtask without firing any timer.
     await Promise.resolve()
 
     const sessionsAfterExpiry = await host.listSessions('client_1', OWNER_1, '/repo')

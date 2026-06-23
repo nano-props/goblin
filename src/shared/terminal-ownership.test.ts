@@ -21,9 +21,9 @@ describe('shared terminal ownership helpers', () => {
       role: 'unowned',
       controllerStatus: 'none',
     })
-    expect(resolveTerminalOwnership({ attachmentId: 'attachment_a', status: 'grace' }, 'attachment_b')).toEqual({
+    expect(resolveTerminalOwnership({ attachmentId: 'attachment_a', status: 'connected' }, 'attachment_b')).toEqual({
       role: 'viewer',
-      controllerStatus: 'grace',
+      controllerStatus: 'connected',
     })
   })
 

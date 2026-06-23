@@ -34,7 +34,7 @@ const TERMINAL_SOCKET_ACTIONS = [
   'prune',
   'session-snapshot',
 ] as const satisfies TerminalSocketRequestAction[]
-const TERMINAL_CONNECTED_CONTROLLER_STATUS_VALUES = ['connected', 'grace'] satisfies Exclude<
+const TERMINAL_CONNECTED_CONTROLLER_STATUS_VALUES = ['connected'] satisfies Exclude<
   TerminalControllerStatus,
   'none'
 >[]

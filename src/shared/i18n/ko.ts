@@ -313,8 +313,8 @@ export const ko: Record<DictKey, string> = {
   'terminal.progress': '터미널 진행률',
   'terminal.empty': '열린 터미널 없음',
   'terminal.drop-hint': '놓아서 경로 붙여넣기',
-  'terminal.mirror-controlled': '다른 창이나 탭이 현재 이 터미널을 제어하고 있습니다.',
-  'terminal.unowned': '현재 이 터미널을 제어하는 창이 없습니다.',
+  'terminal.mirror-controlled': '다른 세션이 현재 이 터미널을 제어하고 있습니다.',
+  'terminal.unowned': '현재 이 터미널을 제어하는 세션이 없습니다.',
   'terminal.takeover': '터미널 제어 가져오기',
   'terminal.takeover-failed':
     '터미널을 제어할 수 없습니다. 터미널이 닫혔거나 연결이 아직 준비되지 않았을 수 있습니다. 다시 시도하세요.',

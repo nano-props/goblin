@@ -97,7 +97,7 @@ describe('TerminalSessionState', () => {
       processName: 'zsh',
       canonicalTitle: '~/Developer/goblin — npm run dev',
       role: 'viewer',
-      controllerStatus: 'grace',
+      controllerStatus: 'connected',
       canonicalCols: 120,
       canonicalRows: 40,
     })
@@ -115,7 +115,7 @@ describe('TerminalSessionState', () => {
       canonicalTitle: '~/Developer/goblin — npm run dev',
       attachment: {
         role: 'viewer',
-        controllerStatus: 'grace',
+        controllerStatus: 'connected',
         active: false,
         canTakeover: true,
         canonicalCols: 120,

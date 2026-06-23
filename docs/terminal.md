@@ -146,8 +146,8 @@ Ownership is a business concept, not just a transport detail.
 
 - Only the controller may drive PTY writes and PTY resize.
 - Attach may result in controller, viewer, or unowned state.
-- Temporary disconnect should not immediately destroy ownership; graceful reconnect matters.
-- Takeover should be explicit and confirmed by server-owned ownership state.
+- On disconnect, the controller slot clears immediately; the per-session `claimedByOwner` flag stays set so a subsequent attach from any of the owner's attachments auto-claims when no controller is present.
+- Takeover should be explicit and confirmed by server-owned ownership state. See `terminal-takeover.md` for the model.
 
 ### Why this matters
 
@@ -300,7 +300,7 @@ The terminal system should optimize for continuity, but it still needs clear fai
 ### Design expectations
 
 - Failed create or restart must not leave zombie sessions presented as healthy terminals.
-- Disconnect should prefer grace and reattach over eager destruction.
+- Disconnect should not destroy the session itself: a 24h detached TTL keeps the catalog alive so a later attach from the same owner can re-enter via auto-claim. The controller slot, however, clears on disconnect so siblings can claim it without waiting.
 - View destruction should clean up local resources without corrupting session state.
 - Server shutdown should end the runtime cleanly and stop further dispatch.
 

@@ -1,0 +1,243 @@
+import { readOrCreateWebTerminalAttachmentId } from '#/web/renderer-terminal-bridge.ts'
+import { terminalLog } from '#/web/logger.ts'
+import type { RendererTerminalBridge } from '#/web/renderer-bridge-types.ts'
+import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
+
+/**
+ * `AuthorityGate` is the single source of truth for "can I write to
+ * the terminal right now?" It is shared by every write path the
+ * renderer exposes — xterm onData, paste, file drop, the manual
+ * "接管" button — so the auto-promote behavior lives in one place
+ * instead of being duplicated across call sites.
+ *
+ * Model (matches `src/server/terminal/terminal-ownership.ts`):
+ * the server is owner-scoped. Every attachmentId from the same
+ * ownerId is the same logical user. If the server believes the
+ * caller is the controller, writes pass through; if the caller is
+ * a viewer (someone else — including a sibling device — is
+ * currently the controller), the gate issues an explicit takeover
+ * round-trip first and then forwards the write. The result of the
+ * promote is surfaced to the caller via `AuthorizationResult` so the
+ * UI can show a toast on the rare failure path.
+ *
+ * The gate is intentionally synchronous for "is controller?": the
+ * realtime ownership event pushes role changes into `setRole`, and
+ * read paths (`isController`, `canWrite`) just return the cached
+ * value. The only async path is `authorize` / `takeover`, both of
+ * which hit the bridge.
+ */
+/**
+ * Reasons a write or takeover was denied. Surfaced to the UI so the
+ * right toast can be shown (and to logs so the failure mode is
+ * diagnosable from production).
+ *
+ * - `session-closed` — gate-internal: the runtime no longer has a
+ *   sessionId, or the session was disposed mid-call. The takeover
+ *   round-trip never started.
+ * - `no-bridge` — gate-internal: the renderer bridge is unavailable
+ *   (typically only in tests / startup). The takeover round-trip
+ *   never started.
+ * - `session-unknown` — the server reported the sessionId is not
+ *   known to this owner. The renderer's catalog is stale; the user
+ *   needs to re-list before retrying.
+ * - `attachment-offline` — the server's broker has no live socket
+ *   for `(ownerId, attachmentId)`. The renderer is reconnecting.
+ *   Retrying after a moment usually works.
+ * - `takeover-rejected` — catch-all for any other server-side
+ *   refusal (size out of range, validator rejection, etc.). The
+ *   `message` field carries the server's i18n key.
+ */
+export type AuthorizationDenialReason =
+  | 'session-closed'
+  | 'no-bridge'
+  | 'session-unknown'
+  | 'attachment-offline'
+  | 'takeover-rejected'
+
+export type AuthorizationResult =
+  | { kind: 'allowed' }
+  | { kind: 'promoted' }
+  | { kind: 'denied'; reason: AuthorizationDenialReason; message?: string }
+
+export interface TerminalAuthorityGate {
+  /** True when the cached role says we're the controller. */
+  isController(): boolean
+  /**
+   * True when we can write — either we're the controller already, or
+   * we know we're a viewer and the gate will auto-promote on the
+   * next `authorize` call. False only while the session is unowned
+   * AND we haven't even attached yet.
+   */
+  canWrite(): boolean
+  /**
+   * Pre-write hook. Returns `allowed` when we're already the
+   * controller (writes may proceed without a server round-trip).
+   * Returns `promoted` after a successful viewer→controller
+   * takeover (the caller should now retry or proceed with the
+   * write). Returns `denied` when the session vanished or the
+   * takeover was rejected.
+   */
+  authorize(action: 'write' | 'resize'): Promise<AuthorizationResult>
+  /**
+   * Explicit takeover — used by the 接管 button, by keyboard
+   * shortcuts, and by any other "I want control right now" path.
+   * Internal callers go through `authorize` for write/resize so the
+   * promote + retry pattern stays centralized.
+   *
+   * Returns the structured outcome (an `AuthorizationResult` with
+   * only `allowed` or `denied` in practice — `promoted` is
+   * write-specific) so the caller can surface a specific toast for
+   * the failure mode and log the server's i18n key.
+   */
+  takeover(): Promise<AuthorizationResult>
+  /**
+   * Push the latest role the server believes this attachmentId has.
+   * Called by the realtime ownership event handler in
+   * `ManagedTerminalSession.handleOwnership`.
+   */
+  setRole(role: 'controller' | 'viewer' | 'unowned'): void
+  /**
+   * Current cached role (last value fed to `setRole`). For tests
+   * and diagnostic surfaces; production code should branch on
+   * `isController` / `canWrite` instead.
+   */
+  currentRole(): 'controller' | 'viewer' | 'unowned'
+}
+
+interface XtermAuthorityGateOptions {
+  bridge: RendererTerminalBridge
+  resolveSize: () => Promise<{ cols: number; rows: number }>
+  /**
+   * Non-throwing predicate: returns true while the session is
+   * still the one this gate belongs to and the parent hasn't been
+   * disposed. Used to short-circuit `doTakeover` if the session
+   * vanished between the caller queuing a keystroke and the bridge
+   * round-trip resolving. The previous name `assertSessionAlive`
+   * was misleading — this never throws, it just returns false.
+   */
+  isSessionAlive: (sessionId: string) => boolean
+  getSessionId: () => string | null
+  /** Called after a successful auto-promote so the caller can apply
+   *  the post-takeover frame (similar to `applyTakeover` on the
+   *  runtime) without coupling the gate to the runtime type. */
+  onPromoted?: (result: TerminalTakeoverResult) => void
+}
+
+/**
+ * Default implementation. One instance per `ManagedTerminalSession`
+ * — the registry constructs them when a session becomes active.
+ */
+export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): TerminalAuthorityGate {
+  let role: 'controller' | 'viewer' | 'unowned' = 'unowned'
+
+  function readAttachmentId(): string {
+    return readOrCreateWebTerminalAttachmentId()
+  }
+
+  return {
+    isController: () => role === 'controller',
+    canWrite: () => role === 'controller' || role === 'viewer',
+    currentRole: () => role,
+
+    setRole(next) {
+      role = next
+    },
+
+    async authorize(action) {
+      if (role === 'controller') return { kind: 'allowed' }
+      if (role === 'unowned') return { kind: 'denied', reason: 'session-closed' }
+      // role === 'viewer': auto-promote
+      const takeover = await doTakeover()
+      if (takeover.kind === 'allowed') return { kind: 'promoted' }
+      return takeover
+    },
+
+    async takeover() {
+      return await doTakeover()
+    },
+  }
+
+  /**
+   * Single deny-path helper: emits a structured `warn` (so ops can
+   * correlate with the i18n key in the `message` field) and returns
+   * the matching `AuthorizationResult`. The `stage` tag is the only
+   * diagnostic the helper adds — it tells the operator which step
+   * in the takeover pipeline produced the denial (preflight /
+   * resolveSize / bridge / server) without forcing the call site
+   * to invent a new log message per branch.
+   */
+  function deny(
+    reason: AuthorizationDenialReason,
+    stage: string,
+    extra: { sessionId?: string; message?: string; err?: unknown } = {},
+  ): { kind: 'denied'; reason: AuthorizationDenialReason; message?: string } {
+    terminalLog.warn('authority gate: takeover denied', {
+      reason,
+      stage,
+      ...(extra.sessionId !== undefined ? { sessionId: extra.sessionId } : {}),
+      ...(extra.message !== undefined ? { message: extra.message } : {}),
+      ...(extra.err !== undefined ? { err: extra.err } : {}),
+    })
+    return extra.message !== undefined
+      ? { kind: 'denied', reason, message: extra.message }
+      : { kind: 'denied', reason }
+  }
+
+  async function doTakeover(): Promise<AuthorizationResult> {
+    const sessionId = opts.getSessionId()
+    if (!sessionId) return deny('session-closed', 'preflight')
+    if (!opts.isSessionAlive(sessionId)) return deny('session-closed', 'isSessionAlive', { sessionId })
+    let size: { cols: number; rows: number }
+    try {
+      size = await opts.resolveSize()
+    } catch (err) {
+      return deny('takeover-rejected', 'resolveSize', { sessionId, err })
+    }
+    let result: TerminalTakeoverResult
+    try {
+      result = await opts.bridge.takeover({
+        sessionId,
+        cols: size.cols,
+        rows: size.rows,
+        attachmentId: readAttachmentId(),
+      })
+    } catch (err) {
+      return deny('no-bridge', 'bridge', { sessionId, err })
+    }
+    if (!result.ok) {
+      return deny(classifyTakeoverRejection(result.message), 'server', {
+        sessionId,
+        message: result.message,
+      })
+    }
+    // ORDERING CONTRACT: `onPromoted` MUST run before `role` is
+    // flipped to 'controller'. Callers of `takeover()` /
+    // `authorize('write')` rely on the post-call `canWrite()`
+    // returning true without a separate realtime ownership event.
+    // The runtime's `applyTakeover` (wired through `onPromoted`)
+    // updates the runtime's controller cache synchronously, so by
+    // the time the gate sets `role = 'controller'`, both layers
+    // agree. Moving the assignment above `onPromoted` (or deferring
+    // it past the await chain) would break the round-trip-free
+    // recovery path that lets a viewer type into a fresh keystroke
+    // and have it land without seeing a transient "denied".
+    opts.onPromoted?.(result)
+    role = 'controller'
+    return { kind: 'allowed' }
+  }
+}
+
+/**
+ * Classify a server-side takeover rejection message into a UI-friendly
+ * reason. The server returns i18n keys; only two are used in the
+ * takeover failure paths today (`error.unavailable` for the
+ * "attachment not connected" path, and `error.invalid-arguments`
+ * for everything else, including unknown session/attachment). The
+ * catch-all `takeover-rejected` is preserved so a future server
+ * message key can land without a renderer change.
+ */
+function classifyTakeoverRejection(message: string): AuthorizationDenialReason {
+  if (message === 'error.unavailable') return 'attachment-offline'
+  if (message === 'error.invalid-arguments') return 'session-unknown'
+  return 'takeover-rejected'
+}

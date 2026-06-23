@@ -16,10 +16,10 @@ import type {
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
 import {
-  isValidTerminalAttachmentId,
   isValidTerminalSessionId,
   isValidTerminalSize,
 } from '#/shared/terminal-validators.ts'
+import { isValidTerminalSocketAttachmentId } from '#/server/terminal/terminal-runtime-support.ts'
 import type { TerminalRealtimeBroker } from '#/server/terminal/terminal-realtime-broker.ts'
 import { isValidTerminalWriteData, type TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 
@@ -50,7 +50,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         !isValidTerminalClientId(clientId) ||
         !isValidTerminalSessionId(input?.sessionId) ||
         !isValidTerminalSize(input?.cols, input?.rows) ||
-        !isValidTerminalAttachmentId(input?.attachmentId)
+        !isValidTerminalSocketAttachmentId(input?.attachmentId)
       ) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
@@ -71,7 +71,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         !isValidTerminalClientId(clientId) ||
         !isValidTerminalSessionId(input?.sessionId) ||
         !isValidTerminalSize(input?.cols, input?.rows) ||
-        !isValidTerminalAttachmentId(input?.attachmentId)
+        !isValidTerminalSocketAttachmentId(input?.attachmentId)
       ) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
@@ -104,7 +104,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       if (
         !isValidTerminalSessionId(input?.sessionId) ||
         !isValidTerminalWriteData(input?.data) ||
-        !isValidTerminalAttachmentId(input?.attachmentId)
+        !isValidTerminalSocketAttachmentId(input?.attachmentId)
       ) {
         return false
       }
@@ -116,7 +116,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       if (
         !isValidTerminalSessionId(input?.sessionId) ||
         !isValidTerminalSize(input?.cols, input?.rows) ||
-        !isValidTerminalAttachmentId(input?.attachmentId)
+        !isValidTerminalSocketAttachmentId(input?.attachmentId)
       ) {
         return false
       }
@@ -164,7 +164,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       if (
         !isValidTerminalSessionId(input?.sessionId) ||
         !isValidTerminalSize(input?.cols, input?.rows) ||
-        !isValidTerminalAttachmentId(input?.attachmentId)
+        !isValidTerminalSocketAttachmentId(input?.attachmentId)
       ) {
         return { ok: false, message: 'error.invalid-arguments' }
       }

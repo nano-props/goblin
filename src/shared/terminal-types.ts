@@ -1,6 +1,12 @@
 import type { WorkspacePaneViewType } from '#/shared/workspace-pane.ts'
 
-export type TerminalControllerStatus = 'connected' | 'grace' | 'none'
+/**
+ * `controllerStatus === 'connected'` while the controller's attachment has
+ * a live socket. The server clears the controller slot on disconnect
+ * (no grace), so the only transient state the renderer needs to render is
+ * `connected` vs `none`.
+ */
+export type TerminalControllerStatus = 'connected' | 'none'
 export type TerminalAttachmentRole = 'controller' | 'viewer' | 'unowned'
 export type TerminalSessionPhase = 'opening' | 'restarting' | 'open' | 'error' | 'closed'
 
@@ -62,7 +68,7 @@ export type TerminalTakeoverResult =
       ok: true
       sessionId: string
       role: 'controller' | 'viewer' | 'unowned'
-      controllerStatus: 'connected' | 'grace' | 'none'
+      controllerStatus: 'connected' | 'none'
       controller: TerminalController | null
       canonicalCols: number
       canonicalRows: number
