@@ -40,7 +40,7 @@ const DEFAULT_PARKING_HEIGHT = 400
 const RESIZE_DEBOUNCE_MS = 80
 const FONT_REMEASURE_DEBOUNCE_MS = 80
 
-export class TerminalSessionView {
+export class TerminalSlotView {
   private readonly frame: HTMLDivElement
   private readonly xtermHost: HTMLDivElement
   private readonly parkingElement: HTMLDivElement

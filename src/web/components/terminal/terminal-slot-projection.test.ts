@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   projectServerTerminalSession,
   projectTerminalAttachResultForClient,
-} from '#/web/components/terminal/terminal-session-projection.ts'
+} from '#/web/components/terminal/terminal-slot-projection.ts'
 import type { TerminalRepoIndex } from '#/web/components/terminal/types.ts'
 
 const REPO_ROOT = '/repo'

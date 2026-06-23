@@ -7,7 +7,7 @@ import { useKeyboard } from '#/web/hooks/useKeyboard.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { setTerminalSlotCommandBridge } from '#/web/components/terminal/terminal-slot-command-bridge.ts'
 import type { WorktreeTerminalSnapshot } from '#/web/components/terminal/types.ts'
 import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
 
@@ -36,7 +36,7 @@ afterEach(() => {
   act(() => {
     root?.unmount()
   })
-  setTerminalSessionCommandBridge(null)
+  setTerminalSlotCommandBridge(null)
   delete testWindow.goblinNative
   container?.remove()
   root = null
@@ -70,7 +70,7 @@ describe('useKeyboard', () => {
     })
     const selectTerminal = vi.fn()
     const showRepoWorkspacePaneView = vi.fn()
-    setTerminalSessionCommandBridge({
+    setTerminalSlotCommandBridge({
       worktreeSnapshot: () => worktreeSnapshot(),
       createTerminal: vi.fn(async () => 'slot-1'),
       selectTerminal,
@@ -129,7 +129,7 @@ describe('useKeyboard', () => {
     })
     const selectTerminal = vi.fn()
     const showRepoWorkspacePaneView = vi.fn()
-    setTerminalSessionCommandBridge({
+    setTerminalSlotCommandBridge({
       worktreeSnapshot: () => worktreeSnapshot(),
       createTerminal: vi.fn(async () => 'slot-1'),
       selectTerminal,
@@ -165,7 +165,7 @@ describe('useKeyboard', () => {
     })
     const createTerminal = vi.fn(async () => 'slot-2')
     const closeTerminalByDescriptor = vi.fn()
-    setTerminalSessionCommandBridge({
+    setTerminalSlotCommandBridge({
       worktreeSnapshot: () => worktreeSnapshot(),
       createTerminal,
       selectTerminal: vi.fn(),
@@ -192,7 +192,7 @@ describe('useKeyboard', () => {
       preferredWorkspacePaneView: 'terminal',
     })
     const closeTerminalByDescriptor = vi.fn()
-    setTerminalSessionCommandBridge({
+    setTerminalSlotCommandBridge({
       worktreeSnapshot: () => worktreeSnapshot(),
       createTerminal: vi.fn(async () => 'slot-1'),
       selectTerminal: vi.fn(),

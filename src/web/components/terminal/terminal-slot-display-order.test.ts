@@ -3,7 +3,7 @@ import {
   restoreDisplayOrder,
   snapshotDisplayOrder,
   terminalSessionDisplayOrder,
-} from '#/web/components/terminal/terminal-session-display-order.ts'
+} from '#/web/components/terminal/terminal-slot-display-order.ts'
 
 describe('terminal session display order helpers', () => {
   test('derives display rank from persisted order or descriptor index fallback', () => {

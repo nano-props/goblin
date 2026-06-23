@@ -15,13 +15,13 @@ import { preloadTerminalFont, proposeTerminalGeometry } from '#/web/components/t
 import {
   TerminalHostNotMeasurableError,
   waitForMeasurableHost,
-} from '#/web/components/terminal/terminal-session-geometry.ts'
+} from '#/web/components/terminal/terminal-slot-geometry.ts'
 import {
   projectTerminalAttachResultForClient,
   type TerminalAttachResultWithOwnership,
-} from '#/web/components/terminal/terminal-session-projection.ts'
-import { TerminalSessionRuntime } from '#/web/components/terminal/terminal-session-runtime.ts'
-import { TerminalSessionView } from '#/web/components/terminal/terminal-session-view.ts'
+} from '#/web/components/terminal/terminal-slot-projection.ts'
+import { TerminalSessionRuntime } from '#/web/components/terminal/terminal-slot-runtime.ts'
+import { TerminalSlotView } from '#/web/components/terminal/terminal-slot-view.ts'
 import { isTerminalEmulatorInput, type TerminalInput } from '#/web/components/terminal/terminal-input.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/renderer-terminal-bridge.ts'
 import { createXtermAuthorityGate, type TerminalAuthorityGate } from '#/web/components/terminal/authority-gate.ts'
@@ -43,7 +43,7 @@ export class ManagedTerminalSession {
   private readonly onBell: ((descriptor: TerminalDescriptor, event: TerminalBellEvent) => void) | null
   private readonly requestDurableClose: (ptySessionId: string) => Promise<void>
   private readonly runtime = new TerminalSessionRuntime()
-  private readonly view: TerminalSessionView
+  private readonly view: TerminalSlotView
   // Authority gate owns the "am I the controller?" cache and the
   // auto-promote-on-write path. The gate is constructed lazily so
   // the runtime/bridge dependency wiring stays inside the methods
@@ -75,14 +75,14 @@ export class ManagedTerminalSession {
     // fire-and-forget. The old `void … .catch(() => {})` path could
     // drop the request if the WebSocket was already closing, leaving
     // the server PTY alive and the next create reattaching to the
-    // orphan. See `TerminalSessionRegistry.pendingCloseBySessionId`.
+    // orphan. See `TerminalSlotRegistry.pendingCloseBySessionId`.
     requestDurableClose: (ptySessionId: string) => Promise<void> = () => Promise.resolve(),
   ) {
     this.descriptor = descriptor
     this.notify = notify
     this.onBell = onBell
     this.requestDurableClose = requestDurableClose
-    this.view = new TerminalSessionView({
+    this.view = new TerminalSlotView({
       onInput: (data) => this.writeInput(data),
       onBell: () => this.handleBell(),
       onResize: ({ cols, rows }) => this.queueResize(cols, rows),

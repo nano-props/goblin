@@ -1,9 +1,9 @@
 import { setTerminalFocused } from '#/web/terminal-focus.ts'
-import { terminalSessionProviderLog } from '#/web/logger.ts'
-import { ManagedTerminalSession } from '#/web/components/terminal/ManagedTerminalSession.ts'
+import { terminalSlotProviderLog } from '#/web/logger.ts'
+import { ManagedTerminalSession } from '#/web/components/terminal/ManagedTerminalSlot.ts'
 import { createTerminalBellController } from '#/web/components/terminal/terminal-bell-controller.ts'
 import { terminalDescriptor } from '#/web/components/terminal/terminal-descriptor.ts'
-import { parseWorktreeKey, worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
+import { parseWorktreeKey, worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/renderer-terminal-bridge.ts'
 import { parseTerminalSlotKey } from '#/shared/terminal-slot-key.ts'
@@ -15,27 +15,27 @@ import { branchForTerminalWorktree } from '#/web/components/terminal/terminal-re
 import {
   projectServerTerminalSession,
   type ReattachSnapshotCacheEntry,
-} from '#/web/components/terminal/terminal-session-projection.ts'
+} from '#/web/components/terminal/terminal-slot-projection.ts'
 import { userTerminalInput, type TerminalUserInputSource } from '#/web/components/terminal/terminal-input.ts'
-import { terminalSessionDisplayOrder } from '#/web/components/terminal/terminal-session-display-order.ts'
+import { terminalSessionDisplayOrder } from '#/web/components/terminal/terminal-slot-display-order.ts'
 import {
   captureTerminalHostGeometry,
   resolveTerminalCreateGeometry,
   waitForMeasurableHost,
-} from '#/web/components/terminal/terminal-session-geometry.ts'
+} from '#/web/components/terminal/terminal-slot-geometry.ts'
 import {
   countOrphanedTerminalSlotKeys,
   resolveAdjacentTerminalSelectionAfterRemoval,
-} from '#/web/components/terminal/terminal-session-eviction.ts'
-import { syncTerminalSessionIdIndex } from '#/web/components/terminal/terminal-session-index.ts'
-import { resolveSelectedTerminalKey } from '#/web/components/terminal/terminal-session-selection.ts'
-import { buildWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-worktree-snapshot.ts'
+} from '#/web/components/terminal/terminal-slot-eviction.ts'
+import { syncTerminalSessionIdIndex } from '#/web/components/terminal/terminal-slot-index.ts'
+import { resolveSelectedTerminalKey } from '#/web/components/terminal/terminal-slot-selection.ts'
+import { buildWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-slot-worktree-snapshot.ts'
 import type {
   TerminalDescriptor,
   TerminalOwnershipViewModel,
   TerminalRepoIndex,
   WorktreeTerminalSnapshot,
-  TerminalSessionBase,
+  TerminalSlotBase,
   TerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
 
@@ -49,9 +49,9 @@ const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
  * Renderer-level authority for terminal session state.
  *
  * **Lifetime**: renderer-level singleton — one instance per renderer
- * process, created on first access via `getTerminalSessionRegistry(...)`,
+ * process, created on first access via `getTerminalSlotRegistry(...)`,
  * lives until the process tears down. The class is intentionally
- * Provider-independent: `TerminalSessionProvider` is just a wiring
+ * Provider-independent: `TerminalSlotProvider` is just a wiring
  * adapter that forwards bridge events into the singleton and exposes
  * its API via React context. A dev-mode React StrictMode re-mount of
  * the Provider must NOT recreate the registry — see
@@ -64,10 +64,10 @@ const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
  * required a `pendingRegistryDestroyRef + setTimeout(0)` debounce to
  * survive StrictMode; the singleton removes that dance entirely.
  */
-export class TerminalSessionRegistry {
+export class TerminalSlotRegistry {
   private readonly getCurrentRepoId: () => string | null
   private readonly onSelectedWorktreeChange: (worktreeTerminalKey: string, key: string | null) => void
-  private readonly onTerminalSessionRemoved: (key: string, base: TerminalSessionBase) => void
+  private readonly onTerminalSessionRemoved: (key: string, base: TerminalSlotBase) => void
   private repoIndex: TerminalRepoIndex = {}
   private parkingRoot: HTMLDivElement | null = null
   private readonly sessions = new Map<string, ManagedTerminalSession>()
@@ -81,7 +81,7 @@ export class TerminalSessionRegistry {
   private readonly pendingCreateByWorktree = new Map<
     string,
     {
-      base: TerminalSessionBase
+      base: TerminalSlotBase
       promise: Promise<string>
       resolve: (key: string) => void
       reject: (error: unknown) => void
@@ -151,7 +151,7 @@ export class TerminalSessionRegistry {
   constructor(
     getCurrentRepoId: () => string | null,
     onSelectedWorktreeChange: (worktreeTerminalKey: string, key: string | null) => void = () => {},
-    onTerminalSessionRemoved: (key: string, base: TerminalSessionBase) => void = () => {},
+    onTerminalSessionRemoved: (key: string, base: TerminalSlotBase) => void = () => {},
   ) {
     this.getCurrentRepoId = getCurrentRepoId
     this.onSelectedWorktreeChange = onSelectedWorktreeChange
@@ -178,7 +178,7 @@ export class TerminalSessionRegistry {
    *
    * Tests use `destroy()` on a per-test local instance to drain
    * pending promises and clear listener maps before the test seam
-   * (`setTerminalSessionRegistryForTests`) resets the singleton slot.
+   * (`setTerminalSlotRegistryForTests`) resets the singleton slot.
    *
    * Real production callers should only reach for this in narrowly
    * justified scenarios: a forced reset action in a dev menu, or a
@@ -398,7 +398,7 @@ export class TerminalSessionRegistry {
     }
   }
 
-  createTerminal = (base: TerminalSessionBase): Promise<string> =>
+  createTerminal = (base: TerminalSlotBase): Promise<string> =>
     this.enqueuePendingCreate(base, worktreeTerminalKey(base.repoRoot, base.worktreePath))
 
   registerHost = (worktreeTerminalKey: string, host: HTMLElement): void => {
@@ -419,7 +419,7 @@ export class TerminalSessionRegistry {
   }
 
   private async performCreateTerminal(
-    base: TerminalSessionBase,
+    base: TerminalSlotBase,
     geometry: { cols: number; rows: number },
   ): Promise<string> {
     const clientId = readOrCreateWebTerminalClientId()
@@ -522,7 +522,7 @@ export class TerminalSessionRegistry {
     // the `finally` so the post-await state matches the pre-await state.
     const geometryAbortController = new AbortController()
     pending.geometryAbortController = geometryAbortController
-    const timeoutMs = TerminalSessionRegistry.CREATE_GEOMETRY_WAIT_TIMEOUT_MS
+    const timeoutMs = TerminalSlotRegistry.CREATE_GEOMETRY_WAIT_TIMEOUT_MS
     const timeout = timeoutMs > 0 ? setTimeout(() => {
       geometryAbortController.abort(new Error(`terminal create geometry wait timed out after ${timeoutMs}ms`))
     }, timeoutMs) : null
@@ -543,7 +543,7 @@ export class TerminalSessionRegistry {
     }
   }
 
-  private enqueuePendingCreate(base: TerminalSessionBase, worktreeTerminalKey: string): Promise<string> {
+  private enqueuePendingCreate(base: TerminalSlotBase, worktreeTerminalKey: string): Promise<string> {
     const existing = this.pendingCreateByWorktree.get(worktreeTerminalKey)
     if (existing) return existing.promise
     let resolve!: (key: string) => void
@@ -657,7 +657,7 @@ export class TerminalSessionRegistry {
       // a tab close) is otherwise invisible to operators and surfaces
       // only as a confused user re-opening a tab and seeing the prior
       // shell's `Restored session: …` line print twice.
-      terminalSessionProviderLog.warn('durable close failed for terminal session', { ptySessionId, err })
+      terminalSlotProviderLog.warn('durable close failed for terminal session', { ptySessionId, err })
       entry?.reject(err)
     }
   }
@@ -728,7 +728,7 @@ export class TerminalSessionRegistry {
     this.sessions.get(key)?.scrollLines(amount)
   }
 
-  closeTerminalByDescriptor = (key: string, base: TerminalSessionBase): void => {
+  closeTerminalByDescriptor = (key: string, base: TerminalSlotBase): void => {
     const session = this.sessions.get(key)
     if (!session || session.descriptor.worktreeTerminalKey !== worktreeTerminalKey(base.repoRoot, base.worktreePath))
       return
@@ -811,7 +811,7 @@ export class TerminalSessionRegistry {
       try {
         listener()
       } catch (err) {
-        terminalSessionProviderLog.warn('worktree listener threw', { worktreeTerminalKey, err })
+        terminalSlotProviderLog.warn('worktree listener threw', { worktreeTerminalKey, err })
       }
     }
   }
@@ -823,7 +823,7 @@ export class TerminalSessionRegistry {
       try {
         listener()
       } catch (err) {
-        terminalSessionProviderLog.warn('snapshot listener threw', { key, err })
+        terminalSlotProviderLog.warn('snapshot listener threw', { key, err })
       }
     }
   }
@@ -883,7 +883,7 @@ export class TerminalSessionRegistry {
   private setReattachSnapshot(key: string, entry: ReattachSnapshotCacheEntry): void {
     if (this.reattachSnapshotCache.has(key)) this.reattachSnapshotCache.delete(key)
     this.reattachSnapshotCache.set(key, entry)
-    while (this.reattachSnapshotCache.size > TerminalSessionRegistry.REATTACH_SNAPSHOT_CACHE_HARD_CAP) {
+    while (this.reattachSnapshotCache.size > TerminalSlotRegistry.REATTACH_SNAPSHOT_CACHE_HARD_CAP) {
       const oldestKey = this.reattachSnapshotCache.keys().next().value
       if (oldestKey === undefined) break
       this.reattachSnapshotCache.delete(oldestKey)
@@ -915,11 +915,11 @@ export class TerminalSessionRegistry {
     return true
   }
 
-  private notifyTerminalSessionRemoved(key: string, base: TerminalSessionBase): void {
+  private notifyTerminalSessionRemoved(key: string, base: TerminalSlotBase): void {
     try {
       this.onTerminalSessionRemoved(key, base)
     } catch (err) {
-      terminalSessionProviderLog.warn('terminal session removal callback failed', { key, err })
+      terminalSlotProviderLog.warn('terminal session removal callback failed', { key, err })
     }
   }
 
@@ -927,7 +927,7 @@ export class TerminalSessionRegistry {
     this.removeSession(key, { dispose: true, closeSlot: true })
   }
 
-  private discardLocalSessionAndDismissDetailIfLast(key: string, base: TerminalSessionBase): void {
+  private discardLocalSessionAndDismissDetailIfLast(key: string, base: TerminalSlotBase): void {
     const session = this.sessions.get(key)
     const terminalWorktreeKey = worktreeTerminalKey(base.repoRoot, base.worktreePath)
     if (!session || session.descriptor.worktreeTerminalKey !== terminalWorktreeKey) return
@@ -1017,13 +1017,13 @@ export class TerminalSessionRegistry {
   }
 }
 
-export interface TerminalSessionRegistryDeps {
+export interface TerminalSlotRegistryDeps {
   getCurrentRepoId: () => string | null
   onSelectedWorktreeChange: (worktreeTerminalKey: string, key: string | null) => void
-  onTerminalSessionRemoved?: (key: string, base: TerminalSessionBase) => void
+  onTerminalSessionRemoved?: (key: string, base: TerminalSlotBase) => void
 }
 
-let registryInstance: TerminalSessionRegistry | null = null
+let registryInstance: TerminalSlotRegistry | null = null
 
 /**
  * Lazy getter for the renderer-level terminal session registry.
@@ -1032,14 +1032,14 @@ let registryInstance: TerminalSessionRegistry | null = null
  * call's deps are honored — subsequent calls return the existing
  * instance even if deps differ, because the singleton is meant to
  * outlive any Provider remount). The Provider is the canonical
- * caller; tests inject via `setTerminalSessionRegistryForTests`.
+ * caller; tests inject via `setTerminalSlotRegistryForTests`.
  *
  * Mirrors the `getRendererBridge()` shape at
  * `src/web/renderer-bridge.ts`.
  */
-export function getTerminalSessionRegistry(deps: TerminalSessionRegistryDeps): TerminalSessionRegistry {
+export function getTerminalSlotRegistry(deps: TerminalSlotRegistryDeps): TerminalSlotRegistry {
   if (!registryInstance) {
-    registryInstance = new TerminalSessionRegistry(
+    registryInstance = new TerminalSlotRegistry(
       deps.getCurrentRepoId,
       deps.onSelectedWorktreeChange,
       deps.onTerminalSessionRemoved,
@@ -1051,9 +1051,9 @@ export function getTerminalSessionRegistry(deps: TerminalSessionRegistryDeps): T
 /**
  * Test seam: install or clear the singleton slot. Tests should:
  *
- * 1. In `beforeEach`: construct a fresh `TerminalSessionRegistry` and
- *    install it with `setTerminalSessionRegistryForTests(instance)`.
- * 2. In `afterEach`: call `setTerminalSessionRegistryForTests(null)`.
+ * 1. In `beforeEach`: construct a fresh `TerminalSlotRegistry` and
+ *    install it with `setTerminalSlotRegistryForTests(instance)`.
+ * 2. In `afterEach`: call `setTerminalSlotRegistryForTests(null)`.
  *    If the per-test instance needs to drain pending promises or
  *    clear listener maps, call `registry.destroy()` on the local
  *    reference before clearing the slot.
@@ -1061,6 +1061,6 @@ export function getTerminalSessionRegistry(deps: TerminalSessionRegistryDeps): T
  * Production code never calls this. Mirrors
  * `setRendererBridgeForTests()` at `src/web/renderer-bridge.ts`.
  */
-export function setTerminalSessionRegistryForTests(instance: TerminalSessionRegistry | null): void {
+export function setTerminalSlotRegistryForTests(instance: TerminalSlotRegistry | null): void {
   registryInstance = instance
 }

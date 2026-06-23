@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { TerminalSlotState } from '#/web/components/terminal/terminal-session-state.ts'
+import { TerminalSlotState } from '#/web/components/terminal/terminal-slot-state.ts'
 
 describe('TerminalSlotState', () => {
   test('tracks snapshot and attachment state transitions', () => {

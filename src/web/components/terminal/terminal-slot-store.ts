@@ -1,5 +1,5 @@
 import { useCallback, useSyncExternalStore } from 'react'
-import { useTerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
+import { useTerminalSlotReadContext } from '#/web/components/terminal/terminal-slot-context.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type {
@@ -21,7 +21,7 @@ const EMPTY_WORKTREE_TERMINAL_SNAPSHOT: WorktreeTerminalSnapshot = {
 const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = { phase: 'opening', message: null, processName: 'terminal' }
 
 export function useWorktreeTerminalSnapshot(worktreeTerminalKey: string | null): WorktreeTerminalSnapshot {
-  const { worktreeSnapshot, subscribeWorktree } = useTerminalSessionReadContext()
+  const { worktreeSnapshot, subscribeWorktree } = useTerminalSlotReadContext()
   const subscribe = useCallback(
     (listener: () => void) => (worktreeTerminalKey ? subscribeWorktree(worktreeTerminalKey, listener) : () => {}),
     [worktreeTerminalKey, subscribeWorktree],
@@ -34,7 +34,7 @@ export function useWorktreeTerminalSnapshot(worktreeTerminalKey: string | null):
 }
 
 export function useWorktreeTerminalCount(worktreeTerminalKey: string | null): number {
-  const { worktreeSnapshot, subscribeWorktree } = useTerminalSessionReadContext()
+  const { worktreeSnapshot, subscribeWorktree } = useTerminalSlotReadContext()
   const subscribe = useCallback(
     (listener: () => void) => (worktreeTerminalKey ? subscribeWorktree(worktreeTerminalKey, listener) : () => {}),
     [worktreeTerminalKey, subscribeWorktree],
@@ -47,7 +47,7 @@ export function useWorktreeTerminalCount(worktreeTerminalKey: string | null): nu
 }
 
 export function useWorktreeTerminalPendingCreate(worktreeTerminalKey: string | null): boolean {
-  const { worktreeSnapshot, subscribeWorktree } = useTerminalSessionReadContext()
+  const { worktreeSnapshot, subscribeWorktree } = useTerminalSlotReadContext()
   const subscribe = useCallback(
     (listener: () => void) => (worktreeTerminalKey ? subscribeWorktree(worktreeTerminalKey, listener) : () => {}),
     [worktreeTerminalKey, subscribeWorktree],
@@ -60,7 +60,7 @@ export function useWorktreeTerminalPendingCreate(worktreeTerminalKey: string | n
 }
 
 export function useWorktreeTerminalBellCount(worktreeTerminalKey: string | null): number {
-  const { worktreeSnapshot, subscribeWorktree } = useTerminalSessionReadContext()
+  const { worktreeSnapshot, subscribeWorktree } = useTerminalSlotReadContext()
   const subscribe = useCallback(
     (listener: () => void) => (worktreeTerminalKey ? subscribeWorktree(worktreeTerminalKey, listener) : () => {}),
     [worktreeTerminalKey, subscribeWorktree],
@@ -73,7 +73,7 @@ export function useWorktreeTerminalBellCount(worktreeTerminalKey: string | null)
 }
 
 export function useWorktreeTerminalSelectedDescriptor(worktreeTerminalKey: string | null): TerminalDescriptor | null {
-  const { worktreeSnapshot, subscribeWorktree } = useTerminalSessionReadContext()
+  const { worktreeSnapshot, subscribeWorktree } = useTerminalSlotReadContext()
   const subscribe = useCallback(
     (listener: () => void) => (worktreeTerminalKey ? subscribeWorktree(worktreeTerminalKey, listener) : () => {}),
     [worktreeTerminalKey, subscribeWorktree],
@@ -86,7 +86,7 @@ export function useWorktreeTerminalSelectedDescriptor(worktreeTerminalKey: strin
 }
 
 export function useTerminalSessionSummaries(worktreeTerminalKey: string | null): TerminalSlotSummary[] {
-  const { worktreeSnapshot, subscribeWorktree } = useTerminalSessionReadContext()
+  const { worktreeSnapshot, subscribeWorktree } = useTerminalSlotReadContext()
   const subscribe = useCallback(
     (listener: () => void) => (worktreeTerminalKey ? subscribeWorktree(worktreeTerminalKey, listener) : () => {}),
     [worktreeTerminalKey, subscribeWorktree],
@@ -107,7 +107,7 @@ export function useTerminalRepoSyncReady(repoRoot: string | null): boolean {
 }
 
 export function useTerminalSnapshot(key: string | null): TerminalSnapshot {
-  const { snapshot, subscribeSnapshot } = useTerminalSessionReadContext()
+  const { snapshot, subscribeSnapshot } = useTerminalSlotReadContext()
   const subscribe = useCallback(
     (listener: () => void) => (key ? subscribeSnapshot(key, listener) : () => {}),
     [key, subscribeSnapshot],

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   countOrphanedTerminalSlotKeys,
   resolveAdjacentTerminalSelectionAfterRemoval,
-} from '#/web/components/terminal/terminal-session-eviction.ts'
+} from '#/web/components/terminal/terminal-slot-eviction.ts'
 
 describe('terminal session eviction helpers', () => {
   test('finds orphaned local sessions that no longer exist on the server', () => {

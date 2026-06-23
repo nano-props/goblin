@@ -5,12 +5,12 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { TerminalSlot } from '#/web/components/terminal/TerminalSlot.tsx'
 import {
-  TerminalSessionContext,
-  TerminalSessionReadContext,
-} from '#/web/components/terminal/terminal-session-context.ts'
+  TerminalSlotContext,
+  TerminalSlotReadContext,
+} from '#/web/components/terminal/terminal-slot-context.ts'
 import type {
-  TerminalSessionContextValue,
-  TerminalSessionReadContextValue,
+  TerminalSlotContextValue,
+  TerminalSlotReadContextValue,
   TerminalSlotSummary,
   WorktreeTerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
@@ -108,7 +108,7 @@ async function renderControllerSlot() {
       phase: 'open' as const,
     },
   }
-  const context: TerminalSessionContextValue = {
+  const context: TerminalSlotContextValue = {
     createTerminal: async () => 'slot-1',
     registerHost: vi.fn(),
     unregisterHost: vi.fn(),
@@ -128,7 +128,7 @@ async function renderControllerSlot() {
     takeover: vi.fn(),
     serialize: vi.fn(() => ''),
   }
-  const readContext: TerminalSessionReadContextValue = {
+  const readContext: TerminalSlotReadContextValue = {
     worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
     subscribeWorktree: () => () => {},
     snapshot: () => snapshot,
@@ -137,11 +137,11 @@ async function renderControllerSlot() {
 
   await act(async () => {
     root.render(
-      <TerminalSessionContext.Provider value={context}>
-        <TerminalSessionReadContext.Provider value={readContext}>
+      <TerminalSlotContext.Provider value={context}>
+        <TerminalSlotReadContext.Provider value={readContext}>
           <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-        </TerminalSessionReadContext.Provider>
-      </TerminalSessionContext.Provider>,
+        </TerminalSlotReadContext.Provider>
+      </TerminalSlotContext.Provider>,
     )
   })
 
@@ -223,7 +223,7 @@ describe('TerminalSlot', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSlotContextValue = {
       createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -243,7 +243,7 @@ describe('TerminalSlot', () => {
       takeover,
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
@@ -252,11 +252,11 @@ describe('TerminalSlot', () => {
 
     await act(async () => {
       root.render(
-        <TerminalSessionContext.Provider value={context}>
-          <TerminalSessionReadContext.Provider value={readContext}>
+        <TerminalSlotContext.Provider value={context}>
+          <TerminalSlotReadContext.Provider value={readContext}>
             <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
+          </TerminalSlotReadContext.Provider>
+        </TerminalSlotContext.Provider>,
       )
     })
 
@@ -294,7 +294,7 @@ describe('TerminalSlot', () => {
       pendingCreate: false,
     }
     const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSlotContextValue = {
       createTerminal: vi.fn(async () => 'slot-2'),
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -314,7 +314,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => emptySnapshot,
@@ -323,11 +323,11 @@ describe('TerminalSlot', () => {
 
     await act(async () => {
       root.render(
-        <TerminalSessionContext.Provider value={context}>
-          <TerminalSessionReadContext.Provider value={readContext}>
+        <TerminalSlotContext.Provider value={context}>
+          <TerminalSlotReadContext.Provider value={readContext}>
             <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
+          </TerminalSlotReadContext.Provider>
+        </TerminalSlotContext.Provider>,
       )
     })
 
@@ -335,11 +335,11 @@ describe('TerminalSlot', () => {
       expect(container.querySelector('.goblin-terminal-slot__empty')).toBeNull()
       await act(async () => {
         root.render(
-          <TerminalSessionContext.Provider value={context}>
-            <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSlotContext.Provider value={context}>
+            <TerminalSlotReadContext.Provider value={readContext}>
               <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>,
+            </TerminalSlotReadContext.Provider>
+          </TerminalSlotContext.Provider>,
         )
       })
     } finally {
@@ -400,7 +400,7 @@ describe('TerminalSlot', () => {
         phase: 'error' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSlotContextValue = {
       createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -420,7 +420,7 @@ describe('TerminalSlot', () => {
       takeover,
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
@@ -429,11 +429,11 @@ describe('TerminalSlot', () => {
 
     await act(async () => {
       root.render(
-        <TerminalSessionContext.Provider value={context}>
-          <TerminalSessionReadContext.Provider value={readContext}>
+        <TerminalSlotContext.Provider value={context}>
+          <TerminalSlotReadContext.Provider value={readContext}>
             <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
+          </TerminalSlotReadContext.Provider>
+        </TerminalSlotContext.Provider>,
       )
     })
 
@@ -518,7 +518,7 @@ describe('TerminalSlot', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSlotContextValue = {
       createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -538,7 +538,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
@@ -547,11 +547,11 @@ describe('TerminalSlot', () => {
 
     await act(async () => {
       root.render(
-        <TerminalSessionContext.Provider value={context}>
-          <TerminalSessionReadContext.Provider value={readContext}>
+        <TerminalSlotContext.Provider value={context}>
+          <TerminalSlotReadContext.Provider value={readContext}>
             <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
+          </TerminalSlotReadContext.Provider>
+        </TerminalSlotContext.Provider>,
       )
     })
 
@@ -639,7 +639,7 @@ describe('TerminalSlot', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSlotContextValue = {
       createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -659,7 +659,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
@@ -678,11 +678,11 @@ describe('TerminalSlot', () => {
     try {
       await act(async () => {
         root.render(
-          <TerminalSessionContext.Provider value={context}>
-            <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSlotContext.Provider value={context}>
+            <TerminalSlotReadContext.Provider value={readContext}>
               <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>,
+            </TerminalSlotReadContext.Provider>
+          </TerminalSlotContext.Provider>,
         )
       })
 
@@ -777,7 +777,7 @@ describe('TerminalSlot', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSlotContextValue = {
       createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -797,7 +797,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
@@ -807,11 +807,11 @@ describe('TerminalSlot', () => {
     try {
       await act(async () => {
         root.render(
-          <TerminalSessionContext.Provider value={context}>
-            <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSlotContext.Provider value={context}>
+            <TerminalSlotReadContext.Provider value={readContext}>
               <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>,
+            </TerminalSlotReadContext.Provider>
+          </TerminalSlotContext.Provider>,
         )
       })
       const slotRoot = container.querySelector('.goblin-terminal-slot') as HTMLElement
@@ -887,7 +887,7 @@ describe('TerminalSlot', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSlotContextValue = {
       createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -907,7 +907,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
@@ -921,11 +921,11 @@ describe('TerminalSlot', () => {
     try {
       await act(async () => {
         root.render(
-          <TerminalSessionContext.Provider value={context}>
-            <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSlotContext.Provider value={context}>
+            <TerminalSlotReadContext.Provider value={readContext}>
               <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>,
+            </TerminalSlotReadContext.Provider>
+          </TerminalSlotContext.Provider>,
         )
       })
 
@@ -1010,7 +1010,7 @@ describe('TerminalSlot', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSlotContextValue = {
       createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -1030,7 +1030,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
@@ -1047,11 +1047,11 @@ describe('TerminalSlot', () => {
     try {
       await act(async () => {
         root.render(
-          <TerminalSessionContext.Provider value={context}>
-            <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSlotContext.Provider value={context}>
+            <TerminalSlotReadContext.Provider value={readContext}>
               <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>,
+            </TerminalSlotReadContext.Provider>
+          </TerminalSlotContext.Provider>,
         )
       })
 
@@ -1217,7 +1217,7 @@ describe('TerminalSlot', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSlotContextValue = {
       createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -1237,7 +1237,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(worktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshot,
@@ -1257,11 +1257,11 @@ describe('TerminalSlot', () => {
     try {
       await act(async () => {
         root.render(
-          <TerminalSessionContext.Provider value={context}>
-            <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSlotContext.Provider value={context}>
+            <TerminalSlotReadContext.Provider value={readContext}>
               <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>,
+            </TerminalSlotReadContext.Provider>
+          </TerminalSlotContext.Provider>,
         )
       })
       vi.mocked(toast.error).mockClear()
@@ -1381,7 +1381,7 @@ describe('TerminalSlot', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSlotContextValue = {
       createTerminal: async () => 'slot-1',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -1402,7 +1402,7 @@ describe('TerminalSlot', () => {
       serialize: vi.fn(() => ''),
     }
     let activeWorktreeSnapshot = worktreeSnapshotA
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(activeWorktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => snapshotOpen,
@@ -1426,11 +1426,11 @@ describe('TerminalSlot', () => {
     try {
       await act(async () => {
         root.render(
-          <TerminalSessionContext.Provider value={context}>
-            <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSlotContext.Provider value={context}>
+            <TerminalSlotReadContext.Provider value={readContext}>
               <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>,
+            </TerminalSlotReadContext.Provider>
+          </TerminalSlotContext.Provider>,
         )
       })
 
@@ -1457,11 +1457,11 @@ describe('TerminalSlot', () => {
       activeWorktreeSnapshot = worktreeSnapshotB
       await act(async () => {
         root.render(
-          <TerminalSessionContext.Provider value={context}>
-            <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSlotContext.Provider value={context}>
+            <TerminalSlotReadContext.Provider value={readContext}>
               <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree-other" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>,
+            </TerminalSlotReadContext.Provider>
+          </TerminalSlotContext.Provider>,
         )
       })
 
@@ -1502,7 +1502,7 @@ describe('TerminalSlot', () => {
       pendingCreate: false,
     }
     const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSlotContextValue = {
       createTerminal,
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -1522,7 +1522,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => emptySnapshot,
@@ -1531,11 +1531,11 @@ describe('TerminalSlot', () => {
 
     await act(async () => {
       root.render(
-        <TerminalSessionContext.Provider value={context}>
-          <TerminalSessionReadContext.Provider value={readContext}>
+        <TerminalSlotContext.Provider value={context}>
+          <TerminalSlotReadContext.Provider value={readContext}>
             <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
+          </TerminalSlotReadContext.Provider>
+        </TerminalSlotContext.Provider>,
       )
     })
 
@@ -1589,7 +1589,7 @@ describe('TerminalSlot', () => {
       pendingCreate: false,
     }
     const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSlotContextValue = {
       createTerminal,
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -1609,7 +1609,7 @@ describe('TerminalSlot', () => {
       takeover: vi.fn(),
       serialize: vi.fn(() => ''),
     }
-    const readContext: TerminalSessionReadContextValue = {
+    const readContext: TerminalSlotReadContextValue = {
       worktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
       subscribeWorktree: () => () => {},
       snapshot: () => emptySnapshot,
@@ -1618,11 +1618,11 @@ describe('TerminalSlot', () => {
 
     await act(async () => {
       root.render(
-        <TerminalSessionContext.Provider value={context}>
-          <TerminalSessionReadContext.Provider value={readContext}>
+        <TerminalSlotContext.Provider value={context}>
+          <TerminalSlotReadContext.Provider value={readContext}>
             <TerminalSlot repoRoot="/repo" branch="feature" worktreePath="/worktree" />
-          </TerminalSessionReadContext.Provider>
-        </TerminalSessionContext.Provider>,
+          </TerminalSlotReadContext.Provider>
+        </TerminalSlotContext.Provider>,
       )
     })
 

@@ -2,11 +2,11 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
-  TerminalSessionRegistry,
-  getTerminalSessionRegistry,
-  setTerminalSessionRegistryForTests,
-} from '#/web/components/terminal/TerminalSessionRegistry.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
+  TerminalSlotRegistry,
+  getTerminalSlotRegistry,
+  setTerminalSlotRegistryForTests,
+} from '#/web/components/terminal/TerminalSlotRegistry.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
 import type { TerminalDescriptor, TerminalRepoIndex } from '#/web/components/terminal/types.ts'
 import type { TerminalSlotSummary } from '#/shared/terminal-types.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/stores/repos/test-utils.ts'
@@ -72,8 +72,8 @@ function makeServerSession(
   }
 }
 
-describe('TerminalSessionRegistry', () => {
-  let registry: TerminalSessionRegistry
+describe('TerminalSlotRegistry', () => {
+  let registry: TerminalSlotRegistry
   let selectedChanges: Array<{ worktreeTerminalKey: string; key: string | null }>
   let removedSessions: Array<{ key: string; repoRoot: string; branch: string; worktreePath: string }>
 
@@ -81,7 +81,7 @@ describe('TerminalSessionRegistry', () => {
     resetReposStore()
     selectedChanges = []
     removedSessions = []
-    registry = new TerminalSessionRegistry(
+    registry = new TerminalSlotRegistry(
       () => REPO_ROOT,
       (worktreeTerminalKey, key) => selectedChanges.push({ worktreeTerminalKey, key }),
       (key, base) =>
@@ -93,19 +93,19 @@ describe('TerminalSessionRegistry', () => {
         }),
     )
     // Install into the singleton slot so any code that reaches the
-    // registry via `getTerminalSessionRegistry()` (e.g., a Provider
+    // registry via `getTerminalSlotRegistry()` (e.g., a Provider
     // mounted inside a sub-component) sees the same instance this
     // test constructed.
-    setTerminalSessionRegistryForTests(registry)
+    setTerminalSlotRegistryForTests(registry)
   })
 
   afterEach(() => {
     // Drain pending state and clear listener maps on the per-test
     // instance, then release the singleton slot so the next test
     // starts clean. Mirrors the production singleton-vs-test
-    // contract documented at `setTerminalSessionRegistryForTests`.
+    // contract documented at `setTerminalSlotRegistryForTests`.
     registry.destroy()
-    setTerminalSessionRegistryForTests(null)
+    setTerminalSlotRegistryForTests(null)
     resetReposStore()
   })
 
@@ -208,7 +208,7 @@ describe('TerminalSessionRegistry', () => {
       // wedged server that never emits exit events). In normal use no
       // entry should be evicted, but if the cache somehow exceeds the
       // limit, the oldest entry is dropped.
-      const limit = (TerminalSessionRegistry as unknown as { REATTACH_SNAPSHOT_CACHE_HARD_CAP: number })
+      const limit = (TerminalSlotRegistry as unknown as { REATTACH_SNAPSHOT_CACHE_HARD_CAP: number })
         .REATTACH_SNAPSHOT_CACHE_HARD_CAP
 
       for (let i = 0; i < limit + 1; i++) {
@@ -232,7 +232,7 @@ describe('TerminalSessionRegistry', () => {
       // value) is a deliberate decision and should not happen
       // silently — if a future change moves it, this test forces a
       // conversation.
-      const cap = (TerminalSessionRegistry as unknown as { REATTACH_SNAPSHOT_CACHE_HARD_CAP: number })
+      const cap = (TerminalSlotRegistry as unknown as { REATTACH_SNAPSHOT_CACHE_HARD_CAP: number })
         .REATTACH_SNAPSHOT_CACHE_HARD_CAP
       expect(cap).toBe(8)
     })
@@ -350,7 +350,7 @@ describe('TerminalSessionRegistry', () => {
           ],
         },
       })
-      const registryWithStore = new TerminalSessionRegistry(
+      const registryWithStore = new TerminalSlotRegistry(
         () => REPO_ROOT,
         () => {},
         (key, base) => {
@@ -379,7 +379,7 @@ describe('TerminalSessionRegistry', () => {
     })
 
     test('session removal callback failures do not block terminal disposal', () => {
-      const registryWithThrowingCallback = new TerminalSessionRegistry(
+      const registryWithThrowingCallback = new TerminalSlotRegistry(
         () => REPO_ROOT,
         () => {},
         () => {
@@ -536,15 +536,15 @@ describe('TerminalSessionRegistry', () => {
   })
 
   describe('singleton lifetime (P1.7)', () => {
-    test('getTerminalSessionRegistry returns the same instance across calls with the same deps', () => {
+    test('getTerminalSlotRegistry returns the same instance across calls with the same deps', () => {
       // The slot was filled by `beforeEach` with the per-test
       // `registry`. The getter must return that exact instance, not
       // construct a new one.
-      const first = getTerminalSessionRegistry({
+      const first = getTerminalSlotRegistry({
         getCurrentRepoId: () => REPO_ROOT,
         onSelectedWorktreeChange: () => {},
       })
-      const second = getTerminalSessionRegistry({
+      const second = getTerminalSlotRegistry({
         getCurrentRepoId: () => REPO_ROOT,
         onSelectedWorktreeChange: () => {},
       })
@@ -552,20 +552,20 @@ describe('TerminalSessionRegistry', () => {
       expect(first).toBe(registry)
     })
 
-    test('setTerminalSessionRegistryForTests(null) clears the slot so the next getter constructs a fresh instance', () => {
+    test('setTerminalSlotRegistryForTests(null) clears the slot so the next getter constructs a fresh instance', () => {
       const original = registry
-      setTerminalSessionRegistryForTests(null)
-      const fresh = getTerminalSessionRegistry({
+      setTerminalSlotRegistryForTests(null)
+      const fresh = getTerminalSlotRegistry({
         getCurrentRepoId: () => REPO_ROOT,
         onSelectedWorktreeChange: () => {},
       })
       expect(fresh).not.toBe(original)
       // Re-install for `afterEach` cleanup.
-      setTerminalSessionRegistryForTests(registry)
+      setTerminalSlotRegistryForTests(registry)
     })
 
     test('destroy clears the singleton slot when destroying the installed instance', () => {
-      const original = getTerminalSessionRegistry({
+      const original = getTerminalSlotRegistry({
         getCurrentRepoId: () => REPO_ROOT,
         onSelectedWorktreeChange: () => {},
       })
@@ -573,7 +573,7 @@ describe('TerminalSessionRegistry', () => {
 
       original.destroy()
 
-      const fresh = getTerminalSessionRegistry({
+      const fresh = getTerminalSlotRegistry({
         getCurrentRepoId: () => REPO_ROOT,
         onSelectedWorktreeChange: () => {},
       })
@@ -597,7 +597,7 @@ describe('TerminalSessionRegistry', () => {
       })
       // Synthesize a remount: re-fetch the singleton via the
       // getter (the Provider's mount effect does exactly this).
-      const after = getTerminalSessionRegistry({
+      const after = getTerminalSlotRegistry({
         getCurrentRepoId: () => REPO_ROOT,
         onSelectedWorktreeChange: () => {},
       })

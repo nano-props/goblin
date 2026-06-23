@@ -32,7 +32,7 @@ vi.mock('#/web/components/terminal/terminal-geometry.ts', () => ({
   proposeTerminalGeometry: mocks.proposeTerminalGeometryMock,
 }))
 
-vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
+vi.mock('#/web/components/terminal/ManagedTerminalSlot.ts', () => {
   class MockManagedTerminalSession {
     descriptor: any
     private ptySessionId: string | null = null
@@ -106,9 +106,9 @@ vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
 })
 
 import {
-  TerminalSessionRegistry,
-  setTerminalSessionRegistryForTests,
-} from '#/web/components/terminal/TerminalSessionRegistry.ts'
+  TerminalSlotRegistry,
+  setTerminalSlotRegistryForTests,
+} from '#/web/components/terminal/TerminalSlotRegistry.ts'
 
 const REPO_ROOT = '/repo'
 const WORKTREE_PATH = '/repo'
@@ -175,8 +175,8 @@ function makeCreateResult(overrides: Partial<Record<string, unknown>> = {}) {
   }
 }
 
-describe('TerminalSessionRegistry create flow', () => {
-  let registry: TerminalSessionRegistry
+describe('TerminalSlotRegistry create flow', () => {
+  let registry: TerminalSlotRegistry
 
   beforeEach(() => {
     mocks.createMock.mockReset()
@@ -186,9 +186,9 @@ describe('TerminalSessionRegistry create flow', () => {
     mocks.proposeTerminalGeometryMock.mockClear()
     mocks.preloadTerminalFontMock.mockClear()
     mocks.attachmentIdMock.mockClear()
-    registry = new TerminalSessionRegistry(() => REPO_ROOT)
+    registry = new TerminalSlotRegistry(() => REPO_ROOT)
     registry.setRepoIndex(makeRepoIndex())
-    setTerminalSessionRegistryForTests(registry)
+    setTerminalSlotRegistryForTests(registry)
     originalResizeObserver = globalThis.ResizeObserver
     Object.defineProperty(globalThis, 'ResizeObserver', {
       configurable: true,
@@ -199,7 +199,7 @@ describe('TerminalSessionRegistry create flow', () => {
 
   afterEach(() => {
     registry.destroy()
-    setTerminalSessionRegistryForTests(null)
+    setTerminalSlotRegistryForTests(null)
     document.body.innerHTML = ''
     if (originalResizeObserver) {
       Object.defineProperty(globalThis, 'ResizeObserver', {

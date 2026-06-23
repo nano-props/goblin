@@ -2,7 +2,7 @@ import type { TerminalSlotSummary } from '#/shared/terminal-types.ts'
 import { terminalBridge } from '#/web/terminal.ts'
 
 // Plain async loader for a repo's terminal session list. The
-// TerminalSessionRegistry is the single source of truth for session
+// TerminalSlotRegistry is the single source of truth for session
 // state; this loader is only used by the provider to refetch the
 // list when a `sessions-changed` realtime event arrives. It used
 // to be wrapped in a TanStack Query `queryOptions` (the only

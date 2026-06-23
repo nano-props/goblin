@@ -4,15 +4,15 @@ import { act, useEffect, useRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessionProvider.tsx'
-import { setTerminalSessionRegistryForTests } from '#/web/components/terminal/TerminalSessionRegistry.ts'
-import { terminalSessionProviderLog } from '#/web/logger.ts'
-import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
+import { TerminalSlotProvider } from '#/web/components/terminal/TerminalSlotProvider.tsx'
+import { setTerminalSlotRegistryForTests } from '#/web/components/terminal/TerminalSlotRegistry.ts'
+import { terminalSlotProviderLog } from '#/web/logger.ts'
+import { useTerminalSlotContext } from '#/web/components/terminal/terminal-slot-context.ts'
 import {
   useWorktreeTerminalCount,
   useTerminalSessionSummaries,
-} from '#/web/components/terminal/terminal-session-store.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
+} from '#/web/components/terminal/terminal-slot-store.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
 import { setRendererBridgeForTests } from '#/web/renderer-bridge.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { mainWindowQueryClient } from '#/web/main-window-queries.ts'
@@ -29,7 +29,7 @@ import type {
   TerminalDescriptor,
   TerminalOwnershipViewModel,
   TerminalSearchResult,
-  TerminalSessionContextValue,
+  TerminalSlotContextValue,
   TerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
 import type {
@@ -73,7 +73,7 @@ function selectedWorkspacePaneView(repoId: string) {
   return repo ? preferredWorkspacePaneViewForBranch(repo.ui, repo.ui.selectedBranch) : null
 }
 
-vi.mock('#/web/components/terminal/ManagedTerminalSession.ts', () => {
+vi.mock('#/web/components/terminal/ManagedTerminalSlot.ts', () => {
   class ManagedTerminalSession {
     descriptor: TerminalDescriptor
     private readonly onBell: (descriptor: TerminalDescriptor, event: TerminalBellEvent) => void
@@ -599,13 +599,13 @@ beforeEach(() => {
   })
 })
 
-describe('TerminalSessionProvider', () => {
+describe('TerminalSlotProvider', () => {
   // The Provider reaches the registry via the renderer-level singleton.
   // Each test must clear the slot so a previous test's bridge wiring
   // doesn't leak into the next one. Mirrors
-  // `setTerminalSessionRegistryForTests(null)` in the registry tests.
+  // `setTerminalSlotRegistryForTests(null)` in the registry tests.
   afterEach(() => {
-    setTerminalSessionRegistryForTests(null)
+    setTerminalSlotRegistryForTests(null)
   })
   test('keeps terminal detail open and switches the selected session when one of multiple terminals exits', async () => {
     seedRepoState({
@@ -1605,12 +1605,12 @@ describe('TerminalSessionProvider', () => {
     // First snapshot rejects, second resolves. The provider uses
     // Promise.allSettled (not Promise.all) so the rejection does not
     // cancel the whole reconcile. Rejections are surfaced via
-    // result.reason and logged via terminalSessionProviderLog.debug;
+    // result.reason and logged via terminalSlotProviderLog.debug;
     // healthy results are collected into the snapshot map. A
     // regression to Promise.all would either cancel reconcile
     // entirely or surface the rejection to the caller as an
     // unhandled promise.
-    const debugSpy = vi.spyOn(terminalSessionProviderLog, 'debug').mockImplementation(() => {})
+    const debugSpy = vi.spyOn(terminalSlotProviderLog, 'debug').mockImplementation(() => {})
     getSlotSnapshotMock.mockImplementation(async ({ ptySessionId }) => {
       if (ptySessionId === 'session_fail') throw new Error('snapshot unavailable')
       return { ptySessionId: 'session_ok', snapshot: 'ok-snapshot', snapshotSeq: 1 }
@@ -1715,16 +1715,16 @@ describe('TerminalSessionProvider', () => {
     // Mount the Provider with no children that go through the host
     // registration path (no RegisterHost, no probes) so the only
     // preloadTerminalFont call comes from the new useEffect in
-    // TerminalSessionProvider itself.
+    // TerminalSlotProvider itself.
     const container = document.createElement('div')
     document.body.appendChild(container)
     const root = createRoot(container)
     try {
       await act(async () => {
         root.render(
-          <TerminalSessionProvider>
+          <TerminalSlotProvider>
             <span>probe</span>
-          </TerminalSessionProvider>,
+          </TerminalSlotProvider>,
         )
       })
       expect(geometryMocks.preloadTerminalFont).toHaveBeenCalledTimes(1)
@@ -1805,9 +1805,9 @@ describe('TerminalSessionProvider', () => {
     try {
       await act(async () => {
         root.render(
-          <TerminalSessionProvider>
+          <TerminalSlotProvider>
             <span>probe</span>
-          </TerminalSessionProvider>,
+          </TerminalSlotProvider>,
         )
       })
 
@@ -1904,9 +1904,9 @@ describe('TerminalSessionProvider', () => {
     try {
       await act(async () => {
         root.render(
-          <TerminalSessionProvider>
+          <TerminalSlotProvider>
             <span>probe</span>
-          </TerminalSessionProvider>,
+          </TerminalSlotProvider>,
         )
       })
 
@@ -1987,7 +1987,7 @@ describe('TerminalSessionProvider', () => {
     const second = await renderProviderWithProbe(terminalWorktreeKey)
     try {
       // The second mount reaches the singleton via
-      // `getTerminalSessionRegistry`. If state survived, the prior
+      // `getTerminalSlotRegistry`. If state survived, the prior
       // session is observable; if not, count is 0. The point is
       // that we did NOT have to clear the slot between mounts.
       expect(second.getProbe().count).toBeGreaterThanOrEqual(1)
@@ -1997,8 +1997,8 @@ describe('TerminalSessionProvider', () => {
   })
 })
 
-function CaptureContext({ onContext }: { onContext: (value: TerminalSessionContextValue) => void }) {
-  onContext(useTerminalSessionContext())
+function CaptureContext({ onContext }: { onContext: (value: TerminalSlotContextValue) => void }) {
+  onContext(useTerminalSlotContext())
   return null
 }
 
@@ -2037,27 +2037,27 @@ function CaptureGroupProbe({
 }
 
 async function renderProvider(): Promise<{
-  getContext: () => TerminalSessionContextValue
+  getContext: () => TerminalSlotContextValue
   unmount: () => Promise<void>
 }> {
   return renderProviderWithHost()
 }
 
 async function renderProviderWithHost(): Promise<{
-  getContext: () => TerminalSessionContextValue
+  getContext: () => TerminalSlotContextValue
   unmount: () => Promise<void>
 }> {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root: Root = createRoot(container)
-  let context: TerminalSessionContextValue | null = null
+  let context: TerminalSlotContextValue | null = null
 
   await act(async () => {
     root.render(
-      <TerminalSessionProvider>
+      <TerminalSlotProvider>
         <CaptureContext onContext={(value) => (context = value)} />
         <RegisterHost worktreeTerminalKey={worktreeTerminalKey(REPO_ID, WORKTREE_PATH)} />
-      </TerminalSessionProvider>,
+      </TerminalSlotProvider>,
     )
   })
 
@@ -2074,7 +2074,7 @@ async function renderProviderWithHost(): Promise<{
 }
 
 async function renderProviderWithProbe(worktreeTerminalKey: string): Promise<{
-  getContext: () => TerminalSessionContextValue
+  getContext: () => TerminalSlotContextValue
   getProbe: () => {
     count: number
     terminalIds: string[]
@@ -2092,7 +2092,7 @@ async function renderProviderWithProbe(worktreeTerminalKey: string): Promise<{
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root: Root = createRoot(container)
-  let context: TerminalSessionContextValue | null = null
+  let context: TerminalSlotContextValue | null = null
   let probe: {
     count: number
     terminalIds: string[]
@@ -2108,11 +2108,11 @@ async function renderProviderWithProbe(worktreeTerminalKey: string): Promise<{
 
   await act(async () => {
     root.render(
-      <TerminalSessionProvider>
+      <TerminalSlotProvider>
         <CaptureContext onContext={(value) => (context = value)} />
         <RegisterHost worktreeTerminalKey={worktreeTerminalKey} />
         <CaptureGroupProbe worktreeTerminalKey={worktreeTerminalKey} onProbe={(value) => (probe = value)} />
-      </TerminalSessionProvider>,
+      </TerminalSlotProvider>,
     )
   })
 
@@ -2133,7 +2133,7 @@ async function renderProviderWithProbe(worktreeTerminalKey: string): Promise<{
 }
 
 function RegisterHost({ worktreeTerminalKey }: { worktreeTerminalKey: string }) {
-  const context = useTerminalSessionContext()
+  const context = useTerminalSlotContext()
   const ref = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {

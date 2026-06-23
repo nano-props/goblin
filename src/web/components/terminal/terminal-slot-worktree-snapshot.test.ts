@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
-import { buildWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-session-worktree-snapshot.ts'
+import { buildWorktreeTerminalSnapshot } from '#/web/components/terminal/terminal-slot-worktree-snapshot.ts'
 import type {
   ManagedTerminalSessionLike,
   TerminalDescriptor,

@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ILinkHandler } from '@xterm/xterm'
 import { ELECTRON_RENDERER_CAPABILITIES, RENDERER_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import { ManagedTerminalSession } from '#/web/components/terminal/ManagedTerminalSession.ts'
+import { ManagedTerminalSession } from '#/web/components/terminal/ManagedTerminalSlot.ts'
 import { terminalLog } from '#/web/logger.ts'
 import { installTerminalThemeStyles } from '#/web/components/terminal/terminal-theme-test-utils.ts'
 import { isTerminalFocused } from '#/web/terminal-focus.ts'

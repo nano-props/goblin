@@ -27,7 +27,7 @@ import {
   isValidTerminalClientId,
   isValidTerminalId,
 } from '#/server/terminal/terminal-runtime-support.ts'
-import { TerminalSlotManager } from '#/server/terminal/terminal-session-manager.ts'
+import { TerminalSlotManager } from '#/server/terminal/terminal-slot-manager.ts'
 import { type PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { type ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.ts'

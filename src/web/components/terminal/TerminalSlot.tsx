@@ -20,17 +20,17 @@ import type { PasteResolution } from '#/web/clipboard/resolver.ts'
 import { PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { terminalLog } from '#/web/logger.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
-import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
+import { useTerminalSlotContext } from '#/web/components/terminal/terminal-slot-context.ts'
 import {
   useWorktreeTerminalSelectedDescriptor,
   useWorktreeTerminalCount,
   useWorktreeTerminalPendingCreate,
   useTerminalSnapshot,
-} from '#/web/components/terminal/terminal-session-store.ts'
+} from '#/web/components/terminal/terminal-slot-store.ts'
 import { MobileTerminalToolbar } from '#/web/components/terminal/mobile-terminal-toolbar.tsx'
 import { isMobileDevice } from '#/web/components/terminal/mobile-detection.ts'
-import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
+import type { TerminalSlotBase } from '#/web/components/terminal/types.ts'
 
 const DEFAULT_TERMINAL_ERROR_MESSAGE_KEY = 'error.unknown'
 
@@ -39,7 +39,7 @@ interface TerminalSlotProps {
   branch: string
   worktreePath: string
   syncReady?: boolean
-  createTerminalForSlot?: (base: TerminalSessionBase) => Promise<string>
+  createTerminalForSlot?: (base: TerminalSlotBase) => Promise<string>
 }
 
 export function TerminalSlot({
@@ -54,7 +54,7 @@ export function TerminalSlot({
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const context = useTerminalSessionContext()
+  const context = useTerminalSlotContext()
   const {
     clearBell,
     attach,

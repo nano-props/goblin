@@ -6,8 +6,8 @@
 // behavior stays in lockstep.
 
 import { BranchRow, type BranchRowProps } from '#/web/components/branch-navigator/BranchRow.tsx'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
-import { useWorktreeTerminalBellCount } from '#/web/components/terminal/terminal-session-store.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
+import { useWorktreeTerminalBellCount } from '#/web/components/terminal/terminal-slot-store.ts'
 import { branchActionDisplayPhase } from '#/web/hooks/branch-action-state.ts'
 
 export function BranchListRow(props: BranchRowProps) {

@@ -87,7 +87,7 @@ export interface TerminalSearchResult {
   found: boolean
 }
 
-export interface TerminalSessionBase {
+export interface TerminalSlotBase {
   repoRoot: string
   branch: string
   worktreePath: string
@@ -127,15 +127,15 @@ export interface WorktreeTerminalSnapshot {
   pendingCreate: boolean
 }
 
-export interface TerminalSessionContextValue {
-  createTerminal: (base: TerminalSessionBase) => Promise<string>
+export interface TerminalSlotContextValue {
+  createTerminal: (base: TerminalSlotBase) => Promise<string>
   registerHost: (worktreeTerminalKey: string, host: HTMLElement) => void
   unregisterHost: (worktreeTerminalKey: string, host: HTMLElement) => void
   selectTerminal: (worktreeTerminalKey: string, key: string) => void
   scrollToBottom: (key: string) => void
   scrollLines: (key: string, amount: number) => void
   clearBell: (key: string) => boolean
-  closeTerminalByDescriptor: (key: string, base: TerminalSessionBase) => void
+  closeTerminalByDescriptor: (key: string, base: TerminalSlotBase) => void
   attach: (descriptor: TerminalDescriptor, host: HTMLElement) => void
   detach: (key: string, host: HTMLElement) => void
   restart: (key: string) => void
@@ -149,7 +149,7 @@ export interface TerminalSessionContextValue {
   serialize: (key: string) => string
 }
 
-export interface TerminalSessionReadContextValue {
+export interface TerminalSlotReadContextValue {
   worktreeSnapshot: (worktreeTerminalKey: string) => WorktreeTerminalSnapshot
   subscribeWorktree: (worktreeTerminalKey: string, listener: () => void) => () => void
   snapshot: (key: string) => TerminalSnapshot

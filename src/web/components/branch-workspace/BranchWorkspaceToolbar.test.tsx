@@ -7,9 +7,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchWorkspaceToolbar } from '#/web/components/branch-workspace/BranchWorkspaceToolbar.tsx'
 import { getSelectedBranchWorkspacePresentation } from '#/web/components/branch-workspace/model.ts'
 import {
-  TerminalSessionContext,
-  TerminalSessionReadContext,
-} from '#/web/components/terminal/terminal-session-context.ts'
+  TerminalSlotContext,
+  TerminalSlotReadContext,
+} from '#/web/components/terminal/terminal-slot-context.ts'
 import type {
   WorkspacePaneStaticViewType,
   WorkspacePaneTabOrderEntry,
@@ -17,8 +17,8 @@ import type {
 } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabOrderEntry } from '#/shared/workspace-pane.ts'
 import type {
-  TerminalSessionContextValue,
-  TerminalSessionReadContextValue,
+  TerminalSlotContextValue,
+  TerminalSlotReadContextValue,
   TerminalSlotSummary,
   TerminalDescriptor,
   WorktreeTerminalSnapshot,
@@ -34,7 +34,7 @@ import {
   workspacePaneStaticViewsForBranch,
   workspacePaneTabOrderForBranch,
 } from '#/web/stores/repos/workspace-pane-tabs.ts'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { setTerminalSlotCommandBridge } from '#/web/components/terminal/terminal-slot-command-bridge.ts'
 
 let compactUi = false
 
@@ -88,7 +88,7 @@ afterEach(() => {
   queryClient = null
   toastMocks.error.mockClear()
   setRendererBridgeForTests(null)
-  setTerminalSessionCommandBridge(null)
+  setTerminalSlotCommandBridge(null)
   reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
 })
 
@@ -787,7 +787,7 @@ function renderToolbar(options: {
     pendingCreate: options.pendingCreate ?? false,
   }
   const terminalSnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
-  const readContext: TerminalSessionReadContextValue = {
+  const readContext: TerminalSlotReadContextValue = {
     worktreeSnapshot: () => worktreeSnapshot,
     subscribeWorktree: () => () => {},
     snapshot: () => terminalSnapshot,
@@ -798,7 +798,7 @@ function renderToolbar(options: {
   const scrollToBottom = vi.fn()
   const closeTerminalByDescriptor = vi.fn()
   const showRepoWorkspacePaneView = vi.fn(options.navigation.showRepoWorkspacePaneView)
-  const commandContext: TerminalSessionContextValue = {
+  const commandContext: TerminalSlotContextValue = {
     createTerminal,
     registerHost: vi.fn(),
     unregisterHost: vi.fn(),
@@ -818,7 +818,7 @@ function renderToolbar(options: {
     takeover: vi.fn(),
     serialize: vi.fn(() => ''),
   }
-  setTerminalSessionCommandBridge({
+  setTerminalSlotCommandBridge({
     worktreeSnapshot: readContext.worktreeSnapshot,
     createTerminal,
     selectTerminal,
@@ -833,11 +833,11 @@ function renderToolbar(options: {
     root!.render(
       <QueryClientProvider client={queryClient!}>
         <MainWindowNavigationProvider value={options.navigation}>
-          <TerminalSessionContext.Provider value={commandContext}>
-            <TerminalSessionReadContext.Provider value={readContext}>
+          <TerminalSlotContext.Provider value={commandContext}>
+            <TerminalSlotReadContext.Provider value={readContext}>
               <BranchWorkspaceToolbar repo={repo} detail={detail} workspacePaneId="workspace" />
-            </TerminalSessionReadContext.Provider>
-          </TerminalSessionContext.Provider>
+            </TerminalSlotReadContext.Provider>
+          </TerminalSlotContext.Provider>
         </MainWindowNavigationProvider>
       </QueryClientProvider>,
     )

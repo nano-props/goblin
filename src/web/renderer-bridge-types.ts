@@ -65,7 +65,7 @@ export interface RendererTerminalBridge {
   /**
    * Subscribe to per-session close broadcasts from the server. Emitted
    * after a successful `close` IPC alongside the broader
-   * `sessions-changed` event. The `TerminalSessionRegistry` uses this
+   * `sessions-changed` event. The `TerminalSlotRegistry` uses this
    * to drop a stale local entry immediately, without waiting for the
    * next reconcile — the critical fix for the "open new terminal and
    * see the previous shell's `Restored session: …` line print twice"

@@ -1,6 +1,6 @@
 import { TerminalConnectionState } from '#/server/terminal/terminal-connection-state.ts'
 import { TerminalRealtimeBroker } from '#/server/terminal/terminal-realtime-broker.ts'
-import type { TerminalSlotManager } from '#/server/terminal/terminal-session-manager.ts'
+import type { TerminalSlotManager } from '#/server/terminal/terminal-slot-manager.ts'
 import type { TerminalViewOrderRuntime } from '#/server/terminal/terminal-view-order-runtime.ts'
 
 export interface TerminalRuntimeCoordinatorOptions {

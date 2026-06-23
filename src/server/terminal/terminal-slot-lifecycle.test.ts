@@ -6,7 +6,7 @@ import {
   markTerminalSlotOpening,
   markTerminalSlotRestarting,
   type TerminalLifecycleState,
-} from '#/server/terminal/terminal-session-lifecycle.ts'
+} from '#/server/terminal/terminal-slot-lifecycle.ts'
 
 describe('terminal session lifecycle helpers', () => {
   test('drives the session through explicit lifecycle phases', () => {

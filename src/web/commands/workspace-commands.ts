@@ -1,11 +1,11 @@
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
-import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
+import { readTerminalSlotCommandBridge } from '#/web/components/terminal/terminal-slot-command-bridge.ts'
 import { openWorkspacePaneView } from '#/web/components/branch-workspace/open-workspace-pane-view.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { MainWindowNavigationActions } from '#/web/main-window-navigation.tsx'
 import type { WorkspacePaneView } from '#/shared/workspace-pane.ts'
 import { isWorkspacePaneStaticViewType } from '#/shared/workspace-pane.ts'
-import type { TerminalSessionBase } from '#/web/components/terminal/types.ts'
+import type { TerminalSlotBase } from '#/web/components/terminal/types.ts'
 import { workspacePaneTabOrderForBranch } from '#/web/stores/repos/workspace-pane-tabs.ts'
 import { preferredWorkspacePaneViewForBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
@@ -85,7 +85,7 @@ export async function runTerminalPrimaryActionCommand({
   await runShowWorkspacePaneViewCommand({ repoId, tab: 'terminal', navigation })
   const base = selectedTerminalBase(repoId)
   if (!base) return true
-  const bridge = readTerminalSessionCommandBridge()
+  const bridge = readTerminalSlotCommandBridge()
   if (!bridge) return true
   const worktreeKey = worktreeTerminalKey(base.repoRoot, base.worktreePath)
   const worktree = bridge.worktreeSnapshot(worktreeKey)
@@ -106,7 +106,7 @@ export async function runNewTerminalTabCommand({ repoId, navigation }: NewTermin
   const base = selectedTerminalBase(repoId)
   if (!base) return false
   await runShowWorkspacePaneViewCommand({ repoId, tab: 'terminal', navigation })
-  const bridge = readTerminalSessionCommandBridge()
+  const bridge = readTerminalSlotCommandBridge()
   if (!bridge) return true
   await createWorkspacePaneTerminalTab({ base, createTerminal: bridge.createTerminal })
   return true
@@ -181,7 +181,7 @@ export function runMoveWorkspacePaneTabCommand({
   return true
 }
 
-function selectedTerminalBase(repoId: string): TerminalSessionBase | null {
+function selectedTerminalBase(repoId: string): TerminalSlotBase | null {
   const target = selectedBranchWorkspaceTarget(repoId)
   if (!target?.worktreePath) return null
   return {
@@ -218,7 +218,7 @@ function closeTerminalWorkspacePaneCommandTab(
   tab: Extract<BranchWorkspacePaneTab, { kind: 'terminal' }>,
 ): Promise<boolean> {
   if (!target.terminalBase) return Promise.resolve(false)
-  const bridge = readTerminalSessionCommandBridge()
+  const bridge = readTerminalSlotCommandBridge()
   if (!bridge?.closeTerminalByDescriptor) return Promise.resolve(false)
   bridge.closeTerminalByDescriptor(tab.key, target.terminalBase)
   return Promise.resolve(true)
@@ -231,7 +231,7 @@ function showWorkspacePaneCommandTab(
 ): void {
   navigation.showRepoWorkspacePaneView(target.repoId, tab.type)
   if (tab.kind === 'terminal' && target.worktreeTerminalKey) {
-    readTerminalSessionCommandBridge()?.selectTerminal(target.worktreeTerminalKey, tab.key)
+    readTerminalSlotCommandBridge()?.selectTerminal(target.worktreeTerminalKey, tab.key)
   }
 }
 
@@ -245,7 +245,7 @@ function workspacePaneCommandTarget(repoId: string): BranchWorkspacePaneTabModel
   const worktreePath = branch.worktree?.path
   const terminalSyncReady = useRepoSyncStore.getState().ready.get(repoId) === repo.instanceToken
   const worktreeKey = worktreePath ? worktreeTerminalKey(repo.id, worktreePath) : null
-  const snapshot = worktreeKey ? (readTerminalSessionCommandBridge()?.worktreeSnapshot(worktreeKey) ?? null) : null
+  const snapshot = worktreeKey ? (readTerminalSlotCommandBridge()?.worktreeSnapshot(worktreeKey) ?? null) : null
   return createBranchWorkspacePaneTabModel({
     repoId,
     branchName,

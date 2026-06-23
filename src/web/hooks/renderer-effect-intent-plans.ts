@@ -1,4 +1,4 @@
-import { parseTerminalSlotKey, worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
+import { parseTerminalSlotKey, worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
 import type { RendererEffectIntent } from '#/shared/renderer-effect-intents.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'

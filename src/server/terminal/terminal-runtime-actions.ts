@@ -21,7 +21,7 @@ import {
 } from '#/shared/terminal-validators.ts'
 import { isValidTerminalClientId } from '#/server/terminal/terminal-runtime-support.ts'
 import type { TerminalRealtimeBroker } from '#/server/terminal/terminal-realtime-broker.ts'
-import { isValidTerminalWriteData, type TerminalSlotManager } from '#/server/terminal/terminal-session-manager.ts'
+import { isValidTerminalWriteData, type TerminalSlotManager } from '#/server/terminal/terminal-slot-manager.ts'
 
 interface TerminalCatalogLike {
   create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCatalogMutationResult>

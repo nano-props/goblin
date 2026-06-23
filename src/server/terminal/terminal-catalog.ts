@@ -17,7 +17,7 @@ import {
 import { formatSlotId, parseSlotIdIndex } from '#/shared/slot-ids.ts'
 import { isValidTerminalClientId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import { formatTerminalSlotKey, parseTerminalSlotKey } from '#/shared/terminal-slot-key.ts'
-import { terminalSessionScope } from '#/server/terminal/terminal-session-scope.ts'
+import { terminalSessionScope } from '#/server/terminal/terminal-slot-scope.ts'
 import {
   buildGoblinTerminalCommandEnvironment,
   type GoblinTerminalCommandRuntime,
@@ -108,14 +108,14 @@ class TerminalCatalog {
     if (!this.options.isValidTerminalId(slotId)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidTerminalSize(cols, rows)) return { ok: false, message: 'error.invalid-arguments' }
 
-    const sessionScope = terminalSessionScope(input.repoRoot)
-    const existingSessions = await this.options.manager.listSlotsForUser(userId, sessionScope)
+    const slotScope = terminalSessionScope(input.repoRoot)
+    const existingSessions = await this.options.manager.listSlotsForUser(userId, slotScope)
     // Build the target session key from the same form the manager uses
     // to scope owner-scoped session lists — see the comment on
     // `terminalSessionScope` in server/terminal/terminal-session-scope.ts
     // for the normalization rationale.
     const targetSessionKey = formatTerminalSlotKey(
-      sessionScope,
+      slotScope,
       isRemoteRepoId(input.repoRoot) ? input.worktreePath : path.resolve(input.worktreePath),
       slotId,
     )
@@ -174,8 +174,8 @@ class TerminalCatalog {
     if (!this.options.isValidClientId(clientId)) return { pruned: 0, remaining: 0 }
     if (!isValidRepoLocator(repoRoot)) return { pruned: 0, remaining: 0 }
 
-    const sessionScope = terminalSessionScope(repoRoot)
-    const allSessions = await this.options.manager.listSlotsForUser(userId, sessionScope)
+    const slotScope = terminalSessionScope(repoRoot)
+    const allSessions = await this.options.manager.listSlotsForUser(userId, slotScope)
     if (isRemoteRepoId(repoRoot)) return { pruned: 0, remaining: allSessions.length }
 
     const worktrees = await getWorktrees(repoRoot, { includeStatus: false })
@@ -191,7 +191,7 @@ class TerminalCatalog {
     }
     if (pruned > 0) this.options.broadcastSessionsChanged(userId, repoRoot)
     const remaining = await this.options.manager
-      .listSlotsForUser(userId, sessionScope)
+      .listSlotsForUser(userId, slotScope)
       .then((sessions) => sessions.length)
     return { pruned, remaining }
   }

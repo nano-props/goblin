@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { syncTerminalSessionIdIndex } from '#/web/components/terminal/terminal-session-index.ts'
+import { syncTerminalSessionIdIndex } from '#/web/components/terminal/terminal-slot-index.ts'
 
 describe('terminal session index helper', () => {
   test('updates both key->session and session->key maps coherently', () => {

@@ -2,31 +2,31 @@ import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 
 import type { TerminalSlotSnapshot, TerminalSlotSummary } from '#/shared/terminal-types.ts'
-import '#/web/components/terminal/terminal-session.css'
+import '#/web/components/terminal/terminal-slot.css'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import { terminalBridge } from '#/web/terminal.ts'
-import { terminalSessionProviderLog } from '#/web/logger.ts'
+import { terminalSlotProviderLog } from '#/web/logger.ts'
 import {
-  TerminalSessionContext,
-  TerminalSessionReadContext,
-} from '#/web/components/terminal/terminal-session-context.ts'
+  TerminalSlotContext,
+  TerminalSlotReadContext,
+} from '#/web/components/terminal/terminal-slot-context.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/renderer-terminal-bridge.ts'
 import { preloadTerminalFont } from '#/web/components/terminal/terminal-geometry.ts'
 import { loadTerminalSessions } from '#/web/terminal-session-queries.ts'
 import {
-  TerminalSessionRegistry,
-  getTerminalSessionRegistry,
-} from '#/web/components/terminal/TerminalSessionRegistry.ts'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+  TerminalSlotRegistry,
+  getTerminalSlotRegistry,
+} from '#/web/components/terminal/TerminalSlotRegistry.ts'
+import { setTerminalSlotCommandBridge } from '#/web/components/terminal/terminal-slot-command-bridge.ts'
 import { repoIndexEqual, repoIndexFromRepos } from '#/web/components/terminal/terminal-repo-index.ts'
-import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
+import type { TerminalSlotContextValue, TerminalSlotReadContextValue } from '#/web/components/terminal/types.ts'
 
-interface TerminalSessionProviderProps {
+interface TerminalSlotProviderProps {
   children: ReactNode
 }
 
-export function TerminalSessionProvider({ children }: TerminalSessionProviderProps) {
+export function TerminalSlotProvider({ children }: TerminalSlotProviderProps) {
   const repoIndex = useStoreWithEqualityFn(useReposStore, (s) => repoIndexFromRepos(s.repos), repoIndexEqual)
   // The provider lives at the router root (above the per-route App), so it
   // reads the active repo directly from the repos store rather than via a
@@ -65,13 +65,13 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   }, [currentRepoId])
 
   // The registry is a renderer-level singleton (terminal-roadmap.md P1.7).
-  // The first Provider mount constructs it via `getTerminalSessionRegistry`;
+  // The first Provider mount constructs it via `getTerminalSlotRegistry`;
   // subsequent mounts (StrictMode re-mount, route round-trip) reuse the
   // same instance. The ref is kept only so the rest of this component can
   // reach the singleton without re-calling the getter on every render.
-  const registryRef = useRef<TerminalSessionRegistry | null>(null)
+  const registryRef = useRef<TerminalSlotRegistry | null>(null)
   if (!registryRef.current) {
-    registryRef.current = getTerminalSessionRegistry({
+    registryRef.current = getTerminalSlotRegistry({
       getCurrentRepoId: () => currentRepoIdRef.current,
       onSelectedWorktreeChange: setSelectedTerminal,
       // Terminal-session lifetime owns terminal tab lifetime. User closes,
@@ -108,7 +108,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
           if (snapshot) entries.push([session.ptySessionId, snapshot])
           return
         }
-        terminalSessionProviderLog.debug('failed to load terminal session snapshot', {
+        terminalSlotProviderLog.debug('failed to load terminal session snapshot', {
           ptySessionId: session.ptySessionId,
           err: result.reason,
         })
@@ -128,7 +128,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
         if (!repoIndexRef.current[repoRoot]) return
         registry.reconcileServerSessions(repoRoot, serverSessions, clientId, snapshotsBySessionId)
       } catch (err) {
-        terminalSessionProviderLog.debug('failed to sync server sessions', { err })
+        terminalSlotProviderLog.debug('failed to sync server sessions', { err })
       } finally {
         const instanceToken = repoIndexRef.current[repoRoot]?.instanceToken
         if (typeof instanceToken === 'number') {
@@ -208,7 +208,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       registry.handleSlotClosed(event.ptySessionId)
     })
 
-    setTerminalSessionCommandBridge({
+    setTerminalSlotCommandBridge({
       worktreeSnapshot: registry.worktreeSnapshot,
       createTerminal: registry.createTerminal,
       selectTerminal: registry.selectTerminal,
@@ -261,7 +261,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     }
   }, [currentRepoId, currentRepoInstanceToken, syncServerSessions])
 
-  const commandValue = useMemo<TerminalSessionContextValue>(
+  const commandValue = useMemo<TerminalSlotContextValue>(
     () => ({
       createTerminal: registry.createTerminal,
       registerHost: registry.registerHost,
@@ -284,7 +284,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     }),
     [registry],
   )
-  const readValue = useMemo<TerminalSessionReadContextValue>(
+  const readValue = useMemo<TerminalSlotReadContextValue>(
     () => ({
       worktreeSnapshot: registry.worktreeSnapshot,
       subscribeWorktree: registry.subscribeWorktree,
@@ -295,11 +295,11 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   )
 
   return (
-    <TerminalSessionContext.Provider value={commandValue}>
-      <TerminalSessionReadContext.Provider value={readValue}>
+    <TerminalSlotContext.Provider value={commandValue}>
+      <TerminalSlotReadContext.Provider value={readValue}>
         {children}
         <div ref={parkingRootRef} className="goblin-terminal-parking" aria-hidden="true" />
-      </TerminalSessionReadContext.Provider>
-    </TerminalSessionContext.Provider>
+      </TerminalSlotReadContext.Provider>
+    </TerminalSlotContext.Provider>
   )
 }

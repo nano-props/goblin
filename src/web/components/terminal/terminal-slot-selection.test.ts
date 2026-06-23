@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { resolveSelectedTerminalKey } from '#/web/components/terminal/terminal-session-selection.ts'
+import { resolveSelectedTerminalKey } from '#/web/components/terminal/terminal-slot-selection.ts'
 import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
 
 function descriptor(key: string): TerminalDescriptor {

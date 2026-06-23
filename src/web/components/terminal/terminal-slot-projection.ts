@@ -8,7 +8,7 @@ import type {
 } from '#/shared/terminal-types.ts'
 import { terminalDescriptor } from '#/web/components/terminal/terminal-descriptor.ts'
 import { branchForTerminalWorktree } from '#/web/components/terminal/terminal-repo-index.ts'
-import { worktreeTerminalKey } from '#/web/components/terminal/terminal-session-keys.ts'
+import { worktreeTerminalKey } from '#/web/components/terminal/terminal-slot-keys.ts'
 import type {
   TerminalDescriptor,
   TerminalRepoIndex,

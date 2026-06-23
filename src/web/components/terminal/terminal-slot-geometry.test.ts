@@ -6,7 +6,7 @@ import {
   resolveTerminalCreateGeometry,
   TerminalHostNotMeasurableError,
   waitForMeasurableHost,
-} from '#/web/components/terminal/terminal-session-geometry.ts'
+} from '#/web/components/terminal/terminal-slot-geometry.ts'
 import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
 
 const geometryMocks = vi.hoisted(() => ({

@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { describe, expect, test } from 'vitest'
-import { terminalSessionScope } from '#/server/terminal/terminal-session-scope.ts'
+import { terminalSessionScope } from '#/server/terminal/terminal-slot-scope.ts'
 
 describe('terminalSessionScope', () => {
   test('normalizes local repo roots into canonical session scope', () => {

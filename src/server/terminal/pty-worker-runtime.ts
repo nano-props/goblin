@@ -122,7 +122,7 @@ export class PtyWorkerRuntime {
 }
 
 function createSessionId(): string {
-  return `ptyw_${crypto.randomUUID()}`
+  return `pty_${crypto.randomUUID()}`
 }
 
 function defaultSpawnPty(input: PtySpawnInput): PtySpawnOutcome {

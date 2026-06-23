@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { TerminalSessionRuntime } from '#/web/components/terminal/terminal-session-runtime.ts'
+import { TerminalSessionRuntime } from '#/web/components/terminal/terminal-slot-runtime.ts'
 
 describe('TerminalSessionRuntime', () => {
   test('tracks restart flow and replacing session ids', () => {

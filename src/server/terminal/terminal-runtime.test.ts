@@ -123,16 +123,16 @@ describe('server terminal runtime', () => {
   test('create claims controller ownership for the provided attachment', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_1_attachment_a', USER_1, socket)
+    host.registerSocket('client_a', USER_1, socket)
 
-    const result = await host.create('client_1_attachment_a', USER_1, {
+    const result = await host.create('client_a', USER_1, {
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'additional',
       cols: 80,
       rows: 24,
-      clientId: 'client_1_attachment_a',
+      clientId: 'client_a',
     })
 
     expect(result.ok).toBe(true)
@@ -140,7 +140,7 @@ describe('server terminal runtime', () => {
     expect(result.sessions).toEqual([
       expect.objectContaining({
         key: result.key,
-        controller: { clientId: 'client_1_attachment_a', status: 'connected' },
+        controller: { clientId: 'client_a', status: 'connected' },
         phase: 'open',
         message: null,
         cols: 80,
@@ -148,7 +148,7 @@ describe('server terminal runtime', () => {
       }),
     ])
 
-    host.unregisterSocket('client_1_attachment_a', USER_1, socket)
+    host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
   })
 
@@ -156,66 +156,66 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
     const socketB = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_1_attachment_a', USER_1, socketA)
-    host.registerSocket('client_1_attachment_b', USER_1, socketB)
+    host.registerSocket('client_a', USER_1, socketA)
+    host.registerSocket('client_b', USER_1, socketB)
 
-    const createResult = await host.create('client_1_attachment_a', USER_1, {
+    const createResult = await host.create('client_a', USER_1, {
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'additional',
       cols: 80,
       rows: 24,
-      clientId: 'client_1_attachment_a',
+      clientId: 'client_a',
     })
     expect(createResult.ok).toBe(true)
     if (!createResult.ok) return
     const ptySessionId = createResult.sessions[0]?.ptySessionId
     if (!ptySessionId) throw new Error('expected session id')
 
-    const attachResult = await host.attach('client_1_attachment_a', USER_1, {
+    const attachResult = await host.attach('client_a', USER_1, {
       ptySessionId,
       cols: 120,
       rows: 40,
-      clientId: 'client_1_attachment_b',
+      clientId: 'client_b',
     })
     expect(attachResult).toMatchObject({
       ok: true,
       ptySessionId,
-      controller: { clientId: 'client_1_attachment_a', status: 'connected' },
+      controller: { clientId: 'client_a', status: 'connected' },
       canonicalCols: 80,
       canonicalRows: 24,
     })
 
-    const sessions = await host.listSessions('client_1_attachment_a', USER_1, '/repo')
+    const sessions = await host.listSessions('client_a', USER_1, '/repo')
     expect(sessions).toEqual([
       expect.objectContaining({
         ptySessionId,
-        controller: { clientId: 'client_1_attachment_a', status: 'connected' },
+        controller: { clientId: 'client_a', status: 'connected' },
         cols: 80,
         rows: 24,
       }),
     ])
 
-    host.unregisterSocket('client_1_attachment_a', USER_1, socketA)
-    host.unregisterSocket('client_1_attachment_b', USER_1, socketB)
+    host.unregisterSocket('client_a', USER_1, socketA)
+    host.unregisterSocket('client_b', USER_1, socketB)
     shutdown()
   })
 
   test('replay snapshots omit a leading zsh prompt end marker prelude', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_1_attachment_a', USER_1, socket)
+    host.registerSocket('client_a', USER_1, socket)
     const ptySessionId = await createTerminalSession(host, 'client_1')
     const prompt =
       '\x1b[1m\x1b[7m%\x1b[27m\x1b[1m\x1b[0m                                                                            \r \r\r\x1b[0m\x1b[27m\x1b[24m\x1b[J👾:~/repo\r\n$ '
     mockPtys[0]?.emitData(prompt)
 
-    const attach = await host.attach('client_1_attachment_a', USER_1, {
+    const attach = await host.attach('client_a', USER_1, {
       ptySessionId,
       cols: 80,
       rows: 24,
-      clientId: 'client_1_attachment_a',
+      clientId: 'client_a',
     })
     const snapshot = await host.getSlotSnapshot('client_1', USER_1, { ptySessionId })
 
@@ -223,7 +223,7 @@ describe('server terminal runtime', () => {
     if (!attach.ok) return
     expect(attach.snapshot).toBe('👾:~/repo\r\n$ ')
     expect(snapshot?.snapshot).toBe('👾:~/repo\r\n$ ')
-    host.unregisterSocket('client_1_attachment_a', USER_1, socket)
+    host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
   })
 
@@ -236,68 +236,68 @@ describe('server terminal runtime', () => {
     // reattach auto-claims.
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_1_attachment_a', USER_1, socketA)
+    host.registerSocket('client_a', USER_1, socketA)
 
-    const createResult = await host.create('client_1_attachment_a', USER_1, {
+    const createResult = await host.create('client_a', USER_1, {
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'additional',
       cols: 80,
       rows: 24,
-      clientId: 'client_1_attachment_a',
+      clientId: 'client_a',
     })
     expect(createResult.ok).toBe(true)
     if (!createResult.ok) return
     const ptySessionId = createResult.sessions[0]?.ptySessionId
     if (!ptySessionId) throw new Error('expected session id')
 
-    host.unregisterSocket('client_1_attachment_a', USER_1, socketA)
+    host.unregisterSocket('client_a', USER_1, socketA)
     const socketA2 = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_1_attachment_a', USER_1, socketA2)
+    host.registerSocket('client_a', USER_1, socketA2)
 
-    const reattachResult = await host.attach('client_1_attachment_a', USER_1, {
+    const reattachResult = await host.attach('client_a', USER_1, {
       ptySessionId,
       cols: 101,
       rows: 31,
-      clientId: 'client_1_attachment_a',
+      clientId: 'client_a',
     })
     expect(reattachResult).toMatchObject({
       ok: true,
       ptySessionId,
-      controller: { clientId: 'client_1_attachment_a', status: 'connected' },
+      controller: { clientId: 'client_a', status: 'connected' },
       canonicalCols: 101,
       canonicalRows: 31,
     })
     expect(mockPtys[0]?.resize).toHaveBeenLastCalledWith(101, 31)
 
-    const sessions = await host.listSessions('client_1_attachment_a', USER_1, '/repo')
+    const sessions = await host.listSessions('client_a', USER_1, '/repo')
     expect(sessions).toEqual([
       expect.objectContaining({
         ptySessionId,
-        controller: { clientId: 'client_1_attachment_a', status: 'connected' },
+        controller: { clientId: 'client_a', status: 'connected' },
         cols: 101,
         rows: 31,
       }),
     ])
 
-    host.unregisterSocket('client_1_attachment_a', USER_1, socketA2)
+    host.unregisterSocket('client_a', USER_1, socketA2)
     shutdown()
   })
 
   test('realtime attach injects the socket clientId and resizes an owned session to the live terminal size', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_1_attachment_a', USER_1, socket)
+    host.registerSocket('client_a', USER_1, socket)
 
-    const createResult = await host.create('client_1_attachment_a', USER_1, {
+    const createResult = await host.create('client_a', USER_1, {
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'primary',
       cols: 80,
       rows: 24,
-      clientId: 'client_1_attachment_a',
+      clientId: 'client_a',
     })
     expect(createResult.ok).toBe(true)
     if (!createResult.ok) return
@@ -305,12 +305,12 @@ describe('server terminal runtime', () => {
     if (!ptySessionId) throw new Error('expected session id')
     socket.send.mockClear()
 
-    host.handleRealtimeMessage('client_1_attachment_a', USER_1, socket,
+    host.handleRealtimeMessage('client_a', USER_1, socket,
       JSON.stringify({
         type: 'request',
         requestId: 'req_attach_resize',
         action: 'attach',
-        input: { ptySessionId, cols: 101, rows: 31, clientId: 'client_1_attachment_a' },
+        input: { ptySessionId, cols: 101, rows: 31, clientId: 'client_a' },
       }),
     )
 
@@ -333,26 +333,26 @@ describe('server terminal runtime', () => {
         message: null,
         canonicalCols: 101,
         canonicalRows: 31,
-        controller: { clientId: 'client_1_attachment_a', status: 'connected' },
+        controller: { clientId: 'client_a', status: 'connected' },
       },
     })
     expect(mockPtys[0]?.resize).toHaveBeenLastCalledWith(101, 31)
 
-    host.unregisterSocket('client_1_attachment_a', USER_1, socket)
+    host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
   })
 
   test('broadcasts output and exit events to registered web terminal sockets', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_1_attachment_a', USER_1, socket)
+    host.registerSocket('client_a', USER_1, socket)
     const ptySessionId = await createTerminalSession(host, 'client_1')
 
-    const result = await host.attach('client_1_attachment_a', USER_1, {
+    const result = await host.attach('client_a', USER_1, {
       ptySessionId,
       cols: 80,
       rows: 24,
-      clientId: 'client_1_attachment_a',
+      clientId: 'client_a',
     })
     expect(result.ok).toBe(true)
 
@@ -372,13 +372,13 @@ describe('server terminal runtime', () => {
     expect(exitMessage).toMatchObject({ type: 'exit' })
     expect(host.getDiagnostics().pty.state).toBe('idle')
 
-    host.unregisterSocket('client_1_attachment_a', USER_1, socket)
+    host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
   })
 
   test('returns created terminal sessions for SSH remote repositories', async () => {
     const { host, shutdown } = buildRuntime()
-    const result = await host.create('client_1_attachment_a', USER_1, {
+    const result = await host.create('client_a', USER_1, {
       repoRoot: 'ssh-config://prod/srv/repo',
       branch: 'feature',
       worktreePath: '/srv/repo',
@@ -401,7 +401,7 @@ describe('server terminal runtime', () => {
 
   test('reuses the existing terminal when reopening the same repo root', async () => {
     const { host, shutdown } = buildRuntime()
-    const first = await host.create('client_1_attachment_a', USER_1, {
+    const first = await host.create('client_a', USER_1, {
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/repo-linked',
@@ -412,7 +412,7 @@ describe('server terminal runtime', () => {
     expect(first.ok).toBe(true)
     if (!first.ok) return
     expect(first.action).toBe('created')
-    const second = await host.create('client_1_attachment_a', USER_1, {
+    const second = await host.create('client_a', USER_1, {
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/repo-linked',
@@ -431,55 +431,55 @@ describe('server terminal runtime', () => {
   test('reopening an existing terminal from a new attachment auto-reclaims owner-sticky control', async () => {
     const { host, shutdown } = buildRuntime()
     const browserSocket = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_browser_attachment_browser', USER_1, browserSocket)
+    host.registerSocket('client_browser', USER_1, browserSocket)
 
-    const first = await host.create('client_browser_attachment_browser', USER_1, {
+    const first = await host.create('client_browser', USER_1, {
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'primary',
       cols: 80,
       rows: 24,
-      clientId: 'client_browser_attachment_browser',
+      clientId: 'client_browser',
     })
     expect(first.ok).toBe(true)
     if (!first.ok) return
-    expect(first.controller).toEqual({ clientId: 'client_browser_attachment_browser', status: 'connected' })
+    expect(first.controller).toEqual({ clientId: 'client_browser', status: 'connected' })
 
-    host.unregisterSocket('client_browser_attachment_browser', USER_1, browserSocket)
+    host.unregisterSocket('client_browser', USER_1, browserSocket)
 
     const electronSocket = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_electron_attachment_electron', USER_1, electronSocket)
+    host.registerSocket('client_electron', USER_1, electronSocket)
 
-    const reopened = await host.create('client_electron_attachment_electron', USER_1, {
+    const reopened = await host.create('client_electron', USER_1, {
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'primary',
       cols: 102,
       rows: 33,
-      clientId: 'client_electron_attachment_electron',
+      clientId: 'client_electron',
     })
     expect(reopened.ok).toBe(true)
     if (!reopened.ok) return
     expect(reopened.action).toBe('reused')
     expect(reopened.key).toBe(first.key)
-    expect(reopened.controller).toEqual({ clientId: 'client_electron_attachment_electron', status: 'connected' })
+    expect(reopened.controller).toEqual({ clientId: 'client_electron', status: 'connected' })
     expect(reopened.canonicalCols).toBe(102)
     expect(reopened.canonicalRows).toBe(33)
     expect(mockPtys[0]?.resize).toHaveBeenLastCalledWith(102, 33)
 
-    const sessions = await host.listSessions('client_electron_attachment_electron', USER_1, '/repo')
+    const sessions = await host.listSessions('client_electron', USER_1, '/repo')
     expect(sessions).toEqual([
       expect.objectContaining({
         key: first.key,
-        controller: { clientId: 'client_electron_attachment_electron', status: 'connected' },
+        controller: { clientId: 'client_electron', status: 'connected' },
         cols: 102,
         rows: 33,
       }),
     ])
 
-    host.unregisterSocket('client_electron_attachment_electron', USER_1, electronSocket)
+    host.unregisterSocket('client_electron', USER_1, electronSocket)
     shutdown()
   })
 
@@ -490,10 +490,10 @@ describe('server terminal runtime', () => {
     })
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_1_attachment_a', USER_1, socket)
+    host.registerSocket('client_a', USER_1, socket)
     socket.send.mockClear()
 
-    const failed = await host.create('client_1_attachment_a', USER_1, {
+    const failed = await host.create('client_a', USER_1, {
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/repo-linked',
@@ -507,7 +507,7 @@ describe('server terminal runtime', () => {
     // After the failure, listSessions must not report the zombie. If
     // it did, the catalog would match it on retry and surface a
     // blank, non-responsive terminal as a successful attach.
-    const sessionsAfterFailure = await host.listSessions('client_1_attachment_a', USER_1, '/repo')
+    const sessionsAfterFailure = await host.listSessions('client_a', USER_1, '/repo')
     expect(sessionsAfterFailure).toEqual([])
 
     // A never-spawned session has no exit event — lock in that
@@ -518,7 +518,7 @@ describe('server terminal runtime', () => {
     expect(exitBroadcasts).toEqual([])
 
     // Retry with a working spawn must succeed as a brand-new create.
-    const retried = await host.create('client_1_attachment_a', USER_1, {
+    const retried = await host.create('client_a', USER_1, {
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/repo-linked',
@@ -529,32 +529,32 @@ describe('server terminal runtime', () => {
     expect(retried.ok).toBe(true)
     if (retried.ok) expect(retried.action).toBe('created')
 
-    host.unregisterSocket('client_1_attachment_a', USER_1, socket)
+    host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
   })
 
   test('a failed restart keeps the session visible as error state', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_1_attachment_a', USER_1, socket)
-    const ptySessionId = await createTerminalSession(host, 'client_1_attachment_a')
+    host.registerSocket('client_a', USER_1, socket)
+    const ptySessionId = await createTerminalSession(host, 'client_a')
 
     const { spawn } = await import('node-pty')
     vi.mocked(spawn).mockImplementationOnce(() => {
       throw new Error('pty restart failed')
     })
 
-    const restarted = await host.restart('client_1_attachment_a', USER_1, {
+    const restarted = await host.restart('client_a', USER_1, {
       ptySessionId,
       cols: 100,
       rows: 30,
-      clientId: 'client_1_attachment_a',
+      clientId: 'client_a',
     })
     expect(restarted.ok).toBe(false)
     if (restarted.ok) return
     expect(restarted.message).toBe('pty restart failed')
 
-    const sessionsAfterFailure = await host.listSessions('client_1_attachment_a', USER_1, '/repo')
+    const sessionsAfterFailure = await host.listSessions('client_a', USER_1, '/repo')
     expect(sessionsAfterFailure).toEqual([
       expect.objectContaining({
         ptySessionId,
@@ -565,7 +565,7 @@ describe('server terminal runtime', () => {
       }),
     ])
 
-    host.unregisterSocket('client_1_attachment_a', USER_1, socket)
+    host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
   })
 
@@ -573,15 +573,15 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
     const socketB = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_1_attachment_a', USER_1, socketA)
-    host.registerSocket('client_1_attachment_b', USER_1, socketB)
+    host.registerSocket('client_a', USER_1, socketA)
+    host.registerSocket('client_b', USER_1, socketB)
     const ptySessionId = await createTerminalSession(host, 'client_1')
 
-    const restarted = await host.restart('client_1_attachment_a', USER_1, {
+    const restarted = await host.restart('client_a', USER_1, {
       ptySessionId,
       cols: 100,
       rows: 30,
-      clientId: 'client_1_attachment_b',
+      clientId: 'client_b',
     })
     expect(restarted.ok).toBe(false)
     if (!restarted.ok) return
@@ -594,25 +594,25 @@ describe('server terminal runtime', () => {
     vi.mocked(spawn).mockImplementationOnce(() => {
       throw new Error('pty restart failed')
     })
-    const retry = await host.restart('client_1_attachment_a', USER_1, {
+    const retry = await host.restart('client_a', USER_1, {
       ptySessionId,
       cols: 100,
       rows: 30,
-      clientId: 'client_1_attachment_a',
+      clientId: 'client_a',
     })
     expect(retry.ok).toBe(false)
     if (retry.ok) return
     expect(retry.message).toBe('pty restart failed')
 
-    host.unregisterSocket('client_1_attachment_a', USER_1, socketA)
-    host.unregisterSocket('client_1_attachment_b', USER_1, socketB)
+    host.unregisterSocket('client_a', USER_1, socketA)
+    host.unregisterSocket('client_b', USER_1, socketB)
     shutdown()
   })
 
   test('sends attach response before flushing buffered output emitted during the attach request', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_1_attachment_a', USER_1, socket)
+    host.registerSocket('client_a', USER_1, socket)
     const ptySessionId = await createTerminalSession(host, 'client_1')
     socket.send.mockClear()
 
@@ -647,14 +647,14 @@ describe('server terminal runtime', () => {
       event: { ptySessionId, data: 'during-attach', seq: 1 },
     })
 
-    host.unregisterSocket('client_1_attachment_a', USER_1, socket)
+    host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
   })
 
   test('realtime create returns snapshot hydration fields in its response payload', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_1_attachment_a', USER_1, socket)
+    host.registerSocket('client_a', USER_1, socket)
 
     host.handleRealtimeMessage('client_1', USER_1, socket,
       JSON.stringify({
@@ -701,7 +701,7 @@ describe('server terminal runtime', () => {
       },
     })
 
-    host.unregisterSocket('client_1_attachment_a', USER_1, socket)
+    host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
   })
 
@@ -723,15 +723,15 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
     const socketB = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_1_attachment_a', USER_1, socketA)
+    host.registerSocket('client_a', USER_1, socketA)
     const ptySessionId = await createTerminalSession(host, 'client_1')
-    host.registerSocket('client_1_attachment_b', USER_1, socketB)
+    host.registerSocket('client_b', USER_1, socketB)
 
-    const result = host.takeover('client_1_attachment_a', USER_1, {
+    const result = host.takeover('client_a', USER_1, {
       ptySessionId,
       cols: 120,
       rows: 40,
-      clientId: 'client_1_attachment_b',
+      clientId: 'client_b',
     })
 
     expect(result).toEqual({
@@ -739,15 +739,15 @@ describe('server terminal runtime', () => {
       ptySessionId,
       role: 'controller',
       controllerStatus: 'connected',
-      controller: { clientId: 'client_1_attachment_b', status: 'connected' },
+      controller: { clientId: 'client_b', status: 'connected' },
       canonicalCols: 120,
       canonicalRows: 40,
       phase: 'open',
     })
     expect(mockPtys[0]?.resize).toHaveBeenLastCalledWith(120, 40)
 
-    host.unregisterSocket('client_1_attachment_a', USER_1, socketA)
-    host.unregisterSocket('client_1_attachment_b', USER_1, socketB)
+    host.unregisterSocket('client_a', USER_1, socketA)
+    host.unregisterSocket('client_b', USER_1, socketB)
     shutdown()
   })
 
@@ -755,17 +755,17 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
     const socketB = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_1_attachment_a', USER_1, socketA)
-    const ptySessionId = await createTerminalSession(host, 'client_1_attachment_a')
-    host.registerSocket('client_1_attachment_b', USER_1, socketB)
+    host.registerSocket('client_a', USER_1, socketA)
+    const ptySessionId = await createTerminalSession(host, 'client_a')
+    host.registerSocket('client_b', USER_1, socketB)
     socketB.send.mockClear()
 
-    host.handleRealtimeMessage('client_1_attachment_b', USER_1, socketB,
+    host.handleRealtimeMessage('client_b', USER_1, socketB,
       JSON.stringify({
         type: 'request',
         requestId: 'req_takeover',
         action: 'takeover',
-        input: { ptySessionId, cols: 120, rows: 40, clientId: 'client_1_attachment_b' },
+        input: { ptySessionId, cols: 120, rows: 40, clientId: 'client_b' },
       }),
     )
 
@@ -784,7 +784,7 @@ describe('server terminal runtime', () => {
       payload: {
         ok: true,
         ptySessionId,
-        controller: { clientId: 'client_1_attachment_b', status: 'connected' },
+        controller: { clientId: 'client_b', status: 'connected' },
       },
     })
     const messages = socketB.send.mock.calls.map(([payload]) => JSON.parse(String(payload)))
@@ -797,8 +797,8 @@ describe('server terminal runtime', () => {
     expect(responseIndex).toBeGreaterThanOrEqual(0)
     expect(ownershipIndex).toBeGreaterThan(responseIndex)
 
-    host.unregisterSocket('client_1_attachment_a', USER_1, socketA)
-    host.unregisterSocket('client_1_attachment_b', USER_1, socketB)
+    host.unregisterSocket('client_a', USER_1, socketA)
+    host.unregisterSocket('client_b', USER_1, socketB)
     shutdown()
   })
 
@@ -806,15 +806,15 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
     const socketB = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_1_attachment_a', USER_1, socketA)
-    host.registerSocket('client_2_attachment_b', USER_1, socketB)
+    host.registerSocket('client_a', USER_1, socketA)
+    host.registerSocket('client2_b', USER_1, socketB)
     const ptySessionId = await createTerminalSession(host, 'client_1')
 
-    const result = await host.attach('client_1_attachment_a', USER_1, {
+    const result = await host.attach('client_a', USER_1, {
       ptySessionId,
       cols: 80,
       rows: 24,
-      clientId: 'client_1_attachment_a',
+      clientId: 'client_a',
     })
     expect(result.ok).toBe(true)
 
@@ -829,8 +829,8 @@ describe('server terminal runtime', () => {
       }),
     ).toBe(true)
 
-    host.unregisterSocket('client_1_attachment_a', USER_1, socketA)
-    host.unregisterSocket('client_2_attachment_b', USER_1, socketB)
+    host.unregisterSocket('client_a', USER_1, socketA)
+    host.unregisterSocket('client2_b', USER_1, socketB)
     shutdown()
   })
 
@@ -848,7 +848,7 @@ describe('server terminal runtime', () => {
       kind: 'additional',
       cols: 80,
       rows: 24,
-      clientId: 'client_1_attachment_a',
+      clientId: 'client_a',
     })
     expect(ownerACreate.ok).toBe(true)
     if (!ownerACreate.ok) return
@@ -874,7 +874,7 @@ describe('server terminal runtime', () => {
       kind: 'additional',
       cols: 100,
       rows: 30,
-      clientId: 'client_1_attachment_b',
+      clientId: 'client_b',
     })
     expect(ownerBCreate.ok).toBe(true)
     if (!ownerBCreate.ok) return
@@ -899,37 +899,37 @@ describe('server terminal runtime', () => {
     vi.useFakeTimers()
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_1_attachment_a', USER_1, socket)
+    host.registerSocket('client_a', USER_1, socket)
     const ptySessionId = await createTerminalSession(host, 'client_1')
 
-    const first = await host.attach('client_1_attachment_a', USER_1, {
+    const first = await host.attach('client_a', USER_1, {
       ptySessionId,
       cols: 80,
       rows: 24,
-      clientId: 'client_1_attachment_a',
+      clientId: 'client_a',
     })
     expect(first.ok).toBe(true)
     expect(mockPtys).toHaveLength(1)
 
-    host.unregisterSocket('client_1_attachment_a', USER_1, socket)
+    host.unregisterSocket('client_a', USER_1, socket)
     await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000 + 1)
     await vi.runOnlyPendingTimersAsync()
     await Promise.resolve()
 
     const socket2 = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_1_attachment_b', USER_1, socket2)
+    host.registerSocket('client_b', USER_1, socket2)
     const recreatedSessionId = await createTerminalSession(host, 'client_1')
-    const replacementAttach = await host.attach('client_1_attachment_a', USER_1, {
+    const replacementAttach = await host.attach('client_a', USER_1, {
       ptySessionId: recreatedSessionId,
       cols: 80,
       rows: 24,
-      clientId: 'client_1_attachment_b',
+      clientId: 'client_b',
     })
     expect(replacementAttach.ok).toBe(true)
     if (!first.ok || !replacementAttach.ok) return
     expect(replacementAttach.ptySessionId).not.toBe(first.ptySessionId)
 
-    host.unregisterSocket('client_1_attachment_b', USER_1, socket2)
+    host.unregisterSocket('client_b', USER_1, socket2)
     shutdown()
   })
 
@@ -943,41 +943,41 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
     const socketB = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_1_attachment_a', USER_1, socketA)
-    const created = await host.create('client_1_attachment_a', USER_1, {
+    host.registerSocket('client_a', USER_1, socketA)
+    const created = await host.create('client_a', USER_1, {
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'additional',
       cols: 80,
       rows: 24,
-      clientId: 'client_1_attachment_a',
+      clientId: 'client_a',
     })
     expect(created.ok).toBe(true)
     if (!created.ok) return
     const ptySessionId = created.sessions[0]?.ptySessionId
     if (!ptySessionId) throw new Error('expected session id')
 
-    host.unregisterSocket('client_1_attachment_a', USER_1, socketA)
+    host.unregisterSocket('client_a', USER_1, socketA)
 
     // B comes online and attaches — no explicit takeover needed
     // because the slot was cleared on A's disconnect.
-    host.registerSocket('client_1_attachment_b', USER_1, socketB)
-    const viewerAttach = await host.attach('client_1_attachment_a', USER_1, {
+    host.registerSocket('client_b', USER_1, socketB)
+    const viewerAttach = await host.attach('client_a', USER_1, {
       ptySessionId,
       cols: 120,
       rows: 40,
-      clientId: 'client_1_attachment_b',
+      clientId: 'client_b',
     })
     expect(viewerAttach).toMatchObject({
       ok: true,
       ptySessionId,
-      controller: { clientId: 'client_1_attachment_b', status: 'connected' },
+      controller: { clientId: 'client_b', status: 'connected' },
       canonicalCols: 120,
       canonicalRows: 40,
     })
 
-    host.unregisterSocket('client_1_attachment_b', USER_1, socketB)
+    host.unregisterSocket('client_b', USER_1, socketB)
     shutdown()
   })
 
@@ -1002,15 +1002,15 @@ describe('server terminal runtime', () => {
     const socketA = { send: vi.fn(), close: vi.fn() }
     const socketB = { send: vi.fn(), close: vi.fn() }
     const socketAReconnect = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_1_attachment_a', USER_1, socketA)
-    const created = await host.create('client_1_attachment_a', USER_1, {
+    host.registerSocket('client_a', USER_1, socketA)
+    const created = await host.create('client_a', USER_1, {
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'additional',
       cols: 80,
       rows: 24,
-      clientId: 'client_1_attachment_a',
+      clientId: 'client_a',
     })
     expect(created.ok).toBe(true)
     if (!created.ok) return
@@ -1018,68 +1018,68 @@ describe('server terminal runtime', () => {
     if (!ptySessionId) throw new Error('expected session id')
 
     // A disconnects; B attaches and claims the now-empty slot.
-    host.unregisterSocket('client_1_attachment_a', USER_1, socketA)
-    host.registerSocket('client_1_attachment_b', USER_1, socketB)
-    const bAttach = await host.attach('client_1_attachment_a', USER_1, {
+    host.unregisterSocket('client_a', USER_1, socketA)
+    host.registerSocket('client_b', USER_1, socketB)
+    const bAttach = await host.attach('client_a', USER_1, {
       ptySessionId,
       cols: 120,
       rows: 40,
-      clientId: 'client_1_attachment_b',
+      clientId: 'client_b',
     })
     expect(bAttach).toMatchObject({
       ok: true,
-      controller: { clientId: 'client_1_attachment_b', status: 'connected' },
+      controller: { clientId: 'client_b', status: 'connected' },
     })
 
     // A reconnects later. The slot is held by B; A's attach must
     // NOT preempt B — A becomes a viewer.
-    host.registerSocket('client_1_attachment_a', USER_1, socketAReconnect)
-    const aReattach = await host.attach('client_1_attachment_a', USER_1, {
+    host.registerSocket('client_a', USER_1, socketAReconnect)
+    const aReattach = await host.attach('client_a', USER_1, {
       ptySessionId,
       cols: 80,
       rows: 24,
-      clientId: 'client_1_attachment_a',
+      clientId: 'client_a',
     })
     expect(aReattach).toMatchObject({
       ok: true,
       ptySessionId,
       // A's view sees B still in control.
-      controller: { clientId: 'client_1_attachment_b', status: 'connected' },
+      controller: { clientId: 'client_b', status: 'connected' },
     })
 
     // And A's write is rejected — server-side authority check fails
     // with not-controller. The renderer-side AuthorityGate catches
     // this and fires a takeover before retrying; this test pins the
     // server invariant.
-    const aWrite = host.write('client_1_attachment_a', USER_1, {
+    const aWrite = host.write('client_a', USER_1, {
       ptySessionId,
       data: 'ls\n',
-      clientId: 'client_1_attachment_a',
+      clientId: 'client_a',
     })
     expect(aWrite).toBe(false)
 
     // B's write still works.
-    const bWrite = host.write('client_1_attachment_a', USER_1, {
+    const bWrite = host.write('client_a', USER_1, {
       ptySessionId,
       data: 'pwd\n',
-      clientId: 'client_1_attachment_b',
+      clientId: 'client_b',
     })
     expect(bWrite).toBe(true)
 
     // listSessions confirms the global view: B is the controller,
     // canonical geometry follows B (the most recent writer).
-    const sessions = await host.listSessions('client_1_attachment_a', USER_1, '/repo')
+    const sessions = await host.listSessions('client_a', USER_1, '/repo')
     expect(sessions).toEqual([
       expect.objectContaining({
         ptySessionId,
-        controller: { clientId: 'client_1_attachment_b', status: 'connected' },
+        controller: { clientId: 'client_b', status: 'connected' },
         cols: 120,
         rows: 40,
       }),
     ])
 
-    host.unregisterSocket('client_1_attachment_a', USER_1, socketAReconnect)
-    host.unregisterSocket('client_1_attachment_b', USER_1, socketB)
+    host.unregisterSocket('client_a', USER_1, socketAReconnect)
+    host.unregisterSocket('client_b', USER_1, socketB)
     shutdown()
   })
 
@@ -1094,69 +1094,69 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
     const socketB = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_1_attachment_a', USER_1, socketA)
-    const created = await host.create('client_1_attachment_a', USER_1, {
+    host.registerSocket('client_a', USER_1, socketA)
+    const created = await host.create('client_a', USER_1, {
       repoRoot: '/repo',
       branch: 'feature',
       worktreePath: '/repo-linked',
       kind: 'additional',
       cols: 80,
       rows: 24,
-      clientId: 'client_1_attachment_a',
+      clientId: 'client_a',
     })
     expect(created.ok).toBe(true)
     if (!created.ok) return
     const ptySessionId = created.sessions[0]?.ptySessionId
     if (!ptySessionId) throw new Error('expected session id')
 
-    host.registerSocket('client_1_attachment_b', USER_1, socketB)
-    const viewerAttach = await host.attach('client_1_attachment_a', USER_1, {
+    host.registerSocket('client_b', USER_1, socketB)
+    const viewerAttach = await host.attach('client_a', USER_1, {
       ptySessionId,
       cols: 120,
       rows: 40,
-      clientId: 'client_1_attachment_b',
+      clientId: 'client_b',
     })
     expect(viewerAttach.ok).toBe(true)
 
-    host.unregisterSocket('client_1_attachment_b', USER_1, socketB)
+    host.unregisterSocket('client_b', USER_1, socketB)
     // The detached TTL is 24h — far longer than any grace we used
     // to have. Run a small tick to flush the socket-disconnect
     // microtask without firing any timer.
     await Promise.resolve()
 
-    const sessionsAfterExpiry = await host.listSessions('client_1_attachment_a', USER_1, '/repo')
+    const sessionsAfterExpiry = await host.listSessions('client_a', USER_1, '/repo')
     expect(sessionsAfterExpiry).toEqual([
       expect.objectContaining({
         ptySessionId,
-        controller: { clientId: 'client_1_attachment_a', status: 'connected' },
+        controller: { clientId: 'client_a', status: 'connected' },
         cols: 80,
         rows: 24,
       }),
     ])
 
-    host.unregisterSocket('client_1_attachment_a', USER_1, socketA)
+    host.unregisterSocket('client_a', USER_1, socketA)
     shutdown()
   })
 
   test('batches rapid writes into a single ordered pty write via the input queue', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_1_attachment_a', USER_1, socket)
+    host.registerSocket('client_a', USER_1, socket)
     const ptySessionId = await createTerminalSession(host, 'client_1')
 
-    const attach = await host.attach('client_1_attachment_a', USER_1, {
+    const attach = await host.attach('client_a', USER_1, {
       ptySessionId,
       cols: 80,
       rows: 24,
-      clientId: 'client_1_attachment_a',
+      clientId: 'client_a',
     })
     expect(attach.ok).toBe(true)
 
-    host.write('client_1_attachment_a', USER_1, { ptySessionId, data: 'c', clientId: 'client_1_attachment_a' })
-    host.write('client_1_attachment_a', USER_1, { ptySessionId, data: 'l', clientId: 'client_1_attachment_a' })
-    host.write('client_1_attachment_a', USER_1, { ptySessionId, data: 'e', clientId: 'client_1_attachment_a' })
-    host.write('client_1_attachment_a', USER_1, { ptySessionId, data: 'a', clientId: 'client_1_attachment_a' })
-    host.write('client_1_attachment_a', USER_1, { ptySessionId, data: 'r', clientId: 'client_1_attachment_a' })
+    host.write('client_a', USER_1, { ptySessionId, data: 'c', clientId: 'client_a' })
+    host.write('client_a', USER_1, { ptySessionId, data: 'l', clientId: 'client_a' })
+    host.write('client_a', USER_1, { ptySessionId, data: 'e', clientId: 'client_a' })
+    host.write('client_a', USER_1, { ptySessionId, data: 'a', clientId: 'client_a' })
+    host.write('client_a', USER_1, { ptySessionId, data: 'r', clientId: 'client_a' })
 
     expect(mockPtys[0]?.write).toHaveBeenCalledTimes(0)
 
@@ -1165,7 +1165,7 @@ describe('server terminal runtime', () => {
     expect(mockPtys[0]?.write).toHaveBeenCalledTimes(1)
     expect(mockPtys[0]?.write).toHaveBeenCalledWith('clear')
 
-    host.unregisterSocket('client_1_attachment_a', USER_1, socket)
+    host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
   })
 
@@ -1179,15 +1179,15 @@ describe('server terminal runtime', () => {
   test('emits an ownership change when a takeover succeeds', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_1_attachment_a', USER_1, socket)
+    host.registerSocket('client_a', USER_1, socket)
     const ptySessionId = await createTerminalSession(host, 'client_1')
     socket.send.mockClear()
 
-    const result = await host.takeover('client_1_attachment_a', USER_1, {
+    const result = await host.takeover('client_a', USER_1, {
       ptySessionId,
       cols: 100,
       rows: 30,
-      clientId: 'client_1_attachment_a',
+      clientId: 'client_a',
     })
     expect(result.ok).toBe(true)
     await new Promise((resolve) => setTimeout(resolve, 0))
@@ -1199,13 +1199,13 @@ describe('server terminal runtime', () => {
     expect(ownershipMessages.at(-1)).toMatchObject({
       event: {
         ptySessionId,
-        controller: { clientId: 'client_1_attachment_a', status: 'connected' },
+        controller: { clientId: 'client_a', status: 'connected' },
         cols: 100,
         rows: 30,
       },
     })
 
-    host.unregisterSocket('client_1_attachment_a', USER_1, socket)
+    host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
   })
 

@@ -43,11 +43,11 @@ import {
   markTerminalSlotOpen,
   markTerminalSlotOpening,
   markTerminalSlotRestarting,
-} from '#/server/terminal/terminal-session-lifecycle.ts'
+} from '#/server/terminal/terminal-slot-lifecycle.ts'
 import type { PtyHandle, PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
-const sessionManagerLogger = serverLogger.child({ module: 'terminal-session-manager' })
+const slotManagerLogger = serverLogger.child({ module: 'terminal-slot-manager' })
 
 type TerminalViewOrderRuntimeLike<TUser extends string | number> = Pick<
   TerminalViewOrderRuntime<TUser>,
@@ -450,7 +450,7 @@ export class TerminalSlotManager<TUser extends string | number> {
       this.emitOwnership(session)
       return true
     } catch (err) {
-      sessionManagerLogger.warn({ ptySessionId: session.id, err }, 'failed to resize PTY')
+      slotManagerLogger.warn({ ptySessionId: session.id, err }, 'failed to resize PTY')
       return false
     }
   }
@@ -626,7 +626,7 @@ export class TerminalSlotManager<TUser extends string | number> {
       try {
         this.ptySupervisor.kill(session.pty)
       } catch (err) {
-        sessionManagerLogger.warn({ ptySessionId: session.id, err }, 'failed to kill PTY')
+        slotManagerLogger.warn({ ptySessionId: session.id, err }, 'failed to kill PTY')
       }
     }
     session.pty = null
@@ -649,7 +649,7 @@ export class TerminalSlotManager<TUser extends string | number> {
     try {
       this.ptySupervisor.write(session.pty, batch)
     } catch (err) {
-      sessionManagerLogger.warn({ ptySessionId: session.id, err, bytes: batch.length }, 'failed to write PTY')
+      slotManagerLogger.warn({ ptySessionId: session.id, err, bytes: batch.length }, 'failed to write PTY')
     }
   }
 
@@ -689,7 +689,7 @@ function disposeSessionListeners<TUser extends string | number>(session: Termina
     try {
       disposable.dispose()
     } catch (err) {
-      sessionManagerLogger.warn({ ptySessionId: session.id, err }, 'failed to dispose PTY listener')
+      slotManagerLogger.warn({ ptySessionId: session.id, err }, 'failed to dispose PTY listener')
     }
   }
 }

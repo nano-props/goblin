@@ -5,7 +5,7 @@ import type {
   TerminalSlotPhase,
   TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
-import { TerminalSlotState } from '#/web/components/terminal/terminal-session-state.ts'
+import { TerminalSlotState } from '#/web/components/terminal/terminal-slot-state.ts'
 import type { TerminalOwnershipViewModel, TerminalSearchResult } from '#/web/components/terminal/types.ts'
 export class TerminalSessionRuntime {
   private readonly state = new TerminalSlotState()
