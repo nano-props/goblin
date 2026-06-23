@@ -5,6 +5,11 @@ import {
   registerInvalidationSocket,
   unregisterInvalidationSocket,
 } from '#/server/modules/invalidation-broker.ts'
+import {
+  RendererIntentSocketLimitError,
+  registerRendererIntentSocket,
+  unregisterRendererIntentSocket,
+} from '#/server/modules/renderer-intent-broker.ts'
 import { createAccessTokenMiddleware } from '#/server/common/auth.ts'
 import { ownerIdFromContext } from '#/server/common/identity.ts'
 import { errorJson } from '#/server/common/responses.ts'
@@ -24,8 +29,17 @@ interface RealtimeRouteOptions {
 // stay aligned as a single invariant — see the export site for the
 // reasoning.
 
-// Server-authoritative realtime only. Native-host renderer effect intents stay
-// on Electron IPC so the server does not become a broker for local shell APIs.
+// Server-authoritative realtime for data, plus a dedicated envelope-forwarding
+// channel for renderer effect intents sourced from `g`-style CLI clients.
+//
+// `/ws/invalidation` and `/ws/terminal` remain data-plane — they push server-
+// owned state changes (repo invalidations, terminal stream events) to
+// subscribers. `/ws/renderer-intent` is a control-plane relay: the server
+// receives a `RendererEffectIntent` over HTTP (e.g. from `g ss`), wraps it
+// in a JSON envelope, and fans it out to subscribed renderers. The server
+// does not interpret intent semantics — it just forwards. Interpretation
+// happens in the renderer's existing `useRendererEffectIntentRouter`,
+// which already handles the same intents coming from Electron IPC.
 export function createRealtimeRoutes({ accessToken, terminalHost }: RealtimeRouteOptions) {
   // The shared middleware accepts cookie, header, or `?t=` query, so
   // browser clients (cookie), embedded Electron clients (`?t=`),
@@ -76,6 +90,39 @@ export function createRealtimeRoutes({ accessToken, terminalHost }: RealtimeRout
         },
         onError(_event, ws) {
           unregisterInvalidationSocket(ws)
+        },
+      }
+    }),
+  )
+  // Renderer-side subscribers opt in to receive renderer effect intents
+  // forwarded by the server. The renderer opens this socket once at boot
+  // and feeds incoming payloads into its existing intent router — the
+  // same path Electron IPC intents travel through. No server-side
+  // message handling beyond register/unregister; the server never
+  // receives anything from this socket beyond the upgrade.
+  app.get(
+    '/renderer-intent',
+    auth,
+    upgradeWebSocket(() => {
+      return {
+        onOpen(_event, ws) {
+          try {
+            registerRendererIntentSocket(ws)
+          } catch (err) {
+            if (err instanceof RendererIntentSocketLimitError) {
+              try {
+                ws.close(1013, 'subscriber limit reached')
+              } catch {}
+              return
+            }
+            throw err
+          }
+        },
+        onClose(_event, ws) {
+          unregisterRendererIntentSocket(ws)
+        },
+        onError(_event, ws) {
+          unregisterRendererIntentSocket(ws)
         },
       }
     }),

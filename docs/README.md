@@ -8,6 +8,7 @@ Use these docs for app-level product and architecture decisions:
 - `state-sync.md`: state ownership and sync model
 - `renderer-model.md`: renderer model
 - `realtime.md`: realtime rules
+- `g-command.md`: `g` shell command architecture (registry, control vs. data plane, error envelope)
 - `terminal.md`: terminal system design
 - `terminal-session-lifecycle.md`: terminal session lifecycle correctness (first-frame protocol, durable close, `session-closed` broadcast, empty-state CTA)
 - `terminal-roadmap.md`: terminal refactor roadmap
