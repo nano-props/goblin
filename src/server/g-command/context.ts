@@ -14,12 +14,11 @@ export interface GoblinCommandIo {
 }
 
 // Minimal HTTP transport. Today: only POST to dispatch an intent
-// (`/api/repo/view`) and GET for read-style commands. Kept narrow so
-// a future capability (e.g. command-line websocket, file fallback)
-// can plug in without re-shaping every command.
+// (`/api/repo/view`). Kept narrow so a future capability (e.g. a
+// read endpoint, command-line websocket, file fallback) can extend
+// the interface without re-shaping every existing command.
 export interface GoblinCommandTransport {
   postJson<T>(pathname: string, body: unknown): Promise<T>
-  get<T>(pathname: string, query?: Record<string, string>): Promise<T>
 }
 
 export interface GoblinCommandContext {

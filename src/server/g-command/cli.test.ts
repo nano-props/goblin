@@ -3,7 +3,6 @@ import { runGoblinCommand } from '#/server/g-command/cli.ts'
 import type { GoblinCommandIo, GoblinCommandTransport } from '#/server/g-command/context.ts'
 
 type PostJsonFn = (pathname: string, body: unknown) => Promise<unknown>
-type GetJsonFn = (pathname: string, query?: Record<string, string>) => Promise<unknown>
 type StdoutFn = (message: string) => void
 type StderrFn = (message: string) => void
 
@@ -20,15 +19,12 @@ function makeIo(): { io: GoblinCommandIo; stdout: ReturnType<typeof vi.fn<Stdout
 function makeTransport(): {
   transport: GoblinCommandTransport
   postJson: ReturnType<typeof vi.fn<PostJsonFn>>
-  get: ReturnType<typeof vi.fn<GetJsonFn>>
 } {
   const postJson = vi.fn<PostJsonFn>()
-  const get = vi.fn<GetJsonFn>()
   const transport: GoblinCommandTransport = {
     postJson: postJson as GoblinCommandTransport['postJson'],
-    get: get as GoblinCommandTransport['get'],
   }
-  return { transport, postJson, get }
+  return { transport, postJson }
 }
 
 describe('g command cli', () => {

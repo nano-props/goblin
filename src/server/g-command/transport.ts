@@ -22,11 +22,6 @@ function readAccessToken(env: NodeJS.ProcessEnv): string | null {
   return env.GOBLIN_SERVER_ACCESS_TOKEN?.trim() || null
 }
 
-interface RequestOptions {
-  body?: unknown
-  query?: Record<string, string>
-}
-
 export function createHttpTransport(
   env: NodeJS.ProcessEnv = process.env,
   fetchImpl: typeof fetch = globalThis.fetch,
@@ -38,19 +33,14 @@ export function createHttpTransport(
   const baseUrl = readServerUrl(env)
   const headers = { [ACCESS_TOKEN_HEADER]: token }
 
-  async function sendJson<T>(method: 'GET' | 'POST', pathname: string, options?: RequestOptions): Promise<T> {
+  async function postJson<T>(pathname: string, body: unknown): Promise<T> {
     const url = new URL(pathname, baseUrl)
-    if (options?.query) {
-      for (const [key, value] of Object.entries(options.query)) {
-        if (value) url.searchParams.set(key, value)
-      }
-    }
     let response: Response
     try {
       response = await fetchImpl(url, {
-        method,
+        method: 'POST',
         headers,
-        ...(options?.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
+        body: JSON.stringify(body),
       })
     } catch (err) {
       throw new TransportError(err instanceof Error ? err.message : String(err))
@@ -66,14 +56,7 @@ export function createHttpTransport(
     return (await response.json()) as T
   }
 
-  return {
-    postJson<T>(pathname: string, body: unknown): Promise<T> {
-      return sendJson<T>('POST', pathname, { body })
-    },
-    get<T>(pathname: string, query?: Record<string, string>): Promise<T> {
-      return sendJson<T>('GET', pathname, query ? { query } : undefined)
-    },
-  }
+  return { postJson }
 }
 
 export class TransportError extends Error {
